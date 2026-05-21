@@ -40,6 +40,21 @@ MVP 要求：
 - 非流式和 SSE 流式。
 - Scheduler decision / feedback / usage log。
 - OpenAI-compatible 错误渲染。
+- 已实现的 Provider alias 必须复用标准 Gateway runtime，只改变 provider context，并把实际 alias path 写入 usage log 与 scheduler decision。
+
+当前 Provider alias 由 Compatible Provider preset registry 动态注册，不为每个 Provider 复制 handler。已实现规则：
+
+```txt
+OpenAI-compatible preset:
+  POST {alias}/v1/chat/completions
+  POST {alias}/v1/responses
+  POST {alias}/v1/messages
+
+Anthropic-compatible preset:
+  POST {alias}/v1/messages
+```
+
+`{alias}` 来自 `COMPATIBLE_PROVIDER_REGISTRY_SPEC.md` 的 `route_aliases`。例如 `/api/provider/deepseek/v1/chat/completions` 强制 `provider_key=deepseek`，但仍复用标准 Gateway runtime、API Key policy、model visibility、Scheduler、usage 和 decision 记录。
 
 ## 4. Provider alias 规划
 

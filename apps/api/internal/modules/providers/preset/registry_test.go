@@ -1,0 +1,117 @@
+package preset
+
+import (
+	"reflect"
+	"testing"
+)
+
+func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
+	registry := Default()
+
+	keys := make([]string, 0, len(registry.List()))
+	for _, preset := range registry.List() {
+		keys = append(keys, preset.ProviderKey)
+	}
+	wantKeys := []string{
+		"anthropic",
+		"anthropic-compatible",
+		"anyrouter",
+		"cerebras",
+		"deepseek",
+		"deepseek-anthropic",
+		"grok",
+		"groq",
+		"kimi",
+		"moonshot",
+		"moonshot-anthropic",
+		"openai",
+		"openai-compatible",
+		"openrouter",
+		"zai",
+		"zai-anthropic",
+		"zhipu",
+		"zhipu-anthropic",
+	}
+	if !reflect.DeepEqual(keys, wantKeys) {
+		t.Fatalf("unexpected preset keys: want %v got %v", wantKeys, keys)
+	}
+
+	openaiPreset, ok := registry.Lookup("openai-compatible")
+	if !ok {
+		t.Fatalf("missing openai-compatible preset")
+	}
+	if openaiPreset.DefaultBaseURL != "https://api.openai.com/v1" {
+		t.Fatalf("unexpected openai-compatible base url: %s", openaiPreset.DefaultBaseURL)
+	}
+	if !openaiPreset.MatchesPath("/api/provider/openai-compatible/v1/chat/completions") {
+		t.Fatalf("expected openai-compatible route alias to match path")
+	}
+	if !containsAccountType(openaiPreset.AccountTypeAllowlist, AccountTypeCustomReverseProxy) {
+		t.Fatalf("expected openai-compatible allowlist to include custom_reverse_proxy")
+	}
+
+	anthropicPreset, ok := registry.Lookup("anthropic-compatible")
+	if !ok {
+		t.Fatalf("missing anthropic-compatible preset")
+	}
+	if anthropicPreset.DefaultBaseURL != "https://api.anthropic.com/v1" {
+		t.Fatalf("unexpected anthropic-compatible base url: %s", anthropicPreset.DefaultBaseURL)
+	}
+	if !anthropicPreset.MatchesPath("/api/provider/anthropic-compatible/v1/messages") {
+		t.Fatalf("expected anthropic-compatible route alias to match path")
+	}
+	if !containsAuthMode(anthropicPreset.AuthModes, AuthModeCustomHeader) {
+		t.Fatalf("expected anthropic-compatible auth modes to include custom_header")
+	}
+
+	deepseekPreset, ok := registry.Lookup("deepseek")
+	if !ok {
+		t.Fatalf("missing deepseek preset")
+	}
+	if deepseekPreset.PlatformFamily != PlatformFamilyOpenAICompatible {
+		t.Fatalf("expected deepseek to be OpenAI-compatible, got %s", deepseekPreset.PlatformFamily)
+	}
+	if deepseekPreset.DefaultBaseURL != "https://api.deepseek.com" {
+		t.Fatalf("unexpected deepseek base url: %s", deepseekPreset.DefaultBaseURL)
+	}
+	if !deepseekPreset.MatchesPath("/api/provider/deepseek/v1/chat/completions") {
+		t.Fatalf("expected deepseek route alias to match path")
+	}
+
+	claudeAliasPreset, ok := registry.Lookup("anthropic-compatible")
+	if !ok {
+		t.Fatalf("missing anthropic-compatible preset")
+	}
+	if !claudeAliasPreset.MatchesPath("/api/provider/claude-compatible/v1/messages") {
+		t.Fatalf("expected claude-compatible route alias to map to anthropic-compatible preset")
+	}
+
+	groqPreset, ok := registry.Lookup("groq")
+	if !ok {
+		t.Fatalf("missing groq preset")
+	}
+	if groqPreset.DefaultBaseURL != "https://api.groq.com/openai/v1" {
+		t.Fatalf("unexpected groq base url: %s", groqPreset.DefaultBaseURL)
+	}
+	if !containsAccountType(groqPreset.AccountTypeAllowlist, AccountTypeAPIKey) || !containsAuthMode(groqPreset.AuthModes, AuthModeBearer) {
+		t.Fatalf("expected groq preset to include bearer api_key support")
+	}
+}
+
+func containsAccountType(values []AccountType, target AccountType) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
+}
+
+func containsAuthMode(values []AuthMode, target AuthMode) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
+}

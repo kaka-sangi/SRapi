@@ -1,0 +1,3969 @@
+openapi: 3.0.3
+info:
+  title: SRapi API
+  version: 0.1.0
+  description: |
+    This is the first executable OpenAPI contract for SRapi M1.
+    It intentionally covers only the MVP bootstrap surface so the project can
+    generate server types, TypeScript clients, contract tests, and mock servers
+    before implementation starts.
+  license:
+    name: Proprietary
+    url: https://srapi.local/license
+servers:
+  - url: /
+    description: Relative API root. Local development usually serves this from http://localhost:8080.
+tags:
+  - name: Health
+    description: Process and dependency health endpoints.
+  - name: Auth
+    description: Console authentication endpoints.
+  - name: CurrentUser
+    description: Current console user endpoints.
+  - name: ApiKeys
+    description: User-managed gateway API key endpoints.
+  - name: AdminProviders
+    description: Provider registry administration endpoints.
+  - name: AdminModels
+    description: Model registry administration endpoints.
+  - name: AdminAccounts
+    description: Provider account administration endpoints.
+  - name: AdminCapabilities
+    description: Capability taxonomy administration endpoints.
+  - name: AdminScheduler
+    description: Scheduler strategy and diagnostic administration endpoints.
+  - name: AdminAudit
+    description: Audit log administration endpoints.
+  - name: AdminBilling
+    description: Billing ledger administration endpoints.
+  - name: AdminOps
+    description: Operational event administration endpoints.
+  - name: Gateway
+    description: OpenAI and Anthropic compatible gateway endpoints.
+x-srapi-contract-stage: m1-openapi-bootstrap
+x-srapi-contract-harness:
+  requiredChecks:
+    - openapi-lint
+    - openapi-bundle
+    - go-server-types-codegen
+    - typescript-client-codegen
+  smokeOperations:
+    - getHealth
+    - login
+    - getCurrentUser
+    - createApiKey
+    - listModels
+    - createChatCompletion
+paths:
+  /api/v1/health:
+    get:
+      tags:
+        - Health
+      operationId: getHealth
+      summary: Check API health.
+      security: []
+      responses:
+        "200":
+          description: API and core dependencies are reachable.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              examples:
+                ok:
+                  value:
+                    data:
+                      status: ok
+                      version: 0.1.0
+                      dependencies:
+                        database: ok
+                        redis: ok
+                    request_id: req_01HY0000000000000000000000
+        "429":
+          $ref: "#/components/responses/StandardError"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/auth/login:
+    post:
+      tags:
+        - Auth
+      operationId: login
+      summary: Login to the console.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login succeeded and session cookie was set.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+            Set-Cookie:
+              description: HttpOnly console session cookie.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/auth/logout:
+    post:
+      tags:
+        - Auth
+      operationId: logout
+      summary: Logout from the console.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      responses:
+        "204":
+          description: Logout succeeded.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/me:
+    get:
+      tags:
+        - CurrentUser
+      operationId: getCurrentUser
+      summary: Get current console user.
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Current user.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/me/usage:
+    get:
+      tags:
+        - CurrentUser
+      operationId: getCurrentUserUsage
+      summary: List usage logs for the current console user.
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: Current user usage logs.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsageLogListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/api-keys:
+    get:
+      tags:
+        - ApiKeys
+      operationId: listApiKeys
+      summary: List API keys visible to the current user.
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/Status"
+      responses:
+        "200":
+          description: API key list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKeyListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        default:
+          $ref: "#/components/responses/StandardError"
+    post:
+      tags:
+        - ApiKeys
+      operationId: createApiKey
+      summary: Create an API key and return its plaintext exactly once.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateApiKeyRequest"
+      responses:
+        "201":
+          description: API key created. The plaintext key is only returned in this response.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateApiKeyResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/api-keys/{id}:
+    patch:
+      tags:
+        - ApiKeys
+      operationId: updateApiKey
+      summary: Update API key metadata and policy.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateApiKeyRequest"
+      responses:
+        "200":
+          description: API key updated.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKeyResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/providers:
+    get:
+      tags:
+        - AdminProviders
+      operationId: listAdminProviders
+      summary: List providers.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/Status"
+        - $ref: "#/components/parameters/SearchQuery"
+      responses:
+        "200":
+          description: Provider list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+    post:
+      tags:
+        - AdminProviders
+      operationId: createAdminProvider
+      summary: Create a provider.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProviderRequest"
+      responses:
+        "201":
+          description: Provider created.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/providers/{id}:
+    patch:
+      tags:
+        - AdminProviders
+      operationId: updateAdminProvider
+      summary: Update a provider.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProviderRequest"
+      responses:
+        "200":
+          description: Provider updated.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/providers/{id}/test:
+    post:
+      tags:
+        - AdminProviders
+      operationId: testAdminProvider
+      summary: Test provider configuration.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+        operator: read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Provider test result.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminTestResultResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/overview:
+    get:
+      tags:
+        - AdminScheduler
+      operationId: getAdminOverview
+      summary: Get admin overview counters.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      responses:
+        "200":
+          description: Admin overview.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminOverviewResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/models:
+    get:
+      tags:
+        - AdminModels
+      operationId: listAdminModels
+      summary: List model registry entries.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/Status"
+        - $ref: "#/components/parameters/SearchQuery"
+      responses:
+        "200":
+          description: Model list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+    post:
+      tags:
+        - AdminModels
+      operationId: createAdminModel
+      summary: Create a model registry entry.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateModelRequest"
+      responses:
+        "201":
+          description: Model created.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/models/{id}:
+    patch:
+      tags:
+        - AdminModels
+      operationId: updateAdminModel
+      summary: Update a model registry entry.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateModelRequest"
+      responses:
+        "200":
+          description: Model updated.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/models/{id}/aliases:
+    post:
+      tags:
+        - AdminModels
+      operationId: createAdminModelAlias
+      summary: Create a model alias.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateModelAliasRequest"
+      responses:
+        "201":
+          description: Model alias created.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelAliasResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/models/{id}/mappings:
+    post:
+      tags:
+        - AdminModels
+      operationId: createAdminModelMapping
+      summary: Create a provider mapping for a model.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateModelProviderMappingRequest"
+      responses:
+        "201":
+          description: Model provider mapping created.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelProviderMappingResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/accounts:
+    get:
+      tags:
+        - AdminAccounts
+      operationId: listAdminAccounts
+      summary: List provider accounts.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/Status"
+        - name: provider_id
+          in: query
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Provider account list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderAccountListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+    post:
+      tags:
+        - AdminAccounts
+      operationId: createAdminAccount
+      summary: Create a provider account.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProviderAccountRequest"
+      responses:
+        "201":
+          description: Provider account created.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderAccountResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/accounts/{id}:
+    patch:
+      tags:
+        - AdminAccounts
+      operationId: updateAdminAccount
+      summary: Update a provider account.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProviderAccountRequest"
+      responses:
+        "200":
+          description: Provider account updated.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderAccountResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/accounts/{id}/test:
+    post:
+      tags:
+        - AdminAccounts
+      operationId: testAdminAccount
+      summary: Test provider account configuration.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+        operator: read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Provider account test result.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminTestResultResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/accounts/{id}/disable:
+    post:
+      tags:
+        - AdminAccounts
+      operationId: disableAdminAccount
+      summary: Disable a provider account.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Provider account disabled.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderAccountResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/accounts/{id}/enable:
+    post:
+      tags:
+        - AdminAccounts
+      operationId: enableAdminAccount
+      summary: Enable a provider account.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Provider account enabled.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderAccountResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/accounts/{id}/health:
+    get:
+      tags:
+        - AdminAccounts
+      operationId: getAdminAccountHealth
+      summary: Get provider account health snapshot.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Account health snapshot.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountHealthResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/accounts/{id}/quota:
+    get:
+      tags:
+        - AdminAccounts
+      operationId: getAdminAccountQuota
+      summary: Get provider account quota snapshots.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Account quota snapshots.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountQuotaListResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/usage-logs:
+    get:
+      tags:
+        - AdminScheduler
+      operationId: listAdminUsageLogs
+      summary: List usage logs.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - name: user_id
+          in: query
+          schema:
+            $ref: "#/components/schemas/Id"
+        - name: model
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Usage log list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsageLogListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/audit-logs:
+    get:
+      tags:
+        - AdminAudit
+      operationId: listAdminAuditLogs
+      summary: List audit logs.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - name: action
+          in: query
+          schema:
+            type: string
+        - name: resource_type
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Audit log list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditLogListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/billing-ledger:
+    get:
+      tags:
+        - AdminBilling
+      operationId: listAdminBillingLedger
+      summary: List billing ledger entries.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - name: user_id
+          in: query
+          schema:
+            $ref: "#/components/schemas/Id"
+        - name: reference_type
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Billing ledger list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillingLedgerListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/ops/events/outbox:
+    get:
+      tags:
+        - AdminOps
+      operationId: listAdminOutboxEvents
+      summary: List domain event outbox entries.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: event_type
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Domain event outbox list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DomainEventOutboxListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/capabilities:
+    get:
+      tags:
+        - AdminCapabilities
+      operationId: listAdminCapabilities
+      summary: List capability descriptors.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - name: category
+          in: query
+          schema:
+            type: string
+        - $ref: "#/components/parameters/Status"
+      responses:
+        "200":
+          description: Capability list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CapabilityListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/scheduler/overview:
+    get:
+      tags:
+        - AdminScheduler
+      operationId: getAdminSchedulerOverview
+      summary: Get scheduler overview.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      responses:
+        "200":
+          description: Scheduler overview.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SchedulerOverviewResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/scheduler/decisions:
+    get:
+      tags:
+        - AdminScheduler
+      operationId: listAdminSchedulerDecisions
+      summary: List scheduler decisions.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - name: request_id
+          in: query
+          schema:
+            type: string
+        - name: model
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Scheduler decision list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SchedulerDecisionListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/scheduler/strategies:
+    get:
+      tags:
+        - AdminScheduler
+      operationId: listSchedulerStrategies
+      summary: List scheduler strategies.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/Status"
+        - name: name
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Scheduler strategy list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SchedulerStrategyListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /v1/models:
+    get:
+      tags:
+        - Gateway
+      operationId: listModels
+      summary: List models available to the gateway API key.
+      security:
+        - gatewayBearerAuth: []
+      responses:
+        "200":
+          description: OpenAI-compatible model list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpenAIModelList"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /v1/chat/completions:
+    post:
+      tags:
+        - Gateway
+      operationId: createChatCompletion
+      summary: Create an OpenAI-compatible chat completion.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatCompletionRequest"
+            examples:
+              basic:
+                value:
+                  model: gpt-4o-mini
+                  messages:
+                    - role: user
+                      content: Say hello from SRapi.
+                  stream: false
+      responses:
+        "200":
+          description: Chat completion response, or SSE stream when stream is true.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatCompletionResponse"
+            text/event-stream:
+              schema:
+                type: string
+                description: OpenAI-compatible SSE chunks.
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /v1/responses:
+    post:
+      tags:
+        - Gateway
+      operationId: createResponse
+      summary: Create an OpenAI Responses-compatible response.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResponsesRequest"
+      responses:
+        "200":
+          description: Responses-compatible response, or SSE stream when stream is true.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResponsesResponse"
+            text/event-stream:
+              schema:
+                type: string
+                description: Responses-compatible SSE events.
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /v1/messages:
+    post:
+      tags:
+        - Gateway
+      operationId: createMessage
+      summary: Create an Anthropic Messages-compatible message.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnthropicMessagesRequest"
+      responses:
+        "200":
+          description: Anthropic-compatible response, or SSE stream when stream is true.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnthropicMessagesResponse"
+            text/event-stream:
+              schema:
+                type: string
+                description: Anthropic-compatible SSE events.
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /api/provider/openai-compatible/v1/chat/completions:
+    post:
+      tags:
+        - Gateway
+      operationId: createOpenAICompatibleChatCompletionAlias
+      summary: Create an OpenAI-compatible chat completion with openai-compatible provider context.
+      description: Provider alias route. It reuses the standard chat completion runtime and forces the `openai-compatible` provider context.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatCompletionRequest"
+      responses:
+        "200":
+          description: Chat completion response, or SSE stream when stream is true.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatCompletionResponse"
+            text/event-stream:
+              schema:
+                type: string
+                description: OpenAI-compatible SSE chunks.
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /api/provider/openai-compatible/v1/responses:
+    post:
+      tags:
+        - Gateway
+      operationId: createOpenAICompatibleResponseAlias
+      summary: Create an OpenAI Responses-compatible response with openai-compatible provider context.
+      description: Provider alias route. It reuses the standard Responses runtime and forces the `openai-compatible` provider context.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResponsesRequest"
+      responses:
+        "200":
+          description: Responses-compatible response, or SSE stream when stream is true.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResponsesResponse"
+            text/event-stream:
+              schema:
+                type: string
+                description: Responses-compatible SSE events.
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /api/provider/openai-compatible/v1/messages:
+    post:
+      tags:
+        - Gateway
+      operationId: createOpenAICompatibleMessageAlias
+      summary: Create an Anthropic Messages-compatible message with openai-compatible provider context.
+      description: Provider alias route. It reuses the standard Messages runtime and forces the `openai-compatible` provider context.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnthropicMessagesRequest"
+      responses:
+        "200":
+          description: Anthropic-compatible response, or SSE stream when stream is true.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnthropicMessagesResponse"
+            text/event-stream:
+              schema:
+                type: string
+                description: Anthropic-compatible SSE events.
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /api/provider/anthropic-compatible/v1/messages:
+    post:
+      tags:
+        - Gateway
+      operationId: createAnthropicCompatibleMessageAlias
+      summary: Create an Anthropic Messages-compatible message with anthropic-compatible provider context.
+      description: Provider alias route. It reuses the standard Messages runtime and forces the `anthropic-compatible` provider context.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnthropicMessagesRequest"
+      responses:
+        "200":
+          description: Anthropic-compatible response, or SSE stream when stream is true.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnthropicMessagesResponse"
+            text/event-stream:
+              schema:
+                type: string
+                description: Anthropic-compatible SSE events.
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: srapi_session
+    csrfHeader:
+      type: apiKey
+      in: header
+      name: X-CSRF-Token
+    gatewayBearerAuth:
+      type: http
+      scheme: bearer
+
+  headers:
+    RequestIdHeader:
+      description: Request correlation id.
+      schema:
+        $ref: "#/components/schemas/RequestId"
+
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      name: page_size
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    Status:
+      name: status
+      in: query
+      schema:
+        type: string
+    SearchQuery:
+      name: q
+      in: query
+      schema:
+        type: string
+        maxLength: 200
+
+  responses:
+    StandardError:
+      description: Standard SRapi error.
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestIdHeader"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ValidationError:
+      description: Request validation failed.
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestIdHeader"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            validation:
+              value:
+                error:
+                  code: VALIDATION_FAILED
+                  message: validation failed
+                  details: {}
+                  trace_id: trace_01HY0000000000000000000000
+                request_id: req_01HY0000000000000000000000
+    Unauthorized:
+      description: Authentication is missing or invalid.
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestIdHeader"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: The caller is not allowed to access the resource.
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestIdHeader"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Conflict:
+      description: Resource conflict.
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestIdHeader"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Resource was not found.
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestIdHeader"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    GatewayError:
+      description: OpenAI-compatible gateway error.
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestIdHeader"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/GatewayErrorResponse"
+    GatewayBadRequest:
+      description: Invalid gateway request.
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestIdHeader"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/GatewayErrorResponse"
+    GatewayUnauthorized:
+      description: Missing or invalid gateway API key.
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestIdHeader"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/GatewayErrorResponse"
+    GatewayForbidden:
+      description: Gateway API key or user policy forbids this operation.
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestIdHeader"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/GatewayErrorResponse"
+    GatewayValidationError:
+      description: Request cannot be converted without semantic loss.
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestIdHeader"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/GatewayErrorResponse"
+    GatewayUnavailable:
+      description: No schedulable account is available.
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestIdHeader"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/GatewayErrorResponse"
+
+  schemas:
+    Id:
+      type: string
+      minLength: 1
+      maxLength: 64
+      example: "10001"
+
+    RequestId:
+      type: string
+      minLength: 8
+      maxLength: 128
+      pattern: "^req_[A-Za-z0-9_\\-]+$"
+      example: req_01HY0000000000000000000000
+
+    TraceId:
+      type: string
+      minLength: 8
+      maxLength: 128
+      example: trace_01HY0000000000000000000000
+
+    Timestamp:
+      type: string
+      format: date-time
+      example: "2026-05-21T00:00:00Z"
+
+    JsonObject:
+      type: object
+      additionalProperties: true
+
+    Pagination:
+      type: object
+      required:
+        - page
+        - page_size
+        - total
+        - has_next
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        page_size:
+          type: integer
+          minimum: 1
+          maximum: 100
+        total:
+          type: integer
+          minimum: 0
+        has_next:
+          type: boolean
+
+    ErrorCode:
+      type: string
+      enum:
+        - INVALID_REQUEST
+        - UNAUTHORIZED
+        - FORBIDDEN
+        - RESOURCE_NOT_FOUND
+        - RESOURCE_CONFLICT
+        - VALIDATION_FAILED
+        - RATE_LIMIT_EXCEEDED
+        - USER_BALANCE_INSUFFICIENT
+        - SUBSCRIPTION_EXPIRED
+        - API_KEY_DISABLED
+        - MODEL_NOT_ALLOWED
+        - MODEL_NOT_FOUND
+        - NO_AVAILABLE_ACCOUNT
+        - SCHEDULER_REJECTED
+        - PROVIDER_RATE_LIMITED
+        - PROVIDER_AUTH_FAILED
+        - PROVIDER_QUOTA_EXCEEDED
+        - INTERNAL_ERROR
+
+    ErrorObject:
+      type: object
+      required:
+        - code
+        - message
+        - trace_id
+      properties:
+        code:
+          $ref: "#/components/schemas/ErrorCode"
+        message:
+          type: string
+        details:
+          $ref: "#/components/schemas/JsonObject"
+        trace_id:
+          $ref: "#/components/schemas/TraceId"
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - request_id
+      properties:
+        error:
+          $ref: "#/components/schemas/ErrorObject"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    GatewayErrorObject:
+      type: object
+      required:
+        - message
+        - type
+      properties:
+        message:
+          type: string
+        type:
+          type: string
+          enum:
+            - invalid_request_error
+            - authentication_error
+            - permission_error
+            - rate_limit_error
+            - upstream_error
+            - service_unavailable_error
+            - internal_error
+        param:
+          type: string
+          nullable: true
+        code:
+          type: string
+          nullable: true
+          example: invalid_request
+
+    GatewayErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          $ref: "#/components/schemas/GatewayErrorObject"
+
+    HealthDependencyStatus:
+      type: string
+      enum:
+        - ok
+        - degraded
+        - unavailable
+        - not_configured
+
+    HealthData:
+      type: object
+      required:
+        - status
+        - version
+        - dependencies
+      properties:
+        status:
+          type: string
+          enum:
+            - ok
+            - degraded
+        version:
+          type: string
+        dependencies:
+          type: object
+          required:
+            - database
+            - redis
+          properties:
+            database:
+              $ref: "#/components/schemas/HealthDependencyStatus"
+            redis:
+              $ref: "#/components/schemas/HealthDependencyStatus"
+
+    HealthResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/HealthData"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    UserRole:
+      type: string
+      enum:
+        - owner
+        - admin
+        - operator
+        - user
+
+    UserStatus:
+      type: string
+      enum:
+        - active
+        - disabled
+        - pending
+
+    User:
+      type: object
+      required:
+        - id
+        - email
+        - name
+        - status
+        - roles
+        - created_at
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        status:
+          $ref: "#/components/schemas/UserStatus"
+        roles:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserRole"
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+          minLength: 8
+
+    SessionData:
+      type: object
+      required:
+        - user
+        - csrf_token
+        - expires_at
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        csrf_token:
+          type: string
+          description: Token to send as X-CSRF-Token for console writes.
+        expires_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    LoginResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/SessionData"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    UserResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/User"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    ResourceStatus:
+      type: string
+      enum:
+        - active
+        - disabled
+        - pending
+        - archived
+
+    ApiKeyStatus:
+      type: string
+      enum:
+        - active
+        - disabled
+        - expired
+
+    ApiKey:
+      type: object
+      required:
+        - id
+        - name
+        - prefix
+        - status
+        - scopes
+        - allowed_models
+        - group_ids
+        - created_at
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        name:
+          type: string
+        prefix:
+          type: string
+          description: Public key prefix for lookup, never sufficient for authentication.
+          example: sk_live_abcd1234
+        status:
+          $ref: "#/components/schemas/ApiKeyStatus"
+        scopes:
+          type: array
+          items:
+            type: string
+        allowed_models:
+          type: array
+          items:
+            type: string
+        group_ids:
+          type: array
+          items:
+            $ref: "#/components/schemas/Id"
+        rpm_limit:
+          type: integer
+          nullable: true
+          minimum: 0
+        tpm_limit:
+          type: integer
+          nullable: true
+          minimum: 0
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_used_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    CreateApiKeyRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        scopes:
+          type: array
+          items:
+            type: string
+          default:
+            - gateway:invoke
+        allowed_models:
+          type: array
+          items:
+            type: string
+          default: []
+        group_ids:
+          type: array
+          items:
+            $ref: "#/components/schemas/Id"
+          default: []
+        rpm_limit:
+          type: integer
+          nullable: true
+          minimum: 0
+        tpm_limit:
+          type: integer
+          nullable: true
+          minimum: 0
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    UpdateApiKeyRequest:
+      type: object
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        status:
+          $ref: "#/components/schemas/ApiKeyStatus"
+        scopes:
+          type: array
+          items:
+            type: string
+        allowed_models:
+          type: array
+          items:
+            type: string
+        group_ids:
+          type: array
+          items:
+            $ref: "#/components/schemas/Id"
+
+    ApiKeySecretData:
+      type: object
+      required:
+        - api_key
+        - plaintext_key
+      properties:
+        api_key:
+          $ref: "#/components/schemas/ApiKey"
+        plaintext_key:
+          type: string
+          description: Full plaintext API key. This value is never returned again.
+          example: sk_live_abcd1234_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+    ApiKeyListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApiKey"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    CreateApiKeyResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/ApiKeySecretData"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    ApiKeyResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/ApiKey"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    ProviderProtocol:
+      type: string
+      enum:
+        - openai-compatible
+        - anthropic-compatible
+        - gemini-compatible
+
+    ProviderAdapterType:
+      type: string
+      enum:
+        - openai-compatible
+        - anthropic-compatible
+        - gemini-compatible
+        - native-openai
+        - native-anthropic
+        - native-gemini
+        - openrouter
+        - reverse-proxy-chatgpt-web
+        - reverse-proxy-codex-cli
+        - reverse-proxy-claude-web
+        - reverse-proxy-claude-code-cli
+        - reverse-proxy-gemini-cli
+        - custom
+
+    Provider:
+      type: object
+      required:
+        - id
+        - name
+        - display_name
+        - adapter_type
+        - protocol
+        - status
+        - created_at
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        name:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9_\\-]{1,62}$"
+        display_name:
+          type: string
+        adapter_type:
+          $ref: "#/components/schemas/ProviderAdapterType"
+        protocol:
+          $ref: "#/components/schemas/ProviderProtocol"
+        status:
+          $ref: "#/components/schemas/ResourceStatus"
+        capabilities:
+          $ref: "#/components/schemas/JsonObject"
+        config_schema:
+          $ref: "#/components/schemas/JsonObject"
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    CreateProviderRequest:
+      type: object
+      required:
+        - name
+        - display_name
+        - adapter_type
+        - protocol
+      properties:
+        name:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9_\\-]{1,62}$"
+        display_name:
+          type: string
+          minLength: 1
+        adapter_type:
+          $ref: "#/components/schemas/ProviderAdapterType"
+        protocol:
+          $ref: "#/components/schemas/ProviderProtocol"
+        status:
+          $ref: "#/components/schemas/ResourceStatus"
+        capabilities:
+          $ref: "#/components/schemas/JsonObject"
+        config_schema:
+          $ref: "#/components/schemas/JsonObject"
+
+    UpdateProviderRequest:
+      type: object
+      minProperties: 1
+      properties:
+        display_name:
+          type: string
+          minLength: 1
+        adapter_type:
+          $ref: "#/components/schemas/ProviderAdapterType"
+        protocol:
+          $ref: "#/components/schemas/ProviderProtocol"
+        status:
+          $ref: "#/components/schemas/ResourceStatus"
+        capabilities:
+          $ref: "#/components/schemas/JsonObject"
+        config_schema:
+          $ref: "#/components/schemas/JsonObject"
+
+    ProviderResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/Provider"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    ProviderListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Provider"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    AdminTestResult:
+      type: object
+      required:
+        - ok
+        - status
+        - checked_at
+      properties:
+        ok:
+          type: boolean
+        status:
+          type: string
+          enum:
+            - ok
+            - failed
+        provider_id:
+          $ref: "#/components/schemas/Id"
+        account_id:
+          $ref: "#/components/schemas/Id"
+        latency_ms:
+          type: integer
+          minimum: 0
+        message:
+          type: string
+        checks:
+          $ref: "#/components/schemas/JsonObject"
+        checked_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    AdminTestResultResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/AdminTestResult"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    CapabilityDescriptor:
+      type: object
+      required:
+        - key
+        - version
+        - status
+        - level
+      properties:
+        key:
+          type: string
+          example: input.text
+        version:
+          type: string
+          example: v1
+        status:
+          type: string
+          enum:
+            - stable
+            - experimental
+            - deprecated
+        level:
+          type: string
+          enum:
+            - required
+            - optional
+            - unsupported
+        metadata:
+          $ref: "#/components/schemas/JsonObject"
+
+    Model:
+      type: object
+      required:
+        - id
+        - canonical_name
+        - display_name
+        - status
+        - capabilities
+        - created_at
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        canonical_name:
+          type: string
+          example: gpt-4o-mini
+        display_name:
+          type: string
+        family:
+          type: string
+          example: gpt-4o
+        context_window:
+          type: integer
+          nullable: true
+          minimum: 1
+        max_output_tokens:
+          type: integer
+          nullable: true
+          minimum: 1
+        quality_tier:
+          type: string
+          nullable: true
+        status:
+          $ref: "#/components/schemas/ResourceStatus"
+        capabilities:
+          type: array
+          items:
+            $ref: "#/components/schemas/CapabilityDescriptor"
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    CreateModelRequest:
+      type: object
+      required:
+        - canonical_name
+        - display_name
+      properties:
+        canonical_name:
+          type: string
+        display_name:
+          type: string
+        family:
+          type: string
+        context_window:
+          type: integer
+          nullable: true
+          minimum: 1
+        max_output_tokens:
+          type: integer
+          nullable: true
+          minimum: 1
+        quality_tier:
+          type: string
+          nullable: true
+        status:
+          $ref: "#/components/schemas/ResourceStatus"
+        capabilities:
+          type: array
+          items:
+            $ref: "#/components/schemas/CapabilityDescriptor"
+          default: []
+
+    UpdateModelRequest:
+      type: object
+      minProperties: 1
+      properties:
+        display_name:
+          type: string
+          minLength: 1
+        family:
+          type: string
+          nullable: true
+        context_window:
+          type: integer
+          nullable: true
+          minimum: 1
+        max_output_tokens:
+          type: integer
+          nullable: true
+          minimum: 1
+        quality_tier:
+          type: string
+          nullable: true
+        status:
+          $ref: "#/components/schemas/ResourceStatus"
+        capabilities:
+          type: array
+          items:
+            $ref: "#/components/schemas/CapabilityDescriptor"
+          default: []
+
+    ModelResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/Model"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    ModelListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Model"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    ModelAlias:
+      type: object
+      required:
+        - id
+        - alias
+        - model_id
+        - fallback_models
+        - status
+        - created_at
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        alias:
+          type: string
+          minLength: 1
+          example: claude-sonnet
+        model_id:
+          $ref: "#/components/schemas/Id"
+        strategy_hint:
+          type: string
+          nullable: true
+          example: balanced
+        fallback_models:
+          type: array
+          items:
+            type: string
+          default: []
+        status:
+          $ref: "#/components/schemas/ResourceStatus"
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    CreateModelAliasRequest:
+      type: object
+      required:
+        - alias
+      properties:
+        alias:
+          type: string
+          minLength: 1
+          example: claude-sonnet
+        strategy_hint:
+          type: string
+          nullable: true
+          example: balanced
+        fallback_models:
+          type: array
+          items:
+            type: string
+          default: []
+        status:
+          $ref: "#/components/schemas/ResourceStatus"
+
+    ModelAliasResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/ModelAlias"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    ModelProviderMapping:
+      type: object
+      required:
+        - id
+        - model_id
+        - provider_id
+        - upstream_model_name
+        - status
+        - created_at
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        model_id:
+          $ref: "#/components/schemas/Id"
+        provider_id:
+          $ref: "#/components/schemas/Id"
+        upstream_model_name:
+          type: string
+          minLength: 1
+          example: claude-3-7-sonnet
+        status:
+          $ref: "#/components/schemas/ResourceStatus"
+        capability_override:
+          type: array
+          items:
+            $ref: "#/components/schemas/CapabilityDescriptor"
+          default: []
+        pricing_override:
+          $ref: "#/components/schemas/JsonObject"
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    CreateModelProviderMappingRequest:
+      type: object
+      required:
+        - provider_id
+        - upstream_model_name
+      properties:
+        provider_id:
+          $ref: "#/components/schemas/Id"
+        upstream_model_name:
+          type: string
+          minLength: 1
+        status:
+          $ref: "#/components/schemas/ResourceStatus"
+        capability_override:
+          type: array
+          items:
+            $ref: "#/components/schemas/CapabilityDescriptor"
+          default: []
+        pricing_override:
+          $ref: "#/components/schemas/JsonObject"
+
+    ModelProviderMappingResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/ModelProviderMapping"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    RuntimeClass:
+      type: string
+      enum:
+        - api_key
+        - oauth_refresh
+        - oauth_device_code
+        - web_session_cookie
+        - desktop_client_token
+        - cli_client_token
+        - ide_plugin_token
+        - service_account_json
+        - custom_reverse_proxy
+
+    ProviderAccountStatus:
+      type: string
+      enum:
+        - active
+        - disabled
+        - needs_reauth
+        - suspended
+        - dead
+
+    ProviderAccount:
+      type: object
+      required:
+        - id
+        - provider_id
+        - name
+        - runtime_class
+        - status
+        - priority
+        - weight
+        - created_at
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        provider_id:
+          $ref: "#/components/schemas/Id"
+        name:
+          type: string
+        runtime_class:
+          $ref: "#/components/schemas/RuntimeClass"
+        upstream_client:
+          type: string
+          nullable: true
+          example: claude_code_cli
+        status:
+          $ref: "#/components/schemas/ProviderAccountStatus"
+        priority:
+          type: integer
+          default: 0
+        weight:
+          type: number
+          minimum: 0
+          default: 1
+        risk_level:
+          type: string
+          nullable: true
+        metadata:
+          $ref: "#/components/schemas/JsonObject"
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    CreateProviderAccountRequest:
+      type: object
+      required:
+        - provider_id
+        - name
+        - runtime_class
+        - credential
+      properties:
+        provider_id:
+          $ref: "#/components/schemas/Id"
+        name:
+          type: string
+          minLength: 1
+        runtime_class:
+          $ref: "#/components/schemas/RuntimeClass"
+        upstream_client:
+          type: string
+          nullable: true
+        credential:
+          type: object
+          description: Write-only credential payload. It must be encrypted before persistence.
+          writeOnly: true
+          additionalProperties: true
+        proxy_id:
+          type: string
+          nullable: true
+        status:
+          $ref: "#/components/schemas/ProviderAccountStatus"
+        priority:
+          type: integer
+          default: 0
+        weight:
+          type: number
+          minimum: 0
+          default: 1
+        metadata:
+          $ref: "#/components/schemas/JsonObject"
+
+    UpdateProviderAccountRequest:
+      type: object
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 1
+        runtime_class:
+          $ref: "#/components/schemas/RuntimeClass"
+        upstream_client:
+          type: string
+          nullable: true
+        credential:
+          type: object
+          description: Write-only replacement credential payload. It must be encrypted before persistence.
+          writeOnly: true
+          additionalProperties: true
+        proxy_id:
+          type: string
+          nullable: true
+        status:
+          $ref: "#/components/schemas/ProviderAccountStatus"
+        priority:
+          type: integer
+        weight:
+          type: number
+          minimum: 0
+        metadata:
+          $ref: "#/components/schemas/JsonObject"
+
+    ProviderAccountResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/ProviderAccount"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    ProviderAccountListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProviderAccount"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    CapabilityDefinition:
+      type: object
+      required:
+        - key
+        - version
+        - category
+        - status
+        - description
+      properties:
+        key:
+          type: string
+        version:
+          type: string
+        category:
+          type: string
+        status:
+          type: string
+          enum:
+            - stable
+            - experimental
+            - deprecated
+        description:
+          type: string
+        schema:
+          $ref: "#/components/schemas/JsonObject"
+        replacement_key:
+          type: string
+          nullable: true
+
+    CapabilityListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/CapabilityDefinition"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    AdminOverview:
+      type: object
+      required:
+        - provider_count
+        - model_count
+        - account_count
+        - active_account_count
+        - usage_log_count
+        - scheduler_decision_count
+        - request_success_rate
+      properties:
+        provider_count:
+          type: integer
+          minimum: 0
+        model_count:
+          type: integer
+          minimum: 0
+        account_count:
+          type: integer
+          minimum: 0
+        active_account_count:
+          type: integer
+          minimum: 0
+        usage_log_count:
+          type: integer
+          minimum: 0
+        scheduler_decision_count:
+          type: integer
+          minimum: 0
+        request_success_rate:
+          type: number
+          minimum: 0
+          maximum: 1
+
+    AdminOverviewResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/AdminOverview"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    AccountHealthSnapshot:
+      type: object
+      required:
+        - account_id
+        - provider_id
+        - status
+        - success_rate
+        - error_rate
+        - latency_p50_ms
+        - latency_p95_ms
+        - rate_limit_count
+        - timeout_count
+        - circuit_state
+        - snapshot_at
+      properties:
+        account_id:
+          $ref: "#/components/schemas/Id"
+        provider_id:
+          $ref: "#/components/schemas/Id"
+        status:
+          type: string
+        success_rate:
+          type: number
+          minimum: 0
+          maximum: 1
+        error_rate:
+          type: number
+          minimum: 0
+          maximum: 1
+        latency_p50_ms:
+          type: integer
+          minimum: 0
+        latency_p95_ms:
+          type: integer
+          minimum: 0
+        rate_limit_count:
+          type: integer
+          minimum: 0
+        timeout_count:
+          type: integer
+          minimum: 0
+        cooldown_until:
+          type: string
+          format: date-time
+          nullable: true
+        circuit_state:
+          type: string
+        snapshot_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    AccountHealthResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/AccountHealthSnapshot"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    AccountQuotaSnapshot:
+      type: object
+      required:
+        - account_id
+        - provider_id
+        - quota_type
+        - remaining
+        - used
+        - quota_limit
+        - remaining_ratio
+        - snapshot_at
+      properties:
+        account_id:
+          $ref: "#/components/schemas/Id"
+        provider_id:
+          $ref: "#/components/schemas/Id"
+        quota_type:
+          type: string
+        remaining:
+          type: string
+        used:
+          type: string
+        quota_limit:
+          type: string
+        remaining_ratio:
+          type: number
+          minimum: 0
+        reset_at:
+          type: string
+          format: date-time
+          nullable: true
+        snapshot_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    AccountQuotaListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountQuotaSnapshot"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    UsageLog:
+      type: object
+      required:
+        - id
+        - request_id
+        - user_id
+        - api_key_id
+        - source_protocol
+        - source_endpoint
+        - model
+        - input_tokens
+        - output_tokens
+        - cached_tokens
+        - total_tokens
+        - usage_estimated
+        - latency_ms
+        - success
+        - cost
+        - currency
+        - compatibility_warnings
+        - created_at
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+        user_id:
+          $ref: "#/components/schemas/Id"
+        api_key_id:
+          $ref: "#/components/schemas/Id"
+        provider_id:
+          type: string
+          nullable: true
+        account_id:
+          type: string
+          nullable: true
+        source_protocol:
+          type: string
+        source_endpoint:
+          type: string
+        target_protocol:
+          type: string
+        model:
+          type: string
+        input_tokens:
+          type: integer
+          minimum: 0
+        output_tokens:
+          type: integer
+          minimum: 0
+        cached_tokens:
+          type: integer
+          minimum: 0
+        total_tokens:
+          type: integer
+          minimum: 0
+        usage_estimated:
+          type: boolean
+        latency_ms:
+          type: integer
+          minimum: 0
+        success:
+          type: boolean
+        error_class:
+          type: string
+          nullable: true
+        cost:
+          type: string
+        currency:
+          type: string
+        compatibility_warnings:
+          type: array
+          items:
+            type: string
+          default: []
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    UsageLogListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/UsageLog"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    AuditLog:
+      type: object
+      required:
+        - id
+        - action
+        - resource_type
+        - resource_id
+        - before
+        - after
+        - ip
+        - user_agent
+        - trace_id
+        - created_at
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        actor_user_id:
+          type: string
+          nullable: true
+        action:
+          type: string
+        resource_type:
+          type: string
+        resource_id:
+          type: string
+        before:
+          $ref: "#/components/schemas/JsonObject"
+        after:
+          $ref: "#/components/schemas/JsonObject"
+        ip:
+          type: string
+        user_agent:
+          type: string
+        trace_id:
+          type: string
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    AuditLogListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditLog"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    BillingLedgerEntry:
+      type: object
+      required:
+        - id
+        - user_id
+        - type
+        - amount
+        - currency
+        - balance_before
+        - balance_after
+        - reference_type
+        - reference_id
+        - metadata
+        - created_at
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        user_id:
+          $ref: "#/components/schemas/Id"
+        type:
+          type: string
+          enum:
+            - usage_charge
+            - refund
+            - adjustment
+            - compensation
+        amount:
+          type: string
+        currency:
+          type: string
+        balance_before:
+          type: string
+        balance_after:
+          type: string
+        reference_type:
+          type: string
+        reference_id:
+          type: string
+        metadata:
+          $ref: "#/components/schemas/JsonObject"
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    BillingLedgerListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/BillingLedgerEntry"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    DomainEventOutbox:
+      type: object
+      required:
+        - id
+        - event_id
+        - event_type
+        - event_version
+        - producer_module
+        - aggregate_type
+        - aggregate_id
+        - correlation_id
+        - causation_id
+        - idempotency_key
+        - payload
+        - metadata
+        - status
+        - attempt_count
+        - created_at
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        event_id:
+          type: string
+        event_type:
+          type: string
+        event_version:
+          type: string
+        producer_module:
+          type: string
+        aggregate_type:
+          type: string
+        aggregate_id:
+          type: string
+        correlation_id:
+          type: string
+        causation_id:
+          type: string
+        idempotency_key:
+          type: string
+        payload:
+          $ref: "#/components/schemas/JsonObject"
+        metadata:
+          $ref: "#/components/schemas/JsonObject"
+        status:
+          type: string
+          enum:
+            - pending
+            - published
+            - failed
+        attempt_count:
+          type: integer
+          minimum: 0
+        next_retry_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_error:
+          type: string
+          nullable: true
+        published_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    DomainEventOutboxListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/DomainEventOutbox"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    SchedulerDecision:
+      type: object
+      required:
+        - id
+        - request_id
+        - attempt_no
+        - user_id
+        - api_key_id
+        - source_protocol
+        - source_endpoint
+        - target_protocol
+        - model
+        - strategy
+        - strategy_version
+        - strategy_config_hash
+        - candidate_count
+        - rejected_count
+        - scores
+        - reject_reasons
+        - strategy_weights
+        - compatibility_warnings
+        - sticky_hit
+        - cache_affinity_hit
+        - estimated_cost
+        - currency
+        - created_at
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+        attempt_no:
+          type: integer
+          minimum: 1
+        user_id:
+          $ref: "#/components/schemas/Id"
+        api_key_id:
+          $ref: "#/components/schemas/Id"
+        source_protocol:
+          type: string
+        source_endpoint:
+          type: string
+        target_protocol:
+          type: string
+        model:
+          type: string
+        strategy:
+          type: string
+          enum:
+            - balanced
+            - cost_saver
+        strategy_version:
+          type: string
+        strategy_config_hash:
+          type: string
+        selected_provider_id:
+          type: string
+          nullable: true
+        selected_account_id:
+          type: string
+          nullable: true
+        candidate_count:
+          type: integer
+          minimum: 0
+        rejected_count:
+          type: integer
+          minimum: 0
+        scores:
+          $ref: "#/components/schemas/JsonObject"
+        reject_reasons:
+          $ref: "#/components/schemas/JsonObject"
+        strategy_weights:
+          $ref: "#/components/schemas/JsonObject"
+        compatibility_warnings:
+          type: array
+          items:
+            type: string
+          default: []
+        sticky_hit:
+          type: boolean
+        cache_affinity_hit:
+          type: boolean
+        estimated_cost:
+          type: string
+        currency:
+          type: string
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    SchedulerDecisionListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/SchedulerDecision"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    SchedulerOverview:
+      type: object
+      required:
+        - total_decisions
+        - selected_decisions
+        - failed_decisions
+        - success_rate
+        - average_latency_ms
+        - sticky_hit_count
+        - cache_affinity_hit_count
+        - strategy_counts
+      properties:
+        total_decisions:
+          type: integer
+          minimum: 0
+        selected_decisions:
+          type: integer
+          minimum: 0
+        failed_decisions:
+          type: integer
+          minimum: 0
+        success_rate:
+          type: number
+          minimum: 0
+          maximum: 1
+        average_latency_ms:
+          type: integer
+          minimum: 0
+        sticky_hit_count:
+          type: integer
+          minimum: 0
+        cache_affinity_hit_count:
+          type: integer
+          minimum: 0
+        strategy_counts:
+          $ref: "#/components/schemas/JsonObject"
+
+    SchedulerOverviewResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/SchedulerOverview"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    SchedulerStrategy:
+      type: object
+      required:
+        - id
+        - name
+        - version
+        - status
+        - config_hash
+        - config
+        - created_at
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        name:
+          type: string
+          enum:
+            - balanced
+            - cost_saver
+            - quality_first
+            - cache_affinity
+            - low_latency
+        version:
+          type: string
+          example: v1
+        status:
+          type: string
+          enum:
+            - active
+            - draft
+            - deprecated
+        config_hash:
+          type: string
+        config:
+          $ref: "#/components/schemas/JsonObject"
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+        activated_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    SchedulerStrategyListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/SchedulerStrategy"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    OpenAIModel:
+      type: object
+      required:
+        - id
+        - object
+        - owned_by
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+          enum:
+            - model
+        created:
+          type: integer
+          nullable: true
+        owned_by:
+          type: string
+
+    OpenAIModelList:
+      type: object
+      required:
+        - object
+        - data
+      properties:
+        object:
+          type: string
+          enum:
+            - list
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/OpenAIModel"
+
+    TokenUsage:
+      type: object
+      properties:
+        prompt_tokens:
+          type: integer
+          minimum: 0
+        completion_tokens:
+          type: integer
+          minimum: 0
+        total_tokens:
+          type: integer
+          minimum: 0
+        input_tokens:
+          type: integer
+          minimum: 0
+        output_tokens:
+          type: integer
+          minimum: 0
+        cached_tokens:
+          type: integer
+          minimum: 0
+
+    ChatMessage:
+      type: object
+      required:
+        - role
+        - content
+      properties:
+        role:
+          type: string
+          enum:
+            - system
+            - developer
+            - user
+            - assistant
+            - tool
+        content:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                $ref: "#/components/schemas/ContentBlock"
+        name:
+          type: string
+        tool_call_id:
+          type: string
+
+    ContentBlock:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum:
+            - text
+            - image_url
+            - input_text
+            - input_image
+            - tool_call
+            - tool_result
+        text:
+          type: string
+        image_url:
+          $ref: "#/components/schemas/JsonObject"
+      additionalProperties: true
+
+    ToolDefinition:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+        function:
+          $ref: "#/components/schemas/JsonObject"
+      additionalProperties: true
+
+    ChatCompletionRequest:
+      type: object
+      required:
+        - model
+        - messages
+      properties:
+        model:
+          type: string
+        messages:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/ChatMessage"
+        stream:
+          type: boolean
+          default: false
+        temperature:
+          type: number
+          minimum: 0
+          maximum: 2
+        top_p:
+          type: number
+          minimum: 0
+          maximum: 1
+        max_tokens:
+          type: integer
+          minimum: 1
+        tools:
+          type: array
+          items:
+            $ref: "#/components/schemas/ToolDefinition"
+        tool_choice:
+          oneOf:
+            - type: string
+            - $ref: "#/components/schemas/JsonObject"
+        response_format:
+          $ref: "#/components/schemas/JsonObject"
+        stop:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+      additionalProperties: true
+
+    ChatCompletionChoice:
+      type: object
+      required:
+        - index
+        - message
+        - finish_reason
+      properties:
+        index:
+          type: integer
+          minimum: 0
+        message:
+          $ref: "#/components/schemas/ChatMessage"
+        finish_reason:
+          type: string
+          nullable: true
+
+    ChatCompletionResponse:
+      type: object
+      required:
+        - id
+        - object
+        - created
+        - model
+        - choices
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+          enum:
+            - chat.completion
+        created:
+          type: integer
+        model:
+          type: string
+        choices:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatCompletionChoice"
+        usage:
+          $ref: "#/components/schemas/TokenUsage"
+        system_fingerprint:
+          type: string
+          nullable: true
+
+    ResponsesRequest:
+      type: object
+      required:
+        - model
+        - input
+      properties:
+        model:
+          type: string
+        input:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                $ref: "#/components/schemas/ContentBlock"
+        instructions:
+          type: string
+        stream:
+          type: boolean
+          default: false
+        tools:
+          type: array
+          items:
+            $ref: "#/components/schemas/ToolDefinition"
+        temperature:
+          type: number
+          minimum: 0
+          maximum: 2
+        top_p:
+          type: number
+          minimum: 0
+          maximum: 1
+        max_output_tokens:
+          type: integer
+          minimum: 1
+        text:
+          $ref: "#/components/schemas/JsonObject"
+        reasoning:
+          $ref: "#/components/schemas/JsonObject"
+      additionalProperties: true
+
+    ResponsesOutputItem:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+        role:
+          type: string
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContentBlock"
+      additionalProperties: true
+
+    ResponsesResponse:
+      type: object
+      required:
+        - id
+        - object
+        - created_at
+        - model
+        - output
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+          enum:
+            - response
+        created_at:
+          type: integer
+        model:
+          type: string
+        output:
+          type: array
+          items:
+            $ref: "#/components/schemas/ResponsesOutputItem"
+        usage:
+          $ref: "#/components/schemas/TokenUsage"
+        status:
+          type: string
+        compatibility_warnings:
+          type: array
+          items:
+            type: string
+
+    AnthropicContentBlock:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum:
+            - text
+            - image
+            - tool_use
+            - tool_result
+        text:
+          type: string
+      additionalProperties: true
+
+    AnthropicMessage:
+      type: object
+      required:
+        - role
+        - content
+      properties:
+        role:
+          type: string
+          enum:
+            - user
+            - assistant
+        content:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                $ref: "#/components/schemas/AnthropicContentBlock"
+
+    AnthropicMessagesRequest:
+      type: object
+      required:
+        - model
+        - messages
+        - max_tokens
+      properties:
+        model:
+          type: string
+        system:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                $ref: "#/components/schemas/AnthropicContentBlock"
+        messages:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/AnthropicMessage"
+        max_tokens:
+          type: integer
+          minimum: 1
+        stream:
+          type: boolean
+          default: false
+        tools:
+          type: array
+          items:
+            $ref: "#/components/schemas/JsonObject"
+        tool_choice:
+          $ref: "#/components/schemas/JsonObject"
+        temperature:
+          type: number
+          minimum: 0
+          maximum: 1
+        top_p:
+          type: number
+          minimum: 0
+          maximum: 1
+        thinking:
+          $ref: "#/components/schemas/JsonObject"
+      additionalProperties: true
+
+    AnthropicUsage:
+      type: object
+      properties:
+        input_tokens:
+          type: integer
+          minimum: 0
+        output_tokens:
+          type: integer
+          minimum: 0
+        cache_creation_input_tokens:
+          type: integer
+          minimum: 0
+        cache_read_input_tokens:
+          type: integer
+          minimum: 0
+
+    AnthropicMessagesResponse:
+      type: object
+      required:
+        - id
+        - type
+        - role
+        - model
+        - content
+        - stop_reason
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum:
+            - message
+        role:
+          type: string
+          enum:
+            - assistant
+        model:
+          type: string
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/AnthropicContentBlock"
+        stop_reason:
+          type: string
+          nullable: true
+        stop_sequence:
+          type: string
+          nullable: true
+        usage:
+          $ref: "#/components/schemas/AnthropicUsage"
+        compatibility_warnings:
+          type: array
+          items:
+            type: string

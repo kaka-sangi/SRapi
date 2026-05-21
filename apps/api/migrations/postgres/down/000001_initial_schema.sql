@@ -1,0 +1,27 @@
+-- Drop initial SRapi MVP schema.
+DROP TABLE IF EXISTS "user_roles";
+DROP TABLE IF EXISTS "users";
+DROP TABLE IF EXISTS "usage_logs";
+DROP TABLE IF EXISTS "settings";
+DROP TABLE IF EXISTS "scheduler_strategies";
+DROP TABLE IF EXISTS "scheduler_feedbacks";
+DROP TABLE IF EXISTS "scheduler_decisions";
+DROP TABLE IF EXISTS "roles";
+DROP TABLE IF EXISTS "provider_accounts";
+DROP TABLE IF EXISTS "providers";
+DROP TABLE IF EXISTS "pricing_rules";
+DROP TABLE IF EXISTS "model_registries";
+DROP TABLE IF EXISTS "model_provider_mappings";
+DROP TABLE IF EXISTS "model_alias";
+DROP TABLE IF EXISTS "idempotency_records";
+DROP TABLE IF EXISTS "domain_events_outboxes";
+DROP TABLE IF EXISTS "domain_events_inboxes";
+DROP TABLE IF EXISTS "capability_definitions";
+DROP TABLE IF EXISTS "billing_ledgers";
+DROP TABLE IF EXISTS "audit_logs";
+DROP TABLE IF EXISTS "account_quota_snapshots";
+DROP TABLE IF EXISTS "account_health_snapshots";
+DROP TABLE IF EXISTS "account_group_members";
+DROP TABLE IF EXISTS "account_groups";
+DROP TABLE IF EXISTS "api_key_groups";
+DROP TABLE IF EXISTS "api_keys";

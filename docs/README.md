@@ -12,6 +12,7 @@
 | `MVP_SPEC.md` | MVP 功能需求、非功能需求、验收条件和测试映射。 |
 | `MVP_IMPLEMENTATION_PLAN.md` | MVP 里程碑拆解和实现顺序。 |
 | `ARCHITECTURE.md` | 后端模块边界、依赖方向和调用链。 |
+| `ARCHITECTURE_REQUIREMENTS.md` | MVP 架构要求、启动 harness 和证据映射。 |
 | `MODULE_INTERFACE_CONTRACTS.md` | 模块间 contract、DTO、同步调用和事件边界。 |
 | `DOMAIN_EVENTS_SPEC.md` | 领域事件、Outbox、Inbox、幂等、重试和补偿规则。 |
 | `DOMAIN_MODEL.md` | 核心业务概念、术语和领域关系。 |
@@ -55,7 +56,16 @@
 | --- | --- |
 | `FRONTEND_DESIGN_SYSTEM.md` | 控制台视觉、组件、动效和响应式约束。 |
 
-## 7. 维护规则
+## 7. Codex 执行规格
+
+| 文档 | 作用 |
+| --- | --- |
+| `../specs/README.md` | 长期 Codex goal 的入口、阅读顺序和恢复提示。 |
+| `../specs/WORK_PACKAGES.md` | 按阶段拆分的可执行工作包、责任范围和完成定义。 |
+| `../specs/QUALITY_GATES.md` | 不同变更类型必须运行的质量门禁。 |
+| `../specs/STATUS.md` | 跨 goal 的当前进度、下一推荐工作包和最近门禁记录。 |
+
+## 8. 维护规则
 
 - 改接口必须同步 `OPENAPI_CONTRACT.md`。
 - 改跨模块调用必须同步 `MODULE_INTERFACE_CONTRACTS.md`。
@@ -71,3 +81,4 @@
 - 改支付必须同步 `PAYMENT_SPEC.md`。
 - 改返利必须同步 `AFFILIATE_REBATE_SPEC.md`。
 - 改可观测、告警、运维后台必须同步 `OBSERVABILITY_SPEC.md`。
+- 改架构要求、启动 harness 和门禁映射必须同步 `ARCHITECTURE_REQUIREMENTS.md`。

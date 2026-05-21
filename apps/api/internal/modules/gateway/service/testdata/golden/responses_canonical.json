@@ -1,0 +1,69 @@
+{
+  "request_id": "req_golden_001",
+  "source_protocol": "openai-compatible",
+  "source_endpoint": "/v1/responses",
+  "response_protocol": "openai-compatible",
+  "user_id": 101,
+  "api_key_id": 202,
+  "model": "client-facing-model",
+  "canonical_model": "canonical-text-model",
+  "input_items": [
+    {
+      "type": "text",
+      "role": "user",
+      "text": "Summarize the attached image."
+    },
+    {
+      "type": "image",
+      "role": "user",
+      "text": "[image]",
+      "metadata": {
+        "url": "https://example.invalid/diagram.png"
+      }
+    }
+  ],
+  "instructions": "Be concise.",
+  "stream": true,
+  "tools": [
+    {
+      "function": {
+        "name": "lookup"
+      },
+      "type": "function"
+    }
+  ],
+  "response_format": {
+    "name": "summary",
+    "type": "json_schema"
+  },
+  "reasoning": {
+    "effort": "low"
+  },
+  "prompt": "instructions: Be concise.\nSummarize the attached image.\n[image]",
+  "compatibility_warnings": [
+    "vision_ignored",
+    "reasoning_ignored"
+  ],
+  "request_capabilities": [
+    {
+      "key": "reasoning_control",
+      "version": "v1"
+    },
+    {
+      "key": "streaming",
+      "version": "v1"
+    },
+    {
+      "key": "structured_output",
+      "version": "v1"
+    },
+    {
+      "key": "tool_calling",
+      "version": "v1"
+    },
+    {
+      "key": "vision_input",
+      "version": "v1"
+    }
+  ]
+}

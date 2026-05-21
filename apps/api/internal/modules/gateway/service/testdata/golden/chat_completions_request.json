@@ -1,0 +1,40 @@
+{
+  "model": "client-facing-model",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are terse."
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "Describe this"
+        },
+        {
+          "type": "image_url",
+          "image_url": {
+            "url": "https://example.invalid/image.png"
+          }
+        }
+      ]
+    }
+  ],
+  "stream": true,
+  "response_format": {
+    "type": "json_object"
+  },
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "lookup",
+        "parameters": {
+          "type": "object"
+        }
+      }
+    }
+  ],
+  "tool_choice": "auto"
+}

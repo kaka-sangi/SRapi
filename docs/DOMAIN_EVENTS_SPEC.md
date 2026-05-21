@@ -116,9 +116,23 @@ published_at
 
 ```txt
 pending
-publishing
 published
 failed
+```
+
+MVP 状态机：
+
+```txt
+pending --dispatch ok--> published
+pending --dispatch failed--> failed(next_retry_at, last_error, attempt_count + 1)
+failed(next_retry_at <= now) --dispatch ok--> published
+failed(next_retry_at <= now) --dispatch failed--> failed(next_retry_at, last_error, attempt_count + 1)
+```
+
+多 worker 或外部消息中间件阶段可增加：
+
+```txt
+publishing
 dead_lettered
 ```
 
@@ -156,7 +170,7 @@ unique(event_id, consumer_name)
 index(consumer_name, status, created_at)
 ```
 
-每个消费者必须先写 inbox 再处理，重复事件直接跳过。
+每个消费者必须先写 inbox 再处理；处理成功标记 `processed` 和 `processed_at`，处理失败标记 `failed`、递增 `attempt_count` 并写入 `last_error`。重复事件如果已 `processed` 必须直接跳过。
 
 ## 7. 发布模式
 

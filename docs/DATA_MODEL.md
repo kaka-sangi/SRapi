@@ -144,20 +144,18 @@ index(role_id)
 
 ### 6.4 user_groups
 
-```txt
-id
-name
-description
-default_strategy
-rate_multiplier
-account_group_scope_json
-model_scope_json
-status
-created_at
-updated_at
-```
+用户权益组用于订阅、价格倍率和用户侧权限分组，MVP 阶段不单独落库。
+MVP 中 API Key 的 `group_ids` 指向 9.2 的 `account_groups`，用于选择可用账号池和调度偏好。
 
 ### 6.5 user_group_members
+
+用户权益组成员关系随 `user_groups` 在订阅阶段引入，MVP 阶段不单独落库。
+
+```txt
+MVP no-op
+```
+
+### 6.6 reserved user entitlement group fields
 
 ```txt
 id
@@ -210,20 +208,20 @@ index(expires_at)
 
 ### 7.2 api_key_groups
 
-用于支持一个 API Key 绑定多个用户组或路由组，Gateway 运行时按请求模型和 platform 解析最终 group。
+用于支持一个 API Key 绑定多个账号组，Gateway 运行时按请求模型和 platform 解析最终 account group。
 
 ```txt
 id
 api_key_id
-user_group_id
+account_group_id
 created_at
 ```
 
 索引：
 
 ```txt
-unique(api_key_id, user_group_id)
-index(user_group_id)
+unique(api_key_id, account_group_id)
+index(account_group_id)
 ```
 
 规则：

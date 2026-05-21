@@ -1,0 +1,34 @@
+{
+  "model": "client-facing-model",
+  "input": [
+    {
+      "type": "input_text",
+      "text": "Summarize the attached image."
+    },
+    {
+      "type": "input_image",
+      "image_url": {
+        "url": "https://example.invalid/diagram.png"
+      }
+    }
+  ],
+  "instructions": "Be concise.",
+  "stream": true,
+  "reasoning": {
+    "effort": "low"
+  },
+  "text": {
+    "format": {
+      "type": "json_schema",
+      "name": "summary"
+    }
+  },
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "lookup"
+      }
+    }
+  ]
+}

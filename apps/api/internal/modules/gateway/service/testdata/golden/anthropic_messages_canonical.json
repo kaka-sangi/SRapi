@@ -1,0 +1,75 @@
+{
+  "request_id": "req_golden_001",
+  "source_protocol": "anthropic-compatible",
+  "source_endpoint": "/v1/messages",
+  "response_protocol": "anthropic-compatible",
+  "user_id": 101,
+  "api_key_id": 202,
+  "model": "client-facing-model",
+  "canonical_model": "canonical-text-model",
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "role": "user",
+          "text": "Draft a response."
+        },
+        {
+          "type": "image",
+          "role": "user",
+          "text": "[image]"
+        }
+      ]
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "text",
+          "role": "assistant",
+          "text": "Existing context."
+        }
+      ]
+    }
+  ],
+  "instructions": "You are careful.\n[image]",
+  "stream": false,
+  "max_output_tokens": 256,
+  "tools": [
+    {
+      "function": {
+        "name": "lookup",
+        "parameters": {
+          "type": "object"
+        }
+      },
+      "type": "function"
+    }
+  ],
+  "tool_choice": "auto",
+  "reasoning": {
+    "budget_tokens": 128,
+    "type": "enabled"
+  },
+  "prompt": "system: You are careful.\n[image]\nuser: Draft a response.\n[image]\nassistant: Existing context.",
+  "compatibility_warnings": [
+    "vision_ignored",
+    "thinking_ignored"
+  ],
+  "request_capabilities": [
+    {
+      "key": "reasoning_control",
+      "version": "v1"
+    },
+    {
+      "key": "tool_calling",
+      "version": "v1"
+    },
+    {
+      "key": "vision_input",
+      "version": "v1"
+    }
+  ]
+}

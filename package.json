@@ -1,0 +1,19 @@
+{
+  "name": "srapi",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "openapi:lint": "redocly lint packages/openapi/openapi.yaml",
+    "openapi:bundle": "redocly bundle packages/openapi/openapi.yaml --output build/openapi/openapi.bundle.yaml",
+    "openapi:ts": "openapi-ts -i packages/openapi/openapi.yaml -o packages/sdk/typescript/src -c @hey-api/client-fetch -p @hey-api/typescript @hey-api/sdk --no-log-file",
+    "sdk:tsc": "tsc -p packages/sdk/typescript/tsconfig.json --noEmit",
+    "secret:scan": "secretlint \"**/*\""
+  },
+  "devDependencies": {
+    "@hey-api/openapi-ts": "0.97.2",
+    "@redocly/cli": "2.31.2",
+    "@secretlint/secretlint-rule-preset-recommend": "13.0.2",
+    "secretlint": "13.0.2",
+    "typescript": "5.9.3"
+  }
+}

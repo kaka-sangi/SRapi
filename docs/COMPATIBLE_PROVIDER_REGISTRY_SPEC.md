@@ -30,14 +30,16 @@ Provider preset 的目标是减少硬编码分叉：
 | --- | --- | --- |
 | `openai-compatible` | 通用自定义 OpenAI-compatible 上游 | MVP |
 | `openai` | 官方 API Key 或官方兼容 API | MVP |
-| `groq` | Groq OpenAI-compatible | Phase 2 |
-| `cerebras` | Cerebras OpenAI-compatible | Phase 2 |
-| `deepseek` | DeepSeek Chat / Reasoner | Phase 2 |
-| `moonshot` | Moonshot / Kimi | Phase 2 |
-| `openrouter` | OpenRouter | Phase 2 |
-| `anyrouter` | AnyRouter | Phase 2 |
-| `zhipu` | GLM / Zhipu | Phase 2 |
-| `zai` | Z.AI / GLM | Phase 2 |
+| `groq` | Groq OpenAI-compatible | MVP preset |
+| `cerebras` | Cerebras OpenAI-compatible | MVP preset |
+| `deepseek` | DeepSeek Chat / Reasoner | MVP preset |
+| `grok` | xAI Grok OpenAI-compatible | MVP preset |
+| `moonshot` | Moonshot / Kimi | MVP preset |
+| `kimi` | Kimi route alias preset | MVP preset |
+| `openrouter` | OpenRouter | MVP preset |
+| `anyrouter` | AnyRouter | MVP preset |
+| `zhipu` | GLM / Zhipu | MVP preset |
+| `zai` | Z.AI / GLM | MVP preset |
 
 允许账号类型：
 
@@ -57,10 +59,10 @@ custom_reverse_proxy
 | --- | --- | --- |
 | `anthropic-compatible` | 通用 Anthropic Messages-compatible 上游 | MVP |
 | `anthropic` | Anthropic official API Key / OAuth runtime | MVP |
-| `deepseek-anthropic` | DeepSeek Anthropic-compatible | Phase 2 |
-| `moonshot-anthropic` | Moonshot/Kimi Anthropic-compatible | Phase 2 |
-| `zhipu-anthropic` | Zhipu Anthropic-compatible | Phase 2 |
-| `zai-anthropic` | Z.AI Anthropic-compatible | Phase 2 |
+| `deepseek-anthropic` | DeepSeek Anthropic-compatible | MVP preset |
+| `moonshot-anthropic` | Moonshot/Kimi Anthropic-compatible | MVP preset |
+| `zhipu-anthropic` | Zhipu Anthropic-compatible | MVP preset |
+| `zai-anthropic` | Z.AI Anthropic-compatible | MVP preset |
 
 Anthropic-compatible preset 不得进入 Claude Web / Claude Code OAuth mimicry runtime。`claude-compatible` 只能作为历史兼容 route alias，不能作为新的 adapter_type 或 provider.protocol。
 
@@ -73,7 +75,7 @@ display_name: DeepSeek
 route_aliases:
   - /api/provider/deepseek
   - /api/provider/deepseek/v1
-default_base_url: https://api.deepseek.com/v1
+default_base_url: https://api.deepseek.com
 auth_modes:
   - bearer
 account_type_allowlist:
@@ -87,6 +89,31 @@ capabilities:
   embeddings: false
   stream: true
 ```
+
+当前内置 registry 至少必须覆盖以下 key：
+
+```txt
+anthropic
+anthropic-compatible
+anyrouter
+cerebras
+deepseek
+deepseek-anthropic
+grok
+groq
+kimi
+moonshot
+moonshot-anthropic
+openai
+openai-compatible
+openrouter
+zai
+zai-anthropic
+zhipu
+zhipu-anthropic
+```
+
+`deepseek` 的 OpenAI-compatible 默认 base URL 为 `https://api.deepseek.com`；`deepseek-anthropic` 为 `https://api.deepseek.com/anthropic`。其他 preset 必须同样保留显式 `default_base_url`，避免 Gateway 运行时按 provider 名称硬编码。
 
 ## 6. Auth Modes
 
@@ -116,6 +143,8 @@ Provider alias 只改变 platform context，不新增 runtime。
 ```
 
 Handler 不得复制 Provider-specific 转发逻辑。
+
+Provider alias 进入 Scheduler 前必须先应用 API Key policy，包括 `allowed_models` 与 `group_ids`。当 API Key 绑定了 `group_ids` 时，候选账号必须属于至少一个绑定的 account group；未绑定 group 的账号不得被 alias 路径调度。
 
 ## 8. 模型目录优先级
 

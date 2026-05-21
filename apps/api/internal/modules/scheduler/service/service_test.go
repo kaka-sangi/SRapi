@@ -1,0 +1,752 @@
+package service_test
+
+import (
+	"context"
+	"errors"
+	"strconv"
+	"strings"
+	"testing"
+	"time"
+
+	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
+	capabilitiescontract "github.com/srapi/srapi/apps/api/internal/modules/capabilities/contract"
+	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
+	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
+	"github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
+	"github.com/srapi/srapi/apps/api/internal/modules/scheduler/service"
+	schedulermemory "github.com/srapi/srapi/apps/api/internal/modules/scheduler/store/memory"
+)
+
+func TestScheduleRejectsRuntimeLimitAndCapabilityFailures(t *testing.T) {
+	svc := newService(t)
+	req := baseRequest()
+	req.RequestCapabilities = []capabilitiescontract.Descriptor{
+		{Key: capabilitiescontract.KeyToolCalling, Level: capabilitiescontract.DescriptorLevelRequired, Status: capabilitiescontract.DescriptorStatusStable, Version: "v1"},
+	}
+	req.Candidates = []contract.Candidate{
+		candidate(1, withMaxConcurrency(1), withConcurrency(1), withCapabilities(capabilitiescontract.KeyToolCalling)),
+		candidate(2, withRPMLimit(10), withRPMUsed(10), withCapabilities(capabilitiescontract.KeyToolCalling)),
+		candidate(3, withTPMLimit(100), withTPMUsed(100), withCapabilities(capabilitiescontract.KeyToolCalling)),
+		candidate(4, noOptions(), noRuntime(), withCapabilities(capabilitiescontract.KeyStreaming)),
+		candidate(5, noOptions(), noRuntime(), withCapabilities(capabilitiescontract.KeyToolCalling)),
+	}
+
+	result, err := svc.Schedule(context.Background(), req)
+	if err != nil {
+		t.Fatalf("schedule: %v", err)
+	}
+	if result.Candidate.Account.ID != 5 {
+		t.Fatalf("expected account 5 selected, got %d", result.Candidate.Account.ID)
+	}
+	if result.Lease.Status != contract.LeaseStatusPending || result.Lease.AccountID != 5 {
+		t.Fatalf("expected pending lease for account 5, got %+v", result.Lease)
+	}
+	assertRejectReason(t, result.Decision.RejectReasons, 1, "concurrency_full")
+	assertRejectReason(t, result.Decision.RejectReasons, 2, "rpm_limit_exceeded")
+	assertRejectReason(t, result.Decision.RejectReasons, 3, "tpm_limit_exceeded")
+	assertRejectReason(t, result.Decision.RejectReasons, 4, "capability_mismatch")
+	if result.Decision.RejectedCount != 4 || result.Decision.CandidateCount != 5 {
+		t.Fatalf("unexpected decision counts: %+v", result.Decision)
+	}
+}
+
+func TestScheduleReturnsNoAvailableAccountWithStructuredReasons(t *testing.T) {
+	svc := newService(t)
+	req := baseRequest()
+	req.Candidates = []contract.Candidate{
+		candidate(1, noOptions(), withQuotaExhausted(), withCapabilities(capabilitiescontract.KeyStreaming)),
+		candidate(2, noOptions(), withCircuitOpen(), withCapabilities(capabilitiescontract.KeyStreaming)),
+		candidate(3, noOptions(), withCooldownActive(), withCapabilities(capabilitiescontract.KeyStreaming)),
+		candidate(4, noOptions(), noRuntime(), withAccountStatus(accountcontract.StatusNeedsReauth), withCapabilities(capabilitiescontract.KeyStreaming)),
+		candidate(5, noOptions(), noRuntime(), withCredential(""), withCapabilities(capabilitiescontract.KeyStreaming)),
+	}
+
+	result, err := svc.Schedule(context.Background(), req)
+	if err == nil {
+		t.Fatal("expected no available account")
+	}
+	if err != service.ErrNoAvailableAccount {
+		t.Fatalf("expected ErrNoAvailableAccount, got %v", err)
+	}
+	assertRejectReason(t, result.Decision.RejectReasons, 1, "quota_exhausted")
+	assertRejectReason(t, result.Decision.RejectReasons, 2, "circuit_open")
+	assertRejectReason(t, result.Decision.RejectReasons, 3, "cooldown_active")
+	assertRejectReason(t, result.Decision.RejectReasons, 4, "needs_reauth")
+	assertRejectReason(t, result.Decision.RejectReasons, 5, "credential_invalid")
+	if result.Decision.SelectedAccountID != nil {
+		t.Fatalf("expected no selected account, got %+v", result.Decision.SelectedAccountID)
+	}
+}
+
+func TestBalancedStrategyPrefersHealthyCandidate(t *testing.T) {
+	svc := newService(t)
+	req := baseRequest()
+	req.Candidates = []contract.Candidate{
+		candidate(1, withHealth(0.95), withQuotaRemaining(0.50), withRelativeCost("0.5"), withCapabilities(capabilitiescontract.KeyStreaming)),
+		candidate(2, withHealth(0.60), withQuotaRemaining(0.90), withRelativeCost("0.1"), withCapabilities(capabilitiescontract.KeyStreaming)),
+	}
+
+	result, err := svc.Schedule(context.Background(), req)
+	if err != nil {
+		t.Fatalf("schedule: %v", err)
+	}
+	if result.Candidate.Account.ID != 1 {
+		t.Fatalf("expected healthier account 1 selected, got %d", result.Candidate.Account.ID)
+	}
+	if len(result.Decision.RejectReasons) != 0 {
+		t.Fatalf("expected no hard filter rejects, got %+v", result.Decision.RejectReasons)
+	}
+	account1 := decisionScore(t, result.Decision.Scores, 1)
+	account2 := decisionScore(t, result.Decision.Scores, 2)
+	if account1["health_score"].(float64) <= account2["health_score"].(float64) {
+		t.Fatalf("expected account 1 health score to dominate, got a1=%+v a2=%+v", account1, account2)
+	}
+}
+
+func TestFreeTierRejectsProtectedLowQuotaAccount(t *testing.T) {
+	svc := newService(t)
+	req := baseRequest()
+	req.UserTier = contract.UserTierFree
+	req.Strategy = contract.StrategyCostSaver
+	req.Candidates = []contract.Candidate{
+		candidate(1, withHealth(0.95), withQuotaRemaining(0.08), withProtectedAccount(), withRelativeCost("0.1"), withCapabilities(capabilitiescontract.KeyStreaming)),
+		candidate(2, withHealth(0.90), withQuotaRemaining(0.70), withRelativeCost("0.2"), withCapabilities(capabilitiescontract.KeyStreaming)),
+	}
+
+	result, err := svc.Schedule(context.Background(), req)
+	if err != nil {
+		t.Fatalf("schedule: %v", err)
+	}
+	if result.Candidate.Account.ID != 2 {
+		t.Fatalf("expected normal quota account 2 selected, got %d", result.Candidate.Account.ID)
+	}
+	assertRejectReason(t, result.Decision.RejectReasons, 1, "quota_protected")
+}
+
+func TestSoftStickyInfluencesCloseCandidates(t *testing.T) {
+	svc := newService(t)
+	req := baseRequest()
+	stickyAccountID := 1
+	req.StickyAccountID = &stickyAccountID
+	req.StickyStrength = contract.StickyStrengthSoft
+	req.Candidates = []contract.Candidate{
+		candidate(1, withHealth(0.90), withQuotaRemaining(0.60), withCapabilities(capabilitiescontract.KeyStreaming)),
+		candidate(2, withHealth(0.92), withQuotaRemaining(0.60), withCapabilities(capabilitiescontract.KeyStreaming)),
+	}
+
+	result, err := svc.Schedule(context.Background(), req)
+	if err != nil {
+		t.Fatalf("schedule: %v", err)
+	}
+	if result.Candidate.Account.ID != 1 {
+		t.Fatalf("expected soft sticky account 1 selected, got %d", result.Candidate.Account.ID)
+	}
+	if !result.Decision.StickyHit {
+		t.Fatalf("expected sticky hit in decision, got %+v", result.Decision)
+	}
+	if sticky := decisionScore(t, result.Decision.Scores, 1)["sticky_score"].(float64); sticky <= 0 {
+		t.Fatalf("expected sticky score, got %+v", result.Decision.Scores)
+	}
+}
+
+func TestSoftStickyDoesNotBypassHardFilters(t *testing.T) {
+	svc := newService(t)
+	req := baseRequest()
+	stickyAccountID := 1
+	req.StickyAccountID = &stickyAccountID
+	req.StickyStrength = contract.StickyStrengthSoft
+	req.Candidates = []contract.Candidate{
+		candidate(1, withCircuitOpen(), withCapabilities(capabilitiescontract.KeyStreaming)),
+		candidate(2, withHealth(0.88), withQuotaRemaining(0.70), withCapabilities(capabilitiescontract.KeyStreaming)),
+	}
+
+	result, err := svc.Schedule(context.Background(), req)
+	if err != nil {
+		t.Fatalf("schedule: %v", err)
+	}
+	if result.Candidate.Account.ID != 2 {
+		t.Fatalf("expected fallback account 2 selected, got %d", result.Candidate.Account.ID)
+	}
+	assertRejectReason(t, result.Decision.RejectReasons, 1, "circuit_open")
+	if result.Decision.RejectReasons["sticky_broken_reason"] != "circuit_open" {
+		t.Fatalf("expected sticky broken reason, got %+v", result.Decision.RejectReasons)
+	}
+}
+
+func TestCostSaverPrefersLowerRelativeCost(t *testing.T) {
+	svc := newService(t)
+	req := baseRequest()
+	req.Strategy = contract.StrategyCostSaver
+	req.Candidates = []contract.Candidate{
+		candidate(1, noOptions(), noRuntime(), withRelativeCost("0.9"), withCapabilities(capabilitiescontract.KeyStreaming)),
+		candidate(2, noOptions(), noRuntime(), withRelativeCost("0.1"), withCapabilities(capabilitiescontract.KeyStreaming)),
+	}
+
+	result, err := svc.Schedule(context.Background(), req)
+	if err != nil {
+		t.Fatalf("schedule: %v", err)
+	}
+	if result.Candidate.Account.ID != 2 {
+		t.Fatalf("expected lower-cost account 2 selected, got %d", result.Candidate.Account.ID)
+	}
+	if result.Decision.Strategy != contract.StrategyCostSaver || result.Decision.StrategyVersion == "" || len(result.Decision.StrategyWeights) == 0 {
+		t.Fatalf("expected strategy snapshot in decision, got %+v", result.Decision)
+	}
+	if !strings.HasPrefix(result.Decision.StrategyConfigHash, "sha256:") {
+		t.Fatalf("expected strategy config hash snapshot, got %+v", result.Decision)
+	}
+}
+
+func TestSchedulingScenarioMatrixMVP(t *testing.T) {
+	cases := []struct {
+		name          string
+		req           contract.ScheduleRequest
+		wantAccountID int
+		wantErr       error
+		wantRejects   map[int]string
+		wantDecision  map[string]any
+		wantLease     bool
+		assertScores  func(t *testing.T, decision contract.Decision)
+	}{
+		{
+			name: "A health priority",
+			req: withCandidates(baseRequest(),
+				candidate(1, withHealth(0.95), withQuotaRemaining(0.50), withRelativeCost("0.5"), withCapabilities(capabilitiescontract.KeyStreaming)),
+				candidate(2, withHealth(0.60), withQuotaRemaining(0.90), withRelativeCost("0.1"), withCapabilities(capabilitiescontract.KeyStreaming)),
+			),
+			wantAccountID: 1,
+			wantLease:     true,
+			assertScores: func(t *testing.T, decision contract.Decision) {
+				t.Helper()
+				if decisionScore(t, decision.Scores, 1)["health_score"].(float64) <= decisionScore(t, decision.Scores, 2)["health_score"].(float64) {
+					t.Fatalf("scenario A expected account 1 health score to dominate: %+v", decision.Scores)
+				}
+			},
+		},
+		{
+			name: "B quota protection",
+			req: func() contract.ScheduleRequest {
+				req := baseRequest()
+				req.UserTier = contract.UserTierFree
+				req.Strategy = contract.StrategyCostSaver
+				return withCandidates(req,
+					candidate(1, withHealth(0.95), withQuotaRemaining(0.08), withProtectedAccount(), withRelativeCost("0.1"), withCapabilities(capabilitiescontract.KeyStreaming)),
+					candidate(2, withHealth(0.90), withQuotaRemaining(0.70), withRelativeCost("0.2"), withCapabilities(capabilitiescontract.KeyStreaming)),
+				)
+			}(),
+			wantAccountID: 2,
+			wantRejects:   map[int]string{1: "quota_protected"},
+			wantLease:     true,
+		},
+		{
+			name: "D soft sticky hit",
+			req: func() contract.ScheduleRequest {
+				stickyAccountID := 1
+				req := baseRequest()
+				req.StickyAccountID = &stickyAccountID
+				req.StickyStrength = contract.StickyStrengthSoft
+				return withCandidates(req,
+					candidate(1, withHealth(0.90), withQuotaRemaining(0.60), withCapabilities(capabilitiescontract.KeyStreaming)),
+					candidate(2, withHealth(0.92), withQuotaRemaining(0.60), withCapabilities(capabilitiescontract.KeyStreaming)),
+				)
+			}(),
+			wantAccountID: 1,
+			wantDecision:  map[string]any{"sticky_hit": true},
+			wantLease:     true,
+		},
+		{
+			name: "E sticky failure fallback",
+			req: func() contract.ScheduleRequest {
+				stickyAccountID := 1
+				req := baseRequest()
+				req.StickyAccountID = &stickyAccountID
+				req.StickyStrength = contract.StickyStrengthSoft
+				return withCandidates(req,
+					candidate(1, withCircuitOpen(), withCapabilities(capabilitiescontract.KeyStreaming)),
+					candidate(2, withHealth(0.88), withQuotaRemaining(0.70), withCapabilities(capabilitiescontract.KeyStreaming)),
+				)
+			}(),
+			wantAccountID: 2,
+			wantRejects:   map[int]string{1: "circuit_open"},
+			wantDecision:  map[string]any{"sticky_broken_reason": "circuit_open"},
+			wantLease:     true,
+		},
+		{
+			name: "J cost first",
+			req: func() contract.ScheduleRequest {
+				req := baseRequest()
+				req.Strategy = contract.StrategyCostSaver
+				return withCandidates(req,
+					candidate(1, withHealth(0.95), withQuotaRemaining(0.90), withRelativeCost("0.9"), withCapabilities(capabilitiescontract.KeyStreaming)),
+					candidate(2, withHealth(0.85), withQuotaRemaining(0.90), withRelativeCost("0.1"), withCapabilities(capabilitiescontract.KeyStreaming)),
+				)
+			}(),
+			wantAccountID: 2,
+			wantLease:     true,
+			assertScores: func(t *testing.T, decision contract.Decision) {
+				t.Helper()
+				if decisionScore(t, decision.Scores, 2)["cost_score"].(float64) <= decisionScore(t, decision.Scores, 1)["cost_score"].(float64) {
+					t.Fatalf("scenario J expected account 2 cost score to dominate: %+v", decision.Scores)
+				}
+			},
+		},
+		{
+			name: "L lease concurrency limit",
+			req: withCandidates(baseRequest(),
+				candidate(1, withMaxConcurrency(10), withConcurrency(10), withCapabilities(capabilitiescontract.KeyStreaming)),
+				candidate(2, withMaxConcurrency(10), withConcurrency(5), withCapabilities(capabilitiescontract.KeyStreaming)),
+			),
+			wantAccountID: 2,
+			wantRejects:   map[int]string{1: "concurrency_full"},
+			wantLease:     true,
+		},
+		{
+			name: "M RPM limit",
+			req: withCandidates(baseRequest(),
+				candidate(1, withRPMLimit(10), withRPMUsed(10), withCapabilities(capabilitiescontract.KeyStreaming)),
+				candidate(2, withRPMLimit(10), withRPMUsed(5), withCapabilities(capabilitiescontract.KeyStreaming)),
+			),
+			wantAccountID: 2,
+			wantRejects:   map[int]string{1: "rpm_limit_exceeded"},
+			wantLease:     true,
+		},
+		{
+			name: "N no available account",
+			req: withCandidates(baseRequest(),
+				candidate(1, withAccountStatus(accountcontract.StatusDisabled), withCapabilities(capabilitiescontract.KeyStreaming)),
+				candidate(2, withQuotaExhausted(), withCapabilities(capabilitiescontract.KeyStreaming)),
+				candidate(3, withCircuitOpen(), withCapabilities(capabilitiescontract.KeyStreaming)),
+			),
+			wantErr:     service.ErrNoAvailableAccount,
+			wantRejects: map[int]string{1: "account_disabled", 2: "quota_exhausted", 3: "circuit_open"},
+		},
+		{
+			name: "Q user balance insufficient",
+			req: func() contract.ScheduleRequest {
+				req := baseRequest()
+				req.UserBalanceInsufficient = true
+				return withCandidates(req,
+					candidate(1, withCapabilities(capabilitiescontract.KeyStreaming)),
+					candidate(2, withCapabilities(capabilitiescontract.KeyStreaming)),
+				)
+			}(),
+			wantErr:     service.ErrUserBalanceInsufficient,
+			wantRejects: map[int]string{1: "user_balance_insufficient", 2: "user_balance_insufficient"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			svc := newService(t)
+			result, err := svc.Schedule(context.Background(), tc.req)
+			if tc.wantErr != nil {
+				if !errors.Is(err, tc.wantErr) {
+					t.Fatalf("expected %v, got result=%+v err=%v", tc.wantErr, result, err)
+				}
+				if result.Decision.SelectedAccountID != nil {
+					t.Fatalf("expected no selected account, got %+v", result.Decision)
+				}
+			} else if err != nil {
+				t.Fatalf("schedule: %v", err)
+			}
+			if tc.wantAccountID > 0 && result.Candidate.Account.ID != tc.wantAccountID {
+				t.Fatalf("expected account %d selected, got %+v", tc.wantAccountID, result.Candidate.Account)
+			}
+			for accountID, reason := range tc.wantRejects {
+				assertRejectReason(t, result.Decision.RejectReasons, accountID, reason)
+			}
+			for key, value := range tc.wantDecision {
+				switch key {
+				case "sticky_hit":
+					if result.Decision.StickyHit != value.(bool) {
+						t.Fatalf("expected sticky_hit=%v, got %+v", value, result.Decision)
+					}
+				default:
+					if result.Decision.RejectReasons[key] != value {
+						t.Fatalf("expected decision marker %s=%v, got %+v", key, value, result.Decision.RejectReasons)
+					}
+				}
+			}
+			if tc.wantLease && (result.Lease.Status != contract.LeaseStatusPending || result.Lease.AccountID != tc.wantAccountID) {
+				t.Fatalf("expected pending lease on account %d, got %+v", tc.wantAccountID, result.Lease)
+			}
+			if !tc.wantLease && result.Lease.ID != "" {
+				t.Fatalf("expected no lease, got %+v", result.Lease)
+			}
+			if tc.assertScores != nil {
+				tc.assertScores(t, result.Decision)
+			}
+		})
+	}
+}
+
+func TestUserBalanceInsufficientCreatesDecisionWithoutLease(t *testing.T) {
+	svc := newService(t)
+	req := baseRequest()
+	req.UserBalanceInsufficient = true
+	req.Candidates = []contract.Candidate{
+		candidate(1, withCapabilities(capabilitiescontract.KeyStreaming)),
+		candidate(2, withCapabilities(capabilitiescontract.KeyStreaming)),
+	}
+
+	result, err := svc.Schedule(context.Background(), req)
+	if !errors.Is(err, service.ErrUserBalanceInsufficient) {
+		t.Fatalf("expected ErrUserBalanceInsufficient, got result=%+v err=%v", result, err)
+	}
+	if result.Decision.SelectedAccountID != nil {
+		t.Fatalf("expected no selected account, got %+v", result.Decision)
+	}
+	assertRejectReason(t, result.Decision.RejectReasons, 1, "user_balance_insufficient")
+	assertRejectReason(t, result.Decision.RejectReasons, 2, "user_balance_insufficient")
+	leases, err := svc.ListLeases(context.Background())
+	if err != nil {
+		t.Fatalf("list leases: %v", err)
+	}
+	if len(leases) != 0 {
+		t.Fatalf("expected no lease for user-side balance rejection, got %+v", leases)
+	}
+}
+
+func TestStrategyRegistryListsSeededStrategies(t *testing.T) {
+	svc := newService(t)
+	strategies := svc.ListStrategies()
+	if len(strategies) != 2 {
+		t.Fatalf("expected 2 seeded strategies, got %d", len(strategies))
+	}
+	for _, strategy := range strategies {
+		if strategy.Version == "" || strategy.Status != "active" || !strings.HasPrefix(strategy.ConfigHash, "sha256:") || len(strategy.Weights) == 0 || len(strategy.Config) == 0 {
+			t.Fatalf("unexpected strategy descriptor: %+v", strategy)
+		}
+	}
+}
+
+func TestLeasePreventsConcurrentSchedulingAndFeedbackReleases(t *testing.T) {
+	svc := newService(t)
+	req := baseRequest()
+	req.Candidates = []contract.Candidate{
+		candidate(1, withMaxConcurrency(1), withCapabilities(capabilitiescontract.KeyStreaming)),
+	}
+
+	first, err := svc.Schedule(context.Background(), req)
+	if err != nil {
+		t.Fatalf("first schedule: %v", err)
+	}
+	if first.Lease.Status != contract.LeaseStatusPending {
+		t.Fatalf("expected pending lease, got %+v", first.Lease)
+	}
+
+	secondReq := req
+	secondReq.RequestID = "req_scheduler_2"
+	second, err := svc.Schedule(context.Background(), secondReq)
+	if err != service.ErrNoAvailableAccount {
+		t.Fatalf("expected no available account from lease saturation, got result=%+v err=%v", second, err)
+	}
+	assertRejectReason(t, second.Decision.RejectReasons, 1, "concurrency_full")
+
+	_, err = svc.RecordFeedback(context.Background(), contract.RecordFeedbackRequest{
+		RequestID:  first.Decision.RequestID,
+		DecisionID: first.Decision.ID,
+		AttemptNo:  first.Decision.AttemptNo,
+		AccountID:  first.Candidate.Account.ID,
+		ProviderID: first.Candidate.Provider.ID,
+		Model:      first.Decision.Model,
+		Success:    true,
+	})
+	if err != nil {
+		t.Fatalf("record feedback: %v", err)
+	}
+	leases, err := svc.ListLeases(context.Background())
+	if err != nil {
+		t.Fatalf("list leases: %v", err)
+	}
+	if len(leases) == 0 || leases[0].Status != contract.LeaseStatusCommitted {
+		t.Fatalf("expected committed lease after feedback, got %+v", leases)
+	}
+
+	thirdReq := req
+	thirdReq.RequestID = "req_scheduler_3"
+	third, err := svc.Schedule(context.Background(), thirdReq)
+	if err != nil {
+		t.Fatalf("expected scheduling after release, got result=%+v err=%v", third, err)
+	}
+}
+
+func TestRecordFailedFeedbackMarksLeaseFailed(t *testing.T) {
+	svc := newService(t)
+	req := baseRequest()
+	req.Candidates = []contract.Candidate{
+		candidate(1, withMaxConcurrency(1), withCapabilities(capabilitiescontract.KeyStreaming)),
+	}
+	result, err := svc.Schedule(context.Background(), req)
+	if err != nil {
+		t.Fatalf("schedule: %v", err)
+	}
+	errorClass := "stream_interrupted"
+	statusCode := 502
+	feedback, err := svc.RecordFeedback(context.Background(), contract.RecordFeedbackRequest{
+		RequestID:    result.Decision.RequestID,
+		DecisionID:   result.Decision.ID,
+		AttemptNo:    result.Decision.AttemptNo,
+		AccountID:    result.Candidate.Account.ID,
+		ProviderID:   result.Candidate.Provider.ID,
+		Model:        result.Decision.Model,
+		Success:      false,
+		ErrorClass:   &errorClass,
+		StatusCode:   &statusCode,
+		LatencyMS:    123,
+		InputTokens:  10,
+		OutputTokens: 3,
+	})
+	if err != nil {
+		t.Fatalf("record failed feedback: %v", err)
+	}
+	if feedback.ErrorClass == nil || *feedback.ErrorClass != errorClass || feedback.StatusCode == nil || *feedback.StatusCode != statusCode {
+		t.Fatalf("expected failed feedback details, got %+v", feedback)
+	}
+	leases, err := svc.ListLeases(context.Background())
+	if err != nil {
+		t.Fatalf("list leases: %v", err)
+	}
+	if len(leases) != 1 || leases[0].Status != contract.LeaseStatusFailed {
+		t.Fatalf("expected failed lease after failed feedback, got %+v", leases)
+	}
+}
+
+func TestLeaseExpiresAndFreesConcurrency(t *testing.T) {
+	svc := newService(t)
+	req := baseRequest()
+	req.LeaseTTL = time.Nanosecond
+	req.Candidates = []contract.Candidate{
+		candidate(1, withMaxConcurrency(1), withCapabilities(capabilitiescontract.KeyStreaming)),
+	}
+	first, err := svc.Schedule(context.Background(), req)
+	if err != nil {
+		t.Fatalf("first schedule: %v", err)
+	}
+	if first.Lease.Status != contract.LeaseStatusPending {
+		t.Fatalf("expected pending lease, got %+v", first.Lease)
+	}
+	time.Sleep(time.Millisecond)
+
+	secondReq := req
+	secondReq.RequestID = "req_scheduler_expired_2"
+	second, err := svc.Schedule(context.Background(), secondReq)
+	if err != nil {
+		t.Fatalf("expected lease expiry to free concurrency, got result=%+v err=%v", second, err)
+	}
+	leases, err := svc.ListLeases(context.Background())
+	if err != nil {
+		t.Fatalf("list leases: %v", err)
+	}
+	foundExpired := false
+	for _, lease := range leases {
+		if lease.RequestID == first.Lease.RequestID && lease.Status == contract.LeaseStatusExpired {
+			foundExpired = true
+		}
+	}
+	if !foundExpired {
+		t.Fatalf("expected first lease expired, got %+v", leases)
+	}
+}
+
+func TestScheduleRejectsUnknownCapabilityKeys(t *testing.T) {
+	svc := newService(t)
+	req := baseRequest()
+	req.RequestCapabilities = []capabilitiescontract.Descriptor{
+		{Key: "tool_callng", Level: capabilitiescontract.DescriptorLevelRequired, Status: capabilitiescontract.DescriptorStatusStable, Version: "v1"},
+	}
+	req.Candidates = []contract.Candidate{
+		candidate(1, withCapabilities(capabilitiescontract.KeyToolCalling)),
+	}
+	if _, err := svc.Schedule(context.Background(), req); !errors.Is(err, service.ErrInvalidInput) {
+		t.Fatalf("expected ErrInvalidInput for misspelled request capability, got %v", err)
+	}
+
+	req = baseRequest()
+	req.RequestCapabilities = []capabilitiescontract.Descriptor{
+		{Key: capabilitiescontract.KeyToolCalling, Level: capabilitiescontract.DescriptorLevelRequired, Status: capabilitiescontract.DescriptorStatusStable, Version: "v1"},
+	}
+	req.Candidates = []contract.Candidate{
+		candidate(1, withCapabilities("tool_callng")),
+	}
+	if _, err := svc.Schedule(context.Background(), req); !errors.Is(err, service.ErrInvalidInput) {
+		t.Fatalf("expected ErrInvalidInput for misspelled effective capability, got %v", err)
+	}
+}
+
+func newService(t *testing.T) *service.Service {
+	t.Helper()
+	svc, err := service.New(schedulermemory.New(), nil)
+	if err != nil {
+		t.Fatalf("create scheduler service: %v", err)
+	}
+	return svc
+}
+
+func baseRequest() contract.ScheduleRequest {
+	return contract.ScheduleRequest{
+		RequestID:      "req_scheduler",
+		UserID:         1,
+		APIKeyID:       1,
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/chat/completions",
+		Model:          "gpt-test",
+		Strategy:       contract.StrategyBalanced,
+	}
+}
+
+func withCandidates(req contract.ScheduleRequest, candidates ...contract.Candidate) contract.ScheduleRequest {
+	req.Candidates = candidates
+	return req
+}
+
+type candidateOption func(*contract.Candidate)
+
+func candidate(id int, opts ...candidateOption) contract.Candidate {
+	out := contract.Candidate{
+		Account: accountcontract.ProviderAccount{
+			ID:                   id,
+			ProviderID:           1,
+			Name:                 "account",
+			RuntimeClass:         accountcontract.RuntimeClassAPIKey,
+			CredentialCiphertext: "encrypted",
+			Status:               accountcontract.StatusActive,
+			Weight:               1,
+		},
+		Provider: providercontract.Provider{
+			ID:          1,
+			Name:        "provider",
+			AdapterType: "openai-compatible",
+			Protocol:    "openai-compatible",
+			Status:      providercontract.StatusActive,
+		},
+		Mapping: modelcontract.ModelProviderMapping{
+			ID:                id,
+			ModelID:           1,
+			ProviderID:        1,
+			UpstreamModelName: "gpt-test",
+			Status:            modelcontract.StatusActive,
+			PricingOverride:   map[string]any{},
+		},
+		EffectiveCapabilities: []capabilitiescontract.Descriptor{
+			{Key: capabilitiescontract.KeyStreaming, Level: capabilitiescontract.DescriptorLevelRequired, Status: capabilitiescontract.DescriptorStatusStable, Version: "v1"},
+		},
+	}
+	for _, opt := range opts {
+		opt(&out)
+	}
+	return out
+}
+
+func noOptions() candidateOption {
+	return func(*contract.Candidate) {}
+}
+
+func noRuntime() candidateOption {
+	return func(*contract.Candidate) {}
+}
+
+func withMaxConcurrency(value int) candidateOption {
+	return func(candidate *contract.Candidate) { candidate.Limits.MaxConcurrency = &value }
+}
+
+func withConcurrency(value int) candidateOption {
+	return func(candidate *contract.Candidate) { candidate.RuntimeState.CurrentConcurrency = value }
+}
+
+func withRPMLimit(value int) candidateOption {
+	return func(candidate *contract.Candidate) { candidate.Limits.RPMLimit = &value }
+}
+
+func withRPMUsed(value int) candidateOption {
+	return func(candidate *contract.Candidate) { candidate.RuntimeState.RPMUsed = value }
+}
+
+func withTPMLimit(value int) candidateOption {
+	return func(candidate *contract.Candidate) { candidate.Limits.TPMLimit = &value }
+}
+
+func withTPMUsed(value int) candidateOption {
+	return func(candidate *contract.Candidate) { candidate.RuntimeState.TPMUsed = value }
+}
+
+func withQuotaExhausted() candidateOption {
+	return func(candidate *contract.Candidate) { candidate.RuntimeState.QuotaExhausted = true }
+}
+
+func withHealth(value float64) candidateOption {
+	return func(candidate *contract.Candidate) { candidate.RuntimeState.HealthScore = &value }
+}
+
+func withQuotaRemaining(value float64) candidateOption {
+	return func(candidate *contract.Candidate) { candidate.RuntimeState.QuotaRemainingRatio = &value }
+}
+
+func withProtectedAccount() candidateOption {
+	return func(candidate *contract.Candidate) {
+		if candidate.Account.Metadata == nil {
+			candidate.Account.Metadata = map[string]any{}
+		}
+		candidate.Account.Metadata["quota_protected"] = true
+	}
+}
+
+func withCircuitOpen() candidateOption {
+	return func(candidate *contract.Candidate) { candidate.RuntimeState.CircuitOpen = true }
+}
+
+func withCooldownActive() candidateOption {
+	return func(candidate *contract.Candidate) { candidate.RuntimeState.CooldownActive = true }
+}
+
+func withAccountStatus(status accountcontract.Status) candidateOption {
+	return func(candidate *contract.Candidate) { candidate.Account.Status = status }
+}
+
+func withCredential(ciphertext string) candidateOption {
+	return func(candidate *contract.Candidate) { candidate.Account.CredentialCiphertext = ciphertext }
+}
+
+func withCapabilities(keys ...string) candidateOption {
+	return func(candidate *contract.Candidate) {
+		candidate.EffectiveCapabilities = make([]capabilitiescontract.Descriptor, 0, len(keys))
+		for _, key := range keys {
+			candidate.EffectiveCapabilities = append(candidate.EffectiveCapabilities, capabilitiescontract.Descriptor{
+				Key:     key,
+				Level:   capabilitiescontract.DescriptorLevelRequired,
+				Status:  capabilitiescontract.DescriptorStatusStable,
+				Version: "v1",
+			})
+		}
+	}
+}
+
+func withRelativeCost(value string) candidateOption {
+	return func(candidate *contract.Candidate) {
+		candidate.Mapping.PricingOverride["relative_cost"] = value
+	}
+}
+
+func assertRejectReason(t *testing.T, reasons map[string]any, accountID int, expected string) {
+	t.Helper()
+	got, ok := reasons["account_"+strconv.Itoa(accountID)]
+	if !ok {
+		t.Fatalf("missing reject reason for account %d in %+v", accountID, reasons)
+	}
+	if got != expected {
+		t.Fatalf("expected account %d reject reason %q, got %v", accountID, expected, got)
+	}
+}
+
+func decisionScore(t *testing.T, scores map[string]any, accountID int) map[string]any {
+	t.Helper()
+	raw, ok := scores["account_"+strconv.Itoa(accountID)]
+	if !ok {
+		t.Fatalf("missing score for account %d in %+v", accountID, scores)
+	}
+	score, ok := raw.(map[string]any)
+	if !ok {
+		t.Fatalf("expected score map for account %d, got %T %+v", accountID, raw, raw)
+	}
+	return score
+}

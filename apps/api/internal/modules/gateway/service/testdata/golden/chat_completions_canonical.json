@@ -1,0 +1,75 @@
+{
+  "request_id": "req_golden_001",
+  "source_protocol": "openai-compatible",
+  "source_endpoint": "/v1/chat/completions",
+  "response_protocol": "openai-compatible",
+  "user_id": 101,
+  "api_key_id": 202,
+  "model": "client-facing-model",
+  "canonical_model": "canonical-text-model",
+  "messages": [
+    {
+      "role": "system",
+      "content": [
+        {
+          "type": "text",
+          "text": "You are terse."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "Describe this"
+        },
+        {
+          "type": "image",
+          "text": "[image]",
+          "metadata": {
+            "url": "https://example.invalid/image.png"
+          }
+        }
+      ]
+    }
+  ],
+  "stream": true,
+  "tools": [
+    {
+      "function": {
+        "name": "lookup",
+        "parameters": {
+          "type": "object"
+        }
+      },
+      "type": "function"
+    }
+  ],
+  "tool_choice": "auto",
+  "response_format": {
+    "type": "json_object"
+  },
+  "prompt": "system: You are terse.\nuser: Describe this\n[image]",
+  "compatibility_warnings": [
+    "vision_ignored"
+  ],
+  "request_capabilities": [
+    {
+      "key": "streaming",
+      "version": "v1"
+    },
+    {
+      "key": "structured_output",
+      "version": "v1"
+    },
+    {
+      "key": "tool_calling",
+      "version": "v1"
+    },
+    {
+      "key": "vision_input",
+      "version": "v1"
+    }
+  ]
+}

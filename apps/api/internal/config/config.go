@@ -1,0 +1,187 @@
+package config
+
+import (
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+)
+
+const (
+	defaultHost            = "0.0.0.0"
+	defaultPort            = 8080
+	defaultShutdownSeconds = 45
+	defaultVersion         = "0.1.0"
+	defaultGatewayBodySize = 268435456
+)
+
+type Config struct {
+	Server    ServerConfig
+	Database  DependencyConfig
+	Redis     DependencyConfig
+	Gateway   GatewayConfig
+	Security  SecurityConfig
+	Bootstrap BootstrapConfig
+}
+
+type ServerConfig struct {
+	Host            string
+	Port            int
+	Mode            string
+	Version         string
+	ShutdownTimeout time.Duration
+}
+
+type DependencyConfig struct {
+	Host     string
+	Port     int
+	User     string
+	Password string
+	Database string
+	SSLMode  string
+}
+
+type GatewayConfig struct {
+	MaxBodySize       int64
+	RequestTimeout    time.Duration
+	StreamIdleTimeout time.Duration
+}
+
+type SecurityConfig struct {
+	JWTSecret    string
+	MasterKey    string
+	APIKeyPepper string
+}
+
+type BootstrapConfig struct {
+	AdminEmail    string
+	AdminPassword string
+	AdminName     string
+}
+
+func Load() Config {
+	return Config{
+		Server: ServerConfig{
+			Host:            getEnv("SERVER_HOST", defaultHost),
+			Port:            getIntEnv("SERVER_PORT", defaultPort),
+			Mode:            getEnv("SERVER_MODE", "local"),
+			Version:         getEnv("SRAPI_VERSION", defaultVersion),
+			ShutdownTimeout: time.Duration(getIntEnv("SERVER_SHUTDOWN_TIMEOUT_SECONDS", defaultShutdownSeconds)) * time.Second,
+		},
+		Database: DependencyConfig{
+			Host:     getEnv("DATABASE_HOST", "localhost"),
+			Port:     getIntEnv("DATABASE_PORT", 5432),
+			User:     getEnv("DATABASE_USER", "srapi"),
+			Password: getEnv("DATABASE_PASSWORD", ""),
+			Database: getEnv("DATABASE_DBNAME", "srapi"),
+			SSLMode:  getEnv("DATABASE_SSLMODE", "disable"),
+		},
+		Redis: DependencyConfig{
+			Host:     getEnv("REDIS_HOST", "localhost"),
+			Port:     getIntEnv("REDIS_PORT", 6379),
+			Password: getEnv("REDIS_PASSWORD", ""),
+			Database: getEnv("REDIS_DB", "0"),
+		},
+		Gateway: GatewayConfig{
+			MaxBodySize:       int64(getIntEnv("GATEWAY_MAX_BODY_SIZE", defaultGatewayBodySize)),
+			RequestTimeout:    time.Duration(getIntEnv("GATEWAY_REQUEST_TIMEOUT_SECONDS", 600)) * time.Second,
+			StreamIdleTimeout: time.Duration(getIntEnv("GATEWAY_STREAM_IDLE_TIMEOUT_SECONDS", 120)) * time.Second,
+		},
+		Security: SecurityConfig{
+			JWTSecret:    getEnv("JWT_SECRET", ""),
+			MasterKey:    getEnv("SRAPI_MASTER_KEY", "local_dev_master_key_32_bytes_minimum_change_me"),
+			APIKeyPepper: getEnv("API_KEY_PEPPER", "local_dev_api_key_pepper_change_me_32+"),
+		},
+		Bootstrap: BootstrapConfig{
+			AdminEmail:    getEnv("BOOTSTRAP_ADMIN_EMAIL", "admin@srapi.local"),
+			AdminPassword: getEnv("BOOTSTRAP_ADMIN_PASSWORD", "password123"),
+			AdminName:     getEnv("BOOTSTRAP_ADMIN_NAME", "Admin"),
+		},
+	}
+}
+
+func (c Config) Address() string {
+	return fmt.Sprintf("%s:%d", c.Server.Host, c.Server.Port)
+}
+
+func (c Config) HealthcheckAddress() string {
+	if c.Server.Host == "" || c.Server.Host == "0.0.0.0" || c.Server.Host == "::" {
+		return fmt.Sprintf("127.0.0.1:%d", c.Server.Port)
+	}
+	return c.Address()
+}
+
+func (c Config) Validate() error {
+	if c.Server.Port <= 0 || c.Server.Port > 65535 {
+		return fmt.Errorf("SERVER_PORT must be between 1 and 65535")
+	}
+	if c.Gateway.MaxBodySize <= 0 {
+		return fmt.Errorf("GATEWAY_MAX_BODY_SIZE must be positive")
+	}
+	if c.Gateway.RequestTimeout <= 0 {
+		return fmt.Errorf("GATEWAY_REQUEST_TIMEOUT_SECONDS must be positive")
+	}
+	if c.Gateway.StreamIdleTimeout <= 0 {
+		return fmt.Errorf("GATEWAY_STREAM_IDLE_TIMEOUT_SECONDS must be positive")
+	}
+	if c.Server.Mode == "release" {
+		if weakSecret(c.Security.JWTSecret) {
+			return fmt.Errorf("JWT_SECRET must be strong and at least 32 bytes in release mode")
+		}
+		if weakSecret(c.Security.MasterKey) {
+			return fmt.Errorf("SRAPI_MASTER_KEY must be strong and at least 32 bytes in release mode")
+		}
+		if weakSecret(c.Security.APIKeyPepper) {
+			return fmt.Errorf("API_KEY_PEPPER must be strong and at least 32 bytes in release mode")
+		}
+		if c.Database.Password == "" || isWeakDevelopmentSecret(c.Database.Password) {
+			return fmt.Errorf("DATABASE_PASSWORD must be set to a non-development value in release mode")
+		}
+	}
+	return nil
+}
+
+func (d DependencyConfig) Address() string {
+	return fmt.Sprintf("%s:%d", d.Host, d.Port)
+}
+
+func getEnv(key, fallback string) string {
+	value, ok := os.LookupEnv(key)
+	if !ok || value == "" {
+		return fallback
+	}
+	return value
+}
+
+func getIntEnv(key string, fallback int) int {
+	value, ok := os.LookupEnv(key)
+	if !ok || value == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
+}
+
+func isWeakDevelopmentSecret(value string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	if normalized == "" {
+		return true
+	}
+	if strings.Contains(normalized, "local_dev") || strings.Contains(normalized, "change_me") || strings.Contains(normalized, "changeme") {
+		return true
+	}
+	switch normalized {
+	case "password", "postgres", "srapi", "srapi_dev_password_change_me":
+		return true
+	default:
+		return false
+	}
+}
+
+func weakSecret(value string) bool {
+	return len(value) < 32 || isWeakDevelopmentSecret(value)
+}
