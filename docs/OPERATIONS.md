@@ -1,0 +1,235 @@
+# SRapi 运维与生产治理规范
+
+## 1. 目标
+
+本文档定义 SRapi 从 MVP 走向可自托管生产部署时必须具备的运维能力，覆盖配置、迁移、备份恢复、健康检查、发布门禁、日志脱敏、数据生命周期和事故处理。
+
+SRapi 的运维设计原则：
+
+```txt
+可恢复 > 可观测 > 可升级 > 可回滚 > 可自动化
+```
+
+## 2. 适用范围
+
+本文档约束：
+
+- Docker Compose 与单机部署。
+- 后续 Kubernetes 部署。
+- PostgreSQL / Redis 生命周期。
+- Gateway、Scheduler、Provider Adapter、Reverse Proxy Runtime 的运行诊断。
+- 支付、订阅、返利、用量、审计等高价值数据。
+
+MVP 可以只实现最小子集，但目录、配置和数据模型必须为本文档预留扩展点。
+
+## 3. 运维端点
+
+生产部署必须区分 liveness、readiness 和 metrics。
+
+```txt
+GET /livez
+GET /readyz
+GET /metrics
+GET /api/v1/health
+```
+
+| 端点 | 用途 | 认证 | 行为 |
+| --- | --- | --- | --- |
+| `/livez` | 进程存活探针 | 无 | 只要 HTTP server 可响应即返回 200。 |
+| `/readyz` | 就绪探针 | 无 | 必须检查 PostgreSQL、Redis、关键 worker 初始化状态。 |
+| `/metrics` | Prometheus 指标 | 默认无，生产可由反向代理限制 | 输出 Prometheus text format。 |
+| `/api/v1/health` | 兼容健康检查 | 无 | 返回 request_id、版本、基础依赖状态。 |
+
+`/readyz` 不得在数据库不可用、迁移未完成、Redis 连接失败、关键配置缺失时返回 200。
+
+## 4. 启动就绪门禁
+
+HTTP listener 可以启动，但 Gateway 流量不得在以下条件满足前进入主流程：
+
+- 配置加载成功。
+- PostgreSQL 连接成功。
+- 数据库迁移状态可判定。
+- Redis 连接成功。
+- 加密主密钥可用。
+- API Key、Provider Account、Scheduler 所需 repository 初始化成功。
+- Reverse Proxy Runtime 的 credential decryptor、cookie jar store、HTTP client factory 初始化成功。
+
+如果启动预算耗尽，进程必须 fail fast，不得半初始化对外服务。
+
+## 5. 迁移与回滚
+
+### 5.1 迁移要求
+
+数据库迁移必须满足：
+
+- 可在空库执行。
+- 可重复执行或具备明确幂等保护。
+- 高风险迁移必须有回滚策略。
+- 修改高增长表时必须评估锁表时间。
+- 账务、支付、审计、用量表不得通过破坏性迁移丢失历史数据。
+
+### 5.2 回滚分级
+
+| 类型 | 要求 |
+| --- | --- |
+| 可逆迁移 | 必须提供 down migration。 |
+| 条件可逆迁移 | 必须说明回滚前置条件和数据损失范围。 |
+| 不可逆迁移 | 必须登记原因、恢复路径和备份要求。 |
+
+### 5.3 发布前门禁
+
+发布前至少执行：
+
+```txt
+OpenAPI lint / bundle / codegen check
+数据库迁移 dry-run
+后端测试
+前端 typecheck
+secret scan
+Docker image smoke test
+```
+
+## 6. 备份与恢复
+
+### 6.1 备份对象
+
+必须纳入备份：
+
+- PostgreSQL。
+- 加密主密钥或 KMS 引用配置。
+- Provider Account 凭证密文。
+- Reverse Proxy cookie jar / device fingerprint 密文。
+- 支付服务商配置密文。
+- S3 或对象存储中的备份元数据。
+
+Redis 只保存可重建运行时状态，默认不作为长期备份对象。
+
+### 6.2 备份策略
+
+建议支持：
+
+- 手动备份。
+- 定时备份。
+- S3-compatible 对象存储。
+- retain-days / retain-count 保留策略。
+- 备份校验和。
+- 恢复前互斥锁，防止恢复期间继续写入。
+
+### 6.3 恢复要求
+
+恢复流程必须确保：
+
+- 恢复前停止 Gateway 写流量。
+- 恢复后重新验证迁移版本。
+- 恢复后清理 Redis 可重建状态。
+- 恢复后重新构建 Scheduler snapshot。
+- 恢复后验证管理员登录、API Key 鉴权、一次 mock Gateway 请求。
+
+## 7. 数据生命周期矩阵
+
+| 数据集 | 所有者 | 保留策略 | 特殊要求 |
+| --- | --- | --- | --- |
+| `usage_logs` | Observability / Billing | 可配置，默认 90 天原始日志 | 可聚合后归档。 |
+| `scheduler_decisions` | Scheduler | 可配置，默认 30-90 天 | 保留 score breakdown 用于诊断。 |
+| `scheduler_feedbacks` | Scheduler | 可配置，默认 90 天 | 用于账号健康计算。 |
+| `billing_ledger` | Billing | 永久 | 只追加，不软删。 |
+| `payment_orders` | Payments | 长期保留 | Webhook、退款、争议需要追溯。 |
+| `payment_audit_logs` | Payments | 长期保留 | 不得包含明文密钥。 |
+| `affiliate_ledger` | Affiliate | 长期保留 | 退款补偿必须追加反向记录。 |
+| `audit_logs` | Audit | 默认 180-365 天 | 高风险操作必须可追溯。 |
+| `idempotency_records` | Platform | TTL 清理 | 过期后可删除。 |
+| `account_health_snapshots` | Scheduler / Ops | 聚合后清理 | 可用于容量规划。 |
+| `content_moderation_logs` | Risk Control | 可配置短保留 | prompt excerpt 视为敏感数据。 |
+| `backup_records` | Operations | 与备份对象一致 | 删除备份时同步记录状态。 |
+
+## 8. 日志与脱敏
+
+日志默认不得输出：
+
+```txt
+API Key 原文
+Provider API Key
+OAuth access_token / refresh_token
+Cookie
+Authorization header
+payment provider secret
+JWT secret
+TOTP secret
+完整 prompt / messages / tool arguments
+反代 device fingerprint
+proxy credential
+```
+
+必须提供共享脱敏边界，HTTP handler、service、adapter、worker、audit writer 都不得各自实现不一致的脱敏逻辑。
+
+## 9. 指标基线
+
+`/metrics` 至少暴露：
+
+```txt
+srapi_gateway_requests_total
+srapi_gateway_request_duration_seconds
+srapi_gateway_inflight_requests
+srapi_gateway_errors_total
+srapi_scheduler_decisions_total
+srapi_provider_errors_total
+srapi_usage_tokens_total
+srapi_reverse_proxy_ban_signals_total
+```
+
+AI Gateway 专项指标以 `OBSERVABILITY_SPEC.md` 为准。
+
+## 10. 安全运营
+
+生产环境必须检查：
+
+- 管理员密码不是默认值。
+- JWT secret 或 RSA private key 固定且足够强。
+- TOTP encryption key 固定且备份。
+- Provider 凭证加密主密钥固定且可轮换。
+- URL allowlist / SSRF 防护策略明确。
+- 反代账号 cookie jar 和 device fingerprint 不跨账号复用。
+- 管理后台不直接暴露公网，或启用强认证与 TLS。
+
+## 11. 事故处理
+
+必须支持按 request_id / trace_id 串联：
+
+```txt
+Gateway request
+API key
+user
+scheduler decision
+provider account
+provider feedback
+usage log
+audit log
+payment order
+```
+
+上游账号异常时，必须能区分：
+
+- 普通 rate limit。
+- 额度耗尽。
+- 临时 5xx。
+- session_invalid。
+- account_locked。
+- account_banned。
+- geo_blocked。
+- device_unrecognized。
+
+反代账号状态迁移以 `REVERSE_PROXY_SPEC.md` 为准。
+
+## 12. MVP 最小要求
+
+MVP 必须至少实现：
+
+- `/api/v1/health`。
+- 基础 `/livez`、`/readyz`。
+- 结构化日志和 request_id。
+- secret scan。
+- 数据库迁移验证。
+- Docker Compose 本地启动。
+- Provider 凭证和 API Key 脱敏测试。
+
+Phase 2 起必须补齐 `/metrics`、备份恢复、发布 smoke、数据生命周期清理和 SLO 告警。

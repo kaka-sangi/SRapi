@@ -1,0 +1,987 @@
+# SRapi 数据模型设计
+
+## 1. 目标
+
+本文档定义 SRapi 第一阶段核心数据模型，为后续 Ent schema、数据库迁移和 API 契约提供依据。
+
+数据库建议：
+
+```txt
+PostgreSQL 16+
+```
+
+ORM / Schema：
+
+```txt
+Ent + Atlas migrations
+```
+
+## 2. 通用字段规范
+
+大多数业务表建议包含：
+
+```txt
+id                 bigint / uuid
+created_at         timestamptz
+updated_at         timestamptz
+deleted_at         timestamptz nullable
+```
+
+是否使用软删除：
+
+- 用户、账号、API Key、配置类资源建议软删除。
+- Ledger、Usage、Audit 不建议软删除。
+- Payment order 不建议软删除。
+
+## 3. ID 策略
+
+第一阶段建议使用：
+
+```txt
+bigint snowflake-like id 或 PostgreSQL bigserial
+```
+
+如果希望更方便分布式和外部暴露，可以使用：
+
+```txt
+uuid / ulid
+```
+
+建议外部 API 不依赖连续自增 ID，可后续引入 public id。
+
+## 4. 金额字段
+
+禁止使用 float 存储真实账务金额。
+
+推荐二选一：
+
+```txt
+numeric(20, 8)
+```
+
+或：
+
+```txt
+amount_minor bigint + currency
+```
+
+若需要支持多币种和高精度模型成本，建议使用 `numeric(20, 8)`。
+
+## 5. JSON 字段使用原则
+
+可以使用 `jsonb` 存储：
+
+- Provider capabilities。
+- Model capabilities。
+- Scheduler score breakdown。
+- Reject reasons。
+- Webhook payload snapshot。
+- Metadata。
+
+不应把核心查询字段只放 JSON。
+
+## 6. 用户与权限
+
+### 6.1 users
+
+```txt
+id
+email
+email_verified_at
+name
+password_hash
+status
+balance
+currency
+created_at
+updated_at
+deleted_at
+```
+
+索引：
+
+```txt
+unique(email)
+index(status)
+```
+
+### 6.2 roles
+
+```txt
+id
+name
+description
+created_at
+updated_at
+```
+
+索引：
+
+```txt
+unique(name)
+```
+
+### 6.3 user_roles
+
+```txt
+id
+user_id
+role_id
+created_at
+```
+
+索引：
+
+```txt
+unique(user_id, role_id)
+index(role_id)
+```
+
+### 6.4 user_groups
+
+```txt
+id
+name
+description
+default_strategy
+rate_multiplier
+account_group_scope_json
+model_scope_json
+status
+created_at
+updated_at
+```
+
+### 6.5 user_group_members
+
+```txt
+id
+user_id
+user_group_id
+created_at
+```
+
+索引：
+
+```txt
+unique(user_id, user_group_id)
+```
+
+## 7. API Key
+
+### 7.1 api_keys
+
+```txt
+id
+user_id
+name
+prefix
+hash
+status
+scopes_json
+allowed_models_json
+rpm_limit
+tpm_limit
+expires_at
+last_used_at
+created_at
+updated_at
+deleted_at
+```
+
+索引：
+
+```txt
+unique(prefix)
+index(user_id, status)
+index(expires_at)
+```
+
+安全要求：
+
+- 不存 API Key 原文。
+- `hash` 使用安全哈希。
+- `prefix` 用于定位，不用于认证。
+
+### 7.2 api_key_groups
+
+用于支持一个 API Key 绑定多个用户组或路由组，Gateway 运行时按请求模型和 platform 解析最终 group。
+
+```txt
+id
+api_key_id
+user_group_id
+created_at
+```
+
+索引：
+
+```txt
+unique(api_key_id, user_group_id)
+index(user_group_id)
+```
+
+规则：
+
+- 旧版 `api_keys.group_id` 如果存在，只作为单组兼容字段。
+- 新接口应优先使用 `group_ids`。
+- `/v1/models` 对多组 API Key 返回可见模型并集。
+- 请求执行时的 group 解析规则以 `GATEWAY_ROUTE_MATRIX.md` 为准。
+
+## 8. Provider 与模型
+
+### 8.1 providers
+
+```txt
+id
+name
+display_name
+adapter_type
+status
+capabilities_json
+config_schema_json
+created_at
+updated_at
+deleted_at
+```
+
+索引：
+
+```txt
+unique(name)
+index(status)
+```
+
+### 8.2 model_registry
+
+```txt
+id
+canonical_name
+display_name
+family
+context_window
+max_output_tokens
+quality_tier
+status
+capabilities_json
+created_at
+updated_at
+deleted_at
+```
+
+索引：
+
+```txt
+unique(canonical_name)
+index(family)
+index(status)
+```
+
+### 8.3 model_aliases
+
+```txt
+id
+alias
+model_id
+strategy_hint
+fallback_models_json
+status
+created_at
+updated_at
+```
+
+索引：
+
+```txt
+unique(alias)
+index(model_id)
+```
+
+### 8.4 model_provider_mappings
+
+```txt
+id
+model_id
+provider_id
+upstream_model_name
+status
+capability_override_json
+pricing_override_json
+created_at
+updated_at
+```
+
+索引：
+
+```txt
+unique(model_id, provider_id, upstream_model_name)
+index(provider_id, status)
+```
+
+### 8.5 pricing_rules
+
+```txt
+id
+model_id
+provider_id
+input_price_per_million
+output_price_per_million
+cache_read_price_per_million
+cache_write_price_per_million
+currency
+effective_from
+effective_to
+created_at
+updated_at
+```
+
+索引：
+
+```txt
+index(model_id, provider_id)
+index(effective_from, effective_to)
+```
+
+## 9. 账号池
+
+### 9.1 provider_accounts
+
+```txt
+id
+provider_id
+name
+account_type
+credential_ciphertext
+credential_version
+proxy_id
+status
+priority
+weight
+risk_level
+metadata_json
+created_at
+updated_at
+deleted_at
+```
+
+索引：
+
+```txt
+index(provider_id, status)
+index(status, priority)
+```
+
+### 9.2 account_groups
+
+```txt
+id
+name
+description
+provider_scope_json
+model_scope_json
+strategy_hint
+status
+created_at
+updated_at
+```
+
+索引：
+
+```txt
+unique(name)
+index(status)
+```
+
+### 9.3 account_group_members
+
+```txt
+id
+account_id
+account_group_id
+created_at
+```
+
+索引：
+
+```txt
+unique(account_id, account_group_id)
+index(account_group_id)
+```
+
+### 9.4 proxies
+
+```txt
+id
+name
+type
+url_ciphertext
+status
+metadata_json
+created_at
+updated_at
+deleted_at
+```
+
+类型：
+
+```txt
+http
+https
+socks5
+```
+
+## 10. 调度相关
+
+### 10.1 scheduler_decisions
+
+```txt
+id
+request_id
+attempt_no
+user_id
+api_key_id
+source_protocol
+source_endpoint
+target_protocol
+model
+strategy
+strategy_version
+selected_provider_id
+selected_account_id
+candidate_count
+rejected_count
+scores_json
+reject_reasons_json
+strategy_weights_json
+compatibility_warnings_json
+sticky_hit
+cache_affinity_hit
+estimated_cost
+currency
+created_at
+```
+
+索引：
+
+```txt
+unique(request_id, attempt_no)
+index(user_id, created_at)
+index(api_key_id, created_at)
+index(selected_account_id, created_at)
+index(strategy, created_at)
+```
+
+规则：
+
+- 同一 Gateway 请求如果发生 fallback，必须使用同一个 `request_id` 和递增 `attempt_no`。
+- 每个 attempt 必须保留当时的 `strategy_version` 与 `strategy_weights_json`。
+- 历史 decision 不得因策略权重变更而被重写。
+
+### 10.2 scheduler_feedbacks
+
+```txt
+id
+request_id
+decision_id
+attempt_no
+account_id
+provider_id
+model
+success
+error_class
+status_code
+latency_ms
+input_tokens
+output_tokens
+cached_tokens
+actual_cost
+currency
+created_at
+```
+
+索引：
+
+```txt
+index(decision_id)
+index(request_id, attempt_no)
+index(account_id, created_at)
+index(provider_id, created_at)
+index(error_class, created_at)
+```
+
+### 10.3 sticky_sessions
+
+```txt
+id
+binding_key
+binding_type
+user_id
+api_key_id
+model
+provider_id
+account_id
+strength
+expires_at
+last_seen_at
+created_at
+updated_at
+```
+
+索引：
+
+```txt
+unique(binding_key)
+index(account_id)
+index(expires_at)
+```
+
+### 10.4 cache_affinity_records
+
+```txt
+id
+provider_id
+model
+account_id
+prompt_prefix_hash
+cached_token_estimate
+cache_write_time
+last_hit_time
+ttl_seconds
+created_at
+updated_at
+```
+
+索引：
+
+```txt
+unique(provider_id, model, account_id, prompt_prefix_hash)
+index(prompt_prefix_hash)
+index(last_hit_time)
+```
+
+### 10.5 account_health_snapshots
+
+```txt
+id
+account_id
+provider_id
+status
+success_rate
+error_rate
+latency_p50_ms
+latency_p95_ms
+rate_limit_count
+timeout_count
+cooldown_until
+circuit_state
+snapshot_at
+```
+
+索引：
+
+```txt
+index(account_id, snapshot_at)
+index(provider_id, snapshot_at)
+index(status)
+```
+
+### 10.6 account_quota_snapshots
+
+```txt
+id
+account_id
+provider_id
+quota_type
+remaining
+used
+quota_limit
+remaining_ratio
+reset_at
+snapshot_at
+```
+
+索引：
+
+```txt
+index(account_id, quota_type, snapshot_at)
+index(reset_at)
+```
+
+## 11. 用量与计费
+
+### 11.1 usage_logs
+
+```txt
+id
+request_id
+user_id
+api_key_id
+provider_id
+account_id
+source_protocol
+source_endpoint
+target_protocol
+model
+input_tokens
+output_tokens
+cached_tokens
+total_tokens
+usage_estimated
+latency_ms
+success
+error_class
+cost
+currency
+compatibility_warnings_json
+created_at
+```
+
+索引：
+
+```txt
+unique(request_id)
+index(user_id, created_at)
+index(api_key_id, created_at)
+index(account_id, created_at)
+index(source_endpoint, created_at)
+index(model, created_at)
+```
+
+### 11.2 billing_ledger
+
+```txt
+id
+user_id
+type
+amount
+currency
+balance_before
+balance_after
+reference_type
+reference_id
+metadata_json
+created_at
+```
+
+索引：
+
+```txt
+index(user_id, created_at)
+index(reference_type, reference_id)
+```
+
+规则：
+
+- 账务流水只追加。
+- 退款或修正使用反向记录。
+- 用户余额更新和 ledger 写入必须在同一事务内。
+
+## 12. 订阅
+
+### 12.1 subscription_plans
+
+```txt
+id
+name
+description
+price
+currency
+validity_days
+entitlements_json
+for_sale
+sort_order
+status
+created_at
+updated_at
+deleted_at
+```
+
+索引：
+
+```txt
+index(for_sale, sort_order)
+index(status)
+```
+
+### 12.2 user_subscriptions
+
+```txt
+id
+user_id
+plan_id
+status
+starts_at
+expires_at
+entitlements_snapshot_json
+source_type
+source_id
+created_at
+updated_at
+```
+
+索引：
+
+```txt
+index(user_id, status)
+index(expires_at)
+index(plan_id)
+```
+
+## 13. 支付
+
+### 13.1 payment_provider_instances
+
+```txt
+id
+provider
+name
+status
+config_ciphertext
+config_version
+metadata_json
+created_at
+updated_at
+deleted_at
+```
+
+### 13.2 payment_orders
+
+```txt
+id
+user_id
+order_no
+provider_instance_id
+amount
+currency
+status
+product_type
+product_id
+provider_transaction_id
+metadata_json
+created_at
+paid_at
+closed_at
+updated_at
+```
+
+索引：
+
+```txt
+unique(order_no)
+index(user_id, created_at)
+index(status, created_at)
+index(provider_transaction_id)
+```
+
+### 13.3 payment_audit_logs
+
+```txt
+id
+order_id
+provider_instance_id
+event_type
+payload_json
+signature_valid
+created_at
+```
+
+索引：
+
+```txt
+index(order_id, created_at)
+index(event_type, created_at)
+```
+
+### 13.4 affiliate_ledger
+
+邀请返利账本，受 `AFFILIATE_REBATE_SPEC.md` 约束。
+
+```txt
+id
+user_id
+related_user_id
+payment_order_id
+subscription_id
+type
+amount
+currency
+status
+reference_id
+metadata_json
+created_at
+settled_at
+```
+
+索引：
+
+```txt
+index(user_id, created_at)
+index(related_user_id, created_at)
+index(payment_order_id)
+index(type, created_at)
+```
+
+规则：
+
+- 只追加，不改写历史 accrual。
+- 退款补偿必须使用反向 ledger。
+- 转余额必须与 `billing_ledger` 和用户余额保持事务一致或通过可靠 outbox 保证最终一致。
+
+## 14. 幂等
+
+### 14.1 idempotency_records
+
+```txt
+id
+idempotency_key
+method
+path
+request_hash
+status
+response_snapshot_json
+locked_until
+expires_at
+created_at
+updated_at
+```
+
+索引：
+
+```txt
+unique(idempotency_key, method, path)
+index(expires_at)
+```
+
+## 15. 审计
+
+### 15.1 audit_logs
+
+```txt
+id
+actor_user_id
+action
+resource_type
+resource_id
+before_json
+after_json
+ip
+user_agent
+trace_id
+created_at
+```
+
+索引：
+
+```txt
+index(actor_user_id, created_at)
+index(resource_type, resource_id)
+index(action, created_at)
+```
+
+## 16. 系统配置
+
+### 16.1 settings
+
+```txt
+id
+key
+value_json
+value_ciphertext
+is_secret
+description
+updated_by
+created_at
+updated_at
+```
+
+索引：
+
+```txt
+unique(key)
+```
+
+## 17. 数据冷热分层
+
+高增长表：
+
+```txt
+usage_logs
+scheduler_decisions
+scheduler_feedbacks
+audit_logs
+account_health_snapshots
+account_quota_snapshots
+```
+
+建议：
+
+- 第一阶段保留普通表。
+- 后续按月分区。
+- 报表使用聚合表。
+- 原始日志可归档到对象存储。
+
+## 18. 一致性边界
+
+必须强一致：
+
+- 用户余额和 billing ledger。
+- 支付订单状态和订阅激活。
+- API Key 创建和哈希保存。
+- Provider Account 凭证保存。
+
+最终一致：
+
+- Usage 聚合。
+- 调度反馈快照。
+- 账号健康统计。
+- 报表数据。
+
+## 19. 加密字段
+
+必须加密：
+
+```txt
+provider_accounts.credential_ciphertext
+provider_accounts.cookie_jar_ciphertext
+provider_accounts.device_fingerprint_ciphertext
+proxies.url_ciphertext
+payment_provider_instances.config_ciphertext
+settings.value_ciphertext when is_secret = true
+```
+
+加密建议：
+
+- AES-GCM。
+- 主密钥来自环境变量或密钥管理系统。
+- 记录 credential_version 以支持轮换。
+
+## 20. 第一阶段最小表集合
+
+MVP 最小可先实现：
+
+```txt
+users
+api_keys
+api_key_groups
+providers
+model_registry
+model_aliases
+model_provider_mappings
+pricing_rules
+provider_accounts
+account_groups
+account_group_members
+usage_logs
+scheduler_decisions
+scheduler_feedbacks
+billing_ledger
+account_health_snapshots
+account_quota_snapshots
+settings
+audit_logs
+idempotency_records
+```
+
+`sticky_sessions` 和 `cache_affinity_records` 在 MVP 中可以先使用 Redis-only 实现，但必须遵守 `SCHEDULER_V1_SPEC.md` 中的 TTL、重建和后续落库约束。
+
+支付和订阅可在 Phase 3 引入。
