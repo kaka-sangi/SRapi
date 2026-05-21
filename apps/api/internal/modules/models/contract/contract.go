@@ -63,6 +63,11 @@ type ModelAlias struct {
 	UpdatedAt      time.Time
 }
 
+type ModelResolution struct {
+	Model Model
+	Alias *ModelAlias
+}
+
 type CreateAliasRequest struct {
 	Alias          string
 	StrategyHint   *string

@@ -444,6 +444,48 @@ func TestReverseProxyAdapterUsesRuntimeForNonAPIKeyAccount(t *testing.T) {
 	}
 }
 
+func TestReverseProxyAdapterPassesCliRuntimeContext(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body:       []byte(`{"choices":[{"message":{"role":"assistant","content":"cli response"}}],"usage":{"input_tokens":1,"output_tokens":2}}`),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeText(context.Background(), contract.TextRequest{
+		RequestID: "req_cli_runtime",
+		Model:     "codex-local",
+		Prompt:    "hello",
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": "https://upstream.example/v1"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+		Credential: map[string]any{"cli_client_token": "cli-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke cli reverse proxy adapter: %v", err)
+	}
+	if resp.Text != "cli response" {
+		t.Fatalf("unexpected cli response: %+v", resp)
+	}
+	if runtime.request.Account.RuntimeClass != string(accountcontract.RuntimeClassCliClientToken) ||
+		runtime.request.Account.UpstreamClient == nil ||
+		*runtime.request.Account.UpstreamClient != "codex_cli" ||
+		runtime.request.Account.Credential["cli_client_token"] != "cli-token" {
+		t.Fatalf("expected cli runtime context, got %+v", runtime.request.Account)
+	}
+}
+
 func TestReverseProxyAdapterStreamsThroughRuntime(t *testing.T) {
 	runtime := capturingRuntime{
 		response: reverseproxycontract.Response{

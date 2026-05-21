@@ -76,8 +76,10 @@ func TestEntSchemaAppliesToEmptyDatabase(t *testing.T) {
 		"scheduler_feedbacks",
 		"scheduler_strategies",
 		"settings",
+		"subscription_plans",
 		"usage_logs",
 		"user_roles",
+		"user_subscriptions",
 		"users",
 	}
 	if !reflect.DeepEqual(got, want) {

@@ -35,9 +35,11 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/schedulerfeedback"
 	"github.com/srapi/srapi/apps/api/ent/schedulerstrategy"
 	"github.com/srapi/srapi/apps/api/ent/setting"
+	"github.com/srapi/srapi/apps/api/ent/subscriptionplan"
 	"github.com/srapi/srapi/apps/api/ent/usagelog"
 	"github.com/srapi/srapi/apps/api/ent/user"
 	"github.com/srapi/srapi/apps/api/ent/userrole"
+	"github.com/srapi/srapi/apps/api/ent/usersubscription"
 )
 
 // ent aliases to avoid import conflicts in user's code.
@@ -121,9 +123,11 @@ func checkColumn(t, c string) error {
 			schedulerfeedback.Table:     schedulerfeedback.ValidColumn,
 			schedulerstrategy.Table:     schedulerstrategy.ValidColumn,
 			setting.Table:               setting.ValidColumn,
+			subscriptionplan.Table:      subscriptionplan.ValidColumn,
 			usagelog.Table:              usagelog.ValidColumn,
 			user.Table:                  user.ValidColumn,
 			userrole.Table:              userrole.ValidColumn,
+			usersubscription.Table:      usersubscription.ValidColumn,
 		})
 	})
 	return columnCheck(t, c)

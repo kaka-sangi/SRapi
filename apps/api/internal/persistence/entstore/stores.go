@@ -12,6 +12,7 @@ import (
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
+	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
 	userscontract "github.com/srapi/srapi/apps/api/internal/modules/users/contract"
 	accountstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/accounts"
@@ -22,6 +23,7 @@ import (
 	modelstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/models"
 	providerstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/providers"
 	schedulerstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/scheduler"
+	subscriptionstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/subscriptions"
 	usagestore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/usage"
 	userstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/users"
 )
@@ -38,6 +40,7 @@ type Stores struct {
 	Billing   billingcontract.Store
 	Events    eventscontract.Store
 	Scheduler schedulercontract.Store
+	Subscriptions subscriptioncontract.Store
 	Usage     usagecontract.Store
 }
 
@@ -81,6 +84,10 @@ func New(client *ent.Client) (Stores, error) {
 	if err != nil {
 		return Stores{}, err
 	}
+	subscriptions, err := subscriptionstore.New(client)
+	if err != nil {
+		return Stores{}, err
+	}
 	usage, err := usagestore.New(client)
 	if err != nil {
 		return Stores{}, err
@@ -95,6 +102,7 @@ func New(client *ent.Client) (Stores, error) {
 		Billing:   billing,
 		Events:    events,
 		Scheduler: scheduler,
+		Subscriptions: subscriptions,
 		Usage:     usage,
 	}, nil
 }

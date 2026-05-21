@@ -29,9 +29,11 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/schedulerstrategy"
 	"github.com/srapi/srapi/apps/api/ent/schema"
 	"github.com/srapi/srapi/apps/api/ent/setting"
+	"github.com/srapi/srapi/apps/api/ent/subscriptionplan"
 	"github.com/srapi/srapi/apps/api/ent/usagelog"
 	"github.com/srapi/srapi/apps/api/ent/user"
 	"github.com/srapi/srapi/apps/api/ent/userrole"
+	"github.com/srapi/srapi/apps/api/ent/usersubscription"
 )
 
 // The init function reads all schema descriptors with runtime code
@@ -849,6 +851,49 @@ func init() {
 	settingDescDescription := settingFields[4].Descriptor()
 	// setting.DefaultDescription holds the default value on creation for the description field.
 	setting.DefaultDescription = settingDescDescription.Default.(string)
+	subscriptionplanMixin := schema.SubscriptionPlan{}.Mixin()
+	subscriptionplanMixinFields0 := subscriptionplanMixin[0].Fields()
+	_ = subscriptionplanMixinFields0
+	subscriptionplanFields := schema.SubscriptionPlan{}.Fields()
+	_ = subscriptionplanFields
+	// subscriptionplanDescCreatedAt is the schema descriptor for created_at field.
+	subscriptionplanDescCreatedAt := subscriptionplanMixinFields0[0].Descriptor()
+	// subscriptionplan.DefaultCreatedAt holds the default value on creation for the created_at field.
+	subscriptionplan.DefaultCreatedAt = subscriptionplanDescCreatedAt.Default.(func() time.Time)
+	// subscriptionplanDescUpdatedAt is the schema descriptor for updated_at field.
+	subscriptionplanDescUpdatedAt := subscriptionplanMixinFields0[1].Descriptor()
+	// subscriptionplan.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	subscriptionplan.DefaultUpdatedAt = subscriptionplanDescUpdatedAt.Default.(func() time.Time)
+	// subscriptionplan.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	subscriptionplan.UpdateDefaultUpdatedAt = subscriptionplanDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// subscriptionplanDescName is the schema descriptor for name field.
+	subscriptionplanDescName := subscriptionplanFields[0].Descriptor()
+	// subscriptionplan.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	subscriptionplan.NameValidator = subscriptionplanDescName.Validators[0].(func(string) error)
+	// subscriptionplanDescDescription is the schema descriptor for description field.
+	subscriptionplanDescDescription := subscriptionplanFields[1].Descriptor()
+	// subscriptionplan.DefaultDescription holds the default value on creation for the description field.
+	subscriptionplan.DefaultDescription = subscriptionplanDescDescription.Default.(string)
+	// subscriptionplanDescPrice is the schema descriptor for price field.
+	subscriptionplanDescPrice := subscriptionplanFields[2].Descriptor()
+	// subscriptionplan.DefaultPrice holds the default value on creation for the price field.
+	subscriptionplan.DefaultPrice = subscriptionplanDescPrice.Default.(string)
+	// subscriptionplanDescCurrency is the schema descriptor for currency field.
+	subscriptionplanDescCurrency := subscriptionplanFields[3].Descriptor()
+	// subscriptionplan.DefaultCurrency holds the default value on creation for the currency field.
+	subscriptionplan.DefaultCurrency = subscriptionplanDescCurrency.Default.(string)
+	// subscriptionplanDescForSale is the schema descriptor for for_sale field.
+	subscriptionplanDescForSale := subscriptionplanFields[6].Descriptor()
+	// subscriptionplan.DefaultForSale holds the default value on creation for the for_sale field.
+	subscriptionplan.DefaultForSale = subscriptionplanDescForSale.Default.(bool)
+	// subscriptionplanDescSortOrder is the schema descriptor for sort_order field.
+	subscriptionplanDescSortOrder := subscriptionplanFields[7].Descriptor()
+	// subscriptionplan.DefaultSortOrder holds the default value on creation for the sort_order field.
+	subscriptionplan.DefaultSortOrder = subscriptionplanDescSortOrder.Default.(int)
+	// subscriptionplanDescStatus is the schema descriptor for status field.
+	subscriptionplanDescStatus := subscriptionplanFields[8].Descriptor()
+	// subscriptionplan.DefaultStatus holds the default value on creation for the status field.
+	subscriptionplan.DefaultStatus = subscriptionplanDescStatus.Default.(string)
 	usagelogMixin := schema.UsageLog{}.Mixin()
 	usagelogMixinFields0 := usagelogMixin[0].Fields()
 	_ = usagelogMixinFields0
@@ -970,4 +1015,31 @@ func init() {
 	userrole.DefaultUpdatedAt = userroleDescUpdatedAt.Default.(func() time.Time)
 	// userrole.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	userrole.UpdateDefaultUpdatedAt = userroleDescUpdatedAt.UpdateDefault.(func() time.Time)
+	usersubscriptionMixin := schema.UserSubscription{}.Mixin()
+	usersubscriptionMixinFields0 := usersubscriptionMixin[0].Fields()
+	_ = usersubscriptionMixinFields0
+	usersubscriptionFields := schema.UserSubscription{}.Fields()
+	_ = usersubscriptionFields
+	// usersubscriptionDescCreatedAt is the schema descriptor for created_at field.
+	usersubscriptionDescCreatedAt := usersubscriptionMixinFields0[0].Descriptor()
+	// usersubscription.DefaultCreatedAt holds the default value on creation for the created_at field.
+	usersubscription.DefaultCreatedAt = usersubscriptionDescCreatedAt.Default.(func() time.Time)
+	// usersubscriptionDescUpdatedAt is the schema descriptor for updated_at field.
+	usersubscriptionDescUpdatedAt := usersubscriptionMixinFields0[1].Descriptor()
+	// usersubscription.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	usersubscription.DefaultUpdatedAt = usersubscriptionDescUpdatedAt.Default.(func() time.Time)
+	// usersubscription.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	usersubscription.UpdateDefaultUpdatedAt = usersubscriptionDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// usersubscriptionDescStatus is the schema descriptor for status field.
+	usersubscriptionDescStatus := usersubscriptionFields[2].Descriptor()
+	// usersubscription.DefaultStatus holds the default value on creation for the status field.
+	usersubscription.DefaultStatus = usersubscriptionDescStatus.Default.(string)
+	// usersubscriptionDescSourceType is the schema descriptor for source_type field.
+	usersubscriptionDescSourceType := usersubscriptionFields[6].Descriptor()
+	// usersubscription.DefaultSourceType holds the default value on creation for the source_type field.
+	usersubscription.DefaultSourceType = usersubscriptionDescSourceType.Default.(string)
+	// usersubscriptionDescSourceID is the schema descriptor for source_id field.
+	usersubscriptionDescSourceID := usersubscriptionFields[7].Descriptor()
+	// usersubscription.DefaultSourceID holds the default value on creation for the source_id field.
+	usersubscription.DefaultSourceID = usersubscriptionDescSourceID.Default.(string)
 }

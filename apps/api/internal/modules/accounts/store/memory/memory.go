@@ -12,17 +12,35 @@ import (
 )
 
 type Store struct {
-	mu     sync.Mutex
-	nextID int
-	byID   map[int]contract.ProviderAccount
-	byName map[string]int
+	mu                  sync.Mutex
+	nextID              int
+	nextGroupID         int
+	nextGroupMemberID   int
+	nextHealthID        int
+	nextQuotaID         int
+	byID                map[int]contract.ProviderAccount
+	byName              map[string]int
+	groupsByID          map[int]contract.AccountGroup
+	groupsByName        map[string]int
+	groupMembersByID    map[int]contract.AccountGroupMember
+	healthSnapshotsByID map[int]contract.AccountHealthSnapshot
+	quotaSnapshotsByID  map[int]contract.AccountQuotaSnapshot
 }
 
 func New() *Store {
 	return &Store{
-		nextID: 1,
-		byID:   map[int]contract.ProviderAccount{},
-		byName: map[string]int{},
+		nextID:              1,
+		nextGroupID:         1,
+		nextGroupMemberID:   1,
+		nextHealthID:        1,
+		nextQuotaID:         1,
+		byID:                map[int]contract.ProviderAccount{},
+		byName:              map[string]int{},
+		groupsByID:          map[int]contract.AccountGroup{},
+		groupsByName:        map[string]int{},
+		groupMembersByID:    map[int]contract.AccountGroupMember{},
+		healthSnapshotsByID: map[int]contract.AccountHealthSnapshot{},
+		quotaSnapshotsByID:  map[int]contract.AccountQuotaSnapshot{},
 	}
 }
 
@@ -92,11 +110,247 @@ func (s *Store) ListGroupIDsByAccount(_ context.Context, accountID int) ([]int, 
 	if _, ok := s.byID[accountID]; !ok {
 		return nil, errors.New("account not found")
 	}
-	return nil, nil
+	out := make([]int, 0)
+	for _, member := range s.groupMembersByID {
+		if member.AccountID == accountID {
+			out = append(out, member.AccountGroupID)
+		}
+	}
+	sort.Ints(out)
+	return out, nil
+}
+
+func (s *Store) CreateGroup(_ context.Context, input contract.CreateStoredAccountGroup) (contract.AccountGroup, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := time.Now().UTC()
+	group := contract.AccountGroup{
+		ID:            s.nextGroupID,
+		Name:          input.Name,
+		Description:   input.Description,
+		ProviderScope: cloneMap(input.ProviderScope),
+		ModelScope:    cloneMap(input.ModelScope),
+		StrategyHint:  input.StrategyHint,
+		Status:        input.Status,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}
+	s.groupsByID[group.ID] = group
+	s.groupsByName[strings.ToLower(group.Name)] = group.ID
+	s.nextGroupID++
+	return cloneGroup(group), nil
+}
+
+func (s *Store) UpdateGroup(_ context.Context, group contract.AccountGroup) (contract.AccountGroup, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.groupsByID[group.ID]; !ok {
+		return contract.AccountGroup{}, errors.New("account group not found")
+	}
+	stored := cloneGroup(group)
+	s.groupsByID[stored.ID] = stored
+	s.groupsByName[strings.ToLower(stored.Name)] = stored.ID
+	return cloneGroup(stored), nil
+}
+
+func (s *Store) FindGroupByID(_ context.Context, id int) (contract.AccountGroup, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	group, ok := s.groupsByID[id]
+	if !ok {
+		return contract.AccountGroup{}, errors.New("account group not found")
+	}
+	return cloneGroup(group), nil
+}
+
+func (s *Store) ListGroups(_ context.Context) ([]contract.AccountGroup, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]contract.AccountGroup, 0, len(s.groupsByID))
+	for _, group := range s.groupsByID {
+		out = append(out, cloneGroup(group))
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out, nil
+}
+
+func (s *Store) AddAccountToGroup(_ context.Context, accountID int, groupID int) (contract.AccountGroupMember, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.byID[accountID]; !ok {
+		return contract.AccountGroupMember{}, errors.New("account not found")
+	}
+	if _, ok := s.groupsByID[groupID]; !ok {
+		return contract.AccountGroupMember{}, errors.New("account group not found")
+	}
+	for _, member := range s.groupMembersByID {
+		if member.AccountID == accountID && member.AccountGroupID == groupID {
+			return cloneGroupMember(member), nil
+		}
+	}
+	now := time.Now().UTC()
+	member := contract.AccountGroupMember{
+		ID:             s.nextGroupMemberID,
+		AccountID:      accountID,
+		AccountGroupID: groupID,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}
+	s.groupMembersByID[member.ID] = member
+	s.nextGroupMemberID++
+	return cloneGroupMember(member), nil
+}
+
+func (s *Store) RemoveAccountFromGroup(_ context.Context, accountID int, groupID int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for id, member := range s.groupMembersByID {
+		if member.AccountID == accountID && member.AccountGroupID == groupID {
+			delete(s.groupMembersByID, id)
+			return nil
+		}
+	}
+	return nil
+}
+
+func (s *Store) ListGroupMembers(_ context.Context, groupID int) ([]contract.AccountGroupMember, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.groupsByID[groupID]; !ok {
+		return nil, errors.New("account group not found")
+	}
+	out := make([]contract.AccountGroupMember, 0)
+	for _, member := range s.groupMembersByID {
+		if member.AccountGroupID == groupID {
+			out = append(out, cloneGroupMember(member))
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out, nil
+}
+
+func (s *Store) RecordHealthSnapshot(_ context.Context, snapshot contract.AccountHealthSnapshot) (contract.AccountHealthSnapshot, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.byID[snapshot.AccountID]; !ok {
+		return contract.AccountHealthSnapshot{}, errors.New("account not found")
+	}
+	stored := snapshot
+	stored.ID = s.nextHealthID
+	if stored.SnapshotAt.IsZero() {
+		stored.SnapshotAt = time.Now().UTC()
+	}
+	s.healthSnapshotsByID[stored.ID] = stored
+	s.nextHealthID++
+	return cloneHealthSnapshot(stored), nil
+}
+
+func (s *Store) LatestHealthSnapshotByAccount(_ context.Context, accountID int) (contract.AccountHealthSnapshot, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var latest contract.AccountHealthSnapshot
+	found := false
+	for _, snapshot := range s.healthSnapshotsByID {
+		if snapshot.AccountID != accountID {
+			continue
+		}
+		if !found || snapshot.SnapshotAt.After(latest.SnapshotAt) || (snapshot.SnapshotAt.Equal(latest.SnapshotAt) && snapshot.ID > latest.ID) {
+			latest = snapshot
+			found = true
+		}
+	}
+	if !found {
+		return contract.AccountHealthSnapshot{}, errors.New("account health snapshot not found")
+	}
+	return cloneHealthSnapshot(latest), nil
+}
+
+func (s *Store) ListHealthSnapshotsByAccount(_ context.Context, accountID int, limit int) ([]contract.AccountHealthSnapshot, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]contract.AccountHealthSnapshot, 0)
+	for _, snapshot := range s.healthSnapshotsByID {
+		if snapshot.AccountID == accountID {
+			out = append(out, cloneHealthSnapshot(snapshot))
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].SnapshotAt.Equal(out[j].SnapshotAt) {
+			return out[i].ID > out[j].ID
+		}
+		return out[i].SnapshotAt.After(out[j].SnapshotAt)
+	})
+	if limit > 0 && len(out) > limit {
+		out = out[:limit]
+	}
+	return out, nil
+}
+
+func (s *Store) RecordQuotaSnapshot(_ context.Context, snapshot contract.AccountQuotaSnapshot) (contract.AccountQuotaSnapshot, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.byID[snapshot.AccountID]; !ok {
+		return contract.AccountQuotaSnapshot{}, errors.New("account not found")
+	}
+	stored := snapshot
+	stored.ID = s.nextQuotaID
+	if stored.SnapshotAt.IsZero() {
+		stored.SnapshotAt = time.Now().UTC()
+	}
+	s.quotaSnapshotsByID[stored.ID] = stored
+	s.nextQuotaID++
+	return cloneQuotaSnapshot(stored), nil
+}
+
+func (s *Store) ListQuotaSnapshotsByAccount(_ context.Context, accountID int, limit int) ([]contract.AccountQuotaSnapshot, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]contract.AccountQuotaSnapshot, 0)
+	for _, snapshot := range s.quotaSnapshotsByID {
+		if snapshot.AccountID == accountID {
+			out = append(out, cloneQuotaSnapshot(snapshot))
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].SnapshotAt.Equal(out[j].SnapshotAt) {
+			return out[i].ID > out[j].ID
+		}
+		return out[i].SnapshotAt.After(out[j].SnapshotAt)
+	})
+	if limit > 0 && len(out) > limit {
+		out = out[:limit]
+	}
+	return out, nil
 }
 
 func cloneAccount(value contract.ProviderAccount) contract.ProviderAccount {
 	value.Metadata = cloneMap(value.Metadata)
+	return value
+}
+
+func cloneGroup(value contract.AccountGroup) contract.AccountGroup {
+	value.ProviderScope = cloneMap(value.ProviderScope)
+	value.ModelScope = cloneMap(value.ModelScope)
+	return value
+}
+
+func cloneGroupMember(value contract.AccountGroupMember) contract.AccountGroupMember {
+	return value
+}
+
+func cloneHealthSnapshot(value contract.AccountHealthSnapshot) contract.AccountHealthSnapshot {
+	if value.CooldownUntil != nil {
+		cloned := *value.CooldownUntil
+		value.CooldownUntil = &cloned
+	}
+	return value
+}
+
+func cloneQuotaSnapshot(value contract.AccountQuotaSnapshot) contract.AccountQuotaSnapshot {
+	if value.ResetAt != nil {
+		cloned := *value.ResetAt
+		value.ResetAt = &cloned
+	}
 	return value
 }
 

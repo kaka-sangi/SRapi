@@ -335,6 +335,14 @@ func (s *Service) buildDecision(req contract.ScheduleRequest, strategy contract.
 	if targetProtocol == "" && selected != nil {
 		targetProtocol = selected.Provider.Protocol
 	}
+	estimatedCost := strings.TrimSpace(req.EstimatedCost)
+	if estimatedCost == "" {
+		estimatedCost = "0.00000000"
+	}
+	currency := strings.TrimSpace(req.Currency)
+	if currency == "" {
+		currency = "USD"
+	}
 	decision := contract.Decision{
 		RequestID:             strings.TrimSpace(req.RequestID),
 		AttemptNo:             1,
@@ -353,10 +361,12 @@ func (s *Service) buildDecision(req contract.ScheduleRequest, strategy contract.
 		RejectReasons:         rejectReasons,
 		StrategyWeights:       strategyWeightsPayload(strategy),
 		CompatibilityWarnings: cloneStrings(req.Warnings),
-		EstimatedCost:         "0.00000000",
-		Currency:              "USD",
+		EstimatedCost:         estimatedCost,
+		Currency:              currency,
 		CreatedAt:             s.clock.Now(),
 	}
+	attachRoutingHints(&decision, req)
+	attachPricingEvidence(&decision, req)
 	if selected != nil {
 		providerID := selected.Provider.ID
 		accountID := selected.Account.ID
@@ -365,6 +375,79 @@ func (s *Service) buildDecision(req contract.ScheduleRequest, strategy contract.
 		decision.StickyHit = stickyScore(*selected, req) > 0
 	}
 	return decision
+}
+
+func attachPricingEvidence(decision *contract.Decision, req contract.ScheduleRequest) {
+	evidence := map[string]any{}
+	if req.EstimatedInputTokens > 0 {
+		evidence["estimated_input_tokens"] = req.EstimatedInputTokens
+	}
+	if req.EstimatedOutputTokens > 0 {
+		evidence["estimated_output_tokens"] = req.EstimatedOutputTokens
+	}
+	if cost := strings.TrimSpace(req.EstimatedCost); cost != "" {
+		evidence["estimated_cost"] = cost
+	}
+	if currency := strings.TrimSpace(req.Currency); currency != "" {
+		evidence["currency"] = currency
+	}
+	if req.PricingRuleID != nil {
+		evidence["pricing_rule_id"] = *req.PricingRuleID
+	}
+	if source := strings.TrimSpace(req.PricingSource); source != "" {
+		evidence["pricing_source"] = source
+	}
+	evidence["pricing_estimated"] = req.PricingEstimated
+	if len(evidence) == 1 && !req.PricingEstimated {
+		return
+	}
+	if decision.Scores == nil {
+		decision.Scores = map[string]any{}
+	}
+	decision.Scores["pricing"] = evidence
+}
+
+func attachRoutingHints(decision *contract.Decision, req contract.ScheduleRequest) {
+	hints := routingHints(req)
+	if len(hints) == 0 {
+		return
+	}
+	if decision.Scores == nil {
+		decision.Scores = map[string]any{}
+	}
+	decision.Scores["routing_hints"] = hints
+}
+
+func routingHints(req contract.ScheduleRequest) map[string]any {
+	hints := map[string]any{}
+	if alias := strings.TrimSpace(req.ModelAlias); alias != "" {
+		hints["model_alias"] = alias
+	}
+	if len(req.FallbackModels) > 0 {
+		hints["fallback_models"] = cloneStrings(req.FallbackModels)
+	}
+	if source := strings.TrimSpace(req.SessionAffinitySource); source != "" {
+		hints["session_affinity_source"] = source
+	}
+	if keyHash := affinityKeyHash(req.SessionAffinityKey); keyHash != "" {
+		hints["session_affinity_key_hash"] = keyHash
+	}
+	if req.StickyAccountID != nil {
+		hints["sticky_account_id"] = *req.StickyAccountID
+	}
+	if req.StickyStrength != "" {
+		hints["sticky_strength"] = string(req.StickyStrength)
+	}
+	return hints
+}
+
+func affinityKeyHash(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(value))
+	return "sha256:" + hex.EncodeToString(sum[:])
 }
 
 type candidateScore struct {
@@ -414,6 +497,14 @@ func scoreCandidate(candidate contract.Candidate, req contract.ScheduleRequest, 
 }
 
 func rejectReason(candidate contract.Candidate, req contract.ScheduleRequest) string {
+	if req.StickyStrength == contract.StickyStrengthHard {
+		if req.StickyAccountID == nil {
+			return "hard_sticky_missing"
+		}
+		if candidate.Account.ID != *req.StickyAccountID {
+			return "hard_sticky_mismatch"
+		}
+	}
 	if candidate.Provider.Status != "active" {
 		return "provider_disabled"
 	}
@@ -503,6 +594,10 @@ func addStickyBrokenReason(rejectReasons map[string]any, req contract.ScheduleRe
 		return
 	}
 	reason, ok := rejectReasons[accountKey(*req.StickyAccountID)]
+	if !ok && req.StickyStrength == contract.StickyStrengthHard {
+		reason = "sticky_account_not_found"
+		ok = true
+	}
 	if !ok {
 		return
 	}

@@ -21,19 +21,29 @@ last_completed:
 - WP-110: Provider preset registry expansion now seeds common OpenAI-compatible and Anthropic-compatible presets, dynamically registers provider alias routes from preset metadata, and verifies alias routes preserve model/API key policy and scheduler evidence.
 - WP-120: Reverse Proxy Runtime foundation routes non-API-key accounts through the runtime, strips SRapi/gateway headers, isolates account cookie jars, maps runtime risk classes to metrics/account protection, and validates OAuth refresh persistence through HTTP regressions.
 - WP-130: OAuth refresh and token lifecycle now verifies per-account refresh behavior, refresh failure audit without credential overwrite, refresh success credential re-encryption/audit, and ban/session signals stopping future scheduling.
+- WP-140: CLI runtime concepts are represented as durable account runtime classes and adapter/runtime inputs; model alias strategy and session affinity now feed Scheduler decisions with hashed affinity evidence.
+- WP-150: Admin diagnostics now expose Scheduler overview/decision evidence and account health summaries with runtime class, recent error class, quota, cooldown, latency, and circuit state.
+- WP-170: Account operations parity now covers account groups, safe inspect/export/import, proxy binding, recovery, persisted health/quota snapshots, CSRF coverage, and generated SDK/OpenAPI parity.
+- WP-180: Subscription and pricing foundations now include subscription plans, user subscriptions, decimal-safe pricing rules, Gateway entitlement/pricing admission, billing metadata linkage, admin/current-user control-plane APIs, and generated SDK/OpenAPI parity.
 
 current:
 
-- package: WP-140
+- package: WP-190
 - status: pending
-- objective: add Codex/Claude/Gemini CLI-style runtime concepts without importing CLIProxyAPI architecture wholesale.
+- objective: implement payment orders and at least one provider integration path.
 
-next_recommended: WP-140
+next_recommended: WP-190
 
 last_gates:
 
-- `cd apps/api && go test ./internal/httpserver -run 'TestGatewayReverseProxy(BanSignalDisablesAccountAndStopsScheduling|AccountAutoProtectsOnSessionInvalid|OAuthRefreshPersistsCredentialAndAudits|OAuthRefreshFailureDoesNotPersistCredential)'`: pass
-- `cd apps/api && go test ./internal/modules/accounts/... ./internal/modules/reverse_proxy/...`: pass
+- `make openapi-lint`: pass
+- `make openapi-codegen-check`: pass
+- `make openapi-ts-codegen-check`: pass
+- `make sdk-ts-typecheck`: pass
+- `make ent-generate-check`: pass
+- `make migration-check`: pass
+- `cd apps/api && go test ./internal/httpserver -run 'Test(AdminSubscriptionPricingControlPlane|ConsoleWriteRoutesRequireCSRF|GatewaySubscriptionEntitlementRejectsBeforeSchedulerConsumesAccount)' -count=1`: pass
+- `cd apps/api && go test ./internal/httpserver ./internal/modules/subscriptions/... ./internal/persistence/entstore/subscriptions -count=1`: pass
 - `make architecture-check`: pass
 
 notes:
@@ -50,6 +60,11 @@ notes:
 - WP-110 added `TestGatewayProviderAliasUsesPresetProviderKey` to prove non-generic preset aliases such as `/api/provider/deepseek/v1/chat/completions` force provider context while reusing Gateway runtime and Scheduler evidence.
 - WP-120 reused the existing runtime foundation and verified it with module gates plus focused HTTP regressions for session-invalid auto protection and OAuth refresh persistence/failure handling.
 - WP-130 added `TestGatewayReverseProxyBanSignalDisablesAccountAndStopsScheduling` to prove `account_banned` disables the account and prevents subsequent upstream dispatch.
+- WP-140 added `TestRuntimeInjectsCliClientTokenAndDefaultClientUserAgent`, `TestReverseProxyAdapterPassesCliRuntimeContext`, `TestRoutingHintsAreRecordedWithoutLeakingAffinityKey`, and `TestGatewayModelAliasAndSessionAffinityFeedScheduler` to prove CLI runtime context, model alias strategy, and session affinity are explicit Scheduler/runtime inputs.
+- WP-150 expanded `AccountHealthSnapshot` in OpenAPI and generated SDKs, added health summary derivation from account metadata/usage logs, and extended the rate-limit cooldown HTTP regression to prove operator-visible runtime/error/quota/cooldown diagnostics.
+- WP-160 is deferred by explicit user instruction: frontend visual implementation will be handled later by Gemini. Continue backend work at WP-170.
+- WP-170 added account group operations, account inspect/export/import, proxy bind, recover, persisted test/gateway health and quota snapshots, recursive export metadata sanitization, expanded CSRF regression coverage, and generated SDK methods for account operations.
+- WP-180 added `GET /api/v1/me/subscriptions`, admin subscription plan/user subscription/pricing rule APIs, entitlement rejection before Scheduler lease consumption, decimal-normalized pricing rule responses, pricing metadata on billing ledger entries, generated SDK methods, Ent/migration parity, and CSRF coverage for new console writes.
 
 ## Work Package Ledger
 
@@ -69,11 +84,11 @@ notes:
 | WP-110 | completed | Common compatible provider presets, dynamic alias route registration, and alias policy/evidence regressions pass. |
 | WP-120 | completed | Runtime routing, header hygiene, account isolation, risk metrics/protection, and reverse-proxy adapter gates pass. |
 | WP-130 | completed | Refresh lifecycle, audit, re-encryption path, and ban/session scheduling stop regressions pass. |
-| WP-140 | pending | CLI runtime lessons from CLIProxyAPI. |
-| WP-150 | pending | Admin Ops and Scheduler diagnostics. |
-| WP-160 | pending | Frontend foundation. |
-| WP-170 | pending | Account operations parity from sub2api. |
-| WP-180 | pending | Subscription and pricing. |
+| WP-140 | completed | CLI runtime classes, CLI token materialization, model alias strategy, and session affinity Scheduler evidence are covered. |
+| WP-150 | completed | Scheduler diagnostics and account health summaries include score/reject evidence, runtime class, recent error, quota, cooldown, latency, and circuit state. |
+| WP-160 | deferred | Frontend visual implementation intentionally deferred per user instruction; backend work continues. |
+| WP-170 | completed | Account groups, account test/recovery, proxy binding, safe import/export, and persisted health/quota snapshots are covered. |
+| WP-180 | completed | Subscription plans, user subscriptions, entitlement admission, decimal pricing rules, billing metadata linkage, admin/current-user APIs, and generated SDK/OpenAPI parity are covered. |
 | WP-190 | pending | Payment system Phase 2. |
 | WP-200 | pending | Affiliate rebate Phase 2. |
 | WP-210 | pending | Production operations. |

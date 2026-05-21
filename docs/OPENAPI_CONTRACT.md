@@ -77,6 +77,9 @@ packages/openapi/
 /api/v1/admin/models
 /api/v1/admin/accounts
 /api/v1/admin/scheduler
+/api/v1/admin/subscription-plans
+/api/v1/admin/user-subscriptions
+/api/v1/admin/pricing-rules
 /api/v1/admin/payments
 /api/v1/admin/affiliate
 /api/v1/admin/ops
@@ -174,7 +177,17 @@ components:
 - 控制台写接口使用 `cookieAuth` + `csrfHeader`。
 - Gateway `/v1/*` 接口使用 `gatewayBearerAuth`。
 
-### 4.5 RBAC Matrix
+### 4.5 Provider Account Import / Export
+
+账号池导入导出接口必须保持凭证安全边界：
+
+- `GET /api/v1/admin/accounts/export` 只导出账号元数据、分组、状态、权重、代理绑定等可操作字段，不得返回 `credential`、`credential_ciphertext`、OAuth token、Cookie、API Key 或 refresh token。
+- 导出响应必须包含 `credential_exported: false`，用于提醒调用方该 payload 不能作为完整备份凭证源。
+- 导出 metadata 必须递归移除敏感键，例如 `api_key`、`access_token`、`refresh_token`、`authorization`、`cookie`、`secret`、`password`、`token`。
+- `POST /api/v1/admin/accounts/import` 的凭证字段是 write-only 输入；服务端必须通过 Provider Account 凭证加密边界持久化，不得在响应、audit before/after、错误 details 或日志中回显。
+- import/export 写语义以 OpenAPI schema 为准：export 是读接口使用 `cookieAuth`，import 是写接口必须使用 `cookieAuth` + `csrfHeader`。
+
+### 4.6 RBAC Matrix
 
 管理员接口必须在 OpenAPI 描述中标注权限需求。
 
@@ -508,6 +521,15 @@ GET   /api/v1/admin/accounts/{id}/health
 GET   /api/v1/admin/accounts/{id}/quota
 ```
 
+`GET /api/v1/admin/accounts/{id}/health` 必须返回运维排障所需的低基数字段：
+
+- 账号和 Provider 标识：`account_id`、`provider_id`、`runtime_class`、`status`。
+- 最近错误与健康：`error_class`、`success_rate`、`error_rate`、`latency_p50_ms`、`latency_p95_ms`。
+- 额度与限流：`quota_remaining_ratio`、`quota_exhausted`、`rate_limit_count`、`timeout_count`。
+- 保护状态：`cooldown_until`、`cooldown_reason`、`circuit_state`、`snapshot_at`。
+
+该响应不得包含账号名称、上游凭证、Cookie、OAuth token、API Key 或 prompt 内容。
+
 ### 16.7 Admin Scheduler
 
 ```txt
@@ -543,7 +565,26 @@ POST /api/provider/anthropic-compatible/v1/messages
 
 后续更多 Provider alias、passthrough、Gemini native、WebSocket、images、embeddings、audio、moderation 等路由以 `GATEWAY_ROUTE_MATRIX.md` 为准。
 
-### 16.9 Admin Ops
+### 16.9 Admin Subscriptions
+
+```txt
+GET  /api/v1/admin/subscription-plans
+POST /api/v1/admin/subscription-plans
+GET  /api/v1/admin/user-subscriptions
+POST /api/v1/admin/user-subscriptions
+GET  /api/v1/admin/pricing-rules
+POST /api/v1/admin/pricing-rules
+```
+
+订阅与定价控制面必须满足：
+
+- 金额和每百万 tokens 单价使用 decimal string，不使用 float 表示真实账务金额。
+- `GET /api/v1/me/subscriptions` 只能返回当前用户订阅。
+- 管理员创建用户订阅时必须复制套餐权益快照，后续套餐变更不得回写既有订阅权益。
+- Pricing Rule 的 `provider_id=0` 表示模型级通用价格，具体 Provider 规则优先。
+- Gateway admission 必须在 Scheduler 获取账号 lease 前执行用户/模型 entitlement 检查。
+
+### 16.10 Admin Ops
 
 ```txt
 GET  /api/v1/admin/ops/overview
@@ -563,7 +604,7 @@ POST /api/v1/admin/ops/events/{event_id}/replay
 
 领域事件 Outbox、Inbox、重试、死信和补偿以 `DOMAIN_EVENTS_SPEC.md` 为准。
 
-### 16.10 Payments
+### 16.11 Payments
 
 ```txt
 GET  /api/v1/payment/methods
@@ -575,7 +616,7 @@ GET  /api/v1/admin/payments/orders
 POST /api/v1/admin/payments/orders/{id}/refund
 ```
 
-### 16.11 Affiliate
+### 16.12 Affiliate
 
 ```txt
 GET  /api/v1/me/affiliate

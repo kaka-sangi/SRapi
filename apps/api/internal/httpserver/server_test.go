@@ -13,6 +13,9 @@ import (
 
 	"github.com/srapi/srapi/apps/api/internal/config"
 	schedulermemory "github.com/srapi/srapi/apps/api/internal/modules/scheduler/store/memory"
+	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
+	subscriptionservice "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/service"
+	subscriptionmemory "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/store/memory"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
 
@@ -311,6 +314,7 @@ func TestConsoleWriteRoutesRequireCSRF(t *testing.T) {
 	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"csrf-provider","display_name":"CSRF Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
 	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"csrf-model","display_name":"CSRF Model","status":"active"}`)
 	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"csrf-account","runtime_class":"api_key","credential":{"api_key":"secret"},"status":"active"}`)
+	groupResp := mustCreateAccountGroup(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"csrf-group","description":"CSRF Group","status":"active"}`)
 	apiKeyResp, _ := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
 
 	writeRoutes := []struct {
@@ -329,10 +333,20 @@ func TestConsoleWriteRoutesRequireCSRF(t *testing.T) {
 		{http.MethodPost, "/api/v1/admin/models/" + string(modelResp.Data.Id) + "/aliases", `{"alias":"blocked-alias","status":"active"}`},
 		{http.MethodPost, "/api/v1/admin/models/" + string(modelResp.Data.Id) + "/mappings", `{"provider_id":"` + string(providerResp.Data.Id) + `","upstream_model_name":"blocked","status":"active"}`},
 		{http.MethodPost, "/api/v1/admin/accounts", `{"provider_id":"` + string(providerResp.Data.Id) + `","name":"blocked-account","runtime_class":"api_key","credential":{"api_key":"secret"},"status":"active"}`},
+		{http.MethodPost, "/api/v1/admin/accounts/import", `{"accounts":[{"provider_id":"` + string(providerResp.Data.Id) + `","name":"blocked-import","runtime_class":"api_key","credential":{"api_key":"secret"},"status":"active"}]}`},
 		{http.MethodPatch, "/api/v1/admin/accounts/" + string(accountResp.Data.Id), `{"name":"blocked-account"}`},
+		{http.MethodPatch, "/api/v1/admin/accounts/" + string(accountResp.Data.Id) + "/proxy", `{"proxy_id":"proxy-blocked"}`},
 		{http.MethodPost, "/api/v1/admin/accounts/" + string(accountResp.Data.Id) + "/test", `{}`},
 		{http.MethodPost, "/api/v1/admin/accounts/" + string(accountResp.Data.Id) + "/disable", `{}`},
 		{http.MethodPost, "/api/v1/admin/accounts/" + string(accountResp.Data.Id) + "/enable", `{}`},
+		{http.MethodPost, "/api/v1/admin/accounts/" + string(accountResp.Data.Id) + "/recover", `{}`},
+		{http.MethodPost, "/api/v1/admin/account-groups", `{"name":"blocked-group","status":"active"}`},
+		{http.MethodPatch, "/api/v1/admin/account-groups/" + string(groupResp.Data.Id), `{"description":"blocked"}`},
+		{http.MethodPost, "/api/v1/admin/account-groups/" + string(groupResp.Data.Id) + "/accounts/" + string(accountResp.Data.Id), `{}`},
+		{http.MethodDelete, "/api/v1/admin/account-groups/" + string(groupResp.Data.Id) + "/accounts/" + string(accountResp.Data.Id), `{}`},
+		{http.MethodPost, "/api/v1/admin/subscription-plans", `{"name":"blocked-plan","price":"1.00","currency":"USD","validity_days":30}`},
+		{http.MethodPost, "/api/v1/admin/user-subscriptions", `{"user_id":"` + string(loginResp.Data.User.Id) + `","plan_id":"1"}`},
+		{http.MethodPost, "/api/v1/admin/pricing-rules", `{"model_id":"` + string(modelResp.Data.Id) + `","provider_id":"` + string(providerResp.Data.Id) + `","input_price_per_million_tokens":"1","output_price_per_million_tokens":"2","cache_read_price_per_million_tokens":"0","cache_write_price_per_million_tokens":"0","currency":"USD"}`},
 	}
 
 	for _, route := range writeRoutes {
@@ -344,6 +358,211 @@ func TestConsoleWriteRoutesRequireCSRF(t *testing.T) {
 		if rec.Code != http.StatusForbidden {
 			t.Fatalf("%s %s without csrf: expected 403, got %d body=%s", route.method, route.path, rec.Code, rec.Body.String())
 		}
+	}
+}
+
+func TestAdminSubscriptionPricingControlPlane(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"subscription-provider","display_name":"Subscription Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"subscription-model","display_name":"Subscription Model","status":"active"}`)
+
+	planReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/subscription-plans", strings.NewReader(`{"name":"commercial-pro","description":"Commercial Pro","price":"19.99","currency":"usd","validity_days":30,"entitlements":{"allowed_models":["subscription-model"],"monthly_token_quota":1000,"scheduler_strategy":"cost_saver"},"for_sale":true,"sort_order":5,"status":"active"}`))
+	planReq.Header.Set("Content-Type", "application/json")
+	planReq.AddCookie(sessionCookie)
+	planReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	planRec := httptest.NewRecorder()
+	handler.ServeHTTP(planRec, planReq)
+	if planRec.Code != http.StatusCreated {
+		t.Fatalf("expected subscription plan create 201, got %d body=%s", planRec.Code, planRec.Body.String())
+	}
+	var planResp apiopenapi.SubscriptionPlanResponse
+	if err := json.NewDecoder(planRec.Body).Decode(&planResp); err != nil {
+		t.Fatalf("decode subscription plan: %v", err)
+	}
+	if planResp.Data.Price != "19.99000000" || planResp.Data.Currency != "USD" || planResp.Data.Status != apiopenapi.SubscriptionPlanStatusActive {
+		t.Fatalf("unexpected subscription plan response: %+v", planResp.Data)
+	}
+	if planResp.Data.Entitlements["scheduler_strategy"] != "cost_saver" {
+		t.Fatalf("expected entitlement snapshot in plan response, got %+v", planResp.Data.Entitlements)
+	}
+
+	userSubReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/user-subscriptions", strings.NewReader(`{"user_id":"`+string(loginResp.Data.User.Id)+`","plan_id":"`+string(planResp.Data.Id)+`","source_type":"manual","source_id":"admin-seed"}`))
+	userSubReq.Header.Set("Content-Type", "application/json")
+	userSubReq.AddCookie(sessionCookie)
+	userSubReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	userSubRec := httptest.NewRecorder()
+	handler.ServeHTTP(userSubRec, userSubReq)
+	if userSubRec.Code != http.StatusCreated {
+		t.Fatalf("expected user subscription create 201, got %d body=%s", userSubRec.Code, userSubRec.Body.String())
+	}
+	var userSubResp apiopenapi.UserSubscriptionResponse
+	if err := json.NewDecoder(userSubRec.Body).Decode(&userSubResp); err != nil {
+		t.Fatalf("decode user subscription: %v", err)
+	}
+	if userSubResp.Data.UserId != loginResp.Data.User.Id || userSubResp.Data.PlanId != planResp.Data.Id || userSubResp.Data.Status != apiopenapi.UserSubscriptionStatusActive {
+		t.Fatalf("unexpected user subscription response: %+v", userSubResp.Data)
+	}
+	if userSubResp.Data.EntitlementsSnapshot["scheduler_strategy"] != "cost_saver" {
+		t.Fatalf("expected entitlement snapshot copied to subscription, got %+v", userSubResp.Data.EntitlementsSnapshot)
+	}
+
+	pricingReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/pricing-rules", strings.NewReader(`{"model_id":"`+string(modelResp.Data.Id)+`","provider_id":"`+string(providerResp.Data.Id)+`","input_price_per_million_tokens":"1.25","output_price_per_million_tokens":"2.50","cache_read_price_per_million_tokens":"0.10","cache_write_price_per_million_tokens":"0.20","currency":"usd"}`))
+	pricingReq.Header.Set("Content-Type", "application/json")
+	pricingReq.AddCookie(sessionCookie)
+	pricingReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	pricingRec := httptest.NewRecorder()
+	handler.ServeHTTP(pricingRec, pricingReq)
+	if pricingRec.Code != http.StatusCreated {
+		t.Fatalf("expected pricing rule create 201, got %d body=%s", pricingRec.Code, pricingRec.Body.String())
+	}
+	var pricingResp apiopenapi.PricingRuleResponse
+	if err := json.NewDecoder(pricingRec.Body).Decode(&pricingResp); err != nil {
+		t.Fatalf("decode pricing rule: %v", err)
+	}
+	if pricingResp.Data.InputPricePerMillionTokens != "1.25000000" || pricingResp.Data.OutputPricePerMillionTokens != "2.50000000" || pricingResp.Data.Currency != "USD" {
+		t.Fatalf("expected normalized decimal pricing rule, got %+v", pricingResp.Data)
+	}
+
+	plansReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/subscription-plans", nil)
+	plansReq.AddCookie(sessionCookie)
+	plansRec := httptest.NewRecorder()
+	handler.ServeHTTP(plansRec, plansReq)
+	if plansRec.Code != http.StatusOK {
+		t.Fatalf("expected subscription plan list 200, got %d body=%s", plansRec.Code, plansRec.Body.String())
+	}
+	var plansResp apiopenapi.SubscriptionPlanListResponse
+	if err := json.NewDecoder(plansRec.Body).Decode(&plansResp); err != nil {
+		t.Fatalf("decode subscription plan list: %v", err)
+	}
+	if len(plansResp.Data) != 1 || plansResp.Data[0].Id != planResp.Data.Id {
+		t.Fatalf("unexpected subscription plan list: %+v", plansResp.Data)
+	}
+
+	adminSubsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/user-subscriptions?user_id="+string(loginResp.Data.User.Id), nil)
+	adminSubsReq.AddCookie(sessionCookie)
+	adminSubsRec := httptest.NewRecorder()
+	handler.ServeHTTP(adminSubsRec, adminSubsReq)
+	if adminSubsRec.Code != http.StatusOK {
+		t.Fatalf("expected admin user subscription list 200, got %d body=%s", adminSubsRec.Code, adminSubsRec.Body.String())
+	}
+	var adminSubsResp apiopenapi.UserSubscriptionListResponse
+	if err := json.NewDecoder(adminSubsRec.Body).Decode(&adminSubsResp); err != nil {
+		t.Fatalf("decode admin user subscription list: %v", err)
+	}
+	if len(adminSubsResp.Data) != 1 || adminSubsResp.Data[0].Id != userSubResp.Data.Id {
+		t.Fatalf("unexpected admin user subscription list: %+v", adminSubsResp.Data)
+	}
+
+	meSubsReq := httptest.NewRequest(http.MethodGet, "/api/v1/me/subscriptions", nil)
+	meSubsReq.AddCookie(sessionCookie)
+	meSubsRec := httptest.NewRecorder()
+	handler.ServeHTTP(meSubsRec, meSubsReq)
+	if meSubsRec.Code != http.StatusOK {
+		t.Fatalf("expected current user subscription list 200, got %d body=%s", meSubsRec.Code, meSubsRec.Body.String())
+	}
+	var meSubsResp apiopenapi.UserSubscriptionListResponse
+	if err := json.NewDecoder(meSubsRec.Body).Decode(&meSubsResp); err != nil {
+		t.Fatalf("decode current user subscription list: %v", err)
+	}
+	if len(meSubsResp.Data) != 1 || meSubsResp.Data[0].Id != userSubResp.Data.Id {
+		t.Fatalf("unexpected current user subscription list: %+v", meSubsResp.Data)
+	}
+
+	rulesReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/pricing-rules", nil)
+	rulesReq.AddCookie(sessionCookie)
+	rulesRec := httptest.NewRecorder()
+	handler.ServeHTTP(rulesRec, rulesReq)
+	if rulesRec.Code != http.StatusOK {
+		t.Fatalf("expected pricing rule list 200, got %d body=%s", rulesRec.Code, rulesRec.Body.String())
+	}
+	var rulesResp apiopenapi.PricingRuleListResponse
+	if err := json.NewDecoder(rulesRec.Body).Decode(&rulesResp); err != nil {
+		t.Fatalf("decode pricing rule list: %v", err)
+	}
+	if len(rulesResp.Data) != 1 || rulesResp.Data[0].Id != pricingResp.Data.Id {
+		t.Fatalf("unexpected pricing rule list: %+v", rulesResp.Data)
+	}
+
+	auditReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/audit-logs", nil)
+	auditReq.AddCookie(sessionCookie)
+	auditRec := httptest.NewRecorder()
+	handler.ServeHTTP(auditRec, auditReq)
+	if auditRec.Code != http.StatusOK {
+		t.Fatalf("expected audit log list 200, got %d body=%s", auditRec.Code, auditRec.Body.String())
+	}
+	var auditResp apiopenapi.AuditLogListResponse
+	if err := json.NewDecoder(auditRec.Body).Decode(&auditResp); err != nil {
+		t.Fatalf("decode audit logs: %v", err)
+	}
+	for _, action := range []string{"subscription_plan.create", "user_subscription.create", "pricing_rule.create"} {
+		if !auditLogHasAction(auditResp.Data, action) {
+			t.Fatalf("expected audit action %s in %+v", action, auditResp.Data)
+		}
+	}
+}
+
+func TestAdminAccountInspectAndExportStaySecretSafe(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"account-ops-provider","display_name":"Account Ops Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"account-ops-account","runtime_class":"api_key","credential":{"api_key":"account-ops-secret"},"metadata":{"base_url":"https://upstream.example/v1","access_token":"metadata-access-token","cookie":"metadata-cookie","nested":{"refresh_token":"nested-refresh-token","safe":"kept"},"labels":[{"api_key":"nested-api-key","region":"us"}]},"status":"active"}`)
+	groupResp := mustCreateAccountGroup(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"account-ops-group","description":"ops","provider_scope":{"provider_id":"`+string(providerResp.Data.Id)+`"},"model_scope":{"family":"claude"},"strategy_hint":"balanced","status":"active"}`)
+
+	addMemberReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/account-groups/"+string(groupResp.Data.Id)+"/accounts/"+string(accountResp.Data.Id), nil)
+	addMemberReq.AddCookie(sessionCookie)
+	addMemberReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	addMemberRec := httptest.NewRecorder()
+	handler.ServeHTTP(addMemberRec, addMemberReq)
+	if addMemberRec.Code != http.StatusOK {
+		t.Fatalf("expected account group member add 200, got %d body=%s", addMemberRec.Code, addMemberRec.Body.String())
+	}
+
+	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts/"+string(accountResp.Data.Id), nil)
+	getReq.AddCookie(sessionCookie)
+	getRec := httptest.NewRecorder()
+	handler.ServeHTTP(getRec, getReq)
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("expected account inspect 200, got %d body=%s", getRec.Code, getRec.Body.String())
+	}
+	var getResp apiopenapi.ProviderAccountResponse
+	if err := json.NewDecoder(getRec.Body).Decode(&getResp); err != nil {
+		t.Fatalf("decode account inspect: %v", err)
+	}
+	if getResp.Data.Id != accountResp.Data.Id || len(getResp.Data.GroupIds) != 1 || getResp.Data.GroupIds[0] != groupResp.Data.Id {
+		t.Fatalf("expected inspected account with group id, got %+v", getResp.Data)
+	}
+	if strings.Contains(getRec.Body.String(), "account-ops-secret") {
+		t.Fatalf("account inspect leaked credential material: %s", getRec.Body.String())
+	}
+
+	exportReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts/export", nil)
+	exportReq.AddCookie(sessionCookie)
+	exportRec := httptest.NewRecorder()
+	handler.ServeHTTP(exportRec, exportReq)
+	if exportRec.Code != http.StatusOK {
+		t.Fatalf("expected account export 200, got %d body=%s", exportRec.Code, exportRec.Body.String())
+	}
+	if body := exportRec.Body.String(); strings.Contains(body, "account-ops-secret") ||
+		strings.Contains(body, "metadata-access-token") ||
+		strings.Contains(body, "metadata-cookie") ||
+		strings.Contains(body, "nested-refresh-token") ||
+		strings.Contains(body, "nested-api-key") {
+		t.Fatalf("account export leaked sensitive material: %s", body)
+	}
+	var exportResp apiopenapi.ProviderAccountExportResponse
+	if err := json.NewDecoder(exportRec.Body).Decode(&exportResp); err != nil {
+		t.Fatalf("decode account export: %v", err)
+	}
+	item := findProviderAccountExportByName(exportResp.Data, "account-ops-account")
+	if item == nil {
+		t.Fatalf("exported account not found in %+v", exportResp.Data)
+	}
+	if item.CredentialExported || item.GroupIds == nil || len(*item.GroupIds) != 1 || (*item.GroupIds)[0] != groupResp.Data.Id {
+		t.Fatalf("expected non-secret export with group id, got %+v", item)
+	}
+	if item.Metadata == nil || (*item.Metadata)["base_url"] != "https://upstream.example/v1" || (*item.Metadata)["nested"].(map[string]any)["safe"] != "kept" {
+		t.Fatalf("expected safe metadata retained, got %+v", item.Metadata)
 	}
 }
 
@@ -712,7 +931,7 @@ func TestAdminCatalogFlow(t *testing.T) {
 	if err := json.NewDecoder(accountQuotaRec.Body).Decode(&accountQuotaResp); err != nil {
 		t.Fatalf("decode account quota: %v", err)
 	}
-	if len(accountQuotaResp.Data) != 1 || accountQuotaResp.Data[0].QuotaType != "monthly_tokens" || accountQuotaResp.Data[0].Used == "0" {
+	if len(accountQuotaResp.Data) == 0 || accountQuotaResp.Data[0].QuotaType != "monthly_tokens" || accountQuotaResp.Data[0].Used == "0" {
 		t.Fatalf("unexpected account quota: %+v", accountQuotaResp.Data)
 	}
 
@@ -998,6 +1217,86 @@ func TestGatewayRejectsModelWithoutProviderMapping(t *testing.T) {
 		t.Fatalf("unexpected failed gateway outbox event: %+v", event)
 	}
 	_ = apiKeyResp
+}
+
+func TestGatewaySubscriptionEntitlementRejectsBeforeSchedulerConsumesAccount(t *testing.T) {
+	schedulerStore := schedulermemory.New()
+	subscriptionStore := subscriptionmemory.New()
+	subscriptionSvc, err := subscriptionservice.New(subscriptionStore, nil)
+	if err != nil {
+		t.Fatalf("new subscription service: %v", err)
+	}
+	handler := New(config.Load(), nil,
+		WithSchedulerStore(schedulerStore),
+		WithSubscriptionStore(subscriptionStore),
+	)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"entitlement-provider","display_name":"Entitlement Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"blocked-model","display_name":"Blocked Model","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"blocked-upstream","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"entitlement-account","runtime_class":"api_key","credential":{"api_key":"entitlement-secret"},"status":"active"}`)
+
+	userID, err := strconv.Atoi(string(loginResp.Data.User.Id))
+	if err != nil {
+		t.Fatalf("parse login user id: %v", err)
+	}
+	plan, err := subscriptionSvc.CreatePlan(t.Context(), subscriptioncontract.CreatePlanRequest{
+		Name:         "locked-plan",
+		Price:        "0",
+		Currency:     "USD",
+		ValidityDays: 30,
+		Entitlements: map[string]any{
+			"allowed_models": []any{"allowed-model"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("create plan: %v", err)
+	}
+	if _, err := subscriptionSvc.CreateUserSubscription(t.Context(), subscriptioncontract.CreateSubscriptionRequest{
+		UserID: userID,
+		PlanID: plan.ID,
+	}); err != nil {
+		t.Fatalf("create subscription: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"blocked-model","messages":[{"role":"user","content":"should be rejected"}]}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected entitlement rejection 403, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var gatewayErr apiopenapi.GatewayErrorResponse
+	if err := json.NewDecoder(rec.Body).Decode(&gatewayErr); err != nil {
+		t.Fatalf("decode gateway error: %v", err)
+	}
+	if gatewayErr.Error.Code == nil || *gatewayErr.Error.Code != "entitlement_model_not_allowed" {
+		t.Fatalf("expected entitlement error code, got %+v", gatewayErr.Error)
+	}
+
+	decisions, err := schedulerStore.ListDecisions(t.Context())
+	if err != nil {
+		t.Fatalf("list scheduler decisions: %v", err)
+	}
+	if len(decisions) != 0 {
+		t.Fatalf("entitlement rejection must happen before scheduler decision, got %+v", decisions)
+	}
+	leases, err := schedulerStore.ListLeases(t.Context())
+	if err != nil {
+		t.Fatalf("list scheduler leases: %v", err)
+	}
+	if len(leases) != 0 {
+		t.Fatalf("entitlement rejection must not acquire leases, got %+v", leases)
+	}
+	feedbacks, err := schedulerStore.ListFeedbacks(t.Context())
+	if err != nil {
+		t.Fatalf("list scheduler feedbacks: %v", err)
+	}
+	if len(feedbacks) != 0 {
+		t.Fatalf("entitlement rejection must not record scheduler feedback, got %+v", feedbacks)
+	}
 }
 
 func TestGatewayInvokesOpenAICompatibleProviderAdapter(t *testing.T) {
@@ -1380,6 +1679,87 @@ func TestGatewayProviderAliasUsesPresetProviderKey(t *testing.T) {
 	}
 }
 
+func TestGatewayModelAliasAndSessionAffinityFeedScheduler(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"wp140-provider","display_name":"WP140 Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"wp140-canonical","display_name":"WP140 Canonical","status":"active"}`)
+	createAliasReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/models/"+string(modelResp.Data.Id)+"/aliases", strings.NewReader(`{"alias":"wp140-cli-alias","fallback_models":["wp140-fallback"],"strategy_hint":"cost_saver","status":"active"}`))
+	createAliasReq.Header.Set("Content-Type", "application/json")
+	createAliasReq.AddCookie(sessionCookie)
+	createAliasReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	createAliasRec := httptest.NewRecorder()
+	handler.ServeHTTP(createAliasRec, createAliasReq)
+	if createAliasRec.Code != http.StatusCreated {
+		t.Fatalf("expected model alias create 201, got %d body=%s", createAliasRec.Code, createAliasRec.Body.String())
+	}
+
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"wp140-upstream","status":"active"}`)
+	firstAccount := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"wp140-first-account","runtime_class":"api_key","credential":{"api_key":"first-secret"},"metadata":{"health_score":0.9},"status":"active"}`)
+	stickyAccount := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"wp140-sticky-account","runtime_class":"api_key","credential":{"api_key":"sticky-secret"},"metadata":{"health_score":0.9,"session_affinity_key":"thread-wp140"},"status":"active"}`)
+
+	keyReq := httptest.NewRequest(http.MethodPost, "/api/v1/api-keys", strings.NewReader(`{"name":"gateway-alias","scopes":["gateway:invoke"],"allowed_models":["wp140-cli-alias"]}`))
+	keyReq.Header.Set("Content-Type", "application/json")
+	keyReq.AddCookie(sessionCookie)
+	keyReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	keyRec := httptest.NewRecorder()
+	handler.ServeHTTP(keyRec, keyReq)
+	if keyRec.Code != http.StatusCreated {
+		t.Fatalf("expected api key create 201, got %d body=%s", keyRec.Code, keyRec.Body.String())
+	}
+	var keyResp apiopenapi.CreateApiKeyResponse
+	if err := json.NewDecoder(keyRec.Body).Decode(&keyResp); err != nil {
+		t.Fatalf("decode api key response: %v", err)
+	}
+
+	chatReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"wp140-cli-alias","messages":[{"role":"user","content":"route with affinity"}]}`))
+	chatReq.Header.Set("Content-Type", "application/json")
+	chatReq.Header.Set("Authorization", "Bearer "+keyResp.Data.PlaintextKey)
+	chatReq.Header.Set("X-SRapi-Session-Affinity-Key", "thread-wp140")
+	chatReq.Header.Set("X-SRapi-Sticky-Strength", "hard")
+	chatRec := httptest.NewRecorder()
+	handler.ServeHTTP(chatRec, chatReq)
+	if chatRec.Code != http.StatusOK {
+		t.Fatalf("expected alias affinity chat 200, got %d body=%s", chatRec.Code, chatRec.Body.String())
+	}
+
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=wp140-canonical", nil)
+	decisionsReq.AddCookie(sessionCookie)
+	decisionsRec := httptest.NewRecorder()
+	handler.ServeHTTP(decisionsRec, decisionsReq)
+	if decisionsRec.Code != http.StatusOK {
+		t.Fatalf("expected decisions 200, got %d body=%s", decisionsRec.Code, decisionsRec.Body.String())
+	}
+	var decisionsResp apiopenapi.SchedulerDecisionListResponse
+	if err := json.NewDecoder(decisionsRec.Body).Decode(&decisionsResp); err != nil {
+		t.Fatalf("decode decisions: %v", err)
+	}
+	if len(decisionsResp.Data) != 1 {
+		t.Fatalf("expected one wp140 decision, got %+v", decisionsResp.Data)
+	}
+	decision := decisionsResp.Data[0]
+	if decision.Strategy != apiopenapi.SchedulerDecisionStrategyCostSaver {
+		t.Fatalf("expected alias strategy cost_saver, got %+v", decision)
+	}
+	if decision.SelectedAccountId == nil || *decision.SelectedAccountId != string(stickyAccount.Data.Id) {
+		t.Fatalf("expected sticky account %s selected, got %+v", stickyAccount.Data.Id, decision.SelectedAccountId)
+	}
+	if !decision.StickyHit || !jsonObjectContainsString(decision.RejectReasons, "hard_sticky_mismatch") {
+		t.Fatalf("expected hard sticky evidence, got decision=%+v first=%+v", decision, firstAccount.Data.Id)
+	}
+	hints, ok := decision.Scores["routing_hints"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected routing hints, got %+v", decision.Scores)
+	}
+	if hints["model_alias"] != "wp140-cli-alias" || hints["sticky_strength"] != "hard" || hints["session_affinity_source"] != "header:x-srapi-session-affinity-key" {
+		t.Fatalf("unexpected routing hints: %+v", hints)
+	}
+	if keyHash, ok := hints["session_affinity_key_hash"].(string); !ok || !strings.HasPrefix(keyHash, "sha256:") || strings.Contains(keyHash, "thread-wp140") {
+		t.Fatalf("expected hashed affinity key, got %+v", hints)
+	}
+}
+
 func TestGatewayRateLimitFeedbackAppliesAccountCooldown(t *testing.T) {
 	var upstreamCalls int
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1471,6 +1851,28 @@ func TestGatewayRateLimitFeedbackAppliesAccountCooldown(t *testing.T) {
 	cooldownAccount := findProviderAccountByID(accountsResp.Data, accountResp.Data.Id)
 	if cooldownAccount == nil || cooldownAccount.Metadata == nil || (*cooldownAccount.Metadata)["cooldown_active"] != true || (*cooldownAccount.Metadata)["cooldown_reason"] != "rate_limit" {
 		t.Fatalf("expected account cooldown metadata, got %+v", cooldownAccount)
+	}
+
+	healthReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts/"+string(accountResp.Data.Id)+"/health", nil)
+	healthReq.AddCookie(sessionCookie)
+	healthRec := httptest.NewRecorder()
+	handler.ServeHTTP(healthRec, healthReq)
+	if healthRec.Code != http.StatusOK {
+		t.Fatalf("expected account health 200, got %d body=%s", healthRec.Code, healthRec.Body.String())
+	}
+	var healthResp apiopenapi.AccountHealthResponse
+	if err := json.NewDecoder(healthRec.Body).Decode(&healthResp); err != nil {
+		t.Fatalf("decode account health: %v", err)
+	}
+	if healthResp.Data.RuntimeClass != apiopenapi.RuntimeClassApiKey ||
+		healthResp.Data.ErrorClass == nil ||
+		*healthResp.Data.ErrorClass != "rate_limit" ||
+		healthResp.Data.CooldownReason == nil ||
+		*healthResp.Data.CooldownReason != "rate_limit" ||
+		healthResp.Data.CooldownUntil == nil ||
+		healthResp.Data.QuotaExhausted ||
+		healthResp.Data.QuotaRemainingRatio != 1 {
+		t.Fatalf("unexpected account health diagnostics: %+v", healthResp.Data)
 	}
 
 	secondReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"rate-limit-model","messages":[{"role":"user","content":"second"}]}`))
@@ -2130,6 +2532,24 @@ func mustCreateAccount(t *testing.T, handler http.Handler, sessionCookie *http.C
 	return resp
 }
 
+func mustCreateAccountGroup(t *testing.T, handler http.Handler, sessionCookie *http.Cookie, csrfToken, body string) apiopenapi.AccountGroupResponse {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/account-groups", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(sessionCookie)
+	req.Header.Set("X-CSRF-Token", csrfToken)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected account group create 201, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var resp apiopenapi.AccountGroupResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode account group response: %v", err)
+	}
+	return resp
+}
+
 func decodeChatMessageText(t *testing.T, content apiopenapi.ChatMessage_Content) string {
 	t.Helper()
 	text, err := content.AsChatMessageContent0()
@@ -2181,6 +2601,15 @@ func mustFindAuditLog(t *testing.T, items []apiopenapi.AuditLog, action string) 
 func findProviderAccountByID(items []apiopenapi.ProviderAccount, id apiopenapi.Id) *apiopenapi.ProviderAccount {
 	for i := range items {
 		if items[i].Id == id {
+			return &items[i]
+		}
+	}
+	return nil
+}
+
+func findProviderAccountExportByName(items []apiopenapi.ProviderAccountExportItem, name string) *apiopenapi.ProviderAccountExportItem {
+	for i := range items {
+		if items[i].Name == name {
 			return &items[i]
 		}
 	}

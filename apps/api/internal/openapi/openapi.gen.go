@@ -23,6 +23,24 @@ const (
 	GatewayBearerAuthScopes gatewayBearerAuthContextKey = "gatewayBearerAuth.Scopes"
 )
 
+// Defines values for AccountGroupStatus.
+const (
+	AccountGroupStatusActive   AccountGroupStatus = "active"
+	AccountGroupStatusDisabled AccountGroupStatus = "disabled"
+)
+
+// Valid indicates whether the value is a known member of the AccountGroupStatus enum.
+func (e AccountGroupStatus) Valid() bool {
+	switch e {
+	case AccountGroupStatusActive:
+		return true
+	case AccountGroupStatusDisabled:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for AdminTestResultStatus.
 const (
 	AdminTestResultStatusFailed AdminTestResultStatus = "failed"
@@ -728,6 +746,27 @@ func (e SchedulerStrategyStatus) Valid() bool {
 	}
 }
 
+// Defines values for SubscriptionPlanStatus.
+const (
+	SubscriptionPlanStatusActive   SubscriptionPlanStatus = "active"
+	SubscriptionPlanStatusArchived SubscriptionPlanStatus = "archived"
+	SubscriptionPlanStatusDisabled SubscriptionPlanStatus = "disabled"
+)
+
+// Valid indicates whether the value is a known member of the SubscriptionPlanStatus enum.
+func (e SubscriptionPlanStatus) Valid() bool {
+	switch e {
+	case SubscriptionPlanStatusActive:
+		return true
+	case SubscriptionPlanStatusArchived:
+		return true
+	case SubscriptionPlanStatusDisabled:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for UserRole.
 const (
 	UserRoleAdmin    UserRole = "admin"
@@ -754,24 +793,90 @@ func (e UserRole) Valid() bool {
 
 // Defines values for UserStatus.
 const (
-	Active   UserStatus = "active"
-	Disabled UserStatus = "disabled"
-	Pending  UserStatus = "pending"
+	UserStatusActive   UserStatus = "active"
+	UserStatusDisabled UserStatus = "disabled"
+	UserStatusPending  UserStatus = "pending"
 )
 
 // Valid indicates whether the value is a known member of the UserStatus enum.
 func (e UserStatus) Valid() bool {
 	switch e {
-	case Active:
+	case UserStatusActive:
 		return true
-	case Disabled:
+	case UserStatusDisabled:
 		return true
-	case Pending:
+	case UserStatusPending:
 		return true
 	default:
 		return false
 	}
 }
+
+// Defines values for UserSubscriptionStatus.
+const (
+	UserSubscriptionStatusActive    UserSubscriptionStatus = "active"
+	UserSubscriptionStatusCancelled UserSubscriptionStatus = "cancelled"
+	UserSubscriptionStatusExpired   UserSubscriptionStatus = "expired"
+	UserSubscriptionStatusSuspended UserSubscriptionStatus = "suspended"
+)
+
+// Valid indicates whether the value is a known member of the UserSubscriptionStatus enum.
+func (e UserSubscriptionStatus) Valid() bool {
+	switch e {
+	case UserSubscriptionStatusActive:
+		return true
+	case UserSubscriptionStatusCancelled:
+		return true
+	case UserSubscriptionStatusExpired:
+		return true
+	case UserSubscriptionStatusSuspended:
+		return true
+	default:
+		return false
+	}
+}
+
+// AccountGroup defines model for AccountGroup.
+type AccountGroup struct {
+	CreatedAt     Timestamp          `json:"created_at"`
+	Description   string             `json:"description"`
+	Id            Id                 `json:"id"`
+	ModelScope    JsonObject         `json:"model_scope"`
+	Name          string             `json:"name"`
+	ProviderScope JsonObject         `json:"provider_scope"`
+	Status        AccountGroupStatus `json:"status"`
+	StrategyHint  string             `json:"strategy_hint"`
+}
+
+// AccountGroupListResponse defines model for AccountGroupListResponse.
+type AccountGroupListResponse struct {
+	Data       []AccountGroup `json:"data"`
+	Pagination Pagination     `json:"pagination"`
+	RequestId  RequestId      `json:"request_id"`
+}
+
+// AccountGroupMember defines model for AccountGroupMember.
+type AccountGroupMember struct {
+	AccountGroupId Id        `json:"account_group_id"`
+	AccountId      Id        `json:"account_id"`
+	CreatedAt      Timestamp `json:"created_at"`
+	Id             Id        `json:"id"`
+}
+
+// AccountGroupMemberResponse defines model for AccountGroupMemberResponse.
+type AccountGroupMemberResponse struct {
+	Data      AccountGroupMember `json:"data"`
+	RequestId RequestId          `json:"request_id"`
+}
+
+// AccountGroupResponse defines model for AccountGroupResponse.
+type AccountGroupResponse struct {
+	Data      AccountGroup `json:"data"`
+	RequestId RequestId    `json:"request_id"`
+}
+
+// AccountGroupStatus defines model for AccountGroupStatus.
+type AccountGroupStatus string
 
 // AccountHealthResponse defines model for AccountHealthResponse.
 type AccountHealthResponse struct {
@@ -781,18 +886,23 @@ type AccountHealthResponse struct {
 
 // AccountHealthSnapshot defines model for AccountHealthSnapshot.
 type AccountHealthSnapshot struct {
-	AccountId      Id         `json:"account_id"`
-	CircuitState   string     `json:"circuit_state"`
-	CooldownUntil  *time.Time `json:"cooldown_until,omitempty"`
-	ErrorRate      float32    `json:"error_rate"`
-	LatencyP50Ms   int        `json:"latency_p50_ms"`
-	LatencyP95Ms   int        `json:"latency_p95_ms"`
-	ProviderId     Id         `json:"provider_id"`
-	RateLimitCount int        `json:"rate_limit_count"`
-	SnapshotAt     Timestamp  `json:"snapshot_at"`
-	Status         string     `json:"status"`
-	SuccessRate    float32    `json:"success_rate"`
-	TimeoutCount   int        `json:"timeout_count"`
+	AccountId           Id           `json:"account_id"`
+	CircuitState        string       `json:"circuit_state"`
+	CooldownReason      *string      `json:"cooldown_reason,omitempty"`
+	CooldownUntil       *time.Time   `json:"cooldown_until,omitempty"`
+	ErrorClass          *string      `json:"error_class,omitempty"`
+	ErrorRate           float32      `json:"error_rate"`
+	LatencyP50Ms        int          `json:"latency_p50_ms"`
+	LatencyP95Ms        int          `json:"latency_p95_ms"`
+	ProviderId          Id           `json:"provider_id"`
+	QuotaExhausted      bool         `json:"quota_exhausted"`
+	QuotaRemainingRatio float32      `json:"quota_remaining_ratio"`
+	RateLimitCount      int          `json:"rate_limit_count"`
+	RuntimeClass        RuntimeClass `json:"runtime_class"`
+	SnapshotAt          Timestamp    `json:"snapshot_at"`
+	Status              string       `json:"status"`
+	SuccessRate         float32      `json:"success_rate"`
+	TimeoutCount        int          `json:"timeout_count"`
 }
 
 // AccountQuotaListResponse defines model for AccountQuotaListResponse.
@@ -1025,6 +1135,12 @@ type BillingLedgerListResponse struct {
 	RequestId  RequestId            `json:"request_id"`
 }
 
+// BindProviderAccountProxyRequest defines model for BindProviderAccountProxyRequest.
+type BindProviderAccountProxyRequest struct {
+	// ProxyId Set to null or an empty string to clear proxy binding.
+	ProxyId *string `json:"proxy_id"`
+}
+
 // CapabilityDefinition defines model for CapabilityDefinition.
 type CapabilityDefinition struct {
 	Category       string                     `json:"category"`
@@ -1149,6 +1265,16 @@ type ContentBlock struct {
 // ContentBlockType defines model for ContentBlock.Type.
 type ContentBlockType string
 
+// CreateAccountGroupRequest defines model for CreateAccountGroupRequest.
+type CreateAccountGroupRequest struct {
+	Description   *string             `json:"description,omitempty"`
+	ModelScope    *JsonObject         `json:"model_scope,omitempty"`
+	Name          string              `json:"name"`
+	ProviderScope *JsonObject         `json:"provider_scope,omitempty"`
+	Status        *AccountGroupStatus `json:"status,omitempty"`
+	StrategyHint  *string             `json:"strategy_hint,omitempty"`
+}
+
 // CreateApiKeyRequest defines model for CreateApiKeyRequest.
 type CreateApiKeyRequest struct {
 	AllowedModels *[]string  `json:"allowed_models,omitempty"`
@@ -1195,6 +1321,19 @@ type CreateModelRequest struct {
 	Status          *ResourceStatus         `json:"status,omitempty"`
 }
 
+// CreatePricingRuleRequest defines model for CreatePricingRuleRequest.
+type CreatePricingRuleRequest struct {
+	CacheReadPricePerMillionTokens  string     `json:"cache_read_price_per_million_tokens"`
+	CacheWritePricePerMillionTokens string     `json:"cache_write_price_per_million_tokens"`
+	Currency                        string     `json:"currency"`
+	EffectiveFrom                   *time.Time `json:"effective_from,omitempty"`
+	EffectiveTo                     *time.Time `json:"effective_to,omitempty"`
+	InputPricePerMillionTokens      string     `json:"input_price_per_million_tokens"`
+	ModelId                         Id         `json:"model_id"`
+	OutputPricePerMillionTokens     string     `json:"output_price_per_million_tokens"`
+	ProviderId                      Id         `json:"provider_id"`
+}
+
 // CreateProviderAccountRequest defines model for CreateProviderAccountRequest.
 type CreateProviderAccountRequest struct {
 	// Credential Write-only credential payload. It must be encrypted before persistence.
@@ -1219,6 +1358,32 @@ type CreateProviderRequest struct {
 	Name         string              `json:"name"`
 	Protocol     ProviderProtocol    `json:"protocol"`
 	Status       *ResourceStatus     `json:"status,omitempty"`
+}
+
+// CreateSubscriptionPlanRequest defines model for CreateSubscriptionPlanRequest.
+type CreateSubscriptionPlanRequest struct {
+	Currency     string      `json:"currency"`
+	Description  *string     `json:"description,omitempty"`
+	Entitlements *JsonObject `json:"entitlements,omitempty"`
+	ForSale      *bool       `json:"for_sale,omitempty"`
+	Name         string      `json:"name"`
+
+	// Price Decimal string amount. Float values are not accepted by the service.
+	Price        string                  `json:"price"`
+	SortOrder    *int                    `json:"sort_order,omitempty"`
+	Status       *SubscriptionPlanStatus `json:"status,omitempty"`
+	ValidityDays int                     `json:"validity_days"`
+}
+
+// CreateUserSubscriptionRequest defines model for CreateUserSubscriptionRequest.
+type CreateUserSubscriptionRequest struct {
+	ExpiresAt  *time.Time              `json:"expires_at,omitempty"`
+	PlanId     Id                      `json:"plan_id"`
+	SourceId   *string                 `json:"source_id,omitempty"`
+	SourceType *string                 `json:"source_type,omitempty"`
+	StartsAt   *time.Time              `json:"starts_at,omitempty"`
+	Status     *UserSubscriptionStatus `json:"status,omitempty"`
+	UserId     Id                      `json:"user_id"`
 }
 
 // DomainEventOutbox defines model for DomainEventOutbox.
@@ -1416,6 +1581,35 @@ type Pagination struct {
 	Total    int  `json:"total"`
 }
 
+// PricingRule defines model for PricingRule.
+type PricingRule struct {
+	CacheReadPricePerMillionTokens  string     `json:"cache_read_price_per_million_tokens"`
+	CacheWritePricePerMillionTokens string     `json:"cache_write_price_per_million_tokens"`
+	CreatedAt                       Timestamp  `json:"created_at"`
+	Currency                        string     `json:"currency"`
+	EffectiveFrom                   *time.Time `json:"effective_from,omitempty"`
+	EffectiveTo                     *time.Time `json:"effective_to,omitempty"`
+	Id                              Id         `json:"id"`
+	InputPricePerMillionTokens      string     `json:"input_price_per_million_tokens"`
+	ModelId                         Id         `json:"model_id"`
+	OutputPricePerMillionTokens     string     `json:"output_price_per_million_tokens"`
+	ProviderId                      Id         `json:"provider_id"`
+	UpdatedAt                       Timestamp  `json:"updated_at"`
+}
+
+// PricingRuleListResponse defines model for PricingRuleListResponse.
+type PricingRuleListResponse struct {
+	Data       []PricingRule `json:"data"`
+	Pagination Pagination    `json:"pagination"`
+	RequestId  RequestId     `json:"request_id"`
+}
+
+// PricingRuleResponse defines model for PricingRuleResponse.
+type PricingRuleResponse struct {
+	Data      PricingRule `json:"data"`
+	RequestId RequestId   `json:"request_id"`
+}
+
 // Provider defines model for Provider.
 type Provider struct {
 	AdapterType  ProviderAdapterType `json:"adapter_type"`
@@ -1432,6 +1626,7 @@ type Provider struct {
 // ProviderAccount defines model for ProviderAccount.
 type ProviderAccount struct {
 	CreatedAt      Timestamp             `json:"created_at"`
+	GroupIds       []Id                  `json:"group_ids"`
 	Id             Id                    `json:"id"`
 	Metadata       *JsonObject           `json:"metadata,omitempty"`
 	Name           string                `json:"name"`
@@ -1442,6 +1637,63 @@ type ProviderAccount struct {
 	Status         ProviderAccountStatus `json:"status"`
 	UpstreamClient *string               `json:"upstream_client,omitempty"`
 	Weight         float32               `json:"weight"`
+}
+
+// ProviderAccountExportItem defines model for ProviderAccountExportItem.
+type ProviderAccountExportItem struct {
+	// CredentialExported Always false for this endpoint; credentials are never exported.
+	CredentialExported bool                  `json:"credential_exported"`
+	GroupIds           *[]Id                 `json:"group_ids,omitempty"`
+	Metadata           *JsonObject           `json:"metadata,omitempty"`
+	Name               string                `json:"name"`
+	Priority           int                   `json:"priority"`
+	ProviderId         Id                    `json:"provider_id"`
+	ProxyId            *string               `json:"proxy_id,omitempty"`
+	RuntimeClass       RuntimeClass          `json:"runtime_class"`
+	Status             ProviderAccountStatus `json:"status"`
+	UpstreamClient     *string               `json:"upstream_client,omitempty"`
+	Weight             float32               `json:"weight"`
+}
+
+// ProviderAccountExportResponse defines model for ProviderAccountExportResponse.
+type ProviderAccountExportResponse struct {
+	Data      []ProviderAccountExportItem `json:"data"`
+	RequestId RequestId                   `json:"request_id"`
+}
+
+// ProviderAccountImportItem defines model for ProviderAccountImportItem.
+type ProviderAccountImportItem struct {
+	// Credential Write-only credential payload. Exports intentionally omit this field.
+	Credential     *map[string]interface{} `json:"credential,omitempty"`
+	GroupIds       *[]Id                   `json:"group_ids,omitempty"`
+	Metadata       *JsonObject             `json:"metadata,omitempty"`
+	Name           string                  `json:"name"`
+	Priority       *int                    `json:"priority,omitempty"`
+	ProviderId     Id                      `json:"provider_id"`
+	ProxyId        *string                 `json:"proxy_id,omitempty"`
+	RuntimeClass   RuntimeClass            `json:"runtime_class"`
+	Status         *ProviderAccountStatus  `json:"status,omitempty"`
+	UpstreamClient *string                 `json:"upstream_client,omitempty"`
+	Weight         *float32                `json:"weight,omitempty"`
+}
+
+// ProviderAccountImportRequest defines model for ProviderAccountImportRequest.
+type ProviderAccountImportRequest struct {
+	Accounts []ProviderAccountImportItem `json:"accounts"`
+}
+
+// ProviderAccountImportResponse defines model for ProviderAccountImportResponse.
+type ProviderAccountImportResponse struct {
+	Data      ProviderAccountImportResult `json:"data"`
+	RequestId RequestId                   `json:"request_id"`
+}
+
+// ProviderAccountImportResult defines model for ProviderAccountImportResult.
+type ProviderAccountImportResult struct {
+	CreatedCount int      `json:"created_count"`
+	CreatedIds   []Id     `json:"created_ids"`
+	Errors       []string `json:"errors"`
+	SkippedCount int      `json:"skipped_count"`
 }
 
 // ProviderAccountListResponse defines model for ProviderAccountListResponse.
@@ -1627,6 +1879,40 @@ type SessionData struct {
 	User      User      `json:"user"`
 }
 
+// SubscriptionPlan defines model for SubscriptionPlan.
+type SubscriptionPlan struct {
+	CreatedAt    Timestamp  `json:"created_at"`
+	Currency     string     `json:"currency"`
+	Description  *string    `json:"description,omitempty"`
+	Entitlements JsonObject `json:"entitlements"`
+	ForSale      bool       `json:"for_sale"`
+	Id           Id         `json:"id"`
+	Name         string     `json:"name"`
+
+	// Price Decimal string amount for the plan purchase price.
+	Price        string                 `json:"price"`
+	SortOrder    int                    `json:"sort_order"`
+	Status       SubscriptionPlanStatus `json:"status"`
+	UpdatedAt    Timestamp              `json:"updated_at"`
+	ValidityDays int                    `json:"validity_days"`
+}
+
+// SubscriptionPlanListResponse defines model for SubscriptionPlanListResponse.
+type SubscriptionPlanListResponse struct {
+	Data       []SubscriptionPlan `json:"data"`
+	Pagination Pagination         `json:"pagination"`
+	RequestId  RequestId          `json:"request_id"`
+}
+
+// SubscriptionPlanResponse defines model for SubscriptionPlanResponse.
+type SubscriptionPlanResponse struct {
+	Data      SubscriptionPlan `json:"data"`
+	RequestId RequestId        `json:"request_id"`
+}
+
+// SubscriptionPlanStatus defines model for SubscriptionPlanStatus.
+type SubscriptionPlanStatus string
+
 // Timestamp defines model for Timestamp.
 type Timestamp = time.Time
 
@@ -1649,6 +1935,16 @@ type ToolDefinition struct {
 
 // TraceId defines model for TraceId.
 type TraceId = string
+
+// UpdateAccountGroupRequest defines model for UpdateAccountGroupRequest.
+type UpdateAccountGroupRequest struct {
+	Description   *string             `json:"description,omitempty"`
+	ModelScope    *JsonObject         `json:"model_scope,omitempty"`
+	Name          *string             `json:"name,omitempty"`
+	ProviderScope *JsonObject         `json:"provider_scope,omitempty"`
+	Status        *AccountGroupStatus `json:"status,omitempty"`
+	StrategyHint  *string             `json:"strategy_hint,omitempty"`
+}
 
 // UpdateApiKeyRequest defines model for UpdateApiKeyRequest.
 type UpdateApiKeyRequest struct {
@@ -1748,6 +2044,37 @@ type UserRole string
 
 // UserStatus defines model for UserStatus.
 type UserStatus string
+
+// UserSubscription defines model for UserSubscription.
+type UserSubscription struct {
+	CreatedAt            Timestamp              `json:"created_at"`
+	EntitlementsSnapshot JsonObject             `json:"entitlements_snapshot"`
+	ExpiresAt            Timestamp              `json:"expires_at"`
+	Id                   Id                     `json:"id"`
+	PlanId               Id                     `json:"plan_id"`
+	SourceId             string                 `json:"source_id"`
+	SourceType           string                 `json:"source_type"`
+	StartsAt             Timestamp              `json:"starts_at"`
+	Status               UserSubscriptionStatus `json:"status"`
+	UpdatedAt            Timestamp              `json:"updated_at"`
+	UserId               Id                     `json:"user_id"`
+}
+
+// UserSubscriptionListResponse defines model for UserSubscriptionListResponse.
+type UserSubscriptionListResponse struct {
+	Data       []UserSubscription `json:"data"`
+	Pagination Pagination         `json:"pagination"`
+	RequestId  RequestId          `json:"request_id"`
+}
+
+// UserSubscriptionResponse defines model for UserSubscriptionResponse.
+type UserSubscriptionResponse struct {
+	Data      UserSubscription `json:"data"`
+	RequestId RequestId        `json:"request_id"`
+}
+
+// UserSubscriptionStatus defines model for UserSubscriptionStatus.
+type UserSubscriptionStatus string
 
 // Page defines model for Page.
 type Page = int
@@ -1854,6 +2181,12 @@ type ListAdminOutboxEventsParams struct {
 	EventType *string   `form:"event_type,omitempty" json:"event_type,omitempty"`
 }
 
+// ListAdminPricingRulesParams defines parameters for ListAdminPricingRules.
+type ListAdminPricingRulesParams struct {
+	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
+
 // ListAdminProvidersParams defines parameters for ListAdminProviders.
 type ListAdminProvidersParams struct {
 	Page     *Page        `form:"page,omitempty" json:"page,omitempty"`
@@ -1878,6 +2211,12 @@ type ListSchedulerStrategiesParams struct {
 	Name     *string   `form:"name,omitempty" json:"name,omitempty"`
 }
 
+// ListAdminSubscriptionPlansParams defines parameters for ListAdminSubscriptionPlans.
+type ListAdminSubscriptionPlansParams struct {
+	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
+
 // ListAdminUsageLogsParams defines parameters for ListAdminUsageLogs.
 type ListAdminUsageLogsParams struct {
 	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
@@ -1886,11 +2225,24 @@ type ListAdminUsageLogsParams struct {
 	Model    *string   `form:"model,omitempty" json:"model,omitempty"`
 }
 
+// ListAdminUserSubscriptionsParams defines parameters for ListAdminUserSubscriptions.
+type ListAdminUserSubscriptionsParams struct {
+	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+	UserId   *Id       `form:"user_id,omitempty" json:"user_id,omitempty"`
+}
+
 // ListApiKeysParams defines parameters for ListApiKeys.
 type ListApiKeysParams struct {
 	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
 	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
 	Status   *Status   `form:"status,omitempty" json:"status,omitempty"`
+}
+
+// GetCurrentUserSubscriptionsParams defines parameters for GetCurrentUserSubscriptions.
+type GetCurrentUserSubscriptionsParams struct {
+	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
 }
 
 // GetCurrentUserUsageParams defines parameters for GetCurrentUserUsage.
@@ -1911,11 +2263,23 @@ type CreateOpenAICompatibleMessageAliasJSONRequestBody = AnthropicMessagesReques
 // CreateOpenAICompatibleResponseAliasJSONRequestBody defines body for CreateOpenAICompatibleResponseAlias for application/json ContentType.
 type CreateOpenAICompatibleResponseAliasJSONRequestBody = ResponsesRequest
 
+// CreateAdminAccountGroupJSONRequestBody defines body for CreateAdminAccountGroup for application/json ContentType.
+type CreateAdminAccountGroupJSONRequestBody = CreateAccountGroupRequest
+
+// UpdateAdminAccountGroupJSONRequestBody defines body for UpdateAdminAccountGroup for application/json ContentType.
+type UpdateAdminAccountGroupJSONRequestBody = UpdateAccountGroupRequest
+
 // CreateAdminAccountJSONRequestBody defines body for CreateAdminAccount for application/json ContentType.
 type CreateAdminAccountJSONRequestBody = CreateProviderAccountRequest
 
+// ImportAdminAccountsJSONRequestBody defines body for ImportAdminAccounts for application/json ContentType.
+type ImportAdminAccountsJSONRequestBody = ProviderAccountImportRequest
+
 // UpdateAdminAccountJSONRequestBody defines body for UpdateAdminAccount for application/json ContentType.
 type UpdateAdminAccountJSONRequestBody = UpdateProviderAccountRequest
+
+// BindAdminAccountProxyJSONRequestBody defines body for BindAdminAccountProxy for application/json ContentType.
+type BindAdminAccountProxyJSONRequestBody = BindProviderAccountProxyRequest
 
 // CreateAdminModelJSONRequestBody defines body for CreateAdminModel for application/json ContentType.
 type CreateAdminModelJSONRequestBody = CreateModelRequest
@@ -1929,11 +2293,20 @@ type CreateAdminModelAliasJSONRequestBody = CreateModelAliasRequest
 // CreateAdminModelMappingJSONRequestBody defines body for CreateAdminModelMapping for application/json ContentType.
 type CreateAdminModelMappingJSONRequestBody = CreateModelProviderMappingRequest
 
+// CreateAdminPricingRuleJSONRequestBody defines body for CreateAdminPricingRule for application/json ContentType.
+type CreateAdminPricingRuleJSONRequestBody = CreatePricingRuleRequest
+
 // CreateAdminProviderJSONRequestBody defines body for CreateAdminProvider for application/json ContentType.
 type CreateAdminProviderJSONRequestBody = CreateProviderRequest
 
 // UpdateAdminProviderJSONRequestBody defines body for UpdateAdminProvider for application/json ContentType.
 type UpdateAdminProviderJSONRequestBody = UpdateProviderRequest
+
+// CreateAdminSubscriptionPlanJSONRequestBody defines body for CreateAdminSubscriptionPlan for application/json ContentType.
+type CreateAdminSubscriptionPlanJSONRequestBody = CreateSubscriptionPlanRequest
+
+// CreateAdminUserSubscriptionJSONRequestBody defines body for CreateAdminUserSubscription for application/json ContentType.
+type CreateAdminUserSubscriptionJSONRequestBody = CreateUserSubscriptionRequest
 
 // CreateApiKeyJSONRequestBody defines body for CreateApiKey for application/json ContentType.
 type CreateApiKeyJSONRequestBody = CreateApiKeyRequest
@@ -3292,12 +3665,36 @@ type ServerInterface interface {
 	// Create an OpenAI Responses-compatible response with openai-compatible provider context.
 	// (POST /api/provider/openai-compatible/v1/responses)
 	CreateOpenAICompatibleResponseAlias(w http.ResponseWriter, r *http.Request)
+	// List provider account groups.
+	// (GET /api/v1/admin/account-groups)
+	ListAdminAccountGroups(w http.ResponseWriter, r *http.Request)
+	// Create a provider account group.
+	// (POST /api/v1/admin/account-groups)
+	CreateAdminAccountGroup(w http.ResponseWriter, r *http.Request)
+	// Update a provider account group.
+	// (PATCH /api/v1/admin/account-groups/{id})
+	UpdateAdminAccountGroup(w http.ResponseWriter, r *http.Request, id Id)
+	// Remove a provider account from an account group.
+	// (DELETE /api/v1/admin/account-groups/{id}/accounts/{account_id})
+	RemoveAdminAccountGroupMember(w http.ResponseWriter, r *http.Request, id Id, accountId Id)
+	// Add a provider account to an account group.
+	// (POST /api/v1/admin/account-groups/{id}/accounts/{account_id})
+	AddAdminAccountGroupMember(w http.ResponseWriter, r *http.Request, id Id, accountId Id)
 	// List provider accounts.
 	// (GET /api/v1/admin/accounts)
 	ListAdminAccounts(w http.ResponseWriter, r *http.Request, params ListAdminAccountsParams)
 	// Create a provider account.
 	// (POST /api/v1/admin/accounts)
 	CreateAdminAccount(w http.ResponseWriter, r *http.Request)
+	// Export provider account metadata without credentials.
+	// (GET /api/v1/admin/accounts/export)
+	ExportAdminAccounts(w http.ResponseWriter, r *http.Request)
+	// Import provider account metadata and write-only credentials.
+	// (POST /api/v1/admin/accounts/import)
+	ImportAdminAccounts(w http.ResponseWriter, r *http.Request)
+	// Get a provider account.
+	// (GET /api/v1/admin/accounts/{id})
+	GetAdminAccount(w http.ResponseWriter, r *http.Request, id Id)
 	// Update a provider account.
 	// (PATCH /api/v1/admin/accounts/{id})
 	UpdateAdminAccount(w http.ResponseWriter, r *http.Request, id Id)
@@ -3310,9 +3707,15 @@ type ServerInterface interface {
 	// Get provider account health snapshot.
 	// (GET /api/v1/admin/accounts/{id}/health)
 	GetAdminAccountHealth(w http.ResponseWriter, r *http.Request, id Id)
+	// Bind or clear a provider account proxy.
+	// (PATCH /api/v1/admin/accounts/{id}/proxy)
+	BindAdminAccountProxy(w http.ResponseWriter, r *http.Request, id Id)
 	// Get provider account quota snapshots.
 	// (GET /api/v1/admin/accounts/{id}/quota)
 	GetAdminAccountQuota(w http.ResponseWriter, r *http.Request, id Id)
+	// Recover a protected provider account after operator remediation.
+	// (POST /api/v1/admin/accounts/{id}/recover)
+	RecoverAdminAccount(w http.ResponseWriter, r *http.Request, id Id)
 	// Test provider account configuration.
 	// (POST /api/v1/admin/accounts/{id}/test)
 	TestAdminAccount(w http.ResponseWriter, r *http.Request, id Id)
@@ -3346,6 +3749,12 @@ type ServerInterface interface {
 	// Get admin overview counters.
 	// (GET /api/v1/admin/overview)
 	GetAdminOverview(w http.ResponseWriter, r *http.Request)
+	// List pricing rules.
+	// (GET /api/v1/admin/pricing-rules)
+	ListAdminPricingRules(w http.ResponseWriter, r *http.Request, params ListAdminPricingRulesParams)
+	// Create a decimal-safe pricing rule.
+	// (POST /api/v1/admin/pricing-rules)
+	CreateAdminPricingRule(w http.ResponseWriter, r *http.Request)
 	// List providers.
 	// (GET /api/v1/admin/providers)
 	ListAdminProviders(w http.ResponseWriter, r *http.Request, params ListAdminProvidersParams)
@@ -3367,9 +3776,21 @@ type ServerInterface interface {
 	// List scheduler strategies.
 	// (GET /api/v1/admin/scheduler/strategies)
 	ListSchedulerStrategies(w http.ResponseWriter, r *http.Request, params ListSchedulerStrategiesParams)
+	// List subscription plans.
+	// (GET /api/v1/admin/subscription-plans)
+	ListAdminSubscriptionPlans(w http.ResponseWriter, r *http.Request, params ListAdminSubscriptionPlansParams)
+	// Create a subscription plan.
+	// (POST /api/v1/admin/subscription-plans)
+	CreateAdminSubscriptionPlan(w http.ResponseWriter, r *http.Request)
 	// List usage logs.
 	// (GET /api/v1/admin/usage-logs)
 	ListAdminUsageLogs(w http.ResponseWriter, r *http.Request, params ListAdminUsageLogsParams)
+	// List user subscriptions.
+	// (GET /api/v1/admin/user-subscriptions)
+	ListAdminUserSubscriptions(w http.ResponseWriter, r *http.Request, params ListAdminUserSubscriptionsParams)
+	// Create a user subscription from an existing plan.
+	// (POST /api/v1/admin/user-subscriptions)
+	CreateAdminUserSubscription(w http.ResponseWriter, r *http.Request)
 	// List API keys visible to the current user.
 	// (GET /api/v1/api-keys)
 	ListApiKeys(w http.ResponseWriter, r *http.Request, params ListApiKeysParams)
@@ -3391,6 +3812,9 @@ type ServerInterface interface {
 	// Get current console user.
 	// (GET /api/v1/me)
 	GetCurrentUser(w http.ResponseWriter, r *http.Request)
+	// List subscriptions for the current console user.
+	// (GET /api/v1/me/subscriptions)
+	GetCurrentUserSubscriptions(w http.ResponseWriter, r *http.Request, params GetCurrentUserSubscriptionsParams)
 	// List usage logs for the current console user.
 	// (GET /api/v1/me/usage)
 	GetCurrentUserUsage(w http.ResponseWriter, r *http.Request, params GetCurrentUserUsageParams)
@@ -3497,6 +3921,168 @@ func (siw *ServerInterfaceWrapper) CreateOpenAICompatibleResponseAlias(w http.Re
 	handler.ServeHTTP(w, r)
 }
 
+// ListAdminAccountGroups operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminAccountGroups(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminAccountGroups(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAdminAccountGroup operation middleware
+func (siw *ServerInterfaceWrapper) CreateAdminAccountGroup(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAdminAccountGroup(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateAdminAccountGroup operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAdminAccountGroup(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAdminAccountGroup(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RemoveAdminAccountGroupMember operation middleware
+func (siw *ServerInterfaceWrapper) RemoveAdminAccountGroupMember(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "account_id" -------------
+	var accountId Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "account_id", r.PathValue("account_id"), &accountId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "account_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RemoveAdminAccountGroupMember(w, r, id, accountId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AddAdminAccountGroupMember operation middleware
+func (siw *ServerInterfaceWrapper) AddAdminAccountGroupMember(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "account_id" -------------
+	var accountId Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "account_id", r.PathValue("account_id"), &accountId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "account_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AddAdminAccountGroupMember(w, r, id, accountId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListAdminAccounts operation middleware
 func (siw *ServerInterfaceWrapper) ListAdminAccounts(w http.ResponseWriter, r *http.Request) {
 
@@ -3588,6 +4174,80 @@ func (siw *ServerInterfaceWrapper) CreateAdminAccount(w http.ResponseWriter, r *
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateAdminAccount(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ExportAdminAccounts operation middleware
+func (siw *ServerInterfaceWrapper) ExportAdminAccounts(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ExportAdminAccounts(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ImportAdminAccounts operation middleware
+func (siw *ServerInterfaceWrapper) ImportAdminAccounts(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ImportAdminAccounts(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminAccount operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminAccount(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminAccount(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3731,6 +4391,40 @@ func (siw *ServerInterfaceWrapper) GetAdminAccountHealth(w http.ResponseWriter, 
 	handler.ServeHTTP(w, r)
 }
 
+// BindAdminAccountProxy operation middleware
+func (siw *ServerInterfaceWrapper) BindAdminAccountProxy(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BindAdminAccountProxy(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetAdminAccountQuota operation middleware
 func (siw *ServerInterfaceWrapper) GetAdminAccountQuota(w http.ResponseWriter, r *http.Request) {
 
@@ -3754,6 +4448,40 @@ func (siw *ServerInterfaceWrapper) GetAdminAccountQuota(w http.ResponseWriter, r
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetAdminAccountQuota(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RecoverAdminAccount operation middleware
+func (siw *ServerInterfaceWrapper) RecoverAdminAccount(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RecoverAdminAccount(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -4331,6 +5059,80 @@ func (siw *ServerInterfaceWrapper) GetAdminOverview(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// ListAdminPricingRules operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminPricingRules(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminPricingRulesParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminPricingRules(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAdminPricingRule operation middleware
+func (siw *ServerInterfaceWrapper) CreateAdminPricingRule(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAdminPricingRule(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListAdminProviders operation middleware
 func (siw *ServerInterfaceWrapper) ListAdminProviders(w http.ResponseWriter, r *http.Request) {
 
@@ -4675,6 +5477,80 @@ func (siw *ServerInterfaceWrapper) ListSchedulerStrategies(w http.ResponseWriter
 	handler.ServeHTTP(w, r)
 }
 
+// ListAdminSubscriptionPlans operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminSubscriptionPlans(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminSubscriptionPlansParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminSubscriptionPlans(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAdminSubscriptionPlan operation middleware
+func (siw *ServerInterfaceWrapper) CreateAdminSubscriptionPlan(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAdminSubscriptionPlan(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListAdminUsageLogs operation middleware
 func (siw *ServerInterfaceWrapper) ListAdminUsageLogs(w http.ResponseWriter, r *http.Request) {
 
@@ -4744,6 +5620,93 @@ func (siw *ServerInterfaceWrapper) ListAdminUsageLogs(w http.ResponseWriter, r *
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListAdminUsageLogs(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAdminUserSubscriptions operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminUserSubscriptions(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminUserSubscriptionsParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "user_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "user_id", r.URL.Query(), &params.UserId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "user_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminUserSubscriptions(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAdminUserSubscription operation middleware
+func (siw *ServerInterfaceWrapper) CreateAdminUserSubscription(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAdminUserSubscription(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -4935,6 +5898,58 @@ func (siw *ServerInterfaceWrapper) GetCurrentUser(w http.ResponseWriter, r *http
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetCurrentUser(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetCurrentUserSubscriptions operation middleware
+func (siw *ServerInterfaceWrapper) GetCurrentUserSubscriptions(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetCurrentUserSubscriptionsParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetCurrentUserSubscriptions(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -5200,13 +6215,23 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/chat/completions", wrapper.CreateOpenAICompatibleChatCompletionAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/messages", wrapper.CreateOpenAICompatibleMessageAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/responses", wrapper.CreateOpenAICompatibleResponseAlias)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/account-groups", wrapper.ListAdminAccountGroups)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/account-groups", wrapper.CreateAdminAccountGroup)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/account-groups/{id}", wrapper.UpdateAdminAccountGroup)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/account-groups/{id}/accounts/{account_id}", wrapper.RemoveAdminAccountGroupMember)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/account-groups/{id}/accounts/{account_id}", wrapper.AddAdminAccountGroupMember)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts", wrapper.ListAdminAccounts)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts", wrapper.CreateAdminAccount)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/export", wrapper.ExportAdminAccounts)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/import", wrapper.ImportAdminAccounts)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/{id}", wrapper.GetAdminAccount)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/accounts/{id}", wrapper.UpdateAdminAccount)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/disable", wrapper.DisableAdminAccount)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/enable", wrapper.EnableAdminAccount)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/health", wrapper.GetAdminAccountHealth)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/proxy", wrapper.BindAdminAccountProxy)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/quota", wrapper.GetAdminAccountQuota)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/recover", wrapper.RecoverAdminAccount)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/test", wrapper.TestAdminAccount)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/audit-logs", wrapper.ListAdminAuditLogs)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/billing-ledger", wrapper.ListAdminBillingLedger)
@@ -5218,6 +6243,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/models/{id}/mappings", wrapper.CreateAdminModelMapping)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/events/outbox", wrapper.ListAdminOutboxEvents)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/overview", wrapper.GetAdminOverview)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/pricing-rules", wrapper.ListAdminPricingRules)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/pricing-rules", wrapper.CreateAdminPricingRule)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/providers", wrapper.ListAdminProviders)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/providers", wrapper.CreateAdminProvider)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/providers/{id}", wrapper.UpdateAdminProvider)
@@ -5225,7 +6252,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/scheduler/decisions", wrapper.ListAdminSchedulerDecisions)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/scheduler/overview", wrapper.GetAdminSchedulerOverview)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/scheduler/strategies", wrapper.ListSchedulerStrategies)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/subscription-plans", wrapper.ListAdminSubscriptionPlans)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/subscription-plans", wrapper.CreateAdminSubscriptionPlan)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/usage-logs", wrapper.ListAdminUsageLogs)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/user-subscriptions", wrapper.ListAdminUserSubscriptions)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/user-subscriptions", wrapper.CreateAdminUserSubscription)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/api-keys", wrapper.ListApiKeys)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/api-keys", wrapper.CreateApiKey)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/api-keys/{id}", wrapper.UpdateApiKey)
@@ -5233,6 +6264,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/auth/logout", wrapper.Logout)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/health", wrapper.GetHealth)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me", wrapper.GetCurrentUser)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/subscriptions", wrapper.GetCurrentUserSubscriptions)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/usage", wrapper.GetCurrentUserUsage)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/chat/completions", wrapper.CreateChatCompletion)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/messages", wrapper.CreateMessage)

@@ -141,21 +141,33 @@ func (s *Service) FindByCanonicalName(ctx context.Context, canonicalName string)
 }
 
 func (s *Service) ResolveModel(ctx context.Context, name string) (contract.Model, error) {
+	resolution, err := s.ResolveModelReference(ctx, name)
+	if err != nil {
+		return contract.Model{}, err
+	}
+	return resolution.Model, nil
+}
+
+func (s *Service) ResolveModelReference(ctx context.Context, name string) (contract.ModelResolution, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return contract.Model{}, ErrInvalidInput
+		return contract.ModelResolution{}, ErrInvalidInput
 	}
 	if model, err := s.store.FindByCanonicalName(ctx, name); err == nil {
-		return model, nil
+		return contract.ModelResolution{Model: model}, nil
 	}
 	alias, err := s.store.FindByAlias(ctx, name)
 	if err != nil {
-		return contract.Model{}, ErrModelNotFound
+		return contract.ModelResolution{}, ErrModelNotFound
 	}
 	if alias.Status != contract.StatusActive {
-		return contract.Model{}, ErrModelNotFound
+		return contract.ModelResolution{}, ErrModelNotFound
 	}
-	return s.store.FindByID(ctx, alias.ModelID)
+	model, err := s.store.FindByID(ctx, alias.ModelID)
+	if err != nil {
+		return contract.ModelResolution{}, err
+	}
+	return contract.ModelResolution{Model: model, Alias: &alias}, nil
 }
 
 func (s *Service) CreateAlias(ctx context.Context, modelID int, req contract.CreateAliasRequest) (contract.ModelAlias, error) {

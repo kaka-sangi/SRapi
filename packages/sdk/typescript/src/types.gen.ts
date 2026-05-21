@@ -165,6 +165,127 @@ export type ApiKeyResponse = {
     request_id: RequestId;
 };
 
+export type SubscriptionPlanStatus = 'active' | 'disabled' | 'archived';
+
+export type UserSubscriptionStatus = 'active' | 'expired' | 'cancelled' | 'suspended';
+
+export type SubscriptionPlan = {
+    id: Id;
+    name: string;
+    description?: string;
+    /**
+     * Decimal string amount for the plan purchase price.
+     */
+    price: string;
+    currency: string;
+    validity_days: number;
+    entitlements: JsonObject;
+    for_sale: boolean;
+    sort_order: number;
+    status: SubscriptionPlanStatus;
+    created_at: Timestamp;
+    updated_at: Timestamp;
+};
+
+export type CreateSubscriptionPlanRequest = {
+    name: string;
+    description?: string;
+    /**
+     * Decimal string amount. Float values are not accepted by the service.
+     */
+    price: string;
+    currency: string;
+    validity_days: number;
+    entitlements?: JsonObject;
+    for_sale?: boolean;
+    sort_order?: number;
+    status?: SubscriptionPlanStatus;
+};
+
+export type SubscriptionPlanResponse = {
+    data: SubscriptionPlan;
+    request_id: RequestId;
+};
+
+export type SubscriptionPlanListResponse = {
+    data: Array<SubscriptionPlan>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type UserSubscription = {
+    id: Id;
+    user_id: Id;
+    plan_id: Id;
+    status: UserSubscriptionStatus;
+    starts_at: Timestamp;
+    expires_at: Timestamp;
+    entitlements_snapshot: JsonObject;
+    source_type: string;
+    source_id: string;
+    created_at: Timestamp;
+    updated_at: Timestamp;
+};
+
+export type CreateUserSubscriptionRequest = {
+    user_id: Id;
+    plan_id: Id;
+    status?: UserSubscriptionStatus;
+    starts_at?: string;
+    expires_at?: string;
+    source_type?: string;
+    source_id?: string;
+};
+
+export type UserSubscriptionResponse = {
+    data: UserSubscription;
+    request_id: RequestId;
+};
+
+export type UserSubscriptionListResponse = {
+    data: Array<UserSubscription>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type PricingRule = {
+    id: Id;
+    model_id: Id;
+    provider_id: Id;
+    input_price_per_million_tokens: string;
+    output_price_per_million_tokens: string;
+    cache_read_price_per_million_tokens: string;
+    cache_write_price_per_million_tokens: string;
+    currency: string;
+    effective_from?: string | null;
+    effective_to?: string | null;
+    created_at: Timestamp;
+    updated_at: Timestamp;
+};
+
+export type CreatePricingRuleRequest = {
+    model_id: Id;
+    provider_id: Id;
+    input_price_per_million_tokens: string;
+    output_price_per_million_tokens: string;
+    cache_read_price_per_million_tokens: string;
+    cache_write_price_per_million_tokens: string;
+    currency: string;
+    effective_from?: string | null;
+    effective_to?: string | null;
+};
+
+export type PricingRuleResponse = {
+    data: PricingRule;
+    request_id: RequestId;
+};
+
+export type PricingRuleListResponse = {
+    data: Array<PricingRule>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
 export type ProviderProtocol = 'openai-compatible' | 'anthropic-compatible' | 'gemini-compatible';
 
 export type ProviderAdapterType = 'openai-compatible' | 'anthropic-compatible' | 'gemini-compatible' | 'native-openai' | 'native-anthropic' | 'native-gemini' | 'openrouter' | 'reverse-proxy-chatgpt-web' | 'reverse-proxy-codex-cli' | 'reverse-proxy-claude-web' | 'reverse-proxy-claude-code-cli' | 'reverse-proxy-gemini-cli' | 'custom';
@@ -330,6 +451,60 @@ export type RuntimeClass = 'api_key' | 'oauth_refresh' | 'oauth_device_code' | '
 
 export type ProviderAccountStatus = 'active' | 'disabled' | 'needs_reauth' | 'suspended' | 'dead';
 
+export type AccountGroupStatus = 'active' | 'disabled';
+
+export type AccountGroup = {
+    id: Id;
+    name: string;
+    description: string;
+    provider_scope: JsonObject;
+    model_scope: JsonObject;
+    strategy_hint: string;
+    status: AccountGroupStatus;
+    created_at: Timestamp;
+};
+
+export type CreateAccountGroupRequest = {
+    name: string;
+    description?: string;
+    provider_scope?: JsonObject;
+    model_scope?: JsonObject;
+    strategy_hint?: string;
+    status?: AccountGroupStatus;
+};
+
+export type UpdateAccountGroupRequest = {
+    name?: string;
+    description?: string;
+    provider_scope?: JsonObject;
+    model_scope?: JsonObject;
+    strategy_hint?: string;
+    status?: AccountGroupStatus;
+};
+
+export type AccountGroupResponse = {
+    data: AccountGroup;
+    request_id: RequestId;
+};
+
+export type AccountGroupListResponse = {
+    data: Array<AccountGroup>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type AccountGroupMember = {
+    id: Id;
+    account_id: Id;
+    account_group_id: Id;
+    created_at: Timestamp;
+};
+
+export type AccountGroupMemberResponse = {
+    data: AccountGroupMember;
+    request_id: RequestId;
+};
+
 export type ProviderAccount = {
     id: Id;
     provider_id: Id;
@@ -340,6 +515,7 @@ export type ProviderAccount = {
     priority: number;
     weight: number;
     risk_level?: string | null;
+    group_ids: Array<Id>;
     metadata?: JsonObject;
     created_at: Timestamp;
 };
@@ -365,6 +541,64 @@ export type UpdateProviderAccountRequest = {
     priority?: number;
     weight?: number;
     metadata?: JsonObject;
+};
+
+export type BindProviderAccountProxyRequest = {
+    /**
+     * Set to null or an empty string to clear proxy binding.
+     */
+    proxy_id: string | null;
+};
+
+export type ProviderAccountExportItem = {
+    provider_id: Id;
+    name: string;
+    runtime_class: RuntimeClass;
+    upstream_client?: string | null;
+    proxy_id?: string | null;
+    status: ProviderAccountStatus;
+    priority: number;
+    weight: number;
+    metadata?: JsonObject;
+    group_ids?: Array<Id>;
+    /**
+     * Always false for this endpoint; credentials are never exported.
+     */
+    credential_exported: boolean;
+};
+
+export type ProviderAccountExportResponse = {
+    data: Array<ProviderAccountExportItem>;
+    request_id: RequestId;
+};
+
+export type ProviderAccountImportItem = {
+    provider_id: Id;
+    name: string;
+    runtime_class: RuntimeClass;
+    upstream_client?: string | null;
+    proxy_id?: string | null;
+    status?: ProviderAccountStatus;
+    priority?: number;
+    weight?: number;
+    metadata?: JsonObject;
+    group_ids?: Array<Id>;
+};
+
+export type ProviderAccountImportRequest = {
+    accounts: Array<ProviderAccountImportItem>;
+};
+
+export type ProviderAccountImportResult = {
+    created_count: number;
+    skipped_count: number;
+    created_ids: Array<Id>;
+    errors: Array<string>;
+};
+
+export type ProviderAccountImportResponse = {
+    data: ProviderAccountImportResult;
+    request_id: RequestId;
 };
 
 export type ProviderAccountResponse = {
@@ -412,14 +646,19 @@ export type AdminOverviewResponse = {
 export type AccountHealthSnapshot = {
     account_id: Id;
     provider_id: Id;
+    runtime_class: RuntimeClass;
     status: string;
+    error_class?: string | null;
     success_rate: number;
     error_rate: number;
     latency_p50_ms: number;
     latency_p95_ms: number;
+    quota_remaining_ratio: number;
+    quota_exhausted: boolean;
     rate_limit_count: number;
     timeout_count: number;
     cooldown_until?: string | null;
+    cooldown_reason?: string | null;
     circuit_state: string;
     snapshot_at: Timestamp;
 };
@@ -794,6 +1033,29 @@ export type UpdateProviderAccountRequestWritable = {
     metadata?: JsonObject;
 };
 
+export type ProviderAccountImportItemWritable = {
+    provider_id: Id;
+    name: string;
+    runtime_class: RuntimeClass;
+    upstream_client?: string | null;
+    /**
+     * Write-only credential payload. Exports intentionally omit this field.
+     */
+    credential?: {
+        [key: string]: unknown;
+    };
+    proxy_id?: string | null;
+    status?: ProviderAccountStatus;
+    priority?: number;
+    weight?: number;
+    metadata?: JsonObject;
+    group_ids?: Array<Id>;
+};
+
+export type ProviderAccountImportRequestWritable = {
+    accounts: Array<ProviderAccountImportItemWritable>;
+};
+
 export type Page = number;
 
 export type PageSize = number;
@@ -953,6 +1215,38 @@ export type GetCurrentUserUsageResponses = {
 };
 
 export type GetCurrentUserUsageResponse = GetCurrentUserUsageResponses[keyof GetCurrentUserUsageResponses];
+
+export type GetCurrentUserSubscriptionsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        page_size?: number;
+    };
+    url: '/api/v1/me/subscriptions';
+};
+
+export type GetCurrentUserSubscriptionsErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetCurrentUserSubscriptionsError = GetCurrentUserSubscriptionsErrors[keyof GetCurrentUserSubscriptionsErrors];
+
+export type GetCurrentUserSubscriptionsResponses = {
+    /**
+     * Current user subscriptions.
+     */
+    200: UserSubscriptionListResponse;
+};
+
+export type GetCurrentUserSubscriptionsResponse = GetCurrentUserSubscriptionsResponses[keyof GetCurrentUserSubscriptionsResponses];
 
 export type ListApiKeysData = {
     body?: never;
@@ -1556,6 +1850,119 @@ export type CreateAdminAccountResponses = {
 
 export type CreateAdminAccountResponse = CreateAdminAccountResponses[keyof CreateAdminAccountResponses];
 
+export type ExportAdminAccountsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/accounts/export';
+};
+
+export type ExportAdminAccountsErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ExportAdminAccountsError = ExportAdminAccountsErrors[keyof ExportAdminAccountsErrors];
+
+export type ExportAdminAccountsResponses = {
+    /**
+     * Provider account export without secrets.
+     */
+    200: ProviderAccountExportResponse;
+};
+
+export type ExportAdminAccountsResponse = ExportAdminAccountsResponses[keyof ExportAdminAccountsResponses];
+
+export type ImportAdminAccountsData = {
+    body: ProviderAccountImportRequestWritable;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/accounts/import';
+};
+
+export type ImportAdminAccountsErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ImportAdminAccountsError = ImportAdminAccountsErrors[keyof ImportAdminAccountsErrors];
+
+export type ImportAdminAccountsResponses = {
+    /**
+     * Provider account import result.
+     */
+    200: ProviderAccountImportResponse;
+};
+
+export type ImportAdminAccountsResponse = ImportAdminAccountsResponses[keyof ImportAdminAccountsResponses];
+
+export type GetAdminAccountData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/accounts/{id}';
+};
+
+export type GetAdminAccountErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminAccountError = GetAdminAccountErrors[keyof GetAdminAccountErrors];
+
+export type GetAdminAccountResponses = {
+    /**
+     * Provider account.
+     */
+    200: ProviderAccountResponse;
+};
+
+export type GetAdminAccountResponse = GetAdminAccountResponses[keyof GetAdminAccountResponses];
+
 export type UpdateAdminAccountData = {
     body: UpdateProviderAccountRequestWritable;
     path: {
@@ -1599,6 +2006,49 @@ export type UpdateAdminAccountResponses = {
 
 export type UpdateAdminAccountResponse = UpdateAdminAccountResponses[keyof UpdateAdminAccountResponses];
 
+export type BindAdminAccountProxyData = {
+    body: BindProviderAccountProxyRequest;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/accounts/{id}/proxy';
+};
+
+export type BindAdminAccountProxyErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type BindAdminAccountProxyError = BindAdminAccountProxyErrors[keyof BindAdminAccountProxyErrors];
+
+export type BindAdminAccountProxyResponses = {
+    /**
+     * Provider account proxy binding updated.
+     */
+    200: ProviderAccountResponse;
+};
+
+export type BindAdminAccountProxyResponse = BindAdminAccountProxyResponses[keyof BindAdminAccountProxyResponses];
+
 export type TestAdminAccountData = {
     body?: never;
     path: {
@@ -1641,6 +2091,49 @@ export type TestAdminAccountResponses = {
 };
 
 export type TestAdminAccountResponse = TestAdminAccountResponses[keyof TestAdminAccountResponses];
+
+export type RecoverAdminAccountData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/accounts/{id}/recover';
+};
+
+export type RecoverAdminAccountErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type RecoverAdminAccountError = RecoverAdminAccountErrors[keyof RecoverAdminAccountErrors];
+
+export type RecoverAdminAccountResponses = {
+    /**
+     * Provider account recovered.
+     */
+    200: ProviderAccountResponse;
+};
+
+export type RecoverAdminAccountResponse = RecoverAdminAccountResponses[keyof RecoverAdminAccountResponses];
 
 export type DisableAdminAccountData = {
     body?: never;
@@ -1814,6 +2307,207 @@ export type GetAdminAccountQuotaResponses = {
 
 export type GetAdminAccountQuotaResponse = GetAdminAccountQuotaResponses[keyof GetAdminAccountQuotaResponses];
 
+export type ListAdminAccountGroupsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/account-groups';
+};
+
+export type ListAdminAccountGroupsErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminAccountGroupsError = ListAdminAccountGroupsErrors[keyof ListAdminAccountGroupsErrors];
+
+export type ListAdminAccountGroupsResponses = {
+    /**
+     * Account group list.
+     */
+    200: AccountGroupListResponse;
+};
+
+export type ListAdminAccountGroupsResponse = ListAdminAccountGroupsResponses[keyof ListAdminAccountGroupsResponses];
+
+export type CreateAdminAccountGroupData = {
+    body: CreateAccountGroupRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/account-groups';
+};
+
+export type CreateAdminAccountGroupErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type CreateAdminAccountGroupError = CreateAdminAccountGroupErrors[keyof CreateAdminAccountGroupErrors];
+
+export type CreateAdminAccountGroupResponses = {
+    /**
+     * Account group created.
+     */
+    201: AccountGroupResponse;
+};
+
+export type CreateAdminAccountGroupResponse = CreateAdminAccountGroupResponses[keyof CreateAdminAccountGroupResponses];
+
+export type UpdateAdminAccountGroupData = {
+    body: UpdateAccountGroupRequest;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/account-groups/{id}';
+};
+
+export type UpdateAdminAccountGroupErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UpdateAdminAccountGroupError = UpdateAdminAccountGroupErrors[keyof UpdateAdminAccountGroupErrors];
+
+export type UpdateAdminAccountGroupResponses = {
+    /**
+     * Account group updated.
+     */
+    200: AccountGroupResponse;
+};
+
+export type UpdateAdminAccountGroupResponse = UpdateAdminAccountGroupResponses[keyof UpdateAdminAccountGroupResponses];
+
+export type RemoveAdminAccountGroupMemberData = {
+    body?: never;
+    path: {
+        id: Id;
+        account_id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/account-groups/{id}/accounts/{account_id}';
+};
+
+export type RemoveAdminAccountGroupMemberErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type RemoveAdminAccountGroupMemberError = RemoveAdminAccountGroupMemberErrors[keyof RemoveAdminAccountGroupMemberErrors];
+
+export type RemoveAdminAccountGroupMemberResponses = {
+    /**
+     * Account group membership removed.
+     */
+    204: void;
+};
+
+export type RemoveAdminAccountGroupMemberResponse = RemoveAdminAccountGroupMemberResponses[keyof RemoveAdminAccountGroupMemberResponses];
+
+export type AddAdminAccountGroupMemberData = {
+    body?: never;
+    path: {
+        id: Id;
+        account_id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/account-groups/{id}/accounts/{account_id}';
+};
+
+export type AddAdminAccountGroupMemberErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type AddAdminAccountGroupMemberError = AddAdminAccountGroupMemberErrors[keyof AddAdminAccountGroupMemberErrors];
+
+export type AddAdminAccountGroupMemberResponses = {
+    /**
+     * Account group membership created.
+     */
+    200: AccountGroupMemberResponse;
+};
+
+export type AddAdminAccountGroupMemberResponse = AddAdminAccountGroupMemberResponses[keyof AddAdminAccountGroupMemberResponses];
+
 export type ListAdminUsageLogsData = {
     body?: never;
     path?: never;
@@ -1927,6 +2621,226 @@ export type ListAdminBillingLedgerResponses = {
 };
 
 export type ListAdminBillingLedgerResponse = ListAdminBillingLedgerResponses[keyof ListAdminBillingLedgerResponses];
+
+export type ListAdminSubscriptionPlansData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        page_size?: number;
+    };
+    url: '/api/v1/admin/subscription-plans';
+};
+
+export type ListAdminSubscriptionPlansErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminSubscriptionPlansError = ListAdminSubscriptionPlansErrors[keyof ListAdminSubscriptionPlansErrors];
+
+export type ListAdminSubscriptionPlansResponses = {
+    /**
+     * Subscription plan list.
+     */
+    200: SubscriptionPlanListResponse;
+};
+
+export type ListAdminSubscriptionPlansResponse = ListAdminSubscriptionPlansResponses[keyof ListAdminSubscriptionPlansResponses];
+
+export type CreateAdminSubscriptionPlanData = {
+    body: CreateSubscriptionPlanRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/subscription-plans';
+};
+
+export type CreateAdminSubscriptionPlanErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type CreateAdminSubscriptionPlanError = CreateAdminSubscriptionPlanErrors[keyof CreateAdminSubscriptionPlanErrors];
+
+export type CreateAdminSubscriptionPlanResponses = {
+    /**
+     * Subscription plan created.
+     */
+    201: SubscriptionPlanResponse;
+};
+
+export type CreateAdminSubscriptionPlanResponse = CreateAdminSubscriptionPlanResponses[keyof CreateAdminSubscriptionPlanResponses];
+
+export type ListAdminUserSubscriptionsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        page_size?: number;
+        user_id?: Id;
+    };
+    url: '/api/v1/admin/user-subscriptions';
+};
+
+export type ListAdminUserSubscriptionsErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminUserSubscriptionsError = ListAdminUserSubscriptionsErrors[keyof ListAdminUserSubscriptionsErrors];
+
+export type ListAdminUserSubscriptionsResponses = {
+    /**
+     * User subscription list.
+     */
+    200: UserSubscriptionListResponse;
+};
+
+export type ListAdminUserSubscriptionsResponse = ListAdminUserSubscriptionsResponses[keyof ListAdminUserSubscriptionsResponses];
+
+export type CreateAdminUserSubscriptionData = {
+    body: CreateUserSubscriptionRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/user-subscriptions';
+};
+
+export type CreateAdminUserSubscriptionErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type CreateAdminUserSubscriptionError = CreateAdminUserSubscriptionErrors[keyof CreateAdminUserSubscriptionErrors];
+
+export type CreateAdminUserSubscriptionResponses = {
+    /**
+     * User subscription created.
+     */
+    201: UserSubscriptionResponse;
+};
+
+export type CreateAdminUserSubscriptionResponse = CreateAdminUserSubscriptionResponses[keyof CreateAdminUserSubscriptionResponses];
+
+export type ListAdminPricingRulesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        page_size?: number;
+    };
+    url: '/api/v1/admin/pricing-rules';
+};
+
+export type ListAdminPricingRulesErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminPricingRulesError = ListAdminPricingRulesErrors[keyof ListAdminPricingRulesErrors];
+
+export type ListAdminPricingRulesResponses = {
+    /**
+     * Pricing rule list.
+     */
+    200: PricingRuleListResponse;
+};
+
+export type ListAdminPricingRulesResponse = ListAdminPricingRulesResponses[keyof ListAdminPricingRulesResponses];
+
+export type CreateAdminPricingRuleData = {
+    body: CreatePricingRuleRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/pricing-rules';
+};
+
+export type CreateAdminPricingRuleErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type CreateAdminPricingRuleError = CreateAdminPricingRuleErrors[keyof CreateAdminPricingRuleErrors];
+
+export type CreateAdminPricingRuleResponses = {
+    /**
+     * Pricing rule created.
+     */
+    201: PricingRuleResponse;
+};
+
+export type CreateAdminPricingRuleResponse = CreateAdminPricingRuleResponses[keyof CreateAdminPricingRuleResponses];
 
 export type ListAdminOutboxEventsData = {
     body?: never;

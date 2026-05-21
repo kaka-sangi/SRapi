@@ -270,6 +270,17 @@ AES-GCM 要求：
 - 反代请求向上游发出时，不得包含任何 SRapi 自身标识（`X-Request-ID`、`X-Forwarded-*`、`Via`、`X-SRapi-*`、`User-Agent: SRapi/*` 等）。
 - 解题 / 验证码 / Cloudflare challenge 的中间 token 必须按 cookie jar 绑定，且不得跨账号复用。
 
+### 5.4 账号导入导出安全边界
+
+Provider Account 的 import/export 是运维便利接口，不是明文凭证备份通道。
+
+- 导出接口不得返回 `credential`、`credential_ciphertext`、API Key、OAuth token、refresh token、Cookie、Authorization header、password、secret 或其他可复用凭证。
+- 导出 metadata 必须递归移除敏感键，只保留非敏感操作字段，例如 `base_url`、策略标签、分组和代理绑定。
+- 导出响应必须显式标记 `credential_exported: false`。
+- 导入接口可以接收 write-only `credential` payload，但服务端必须立即进入 Provider Account 加密写入路径。
+- 导入失败的错误消息、audit、日志和响应不得回显导入凭证内容。
+- import 属于控制台写操作，必须要求登录态和 CSRF；export 属于管理读操作，仍必须要求登录态和 RBAC。
+
 ## 6. RBAC 与权限
 
 MVP 角色：

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math/big"
 	"net"
 	"net/http"
 	"sort"
@@ -49,6 +50,9 @@ import (
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 	schedulerservice "github.com/srapi/srapi/apps/api/internal/modules/scheduler/service"
 	schedulermemory "github.com/srapi/srapi/apps/api/internal/modules/scheduler/store/memory"
+	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
+	subscriptionservice "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/service"
+	subscriptionmemory "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/store/memory"
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
 	usageservice "github.com/srapi/srapi/apps/api/internal/modules/usage/service"
 	usagememory "github.com/srapi/srapi/apps/api/internal/modules/usage/store/memory"
@@ -67,36 +71,38 @@ const (
 var errRequestTooLarge = errors.New("request body too large")
 
 type runtimeState struct {
-	cfg            config.Config
-	logger         *slog.Logger
-	users          *usersservice.Service
-	auth           *authservice.Service
-	apiKeys        *apikeyservice.Service
-	audit          *auditservice.Service
-	billing        *billingservice.Service
-	events         *eventsservice.Service
-	gateway        *gatewayservice.Service
-	providers      *providerservice.Service
-	models         *modelservice.Service
-	adapters       *provideradapterservice.Service
-	reverseProxy   *reverseproxyservice.Service
-	accounts       *accountservice.Service
-	scheduler      *schedulerservice.Service
-	usage          *usageservice.Service
-	userStore      userscontract.Store
-	sessionStore   *authmemory.Store
-	apiKeyStore    apikeycontract.Store
-	auditStore     auditcontract.Store
-	billingStore   billingcontract.Store
-	eventsStore    eventscontract.Store
-	providerStore  providercontract.Store
-	modelStore     modelcontract.Store
-	accountStore   accountcontract.Store
-	schedulerStore schedulercontract.Store
-	usageStore     usagecontract.Store
-	capabilities   []capabilitiescontract.Definition
-	databaseProbe  dependencyPinger
-	redisProbe     dependencyPinger
+	cfg               config.Config
+	logger            *slog.Logger
+	users             *usersservice.Service
+	auth              *authservice.Service
+	apiKeys           *apikeyservice.Service
+	audit             *auditservice.Service
+	billing           *billingservice.Service
+	events            *eventsservice.Service
+	gateway           *gatewayservice.Service
+	providers         *providerservice.Service
+	models            *modelservice.Service
+	adapters          *provideradapterservice.Service
+	reverseProxy      *reverseproxyservice.Service
+	accounts          *accountservice.Service
+	scheduler         *schedulerservice.Service
+	subscriptions     *subscriptionservice.Service
+	usage             *usageservice.Service
+	userStore         userscontract.Store
+	sessionStore      *authmemory.Store
+	apiKeyStore       apikeycontract.Store
+	auditStore        auditcontract.Store
+	billingStore      billingcontract.Store
+	eventsStore       eventscontract.Store
+	providerStore     providercontract.Store
+	modelStore        modelcontract.Store
+	accountStore      accountcontract.Store
+	schedulerStore    schedulercontract.Store
+	subscriptionStore subscriptioncontract.Store
+	usageStore        usagecontract.Store
+	capabilities      []capabilitiescontract.Definition
+	databaseProbe     dependencyPinger
+	redisProbe        dependencyPinger
 }
 
 type dependencyHealth struct {
@@ -207,6 +213,15 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 		return nil, err
 	}
 
+	subscriptionStore := opts.subscriptions
+	if subscriptionStore == nil {
+		subscriptionStore = subscriptionmemory.New()
+	}
+	subscriptionSvc, err := subscriptionservice.New(subscriptionStore, nil)
+	if err != nil {
+		return nil, err
+	}
+
 	usageStore := opts.usage
 	if usageStore == nil {
 		usageStore = usagememory.New()
@@ -217,36 +232,38 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 	}
 
 	rt := &runtimeState{
-		cfg:            cfg,
-		logger:         logger,
-		users:          usersSvc,
-		auth:           authSvc,
-		apiKeys:        apiKeysSvc,
-		audit:          auditSvc,
-		billing:        billingSvc,
-		events:         eventsSvc,
-		gateway:        gatewaySvc,
-		providers:      providersSvc,
-		models:         modelsSvc,
-		adapters:       adaptersSvc,
-		reverseProxy:   reverseProxySvc,
-		accounts:       accountsSvc,
-		scheduler:      schedulerSvc,
-		usage:          usageSvc,
-		userStore:      userStore,
-		sessionStore:   sessionStore,
-		apiKeyStore:    apiKeyStore,
-		auditStore:     auditStore,
-		billingStore:   billingStore,
-		eventsStore:    eventsStore,
-		providerStore:  providerStore,
-		modelStore:     modelStore,
-		accountStore:   accountStore,
-		schedulerStore: schedulerStore,
-		usageStore:     usageStore,
-		capabilities:   seedCapabilities(),
-		databaseProbe:  opts.database,
-		redisProbe:     opts.redis,
+		cfg:               cfg,
+		logger:            logger,
+		users:             usersSvc,
+		auth:              authSvc,
+		apiKeys:           apiKeysSvc,
+		audit:             auditSvc,
+		billing:           billingSvc,
+		events:            eventsSvc,
+		gateway:           gatewaySvc,
+		providers:         providersSvc,
+		models:            modelsSvc,
+		adapters:          adaptersSvc,
+		reverseProxy:      reverseProxySvc,
+		accounts:          accountsSvc,
+		scheduler:         schedulerSvc,
+		subscriptions:     subscriptionSvc,
+		usage:             usageSvc,
+		userStore:         userStore,
+		sessionStore:      sessionStore,
+		apiKeyStore:       apiKeyStore,
+		auditStore:        auditStore,
+		billingStore:      billingStore,
+		eventsStore:       eventsStore,
+		providerStore:     providerStore,
+		modelStore:        modelStore,
+		accountStore:      accountStore,
+		schedulerStore:    schedulerStore,
+		subscriptionStore: subscriptionStore,
+		usageStore:        usageStore,
+		capabilities:      seedCapabilities(),
+		databaseProbe:     opts.database,
+		redisProbe:        opts.redis,
 	}
 	if err := rt.bootstrapAdmin(context.Background()); err != nil {
 		return nil, err
@@ -503,6 +520,29 @@ func (s *Server) handleCurrentUserUsage(w http.ResponseWriter, r *http.Request) 
 		data = append(data, toAPIUsageLog(item))
 	}
 	writeJSONAny(w, http.StatusOK, apiopenapi.UsageLogListResponse{
+		Data:       data,
+		Pagination: pagination(len(data)),
+		RequestId:  requestID,
+	})
+}
+
+func (s *Server) handleCurrentUserSubscriptions(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireConsoleSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusUnauthorized, apiopenapi.UNAUTHORIZED, "unauthorized", requestID)
+		return
+	}
+	items, err := s.runtime.subscriptions.ListUserSubscriptionsByUser(r.Context(), session.User.ID)
+	if err != nil {
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list subscriptions", requestID)
+		return
+	}
+	data := make([]apiopenapi.UserSubscription, 0, len(items))
+	for _, item := range items {
+		data = append(data, toAPIUserSubscription(item))
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.UserSubscriptionListResponse{
 		Data:       data,
 		Pagination: pagination(len(data)),
 		RequestId:  requestID,
@@ -1148,12 +1188,34 @@ func (s *Server) handleListAdminAccounts(w http.ResponseWriter, r *http.Request)
 	accounts = filterAccounts(accounts, r.URL.Query().Get("status"), r.URL.Query().Get("provider_id"))
 	data := make([]apiopenapi.ProviderAccount, 0, len(accounts))
 	for _, account := range accounts {
-		data = append(data, toAPIAccount(account))
+		data = append(data, s.apiAccount(r.Context(), account))
 	}
 	writeJSONAny(w, http.StatusOK, apiopenapi.ProviderAccountListResponse{
 		Data:       data,
 		Pagination: pagination(len(data)),
 		RequestId:  requestID,
+	})
+}
+
+func (s *Server) handleGetAdminAccount(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	if _, err := s.requireAdminSession(r); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	accountID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || accountID <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid account id", requestID)
+		return
+	}
+	account, err := s.runtime.accounts.FindByID(r.Context(), accountID)
+	if err != nil {
+		writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "account not found", requestID)
+		return
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.ProviderAccountResponse{
+		Data:      s.apiAccount(r.Context(), account),
+		RequestId: requestID,
 	})
 }
 
@@ -1212,7 +1274,123 @@ func (s *Server) handleCreateAdminAccount(w http.ResponseWriter, r *http.Request
 		"weight":        account.Weight,
 	}))
 	writeJSONAny(w, http.StatusCreated, apiopenapi.ProviderAccountResponse{
-		Data:      toAPIAccount(account),
+		Data:      s.apiAccount(r.Context(), account),
+		RequestId: requestID,
+	})
+}
+
+func (s *Server) handleExportAdminAccounts(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	if _, err := s.requireAdminSession(r); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	accounts, err := s.runtime.accounts.List(r.Context())
+	if err != nil {
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to export accounts", requestID)
+		return
+	}
+	data := make([]apiopenapi.ProviderAccountExportItem, 0, len(accounts))
+	for _, account := range accounts {
+		groupIDs, _ := s.runtime.accounts.ListGroupIDsByAccount(r.Context(), account.ID)
+		data = append(data, apiopenapi.ProviderAccountExportItem{
+			CredentialExported: false,
+			GroupIds:           apiIDsPtr(groupIDs),
+			Metadata:           mapToJsonObjectPtr(sanitizedExportMetadata(account.Metadata)),
+			Name:               account.Name,
+			Priority:           account.Priority,
+			ProviderId:         apiopenapi.Id(strconv.Itoa(account.ProviderID)),
+			ProxyId:            account.ProxyID,
+			RuntimeClass:       apiopenapi.RuntimeClass(account.RuntimeClass),
+			Status:             apiopenapi.ProviderAccountStatus(account.Status),
+			UpstreamClient:     account.UpstreamClient,
+			Weight:             account.Weight,
+		})
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.ProviderAccountExportResponse{
+		Data:      data,
+		RequestId: requestID,
+	})
+}
+
+func (s *Server) handleImportAdminAccounts(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	var body apiopenapi.ProviderAccountImportRequest
+	if err := s.decodeJSONBody(w, r, &body); err != nil {
+		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid account import request", requestID)
+		return
+	}
+	createdIDs := make([]apiopenapi.Id, 0)
+	importErrors := make([]string, 0)
+	skipped := 0
+	for idx, item := range body.Accounts {
+		providerID, err := strconv.Atoi(string(item.ProviderId))
+		if err != nil || providerID <= 0 {
+			skipped++
+			importErrors = append(importErrors, fmt.Sprintf("accounts[%d].provider_id invalid", idx))
+			continue
+		}
+		if _, err := s.runtime.providers.FindByID(r.Context(), providerID); err != nil {
+			skipped++
+			importErrors = append(importErrors, fmt.Sprintf("accounts[%d].provider_id not found", idx))
+			continue
+		}
+		credential := derefMap(item.Credential)
+		if len(credential) == 0 {
+			skipped++
+			importErrors = append(importErrors, fmt.Sprintf("accounts[%d].credential required", idx))
+			continue
+		}
+		account, err := s.runtime.accounts.Create(r.Context(), accountcontract.CreateRequest{
+			ProviderID:     providerID,
+			Name:           item.Name,
+			RuntimeClass:   accountcontract.RuntimeClass(item.RuntimeClass),
+			Credential:     credential,
+			Metadata:       jsonObjectToMap(item.Metadata),
+			ProxyID:        item.ProxyId,
+			Status:         toAccountStatusPtr(item.Status),
+			Priority:       item.Priority,
+			Weight:         item.Weight,
+			UpstreamClient: item.UpstreamClient,
+		})
+		if err != nil {
+			skipped++
+			importErrors = append(importErrors, fmt.Sprintf("accounts[%d] create failed", idx))
+			continue
+		}
+		createdIDs = append(createdIDs, apiopenapi.Id(strconv.Itoa(account.ID)))
+		groupIDs, err := apiIDsToInts(item.GroupIds)
+		if err != nil {
+			importErrors = append(importErrors, fmt.Sprintf("accounts[%d].group_ids invalid", idx))
+			continue
+		}
+		for _, groupID := range groupIDs {
+			if _, err := s.runtime.accounts.AddAccountToGroup(r.Context(), account.ID, groupID); err != nil {
+				importErrors = append(importErrors, fmt.Sprintf("accounts[%d].group_ids[%d] add failed", idx, groupID))
+			}
+		}
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "provider_account.import", "provider_account", "bulk", nil, map[string]any{
+		"created_count": len(createdIDs),
+		"skipped_count": skipped,
+		"error_count":   len(importErrors),
+	}))
+	writeJSONAny(w, http.StatusOK, apiopenapi.ProviderAccountImportResponse{
+		Data: apiopenapi.ProviderAccountImportResult{
+			CreatedCount: len(createdIDs),
+			CreatedIds:   createdIDs,
+			Errors:       importErrors,
+			SkippedCount: skipped,
+		},
 		RequestId: requestID,
 	})
 }
@@ -1265,7 +1443,45 @@ func (s *Server) handleUpdateAdminAccount(w http.ResponseWriter, r *http.Request
 	}
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "provider_account.update", "provider_account", strconv.Itoa(account.ID), accountAuditSnapshot(before), accountAuditSnapshot(account)))
 	writeJSONAny(w, http.StatusOK, apiopenapi.ProviderAccountResponse{
-		Data:      toAPIAccount(account),
+		Data:      s.apiAccount(r.Context(), account),
+		RequestId: requestID,
+	})
+}
+
+func (s *Server) handleBindAdminAccountProxy(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	accountID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid account id", requestID)
+		return
+	}
+	before, err := s.runtime.accounts.FindByID(r.Context(), accountID)
+	if err != nil {
+		writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "account not found", requestID)
+		return
+	}
+	var body apiopenapi.BindProviderAccountProxyRequest
+	if err := s.decodeJSONBody(w, r, &body); err != nil {
+		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid account proxy request", requestID)
+		return
+	}
+	account, err := s.runtime.accounts.BindProxy(r.Context(), accountID, body.ProxyId)
+	if err != nil {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid account proxy request", requestID)
+		return
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "provider_account.proxy_bind", "provider_account", strconv.Itoa(account.ID), accountAuditSnapshot(before), accountAuditSnapshot(account)))
+	writeJSONAny(w, http.StatusOK, apiopenapi.ProviderAccountResponse{
+		Data:      s.apiAccount(r.Context(), account),
 		RequestId: requestID,
 	})
 }
@@ -1276,6 +1492,39 @@ func (s *Server) handleDisableAdminAccount(w http.ResponseWriter, r *http.Reques
 
 func (s *Server) handleEnableAdminAccount(w http.ResponseWriter, r *http.Request) {
 	s.handleSetAdminAccountStatus(w, r, accountcontract.StatusActive, "provider_account.enable")
+}
+
+func (s *Server) handleRecoverAdminAccount(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	accountID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid account id", requestID)
+		return
+	}
+	before, err := s.runtime.accounts.FindByID(r.Context(), accountID)
+	if err != nil {
+		writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "account not found", requestID)
+		return
+	}
+	account, err := s.runtime.accounts.Recover(r.Context(), accountID)
+	if err != nil {
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to recover account", requestID)
+		return
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "provider_account.recover", "provider_account", strconv.Itoa(account.ID), accountAuditSnapshot(before), accountAuditSnapshot(account)))
+	writeJSONAny(w, http.StatusOK, apiopenapi.ProviderAccountResponse{
+		Data:      s.apiAccount(r.Context(), account),
+		RequestId: requestID,
+	})
 }
 
 func (s *Server) handleTestAdminAccount(w http.ResponseWriter, r *http.Request) {
@@ -1311,6 +1560,7 @@ func (s *Server) handleTestAdminAccount(w http.ResponseWriter, r *http.Request) 
 		"status": result.Status,
 		"checks": result.Checks,
 	}))
+	s.runtime.recordAccountTestHealthSnapshot(r.Context(), account, result)
 	writeJSONAny(w, http.StatusOK, apiopenapi.AdminTestResultResponse{
 		Data:      result,
 		RequestId: requestID,
@@ -1345,7 +1595,7 @@ func (s *Server) handleSetAdminAccountStatus(w http.ResponseWriter, r *http.Requ
 	}
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, action, "provider_account", strconv.Itoa(account.ID), accountAuditSnapshot(before), accountAuditSnapshot(account)))
 	writeJSONAny(w, http.StatusOK, apiopenapi.ProviderAccountResponse{
-		Data:      toAPIAccount(account),
+		Data:      s.apiAccount(r.Context(), account),
 		RequestId: requestID,
 	})
 }
@@ -1372,6 +1622,12 @@ func (s *Server) handleAdminAccountHealth(w http.ResponseWriter, r *http.Request
 		return
 	}
 	snapshot := buildAccountHealthSnapshot(account, usageLogsForAccount(usageLogs, account.ID), time.Now().UTC())
+	if latest, err := s.runtime.accounts.LatestHealthSnapshotByAccount(r.Context(), account.ID); err == nil {
+		overlayAccountHealthSnapshot(&snapshot, latest)
+	}
+	if quotas, err := s.runtime.accounts.ListQuotaSnapshotsByAccount(r.Context(), account.ID, 1); err == nil && len(quotas) > 0 {
+		overlayAccountQuotaOnHealth(&snapshot, quotas[0])
+	}
 	writeJSONAny(w, http.StatusOK, apiopenapi.AccountHealthResponse{
 		Data:      snapshot,
 		RequestId: requestID,
@@ -1399,12 +1655,183 @@ func (s *Server) handleAdminAccountQuota(w http.ResponseWriter, r *http.Request)
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list usage logs", requestID)
 		return
 	}
-	snapshot := buildAccountQuotaSnapshot(account, usageLogsForAccount(usageLogs, account.ID), time.Now().UTC())
+	snapshots, err := s.runtime.accounts.ListQuotaSnapshotsByAccount(r.Context(), account.ID, 50)
+	if err != nil {
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list account quota snapshots", requestID)
+		return
+	}
+	data := make([]apiopenapi.AccountQuotaSnapshot, 0, len(snapshots))
+	for _, snapshot := range snapshots {
+		data = append(data, toAPIAccountQuotaSnapshot(snapshot))
+	}
+	if len(data) == 0 {
+		data = append(data, buildAccountQuotaSnapshot(account, usageLogsForAccount(usageLogs, account.ID), time.Now().UTC()))
+	}
 	writeJSONAny(w, http.StatusOK, apiopenapi.AccountQuotaListResponse{
-		Data:       []apiopenapi.AccountQuotaSnapshot{snapshot},
-		Pagination: pagination(1),
+		Data:       data,
+		Pagination: pagination(len(data)),
 		RequestId:  requestID,
 	})
+}
+
+func (s *Server) handleListAdminAccountGroups(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	if _, err := s.requireAdminSession(r); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	groups, err := s.runtime.accounts.ListGroups(r.Context())
+	if err != nil {
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list account groups", requestID)
+		return
+	}
+	data := make([]apiopenapi.AccountGroup, 0, len(groups))
+	for _, group := range groups {
+		data = append(data, toAPIAccountGroup(group))
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.AccountGroupListResponse{
+		Data:       data,
+		Pagination: pagination(len(data)),
+		RequestId:  requestID,
+	})
+}
+
+func (s *Server) handleCreateAdminAccountGroup(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	var body apiopenapi.CreateAccountGroupRequest
+	if err := s.decodeJSONBody(w, r, &body); err != nil {
+		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid account group request", requestID)
+		return
+	}
+	description := ""
+	if body.Description != nil {
+		description = *body.Description
+	}
+	group, err := s.runtime.accounts.CreateGroup(r.Context(), accountcontract.CreateGroupRequest{
+		Name:          body.Name,
+		Description:   description,
+		ProviderScope: jsonObjectToMap(body.ProviderScope),
+		ModelScope:    jsonObjectToMap(body.ModelScope),
+		StrategyHint:  body.StrategyHint,
+		Status:        toAccountGroupStatusPtr(body.Status),
+	})
+	if err != nil {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid account group request", requestID)
+		return
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "account_group.create", "account_group", strconv.Itoa(group.ID), nil, accountGroupAuditSnapshot(group)))
+	writeJSONAny(w, http.StatusCreated, apiopenapi.AccountGroupResponse{
+		Data:      toAPIAccountGroup(group),
+		RequestId: requestID,
+	})
+}
+
+func (s *Server) handleUpdateAdminAccountGroup(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	groupID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid account group id", requestID)
+		return
+	}
+	before, err := s.runtime.accounts.FindGroupByID(r.Context(), groupID)
+	if err != nil {
+		writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "account group not found", requestID)
+		return
+	}
+	var body apiopenapi.UpdateAccountGroupRequest
+	if err := s.decodeJSONBody(w, r, &body); err != nil {
+		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid account group update request", requestID)
+		return
+	}
+	group, err := s.runtime.accounts.UpdateGroup(r.Context(), groupID, accountcontract.UpdateGroupRequest{
+		Name:          body.Name,
+		Description:   body.Description,
+		ProviderScope: jsonObjectToMapPtr(body.ProviderScope),
+		ModelScope:    jsonObjectToMapPtr(body.ModelScope),
+		StrategyHint:  body.StrategyHint,
+		Status:        toAccountGroupStatusPtr(body.Status),
+	})
+	if err != nil {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid account group update request", requestID)
+		return
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "account_group.update", "account_group", strconv.Itoa(group.ID), accountGroupAuditSnapshot(before), accountGroupAuditSnapshot(group)))
+	writeJSONAny(w, http.StatusOK, apiopenapi.AccountGroupResponse{
+		Data:      toAPIAccountGroup(group),
+		RequestId: requestID,
+	})
+}
+
+func (s *Server) handleAddAdminAccountGroupMember(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	groupID, accountID, ok := accountGroupMemberPathIDs(w, r, requestID)
+	if !ok {
+		return
+	}
+	member, err := s.runtime.accounts.AddAccountToGroup(r.Context(), accountID, groupID)
+	if err != nil {
+		writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "account or group not found", requestID)
+		return
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "account_group.member_add", "account_group", strconv.Itoa(groupID), nil, map[string]any{
+		"account_id": accountID,
+	}))
+	writeJSONAny(w, http.StatusOK, apiopenapi.AccountGroupMemberResponse{
+		Data:      toAPIAccountGroupMember(member),
+		RequestId: requestID,
+	})
+}
+
+func (s *Server) handleRemoveAdminAccountGroupMember(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	groupID, accountID, ok := accountGroupMemberPathIDs(w, r, requestID)
+	if !ok {
+		return
+	}
+	if err := s.runtime.accounts.RemoveAccountFromGroup(r.Context(), accountID, groupID); err != nil {
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to remove account group membership", requestID)
+		return
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "account_group.member_remove", "account_group", strconv.Itoa(groupID), map[string]any{
+		"account_id": accountID,
+	}, nil))
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) handleListAdminUsageLogs(w http.ResponseWriter, r *http.Request) {
@@ -1473,6 +1900,243 @@ func (s *Server) handleListAdminBillingLedger(w http.ResponseWriter, r *http.Req
 		Data:       data,
 		Pagination: pagination(len(data)),
 		RequestId:  requestID,
+	})
+}
+
+func (s *Server) handleListAdminSubscriptionPlans(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	if _, err := s.requireAdminSession(r); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	items, err := s.runtime.subscriptions.ListPlans(r.Context())
+	if err != nil {
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list subscription plans", requestID)
+		return
+	}
+	data := make([]apiopenapi.SubscriptionPlan, 0, len(items))
+	for _, item := range items {
+		data = append(data, toAPISubscriptionPlan(item))
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.SubscriptionPlanListResponse{
+		Data:       data,
+		Pagination: pagination(len(data)),
+		RequestId:  requestID,
+	})
+}
+
+func (s *Server) handleCreateAdminSubscriptionPlan(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	var body apiopenapi.CreateSubscriptionPlanRequest
+	if err := s.decodeJSONBody(w, r, &body); err != nil {
+		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid subscription plan request", requestID)
+		return
+	}
+	description := ""
+	if body.Description != nil {
+		description = *body.Description
+	}
+	plan, err := s.runtime.subscriptions.CreatePlan(r.Context(), subscriptioncontract.CreatePlanRequest{
+		Name:         body.Name,
+		Description:  description,
+		Price:        body.Price,
+		Currency:     body.Currency,
+		ValidityDays: body.ValidityDays,
+		Entitlements: jsonObjectToMap(body.Entitlements),
+		ForSale:      body.ForSale,
+		SortOrder:    body.SortOrder,
+		Status:       toSubscriptionPlanStatusPtr(body.Status),
+	})
+	if err != nil {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid subscription plan request", requestID)
+		return
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "subscription_plan.create", "subscription_plan", strconv.Itoa(plan.ID), nil, subscriptionPlanAuditSnapshot(plan)))
+	writeJSONAny(w, http.StatusCreated, apiopenapi.SubscriptionPlanResponse{
+		Data:      toAPISubscriptionPlan(plan),
+		RequestId: requestID,
+	})
+}
+
+func (s *Server) handleListAdminUserSubscriptions(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	if _, err := s.requireAdminSession(r); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	var (
+		items []subscriptioncontract.UserSubscription
+		err   error
+	)
+	if userIDRaw := strings.TrimSpace(r.URL.Query().Get("user_id")); userIDRaw != "" {
+		userID, parseErr := strconv.Atoi(userIDRaw)
+		if parseErr != nil || userID <= 0 {
+			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid user id", requestID)
+			return
+		}
+		items, err = s.runtime.subscriptions.ListUserSubscriptionsByUser(r.Context(), userID)
+	} else {
+		items, err = s.runtime.subscriptions.ListUserSubscriptions(r.Context())
+	}
+	if err != nil {
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list user subscriptions", requestID)
+		return
+	}
+	data := make([]apiopenapi.UserSubscription, 0, len(items))
+	for _, item := range items {
+		data = append(data, toAPIUserSubscription(item))
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.UserSubscriptionListResponse{
+		Data:       data,
+		Pagination: pagination(len(data)),
+		RequestId:  requestID,
+	})
+}
+
+func (s *Server) handleCreateAdminUserSubscription(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	var body apiopenapi.CreateUserSubscriptionRequest
+	if err := s.decodeJSONBody(w, r, &body); err != nil {
+		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid user subscription request", requestID)
+		return
+	}
+	userID, err := strconv.Atoi(string(body.UserId))
+	if err != nil || userID <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid user id", requestID)
+		return
+	}
+	planID, err := strconv.Atoi(string(body.PlanId))
+	if err != nil || planID <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid plan id", requestID)
+		return
+	}
+	if _, err := s.runtime.users.FindByID(r.Context(), userID); err != nil {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "user not found", requestID)
+		return
+	}
+	sourceType := ""
+	if body.SourceType != nil {
+		sourceType = *body.SourceType
+	}
+	sourceID := ""
+	if body.SourceId != nil {
+		sourceID = *body.SourceId
+	}
+	subscription, err := s.runtime.subscriptions.CreateUserSubscription(r.Context(), subscriptioncontract.CreateSubscriptionRequest{
+		UserID:     userID,
+		PlanID:     planID,
+		Status:     toUserSubscriptionStatusPtr(body.Status),
+		StartsAt:   body.StartsAt,
+		ExpiresAt:  body.ExpiresAt,
+		SourceType: sourceType,
+		SourceID:   sourceID,
+	})
+	if err != nil {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid user subscription request", requestID)
+		return
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "user_subscription.create", "user_subscription", strconv.Itoa(subscription.ID), nil, userSubscriptionAuditSnapshot(subscription)))
+	writeJSONAny(w, http.StatusCreated, apiopenapi.UserSubscriptionResponse{
+		Data:      toAPIUserSubscription(subscription),
+		RequestId: requestID,
+	})
+}
+
+func (s *Server) handleListAdminPricingRules(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	if _, err := s.requireAdminSession(r); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	items, err := s.runtime.subscriptions.ListPricingRules(r.Context())
+	if err != nil {
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list pricing rules", requestID)
+		return
+	}
+	data := make([]apiopenapi.PricingRule, 0, len(items))
+	for _, item := range items {
+		data = append(data, toAPIPricingRule(item))
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.PricingRuleListResponse{
+		Data:       data,
+		Pagination: pagination(len(data)),
+		RequestId:  requestID,
+	})
+}
+
+func (s *Server) handleCreateAdminPricingRule(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	var body apiopenapi.CreatePricingRuleRequest
+	if err := s.decodeJSONBody(w, r, &body); err != nil {
+		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid pricing rule request", requestID)
+		return
+	}
+	modelID, err := strconv.Atoi(string(body.ModelId))
+	if err != nil || modelID <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid model id", requestID)
+		return
+	}
+	providerID, err := strconv.Atoi(string(body.ProviderId))
+	if err != nil || providerID < 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid provider id", requestID)
+		return
+	}
+	if _, err := s.runtime.models.FindByID(r.Context(), modelID); err != nil {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "model not found", requestID)
+		return
+	}
+	if providerID > 0 {
+		if _, err := s.runtime.providers.FindByID(r.Context(), providerID); err != nil {
+			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "provider not found", requestID)
+			return
+		}
+	}
+	rule, err := s.runtime.subscriptions.CreatePricingRule(r.Context(), subscriptioncontract.CreatePricingRuleRequest{
+		ModelID:                         modelID,
+		ProviderID:                      providerID,
+		InputPricePerMillionTokens:      body.InputPricePerMillionTokens,
+		OutputPricePerMillionTokens:     body.OutputPricePerMillionTokens,
+		CacheReadPricePerMillionTokens:  body.CacheReadPricePerMillionTokens,
+		CacheWritePricePerMillionTokens: body.CacheWritePricePerMillionTokens,
+		Currency:                        body.Currency,
+		EffectiveFrom:                   body.EffectiveFrom,
+		EffectiveTo:                     body.EffectiveTo,
+	})
+	if err != nil {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid pricing rule request", requestID)
+		return
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "pricing_rule.create", "pricing_rule", strconv.Itoa(rule.ID), nil, pricingRuleAuditSnapshot(rule)))
+	writeJSONAny(w, http.StatusCreated, apiopenapi.PricingRuleResponse{
+		Data:      toAPIPricingRule(rule),
+		RequestId: requestID,
 	})
 }
 
@@ -1645,7 +2309,7 @@ func (s *Server) handleCreateChatCompletion(w http.ResponseWriter, r *http.Reque
 		writeGatewayError(w, jsonDecodeStatus(err), apiopenapi.InvalidRequestError, "invalid chat completion request", "invalid_request")
 		return
 	}
-	model, err := s.runtime.models.ResolveModel(r.Context(), body.Model)
+	modelResolution, err := s.runtime.models.ResolveModelReference(r.Context(), body.Model)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:      requestID,
@@ -1661,7 +2325,8 @@ func (s *Server) handleCreateChatCompletion(w http.ResponseWriter, r *http.Reque
 		writeGatewayError(w, http.StatusNotFound, apiopenapi.InvalidRequestError, "model not found", "model_not_found")
 		return
 	}
-	if !apiKeyAllowsModel(authed.Key.AllowedModels, model.CanonicalName) {
+	model := modelResolution.Model
+	if !apiKeyAllowsModelReference(authed.Key.AllowedModels, modelResolution) {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:      requestID,
 			Authed:         authed,
@@ -1683,17 +2348,48 @@ func (s *Server) handleCreateChatCompletion(w http.ResponseWriter, r *http.Reque
 		APIKeyID:       authed.Key.ID,
 		CanonicalModel: model.CanonicalName,
 	})
-	result, err := s.runtime.scheduleGatewayRequest(r.Context(), schedulercontract.ScheduleRequest{
-		RequestID:           canonical.RequestID,
-		UserID:              canonical.UserID,
-		APIKeyID:            canonical.APIKeyID,
-		SourceProtocol:      string(canonical.SourceProtocol),
-		SourceEndpoint:      canonical.SourceEndpoint,
-		Model:               canonical.CanonicalModel,
-		Strategy:            schedulercontract.StrategyBalanced,
-		Warnings:            canonical.CompatibilityWarnings,
-		RequestCapabilities: gatewayservice.CapabilityDescriptors(canonical),
-	}, model.ID, forcedProviderKey, authed.Key)
+	admission, err := s.runtime.prepareGatewayAdmission(r.Context(), canonical, modelResolution, model.ID)
+	if err != nil {
+		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
+			RequestID:             canonical.RequestID,
+			Authed:                authed,
+			SourceProtocol:        string(canonical.SourceProtocol),
+			SourceEndpoint:        canonical.SourceEndpoint,
+			Model:                 canonical.CanonicalModel,
+			Success:               false,
+			ErrorClass:            ptrStringValue("entitlement_check_failed"),
+			LatencyMS:             elapsedMillis(startedAt),
+			UsageEstimated:        true,
+			Pricing:               admission.Pricing,
+			CompatibilityWarnings: canonical.CompatibilityWarnings,
+		})
+		writeGatewayError(w, http.StatusInternalServerError, apiopenapi.InternalError, "failed to check gateway entitlement", "entitlement_check_failed")
+		return
+	}
+	if !admission.Entitlement.Allowed {
+		errorClass := gatewayEntitlementErrorClass(admission.Entitlement)
+		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
+			RequestID:             canonical.RequestID,
+			Authed:                authed,
+			SourceProtocol:        string(canonical.SourceProtocol),
+			SourceEndpoint:        canonical.SourceEndpoint,
+			Model:                 canonical.CanonicalModel,
+			Success:               false,
+			ErrorClass:            ptrStringValue(errorClass),
+			LatencyMS:             elapsedMillis(startedAt),
+			InputTokens:           admission.EstimatedUsage.InputTokens,
+			OutputTokens:          admission.EstimatedUsage.OutputTokens,
+			CachedTokens:          admission.EstimatedUsage.CachedTokens,
+			UsageEstimated:        true,
+			Pricing:               admission.Pricing,
+			CompatibilityWarnings: canonical.CompatibilityWarnings,
+		})
+		writeGatewayError(w, gatewayEntitlementHTTPStatus(errorClass), gatewayEntitlementErrorType(errorClass), gatewayEntitlementMessage(errorClass), errorClass)
+		return
+	}
+	scheduleReq := gatewayScheduleRequest(r, canonical, modelResolution)
+	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
+	result, err := s.runtime.scheduleGatewayRequest(r.Context(), scheduleReq, model.ID, forcedProviderKey, authed.Key)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:             canonical.RequestID,
@@ -1706,7 +2402,11 @@ func (s *Server) handleCreateChatCompletion(w http.ResponseWriter, r *http.Reque
 			Success:               false,
 			ErrorClass:            ptrStringValue("no_available_account"),
 			LatencyMS:             elapsedMillis(startedAt),
+			InputTokens:           admission.EstimatedUsage.InputTokens,
+			OutputTokens:          admission.EstimatedUsage.OutputTokens,
+			CachedTokens:          admission.EstimatedUsage.CachedTokens,
 			UsageEstimated:        true,
+			Pricing:               admission.Pricing,
 			CompatibilityWarnings: canonical.CompatibilityWarnings,
 		})
 		writeGatewayError(w, http.StatusServiceUnavailable, apiopenapi.ServiceUnavailableError, "no available account", "no_available_account")
@@ -1730,7 +2430,11 @@ func (s *Server) handleCreateChatCompletion(w http.ResponseWriter, r *http.Reque
 			ErrorClass:            ptrStringValue(errorClass),
 			StatusCode:            ptrInt(upstreamStatus),
 			LatencyMS:             elapsedMillis(startedAt),
+			InputTokens:           admission.EstimatedUsage.InputTokens,
+			OutputTokens:          admission.EstimatedUsage.OutputTokens,
+			CachedTokens:          admission.EstimatedUsage.CachedTokens,
 			UsageEstimated:        true,
+			Pricing:               admission.Pricing,
 			CompatibilityWarnings: canonical.CompatibilityWarnings,
 		})
 		writeGatewayError(w, providerGatewayHTTPStatus(upstreamStatus), errorType, providerGatewayMessage(errorClass), errorClass)
@@ -1738,6 +2442,7 @@ func (s *Server) handleCreateChatCompletion(w http.ResponseWriter, r *http.Reque
 	}
 	usage := gatewayUsageFromProvider(providerResp)
 	canonicalResp := s.runtime.gateway.BuildCanonicalTextResponse(canonical, providerResp.Text, usage)
+	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequest(model.ID, result.Candidate, canonicalResp.Usage), canonicalResp.Usage.Estimated)
 	s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 		RequestID:             canonical.RequestID,
 		Authed:                authed,
@@ -1756,6 +2461,7 @@ func (s *Server) handleCreateChatCompletion(w http.ResponseWriter, r *http.Reque
 		OutputTokens:          canonicalResp.Usage.OutputTokens,
 		CachedTokens:          canonicalResp.Usage.CachedTokens,
 		UsageEstimated:        canonicalResp.Usage.Estimated,
+		Pricing:               pricing,
 		CompatibilityWarnings: canonicalResp.CompatibilityWarnings,
 	})
 	if canonical.Stream {
@@ -1791,7 +2497,7 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 		writeGatewayError(w, jsonDecodeStatus(err), apiopenapi.InvalidRequestError, "invalid responses request", "invalid_request")
 		return
 	}
-	model, err := s.runtime.models.ResolveModel(r.Context(), body.Model)
+	modelResolution, err := s.runtime.models.ResolveModelReference(r.Context(), body.Model)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:      requestID,
@@ -1807,7 +2513,8 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 		writeGatewayError(w, http.StatusNotFound, apiopenapi.InvalidRequestError, "model not found", "model_not_found")
 		return
 	}
-	if !apiKeyAllowsModel(authed.Key.AllowedModels, model.CanonicalName) {
+	model := modelResolution.Model
+	if !apiKeyAllowsModelReference(authed.Key.AllowedModels, modelResolution) {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:      requestID,
 			Authed:         authed,
@@ -1829,17 +2536,48 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 		APIKeyID:       authed.Key.ID,
 		CanonicalModel: model.CanonicalName,
 	})
-	result, err := s.runtime.scheduleGatewayRequest(r.Context(), schedulercontract.ScheduleRequest{
-		RequestID:           canonical.RequestID,
-		UserID:              canonical.UserID,
-		APIKeyID:            canonical.APIKeyID,
-		SourceProtocol:      string(canonical.SourceProtocol),
-		SourceEndpoint:      canonical.SourceEndpoint,
-		Model:               canonical.CanonicalModel,
-		Strategy:            schedulercontract.StrategyBalanced,
-		Warnings:            canonical.CompatibilityWarnings,
-		RequestCapabilities: gatewayservice.CapabilityDescriptors(canonical),
-	}, model.ID, forcedProviderKey, authed.Key)
+	admission, err := s.runtime.prepareGatewayAdmission(r.Context(), canonical, modelResolution, model.ID)
+	if err != nil {
+		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
+			RequestID:             canonical.RequestID,
+			Authed:                authed,
+			SourceProtocol:        string(canonical.SourceProtocol),
+			SourceEndpoint:        canonical.SourceEndpoint,
+			Model:                 canonical.CanonicalModel,
+			Success:               false,
+			ErrorClass:            ptrStringValue("entitlement_check_failed"),
+			LatencyMS:             elapsedMillis(startedAt),
+			UsageEstimated:        true,
+			Pricing:               admission.Pricing,
+			CompatibilityWarnings: canonical.CompatibilityWarnings,
+		})
+		writeGatewayError(w, http.StatusInternalServerError, apiopenapi.InternalError, "failed to check gateway entitlement", "entitlement_check_failed")
+		return
+	}
+	if !admission.Entitlement.Allowed {
+		errorClass := gatewayEntitlementErrorClass(admission.Entitlement)
+		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
+			RequestID:             canonical.RequestID,
+			Authed:                authed,
+			SourceProtocol:        string(canonical.SourceProtocol),
+			SourceEndpoint:        canonical.SourceEndpoint,
+			Model:                 canonical.CanonicalModel,
+			Success:               false,
+			ErrorClass:            ptrStringValue(errorClass),
+			LatencyMS:             elapsedMillis(startedAt),
+			InputTokens:           admission.EstimatedUsage.InputTokens,
+			OutputTokens:          admission.EstimatedUsage.OutputTokens,
+			CachedTokens:          admission.EstimatedUsage.CachedTokens,
+			UsageEstimated:        true,
+			Pricing:               admission.Pricing,
+			CompatibilityWarnings: canonical.CompatibilityWarnings,
+		})
+		writeGatewayError(w, gatewayEntitlementHTTPStatus(errorClass), gatewayEntitlementErrorType(errorClass), gatewayEntitlementMessage(errorClass), errorClass)
+		return
+	}
+	scheduleReq := gatewayScheduleRequest(r, canonical, modelResolution)
+	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
+	result, err := s.runtime.scheduleGatewayRequest(r.Context(), scheduleReq, model.ID, forcedProviderKey, authed.Key)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:             canonical.RequestID,
@@ -1852,7 +2590,11 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 			Success:               false,
 			ErrorClass:            ptrStringValue("no_available_account"),
 			LatencyMS:             elapsedMillis(startedAt),
+			InputTokens:           admission.EstimatedUsage.InputTokens,
+			OutputTokens:          admission.EstimatedUsage.OutputTokens,
+			CachedTokens:          admission.EstimatedUsage.CachedTokens,
 			UsageEstimated:        true,
+			Pricing:               admission.Pricing,
 			CompatibilityWarnings: canonical.CompatibilityWarnings,
 		})
 		writeGatewayError(w, http.StatusServiceUnavailable, apiopenapi.ServiceUnavailableError, "no available account", "no_available_account")
@@ -1876,7 +2618,11 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 			ErrorClass:            ptrStringValue(errorClass),
 			StatusCode:            ptrInt(upstreamStatus),
 			LatencyMS:             elapsedMillis(startedAt),
+			InputTokens:           admission.EstimatedUsage.InputTokens,
+			OutputTokens:          admission.EstimatedUsage.OutputTokens,
+			CachedTokens:          admission.EstimatedUsage.CachedTokens,
 			UsageEstimated:        true,
+			Pricing:               admission.Pricing,
 			CompatibilityWarnings: canonical.CompatibilityWarnings,
 		})
 		writeGatewayError(w, providerGatewayHTTPStatus(upstreamStatus), errorType, providerGatewayMessage(errorClass), errorClass)
@@ -1884,6 +2630,7 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 	}
 	usage := gatewayUsageFromProvider(providerResp)
 	canonicalResp := s.runtime.gateway.BuildCanonicalTextResponse(canonical, providerResp.Text, usage)
+	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequest(model.ID, result.Candidate, canonicalResp.Usage), canonicalResp.Usage.Estimated)
 	s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 		RequestID:             canonical.RequestID,
 		Authed:                authed,
@@ -1902,6 +2649,7 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 		OutputTokens:          canonicalResp.Usage.OutputTokens,
 		CachedTokens:          canonicalResp.Usage.CachedTokens,
 		UsageEstimated:        canonicalResp.Usage.Estimated,
+		Pricing:               pricing,
 		CompatibilityWarnings: canonicalResp.CompatibilityWarnings,
 	})
 	response := s.runtime.gateway.RenderResponses(canonicalResp)
@@ -1938,7 +2686,7 @@ func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
 		writeGatewayError(w, jsonDecodeStatus(err), apiopenapi.InvalidRequestError, "invalid messages request", "invalid_request")
 		return
 	}
-	model, err := s.runtime.models.ResolveModel(r.Context(), body.Model)
+	modelResolution, err := s.runtime.models.ResolveModelReference(r.Context(), body.Model)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:      requestID,
@@ -1954,7 +2702,8 @@ func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
 		writeGatewayError(w, http.StatusNotFound, apiopenapi.InvalidRequestError, "model not found", "model_not_found")
 		return
 	}
-	if !apiKeyAllowsModel(authed.Key.AllowedModels, model.CanonicalName) {
+	model := modelResolution.Model
+	if !apiKeyAllowsModelReference(authed.Key.AllowedModels, modelResolution) {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:      requestID,
 			Authed:         authed,
@@ -1976,17 +2725,48 @@ func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
 		APIKeyID:       authed.Key.ID,
 		CanonicalModel: model.CanonicalName,
 	})
-	result, err := s.runtime.scheduleGatewayRequest(r.Context(), schedulercontract.ScheduleRequest{
-		RequestID:           canonical.RequestID,
-		UserID:              canonical.UserID,
-		APIKeyID:            canonical.APIKeyID,
-		SourceProtocol:      string(canonical.SourceProtocol),
-		SourceEndpoint:      canonical.SourceEndpoint,
-		Model:               canonical.CanonicalModel,
-		Strategy:            schedulercontract.StrategyBalanced,
-		Warnings:            canonical.CompatibilityWarnings,
-		RequestCapabilities: gatewayservice.CapabilityDescriptors(canonical),
-	}, model.ID, forcedProviderKey, authed.Key)
+	admission, err := s.runtime.prepareGatewayAdmission(r.Context(), canonical, modelResolution, model.ID)
+	if err != nil {
+		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
+			RequestID:             canonical.RequestID,
+			Authed:                authed,
+			SourceProtocol:        string(canonical.SourceProtocol),
+			SourceEndpoint:        canonical.SourceEndpoint,
+			Model:                 canonical.CanonicalModel,
+			Success:               false,
+			ErrorClass:            ptrStringValue("entitlement_check_failed"),
+			LatencyMS:             elapsedMillis(startedAt),
+			UsageEstimated:        true,
+			Pricing:               admission.Pricing,
+			CompatibilityWarnings: canonical.CompatibilityWarnings,
+		})
+		writeGatewayError(w, http.StatusInternalServerError, apiopenapi.InternalError, "failed to check gateway entitlement", "entitlement_check_failed")
+		return
+	}
+	if !admission.Entitlement.Allowed {
+		errorClass := gatewayEntitlementErrorClass(admission.Entitlement)
+		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
+			RequestID:             canonical.RequestID,
+			Authed:                authed,
+			SourceProtocol:        string(canonical.SourceProtocol),
+			SourceEndpoint:        canonical.SourceEndpoint,
+			Model:                 canonical.CanonicalModel,
+			Success:               false,
+			ErrorClass:            ptrStringValue(errorClass),
+			LatencyMS:             elapsedMillis(startedAt),
+			InputTokens:           admission.EstimatedUsage.InputTokens,
+			OutputTokens:          admission.EstimatedUsage.OutputTokens,
+			CachedTokens:          admission.EstimatedUsage.CachedTokens,
+			UsageEstimated:        true,
+			Pricing:               admission.Pricing,
+			CompatibilityWarnings: canonical.CompatibilityWarnings,
+		})
+		writeGatewayError(w, gatewayEntitlementHTTPStatus(errorClass), gatewayEntitlementErrorType(errorClass), gatewayEntitlementMessage(errorClass), errorClass)
+		return
+	}
+	scheduleReq := gatewayScheduleRequest(r, canonical, modelResolution)
+	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
+	result, err := s.runtime.scheduleGatewayRequest(r.Context(), scheduleReq, model.ID, forcedProviderKey, authed.Key)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:             canonical.RequestID,
@@ -1999,7 +2779,11 @@ func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
 			Success:               false,
 			ErrorClass:            ptrStringValue("no_available_account"),
 			LatencyMS:             elapsedMillis(startedAt),
+			InputTokens:           admission.EstimatedUsage.InputTokens,
+			OutputTokens:          admission.EstimatedUsage.OutputTokens,
+			CachedTokens:          admission.EstimatedUsage.CachedTokens,
 			UsageEstimated:        true,
+			Pricing:               admission.Pricing,
 			CompatibilityWarnings: canonical.CompatibilityWarnings,
 		})
 		writeGatewayError(w, http.StatusServiceUnavailable, apiopenapi.ServiceUnavailableError, "no available account", "no_available_account")
@@ -2023,7 +2807,11 @@ func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
 			ErrorClass:            ptrStringValue(errorClass),
 			StatusCode:            ptrInt(upstreamStatus),
 			LatencyMS:             elapsedMillis(startedAt),
+			InputTokens:           admission.EstimatedUsage.InputTokens,
+			OutputTokens:          admission.EstimatedUsage.OutputTokens,
+			CachedTokens:          admission.EstimatedUsage.CachedTokens,
 			UsageEstimated:        true,
+			Pricing:               admission.Pricing,
 			CompatibilityWarnings: canonical.CompatibilityWarnings,
 		})
 		writeGatewayError(w, providerGatewayHTTPStatus(upstreamStatus), errorType, providerGatewayMessage(errorClass), errorClass)
@@ -2031,6 +2819,7 @@ func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	usage := gatewayUsageFromProvider(providerResp)
 	canonicalResp := s.runtime.gateway.BuildCanonicalTextResponse(canonical, providerResp.Text, usage)
+	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequest(model.ID, result.Candidate, canonicalResp.Usage), canonicalResp.Usage.Estimated)
 	s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 		RequestID:             canonical.RequestID,
 		Authed:                authed,
@@ -2049,6 +2838,7 @@ func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
 		OutputTokens:          canonicalResp.Usage.OutputTokens,
 		CachedTokens:          canonicalResp.Usage.CachedTokens,
 		UsageEstimated:        canonicalResp.Usage.Estimated,
+		Pricing:               pricing,
 		CompatibilityWarnings: canonicalResp.CompatibilityWarnings,
 	})
 	response := s.runtime.gateway.RenderAnthropicMessages(canonicalResp)
@@ -2111,7 +2901,35 @@ type gatewayUsageRecord struct {
 	OutputTokens          int
 	CachedTokens          int
 	UsageEstimated        bool
+	Pricing               gatewayPricingEvidence
 	CompatibilityWarnings []string
+}
+
+type gatewayAdmission struct {
+	EstimatedUsage gatewaycontract.Usage
+	Pricing        gatewayPricingEvidence
+	Entitlement    subscriptioncontract.EntitlementDecision
+}
+
+type gatewayPricingEvidence struct {
+	Amount           string
+	Currency         string
+	PricingRuleID    *int
+	PricingSource    string
+	PricingEstimated bool
+}
+
+func (e gatewayPricingEvidence) withDefaults() gatewayPricingEvidence {
+	if strings.TrimSpace(e.Amount) == "" {
+		e.Amount = "0.00000000"
+	}
+	if strings.TrimSpace(e.Currency) == "" {
+		e.Currency = "USD"
+	}
+	if strings.TrimSpace(e.PricingSource) == "" {
+		e.PricingSource = "default_zero"
+	}
+	return e
 }
 
 func (rt *runtimeState) scheduleGatewayRequest(ctx context.Context, req schedulercontract.ScheduleRequest, modelID int, forcedProviderKey string, apiKey apikeycontract.APIKey) (schedulercontract.ScheduleResult, error) {
@@ -2119,8 +2937,465 @@ func (rt *runtimeState) scheduleGatewayRequest(ctx context.Context, req schedule
 	if err != nil {
 		return schedulercontract.ScheduleResult{}, err
 	}
+	if len(req.AccountGroupScope) > 0 {
+		candidates, err = rt.filterCandidatesByAccountGroupScope(ctx, candidates, req.AccountGroupScope)
+		if err != nil {
+			return schedulercontract.ScheduleResult{}, err
+		}
+	}
+	if req.StickyAccountID == nil && strings.TrimSpace(req.SessionAffinityKey) != "" {
+		req.StickyAccountID = stickyAccountIDFromCandidates(candidates, req.SessionAffinityKey)
+	}
 	req.Candidates = candidates
 	return rt.scheduler.Schedule(ctx, req)
+}
+
+func (rt *runtimeState) prepareGatewayAdmission(ctx context.Context, canonical gatewaycontract.CanonicalRequest, resolution modelcontract.ModelResolution, modelID int) (gatewayAdmission, error) {
+	estimatedUsage := estimateGatewayRequestUsage(canonical)
+	pricing := rt.gatewayPricing(ctx, subscriptioncontract.PricingRequest{
+		ModelID:      modelID,
+		ProviderID:   0,
+		InputTokens:  estimatedUsage.InputTokens,
+		OutputTokens: estimatedUsage.OutputTokens,
+		At:           time.Now().UTC(),
+	}, true)
+	tokensUsed, costUsed, err := rt.gatewayUserPeriodUsage(ctx, canonical.UserID, time.Now().UTC())
+	if err != nil {
+		return gatewayAdmission{}, err
+	}
+	entitlement, err := rt.subscriptions.CheckEntitlement(ctx, subscriptioncontract.EntitlementCheckRequest{
+		UserID:             canonical.UserID,
+		ModelReferences:    gatewayModelReferences(canonical, resolution),
+		EstimatedTokens:    estimatedUsage.InputTokens + estimatedUsage.OutputTokens + estimatedUsage.CachedTokens,
+		EstimatedCost:      pricing.Amount,
+		TokensUsedInPeriod: tokensUsed,
+		CostUsedInPeriod:   costUsed,
+		RequestTime:        time.Now().UTC(),
+	})
+	if err != nil {
+		return gatewayAdmission{}, err
+	}
+	return gatewayAdmission{EstimatedUsage: estimatedUsage, Pricing: pricing, Entitlement: entitlement}, nil
+}
+
+func (rt *runtimeState) applyGatewayAdmission(req *schedulercontract.ScheduleRequest, admission gatewayAdmission) {
+	req.EstimatedInputTokens = admission.EstimatedUsage.InputTokens
+	req.EstimatedOutputTokens = admission.EstimatedUsage.OutputTokens
+	req.EstimatedCost = admission.Pricing.Amount
+	req.Currency = admission.Pricing.Currency
+	req.PricingRuleID = admission.Pricing.PricingRuleID
+	req.PricingSource = admission.Pricing.PricingSource
+	req.PricingEstimated = true
+	req.AccountGroupScope = append([]int(nil), admission.Entitlement.AccountGroupScope...)
+	if strategy := schedulerStrategyName(admission.Entitlement.SchedulerStrategy); strategy != "" {
+		req.Strategy = strategy
+	}
+}
+
+func (rt *runtimeState) filterCandidatesByAccountGroupScope(ctx context.Context, candidates []schedulercontract.Candidate, scope []int) ([]schedulercontract.Candidate, error) {
+	if len(scope) == 0 {
+		return candidates, nil
+	}
+	out := make([]schedulercontract.Candidate, 0, len(candidates))
+	for _, candidate := range candidates {
+		groupIDs, err := rt.accounts.ListGroupIDsByAccount(ctx, candidate.Account.ID)
+		if err != nil {
+			return nil, err
+		}
+		if intersectsInt(scope, groupIDs) {
+			out = append(out, candidate)
+		}
+	}
+	return out, nil
+}
+
+func (rt *runtimeState) gatewayPricing(ctx context.Context, req subscriptioncontract.PricingRequest, estimated bool) gatewayPricingEvidence {
+	result, err := rt.subscriptions.EstimatePrice(ctx, req)
+	if err != nil {
+		rt.logger.Warn("failed to estimate gateway price", "error", err, "model_id", req.ModelID, "provider_id", req.ProviderID)
+		return gatewayPricingEvidence{Amount: "0.00000000", Currency: "USD", PricingSource: "pricing_error", PricingEstimated: estimated}
+	}
+	source := "default_zero"
+	if len(req.PricingOverride) > 0 {
+		source = "mapping_override"
+	} else if result.PricingRuleID != nil {
+		source = "pricing_rule"
+	}
+	return gatewayPricingEvidence{
+		Amount:           result.Amount,
+		Currency:         result.Currency,
+		PricingRuleID:    cloneIntPtr(result.PricingRuleID),
+		PricingSource:    source,
+		PricingEstimated: estimated,
+	}.withDefaults()
+}
+
+func gatewayPricingRequest(modelID int, candidate schedulercontract.Candidate, usage gatewaycontract.Usage) subscriptioncontract.PricingRequest {
+	return subscriptioncontract.PricingRequest{
+		ModelID:         modelID,
+		ProviderID:      candidate.Provider.ID,
+		InputTokens:     usage.InputTokens,
+		OutputTokens:    usage.OutputTokens,
+		CacheReadTokens: usage.CachedTokens,
+		At:              time.Now().UTC(),
+		PricingOverride: cloneAnyMap(candidate.Mapping.PricingOverride),
+	}
+}
+
+func (rt *runtimeState) gatewayUserPeriodUsage(ctx context.Context, userID int, now time.Time) (int, string, error) {
+	logs, err := rt.usage.ListByUser(ctx, userID)
+	if err != nil {
+		return 0, "", err
+	}
+	start := time.Date(now.UTC().Year(), now.UTC().Month(), 1, 0, 0, 0, 0, time.UTC)
+	tokens := 0
+	cost := "0.00000000"
+	for _, log := range logs {
+		if !log.Success || log.CreatedAt.Before(start) {
+			continue
+		}
+		tokens += log.TotalTokens
+		cost = addDecimalMoney(cost, log.Cost)
+	}
+	return tokens, cost, nil
+}
+
+func gatewayModelReferences(canonical gatewaycontract.CanonicalRequest, resolution modelcontract.ModelResolution) []string {
+	refs := []string{canonical.CanonicalModel, canonical.Model, resolution.Model.CanonicalName}
+	if resolution.Alias != nil {
+		refs = append(refs, resolution.Alias.Alias)
+		refs = append(refs, resolution.Alias.FallbackModels...)
+	}
+	return uniqueNonEmptyStrings(refs)
+}
+
+func gatewayEntitlementErrorClass(decision subscriptioncontract.EntitlementDecision) string {
+	switch strings.TrimSpace(decision.Reason) {
+	case "model_not_allowed":
+		return "entitlement_model_not_allowed"
+	case "monthly_token_quota_exceeded":
+		return "monthly_token_quota_exceeded"
+	case "monthly_cost_quota_exceeded":
+		return "monthly_cost_quota_exceeded"
+	default:
+		return "entitlement_denied"
+	}
+}
+
+func gatewayEntitlementHTTPStatus(errorClass string) int {
+	switch errorClass {
+	case "monthly_token_quota_exceeded", "monthly_cost_quota_exceeded":
+		return http.StatusTooManyRequests
+	default:
+		return http.StatusForbidden
+	}
+}
+
+func gatewayEntitlementErrorType(errorClass string) apiopenapi.GatewayErrorObjectType {
+	switch errorClass {
+	case "monthly_token_quota_exceeded", "monthly_cost_quota_exceeded":
+		return apiopenapi.RateLimitError
+	default:
+		return apiopenapi.PermissionError
+	}
+}
+
+func gatewayEntitlementMessage(errorClass string) string {
+	switch errorClass {
+	case "entitlement_model_not_allowed":
+		return "model not allowed by subscription entitlement"
+	case "monthly_token_quota_exceeded":
+		return "monthly token quota exceeded"
+	case "monthly_cost_quota_exceeded":
+		return "monthly cost quota exceeded"
+	default:
+		return "request not allowed by subscription entitlement"
+	}
+}
+
+func estimateGatewayRequestUsage(canonical gatewaycontract.CanonicalRequest) gatewaycontract.Usage {
+	inputTokens := estimateGatewayTokens(gatewayRequestText(canonical))
+	outputTokens := max(1, inputTokens/2)
+	if canonical.MaxOutputTokens != nil && *canonical.MaxOutputTokens > 0 {
+		outputTokens = *canonical.MaxOutputTokens
+	}
+	return gatewaycontract.Usage{
+		InputTokens:  inputTokens,
+		OutputTokens: outputTokens,
+		Estimated:    true,
+	}
+}
+
+func gatewayRequestText(canonical gatewaycontract.CanonicalRequest) string {
+	parts := []string{canonical.Prompt, canonical.Instructions}
+	for _, message := range canonical.Messages {
+		parts = append(parts, canonicalContentText(message.Content))
+	}
+	parts = append(parts, canonicalContentText(canonical.InputItems))
+	return strings.Join(uniqueNonEmptyStrings(parts), "\n")
+}
+
+func estimateGatewayTokens(text string) int {
+	fields := strings.Fields(text)
+	if len(fields) == 0 {
+		if strings.TrimSpace(text) == "" {
+			return 1
+		}
+		return max(1, len(text)/4)
+	}
+	return max(1, len(fields)*2)
+}
+
+func schedulerStrategyName(value string) schedulercontract.StrategyName {
+	switch schedulercontract.StrategyName(strings.TrimSpace(value)) {
+	case schedulercontract.StrategyBalanced:
+		return schedulercontract.StrategyBalanced
+	case schedulercontract.StrategyCostSaver:
+		return schedulercontract.StrategyCostSaver
+	default:
+		return ""
+	}
+}
+
+func uniqueNonEmptyStrings(values []string) []string {
+	seen := map[string]struct{}{}
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			continue
+		}
+		if _, ok := seen[strings.ToLower(trimmed)]; ok {
+			continue
+		}
+		seen[strings.ToLower(trimmed)] = struct{}{}
+		out = append(out, trimmed)
+	}
+	return out
+}
+
+func addDecimalMoney(left string, right string) string {
+	leftRat, ok := new(big.Rat).SetString(defaultDecimalMoney(left))
+	if !ok {
+		leftRat = new(big.Rat)
+	}
+	rightRat, ok := new(big.Rat).SetString(defaultDecimalMoney(right))
+	if !ok {
+		rightRat = new(big.Rat)
+	}
+	return formatDecimalFixed(leftRat.Add(leftRat, rightRat), 8)
+}
+
+func defaultDecimalMoney(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "0.00000000"
+	}
+	return value
+}
+
+func formatDecimalFixed(value *big.Rat, scale int) string {
+	if value == nil {
+		value = new(big.Rat)
+	}
+	multiplier := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(scale)), nil)
+	scaled := new(big.Rat).Mul(value, new(big.Rat).SetInt(multiplier))
+	numerator := new(big.Int).Set(scaled.Num())
+	denominator := new(big.Int).Set(scaled.Denom())
+	quotient, remainder := new(big.Int).QuoRem(numerator, denominator, new(big.Int))
+	doubleRemainder := new(big.Int).Mul(remainder, big.NewInt(2))
+	if doubleRemainder.Cmp(denominator) >= 0 {
+		quotient.Add(quotient, big.NewInt(1))
+	}
+	raw := quotient.String()
+	if scale == 0 {
+		return raw
+	}
+	for len(raw) <= scale {
+		raw = "0" + raw
+	}
+	return raw[:len(raw)-scale] + "." + raw[len(raw)-scale:]
+}
+
+func gatewayScheduleRequest(r *http.Request, canonical gatewaycontract.CanonicalRequest, resolution modelcontract.ModelResolution) schedulercontract.ScheduleRequest {
+	req := schedulercontract.ScheduleRequest{
+		RequestID:           canonical.RequestID,
+		UserID:              canonical.UserID,
+		APIKeyID:            canonical.APIKeyID,
+		SourceProtocol:      string(canonical.SourceProtocol),
+		SourceEndpoint:      canonical.SourceEndpoint,
+		Model:               canonical.CanonicalModel,
+		Strategy:            schedulercontract.StrategyBalanced,
+		Warnings:            canonical.CompatibilityWarnings,
+		RequestCapabilities: gatewayservice.CapabilityDescriptors(canonical),
+	}
+	if resolution.Alias != nil {
+		req.ModelAlias = resolution.Alias.Alias
+		req.FallbackModels = append([]string(nil), resolution.Alias.FallbackModels...)
+		if strategy := schedulerStrategyHint(resolution.Alias.StrategyHint); strategy != "" {
+			req.Strategy = strategy
+		}
+	}
+	req.StickyAccountID, req.StickyStrength, req.SessionAffinityKey, req.SessionAffinitySource = gatewaySessionAffinity(r)
+	return req
+}
+
+func schedulerStrategyHint(value *string) schedulercontract.StrategyName {
+	if value == nil {
+		return ""
+	}
+	switch schedulercontract.StrategyName(strings.TrimSpace(*value)) {
+	case schedulercontract.StrategyBalanced:
+		return schedulercontract.StrategyBalanced
+	case schedulercontract.StrategyCostSaver:
+		return schedulercontract.StrategyCostSaver
+	default:
+		return ""
+	}
+}
+
+func gatewaySessionAffinity(r *http.Request) (*int, schedulercontract.StickyStrength, string, string) {
+	strength := schedulerStickyStrength(firstNonEmpty(
+		r.Header.Get("X-SRapi-Sticky-Strength"),
+		r.URL.Query().Get("sticky_strength"),
+	))
+	accountID, accountSource := gatewayStickyAccountID(r)
+	key, keySource := gatewaySessionAffinityKey(r)
+	if strength == "" && (accountID != nil || key != "") {
+		strength = schedulercontract.StickyStrengthSoft
+	}
+	if accountSource != "" {
+		return accountID, strength, key, accountSource
+	}
+	return accountID, strength, key, keySource
+}
+
+func gatewayStickyAccountID(r *http.Request) (*int, string) {
+	for _, candidate := range []struct {
+		value  string
+		source string
+	}{
+		{r.Header.Get("X-SRapi-Sticky-Account-ID"), "header:x-srapi-sticky-account-id"},
+		{r.URL.Query().Get("sticky_account_id"), "query:sticky_account_id"},
+	} {
+		value := strings.TrimSpace(candidate.value)
+		if value == "" {
+			continue
+		}
+		parsed, err := strconv.Atoi(value)
+		if err == nil && parsed > 0 {
+			return &parsed, candidate.source
+		}
+	}
+	return nil, ""
+}
+
+func gatewaySessionAffinityKey(r *http.Request) (string, string) {
+	for _, candidate := range []struct {
+		value  string
+		source string
+	}{
+		{r.Header.Get("X-SRapi-Session-Affinity-Key"), "header:x-srapi-session-affinity-key"},
+		{r.URL.Query().Get("session_affinity_key"), "query:session_affinity_key"},
+	} {
+		value := strings.TrimSpace(candidate.value)
+		if value != "" {
+			return value, candidate.source
+		}
+	}
+	return "", ""
+}
+
+func schedulerStickyStrength(value string) schedulercontract.StickyStrength {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case string(schedulercontract.StickyStrengthHard):
+		return schedulercontract.StickyStrengthHard
+	case string(schedulercontract.StickyStrengthSoft):
+		return schedulercontract.StickyStrengthSoft
+	default:
+		return ""
+	}
+}
+
+func stickyAccountIDFromCandidates(candidates []schedulercontract.Candidate, bindingKey string) *int {
+	bindingKey = strings.TrimSpace(bindingKey)
+	if bindingKey == "" {
+		return nil
+	}
+	for _, candidate := range candidates {
+		if accountMatchesAffinityKey(candidate.Account.Metadata, bindingKey) {
+			accountID := candidate.Account.ID
+			return &accountID
+		}
+	}
+	return nil
+}
+
+func accountMatchesAffinityKey(metadata map[string]any, bindingKey string) bool {
+	for _, key := range []string{"session_affinity_key", "sticky_binding_key", "sticky_session_key"} {
+		if strings.EqualFold(metadataString(metadata, key), bindingKey) {
+			return true
+		}
+	}
+	for _, key := range []string{"session_affinity_keys", "sticky_binding_keys", "sticky_session_keys"} {
+		if metadataStringListContains(metadata, key, bindingKey) {
+			return true
+		}
+	}
+	return false
+}
+
+func metadataString(metadata map[string]any, key string) string {
+	if metadata == nil {
+		return ""
+	}
+	value, ok := metadata[key]
+	if !ok || value == nil {
+		return ""
+	}
+	switch value := value.(type) {
+	case string:
+		return strings.TrimSpace(value)
+	case json.Number:
+		return value.String()
+	default:
+		return strings.TrimSpace(fmt.Sprint(value))
+	}
+}
+
+func metadataStringListContains(metadata map[string]any, key string, target string) bool {
+	if metadata == nil {
+		return false
+	}
+	target = strings.TrimSpace(target)
+	if target == "" {
+		return false
+	}
+	value, ok := metadata[key]
+	if !ok || value == nil {
+		return false
+	}
+	switch value := value.(type) {
+	case []string:
+		for _, item := range value {
+			if strings.EqualFold(strings.TrimSpace(item), target) {
+				return true
+			}
+		}
+	case []any:
+		for _, item := range value {
+			if strings.EqualFold(strings.TrimSpace(fmt.Sprint(item)), target) {
+				return true
+			}
+		}
+	case string:
+		for _, item := range strings.Split(value, ",") {
+			if strings.EqualFold(strings.TrimSpace(item), target) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (rt *runtimeState) gatewayCandidates(ctx context.Context, modelID int, forcedProviderKey string, apiKey apikeycontract.APIKey) ([]schedulercontract.Candidate, error) {
@@ -2157,17 +3432,36 @@ func (rt *runtimeState) gatewayCandidates(ctx context.Context, modelID int, forc
 			if !allowed {
 				continue
 			}
+			runtimeState := rt.accountSchedulerRuntimeState(ctx, account)
 			candidates = append(candidates, schedulercontract.Candidate{
 				Account:               account,
 				Provider:              provider,
 				Mapping:               mapping,
 				EffectiveCapabilities: effectiveCapabilities(model, mapping, provider, account),
-				RuntimeState:          schedulerRuntimeState(account.Metadata),
+				RuntimeState:          runtimeState,
 				Limits:                schedulerRuntimeLimits(account.Metadata),
 			})
 		}
 	}
 	return candidates, nil
+}
+
+func (rt *runtimeState) accountSchedulerRuntimeState(ctx context.Context, account accountcontract.ProviderAccount) schedulercontract.RuntimeState {
+	state := schedulerRuntimeState(account.Metadata)
+	if latest, err := rt.accounts.LatestHealthSnapshotByAccount(ctx, account.ID); err == nil {
+		healthScore := float64(latest.SuccessRate)
+		state.HealthScore = &healthScore
+		p95 := latest.LatencyP95MS
+		state.LatencyP95MS = &p95
+		state.CircuitOpen = state.CircuitOpen || strings.EqualFold(latest.CircuitState, "open")
+		state.CooldownActive = state.CooldownActive || (latest.CooldownUntil != nil && latest.CooldownUntil.After(time.Now().UTC()))
+	}
+	if quotas, err := rt.accounts.ListQuotaSnapshotsByAccount(ctx, account.ID, 1); err == nil && len(quotas) > 0 {
+		remainingRatio := float64(quotas[0].RemainingRatio)
+		state.QuotaRemainingRatio = &remainingRatio
+		state.QuotaExhausted = state.QuotaExhausted || quotas[0].RemainingRatio <= 0
+	}
+	return state
 }
 
 func (rt *runtimeState) apiKeyAllowsAccount(ctx context.Context, apiKey apikeycontract.APIKey, accountID int) (bool, error) {
@@ -2757,6 +4051,7 @@ func (rt *runtimeState) recordGatewayUsage(ctx context.Context, rec gatewayUsage
 	if rec.AttemptNo == 0 {
 		rec.AttemptNo = 1
 	}
+	pricing := rec.Pricing.withDefaults()
 	usageLog, usageErr := rt.usage.Record(ctx, usagecontract.RecordRequest{
 		RequestID:             rec.RequestID,
 		UserID:                rec.Authed.UserID,
@@ -2774,15 +4069,15 @@ func (rt *runtimeState) recordGatewayUsage(ctx context.Context, rec gatewayUsage
 		LatencyMS:             rec.LatencyMS,
 		Success:               rec.Success,
 		ErrorClass:            rec.ErrorClass,
-		Cost:                  "0.00000000",
-		Currency:              "USD",
+		Cost:                  pricing.Amount,
+		Currency:              pricing.Currency,
 		CompatibilityWarnings: rec.CompatibilityWarnings,
 	})
 	if usageErr != nil {
 		rt.logger.Warn("failed to record usage log", "error", usageErr, "request_id", rec.RequestID)
 		rt.enqueueGatewayUsageFailureEvent(ctx, rec, model)
 	} else {
-		rt.recordUsageBilling(ctx, usageLog)
+		rt.recordUsageBilling(ctx, usageLog, pricing)
 		rt.enqueueGatewayUsageEvent(ctx, usageLog)
 	}
 	if rec.DecisionID <= 0 || rec.AccountID == nil || rec.ProviderID == nil {
@@ -2802,8 +4097,8 @@ func (rt *runtimeState) recordGatewayUsage(ctx context.Context, rec gatewayUsage
 		InputTokens:  rec.InputTokens,
 		OutputTokens: rec.OutputTokens,
 		CachedTokens: rec.CachedTokens,
-		ActualCost:   "0.00000000",
-		Currency:     "USD",
+		ActualCost:   pricing.Amount,
+		Currency:     pricing.Currency,
 	})
 	if feedbackErr != nil {
 		rt.logger.Warn("failed to record scheduler feedback", "error", feedbackErr, "request_id", rec.RequestID)
@@ -2811,6 +4106,7 @@ func (rt *runtimeState) recordGatewayUsage(ctx context.Context, rec gatewayUsage
 	if !rec.Success && rec.ErrorClass != nil && *rec.ErrorClass == "rate_limit" {
 		rt.applyProviderRateLimitCooldown(ctx, *rec.AccountID)
 	}
+	rt.recordGatewayAccountSnapshots(ctx, rec)
 }
 
 func (rt *runtimeState) applyProviderRateLimitCooldown(ctx context.Context, accountID int) {
@@ -2843,9 +4139,77 @@ func (rt *runtimeState) applyProviderRateLimitCooldown(ctx context.Context, acco
 	})
 }
 
-func (rt *runtimeState) recordUsageBilling(ctx context.Context, log usagecontract.UsageLog) {
+func (rt *runtimeState) recordGatewayAccountSnapshots(ctx context.Context, rec gatewayUsageRecord) {
+	if rec.AccountID == nil || rec.ProviderID == nil {
+		return
+	}
+	account, err := rt.accounts.FindByID(ctx, *rec.AccountID)
+	if err != nil {
+		rt.logger.Warn("failed to load provider account for snapshot", "error", err, "account_id", *rec.AccountID)
+		return
+	}
+	usageLogs, err := rt.usage.List(ctx)
+	if err != nil {
+		rt.logger.Warn("failed to list usage logs for account snapshot", "error", err, "account_id", *rec.AccountID)
+		return
+	}
+	now := time.Now().UTC()
+	health := buildAccountHealthSnapshot(account, usageLogsForAccount(usageLogs, account.ID), now)
+	if _, err := rt.accounts.RecordHealthSnapshot(ctx, accountHealthSnapshotFromAPI(health)); err != nil {
+		rt.logger.Warn("failed to record account health snapshot", "error", err, "account_id", account.ID)
+	}
+	quota := buildAccountQuotaSnapshot(account, usageLogsForAccount(usageLogs, account.ID), now)
+	if _, err := rt.accounts.RecordQuotaSnapshot(ctx, accountQuotaSnapshotFromAPI(quota)); err != nil {
+		rt.logger.Warn("failed to record account quota snapshot", "error", err, "account_id", account.ID)
+	}
+}
+
+func (rt *runtimeState) recordAccountTestHealthSnapshot(ctx context.Context, account accountcontract.ProviderAccount, result apiopenapi.AdminTestResult) {
+	status := "healthy"
+	successRate := float32(1)
+	errorRate := float32(0)
+	if !result.Ok {
+		status = "degraded"
+		successRate = 0
+		errorRate = 1
+	}
+	latencyMS := 0
+	if result.LatencyMs != nil {
+		latencyMS = *result.LatencyMs
+	}
+	_, err := rt.accounts.RecordHealthSnapshot(ctx, accountcontract.AccountHealthSnapshot{
+		AccountID:     account.ID,
+		ProviderID:    account.ProviderID,
+		Status:        status,
+		SuccessRate:   successRate,
+		ErrorRate:     errorRate,
+		LatencyP50MS:  latencyMS,
+		LatencyP95MS:  latencyMS,
+		CircuitState:  accountCircuitState(account),
+		SnapshotAt:    result.CheckedAt,
+		CooldownUntil: metadataOptionalTime(account.Metadata, "cooldown_until"),
+	})
+	if err != nil {
+		rt.logger.Warn("failed to record account test health snapshot", "error", err, "account_id", account.ID)
+	}
+}
+
+func (rt *runtimeState) recordUsageBilling(ctx context.Context, log usagecontract.UsageLog, pricing gatewayPricingEvidence) {
 	if !log.Success {
 		return
+	}
+	pricing = pricing.withDefaults()
+	metadata := map[string]any{
+		"request_id":        log.RequestID,
+		"model":             log.Model,
+		"source_endpoint":   log.SourceEndpoint,
+		"total_tokens":      log.TotalTokens,
+		"usage_estimated":   log.UsageEstimated,
+		"pricing_source":    pricing.PricingSource,
+		"pricing_estimated": pricing.PricingEstimated,
+	}
+	if pricing.PricingRuleID != nil {
+		metadata["pricing_rule_id"] = *pricing.PricingRuleID
 	}
 	_, err := rt.billing.Record(ctx, billingcontract.RecordRequest{
 		UserID:        log.UserID,
@@ -2856,13 +4220,7 @@ func (rt *runtimeState) recordUsageBilling(ctx context.Context, log usagecontrac
 		BalanceAfter:  "0.00000000",
 		ReferenceType: "usage_log",
 		ReferenceID:   strconv.Itoa(log.ID),
-		Metadata: map[string]any{
-			"request_id":      log.RequestID,
-			"model":           log.Model,
-			"source_endpoint": log.SourceEndpoint,
-			"total_tokens":    log.TotalTokens,
-			"usage_estimated": log.UsageEstimated,
-		},
+		Metadata:      metadata,
 	})
 	if err != nil {
 		rt.logger.Warn("failed to record billing ledger", "error", err, "request_id", log.RequestID)
@@ -3016,6 +4374,17 @@ func accountAuditSnapshot(account accountcontract.ProviderAccount) map[string]an
 	}
 }
 
+func accountGroupAuditSnapshot(group accountcontract.AccountGroup) map[string]any {
+	return map[string]any{
+		"name":           group.Name,
+		"description":    group.Description,
+		"provider_scope": cloneAnyMap(group.ProviderScope),
+		"model_scope":    cloneAnyMap(group.ModelScope),
+		"strategy_hint":  group.StrategyHint,
+		"status":         group.Status,
+	}
+}
+
 func apiKeyAuditSnapshot(key apikeycontract.APIKey) map[string]any {
 	return map[string]any{
 		"name":           key.Name,
@@ -3024,6 +4393,47 @@ func apiKeyAuditSnapshot(key apikeycontract.APIKey) map[string]any {
 		"scopes":         append([]string(nil), key.Scopes...),
 		"allowed_models": append([]string(nil), key.AllowedModels...),
 		"group_ids":      append([]int(nil), key.GroupIDs...),
+	}
+}
+
+func subscriptionPlanAuditSnapshot(plan subscriptioncontract.SubscriptionPlan) map[string]any {
+	return map[string]any{
+		"name":          plan.Name,
+		"description":   plan.Description,
+		"price":         plan.Price,
+		"currency":      plan.Currency,
+		"validity_days": plan.ValidityDays,
+		"entitlements":  cloneAnyMap(plan.Entitlements),
+		"for_sale":      plan.ForSale,
+		"sort_order":    plan.SortOrder,
+		"status":        plan.Status,
+	}
+}
+
+func userSubscriptionAuditSnapshot(subscription subscriptioncontract.UserSubscription) map[string]any {
+	return map[string]any{
+		"user_id":               subscription.UserID,
+		"plan_id":               subscription.PlanID,
+		"status":                subscription.Status,
+		"starts_at":             subscription.StartsAt,
+		"expires_at":            subscription.ExpiresAt,
+		"entitlements_snapshot": cloneAnyMap(subscription.EntitlementsSnapshot),
+		"source_type":           subscription.SourceType,
+		"source_id":             subscription.SourceID,
+	}
+}
+
+func pricingRuleAuditSnapshot(rule subscriptioncontract.PricingRule) map[string]any {
+	return map[string]any{
+		"model_id":                             rule.ModelID,
+		"provider_id":                          rule.ProviderID,
+		"input_price_per_million_tokens":       rule.InputPricePerMillionTokens,
+		"output_price_per_million_tokens":      rule.OutputPricePerMillionTokens,
+		"cache_read_price_per_million_tokens":  rule.CacheReadPricePerMillionTokens,
+		"cache_write_price_per_million_tokens": rule.CacheWritePricePerMillionTokens,
+		"currency":                             rule.Currency,
+		"effective_from":                       rule.EffectiveFrom,
+		"effective_to":                         rule.EffectiveTo,
 	}
 }
 
@@ -3036,6 +4446,67 @@ func cloneMetadata(value map[string]any) map[string]any {
 		out[key] = item
 	}
 	return out
+}
+
+func sanitizedExportMetadata(value map[string]any) map[string]any {
+	if value == nil {
+		return nil
+	}
+	out := make(map[string]any, len(value))
+	for key, item := range value {
+		if sensitiveMetadataKey(key) {
+			continue
+		}
+		out[key] = sanitizeExportMetadataValue(item)
+	}
+	return out
+}
+
+func sanitizeExportMetadataValue(value any) any {
+	switch typed := value.(type) {
+	case map[string]any:
+		return sanitizedExportMetadata(typed)
+	case []map[string]any:
+		out := make([]map[string]any, len(typed))
+		for idx, item := range typed {
+			out[idx] = sanitizedExportMetadata(item)
+		}
+		return out
+	case []any:
+		out := make([]any, len(typed))
+		for idx, item := range typed {
+			out[idx] = sanitizeExportMetadataValue(item)
+		}
+		return out
+	default:
+		return typed
+	}
+}
+
+func sensitiveMetadataKey(key string) bool {
+	key = strings.ToLower(strings.TrimSpace(key))
+	key = strings.NewReplacer("-", "_", " ", "_").Replace(key)
+	if key == "key" || strings.HasSuffix(key, "_key") {
+		return true
+	}
+	sensitiveMarkers := []string{
+		"authorization",
+		"bearer",
+		"cookie",
+		"credential",
+		"password",
+		"passwd",
+		"private_key",
+		"secret",
+		"session_affinity_key",
+		"token",
+	}
+	for _, marker := range sensitiveMarkers {
+		if strings.Contains(key, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 func cloneMapSlice(values []map[string]any) []map[string]any {
@@ -3245,6 +4716,52 @@ func idsToInts(values *[]apiopenapi.Id) ([]int, error) {
 	return out, nil
 }
 
+func apiIDs(values []int) []apiopenapi.Id {
+	if values == nil {
+		return []apiopenapi.Id{}
+	}
+	out := make([]apiopenapi.Id, 0, len(values))
+	for _, value := range values {
+		out = append(out, apiopenapi.Id(strconv.Itoa(value)))
+	}
+	return out
+}
+
+func apiIDsPtr(values []int) *[]apiopenapi.Id {
+	if len(values) == 0 {
+		return nil
+	}
+	out := apiIDs(values)
+	return &out
+}
+
+func apiIDsToInts(values *[]apiopenapi.Id) ([]int, error) {
+	ids, err := idsToInts(values)
+	if err != nil {
+		return nil, err
+	}
+	for _, id := range ids {
+		if id <= 0 {
+			return nil, fmt.Errorf("invalid id %d", id)
+		}
+	}
+	return ids, nil
+}
+
+func accountGroupMemberPathIDs(w http.ResponseWriter, r *http.Request, requestID string) (int, int, bool) {
+	groupID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || groupID <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid account group id", requestID)
+		return 0, 0, false
+	}
+	accountID, err := strconv.Atoi(r.PathValue("account_id"))
+	if err != nil || accountID <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid account id", requestID)
+		return 0, 0, false
+	}
+	return groupID, accountID, true
+}
+
 func paginateApiKeys(keys []apikeycontract.APIKey, page, pageSize int) ([]apikeycontract.APIKey, int, bool) {
 	total := len(keys)
 	if page <= 0 {
@@ -3407,6 +4924,7 @@ func toAPIModelProviderMapping(mapping modelcontract.ModelProviderMapping) apiop
 func toAPIAccount(account accountcontract.ProviderAccount) apiopenapi.ProviderAccount {
 	return apiopenapi.ProviderAccount{
 		CreatedAt:      account.CreatedAt,
+		GroupIds:       []apiopenapi.Id{},
 		Id:             apiopenapi.Id(strconv.Itoa(account.ID)),
 		Metadata:       mapToJsonObjectPtr(account.Metadata),
 		Name:           account.Name,
@@ -3418,6 +4936,104 @@ func toAPIAccount(account accountcontract.ProviderAccount) apiopenapi.ProviderAc
 		UpstreamClient: account.UpstreamClient,
 		Weight:         account.Weight,
 	}
+}
+
+func (s *Server) apiAccount(ctx context.Context, account accountcontract.ProviderAccount) apiopenapi.ProviderAccount {
+	out := toAPIAccount(account)
+	groupIDs, err := s.runtime.accounts.ListGroupIDsByAccount(ctx, account.ID)
+	if err == nil {
+		out.GroupIds = apiIDs(groupIDs)
+	}
+	return out
+}
+
+func toAPIAccountGroup(group accountcontract.AccountGroup) apiopenapi.AccountGroup {
+	return apiopenapi.AccountGroup{
+		CreatedAt:     group.CreatedAt,
+		Description:   group.Description,
+		Id:            apiopenapi.Id(strconv.Itoa(group.ID)),
+		ModelScope:    jsonObject(group.ModelScope),
+		Name:          group.Name,
+		ProviderScope: jsonObject(group.ProviderScope),
+		Status:        apiopenapi.AccountGroupStatus(group.Status),
+		StrategyHint:  group.StrategyHint,
+	}
+}
+
+func toAPIAccountGroupMember(member accountcontract.AccountGroupMember) apiopenapi.AccountGroupMember {
+	return apiopenapi.AccountGroupMember{
+		AccountGroupId: apiopenapi.Id(strconv.Itoa(member.AccountGroupID)),
+		AccountId:      apiopenapi.Id(strconv.Itoa(member.AccountID)),
+		CreatedAt:      member.CreatedAt,
+		Id:             apiopenapi.Id(strconv.Itoa(member.ID)),
+	}
+}
+
+func toAPIAccountQuotaSnapshot(snapshot accountcontract.AccountQuotaSnapshot) apiopenapi.AccountQuotaSnapshot {
+	return apiopenapi.AccountQuotaSnapshot{
+		AccountId:      apiopenapi.Id(strconv.Itoa(snapshot.AccountID)),
+		ProviderId:     apiopenapi.Id(strconv.Itoa(snapshot.ProviderID)),
+		QuotaLimit:     snapshot.QuotaLimit,
+		QuotaType:      snapshot.QuotaType,
+		Remaining:      snapshot.Remaining,
+		RemainingRatio: snapshot.RemainingRatio,
+		ResetAt:        snapshot.ResetAt,
+		SnapshotAt:     snapshot.SnapshotAt,
+		Used:           snapshot.Used,
+	}
+}
+
+func accountHealthSnapshotFromAPI(snapshot apiopenapi.AccountHealthSnapshot) accountcontract.AccountHealthSnapshot {
+	accountID, _ := strconv.Atoi(string(snapshot.AccountId))
+	providerID, _ := strconv.Atoi(string(snapshot.ProviderId))
+	return accountcontract.AccountHealthSnapshot{
+		AccountID:      accountID,
+		ProviderID:     providerID,
+		Status:         snapshot.Status,
+		SuccessRate:    snapshot.SuccessRate,
+		ErrorRate:      snapshot.ErrorRate,
+		LatencyP50MS:   snapshot.LatencyP50Ms,
+		LatencyP95MS:   snapshot.LatencyP95Ms,
+		RateLimitCount: snapshot.RateLimitCount,
+		TimeoutCount:   snapshot.TimeoutCount,
+		CooldownUntil:  cloneTimePtr(snapshot.CooldownUntil),
+		CircuitState:   snapshot.CircuitState,
+		SnapshotAt:     snapshot.SnapshotAt,
+	}
+}
+
+func accountQuotaSnapshotFromAPI(snapshot apiopenapi.AccountQuotaSnapshot) accountcontract.AccountQuotaSnapshot {
+	accountID, _ := strconv.Atoi(string(snapshot.AccountId))
+	providerID, _ := strconv.Atoi(string(snapshot.ProviderId))
+	return accountcontract.AccountQuotaSnapshot{
+		AccountID:      accountID,
+		ProviderID:     providerID,
+		QuotaType:      snapshot.QuotaType,
+		Remaining:      snapshot.Remaining,
+		Used:           snapshot.Used,
+		QuotaLimit:     snapshot.QuotaLimit,
+		RemainingRatio: snapshot.RemainingRatio,
+		ResetAt:        cloneTimePtr(snapshot.ResetAt),
+		SnapshotAt:     snapshot.SnapshotAt,
+	}
+}
+
+func overlayAccountHealthSnapshot(target *apiopenapi.AccountHealthSnapshot, latest accountcontract.AccountHealthSnapshot) {
+	target.Status = latest.Status
+	target.SuccessRate = latest.SuccessRate
+	target.ErrorRate = latest.ErrorRate
+	target.LatencyP50Ms = latest.LatencyP50MS
+	target.LatencyP95Ms = latest.LatencyP95MS
+	target.RateLimitCount = latest.RateLimitCount
+	target.TimeoutCount = latest.TimeoutCount
+	target.CooldownUntil = cloneTimePtr(latest.CooldownUntil)
+	target.CircuitState = latest.CircuitState
+	target.SnapshotAt = latest.SnapshotAt
+}
+
+func overlayAccountQuotaOnHealth(target *apiopenapi.AccountHealthSnapshot, latest accountcontract.AccountQuotaSnapshot) {
+	target.QuotaRemainingRatio = latest.RemainingRatio
+	target.QuotaExhausted = latest.RemainingRatio <= 0
 }
 
 func toAPIUsageLog(log usagecontract.UsageLog) apiopenapi.UsageLog {
@@ -3476,6 +5092,56 @@ func toAPIBillingLedgerEntry(entry billingcontract.LedgerEntry) apiopenapi.Billi
 		ReferenceType: entry.ReferenceType,
 		Type:          apiopenapi.BillingLedgerEntryType(entry.Type),
 		UserId:        apiopenapi.Id(strconv.Itoa(entry.UserID)),
+	}
+}
+
+func toAPISubscriptionPlan(plan subscriptioncontract.SubscriptionPlan) apiopenapi.SubscriptionPlan {
+	return apiopenapi.SubscriptionPlan{
+		CreatedAt:    plan.CreatedAt,
+		Currency:     plan.Currency,
+		Description:  optionalString(plan.Description),
+		Entitlements: jsonObject(plan.Entitlements),
+		ForSale:      plan.ForSale,
+		Id:           apiopenapi.Id(strconv.Itoa(plan.ID)),
+		Name:         plan.Name,
+		Price:        plan.Price,
+		SortOrder:    plan.SortOrder,
+		Status:       apiopenapi.SubscriptionPlanStatus(plan.Status),
+		UpdatedAt:    plan.UpdatedAt,
+		ValidityDays: plan.ValidityDays,
+	}
+}
+
+func toAPIUserSubscription(subscription subscriptioncontract.UserSubscription) apiopenapi.UserSubscription {
+	return apiopenapi.UserSubscription{
+		CreatedAt:            subscription.CreatedAt,
+		EntitlementsSnapshot: jsonObject(subscription.EntitlementsSnapshot),
+		ExpiresAt:            subscription.ExpiresAt,
+		Id:                   apiopenapi.Id(strconv.Itoa(subscription.ID)),
+		PlanId:               apiopenapi.Id(strconv.Itoa(subscription.PlanID)),
+		SourceId:             subscription.SourceID,
+		SourceType:           subscription.SourceType,
+		StartsAt:             subscription.StartsAt,
+		Status:               apiopenapi.UserSubscriptionStatus(subscription.Status),
+		UpdatedAt:            subscription.UpdatedAt,
+		UserId:               apiopenapi.Id(strconv.Itoa(subscription.UserID)),
+	}
+}
+
+func toAPIPricingRule(rule subscriptioncontract.PricingRule) apiopenapi.PricingRule {
+	return apiopenapi.PricingRule{
+		CacheReadPricePerMillionTokens:  rule.CacheReadPricePerMillionTokens,
+		CacheWritePricePerMillionTokens: rule.CacheWritePricePerMillionTokens,
+		CreatedAt:                       rule.CreatedAt,
+		Currency:                        rule.Currency,
+		EffectiveFrom:                   cloneTimePtr(rule.EffectiveFrom),
+		EffectiveTo:                     cloneTimePtr(rule.EffectiveTo),
+		Id:                              apiopenapi.Id(strconv.Itoa(rule.ID)),
+		InputPricePerMillionTokens:      rule.InputPricePerMillionTokens,
+		ModelId:                         apiopenapi.Id(strconv.Itoa(rule.ModelID)),
+		OutputPricePerMillionTokens:     rule.OutputPricePerMillionTokens,
+		ProviderId:                      apiopenapi.Id(strconv.Itoa(rule.ProviderID)),
+		UpdatedAt:                       rule.UpdatedAt,
 	}
 }
 
@@ -3707,11 +5373,35 @@ func toAccountStatusPtr(value *apiopenapi.ProviderAccountStatus) *accountcontrac
 	return &status
 }
 
+func toAccountGroupStatusPtr(value *apiopenapi.AccountGroupStatus) *accountcontract.GroupStatus {
+	if value == nil {
+		return nil
+	}
+	status := accountcontract.GroupStatus(*value)
+	return &status
+}
+
 func toAPIKeyStatusPtr(value *apiopenapi.ApiKeyStatus) *apikeycontract.Status {
 	if value == nil {
 		return nil
 	}
 	status := apikeycontract.Status(*value)
+	return &status
+}
+
+func toSubscriptionPlanStatusPtr(value *apiopenapi.SubscriptionPlanStatus) *subscriptioncontract.PlanStatus {
+	if value == nil {
+		return nil
+	}
+	status := subscriptioncontract.PlanStatus(*value)
+	return &status
+}
+
+func toUserSubscriptionStatusPtr(value *apiopenapi.UserSubscriptionStatus) *subscriptioncontract.SubscriptionStatus {
+	if value == nil {
+		return nil
+	}
+	status := subscriptioncontract.SubscriptionStatus(*value)
 	return &status
 }
 
@@ -3743,6 +5433,14 @@ func ptrString(value string) *string { return &value }
 
 func ptrInt(value int) *int { return &value }
 
+func cloneIntPtr(value *int) *int {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
+}
+
 func ptrFloat32(value float32) *float32 { return &value }
 
 func ptrProviderStatus(value providercontract.Status) *providercontract.Status { return &value }
@@ -3750,6 +5448,14 @@ func ptrProviderStatus(value providercontract.Status) *providercontract.Status {
 func ptrModelStatus(value modelcontract.Status) *modelcontract.Status { return &value }
 
 func ptrAccountStatus(value accountcontract.Status) *accountcontract.Status { return &value }
+
+func cloneTimePtr(value *time.Time) *time.Time {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
+}
 
 func pagination(total int) apiopenapi.Pagination {
 	return apiopenapi.Pagination{Page: 1, PageSize: total, Total: total, HasNext: false}
@@ -3919,18 +5625,26 @@ func buildSchedulerOverview(decisions []schedulercontract.Decision, usageLogs []
 
 func buildAccountHealthSnapshot(account accountcontract.ProviderAccount, logs []usagecontract.UsageLog, now time.Time) apiopenapi.AccountHealthSnapshot {
 	status := accountHealthStatus(account, logs)
+	successRate := usageSuccessRate(logs)
+	quotaRemainingRatio := accountQuotaRemainingRatio(account)
 	return apiopenapi.AccountHealthSnapshot{
-		AccountId:      apiopenapi.Id(strconv.Itoa(account.ID)),
-		CircuitState:   accountCircuitState(account),
-		ErrorRate:      1 - usageSuccessRate(logs),
-		LatencyP50Ms:   latencyPercentile(logs, 50),
-		LatencyP95Ms:   latencyPercentile(logs, 95),
-		ProviderId:     apiopenapi.Id(strconv.Itoa(account.ProviderID)),
-		RateLimitCount: errorClassCount(logs, "rate_limit"),
-		SnapshotAt:     now,
-		Status:         status,
-		SuccessRate:    usageSuccessRate(logs),
-		TimeoutCount:   errorClassCount(logs, "timeout"),
+		AccountId:           apiopenapi.Id(strconv.Itoa(account.ID)),
+		CircuitState:        accountCircuitState(account),
+		CooldownReason:      nullableMetadataString(account.Metadata, "cooldown_reason"),
+		CooldownUntil:       metadataOptionalTime(account.Metadata, "cooldown_until"),
+		ErrorClass:          accountHealthErrorClass(account, logs),
+		ErrorRate:           1 - successRate,
+		LatencyP50Ms:        latencyPercentile(logs, 50),
+		LatencyP95Ms:        latencyPercentile(logs, 95),
+		ProviderId:          apiopenapi.Id(strconv.Itoa(account.ProviderID)),
+		QuotaExhausted:      accountQuotaExhausted(account, quotaRemainingRatio),
+		QuotaRemainingRatio: quotaRemainingRatio,
+		RateLimitCount:      errorClassCount(logs, "rate_limit"),
+		RuntimeClass:        apiopenapi.RuntimeClass(account.RuntimeClass),
+		SnapshotAt:          now,
+		Status:              status,
+		SuccessRate:         successRate,
+		TimeoutCount:        errorClassCount(logs, "timeout"),
 	}
 }
 
@@ -4014,6 +5728,58 @@ func errorClassCount(logs []usagecontract.UsageLog, errorClass string) int {
 	return count
 }
 
+func accountHealthErrorClass(account accountcontract.ProviderAccount, logs []usagecontract.UsageLog) *string {
+	if value := nullableMetadataString(account.Metadata, "last_error_class"); value != nil {
+		return value
+	}
+	for i := len(logs) - 1; i >= 0; i-- {
+		if logs[i].ErrorClass != nil && strings.TrimSpace(*logs[i].ErrorClass) != "" {
+			return ptrStringValue(strings.TrimSpace(*logs[i].ErrorClass))
+		}
+	}
+	return nil
+}
+
+func accountQuotaRemainingRatio(account accountcontract.ProviderAccount) float32 {
+	if value := metadataOptionalFloat(account.Metadata, "remaining_ratio", "quota_remaining_ratio"); value != nil {
+		if *value < 0 {
+			return 0
+		}
+		if *value > 1 {
+			return 1
+		}
+		return float32(*value)
+	}
+	if metadataBool(account.Metadata, "quota_exhausted") {
+		return 0
+	}
+	return 1
+}
+
+func accountQuotaExhausted(account accountcontract.ProviderAccount, remainingRatio float32) bool {
+	return metadataBool(account.Metadata, "quota_exhausted") || remainingRatio <= 0
+}
+
+func nullableMetadataString(metadata map[string]any, key string) *string {
+	value := metadataString(metadata, key)
+	if value == "" {
+		return nil
+	}
+	return ptrStringValue(value)
+}
+
+func metadataOptionalTime(metadata map[string]any, key string) *time.Time {
+	value := metadataString(metadata, key)
+	if value == "" {
+		return nil
+	}
+	parsed, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return nil
+	}
+	return &parsed
+}
+
 func accountHealthStatus(account accountcontract.ProviderAccount, logs []usagecontract.UsageLog) string {
 	if account.Status != accountcontract.StatusActive {
 		return string(account.Status)
@@ -4057,6 +5823,25 @@ func apiKeyAllowsModel(allowed []string, model string) bool {
 		}
 	}
 	return false
+}
+
+func apiKeyAllowsModelReference(allowed []string, resolution modelcontract.ModelResolution) bool {
+	if apiKeyAllowsModel(allowed, resolution.Model.CanonicalName) {
+		return true
+	}
+	if resolution.Alias != nil && apiKeyAllowsModel(allowed, resolution.Alias.Alias) {
+		return true
+	}
+	return false
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
 }
 
 func writeSSEJSON(w http.ResponseWriter, payload any) {

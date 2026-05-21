@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CreateAdminAccountData, CreateAdminAccountErrors, CreateAdminAccountResponses, CreateAdminModelAliasData, CreateAdminModelAliasErrors, CreateAdminModelAliasResponses, CreateAdminModelData, CreateAdminModelErrors, CreateAdminModelMappingData, CreateAdminModelMappingErrors, CreateAdminModelMappingResponses, CreateAdminModelResponses, CreateAdminProviderData, CreateAdminProviderErrors, CreateAdminProviderResponses, CreateAnthropicCompatibleMessageAliasData, CreateAnthropicCompatibleMessageAliasErrors, CreateAnthropicCompatibleMessageAliasResponses, CreateApiKeyData, CreateApiKeyErrors, CreateApiKeyResponses, CreateChatCompletionData, CreateChatCompletionErrors, CreateChatCompletionResponses, CreateMessageData, CreateMessageErrors, CreateMessageResponses, CreateOpenAiCompatibleChatCompletionAliasData, CreateOpenAiCompatibleChatCompletionAliasErrors, CreateOpenAiCompatibleChatCompletionAliasResponses, CreateOpenAiCompatibleMessageAliasData, CreateOpenAiCompatibleMessageAliasErrors, CreateOpenAiCompatibleMessageAliasResponses, CreateOpenAiCompatibleResponseAliasData, CreateOpenAiCompatibleResponseAliasErrors, CreateOpenAiCompatibleResponseAliasResponses, CreateResponseData, CreateResponseErrors, CreateResponseResponses, DisableAdminAccountData, DisableAdminAccountErrors, DisableAdminAccountResponses, EnableAdminAccountData, EnableAdminAccountErrors, EnableAdminAccountResponses, GetAdminAccountHealthData, GetAdminAccountHealthErrors, GetAdminAccountHealthResponses, GetAdminAccountQuotaData, GetAdminAccountQuotaErrors, GetAdminAccountQuotaResponses, GetAdminOverviewData, GetAdminOverviewErrors, GetAdminOverviewResponses, GetAdminSchedulerOverviewData, GetAdminSchedulerOverviewErrors, GetAdminSchedulerOverviewResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetCurrentUserUsageData, GetCurrentUserUsageErrors, GetCurrentUserUsageResponses, GetHealthData, GetHealthErrors, GetHealthResponses, ListAdminAccountsData, ListAdminAccountsErrors, ListAdminAccountsResponses, ListAdminAuditLogsData, ListAdminAuditLogsErrors, ListAdminAuditLogsResponses, ListAdminBillingLedgerData, ListAdminBillingLedgerErrors, ListAdminBillingLedgerResponses, ListAdminCapabilitiesData, ListAdminCapabilitiesErrors, ListAdminCapabilitiesResponses, ListAdminModelsData, ListAdminModelsErrors, ListAdminModelsResponses, ListAdminOutboxEventsData, ListAdminOutboxEventsErrors, ListAdminOutboxEventsResponses, ListAdminProvidersData, ListAdminProvidersErrors, ListAdminProvidersResponses, ListAdminSchedulerDecisionsData, ListAdminSchedulerDecisionsErrors, ListAdminSchedulerDecisionsResponses, ListAdminUsageLogsData, ListAdminUsageLogsErrors, ListAdminUsageLogsResponses, ListApiKeysData, ListApiKeysErrors, ListApiKeysResponses, ListModelsData, ListModelsErrors, ListModelsResponses, ListSchedulerStrategiesData, ListSchedulerStrategiesErrors, ListSchedulerStrategiesResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, TestAdminAccountData, TestAdminAccountErrors, TestAdminAccountResponses, TestAdminProviderData, TestAdminProviderErrors, TestAdminProviderResponses, UpdateAdminAccountData, UpdateAdminAccountErrors, UpdateAdminAccountResponses, UpdateAdminModelData, UpdateAdminModelErrors, UpdateAdminModelResponses, UpdateAdminProviderData, UpdateAdminProviderErrors, UpdateAdminProviderResponses, UpdateApiKeyData, UpdateApiKeyErrors, UpdateApiKeyResponses } from './types.gen';
+import type { AddAdminAccountGroupMemberData, AddAdminAccountGroupMemberErrors, AddAdminAccountGroupMemberResponses, BindAdminAccountProxyData, BindAdminAccountProxyErrors, BindAdminAccountProxyResponses, CreateAdminAccountData, CreateAdminAccountErrors, CreateAdminAccountGroupData, CreateAdminAccountGroupErrors, CreateAdminAccountGroupResponses, CreateAdminAccountResponses, CreateAdminModelAliasData, CreateAdminModelAliasErrors, CreateAdminModelAliasResponses, CreateAdminModelData, CreateAdminModelErrors, CreateAdminModelMappingData, CreateAdminModelMappingErrors, CreateAdminModelMappingResponses, CreateAdminModelResponses, CreateAdminPricingRuleData, CreateAdminPricingRuleErrors, CreateAdminPricingRuleResponses, CreateAdminProviderData, CreateAdminProviderErrors, CreateAdminProviderResponses, CreateAdminSubscriptionPlanData, CreateAdminSubscriptionPlanErrors, CreateAdminSubscriptionPlanResponses, CreateAdminUserSubscriptionData, CreateAdminUserSubscriptionErrors, CreateAdminUserSubscriptionResponses, CreateAnthropicCompatibleMessageAliasData, CreateAnthropicCompatibleMessageAliasErrors, CreateAnthropicCompatibleMessageAliasResponses, CreateApiKeyData, CreateApiKeyErrors, CreateApiKeyResponses, CreateChatCompletionData, CreateChatCompletionErrors, CreateChatCompletionResponses, CreateMessageData, CreateMessageErrors, CreateMessageResponses, CreateOpenAiCompatibleChatCompletionAliasData, CreateOpenAiCompatibleChatCompletionAliasErrors, CreateOpenAiCompatibleChatCompletionAliasResponses, CreateOpenAiCompatibleMessageAliasData, CreateOpenAiCompatibleMessageAliasErrors, CreateOpenAiCompatibleMessageAliasResponses, CreateOpenAiCompatibleResponseAliasData, CreateOpenAiCompatibleResponseAliasErrors, CreateOpenAiCompatibleResponseAliasResponses, CreateResponseData, CreateResponseErrors, CreateResponseResponses, DisableAdminAccountData, DisableAdminAccountErrors, DisableAdminAccountResponses, EnableAdminAccountData, EnableAdminAccountErrors, EnableAdminAccountResponses, ExportAdminAccountsData, ExportAdminAccountsErrors, ExportAdminAccountsResponses, GetAdminAccountData, GetAdminAccountErrors, GetAdminAccountHealthData, GetAdminAccountHealthErrors, GetAdminAccountHealthResponses, GetAdminAccountQuotaData, GetAdminAccountQuotaErrors, GetAdminAccountQuotaResponses, GetAdminAccountResponses, GetAdminOverviewData, GetAdminOverviewErrors, GetAdminOverviewResponses, GetAdminSchedulerOverviewData, GetAdminSchedulerOverviewErrors, GetAdminSchedulerOverviewResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetCurrentUserSubscriptionsData, GetCurrentUserSubscriptionsErrors, GetCurrentUserSubscriptionsResponses, GetCurrentUserUsageData, GetCurrentUserUsageErrors, GetCurrentUserUsageResponses, GetHealthData, GetHealthErrors, GetHealthResponses, ImportAdminAccountsData, ImportAdminAccountsErrors, ImportAdminAccountsResponses, ListAdminAccountGroupsData, ListAdminAccountGroupsErrors, ListAdminAccountGroupsResponses, ListAdminAccountsData, ListAdminAccountsErrors, ListAdminAccountsResponses, ListAdminAuditLogsData, ListAdminAuditLogsErrors, ListAdminAuditLogsResponses, ListAdminBillingLedgerData, ListAdminBillingLedgerErrors, ListAdminBillingLedgerResponses, ListAdminCapabilitiesData, ListAdminCapabilitiesErrors, ListAdminCapabilitiesResponses, ListAdminModelsData, ListAdminModelsErrors, ListAdminModelsResponses, ListAdminOutboxEventsData, ListAdminOutboxEventsErrors, ListAdminOutboxEventsResponses, ListAdminPricingRulesData, ListAdminPricingRulesErrors, ListAdminPricingRulesResponses, ListAdminProvidersData, ListAdminProvidersErrors, ListAdminProvidersResponses, ListAdminSchedulerDecisionsData, ListAdminSchedulerDecisionsErrors, ListAdminSchedulerDecisionsResponses, ListAdminSubscriptionPlansData, ListAdminSubscriptionPlansErrors, ListAdminSubscriptionPlansResponses, ListAdminUsageLogsData, ListAdminUsageLogsErrors, ListAdminUsageLogsResponses, ListAdminUserSubscriptionsData, ListAdminUserSubscriptionsErrors, ListAdminUserSubscriptionsResponses, ListApiKeysData, ListApiKeysErrors, ListApiKeysResponses, ListModelsData, ListModelsErrors, ListModelsResponses, ListSchedulerStrategiesData, ListSchedulerStrategiesErrors, ListSchedulerStrategiesResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, RecoverAdminAccountData, RecoverAdminAccountErrors, RecoverAdminAccountResponses, RemoveAdminAccountGroupMemberData, RemoveAdminAccountGroupMemberErrors, RemoveAdminAccountGroupMemberResponses, TestAdminAccountData, TestAdminAccountErrors, TestAdminAccountResponses, TestAdminProviderData, TestAdminProviderErrors, TestAdminProviderResponses, UpdateAdminAccountData, UpdateAdminAccountErrors, UpdateAdminAccountGroupData, UpdateAdminAccountGroupErrors, UpdateAdminAccountGroupResponses, UpdateAdminAccountResponses, UpdateAdminModelData, UpdateAdminModelErrors, UpdateAdminModelResponses, UpdateAdminProviderData, UpdateAdminProviderErrors, UpdateAdminProviderResponses, UpdateApiKeyData, UpdateApiKeyErrors, UpdateApiKeyResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -71,6 +71,19 @@ export const getCurrentUserUsage = <ThrowOnError extends boolean = false>(option
             type: 'apiKey'
         }],
     url: '/api/v1/me/usage',
+    ...options
+});
+
+/**
+ * List subscriptions for the current console user.
+ */
+export const getCurrentUserSubscriptions = <ThrowOnError extends boolean = false>(options?: Options<GetCurrentUserSubscriptionsData, ThrowOnError>) => (options?.client ?? client).get<GetCurrentUserSubscriptionsResponses, GetCurrentUserSubscriptionsErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'srapi_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/me/subscriptions',
     ...options
 });
 
@@ -306,6 +319,49 @@ export const createAdminAccount = <ThrowOnError extends boolean = false>(options
 });
 
 /**
+ * Export provider account metadata without credentials.
+ */
+export const exportAdminAccounts = <ThrowOnError extends boolean = false>(options?: Options<ExportAdminAccountsData, ThrowOnError>) => (options?.client ?? client).get<ExportAdminAccountsResponses, ExportAdminAccountsErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'srapi_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/admin/accounts/export',
+    ...options
+});
+
+/**
+ * Import provider account metadata and write-only credentials.
+ */
+export const importAdminAccounts = <ThrowOnError extends boolean = false>(options: Options<ImportAdminAccountsData, ThrowOnError>) => (options.client ?? client).post<ImportAdminAccountsResponses, ImportAdminAccountsErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'srapi_session',
+            type: 'apiKey'
+        }, { name: 'X-CSRF-Token', type: 'apiKey' }],
+    url: '/api/v1/admin/accounts/import',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Get a provider account.
+ */
+export const getAdminAccount = <ThrowOnError extends boolean = false>(options: Options<GetAdminAccountData, ThrowOnError>) => (options.client ?? client).get<GetAdminAccountResponses, GetAdminAccountErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'srapi_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/admin/accounts/{id}',
+    ...options
+});
+
+/**
  * Update a provider account.
  */
 export const updateAdminAccount = <ThrowOnError extends boolean = false>(options: Options<UpdateAdminAccountData, ThrowOnError>) => (options.client ?? client).patch<UpdateAdminAccountResponses, UpdateAdminAccountErrors, ThrowOnError>({
@@ -323,6 +379,23 @@ export const updateAdminAccount = <ThrowOnError extends boolean = false>(options
 });
 
 /**
+ * Bind or clear a provider account proxy.
+ */
+export const bindAdminAccountProxy = <ThrowOnError extends boolean = false>(options: Options<BindAdminAccountProxyData, ThrowOnError>) => (options.client ?? client).patch<BindAdminAccountProxyResponses, BindAdminAccountProxyErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'srapi_session',
+            type: 'apiKey'
+        }, { name: 'X-CSRF-Token', type: 'apiKey' }],
+    url: '/api/v1/admin/accounts/{id}/proxy',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
  * Test provider account configuration.
  */
 export const testAdminAccount = <ThrowOnError extends boolean = false>(options: Options<TestAdminAccountData, ThrowOnError>) => (options.client ?? client).post<TestAdminAccountResponses, TestAdminAccountErrors, ThrowOnError>({
@@ -332,6 +405,19 @@ export const testAdminAccount = <ThrowOnError extends boolean = false>(options: 
             type: 'apiKey'
         }, { name: 'X-CSRF-Token', type: 'apiKey' }],
     url: '/api/v1/admin/accounts/{id}/test',
+    ...options
+});
+
+/**
+ * Recover a protected provider account after operator remediation.
+ */
+export const recoverAdminAccount = <ThrowOnError extends boolean = false>(options: Options<RecoverAdminAccountData, ThrowOnError>) => (options.client ?? client).post<RecoverAdminAccountResponses, RecoverAdminAccountErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'srapi_session',
+            type: 'apiKey'
+        }, { name: 'X-CSRF-Token', type: 'apiKey' }],
+    url: '/api/v1/admin/accounts/{id}/recover',
     ...options
 });
 
@@ -388,6 +474,79 @@ export const getAdminAccountQuota = <ThrowOnError extends boolean = false>(optio
 });
 
 /**
+ * List provider account groups.
+ */
+export const listAdminAccountGroups = <ThrowOnError extends boolean = false>(options?: Options<ListAdminAccountGroupsData, ThrowOnError>) => (options?.client ?? client).get<ListAdminAccountGroupsResponses, ListAdminAccountGroupsErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'srapi_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/admin/account-groups',
+    ...options
+});
+
+/**
+ * Create a provider account group.
+ */
+export const createAdminAccountGroup = <ThrowOnError extends boolean = false>(options: Options<CreateAdminAccountGroupData, ThrowOnError>) => (options.client ?? client).post<CreateAdminAccountGroupResponses, CreateAdminAccountGroupErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'srapi_session',
+            type: 'apiKey'
+        }, { name: 'X-CSRF-Token', type: 'apiKey' }],
+    url: '/api/v1/admin/account-groups',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Update a provider account group.
+ */
+export const updateAdminAccountGroup = <ThrowOnError extends boolean = false>(options: Options<UpdateAdminAccountGroupData, ThrowOnError>) => (options.client ?? client).patch<UpdateAdminAccountGroupResponses, UpdateAdminAccountGroupErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'srapi_session',
+            type: 'apiKey'
+        }, { name: 'X-CSRF-Token', type: 'apiKey' }],
+    url: '/api/v1/admin/account-groups/{id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Remove a provider account from an account group.
+ */
+export const removeAdminAccountGroupMember = <ThrowOnError extends boolean = false>(options: Options<RemoveAdminAccountGroupMemberData, ThrowOnError>) => (options.client ?? client).delete<RemoveAdminAccountGroupMemberResponses, RemoveAdminAccountGroupMemberErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'srapi_session',
+            type: 'apiKey'
+        }, { name: 'X-CSRF-Token', type: 'apiKey' }],
+    url: '/api/v1/admin/account-groups/{id}/accounts/{account_id}',
+    ...options
+});
+
+/**
+ * Add a provider account to an account group.
+ */
+export const addAdminAccountGroupMember = <ThrowOnError extends boolean = false>(options: Options<AddAdminAccountGroupMemberData, ThrowOnError>) => (options.client ?? client).post<AddAdminAccountGroupMemberResponses, AddAdminAccountGroupMemberErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'srapi_session',
+            type: 'apiKey'
+        }, { name: 'X-CSRF-Token', type: 'apiKey' }],
+    url: '/api/v1/admin/account-groups/{id}/accounts/{account_id}',
+    ...options
+});
+
+/**
  * List usage logs.
  */
 export const listAdminUsageLogs = <ThrowOnError extends boolean = false>(options?: Options<ListAdminUsageLogsData, ThrowOnError>) => (options?.client ?? client).get<ListAdminUsageLogsResponses, ListAdminUsageLogsErrors, ThrowOnError>({
@@ -424,6 +583,96 @@ export const listAdminBillingLedger = <ThrowOnError extends boolean = false>(opt
         }],
     url: '/api/v1/admin/billing-ledger',
     ...options
+});
+
+/**
+ * List subscription plans.
+ */
+export const listAdminSubscriptionPlans = <ThrowOnError extends boolean = false>(options?: Options<ListAdminSubscriptionPlansData, ThrowOnError>) => (options?.client ?? client).get<ListAdminSubscriptionPlansResponses, ListAdminSubscriptionPlansErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'srapi_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/admin/subscription-plans',
+    ...options
+});
+
+/**
+ * Create a subscription plan.
+ */
+export const createAdminSubscriptionPlan = <ThrowOnError extends boolean = false>(options: Options<CreateAdminSubscriptionPlanData, ThrowOnError>) => (options.client ?? client).post<CreateAdminSubscriptionPlanResponses, CreateAdminSubscriptionPlanErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'srapi_session',
+            type: 'apiKey'
+        }, { name: 'X-CSRF-Token', type: 'apiKey' }],
+    url: '/api/v1/admin/subscription-plans',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * List user subscriptions.
+ */
+export const listAdminUserSubscriptions = <ThrowOnError extends boolean = false>(options?: Options<ListAdminUserSubscriptionsData, ThrowOnError>) => (options?.client ?? client).get<ListAdminUserSubscriptionsResponses, ListAdminUserSubscriptionsErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'srapi_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/admin/user-subscriptions',
+    ...options
+});
+
+/**
+ * Create a user subscription from an existing plan.
+ */
+export const createAdminUserSubscription = <ThrowOnError extends boolean = false>(options: Options<CreateAdminUserSubscriptionData, ThrowOnError>) => (options.client ?? client).post<CreateAdminUserSubscriptionResponses, CreateAdminUserSubscriptionErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'srapi_session',
+            type: 'apiKey'
+        }, { name: 'X-CSRF-Token', type: 'apiKey' }],
+    url: '/api/v1/admin/user-subscriptions',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * List pricing rules.
+ */
+export const listAdminPricingRules = <ThrowOnError extends boolean = false>(options?: Options<ListAdminPricingRulesData, ThrowOnError>) => (options?.client ?? client).get<ListAdminPricingRulesResponses, ListAdminPricingRulesErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'srapi_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/admin/pricing-rules',
+    ...options
+});
+
+/**
+ * Create a decimal-safe pricing rule.
+ */
+export const createAdminPricingRule = <ThrowOnError extends boolean = false>(options: Options<CreateAdminPricingRuleData, ThrowOnError>) => (options.client ?? client).post<CreateAdminPricingRuleResponses, CreateAdminPricingRuleErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'srapi_session',
+            type: 'apiKey'
+        }, { name: 'X-CSRF-Token', type: 'apiKey' }],
+    url: '/api/v1/admin/pricing-rules',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 /**

@@ -173,6 +173,64 @@ func TestSoftStickyDoesNotBypassHardFilters(t *testing.T) {
 	}
 }
 
+func TestHardStickyOnlyAllowsBoundAccount(t *testing.T) {
+	svc := newService(t)
+	req := baseRequest()
+	stickyAccountID := 2
+	req.StickyAccountID = &stickyAccountID
+	req.StickyStrength = contract.StickyStrengthHard
+	req.Candidates = []contract.Candidate{
+		candidate(1, withHealth(0.99), withQuotaRemaining(1), withCapabilities(capabilitiescontract.KeyStreaming)),
+		candidate(2, withHealth(0.20), withQuotaRemaining(0.30), withCapabilities(capabilitiescontract.KeyStreaming)),
+	}
+
+	result, err := svc.Schedule(context.Background(), req)
+	if err != nil {
+		t.Fatalf("schedule: %v", err)
+	}
+	if result.Candidate.Account.ID != 2 {
+		t.Fatalf("expected hard sticky account 2 selected, got %d", result.Candidate.Account.ID)
+	}
+	if !result.Decision.StickyHit {
+		t.Fatalf("expected hard sticky hit, got %+v", result.Decision)
+	}
+	assertRejectReason(t, result.Decision.RejectReasons, 1, "hard_sticky_mismatch")
+}
+
+func TestRoutingHintsAreRecordedWithoutLeakingAffinityKey(t *testing.T) {
+	svc := newService(t)
+	req := baseRequest()
+	stickyAccountID := 1
+	req.ModelAlias = "claude-sonnet"
+	req.FallbackModels = []string{"claude-haiku"}
+	req.SessionAffinityKey = "conversation-secret"
+	req.SessionAffinitySource = "header:x-srapi-session-affinity-key"
+	req.StickyAccountID = &stickyAccountID
+	req.StickyStrength = contract.StickyStrengthSoft
+	req.Candidates = []contract.Candidate{
+		candidate(1, withCapabilities(capabilitiescontract.KeyStreaming)),
+	}
+
+	result, err := svc.Schedule(context.Background(), req)
+	if err != nil {
+		t.Fatalf("schedule: %v", err)
+	}
+	hints, ok := result.Decision.Scores["routing_hints"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected routing hints in decision scores, got %+v", result.Decision.Scores)
+	}
+	if hints["model_alias"] != "claude-sonnet" || hints["sticky_strength"] != "soft" || hints["sticky_account_id"].(float64) != 1 {
+		t.Fatalf("unexpected routing hints: %+v", hints)
+	}
+	if hints["session_affinity_key_hash"] == "conversation-secret" || !strings.HasPrefix(hints["session_affinity_key_hash"].(string), "sha256:") {
+		t.Fatalf("expected hashed affinity key, got %+v", hints)
+	}
+	fallbacks, ok := hints["fallback_models"].([]any)
+	if !ok || len(fallbacks) != 1 || fallbacks[0] != "claude-haiku" {
+		t.Fatalf("expected fallback model hint, got %+v", hints["fallback_models"])
+	}
+}
+
 func TestCostSaverPrefersLowerRelativeCost(t *testing.T) {
 	svc := newService(t)
 	req := baseRequest()

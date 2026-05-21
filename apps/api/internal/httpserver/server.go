@@ -23,6 +23,7 @@ import (
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	providerpreset "github.com/srapi/srapi/apps/api/internal/modules/providers/preset"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
+	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
 	userscontract "github.com/srapi/srapi/apps/api/internal/modules/users/contract"
 )
@@ -42,18 +43,19 @@ type dependencyPinger interface {
 type Option func(*runtimeOptions)
 
 type runtimeOptions struct {
-	database  dependencyPinger
-	redis     dependencyPinger
-	users     userscontract.Store
-	apiKeys   apikeycontract.Store
-	providers providercontract.Store
-	models    modelcontract.Store
-	accounts  accountcontract.Store
-	audit     auditcontract.Store
-	billing   billingcontract.Store
-	events    eventscontract.Store
-	scheduler schedulercontract.Store
-	usage     usagecontract.Store
+	database      dependencyPinger
+	redis         dependencyPinger
+	users         userscontract.Store
+	apiKeys       apikeycontract.Store
+	providers     providercontract.Store
+	models        modelcontract.Store
+	accounts      accountcontract.Store
+	audit         auditcontract.Store
+	billing       billingcontract.Store
+	events        eventscontract.Store
+	scheduler     schedulercontract.Store
+	subscriptions subscriptioncontract.Store
+	usage         usagecontract.Store
 }
 
 func WithDatabasePinger(p dependencyPinger) Option {
@@ -122,6 +124,12 @@ func WithSchedulerStore(store schedulercontract.Store) Option {
 	}
 }
 
+func WithSubscriptionStore(store subscriptioncontract.Store) Option {
+	return func(opts *runtimeOptions) {
+		opts.subscriptions = store
+	}
+}
+
 func WithUsageStore(store usagecontract.Store) Option {
 	return func(opts *runtimeOptions) {
 		opts.usage = store
@@ -165,6 +173,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("POST /api/v1/auth/logout", server.handleLogout)
 	mux.HandleFunc("GET /api/v1/me", server.handleCurrentUser)
 	mux.HandleFunc("GET /api/v1/me/usage", server.handleCurrentUserUsage)
+	mux.HandleFunc("GET /api/v1/me/subscriptions", server.handleCurrentUserSubscriptions)
 	mux.HandleFunc("GET /api/v1/api-keys", server.handleListApiKeys)
 	mux.HandleFunc("POST /api/v1/api-keys", server.handleCreateApiKey)
 	mux.HandleFunc("PATCH /api/v1/api-keys/{id}", server.handleUpdateApiKey)
@@ -180,15 +189,31 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("POST /api/v1/admin/models/{id}/mappings", server.handleCreateAdminModelMapping)
 	mux.HandleFunc("GET /api/v1/admin/accounts", server.handleListAdminAccounts)
 	mux.HandleFunc("POST /api/v1/admin/accounts", server.handleCreateAdminAccount)
+	mux.HandleFunc("GET /api/v1/admin/accounts/export", server.handleExportAdminAccounts)
+	mux.HandleFunc("POST /api/v1/admin/accounts/import", server.handleImportAdminAccounts)
+	mux.HandleFunc("GET /api/v1/admin/accounts/{id}", server.handleGetAdminAccount)
 	mux.HandleFunc("PATCH /api/v1/admin/accounts/{id}", server.handleUpdateAdminAccount)
+	mux.HandleFunc("PATCH /api/v1/admin/accounts/{id}/proxy", server.handleBindAdminAccountProxy)
 	mux.HandleFunc("POST /api/v1/admin/accounts/{id}/test", server.handleTestAdminAccount)
 	mux.HandleFunc("POST /api/v1/admin/accounts/{id}/disable", server.handleDisableAdminAccount)
 	mux.HandleFunc("POST /api/v1/admin/accounts/{id}/enable", server.handleEnableAdminAccount)
+	mux.HandleFunc("POST /api/v1/admin/accounts/{id}/recover", server.handleRecoverAdminAccount)
 	mux.HandleFunc("GET /api/v1/admin/accounts/{id}/health", server.handleAdminAccountHealth)
 	mux.HandleFunc("GET /api/v1/admin/accounts/{id}/quota", server.handleAdminAccountQuota)
+	mux.HandleFunc("GET /api/v1/admin/account-groups", server.handleListAdminAccountGroups)
+	mux.HandleFunc("POST /api/v1/admin/account-groups", server.handleCreateAdminAccountGroup)
+	mux.HandleFunc("PATCH /api/v1/admin/account-groups/{id}", server.handleUpdateAdminAccountGroup)
+	mux.HandleFunc("POST /api/v1/admin/account-groups/{id}/accounts/{account_id}", server.handleAddAdminAccountGroupMember)
+	mux.HandleFunc("DELETE /api/v1/admin/account-groups/{id}/accounts/{account_id}", server.handleRemoveAdminAccountGroupMember)
 	mux.HandleFunc("GET /api/v1/admin/usage-logs", server.handleListAdminUsageLogs)
 	mux.HandleFunc("GET /api/v1/admin/audit-logs", server.handleListAdminAuditLogs)
 	mux.HandleFunc("GET /api/v1/admin/billing-ledger", server.handleListAdminBillingLedger)
+	mux.HandleFunc("GET /api/v1/admin/subscription-plans", server.handleListAdminSubscriptionPlans)
+	mux.HandleFunc("POST /api/v1/admin/subscription-plans", server.handleCreateAdminSubscriptionPlan)
+	mux.HandleFunc("GET /api/v1/admin/user-subscriptions", server.handleListAdminUserSubscriptions)
+	mux.HandleFunc("POST /api/v1/admin/user-subscriptions", server.handleCreateAdminUserSubscription)
+	mux.HandleFunc("GET /api/v1/admin/pricing-rules", server.handleListAdminPricingRules)
+	mux.HandleFunc("POST /api/v1/admin/pricing-rules", server.handleCreateAdminPricingRule)
 	mux.HandleFunc("GET /api/v1/admin/ops/events/outbox", server.handleListAdminOutboxEvents)
 	mux.HandleFunc("GET /api/v1/admin/capabilities", server.handleListAdminCapabilities)
 	mux.HandleFunc("GET /api/v1/admin/scheduler/overview", server.handleAdminSchedulerOverview)

@@ -242,7 +242,11 @@ func forbiddenHeader(key string, values []string) bool {
 
 func injectAuth(headers http.Header, account contract.AccountRuntime) {
 	switch account.RuntimeClass {
-	case "oauth_refresh", "oauth_device_code", "desktop_client_token", "cli_client_token", "ide_plugin_token":
+	case "cli_client_token":
+		if token := firstCredentialString(account.Credential, "cli_client_token", "cli_token", "device_token", "access_token"); token != "" {
+			headers.Set("Authorization", "Bearer "+token)
+		}
+	case "oauth_refresh", "oauth_device_code", "desktop_client_token", "ide_plugin_token":
 		if token := credentialString(account.Credential, "access_token"); token != "" {
 			headers.Set("Authorization", "Bearer "+token)
 		}
@@ -266,9 +270,34 @@ func userAgent(account contract.AccountRuntime) string {
 		return value
 	}
 	if account.UpstreamClient != nil && strings.TrimSpace(*account.UpstreamClient) != "" {
+		if ua := defaultUserAgentForUpstreamClient(*account.UpstreamClient); ua != "" {
+			return ua
+		}
 		return strings.TrimSpace(*account.UpstreamClient)
 	}
 	return "Mozilla/5.0"
+}
+
+func firstCredentialString(values map[string]any, keys ...string) string {
+	for _, key := range keys {
+		if value := credentialString(values, key); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func defaultUserAgentForUpstreamClient(upstreamClient string) string {
+	switch strings.ToLower(strings.TrimSpace(upstreamClient)) {
+	case "codex_cli":
+		return "Codex/1.0"
+	case "claude_code_cli":
+		return "Claude-Code/1.0"
+	case "gemini_cli":
+		return "Gemini-CLI/1.0"
+	default:
+		return ""
+	}
 }
 
 func guardBody(body []byte) error {

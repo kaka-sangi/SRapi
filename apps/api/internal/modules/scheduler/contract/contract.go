@@ -71,10 +71,20 @@ type ScheduleRequest struct {
 	SourceEndpoint          string
 	TargetProtocol          string
 	Model                   string
+	ModelAlias              string
+	FallbackModels          []string
+	SessionAffinityKey      string
+	SessionAffinitySource   string
+	AccountGroupScope       []int
 	UserTier                UserTier
 	UserBalanceInsufficient bool
 	EstimatedInputTokens    int
 	EstimatedOutputTokens   int
+	EstimatedCost           string
+	Currency                string
+	PricingRuleID           *int
+	PricingSource           string
+	PricingEstimated        bool
 	IsStream                bool
 	StickyAccountID         *int
 	StickyStrength          StickyStrength

@@ -828,6 +828,40 @@ var (
 			},
 		},
 	}
+	// SubscriptionPlansColumns holds the columns for the "subscription_plans" table.
+	SubscriptionPlansColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "deleted_at", Type: field.TypeTime, Nullable: true},
+		{Name: "name", Type: field.TypeString},
+		{Name: "description", Type: field.TypeString, Default: ""},
+		{Name: "price", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "currency", Type: field.TypeString, Default: "USD"},
+		{Name: "validity_days", Type: field.TypeInt},
+		{Name: "entitlements_json", Type: field.TypeJSON, Nullable: true},
+		{Name: "for_sale", Type: field.TypeBool, Default: true},
+		{Name: "sort_order", Type: field.TypeInt, Default: 0},
+		{Name: "status", Type: field.TypeString, Default: "active"},
+	}
+	// SubscriptionPlansTable holds the schema information for the "subscription_plans" table.
+	SubscriptionPlansTable = &schema.Table{
+		Name:       "subscription_plans",
+		Columns:    SubscriptionPlansColumns,
+		PrimaryKey: []*schema.Column{SubscriptionPlansColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "subscriptionplan_for_sale_sort_order",
+				Unique:  false,
+				Columns: []*schema.Column{SubscriptionPlansColumns[10], SubscriptionPlansColumns[11]},
+			},
+			{
+				Name:    "subscriptionplan_status",
+				Unique:  false,
+				Columns: []*schema.Column{SubscriptionPlansColumns[12]},
+			},
+		},
+	}
 	// UsageLogsColumns holds the columns for the "usage_logs" table.
 	UsageLogsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -956,6 +990,43 @@ var (
 			},
 		},
 	}
+	// UserSubscriptionsColumns holds the columns for the "user_subscriptions" table.
+	UserSubscriptionsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "user_id", Type: field.TypeInt},
+		{Name: "plan_id", Type: field.TypeInt},
+		{Name: "status", Type: field.TypeString, Default: "active"},
+		{Name: "starts_at", Type: field.TypeTime},
+		{Name: "expires_at", Type: field.TypeTime},
+		{Name: "entitlements_snapshot_json", Type: field.TypeJSON, Nullable: true},
+		{Name: "source_type", Type: field.TypeString, Default: ""},
+		{Name: "source_id", Type: field.TypeString, Default: ""},
+	}
+	// UserSubscriptionsTable holds the schema information for the "user_subscriptions" table.
+	UserSubscriptionsTable = &schema.Table{
+		Name:       "user_subscriptions",
+		Columns:    UserSubscriptionsColumns,
+		PrimaryKey: []*schema.Column{UserSubscriptionsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "usersubscription_user_id_status",
+				Unique:  false,
+				Columns: []*schema.Column{UserSubscriptionsColumns[3], UserSubscriptionsColumns[5]},
+			},
+			{
+				Name:    "usersubscription_expires_at",
+				Unique:  false,
+				Columns: []*schema.Column{UserSubscriptionsColumns[7]},
+			},
+			{
+				Name:    "usersubscription_plan_id",
+				Unique:  false,
+				Columns: []*schema.Column{UserSubscriptionsColumns[4]},
+			},
+		},
+	}
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
 		APIKeysTable,
@@ -981,9 +1052,11 @@ var (
 		SchedulerFeedbacksTable,
 		SchedulerStrategiesTable,
 		SettingsTable,
+		SubscriptionPlansTable,
 		UsageLogsTable,
 		UsersTable,
 		UserRolesTable,
+		UserSubscriptionsTable,
 	}
 )
 

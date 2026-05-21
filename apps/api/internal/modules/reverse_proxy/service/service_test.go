@@ -67,6 +67,43 @@ func TestRuntimeSanitizesHeadersAndInjectsAccountContext(t *testing.T) {
 	}
 }
 
+func TestRuntimeInjectsCliClientTokenAndDefaultClientUserAgent(t *testing.T) {
+	var gotHeader http.Header
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotHeader = r.Header.Clone()
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := New(nil)
+	if err != nil {
+		t.Fatalf("create runtime: %v", err)
+	}
+	_, err = svc.Do(context.Background(), contract.Request{
+		Account: contract.AccountRuntime{
+			AccountID:      7,
+			RuntimeClass:   "cli_client_token",
+			UpstreamClient: ptrString("claude_code_cli"),
+			Credential: map[string]any{
+				"access_token":     "wrong-token",
+				"cli_client_token": "cli-token",
+			},
+		},
+		Method: http.MethodPost,
+		URL:    upstream.URL,
+		Body:   []byte(`{"model":"cli-model"}`),
+	})
+	if err != nil {
+		t.Fatalf("runtime request: %v", err)
+	}
+	if gotHeader.Get("Authorization") != "Bearer cli-token" {
+		t.Fatalf("expected cli client token auth, got %q", gotHeader.Get("Authorization"))
+	}
+	if gotHeader.Get("User-Agent") != "Claude-Code/1.0" {
+		t.Fatalf("expected claude code user agent, got %q", gotHeader.Get("User-Agent"))
+	}
+}
+
 func TestRuntimeRejectsSRapiInternalBodyFields(t *testing.T) {
 	svc, err := New(nil)
 	if err != nil {

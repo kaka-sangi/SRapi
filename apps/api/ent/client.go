@@ -37,9 +37,11 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/schedulerfeedback"
 	"github.com/srapi/srapi/apps/api/ent/schedulerstrategy"
 	"github.com/srapi/srapi/apps/api/ent/setting"
+	"github.com/srapi/srapi/apps/api/ent/subscriptionplan"
 	"github.com/srapi/srapi/apps/api/ent/usagelog"
 	"github.com/srapi/srapi/apps/api/ent/user"
 	"github.com/srapi/srapi/apps/api/ent/userrole"
+	"github.com/srapi/srapi/apps/api/ent/usersubscription"
 )
 
 // Client is the client that holds all ent builders.
@@ -93,12 +95,16 @@ type Client struct {
 	SchedulerStrategy *SchedulerStrategyClient
 	// Setting is the client for interacting with the Setting builders.
 	Setting *SettingClient
+	// SubscriptionPlan is the client for interacting with the SubscriptionPlan builders.
+	SubscriptionPlan *SubscriptionPlanClient
 	// UsageLog is the client for interacting with the UsageLog builders.
 	UsageLog *UsageLogClient
 	// User is the client for interacting with the User builders.
 	User *UserClient
 	// UserRole is the client for interacting with the UserRole builders.
 	UserRole *UserRoleClient
+	// UserSubscription is the client for interacting with the UserSubscription builders.
+	UserSubscription *UserSubscriptionClient
 }
 
 // NewClient creates a new client configured with the given options.
@@ -133,9 +139,11 @@ func (c *Client) init() {
 	c.SchedulerFeedback = NewSchedulerFeedbackClient(c.config)
 	c.SchedulerStrategy = NewSchedulerStrategyClient(c.config)
 	c.Setting = NewSettingClient(c.config)
+	c.SubscriptionPlan = NewSubscriptionPlanClient(c.config)
 	c.UsageLog = NewUsageLogClient(c.config)
 	c.User = NewUserClient(c.config)
 	c.UserRole = NewUserRoleClient(c.config)
+	c.UserSubscription = NewUserSubscriptionClient(c.config)
 }
 
 type (
@@ -251,9 +259,11 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		SchedulerFeedback:     NewSchedulerFeedbackClient(cfg),
 		SchedulerStrategy:     NewSchedulerStrategyClient(cfg),
 		Setting:               NewSettingClient(cfg),
+		SubscriptionPlan:      NewSubscriptionPlanClient(cfg),
 		UsageLog:              NewUsageLogClient(cfg),
 		User:                  NewUserClient(cfg),
 		UserRole:              NewUserRoleClient(cfg),
+		UserSubscription:      NewUserSubscriptionClient(cfg),
 	}, nil
 }
 
@@ -296,9 +306,11 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		SchedulerFeedback:     NewSchedulerFeedbackClient(cfg),
 		SchedulerStrategy:     NewSchedulerStrategyClient(cfg),
 		Setting:               NewSettingClient(cfg),
+		SubscriptionPlan:      NewSubscriptionPlanClient(cfg),
 		UsageLog:              NewUsageLogClient(cfg),
 		User:                  NewUserClient(cfg),
 		UserRole:              NewUserRoleClient(cfg),
+		UserSubscription:      NewUserSubscriptionClient(cfg),
 	}, nil
 }
 
@@ -333,8 +345,8 @@ func (c *Client) Use(hooks ...Hook) {
 		c.CapabilityDefinition, c.DomainEventsInbox, c.DomainEventsOutbox,
 		c.IdempotencyRecord, c.ModelAlias, c.ModelProviderMapping, c.ModelRegistry,
 		c.PricingRule, c.Provider, c.ProviderAccount, c.Role, c.SchedulerDecision,
-		c.SchedulerFeedback, c.SchedulerStrategy, c.Setting, c.UsageLog, c.User,
-		c.UserRole,
+		c.SchedulerFeedback, c.SchedulerStrategy, c.Setting, c.SubscriptionPlan,
+		c.UsageLog, c.User, c.UserRole, c.UserSubscription,
 	} {
 		n.Use(hooks...)
 	}
@@ -349,8 +361,8 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.CapabilityDefinition, c.DomainEventsInbox, c.DomainEventsOutbox,
 		c.IdempotencyRecord, c.ModelAlias, c.ModelProviderMapping, c.ModelRegistry,
 		c.PricingRule, c.Provider, c.ProviderAccount, c.Role, c.SchedulerDecision,
-		c.SchedulerFeedback, c.SchedulerStrategy, c.Setting, c.UsageLog, c.User,
-		c.UserRole,
+		c.SchedulerFeedback, c.SchedulerStrategy, c.Setting, c.SubscriptionPlan,
+		c.UsageLog, c.User, c.UserRole, c.UserSubscription,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -405,12 +417,16 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.SchedulerStrategy.mutate(ctx, m)
 	case *SettingMutation:
 		return c.Setting.mutate(ctx, m)
+	case *SubscriptionPlanMutation:
+		return c.SubscriptionPlan.mutate(ctx, m)
 	case *UsageLogMutation:
 		return c.UsageLog.mutate(ctx, m)
 	case *UserMutation:
 		return c.User.mutate(ctx, m)
 	case *UserRoleMutation:
 		return c.UserRole.mutate(ctx, m)
+	case *UserSubscriptionMutation:
+		return c.UserSubscription.mutate(ctx, m)
 	default:
 		return nil, fmt.Errorf("ent: unknown mutation type %T", m)
 	}
@@ -3475,6 +3491,139 @@ func (c *SettingClient) mutate(ctx context.Context, m *SettingMutation) (Value, 
 	}
 }
 
+// SubscriptionPlanClient is a client for the SubscriptionPlan schema.
+type SubscriptionPlanClient struct {
+	config
+}
+
+// NewSubscriptionPlanClient returns a client for the SubscriptionPlan from the given config.
+func NewSubscriptionPlanClient(c config) *SubscriptionPlanClient {
+	return &SubscriptionPlanClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `subscriptionplan.Hooks(f(g(h())))`.
+func (c *SubscriptionPlanClient) Use(hooks ...Hook) {
+	c.hooks.SubscriptionPlan = append(c.hooks.SubscriptionPlan, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `subscriptionplan.Intercept(f(g(h())))`.
+func (c *SubscriptionPlanClient) Intercept(interceptors ...Interceptor) {
+	c.inters.SubscriptionPlan = append(c.inters.SubscriptionPlan, interceptors...)
+}
+
+// Create returns a builder for creating a SubscriptionPlan entity.
+func (c *SubscriptionPlanClient) Create() *SubscriptionPlanCreate {
+	mutation := newSubscriptionPlanMutation(c.config, OpCreate)
+	return &SubscriptionPlanCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of SubscriptionPlan entities.
+func (c *SubscriptionPlanClient) CreateBulk(builders ...*SubscriptionPlanCreate) *SubscriptionPlanCreateBulk {
+	return &SubscriptionPlanCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *SubscriptionPlanClient) MapCreateBulk(slice any, setFunc func(*SubscriptionPlanCreate, int)) *SubscriptionPlanCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &SubscriptionPlanCreateBulk{err: fmt.Errorf("calling to SubscriptionPlanClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*SubscriptionPlanCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &SubscriptionPlanCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for SubscriptionPlan.
+func (c *SubscriptionPlanClient) Update() *SubscriptionPlanUpdate {
+	mutation := newSubscriptionPlanMutation(c.config, OpUpdate)
+	return &SubscriptionPlanUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *SubscriptionPlanClient) UpdateOne(_m *SubscriptionPlan) *SubscriptionPlanUpdateOne {
+	mutation := newSubscriptionPlanMutation(c.config, OpUpdateOne, withSubscriptionPlan(_m))
+	return &SubscriptionPlanUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *SubscriptionPlanClient) UpdateOneID(id int) *SubscriptionPlanUpdateOne {
+	mutation := newSubscriptionPlanMutation(c.config, OpUpdateOne, withSubscriptionPlanID(id))
+	return &SubscriptionPlanUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for SubscriptionPlan.
+func (c *SubscriptionPlanClient) Delete() *SubscriptionPlanDelete {
+	mutation := newSubscriptionPlanMutation(c.config, OpDelete)
+	return &SubscriptionPlanDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *SubscriptionPlanClient) DeleteOne(_m *SubscriptionPlan) *SubscriptionPlanDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *SubscriptionPlanClient) DeleteOneID(id int) *SubscriptionPlanDeleteOne {
+	builder := c.Delete().Where(subscriptionplan.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &SubscriptionPlanDeleteOne{builder}
+}
+
+// Query returns a query builder for SubscriptionPlan.
+func (c *SubscriptionPlanClient) Query() *SubscriptionPlanQuery {
+	return &SubscriptionPlanQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeSubscriptionPlan},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a SubscriptionPlan entity by its id.
+func (c *SubscriptionPlanClient) Get(ctx context.Context, id int) (*SubscriptionPlan, error) {
+	return c.Query().Where(subscriptionplan.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *SubscriptionPlanClient) GetX(ctx context.Context, id int) *SubscriptionPlan {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *SubscriptionPlanClient) Hooks() []Hook {
+	return c.hooks.SubscriptionPlan
+}
+
+// Interceptors returns the client interceptors.
+func (c *SubscriptionPlanClient) Interceptors() []Interceptor {
+	return c.inters.SubscriptionPlan
+}
+
+func (c *SubscriptionPlanClient) mutate(ctx context.Context, m *SubscriptionPlanMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&SubscriptionPlanCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&SubscriptionPlanUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&SubscriptionPlanUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&SubscriptionPlanDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown SubscriptionPlan mutation op: %q", m.Op())
+	}
+}
+
 // UsageLogClient is a client for the UsageLog schema.
 type UsageLogClient struct {
 	config
@@ -3874,6 +4023,139 @@ func (c *UserRoleClient) mutate(ctx context.Context, m *UserRoleMutation) (Value
 	}
 }
 
+// UserSubscriptionClient is a client for the UserSubscription schema.
+type UserSubscriptionClient struct {
+	config
+}
+
+// NewUserSubscriptionClient returns a client for the UserSubscription from the given config.
+func NewUserSubscriptionClient(c config) *UserSubscriptionClient {
+	return &UserSubscriptionClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `usersubscription.Hooks(f(g(h())))`.
+func (c *UserSubscriptionClient) Use(hooks ...Hook) {
+	c.hooks.UserSubscription = append(c.hooks.UserSubscription, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `usersubscription.Intercept(f(g(h())))`.
+func (c *UserSubscriptionClient) Intercept(interceptors ...Interceptor) {
+	c.inters.UserSubscription = append(c.inters.UserSubscription, interceptors...)
+}
+
+// Create returns a builder for creating a UserSubscription entity.
+func (c *UserSubscriptionClient) Create() *UserSubscriptionCreate {
+	mutation := newUserSubscriptionMutation(c.config, OpCreate)
+	return &UserSubscriptionCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of UserSubscription entities.
+func (c *UserSubscriptionClient) CreateBulk(builders ...*UserSubscriptionCreate) *UserSubscriptionCreateBulk {
+	return &UserSubscriptionCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *UserSubscriptionClient) MapCreateBulk(slice any, setFunc func(*UserSubscriptionCreate, int)) *UserSubscriptionCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &UserSubscriptionCreateBulk{err: fmt.Errorf("calling to UserSubscriptionClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*UserSubscriptionCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &UserSubscriptionCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for UserSubscription.
+func (c *UserSubscriptionClient) Update() *UserSubscriptionUpdate {
+	mutation := newUserSubscriptionMutation(c.config, OpUpdate)
+	return &UserSubscriptionUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *UserSubscriptionClient) UpdateOne(_m *UserSubscription) *UserSubscriptionUpdateOne {
+	mutation := newUserSubscriptionMutation(c.config, OpUpdateOne, withUserSubscription(_m))
+	return &UserSubscriptionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *UserSubscriptionClient) UpdateOneID(id int) *UserSubscriptionUpdateOne {
+	mutation := newUserSubscriptionMutation(c.config, OpUpdateOne, withUserSubscriptionID(id))
+	return &UserSubscriptionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for UserSubscription.
+func (c *UserSubscriptionClient) Delete() *UserSubscriptionDelete {
+	mutation := newUserSubscriptionMutation(c.config, OpDelete)
+	return &UserSubscriptionDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *UserSubscriptionClient) DeleteOne(_m *UserSubscription) *UserSubscriptionDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *UserSubscriptionClient) DeleteOneID(id int) *UserSubscriptionDeleteOne {
+	builder := c.Delete().Where(usersubscription.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &UserSubscriptionDeleteOne{builder}
+}
+
+// Query returns a query builder for UserSubscription.
+func (c *UserSubscriptionClient) Query() *UserSubscriptionQuery {
+	return &UserSubscriptionQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeUserSubscription},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a UserSubscription entity by its id.
+func (c *UserSubscriptionClient) Get(ctx context.Context, id int) (*UserSubscription, error) {
+	return c.Query().Where(usersubscription.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *UserSubscriptionClient) GetX(ctx context.Context, id int) *UserSubscription {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *UserSubscriptionClient) Hooks() []Hook {
+	return c.hooks.UserSubscription
+}
+
+// Interceptors returns the client interceptors.
+func (c *UserSubscriptionClient) Interceptors() []Interceptor {
+	return c.inters.UserSubscription
+}
+
+func (c *UserSubscriptionClient) mutate(ctx context.Context, m *UserSubscriptionMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&UserSubscriptionCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&UserSubscriptionUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&UserSubscriptionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&UserSubscriptionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown UserSubscription mutation op: %q", m.Op())
+	}
+}
+
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
@@ -3882,7 +4164,7 @@ type (
 		DomainEventsInbox, DomainEventsOutbox, IdempotencyRecord, ModelAlias,
 		ModelProviderMapping, ModelRegistry, PricingRule, Provider, ProviderAccount,
 		Role, SchedulerDecision, SchedulerFeedback, SchedulerStrategy, Setting,
-		UsageLog, User, UserRole []ent.Hook
+		SubscriptionPlan, UsageLog, User, UserRole, UserSubscription []ent.Hook
 	}
 	inters struct {
 		APIKey, APIKeyGroup, AccountGroup, AccountGroupMember, AccountHealthSnapshot,
@@ -3890,6 +4172,6 @@ type (
 		DomainEventsInbox, DomainEventsOutbox, IdempotencyRecord, ModelAlias,
 		ModelProviderMapping, ModelRegistry, PricingRule, Provider, ProviderAccount,
 		Role, SchedulerDecision, SchedulerFeedback, SchedulerStrategy, Setting,
-		UsageLog, User, UserRole []ent.Interceptor
+		SubscriptionPlan, UsageLog, User, UserRole, UserSubscription []ent.Interceptor
 	}
 )

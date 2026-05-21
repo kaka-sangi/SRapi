@@ -111,6 +111,114 @@ func (s *Service) ListGroupIDsByAccount(ctx context.Context, accountID int) ([]i
 	return s.store.ListGroupIDsByAccount(ctx, accountID)
 }
 
+func (s *Service) CreateGroup(ctx context.Context, req contract.CreateGroupRequest) (contract.AccountGroup, error) {
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		return contract.AccountGroup{}, ErrInvalidInput
+	}
+	strategy := "balanced"
+	if req.StrategyHint != nil {
+		strategy = strings.TrimSpace(*req.StrategyHint)
+		if strategy == "" {
+			return contract.AccountGroup{}, ErrInvalidInput
+		}
+	}
+	status := contract.GroupStatusActive
+	if req.Status != nil {
+		if !validGroupStatus(*req.Status) {
+			return contract.AccountGroup{}, ErrInvalidInput
+		}
+		status = *req.Status
+	}
+	return s.store.CreateGroup(ctx, contract.CreateStoredAccountGroup{
+		Name:          name,
+		Description:   strings.TrimSpace(req.Description),
+		ProviderScope: cloneMap(req.ProviderScope),
+		ModelScope:    cloneMap(req.ModelScope),
+		StrategyHint:  strategy,
+		Status:        status,
+	})
+}
+
+func (s *Service) UpdateGroup(ctx context.Context, id int, req contract.UpdateGroupRequest) (contract.AccountGroup, error) {
+	if id <= 0 {
+		return contract.AccountGroup{}, ErrInvalidInput
+	}
+	group, err := s.store.FindGroupByID(ctx, id)
+	if err != nil {
+		return contract.AccountGroup{}, err
+	}
+	if req.Name != nil {
+		name := strings.TrimSpace(*req.Name)
+		if name == "" {
+			return contract.AccountGroup{}, ErrInvalidInput
+		}
+		group.Name = name
+	}
+	if req.Description != nil {
+		group.Description = strings.TrimSpace(*req.Description)
+	}
+	if req.ProviderScope != nil {
+		group.ProviderScope = cloneMap(*req.ProviderScope)
+	}
+	if req.ModelScope != nil {
+		group.ModelScope = cloneMap(*req.ModelScope)
+	}
+	if req.StrategyHint != nil {
+		strategy := strings.TrimSpace(*req.StrategyHint)
+		if strategy == "" {
+			return contract.AccountGroup{}, ErrInvalidInput
+		}
+		group.StrategyHint = strategy
+	}
+	if req.Status != nil {
+		if !validGroupStatus(*req.Status) {
+			return contract.AccountGroup{}, ErrInvalidInput
+		}
+		group.Status = *req.Status
+	}
+	group.UpdatedAt = s.clock.Now()
+	return s.store.UpdateGroup(ctx, group)
+}
+
+func (s *Service) FindGroupByID(ctx context.Context, id int) (contract.AccountGroup, error) {
+	if id <= 0 {
+		return contract.AccountGroup{}, ErrInvalidInput
+	}
+	return s.store.FindGroupByID(ctx, id)
+}
+
+func (s *Service) ListGroups(ctx context.Context) ([]contract.AccountGroup, error) {
+	return s.store.ListGroups(ctx)
+}
+
+func (s *Service) AddAccountToGroup(ctx context.Context, accountID int, groupID int) (contract.AccountGroupMember, error) {
+	if accountID <= 0 || groupID <= 0 {
+		return contract.AccountGroupMember{}, ErrInvalidInput
+	}
+	if _, err := s.store.FindByID(ctx, accountID); err != nil {
+		return contract.AccountGroupMember{}, err
+	}
+	if _, err := s.store.FindGroupByID(ctx, groupID); err != nil {
+		return contract.AccountGroupMember{}, err
+	}
+	return s.store.AddAccountToGroup(ctx, accountID, groupID)
+}
+
+func (s *Service) RemoveAccountFromGroup(ctx context.Context, accountID int, groupID int) error {
+	if accountID <= 0 || groupID <= 0 {
+		return ErrInvalidInput
+	}
+	return s.store.RemoveAccountFromGroup(ctx, accountID, groupID)
+}
+
+func (s *Service) ListGroupMembers(ctx context.Context, groupID int) ([]contract.AccountGroupMember, error) {
+	if groupID <= 0 {
+		return nil, ErrInvalidInput
+	}
+	return s.store.ListGroupMembers(ctx, groupID)
+}
+
 func (s *Service) FindByID(ctx context.Context, id int) (contract.ProviderAccount, error) {
 	if id <= 0 {
 		return contract.ProviderAccount{}, ErrInvalidInput
@@ -175,6 +283,108 @@ func (s *Service) Update(ctx context.Context, id int, req contract.UpdateRequest
 	return s.store.Update(ctx, account)
 }
 
+func (s *Service) BindProxy(ctx context.Context, id int, proxyID *string) (contract.ProviderAccount, error) {
+	if id <= 0 {
+		return contract.ProviderAccount{}, ErrInvalidInput
+	}
+	normalized := cloneString(proxyID)
+	if normalized != nil {
+		trimmed := strings.TrimSpace(*normalized)
+		if trimmed == "" {
+			normalized = nil
+		} else {
+			normalized = &trimmed
+		}
+	}
+	return s.Update(ctx, id, contract.UpdateRequest{ProxyID: &normalized})
+}
+
+func (s *Service) Recover(ctx context.Context, id int) (contract.ProviderAccount, error) {
+	if id <= 0 {
+		return contract.ProviderAccount{}, ErrInvalidInput
+	}
+	account, err := s.store.FindByID(ctx, id)
+	if err != nil {
+		return contract.ProviderAccount{}, err
+	}
+	metadata := cloneMap(account.Metadata)
+	for _, key := range []string{
+		"cooldown_active",
+		"cooldown_reason",
+		"cooldown_until",
+		"circuit_open",
+		"last_error_class",
+		"quota_exhausted",
+	} {
+		delete(metadata, key)
+	}
+	metadata["last_recovered_at"] = s.clock.Now().Format(time.RFC3339)
+	status := contract.StatusActive
+	return s.Update(ctx, id, contract.UpdateRequest{
+		Status:   &status,
+		Metadata: &metadata,
+	})
+}
+
+func (s *Service) RecordHealthSnapshot(ctx context.Context, snapshot contract.AccountHealthSnapshot) (contract.AccountHealthSnapshot, error) {
+	if snapshot.AccountID <= 0 || snapshot.ProviderID <= 0 {
+		return contract.AccountHealthSnapshot{}, ErrInvalidInput
+	}
+	if strings.TrimSpace(snapshot.Status) == "" {
+		snapshot.Status = "healthy"
+	}
+	if strings.TrimSpace(snapshot.CircuitState) == "" {
+		snapshot.CircuitState = "closed"
+	}
+	snapshot.SuccessRate = clampRatio(snapshot.SuccessRate)
+	snapshot.ErrorRate = clampRatio(snapshot.ErrorRate)
+	if snapshot.SnapshotAt.IsZero() {
+		snapshot.SnapshotAt = s.clock.Now()
+	}
+	return s.store.RecordHealthSnapshot(ctx, snapshot)
+}
+
+func (s *Service) LatestHealthSnapshotByAccount(ctx context.Context, accountID int) (contract.AccountHealthSnapshot, error) {
+	if accountID <= 0 {
+		return contract.AccountHealthSnapshot{}, ErrInvalidInput
+	}
+	return s.store.LatestHealthSnapshotByAccount(ctx, accountID)
+}
+
+func (s *Service) ListHealthSnapshotsByAccount(ctx context.Context, accountID int, limit int) ([]contract.AccountHealthSnapshot, error) {
+	if accountID <= 0 {
+		return nil, ErrInvalidInput
+	}
+	return s.store.ListHealthSnapshotsByAccount(ctx, accountID, limit)
+}
+
+func (s *Service) RecordQuotaSnapshot(ctx context.Context, snapshot contract.AccountQuotaSnapshot) (contract.AccountQuotaSnapshot, error) {
+	if snapshot.AccountID <= 0 || snapshot.ProviderID <= 0 || strings.TrimSpace(snapshot.QuotaType) == "" {
+		return contract.AccountQuotaSnapshot{}, ErrInvalidInput
+	}
+	if strings.TrimSpace(snapshot.Remaining) == "" {
+		snapshot.Remaining = "0"
+	}
+	if strings.TrimSpace(snapshot.Used) == "" {
+		snapshot.Used = "0"
+	}
+	if strings.TrimSpace(snapshot.QuotaLimit) == "" {
+		snapshot.QuotaLimit = "0"
+	}
+	snapshot.RemainingRatio = clampRatio(snapshot.RemainingRatio)
+	if snapshot.SnapshotAt.IsZero() {
+		snapshot.SnapshotAt = s.clock.Now()
+	}
+	return s.store.RecordQuotaSnapshot(ctx, snapshot)
+}
+
+func (s *Service) ListQuotaSnapshotsByAccount(ctx context.Context, accountID int, limit int) ([]contract.AccountQuotaSnapshot, error) {
+	if accountID <= 0 {
+		return nil, ErrInvalidInput
+	}
+	return s.store.ListQuotaSnapshotsByAccount(ctx, accountID, limit)
+}
+
 func (s *Service) DecryptCredential(ctx context.Context, id int) (map[string]any, error) {
 	if id <= 0 {
 		return nil, ErrInvalidInput
@@ -237,6 +447,25 @@ func (s *Service) decryptCredential(ciphertext string) (map[string]any, error) {
 		return nil, err
 	}
 	return payload, nil
+}
+
+func validGroupStatus(status contract.GroupStatus) bool {
+	switch status {
+	case contract.GroupStatusActive, contract.GroupStatusDisabled:
+		return true
+	default:
+		return false
+	}
+}
+
+func clampRatio(value float32) float32 {
+	if value < 0 {
+		return 0
+	}
+	if value > 1 {
+		return 1
+	}
+	return value
 }
 
 func cloneMap(value map[string]any) map[string]any {

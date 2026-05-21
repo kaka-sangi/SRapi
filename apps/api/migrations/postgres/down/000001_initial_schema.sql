@@ -1,7 +1,9 @@
 -- Drop initial SRapi MVP schema.
+DROP TABLE IF EXISTS "user_subscriptions";
 DROP TABLE IF EXISTS "user_roles";
 DROP TABLE IF EXISTS "users";
 DROP TABLE IF EXISTS "usage_logs";
+DROP TABLE IF EXISTS "subscription_plans";
 DROP TABLE IF EXISTS "settings";
 DROP TABLE IF EXISTS "scheduler_strategies";
 DROP TABLE IF EXISTS "scheduler_feedbacks";

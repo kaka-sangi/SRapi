@@ -8,7 +8,10 @@ import (
 	"time"
 
 	"github.com/srapi/srapi/apps/api/ent"
+	entaccountgroup "github.com/srapi/srapi/apps/api/ent/accountgroup"
 	entaccountgroupmember "github.com/srapi/srapi/apps/api/ent/accountgroupmember"
+	entaccounthealthsnapshot "github.com/srapi/srapi/apps/api/ent/accounthealthsnapshot"
+	entaccountquotasnapshot "github.com/srapi/srapi/apps/api/ent/accountquotasnapshot"
 	entaccount "github.com/srapi/srapi/apps/api/ent/provideraccount"
 	"github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 )
@@ -119,6 +122,197 @@ func (s *Store) ListGroupIDsByAccount(ctx context.Context, accountID int) ([]int
 	return out, nil
 }
 
+func (s *Store) CreateGroup(ctx context.Context, input contract.CreateStoredAccountGroup) (contract.AccountGroup, error) {
+	created, err := s.client.AccountGroup.Create().
+		SetName(input.Name).
+		SetDescription(input.Description).
+		SetProviderScopeJSON(cloneMap(input.ProviderScope)).
+		SetModelScopeJSON(cloneMap(input.ModelScope)).
+		SetStrategyHint(input.StrategyHint).
+		SetStatus(string(input.Status)).
+		Save(ctx)
+	if err != nil {
+		return contract.AccountGroup{}, err
+	}
+	return toGroup(created), nil
+}
+
+func (s *Store) UpdateGroup(ctx context.Context, group contract.AccountGroup) (contract.AccountGroup, error) {
+	update := s.client.AccountGroup.UpdateOneID(group.ID).
+		SetName(group.Name).
+		SetDescription(group.Description).
+		SetProviderScopeJSON(cloneMap(group.ProviderScope)).
+		SetModelScopeJSON(cloneMap(group.ModelScope)).
+		SetStrategyHint(group.StrategyHint).
+		SetStatus(string(group.Status))
+	if !group.UpdatedAt.IsZero() {
+		update.SetUpdatedAt(group.UpdatedAt)
+	}
+	updated, err := update.Save(ctx)
+	if err != nil {
+		return contract.AccountGroup{}, err
+	}
+	return toGroup(updated), nil
+}
+
+func (s *Store) FindGroupByID(ctx context.Context, id int) (contract.AccountGroup, error) {
+	found, err := s.client.AccountGroup.Query().
+		Where(entaccountgroup.IDEQ(id)).
+		Only(ctx)
+	if err != nil {
+		return contract.AccountGroup{}, err
+	}
+	return toGroup(found), nil
+}
+
+func (s *Store) ListGroups(ctx context.Context) ([]contract.AccountGroup, error) {
+	rows, err := s.client.AccountGroup.Query().
+		Order(entaccountgroup.ByID()).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]contract.AccountGroup, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toGroup(row))
+	}
+	return out, nil
+}
+
+func (s *Store) AddAccountToGroup(ctx context.Context, accountID int, groupID int) (contract.AccountGroupMember, error) {
+	found, err := s.client.AccountGroupMember.Query().
+		Where(
+			entaccountgroupmember.AccountIDEQ(accountID),
+			entaccountgroupmember.AccountGroupIDEQ(groupID),
+		).
+		Only(ctx)
+	if err == nil {
+		return toGroupMember(found), nil
+	}
+	if !ent.IsNotFound(err) {
+		return contract.AccountGroupMember{}, err
+	}
+	created, err := s.client.AccountGroupMember.Create().
+		SetAccountID(accountID).
+		SetAccountGroupID(groupID).
+		Save(ctx)
+	if err != nil {
+		return contract.AccountGroupMember{}, err
+	}
+	return toGroupMember(created), nil
+}
+
+func (s *Store) RemoveAccountFromGroup(ctx context.Context, accountID int, groupID int) error {
+	_, err := s.client.AccountGroupMember.Delete().
+		Where(
+			entaccountgroupmember.AccountIDEQ(accountID),
+			entaccountgroupmember.AccountGroupIDEQ(groupID),
+		).
+		Exec(ctx)
+	return err
+}
+
+func (s *Store) ListGroupMembers(ctx context.Context, groupID int) ([]contract.AccountGroupMember, error) {
+	rows, err := s.client.AccountGroupMember.Query().
+		Where(entaccountgroupmember.AccountGroupIDEQ(groupID)).
+		Order(entaccountgroupmember.ByID()).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]contract.AccountGroupMember, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toGroupMember(row))
+	}
+	return out, nil
+}
+
+func (s *Store) RecordHealthSnapshot(ctx context.Context, snapshot contract.AccountHealthSnapshot) (contract.AccountHealthSnapshot, error) {
+	created, err := s.client.AccountHealthSnapshot.Create().
+		SetAccountID(snapshot.AccountID).
+		SetProviderID(snapshot.ProviderID).
+		SetStatus(snapshot.Status).
+		SetSuccessRate(float64(snapshot.SuccessRate)).
+		SetErrorRate(float64(snapshot.ErrorRate)).
+		SetLatencyP50Ms(snapshot.LatencyP50MS).
+		SetLatencyP95Ms(snapshot.LatencyP95MS).
+		SetRateLimitCount(snapshot.RateLimitCount).
+		SetTimeoutCount(snapshot.TimeoutCount).
+		SetNillableCooldownUntil(snapshot.CooldownUntil).
+		SetCircuitState(snapshot.CircuitState).
+		SetSnapshotAt(snapshot.SnapshotAt).
+		Save(ctx)
+	if err != nil {
+		return contract.AccountHealthSnapshot{}, err
+	}
+	return toHealthSnapshot(created), nil
+}
+
+func (s *Store) LatestHealthSnapshotByAccount(ctx context.Context, accountID int) (contract.AccountHealthSnapshot, error) {
+	found, err := s.client.AccountHealthSnapshot.Query().
+		Where(entaccounthealthsnapshot.AccountIDEQ(accountID)).
+		Order(ent.Desc(entaccounthealthsnapshot.FieldSnapshotAt), ent.Desc(entaccounthealthsnapshot.FieldID)).
+		First(ctx)
+	if err != nil {
+		return contract.AccountHealthSnapshot{}, err
+	}
+	return toHealthSnapshot(found), nil
+}
+
+func (s *Store) ListHealthSnapshotsByAccount(ctx context.Context, accountID int, limit int) ([]contract.AccountHealthSnapshot, error) {
+	query := s.client.AccountHealthSnapshot.Query().
+		Where(entaccounthealthsnapshot.AccountIDEQ(accountID)).
+		Order(ent.Desc(entaccounthealthsnapshot.FieldSnapshotAt), ent.Desc(entaccounthealthsnapshot.FieldID))
+	if limit > 0 {
+		query.Limit(limit)
+	}
+	rows, err := query.All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]contract.AccountHealthSnapshot, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toHealthSnapshot(row))
+	}
+	return out, nil
+}
+
+func (s *Store) RecordQuotaSnapshot(ctx context.Context, snapshot contract.AccountQuotaSnapshot) (contract.AccountQuotaSnapshot, error) {
+	created, err := s.client.AccountQuotaSnapshot.Create().
+		SetAccountID(snapshot.AccountID).
+		SetProviderID(snapshot.ProviderID).
+		SetQuotaType(snapshot.QuotaType).
+		SetRemaining(snapshot.Remaining).
+		SetUsed(snapshot.Used).
+		SetQuotaLimit(snapshot.QuotaLimit).
+		SetRemainingRatio(float64(snapshot.RemainingRatio)).
+		SetNillableResetAt(snapshot.ResetAt).
+		SetSnapshotAt(snapshot.SnapshotAt).
+		Save(ctx)
+	if err != nil {
+		return contract.AccountQuotaSnapshot{}, err
+	}
+	return toQuotaSnapshot(created), nil
+}
+
+func (s *Store) ListQuotaSnapshotsByAccount(ctx context.Context, accountID int, limit int) ([]contract.AccountQuotaSnapshot, error) {
+	query := s.client.AccountQuotaSnapshot.Query().
+		Where(entaccountquotasnapshot.AccountIDEQ(accountID)).
+		Order(ent.Desc(entaccountquotasnapshot.FieldSnapshotAt), ent.Desc(entaccountquotasnapshot.FieldID))
+	if limit > 0 {
+		query.Limit(limit)
+	}
+	rows, err := query.All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]contract.AccountQuotaSnapshot, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toQuotaSnapshot(row))
+	}
+	return out, nil
+}
+
 func toAccount(row *ent.ProviderAccount) contract.ProviderAccount {
 	return contract.ProviderAccount{
 		ID:                   row.ID,
@@ -137,6 +331,63 @@ func toAccount(row *ent.ProviderAccount) contract.ProviderAccount {
 		CreatedAt:            row.CreatedAt,
 		UpdatedAt:            row.UpdatedAt,
 		DeletedAt:            cloneTime(row.DeletedAt),
+	}
+}
+
+func toGroup(row *ent.AccountGroup) contract.AccountGroup {
+	return contract.AccountGroup{
+		ID:            row.ID,
+		Name:          row.Name,
+		Description:   row.Description,
+		ProviderScope: cloneMap(row.ProviderScopeJSON),
+		ModelScope:    cloneMap(row.ModelScopeJSON),
+		StrategyHint:  row.StrategyHint,
+		Status:        contract.GroupStatus(row.Status),
+		CreatedAt:     row.CreatedAt,
+		UpdatedAt:     row.UpdatedAt,
+	}
+}
+
+func toGroupMember(row *ent.AccountGroupMember) contract.AccountGroupMember {
+	return contract.AccountGroupMember{
+		ID:             row.ID,
+		AccountID:      row.AccountID,
+		AccountGroupID: row.AccountGroupID,
+		CreatedAt:      row.CreatedAt,
+		UpdatedAt:      row.UpdatedAt,
+	}
+}
+
+func toHealthSnapshot(row *ent.AccountHealthSnapshot) contract.AccountHealthSnapshot {
+	return contract.AccountHealthSnapshot{
+		ID:             row.ID,
+		AccountID:      row.AccountID,
+		ProviderID:     row.ProviderID,
+		Status:         row.Status,
+		SuccessRate:    float32(row.SuccessRate),
+		ErrorRate:      float32(row.ErrorRate),
+		LatencyP50MS:   row.LatencyP50Ms,
+		LatencyP95MS:   row.LatencyP95Ms,
+		RateLimitCount: row.RateLimitCount,
+		TimeoutCount:   row.TimeoutCount,
+		CooldownUntil:  cloneTime(row.CooldownUntil),
+		CircuitState:   row.CircuitState,
+		SnapshotAt:     row.SnapshotAt,
+	}
+}
+
+func toQuotaSnapshot(row *ent.AccountQuotaSnapshot) contract.AccountQuotaSnapshot {
+	return contract.AccountQuotaSnapshot{
+		ID:             row.ID,
+		AccountID:      row.AccountID,
+		ProviderID:     row.ProviderID,
+		QuotaType:      row.QuotaType,
+		Remaining:      row.Remaining,
+		Used:           row.Used,
+		QuotaLimit:     row.QuotaLimit,
+		RemainingRatio: float32(row.RemainingRatio),
+		ResetAt:        cloneTime(row.ResetAt),
+		SnapshotAt:     row.SnapshotAt,
 	}
 }
 
