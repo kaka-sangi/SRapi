@@ -6,7 +6,7 @@
 | --- | --- |
 | 状态 | Draft |
 | 适用阶段 | MVP / Phase 1 |
-| 关联文档 | `MVP_IMPLEMENTATION_PLAN.md`, `ARCHITECTURE.md`, `OPENAPI_CONTRACT.md`, `AI_ENDPOINT_COMPATIBILITY.md`, `GATEWAY_ROUTE_MATRIX.md`, `DATA_MODEL.md`, `SCHEDULING_KERNEL_DESIGN.md`, `PROVIDER_ADAPTER_SPEC.md`, `COMPATIBLE_PROVIDER_REGISTRY_SPEC.md`, `REVERSE_PROXY_SPEC.md`, `SECURITY_MODEL.md`, `CONFIGURATION_SPEC.md`, `OPERATIONS.md`, `OBSERVABILITY_SPEC.md`, `PAYMENT_SPEC.md`, `AFFILIATE_REBATE_SPEC.md` |
+| 关联文档 | `MVP_IMPLEMENTATION_PLAN.md`, `ARCHITECTURE.md`, `MODULE_INTERFACE_CONTRACTS.md`, `DOMAIN_EVENTS_SPEC.md`, `OPENAPI_CONTRACT.md`, `AI_ENDPOINT_COMPATIBILITY.md`, `GATEWAY_ROUTE_MATRIX.md`, `DATA_MODEL.md`, `DOMAIN_MODEL.md`, `CAPABILITY_TAXONOMY_SPEC.md`, `SCHEDULING_KERNEL_DESIGN.md`, `SCHEDULER_STRATEGY_EXTENSION_SPEC.md`, `PROVIDER_ADAPTER_SPEC.md`, `COMPATIBLE_PROVIDER_REGISTRY_SPEC.md`, `REVERSE_PROXY_SPEC.md`, `SECURITY_MODEL.md`, `CONFIGURATION_SPEC.md`, `OPERATIONS.md`, `OBSERVABILITY_SPEC.md`, `PAYMENT_SPEC.md`, `AFFILIATE_REBATE_SPEC.md` |
 | 目标读者 | 后端、前端、测试、文档、AI 编码代理 |
 
 ## 2. 目标
@@ -30,6 +30,8 @@ API Key -> Client Endpoint Adapter -> Canonical AI Request -> Scheduler v1 -> Pr
 - 控制台登录与当前用户接口。
 - API Key 创建、展示一次、哈希存储、鉴权。
 - Provider / Model / Provider Account 基础管理。
+- 模块 contract 边界和最小领域事件 outbox/inbox 骨架。
+- Capability descriptor 注册和最小能力 taxonomy seed。
 - OpenAI-compatible `/v1/models`。
 - OpenAI-compatible `/v1/chat/completions`，包含非流式和流式。
 - OpenAI-compatible `/v1/responses`，包含非流式和流式基础转换。
@@ -41,6 +43,7 @@ API Key -> Client Endpoint Adapter -> Canonical AI Request -> Scheduler v1 -> Pr
 - 反代运行时（Reverse Proxy Runtime）骨架：账号 runtime_class、独立 HTTP client、独立 cookie jar、独立出口代理、Header Hygiene、SSE 字节透传、OAuth refresh 接口、反代错误分类。
 - 至少 1 个反代 Provider Adapter（推荐 `reverse-proxy-claude-code-cli` 或 `reverse-proxy-codex-cli`，使用 OAuth refresh token），用于验证反代闭环。
 - Scheduler v1 的账号选择、过滤、打分、Lease、Decision、Feedback。
+- Scheduler StrategyRegistry 最小实现和策略版本快照。
 - Usage Log 与基础管理查询接口。
 - 基础 Audit Log。
 - 本地质量门禁。
@@ -97,6 +100,10 @@ API Key -> Client Endpoint Adapter -> Canonical AI Request -> Scheduler v1 -> Pr
 | FR-024 | 本地开发必须能通过一条命令或清晰步骤启动 PostgreSQL、Redis、API。 |
 | FR-025 | MVP 必须提供配置样例、配置校验和 release 模式弱 secret 拒绝启动规则，详见 `CONFIGURATION_SPEC.md`。 |
 | FR-026 | MVP 必须提供基础运维端点和本地部署门禁，生产治理扩展以 `OPERATIONS.md` 为准。 |
+| FR-027 | MVP 内部跨模块调用必须通过 `MODULE_INTERFACE_CONTRACTS.md` 定义的 contract，不得跨模块访问 repository、handler 或 Ent query。 |
+| FR-028 | MVP 必须提供 `domain_events_outbox` / `domain_events_inbox` 骨架，用于 Gateway usage、scheduler feedback、payment/affiliate 后续阶段的最终一致扩展。 |
+| FR-029 | MVP 必须使用 `CAPABILITY_TAXONOMY_SPEC.md` 的 capability descriptor 表达 RequestCapability、ModelCapability、ProviderCapability 和 EffectiveCapability。 |
+| FR-030 | Scheduler v1 的 `balanced` 与 `cost_saver` 必须经 StrategyRegistry 解析，并在 decision 中记录 strategy version、config hash 和 weights snapshot。 |
 
 ## 5. 非功能需求
 
@@ -118,6 +125,9 @@ API Key -> Client Endpoint Adapter -> Canonical AI Request -> Scheduler v1 -> Pr
 | NFR-014 | SRapi 不内置任何具体上游 ToS 绕过手段；任何反代行为的合规风险由部署者承担，并在 README 与管理后台明示。 |
 | NFR-015 | Gateway 路由新增或 Provider alias 新增必须同步 `GATEWAY_ROUTE_MATRIX.md`，不得在 handler 中复制 provider-specific 账号选择逻辑。 |
 | NFR-016 | Compatible Provider preset 新增必须同步 `COMPATIBLE_PROVIDER_REGISTRY_SPEC.md`，不得硬编码 secret 或绕过模型可见性。 |
+| NFR-017 | 新增跨模块协作必须优先选择 module contract 或 domain event，不得引入反向依赖。 |
+| NFR-018 | 新增能力 key 必须先登记到 `CAPABILITY_TAXONOMY_SPEC.md`，不得在 Adapter、Gateway 或 Scheduler 中临时发明字段。 |
+| NFR-019 | 新增调度策略必须具备 descriptor、config schema、版本、dry-run 测试和回滚说明。 |
 
 ## 6. 验收条件
 
@@ -145,6 +155,10 @@ API Key -> Client Endpoint Adapter -> Canonical AI Request -> Scheduler v1 -> Pr
 | AC-013 | Given 管理员禁用账号，When 查询 audit logs，Then 可以看到操作者、资源、前后状态摘要和 trace id。 |
 | AC-014 | Given OpenAPI 契约变更，When 运行质量门禁，Then lint、bundle、codegen check 都通过。 |
 | AC-015 | Given 新开发者 clone 项目，When 按 README 执行本地启动步骤，Then 能完成管理员登录和一次 mock Gateway 调用。 |
+| AC-016 | Given 新增模块间调用，When 运行架构检查或代码审查，Then 调用方只依赖被调用模块 contract，不直接依赖 repository、handler 或 Ent query。 |
+| AC-017 | Given 一次 Gateway 请求完成，When usage 或 feedback 后续处理失败，Then 主请求不回滚且 outbox/inbox 可用于重试或补偿。 |
+| AC-018 | Given 请求需要 tools、vision 或 structured output，When Scheduler 构建候选，Then 只能使用 RequestCapability 与 EffectiveCapability 做能力匹配。 |
+| AC-019 | Given 切换 `balanced` 到 `cost_saver` 策略，When 查询 scheduler decisions，Then 历史 decision 保留旧 strategy version 和权重快照。 |
 
 ## 7. 边界场景
 
@@ -175,6 +189,7 @@ api_keys
 api_key_groups
 providers
 model_registry
+capability_definitions
 model_aliases
 model_provider_mappings
 pricing_rules
@@ -184,9 +199,12 @@ account_group_members
 usage_logs
 scheduler_decisions
 scheduler_feedbacks
+scheduler_strategies
 billing_ledger
 account_health_snapshots
 account_quota_snapshots
+domain_events_outbox
+domain_events_inbox
 settings
 audit_logs
 idempotency_records
@@ -209,6 +227,10 @@ idempotency_records
 | FR-023 | OpenAPI CI checks |
 | FR-024 | Docker Compose smoke test |
 | FR-025, FR-026 | config validation + health/readiness smoke test |
+| FR-027 | module contract boundary tests / architecture import checks |
+| FR-028 | outbox/inbox idempotency tests |
+| FR-029 | capability extraction and matching golden tests |
+| FR-030 | scheduler strategy registry, version snapshot and dry-run tests |
 
 ## 10. 交付门禁
 
@@ -222,4 +244,8 @@ MVP 不满足以下任一项，不得标记完成：
 - Gateway 请求必须产生 decision、feedback、usage log。
 - `/v1/chat/completions`、`/v1/responses`、`/v1/messages` 的最小互转测试通过。
 - Scheduler 场景矩阵最小集合通过。
+- Module contract 边界检查通过。
+- Capability taxonomy 兼容性测试通过。
+- StrategyRegistry 版本快照测试通过。
+- Outbox / Inbox 幂等测试通过。
 - 本地启动流程在 README 中可复现。

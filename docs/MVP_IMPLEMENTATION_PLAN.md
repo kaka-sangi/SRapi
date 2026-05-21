@@ -88,7 +88,7 @@ SRapi/
 
 - 目录存在。
 - README 指向核心文档。
-- docs 包含架构、领域、OpenAPI、数据模型、安全模型、调度、Scheduler v1、Provider、MVP 实现级规格文档。
+- docs 包含架构、模块接口契约、领域事件、能力 taxonomy、领域、OpenAPI、数据模型、安全模型、调度、Scheduler v1、策略扩展、Provider、MVP 实现级规格文档。
 
 ## 5. M1：OpenAPI 契约基础
 
@@ -119,6 +119,8 @@ GET  /api/v1/admin/models
 POST /api/v1/admin/models
 GET  /api/v1/admin/accounts
 POST /api/v1/admin/accounts
+GET  /api/v1/admin/capabilities
+GET  /api/v1/admin/scheduler/strategies
 GET  /v1/models
 POST /v1/chat/completions
 POST /v1/responses
@@ -189,6 +191,7 @@ users
 api_keys
 providers
 model_registry
+capability_definitions
 model_aliases
 model_provider_mappings
 provider_accounts
@@ -197,7 +200,10 @@ account_group_members
 usage_logs
 scheduler_decisions
 scheduler_feedbacks
+scheduler_strategies
 billing_ledger
+domain_events_outbox
+domain_events_inbox
 settings
 audit_logs
 ```
@@ -219,6 +225,7 @@ apps/api/migrations
 
 - 数据库迁移可运行。
 - Ent client 可生成。
+- Capability registry、Strategy registry 和 Outbox / Inbox 表具备最小 schema。
 
 ## 8. M4：Auth 与 API Key
 
@@ -275,6 +282,7 @@ modules/accounts
 - 创建 Model。
 - 创建 Model Alias。
 - 创建 Provider Model Mapping。
+- 创建 Capability definition seed。
 - 创建 Provider Account。
 - 加密保存 Provider Account credential。
 - 测试账号连通性。
@@ -293,6 +301,7 @@ mapping: openai-compatible model mapping
 
 - Provider CRUD。
 - Model CRUD。
+- Capability descriptor seed 和 schema 校验。
 - Account credential encryption。
 - Account validation mock。
 
@@ -359,6 +368,7 @@ modules/scheduler
 ### 组件
 
 - RequestClassifier。
+- CapabilityResolver。
 - CandidateBuilder。
 - PolicyFilter。
 - ScoreEngine。
@@ -378,6 +388,7 @@ cost_saver
 ### 能力
 
 - 账号硬过滤。
+- RequestCapability / EffectiveCapability 匹配。
 - 健康分基础计算。
 - 额度分基础计算。
 - 成本分基础计算。
@@ -385,10 +396,13 @@ cost_saver
 - Lease 并发控制。
 - Scheduler Decision 持久化。
 - Scheduler Feedback 持久化。
+- Strategy version 和 weights snapshot 持久化。
 
 ### 测试
 
-至少覆盖 `SCHEDULING_SCENARIOS.md` 最小集合。
+- 至少覆盖 `SCHEDULING_SCENARIOS.md` 最小集合。
+- 覆盖 `CAPABILITY_TAXONOMY_SPEC.md` 的 required / optional capability 匹配。
+- 覆盖 `SCHEDULER_STRATEGY_EXTENSION_SPEC.md` 的 strategy version 和 dry-run 基础行为。
 
 ### 完成标准
 

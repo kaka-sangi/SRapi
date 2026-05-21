@@ -424,6 +424,8 @@ quality_tier
 fallback_models
 ```
 
+上述 `supports_*` 字段只是管理端 DTO 形态；真实能力注册、版本、降级和匹配规则必须以 `CAPABILITY_TAXONOMY_SPEC.md` 的 capability descriptor 为准。
+
 ### 8.6 Accounts 模块
 
 能力：

@@ -122,10 +122,14 @@ strategy_hint
 处理逻辑：
 
 - 模型别名解析。
-- 模型能力匹配。
-- Provider 支持检查。
+- RequestCapability 提取。
+- ModelCapability 匹配。
+- ProviderCapability 支持检查。
+- EffectiveCapability 计算。
 - 用户组权限检查。
 - fallback model 候选生成。
+
+能力 key、版本、状态、降级和 matching 规则以 `CAPABILITY_TAXONOMY_SPEC.md` 为准。
 
 示例：
 
@@ -144,7 +148,7 @@ strategy_hint
 候选账号必须满足：
 
 - Provider 匹配。
-- 模型能力匹配。
+- EffectiveCapability 匹配 RequestCapability。
 - 账号启用。
 - 账号属于可用分组。
 - 用户或 API Key 有权限。

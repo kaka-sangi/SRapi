@@ -73,12 +73,17 @@ amount_minor bigint + currency
 
 - Provider capabilities。
 - Model capabilities。
+- Capability descriptors。
 - Scheduler score breakdown。
+- Scheduler strategy config。
 - Reject reasons。
+- Domain event payload snapshot。
 - Webhook payload snapshot。
 - Metadata。
 
 不应把核心查询字段只放 JSON。
+
+能力类 JSON 必须遵守 `CAPABILITY_TAXONOMY_SPEC.md` 的 key、version、status、level 和 metadata schema 规则。
 
 ## 6. 用户与权限
 
@@ -342,6 +347,33 @@ index(model_id, provider_id)
 index(effective_from, effective_to)
 ```
 
+### 8.6 capability_definitions
+
+```txt
+id
+key
+version
+category
+status
+description
+schema_json
+replacement_key
+created_at
+updated_at
+```
+
+索引：
+
+```txt
+unique(key, version)
+index(category, status)
+```
+
+规则：
+
+- 能力 key、分类、版本和废弃策略以 `CAPABILITY_TAXONOMY_SPEC.md` 为准。
+- MVP 可以先以 seed 数据或代码常量实现，但数据库模型必须预留。
+
 ## 9. 账号池
 
 ### 9.1 provider_accounts
@@ -509,7 +541,39 @@ index(provider_id, created_at)
 index(error_class, created_at)
 ```
 
-### 10.3 sticky_sessions
+### 10.3 scheduler_strategies
+
+```txt
+id
+name
+version
+status
+scope_type
+scope_id
+config_json
+config_hash
+description
+created_by
+created_at
+updated_at
+activated_at
+deprecated_at
+```
+
+索引：
+
+```txt
+unique(name, version, scope_type, scope_id)
+index(status, scope_type, scope_id)
+index(name, status)
+```
+
+规则：
+
+- 策略 descriptor、配置 schema、版本和灰度规则以 `SCHEDULER_STRATEGY_EXTENSION_SPEC.md` 为准。
+- `scheduler_decisions` 必须记录当次使用的策略版本、配置 hash 和权重快照。
+
+### 10.4 sticky_sessions
 
 ```txt
 id
@@ -535,7 +599,7 @@ index(account_id)
 index(expires_at)
 ```
 
-### 10.4 cache_affinity_records
+### 10.5 cache_affinity_records
 
 ```txt
 id
@@ -559,7 +623,7 @@ index(prompt_prefix_hash)
 index(last_hit_time)
 ```
 
-### 10.5 account_health_snapshots
+### 10.6 account_health_snapshots
 
 ```txt
 id
@@ -585,7 +649,7 @@ index(provider_id, snapshot_at)
 index(status)
 ```
 
-### 10.6 account_quota_snapshots
+### 10.7 account_quota_snapshots
 
 ```txt
 id
@@ -878,6 +942,68 @@ index(resource_type, resource_id)
 index(action, created_at)
 ```
 
+## 15A. 领域事件
+
+### 15A.1 domain_events_outbox
+
+```txt
+id
+event_id
+event_type
+event_version
+producer_module
+aggregate_type
+aggregate_id
+correlation_id
+causation_id
+idempotency_key
+payload_json
+metadata_json
+status
+attempt_count
+next_retry_at
+last_error
+created_at
+published_at
+```
+
+索引：
+
+```txt
+unique(event_id)
+unique(producer_module, idempotency_key)
+index(status, next_retry_at)
+index(event_type, created_at)
+index(aggregate_type, aggregate_id, created_at)
+index(correlation_id)
+```
+
+### 15A.2 domain_events_inbox
+
+```txt
+id
+event_id
+consumer_name
+event_type
+status
+attempt_count
+last_error
+processed_at
+created_at
+```
+
+索引：
+
+```txt
+unique(event_id, consumer_name)
+index(consumer_name, status, created_at)
+```
+
+规则：
+
+- 事件 envelope、Outbox 状态、Inbox 幂等和死信处理以 `DOMAIN_EVENTS_SPEC.md` 为准。
+- 事件 payload 不得包含明文 API Key、Provider 凭证、cookie、OAuth token 或原始 prompt。
+
 ## 16. 系统配置
 
 ### 16.1 settings
@@ -911,6 +1037,8 @@ scheduler_feedbacks
 audit_logs
 account_health_snapshots
 account_quota_snapshots
+domain_events_outbox
+domain_events_inbox
 ```
 
 建议：
@@ -935,6 +1063,9 @@ account_quota_snapshots
 - 调度反馈快照。
 - 账号健康统计。
 - 报表数据。
+- 领域事件消费和跨模块补偿。
+
+最终一致流程必须通过 `DOMAIN_EVENTS_SPEC.md` 的 Outbox / Inbox / 幂等机制实现。
 
 ## 19. 加密字段
 
@@ -965,6 +1096,7 @@ api_keys
 api_key_groups
 providers
 model_registry
+capability_definitions
 model_aliases
 model_provider_mappings
 pricing_rules
@@ -974,9 +1106,12 @@ account_group_members
 usage_logs
 scheduler_decisions
 scheduler_feedbacks
+scheduler_strategies
 billing_ledger
 account_health_snapshots
 account_quota_snapshots
+domain_events_outbox
+domain_events_inbox
 settings
 audit_logs
 idempotency_records

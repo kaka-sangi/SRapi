@@ -39,6 +39,8 @@ SRapi/
 | [完整项目开发方案](docs/PROJECT_DEVELOPMENT_PLAN.md) | 项目全局路线图与阶段规划 | 是 |
 | [MVP 实现级规格](docs/MVP_SPEC.md) | MVP 功能需求、非功能需求、验收条件和测试映射 | 是 |
 | [后端架构设计](docs/ARCHITECTURE.md) | 后端模块边界、依赖方向和调用链 | 是 |
+| [模块接口契约规范](docs/MODULE_INTERFACE_CONTRACTS.md) | 跨模块 contract、DTO、同步调用、事件边界和测试规则 | 是 |
+| [领域事件规范](docs/DOMAIN_EVENTS_SPEC.md) | 领域事件、Outbox、Inbox、幂等、重试、死信和补偿 | 是 |
 | [领域模型](docs/DOMAIN_MODEL.md) | 核心业务概念和术语边界 | 是 |
 | [OpenAPI 契约规范](docs/OPENAPI_CONTRACT.md) | HTTP 契约、错误、鉴权、分页和 codegen 规则 | 是 |
 | [AI 端点兼容与转换规范](docs/AI_ENDPOINT_COMPATIBILITY.md) | Chat Completions、Responses、Messages、Gemini 等端点互转与 Canonical AI IR | 是 |
@@ -46,8 +48,10 @@ SRapi/
 | [安全模型](docs/SECURITY_MODEL.md) | API Key、Cookie、CSRF、Provider 凭证、日志和审计要求 | 是 |
 | [调度内核专项设计](docs/SCHEDULING_KERNEL_DESIGN.md) | 调度内核总体设计和长期演进模型 | 是 |
 | [Scheduler v1 实现级规格](docs/SCHEDULER_V1_SPEC.md) | MVP 调度过滤、打分、Lease、Decision 和 Feedback 规则 | 是 |
+| [Scheduler 策略扩展规范](docs/SCHEDULER_STRATEGY_EXTENSION_SPEC.md) | 策略注册、版本、灰度、dry-run、shadow decision 和回滚规则 | 是 |
 | [调度场景矩阵](docs/SCHEDULING_SCENARIOS.md) | Scheduler 单元测试、集成测试和模拟器场景 | 是 |
 | [Provider Adapter 规范](docs/PROVIDER_ADAPTER_SPEC.md) | Provider 扩展、错误分类、usage 和流式解析规范 | 是 |
+| [能力分类与版本化规范](docs/CAPABILITY_TAXONOMY_SPEC.md) | Request / Model / Provider / Endpoint capability 命名、匹配、降级和版本规则 | 是 |
 | [反代运行时与去特征规范](docs/REVERSE_PROXY_SPEC.md) | 2api 反代、TLS / HTTP/2 / Header 指纹、cookie / OAuth 凭证、反封号策略 | 是 |
 | [Gateway 路由矩阵](docs/GATEWAY_ROUTE_MATRIX.md) | Gateway 路由族、Provider alias、passthrough、WebSocket 和阶段规划 | 是 |
 | [兼容 Provider 注册表规范](docs/COMPATIBLE_PROVIDER_REGISTRY_SPEC.md) | OpenAI-compatible / Anthropic-compatible preset、base URL、auth mode、模型目录和 route alias | 是 |

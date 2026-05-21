@@ -147,7 +147,7 @@ type ProviderStream interface {
 
 ## 6. ProviderCapabilities
 
-Adapter 必须声明能力。
+Adapter 必须声明能力。能力命名、版本、状态、降级和 metadata schema 以 `CAPABILITY_TAXONOMY_SPEC.md` 为准。
 
 ```txt
 provider_name
@@ -173,6 +173,19 @@ supports_oauth_refresh
 rate_limit_model
 quota_model
 ```
+
+上述 `supports_*` 字段是实现 DTO 的便利表达，必须映射为 canonical capability descriptor：
+
+```txt
+key
+version
+status
+level
+source
+metadata_json
+```
+
+Provider Adapter 不得发明未登记的 capability key。新增能力必须先更新 `CAPABILITY_TAXONOMY_SPEC.md` 和对应测试。
 
 ## 7. Model Capability 映射
 
@@ -200,6 +213,8 @@ pricing_override
 - 模型映射优先来自数据库 `model_provider_mappings`。
 - Adapter 可以提供默认映射。
 - 数据库配置优先于 Adapter 默认映射。
+- `capability_override` 必须使用 `CAPABILITY_TAXONOMY_SPEC.md` 的 descriptor 结构。
+- 最终能力由 ModelCapability、ProviderCapability、MappingOverride 和 AccountRuntimeState 共同计算，Scheduler 只消费 EffectiveCapability。
 
 ## 8. 账号凭证模型
 

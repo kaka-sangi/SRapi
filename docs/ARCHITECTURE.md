@@ -32,6 +32,8 @@ Modular Monolith + Hexagonal Boundaries + OpenAPI-first
 - 模块之间通过接口交互。
 - 具体基础设施实现放在 platform 层或模块内 adapter 中。
 - HTTP 层、数据库层、Provider 协议层不能污染核心业务逻辑。
+- 跨模块同步调用必须依赖 `MODULE_INTERFACE_CONTRACTS.md` 定义的 contract。
+- 跨模块最终一致协作必须通过 `DOMAIN_EVENTS_SPEC.md` 定义的领域事件和 Outbox。
 
 ## 3. 代码结构
 
@@ -126,6 +128,7 @@ apps/api/
 
 - Domain model。
 - Service。
+- Contract。
 - Repository interface。
 - Handler。
 - Policy。
@@ -164,6 +167,7 @@ apps/api/
 http → modules → platform
        modules → openapi types
        modules → other module interfaces
+       modules → domain event publisher
 ```
 
 禁止：
@@ -175,6 +179,8 @@ service → handler
 provider adapter → http handler
 scheduler → concrete provider implementation
 billing → concrete gateway handler
+module A → module B repository
+module A → module B handler
 ```
 
 ## 6. 核心调用链
@@ -244,6 +250,8 @@ Billing / Subscription Update
   ↓
 Audit Log
 ```
+
+支付完成、退款、返利、账务和观测的后续处理应优先通过 `DOMAIN_EVENTS_SPEC.md` 的事件机制完成，避免 Payments 同步耦合 Billing、Affiliate、Observability 和通知模块。
 
 ### 6.4 异步任务调用链
 
@@ -497,6 +505,7 @@ Gateway 上游错误需要转换为：
 - 增加模型映射。
 - 增加错误分类器。
 - 增加 usage parser。
+- 通过 `CAPABILITY_TAXONOMY_SPEC.md` 声明 Provider / Model / Endpoint capability。
 - 不修改 Scheduler 核心流程。
 
 新增客户端端点协议：
@@ -509,6 +518,7 @@ Gateway 上游错误需要转换为：
 新增调度策略：
 
 - 增加 Strategy 实现或配置。
+- 增加 strategy descriptor、配置 schema、版本和 dry-run 测试，详见 `SCHEDULER_STRATEGY_EXTENSION_SPEC.md`。
 - 不修改 Gateway。
 - 不修改 Provider Adapter。
 
@@ -521,7 +531,15 @@ Gateway 上游错误需要转换为：
 
 - 扩展 Model Capability。
 - 扩展 Provider Capability。
+- 使用 `CAPABILITY_TAXONOMY_SPEC.md` 的 capability key、version、status 和 downgrade 规则。
 - 保持旧字段兼容。
+
+新增跨模块协作：
+
+- 优先增加 contract 或 domain event。
+- 不允许直接依赖其他模块 repository、handler 或 Ent query。
+- contract 规则以 `MODULE_INTERFACE_CONTRACTS.md` 为准。
+- 事件、重试、死信和补偿以 `DOMAIN_EVENTS_SPEC.md` 为准。
 
 ## 13. 架构约束
 
@@ -529,6 +547,8 @@ Gateway 上游错误需要转换为：
 - Client endpoint-specific 逻辑不得进入 Scheduler score core。
 - Gateway 不得直接选择账号。
 - Billing 不得直接调用 Provider。
+- 跨模块调用不得绕过 module contract。
+- 可最终一致的跨模块副作用不得强行放进同步主链路。
 - Payment webhook 必须幂等。
 - API Key 原文不得持久化。
 - 上游凭证、cookie、OAuth token 不得明文存储。

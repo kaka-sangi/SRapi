@@ -6,6 +6,8 @@
 
 Scheduler v1 的目标是先实现可解释、可审计、可控成本的账号选择闭环，而不是实现复杂策略 DSL 或机器学习调度。
 
+策略扩展、版本、灰度、dry-run 和 shadow decision 以 `SCHEDULER_STRATEGY_EXTENSION_SPEC.md` 为准。
+
 ## 2. 输入与输出
 
 ### 2.1 输入
@@ -19,6 +21,8 @@ ModelRegistry
 ProviderCapabilities
 ProviderAccountRuntimeState
 PricingRule
+RequestCapability
+EffectiveCapability
 StickyState optional
 CacheAffinityState optional
 ```
@@ -64,6 +68,7 @@ strategy_hint
 - `source_protocol` 和 `source_endpoint` 只允许用于审计和兼容性诊断，不得影响 Scheduler 账号评分。
 - `estimated_input_tokens` 和 `estimated_output_tokens` 可以使用 MVP 简单估算，但必须标记估算来源。
 - `conversation_hash` 和 `session_hash` 必须是不可逆哈希，不得保存原始 prompt 或会话内容。
+- RequestProfile 中的能力需求必须来自 `CAPABILITY_TAXONOMY_SPEC.md` 定义的 RequestCapability。
 
 ## 4. CandidateBuilder
 
@@ -73,7 +78,7 @@ strategy_hint
 provider enabled
 provider_account enabled
 model mapping exists
-model capability matches request
+effective capability matches request capability
 api key allowed model scope
 user entitlement allowed model scope
 account group scope matches user/api key
@@ -97,6 +102,8 @@ weight
 risk_level
 runtime_limits
 ```
+
+CandidateBuilder 必须使用 `CAPABILITY_TAXONOMY_SPEC.md` 定义的 EffectiveCapability 做能力匹配，不得直接使用 Provider-specific 字段做 hard filter。
 
 ## 5. Filter Reasons
 

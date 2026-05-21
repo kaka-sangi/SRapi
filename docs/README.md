@@ -12,6 +12,8 @@
 | `MVP_SPEC.md` | MVP 功能需求、非功能需求、验收条件和测试映射。 |
 | `MVP_IMPLEMENTATION_PLAN.md` | MVP 里程碑拆解和实现顺序。 |
 | `ARCHITECTURE.md` | 后端模块边界、依赖方向和调用链。 |
+| `MODULE_INTERFACE_CONTRACTS.md` | 模块间 contract、DTO、同步调用和事件边界。 |
+| `DOMAIN_EVENTS_SPEC.md` | 领域事件、Outbox、Inbox、幂等、重试和补偿规则。 |
 | `DOMAIN_MODEL.md` | 核心业务概念、术语和领域关系。 |
 | `DATA_MODEL.md` | PostgreSQL 表、索引、一致性和加密字段。 |
 | `OPENAPI_CONTRACT.md` | HTTP 契约、错误、鉴权、分页和 codegen 规则。 |
@@ -27,6 +29,7 @@
 | `GATEWAY_ROUTE_MATRIX.md` | Gateway 路由族、Provider alias、passthrough、WebSocket 和阶段规划。 |
 | `PROVIDER_ADAPTER_SPEC.md` | Provider Adapter 扩展、错误分类、usage 和流式解析规范。 |
 | `COMPATIBLE_PROVIDER_REGISTRY_SPEC.md` | OpenAI-compatible / Anthropic-compatible preset、默认 base URL、auth mode、模型目录和 route alias。 |
+| `CAPABILITY_TAXONOMY_SPEC.md` | Request / Model / Provider / Endpoint capability 命名、版本、降级和匹配规则。 |
 | `REVERSE_PROXY_SPEC.md` | 2api 反代、TLS / HTTP/2 / Header 指纹、cookie / OAuth 凭证和反封号策略。 |
 
 ## 4. Scheduler 文档
@@ -35,6 +38,7 @@
 | --- | --- |
 | `SCHEDULING_KERNEL_DESIGN.md` | 调度内核总体设计和长期演进模型。 |
 | `SCHEDULER_V1_SPEC.md` | MVP 调度过滤、打分、Lease、Decision 和 Feedback 规则。 |
+| `SCHEDULER_STRATEGY_EXTENSION_SPEC.md` | 调度策略注册、版本、灰度、dry-run、shadow decision 和回滚规则。 |
 | `SCHEDULING_SCENARIOS.md` | Scheduler 单元测试、集成测试和模拟器场景。 |
 
 ## 5. 商业化与运营文档
@@ -54,11 +58,14 @@
 ## 7. 维护规则
 
 - 改接口必须同步 `OPENAPI_CONTRACT.md`。
+- 改跨模块调用必须同步 `MODULE_INTERFACE_CONTRACTS.md`。
+- 改领域事件、异步补偿或 Outbox 必须同步 `DOMAIN_EVENTS_SPEC.md`。
 - 改数据表必须同步 `DATA_MODEL.md`。
 - 改 Gateway 路由必须同步 `GATEWAY_ROUTE_MATRIX.md`。
 - 改 Provider preset 必须同步 `COMPATIBLE_PROVIDER_REGISTRY_SPEC.md`。
+- 改模型、Provider、请求或端点能力必须同步 `CAPABILITY_TAXONOMY_SPEC.md`。
 - 改反代行为必须同步 `REVERSE_PROXY_SPEC.md`。
-- 改调度策略必须同步 `SCHEDULER_V1_SPEC.md` 和 `SCHEDULING_SCENARIOS.md`。
+- 改调度策略必须同步 `SCHEDULER_V1_SPEC.md`、`SCHEDULER_STRATEGY_EXTENSION_SPEC.md` 和 `SCHEDULING_SCENARIOS.md`。
 - 改配置键必须同步 `CONFIGURATION_SPEC.md`。
 - 改部署、迁移、备份、日志、健康检查必须同步 `OPERATIONS.md`。
 - 改支付必须同步 `PAYMENT_SPEC.md`。

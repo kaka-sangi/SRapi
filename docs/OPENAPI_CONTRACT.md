@@ -34,6 +34,7 @@ packages/openapi/
 │   ├── subscriptions.yaml
 │   ├── payments.yaml
 │   ├── affiliate.yaml
+│   ├── capabilities.yaml
 │   ├── operations.yaml
 │   └── observability.yaml
 ├── schemas/
@@ -45,6 +46,8 @@ packages/openapi/
 │   ├── models.yaml
 │   ├── accounts.yaml
 │   ├── scheduler.yaml
+│   ├── capabilities.yaml
+│   ├── events.yaml
 │   ├── billing.yaml
 │   └── payments.yaml
 └── examples/
@@ -485,7 +488,11 @@ GET   /api/v1/admin/models/{id}
 PATCH /api/v1/admin/models/{id}
 POST  /api/v1/admin/models/{id}/aliases
 POST  /api/v1/admin/models/{id}/mappings
+GET   /api/v1/admin/capabilities
+GET   /api/v1/admin/capabilities/{key}
 ```
+
+Capability descriptor、版本、状态和降级规则以 `CAPABILITY_TAXONOMY_SPEC.md` 为准。
 
 ### 16.6 Admin Accounts
 
@@ -509,8 +516,15 @@ GET  /api/v1/admin/scheduler/decisions
 GET  /api/v1/admin/scheduler/decisions/{id}
 POST /api/v1/admin/scheduler/simulate
 GET  /api/v1/admin/scheduler/strategies
+POST /api/v1/admin/scheduler/strategies
+GET  /api/v1/admin/scheduler/strategies/{id}
 PATCH /api/v1/admin/scheduler/strategies/{id}
+POST /api/v1/admin/scheduler/strategies/{id}/activate
+POST /api/v1/admin/scheduler/strategies/{id}/simulate
+GET  /api/v1/admin/scheduler/strategies/{id}/versions
 ```
+
+策略 descriptor、配置 schema、版本、dry-run、shadow decision 和回滚规则以 `SCHEDULER_STRATEGY_EXTENSION_SPEC.md` 为准。
 
 ### 16.8 Gateway
 
@@ -538,7 +552,12 @@ POST /api/v1/admin/ops/alerts/{id}/ack
 GET  /api/v1/admin/ops/slo
 POST /api/v1/admin/ops/slo
 PATCH /api/v1/admin/ops/slo/{id}
+GET  /api/v1/admin/ops/events/outbox
+GET  /api/v1/admin/ops/events/dead-letter
+POST /api/v1/admin/ops/events/{event_id}/replay
 ```
+
+领域事件 Outbox、Inbox、重试、死信和补偿以 `DOMAIN_EVENTS_SPEC.md` 为准。
 
 ### 16.10 Payments
 

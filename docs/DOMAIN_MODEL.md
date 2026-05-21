@@ -347,6 +347,18 @@ supports_batch
 
 能力是 Gateway 和 Scheduler 判断候选 Provider 的基础。
 
+能力字段必须映射到 `CAPABILITY_TAXONOMY_SPEC.md` 的 canonical capability key。文档中的 `supports_*` 字段只是 DTO 表达形式，能力注册、匹配、降级和版本化必须使用 capability descriptor：
+
+```txt
+key
+version
+status
+level
+metadata_json
+```
+
+Gateway 负责从客户端请求提取 RequestCapability；Scheduler 只能使用 RequestCapability 与 EffectiveCapability 做候选过滤；Provider Adapter 负责声明 ProviderCapability。
+
 ## 14. Provider Model Mapping
 
 Provider Model Mapping 表示某个 Provider 如何调用某个内部模型。
@@ -368,6 +380,7 @@ status
 - 同一个 canonical model 可以由不同 Provider 提供。
 - 不同 Provider 的上游模型名可能不同。
 - 某个 Provider 可覆盖价格和能力。
+- `capability_override` 必须遵守 `CAPABILITY_TAXONOMY_SPEC.md`，并参与 EffectiveCapability 计算。
 
 ## 15. Pricing Rule
 
