@@ -56,6 +56,7 @@ last_completed:
 - WP-470: OpenAI-compatible Realtime WebSocket relay v1 now exposes `GET /v1/realtime`, schedules accounts with `realtime_websocket` capability, derives upstream `/realtime?model=<mapped_upstream_model>`, and relays frames through Reverse Proxy Runtime using selected OAuth/session/client-token credentials rather than caller headers or Gateway-local DTOs.
 - WP-480: Images edits runtime v1 now exposes OpenAI-compatible multipart `POST /v1/images/edits`, provider alias routing, canonical image edit normalization/rendering, OpenAI-compatible upstream `/images/edits` multipart adapter dispatch, explicit `images` Scheduler capability filtering, usage/billing/Scheduler feedback evidence, and generated OpenAPI/SDK parity.
 - WP-490: Images variations runtime v1 now exposes OpenAI-compatible multipart `POST /v1/images/variations`, provider alias routing, canonical image variation normalization/rendering, OpenAI-compatible upstream `/images/variations` multipart adapter dispatch, explicit `images` Scheduler capability filtering, usage/billing/Scheduler feedback evidence, and generated OpenAPI/SDK parity.
+- WP-500: Antigravity 2api model discovery now lets `reverse-proxy-antigravity` accounts POST `{base_url}/v1internal:fetchAvailableModels` through Reverse Proxy Runtime, parses model catalogs, persists `supported_models` when requested, and keeps the discovery endpoint credential-free in responses.
 
 current:
 
@@ -81,6 +82,18 @@ last_gates:
 - `make code-quality-check`: pass
 - `make secret-scan`: pass
 - `git diff --check`: pass
+- `make openapi-lint`: pass
+- `make openapi-bundle`: pass
+- `make openapi-codegen-check`: pass
+- `make openapi-ts-codegen-check`: pass
+- `make sdk-ts-typecheck`: pass
+- `cd apps/api && go test ./internal/httpserver -run 'TestAdminAccountModelDiscovery' -count=1`: pass
+- `cd apps/api && go test ./internal/httpserver ./internal/modules/reverse_proxy/...`: pass
+- `cd apps/api && go test ./...`: pass
+- `make architecture-check`: pass
+- `make code-quality-check`: pass
+- `make secret-scan`: pass
+- `git diff --check`: pass
 
 notes:
 
@@ -88,6 +101,7 @@ notes:
 - Future goal runs must read `specs/README.md` first, then continue from `next_recommended`.
 - The repository currently has unrelated dirty worktree entries; Codex must preserve them.
 - Frontend visual implementation is intentionally deferred per user instruction.
+- WP-500 keeps discovery responses credential-free while allowing reverse-proxy Antigravity accounts to use selected credentials upstream.
 - WP-080 added `TestGatewayCompatibilityEndpointsTargetSameOpenAICompatibleUpstream`, which records three upstream `/v1/chat/completions` calls using one OpenAI-compatible account and verifies provider/account usage evidence.
 - `make smoke-gateway` passed against a temporary local API on `127.0.0.1:18080`; the temporary process was stopped after the run.
 - WP-090 added `TestSchedulingScenarioMatrixMVP`, `TestRecordFailedFeedbackMarksLeaseFailed`, and `TestRedisLeaseStoreAllowsOnlyOneConcurrentAcquire`; no production Scheduler logic changed.
@@ -218,4 +232,5 @@ notes:
 | WP-470 | completed | OpenAI-compatible Realtime WebSocket relay v1 with OAuth/session/client-token Reverse Proxy Runtime boundary. |
 | WP-480 | completed | Images edits runtime v1. |
 | WP-490 | completed | Images variations runtime v1. |
+| WP-500 | completed | Antigravity 2api model discovery v1. |
 | WP-500+ | pending | Remaining ecosystem and advanced endpoint packages. |

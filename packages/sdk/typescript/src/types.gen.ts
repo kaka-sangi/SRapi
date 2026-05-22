@@ -756,7 +756,7 @@ export type DiscoverAccountModelsRequest = {
 export type AccountModelDiscovery = {
     provider_id: Id;
     account_id: Id;
-    source: 'openai-compatible' | 'anthropic-compatible' | 'gemini-compatible';
+    source: 'openai-compatible' | 'anthropic-compatible' | 'gemini-compatible' | 'reverse-proxy-antigravity';
     endpoint: string;
     model_ids: Array<string>;
     persisted: boolean;

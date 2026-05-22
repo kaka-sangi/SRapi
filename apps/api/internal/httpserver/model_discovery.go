@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -14,6 +15,7 @@ import (
 
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
+	reverseproxycontract "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
 
@@ -32,17 +34,27 @@ var (
 type modelDiscoverySource string
 
 const (
-	modelDiscoveryOpenAI    modelDiscoverySource = "openai-compatible"
-	modelDiscoveryAnthropic modelDiscoverySource = "anthropic-compatible"
-	modelDiscoveryGemini    modelDiscoverySource = "gemini-compatible"
+	modelDiscoveryOpenAI      modelDiscoverySource = "openai-compatible"
+	modelDiscoveryAnthropic   modelDiscoverySource = "anthropic-compatible"
+	modelDiscoveryGemini      modelDiscoverySource = "gemini-compatible"
+	modelDiscoveryAntigravity modelDiscoverySource = "reverse-proxy-antigravity"
 )
 
+type modelDiscoveryHTTPRequest struct {
+	Method          string
+	Endpoint        string
+	RequestURL      string
+	Headers         http.Header
+	Body            []byte
+	ViaReverseProxy bool
+}
+
 func (rt *runtimeState) discoverAccountModels(ctx context.Context, provider providercontract.Provider, account accountcontract.ProviderAccount, req apiopenapi.DiscoverAccountModelsRequest) (apiopenapi.AccountModelDiscovery, error) {
-	if account.RuntimeClass != accountcontract.RuntimeClassAPIKey {
-		return apiopenapi.AccountModelDiscovery{}, errModelDiscoveryUnsupported
-	}
 	source, ok := modelDiscoverySourceForProvider(provider)
 	if !ok {
+		return apiopenapi.AccountModelDiscovery{}, errModelDiscoveryUnsupported
+	}
+	if !modelDiscoveryRuntimeSupported(source, account) {
 		return apiopenapi.AccountModelDiscovery{}, errModelDiscoveryUnsupported
 	}
 	limit := defaultModelDiscoveryLimit
@@ -56,36 +68,19 @@ func (rt *runtimeState) discoverAccountModels(ctx context.Context, provider prov
 	if err != nil {
 		return apiopenapi.AccountModelDiscovery{}, errModelDiscoveryAuth
 	}
-	endpoint := modelDiscoveryEndpoint(source, provider, account)
-	if endpoint == "" {
-		return apiopenapi.AccountModelDiscovery{}, errModelDiscoveryInvalidInput
-	}
-	if !validModelDiscoveryEndpoint(endpoint) {
-		return apiopenapi.AccountModelDiscovery{}, errModelDiscoveryInvalidInput
-	}
-	requestEndpoint := endpoint
-	headers, err := modelDiscoveryHeaders(source, provider, account, credential, &requestEndpoint)
+	discoveryReq, err := modelDiscoveryRequest(source, provider, account, credential)
 	if err != nil {
 		return apiopenapi.AccountModelDiscovery{}, err
 	}
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, requestEndpoint, nil)
-	if err != nil {
+	if discoveryReq.Endpoint == "" {
 		return apiopenapi.AccountModelDiscovery{}, errModelDiscoveryInvalidInput
 	}
-	httpReq.Header = headers
-
-	client := &http.Client{Timeout: rt.cfg.Gateway.RequestTimeout}
-	resp, err := client.Do(httpReq)
-	if err != nil {
-		return apiopenapi.AccountModelDiscovery{}, errModelDiscoveryUpstream
+	if !validModelDiscoveryEndpoint(discoveryReq.Endpoint) {
+		return apiopenapi.AccountModelDiscovery{}, errModelDiscoveryInvalidInput
 	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxModelDiscoveryBody))
+	body, err := rt.executeModelDiscoveryRequest(ctx, account, credential, discoveryReq)
 	if err != nil {
-		return apiopenapi.AccountModelDiscovery{}, errModelDiscoveryUpstream
-	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return apiopenapi.AccountModelDiscovery{}, errModelDiscoveryUpstream
+		return apiopenapi.AccountModelDiscovery{}, err
 	}
 	modelIDs, err := parseDiscoveredModelIDs(source, body, limit)
 	if err != nil {
@@ -98,7 +93,7 @@ func (rt *runtimeState) discoverAccountModels(ctx context.Context, provider prov
 		metadata := cloneMetadata(account.Metadata)
 		metadata["supported_models"] = append([]string(nil), modelIDs...)
 		metadata["model_discovery_source"] = string(source)
-		metadata["model_discovery_endpoint"] = endpoint
+		metadata["model_discovery_endpoint"] = discoveryReq.Endpoint
 		metadata["model_discovery_last_seen_at"] = checkedAt.Format(time.RFC3339)
 		if _, err := rt.accounts.Update(ctx, account.ID, accountcontract.UpdateRequest{Metadata: &metadata}); err != nil {
 			return apiopenapi.AccountModelDiscovery{}, err
@@ -108,7 +103,7 @@ func (rt *runtimeState) discoverAccountModels(ctx context.Context, provider prov
 	return apiopenapi.AccountModelDiscovery{
 		AccountId:  apiopenapi.Id(strconv.Itoa(account.ID)),
 		CheckedAt:  checkedAt,
-		Endpoint:   endpoint,
+		Endpoint:   discoveryReq.Endpoint,
 		ModelIds:   modelIDs,
 		Persisted:  persisted,
 		ProviderId: apiopenapi.Id(strconv.Itoa(provider.ID)),
@@ -116,7 +111,94 @@ func (rt *runtimeState) discoverAccountModels(ctx context.Context, provider prov
 	}, nil
 }
 
+func modelDiscoveryRuntimeSupported(source modelDiscoverySource, account accountcontract.ProviderAccount) bool {
+	if source == modelDiscoveryAntigravity {
+		return account.RuntimeClass != accountcontract.RuntimeClassAPIKey
+	}
+	return account.RuntimeClass == accountcontract.RuntimeClassAPIKey
+}
+
+func modelDiscoveryRequest(source modelDiscoverySource, provider providercontract.Provider, account accountcontract.ProviderAccount, credential map[string]any) (modelDiscoveryHTTPRequest, error) {
+	endpoint := modelDiscoveryEndpoint(source, provider, account)
+	if endpoint == "" {
+		return modelDiscoveryHTTPRequest{}, errModelDiscoveryInvalidInput
+	}
+	if !validModelDiscoveryEndpoint(endpoint) {
+		return modelDiscoveryHTTPRequest{}, errModelDiscoveryInvalidInput
+	}
+	requestEndpoint := endpoint
+	headers, err := modelDiscoveryHeaders(source, provider, account, credential, &requestEndpoint)
+	if err != nil {
+		return modelDiscoveryHTTPRequest{}, err
+	}
+	out := modelDiscoveryHTTPRequest{
+		Method:     http.MethodGet,
+		Endpoint:   endpoint,
+		RequestURL: requestEndpoint,
+		Headers:    headers,
+	}
+	if source == modelDiscoveryAntigravity {
+		body, err := antigravityModelDiscoveryBody(provider, account, credential)
+		if err != nil {
+			return modelDiscoveryHTTPRequest{}, err
+		}
+		out.Method = http.MethodPost
+		out.Body = body
+		out.ViaReverseProxy = true
+	}
+	return out, nil
+}
+
+func (rt *runtimeState) executeModelDiscoveryRequest(ctx context.Context, account accountcontract.ProviderAccount, credential map[string]any, req modelDiscoveryHTTPRequest) ([]byte, error) {
+	if req.ViaReverseProxy {
+		resp, err := rt.reverseProxy.Do(ctx, reverseproxycontract.Request{
+			Account: antigravityModelDiscoveryRuntime(account, credential),
+			Method:  req.Method,
+			URL:     req.modelDiscoveryRequestURL(),
+			Headers: req.Headers,
+			Body:    req.Body,
+		})
+		if err != nil {
+			return nil, errModelDiscoveryUpstream
+		}
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			return nil, errModelDiscoveryUpstream
+		}
+		return resp.Body, nil
+	}
+	httpReq, err := http.NewRequestWithContext(ctx, req.Method, req.modelDiscoveryRequestURL(), bytes.NewReader(req.Body))
+	if err != nil {
+		return nil, errModelDiscoveryInvalidInput
+	}
+	httpReq.Header = req.Headers
+
+	client := &http.Client{Timeout: rt.cfg.Gateway.RequestTimeout}
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		return nil, errModelDiscoveryUpstream
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxModelDiscoveryBody))
+	if err != nil {
+		return nil, errModelDiscoveryUpstream
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, errModelDiscoveryUpstream
+	}
+	return body, nil
+}
+
+func (req modelDiscoveryHTTPRequest) modelDiscoveryRequestURL() string {
+	if strings.TrimSpace(req.RequestURL) != "" {
+		return req.RequestURL
+	}
+	return req.Endpoint
+}
+
 func modelDiscoverySourceForProvider(provider providercontract.Provider) (modelDiscoverySource, bool) {
+	if strings.EqualFold(strings.TrimSpace(provider.AdapterType), "reverse-proxy-antigravity") {
+		return modelDiscoveryAntigravity, true
+	}
 	for _, value := range []string{provider.Protocol, provider.AdapterType} {
 		switch strings.ToLower(strings.TrimSpace(value)) {
 		case "openai-compatible", "native-openai":
@@ -134,6 +216,12 @@ func modelDiscoveryEndpoint(source modelDiscoverySource, provider providercontra
 	baseURL := upstreamModelDiscoveryBaseURL(source, provider, account)
 	if baseURL == "" {
 		return ""
+	}
+	if source == modelDiscoveryAntigravity {
+		if strings.HasSuffix(baseURL, "/v1internal:fetchAvailableModels") {
+			return baseURL
+		}
+		return strings.TrimRight(baseURL, "/") + "/v1internal:fetchAvailableModels"
 	}
 	if strings.HasSuffix(baseURL, "/models") {
 		return baseURL
@@ -155,6 +243,8 @@ func upstreamModelDiscoveryBaseURL(source modelDiscoverySource, provider provide
 		keys = append([]string{"anthropic_models_url", "anthropic_base_url"}, keys...)
 	case modelDiscoveryGemini:
 		keys = append([]string{"gemini_models_url", "gemini_base_url"}, keys...)
+	case modelDiscoveryAntigravity:
+		keys = append([]string{"antigravity_models_url", "antigravity_base_url"}, keys...)
 	}
 	for _, values := range []map[string]any{account.Metadata, provider.ConfigSchema, provider.Capabilities} {
 		for _, key := range keys {
@@ -169,6 +259,13 @@ func upstreamModelDiscoveryBaseURL(source modelDiscoverySource, provider provide
 func modelDiscoveryHeaders(source modelDiscoverySource, provider providercontract.Provider, account accountcontract.ProviderAccount, credential map[string]any, endpoint *string) (http.Header, error) {
 	headers := http.Header{
 		"Accept": {"application/json"},
+	}
+	if source == modelDiscoveryAntigravity {
+		if mapString(credential, "access_token") == "" {
+			return nil, errModelDiscoveryAuth
+		}
+		headers.Set("Content-Type", "application/json")
+		return headers, nil
 	}
 	apiKey := modelDiscoveryAPIKey(source, credential)
 	if apiKey == "" {
@@ -219,6 +316,34 @@ func modelDiscoveryHeaders(source modelDiscoverySource, provider providercontrac
 		return nil, errModelDiscoveryInvalidInput
 	}
 	return headers, nil
+}
+
+func antigravityModelDiscoveryBody(provider providercontract.Provider, account accountcontract.ProviderAccount, credential map[string]any) ([]byte, error) {
+	payload := map[string]any{}
+	if projectID := modelDiscoverySetting(provider, account, credential, "project_id", "antigravity_project_id", "cloudaicompanion_project"); projectID != "" {
+		payload["project"] = projectID
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return nil, errModelDiscoveryInvalidInput
+	}
+	return raw, nil
+}
+
+func antigravityModelDiscoveryRuntime(account accountcontract.ProviderAccount, credential map[string]any) reverseproxycontract.AccountRuntime {
+	upstreamClient := account.UpstreamClient
+	if upstreamClient == nil || strings.TrimSpace(*upstreamClient) == "" {
+		value := "antigravity_desktop"
+		upstreamClient = &value
+	}
+	return reverseproxycontract.AccountRuntime{
+		AccountID:      account.ID,
+		RuntimeClass:   string(account.RuntimeClass),
+		UpstreamClient: upstreamClient,
+		ProxyID:        account.ProxyID,
+		UserAgent:      mapString(account.Metadata, "user_agent"),
+		Credential:     credential,
+	}
 }
 
 func modelDiscoveryAPIKey(source modelDiscoverySource, credential map[string]any) string {
@@ -284,6 +409,8 @@ func parseDiscoveredModelIDs(source modelDiscoverySource, body []byte, limit int
 		ids = parseObjectModelIDs(body)
 	case modelDiscoveryGemini:
 		ids = parseGeminiModelIDs(body)
+	case modelDiscoveryAntigravity:
+		ids = parseAntigravityModelIDs(body)
 	default:
 		return nil, errModelDiscoveryUnsupported
 	}
@@ -332,6 +459,49 @@ func parseGeminiModelIDs(body []byte) []string {
 		ids = append(ids, strings.TrimPrefix(strings.TrimSpace(model.Name), "models/"))
 	}
 	return ids
+}
+
+func parseAntigravityModelIDs(body []byte) []string {
+	var decoded struct {
+		Models json.RawMessage `json:"models"`
+	}
+	if err := json.Unmarshal(body, &decoded); err != nil || len(decoded.Models) == 0 {
+		return nil
+	}
+	var asObject map[string]json.RawMessage
+	if err := json.Unmarshal(decoded.Models, &asObject); err == nil && len(asObject) > 0 {
+		ids := make([]string, 0, len(asObject))
+		for id := range asObject {
+			if !isInternalAntigravityModelID(id) {
+				ids = append(ids, id)
+			}
+		}
+		return ids
+	}
+	var asArray []struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(decoded.Models, &asArray); err != nil {
+		return nil
+	}
+	ids := make([]string, 0, len(asArray))
+	for _, model := range asArray {
+		id := firstNonEmpty(model.ID, model.Name)
+		if !isInternalAntigravityModelID(id) {
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}
+
+func isInternalAntigravityModelID(value string) bool {
+	switch strings.TrimSpace(value) {
+	case "chat_20706", "chat_23310", "tab_flash_lite_preview", "tab_jump_flash_lite_preview", "gemini-2.5-flash-thinking", "gemini-2.5-pro":
+		return true
+	default:
+		return false
+	}
 }
 
 func normalizeModelIDs(values []string, limit int) []string {

@@ -137,7 +137,8 @@ WP-450 Antigravity 2api boundary:
 - Adapter-owned official-client shape includes `project`, `requestId`, `userAgent: antigravity`, `requestType`, mapped upstream `model`, nested `request.contents`, optional `systemInstruction`, `generationConfig`, `tools`, `toolConfig`, safety settings, and `sessionId`.
 - Runtime-owned transport injects the selected account credential as desktop/IDE/OAuth bearer and strips caller/SRapi headers; adapter must not forward caller `Authorization`.
 - `runtime_class = api_key` is rejected for this adapter because Antigravity 2api means official desktop/IDE/OAuth simulation, not Google/Gemini API-key mode.
-- Antigravity OAuth onboarding, project discovery, credit overage retry policy, full schema cleaning, and persistent realtime session lifecycle remain follow-up packages.
+- WP-500 adds Antigravity model discovery for existing configured accounts: admin `discover-models` posts `{base_url}/v1internal:fetchAvailableModels` through Reverse Proxy Runtime, includes `project_id` when configured, parses upstream `models`, and persists `supported_models` only when requested. This is not OAuth onboarding or project onboarding.
+- Antigravity OAuth onboarding, project/onboardUser discovery, credit overage retry policy, full schema cleaning, and persistent realtime session lifecycle remain follow-up packages.
 
 ## 4. Adapter 生命周期
 

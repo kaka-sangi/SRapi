@@ -917,6 +917,175 @@ func TestAdminAccountModelDiscoveryPersistsGeminiCompatible(t *testing.T) {
 	}
 }
 
+func TestAdminAccountModelDiscoveryPreviewAntigravityReverseProxy(t *testing.T) {
+	type upstreamCall struct {
+		Path          string
+		Method        string
+		Authorization string
+		Cookie        string
+		RequestID     string
+		UserAgent     string
+		Project       string
+	}
+	var call upstreamCall
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1internal:fetchAvailableModels" {
+			t.Fatalf("unexpected discovery path %s", r.URL.Path)
+		}
+		var payload struct {
+			Project string `json:"project"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode antigravity discovery body: %v", err)
+		}
+		call = upstreamCall{
+			Path:          r.URL.Path,
+			Method:        r.Method,
+			Authorization: r.Header.Get("Authorization"),
+			Cookie:        r.Header.Get("Cookie"),
+			RequestID:     r.Header.Get("X-Request-ID"),
+			UserAgent:     r.Header.Get("User-Agent"),
+			Project:       payload.Project,
+		}
+		if r.Header.Get("X-SRapi-Test") != "" || r.Header.Get("X-Gateway-Test") != "" {
+			t.Fatalf("unexpected SRapi/gateway header leakage: %+v", r.Header)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"models":{"z-antigravity":{"displayName":"Z"},"a-antigravity":{"displayName":"A"},"chat_20706":{"displayName":"internal"},"gemini-2.5-pro":{"displayName":"internal"}}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"antigravity-discovery-provider","display_name":"Antigravity Discovery","adapter_type":"reverse-proxy-antigravity","protocol":"gemini-compatible","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"antigravity-discovery-account","runtime_class":"desktop_client_token","upstream_client":"antigravity_desktop","credential":{"access_token":"antigravity-discovery-token"},"metadata":{"base_url":"`+upstream.URL+`","project_id":"project-1"},"status":"active"}`)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/"+string(accountResp.Data.Id)+"/discover-models", strings.NewReader(`{"limit":10}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer caller-token")
+	req.Header.Set("Cookie", "caller_cookie=1")
+	req.Header.Set("X-Request-ID", "caller-request")
+	req.Header.Set("X-SRapi-Test", "leak")
+	req.Header.Set("X-Gateway-Test", "leak")
+	req.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	req.AddCookie(sessionCookie)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected discovery 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if call.Method != http.MethodPost || call.Authorization != "Bearer antigravity-discovery-token" || call.Cookie != "" || call.RequestID != "" || call.UserAgent != "Antigravity/1.0" || call.Project != "project-1" {
+		t.Fatalf("unexpected antigravity discovery upstream call: %+v", call)
+	}
+	if strings.Contains(rec.Body.String(), "antigravity-discovery-token") || strings.Contains(rec.Body.String(), "caller-token") {
+		t.Fatalf("discovery response leaked credential: %s", rec.Body.String())
+	}
+	var resp apiopenapi.AccountModelDiscoveryResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode discovery response: %v", err)
+	}
+	if resp.Data.Source != apiopenapi.AccountModelDiscoverySourceReverseProxyAntigravity || resp.Data.Persisted || len(resp.Data.ModelIds) != 2 || resp.Data.ModelIds[0] != "a-antigravity" || resp.Data.ModelIds[1] != "z-antigravity" {
+		t.Fatalf("unexpected antigravity discovery response: %+v", resp.Data)
+	}
+
+	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts/"+string(accountResp.Data.Id), nil)
+	getReq.AddCookie(sessionCookie)
+	getRec := httptest.NewRecorder()
+	handler.ServeHTTP(getRec, getReq)
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("expected account inspect 200, got %d body=%s", getRec.Code, getRec.Body.String())
+	}
+	var getResp apiopenapi.ProviderAccountResponse
+	if err := json.NewDecoder(getRec.Body).Decode(&getResp); err != nil {
+		t.Fatalf("decode account response: %v", err)
+	}
+	if getResp.Data.Metadata != nil && jsonObjectContainsString(*getResp.Data.Metadata, "a-antigravity") {
+		t.Fatalf("preview discovery should not persist supported models: %+v", getResp.Data.Metadata)
+	}
+}
+
+func TestAdminAccountModelDiscoveryPersistsAntigravityReverseProxy(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1internal:fetchAvailableModels" {
+			t.Fatalf("unexpected discovery path %s", r.URL.Path)
+		}
+		if r.Header.Get("Authorization") != "Bearer antigravity-persist-token" {
+			t.Fatalf("expected selected account token, got %q", r.Header.Get("Authorization"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"models":{"gemini-3-pro-preview":{"maxTokens":1000000},"claude-sonnet-4-6":{"maxTokens":200000}}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"antigravity-persist-provider","display_name":"Antigravity Persist","adapter_type":"reverse-proxy-antigravity","protocol":"gemini-compatible","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"antigravity-persist-account","runtime_class":"ide_plugin_token","credential":{"access_token":"antigravity-persist-token"},"metadata":{"base_url":"`+upstream.URL+`"},"status":"active"}`)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/"+string(accountResp.Data.Id)+"/discover-models", strings.NewReader(`{"persist":true}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	req.AddCookie(sessionCookie)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected discovery 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var resp apiopenapi.AccountModelDiscoveryResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode discovery response: %v", err)
+	}
+	if resp.Data.Source != apiopenapi.AccountModelDiscoverySourceReverseProxyAntigravity || !resp.Data.Persisted || !stringSliceContains(resp.Data.ModelIds, "gemini-3-pro-preview") || !stringSliceContains(resp.Data.ModelIds, "claude-sonnet-4-6") {
+		t.Fatalf("unexpected antigravity persisted discovery response: %+v", resp.Data)
+	}
+
+	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts/"+string(accountResp.Data.Id), nil)
+	getReq.AddCookie(sessionCookie)
+	getRec := httptest.NewRecorder()
+	handler.ServeHTTP(getRec, getReq)
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("expected account inspect 200, got %d body=%s", getRec.Code, getRec.Body.String())
+	}
+	var getResp apiopenapi.ProviderAccountResponse
+	if err := json.NewDecoder(getRec.Body).Decode(&getResp); err != nil {
+		t.Fatalf("decode account response: %v", err)
+	}
+	if getResp.Data.Metadata == nil ||
+		!jsonObjectContainsString(*getResp.Data.Metadata, "gemini-3-pro-preview") ||
+		(*getResp.Data.Metadata)["model_discovery_source"] != "reverse-proxy-antigravity" ||
+		(*getResp.Data.Metadata)["model_discovery_endpoint"] != upstream.URL+"/v1internal:fetchAvailableModels" ||
+		(*getResp.Data.Metadata)["model_discovery_last_seen_at"] == "" {
+		t.Fatalf("expected persisted antigravity discovery metadata, got %+v", getResp.Data.Metadata)
+	}
+}
+
+func TestAdminAccountModelDiscoveryRejectsAntigravityAPIKeyRuntime(t *testing.T) {
+	upstreamCalled := false
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamCalled = true
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"antigravity-api-key-discovery","display_name":"Antigravity API Key Discovery","adapter_type":"reverse-proxy-antigravity","protocol":"gemini-compatible","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"antigravity-api-key-account","runtime_class":"api_key","credential":{"api_key":"wrong-kind"},"metadata":{"base_url":"`+upstream.URL+`"},"status":"active"}`)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/"+string(accountResp.Data.Id)+"/discover-models", strings.NewReader(`{"persist":true}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	req.AddCookie(sessionCookie)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected unsupported discovery 400, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if upstreamCalled {
+		t.Fatal("antigravity api-key runtime should not call upstream")
+	}
+}
+
 func TestAdminAccountModelDiscoveryRejectsUnsupportedRuntime(t *testing.T) {
 	upstreamCalled := false
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -98,6 +98,10 @@ Antigravity 反代账号使用 `reverse-proxy-antigravity` 表示客户端身份
 official-client shape；`provider.protocol` 仍决定下游请求如何进入 Canonical AI Request
 以及如何渲染回客户端协议。它不得绕过 Canonical AI Request、Scheduler、Provider Adapter
 或 Reverse Proxy Runtime，也不得新增 Gateway-local DTO。
+WP-500 起，Antigravity model discovery 也使用同一 2api 边界：管理员触发
+`discover-models` 时，SRapi 通过 Reverse Proxy Runtime 用选中账号的 OAuth/desktop/IDE
+credential POST 到 `{base_url}/v1internal:fetchAvailableModels`，解析上游 `models`，并可把
+结果持久化为账号 `supported_models` 供 Provider-neutral Scheduler 过滤。
 WP-360 起，Antigravity 文本 provider alias（例如
 `/api/provider/antigravity/v1/chat/completions` 和
 `/api/provider/antigravity/v1/messages`）只强制 `provider_key=antigravity`；

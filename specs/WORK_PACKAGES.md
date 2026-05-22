@@ -1944,6 +1944,55 @@ Required gates:
 - `make secret-scan`
 - `git diff --check`
 
+## WP-500: Antigravity 2api Model Discovery v1
+
+Objective: let operators discover Antigravity official-client upstream model catalogs for `reverse-proxy-antigravity` Provider Accounts through the Reverse Proxy Runtime, preserving the 2api boundary and reusing existing account `supported_models` routing metadata.
+
+Read first:
+
+- `docs/2API_REVERSE_PROXY_DEFINITION.md`
+- `docs/REVERSE_PROXY_SPEC.md`
+- `docs/PROVIDER_ADAPTER_SPEC.md`
+- `docs/OPENAPI_CONTRACT.md`
+- `/home/senran/Desktop/CLIProxyAPI/cmd/fetch_antigravity_models/main.go`
+- `apps/api/internal/httpserver/model_discovery.go`
+- `apps/api/internal/modules/reverse_proxy`
+
+Owns:
+
+- OpenAPI model discovery source enum extension for `reverse-proxy-antigravity`
+- Admin account model discovery support for `reverse-proxy-antigravity` non-API-key accounts
+- Antigravity upstream discovery endpoint derivation: `{base_url}/v1internal:fetchAvailableModels`
+- Reverse Proxy Runtime dispatch using selected account OAuth/desktop/IDE credentials and default Antigravity upstream-client identity
+- Antigravity model response parsing and persistence to account `supported_models`
+- Focused HTTP regressions proving credential/header hygiene, preview/persist behavior, and API-key rejection for the 2api path
+
+Definition of Done:
+
+- `POST /api/v1/admin/accounts/{id}/discover-models` supports `reverse-proxy-antigravity` accounts with `runtime_class != api_key` and rejects API-key Antigravity 2api discovery.
+- Discovery calls Antigravity / Google Cloud Code `{base_url}/v1internal:fetchAvailableModels` with `POST` and a JSON body containing configured `project_id` when present.
+- Discovery uses Reverse Proxy Runtime so selected account credentials are injected by runtime; caller authorization, cookies, SRapi request ids, and gateway headers are not forwarded upstream.
+- Antigravity discovery parses model IDs from the upstream `models` object, filters known internal preview IDs copied from the local CLIProxyAPI reference, normalizes/deduplicates/sorts IDs, and obeys the existing `limit`.
+- `persist=true` writes `supported_models`, `model_discovery_source=reverse-proxy-antigravity`, `model_discovery_endpoint`, and `model_discovery_last_seen_at` to account metadata, so Scheduler filtering continues through existing Provider-neutral rules.
+- Existing OpenAI/Anthropic/Gemini API-key discovery behavior remains unchanged.
+- This package does not implement Antigravity OAuth onboarding, project discovery/onboardUser, credit overage retry policy, full tool-schema cleaning, or persistent realtime session lifecycle.
+- No frontend visuals are added.
+
+Required gates:
+
+- `make openapi-lint`
+- `make openapi-bundle`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/httpserver -run 'TestAdminAccountModelDiscovery' -count=1`
+- `cd apps/api && go test ./internal/modules/reverse_proxy/... ./internal/httpserver`
+- `cd apps/api && go test ./...`
+- `make architecture-check`
+- `make code-quality-check`
+- `make secret-scan`
+- `git diff --check`
+
 ## WP-500+: Ecosystem And Remaining Advanced Surface
 
 Use `ROADMAP.md` Phase 7 through Phase 8 to split future packages for:

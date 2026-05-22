@@ -6202,6 +6202,7 @@ components:
             - openai-compatible
             - anthropic-compatible
             - gemini-compatible
+            - reverse-proxy-antigravity
         endpoint:
           type: string
           format: uri

@@ -213,7 +213,7 @@ Provider alias 进入 Scheduler 前必须先应用 API Key policy，包括 `allo
 5. 通用 fallback catalog。
 
 `/v1/models` 必须按 API Key group、provider、model visibility 合并后返回。
-`POST /api/v1/admin/accounts/{id}/discover-models` 可以把 live discovery 结果写入 Account `supported_models`，供后续 Provider-neutral 候选选择使用。
+`POST /api/v1/admin/accounts/{id}/discover-models` 可以把 live discovery 结果写入 Account `supported_models`，供后续 Provider-neutral 候选选择使用。WP-500 起，`reverse-proxy-antigravity` 的 live discovery 通过 Reverse Proxy Runtime 使用选中账号凭证访问 `{base_url}/v1internal:fetchAvailableModels`，不是 API-key discovery。
 
 ## 10. Upstream Endpoint Derivation
 

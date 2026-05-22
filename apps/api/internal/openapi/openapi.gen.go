@@ -43,9 +43,10 @@ func (e AccountGroupStatus) Valid() bool {
 
 // Defines values for AccountModelDiscoverySource.
 const (
-	AccountModelDiscoverySourceAnthropicCompatible AccountModelDiscoverySource = "anthropic-compatible"
-	AccountModelDiscoverySourceGeminiCompatible    AccountModelDiscoverySource = "gemini-compatible"
-	AccountModelDiscoverySourceOpenaiCompatible    AccountModelDiscoverySource = "openai-compatible"
+	AccountModelDiscoverySourceAnthropicCompatible     AccountModelDiscoverySource = "anthropic-compatible"
+	AccountModelDiscoverySourceGeminiCompatible        AccountModelDiscoverySource = "gemini-compatible"
+	AccountModelDiscoverySourceOpenaiCompatible        AccountModelDiscoverySource = "openai-compatible"
+	AccountModelDiscoverySourceReverseProxyAntigravity AccountModelDiscoverySource = "reverse-proxy-antigravity"
 )
 
 // Valid indicates whether the value is a known member of the AccountModelDiscoverySource enum.
@@ -56,6 +57,8 @@ func (e AccountModelDiscoverySource) Valid() bool {
 	case AccountModelDiscoverySourceGeminiCompatible:
 		return true
 	case AccountModelDiscoverySourceOpenaiCompatible:
+		return true
+	case AccountModelDiscoverySourceReverseProxyAntigravity:
 		return true
 	default:
 		return false
