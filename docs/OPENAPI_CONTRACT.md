@@ -101,13 +101,14 @@ packages/openapi/
 /v1/audio/speech
 /v1/moderations
 /v1/rerank
+/v1/responses/ws
 ```
 
 这些接口面向 API 客户端，必须兼容 OpenAI Chat Completions、OpenAI Responses、Anthropic Messages 等主流 AI 端点风格。
 
 Gateway 所有 AI 端点必须先转换为 `AI_ENDPOINT_COMPATIBILITY.md` 定义的 Canonical AI Request，再进入 Scheduler。
 
-Gateway 路由族、Provider alias、passthrough 和 WebSocket 阶段边界以 `GATEWAY_ROUTE_MATRIX.md` 为准。
+Gateway 路由族、Provider alias、passthrough 和 WebSocket 阶段边界以 `GATEWAY_ROUTE_MATRIX.md` 为准。`/v1/responses/ws` 在 OpenAPI 中以 WebSocket upgrade route 表达；运行时 JSON frame schema 复用 `ResponsesRequest`，不新增 provider-specific Gateway DTO。
 
 ### 3.4 Webhook API
 

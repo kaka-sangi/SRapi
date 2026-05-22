@@ -543,6 +543,21 @@ Audio speech endpoint
 - OpenAI-compatible API-key 和 reverse-proxy accounts 上游调用 `/audio/speech`，保留 voice/format/speed/instructions/user 与 passthrough extension fields，并把上游 binary audio bytes 与 content type 直接返回给客户端。
 - Speech response usage 目前按输入文本和音频字节长度估算；如上游后续暴露稳定 token/audio usage header，应在 adapter 层补解析。
 
+WP-380 已实现：
+
+```txt
+Responses WebSocket transport
+```
+
+边界：
+
+- `GET /v1/responses/ws` 建立 WebSocket 连接，客户端发送 JSON text frame。
+- 支持 raw `ResponsesRequest`，也支持 `{"type":"response.create","response":{...}}` event envelope；`model` query 可作为 payload 未携带 model 时的 fallback。
+- 每个 `response.create` payload 都转交给现有 `/v1/responses` Gateway runtime，因此仍进入 API Key auth、模型可见性、entitlement、Scheduler、Provider Adapter、usage、billing 和 feedback 证据链。
+- `stream:true` 的 Responses SSE 事件会转成同名 JSON WebSocket frame；非流式响应返回 `response.completed` frame。
+- `session_affinity_key`、`sticky_strength`、`sticky_account_id` query/header 继续作为 Scheduler sticky routing hint；Gateway 不直接选择账号。
+- 直接上游 WSS relay、复杂 slot 生命周期和 provider-native realtime 协议仍是后续包。
+
 Phase 2 继续实现：
 
 ```txt
@@ -555,7 +570,7 @@ Phase 3+ 继续实现：
 ```txt
 Audio
 Batch
-Realtime
+Provider-native realtime and direct upstream WSS relay
 Fine-tuning
 Provider-native built-in tools
 Advanced stateful responses

@@ -44,14 +44,15 @@ last_completed:
 - WP-350: Antigravity reverse proxy runtime identity now adds `reverse-proxy-antigravity` to the OpenAPI/SDK adapter enum, default `antigravity_desktop` Reverse Proxy Runtime identity, OpenAI/Gemini protocol dispatch tests, and a Gateway regression proving desktop-token Antigravity accounts route through Scheduler and Reverse Proxy Runtime.
 - WP-360: Antigravity text provider aliases now seed an `antigravity` provider preset, register text aliases from capability metadata, expose representative OpenAPI/SDK alias contracts, and prove OpenAI Chat/Anthropic Messages alias requests still route through Scheduler, Provider Adapter, and Reverse Proxy Runtime without Gateway-local DTOs.
 - WP-370: Antigravity Gemini model-action aliases now route `/antigravity/v1beta` and `/api/provider/antigravity/v1beta` GenerateContent/StreamGenerateContent requests through the standard Gemini Gateway handler while forcing `provider_key=antigravity`, preserving alias evidence, and avoiding Gateway-local DTOs.
+- WP-380: Responses WebSocket runtime foundation now exposes `GET /v1/responses/ws`, accepts raw `ResponsesRequest` or `response.create` frames, executes each request through the existing Responses Gateway runtime, forwards streaming Responses events as WebSocket JSON frames, and preserves Scheduler/usage source endpoint evidence.
 
 current:
 
-- package: WP-380+
+- package: WP-390+
 - status: pending
 - objective: split the next ecosystem or remaining advanced endpoint package from the roadmap.
 
-next_recommended: WP-380+
+next_recommended: WP-390+
 
 last_gates:
 
@@ -125,6 +126,9 @@ notes:
 - WP-360 added `TestGatewayAntigravityProviderAliasTargetsOpenAIReverseProxy` and `TestGatewayAntigravityProviderAliasTargetsAnthropicReverseProxy`, proving Antigravity aliases force `provider_key=antigravity`, preserve alias source endpoints, and dispatch through Reverse Proxy Runtime using `provider.protocol`.
 - WP-370 added Antigravity Gemini model-action alias metadata to the provider preset registry and HTTP registration for `/antigravity/v1beta/models/{model}:generateContent`, `/antigravity/v1beta/models/{model}:streamGenerateContent`, `/api/provider/antigravity/v1beta/models/{model}:generateContent`, and `/api/provider/antigravity/v1beta/models/{model}:streamGenerateContent`.
 - WP-370 added `TestGatewayAntigravityGeminiAliasTargetsReverseProxy` and `TestGatewayAntigravityGeminiStreamAliasTargetsReverseProxy`, proving alias source endpoints, forced provider context, mapped upstream model dispatch, Gemini JSON/SSE rendering, and usage/Scheduler evidence.
+- WP-380 added `TestGatewayResponsesWebSocketTargetsResponsesRuntime` and `TestGatewayResponsesWebSocketForwardsStreamingEvents`, proving WebSocket non-streaming and streaming requests reuse `/v1/responses` auth/model policy/Scheduler/Provider Adapter/usage paths and preserve `/v1/responses/ws` as the source endpoint.
+- WP-380 added `nhooyr.io/websocket` only for transport handshake/frame handling; business protocol stays in the existing Responses runtime and direct upstream WSS relay remains a follow-up package.
+- Local client availability is confirmed in PATH for `codex`, `claude`, and `antigravity`. Codex CLI and Claude Code CLI reverse-proxy runtime identities already exist (`reverse-proxy-codex-cli`, `reverse-proxy-claude-code-cli`) and Antigravity alias routing now covers OpenAI-compatible, Anthropic-compatible, and Gemini-compatible routes; actual reverse-proxy use still requires configured Provider/Account/base_url/token records.
 
 ## Work Package Ledger
 
@@ -168,4 +172,5 @@ notes:
 | WP-350 | completed | Antigravity reverse proxy runtime identity v1. |
 | WP-360 | completed | Antigravity text provider alias routes v1. |
 | WP-370 | completed | Antigravity Gemini model-action alias routes v1. |
-| WP-380+ | pending | Remaining ecosystem and advanced endpoint packages. |
+| WP-380 | completed | Responses WebSocket runtime foundation v1. |
+| WP-390+ | pending | Remaining ecosystem and advanced endpoint packages. |

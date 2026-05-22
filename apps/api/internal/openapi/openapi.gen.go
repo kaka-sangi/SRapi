@@ -1286,6 +1286,24 @@ func (e UserSubscriptionStatus) Valid() bool {
 	}
 }
 
+// Defines values for ConnectResponsesWebSocketParamsStickyStrength.
+const (
+	Hard ConnectResponsesWebSocketParamsStickyStrength = "hard"
+	Soft ConnectResponsesWebSocketParamsStickyStrength = "soft"
+)
+
+// Valid indicates whether the value is a known member of the ConnectResponsesWebSocketParamsStickyStrength enum.
+func (e ConnectResponsesWebSocketParamsStickyStrength) Valid() bool {
+	switch e {
+	case Hard:
+		return true
+	case Soft:
+		return true
+	default:
+		return false
+	}
+}
+
 // AccountGroup defines model for AccountGroup.
 type AccountGroup struct {
 	CreatedAt     Timestamp          `json:"created_at"`
@@ -3380,6 +3398,24 @@ type ListPaymentOrdersParams struct {
 	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
 	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
 }
+
+// ConnectResponsesWebSocketParams defines parameters for ConnectResponsesWebSocket.
+type ConnectResponsesWebSocketParams struct {
+	// Model Optional model fallback injected when a response.create payload omits model.
+	Model *string `form:"model,omitempty" json:"model,omitempty"`
+
+	// SessionAffinityKey Optional stable affinity key used by Scheduler sticky routing.
+	SessionAffinityKey *string `form:"session_affinity_key,omitempty" json:"session_affinity_key,omitempty"`
+
+	// StickyStrength Optional sticky routing strength for this WebSocket session.
+	StickyStrength *ConnectResponsesWebSocketParamsStickyStrength `form:"sticky_strength,omitempty" json:"sticky_strength,omitempty"`
+
+	// StickyAccountId Optional explicit sticky account preference for this WebSocket session.
+	StickyAccountId *int `form:"sticky_account_id,omitempty" json:"sticky_account_id,omitempty"`
+}
+
+// ConnectResponsesWebSocketParamsStickyStrength defines parameters for ConnectResponsesWebSocket.
+type ConnectResponsesWebSocketParamsStickyStrength string
 
 // CreateAnthropicCompatibleMessageAliasJSONRequestBody defines body for CreateAnthropicCompatibleMessageAlias for application/json ContentType.
 type CreateAnthropicCompatibleMessageAliasJSONRequestBody = AnthropicMessagesRequest
@@ -7778,6 +7814,9 @@ type ServerInterface interface {
 	// Create an OpenAI Responses-compatible response.
 	// (POST /v1/responses)
 	CreateResponse(w http.ResponseWriter, r *http.Request)
+	// Connect to the Responses WebSocket gateway.
+	// (GET /v1/responses/ws)
+	ConnectResponsesWebSocket(w http.ResponseWriter, r *http.Request, params ConnectResponsesWebSocketParams)
 	// Generate content with the Gemini-compatible gateway route.
 	// (POST /v1beta/models/{model}:generateContent)
 	GenerateGeminiContent(w http.ResponseWriter, r *http.Request, model GeminiModel)
@@ -11015,6 +11054,84 @@ func (siw *ServerInterfaceWrapper) CreateResponse(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// ConnectResponsesWebSocket operation middleware
+func (siw *ServerInterfaceWrapper) ConnectResponsesWebSocket(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ConnectResponsesWebSocketParams
+
+	// ------------- Optional query parameter "model" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "model", r.URL.Query(), &params.Model, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "model"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "model", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "session_affinity_key" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "session_affinity_key", r.URL.Query(), &params.SessionAffinityKey, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "session_affinity_key"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "session_affinity_key", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "sticky_strength" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "sticky_strength", r.URL.Query(), &params.StickyStrength, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "sticky_strength"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sticky_strength", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "sticky_account_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "sticky_account_id", r.URL.Query(), &params.StickyAccountId, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "sticky_account_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sticky_account_id", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ConnectResponsesWebSocket(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GenerateGeminiContent operation middleware
 func (siw *ServerInterfaceWrapper) GenerateGeminiContent(w http.ResponseWriter, r *http.Request) {
 
@@ -11290,6 +11407,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/moderations", wrapper.CreateModeration)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/rerank", wrapper.CreateRerank)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/responses", wrapper.CreateResponse)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/responses/ws", wrapper.ConnectResponsesWebSocket)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1beta/models/{model}:generateContent", wrapper.GenerateGeminiContent)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1beta/models/{model}:streamGenerateContent", wrapper.StreamGeminiContent)
 

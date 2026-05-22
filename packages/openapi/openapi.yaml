@@ -2598,6 +2598,68 @@ paths:
         default:
           $ref: "#/components/responses/GatewayError"
 
+  /v1/responses/ws:
+    get:
+      tags:
+        - Gateway
+      operationId: connectResponsesWebSocket
+      summary: Connect to the Responses WebSocket gateway.
+      description: >
+        Upgrades to a WebSocket transport for Responses-compatible requests.
+        Clients send JSON text frames shaped as either a raw ResponsesRequest or
+        a `response.create` event containing a ResponsesRequest under
+        `response`. Each request is executed through the standard Responses
+        Gateway runtime, Scheduler, Provider Adapter, usage, and decision
+        evidence chain.
+      security:
+        - gatewayBearerAuth: []
+      parameters:
+        - name: model
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Optional model fallback injected when a response.create payload omits model.
+        - name: session_affinity_key
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Optional stable affinity key used by Scheduler sticky routing.
+        - name: sticky_strength
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - soft
+              - hard
+          description: Optional sticky routing strength for this WebSocket session.
+        - name: sticky_account_id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Optional explicit sticky account preference for this WebSocket session.
+      responses:
+        "101":
+          description: WebSocket upgrade accepted. Subsequent messages are JSON text frames.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
   /v1/messages:
     post:
       tags:

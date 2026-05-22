@@ -4274,6 +4274,68 @@ export type CreateResponseResponses = {
 
 export type CreateResponseResponse = CreateResponseResponses[keyof CreateResponseResponses];
 
+export type ConnectResponsesWebSocketData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Optional model fallback injected when a response.create payload omits model.
+         */
+        model?: string;
+        /**
+         * Optional stable affinity key used by Scheduler sticky routing.
+         */
+        session_affinity_key?: string;
+        /**
+         * Optional sticky routing strength for this WebSocket session.
+         */
+        sticky_strength?: 'soft' | 'hard';
+        /**
+         * Optional explicit sticky account preference for this WebSocket session.
+         */
+        sticky_account_id?: number;
+    };
+    url: '/v1/responses/ws';
+};
+
+export type ConnectResponsesWebSocketErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type ConnectResponsesWebSocketError = ConnectResponsesWebSocketErrors[keyof ConnectResponsesWebSocketErrors];
+
+export type ConnectResponsesWebSocketResponses = {
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type ConnectResponsesWebSocketResponse = ConnectResponsesWebSocketResponses[keyof ConnectResponsesWebSocketResponses];
+
 export type CreateMessageData = {
     body: AnthropicMessagesRequest;
     path?: never;

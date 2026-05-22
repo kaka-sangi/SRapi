@@ -1396,11 +1396,59 @@ Required gates:
 - `make secret-scan`
 - `git diff --check`
 
-## WP-380+: Ecosystem And Remaining Advanced Surface
+## WP-380: Responses WebSocket Runtime Foundation v1
+
+Objective: expose the first backend WebSocket transport for Responses-compatible clients at `/v1/responses/ws`, while preserving the existing Gateway -> Scheduler -> Provider Adapter -> usage/decision evidence path and avoiding Gateway-local provider DTOs.
+
+Read first:
+
+- `docs/OPENAPI_CONTRACT.md`
+- `docs/GATEWAY_ROUTE_MATRIX.md`
+- `docs/AI_ENDPOINT_COMPATIBILITY.md`
+- `docs/SCHEDULING_KERNEL_DESIGN.md`
+- `docs/PROVIDER_ADAPTER_SPEC.md`
+- `packages/openapi/openapi.yaml`
+- `apps/api/internal/httpserver`
+- `apps/api/internal/modules/gateway`
+
+Owns:
+
+- OpenAPI contract for `GET /v1/responses/ws` WebSocket upgrade
+- HTTP Gateway WebSocket transport adapter for Responses `response.create` events
+- Scheduler session-affinity propagation from WebSocket query/header hints
+- WebSocket regressions proving non-streaming and streaming Responses requests reuse existing runtime behavior
+- route matrix/compatibility/OpenAPI docs and status updates
+
+Definition of Done:
+
+- `GET /v1/responses/ws` authenticates with Gateway bearer keys before upgrading.
+- WebSocket text frames accept either raw `ResponsesRequest` JSON or `response.create` events with the request under `response`; query `model` may fill a missing request model.
+- Each accepted request is executed by the existing `/v1/responses` Gateway runtime so model policy, entitlement, Scheduler, Provider Adapter, usage logs, billing, and Scheduler feedback remain unchanged.
+- Query/header sticky hints such as `session_affinity_key`, `sticky_strength`, and `sticky_account_id` feed the existing Scheduler affinity logic; the WebSocket layer does not choose accounts directly.
+- Non-streaming Responses results return a `response.completed` WebSocket frame, and streaming Responses requests forward the rendered Responses stream events as WebSocket JSON frames.
+- Gateway usage logs and Scheduler decisions preserve `/v1/responses/ws` as the source endpoint.
+- Direct upstream WSS relay, provider-native realtime semantics, and richer slot lifecycle remain follow-up packages.
+- No frontend visuals are added.
+
+Required gates:
+
+- `make openapi-lint`
+- `make openapi-bundle`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/httpserver`
+- `cd apps/api && go test ./...`
+- `make architecture-check`
+- `make code-quality-check`
+- `make secret-scan`
+- `git diff --check`
+
+## WP-390+: Ecosystem And Remaining Advanced Surface
 
 Use `ROADMAP.md` Phase 7 through Phase 8 to split future packages for:
 
-- realtime/websocket
+- direct upstream WSS relay and richer realtime slot lifecycle
 - SDK examples
 - migration guides
 
