@@ -1230,6 +1230,50 @@ export type ModerationResponse = {
     [key: string]: unknown;
 };
 
+export type AudioTranscriptionRequest = {
+    /**
+     * Audio file to transcribe.
+     */
+    file: Blob | File;
+    model: string;
+    /**
+     * Optional ISO-639-1 input language hint.
+     */
+    language?: string;
+    /**
+     * Optional style or continuation prompt. SRapi does not persist full prompt text in logs.
+     */
+    prompt?: string;
+    response_format?: 'json' | 'text' | 'srt' | 'verbose_json' | 'vtt' | 'diarized_json';
+    temperature?: number;
+    user?: string;
+    [key: string]: unknown;
+};
+
+export type AudioTranscriptionSegment = {
+    id?: number;
+    seek?: number;
+    start?: number;
+    end?: number;
+    text?: string;
+    tokens?: Array<number>;
+    temperature?: number;
+    avg_logprob?: number;
+    compression_ratio?: number;
+    no_speech_prob?: number;
+    [key: string]: unknown;
+};
+
+export type AudioTranscriptionResponse = {
+    text: string;
+    task?: string;
+    language?: string;
+    duration?: number;
+    segments?: Array<AudioTranscriptionSegment>;
+    usage?: TokenUsage;
+    [key: string]: unknown;
+};
+
 export type RerankDocument = string | JsonObject;
 
 export type RerankRequest = {
@@ -4348,6 +4392,51 @@ export type CreateImageGenerationResponses = {
 
 export type CreateImageGenerationResponse = CreateImageGenerationResponses[keyof CreateImageGenerationResponses];
 
+export type CreateAudioTranscriptionData = {
+    body: AudioTranscriptionRequest;
+    path?: never;
+    query?: never;
+    url: '/v1/audio/transcriptions';
+};
+
+export type CreateAudioTranscriptionErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateAudioTranscriptionError = CreateAudioTranscriptionErrors[keyof CreateAudioTranscriptionErrors];
+
+export type CreateAudioTranscriptionResponses = {
+    /**
+     * Audio transcription response. JSON response formats return an object; text, srt, and vtt response formats return plain text.
+     */
+    200: AudioTranscriptionResponse;
+};
+
+export type CreateAudioTranscriptionResponse = CreateAudioTranscriptionResponses[keyof CreateAudioTranscriptionResponses];
+
 export type GenerateGeminiContentData = {
     body: GeminiGenerateContentRequest;
     path: {
@@ -4762,6 +4851,51 @@ export type CreateOpenAiCompatibleModerationAliasResponses = {
 };
 
 export type CreateOpenAiCompatibleModerationAliasResponse = CreateOpenAiCompatibleModerationAliasResponses[keyof CreateOpenAiCompatibleModerationAliasResponses];
+
+export type CreateOpenAiCompatibleAudioTranscriptionAliasData = {
+    body: AudioTranscriptionRequest;
+    path?: never;
+    query?: never;
+    url: '/api/provider/openai-compatible/v1/audio/transcriptions';
+};
+
+export type CreateOpenAiCompatibleAudioTranscriptionAliasErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateOpenAiCompatibleAudioTranscriptionAliasError = CreateOpenAiCompatibleAudioTranscriptionAliasErrors[keyof CreateOpenAiCompatibleAudioTranscriptionAliasErrors];
+
+export type CreateOpenAiCompatibleAudioTranscriptionAliasResponses = {
+    /**
+     * Audio transcription response.
+     */
+    200: AudioTranscriptionResponse;
+};
+
+export type CreateOpenAiCompatibleAudioTranscriptionAliasResponse = CreateOpenAiCompatibleAudioTranscriptionAliasResponses[keyof CreateOpenAiCompatibleAudioTranscriptionAliasResponses];
 
 export type CreateRerankCompatibleRerankAliasData = {
     body: RerankRequest;

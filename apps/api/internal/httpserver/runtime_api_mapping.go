@@ -1040,6 +1040,14 @@ func cloneIntPtr(value *int) *int {
 
 func ptrFloat32(value float32) *float32 { return &value }
 
+func cloneFloat32Ptr(value *float32) *float32 {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
+}
+
 func ptrProviderStatus(value providercontract.Status) *providercontract.Status { return &value }
 
 func ptrModelStatus(value modelcontract.Status) *modelcontract.Status { return &value }

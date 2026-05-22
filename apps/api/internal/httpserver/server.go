@@ -257,6 +257,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("POST /v1/messages", server.handleCreateMessage)
 	mux.HandleFunc("POST /v1/embeddings", server.handleCreateEmbedding)
 	mux.HandleFunc("POST /v1/images/generations", server.handleCreateImageGeneration)
+	mux.HandleFunc("POST /v1/audio/transcriptions", server.handleCreateAudioTranscription)
 	mux.HandleFunc("POST /v1/moderations", server.handleCreateModeration)
 	mux.HandleFunc("POST /v1/rerank", server.handleCreateRerank)
 	mux.HandleFunc("POST /v1beta/models/", server.handleGeminiModelAction)
@@ -388,6 +389,7 @@ func (s *Server) registerGatewayProviderAliases(mux *http.ServeMux) {
 			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "messages", s.handleCreateMessage, true)
 			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "embeddings", s.handleCreateEmbedding, preset.PlatformFamily == providerpreset.PlatformFamilyOpenAICompatible)
 			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "images/generations", s.handleCreateImageGeneration, preset.PlatformFamily == providerpreset.PlatformFamilyOpenAICompatible)
+			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "audio/transcriptions", s.handleCreateAudioTranscription, preset.PlatformFamily == providerpreset.PlatformFamilyOpenAICompatible)
 			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "moderations", s.handleCreateModeration, preset.PlatformFamily == providerpreset.PlatformFamilyOpenAICompatible)
 			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "rerank", s.handleCreateRerank, preset.PlatformFamily == providerpreset.PlatformFamilyRerankCompatible)
 		}

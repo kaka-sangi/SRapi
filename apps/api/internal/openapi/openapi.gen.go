@@ -173,6 +173,36 @@ func (e ApiKeyStatus) Valid() bool {
 	}
 }
 
+// Defines values for AudioTranscriptionRequestResponseFormat.
+const (
+	AudioTranscriptionRequestResponseFormatDiarizedJson AudioTranscriptionRequestResponseFormat = "diarized_json"
+	AudioTranscriptionRequestResponseFormatJson         AudioTranscriptionRequestResponseFormat = "json"
+	AudioTranscriptionRequestResponseFormatSrt          AudioTranscriptionRequestResponseFormat = "srt"
+	AudioTranscriptionRequestResponseFormatText         AudioTranscriptionRequestResponseFormat = "text"
+	AudioTranscriptionRequestResponseFormatVerboseJson  AudioTranscriptionRequestResponseFormat = "verbose_json"
+	AudioTranscriptionRequestResponseFormatVtt          AudioTranscriptionRequestResponseFormat = "vtt"
+)
+
+// Valid indicates whether the value is a known member of the AudioTranscriptionRequestResponseFormat enum.
+func (e AudioTranscriptionRequestResponseFormat) Valid() bool {
+	switch e {
+	case AudioTranscriptionRequestResponseFormatDiarizedJson:
+		return true
+	case AudioTranscriptionRequestResponseFormatJson:
+		return true
+	case AudioTranscriptionRequestResponseFormatSrt:
+		return true
+	case AudioTranscriptionRequestResponseFormatText:
+		return true
+	case AudioTranscriptionRequestResponseFormatVerboseJson:
+		return true
+	case AudioTranscriptionRequestResponseFormatVtt:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for BillingLedgerEntryType.
 const (
 	Adjustment    BillingLedgerEntryType = "adjustment"
@@ -1494,6 +1524,52 @@ type ApiKeySecretData struct {
 
 // ApiKeyStatus defines model for ApiKeyStatus.
 type ApiKeyStatus string
+
+// AudioTranscriptionRequest defines model for AudioTranscriptionRequest.
+type AudioTranscriptionRequest struct {
+	// File Audio file to transcribe.
+	File openapi_types.File `json:"file"`
+
+	// Language Optional ISO-639-1 input language hint.
+	Language *string `json:"language,omitempty"`
+	Model    string  `json:"model"`
+
+	// Prompt Optional style or continuation prompt. SRapi does not persist full prompt text in logs.
+	Prompt               *string                                  `json:"prompt,omitempty"`
+	ResponseFormat       *AudioTranscriptionRequestResponseFormat `json:"response_format,omitempty"`
+	Temperature          *float32                                 `json:"temperature,omitempty"`
+	User                 *string                                  `json:"user,omitempty"`
+	AdditionalProperties map[string]interface{}                   `json:"-"`
+}
+
+// AudioTranscriptionRequestResponseFormat defines model for AudioTranscriptionRequest.ResponseFormat.
+type AudioTranscriptionRequestResponseFormat string
+
+// AudioTranscriptionResponse defines model for AudioTranscriptionResponse.
+type AudioTranscriptionResponse struct {
+	Duration             *float32                     `json:"duration,omitempty"`
+	Language             *string                      `json:"language,omitempty"`
+	Segments             *[]AudioTranscriptionSegment `json:"segments,omitempty"`
+	Task                 *string                      `json:"task,omitempty"`
+	Text                 string                       `json:"text"`
+	Usage                *TokenUsage                  `json:"usage,omitempty"`
+	AdditionalProperties map[string]interface{}       `json:"-"`
+}
+
+// AudioTranscriptionSegment defines model for AudioTranscriptionSegment.
+type AudioTranscriptionSegment struct {
+	AvgLogprob           *float32               `json:"avg_logprob,omitempty"`
+	CompressionRatio     *float32               `json:"compression_ratio,omitempty"`
+	End                  *float32               `json:"end,omitempty"`
+	Id                   *int                   `json:"id,omitempty"`
+	NoSpeechProb         *float32               `json:"no_speech_prob,omitempty"`
+	Seek                 *int                   `json:"seek,omitempty"`
+	Start                *float32               `json:"start,omitempty"`
+	Temperature          *float32               `json:"temperature,omitempty"`
+	Text                 *string                `json:"text,omitempty"`
+	Tokens               *[]int                 `json:"tokens,omitempty"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
 
 // AuditLog defines model for AuditLog.
 type AuditLog struct {
@@ -3257,6 +3333,9 @@ type ListPaymentOrdersParams struct {
 // CreateAnthropicCompatibleMessageAliasJSONRequestBody defines body for CreateAnthropicCompatibleMessageAlias for application/json ContentType.
 type CreateAnthropicCompatibleMessageAliasJSONRequestBody = AnthropicMessagesRequest
 
+// CreateOpenAICompatibleAudioTranscriptionAliasMultipartRequestBody defines body for CreateOpenAICompatibleAudioTranscriptionAlias for multipart/form-data ContentType.
+type CreateOpenAICompatibleAudioTranscriptionAliasMultipartRequestBody = AudioTranscriptionRequest
+
 // CreateOpenAICompatibleChatCompletionAliasJSONRequestBody defines body for CreateOpenAICompatibleChatCompletionAlias for application/json ContentType.
 type CreateOpenAICompatibleChatCompletionAliasJSONRequestBody = ChatCompletionRequest
 
@@ -3352,6 +3431,9 @@ type CreatePaymentOrderJSONRequestBody = CreatePaymentOrderRequest
 
 // HandlePaymentWebhookJSONRequestBody defines body for HandlePaymentWebhook for application/json ContentType.
 type HandlePaymentWebhookJSONRequestBody = PaymentWebhookRequest
+
+// CreateAudioTranscriptionMultipartRequestBody defines body for CreateAudioTranscription for multipart/form-data ContentType.
+type CreateAudioTranscriptionMultipartRequestBody = AudioTranscriptionRequest
 
 // CreateChatCompletionJSONRequestBody defines body for CreateChatCompletion for application/json ContentType.
 type CreateChatCompletionJSONRequestBody = ChatCompletionRequest
@@ -3648,6 +3730,504 @@ func (a AnthropicMessagesRequest) MarshalJSON() ([]byte, error) {
 		object["top_p"], err = json.Marshal(a.TopP)
 		if err != nil {
 			return nil, fmt.Errorf("error marshaling 'top_p': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for AudioTranscriptionRequest. Returns the specified
+// element and whether it was found
+func (a AudioTranscriptionRequest) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for AudioTranscriptionRequest
+func (a *AudioTranscriptionRequest) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for AudioTranscriptionRequest to handle AdditionalProperties
+func (a *AudioTranscriptionRequest) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["file"]; found {
+		err = json.Unmarshal(raw, &a.File)
+		if err != nil {
+			return fmt.Errorf("error reading 'file': %w", err)
+		}
+		delete(object, "file")
+	}
+
+	if raw, found := object["language"]; found {
+		err = json.Unmarshal(raw, &a.Language)
+		if err != nil {
+			return fmt.Errorf("error reading 'language': %w", err)
+		}
+		delete(object, "language")
+	}
+
+	if raw, found := object["model"]; found {
+		err = json.Unmarshal(raw, &a.Model)
+		if err != nil {
+			return fmt.Errorf("error reading 'model': %w", err)
+		}
+		delete(object, "model")
+	}
+
+	if raw, found := object["prompt"]; found {
+		err = json.Unmarshal(raw, &a.Prompt)
+		if err != nil {
+			return fmt.Errorf("error reading 'prompt': %w", err)
+		}
+		delete(object, "prompt")
+	}
+
+	if raw, found := object["response_format"]; found {
+		err = json.Unmarshal(raw, &a.ResponseFormat)
+		if err != nil {
+			return fmt.Errorf("error reading 'response_format': %w", err)
+		}
+		delete(object, "response_format")
+	}
+
+	if raw, found := object["temperature"]; found {
+		err = json.Unmarshal(raw, &a.Temperature)
+		if err != nil {
+			return fmt.Errorf("error reading 'temperature': %w", err)
+		}
+		delete(object, "temperature")
+	}
+
+	if raw, found := object["user"]; found {
+		err = json.Unmarshal(raw, &a.User)
+		if err != nil {
+			return fmt.Errorf("error reading 'user': %w", err)
+		}
+		delete(object, "user")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for AudioTranscriptionRequest to handle AdditionalProperties
+func (a AudioTranscriptionRequest) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	object["file"], err = json.Marshal(a.File)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'file': %w", err)
+	}
+
+	if a.Language != nil {
+		object["language"], err = json.Marshal(a.Language)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'language': %w", err)
+		}
+	}
+
+	object["model"], err = json.Marshal(a.Model)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'model': %w", err)
+	}
+
+	if a.Prompt != nil {
+		object["prompt"], err = json.Marshal(a.Prompt)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'prompt': %w", err)
+		}
+	}
+
+	if a.ResponseFormat != nil {
+		object["response_format"], err = json.Marshal(a.ResponseFormat)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'response_format': %w", err)
+		}
+	}
+
+	if a.Temperature != nil {
+		object["temperature"], err = json.Marshal(a.Temperature)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'temperature': %w", err)
+		}
+	}
+
+	if a.User != nil {
+		object["user"], err = json.Marshal(a.User)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'user': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for AudioTranscriptionResponse. Returns the specified
+// element and whether it was found
+func (a AudioTranscriptionResponse) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for AudioTranscriptionResponse
+func (a *AudioTranscriptionResponse) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for AudioTranscriptionResponse to handle AdditionalProperties
+func (a *AudioTranscriptionResponse) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["duration"]; found {
+		err = json.Unmarshal(raw, &a.Duration)
+		if err != nil {
+			return fmt.Errorf("error reading 'duration': %w", err)
+		}
+		delete(object, "duration")
+	}
+
+	if raw, found := object["language"]; found {
+		err = json.Unmarshal(raw, &a.Language)
+		if err != nil {
+			return fmt.Errorf("error reading 'language': %w", err)
+		}
+		delete(object, "language")
+	}
+
+	if raw, found := object["segments"]; found {
+		err = json.Unmarshal(raw, &a.Segments)
+		if err != nil {
+			return fmt.Errorf("error reading 'segments': %w", err)
+		}
+		delete(object, "segments")
+	}
+
+	if raw, found := object["task"]; found {
+		err = json.Unmarshal(raw, &a.Task)
+		if err != nil {
+			return fmt.Errorf("error reading 'task': %w", err)
+		}
+		delete(object, "task")
+	}
+
+	if raw, found := object["text"]; found {
+		err = json.Unmarshal(raw, &a.Text)
+		if err != nil {
+			return fmt.Errorf("error reading 'text': %w", err)
+		}
+		delete(object, "text")
+	}
+
+	if raw, found := object["usage"]; found {
+		err = json.Unmarshal(raw, &a.Usage)
+		if err != nil {
+			return fmt.Errorf("error reading 'usage': %w", err)
+		}
+		delete(object, "usage")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for AudioTranscriptionResponse to handle AdditionalProperties
+func (a AudioTranscriptionResponse) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.Duration != nil {
+		object["duration"], err = json.Marshal(a.Duration)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'duration': %w", err)
+		}
+	}
+
+	if a.Language != nil {
+		object["language"], err = json.Marshal(a.Language)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'language': %w", err)
+		}
+	}
+
+	if a.Segments != nil {
+		object["segments"], err = json.Marshal(a.Segments)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'segments': %w", err)
+		}
+	}
+
+	if a.Task != nil {
+		object["task"], err = json.Marshal(a.Task)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'task': %w", err)
+		}
+	}
+
+	object["text"], err = json.Marshal(a.Text)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'text': %w", err)
+	}
+
+	if a.Usage != nil {
+		object["usage"], err = json.Marshal(a.Usage)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'usage': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for AudioTranscriptionSegment. Returns the specified
+// element and whether it was found
+func (a AudioTranscriptionSegment) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for AudioTranscriptionSegment
+func (a *AudioTranscriptionSegment) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for AudioTranscriptionSegment to handle AdditionalProperties
+func (a *AudioTranscriptionSegment) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["avg_logprob"]; found {
+		err = json.Unmarshal(raw, &a.AvgLogprob)
+		if err != nil {
+			return fmt.Errorf("error reading 'avg_logprob': %w", err)
+		}
+		delete(object, "avg_logprob")
+	}
+
+	if raw, found := object["compression_ratio"]; found {
+		err = json.Unmarshal(raw, &a.CompressionRatio)
+		if err != nil {
+			return fmt.Errorf("error reading 'compression_ratio': %w", err)
+		}
+		delete(object, "compression_ratio")
+	}
+
+	if raw, found := object["end"]; found {
+		err = json.Unmarshal(raw, &a.End)
+		if err != nil {
+			return fmt.Errorf("error reading 'end': %w", err)
+		}
+		delete(object, "end")
+	}
+
+	if raw, found := object["id"]; found {
+		err = json.Unmarshal(raw, &a.Id)
+		if err != nil {
+			return fmt.Errorf("error reading 'id': %w", err)
+		}
+		delete(object, "id")
+	}
+
+	if raw, found := object["no_speech_prob"]; found {
+		err = json.Unmarshal(raw, &a.NoSpeechProb)
+		if err != nil {
+			return fmt.Errorf("error reading 'no_speech_prob': %w", err)
+		}
+		delete(object, "no_speech_prob")
+	}
+
+	if raw, found := object["seek"]; found {
+		err = json.Unmarshal(raw, &a.Seek)
+		if err != nil {
+			return fmt.Errorf("error reading 'seek': %w", err)
+		}
+		delete(object, "seek")
+	}
+
+	if raw, found := object["start"]; found {
+		err = json.Unmarshal(raw, &a.Start)
+		if err != nil {
+			return fmt.Errorf("error reading 'start': %w", err)
+		}
+		delete(object, "start")
+	}
+
+	if raw, found := object["temperature"]; found {
+		err = json.Unmarshal(raw, &a.Temperature)
+		if err != nil {
+			return fmt.Errorf("error reading 'temperature': %w", err)
+		}
+		delete(object, "temperature")
+	}
+
+	if raw, found := object["text"]; found {
+		err = json.Unmarshal(raw, &a.Text)
+		if err != nil {
+			return fmt.Errorf("error reading 'text': %w", err)
+		}
+		delete(object, "text")
+	}
+
+	if raw, found := object["tokens"]; found {
+		err = json.Unmarshal(raw, &a.Tokens)
+		if err != nil {
+			return fmt.Errorf("error reading 'tokens': %w", err)
+		}
+		delete(object, "tokens")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for AudioTranscriptionSegment to handle AdditionalProperties
+func (a AudioTranscriptionSegment) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.AvgLogprob != nil {
+		object["avg_logprob"], err = json.Marshal(a.AvgLogprob)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'avg_logprob': %w", err)
+		}
+	}
+
+	if a.CompressionRatio != nil {
+		object["compression_ratio"], err = json.Marshal(a.CompressionRatio)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'compression_ratio': %w", err)
+		}
+	}
+
+	if a.End != nil {
+		object["end"], err = json.Marshal(a.End)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'end': %w", err)
+		}
+	}
+
+	if a.Id != nil {
+		object["id"], err = json.Marshal(a.Id)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'id': %w", err)
+		}
+	}
+
+	if a.NoSpeechProb != nil {
+		object["no_speech_prob"], err = json.Marshal(a.NoSpeechProb)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'no_speech_prob': %w", err)
+		}
+	}
+
+	if a.Seek != nil {
+		object["seek"], err = json.Marshal(a.Seek)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'seek': %w", err)
+		}
+	}
+
+	if a.Start != nil {
+		object["start"], err = json.Marshal(a.Start)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'start': %w", err)
+		}
+	}
+
+	if a.Temperature != nil {
+		object["temperature"], err = json.Marshal(a.Temperature)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'temperature': %w", err)
+		}
+	}
+
+	if a.Text != nil {
+		object["text"], err = json.Marshal(a.Text)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'text': %w", err)
+		}
+	}
+
+	if a.Tokens != nil {
+		object["tokens"], err = json.Marshal(a.Tokens)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'tokens': %w", err)
 		}
 	}
 
@@ -6707,6 +7287,9 @@ type ServerInterface interface {
 	// Create an Anthropic Messages-compatible message with anthropic-compatible provider context.
 	// (POST /api/provider/anthropic-compatible/v1/messages)
 	CreateAnthropicCompatibleMessageAlias(w http.ResponseWriter, r *http.Request)
+	// Create an audio transcription with openai-compatible provider context.
+	// (POST /api/provider/openai-compatible/v1/audio/transcriptions)
+	CreateOpenAICompatibleAudioTranscriptionAlias(w http.ResponseWriter, r *http.Request)
 	// Create an OpenAI-compatible chat completion with openai-compatible provider context.
 	// (POST /api/provider/openai-compatible/v1/chat/completions)
 	CreateOpenAICompatibleChatCompletionAlias(w http.ResponseWriter, r *http.Request)
@@ -6929,6 +7512,9 @@ type ServerInterface interface {
 	// Handle a signed payment provider webhook.
 	// (POST /api/v1/webhooks/payments/{provider})
 	HandlePaymentWebhook(w http.ResponseWriter, r *http.Request, provider string)
+	// Create an OpenAI-compatible audio transcription.
+	// (POST /v1/audio/transcriptions)
+	CreateAudioTranscription(w http.ResponseWriter, r *http.Request)
 	// Create an OpenAI-compatible chat completion.
 	// (POST /v1/chat/completions)
 	CreateChatCompletion(w http.ResponseWriter, r *http.Request)
@@ -6981,6 +7567,26 @@ func (siw *ServerInterfaceWrapper) CreateAnthropicCompatibleMessageAlias(w http.
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateAnthropicCompatibleMessageAlias(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateOpenAICompatibleAudioTranscriptionAlias operation middleware
+func (siw *ServerInterfaceWrapper) CreateOpenAICompatibleAudioTranscriptionAlias(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateOpenAICompatibleAudioTranscriptionAlias(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -9846,6 +10452,26 @@ func (siw *ServerInterfaceWrapper) HandlePaymentWebhook(w http.ResponseWriter, r
 	handler.ServeHTTP(w, r)
 }
 
+// CreateAudioTranscription operation middleware
+func (siw *ServerInterfaceWrapper) CreateAudioTranscription(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAudioTranscription(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // CreateChatCompletion operation middleware
 func (siw *ServerInterfaceWrapper) CreateChatCompletion(w http.ResponseWriter, r *http.Request) {
 
@@ -10191,6 +10817,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	}
 
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/anthropic-compatible/v1/messages", wrapper.CreateAnthropicCompatibleMessageAlias)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/audio/transcriptions", wrapper.CreateOpenAICompatibleAudioTranscriptionAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/chat/completions", wrapper.CreateOpenAICompatibleChatCompletionAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/embeddings", wrapper.CreateOpenAICompatibleEmbeddingAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/images/generations", wrapper.CreateOpenAICompatibleImageGenerationAlias)
@@ -10265,6 +10892,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/payment/orders/{id}", wrapper.GetPaymentOrder)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/payment/orders/{id}/cancel", wrapper.CancelPaymentOrder)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/webhooks/payments/{provider}", wrapper.HandlePaymentWebhook)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/audio/transcriptions", wrapper.CreateAudioTranscription)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/chat/completions", wrapper.CreateChatCompletion)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/embeddings", wrapper.CreateEmbedding)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/images/generations", wrapper.CreateImageGeneration)

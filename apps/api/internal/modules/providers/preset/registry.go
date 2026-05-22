@@ -127,16 +127,17 @@ func standardAccountTypes() []AccountType {
 
 func openAICapabilities() map[string]bool {
 	return map[string]bool{
-		capabilitiescontract.KeyChatCompletions:  true,
-		capabilitiescontract.KeyResponses:        true,
-		capabilitiescontract.KeyMessages:         true,
-		capabilitiescontract.KeyEmbeddings:       true,
-		capabilitiescontract.KeyModerations:      true,
-		capabilitiescontract.KeyStreaming:        true,
-		capabilitiescontract.KeyToolCalling:      true,
-		capabilitiescontract.KeyStructuredOutput: true,
-		capabilitiescontract.KeyVisionInput:      true,
-		capabilitiescontract.KeyReasoningControl: true,
+		capabilitiescontract.KeyChatCompletions:     true,
+		capabilitiescontract.KeyResponses:           true,
+		capabilitiescontract.KeyMessages:            true,
+		capabilitiescontract.KeyEmbeddings:          true,
+		capabilitiescontract.KeyAudioTranscriptions: true,
+		capabilitiescontract.KeyModerations:         true,
+		capabilitiescontract.KeyStreaming:           true,
+		capabilitiescontract.KeyToolCalling:         true,
+		capabilitiescontract.KeyStructuredOutput:    true,
+		capabilitiescontract.KeyVisionInput:         true,
+		capabilitiescontract.KeyReasoningControl:    true,
 	}
 }
 

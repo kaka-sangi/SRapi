@@ -76,6 +76,26 @@ type ImageGenerationRequest struct {
 	Credential     map[string]any
 }
 
+type AudioTranscriptionRequest struct {
+	RequestID      string
+	SourceProtocol string
+	SourceEndpoint string
+	Model          string
+	FileName       string
+	ContentType    string
+	Audio          []byte
+	Language       string
+	Prompt         string
+	ResponseFormat string
+	Temperature    *float32
+	User           string
+	Extra          map[string]any
+	Provider       providercontract.Provider
+	Account        accountcontract.ProviderAccount
+	Mapping        modelcontract.ModelProviderMapping
+	Credential     map[string]any
+}
+
 type ModerationRequest struct {
 	RequestID      string
 	SourceProtocol string
@@ -154,6 +174,32 @@ type ModerationResponse struct {
 	Usage      Usage
 }
 
+type AudioTranscriptionSegment struct {
+	ID               *int
+	Seek             *int
+	Start            *float32
+	End              *float32
+	Text             string
+	Tokens           []int
+	Temperature      *float32
+	AvgLogprob       *float32
+	CompressionRatio *float32
+	NoSpeechProb     *float32
+	Metadata         map[string]any
+}
+
+type AudioTranscriptionResponse struct {
+	ID         string
+	Text       string
+	Task       string
+	Language   string
+	Duration   *float32
+	Segments   []AudioTranscriptionSegment
+	Model      string
+	StatusCode int
+	Usage      Usage
+}
+
 type RerankResult struct {
 	Index          int
 	RelevanceScore float32
@@ -201,6 +247,10 @@ type EmbeddingAdapter interface {
 
 type ImageGenerationAdapter interface {
 	InvokeImageGeneration(ctx context.Context, req ImageGenerationRequest) (ImageGenerationResponse, error)
+}
+
+type AudioTranscriptionAdapter interface {
+	InvokeAudioTranscription(ctx context.Context, req AudioTranscriptionRequest) (AudioTranscriptionResponse, error)
 }
 
 type ModerationAdapter interface {

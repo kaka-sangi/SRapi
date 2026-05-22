@@ -151,7 +151,8 @@ Antigravity 可承载 Claude-shaped 和 Gemini-shaped 端点，必须在 route m
 | `/v1/embeddings` | Passthrough runtime | 最小解析 model/input，调度后调用 OpenAI-compatible `/embeddings`，记录用量和调度证据。 | WP-270 |
 | `/v1/images/generations` | Media runtime | 最小解析 OpenAI image generation body，调度后调用 OpenAI-compatible `/images/generations`，记录 media/usage 和调度证据。 | WP-290 |
 | `/v1/images/edits`, `/v1/images/variations` | Media runtime | 图片编辑和 variation。 | Phase 3 |
-| `/v1/audio/*` | Passthrough/media runtime | 音频 transcription/speech。 | Phase 3 |
+| `/v1/audio/transcriptions` | Audio runtime | 最小解析 multipart audio transcription body，调度后调用 OpenAI-compatible `/audio/transcriptions`，记录 audio/usage 和调度证据。 | WP-330 |
+| `/v1/audio/speech` | Audio runtime | 语音合成。 | Phase 3 |
 | `/v1/moderations` | Moderation runtime | 最小解析 OpenAI moderation body，调度后调用 OpenAI-compatible `/moderations`，记录用量和调度证据。 | WP-310 |
 | `/v1/rerank` | Passthrough runtime | 最小解析 query/documents/top_n，调度后调用 rerank-compatible `/rerank`，记录用量和调度证据。 | WP-320 |
 | `/v1/responses/ws` | Realtime/WS runtime | 长连接、粘性账号、slot 生命周期。 | Phase 3 |

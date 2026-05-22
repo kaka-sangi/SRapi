@@ -3,6 +3,7 @@ package service_test
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -202,6 +203,72 @@ func TestOpenAICompatibleAdapterInvokesImageGenerationsUpstream(t *testing.T) {
 	}
 	if resp.Usage.Estimated || resp.Usage.InputTokens != 11 || resp.Usage.OutputTokens != 2 {
 		t.Fatalf("unexpected image usage: %+v", resp.Usage)
+	}
+}
+
+func TestOpenAICompatibleAdapterInvokesAudioTranscriptionsUpstream(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/audio/transcriptions" {
+			t.Fatalf("unexpected upstream path %s", r.URL.Path)
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer audio-secret" {
+			t.Fatalf("unexpected auth header %q", got)
+		}
+		if err := r.ParseMultipartForm(16 << 20); err != nil {
+			t.Fatalf("parse upstream multipart: %v", err)
+		}
+		file, header, err := r.FormFile("file")
+		if err != nil {
+			t.Fatalf("expected upstream file: %v", err)
+		}
+		defer file.Close()
+		audio, err := io.ReadAll(file)
+		if err != nil {
+			t.Fatalf("read upstream file: %v", err)
+		}
+		if header.Filename != "sample.wav" || header.Header.Get("Content-Type") != "audio/wav" || string(audio) != "RIFF-test-audio" {
+			t.Fatalf("unexpected upstream audio file filename=%q content_type=%q data=%q", header.Filename, header.Header.Get("Content-Type"), string(audio))
+		}
+		if r.FormValue("model") != "audio-upstream" || r.FormValue("language") != "en" || r.FormValue("prompt") != "meeting notes" || r.FormValue("response_format") != "verbose_json" || r.FormValue("temperature") != "0.2" || r.FormValue("user") != "user-123" {
+			t.Fatalf("unexpected upstream transcription fields: model=%q language=%q prompt=%q response_format=%q temperature=%q user=%q", r.FormValue("model"), r.FormValue("language"), r.FormValue("prompt"), r.FormValue("response_format"), r.FormValue("temperature"), r.FormValue("user"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"text":"transcribed audio","task":"transcribe","language":"en","duration":1.5,"segments":[{"id":0,"start":0,"end":1.5,"text":"transcribed audio","tokens":[1,2]}],"usage":{"prompt_tokens":9,"total_tokens":9}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeAudioTranscription(context.Background(), contract.AudioTranscriptionRequest{
+		RequestID:      "req_audio",
+		Model:          "audio-local",
+		FileName:       "sample.wav",
+		ContentType:    "audio/wav",
+		Audio:          []byte("RIFF-test-audio"),
+		Language:       "en",
+		Prompt:         "meeting notes",
+		ResponseFormat: "verbose_json",
+		Temperature:    ptrFloat32(0.2),
+		User:           "user-123",
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "openai-compatible",
+			Protocol:    "openai-compatible",
+		},
+		Account:    accountcontract.ProviderAccount{ID: 1, Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "audio-upstream"},
+		Credential: map[string]any{"api_key": "audio-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke audio transcription upstream: %v", err)
+	}
+	if resp.Model != "audio-upstream" || resp.Text != "transcribed audio" || resp.Language != "en" || resp.Duration == nil || *resp.Duration != 1.5 || len(resp.Segments) != 1 {
+		t.Fatalf("unexpected audio transcription response: %+v", resp)
+	}
+	if resp.Usage.Estimated || resp.Usage.InputTokens != 9 || resp.Usage.OutputTokens != 0 {
+		t.Fatalf("unexpected audio transcription usage: %+v", resp.Usage)
 	}
 }
 

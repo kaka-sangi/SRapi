@@ -44,13 +44,14 @@ const (
 	KeyContextCache      = "context_cache"
 	KeyUsageInStream     = "usage_in_stream"
 
-	KeyChatCompletions = "chat_completions"
-	KeyResponses       = "responses"
-	KeyMessages        = "messages"
-	KeyEmbeddings      = "embeddings"
-	KeyImages          = "images"
-	KeyModerations     = "moderations"
-	KeyRerank          = "rerank"
+	KeyChatCompletions     = "chat_completions"
+	KeyResponses           = "responses"
+	KeyMessages            = "messages"
+	KeyEmbeddings          = "embeddings"
+	KeyImages              = "images"
+	KeyAudioTranscriptions = "audio_transcriptions"
+	KeyModerations         = "moderations"
+	KeyRerank              = "rerank"
 )
 
 type DefinitionStatus string
@@ -89,6 +90,7 @@ var defaultDefinitions = []Definition{
 	{Key: KeyMessages, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports Messages-compatible generation."},
 	{Key: KeyEmbeddings, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports embeddings."},
 	{Key: KeyImages, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports image generation."},
+	{Key: KeyAudioTranscriptions, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports audio transcription."},
 	{Key: KeyModerations, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports moderation classification."},
 	{Key: KeyRerank, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports document reranking."},
 }
@@ -102,35 +104,40 @@ var knownKeys = func() map[string]Definition {
 }()
 
 var convenienceKeys = map[string]string{
-	"supports_stream":              KeyStreaming,
-	"stream":                       KeyStreaming,
-	"supports_tools":               KeyToolCalling,
-	"tools":                        KeyToolCalling,
-	"supports_parallel_tool_calls": KeyParallelToolCalls,
-	"supports_vision":              KeyVisionInput,
-	"vision":                       KeyVisionInput,
-	"supports_json":                KeyJSONMode,
-	"json":                         KeyJSONMode,
-	"supports_json_mode":           KeyJSONMode,
-	"supports_structured_output":   KeyStructuredOutput,
-	"supports_reasoning":           KeyReasoningControl,
-	"reasoning":                    KeyReasoningControl,
-	"thinking":                     KeyReasoningControl,
-	"supports_prompt_cache":        KeyPromptCache,
-	"supports_context_cache":       KeyContextCache,
-	"supports_usage_in_stream":     KeyUsageInStream,
-	"supports_chat_completions":    KeyChatCompletions,
-	"supports_responses":           KeyResponses,
-	"supports_messages":            KeyMessages,
-	"supports_embeddings":          KeyEmbeddings,
-	"supports_images":              KeyImages,
-	"supports_moderations":         KeyModerations,
-	"supports_moderation":          KeyModerations,
-	"moderation":                   KeyModerations,
-	"supports_rerank":              KeyRerank,
-	"supports_reranking":           KeyRerank,
-	"rerank":                       KeyRerank,
-	"reranking":                    KeyRerank,
+	"supports_stream":               KeyStreaming,
+	"stream":                        KeyStreaming,
+	"supports_tools":                KeyToolCalling,
+	"tools":                         KeyToolCalling,
+	"supports_parallel_tool_calls":  KeyParallelToolCalls,
+	"supports_vision":               KeyVisionInput,
+	"vision":                        KeyVisionInput,
+	"supports_json":                 KeyJSONMode,
+	"json":                          KeyJSONMode,
+	"supports_json_mode":            KeyJSONMode,
+	"supports_structured_output":    KeyStructuredOutput,
+	"supports_reasoning":            KeyReasoningControl,
+	"reasoning":                     KeyReasoningControl,
+	"thinking":                      KeyReasoningControl,
+	"supports_prompt_cache":         KeyPromptCache,
+	"supports_context_cache":        KeyContextCache,
+	"supports_usage_in_stream":      KeyUsageInStream,
+	"supports_chat_completions":     KeyChatCompletions,
+	"supports_responses":            KeyResponses,
+	"supports_messages":             KeyMessages,
+	"supports_embeddings":           KeyEmbeddings,
+	"supports_images":               KeyImages,
+	"supports_audio":                KeyAudioTranscriptions,
+	"supports_audio_transcriptions": KeyAudioTranscriptions,
+	"audio":                         KeyAudioTranscriptions,
+	"audio_transcriptions":          KeyAudioTranscriptions,
+	"transcriptions":                KeyAudioTranscriptions,
+	"supports_moderations":          KeyModerations,
+	"supports_moderation":           KeyModerations,
+	"moderation":                    KeyModerations,
+	"supports_rerank":               KeyRerank,
+	"supports_reranking":            KeyRerank,
+	"rerank":                        KeyRerank,
+	"reranking":                     KeyRerank,
 }
 
 func DefaultDefinitions() []Definition {

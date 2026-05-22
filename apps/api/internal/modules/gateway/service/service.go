@@ -241,6 +241,49 @@ func (s *Service) NormalizeImageGeneration(req apiopenapi.ImageGenerationRequest
 	return canonical, nil
 }
 
+func (s *Service) NormalizeAudioTranscription(req apiopenapi.AudioTranscriptionRequest, meta RequestMeta) (gatewaycontract.CanonicalRequest, error) {
+	model := strings.TrimSpace(req.Model)
+	if model == "" {
+		return gatewaycontract.CanonicalRequest{}, fmt.Errorf("audio transcription model is empty")
+	}
+	fileBytes, err := req.File.Bytes()
+	if err != nil {
+		return gatewaycontract.CanonicalRequest{}, fmt.Errorf("audio transcription file is unreadable")
+	}
+	if len(fileBytes) == 0 {
+		return gatewaycontract.CanonicalRequest{}, fmt.Errorf("audio transcription file is empty")
+	}
+	format := enumString(req.ResponseFormat)
+	if format == "" {
+		format = "json"
+	}
+	if !validAudioTranscriptionResponseFormat(format) {
+		return gatewaycontract.CanonicalRequest{}, fmt.Errorf("audio transcription response_format is unsupported")
+	}
+	if req.Temperature != nil && (*req.Temperature < 0 || *req.Temperature > 1) {
+		return gatewaycontract.CanonicalRequest{}, fmt.Errorf("audio transcription temperature must be between 0 and 1")
+	}
+	prompt := ""
+	if req.Prompt != nil {
+		prompt = strings.TrimSpace(*req.Prompt)
+	}
+	canonical := canonical(meta, gatewaycontract.ProtocolOpenAICompatible, gatewaycontract.ProtocolOpenAICompatible, model, "", false, audioTranscriptionPrompt(req.File.Filename(), prompt), nil, audioTranscriptionContentBlocks(req.File.Filename(), prompt), "", nil)
+	canonical.AudioFileName = strings.TrimSpace(req.File.Filename())
+	canonical.AudioBytes = append([]byte(nil), fileBytes...)
+	canonical.AudioPrompt = prompt
+	canonical.AudioResponseFormat = format
+	canonical.AudioTemperature = req.Temperature
+	if req.Language != nil {
+		canonical.AudioLanguage = strings.TrimSpace(*req.Language)
+	}
+	if req.User != nil {
+		canonical.AudioUser = strings.TrimSpace(*req.User)
+	}
+	canonical.AudioExtra = cloneMap(req.AdditionalProperties)
+	canonical.RequestCapabilities = append(canonical.RequestCapabilities, gatewaycontract.RequestCapability{Key: capabilitiescontract.KeyAudioTranscriptions, Version: "v1"})
+	return canonical, nil
+}
+
 func (s *Service) NormalizeModerations(req apiopenapi.ModerationRequest, meta RequestMeta) (gatewaycontract.CanonicalRequest, error) {
 	input, err := moderationInput(req.Input)
 	if err != nil {
@@ -389,6 +432,37 @@ func (s *Service) BuildCanonicalModerationResponse(req gatewaycontract.Canonical
 		Model:                 model,
 		CanonicalModel:        canonicalModel,
 		Results:               cloneModerationResults(results),
+		Usage:                 usage,
+		CompatibilityWarnings: uniqueStrings(req.CompatibilityWarnings),
+	}
+}
+
+func (s *Service) BuildCanonicalAudioTranscriptionResponse(req gatewaycontract.CanonicalRequest, id string, text string, task string, language string, duration *float32, segments []gatewaycontract.AudioTranscriptionSegment, usage gatewaycontract.Usage) gatewaycontract.AudioTranscriptionResponse {
+	model := strings.TrimSpace(req.Model)
+	if model == "" {
+		model = req.CanonicalModel
+	}
+	canonicalModel := strings.TrimSpace(req.CanonicalModel)
+	if canonicalModel == "" {
+		canonicalModel = model
+	}
+	id = strings.TrimSpace(id)
+	if id == "" {
+		id = "transcription_" + randomHexString(12)
+	}
+	if usage.InputTokens == 0 && usage.OutputTokens == 0 && usage.CachedTokens == 0 {
+		usage = audioTranscriptionEstimatedUsage(req)
+	}
+	return gatewaycontract.AudioTranscriptionResponse{
+		ID:                    id,
+		RequestID:             strings.TrimSpace(req.RequestID),
+		Model:                 model,
+		CanonicalModel:        canonicalModel,
+		Text:                  strings.TrimSpace(text),
+		Task:                  strings.TrimSpace(task),
+		Language:              strings.TrimSpace(language),
+		Duration:              cloneFloat32(duration),
+		Segments:              cloneAudioTranscriptionSegments(segments),
 		Usage:                 usage,
 		CompatibilityWarnings: uniqueStrings(req.CompatibilityWarnings),
 	}
@@ -575,6 +649,48 @@ func (s *Service) RenderModerations(resp gatewaycontract.ModerationResponse) api
 		Model:   resp.Model,
 		Results: results,
 	}
+}
+
+func (s *Service) RenderAudioTranscription(resp gatewaycontract.AudioTranscriptionResponse) apiopenapi.AudioTranscriptionResponse {
+	rendered := apiopenapi.AudioTranscriptionResponse{
+		Text:                 resp.Text,
+		AdditionalProperties: map[string]interface{}{},
+	}
+	if resp.Task != "" {
+		rendered.Task = ptrString(resp.Task)
+	}
+	if resp.Language != "" {
+		rendered.Language = ptrString(resp.Language)
+	}
+	if resp.Duration != nil {
+		rendered.Duration = cloneFloat32(resp.Duration)
+	}
+	if len(resp.Segments) > 0 {
+		segments := make([]apiopenapi.AudioTranscriptionSegment, 0, len(resp.Segments))
+		for _, item := range resp.Segments {
+			segments = append(segments, apiopenapi.AudioTranscriptionSegment{
+				AvgLogprob:           cloneFloat32(item.AvgLogprob),
+				CompressionRatio:     cloneFloat32(item.CompressionRatio),
+				End:                  cloneFloat32(item.End),
+				Id:                   cloneInt(item.ID),
+				NoSpeechProb:         cloneFloat32(item.NoSpeechProb),
+				Seek:                 cloneInt(item.Seek),
+				Start:                cloneFloat32(item.Start),
+				Temperature:          cloneFloat32(item.Temperature),
+				Text:                 ptrStringIfNotEmpty(item.Text),
+				Tokens:               cloneIntSlicePtr(item.Tokens),
+				AdditionalProperties: cloneMap(item.Metadata),
+			})
+		}
+		rendered.Segments = &segments
+	}
+	if resp.Usage.InputTokens > 0 || resp.Usage.OutputTokens > 0 || resp.Usage.CachedTokens > 0 {
+		rendered.Usage = tokenUsage(resp.Usage)
+	}
+	if len(rendered.AdditionalProperties) == 0 {
+		rendered.AdditionalProperties = nil
+	}
+	return rendered
 }
 
 func (s *Service) RenderRerank(resp gatewaycontract.RerankResponse) apiopenapi.RerankResponse {
@@ -1038,6 +1154,42 @@ func imageContentBlocks(prompt string) []gatewaycontract.ContentBlock {
 	return []gatewaycontract.ContentBlock{{Type: gatewaycontract.ContentBlockText, Role: "user", Text: prompt}}
 }
 
+func validAudioTranscriptionResponseFormat(format string) bool {
+	switch strings.TrimSpace(format) {
+	case "json", "text", "srt", "verbose_json", "vtt", "diarized_json":
+		return true
+	default:
+		return false
+	}
+}
+
+func audioTranscriptionPrompt(filename string, prompt string) string {
+	parts := []string{"audio file: " + strings.TrimSpace(filename)}
+	if prompt = strings.TrimSpace(prompt); prompt != "" {
+		parts = append(parts, prompt)
+	}
+	return strings.Join(uniqueStrings(parts), "\n")
+}
+
+func audioTranscriptionContentBlocks(filename string, prompt string) []gatewaycontract.ContentBlock {
+	filename = strings.TrimSpace(filename)
+	metadata := map[string]any{}
+	if filename != "" {
+		metadata["filename"] = filename
+	}
+	block := gatewaycontract.ContentBlock{
+		Type:     gatewaycontract.ContentBlockAudio,
+		Role:     "user",
+		Text:     "[audio]",
+		Metadata: metadata,
+	}
+	out := []gatewaycontract.ContentBlock{block}
+	if prompt = strings.TrimSpace(prompt); prompt != "" {
+		out = append(out, gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockText, Role: "user", Text: prompt})
+	}
+	return out
+}
+
 func moderationInput(input apiopenapi.ModerationRequest_Input) ([]string, error) {
 	if text, err := input.AsModerationRequestInput0(); err == nil {
 		text = strings.TrimSpace(text)
@@ -1154,6 +1306,17 @@ func imageEstimatedUsage(req gatewaycontract.CanonicalRequest) gatewaycontract.U
 	}
 }
 
+func audioTranscriptionEstimatedUsage(req gatewaycontract.CanonicalRequest) gatewaycontract.Usage {
+	inputTokens := estimateTokens(req.AudioPrompt)
+	if len(req.AudioBytes) > 0 {
+		inputTokens += max(1, len(req.AudioBytes)/1024)
+	}
+	return gatewaycontract.Usage{
+		InputTokens: inputTokens,
+		Estimated:   true,
+	}
+}
+
 func moderationEstimatedUsage(values []string) gatewaycontract.Usage {
 	return gatewaycontract.Usage{
 		InputTokens: estimateTokens(strings.Join(values, "\n")),
@@ -1187,6 +1350,27 @@ func cloneImages(values []gatewaycontract.Image) []gatewaycontract.Image {
 	out := make([]gatewaycontract.Image, len(values))
 	for idx, value := range values {
 		out[idx] = value
+		out[idx].Metadata = cloneMap(value.Metadata)
+	}
+	return out
+}
+
+func cloneAudioTranscriptionSegments(values []gatewaycontract.AudioTranscriptionSegment) []gatewaycontract.AudioTranscriptionSegment {
+	if values == nil {
+		return nil
+	}
+	out := make([]gatewaycontract.AudioTranscriptionSegment, len(values))
+	for idx, value := range values {
+		out[idx] = value
+		out[idx].ID = cloneInt(value.ID)
+		out[idx].Seek = cloneInt(value.Seek)
+		out[idx].Start = cloneFloat32(value.Start)
+		out[idx].End = cloneFloat32(value.End)
+		out[idx].Tokens = append([]int(nil), value.Tokens...)
+		out[idx].Temperature = cloneFloat32(value.Temperature)
+		out[idx].AvgLogprob = cloneFloat32(value.AvgLogprob)
+		out[idx].CompressionRatio = cloneFloat32(value.CompressionRatio)
+		out[idx].NoSpeechProb = cloneFloat32(value.NoSpeechProb)
 		out[idx].Metadata = cloneMap(value.Metadata)
 	}
 	return out
@@ -1287,6 +1471,14 @@ func enumString[T ~string](value *T) string {
 		return ""
 	}
 	return strings.TrimSpace(string(*value))
+}
+
+func cloneFloat32(value *float32) *float32 {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
 }
 
 func refreshRequestCapabilities(req *gatewaycontract.CanonicalRequest) {
@@ -1692,6 +1884,22 @@ func ptrInt(value int) *int {
 
 func ptrString(value string) *string {
 	return &value
+}
+
+func ptrStringIfNotEmpty(value string) *string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	return &value
+}
+
+func cloneIntSlicePtr(values []int) *[]int {
+	if len(values) == 0 {
+		return nil
+	}
+	out := append([]int(nil), values...)
+	return &out
 }
 
 func max(a, b int) int {

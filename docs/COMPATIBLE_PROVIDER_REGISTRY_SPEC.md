@@ -203,6 +203,7 @@ generate_content
 embeddings
 images
 audio
+audio_transcriptions
 rerank
 tools
 structured_output

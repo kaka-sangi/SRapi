@@ -777,7 +777,7 @@ func effectiveCapabilities(model modelcontract.Model, mapping modelcontract.Mode
 			}
 		}
 	}
-	for _, key := range []string{capabilitiescontract.KeyEmbeddings, capabilitiescontract.KeyImages, capabilitiescontract.KeyModerations, capabilitiescontract.KeyRerank} {
+	for _, key := range []string{capabilitiescontract.KeyEmbeddings, capabilitiescontract.KeyImages, capabilitiescontract.KeyAudioTranscriptions, capabilitiescontract.KeyModerations, capabilitiescontract.KeyRerank} {
 		if _, ok := providerScoped[key]; !ok {
 			delete(merged, key)
 		}
@@ -1072,6 +1072,28 @@ func (rt *runtimeState) invokeProviderImageGeneration(ctx context.Context, req p
 	return resp, nil
 }
 
+func (rt *runtimeState) invokeProviderAudioTranscription(ctx context.Context, req provideradaptercontract.AudioTranscriptionRequest) (provideradaptercontract.AudioTranscriptionResponse, error) {
+	if req.Account.ID <= 0 {
+		return provideradaptercontract.AudioTranscriptionResponse{}, provideradaptercontract.ProviderError{Class: "no_available_account", StatusCode: http.StatusServiceUnavailable, Message: "provider account missing"}
+	}
+	credential, err := rt.accounts.DecryptCredential(ctx, req.Account.ID)
+	if err != nil {
+		return provideradaptercontract.AudioTranscriptionResponse{}, provideradaptercontract.ProviderError{Class: "credential_error", StatusCode: http.StatusBadGateway, Message: "provider credential unavailable"}
+	}
+	if refreshed, ok, err := rt.refreshReverseProxyCredential(ctx, req.Account, credential); err != nil {
+		return provideradaptercontract.AudioTranscriptionResponse{}, provideradaptercontract.ProviderError{Class: "auth_failed", StatusCode: http.StatusBadGateway, Message: "provider credential refresh failed"}
+	} else if ok {
+		credential = refreshed
+	}
+	req.Credential = credential
+	resp, err := rt.adapters.InvokeAudioTranscription(ctx, req)
+	if err != nil {
+		rt.applyProviderAccountProtection(ctx, req.Account, err)
+		return provideradaptercontract.AudioTranscriptionResponse{}, err
+	}
+	return resp, nil
+}
+
 func (rt *runtimeState) invokeProviderModerations(ctx context.Context, req provideradaptercontract.ModerationRequest) (provideradaptercontract.ModerationResponse, error) {
 	if req.Account.ID <= 0 {
 		return provideradaptercontract.ModerationResponse{}, provideradaptercontract.ProviderError{Class: "no_available_account", StatusCode: http.StatusServiceUnavailable, Message: "provider account missing"}
@@ -1169,6 +1191,27 @@ func providerImageGenerationRequest(req gatewaycontract.CanonicalRequest, candid
 		ResponseFormat: req.ImageResponseFormat,
 		User:           req.ImageUser,
 		Extra:          cloneAnyMap(req.ImageExtra),
+		Provider:       candidate.Provider,
+		Account:        candidate.Account,
+		Mapping:        candidate.Mapping,
+	}
+}
+
+func providerAudioTranscriptionRequest(req gatewaycontract.CanonicalRequest, candidate schedulercontract.Candidate) provideradaptercontract.AudioTranscriptionRequest {
+	return provideradaptercontract.AudioTranscriptionRequest{
+		RequestID:      req.RequestID,
+		SourceProtocol: string(req.SourceProtocol),
+		SourceEndpoint: req.SourceEndpoint,
+		Model:          req.CanonicalModel,
+		FileName:       req.AudioFileName,
+		ContentType:    req.AudioContentType,
+		Audio:          append([]byte(nil), req.AudioBytes...),
+		Language:       req.AudioLanguage,
+		Prompt:         req.AudioPrompt,
+		ResponseFormat: req.AudioResponseFormat,
+		Temperature:    cloneFloat32Ptr(req.AudioTemperature),
+		User:           req.AudioUser,
+		Extra:          cloneAnyMap(req.AudioExtra),
 		Provider:       candidate.Provider,
 		Account:        candidate.Account,
 		Mapping:        candidate.Mapping,
@@ -1395,6 +1438,15 @@ func gatewayUsageFromImageProvider(resp provideradaptercontract.ImageGenerationR
 	}
 }
 
+func gatewayUsageFromAudioTranscriptionProvider(resp provideradaptercontract.AudioTranscriptionResponse) gatewaycontract.Usage {
+	return gatewaycontract.Usage{
+		InputTokens:  resp.Usage.InputTokens,
+		OutputTokens: resp.Usage.OutputTokens,
+		CachedTokens: resp.Usage.CachedTokens,
+		Estimated:    resp.Usage.Estimated,
+	}
+}
+
 func gatewayUsageFromModerationProvider(resp provideradaptercontract.ModerationResponse) gatewaycontract.Usage {
 	return gatewaycontract.Usage{
 		InputTokens:  resp.Usage.InputTokens,
@@ -1433,6 +1485,29 @@ func gatewayImagesFromProvider(resp provideradaptercontract.ImageGenerationRespo
 			Base64JSON:    item.Base64JSON,
 			RevisedPrompt: item.RevisedPrompt,
 			Metadata:      cloneAnyMap(item.Metadata),
+		})
+	}
+	return out
+}
+
+func gatewayAudioTranscriptionSegmentsFromProvider(resp provideradaptercontract.AudioTranscriptionResponse) []gatewaycontract.AudioTranscriptionSegment {
+	if len(resp.Segments) == 0 {
+		return nil
+	}
+	out := make([]gatewaycontract.AudioTranscriptionSegment, 0, len(resp.Segments))
+	for _, item := range resp.Segments {
+		out = append(out, gatewaycontract.AudioTranscriptionSegment{
+			ID:               cloneIntPtr(item.ID),
+			Seek:             cloneIntPtr(item.Seek),
+			Start:            cloneFloat32Ptr(item.Start),
+			End:              cloneFloat32Ptr(item.End),
+			Text:             item.Text,
+			Tokens:           append([]int(nil), item.Tokens...),
+			Temperature:      cloneFloat32Ptr(item.Temperature),
+			AvgLogprob:       cloneFloat32Ptr(item.AvgLogprob),
+			CompressionRatio: cloneFloat32Ptr(item.CompressionRatio),
+			NoSpeechProb:     cloneFloat32Ptr(item.NoSpeechProb),
+			Metadata:         cloneAnyMap(item.Metadata),
 		})
 	}
 	return out

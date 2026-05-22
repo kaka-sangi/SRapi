@@ -1,11 +1,15 @@
 package httpserver
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"net/textproto"
 	"strconv"
 	"strings"
 	"sync"
@@ -3016,6 +3020,185 @@ func TestGatewayRerankRouteTargetsRerankCompatibleUpstream(t *testing.T) {
 	}
 }
 
+func TestGatewayAudioTranscriptionRouteTargetsOpenAICompatibleUpstream(t *testing.T) {
+	type upstreamCall struct {
+		Path           string
+		Authorization  string
+		Model          string
+		Language       string
+		Prompt         string
+		ResponseFormat string
+		Temperature    string
+		User           string
+		Filename       string
+		ContentType    string
+		Audio          string
+	}
+	var (
+		mu    sync.Mutex
+		calls []upstreamCall
+	)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseMultipartForm(16 << 20); err != nil {
+			t.Fatalf("parse upstream multipart: %v", err)
+		}
+		file, header, err := r.FormFile("file")
+		if err != nil {
+			t.Fatalf("expected upstream file: %v", err)
+		}
+		defer file.Close()
+		audio, err := io.ReadAll(file)
+		if err != nil {
+			t.Fatalf("read upstream file: %v", err)
+		}
+		mu.Lock()
+		calls = append(calls, upstreamCall{
+			Path:           r.URL.Path,
+			Authorization:  r.Header.Get("Authorization"),
+			Model:          r.FormValue("model"),
+			Language:       r.FormValue("language"),
+			Prompt:         r.FormValue("prompt"),
+			ResponseFormat: r.FormValue("response_format"),
+			Temperature:    r.FormValue("temperature"),
+			User:           r.FormValue("user"),
+			Filename:       header.Filename,
+			ContentType:    header.Header.Get("Content-Type"),
+			Audio:          string(audio),
+		})
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"text":"gateway transcribed audio","task":"transcribe","language":"en","duration":2.5,"segments":[{"id":0,"start":0,"end":2.5,"text":"gateway transcribed audio","tokens":[1,2,3]}],"usage":{"prompt_tokens":14,"total_tokens":14}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"wp330-openai","display_name":"WP330 OpenAI","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active","capabilities":{"audio_transcriptions":true}}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"wp330-audio-model","display_name":"WP330 Audio Model","status":"active","capabilities":[{"key":"audio_transcriptions","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"audio-upstream","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"wp330-audio-account","runtime_class":"api_key","credential":{"api_key":"audio-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
+
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	rec := mustGatewayMultipartRequest(t, handler, apiKey, "/v1/audio/transcriptions", map[string]string{
+		"model":           "wp330-audio-model",
+		"language":        "en",
+		"prompt":          "meeting notes",
+		"response_format": "verbose_json",
+		"temperature":     "0.2",
+		"user":            "user-123",
+	}, "sample.wav", "audio/wav", []byte("RIFF-gateway-audio"))
+	var audioResp apiopenapi.AudioTranscriptionResponse
+	if err := json.NewDecoder(rec.Body).Decode(&audioResp); err != nil {
+		t.Fatalf("decode audio transcription response: %v", err)
+	}
+	if audioResp.Text != "gateway transcribed audio" || audioResp.Language == nil || *audioResp.Language != "en" || audioResp.Duration == nil || *audioResp.Duration != 2.5 || audioResp.Segments == nil || len(*audioResp.Segments) != 1 {
+		t.Fatalf("unexpected audio transcription response: %+v", audioResp)
+	}
+	if audioResp.Usage == nil || audioResp.Usage.PromptTokens == nil || *audioResp.Usage.PromptTokens != 14 {
+		t.Fatalf("expected audio usage details, got %+v", audioResp.Usage)
+	}
+
+	mu.Lock()
+	gotCalls := append([]upstreamCall(nil), calls...)
+	mu.Unlock()
+	if len(gotCalls) != 1 {
+		t.Fatalf("expected one upstream call, got %+v", gotCalls)
+	}
+	if gotCalls[0].Path != "/v1/audio/transcriptions" || gotCalls[0].Authorization != "Bearer audio-secret" || gotCalls[0].Model != "audio-upstream" || gotCalls[0].Filename != "sample.wav" || gotCalls[0].ContentType != "audio/wav" || gotCalls[0].Audio != "RIFF-gateway-audio" {
+		t.Fatalf("unexpected upstream audio call: %+v", gotCalls[0])
+	}
+	if gotCalls[0].Language != "en" || gotCalls[0].Prompt != "meeting notes" || gotCalls[0].ResponseFormat != "verbose_json" || gotCalls[0].Temperature != "0.2" || gotCalls[0].User != "user-123" {
+		t.Fatalf("unexpected upstream audio details: %+v", gotCalls[0])
+	}
+
+	usageReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/usage-logs?model=wp330-audio-model", nil)
+	usageReq.AddCookie(sessionCookie)
+	usageRec := httptest.NewRecorder()
+	handler.ServeHTTP(usageRec, usageReq)
+	if usageRec.Code != http.StatusOK {
+		t.Fatalf("expected usage logs 200, got %d", usageRec.Code)
+	}
+	var usageResp apiopenapi.UsageLogListResponse
+	if err := json.NewDecoder(usageRec.Body).Decode(&usageResp); err != nil {
+		t.Fatalf("decode usage logs: %v", err)
+	}
+	if len(usageResp.Data) != 1 {
+		t.Fatalf("expected one audio usage record, got %+v", usageResp.Data)
+	}
+	usage := usageResp.Data[0]
+	if !usage.Success || usage.SourceEndpoint != "/v1/audio/transcriptions" || usage.ProviderId == nil || *usage.ProviderId != string(providerResp.Data.Id) || usage.AccountId == nil || *usage.AccountId != string(accountResp.Data.Id) || usage.TotalTokens != 14 {
+		t.Fatalf("unexpected audio usage evidence: %+v", usage)
+	}
+
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=wp330-audio-model", nil)
+	decisionsReq.AddCookie(sessionCookie)
+	decisionsRec := httptest.NewRecorder()
+	handler.ServeHTTP(decisionsRec, decisionsReq)
+	if decisionsRec.Code != http.StatusOK {
+		t.Fatalf("expected decisions 200, got %d body=%s", decisionsRec.Code, decisionsRec.Body.String())
+	}
+	var decisionsResp apiopenapi.SchedulerDecisionListResponse
+	if err := json.NewDecoder(decisionsRec.Body).Decode(&decisionsResp); err != nil {
+		t.Fatalf("decode decisions: %v", err)
+	}
+	if len(decisionsResp.Data) != 1 || decisionsResp.Data[0].SourceEndpoint != "/v1/audio/transcriptions" || decisionsResp.Data[0].CandidateCount != 1 {
+		t.Fatalf("unexpected audio decision evidence: %+v", decisionsResp.Data)
+	}
+}
+
+func TestGatewayAudioTranscriptionAliasForcesProviderContext(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	openaiProvider := mustFindProviderByName(t, handler, sessionCookie, "openai-compatible")
+	fallbackProvider := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"audio-fallback-provider","display_name":"Audio Fallback","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active","capabilities":{"audio_transcriptions":true}}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"wp330-alias-audio-model","display_name":"WP330 Alias Audio Model","status":"active","capabilities":[{"key":"audio_transcriptions","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","upstream_model_name":"fallback-audio","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","name":"audio-fallback-account","runtime_class":"api_key","credential":{"api_key":"fallback-secret"},"status":"active","priority":100}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(openaiProvider.Id)+`","upstream_model_name":"alias-audio","status":"active"}`)
+
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	mustGatewayMultipartRequest(t, handler, apiKey, "/api/provider/openai-compatible/v1/audio/transcriptions", map[string]string{"model": "wp330-alias-audio-model", "response_format": "json"}, "alias.wav", "audio/wav", []byte("RIFF-alias-audio"))
+
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=wp330-alias-audio-model", nil)
+	decisionsReq.AddCookie(sessionCookie)
+	decisionsRec := httptest.NewRecorder()
+	handler.ServeHTTP(decisionsRec, decisionsReq)
+	if decisionsRec.Code != http.StatusOK {
+		t.Fatalf("expected decisions 200, got %d body=%s", decisionsRec.Code, decisionsRec.Body.String())
+	}
+	var decisionsResp apiopenapi.SchedulerDecisionListResponse
+	if err := json.NewDecoder(decisionsRec.Body).Decode(&decisionsResp); err != nil {
+		t.Fatalf("decode decisions: %v", err)
+	}
+	if len(decisionsResp.Data) != 1 {
+		t.Fatalf("expected one alias audio decision, got %+v", decisionsResp.Data)
+	}
+	decision := decisionsResp.Data[0]
+	if decision.SelectedProviderId == nil || *decision.SelectedProviderId != string(openaiProvider.Id) || decision.CandidateCount != 1 {
+		t.Fatalf("expected audio alias to force openai-compatible provider, got %+v", decision)
+	}
+	if decision.SourceEndpoint != "/api/provider/openai-compatible/v1/audio/transcriptions" {
+		t.Fatalf("expected alias source endpoint, got %q", decision.SourceEndpoint)
+	}
+}
+
+func TestGatewayAudioTranscriptionTextResponseFormatReturnsPlainText(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"wp330-text-audio-model","display_name":"WP330 Text Audio Model","status":"active","capabilities":[{"key":"audio_transcriptions","level":"required","status":"stable","version":"v1"}]}`)
+	openaiProvider := mustFindProviderByName(t, handler, sessionCookie, "openai-compatible")
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(openaiProvider.Id)+`","upstream_model_name":"alias-audio","status":"active"}`)
+
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	rec := mustGatewayMultipartRequest(t, handler, apiKey, "/v1/audio/transcriptions", map[string]string{"model": "wp330-text-audio-model", "response_format": "text"}, "plain.wav", "audio/wav", []byte("RIFF-plain-audio"))
+	if contentType := rec.Header().Get("Content-Type"); !strings.HasPrefix(contentType, "text/plain") {
+		t.Fatalf("expected text/plain content type, got %q", contentType)
+	}
+	if body := strings.TrimSpace(rec.Body.String()); body != "SRapi local transcription for plain.wav" {
+		t.Fatalf("unexpected plain text transcription body %q", body)
+	}
+}
+
 func TestGatewayRerankAliasForcesProviderContext(t *testing.T) {
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
@@ -3808,6 +3991,39 @@ func mustGatewayRequest(t *testing.T, handler http.Handler, apiKey, method, path
 	handler.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected %s %s 200, got %d body=%s", method, path, rec.Code, rec.Body.String())
+	}
+	return rec
+}
+
+func mustGatewayMultipartRequest(t *testing.T, handler http.Handler, apiKey, path string, fields map[string]string, filename string, contentType string, payload []byte) *httptest.ResponseRecorder {
+	t.Helper()
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	for key, value := range fields {
+		if err := writer.WriteField(key, value); err != nil {
+			t.Fatalf("write multipart field: %v", err)
+		}
+	}
+	header := make(textproto.MIMEHeader)
+	header.Set("Content-Disposition", `form-data; name="file"; filename="`+filename+`"`)
+	header.Set("Content-Type", contentType)
+	part, err := writer.CreatePart(header)
+	if err != nil {
+		t.Fatalf("create multipart file: %v", err)
+	}
+	if _, err := part.Write(payload); err != nil {
+		t.Fatalf("write multipart file: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close multipart writer: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, path, &body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected POST %s 200, got %d body=%s", path, rec.Code, rec.Body.String())
 	}
 	return rec
 }

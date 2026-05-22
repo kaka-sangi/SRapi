@@ -589,6 +589,18 @@ OpenAI-compatible upstream response -> Responses response
 OpenAI-compatible upstream response -> Anthropic Messages response
 ```
 
+Advanced endpoint adapter coverage now also includes OpenAI-compatible passthrough families:
+
+```txt
+Embeddings -> OpenAI-compatible /embeddings
+Images generations -> OpenAI-compatible /images/generations
+Moderations -> OpenAI-compatible /moderations
+Audio transcriptions -> OpenAI-compatible /audio/transcriptions
+Rerank -> rerank-compatible /rerank
+```
+
+Audio transcription dispatch must send multipart form-data with `file`, mapped upstream `model`, and supported optional OpenAI-compatible fields. Adapter logs and errors must not include audio bytes, prompts, API keys, cookies, or provider credentials.
+
 端点转换测试必须覆盖：
 
 - 非流式文本。

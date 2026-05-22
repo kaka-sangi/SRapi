@@ -2730,6 +2730,60 @@ paths:
         default:
           $ref: "#/components/responses/GatewayError"
 
+  /v1/audio/transcriptions:
+    post:
+      tags:
+        - Gateway
+      operationId: createAudioTranscription
+      summary: Create an OpenAI-compatible audio transcription.
+      description: OpenAI-compatible audio transcription route. SRapi validates the gateway API key, applies model policy and entitlement, schedules an eligible provider account, invokes the selected OpenAI-compatible provider adapter, and records audio usage and Scheduler evidence.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/AudioTranscriptionRequest"
+            encoding:
+              file:
+                contentType: audio/*
+            examples:
+              basic:
+                value:
+                  model: gpt-4o-mini-transcribe
+                  file: audio.wav
+                  language: en
+                  response_format: json
+      responses:
+        "200":
+          description: Audio transcription response. JSON response formats return an object; text, srt, and vtt response formats return plain text.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AudioTranscriptionResponse"
+            text/plain:
+              schema:
+                type: string
+            text/vtt:
+              schema:
+                type: string
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
   /v1beta/models/{model}:generateContent:
     post:
       tags:
@@ -3092,6 +3146,53 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ModerationResponse"
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /api/provider/openai-compatible/v1/audio/transcriptions:
+    post:
+      tags:
+        - Gateway
+      operationId: createOpenAICompatibleAudioTranscriptionAlias
+      summary: Create an audio transcription with openai-compatible provider context.
+      description: Provider alias route. It reuses the standard audio transcription runtime and forces the `openai-compatible` provider context.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/AudioTranscriptionRequest"
+            encoding:
+              file:
+                contentType: audio/*
+      responses:
+        "200":
+          description: Audio transcription response.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AudioTranscriptionResponse"
+            text/plain:
+              schema:
+                type: string
+            text/vtt:
+              schema:
+                type: string
         "400":
           $ref: "#/components/responses/GatewayBadRequest"
         "401":
@@ -6872,6 +6973,98 @@ components:
             $ref: "#/components/schemas/ModerationResult"
       additionalProperties: true
 
+    AudioTranscriptionRequest:
+      type: object
+      required:
+        - file
+        - model
+      properties:
+        file:
+          type: string
+          format: binary
+          description: Audio file to transcribe.
+        model:
+          type: string
+        language:
+          type: string
+          description: Optional ISO-639-1 input language hint.
+        prompt:
+          type: string
+          description: Optional style or continuation prompt. SRapi does not persist full prompt text in logs.
+        response_format:
+          type: string
+          enum:
+            - json
+            - text
+            - srt
+            - verbose_json
+            - vtt
+            - diarized_json
+          default: json
+        temperature:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+        user:
+          type: string
+      additionalProperties: true
+
+    AudioTranscriptionSegment:
+      type: object
+      properties:
+        id:
+          type: integer
+        seek:
+          type: integer
+        start:
+          type: number
+          format: float
+        end:
+          type: number
+          format: float
+        text:
+          type: string
+        tokens:
+          type: array
+          items:
+            type: integer
+        temperature:
+          type: number
+          format: float
+        avg_logprob:
+          type: number
+          format: float
+        compression_ratio:
+          type: number
+          format: float
+        no_speech_prob:
+          type: number
+          format: float
+      additionalProperties: true
+
+    AudioTranscriptionResponse:
+      type: object
+      required:
+        - text
+      properties:
+        text:
+          type: string
+        task:
+          type: string
+        language:
+          type: string
+        duration:
+          type: number
+          format: float
+        segments:
+          type: array
+          items:
+            $ref: "#/components/schemas/AudioTranscriptionSegment"
+        usage:
+          $ref: "#/components/schemas/TokenUsage"
+      additionalProperties: true
+
     RerankDocument:
       oneOf:
         - type: string
@@ -6978,6 +7171,13 @@ components:
             - input_image
             - tool_call
             - tool_result
+          x-enum-varnames:
+            - ContentBlockTypeText
+            - ContentBlockTypeImageUrl
+            - ContentBlockTypeInputText
+            - ContentBlockTypeInputImage
+            - ContentBlockTypeToolCall
+            - ContentBlockTypeToolResult
         text:
           type: string
         image_url:

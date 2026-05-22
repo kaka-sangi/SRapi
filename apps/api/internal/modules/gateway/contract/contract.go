@@ -16,6 +16,7 @@ const (
 	EndpointMessages              SourceEndpoint = "/v1/messages"
 	EndpointEmbeddings            SourceEndpoint = "/v1/embeddings"
 	EndpointImagesGenerations     SourceEndpoint = "/v1/images/generations"
+	EndpointAudioTranscriptions   SourceEndpoint = "/v1/audio/transcriptions"
 	EndpointModerations           SourceEndpoint = "/v1/moderations"
 	EndpointRerank                SourceEndpoint = "/v1/rerank"
 	EndpointGeminiGenerateContent SourceEndpoint = "/v1beta/models/{model}:generateContent"
@@ -27,6 +28,7 @@ type ContentBlockType string
 const (
 	ContentBlockText     ContentBlockType = "text"
 	ContentBlockImage    ContentBlockType = "image"
+	ContentBlockAudio    ContentBlockType = "audio"
 	ContentBlockToolCall ContentBlockType = "tool_call"
 	ContentBlockMetadata ContentBlockType = "metadata"
 )
@@ -82,6 +84,15 @@ type CanonicalRequest struct {
 	ImageResponseFormat   string
 	ImageUser             string
 	ImageExtra            map[string]any
+	AudioFileName         string
+	AudioContentType      string
+	AudioBytes            []byte
+	AudioLanguage         string
+	AudioPrompt           string
+	AudioResponseFormat   string
+	AudioTemperature      *float32
+	AudioUser             string
+	AudioExtra            map[string]any
 	ModerationInput       []string
 	ModerationUser        string
 	RerankQuery           string
@@ -159,6 +170,34 @@ type ModerationResponse struct {
 	Model                 string
 	CanonicalModel        string
 	Results               []ModerationResult
+	Usage                 Usage
+	CompatibilityWarnings []string
+}
+
+type AudioTranscriptionSegment struct {
+	ID               *int
+	Seek             *int
+	Start            *float32
+	End              *float32
+	Text             string
+	Tokens           []int
+	Temperature      *float32
+	AvgLogprob       *float32
+	CompressionRatio *float32
+	NoSpeechProb     *float32
+	Metadata         map[string]any
+}
+
+type AudioTranscriptionResponse struct {
+	ID                    string
+	RequestID             string
+	Model                 string
+	CanonicalModel        string
+	Text                  string
+	Task                  string
+	Language              string
+	Duration              *float32
+	Segments              []AudioTranscriptionSegment
 	Usage                 Usage
 	CompatibilityWarnings []string
 }

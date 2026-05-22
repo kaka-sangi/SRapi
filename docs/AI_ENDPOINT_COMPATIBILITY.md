@@ -501,6 +501,21 @@ Rerank endpoint
 - Rerank-compatible provider alias（例如 `/api/provider/rerank-compatible/v1/rerank`）强制 provider context。
 - Rerank-compatible API-key 和 reverse-proxy accounts 上游调用 `/rerank` 并解析 `index`、`relevance_score`、可选 `document` 和 usage。
 
+WP-330 已实现：
+
+```txt
+Audio transcriptions endpoint
+```
+
+边界：
+
+- `POST /v1/audio/transcriptions` 接受 OpenAI-compatible multipart `file`、`model`、可选 `language`、`prompt`、`response_format`、`temperature` 和 `user`。
+- 请求仍进入 API Key auth、模型可见性、entitlement、Scheduler、Provider Adapter、usage、billing 和 feedback 证据链。
+- Scheduler 使用 `audio_transcriptions` endpoint capability；Provider 或 account/mapping 必须显式声明 audio transcription 能力，text-only provider 不会被误选。
+- OpenAI-compatible provider alias（例如 `/api/provider/openai-compatible/v1/audio/transcriptions`）强制 provider context。
+- OpenAI-compatible API-key 和 reverse-proxy accounts 上游调用 `/audio/transcriptions` 并解析 JSON/verbose JSON transcription response；plain text 上游响应会被包装为稳定 transcription response。
+- Speech synthesis、streaming transcription、speaker diarization 深度语义、audio moderation 和 realtime 不在 WP-330 范围内。
+
 Phase 2 继续实现：
 
 ```txt
