@@ -184,6 +184,14 @@ rate_limit_model
 quota_model
 ```
 
+WP-270 embeddings adapter boundary:
+
+- OpenAI-compatible API-key accounts dispatch embedding requests to `{base_url}/embeddings`.
+- Reverse-proxy OpenAI-compatible accounts use the same route through Reverse Proxy Runtime with account runtime context.
+- Adapter input includes mapped upstream model, string-array input, encoding format, optional dimensions, and optional user.
+- Adapter output preserves OpenAI-shaped embedding order/index and parses prompt/total token usage as input-token usage.
+- Providers that do not advertise `embeddings` capability are not eligible for embeddings Gateway scheduling.
+
 上述 `supports_*` 字段是实现 DTO 的便利表达，必须映射为 canonical capability descriptor：
 
 ```txt

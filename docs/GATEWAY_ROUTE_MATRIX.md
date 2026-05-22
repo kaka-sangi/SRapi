@@ -148,7 +148,7 @@ Antigravity 可承载 Claude-shaped 和 Gemini-shaped 端点，必须在 route m
 | `/v1/chat/completions` | Compatible text runtime | 校验 OpenAI body，转 Canonical AI Request，渲染 OpenAI 响应。 | MVP |
 | `/v1/responses` | Compatible text runtime | 校验 Responses body，处理 stream/tools/structured output 兼容边界。 | MVP |
 | `/v1/messages` | Anthropic-compatible runtime | 校验 Messages body，转 Canonical AI Request，渲染 Anthropic 响应。 | MVP |
-| `/v1/embeddings` | Passthrough runtime | 最小解析 model/input，调度后透传。 | Phase 2 |
+| `/v1/embeddings` | Passthrough runtime | 最小解析 model/input，调度后调用 OpenAI-compatible `/embeddings`，记录用量和调度证据。 | WP-270 |
 | `/v1/images/*` | Media runtime | 图片生成/编辑/variation，记录非 token 用量。 | Phase 2 |
 | `/v1/audio/*` | Passthrough/media runtime | 音频 transcription/speech。 | Phase 3 |
 | `/v1/moderations` | Moderation runtime | 内容审核和风控日志。 | Phase 3 |

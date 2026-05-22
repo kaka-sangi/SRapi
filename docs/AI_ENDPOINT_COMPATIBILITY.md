@@ -442,11 +442,24 @@ Canonical AI Request -> OpenAI-compatible upstream
 Canonical AI Response -> OpenAI Chat / Responses / Anthropic Messages response
 ```
 
+WP-270 已实现：
+
+```txt
+Embeddings endpoint
+```
+
+边界：
+
+- `POST /v1/embeddings` 接受 OpenAI-compatible 的 `model` 和 string / string-array `input`。
+- token-array input 暂不支持，返回 OpenAI-compatible Gateway error。
+- 请求仍进入 API Key auth、模型可见性、entitlement、Scheduler、Provider Adapter、usage、billing 和 feedback 证据链。
+- OpenAI-compatible provider alias（例如 `/api/provider/openai-compatible/v1/embeddings`）强制 provider context。
+- OpenAI-compatible API-key 和 reverse-proxy accounts 上游调用 `/embeddings` 并解析 usage。
+
 Phase 2 继续实现：
 
 ```txt
 Gemini native models/list endpoint
-Embeddings endpoint
 Images endpoint
 Token counting endpoint
 ```

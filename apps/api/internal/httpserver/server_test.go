@@ -2477,6 +2477,149 @@ func TestGatewayAnthropicProviderAliasTargetsMessagesUpstream(t *testing.T) {
 	}
 }
 
+func TestGatewayEmbeddingsRouteTargetsOpenAICompatibleUpstream(t *testing.T) {
+	type upstreamCall struct {
+		Path          string
+		Authorization string
+		Model         string
+		Input         []string
+		Dimensions    *int
+	}
+	var (
+		mu    sync.Mutex
+		calls []upstreamCall
+	)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload struct {
+			Model      string   `json:"model"`
+			Input      []string `json:"input"`
+			Dimensions *int     `json:"dimensions"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		mu.Lock()
+		calls = append(calls, upstreamCall{
+			Path:          r.URL.Path,
+			Authorization: r.Header.Get("Authorization"),
+			Model:         payload.Model,
+			Input:         append([]string(nil), payload.Input...),
+			Dimensions:    payload.Dimensions,
+		})
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"object":"list","data":[{"object":"embedding","embedding":[0.11,0.22,0.33],"index":0},{"object":"embedding","embedding":[0.44,0.55,0.66],"index":1}],"model":"embedding-upstream","usage":{"prompt_tokens":9,"total_tokens":9}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"wp270-openai","display_name":"WP270 OpenAI","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active","capabilities":{"embeddings":true}}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"wp270-embedding-model","display_name":"WP270 Embedding Model","status":"active","capabilities":[{"key":"embeddings","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"embedding-upstream","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"wp270-embedding-account","runtime_class":"api_key","credential":{"api_key":"embedding-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
+
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/embeddings", `{"model":"wp270-embedding-model","input":["first embedding","second embedding"],"dimensions":3}`)
+	var embeddingResp apiopenapi.EmbeddingResponse
+	if err := json.NewDecoder(rec.Body).Decode(&embeddingResp); err != nil {
+		t.Fatalf("decode embeddings response: %v", err)
+	}
+	if embeddingResp.Object != apiopenapi.EmbeddingResponseObjectList || embeddingResp.Model != "wp270-embedding-model" || len(embeddingResp.Data) != 2 {
+		t.Fatalf("unexpected embeddings response: %+v", embeddingResp)
+	}
+	vector, err := embeddingResp.Data[0].Embedding.AsEmbeddingVector0()
+	if err != nil || len(vector) != 3 {
+		t.Fatalf("expected float embedding vector, got vector=%v err=%v", vector, err)
+	}
+	if embeddingResp.Usage.PromptTokens == nil || *embeddingResp.Usage.PromptTokens != 9 || embeddingResp.Usage.CompletionTokens == nil || *embeddingResp.Usage.CompletionTokens != 0 {
+		t.Fatalf("expected upstream embedding usage, got %+v", embeddingResp.Usage)
+	}
+
+	mu.Lock()
+	gotCalls := append([]upstreamCall(nil), calls...)
+	mu.Unlock()
+	if len(gotCalls) != 1 {
+		t.Fatalf("expected one upstream call, got %+v", gotCalls)
+	}
+	if gotCalls[0].Path != "/v1/embeddings" || gotCalls[0].Authorization != "Bearer embedding-secret" || gotCalls[0].Model != "embedding-upstream" {
+		t.Fatalf("unexpected upstream call: %+v", gotCalls[0])
+	}
+	if gotCalls[0].Dimensions == nil || *gotCalls[0].Dimensions != 3 || len(gotCalls[0].Input) != 2 {
+		t.Fatalf("unexpected upstream input details: %+v", gotCalls[0])
+	}
+
+	usageReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/usage-logs?model=wp270-embedding-model", nil)
+	usageReq.AddCookie(sessionCookie)
+	usageRec := httptest.NewRecorder()
+	handler.ServeHTTP(usageRec, usageReq)
+	if usageRec.Code != http.StatusOK {
+		t.Fatalf("expected usage logs 200, got %d", usageRec.Code)
+	}
+	var usageResp apiopenapi.UsageLogListResponse
+	if err := json.NewDecoder(usageRec.Body).Decode(&usageResp); err != nil {
+		t.Fatalf("decode usage logs: %v", err)
+	}
+	if len(usageResp.Data) != 1 {
+		t.Fatalf("expected one usage record, got %+v", usageResp.Data)
+	}
+	usage := usageResp.Data[0]
+	if !usage.Success || usage.SourceEndpoint != "/v1/embeddings" || usage.ProviderId == nil || *usage.ProviderId != string(providerResp.Data.Id) || usage.AccountId == nil || *usage.AccountId != string(accountResp.Data.Id) {
+		t.Fatalf("unexpected embedding usage evidence: %+v", usage)
+	}
+
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=wp270-embedding-model", nil)
+	decisionsReq.AddCookie(sessionCookie)
+	decisionsRec := httptest.NewRecorder()
+	handler.ServeHTTP(decisionsRec, decisionsReq)
+	if decisionsRec.Code != http.StatusOK {
+		t.Fatalf("expected decisions 200, got %d body=%s", decisionsRec.Code, decisionsRec.Body.String())
+	}
+	var decisionsResp apiopenapi.SchedulerDecisionListResponse
+	if err := json.NewDecoder(decisionsRec.Body).Decode(&decisionsResp); err != nil {
+		t.Fatalf("decode decisions: %v", err)
+	}
+	if len(decisionsResp.Data) != 1 || decisionsResp.Data[0].SourceEndpoint != "/v1/embeddings" || decisionsResp.Data[0].CandidateCount != 1 {
+		t.Fatalf("unexpected embedding decision evidence: %+v", decisionsResp.Data)
+	}
+}
+
+func TestGatewayEmbeddingAliasForcesProviderContext(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	openaiProvider := mustFindProviderByName(t, handler, sessionCookie, "openai-compatible")
+	fallbackProvider := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"embedding-fallback-provider","display_name":"Embedding Fallback","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active","capabilities":{"embeddings":true}}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"wp270-alias-embedding-model","display_name":"WP270 Alias Embedding Model","status":"active","capabilities":[{"key":"embeddings","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","upstream_model_name":"fallback-embedding","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","name":"embedding-fallback-account","runtime_class":"api_key","credential":{"api_key":"fallback-secret"},"status":"active","priority":100}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(openaiProvider.Id)+`","upstream_model_name":"alias-embedding","status":"active"}`)
+
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/api/provider/openai-compatible/v1/embeddings", `{"model":"wp270-alias-embedding-model","input":"alias embedding"}`)
+
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=wp270-alias-embedding-model", nil)
+	decisionsReq.AddCookie(sessionCookie)
+	decisionsRec := httptest.NewRecorder()
+	handler.ServeHTTP(decisionsRec, decisionsReq)
+	if decisionsRec.Code != http.StatusOK {
+		t.Fatalf("expected decisions 200, got %d body=%s", decisionsRec.Code, decisionsRec.Body.String())
+	}
+	var decisionsResp apiopenapi.SchedulerDecisionListResponse
+	if err := json.NewDecoder(decisionsRec.Body).Decode(&decisionsResp); err != nil {
+		t.Fatalf("decode decisions: %v", err)
+	}
+	if len(decisionsResp.Data) != 1 {
+		t.Fatalf("expected one alias embedding decision, got %+v", decisionsResp.Data)
+	}
+	decision := decisionsResp.Data[0]
+	if decision.SelectedProviderId == nil || *decision.SelectedProviderId != string(openaiProvider.Id) || decision.CandidateCount != 1 {
+		t.Fatalf("expected embedding alias to force openai-compatible provider, got %+v", decision)
+	}
+	if decision.SourceEndpoint != "/api/provider/openai-compatible/v1/embeddings" {
+		t.Fatalf("expected alias source endpoint, got %q", decision.SourceEndpoint)
+	}
+}
+
 func TestGatewayModelAliasAndSessionAffinityFeedScheduler(t *testing.T) {
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)

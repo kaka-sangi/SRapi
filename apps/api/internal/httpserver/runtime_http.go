@@ -334,11 +334,12 @@ func (rt *runtimeState) bootstrapAdmin(ctx context.Context) error {
 func (rt *runtimeState) bootstrapGatewayCatalog(ctx context.Context) error {
 	if _, err := rt.providerStore.FindByName(ctx, "openai-compatible"); err != nil {
 		if _, err := rt.providers.Create(ctx, providercontract.CreateRequest{
-			Name:        "openai-compatible",
-			DisplayName: "OpenAI Compatible",
-			AdapterType: "openai-compatible",
-			Protocol:    "openai-compatible",
-			Status:      ptrProviderStatus(providercontract.StatusActive),
+			Name:         "openai-compatible",
+			DisplayName:  "OpenAI Compatible",
+			AdapterType:  "openai-compatible",
+			Protocol:     "openai-compatible",
+			Status:       ptrProviderStatus(providercontract.StatusActive),
+			Capabilities: map[string]any{capabilitiescontract.KeyEmbeddings: true},
 		}); err != nil {
 			return err
 		}
@@ -372,6 +373,14 @@ func (rt *runtimeState) bootstrapGatewayCatalog(ctx context.Context) error {
 	provider, err := rt.providerStore.FindByName(ctx, "openai-compatible")
 	if err != nil {
 		return err
+	}
+	if provider.Capabilities[capabilitiescontract.KeyEmbeddings] != true {
+		capabilities := cloneAnyMap(provider.Capabilities)
+		capabilities[capabilitiescontract.KeyEmbeddings] = true
+		if _, err := rt.providers.Update(ctx, provider.ID, providercontract.UpdateRequest{Capabilities: &capabilities}); err != nil {
+			return err
+		}
+		provider.Capabilities = capabilities
 	}
 	if _, err := rt.modelStore.FindMapping(ctx, model.ID, provider.ID, "gpt-4o-mini"); err != nil {
 		if _, err := rt.models.CreateMapping(ctx, model.ID, modelcontract.CreateMappingRequest{
@@ -2830,7 +2839,7 @@ func (s *Server) handleListModels(w http.ResponseWriter, r *http.Request) {
 	gatewayModels := toGatewayModels(models)
 	gatewayModels = filterGatewayModels(gatewayModels, authed.Key.AllowedModels)
 	writeJSONAny(w, http.StatusOK, apiopenapi.OpenAIModelList{
-		Object: apiopenapi.List,
+		Object: apiopenapi.OpenAIModelListObjectList,
 		Data:   gatewayModels,
 	})
 	_ = requestID
@@ -3400,6 +3409,205 @@ func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSONAny(w, http.StatusOK, response)
+}
+
+func (s *Server) handleCreateEmbedding(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	sourceEndpoint := gatewaySourceEndpoint(r.Context(), "/v1/embeddings")
+	forcedProviderKey := gatewayForcedProviderKey(r.Context())
+	startedAt := time.Now()
+	authed, err := s.requireGatewayKey(r)
+	if err != nil {
+		writeGatewayAuthError(w, err, requestID)
+		return
+	}
+	var body apiopenapi.EmbeddingRequest
+	if err := s.decodeJSONBody(w, r, &body); err != nil {
+		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
+			RequestID:      requestID,
+			Authed:         authed,
+			SourceProtocol: "openai-compatible",
+			SourceEndpoint: sourceEndpoint,
+			Model:          "unknown",
+			Success:        false,
+			ErrorClass:     ptrStringValue("invalid_request"),
+			LatencyMS:      elapsedMillis(startedAt),
+			UsageEstimated: true,
+		})
+		writeGatewayError(w, jsonDecodeStatus(err), apiopenapi.InvalidRequestError, "invalid embeddings request", "invalid_request")
+		return
+	}
+	modelResolution, err := s.runtime.models.ResolveModelReference(r.Context(), body.Model)
+	if err != nil {
+		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
+			RequestID:      requestID,
+			Authed:         authed,
+			SourceProtocol: "openai-compatible",
+			SourceEndpoint: sourceEndpoint,
+			Model:          fallbackModelName(body.Model),
+			Success:        false,
+			ErrorClass:     ptrStringValue("model_not_found"),
+			LatencyMS:      elapsedMillis(startedAt),
+			UsageEstimated: true,
+		})
+		writeGatewayError(w, http.StatusNotFound, apiopenapi.InvalidRequestError, "model not found", "model_not_found")
+		return
+	}
+	model := modelResolution.Model
+	if !apiKeyAllowsModelReference(authed.Key.AllowedModels, modelResolution) {
+		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
+			RequestID:      requestID,
+			Authed:         authed,
+			SourceProtocol: "openai-compatible",
+			SourceEndpoint: sourceEndpoint,
+			Model:          model.CanonicalName,
+			Success:        false,
+			ErrorClass:     ptrStringValue("model_not_allowed"),
+			LatencyMS:      elapsedMillis(startedAt),
+			UsageEstimated: true,
+		})
+		writeGatewayError(w, http.StatusForbidden, apiopenapi.PermissionError, "model not allowed for this api key", "model_not_allowed")
+		return
+	}
+	canonical, err := s.runtime.gateway.NormalizeEmbeddings(body, gatewayservice.RequestMeta{
+		RequestID:      requestID,
+		SourceEndpoint: sourceEndpoint,
+		UserID:         authed.UserID,
+		APIKeyID:       authed.Key.ID,
+		CanonicalModel: model.CanonicalName,
+	})
+	if err != nil {
+		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
+			RequestID:      requestID,
+			Authed:         authed,
+			SourceProtocol: "openai-compatible",
+			SourceEndpoint: sourceEndpoint,
+			Model:          model.CanonicalName,
+			Success:        false,
+			ErrorClass:     ptrStringValue("invalid_request"),
+			LatencyMS:      elapsedMillis(startedAt),
+			UsageEstimated: true,
+		})
+		writeGatewayError(w, http.StatusBadRequest, apiopenapi.InvalidRequestError, err.Error(), "invalid_request")
+		return
+	}
+	admission, err := s.runtime.prepareGatewayAdmission(r.Context(), canonical, modelResolution, model.ID)
+	if err != nil {
+		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
+			RequestID:             canonical.RequestID,
+			Authed:                authed,
+			SourceProtocol:        string(canonical.SourceProtocol),
+			SourceEndpoint:        canonical.SourceEndpoint,
+			Model:                 canonical.CanonicalModel,
+			Success:               false,
+			ErrorClass:            ptrStringValue("entitlement_check_failed"),
+			LatencyMS:             elapsedMillis(startedAt),
+			UsageEstimated:        true,
+			Pricing:               admission.Pricing,
+			CompatibilityWarnings: canonical.CompatibilityWarnings,
+		})
+		writeGatewayError(w, http.StatusInternalServerError, apiopenapi.InternalError, "failed to check gateway entitlement", "entitlement_check_failed")
+		return
+	}
+	if !admission.Entitlement.Allowed {
+		errorClass := gatewayEntitlementErrorClass(admission.Entitlement)
+		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
+			RequestID:             canonical.RequestID,
+			Authed:                authed,
+			SourceProtocol:        string(canonical.SourceProtocol),
+			SourceEndpoint:        canonical.SourceEndpoint,
+			Model:                 canonical.CanonicalModel,
+			Success:               false,
+			ErrorClass:            ptrStringValue(errorClass),
+			LatencyMS:             elapsedMillis(startedAt),
+			InputTokens:           admission.EstimatedUsage.InputTokens,
+			OutputTokens:          admission.EstimatedUsage.OutputTokens,
+			CachedTokens:          admission.EstimatedUsage.CachedTokens,
+			UsageEstimated:        true,
+			Pricing:               admission.Pricing,
+			CompatibilityWarnings: canonical.CompatibilityWarnings,
+		})
+		writeGatewayError(w, gatewayEntitlementHTTPStatus(errorClass), gatewayEntitlementErrorType(errorClass), gatewayEntitlementMessage(errorClass), errorClass)
+		return
+	}
+	scheduleReq := gatewayScheduleRequest(r, canonical, modelResolution)
+	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
+	result, err := s.runtime.scheduleGatewayRequest(r.Context(), scheduleReq, model.ID, forcedProviderKey, authed.Key)
+	if err != nil {
+		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
+			RequestID:             canonical.RequestID,
+			Authed:                authed,
+			DecisionID:            result.Decision.ID,
+			AttemptNo:             result.Decision.AttemptNo,
+			SourceProtocol:        string(canonical.SourceProtocol),
+			SourceEndpoint:        canonical.SourceEndpoint,
+			Model:                 canonical.CanonicalModel,
+			Success:               false,
+			ErrorClass:            ptrStringValue("no_available_account"),
+			LatencyMS:             elapsedMillis(startedAt),
+			InputTokens:           admission.EstimatedUsage.InputTokens,
+			OutputTokens:          admission.EstimatedUsage.OutputTokens,
+			CachedTokens:          admission.EstimatedUsage.CachedTokens,
+			UsageEstimated:        true,
+			Pricing:               admission.Pricing,
+			CompatibilityWarnings: canonical.CompatibilityWarnings,
+		})
+		writeGatewayError(w, http.StatusServiceUnavailable, apiopenapi.ServiceUnavailableError, "no available account", "no_available_account")
+		return
+	}
+	providerResp, err := s.runtime.invokeProviderEmbeddings(r.Context(), providerEmbeddingRequest(canonical, result.Candidate))
+	if err != nil {
+		errorClass, upstreamStatus, errorType := providerGatewayError(err)
+		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
+			RequestID:             canonical.RequestID,
+			Authed:                authed,
+			DecisionID:            result.Decision.ID,
+			AttemptNo:             result.Decision.AttemptNo,
+			ProviderID:            ptrInt(result.Candidate.Provider.ID),
+			AccountID:             ptrInt(result.Candidate.Account.ID),
+			SourceProtocol:        string(canonical.SourceProtocol),
+			SourceEndpoint:        canonical.SourceEndpoint,
+			TargetProtocol:        result.Candidate.Provider.Protocol,
+			Model:                 canonical.CanonicalModel,
+			Success:               false,
+			ErrorClass:            ptrStringValue(errorClass),
+			StatusCode:            ptrInt(upstreamStatus),
+			LatencyMS:             elapsedMillis(startedAt),
+			InputTokens:           admission.EstimatedUsage.InputTokens,
+			OutputTokens:          admission.EstimatedUsage.OutputTokens,
+			CachedTokens:          admission.EstimatedUsage.CachedTokens,
+			UsageEstimated:        true,
+			Pricing:               admission.Pricing,
+			CompatibilityWarnings: canonical.CompatibilityWarnings,
+		})
+		writeGatewayError(w, providerGatewayHTTPStatus(upstreamStatus), errorType, providerGatewayMessage(errorClass), errorClass)
+		return
+	}
+	usage := gatewayUsageFromEmbeddingProvider(providerResp)
+	canonicalResp := s.runtime.gateway.BuildCanonicalEmbeddingResponse(canonical, gatewayEmbeddingsFromProvider(providerResp), usage)
+	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequest(model.ID, result.Candidate, canonicalResp.Usage), canonicalResp.Usage.Estimated)
+	s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
+		RequestID:             canonical.RequestID,
+		Authed:                authed,
+		DecisionID:            result.Decision.ID,
+		AttemptNo:             result.Decision.AttemptNo,
+		ProviderID:            ptrInt(result.Candidate.Provider.ID),
+		AccountID:             ptrInt(result.Candidate.Account.ID),
+		SourceProtocol:        string(canonical.SourceProtocol),
+		SourceEndpoint:        canonical.SourceEndpoint,
+		TargetProtocol:        result.Candidate.Provider.Protocol,
+		Model:                 canonical.CanonicalModel,
+		Success:               true,
+		StatusCode:            ptrInt(http.StatusOK),
+		LatencyMS:             elapsedMillis(startedAt),
+		InputTokens:           canonicalResp.Usage.InputTokens,
+		OutputTokens:          canonicalResp.Usage.OutputTokens,
+		CachedTokens:          canonicalResp.Usage.CachedTokens,
+		UsageEstimated:        canonicalResp.Usage.Estimated,
+		Pricing:               pricing,
+		CompatibilityWarnings: canonicalResp.CompatibilityWarnings,
+	})
+	writeJSONAny(w, http.StatusOK, s.runtime.gateway.RenderEmbeddings(canonicalResp))
 }
 
 func (s *Server) handleGeminiModelAction(w http.ResponseWriter, r *http.Request) {
@@ -4632,10 +4840,17 @@ func effectiveCapabilities(model modelcontract.Model, mapping modelcontract.Mode
 			merged[normalized.Key] = normalized
 		}
 	}
+	providerScoped := map[string]capabilitiescontract.Descriptor{}
+	for _, descriptor := range mapping.CapabilityOverride {
+		if normalized, err := capabilitiescontract.NormalizeDescriptor(descriptor); err == nil {
+			providerScoped[normalized.Key] = normalized
+		}
+	}
 	for key, value := range provider.Capabilities {
 		capabilityKey, ok := capabilitiescontract.CanonicalKeyFromConvenience(key)
 		if ok && boolValue(value) {
 			merged[capabilityKey] = capabilityRequirement(capabilityKey)
+			providerScoped[capabilityKey] = capabilityRequirement(capabilityKey)
 		}
 	}
 	for key, value := range account.Metadata {
@@ -4643,8 +4858,12 @@ func effectiveCapabilities(model modelcontract.Model, mapping modelcontract.Mode
 			capabilityKey := strings.TrimPrefix(key, "capability_")
 			if canonicalKey, ok := capabilitiescontract.CanonicalKeyFromConvenience(capabilityKey); ok {
 				merged[canonicalKey] = capabilityRequirement(canonicalKey)
+				providerScoped[canonicalKey] = capabilityRequirement(canonicalKey)
 			}
 		}
+	}
+	if _, ok := providerScoped[capabilitiescontract.KeyEmbeddings]; !ok {
+		delete(merged, capabilitiescontract.KeyEmbeddings)
 	}
 	out := make([]capabilitiescontract.Descriptor, 0, len(merged))
 	for _, descriptor := range merged {
@@ -4892,6 +5111,28 @@ func (rt *runtimeState) invokeProviderText(ctx context.Context, req provideradap
 	return resp, nil
 }
 
+func (rt *runtimeState) invokeProviderEmbeddings(ctx context.Context, req provideradaptercontract.EmbeddingRequest) (provideradaptercontract.EmbeddingResponse, error) {
+	if req.Account.ID <= 0 {
+		return provideradaptercontract.EmbeddingResponse{}, provideradaptercontract.ProviderError{Class: "no_available_account", StatusCode: http.StatusServiceUnavailable, Message: "provider account missing"}
+	}
+	credential, err := rt.accounts.DecryptCredential(ctx, req.Account.ID)
+	if err != nil {
+		return provideradaptercontract.EmbeddingResponse{}, provideradaptercontract.ProviderError{Class: "credential_error", StatusCode: http.StatusBadGateway, Message: "provider credential unavailable"}
+	}
+	if refreshed, ok, err := rt.refreshReverseProxyCredential(ctx, req.Account, credential); err != nil {
+		return provideradaptercontract.EmbeddingResponse{}, provideradaptercontract.ProviderError{Class: "auth_failed", StatusCode: http.StatusBadGateway, Message: "provider credential refresh failed"}
+	} else if ok {
+		credential = refreshed
+	}
+	req.Credential = credential
+	resp, err := rt.adapters.InvokeEmbeddings(ctx, req)
+	if err != nil {
+		rt.applyProviderAccountProtection(ctx, req.Account, err)
+		return provideradaptercontract.EmbeddingResponse{}, err
+	}
+	return resp, nil
+}
+
 func providerTextRequest(req gatewaycontract.CanonicalRequest, candidate schedulercontract.Candidate) provideradaptercontract.TextRequest {
 	return provideradaptercontract.TextRequest{
 		RequestID:       req.RequestID,
@@ -4912,6 +5153,22 @@ func providerTextRequest(req gatewaycontract.CanonicalRequest, candidate schedul
 		Provider:        candidate.Provider,
 		Account:         candidate.Account,
 		Mapping:         candidate.Mapping,
+	}
+}
+
+func providerEmbeddingRequest(req gatewaycontract.CanonicalRequest, candidate schedulercontract.Candidate) provideradaptercontract.EmbeddingRequest {
+	return provideradaptercontract.EmbeddingRequest{
+		RequestID:      req.RequestID,
+		SourceProtocol: string(req.SourceProtocol),
+		SourceEndpoint: req.SourceEndpoint,
+		Model:          req.CanonicalModel,
+		Input:          append([]string(nil), req.EmbeddingInput...),
+		EncodingFormat: req.EmbeddingEncoding,
+		Dimensions:     cloneIntPtr(req.EmbeddingDimensions),
+		User:           req.EmbeddingUser,
+		Provider:       candidate.Provider,
+		Account:        candidate.Account,
+		Mapping:        candidate.Mapping,
 	}
 }
 
@@ -5069,6 +5326,27 @@ func gatewayUsageFromProvider(resp provideradaptercontract.TextResponse) gateway
 		CachedTokens: resp.Usage.CachedTokens,
 		Estimated:    resp.Usage.Estimated,
 	}
+}
+
+func gatewayUsageFromEmbeddingProvider(resp provideradaptercontract.EmbeddingResponse) gatewaycontract.Usage {
+	return gatewaycontract.Usage{
+		InputTokens:  resp.Usage.InputTokens,
+		OutputTokens: resp.Usage.OutputTokens,
+		CachedTokens: resp.Usage.CachedTokens,
+		Estimated:    resp.Usage.Estimated,
+	}
+}
+
+func gatewayEmbeddingsFromProvider(resp provideradaptercontract.EmbeddingResponse) []gatewaycontract.Embedding {
+	out := make([]gatewaycontract.Embedding, 0, len(resp.Data))
+	for _, item := range resp.Data {
+		out = append(out, gatewaycontract.Embedding{
+			Index:        item.Index,
+			Vector:       append([]float32(nil), item.Vector...),
+			Base64Vector: item.Base64Vector,
+		})
+	}
+	return out
 }
 
 func providerGatewayError(err error) (string, int, apiopenapi.GatewayErrorObjectType) {

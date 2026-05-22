@@ -9,25 +9,25 @@ import (
 )
 
 type TextRequest struct {
-	RequestID        string
-	SourceProtocol   string
-	SourceEndpoint   string
-	Model            string
-	Prompt           string
-	Messages         []TextMessage
-	Instructions     string
-	Stream           bool
-	Temperature      *float32
-	TopP             *float32
-	MaxOutputTokens  *int
-	Stop             []string
-	Tools            []map[string]any
-	ToolChoice       any
-	ResponseFormat   map[string]any
-	Provider         providercontract.Provider
-	Account          accountcontract.ProviderAccount
-	Mapping          modelcontract.ModelProviderMapping
-	Credential       map[string]any
+	RequestID       string
+	SourceProtocol  string
+	SourceEndpoint  string
+	Model           string
+	Prompt          string
+	Messages        []TextMessage
+	Instructions    string
+	Stream          bool
+	Temperature     *float32
+	TopP            *float32
+	MaxOutputTokens *int
+	Stop            []string
+	Tools           []map[string]any
+	ToolChoice      any
+	ResponseFormat  map[string]any
+	Provider        providercontract.Provider
+	Account         accountcontract.ProviderAccount
+	Mapping         modelcontract.ModelProviderMapping
+	Credential      map[string]any
 }
 
 type TextMessage struct {
@@ -40,6 +40,34 @@ type Usage struct {
 	OutputTokens int
 	CachedTokens int
 	Estimated    bool
+}
+
+type EmbeddingRequest struct {
+	RequestID      string
+	SourceProtocol string
+	SourceEndpoint string
+	Model          string
+	Input          []string
+	EncodingFormat string
+	Dimensions     *int
+	User           string
+	Provider       providercontract.Provider
+	Account        accountcontract.ProviderAccount
+	Mapping        modelcontract.ModelProviderMapping
+	Credential     map[string]any
+}
+
+type Embedding struct {
+	Index        int
+	Vector       []float32
+	Base64Vector string
+}
+
+type EmbeddingResponse struct {
+	Data       []Embedding
+	Model      string
+	StatusCode int
+	Usage      Usage
 }
 
 type TextResponse struct {
@@ -66,4 +94,8 @@ func (e ProviderError) Error() string {
 
 type TextAdapter interface {
 	InvokeText(ctx context.Context, req TextRequest) (TextResponse, error)
+}
+
+type EmbeddingAdapter interface {
+	InvokeEmbeddings(ctx context.Context, req EmbeddingRequest) (EmbeddingResponse, error)
 }

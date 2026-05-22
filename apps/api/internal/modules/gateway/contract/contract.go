@@ -14,6 +14,7 @@ const (
 	EndpointChatCompletions       SourceEndpoint = "/v1/chat/completions"
 	EndpointResponses             SourceEndpoint = "/v1/responses"
 	EndpointMessages              SourceEndpoint = "/v1/messages"
+	EndpointEmbeddings            SourceEndpoint = "/v1/embeddings"
 	EndpointGeminiGenerateContent SourceEndpoint = "/v1beta/models/{model}:generateContent"
 	EndpointGeminiStreamContent   SourceEndpoint = "/v1beta/models/{model}:streamGenerateContent"
 )
@@ -66,6 +67,10 @@ type CanonicalRequest struct {
 	ToolChoice            any
 	ResponseFormat        map[string]any
 	Reasoning             map[string]any
+	EmbeddingInput        []string
+	EmbeddingEncoding     string
+	EmbeddingDimensions   *int
+	EmbeddingUser         string
 	Prompt                string
 	CompatibilityWarnings []string
 	RequestCapabilities   []RequestCapability
@@ -85,6 +90,22 @@ type CanonicalResponse struct {
 	CanonicalModel        string
 	Message               string
 	OutputItems           []ContentBlock
+	Usage                 Usage
+	CompatibilityWarnings []string
+}
+
+type Embedding struct {
+	Index        int
+	Vector       []float32
+	Base64Vector string
+}
+
+type EmbeddingResponse struct {
+	ID                    string
+	RequestID             string
+	Model                 string
+	CanonicalModel        string
+	Data                  []Embedding
 	Usage                 Usage
 	CompatibilityWarnings []string
 }

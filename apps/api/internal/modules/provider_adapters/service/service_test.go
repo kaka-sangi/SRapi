@@ -76,6 +76,67 @@ func TestOpenAICompatibleAdapterInvokesUpstream(t *testing.T) {
 	}
 }
 
+func TestOpenAICompatibleAdapterInvokesEmbeddingsUpstream(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/embeddings" {
+			t.Fatalf("unexpected upstream path %s", r.URL.Path)
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer embeddings-secret" {
+			t.Fatalf("unexpected auth header %q", got)
+		}
+		var payload struct {
+			Model          string   `json:"model"`
+			Input          []string `json:"input"`
+			EncodingFormat string   `json:"encoding_format"`
+			Dimensions     *int     `json:"dimensions"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		if payload.Model != "embedding-upstream" || len(payload.Input) != 2 || payload.Input[0] != "first" || payload.Input[1] != "second" {
+			t.Fatalf("unexpected upstream payload: %+v", payload)
+		}
+		if payload.EncodingFormat != "float" || payload.Dimensions == nil || *payload.Dimensions != 3 {
+			t.Fatalf("expected encoding/dimensions, got %+v", payload)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"object":"list","data":[{"object":"embedding","embedding":[0.1,0.2,0.3],"index":0},{"object":"embedding","embedding":[0.4,0.5,0.6],"index":1}],"model":"embedding-upstream","usage":{"prompt_tokens":7,"total_tokens":7}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeEmbeddings(context.Background(), contract.EmbeddingRequest{
+		RequestID:      "req_embeddings",
+		Model:          "embedding-local",
+		Input:          []string{"first", "second"},
+		EncodingFormat: "float",
+		Dimensions:     ptrInt(3),
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "openai-compatible",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:       1,
+			Metadata: map[string]any{"base_url": upstream.URL + "/v1"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "embedding-upstream"},
+		Credential: map[string]any{"api_key": "embeddings-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke embeddings upstream: %v", err)
+	}
+	if resp.Model != "embedding-upstream" || len(resp.Data) != 2 || len(resp.Data[0].Vector) != 3 || resp.Data[1].Index != 1 {
+		t.Fatalf("unexpected embeddings response: %+v", resp)
+	}
+	if resp.Usage.Estimated || resp.Usage.InputTokens != 7 || resp.Usage.OutputTokens != 0 {
+		t.Fatalf("unexpected embedding usage: %+v", resp.Usage)
+	}
+}
+
 func TestOpenAICompatibleAdapterForwardsConversionFields(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var payload struct {

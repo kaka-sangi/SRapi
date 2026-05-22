@@ -191,6 +191,26 @@ func (s *Service) NormalizeGeminiGenerateContent(req apiopenapi.GeminiGenerateCo
 	return canonical
 }
 
+func (s *Service) NormalizeEmbeddings(req apiopenapi.EmbeddingRequest, meta RequestMeta) (gatewaycontract.CanonicalRequest, error) {
+	input, err := embeddingInput(req.Input)
+	if err != nil {
+		return gatewaycontract.CanonicalRequest{}, err
+	}
+	encoding := "float"
+	if req.EncodingFormat != nil && strings.TrimSpace(string(*req.EncodingFormat)) != "" {
+		encoding = strings.TrimSpace(string(*req.EncodingFormat))
+	}
+	canonical := canonical(meta, gatewaycontract.ProtocolOpenAICompatible, gatewaycontract.ProtocolOpenAICompatible, req.Model, "", false, strings.Join(input, "\n"), nil, embeddingContentBlocks(input), "", nil)
+	canonical.EmbeddingInput = append([]string(nil), input...)
+	canonical.EmbeddingEncoding = encoding
+	canonical.EmbeddingDimensions = cloneInt(req.Dimensions)
+	if req.User != nil {
+		canonical.EmbeddingUser = strings.TrimSpace(*req.User)
+	}
+	canonical.RequestCapabilities = append(canonical.RequestCapabilities, gatewaycontract.RequestCapability{Key: capabilitiescontract.KeyEmbeddings, Version: "v1"})
+	return canonical, nil
+}
+
 func (s *Service) BuildTextResponse(model, canonicalModel, text string, warnings []string) gatewaycontract.CanonicalResponse {
 	return s.buildTextResponse("", model, canonicalModel, text, estimateUsage(text), warnings)
 }
@@ -224,6 +244,29 @@ func (s *Service) buildTextResponse(requestID, model, canonicalModel, text strin
 		}},
 		Usage:                 usage,
 		CompatibilityWarnings: uniqueStrings(warnings),
+	}
+}
+
+func (s *Service) BuildCanonicalEmbeddingResponse(req gatewaycontract.CanonicalRequest, embeddings []gatewaycontract.Embedding, usage gatewaycontract.Usage) gatewaycontract.EmbeddingResponse {
+	model := strings.TrimSpace(req.Model)
+	if model == "" {
+		model = req.CanonicalModel
+	}
+	canonicalModel := strings.TrimSpace(req.CanonicalModel)
+	if canonicalModel == "" {
+		canonicalModel = model
+	}
+	if usage.InputTokens == 0 && usage.OutputTokens == 0 && usage.CachedTokens == 0 {
+		usage = embeddingEstimatedUsage(req.EmbeddingInput)
+	}
+	return gatewaycontract.EmbeddingResponse{
+		ID:                    randomHexString(12),
+		RequestID:             strings.TrimSpace(req.RequestID),
+		Model:                 model,
+		CanonicalModel:        canonicalModel,
+		Data:                  cloneEmbeddings(embeddings),
+		Usage:                 usage,
+		CompatibilityWarnings: uniqueStrings(req.CompatibilityWarnings),
 	}
 }
 
@@ -314,6 +357,29 @@ func (s *Service) RenderGeminiGenerateContent(resp gatewaycontract.CanonicalResp
 		rendered.CompatibilityWarnings = &warnings
 	}
 	return rendered
+}
+
+func (s *Service) RenderEmbeddings(resp gatewaycontract.EmbeddingResponse) apiopenapi.EmbeddingResponse {
+	data := make([]apiopenapi.EmbeddingObject, 0, len(resp.Data))
+	for _, item := range resp.Data {
+		vector := apiopenapi.EmbeddingVector{}
+		if item.Base64Vector != "" {
+			_ = vector.FromEmbeddingVector1(item.Base64Vector)
+		} else {
+			_ = vector.FromEmbeddingVector0(append([]float32(nil), item.Vector...))
+		}
+		data = append(data, apiopenapi.EmbeddingObject{
+			Object:    apiopenapi.Embedding,
+			Embedding: vector,
+			Index:     item.Index,
+		})
+	}
+	return apiopenapi.EmbeddingResponse{
+		Object: apiopenapi.EmbeddingResponseObjectList,
+		Data:   data,
+		Model:  resp.Model,
+		Usage:  *tokenUsage(resp.Usage),
+	}
 }
 
 func (s *Service) RenderChatStreamChunk(resp gatewaycontract.CanonicalResponse) map[string]any {
@@ -709,6 +775,61 @@ func extractContentBlocksText(blocks []apiopenapi.ContentBlock) string {
 
 func extractAnthropicContentBlocksText(blocks []apiopenapi.AnthropicContentBlock) string {
 	return textFromBlocks(anthropicContentBlocks(blocks, ""))
+}
+
+func embeddingInput(input apiopenapi.EmbeddingRequest_Input) ([]string, error) {
+	if text, err := input.AsEmbeddingRequestInput0(); err == nil {
+		text = strings.TrimSpace(text)
+		if text == "" {
+			return nil, fmt.Errorf("embedding input is empty")
+		}
+		return []string{text}, nil
+	}
+	if values, err := input.AsEmbeddingRequestInput1(); err == nil {
+		out := make([]string, 0, len(values))
+		for _, value := range values {
+			value = strings.TrimSpace(value)
+			if value != "" {
+				out = append(out, value)
+			}
+		}
+		if len(out) == 0 {
+			return nil, fmt.Errorf("embedding input is empty")
+		}
+		return out, nil
+	}
+	return nil, fmt.Errorf("embedding token-array input is not supported")
+}
+
+func embeddingContentBlocks(values []string) []gatewaycontract.ContentBlock {
+	out := make([]gatewaycontract.ContentBlock, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		out = append(out, gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockText, Role: "user", Text: value})
+	}
+	return out
+}
+
+func embeddingEstimatedUsage(values []string) gatewaycontract.Usage {
+	return gatewaycontract.Usage{
+		InputTokens: estimateTokens(strings.Join(values, "\n")),
+		Estimated:   true,
+	}
+}
+
+func cloneEmbeddings(values []gatewaycontract.Embedding) []gatewaycontract.Embedding {
+	if values == nil {
+		return nil
+	}
+	out := make([]gatewaycontract.Embedding, len(values))
+	for idx, value := range values {
+		out[idx] = value
+		out[idx].Vector = append([]float32(nil), value.Vector...)
+	}
+	return out
 }
 
 func refreshRequestCapabilities(req *gatewaycontract.CanonicalRequest) {

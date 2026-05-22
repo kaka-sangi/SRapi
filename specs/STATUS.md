@@ -33,14 +33,15 @@ last_completed:
 - WP-240: Gemini-compatible/native-gemini upstream adapter now dispatches GenerateContent and StreamGenerateContent payloads to Gemini APIs, parses usage metadata, classifies Google errors, preserves reverse-proxy Gemini runtime dispatch, and proves Gateway Gemini routes schedule Gemini-compatible upstream accounts.
 - WP-250: Provider Account upstream model discovery now exposes `POST /api/v1/admin/accounts/{id}/discover-models`, persists discovered `supported_models` metadata, and feeds provider-neutral candidate filtering without leaking credentials.
 - WP-260: Ops SLO and alert control plane v1 now includes durable SLO definitions, alert events, computed availability/burn-rate evidence from usage logs, CSRF-protected admin APIs, safe audit records, Ent/Postgres persistence, and generated OpenAPI/SDK parity.
+- WP-270: Embeddings passthrough runtime v1 now exposes OpenAI-compatible `/v1/embeddings`, provider alias routing, canonical embeddings normalization/rendering, OpenAI-compatible upstream `/embeddings` adapter dispatch, usage/billing/Scheduler feedback evidence, and generated OpenAPI/SDK parity.
 
 current:
 
-- package: WP-270+
+- package: WP-280
 - status: pending
-- objective: split the next advanced endpoint and provider expansion package from the roadmap.
+- objective: split the oversized HTTP runtime into route-family files and add architecture harness coverage for runtime file size/ownership.
 
-next_recommended: WP-270+
+next_recommended: WP-280
 
 last_gates:
 
@@ -51,7 +52,7 @@ last_gates:
 - `make sdk-ts-typecheck`: pass
 - `make ent-generate-check`: pass
 - `make migration-check`: pass
-- `cd apps/api && go test ./internal/modules/operations/... ./internal/persistence/entstore/operations ./internal/httpserver ./internal/app`: pass
+- `cd apps/api && go test ./internal/modules/provider_adapters/... ./internal/modules/gateway/... ./internal/httpserver`: pass
 - `cd apps/api && go test ./...`: pass
 - `make architecture-check`: pass
 - `make secret-scan`: pass
@@ -91,6 +92,8 @@ notes:
 - WP-240 added `TestGatewayGeminiGenerateContentSchedulesGeminiCompatibleUpstream` to prove Gemini Gateway routes can schedule Gemini-compatible upstream accounts while preserving usage and Scheduler decision evidence.
 - WP-260 added `obs_slo_definitions` and `obs_alert_events`, `GET/POST/PATCH /api/v1/admin/ops/slo`, `GET /api/v1/admin/ops/alerts`, and `POST /api/v1/admin/ops/alerts/{id}/ack`; SLO objective accepts ratio or percent input and persists ratios.
 - WP-260 alert ack audit intentionally records only safe alert summaries, not `details_json`.
+- WP-270 added `POST /v1/embeddings` and OpenAI-compatible provider alias embeddings routes; token-array input is intentionally rejected until a later compatibility package.
+- WP-270 also identified `apps/api/internal/httpserver/runtime_http.go` as oversized at 7750 lines; WP-280 is dedicated to partitioning this file and adding a harness check so this does not remain accepted architecture.
 
 ## Work Package Ledger
 
@@ -123,4 +126,6 @@ notes:
 | WP-240 | completed | Gemini native upstream adapter dispatch for API-key and reverse-proxy accounts. |
 | WP-250 | completed | Provider Account upstream model discovery and supported-model candidate filtering. |
 | WP-260 | completed | Durable SLO definitions, alert events, computed burn-rate evidence, admin APIs, and safe ack audit are covered. |
-| WP-270+ | pending | Advanced endpoint and provider expansion. |
+| WP-270 | completed | Embeddings passthrough runtime v1. |
+| WP-280 | pending | HTTP runtime partition and size harness. |
+| WP-290+ | pending | Remaining advanced endpoint and provider expansion packages. |

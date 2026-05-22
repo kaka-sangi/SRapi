@@ -66,6 +66,90 @@ func (s *Service) InvokeText(ctx context.Context, req contract.TextRequest) (con
 	}, nil
 }
 
+func (s *Service) InvokeEmbeddings(ctx context.Context, req contract.EmbeddingRequest) (contract.EmbeddingResponse, error) {
+	if strings.TrimSpace(req.RequestID) == "" || strings.TrimSpace(req.Model) == "" || strings.TrimSpace(req.Mapping.UpstreamModelName) == "" || len(req.Input) == 0 {
+		return contract.EmbeddingResponse{}, ErrInvalidInput
+	}
+	if baseURL := upstreamBaseURLEmbeddings(req); baseURL != "" {
+		if isReverseProxyEmbeddingRuntime(req) {
+			return s.invokeReverseProxyOpenAICompatibleEmbeddings(ctx, req, baseURL)
+		}
+		return s.invokeOpenAICompatibleEmbeddings(ctx, req, baseURL)
+	}
+	if isReverseProxyEmbeddingRuntime(req) {
+		return contract.EmbeddingResponse{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "reverse proxy upstream base url missing"}
+	}
+	return synthesizeLocalEmbeddings(req), nil
+}
+
+func (s *Service) invokeOpenAICompatibleEmbeddings(ctx context.Context, req contract.EmbeddingRequest, baseURL string) (contract.EmbeddingResponse, error) {
+	apiKey := credentialString(req.Credential, "api_key")
+	if apiKey == "" {
+		return contract.EmbeddingResponse{}, contract.ProviderError{Class: "auth_failed", StatusCode: http.StatusUnauthorized, Message: "provider api key missing"}
+	}
+	raw, err := json.Marshal(openAIEmbeddingPayload(req))
+	if err != nil {
+		return contract.EmbeddingResponse{}, err
+	}
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(baseURL, "/")+"/embeddings", bytes.NewReader(raw))
+	if err != nil {
+		return contract.EmbeddingResponse{}, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+apiKey)
+
+	resp, err := s.client.Do(httpReq)
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return contract.EmbeddingResponse{}, contract.ProviderError{Class: "timeout", StatusCode: http.StatusGatewayTimeout, Message: "provider request timed out"}
+		}
+		return contract.EmbeddingResponse{}, contract.ProviderError{Class: "network_error", StatusCode: http.StatusBadGateway, Message: "provider request failed"}
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
+	if err != nil {
+		return contract.EmbeddingResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response read failed"}
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return contract.EmbeddingResponse{}, classifyProviderHTTPError(resp.StatusCode, body)
+	}
+	return parseOpenAICompatibleEmbeddings(body, resp.StatusCode, req.Mapping.UpstreamModelName, req.Input)
+}
+
+func (s *Service) invokeReverseProxyOpenAICompatibleEmbeddings(ctx context.Context, req contract.EmbeddingRequest, baseURL string) (contract.EmbeddingResponse, error) {
+	if s.reverseProxy == nil {
+		return contract.EmbeddingResponse{}, contract.ProviderError{Class: "network_error", StatusCode: http.StatusBadGateway, Message: "reverse proxy runtime unavailable"}
+	}
+	raw, err := json.Marshal(openAIEmbeddingPayload(req))
+	if err != nil {
+		return contract.EmbeddingResponse{}, err
+	}
+	runtimeResp, err := s.reverseProxy.Do(ctx, reverseproxycontract.Request{
+		Account: reverseproxycontract.AccountRuntime{
+			AccountID:      req.Account.ID,
+			RuntimeClass:   string(req.Account.RuntimeClass),
+			UpstreamClient: req.Account.UpstreamClient,
+			ProxyID:        req.Account.ProxyID,
+			UserAgent:      mapString(req.Account.Metadata, "user_agent"),
+			Credential:     req.Credential,
+		},
+		Method: http.MethodPost,
+		URL:    strings.TrimRight(baseURL, "/") + "/embeddings",
+		Headers: http.Header{
+			"Content-Type": {"application/json"},
+		},
+		Body: raw,
+	})
+	if err != nil {
+		return contract.EmbeddingResponse{}, providerErrorFromReverseProxy(err)
+	}
+	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
+		return contract.EmbeddingResponse{}, classifyProviderHTTPError(runtimeResp.StatusCode, runtimeResp.Body)
+	}
+	return parseOpenAICompatibleEmbeddings(runtimeResp.Body, runtimeResp.StatusCode, req.Mapping.UpstreamModelName, req.Input)
+}
+
 func (s *Service) invokeGeminiCompatible(ctx context.Context, req contract.TextRequest, baseURL string) (contract.TextResponse, error) {
 	apiKey := geminiAPIKey(req)
 	if apiKey == "" {
@@ -736,6 +820,14 @@ type openAIChatCompletionRequest struct {
 	ResponseFormat map[string]any       `json:"response_format,omitempty"`
 }
 
+type openAIEmbeddingRequest struct {
+	Model          string   `json:"model"`
+	Input          []string `json:"input"`
+	EncodingFormat string   `json:"encoding_format,omitempty"`
+	Dimensions     *int     `json:"dimensions,omitempty"`
+	User           string   `json:"user,omitempty"`
+}
+
 type openAIStreamOptions struct {
 	IncludeUsage bool `json:"include_usage"`
 }
@@ -762,6 +854,20 @@ func openAICompatiblePayload(req contract.TextRequest) openAIChatCompletionReque
 		payload.StreamOptions = &openAIStreamOptions{IncludeUsage: true}
 	}
 	return payload
+}
+
+func openAIEmbeddingPayload(req contract.EmbeddingRequest) openAIEmbeddingRequest {
+	encoding := strings.TrimSpace(req.EncodingFormat)
+	if encoding == "" {
+		encoding = "float"
+	}
+	return openAIEmbeddingRequest{
+		Model:          req.Mapping.UpstreamModelName,
+		Input:          append([]string(nil), req.Input...),
+		EncodingFormat: encoding,
+		Dimensions:     cloneIntPtr(req.Dimensions),
+		User:           strings.TrimSpace(req.User),
+	}
 }
 
 func openAICompatibleMessages(req contract.TextRequest) []openAIChatMessage {
@@ -843,11 +949,63 @@ type openAIChatCompletionResponse struct {
 	Usage openAIUsage `json:"usage"`
 }
 
+type openAIEmbeddingResponse struct {
+	Object string `json:"object"`
+	Data   []struct {
+		Object    string          `json:"object"`
+		Embedding json.RawMessage `json:"embedding"`
+		Index     int             `json:"index"`
+	} `json:"data"`
+	Model string      `json:"model"`
+	Usage openAIUsage `json:"usage"`
+}
+
 func (r openAIChatCompletionResponse) FirstText() string {
 	if len(r.Choices) == 0 {
 		return ""
 	}
 	return r.Choices[0].Message.Content
+}
+
+func parseOpenAICompatibleEmbeddings(body []byte, statusCode int, fallbackModel string, input []string) (contract.EmbeddingResponse, error) {
+	var decoded openAIEmbeddingResponse
+	if err := json.Unmarshal(body, &decoded); err != nil {
+		return contract.EmbeddingResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider returned invalid json"}
+	}
+	data := make([]contract.Embedding, 0, len(decoded.Data))
+	for _, item := range decoded.Data {
+		embedding, err := parseOpenAIEmbeddingValue(item.Embedding)
+		if err != nil {
+			return contract.EmbeddingResponse{}, err
+		}
+		embedding.Index = item.Index
+		data = append(data, embedding)
+	}
+	if len(data) == 0 {
+		return contract.EmbeddingResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response contained no embeddings"}
+	}
+	model := strings.TrimSpace(decoded.Model)
+	if model == "" {
+		model = strings.TrimSpace(fallbackModel)
+	}
+	return contract.EmbeddingResponse{
+		Data:       data,
+		Model:      model,
+		StatusCode: statusCode,
+		Usage:      decoded.Usage.ToEmbeddingUsage(input),
+	}, nil
+}
+
+func parseOpenAIEmbeddingValue(raw json.RawMessage) (contract.Embedding, error) {
+	var vector []float32
+	if err := json.Unmarshal(raw, &vector); err == nil && len(vector) > 0 {
+		return contract.Embedding{Vector: vector}, nil
+	}
+	var encoded string
+	if err := json.Unmarshal(raw, &encoded); err == nil && strings.TrimSpace(encoded) != "" {
+		return contract.Embedding{Base64Vector: strings.TrimSpace(encoded)}, nil
+	}
+	return contract.Embedding{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response contained invalid embedding vector"}
 }
 
 type openAIChatCompletionStreamChunk struct {
@@ -900,6 +1058,12 @@ func (u openAIUsage) ToUsage(text string) contract.Usage {
 		CachedTokens: cached,
 		Estimated:    false,
 	}
+}
+
+func (u openAIUsage) ToEmbeddingUsage(input []string) contract.Usage {
+	usage := u.ToUsage(strings.Join(input, "\n"))
+	usage.OutputTokens = 0
+	return usage
 }
 
 func parseOpenAICompatibleStream(body []byte, statusCode int) (contract.TextResponse, error) {
@@ -1229,6 +1393,17 @@ func upstreamBaseURL(req contract.TextRequest) string {
 	return ""
 }
 
+func upstreamBaseURLEmbeddings(req contract.EmbeddingRequest) string {
+	for _, values := range []map[string]any{req.Account.Metadata, req.Provider.ConfigSchema, req.Provider.Capabilities} {
+		for _, key := range []string{"base_url", "upstream_base_url", "openai_base_url"} {
+			if value := mapString(values, key); value != "" {
+				return strings.TrimRight(value, "/")
+			}
+		}
+	}
+	return ""
+}
+
 func isGeminiCompatible(req contract.TextRequest) bool {
 	for _, value := range []string{req.Provider.Protocol, req.Provider.AdapterType} {
 		switch strings.ToLower(strings.TrimSpace(value)) {
@@ -1250,6 +1425,14 @@ func isAnthropicCompatible(req contract.TextRequest) bool {
 }
 
 func isReverseProxyRuntime(req contract.TextRequest) bool {
+	runtimeClass := strings.TrimSpace(string(req.Account.RuntimeClass))
+	if runtimeClass != "" && runtimeClass != "api_key" {
+		return true
+	}
+	return strings.HasPrefix(strings.TrimSpace(req.Provider.AdapterType), "reverse-proxy-")
+}
+
+func isReverseProxyEmbeddingRuntime(req contract.EmbeddingRequest) bool {
 	runtimeClass := strings.TrimSpace(string(req.Account.RuntimeClass))
 	if runtimeClass != "" && runtimeClass != "api_key" {
 		return true
@@ -1544,6 +1727,36 @@ func synthesizeLocalText(model, prompt string) string {
 		return "SRapi local response for " + model
 	}
 	return "SRapi local response for " + model + ": " + prompt
+}
+
+func synthesizeLocalEmbeddings(req contract.EmbeddingRequest) contract.EmbeddingResponse {
+	data := make([]contract.Embedding, 0, len(req.Input))
+	for idx, value := range req.Input {
+		vector := deterministicEmbeddingVector(value, idx)
+		data = append(data, contract.Embedding{Index: idx, Vector: vector})
+	}
+	return contract.EmbeddingResponse{
+		Data:       data,
+		Model:      req.Mapping.UpstreamModelName,
+		StatusCode: http.StatusOK,
+		Usage:      estimatedEmbeddingUsage(req.Input),
+	}
+}
+
+func deterministicEmbeddingVector(value string, index int) []float32 {
+	total := 0
+	for _, r := range value {
+		total += int(r)
+	}
+	base := float32((total % 997) + index + 1)
+	return []float32{base / 997, float32(len(value)+1) / 997, float32(index+1) / 997}
+}
+
+func estimatedEmbeddingUsage(input []string) contract.Usage {
+	return contract.Usage{
+		InputTokens: estimateTokens(strings.Join(input, "\n")),
+		Estimated:   true,
+	}
 }
 
 func estimatedUsage(text string) contract.Usage {

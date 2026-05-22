@@ -1154,6 +1154,30 @@ export type TokenUsage = {
     cached_tokens?: number;
 };
 
+export type EmbeddingRequest = {
+    model: string;
+    input: string | Array<string>;
+    encoding_format?: 'float' | 'base64';
+    dimensions?: number;
+    user?: string;
+    [key: string]: unknown;
+};
+
+export type EmbeddingVector = Array<number> | string;
+
+export type EmbeddingObject = {
+    object: 'embedding';
+    embedding: EmbeddingVector;
+    index: number;
+};
+
+export type EmbeddingResponse = {
+    object: 'list';
+    data: Array<EmbeddingObject>;
+    model: string;
+    usage: TokenUsage;
+};
+
 export type ChatMessage = {
     role: 'system' | 'developer' | 'user' | 'assistant' | 'tool';
     content: string | Array<ContentBlock>;
@@ -4153,6 +4177,51 @@ export type CreateMessageResponses = {
 
 export type CreateMessageResponse = CreateMessageResponses[keyof CreateMessageResponses];
 
+export type CreateEmbeddingData = {
+    body: EmbeddingRequest;
+    path?: never;
+    query?: never;
+    url: '/v1/embeddings';
+};
+
+export type CreateEmbeddingErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateEmbeddingError = CreateEmbeddingErrors[keyof CreateEmbeddingErrors];
+
+export type CreateEmbeddingResponses = {
+    /**
+     * OpenAI-compatible embeddings response.
+     */
+    200: EmbeddingResponse;
+};
+
+export type CreateEmbeddingResponse = CreateEmbeddingResponses[keyof CreateEmbeddingResponses];
+
 export type GenerateGeminiContentData = {
     body: GeminiGenerateContentRequest;
     path: {
@@ -4387,6 +4456,51 @@ export type CreateOpenAiCompatibleMessageAliasResponses = {
 };
 
 export type CreateOpenAiCompatibleMessageAliasResponse = CreateOpenAiCompatibleMessageAliasResponses[keyof CreateOpenAiCompatibleMessageAliasResponses];
+
+export type CreateOpenAiCompatibleEmbeddingAliasData = {
+    body: EmbeddingRequest;
+    path?: never;
+    query?: never;
+    url: '/api/provider/openai-compatible/v1/embeddings';
+};
+
+export type CreateOpenAiCompatibleEmbeddingAliasErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateOpenAiCompatibleEmbeddingAliasError = CreateOpenAiCompatibleEmbeddingAliasErrors[keyof CreateOpenAiCompatibleEmbeddingAliasErrors];
+
+export type CreateOpenAiCompatibleEmbeddingAliasResponses = {
+    /**
+     * OpenAI-compatible embeddings response.
+     */
+    200: EmbeddingResponse;
+};
+
+export type CreateOpenAiCompatibleEmbeddingAliasResponse = CreateOpenAiCompatibleEmbeddingAliasResponses[keyof CreateOpenAiCompatibleEmbeddingAliasResponses];
 
 export type CreateAnthropicCompatibleMessageAliasData = {
     body: AnthropicMessagesRequest;

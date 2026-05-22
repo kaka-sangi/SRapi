@@ -878,12 +878,93 @@ Required gates:
 - `make architecture-check`
 - `git diff --check`
 
-## WP-270+: Advanced Endpoint And Provider Expansion
+## WP-270: Embeddings Passthrough Runtime v1
+
+Objective: add the first `/v1/embeddings` Gateway runtime so OpenAI-compatible embedding clients go through SRapi auth, model policy, entitlement, Scheduler, Provider Adapter dispatch, usage, billing, and operational evidence instead of bypassing the platform.
+
+Read first:
+
+- `docs/GATEWAY_ROUTE_MATRIX.md`
+- `docs/AI_ENDPOINT_COMPATIBILITY.md`
+- `docs/PROVIDER_ADAPTER_SPEC.md`
+- `docs/OPENAPI_CONTRACT.md`
+- `docs/MODULE_INTERFACE_CONTRACTS.md`
+
+Owns:
+
+- `packages/openapi/openapi.yaml`
+- generated Go OpenAPI types and generated TypeScript SDK
+- `apps/api/internal/modules/gateway`
+- `apps/api/internal/modules/provider_adapters`
+- `apps/api/internal/httpserver`
+- provider alias route registration for OpenAI-compatible presets
+- gateway/provider compatibility docs and status updates
+
+Definition of Done:
+
+- `POST /v1/embeddings` is OpenAPI-described, generated, and secured with `gatewayBearerAuth`.
+- OpenAI-compatible provider alias routes, including `/api/provider/openai-compatible/v1/embeddings`, reuse the same runtime while forcing provider context.
+- Requests minimally validate `model` plus string or string-array `input`; token-array input is explicitly rejected until a later compatibility package supports it.
+- Runtime follows the standard Gateway path: API key auth, model visibility, entitlement admission, Scheduler candidate selection, provider credential materialization, Provider Adapter invocation, usage log, billing metadata, Scheduler feedback, and outbox event.
+- OpenAI-compatible API-key and reverse-proxy accounts dispatch upstream to `/embeddings`, pass the mapped upstream model, parse usage, and return OpenAI-shaped embedding objects.
+- Provider and validation errors use the existing OpenAI-compatible Gateway error envelope and preserve request IDs.
+- Focused regressions prove standard route success, provider alias forced context, model/API-key policy rejection, upstream error classification, usage/decision evidence, and adapter request/response parsing.
+- No frontend visuals are added.
+
+Required gates:
+
+- `make openapi-lint`
+- `make openapi-bundle`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/modules/gateway/... ./internal/modules/provider_adapters/... ./internal/httpserver`
+- `cd apps/api && go test ./...`
+- `make architecture-check`
+- `make secret-scan`
+- `git diff --check`
+
+## WP-280: HTTP Runtime Partition And Size Harness
+
+Objective: split the oversized HTTP runtime implementation into route-family files and add architecture harness coverage so `runtime_http.go` stops growing as a catch-all protocol layer.
+
+Read first:
+
+- `docs/ARCHITECTURE.md`
+- `docs/ARCHITECTURE_REQUIREMENTS.md`
+- `docs/MODULE_INTERFACE_CONTRACTS.md`
+- `apps/api/internal/httpserver`
+- `apps/api/internal/architecture`
+
+Owns:
+
+- `apps/api/internal/httpserver`
+- `apps/api/internal/architecture`
+- architecture docs and status updates
+
+Definition of Done:
+
+- HTTP runtime code is partitioned into coherent files such as gateway handlers, admin/control-plane handlers, operations handlers, runtime bootstrap/state, response/error helpers, and metrics helpers.
+- Route handlers continue to call service/contract boundaries only; no Ent or persistence implementation imports are introduced into `internal/httpserver`.
+- `runtime_http.go` is reduced to a small compatibility or shared-runtime file instead of a 7000+ line catch-all.
+- Architecture harness adds a file-size or ownership check that prevents `runtime_http.go` from regressing into the catch-all layer again.
+- Existing Gateway, admin, operations, payment, subscription, and observability HTTP tests continue to pass without frontend visual work.
+- No user-facing API behavior changes are introduced.
+
+Required gates:
+
+- `cd apps/api && go test ./internal/httpserver ./internal/architecture`
+- `cd apps/api && go test ./...`
+- `make architecture-check`
+- `git diff --check`
+
+## WP-290+: Advanced Endpoint And Provider Expansion
 
 Use `ROADMAP.md` Phase 7 through Phase 8 to split future packages for:
 
 - images and media runtime
-- embeddings and rerank
+- rerank
+- audio and moderation
 - realtime/websocket
 - SDK examples
 - migration guides

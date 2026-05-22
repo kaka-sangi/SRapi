@@ -356,6 +356,54 @@ func (e DomainEventOutboxStatus) Valid() bool {
 	}
 }
 
+// Defines values for EmbeddingObjectObject.
+const (
+	Embedding EmbeddingObjectObject = "embedding"
+)
+
+// Valid indicates whether the value is a known member of the EmbeddingObjectObject enum.
+func (e EmbeddingObjectObject) Valid() bool {
+	switch e {
+	case Embedding:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EmbeddingRequestEncodingFormat.
+const (
+	Base64 EmbeddingRequestEncodingFormat = "base64"
+	Float  EmbeddingRequestEncodingFormat = "float"
+)
+
+// Valid indicates whether the value is a known member of the EmbeddingRequestEncodingFormat enum.
+func (e EmbeddingRequestEncodingFormat) Valid() bool {
+	switch e {
+	case Base64:
+		return true
+	case Float:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EmbeddingResponseObject.
+const (
+	EmbeddingResponseObjectList EmbeddingResponseObject = "list"
+)
+
+// Valid indicates whether the value is a known member of the EmbeddingResponseObject enum.
+func (e EmbeddingResponseObject) Valid() bool {
+	switch e {
+	case EmbeddingResponseObjectList:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ErrorCode.
 const (
 	APIKEYDISABLED          ErrorCode = "API_KEY_DISABLED"
@@ -532,13 +580,13 @@ func (e OpenAIModelObject) Valid() bool {
 
 // Defines values for OpenAIModelListObject.
 const (
-	List OpenAIModelListObject = "list"
+	OpenAIModelListObjectList OpenAIModelListObject = "list"
 )
 
 // Valid indicates whether the value is a known member of the OpenAIModelListObject enum.
 func (e OpenAIModelListObject) Valid() bool {
 	switch e {
-	case List:
+	case OpenAIModelListObjectList:
 		return true
 	default:
 		return false
@@ -1716,6 +1764,62 @@ type DomainEventOutboxListResponse struct {
 	Pagination Pagination          `json:"pagination"`
 	RequestId  RequestId           `json:"request_id"`
 }
+
+// EmbeddingObject defines model for EmbeddingObject.
+type EmbeddingObject struct {
+	Embedding EmbeddingVector       `json:"embedding"`
+	Index     int                   `json:"index"`
+	Object    EmbeddingObjectObject `json:"object"`
+}
+
+// EmbeddingObjectObject defines model for EmbeddingObject.Object.
+type EmbeddingObjectObject string
+
+// EmbeddingRequest defines model for EmbeddingRequest.
+type EmbeddingRequest struct {
+	Dimensions           *int                            `json:"dimensions,omitempty"`
+	EncodingFormat       *EmbeddingRequestEncodingFormat `json:"encoding_format,omitempty"`
+	Input                EmbeddingRequest_Input          `json:"input"`
+	Model                string                          `json:"model"`
+	User                 *string                         `json:"user,omitempty"`
+	AdditionalProperties map[string]interface{}          `json:"-"`
+}
+
+// EmbeddingRequestEncodingFormat defines model for EmbeddingRequest.EncodingFormat.
+type EmbeddingRequestEncodingFormat string
+
+// EmbeddingRequestInput0 defines model for .
+type EmbeddingRequestInput0 = string
+
+// EmbeddingRequestInput1 defines model for .
+type EmbeddingRequestInput1 = []string
+
+// EmbeddingRequest_Input defines model for EmbeddingRequest.Input.
+type EmbeddingRequest_Input struct {
+	union json.RawMessage
+}
+
+// EmbeddingResponse defines model for EmbeddingResponse.
+type EmbeddingResponse struct {
+	Data   []EmbeddingObject       `json:"data"`
+	Model  string                  `json:"model"`
+	Object EmbeddingResponseObject `json:"object"`
+	Usage  TokenUsage              `json:"usage"`
+}
+
+// EmbeddingResponseObject defines model for EmbeddingResponse.Object.
+type EmbeddingResponseObject string
+
+// EmbeddingVector defines model for EmbeddingVector.
+type EmbeddingVector struct {
+	union json.RawMessage
+}
+
+// EmbeddingVector0 defines model for .
+type EmbeddingVector0 = []float32
+
+// EmbeddingVector1 defines model for .
+type EmbeddingVector1 = string
 
 // ErrorCode defines model for ErrorCode.
 type ErrorCode string
@@ -2940,6 +3044,9 @@ type CreateAnthropicCompatibleMessageAliasJSONRequestBody = AnthropicMessagesReq
 // CreateOpenAICompatibleChatCompletionAliasJSONRequestBody defines body for CreateOpenAICompatibleChatCompletionAlias for application/json ContentType.
 type CreateOpenAICompatibleChatCompletionAliasJSONRequestBody = ChatCompletionRequest
 
+// CreateOpenAICompatibleEmbeddingAliasJSONRequestBody defines body for CreateOpenAICompatibleEmbeddingAlias for application/json ContentType.
+type CreateOpenAICompatibleEmbeddingAliasJSONRequestBody = EmbeddingRequest
+
 // CreateOpenAICompatibleMessageAliasJSONRequestBody defines body for CreateOpenAICompatibleMessageAlias for application/json ContentType.
 type CreateOpenAICompatibleMessageAliasJSONRequestBody = AnthropicMessagesRequest
 
@@ -3023,6 +3130,9 @@ type HandlePaymentWebhookJSONRequestBody = PaymentWebhookRequest
 
 // CreateChatCompletionJSONRequestBody defines body for CreateChatCompletion for application/json ContentType.
 type CreateChatCompletionJSONRequestBody = ChatCompletionRequest
+
+// CreateEmbeddingJSONRequestBody defines body for CreateEmbedding for application/json ContentType.
+type CreateEmbeddingJSONRequestBody = EmbeddingRequest
 
 // CreateMessageJSONRequestBody defines body for CreateMessage for application/json ContentType.
 type CreateMessageJSONRequestBody = AnthropicMessagesRequest
@@ -3602,6 +3712,130 @@ func (a ContentBlock) MarshalJSON() ([]byte, error) {
 	object["type"], err = json.Marshal(a.Type)
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling 'type': %w", err)
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for EmbeddingRequest. Returns the specified
+// element and whether it was found
+func (a EmbeddingRequest) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for EmbeddingRequest
+func (a *EmbeddingRequest) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for EmbeddingRequest to handle AdditionalProperties
+func (a *EmbeddingRequest) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["dimensions"]; found {
+		err = json.Unmarshal(raw, &a.Dimensions)
+		if err != nil {
+			return fmt.Errorf("error reading 'dimensions': %w", err)
+		}
+		delete(object, "dimensions")
+	}
+
+	if raw, found := object["encoding_format"]; found {
+		err = json.Unmarshal(raw, &a.EncodingFormat)
+		if err != nil {
+			return fmt.Errorf("error reading 'encoding_format': %w", err)
+		}
+		delete(object, "encoding_format")
+	}
+
+	if raw, found := object["input"]; found {
+		err = json.Unmarshal(raw, &a.Input)
+		if err != nil {
+			return fmt.Errorf("error reading 'input': %w", err)
+		}
+		delete(object, "input")
+	}
+
+	if raw, found := object["model"]; found {
+		err = json.Unmarshal(raw, &a.Model)
+		if err != nil {
+			return fmt.Errorf("error reading 'model': %w", err)
+		}
+		delete(object, "model")
+	}
+
+	if raw, found := object["user"]; found {
+		err = json.Unmarshal(raw, &a.User)
+		if err != nil {
+			return fmt.Errorf("error reading 'user': %w", err)
+		}
+		delete(object, "user")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for EmbeddingRequest to handle AdditionalProperties
+func (a EmbeddingRequest) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.Dimensions != nil {
+		object["dimensions"], err = json.Marshal(a.Dimensions)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'dimensions': %w", err)
+		}
+	}
+
+	if a.EncodingFormat != nil {
+		object["encoding_format"], err = json.Marshal(a.EncodingFormat)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'encoding_format': %w", err)
+		}
+	}
+
+	object["input"], err = json.Marshal(a.Input)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'input': %w", err)
+	}
+
+	object["model"], err = json.Marshal(a.Model)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'model': %w", err)
+	}
+
+	if a.User != nil {
+		object["user"], err = json.Marshal(a.User)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'user': %w", err)
+		}
 	}
 
 	for fieldName, field := range a.AdditionalProperties {
@@ -5016,6 +5250,130 @@ func (t *ChatMessage_Content) UnmarshalJSON(b []byte) error {
 	return err
 }
 
+// AsEmbeddingRequestInput0 returns the union data inside the EmbeddingRequest_Input as a EmbeddingRequestInput0
+func (t EmbeddingRequest_Input) AsEmbeddingRequestInput0() (EmbeddingRequestInput0, error) {
+	var body EmbeddingRequestInput0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromEmbeddingRequestInput0 overwrites any union data inside the EmbeddingRequest_Input as the provided EmbeddingRequestInput0
+func (t *EmbeddingRequest_Input) FromEmbeddingRequestInput0(v EmbeddingRequestInput0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeEmbeddingRequestInput0 performs a merge with any union data inside the EmbeddingRequest_Input, using the provided EmbeddingRequestInput0
+func (t *EmbeddingRequest_Input) MergeEmbeddingRequestInput0(v EmbeddingRequestInput0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsEmbeddingRequestInput1 returns the union data inside the EmbeddingRequest_Input as a EmbeddingRequestInput1
+func (t EmbeddingRequest_Input) AsEmbeddingRequestInput1() (EmbeddingRequestInput1, error) {
+	var body EmbeddingRequestInput1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromEmbeddingRequestInput1 overwrites any union data inside the EmbeddingRequest_Input as the provided EmbeddingRequestInput1
+func (t *EmbeddingRequest_Input) FromEmbeddingRequestInput1(v EmbeddingRequestInput1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeEmbeddingRequestInput1 performs a merge with any union data inside the EmbeddingRequest_Input, using the provided EmbeddingRequestInput1
+func (t *EmbeddingRequest_Input) MergeEmbeddingRequestInput1(v EmbeddingRequestInput1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t EmbeddingRequest_Input) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *EmbeddingRequest_Input) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsEmbeddingVector0 returns the union data inside the EmbeddingVector as a EmbeddingVector0
+func (t EmbeddingVector) AsEmbeddingVector0() (EmbeddingVector0, error) {
+	var body EmbeddingVector0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromEmbeddingVector0 overwrites any union data inside the EmbeddingVector as the provided EmbeddingVector0
+func (t *EmbeddingVector) FromEmbeddingVector0(v EmbeddingVector0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeEmbeddingVector0 performs a merge with any union data inside the EmbeddingVector, using the provided EmbeddingVector0
+func (t *EmbeddingVector) MergeEmbeddingVector0(v EmbeddingVector0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsEmbeddingVector1 returns the union data inside the EmbeddingVector as a EmbeddingVector1
+func (t EmbeddingVector) AsEmbeddingVector1() (EmbeddingVector1, error) {
+	var body EmbeddingVector1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromEmbeddingVector1 overwrites any union data inside the EmbeddingVector as the provided EmbeddingVector1
+func (t *EmbeddingVector) FromEmbeddingVector1(v EmbeddingVector1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeEmbeddingVector1 performs a merge with any union data inside the EmbeddingVector, using the provided EmbeddingVector1
+func (t *EmbeddingVector) MergeEmbeddingVector1(v EmbeddingVector1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t EmbeddingVector) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *EmbeddingVector) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsResponsesRequestInput0 returns the union data inside the ResponsesRequest_Input as a ResponsesRequestInput0
 func (t ResponsesRequest_Input) AsResponsesRequestInput0() (ResponsesRequestInput0, error) {
 	var body ResponsesRequestInput0
@@ -5086,6 +5444,9 @@ type ServerInterface interface {
 	// Create an OpenAI-compatible chat completion with openai-compatible provider context.
 	// (POST /api/provider/openai-compatible/v1/chat/completions)
 	CreateOpenAICompatibleChatCompletionAlias(w http.ResponseWriter, r *http.Request)
+	// Create OpenAI-compatible embeddings with openai-compatible provider context.
+	// (POST /api/provider/openai-compatible/v1/embeddings)
+	CreateOpenAICompatibleEmbeddingAlias(w http.ResponseWriter, r *http.Request)
 	// Create an Anthropic Messages-compatible message with openai-compatible provider context.
 	// (POST /api/provider/openai-compatible/v1/messages)
 	CreateOpenAICompatibleMessageAlias(w http.ResponseWriter, r *http.Request)
@@ -5296,6 +5657,9 @@ type ServerInterface interface {
 	// Create an OpenAI-compatible chat completion.
 	// (POST /v1/chat/completions)
 	CreateChatCompletion(w http.ResponseWriter, r *http.Request)
+	// Create OpenAI-compatible embeddings.
+	// (POST /v1/embeddings)
+	CreateEmbedding(w http.ResponseWriter, r *http.Request)
 	// Create an Anthropic Messages-compatible message.
 	// (POST /v1/messages)
 	CreateMessage(w http.ResponseWriter, r *http.Request)
@@ -5353,6 +5717,26 @@ func (siw *ServerInterfaceWrapper) CreateOpenAICompatibleChatCompletionAlias(w h
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateOpenAICompatibleChatCompletionAlias(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateOpenAICompatibleEmbeddingAlias operation middleware
+func (siw *ServerInterfaceWrapper) CreateOpenAICompatibleEmbeddingAlias(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateOpenAICompatibleEmbeddingAlias(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -8138,6 +8522,26 @@ func (siw *ServerInterfaceWrapper) CreateChatCompletion(w http.ResponseWriter, r
 	handler.ServeHTTP(w, r)
 }
 
+// CreateEmbedding operation middleware
+func (siw *ServerInterfaceWrapper) CreateEmbedding(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateEmbedding(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // CreateMessage operation middleware
 func (siw *ServerInterfaceWrapper) CreateMessage(w http.ResponseWriter, r *http.Request) {
 
@@ -8384,6 +8788,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/anthropic-compatible/v1/messages", wrapper.CreateAnthropicCompatibleMessageAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/chat/completions", wrapper.CreateOpenAICompatibleChatCompletionAlias)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/embeddings", wrapper.CreateOpenAICompatibleEmbeddingAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/messages", wrapper.CreateOpenAICompatibleMessageAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/responses", wrapper.CreateOpenAICompatibleResponseAlias)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/account-groups", wrapper.ListAdminAccountGroups)
@@ -8454,6 +8859,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/payment/orders/{id}/cancel", wrapper.CancelPaymentOrder)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/webhooks/payments/{provider}", wrapper.HandlePaymentWebhook)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/chat/completions", wrapper.CreateChatCompletion)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/embeddings", wrapper.CreateEmbedding)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/messages", wrapper.CreateMessage)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/models", wrapper.ListModels)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/responses", wrapper.CreateResponse)
