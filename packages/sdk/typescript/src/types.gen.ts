@@ -48,6 +48,17 @@ export type GatewayErrorResponse = {
     error: GatewayErrorObject;
 };
 
+export type GeminiErrorObject = {
+    code: number;
+    message: string;
+    status: string;
+    details?: Array<JsonObject>;
+};
+
+export type GeminiErrorResponse = {
+    error: GeminiErrorObject;
+};
+
 export type HealthDependencyStatus = 'ok' | 'degraded' | 'unavailable' | 'not_configured';
 
 export type HealthData = {
@@ -1117,6 +1128,72 @@ export type AnthropicMessagesResponse = {
     compatibility_warnings?: Array<string>;
 };
 
+export type GeminiPart = {
+    text?: string;
+    inline_data?: JsonObject;
+    file_data?: JsonObject;
+    function_call?: JsonObject;
+    function_response?: JsonObject;
+    [key: string]: unknown;
+};
+
+export type GeminiContent = {
+    role?: 'user' | 'model';
+    parts: Array<GeminiPart>;
+    [key: string]: unknown;
+};
+
+export type GeminiGenerationConfig = {
+    temperature?: number;
+    topP?: number;
+    topK?: number;
+    maxOutputTokens?: number;
+    stopSequences?: Array<string>;
+    responseMimeType?: string;
+    responseSchema?: JsonObject;
+    [key: string]: unknown;
+};
+
+export type GeminiGenerateContentRequest = {
+    contents: Array<GeminiContent>;
+    systemInstruction?: GeminiContent;
+    generationConfig?: GeminiGenerationConfig;
+    safetySettings?: Array<JsonObject>;
+    tools?: Array<JsonObject>;
+    toolConfig?: JsonObject;
+    [key: string]: unknown;
+};
+
+export type GeminiSafetyRating = {
+    category?: string;
+    probability?: string;
+    blocked?: boolean;
+    [key: string]: unknown;
+};
+
+export type GeminiCandidate = {
+    content: GeminiContent;
+    finishReason: string;
+    index: number;
+    safetyRatings?: Array<GeminiSafetyRating>;
+    [key: string]: unknown;
+};
+
+export type GeminiUsageMetadata = {
+    promptTokenCount?: number;
+    candidatesTokenCount?: number;
+    totalTokenCount?: number;
+    cachedContentTokenCount?: number;
+};
+
+export type GeminiGenerateContentResponse = {
+    candidates: Array<GeminiCandidate>;
+    usageMetadata?: GeminiUsageMetadata;
+    modelVersion?: string;
+    responseId?: string;
+    compatibilityWarnings?: Array<string>;
+};
+
 export type CreateProviderAccountRequestWritable = {
     provider_id: Id;
     name: string;
@@ -1182,6 +1259,11 @@ export type PageSize = number;
 export type Status = string;
 
 export type SearchQuery = string;
+
+/**
+ * Gemini model id from the path. SRapi runtime accepts slash-qualified ids when the HTTP router passes them through.
+ */
+export type GeminiModel = string;
 
 export type GetHealthData = {
     body?: never;
@@ -3678,6 +3760,106 @@ export type CreateMessageResponses = {
 };
 
 export type CreateMessageResponse = CreateMessageResponses[keyof CreateMessageResponses];
+
+export type GenerateGeminiContentData = {
+    body: GeminiGenerateContentRequest;
+    path: {
+        /**
+         * Gemini model id from the path. SRapi runtime accepts slash-qualified ids when the HTTP router passes them through.
+         */
+        model: string;
+    };
+    query?: never;
+    url: '/v1beta/models/{model}:generateContent';
+};
+
+export type GenerateGeminiContentErrors = {
+    /**
+     * Invalid Gemini gateway request.
+     */
+    400: GeminiErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GeminiErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GeminiErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GeminiErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GeminiErrorResponse;
+    /**
+     * Google-style Gemini gateway error.
+     */
+    default: GeminiErrorResponse;
+};
+
+export type GenerateGeminiContentError = GenerateGeminiContentErrors[keyof GenerateGeminiContentErrors];
+
+export type GenerateGeminiContentResponses = {
+    /**
+     * Gemini-compatible generateContent response.
+     */
+    200: GeminiGenerateContentResponse;
+};
+
+export type GenerateGeminiContentResponse = GenerateGeminiContentResponses[keyof GenerateGeminiContentResponses];
+
+export type StreamGeminiContentData = {
+    body: GeminiGenerateContentRequest;
+    path: {
+        /**
+         * Gemini model id from the path. SRapi runtime accepts slash-qualified ids when the HTTP router passes them through.
+         */
+        model: string;
+    };
+    query?: never;
+    url: '/v1beta/models/{model}:streamGenerateContent';
+};
+
+export type StreamGeminiContentErrors = {
+    /**
+     * Invalid Gemini gateway request.
+     */
+    400: GeminiErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GeminiErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GeminiErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GeminiErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GeminiErrorResponse;
+    /**
+     * Google-style Gemini gateway error.
+     */
+    default: GeminiErrorResponse;
+};
+
+export type StreamGeminiContentError = StreamGeminiContentErrors[keyof StreamGeminiContentErrors];
+
+export type StreamGeminiContentResponses = {
+    /**
+     * SSE stream of Gemini-compatible GenerateContentResponse chunks.
+     */
+    200: string;
+};
+
+export type StreamGeminiContentResponse = StreamGeminiContentResponses[keyof StreamGeminiContentResponses];
 
 export type CreateOpenAiCompatibleChatCompletionAliasData = {
     body: ChatCompletionRequest;

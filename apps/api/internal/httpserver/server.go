@@ -241,6 +241,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("POST /v1/chat/completions", server.handleCreateChatCompletion)
 	mux.HandleFunc("POST /v1/responses", server.handleCreateResponse)
 	mux.HandleFunc("POST /v1/messages", server.handleCreateMessage)
+	mux.HandleFunc("POST /v1beta/models/", server.handleGeminiModelAction)
 	server.registerGatewayProviderAliases(mux)
 
 	return requestIDMiddleware(mux)

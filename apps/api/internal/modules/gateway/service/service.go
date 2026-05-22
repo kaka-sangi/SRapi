@@ -143,6 +143,54 @@ func (s *Service) NormalizeAnthropicMessages(req apiopenapi.AnthropicMessagesReq
 	return canonical
 }
 
+func (s *Service) NormalizeGeminiGenerateContent(req apiopenapi.GeminiGenerateContentRequest, model string, stream bool, meta RequestMeta) gatewaycontract.CanonicalRequest {
+	var warnings []string
+	var parts []string
+	var messages []gatewaycontract.Message
+	instructions := geminiContentText(req.SystemInstruction)
+	if instructions != "" {
+		parts = append(parts, "system: "+instructions)
+	}
+	for _, content := range req.Contents {
+		role := geminiRole(content.Role)
+		blocks := geminiContentBlocks(content, role)
+		if len(blocks) > 0 {
+			messages = append(messages, gatewaycontract.Message{Role: role, Content: blocks})
+		}
+		text := textFromBlocks(blocks)
+		if text != "" {
+			parts = append(parts, role+": "+text)
+		}
+		if geminiContentHasMedia(content) {
+			warnings = append(warnings, "vision_ignored")
+		}
+	}
+	if req.SystemInstruction != nil && geminiContentHasMedia(*req.SystemInstruction) {
+		warnings = append(warnings, "vision_ignored")
+	}
+	if req.SafetySettings != nil && len(*req.SafetySettings) > 0 {
+		warnings = append(warnings, "safety_settings_ignored")
+	}
+	if req.GenerationConfig != nil && req.GenerationConfig.TopK != nil {
+		warnings = append(warnings, "top_k_ignored")
+	}
+	canonical := canonical(meta, gatewaycontract.ProtocolGeminiCompatible, gatewaycontract.ProtocolGeminiCompatible, model, "", stream, strings.Join(parts, "\n"), messages, nil, instructions, uniqueStrings(warnings))
+	if cfg := req.GenerationConfig; cfg != nil {
+		canonical.Temperature = cfg.Temperature
+		canonical.TopP = cfg.TopP
+		canonical.MaxOutputTokens = cloneInt(cfg.MaxOutputTokens)
+		canonical.Stop = cloneStringSlicePtr(cfg.StopSequences)
+		canonical.ResponseFormat = geminiResponseFormat(cfg)
+	}
+	canonical.Tools = cloneJSONMaps(req.Tools)
+	if len(canonical.Tools) > 0 {
+		canonical.ToolChoice = geminiToolChoice(req.ToolConfig)
+	}
+	canonical.CompatibilityWarnings = uniqueStrings(warnings)
+	refreshRequestCapabilities(&canonical)
+	return canonical
+}
+
 func (s *Service) BuildTextResponse(model, canonicalModel, text string, warnings []string) gatewaycontract.CanonicalResponse {
 	return s.buildTextResponse("", model, canonicalModel, text, estimateUsage(text), warnings)
 }
@@ -237,6 +285,29 @@ func (s *Service) RenderAnthropicMessages(resp gatewaycontract.CanonicalResponse
 		StopReason: &stopReason,
 		Type:       apiopenapi.Message,
 		Usage:      anthropicUsage(resp.Usage),
+	}
+	if len(resp.CompatibilityWarnings) > 0 {
+		warnings := append([]string(nil), resp.CompatibilityWarnings...)
+		rendered.CompatibilityWarnings = &warnings
+	}
+	return rendered
+}
+
+func (s *Service) RenderGeminiGenerateContent(resp gatewaycontract.CanonicalResponse) apiopenapi.GeminiGenerateContentResponse {
+	role := apiopenapi.GeminiContentRoleModel
+	text := resp.Message
+	rendered := apiopenapi.GeminiGenerateContentResponse{
+		Candidates: []apiopenapi.GeminiCandidate{{
+			Content: apiopenapi.GeminiContent{
+				Role:  &role,
+				Parts: []apiopenapi.GeminiPart{{Text: &text}},
+			},
+			FinishReason: "STOP",
+			Index:        0,
+		}},
+		ModelVersion:  ptrString(resp.Model),
+		ResponseId:    ptrString("gemini_" + responseID(resp)),
+		UsageMetadata: geminiUsage(resp.Usage),
 	}
 	if len(resp.CompatibilityWarnings) > 0 {
 		warnings := append([]string(nil), resp.CompatibilityWarnings...)
@@ -393,6 +464,19 @@ func (s *Service) RenderAnthropicMessagesStreamEvents(resp gatewaycontract.Canon
 	}
 }
 
+func (s *Service) RenderGeminiGenerateContentStreamEvents(resp gatewaycontract.CanonicalResponse) []StreamEvent {
+	rendered := s.RenderGeminiGenerateContent(resp)
+	return []StreamEvent{{
+		Data: map[string]any{
+			"candidates":            rendered.Candidates,
+			"usageMetadata":         rendered.UsageMetadata,
+			"modelVersion":          rendered.ModelVersion,
+			"responseId":            rendered.ResponseId,
+			"compatibilityWarnings": rendered.CompatibilityWarnings,
+		},
+	}}
+}
+
 func CapabilityDescriptors(req gatewaycontract.CanonicalRequest) []capabilitiescontract.Descriptor {
 	values := make([]capabilitiescontract.Descriptor, 0, len(req.RequestCapabilities))
 	for _, capability := range req.RequestCapabilities {
@@ -543,6 +627,76 @@ func anthropicMessageHasImage(content apiopenapi.AnthropicMessage_Content) bool 
 func anthropicContentBlocksHaveImage(blocks []apiopenapi.AnthropicContentBlock) bool {
 	for _, block := range blocks {
 		if block.Type == apiopenapi.AnthropicContentBlockTypeImage {
+			return true
+		}
+	}
+	return false
+}
+
+func geminiContentBlocks(content apiopenapi.GeminiContent, role string) []gatewaycontract.ContentBlock {
+	out := make([]gatewaycontract.ContentBlock, 0, len(content.Parts))
+	for _, part := range content.Parts {
+		if part.Text != nil {
+			text := strings.TrimSpace(*part.Text)
+			if text != "" {
+				out = append(out, gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockText, Role: role, Text: text})
+			}
+		}
+		if part.InlineData != nil || part.FileData != nil {
+			out = append(out, gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockImage, Role: role, Text: "[image]", Metadata: geminiPartMediaMetadata(part)})
+		}
+		if part.FunctionCall != nil {
+			out = append(out, gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockToolCall, Role: role, Text: "[function_call]", Metadata: cloneMap(*part.FunctionCall)})
+		}
+		if part.FunctionResponse != nil {
+			out = append(out, gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockToolCall, Role: role, Text: "[function_response]", Metadata: cloneMap(*part.FunctionResponse)})
+		}
+	}
+	return out
+}
+
+func geminiPartMediaMetadata(part apiopenapi.GeminiPart) map[string]any {
+	out := map[string]any{}
+	if part.InlineData != nil {
+		out["inline_data"] = cloneMap(*part.InlineData)
+	}
+	if part.FileData != nil {
+		out["file_data"] = cloneMap(*part.FileData)
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func geminiContentText(content *apiopenapi.GeminiContent) string {
+	if content == nil {
+		return ""
+	}
+	return textFromBlocks(geminiContentBlocks(*content, "system"))
+}
+
+func geminiRole(role *apiopenapi.GeminiContentRole) string {
+	if role == nil {
+		return "user"
+	}
+	switch *role {
+	case apiopenapi.GeminiContentRoleModel:
+		return "assistant"
+	case apiopenapi.GeminiContentRoleUser:
+		return "user"
+	default:
+		value := strings.TrimSpace(string(*role))
+		if value == "" {
+			return "user"
+		}
+		return value
+	}
+}
+
+func geminiContentHasMedia(content apiopenapi.GeminiContent) bool {
+	for _, part := range content.Parts {
+		if part.InlineData != nil || part.FileData != nil {
 			return true
 		}
 	}
@@ -720,6 +874,61 @@ func anthropicToolChoice(value *apiopenapi.JsonObject) any {
 	return raw
 }
 
+func geminiResponseFormat(cfg *apiopenapi.GeminiGenerationConfig) map[string]any {
+	if cfg == nil {
+		return nil
+	}
+	out := map[string]any{}
+	if cfg.ResponseMimeType != nil && strings.TrimSpace(*cfg.ResponseMimeType) != "" {
+		out["type"] = strings.TrimSpace(*cfg.ResponseMimeType)
+	}
+	if cfg.ResponseSchema != nil {
+		out["schema"] = cloneMap(*cfg.ResponseSchema)
+	}
+	for key, item := range cfg.AdditionalProperties {
+		if _, ok := out[key]; !ok {
+			out[key] = cloneAny(item)
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func geminiToolChoice(value *apiopenapi.JsonObject) any {
+	raw := cloneJSONMap(value)
+	if len(raw) == 0 {
+		return nil
+	}
+	return raw
+}
+
+func cloneJSONMaps(values *[]apiopenapi.JsonObject) []map[string]any {
+	if values == nil || len(*values) == 0 {
+		return nil
+	}
+	out := make([]map[string]any, 0, len(*values))
+	for _, value := range *values {
+		out = append(out, cloneMap(value))
+	}
+	return out
+}
+
+func cloneStringSlicePtr(value *[]string) []string {
+	if value == nil || len(*value) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(*value))
+	for _, item := range *value {
+		item = strings.TrimSpace(item)
+		if item != "" {
+			out = append(out, item)
+		}
+	}
+	return out
+}
+
 func cloneInt(value *int) *int {
 	if value == nil {
 		return nil
@@ -849,6 +1058,16 @@ func anthropicUsage(usage gatewaycontract.Usage) *apiopenapi.AnthropicUsage {
 	return &apiopenapi.AnthropicUsage{
 		InputTokens:  ptrInt(usage.InputTokens),
 		OutputTokens: ptrInt(usage.OutputTokens),
+	}
+}
+
+func geminiUsage(usage gatewaycontract.Usage) *apiopenapi.GeminiUsageMetadata {
+	total := usage.InputTokens + usage.OutputTokens + usage.CachedTokens
+	return &apiopenapi.GeminiUsageMetadata{
+		PromptTokenCount:        ptrInt(usage.InputTokens),
+		CandidatesTokenCount:    ptrInt(usage.OutputTokens),
+		TotalTokenCount:         ptrInt(total),
+		CachedContentTokenCount: ptrInt(usage.CachedTokens),
 	}
 }
 

@@ -19,6 +19,11 @@ import (
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
 
+type upstreamMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
 func TestHealthIncludesRequestIDAndDependencies(t *testing.T) {
 	handler := New(config.Load(), nil)
 	request := httptest.NewRequest(http.MethodGet, "/api/v1/health", nil)
@@ -1462,6 +1467,145 @@ func TestGatewayInvokesOpenAICompatibleProviderAdapter(t *testing.T) {
 	}
 }
 
+func TestGatewayGeminiGenerateContentUsesCanonicalPipeline(t *testing.T) {
+	var (
+		mu    sync.Mutex
+		calls []upstreamGeminiCall
+	)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload struct {
+			Model     string            `json:"model"`
+			Messages  []upstreamMessage `json:"messages"`
+			MaxTokens int               `json:"max_tokens"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		mu.Lock()
+		calls = append(calls, upstreamGeminiCall{
+			Path:          r.URL.Path,
+			Authorization: r.Header.Get("Authorization"),
+			Model:         payload.Model,
+			Messages:      payload.Messages,
+			MaxTokens:     payload.MaxTokens,
+		})
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"gemini upstream response"}}],"usage":{"prompt_tokens":6,"completion_tokens":8,"total_tokens":14}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp, modelResp, accountResp := mustCreateGeminiGatewayTarget(t, handler, sessionCookie, loginResp.Data.CsrfToken, upstream.URL, false)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	body := `{"systemInstruction":{"parts":[{"text":"be brief"}]},"contents":[{"role":"user","parts":[{"text":"gemini route prompt"}]}],"generationConfig":{"maxOutputTokens":32,"temperature":0.2,"topP":0.8}}`
+	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1beta/models/gemini-route-model:generateContent", body)
+	var resp apiopenapi.GeminiGenerateContentResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode gemini response: %v", err)
+	}
+	if len(resp.Candidates) != 1 || len(resp.Candidates[0].Content.Parts) != 1 || resp.Candidates[0].Content.Parts[0].Text == nil || *resp.Candidates[0].Content.Parts[0].Text != "gemini upstream response" {
+		t.Fatalf("unexpected gemini response: %+v", resp)
+	}
+	if resp.UsageMetadata == nil || resp.UsageMetadata.TotalTokenCount == nil || *resp.UsageMetadata.TotalTokenCount != 14 {
+		t.Fatalf("expected parsed gemini usage metadata, got %+v", resp.UsageMetadata)
+	}
+
+	mu.Lock()
+	gotCalls := append([]upstreamGeminiCall(nil), calls...)
+	mu.Unlock()
+	if len(gotCalls) != 1 {
+		t.Fatalf("expected one upstream call, got %+v", gotCalls)
+	}
+	call := gotCalls[0]
+	if call.Path != "/v1/chat/completions" || call.Authorization != "Bearer gemini-route-upstream-secret" || call.Model != "gemini-route-upstream" || call.MaxTokens != 32 {
+		t.Fatalf("unexpected upstream call: %+v", call)
+	}
+	if len(call.Messages) != 2 || call.Messages[0].Role != "system" || call.Messages[0].Content != "be brief" || call.Messages[1].Role != "user" || !strings.Contains(call.Messages[1].Content, "gemini route prompt") {
+		t.Fatalf("expected canonical messages forwarded upstream, got %+v", call.Messages)
+	}
+
+	usageReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/usage-logs?model=gemini-route-model", nil)
+	usageReq.AddCookie(sessionCookie)
+	usageRec := httptest.NewRecorder()
+	handler.ServeHTTP(usageRec, usageReq)
+	if usageRec.Code != http.StatusOK {
+		t.Fatalf("expected usage logs 200, got %d body=%s", usageRec.Code, usageRec.Body.String())
+	}
+	var usageResp apiopenapi.UsageLogListResponse
+	if err := json.NewDecoder(usageRec.Body).Decode(&usageResp); err != nil {
+		t.Fatalf("decode usage logs: %v", err)
+	}
+	if len(usageResp.Data) != 1 {
+		t.Fatalf("expected one usage record, got %+v", usageResp.Data)
+	}
+	usage := usageResp.Data[0]
+	if !usage.Success || usage.SourceProtocol != "gemini-compatible" || usage.SourceEndpoint != "/v1beta/models/gemini-route-model:generateContent" || usage.TargetProtocol == nil || *usage.TargetProtocol != "openai-compatible" || usage.TotalTokens != 14 || usage.UsageEstimated {
+		t.Fatalf("unexpected gemini usage record: %+v", usage)
+	}
+	if usage.ProviderId == nil || *usage.ProviderId != providerResp.Data.Id || usage.AccountId == nil || *usage.AccountId != accountResp.Data.Id || usage.Model != modelResp.Data.CanonicalName {
+		t.Fatalf("expected provider/account/model evidence, got %+v", usage)
+	}
+}
+
+func TestGatewayGeminiStreamGenerateContentEmitsGeminiSSE(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"gemini stream response\"}}]}\n\n"))
+		_, _ = w.Write([]byte("data: {\"choices\":[],\"usage\":{\"prompt_tokens\":3,\"completion_tokens\":4,\"total_tokens\":7}}\n\n"))
+		_, _ = w.Write([]byte("data: [DONE]\n\n"))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	mustCreateGeminiGatewayTarget(t, handler, sessionCookie, loginResp.Data.CsrfToken, upstream.URL, false)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1beta/models/gemini-route-model:streamGenerateContent", `{"contents":[{"role":"user","parts":[{"text":"stream gemini"}]}]}`)
+	if got := rec.Header().Get("Content-Type"); got != "text/event-stream" {
+		t.Fatalf("expected event stream content type, got %q", got)
+	}
+	body := rec.Body.String()
+	for _, expected := range []string{"data:", "gemini stream response", "usageMetadata", "data: [DONE]"} {
+		if !strings.Contains(body, expected) {
+			t.Fatalf("expected SSE body to contain %q, got %s", expected, body)
+		}
+	}
+}
+
+func TestGatewayGeminiProviderErrorsUseGoogleStyleEnvelope(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`{"error":{"type":"rate_limit","message":"slow down"}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	mustCreateGeminiGatewayTarget(t, handler, sessionCookie, loginResp.Data.CsrfToken, upstream.URL, false)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1beta/models/gemini-route-model:generateContent", strings.NewReader(`{"contents":[{"role":"user","parts":[{"text":"rate limit me"}]}]}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected Gemini rate limit 429, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var errResp apiopenapi.GeminiErrorResponse
+	if err := json.NewDecoder(rec.Body).Decode(&errResp); err != nil {
+		t.Fatalf("decode gemini error: %v", err)
+	}
+	if errResp.Error.Code != http.StatusTooManyRequests || errResp.Error.Status != "RESOURCE_EXHAUSTED" || !strings.Contains(errResp.Error.Message, "rate limit") {
+		t.Fatalf("unexpected gemini error envelope: %+v", errResp)
+	}
+}
+
 func TestGatewayRequestRecordsSchedulerFeedback(t *testing.T) {
 	schedulerStore := schedulermemory.New()
 	handler := New(config.Load(), nil, WithSchedulerStore(schedulerStore))
@@ -1499,10 +1643,6 @@ func TestGatewayRequestRecordsSchedulerFeedback(t *testing.T) {
 }
 
 func TestGatewayCompatibilityEndpointsTargetSameOpenAICompatibleUpstream(t *testing.T) {
-	type upstreamMessage struct {
-		Role    string `json:"role"`
-		Content string `json:"content"`
-	}
 	type upstreamCall struct {
 		Path          string
 		Authorization string
@@ -2693,6 +2833,27 @@ func mustCreateAccount(t *testing.T, handler http.Handler, sessionCookie *http.C
 		t.Fatalf("decode account response: %v", err)
 	}
 	return resp
+}
+
+type upstreamGeminiCall struct {
+	Path          string
+	Authorization string
+	Model         string
+	Messages      []upstreamMessage
+	MaxTokens     int
+}
+
+func mustCreateGeminiGatewayTarget(t *testing.T, handler http.Handler, sessionCookie *http.Cookie, csrfToken, upstreamURL string, unique bool) (apiopenapi.ProviderResponse, apiopenapi.ModelResponse, apiopenapi.ProviderAccountResponse) {
+	t.Helper()
+	suffix := ""
+	if unique {
+		suffix = "-error"
+	}
+	providerResp := mustCreateProvider(t, handler, sessionCookie, csrfToken, `{"name":"gemini-route-provider`+suffix+`","display_name":"Gemini Route Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, csrfToken, `{"canonical_name":"gemini-route-model`+suffix+`","display_name":"Gemini Route Model","status":"active","capabilities":[{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, csrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"gemini-route-upstream","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, csrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"gemini-route-account`+suffix+`","runtime_class":"api_key","credential":{"api_key":"gemini-route-upstream-secret"},"metadata":{"base_url":"`+upstreamURL+`/v1"},"status":"active"}`)
+	return providerResp, modelResp, accountResp
 }
 
 func mustCreateAccountGroup(t *testing.T, handler http.Handler, sessionCookie *http.Cookie, csrfToken, body string) apiopenapi.AccountGroupResponse {

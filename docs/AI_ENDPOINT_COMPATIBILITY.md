@@ -69,7 +69,14 @@ models/{model}:streamGenerateContent
 models/{model}:embedContent
 ```
 
-公开 Gemini-native 路由可在后续阶段提供，但内部转换层必须从第一阶段预留 `gemini-compatible` 协议枚举。
+WP-230 起公开 Gemini-native 文本生成路由：
+
+```txt
+POST /v1beta/models/{model}:generateContent
+POST /v1beta/models/{model}:streamGenerateContent
+```
+
+这些路由先完成客户端侧 Gemini GenerateContent 与 Canonical AI Request / Response 的转换，并复用 Gateway API Key、模型策略、Scheduler、Provider Adapter、usage 和 decision 记录。Gemini 原生上游 `generateContent` adapter 仍在后续 Provider Expansion 中实现。
 
 ### 2.4 OpenRouter 与其他聚合协议
 
@@ -279,7 +286,7 @@ stream                -> stream
 contents              -> input_items / messages
 systemInstruction     -> instructions
 generationConfig      -> temperature / top_p / max_output_tokens / stop
-safetySettings        -> provider_options
+safetySettings        -> compatibility_warnings until provider_options is persisted
 tools                 -> tools
 streamGenerateContent -> stream
 ```
@@ -306,6 +313,12 @@ SRapi 返回 OpenAI Responses 响应格式
 客户端调用 /v1/chat/completions
 上游实际调用 Gemini generateContent
 SRapi 返回 OpenAI Chat Completions 响应格式
+```
+
+```txt
+客户端调用 /v1beta/models/{model}:generateContent
+上游实际调用 /v1/chat/completions 或其他可调度 Provider Adapter
+SRapi 返回 Gemini GenerateContent 响应格式
 ```
 
 ## 8. 无损与有损转换策略
@@ -433,6 +446,7 @@ Phase 2 继续实现：
 
 ```txt
 Gemini native generateContent upstream conversion
+Gemini native models/list endpoint
 Embeddings endpoint
 Images endpoint
 Token counting endpoint

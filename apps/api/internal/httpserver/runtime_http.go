@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"net"
 	"net/http"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -3169,6 +3170,200 @@ func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
 	writeJSONAny(w, http.StatusOK, response)
 }
 
+func (s *Server) handleGeminiModelAction(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	modelRef, stream, ok := parseGeminiModelAction(r.URL.Path)
+	if !ok {
+		writeGeminiGatewayError(w, http.StatusNotFound, "NOT_FOUND", "Gemini route not found")
+		return
+	}
+	sourceEndpoint := gatewaySourceEndpoint(r.Context(), r.URL.Path)
+	forcedProviderKey := gatewayForcedProviderKey(r.Context())
+	startedAt := time.Now()
+	authed, err := s.requireGatewayKey(r)
+	if err != nil {
+		writeGeminiGatewayAuthError(w, err)
+		return
+	}
+	var body apiopenapi.GeminiGenerateContentRequest
+	if err := s.decodeJSONBody(w, r, &body); err != nil {
+		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
+			RequestID:      requestID,
+			Authed:         authed,
+			SourceProtocol: string(gatewaycontract.ProtocolGeminiCompatible),
+			SourceEndpoint: sourceEndpoint,
+			Model:          fallbackModelName(modelRef),
+			Success:        false,
+			ErrorClass:     ptrStringValue("invalid_request"),
+			LatencyMS:      elapsedMillis(startedAt),
+			UsageEstimated: true,
+		})
+		writeGeminiGatewayError(w, jsonDecodeStatus(err), "INVALID_ARGUMENT", "invalid generateContent request")
+		return
+	}
+	modelResolution, err := s.runtime.models.ResolveModelReference(r.Context(), modelRef)
+	if err != nil {
+		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
+			RequestID:      requestID,
+			Authed:         authed,
+			SourceProtocol: string(gatewaycontract.ProtocolGeminiCompatible),
+			SourceEndpoint: sourceEndpoint,
+			Model:          fallbackModelName(modelRef),
+			Success:        false,
+			ErrorClass:     ptrStringValue("model_not_found"),
+			LatencyMS:      elapsedMillis(startedAt),
+			UsageEstimated: true,
+		})
+		writeGeminiGatewayError(w, http.StatusNotFound, "NOT_FOUND", "model not found")
+		return
+	}
+	model := modelResolution.Model
+	if !apiKeyAllowsModelReference(authed.Key.AllowedModels, modelResolution) {
+		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
+			RequestID:      requestID,
+			Authed:         authed,
+			SourceProtocol: string(gatewaycontract.ProtocolGeminiCompatible),
+			SourceEndpoint: sourceEndpoint,
+			Model:          model.CanonicalName,
+			Success:        false,
+			ErrorClass:     ptrStringValue("model_not_allowed"),
+			LatencyMS:      elapsedMillis(startedAt),
+			UsageEstimated: true,
+		})
+		writeGeminiGatewayError(w, http.StatusForbidden, "PERMISSION_DENIED", "model not allowed for this api key")
+		return
+	}
+	canonical := s.runtime.gateway.NormalizeGeminiGenerateContent(body, modelRef, stream, gatewayservice.RequestMeta{
+		RequestID:      requestID,
+		SourceEndpoint: sourceEndpoint,
+		UserID:         authed.UserID,
+		APIKeyID:       authed.Key.ID,
+		CanonicalModel: model.CanonicalName,
+	})
+	admission, err := s.runtime.prepareGatewayAdmission(r.Context(), canonical, modelResolution, model.ID)
+	if err != nil {
+		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
+			RequestID:             canonical.RequestID,
+			Authed:                authed,
+			SourceProtocol:        string(canonical.SourceProtocol),
+			SourceEndpoint:        canonical.SourceEndpoint,
+			Model:                 canonical.CanonicalModel,
+			Success:               false,
+			ErrorClass:            ptrStringValue("entitlement_check_failed"),
+			LatencyMS:             elapsedMillis(startedAt),
+			UsageEstimated:        true,
+			Pricing:               admission.Pricing,
+			CompatibilityWarnings: canonical.CompatibilityWarnings,
+		})
+		writeGeminiGatewayError(w, http.StatusInternalServerError, "INTERNAL", "failed to check gateway entitlement")
+		return
+	}
+	if !admission.Entitlement.Allowed {
+		errorClass := gatewayEntitlementErrorClass(admission.Entitlement)
+		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
+			RequestID:             canonical.RequestID,
+			Authed:                authed,
+			SourceProtocol:        string(canonical.SourceProtocol),
+			SourceEndpoint:        canonical.SourceEndpoint,
+			Model:                 canonical.CanonicalModel,
+			Success:               false,
+			ErrorClass:            ptrStringValue(errorClass),
+			LatencyMS:             elapsedMillis(startedAt),
+			InputTokens:           admission.EstimatedUsage.InputTokens,
+			OutputTokens:          admission.EstimatedUsage.OutputTokens,
+			CachedTokens:          admission.EstimatedUsage.CachedTokens,
+			UsageEstimated:        true,
+			Pricing:               admission.Pricing,
+			CompatibilityWarnings: canonical.CompatibilityWarnings,
+		})
+		writeGeminiGatewayError(w, gatewayEntitlementHTTPStatus(errorClass), geminiStatusForGatewayErrorClass(errorClass, gatewayEntitlementHTTPStatus(errorClass)), gatewayEntitlementMessage(errorClass))
+		return
+	}
+	scheduleReq := gatewayScheduleRequest(r, canonical, modelResolution)
+	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
+	result, err := s.runtime.scheduleGatewayRequest(r.Context(), scheduleReq, model.ID, forcedProviderKey, authed.Key)
+	if err != nil {
+		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
+			RequestID:             canonical.RequestID,
+			Authed:                authed,
+			DecisionID:            result.Decision.ID,
+			AttemptNo:             result.Decision.AttemptNo,
+			SourceProtocol:        string(canonical.SourceProtocol),
+			SourceEndpoint:        canonical.SourceEndpoint,
+			Model:                 canonical.CanonicalModel,
+			Success:               false,
+			ErrorClass:            ptrStringValue("no_available_account"),
+			LatencyMS:             elapsedMillis(startedAt),
+			InputTokens:           admission.EstimatedUsage.InputTokens,
+			OutputTokens:          admission.EstimatedUsage.OutputTokens,
+			CachedTokens:          admission.EstimatedUsage.CachedTokens,
+			UsageEstimated:        true,
+			Pricing:               admission.Pricing,
+			CompatibilityWarnings: canonical.CompatibilityWarnings,
+		})
+		writeGeminiGatewayError(w, http.StatusServiceUnavailable, "UNAVAILABLE", "no available account")
+		return
+	}
+	providerResp, err := s.runtime.invokeProviderText(r.Context(), providerTextRequest(canonical, result.Candidate))
+	if err != nil {
+		errorClass, upstreamStatus, _ := providerGatewayError(err)
+		status := providerGatewayHTTPStatus(upstreamStatus)
+		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
+			RequestID:             canonical.RequestID,
+			Authed:                authed,
+			DecisionID:            result.Decision.ID,
+			AttemptNo:             result.Decision.AttemptNo,
+			ProviderID:            ptrInt(result.Candidate.Provider.ID),
+			AccountID:             ptrInt(result.Candidate.Account.ID),
+			SourceProtocol:        string(canonical.SourceProtocol),
+			SourceEndpoint:        canonical.SourceEndpoint,
+			TargetProtocol:        result.Candidate.Provider.Protocol,
+			Model:                 canonical.CanonicalModel,
+			Success:               false,
+			ErrorClass:            ptrStringValue(errorClass),
+			StatusCode:            ptrInt(upstreamStatus),
+			LatencyMS:             elapsedMillis(startedAt),
+			InputTokens:           admission.EstimatedUsage.InputTokens,
+			OutputTokens:          admission.EstimatedUsage.OutputTokens,
+			CachedTokens:          admission.EstimatedUsage.CachedTokens,
+			UsageEstimated:        true,
+			Pricing:               admission.Pricing,
+			CompatibilityWarnings: canonical.CompatibilityWarnings,
+		})
+		writeGeminiGatewayError(w, status, geminiStatusForGatewayErrorClass(errorClass, status), providerGatewayMessage(errorClass))
+		return
+	}
+	usage := gatewayUsageFromProvider(providerResp)
+	canonicalResp := s.runtime.gateway.BuildCanonicalTextResponse(canonical, providerResp.Text, usage)
+	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequest(model.ID, result.Candidate, canonicalResp.Usage), canonicalResp.Usage.Estimated)
+	s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
+		RequestID:             canonical.RequestID,
+		Authed:                authed,
+		DecisionID:            result.Decision.ID,
+		AttemptNo:             result.Decision.AttemptNo,
+		ProviderID:            ptrInt(result.Candidate.Provider.ID),
+		AccountID:             ptrInt(result.Candidate.Account.ID),
+		SourceProtocol:        string(canonical.SourceProtocol),
+		SourceEndpoint:        canonical.SourceEndpoint,
+		TargetProtocol:        result.Candidate.Provider.Protocol,
+		Model:                 canonical.CanonicalModel,
+		Success:               true,
+		StatusCode:            ptrInt(http.StatusOK),
+		LatencyMS:             elapsedMillis(startedAt),
+		InputTokens:           canonicalResp.Usage.InputTokens,
+		OutputTokens:          canonicalResp.Usage.OutputTokens,
+		CachedTokens:          canonicalResp.Usage.CachedTokens,
+		UsageEstimated:        canonicalResp.Usage.Estimated,
+		Pricing:               pricing,
+		CompatibilityWarnings: canonicalResp.CompatibilityWarnings,
+	})
+	if canonical.Stream {
+		writeSSEEvents(w, s.runtime.gateway.RenderGeminiGenerateContentStreamEvents(canonicalResp))
+		return
+	}
+	writeJSONAny(w, http.StatusOK, s.runtime.gateway.RenderGeminiGenerateContent(canonicalResp))
+}
+
 func (s *Server) handleNotImplemented(w http.ResponseWriter, r *http.Request) {
 	writeGatewayError(w, http.StatusNotImplemented, apiopenapi.InternalError, "endpoint not implemented yet", "not_implemented")
 }
@@ -3366,6 +3561,8 @@ func pendingLeaseCount(leases []schedulercontract.Lease) int {
 
 func endpointFamily(endpoint string) string {
 	switch {
+	case strings.Contains(endpoint, ":generateContent") || strings.Contains(endpoint, ":streamGenerateContent"):
+		return "gemini_generate_content"
 	case strings.Contains(endpoint, "/responses"):
 		return "responses"
 	case strings.Contains(endpoint, "/messages"):
@@ -4102,6 +4299,38 @@ func gatewayForcedProviderKey(ctx context.Context) string {
 		return strings.TrimSpace(route.ForcedProviderKey)
 	}
 	return ""
+}
+
+func parseGeminiModelAction(path string) (string, bool, bool) {
+	raw := strings.TrimPrefix(path, "/v1beta/models/")
+	if raw == path || strings.TrimSpace(raw) == "" {
+		return "", false, false
+	}
+	action := ""
+	stream := false
+	switch {
+	case strings.HasSuffix(raw, ":streamGenerateContent"):
+		action = ":streamGenerateContent"
+		stream = true
+	case strings.HasSuffix(raw, ":generateContent"):
+		action = ":generateContent"
+	default:
+		return "", false, false
+	}
+	model := strings.TrimSuffix(raw, action)
+	model = strings.Trim(model, "/")
+	if model == "" {
+		return "", false, false
+	}
+	if decoded, err := url.PathUnescape(model); err == nil {
+		model = decoded
+	}
+	model = strings.TrimPrefix(model, "models/")
+	model = strings.TrimSpace(model)
+	if model == "" {
+		return "", false, false
+	}
+	return model, stream, true
 }
 
 func effectiveCapabilities(model modelcontract.Model, mapping modelcontract.ModelProviderMapping, provider providercontract.Provider, account accountcontract.ProviderAccount) []capabilitiescontract.Descriptor {
@@ -5283,6 +5512,66 @@ func writeGatewayAuthError(w http.ResponseWriter, err error, requestID string) {
 		writeGatewayError(w, http.StatusInternalServerError, apiopenapi.InternalError, "failed to authenticate API key", "internal_error")
 	}
 	_ = requestID
+}
+
+func writeGeminiGatewayError(w http.ResponseWriter, status int, rpcStatus, message string) {
+	writeJSONAny(w, status, apiopenapi.GeminiErrorResponse{
+		Error: apiopenapi.GeminiErrorObject{
+			Code:    status,
+			Message: message,
+			Status:  strings.TrimSpace(rpcStatus),
+		},
+	})
+}
+
+func writeGeminiGatewayAuthError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, apikeyservice.ErrInvalidKey), errors.Is(err, apikeyservice.ErrInvalidInput):
+		writeGeminiGatewayError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "invalid API key")
+	case errors.Is(err, apikeyservice.ErrKeyDisabled), errors.Is(err, apikeyservice.ErrKeyExpired):
+		writeGeminiGatewayError(w, http.StatusForbidden, "PERMISSION_DENIED", "API key disabled or expired")
+	default:
+		writeGeminiGatewayError(w, http.StatusInternalServerError, "INTERNAL", "failed to authenticate API key")
+	}
+}
+
+func geminiStatusForGatewayErrorClass(errorClass string, status int) string {
+	switch errorClass {
+	case "invalid_request":
+		return "INVALID_ARGUMENT"
+	case "rate_limit", "monthly_token_quota_exceeded", "monthly_cost_quota_exceeded":
+		return "RESOURCE_EXHAUSTED"
+	case "auth_failed", "auth_error", "permission_denied", "credential_error", "entitlement_model_not_allowed", "entitlement_denied":
+		return "PERMISSION_DENIED"
+	case "model_not_found":
+		return "NOT_FOUND"
+	case "no_available_account", "model_unavailable", "provider_5xx", "timeout", "network_error", "stream_interrupted":
+		return "UNAVAILABLE"
+	default:
+		return geminiStatusForHTTPStatus(status)
+	}
+}
+
+func geminiStatusForHTTPStatus(status int) string {
+	switch status {
+	case http.StatusBadRequest, http.StatusUnprocessableEntity:
+		return "INVALID_ARGUMENT"
+	case http.StatusUnauthorized:
+		return "UNAUTHENTICATED"
+	case http.StatusForbidden:
+		return "PERMISSION_DENIED"
+	case http.StatusNotFound:
+		return "NOT_FOUND"
+	case http.StatusTooManyRequests:
+		return "RESOURCE_EXHAUSTED"
+	case http.StatusServiceUnavailable, http.StatusBadGateway, http.StatusGatewayTimeout:
+		return "UNAVAILABLE"
+	default:
+		if status >= 500 {
+			return "INTERNAL"
+		}
+		return "UNKNOWN"
+	}
 }
 
 func writePaymentServiceError(w http.ResponseWriter, err error, requestID string) {

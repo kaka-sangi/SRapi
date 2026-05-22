@@ -5,14 +5,17 @@ type Protocol string
 const (
 	ProtocolOpenAICompatible    Protocol = "openai-compatible"
 	ProtocolAnthropicCompatible Protocol = "anthropic-compatible"
+	ProtocolGeminiCompatible    Protocol = "gemini-compatible"
 )
 
 type SourceEndpoint string
 
 const (
-	EndpointChatCompletions SourceEndpoint = "/v1/chat/completions"
-	EndpointResponses       SourceEndpoint = "/v1/responses"
-	EndpointMessages        SourceEndpoint = "/v1/messages"
+	EndpointChatCompletions       SourceEndpoint = "/v1/chat/completions"
+	EndpointResponses             SourceEndpoint = "/v1/responses"
+	EndpointMessages              SourceEndpoint = "/v1/messages"
+	EndpointGeminiGenerateContent SourceEndpoint = "/v1beta/models/{model}:generateContent"
+	EndpointGeminiStreamContent   SourceEndpoint = "/v1beta/models/{model}:streamGenerateContent"
 )
 
 type ContentBlockType string

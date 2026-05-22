@@ -2401,6 +2401,87 @@ paths:
         default:
           $ref: "#/components/responses/GatewayError"
 
+  /v1beta/models/{model}:generateContent:
+    post:
+      tags:
+        - Gateway
+      operationId: generateGeminiContent
+      summary: Generate content with the Gemini-compatible gateway route.
+      description: Gemini-compatible route. SRapi normalizes the request into the Canonical AI Request, schedules an eligible provider account, invokes the selected provider adapter, and renders a Gemini-shaped response.
+      security:
+        - gatewayBearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GeminiModel"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GeminiGenerateContentRequest"
+      responses:
+        "200":
+          description: Gemini-compatible generateContent response.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeminiGenerateContentResponse"
+        "400":
+          $ref: "#/components/responses/GeminiGatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GeminiGatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GeminiGatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GeminiGatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GeminiGatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GeminiGatewayError"
+
+  /v1beta/models/{model}:streamGenerateContent:
+    post:
+      tags:
+        - Gateway
+      operationId: streamGeminiContent
+      summary: Stream content with the Gemini-compatible gateway route.
+      description: Gemini-compatible streaming route. SRapi normalizes the request into the Canonical AI Request, schedules an eligible provider account, invokes the selected provider adapter, and emits Gemini-shaped SSE chunks.
+      security:
+        - gatewayBearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GeminiModel"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GeminiGenerateContentRequest"
+      responses:
+        "200":
+          description: Gemini-compatible SSE stream.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: SSE stream of Gemini-compatible GenerateContentResponse chunks.
+        "400":
+          $ref: "#/components/responses/GeminiGatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GeminiGatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GeminiGatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GeminiGatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GeminiGatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GeminiGatewayError"
+
   /api/provider/openai-compatible/v1/chat/completions:
     post:
       tags:
@@ -2616,6 +2697,14 @@ components:
       schema:
         type: string
         maxLength: 200
+    GeminiModel:
+      name: model
+      in: path
+      required: true
+      description: Gemini model id from the path. SRapi runtime accepts slash-qualified ids when the HTTP router passes them through.
+      schema:
+        type: string
+        minLength: 1
 
   responses:
     StandardError:
@@ -2735,6 +2824,60 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/GatewayErrorResponse"
+    GeminiGatewayError:
+      description: Google-style Gemini gateway error.
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestIdHeader"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/GeminiErrorResponse"
+    GeminiGatewayBadRequest:
+      description: Invalid Gemini gateway request.
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestIdHeader"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/GeminiErrorResponse"
+    GeminiGatewayUnauthorized:
+      description: Missing or invalid gateway API key.
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestIdHeader"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/GeminiErrorResponse"
+    GeminiGatewayForbidden:
+      description: Gateway API key or user policy forbids this operation.
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestIdHeader"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/GeminiErrorResponse"
+    GeminiGatewayValidationError:
+      description: Request cannot be converted without semantic loss.
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestIdHeader"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/GeminiErrorResponse"
+    GeminiGatewayUnavailable:
+      description: No schedulable account is available.
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestIdHeader"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/GeminiErrorResponse"
 
   schemas:
     Id:
@@ -2868,6 +3011,35 @@ components:
       properties:
         error:
           $ref: "#/components/schemas/GatewayErrorObject"
+
+    GeminiErrorObject:
+      type: object
+      required:
+        - code
+        - message
+        - status
+      properties:
+        code:
+          type: integer
+          minimum: 100
+          maximum: 599
+        message:
+          type: string
+        status:
+          type: string
+          example: UNAVAILABLE
+        details:
+          type: array
+          items:
+            $ref: "#/components/schemas/JsonObject"
+
+    GeminiErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          $ref: "#/components/schemas/GeminiErrorObject"
 
     HealthDependencyStatus:
       type: string
@@ -5851,6 +6023,158 @@ components:
         usage:
           $ref: "#/components/schemas/AnthropicUsage"
         compatibility_warnings:
+          type: array
+          items:
+            type: string
+
+    GeminiPart:
+      type: object
+      properties:
+        text:
+          type: string
+        inline_data:
+          $ref: "#/components/schemas/JsonObject"
+        file_data:
+          $ref: "#/components/schemas/JsonObject"
+        function_call:
+          $ref: "#/components/schemas/JsonObject"
+        function_response:
+          $ref: "#/components/schemas/JsonObject"
+      additionalProperties: true
+
+    GeminiContent:
+      type: object
+      required:
+        - parts
+      properties:
+        role:
+          type: string
+          enum:
+            - user
+            - model
+        parts:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/GeminiPart"
+      additionalProperties: true
+
+    GeminiGenerationConfig:
+      type: object
+      properties:
+        temperature:
+          type: number
+          minimum: 0
+          maximum: 2
+        topP:
+          type: number
+          minimum: 0
+          maximum: 1
+        topK:
+          type: integer
+          minimum: 1
+        maxOutputTokens:
+          type: integer
+          minimum: 1
+        stopSequences:
+          type: array
+          items:
+            type: string
+        responseMimeType:
+          type: string
+        responseSchema:
+          $ref: "#/components/schemas/JsonObject"
+      additionalProperties: true
+
+    GeminiGenerateContentRequest:
+      type: object
+      required:
+        - contents
+      properties:
+        contents:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/GeminiContent"
+        systemInstruction:
+          $ref: "#/components/schemas/GeminiContent"
+        generationConfig:
+          $ref: "#/components/schemas/GeminiGenerationConfig"
+        safetySettings:
+          type: array
+          items:
+            $ref: "#/components/schemas/JsonObject"
+        tools:
+          type: array
+          items:
+            $ref: "#/components/schemas/JsonObject"
+        toolConfig:
+          $ref: "#/components/schemas/JsonObject"
+      additionalProperties: true
+
+    GeminiSafetyRating:
+      type: object
+      properties:
+        category:
+          type: string
+        probability:
+          type: string
+        blocked:
+          type: boolean
+      additionalProperties: true
+
+    GeminiCandidate:
+      type: object
+      required:
+        - content
+        - finishReason
+        - index
+      properties:
+        content:
+          $ref: "#/components/schemas/GeminiContent"
+        finishReason:
+          type: string
+        index:
+          type: integer
+          minimum: 0
+        safetyRatings:
+          type: array
+          items:
+            $ref: "#/components/schemas/GeminiSafetyRating"
+      additionalProperties: true
+
+    GeminiUsageMetadata:
+      type: object
+      properties:
+        promptTokenCount:
+          type: integer
+          minimum: 0
+        candidatesTokenCount:
+          type: integer
+          minimum: 0
+        totalTokenCount:
+          type: integer
+          minimum: 0
+        cachedContentTokenCount:
+          type: integer
+          minimum: 0
+
+    GeminiGenerateContentResponse:
+      type: object
+      required:
+        - candidates
+      properties:
+        candidates:
+          type: array
+          items:
+            $ref: "#/components/schemas/GeminiCandidate"
+        usageMetadata:
+          $ref: "#/components/schemas/GeminiUsageMetadata"
+        modelVersion:
+          type: string
+        responseId:
+          type: string
+        compatibilityWarnings:
           type: array
           items:
             type: string

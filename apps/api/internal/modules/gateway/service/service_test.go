@@ -84,6 +84,59 @@ func TestNormalizeResponsesPreservesInstructionsAndWarnings(t *testing.T) {
 	}
 }
 
+func TestNormalizeGeminiGenerateContentProducesCanonicalRequest(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	systemRole := apiopenapi.GeminiContentRoleUser
+	userRole := apiopenapi.GeminiContentRoleUser
+	modelRole := apiopenapi.GeminiContentRoleModel
+	systemText := "be brief"
+	userText := "hello gemini"
+	modelText := "previous answer"
+	inlineData := apiopenapi.JsonObject{"mime_type": "image/png", "data": "abc"}
+	req := apiopenapi.GeminiGenerateContentRequest{
+		SystemInstruction: &apiopenapi.GeminiContent{Role: &systemRole, Parts: []apiopenapi.GeminiPart{{Text: &systemText}}},
+		Contents: []apiopenapi.GeminiContent{
+			{Role: &userRole, Parts: []apiopenapi.GeminiPart{{Text: &userText}, {InlineData: &inlineData}}},
+			{Role: &modelRole, Parts: []apiopenapi.GeminiPart{{Text: &modelText}}},
+		},
+		GenerationConfig: &apiopenapi.GeminiGenerationConfig{
+			MaxOutputTokens:  ptrInt(32),
+			ResponseMimeType: ptrString("application/json"),
+			TopK:             ptrInt(40),
+		},
+		SafetySettings: &[]apiopenapi.JsonObject{{"category": "HARM_CATEGORY_DANGEROUS_CONTENT"}},
+	}
+
+	canonical := svc.NormalizeGeminiGenerateContent(req, "gemini-test", true, RequestMeta{
+		RequestID:      "req_gemini",
+		SourceEndpoint: "/v1beta/models/gemini-test:streamGenerateContent",
+		UserID:         7,
+		APIKeyID:       11,
+		CanonicalModel: "gemini-test",
+	})
+
+	if canonical.SourceProtocol != gatewaycontract.ProtocolGeminiCompatible || canonical.ResponseProtocol != gatewaycontract.ProtocolGeminiCompatible || !canonical.Stream {
+		t.Fatalf("unexpected protocol mapping: %+v", canonical)
+	}
+	if canonical.Instructions != "be brief" || canonical.Prompt != "system: be brief\nuser: hello gemini\n[image]\nassistant: previous answer" {
+		t.Fatalf("unexpected prompt or instructions: prompt=%q instructions=%q", canonical.Prompt, canonical.Instructions)
+	}
+	if canonical.MaxOutputTokens == nil || *canonical.MaxOutputTokens != 32 || canonical.ResponseFormat["type"] != "application/json" {
+		t.Fatalf("expected generation config fields, got %+v", canonical)
+	}
+	for _, warning := range []string{"vision_ignored", "safety_settings_ignored", "top_k_ignored"} {
+		if !stringSliceContains(canonical.CompatibilityWarnings, warning) {
+			t.Fatalf("expected warning %s, got %+v", warning, canonical.CompatibilityWarnings)
+		}
+	}
+	if !requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyStreaming) || !requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyVisionInput) || !requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyStructuredOutput) {
+		t.Fatalf("expected request capabilities, got %+v", canonical.RequestCapabilities)
+	}
+}
+
 func TestRenderProtocolResponses(t *testing.T) {
 	svc, err := New()
 	if err != nil {
@@ -102,6 +155,13 @@ func TestRenderProtocolResponses(t *testing.T) {
 	anthropic := svc.RenderAnthropicMessages(resp)
 	if anthropic.CompatibilityWarnings == nil || len(*anthropic.CompatibilityWarnings) != 1 {
 		t.Fatalf("expected anthropic warnings, got %+v", anthropic.CompatibilityWarnings)
+	}
+	gemini := svc.RenderGeminiGenerateContent(resp)
+	if gemini.CompatibilityWarnings == nil || len(*gemini.CompatibilityWarnings) != 1 || len(gemini.Candidates) != 1 || gemini.Candidates[0].Content.Parts[0].Text == nil {
+		t.Fatalf("expected gemini content and warnings, got %+v", gemini)
+	}
+	if gemini.UsageMetadata == nil || gemini.UsageMetadata.TotalTokenCount == nil || *gemini.UsageMetadata.TotalTokenCount == 0 {
+		t.Fatalf("expected gemini usage metadata, got %+v", gemini.UsageMetadata)
 	}
 }
 

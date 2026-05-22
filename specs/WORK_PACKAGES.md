@@ -707,11 +707,50 @@ Required gates:
 - `cd apps/api && go test ./internal/modules/provider_adapters/... ./internal/httpserver`
 - `make architecture-check`
 
-## WP-230+: Advanced Endpoint And Provider Expansion
+## WP-230: Gemini Native Gateway Route Foundation
+
+Objective: add the first Gemini-native Gateway route family while preserving the existing Canonical AI Request, Scheduler, Provider Adapter, usage, and decision loop.
+
+Read first:
+
+- `docs/OPENAPI_CONTRACT.md`
+- `docs/GATEWAY_ROUTE_MATRIX.md`
+- `docs/AI_ENDPOINT_COMPATIBILITY.md`
+- `docs/PROVIDER_ADAPTER_SPEC.md`
+- `docs/CAPABILITY_TAXONOMY_SPEC.md`
+
+Owns:
+
+- Gemini native OpenAPI request/response schemas and generated SDK/server types
+- `/v1beta/models/{model}:generateContent` and `/v1beta/models/{model}:streamGenerateContent` Gateway routes
+- Gemini request normalization to Canonical AI Request
+- Gemini response and SSE rendering from Canonical AI Response
+- Gateway regressions proving auth, model policy, Scheduler decision, usage, and request ID evidence
+- docs/status updates for the Gemini route foundation
+
+Definition of Done:
+
+- Gemini GenerateContent requests convert `contents`, `systemInstruction`, and `generationConfig` into Canonical AI Request fields.
+- The route uses Gateway API Key auth, model visibility, entitlement admission, Scheduler, Provider Adapter invocation, usage logs, and scheduler decision/feedback evidence.
+- Responses render Google/Gemini-shaped JSON and stream events for Gemini clients.
+- Provider errors render Google-style gateway errors for Gemini native callers.
+- The implementation does not add frontend visuals.
+- OpenAPI Go and TypeScript generated artifacts are in sync.
+
+Required gates:
+
+- `make openapi-lint`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/modules/gateway/... ./internal/httpserver`
+- `make architecture-check`
+
+## WP-240+: Advanced Endpoint And Provider Expansion
 
 Use `ROADMAP.md` Phase 5 through Phase 8 to split future packages for:
 
-- Gemini native routes
+- Gemini native upstream adapter
 - images and media runtime
 - embeddings and rerank
 - realtime/websocket

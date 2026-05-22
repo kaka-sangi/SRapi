@@ -434,6 +434,24 @@ func (e GatewayErrorObjectType) Valid() bool {
 	}
 }
 
+// Defines values for GeminiContentRole.
+const (
+	GeminiContentRoleModel GeminiContentRole = "model"
+	GeminiContentRoleUser  GeminiContentRole = "user"
+)
+
+// Valid indicates whether the value is a known member of the GeminiContentRole enum.
+func (e GeminiContentRole) Valid() bool {
+	switch e {
+	case GeminiContentRoleModel:
+		return true
+	case GeminiContentRoleUser:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for HealthDataStatus.
 const (
 	HealthDataStatusDegraded HealthDataStatus = "degraded"
@@ -1552,6 +1570,96 @@ type GatewayErrorResponse struct {
 	Error GatewayErrorObject `json:"error"`
 }
 
+// GeminiCandidate defines model for GeminiCandidate.
+type GeminiCandidate struct {
+	Content              GeminiContent          `json:"content"`
+	FinishReason         string                 `json:"finishReason"`
+	Index                int                    `json:"index"`
+	SafetyRatings        *[]GeminiSafetyRating  `json:"safetyRatings,omitempty"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// GeminiContent defines model for GeminiContent.
+type GeminiContent struct {
+	Parts                []GeminiPart           `json:"parts"`
+	Role                 *GeminiContentRole     `json:"role,omitempty"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// GeminiContentRole defines model for GeminiContent.Role.
+type GeminiContentRole string
+
+// GeminiErrorObject defines model for GeminiErrorObject.
+type GeminiErrorObject struct {
+	Code    int           `json:"code"`
+	Details *[]JsonObject `json:"details,omitempty"`
+	Message string        `json:"message"`
+	Status  string        `json:"status"`
+}
+
+// GeminiErrorResponse defines model for GeminiErrorResponse.
+type GeminiErrorResponse struct {
+	Error GeminiErrorObject `json:"error"`
+}
+
+// GeminiGenerateContentRequest defines model for GeminiGenerateContentRequest.
+type GeminiGenerateContentRequest struct {
+	Contents             []GeminiContent         `json:"contents"`
+	GenerationConfig     *GeminiGenerationConfig `json:"generationConfig,omitempty"`
+	SafetySettings       *[]JsonObject           `json:"safetySettings,omitempty"`
+	SystemInstruction    *GeminiContent          `json:"systemInstruction,omitempty"`
+	ToolConfig           *JsonObject             `json:"toolConfig,omitempty"`
+	Tools                *[]JsonObject           `json:"tools,omitempty"`
+	AdditionalProperties map[string]interface{}  `json:"-"`
+}
+
+// GeminiGenerateContentResponse defines model for GeminiGenerateContentResponse.
+type GeminiGenerateContentResponse struct {
+	Candidates            []GeminiCandidate    `json:"candidates"`
+	CompatibilityWarnings *[]string            `json:"compatibilityWarnings,omitempty"`
+	ModelVersion          *string              `json:"modelVersion,omitempty"`
+	ResponseId            *string              `json:"responseId,omitempty"`
+	UsageMetadata         *GeminiUsageMetadata `json:"usageMetadata,omitempty"`
+}
+
+// GeminiGenerationConfig defines model for GeminiGenerationConfig.
+type GeminiGenerationConfig struct {
+	MaxOutputTokens      *int                   `json:"maxOutputTokens,omitempty"`
+	ResponseMimeType     *string                `json:"responseMimeType,omitempty"`
+	ResponseSchema       *JsonObject            `json:"responseSchema,omitempty"`
+	StopSequences        *[]string              `json:"stopSequences,omitempty"`
+	Temperature          *float32               `json:"temperature,omitempty"`
+	TopK                 *int                   `json:"topK,omitempty"`
+	TopP                 *float32               `json:"topP,omitempty"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// GeminiPart defines model for GeminiPart.
+type GeminiPart struct {
+	FileData             *JsonObject            `json:"file_data,omitempty"`
+	FunctionCall         *JsonObject            `json:"function_call,omitempty"`
+	FunctionResponse     *JsonObject            `json:"function_response,omitempty"`
+	InlineData           *JsonObject            `json:"inline_data,omitempty"`
+	Text                 *string                `json:"text,omitempty"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// GeminiSafetyRating defines model for GeminiSafetyRating.
+type GeminiSafetyRating struct {
+	Blocked              *bool                  `json:"blocked,omitempty"`
+	Category             *string                `json:"category,omitempty"`
+	Probability          *string                `json:"probability,omitempty"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// GeminiUsageMetadata defines model for GeminiUsageMetadata.
+type GeminiUsageMetadata struct {
+	CachedContentTokenCount *int `json:"cachedContentTokenCount,omitempty"`
+	CandidatesTokenCount    *int `json:"candidatesTokenCount,omitempty"`
+	PromptTokenCount        *int `json:"promptTokenCount,omitempty"`
+	TotalTokenCount         *int `json:"totalTokenCount,omitempty"`
+}
+
 // HealthData defines model for HealthData.
 type HealthData struct {
 	Dependencies struct {
@@ -2286,6 +2394,9 @@ type UserSubscriptionResponse struct {
 // UserSubscriptionStatus defines model for UserSubscriptionStatus.
 type UserSubscriptionStatus string
 
+// GeminiModel defines model for GeminiModel.
+type GeminiModel = string
+
 // Page defines model for Page.
 type Page = int
 
@@ -2321,6 +2432,24 @@ type GatewayUnavailable = GatewayErrorResponse
 
 // GatewayValidationError defines model for GatewayValidationError.
 type GatewayValidationError = GatewayErrorResponse
+
+// GeminiGatewayBadRequest defines model for GeminiGatewayBadRequest.
+type GeminiGatewayBadRequest = GeminiErrorResponse
+
+// GeminiGatewayError defines model for GeminiGatewayError.
+type GeminiGatewayError = GeminiErrorResponse
+
+// GeminiGatewayForbidden defines model for GeminiGatewayForbidden.
+type GeminiGatewayForbidden = GeminiErrorResponse
+
+// GeminiGatewayUnauthorized defines model for GeminiGatewayUnauthorized.
+type GeminiGatewayUnauthorized = GeminiErrorResponse
+
+// GeminiGatewayUnavailable defines model for GeminiGatewayUnavailable.
+type GeminiGatewayUnavailable = GeminiErrorResponse
+
+// GeminiGatewayValidationError defines model for GeminiGatewayValidationError.
+type GeminiGatewayValidationError = GeminiErrorResponse
 
 // NotFound defines model for NotFound.
 type NotFound = ErrorResponse
@@ -2567,6 +2696,12 @@ type CreateMessageJSONRequestBody = AnthropicMessagesRequest
 
 // CreateResponseJSONRequestBody defines body for CreateResponse for application/json ContentType.
 type CreateResponseJSONRequestBody = ResponsesRequest
+
+// GenerateGeminiContentJSONRequestBody defines body for GenerateGeminiContent for application/json ContentType.
+type GenerateGeminiContentJSONRequestBody = GeminiGenerateContentRequest
+
+// StreamGeminiContentJSONRequestBody defines body for StreamGeminiContent for application/json ContentType.
+type StreamGeminiContentJSONRequestBody = GeminiGenerateContentRequest
 
 // Getter for additional properties for AnthropicContentBlock. Returns the specified
 // element and whether it was found
@@ -3134,6 +3269,723 @@ func (a ContentBlock) MarshalJSON() ([]byte, error) {
 	object["type"], err = json.Marshal(a.Type)
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling 'type': %w", err)
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for GeminiCandidate. Returns the specified
+// element and whether it was found
+func (a GeminiCandidate) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for GeminiCandidate
+func (a *GeminiCandidate) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for GeminiCandidate to handle AdditionalProperties
+func (a *GeminiCandidate) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["content"]; found {
+		err = json.Unmarshal(raw, &a.Content)
+		if err != nil {
+			return fmt.Errorf("error reading 'content': %w", err)
+		}
+		delete(object, "content")
+	}
+
+	if raw, found := object["finishReason"]; found {
+		err = json.Unmarshal(raw, &a.FinishReason)
+		if err != nil {
+			return fmt.Errorf("error reading 'finishReason': %w", err)
+		}
+		delete(object, "finishReason")
+	}
+
+	if raw, found := object["index"]; found {
+		err = json.Unmarshal(raw, &a.Index)
+		if err != nil {
+			return fmt.Errorf("error reading 'index': %w", err)
+		}
+		delete(object, "index")
+	}
+
+	if raw, found := object["safetyRatings"]; found {
+		err = json.Unmarshal(raw, &a.SafetyRatings)
+		if err != nil {
+			return fmt.Errorf("error reading 'safetyRatings': %w", err)
+		}
+		delete(object, "safetyRatings")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for GeminiCandidate to handle AdditionalProperties
+func (a GeminiCandidate) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	object["content"], err = json.Marshal(a.Content)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'content': %w", err)
+	}
+
+	object["finishReason"], err = json.Marshal(a.FinishReason)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'finishReason': %w", err)
+	}
+
+	object["index"], err = json.Marshal(a.Index)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'index': %w", err)
+	}
+
+	if a.SafetyRatings != nil {
+		object["safetyRatings"], err = json.Marshal(a.SafetyRatings)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'safetyRatings': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for GeminiContent. Returns the specified
+// element and whether it was found
+func (a GeminiContent) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for GeminiContent
+func (a *GeminiContent) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for GeminiContent to handle AdditionalProperties
+func (a *GeminiContent) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["parts"]; found {
+		err = json.Unmarshal(raw, &a.Parts)
+		if err != nil {
+			return fmt.Errorf("error reading 'parts': %w", err)
+		}
+		delete(object, "parts")
+	}
+
+	if raw, found := object["role"]; found {
+		err = json.Unmarshal(raw, &a.Role)
+		if err != nil {
+			return fmt.Errorf("error reading 'role': %w", err)
+		}
+		delete(object, "role")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for GeminiContent to handle AdditionalProperties
+func (a GeminiContent) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.Parts != nil {
+		object["parts"], err = json.Marshal(a.Parts)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'parts': %w", err)
+		}
+	}
+
+	if a.Role != nil {
+		object["role"], err = json.Marshal(a.Role)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'role': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for GeminiGenerateContentRequest. Returns the specified
+// element and whether it was found
+func (a GeminiGenerateContentRequest) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for GeminiGenerateContentRequest
+func (a *GeminiGenerateContentRequest) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for GeminiGenerateContentRequest to handle AdditionalProperties
+func (a *GeminiGenerateContentRequest) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["contents"]; found {
+		err = json.Unmarshal(raw, &a.Contents)
+		if err != nil {
+			return fmt.Errorf("error reading 'contents': %w", err)
+		}
+		delete(object, "contents")
+	}
+
+	if raw, found := object["generationConfig"]; found {
+		err = json.Unmarshal(raw, &a.GenerationConfig)
+		if err != nil {
+			return fmt.Errorf("error reading 'generationConfig': %w", err)
+		}
+		delete(object, "generationConfig")
+	}
+
+	if raw, found := object["safetySettings"]; found {
+		err = json.Unmarshal(raw, &a.SafetySettings)
+		if err != nil {
+			return fmt.Errorf("error reading 'safetySettings': %w", err)
+		}
+		delete(object, "safetySettings")
+	}
+
+	if raw, found := object["systemInstruction"]; found {
+		err = json.Unmarshal(raw, &a.SystemInstruction)
+		if err != nil {
+			return fmt.Errorf("error reading 'systemInstruction': %w", err)
+		}
+		delete(object, "systemInstruction")
+	}
+
+	if raw, found := object["toolConfig"]; found {
+		err = json.Unmarshal(raw, &a.ToolConfig)
+		if err != nil {
+			return fmt.Errorf("error reading 'toolConfig': %w", err)
+		}
+		delete(object, "toolConfig")
+	}
+
+	if raw, found := object["tools"]; found {
+		err = json.Unmarshal(raw, &a.Tools)
+		if err != nil {
+			return fmt.Errorf("error reading 'tools': %w", err)
+		}
+		delete(object, "tools")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for GeminiGenerateContentRequest to handle AdditionalProperties
+func (a GeminiGenerateContentRequest) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.Contents != nil {
+		object["contents"], err = json.Marshal(a.Contents)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'contents': %w", err)
+		}
+	}
+
+	if a.GenerationConfig != nil {
+		object["generationConfig"], err = json.Marshal(a.GenerationConfig)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'generationConfig': %w", err)
+		}
+	}
+
+	if a.SafetySettings != nil {
+		object["safetySettings"], err = json.Marshal(a.SafetySettings)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'safetySettings': %w", err)
+		}
+	}
+
+	if a.SystemInstruction != nil {
+		object["systemInstruction"], err = json.Marshal(a.SystemInstruction)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'systemInstruction': %w", err)
+		}
+	}
+
+	if a.ToolConfig != nil {
+		object["toolConfig"], err = json.Marshal(a.ToolConfig)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'toolConfig': %w", err)
+		}
+	}
+
+	if a.Tools != nil {
+		object["tools"], err = json.Marshal(a.Tools)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'tools': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for GeminiGenerationConfig. Returns the specified
+// element and whether it was found
+func (a GeminiGenerationConfig) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for GeminiGenerationConfig
+func (a *GeminiGenerationConfig) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for GeminiGenerationConfig to handle AdditionalProperties
+func (a *GeminiGenerationConfig) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["maxOutputTokens"]; found {
+		err = json.Unmarshal(raw, &a.MaxOutputTokens)
+		if err != nil {
+			return fmt.Errorf("error reading 'maxOutputTokens': %w", err)
+		}
+		delete(object, "maxOutputTokens")
+	}
+
+	if raw, found := object["responseMimeType"]; found {
+		err = json.Unmarshal(raw, &a.ResponseMimeType)
+		if err != nil {
+			return fmt.Errorf("error reading 'responseMimeType': %w", err)
+		}
+		delete(object, "responseMimeType")
+	}
+
+	if raw, found := object["responseSchema"]; found {
+		err = json.Unmarshal(raw, &a.ResponseSchema)
+		if err != nil {
+			return fmt.Errorf("error reading 'responseSchema': %w", err)
+		}
+		delete(object, "responseSchema")
+	}
+
+	if raw, found := object["stopSequences"]; found {
+		err = json.Unmarshal(raw, &a.StopSequences)
+		if err != nil {
+			return fmt.Errorf("error reading 'stopSequences': %w", err)
+		}
+		delete(object, "stopSequences")
+	}
+
+	if raw, found := object["temperature"]; found {
+		err = json.Unmarshal(raw, &a.Temperature)
+		if err != nil {
+			return fmt.Errorf("error reading 'temperature': %w", err)
+		}
+		delete(object, "temperature")
+	}
+
+	if raw, found := object["topK"]; found {
+		err = json.Unmarshal(raw, &a.TopK)
+		if err != nil {
+			return fmt.Errorf("error reading 'topK': %w", err)
+		}
+		delete(object, "topK")
+	}
+
+	if raw, found := object["topP"]; found {
+		err = json.Unmarshal(raw, &a.TopP)
+		if err != nil {
+			return fmt.Errorf("error reading 'topP': %w", err)
+		}
+		delete(object, "topP")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for GeminiGenerationConfig to handle AdditionalProperties
+func (a GeminiGenerationConfig) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.MaxOutputTokens != nil {
+		object["maxOutputTokens"], err = json.Marshal(a.MaxOutputTokens)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'maxOutputTokens': %w", err)
+		}
+	}
+
+	if a.ResponseMimeType != nil {
+		object["responseMimeType"], err = json.Marshal(a.ResponseMimeType)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'responseMimeType': %w", err)
+		}
+	}
+
+	if a.ResponseSchema != nil {
+		object["responseSchema"], err = json.Marshal(a.ResponseSchema)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'responseSchema': %w", err)
+		}
+	}
+
+	if a.StopSequences != nil {
+		object["stopSequences"], err = json.Marshal(a.StopSequences)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'stopSequences': %w", err)
+		}
+	}
+
+	if a.Temperature != nil {
+		object["temperature"], err = json.Marshal(a.Temperature)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'temperature': %w", err)
+		}
+	}
+
+	if a.TopK != nil {
+		object["topK"], err = json.Marshal(a.TopK)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'topK': %w", err)
+		}
+	}
+
+	if a.TopP != nil {
+		object["topP"], err = json.Marshal(a.TopP)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'topP': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for GeminiPart. Returns the specified
+// element and whether it was found
+func (a GeminiPart) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for GeminiPart
+func (a *GeminiPart) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for GeminiPart to handle AdditionalProperties
+func (a *GeminiPart) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["file_data"]; found {
+		err = json.Unmarshal(raw, &a.FileData)
+		if err != nil {
+			return fmt.Errorf("error reading 'file_data': %w", err)
+		}
+		delete(object, "file_data")
+	}
+
+	if raw, found := object["function_call"]; found {
+		err = json.Unmarshal(raw, &a.FunctionCall)
+		if err != nil {
+			return fmt.Errorf("error reading 'function_call': %w", err)
+		}
+		delete(object, "function_call")
+	}
+
+	if raw, found := object["function_response"]; found {
+		err = json.Unmarshal(raw, &a.FunctionResponse)
+		if err != nil {
+			return fmt.Errorf("error reading 'function_response': %w", err)
+		}
+		delete(object, "function_response")
+	}
+
+	if raw, found := object["inline_data"]; found {
+		err = json.Unmarshal(raw, &a.InlineData)
+		if err != nil {
+			return fmt.Errorf("error reading 'inline_data': %w", err)
+		}
+		delete(object, "inline_data")
+	}
+
+	if raw, found := object["text"]; found {
+		err = json.Unmarshal(raw, &a.Text)
+		if err != nil {
+			return fmt.Errorf("error reading 'text': %w", err)
+		}
+		delete(object, "text")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for GeminiPart to handle AdditionalProperties
+func (a GeminiPart) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.FileData != nil {
+		object["file_data"], err = json.Marshal(a.FileData)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'file_data': %w", err)
+		}
+	}
+
+	if a.FunctionCall != nil {
+		object["function_call"], err = json.Marshal(a.FunctionCall)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'function_call': %w", err)
+		}
+	}
+
+	if a.FunctionResponse != nil {
+		object["function_response"], err = json.Marshal(a.FunctionResponse)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'function_response': %w", err)
+		}
+	}
+
+	if a.InlineData != nil {
+		object["inline_data"], err = json.Marshal(a.InlineData)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'inline_data': %w", err)
+		}
+	}
+
+	if a.Text != nil {
+		object["text"], err = json.Marshal(a.Text)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'text': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for GeminiSafetyRating. Returns the specified
+// element and whether it was found
+func (a GeminiSafetyRating) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for GeminiSafetyRating
+func (a *GeminiSafetyRating) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for GeminiSafetyRating to handle AdditionalProperties
+func (a *GeminiSafetyRating) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["blocked"]; found {
+		err = json.Unmarshal(raw, &a.Blocked)
+		if err != nil {
+			return fmt.Errorf("error reading 'blocked': %w", err)
+		}
+		delete(object, "blocked")
+	}
+
+	if raw, found := object["category"]; found {
+		err = json.Unmarshal(raw, &a.Category)
+		if err != nil {
+			return fmt.Errorf("error reading 'category': %w", err)
+		}
+		delete(object, "category")
+	}
+
+	if raw, found := object["probability"]; found {
+		err = json.Unmarshal(raw, &a.Probability)
+		if err != nil {
+			return fmt.Errorf("error reading 'probability': %w", err)
+		}
+		delete(object, "probability")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for GeminiSafetyRating to handle AdditionalProperties
+func (a GeminiSafetyRating) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.Blocked != nil {
+		object["blocked"], err = json.Marshal(a.Blocked)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'blocked': %w", err)
+		}
+	}
+
+	if a.Category != nil {
+		object["category"], err = json.Marshal(a.Category)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'category': %w", err)
+		}
+	}
+
+	if a.Probability != nil {
+		object["probability"], err = json.Marshal(a.Probability)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'probability': %w", err)
+		}
 	}
 
 	for fieldName, field := range a.AdditionalProperties {
@@ -4102,6 +4954,12 @@ type ServerInterface interface {
 	// Create an OpenAI Responses-compatible response.
 	// (POST /v1/responses)
 	CreateResponse(w http.ResponseWriter, r *http.Request)
+	// Generate content with the Gemini-compatible gateway route.
+	// (POST /v1beta/models/{model}:generateContent)
+	GenerateGeminiContent(w http.ResponseWriter, r *http.Request, model GeminiModel)
+	// Stream content with the Gemini-compatible gateway route.
+	// (POST /v1beta/models/{model}:streamGenerateContent)
+	StreamGeminiContent(w http.ResponseWriter, r *http.Request, model GeminiModel)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -6735,6 +7593,70 @@ func (siw *ServerInterfaceWrapper) CreateResponse(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// GenerateGeminiContent operation middleware
+func (siw *ServerInterfaceWrapper) GenerateGeminiContent(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "model" -------------
+	var model GeminiModel
+
+	err = runtime.BindStyledParameterWithOptions("simple", "model", r.PathValue("model"), &model, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "model", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GenerateGeminiContent(w, r, model)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// StreamGeminiContent operation middleware
+func (siw *ServerInterfaceWrapper) StreamGeminiContent(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "model" -------------
+	var model GeminiModel
+
+	err = runtime.BindStyledParameterWithOptions("simple", "model", r.PathValue("model"), &model, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "model", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StreamGeminiContent(w, r, model)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -6924,6 +7846,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/messages", wrapper.CreateMessage)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/models", wrapper.ListModels)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/responses", wrapper.CreateResponse)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1beta/models/{model}:generateContent", wrapper.GenerateGeminiContent)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1beta/models/{model}:streamGenerateContent", wrapper.StreamGeminiContent)
 
 	return m
 }

@@ -97,6 +97,7 @@ Anthropic-compatible preset 的 auth、base_url、model catalog 由 `COMPATIBLE_
 
 ```txt
 /v1beta/models/*:generateContent
+/v1beta/models/*:streamGenerateContent
 /v1beta/models
 /api/provider/google/*
 /api/provider/google/v1beta/*
@@ -107,6 +108,15 @@ Anthropic-compatible preset 的 auth、base_url、model catalog 由 `COMPATIBLE_
 ```
 
 Gemini 原生错误必须渲染为 Google-compatible 形状；通过 `/v1/messages` 或 `/v1/chat/completions` 进入的请求则按客户端源协议渲染。
+
+已实现的 Gemini-native 路由：
+
+```txt
+POST /v1beta/models/{model}:generateContent
+POST /v1beta/models/{model}:streamGenerateContent
+```
+
+这两个路由复用标准 Gateway runtime：API Key 鉴权、模型可见性、entitlement、Scheduler、Provider Adapter、usage log、scheduler decision / feedback 均与 OpenAI/Anthropic 兼容入口一致。当前阶段负责 Gemini request/response/error 的边缘转换；Gemini 原生上游 `generateContent` adapter 仍归属后续 Provider Expansion。
 
 ### 4.4 Grok
 
@@ -144,7 +154,8 @@ Antigravity 可承载 Claude-shaped 和 Gemini-shaped 端点，必须在 route m
 | `/v1/moderations` | Moderation runtime | 内容审核和风控日志。 | Phase 3 |
 | `/v1/rerank` | Passthrough runtime | 兼容 rerank provider。 | Phase 3 |
 | `/v1/responses/ws` | Realtime/WS runtime | 长连接、粘性账号、slot 生命周期。 | Phase 3 |
-| Gemini `/v1beta/*` | Gemini native runtime | Google-shaped request/error。 | Phase 2 |
+| Gemini `/v1beta/models/*:generateContent` | Compatible text runtime | Google-shaped request/response/error，复用 Canonical/Scheduler/Provider Adapter。 | WP-230 |
+| Gemini `/v1beta/models/*:streamGenerateContent` | Compatible text runtime | Google-shaped SSE response/error，复用 Canonical/Scheduler/Provider Adapter。 | WP-230 |
 | Native `count_tokens` | Provider native runtime | 计数请求，不进入生成用量。 | Phase 2 |
 
 ## 6. Passthrough 规则
