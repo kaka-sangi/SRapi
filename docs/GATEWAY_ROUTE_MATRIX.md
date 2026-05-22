@@ -144,7 +144,11 @@ Grok API-key/upstream 与 Grok Web session 都归属 `grok` provider，但 runti
 ```
 
 Antigravity 可承载 Claude-shaped 和 Gemini-shaped 端点，必须在 route metadata 中标明目标子协议。
-这些路径当前仍是规划项；在一阶 `reverse-proxy-antigravity` adapter、`antigravity_desktop` runtime context、认证注入规则和回归测试落地前，不视为已实现的 Gateway 入口。
+一阶后端反代身份已实现：管理员可配置 `adapter_type = reverse-proxy-antigravity`、
+`runtime_class = desktop_client_token` 或 `ide_plugin_token`、`upstream_client = antigravity_desktop`，
+并通过现有 `/v1/chat/completions`、`/v1/messages` 或 Gemini-native Gateway 路径进入
+Scheduler / Provider Adapter / Reverse Proxy Runtime。上游子协议由 `provider.protocol` 决定。
+本节列出的 Antigravity 专属 alias 路径仍是规划项，需后续 route-registry package 落地。
 
 ## 5. Route Matrix
 

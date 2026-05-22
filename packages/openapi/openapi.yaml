@@ -4816,6 +4816,7 @@ components:
         - reverse-proxy-claude-web
         - reverse-proxy-claude-code-cli
         - reverse-proxy-gemini-cli
+        - reverse-proxy-antigravity
         - custom
 
     Provider:

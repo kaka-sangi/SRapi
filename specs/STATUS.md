@@ -41,14 +41,15 @@ last_completed:
 - WP-320: Rerank runtime v1 now exposes `/v1/rerank`, rerank-compatible provider alias routing, canonical rerank normalization/rendering, rerank-compatible upstream `/rerank` adapter dispatch, explicit `rerank` Scheduler capability filtering, usage/billing/Scheduler feedback evidence, and generated OpenAPI/SDK parity.
 - WP-330: Audio transcriptions runtime v1 now exposes OpenAI-compatible `/v1/audio/transcriptions`, provider alias routing, canonical audio transcription normalization/rendering, OpenAI-compatible upstream multipart `/audio/transcriptions` adapter dispatch, explicit `audio_transcriptions` Scheduler capability filtering, usage/billing/Scheduler feedback evidence, and generated OpenAPI/SDK parity.
 - WP-340: Audio speech runtime v1 now exposes OpenAI-compatible `/v1/audio/speech`, provider alias routing, canonical audio speech normalization, binary audio rendering, OpenAI-compatible upstream JSON `/audio/speech` adapter dispatch, explicit `audio_speech` Scheduler capability filtering, usage/billing/Scheduler feedback evidence, and generated OpenAPI/SDK parity.
+- WP-350: Antigravity reverse proxy runtime identity now adds `reverse-proxy-antigravity` to the OpenAPI/SDK adapter enum, default `antigravity_desktop` Reverse Proxy Runtime identity, OpenAI/Gemini protocol dispatch tests, and a Gateway regression proving desktop-token Antigravity accounts route through Scheduler and Reverse Proxy Runtime.
 
 current:
 
-- package: WP-350+
+- package: WP-360+
 - status: pending
 - objective: split the next ecosystem or remaining advanced endpoint package from the roadmap.
 
-next_recommended: WP-350+
+next_recommended: WP-360+
 
 last_gates:
 
@@ -115,6 +116,9 @@ notes:
 - WP-330 added `TestOpenAICompatibleAdapterInvokesAudioTranscriptionsUpstream`, `TestGatewayAudioTranscriptionRouteTargetsOpenAICompatibleUpstream`, and `TestGatewayAudioTranscriptionAliasForcesProviderContext`.
 - WP-340 added `audio_speech` to the canonical capability registry and provider convenience key mapping, so Scheduler requires explicit speech synthesis endpoint support before routing text-to-speech requests.
 - WP-340 added `TestOpenAICompatibleAdapterInvokesAudioSpeechUpstream`, `TestGatewayAudioSpeechRouteTargetsOpenAICompatibleUpstream`, and `TestGatewayAudioSpeechAliasForcesProviderContext`.
+- WP-350 verified local client shape without reading credentials: Codex CLI is installed as `codex-cli 0.133.0`, Claude Code is installed as `2.1.144 (Claude Code)`, and Antigravity is installed as desktop app metadata `Antigravity 1.107.0`.
+- WP-350 added `TestRuntimeInjectsAntigravityDesktopTokenAndDefaultUserAgent`, `TestReverseProxyAntigravityOpenAIAdapterDispatchesThroughRuntime`, `TestReverseProxyAntigravityAnthropicAdapterDispatchesThroughRuntime`, `TestReverseProxyAntigravityGeminiAdapterDispatchesThroughRuntime`, and `TestGatewayAntigravityReverseProxyUsesDesktopRuntimeIdentity`.
+- WP-350 intentionally keeps Antigravity-specific `/api/provider/antigravity/*` route aliases as a later route-registry package; configured Antigravity accounts work through existing Gateway routes and `provider.protocol`.
 
 ## Work Package Ledger
 
@@ -155,4 +159,5 @@ notes:
 | WP-320 | completed | Rerank runtime v1. |
 | WP-330 | completed | Audio transcriptions runtime v1. |
 | WP-340 | completed | Audio speech runtime v1. |
-| WP-350+ | pending | Remaining ecosystem and advanced endpoint packages. |
+| WP-350 | completed | Antigravity reverse proxy runtime identity v1. |
+| WP-360+ | pending | Remaining ecosystem and advanced endpoint packages. |

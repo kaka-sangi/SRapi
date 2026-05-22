@@ -295,6 +295,8 @@ func defaultUserAgentForUpstreamClient(upstreamClient string) string {
 		return "Claude-Code/1.0"
 	case "gemini_cli":
 		return "Gemini-CLI/1.0"
+	case "antigravity_desktop", "antigravity":
+		return "Antigravity/1.0"
 	default:
 		return ""
 	}

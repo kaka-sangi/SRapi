@@ -105,7 +105,14 @@ anthropic-compatible    -> /messages
 gemini-compatible       -> /models/{model}:generateContent 或 :streamGenerateContent
 native-gemini           -> /models/{model}:generateContent 或 :streamGenerateContent
 reverse-proxy-gemini-cli -> Reverse Proxy Runtime + Gemini GenerateContent payload
+reverse-proxy-antigravity -> Reverse Proxy Runtime + provider.protocol 选择的 OpenAI/Anthropic/Gemini payload
 ```
+
+`reverse-proxy-antigravity` 是客户端身份，不是独立文本协议。Adapter 必须继续通过
+`provider.protocol` 选择目标上游形状：`openai-compatible` 走 `/chat/completions`，
+`anthropic-compatible` 走 `/messages`，`gemini-compatible` 走 Gemini `generateContent`。
+对应账号推荐使用 `runtime_class = desktop_client_token` 或 `ide_plugin_token`，
+`upstream_client = antigravity_desktop`。
 
 ## 4. Adapter 生命周期
 

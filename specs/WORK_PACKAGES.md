@@ -1248,7 +1248,55 @@ Required gates:
 - `make secret-scan`
 - `git diff --check`
 
-## WP-350+: Ecosystem And Remaining Advanced Surface
+## WP-350: Antigravity Reverse Proxy Runtime Identity v1
+
+Objective: make Antigravity a first-class backend reverse-proxy identity so operators can configure `reverse-proxy-antigravity` Provider Accounts with `antigravity_desktop` runtime context and route existing Gateway text requests through Scheduler, Provider Adapter, and Reverse Proxy Runtime without adding Gateway-local DTOs or provider-specific Scheduler branches.
+
+Read first:
+
+- `docs/OPENAPI_CONTRACT.md`
+- `docs/GATEWAY_ROUTE_MATRIX.md`
+- `docs/AI_ENDPOINT_COMPATIBILITY.md`
+- `docs/PROVIDER_ADAPTER_SPEC.md`
+- `docs/REVERSE_PROXY_SPEC.md`
+- `packages/openapi/openapi.yaml`
+- `apps/api/internal/modules/provider_adapters`
+- `apps/api/internal/modules/reverse_proxy`
+- `apps/api/internal/httpserver`
+
+Owns:
+
+- OpenAPI `ProviderAdapterType` enum support for `reverse-proxy-antigravity`
+- Reverse Proxy Runtime default client identity for `account.upstream_client = antigravity_desktop`
+- Provider Adapter reverse-proxy dispatch for Antigravity accounts using the existing `provider.protocol` target sub-protocol
+- HTTP Gateway regression proving a configured Antigravity desktop account can be selected by Scheduler and invoked through Reverse Proxy Runtime
+- route matrix/provider adapter/reverse proxy docs and status updates
+
+Definition of Done:
+
+- Admin Provider creation accepts `adapter_type = reverse-proxy-antigravity` through the OpenAPI-generated enum.
+- `desktop_client_token` or `ide_plugin_token` accounts with `upstream_client = antigravity_desktop` use `access_token` bearer auth and the Antigravity default User-Agent unless account metadata overrides it.
+- `reverse-proxy-antigravity` does not create a new Gateway-local DTO; existing OpenAI-compatible, Anthropic-compatible, and Gemini-compatible request contracts continue to select the target upstream protocol through `provider.protocol`.
+- OpenAI-compatible text dispatch targets `/chat/completions`; Gemini-compatible text dispatch targets `models/{model}:generateContent` or `:streamGenerateContent` while preserving mapped upstream model names.
+- Gateway `/v1/chat/completions` can schedule an Antigravity reverse-proxy account and record normal usage/decision evidence through existing runtime paths.
+- Antigravity-specific route aliases such as `/api/provider/antigravity/*` remain a separate route-registry package unless this package explicitly adds them.
+- No frontend visuals are added.
+
+Required gates:
+
+- `make openapi-lint`
+- `make openapi-bundle`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/modules/reverse_proxy/... ./internal/modules/provider_adapters/... ./internal/httpserver`
+- `cd apps/api && go test ./...`
+- `make architecture-check`
+- `make code-quality-check`
+- `make secret-scan`
+- `git diff --check`
+
+## WP-360+: Ecosystem And Remaining Advanced Surface
 
 Use `ROADMAP.md` Phase 7 through Phase 8 to split future packages for:
 

@@ -1352,6 +1352,181 @@ func TestReverseProxyAdapterPassesCliRuntimeContext(t *testing.T) {
 	}
 }
 
+func TestReverseProxyAntigravityOpenAIAdapterDispatchesThroughRuntime(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body:       []byte(`{"choices":[{"message":{"role":"assistant","content":"antigravity openai response"}}],"usage":{"input_tokens":2,"output_tokens":3}}`),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeText(context.Background(), contract.TextRequest{
+		RequestID: "req_antigravity_openai",
+		Model:     "antigravity-local",
+		Prompt:    "hello",
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-antigravity",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             15,
+			RuntimeClass:   accountcontract.RuntimeClassDesktopClientToken,
+			UpstreamClient: ptrString("antigravity_desktop"),
+			Metadata:       map[string]any{"base_url": "https://antigravity.example/openai/v1"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "antigravity-openai-upstream"},
+		Credential: map[string]any{"access_token": "desktop-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke antigravity openai adapter: %v", err)
+	}
+	if resp.Text != "antigravity openai response" || resp.Usage.InputTokens != 2 || resp.Usage.OutputTokens != 3 {
+		t.Fatalf("unexpected antigravity openai response: %+v", resp)
+	}
+	if runtime.request.Method != http.MethodPost || runtime.request.URL != "https://antigravity.example/openai/v1/chat/completions" {
+		t.Fatalf("unexpected antigravity openai request: %+v", runtime.request)
+	}
+	if runtime.request.Account.RuntimeClass != string(accountcontract.RuntimeClassDesktopClientToken) ||
+		runtime.request.Account.UpstreamClient == nil ||
+		*runtime.request.Account.UpstreamClient != "antigravity_desktop" ||
+		runtime.request.Account.Credential["access_token"] != "desktop-token" {
+		t.Fatalf("expected antigravity desktop runtime context, got %+v", runtime.request.Account)
+	}
+	var payload struct {
+		Model    string `json:"model"`
+		Messages []struct {
+			Content string `json:"content"`
+		} `json:"messages"`
+	}
+	if err := json.Unmarshal(runtime.request.Body, &payload); err != nil {
+		t.Fatalf("decode antigravity openai payload: %v", err)
+	}
+	if payload.Model != "antigravity-openai-upstream" || len(payload.Messages) != 1 || payload.Messages[0].Content != "hello" {
+		t.Fatalf("unexpected antigravity openai payload: %+v", payload)
+	}
+}
+
+func TestReverseProxyAntigravityAnthropicAdapterDispatchesThroughRuntime(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body:       []byte(`{"content":[{"type":"text","text":"antigravity anthropic response"}],"usage":{"input_tokens":3,"output_tokens":4}}`),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeText(context.Background(), contract.TextRequest{
+		RequestID: "req_antigravity_anthropic",
+		Model:     "antigravity-claude-local",
+		Prompt:    "hello anthropic",
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-antigravity",
+			Protocol:    "anthropic-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             17,
+			RuntimeClass:   accountcontract.RuntimeClassDesktopClientToken,
+			UpstreamClient: ptrString("antigravity_desktop"),
+			Metadata:       map[string]any{"base_url": "https://antigravity.example/anthropic/v1"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "claude-upstream"},
+		Credential: map[string]any{"access_token": "desktop-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke antigravity anthropic adapter: %v", err)
+	}
+	if resp.Text != "antigravity anthropic response" || resp.Usage.InputTokens != 3 || resp.Usage.OutputTokens != 4 {
+		t.Fatalf("unexpected antigravity anthropic response: %+v", resp)
+	}
+	if runtime.request.Method != http.MethodPost || runtime.request.URL != "https://antigravity.example/anthropic/v1/messages" {
+		t.Fatalf("unexpected antigravity anthropic request: %+v", runtime.request)
+	}
+	if runtime.request.Headers.Get("anthropic-version") == "" || runtime.request.Headers.Get("x-api-key") != "" || runtime.request.Headers.Get("Authorization") != "" {
+		t.Fatalf("unexpected antigravity anthropic headers: %+v", runtime.request.Headers)
+	}
+	if runtime.request.Account.RuntimeClass != string(accountcontract.RuntimeClassDesktopClientToken) ||
+		runtime.request.Account.UpstreamClient == nil ||
+		*runtime.request.Account.UpstreamClient != "antigravity_desktop" ||
+		runtime.request.Account.Credential["access_token"] != "desktop-token" {
+		t.Fatalf("expected antigravity desktop runtime context, got %+v", runtime.request.Account)
+	}
+	var payload struct {
+		Model    string `json:"model"`
+		Messages []struct {
+			Content string `json:"content"`
+		} `json:"messages"`
+	}
+	if err := json.Unmarshal(runtime.request.Body, &payload); err != nil {
+		t.Fatalf("decode antigravity anthropic payload: %v", err)
+	}
+	if payload.Model != "claude-upstream" || len(payload.Messages) != 1 || payload.Messages[0].Content != "hello anthropic" {
+		t.Fatalf("unexpected antigravity anthropic payload: %+v", payload)
+	}
+}
+
+func TestReverseProxyAntigravityGeminiAdapterDispatchesThroughRuntime(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body:       []byte(`{"candidates":[{"content":{"parts":[{"text":"antigravity gemini response"}]}}],"usageMetadata":{"promptTokenCount":4,"candidatesTokenCount":5}}`),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeText(context.Background(), contract.TextRequest{
+		RequestID: "req_antigravity_gemini",
+		Model:     "antigravity-gemini-local",
+		Prompt:    "hello gemini",
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-antigravity",
+			Protocol:    "gemini-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             16,
+			RuntimeClass:   accountcontract.RuntimeClassDesktopClientToken,
+			UpstreamClient: ptrString("antigravity_desktop"),
+			Metadata:       map[string]any{"base_url": "https://antigravity.example/v1beta"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gemini-pro"},
+		Credential: map[string]any{"access_token": "desktop-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke antigravity gemini adapter: %v", err)
+	}
+	if resp.Text != "antigravity gemini response" || resp.Usage.InputTokens != 4 || resp.Usage.OutputTokens != 5 {
+		t.Fatalf("unexpected antigravity gemini response: %+v", resp)
+	}
+	if runtime.request.Method != http.MethodPost || runtime.request.URL != "https://antigravity.example/v1beta/models/gemini-pro:generateContent" {
+		t.Fatalf("unexpected antigravity gemini request: %+v", runtime.request)
+	}
+	if runtime.request.Account.RuntimeClass != string(accountcontract.RuntimeClassDesktopClientToken) ||
+		runtime.request.Account.UpstreamClient == nil ||
+		*runtime.request.Account.UpstreamClient != "antigravity_desktop" ||
+		runtime.request.Account.Credential["access_token"] != "desktop-token" {
+		t.Fatalf("expected antigravity desktop runtime context, got %+v", runtime.request.Account)
+	}
+	var payload struct {
+		Contents []struct {
+			Parts []struct {
+				Text string `json:"text"`
+			} `json:"parts"`
+		} `json:"contents"`
+	}
+	if err := json.Unmarshal(runtime.request.Body, &payload); err != nil {
+		t.Fatalf("decode antigravity gemini payload: %v", err)
+	}
+	if len(payload.Contents) != 1 || len(payload.Contents[0].Parts) != 1 || payload.Contents[0].Parts[0].Text != "hello gemini" {
+		t.Fatalf("unexpected antigravity gemini payload: %+v", payload)
+	}
+}
+
 func TestReverseProxyAdapterStreamsThroughRuntime(t *testing.T) {
 	runtime := capturingRuntime{
 		response: reverseproxycontract.Response{

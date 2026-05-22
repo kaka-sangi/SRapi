@@ -118,6 +118,10 @@ version
 - 每个 `upstream_client` 至少要有一个默认 Profile。
 - 升级 Profile 不得改写旧 decision 记录。
 
+当前代码内置的最小默认 User-Agent 覆盖 CLI/桌面身份，包括 `codex_cli`、`claude_code_cli`、
+`gemini_cli` 和 `antigravity_desktop`。完整 TLS/HTTP2 指纹、header 顺序和版本化 Profile
+仍属于 Egress Profile 管理面；账号 metadata 中的 `user_agent` 可覆盖默认值。
+
 ## 6. TLS / JA3 / JA4 指纹
 
 Go 标准 `crypto/tls` 输出的 JA3/JA4 是公开已知特征，必须替换。

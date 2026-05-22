@@ -982,6 +982,7 @@ const (
 	ProviderAdapterTypeOpenaiCompatible          ProviderAdapterType = "openai-compatible"
 	ProviderAdapterTypeOpenrouter                ProviderAdapterType = "openrouter"
 	ProviderAdapterTypeRerankCompatible          ProviderAdapterType = "rerank-compatible"
+	ProviderAdapterTypeReverseProxyAntigravity   ProviderAdapterType = "reverse-proxy-antigravity"
 	ProviderAdapterTypeReverseProxyChatgptWeb    ProviderAdapterType = "reverse-proxy-chatgpt-web"
 	ProviderAdapterTypeReverseProxyClaudeCodeCli ProviderAdapterType = "reverse-proxy-claude-code-cli"
 	ProviderAdapterTypeReverseProxyClaudeWeb     ProviderAdapterType = "reverse-proxy-claude-web"
@@ -1009,6 +1010,8 @@ func (e ProviderAdapterType) Valid() bool {
 	case ProviderAdapterTypeOpenrouter:
 		return true
 	case ProviderAdapterTypeRerankCompatible:
+		return true
+	case ProviderAdapterTypeReverseProxyAntigravity:
 		return true
 	case ProviderAdapterTypeReverseProxyChatgptWeb:
 		return true

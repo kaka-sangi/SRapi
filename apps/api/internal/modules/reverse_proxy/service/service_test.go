@@ -104,6 +104,42 @@ func TestRuntimeInjectsCliClientTokenAndDefaultClientUserAgent(t *testing.T) {
 	}
 }
 
+func TestRuntimeInjectsAntigravityDesktopTokenAndDefaultUserAgent(t *testing.T) {
+	var gotHeader http.Header
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotHeader = r.Header.Clone()
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := New(nil)
+	if err != nil {
+		t.Fatalf("create runtime: %v", err)
+	}
+	_, err = svc.Do(context.Background(), contract.Request{
+		Account: contract.AccountRuntime{
+			AccountID:      11,
+			RuntimeClass:   "desktop_client_token",
+			UpstreamClient: ptrString("antigravity_desktop"),
+			Credential: map[string]any{
+				"access_token": "desktop-token",
+			},
+		},
+		Method: http.MethodPost,
+		URL:    upstream.URL,
+		Body:   []byte(`{"model":"antigravity-model"}`),
+	})
+	if err != nil {
+		t.Fatalf("runtime request: %v", err)
+	}
+	if gotHeader.Get("Authorization") != "Bearer desktop-token" {
+		t.Fatalf("expected desktop bearer token auth, got %q", gotHeader.Get("Authorization"))
+	}
+	if gotHeader.Get("User-Agent") != "Antigravity/1.0" {
+		t.Fatalf("expected antigravity user agent, got %q", gotHeader.Get("User-Agent"))
+	}
+}
+
 func TestRuntimeRejectsSRapiInternalBodyFields(t *testing.T) {
 	svc, err := New(nil)
 	if err != nil {

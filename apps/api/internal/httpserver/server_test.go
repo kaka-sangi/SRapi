@@ -3982,6 +3982,71 @@ func TestGatewayReverseProxyBanSignalDisablesAccountAndStopsScheduling(t *testin
 	}
 }
 
+func TestGatewayAntigravityReverseProxyUsesDesktopRuntimeIdentity(t *testing.T) {
+	var upstreamPath string
+	var upstreamAuthorization string
+	var upstreamUserAgent string
+	var upstreamModel string
+	var upstreamPrompt string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamPath = r.URL.Path
+		upstreamAuthorization = r.Header.Get("Authorization")
+		upstreamUserAgent = r.Header.Get("User-Agent")
+		if r.Header.Get("X-Request-ID") != "" || r.Header.Get("X-SRapi-Test") != "" || strings.Contains(upstreamUserAgent, "SRapi") {
+			t.Fatalf("unexpected SRapi header leakage: %+v", r.Header)
+		}
+		var payload struct {
+			Model    string `json:"model"`
+			Messages []struct {
+				Content string `json:"content"`
+			} `json:"messages"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		upstreamModel = payload.Model
+		if len(payload.Messages) > 0 {
+			upstreamPrompt = payload.Messages[0].Content
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"antigravity ok"}}],"usage":{"input_tokens":6,"output_tokens":7}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"antigravity-provider","display_name":"Antigravity Provider","adapter_type":"reverse-proxy-antigravity","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"antigravity-model","display_name":"Antigravity Model","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"antigravity-upstream","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"antigravity-account","runtime_class":"desktop_client_token","upstream_client":"antigravity_desktop","credential":{"access_token":"desktop-token"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
+
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	chatReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"antigravity-model","messages":[{"role":"user","content":"call antigravity"}]}`))
+	chatReq.Header.Set("Content-Type", "application/json")
+	chatReq.Header.Set("Authorization", "Bearer "+apiKey)
+	chatReq.Header.Set("X-Request-ID", "req_antigravity_gateway")
+	chatReq.Header.Set("X-SRapi-Test", "must-not-forward")
+	chatRec := httptest.NewRecorder()
+	handler.ServeHTTP(chatRec, chatReq)
+	if chatRec.Code != http.StatusOK {
+		t.Fatalf("expected antigravity gateway success 200, got %d body=%s", chatRec.Code, chatRec.Body.String())
+	}
+	if upstreamPath != "/v1/chat/completions" || upstreamAuthorization != "Bearer desktop-token" || upstreamUserAgent != "Antigravity/1.0" {
+		t.Fatalf("unexpected antigravity upstream request path=%q auth=%q ua=%q", upstreamPath, upstreamAuthorization, upstreamUserAgent)
+	}
+	if upstreamModel != "antigravity-upstream" || upstreamPrompt != "call antigravity" {
+		t.Fatalf("unexpected antigravity upstream payload model=%q prompt=%q", upstreamModel, upstreamPrompt)
+	}
+	var chatResp apiopenapi.ChatCompletionResponse
+	if err := json.NewDecoder(chatRec.Body).Decode(&chatResp); err != nil {
+		t.Fatalf("decode chat response: %v", err)
+	}
+	if len(chatResp.Choices) != 1 || decodeChatMessageText(t, chatResp.Choices[0].Message.Content) != "antigravity ok" {
+		t.Fatalf("unexpected antigravity chat response: %+v", chatResp)
+	}
+}
+
 func TestGatewayReverseProxyOAuthRefreshPersistsCredentialAndAudits(t *testing.T) {
 	var gotAuthorization string
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

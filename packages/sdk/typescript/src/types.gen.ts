@@ -418,7 +418,7 @@ export type PricingRuleListResponse = {
 
 export type ProviderProtocol = 'openai-compatible' | 'anthropic-compatible' | 'gemini-compatible' | 'rerank-compatible';
 
-export type ProviderAdapterType = 'openai-compatible' | 'anthropic-compatible' | 'gemini-compatible' | 'rerank-compatible' | 'native-openai' | 'native-anthropic' | 'native-gemini' | 'openrouter' | 'reverse-proxy-chatgpt-web' | 'reverse-proxy-codex-cli' | 'reverse-proxy-claude-web' | 'reverse-proxy-claude-code-cli' | 'reverse-proxy-gemini-cli' | 'custom';
+export type ProviderAdapterType = 'openai-compatible' | 'anthropic-compatible' | 'gemini-compatible' | 'rerank-compatible' | 'native-openai' | 'native-anthropic' | 'native-gemini' | 'openrouter' | 'reverse-proxy-chatgpt-web' | 'reverse-proxy-codex-cli' | 'reverse-proxy-claude-web' | 'reverse-proxy-claude-code-cli' | 'reverse-proxy-gemini-cli' | 'reverse-proxy-antigravity' | 'custom';
 
 export type Provider = {
     id: Id;
