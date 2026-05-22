@@ -211,6 +211,36 @@ func (s *Service) NormalizeEmbeddings(req apiopenapi.EmbeddingRequest, meta Requ
 	return canonical, nil
 }
 
+func (s *Service) NormalizeImageGeneration(req apiopenapi.ImageGenerationRequest, meta RequestMeta) (gatewaycontract.CanonicalRequest, error) {
+	prompt := strings.TrimSpace(req.Prompt)
+	if prompt == "" {
+		return gatewaycontract.CanonicalRequest{}, fmt.Errorf("image prompt is empty")
+	}
+	count := 1
+	if req.N != nil {
+		count = *req.N
+	}
+	if count < 1 || count > 10 {
+		return gatewaycontract.CanonicalRequest{}, fmt.Errorf("image n must be between 1 and 10")
+	}
+	canonical := canonical(meta, gatewaycontract.ProtocolOpenAICompatible, gatewaycontract.ProtocolOpenAICompatible, req.Model, "", false, prompt, nil, imageContentBlocks(prompt), "", nil)
+	canonical.ImagePrompt = prompt
+	canonical.ImageCount = count
+	canonical.ImageSize = enumString(req.Size)
+	canonical.ImageQuality = enumString(req.Quality)
+	canonical.ImageStyle = enumString(req.Style)
+	canonical.ImageResponseFormat = enumString(req.ResponseFormat)
+	if canonical.ImageResponseFormat == "" {
+		canonical.ImageResponseFormat = "url"
+	}
+	if req.User != nil {
+		canonical.ImageUser = strings.TrimSpace(*req.User)
+	}
+	canonical.ImageExtra = cloneMap(req.AdditionalProperties)
+	canonical.RequestCapabilities = append(canonical.RequestCapabilities, gatewaycontract.RequestCapability{Key: capabilitiescontract.KeyImages, Version: "v1"})
+	return canonical, nil
+}
+
 func (s *Service) BuildTextResponse(model, canonicalModel, text string, warnings []string) gatewaycontract.CanonicalResponse {
 	return s.buildTextResponse("", model, canonicalModel, text, estimateUsage(text), warnings)
 }
@@ -265,6 +295,33 @@ func (s *Service) BuildCanonicalEmbeddingResponse(req gatewaycontract.CanonicalR
 		Model:                 model,
 		CanonicalModel:        canonicalModel,
 		Data:                  cloneEmbeddings(embeddings),
+		Usage:                 usage,
+		CompatibilityWarnings: uniqueStrings(req.CompatibilityWarnings),
+	}
+}
+
+func (s *Service) BuildCanonicalImageGenerationResponse(req gatewaycontract.CanonicalRequest, images []gatewaycontract.Image, created int64, usage gatewaycontract.Usage) gatewaycontract.ImageGenerationResponse {
+	model := strings.TrimSpace(req.Model)
+	if model == "" {
+		model = req.CanonicalModel
+	}
+	canonicalModel := strings.TrimSpace(req.CanonicalModel)
+	if canonicalModel == "" {
+		canonicalModel = model
+	}
+	if created == 0 {
+		created = time.Now().Unix()
+	}
+	if usage.InputTokens == 0 && usage.OutputTokens == 0 && usage.CachedTokens == 0 {
+		usage = imageEstimatedUsage(req)
+	}
+	return gatewaycontract.ImageGenerationResponse{
+		ID:                    randomHexString(12),
+		RequestID:             strings.TrimSpace(req.RequestID),
+		Model:                 model,
+		CanonicalModel:        canonicalModel,
+		Created:               created,
+		Data:                  cloneImages(images),
 		Usage:                 usage,
 		CompatibilityWarnings: uniqueStrings(req.CompatibilityWarnings),
 	}
@@ -379,6 +436,29 @@ func (s *Service) RenderEmbeddings(resp gatewaycontract.EmbeddingResponse) apiop
 		Data:   data,
 		Model:  resp.Model,
 		Usage:  *tokenUsage(resp.Usage),
+	}
+}
+
+func (s *Service) RenderImageGeneration(resp gatewaycontract.ImageGenerationResponse) apiopenapi.ImageGenerationResponse {
+	data := make([]apiopenapi.ImageGenerationObject, 0, len(resp.Data))
+	for _, item := range resp.Data {
+		image := apiopenapi.ImageGenerationObject{
+			AdditionalProperties: cloneMap(item.Metadata),
+		}
+		if value := strings.TrimSpace(item.URL); value != "" {
+			image.Url = &value
+		}
+		if value := strings.TrimSpace(item.Base64JSON); value != "" {
+			image.B64Json = &value
+		}
+		if value := strings.TrimSpace(item.RevisedPrompt); value != "" {
+			image.RevisedPrompt = &value
+		}
+		data = append(data, image)
+	}
+	return apiopenapi.ImageGenerationResponse{
+		Created: resp.Created,
+		Data:    data,
 	}
 }
 
@@ -813,10 +893,30 @@ func embeddingContentBlocks(values []string) []gatewaycontract.ContentBlock {
 	return out
 }
 
+func imageContentBlocks(prompt string) []gatewaycontract.ContentBlock {
+	prompt = strings.TrimSpace(prompt)
+	if prompt == "" {
+		return nil
+	}
+	return []gatewaycontract.ContentBlock{{Type: gatewaycontract.ContentBlockText, Role: "user", Text: prompt}}
+}
+
 func embeddingEstimatedUsage(values []string) gatewaycontract.Usage {
 	return gatewaycontract.Usage{
 		InputTokens: estimateTokens(strings.Join(values, "\n")),
 		Estimated:   true,
+	}
+}
+
+func imageEstimatedUsage(req gatewaycontract.CanonicalRequest) gatewaycontract.Usage {
+	output := req.ImageCount
+	if output <= 0 {
+		output = 1
+	}
+	return gatewaycontract.Usage{
+		InputTokens:  estimateTokens(req.ImagePrompt),
+		OutputTokens: output,
+		Estimated:    true,
 	}
 }
 
@@ -830,6 +930,25 @@ func cloneEmbeddings(values []gatewaycontract.Embedding) []gatewaycontract.Embed
 		out[idx].Vector = append([]float32(nil), value.Vector...)
 	}
 	return out
+}
+
+func cloneImages(values []gatewaycontract.Image) []gatewaycontract.Image {
+	if values == nil {
+		return nil
+	}
+	out := make([]gatewaycontract.Image, len(values))
+	for idx, value := range values {
+		out[idx] = value
+		out[idx].Metadata = cloneMap(value.Metadata)
+	}
+	return out
+}
+
+func enumString[T ~string](value *T) string {
+	if value == nil {
+		return ""
+	}
+	return strings.TrimSpace(string(*value))
 }
 
 func refreshRequestCapabilities(req *gatewaycontract.CanonicalRequest) {

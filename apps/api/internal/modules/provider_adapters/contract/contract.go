@@ -57,6 +57,25 @@ type EmbeddingRequest struct {
 	Credential     map[string]any
 }
 
+type ImageGenerationRequest struct {
+	RequestID      string
+	SourceProtocol string
+	SourceEndpoint string
+	Model          string
+	Prompt         string
+	Count          int
+	Size           string
+	Quality        string
+	Style          string
+	ResponseFormat string
+	User           string
+	Extra          map[string]any
+	Provider       providercontract.Provider
+	Account        accountcontract.ProviderAccount
+	Mapping        modelcontract.ModelProviderMapping
+	Credential     map[string]any
+}
+
 type Embedding struct {
 	Index        int
 	Vector       []float32
@@ -65,6 +84,21 @@ type Embedding struct {
 
 type EmbeddingResponse struct {
 	Data       []Embedding
+	Model      string
+	StatusCode int
+	Usage      Usage
+}
+
+type Image struct {
+	URL           string
+	Base64JSON    string
+	RevisedPrompt string
+	Metadata      map[string]any
+}
+
+type ImageGenerationResponse struct {
+	Created    int64
+	Data       []Image
 	Model      string
 	StatusCode int
 	Usage      Usage
@@ -98,4 +132,8 @@ type TextAdapter interface {
 
 type EmbeddingAdapter interface {
 	InvokeEmbeddings(ctx context.Context, req EmbeddingRequest) (EmbeddingResponse, error)
+}
+
+type ImageGenerationAdapter interface {
+	InvokeImageGeneration(ctx context.Context, req ImageGenerationRequest) (ImageGenerationResponse, error)
 }

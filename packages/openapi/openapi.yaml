@@ -2684,6 +2684,52 @@ paths:
         default:
           $ref: "#/components/responses/GatewayError"
 
+  /v1/images/generations:
+    post:
+      tags:
+        - Gateway
+      operationId: createImageGeneration
+      summary: Create OpenAI-compatible image generations.
+      description: OpenAI-compatible image generation route. SRapi validates the gateway API key, applies model policy and entitlement, schedules an eligible provider account, invokes the selected OpenAI-compatible provider adapter, and records media usage and Scheduler evidence.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImageGenerationRequest"
+            examples:
+              basic:
+                value:
+                  model: gpt-image-1
+                  prompt: A product photo of a stainless steel water bottle on a white desk
+                  n: 1
+                  size: 1024x1024
+                  response_format: url
+      responses:
+        "200":
+          description: OpenAI-compatible image generation response.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImageGenerationResponse"
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
   /v1beta/models/{model}:generateContent:
     post:
       tags:
@@ -2916,6 +2962,44 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/EmbeddingResponse"
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /api/provider/openai-compatible/v1/images/generations:
+    post:
+      tags:
+        - Gateway
+      operationId: createOpenAICompatibleImageGenerationAlias
+      summary: Create OpenAI-compatible image generations with openai-compatible provider context.
+      description: Provider alias route. It reuses the standard image generation runtime and forces the `openai-compatible` provider context.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImageGenerationRequest"
+      responses:
+        "200":
+          description: OpenAI-compatible image generation response.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImageGenerationResponse"
         "400":
           $ref: "#/components/responses/GatewayBadRequest"
         "401":
@@ -6458,6 +6542,103 @@ components:
           type: string
         usage:
           $ref: "#/components/schemas/TokenUsage"
+
+    ImageGenerationRequest:
+      type: object
+      required:
+        - model
+        - prompt
+      properties:
+        model:
+          type: string
+        prompt:
+          type: string
+          minLength: 1
+        n:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 1
+        size:
+          type: string
+          enum:
+            - 256x256
+            - 512x512
+            - 1024x1024
+            - 1024x1536
+            - 1536x1024
+            - auto
+          x-enum-varnames:
+            - ImageGenerationRequestSize256x256
+            - ImageGenerationRequestSize512x512
+            - ImageGenerationRequestSize1024x1024
+            - ImageGenerationRequestSize1024x1536
+            - ImageGenerationRequestSize1536x1024
+            - ImageGenerationRequestSizeAuto
+        quality:
+          type: string
+          enum:
+            - standard
+            - hd
+            - low
+            - medium
+            - high
+            - auto
+          x-enum-varnames:
+            - ImageGenerationRequestQualityStandard
+            - ImageGenerationRequestQualityHD
+            - ImageGenerationRequestQualityLow
+            - ImageGenerationRequestQualityMedium
+            - ImageGenerationRequestQualityHigh
+            - ImageGenerationRequestQualityAuto
+        style:
+          type: string
+          enum:
+            - vivid
+            - natural
+            - auto
+          x-enum-varnames:
+            - ImageGenerationRequestStyleVivid
+            - ImageGenerationRequestStyleNatural
+            - ImageGenerationRequestStyleAuto
+        response_format:
+          type: string
+          enum:
+            - url
+            - b64_json
+          x-enum-varnames:
+            - ImageGenerationRequestResponseFormatURL
+            - ImageGenerationRequestResponseFormatB64JSON
+          default: url
+        user:
+          type: string
+      additionalProperties: true
+
+    ImageGenerationObject:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+        b64_json:
+          type: string
+        revised_prompt:
+          type: string
+      additionalProperties: true
+
+    ImageGenerationResponse:
+      type: object
+      required:
+        - created
+        - data
+      properties:
+        created:
+          type: integer
+          format: int64
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImageGenerationObject"
 
     ChatMessage:
       type: object

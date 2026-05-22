@@ -456,11 +456,25 @@ Embeddings endpoint
 - OpenAI-compatible provider alias（例如 `/api/provider/openai-compatible/v1/embeddings`）强制 provider context。
 - OpenAI-compatible API-key 和 reverse-proxy accounts 上游调用 `/embeddings` 并解析 usage。
 
+WP-290 已实现：
+
+```txt
+Images generations endpoint
+```
+
+边界：
+
+- `POST /v1/images/generations` 接受 OpenAI-compatible 的 `model`、`prompt`、`n`、`size`、`quality`、`style`、`response_format` 和 `user`。
+- 请求仍进入 API Key auth、模型可见性、entitlement、Scheduler、Provider Adapter、usage、billing 和 feedback 证据链。
+- Scheduler 使用 `images` endpoint capability；Provider 或 account/mapping 必须显式声明 image generation 能力，text-only provider 不会被误选。
+- OpenAI-compatible provider alias（例如 `/api/provider/openai-compatible/v1/images/generations`）强制 provider context。
+- OpenAI-compatible API-key 和 reverse-proxy accounts 上游调用 `/images/generations` 并解析 `url`、`b64_json` 和 `revised_prompt`。
+- Image edits 和 variations 不在 WP-290 范围内。
+
 Phase 2 继续实现：
 
 ```txt
 Gemini native models/list endpoint
-Images endpoint
 Token counting endpoint
 ```
 

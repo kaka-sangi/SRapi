@@ -777,8 +777,10 @@ func effectiveCapabilities(model modelcontract.Model, mapping modelcontract.Mode
 			}
 		}
 	}
-	if _, ok := providerScoped[capabilitiescontract.KeyEmbeddings]; !ok {
-		delete(merged, capabilitiescontract.KeyEmbeddings)
+	for _, key := range []string{capabilitiescontract.KeyEmbeddings, capabilitiescontract.KeyImages} {
+		if _, ok := providerScoped[key]; !ok {
+			delete(merged, key)
+		}
 	}
 	out := make([]capabilitiescontract.Descriptor, 0, len(merged))
 	for _, descriptor := range merged {
@@ -1048,6 +1050,28 @@ func (rt *runtimeState) invokeProviderEmbeddings(ctx context.Context, req provid
 	return resp, nil
 }
 
+func (rt *runtimeState) invokeProviderImageGeneration(ctx context.Context, req provideradaptercontract.ImageGenerationRequest) (provideradaptercontract.ImageGenerationResponse, error) {
+	if req.Account.ID <= 0 {
+		return provideradaptercontract.ImageGenerationResponse{}, provideradaptercontract.ProviderError{Class: "no_available_account", StatusCode: http.StatusServiceUnavailable, Message: "provider account missing"}
+	}
+	credential, err := rt.accounts.DecryptCredential(ctx, req.Account.ID)
+	if err != nil {
+		return provideradaptercontract.ImageGenerationResponse{}, provideradaptercontract.ProviderError{Class: "credential_error", StatusCode: http.StatusBadGateway, Message: "provider credential unavailable"}
+	}
+	if refreshed, ok, err := rt.refreshReverseProxyCredential(ctx, req.Account, credential); err != nil {
+		return provideradaptercontract.ImageGenerationResponse{}, provideradaptercontract.ProviderError{Class: "auth_failed", StatusCode: http.StatusBadGateway, Message: "provider credential refresh failed"}
+	} else if ok {
+		credential = refreshed
+	}
+	req.Credential = credential
+	resp, err := rt.adapters.InvokeImageGeneration(ctx, req)
+	if err != nil {
+		rt.applyProviderAccountProtection(ctx, req.Account, err)
+		return provideradaptercontract.ImageGenerationResponse{}, err
+	}
+	return resp, nil
+}
+
 func providerTextRequest(req gatewaycontract.CanonicalRequest, candidate schedulercontract.Candidate) provideradaptercontract.TextRequest {
 	return provideradaptercontract.TextRequest{
 		RequestID:       req.RequestID,
@@ -1081,6 +1105,26 @@ func providerEmbeddingRequest(req gatewaycontract.CanonicalRequest, candidate sc
 		EncodingFormat: req.EmbeddingEncoding,
 		Dimensions:     cloneIntPtr(req.EmbeddingDimensions),
 		User:           req.EmbeddingUser,
+		Provider:       candidate.Provider,
+		Account:        candidate.Account,
+		Mapping:        candidate.Mapping,
+	}
+}
+
+func providerImageGenerationRequest(req gatewaycontract.CanonicalRequest, candidate schedulercontract.Candidate) provideradaptercontract.ImageGenerationRequest {
+	return provideradaptercontract.ImageGenerationRequest{
+		RequestID:      req.RequestID,
+		SourceProtocol: string(req.SourceProtocol),
+		SourceEndpoint: req.SourceEndpoint,
+		Model:          req.CanonicalModel,
+		Prompt:         req.ImagePrompt,
+		Count:          req.ImageCount,
+		Size:           req.ImageSize,
+		Quality:        req.ImageQuality,
+		Style:          req.ImageStyle,
+		ResponseFormat: req.ImageResponseFormat,
+		User:           req.ImageUser,
+		Extra:          cloneAnyMap(req.ImageExtra),
 		Provider:       candidate.Provider,
 		Account:        candidate.Account,
 		Mapping:        candidate.Mapping,
@@ -1252,6 +1296,15 @@ func gatewayUsageFromEmbeddingProvider(resp provideradaptercontract.EmbeddingRes
 	}
 }
 
+func gatewayUsageFromImageProvider(resp provideradaptercontract.ImageGenerationResponse) gatewaycontract.Usage {
+	return gatewaycontract.Usage{
+		InputTokens:  resp.Usage.InputTokens,
+		OutputTokens: resp.Usage.OutputTokens,
+		CachedTokens: resp.Usage.CachedTokens,
+		Estimated:    resp.Usage.Estimated,
+	}
+}
+
 func gatewayEmbeddingsFromProvider(resp provideradaptercontract.EmbeddingResponse) []gatewaycontract.Embedding {
 	out := make([]gatewaycontract.Embedding, 0, len(resp.Data))
 	for _, item := range resp.Data {
@@ -1259,6 +1312,19 @@ func gatewayEmbeddingsFromProvider(resp provideradaptercontract.EmbeddingRespons
 			Index:        item.Index,
 			Vector:       append([]float32(nil), item.Vector...),
 			Base64Vector: item.Base64Vector,
+		})
+	}
+	return out
+}
+
+func gatewayImagesFromProvider(resp provideradaptercontract.ImageGenerationResponse) []gatewaycontract.Image {
+	out := make([]gatewaycontract.Image, 0, len(resp.Data))
+	for _, item := range resp.Data {
+		out = append(out, gatewaycontract.Image{
+			URL:           item.URL,
+			Base64JSON:    item.Base64JSON,
+			RevisedPrompt: item.RevisedPrompt,
+			Metadata:      cloneAnyMap(item.Metadata),
 		})
 	}
 	return out

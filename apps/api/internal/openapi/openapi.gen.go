@@ -563,6 +563,105 @@ func (e HealthDependencyStatus) Valid() bool {
 	}
 }
 
+// Defines values for ImageGenerationRequestQuality.
+const (
+	ImageGenerationRequestQualityAuto     ImageGenerationRequestQuality = "auto"
+	ImageGenerationRequestQualityHD       ImageGenerationRequestQuality = "hd"
+	ImageGenerationRequestQualityHigh     ImageGenerationRequestQuality = "high"
+	ImageGenerationRequestQualityLow      ImageGenerationRequestQuality = "low"
+	ImageGenerationRequestQualityMedium   ImageGenerationRequestQuality = "medium"
+	ImageGenerationRequestQualityStandard ImageGenerationRequestQuality = "standard"
+)
+
+// Valid indicates whether the value is a known member of the ImageGenerationRequestQuality enum.
+func (e ImageGenerationRequestQuality) Valid() bool {
+	switch e {
+	case ImageGenerationRequestQualityAuto:
+		return true
+	case ImageGenerationRequestQualityHD:
+		return true
+	case ImageGenerationRequestQualityHigh:
+		return true
+	case ImageGenerationRequestQualityLow:
+		return true
+	case ImageGenerationRequestQualityMedium:
+		return true
+	case ImageGenerationRequestQualityStandard:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ImageGenerationRequestResponseFormat.
+const (
+	ImageGenerationRequestResponseFormatB64JSON ImageGenerationRequestResponseFormat = "b64_json"
+	ImageGenerationRequestResponseFormatURL     ImageGenerationRequestResponseFormat = "url"
+)
+
+// Valid indicates whether the value is a known member of the ImageGenerationRequestResponseFormat enum.
+func (e ImageGenerationRequestResponseFormat) Valid() bool {
+	switch e {
+	case ImageGenerationRequestResponseFormatB64JSON:
+		return true
+	case ImageGenerationRequestResponseFormatURL:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ImageGenerationRequestSize.
+const (
+	ImageGenerationRequestSize1024x1024 ImageGenerationRequestSize = "1024x1024"
+	ImageGenerationRequestSize1024x1536 ImageGenerationRequestSize = "1024x1536"
+	ImageGenerationRequestSize1536x1024 ImageGenerationRequestSize = "1536x1024"
+	ImageGenerationRequestSize256x256   ImageGenerationRequestSize = "256x256"
+	ImageGenerationRequestSize512x512   ImageGenerationRequestSize = "512x512"
+	ImageGenerationRequestSizeAuto      ImageGenerationRequestSize = "auto"
+)
+
+// Valid indicates whether the value is a known member of the ImageGenerationRequestSize enum.
+func (e ImageGenerationRequestSize) Valid() bool {
+	switch e {
+	case ImageGenerationRequestSize1024x1024:
+		return true
+	case ImageGenerationRequestSize1024x1536:
+		return true
+	case ImageGenerationRequestSize1536x1024:
+		return true
+	case ImageGenerationRequestSize256x256:
+		return true
+	case ImageGenerationRequestSize512x512:
+		return true
+	case ImageGenerationRequestSizeAuto:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ImageGenerationRequestStyle.
+const (
+	ImageGenerationRequestStyleAuto    ImageGenerationRequestStyle = "auto"
+	ImageGenerationRequestStyleNatural ImageGenerationRequestStyle = "natural"
+	ImageGenerationRequestStyleVivid   ImageGenerationRequestStyle = "vivid"
+)
+
+// Valid indicates whether the value is a known member of the ImageGenerationRequestStyle enum.
+func (e ImageGenerationRequestStyle) Valid() bool {
+	switch e {
+	case ImageGenerationRequestStyleAuto:
+		return true
+	case ImageGenerationRequestStyleNatural:
+		return true
+	case ImageGenerationRequestStyleVivid:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for OpenAIModelObject.
 const (
 	OpenAIModelObjectModel OpenAIModelObject = "model"
@@ -1969,6 +2068,45 @@ type HealthResponse struct {
 // Id defines model for Id.
 type Id = string
 
+// ImageGenerationObject defines model for ImageGenerationObject.
+type ImageGenerationObject struct {
+	B64Json              *string                `json:"b64_json,omitempty"`
+	RevisedPrompt        *string                `json:"revised_prompt,omitempty"`
+	Url                  *string                `json:"url,omitempty"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// ImageGenerationRequest defines model for ImageGenerationRequest.
+type ImageGenerationRequest struct {
+	Model                string                                `json:"model"`
+	N                    *int                                  `json:"n,omitempty"`
+	Prompt               string                                `json:"prompt"`
+	Quality              *ImageGenerationRequestQuality        `json:"quality,omitempty"`
+	ResponseFormat       *ImageGenerationRequestResponseFormat `json:"response_format,omitempty"`
+	Size                 *ImageGenerationRequestSize           `json:"size,omitempty"`
+	Style                *ImageGenerationRequestStyle          `json:"style,omitempty"`
+	User                 *string                               `json:"user,omitempty"`
+	AdditionalProperties map[string]interface{}                `json:"-"`
+}
+
+// ImageGenerationRequestQuality defines model for ImageGenerationRequest.Quality.
+type ImageGenerationRequestQuality string
+
+// ImageGenerationRequestResponseFormat defines model for ImageGenerationRequest.ResponseFormat.
+type ImageGenerationRequestResponseFormat string
+
+// ImageGenerationRequestSize defines model for ImageGenerationRequest.Size.
+type ImageGenerationRequestSize string
+
+// ImageGenerationRequestStyle defines model for ImageGenerationRequest.Style.
+type ImageGenerationRequestStyle string
+
+// ImageGenerationResponse defines model for ImageGenerationResponse.
+type ImageGenerationResponse struct {
+	Created int64                   `json:"created"`
+	Data    []ImageGenerationObject `json:"data"`
+}
+
 // JsonObject defines model for JsonObject.
 type JsonObject map[string]interface{}
 
@@ -3047,6 +3185,9 @@ type CreateOpenAICompatibleChatCompletionAliasJSONRequestBody = ChatCompletionRe
 // CreateOpenAICompatibleEmbeddingAliasJSONRequestBody defines body for CreateOpenAICompatibleEmbeddingAlias for application/json ContentType.
 type CreateOpenAICompatibleEmbeddingAliasJSONRequestBody = EmbeddingRequest
 
+// CreateOpenAICompatibleImageGenerationAliasJSONRequestBody defines body for CreateOpenAICompatibleImageGenerationAlias for application/json ContentType.
+type CreateOpenAICompatibleImageGenerationAliasJSONRequestBody = ImageGenerationRequest
+
 // CreateOpenAICompatibleMessageAliasJSONRequestBody defines body for CreateOpenAICompatibleMessageAlias for application/json ContentType.
 type CreateOpenAICompatibleMessageAliasJSONRequestBody = AnthropicMessagesRequest
 
@@ -3133,6 +3274,9 @@ type CreateChatCompletionJSONRequestBody = ChatCompletionRequest
 
 // CreateEmbeddingJSONRequestBody defines body for CreateEmbedding for application/json ContentType.
 type CreateEmbeddingJSONRequestBody = EmbeddingRequest
+
+// CreateImageGenerationJSONRequestBody defines body for CreateImageGeneration for application/json ContentType.
+type CreateImageGenerationJSONRequestBody = ImageGenerationRequest
 
 // CreateMessageJSONRequestBody defines body for CreateMessage for application/json ContentType.
 type CreateMessageJSONRequestBody = AnthropicMessagesRequest
@@ -4564,6 +4708,273 @@ func (a GeminiSafetyRating) MarshalJSON() ([]byte, error) {
 	return json.Marshal(object)
 }
 
+// Getter for additional properties for ImageGenerationObject. Returns the specified
+// element and whether it was found
+func (a ImageGenerationObject) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for ImageGenerationObject
+func (a *ImageGenerationObject) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for ImageGenerationObject to handle AdditionalProperties
+func (a *ImageGenerationObject) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["b64_json"]; found {
+		err = json.Unmarshal(raw, &a.B64Json)
+		if err != nil {
+			return fmt.Errorf("error reading 'b64_json': %w", err)
+		}
+		delete(object, "b64_json")
+	}
+
+	if raw, found := object["revised_prompt"]; found {
+		err = json.Unmarshal(raw, &a.RevisedPrompt)
+		if err != nil {
+			return fmt.Errorf("error reading 'revised_prompt': %w", err)
+		}
+		delete(object, "revised_prompt")
+	}
+
+	if raw, found := object["url"]; found {
+		err = json.Unmarshal(raw, &a.Url)
+		if err != nil {
+			return fmt.Errorf("error reading 'url': %w", err)
+		}
+		delete(object, "url")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for ImageGenerationObject to handle AdditionalProperties
+func (a ImageGenerationObject) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.B64Json != nil {
+		object["b64_json"], err = json.Marshal(a.B64Json)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'b64_json': %w", err)
+		}
+	}
+
+	if a.RevisedPrompt != nil {
+		object["revised_prompt"], err = json.Marshal(a.RevisedPrompt)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'revised_prompt': %w", err)
+		}
+	}
+
+	if a.Url != nil {
+		object["url"], err = json.Marshal(a.Url)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'url': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for ImageGenerationRequest. Returns the specified
+// element and whether it was found
+func (a ImageGenerationRequest) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for ImageGenerationRequest
+func (a *ImageGenerationRequest) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for ImageGenerationRequest to handle AdditionalProperties
+func (a *ImageGenerationRequest) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["model"]; found {
+		err = json.Unmarshal(raw, &a.Model)
+		if err != nil {
+			return fmt.Errorf("error reading 'model': %w", err)
+		}
+		delete(object, "model")
+	}
+
+	if raw, found := object["n"]; found {
+		err = json.Unmarshal(raw, &a.N)
+		if err != nil {
+			return fmt.Errorf("error reading 'n': %w", err)
+		}
+		delete(object, "n")
+	}
+
+	if raw, found := object["prompt"]; found {
+		err = json.Unmarshal(raw, &a.Prompt)
+		if err != nil {
+			return fmt.Errorf("error reading 'prompt': %w", err)
+		}
+		delete(object, "prompt")
+	}
+
+	if raw, found := object["quality"]; found {
+		err = json.Unmarshal(raw, &a.Quality)
+		if err != nil {
+			return fmt.Errorf("error reading 'quality': %w", err)
+		}
+		delete(object, "quality")
+	}
+
+	if raw, found := object["response_format"]; found {
+		err = json.Unmarshal(raw, &a.ResponseFormat)
+		if err != nil {
+			return fmt.Errorf("error reading 'response_format': %w", err)
+		}
+		delete(object, "response_format")
+	}
+
+	if raw, found := object["size"]; found {
+		err = json.Unmarshal(raw, &a.Size)
+		if err != nil {
+			return fmt.Errorf("error reading 'size': %w", err)
+		}
+		delete(object, "size")
+	}
+
+	if raw, found := object["style"]; found {
+		err = json.Unmarshal(raw, &a.Style)
+		if err != nil {
+			return fmt.Errorf("error reading 'style': %w", err)
+		}
+		delete(object, "style")
+	}
+
+	if raw, found := object["user"]; found {
+		err = json.Unmarshal(raw, &a.User)
+		if err != nil {
+			return fmt.Errorf("error reading 'user': %w", err)
+		}
+		delete(object, "user")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for ImageGenerationRequest to handle AdditionalProperties
+func (a ImageGenerationRequest) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	object["model"], err = json.Marshal(a.Model)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'model': %w", err)
+	}
+
+	if a.N != nil {
+		object["n"], err = json.Marshal(a.N)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'n': %w", err)
+		}
+	}
+
+	object["prompt"], err = json.Marshal(a.Prompt)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'prompt': %w", err)
+	}
+
+	if a.Quality != nil {
+		object["quality"], err = json.Marshal(a.Quality)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'quality': %w", err)
+		}
+	}
+
+	if a.ResponseFormat != nil {
+		object["response_format"], err = json.Marshal(a.ResponseFormat)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'response_format': %w", err)
+		}
+	}
+
+	if a.Size != nil {
+		object["size"], err = json.Marshal(a.Size)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'size': %w", err)
+		}
+	}
+
+	if a.Style != nil {
+		object["style"], err = json.Marshal(a.Style)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'style': %w", err)
+		}
+	}
+
+	if a.User != nil {
+		object["user"], err = json.Marshal(a.User)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'user': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
 // Getter for additional properties for ResponsesOutputItem. Returns the specified
 // element and whether it was found
 func (a ResponsesOutputItem) Get(fieldName string) (value interface{}, found bool) {
@@ -5447,6 +5858,9 @@ type ServerInterface interface {
 	// Create OpenAI-compatible embeddings with openai-compatible provider context.
 	// (POST /api/provider/openai-compatible/v1/embeddings)
 	CreateOpenAICompatibleEmbeddingAlias(w http.ResponseWriter, r *http.Request)
+	// Create OpenAI-compatible image generations with openai-compatible provider context.
+	// (POST /api/provider/openai-compatible/v1/images/generations)
+	CreateOpenAICompatibleImageGenerationAlias(w http.ResponseWriter, r *http.Request)
 	// Create an Anthropic Messages-compatible message with openai-compatible provider context.
 	// (POST /api/provider/openai-compatible/v1/messages)
 	CreateOpenAICompatibleMessageAlias(w http.ResponseWriter, r *http.Request)
@@ -5660,6 +6074,9 @@ type ServerInterface interface {
 	// Create OpenAI-compatible embeddings.
 	// (POST /v1/embeddings)
 	CreateEmbedding(w http.ResponseWriter, r *http.Request)
+	// Create OpenAI-compatible image generations.
+	// (POST /v1/images/generations)
+	CreateImageGeneration(w http.ResponseWriter, r *http.Request)
 	// Create an Anthropic Messages-compatible message.
 	// (POST /v1/messages)
 	CreateMessage(w http.ResponseWriter, r *http.Request)
@@ -5737,6 +6154,26 @@ func (siw *ServerInterfaceWrapper) CreateOpenAICompatibleEmbeddingAlias(w http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateOpenAICompatibleEmbeddingAlias(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateOpenAICompatibleImageGenerationAlias operation middleware
+func (siw *ServerInterfaceWrapper) CreateOpenAICompatibleImageGenerationAlias(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateOpenAICompatibleImageGenerationAlias(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -8542,6 +8979,26 @@ func (siw *ServerInterfaceWrapper) CreateEmbedding(w http.ResponseWriter, r *htt
 	handler.ServeHTTP(w, r)
 }
 
+// CreateImageGeneration operation middleware
+func (siw *ServerInterfaceWrapper) CreateImageGeneration(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateImageGeneration(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // CreateMessage operation middleware
 func (siw *ServerInterfaceWrapper) CreateMessage(w http.ResponseWriter, r *http.Request) {
 
@@ -8789,6 +9246,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/anthropic-compatible/v1/messages", wrapper.CreateAnthropicCompatibleMessageAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/chat/completions", wrapper.CreateOpenAICompatibleChatCompletionAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/embeddings", wrapper.CreateOpenAICompatibleEmbeddingAlias)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/images/generations", wrapper.CreateOpenAICompatibleImageGenerationAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/messages", wrapper.CreateOpenAICompatibleMessageAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/responses", wrapper.CreateOpenAICompatibleResponseAlias)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/account-groups", wrapper.ListAdminAccountGroups)
@@ -8860,6 +9318,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/webhooks/payments/{provider}", wrapper.HandlePaymentWebhook)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/chat/completions", wrapper.CreateChatCompletion)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/embeddings", wrapper.CreateEmbedding)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/images/generations", wrapper.CreateImageGeneration)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/messages", wrapper.CreateMessage)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/models", wrapper.ListModels)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/responses", wrapper.CreateResponse)

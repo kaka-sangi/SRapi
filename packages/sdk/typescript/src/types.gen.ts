@@ -1178,6 +1178,30 @@ export type EmbeddingResponse = {
     usage: TokenUsage;
 };
 
+export type ImageGenerationRequest = {
+    model: string;
+    prompt: string;
+    n?: number;
+    size?: '256x256' | '512x512' | '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
+    quality?: 'standard' | 'hd' | 'low' | 'medium' | 'high' | 'auto';
+    style?: 'vivid' | 'natural' | 'auto';
+    response_format?: 'url' | 'b64_json';
+    user?: string;
+    [key: string]: unknown;
+};
+
+export type ImageGenerationObject = {
+    url?: string;
+    b64_json?: string;
+    revised_prompt?: string;
+    [key: string]: unknown;
+};
+
+export type ImageGenerationResponse = {
+    created: number;
+    data: Array<ImageGenerationObject>;
+};
+
 export type ChatMessage = {
     role: 'system' | 'developer' | 'user' | 'assistant' | 'tool';
     content: string | Array<ContentBlock>;
@@ -4222,6 +4246,51 @@ export type CreateEmbeddingResponses = {
 
 export type CreateEmbeddingResponse = CreateEmbeddingResponses[keyof CreateEmbeddingResponses];
 
+export type CreateImageGenerationData = {
+    body: ImageGenerationRequest;
+    path?: never;
+    query?: never;
+    url: '/v1/images/generations';
+};
+
+export type CreateImageGenerationErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateImageGenerationError = CreateImageGenerationErrors[keyof CreateImageGenerationErrors];
+
+export type CreateImageGenerationResponses = {
+    /**
+     * OpenAI-compatible image generation response.
+     */
+    200: ImageGenerationResponse;
+};
+
+export type CreateImageGenerationResponse = CreateImageGenerationResponses[keyof CreateImageGenerationResponses];
+
 export type GenerateGeminiContentData = {
     body: GeminiGenerateContentRequest;
     path: {
@@ -4501,6 +4570,51 @@ export type CreateOpenAiCompatibleEmbeddingAliasResponses = {
 };
 
 export type CreateOpenAiCompatibleEmbeddingAliasResponse = CreateOpenAiCompatibleEmbeddingAliasResponses[keyof CreateOpenAiCompatibleEmbeddingAliasResponses];
+
+export type CreateOpenAiCompatibleImageGenerationAliasData = {
+    body: ImageGenerationRequest;
+    path?: never;
+    query?: never;
+    url: '/api/provider/openai-compatible/v1/images/generations';
+};
+
+export type CreateOpenAiCompatibleImageGenerationAliasErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateOpenAiCompatibleImageGenerationAliasError = CreateOpenAiCompatibleImageGenerationAliasErrors[keyof CreateOpenAiCompatibleImageGenerationAliasErrors];
+
+export type CreateOpenAiCompatibleImageGenerationAliasResponses = {
+    /**
+     * OpenAI-compatible image generation response.
+     */
+    200: ImageGenerationResponse;
+};
+
+export type CreateOpenAiCompatibleImageGenerationAliasResponse = CreateOpenAiCompatibleImageGenerationAliasResponses[keyof CreateOpenAiCompatibleImageGenerationAliasResponses];
 
 export type CreateAnthropicCompatibleMessageAliasData = {
     body: AnthropicMessagesRequest;

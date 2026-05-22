@@ -184,6 +184,8 @@ rate_limit_model
 quota_model
 ```
 
+WP-290 起，`supports_images` 映射到 canonical `images` endpoint capability。Gateway image generation 请求必须带 `images` request capability；OpenAI-compatible API-key 和 reverse-proxy accounts 使用 `/images/generations` 上游路径，并解析 `url` / `b64_json` image outputs。
+
 WP-270 embeddings adapter boundary:
 
 - OpenAI-compatible API-key accounts dispatch embedding requests to `{base_url}/embeddings`.

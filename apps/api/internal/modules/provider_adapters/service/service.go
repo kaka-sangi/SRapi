@@ -82,6 +82,22 @@ func (s *Service) InvokeEmbeddings(ctx context.Context, req contract.EmbeddingRe
 	return synthesizeLocalEmbeddings(req), nil
 }
 
+func (s *Service) InvokeImageGeneration(ctx context.Context, req contract.ImageGenerationRequest) (contract.ImageGenerationResponse, error) {
+	if strings.TrimSpace(req.RequestID) == "" || strings.TrimSpace(req.Model) == "" || strings.TrimSpace(req.Mapping.UpstreamModelName) == "" || strings.TrimSpace(req.Prompt) == "" {
+		return contract.ImageGenerationResponse{}, ErrInvalidInput
+	}
+	if baseURL := upstreamBaseURLImages(req); baseURL != "" {
+		if isReverseProxyImageRuntime(req) {
+			return s.invokeReverseProxyOpenAICompatibleImages(ctx, req, baseURL)
+		}
+		return s.invokeOpenAICompatibleImages(ctx, req, baseURL)
+	}
+	if isReverseProxyImageRuntime(req) {
+		return contract.ImageGenerationResponse{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "reverse proxy upstream base url missing"}
+	}
+	return synthesizeLocalImages(req), nil
+}
+
 func (s *Service) invokeOpenAICompatibleEmbeddings(ctx context.Context, req contract.EmbeddingRequest, baseURL string) (contract.EmbeddingResponse, error) {
 	apiKey := credentialString(req.Credential, "api_key")
 	if apiKey == "" {
@@ -148,6 +164,74 @@ func (s *Service) invokeReverseProxyOpenAICompatibleEmbeddings(ctx context.Conte
 		return contract.EmbeddingResponse{}, classifyProviderHTTPError(runtimeResp.StatusCode, runtimeResp.Body)
 	}
 	return parseOpenAICompatibleEmbeddings(runtimeResp.Body, runtimeResp.StatusCode, req.Mapping.UpstreamModelName, req.Input)
+}
+
+func (s *Service) invokeOpenAICompatibleImages(ctx context.Context, req contract.ImageGenerationRequest, baseURL string) (contract.ImageGenerationResponse, error) {
+	apiKey := credentialString(req.Credential, "api_key")
+	if apiKey == "" {
+		return contract.ImageGenerationResponse{}, contract.ProviderError{Class: "auth_failed", StatusCode: http.StatusUnauthorized, Message: "provider api key missing"}
+	}
+	raw, err := json.Marshal(openAIImageGenerationPayload(req))
+	if err != nil {
+		return contract.ImageGenerationResponse{}, err
+	}
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(baseURL, "/")+"/images/generations", bytes.NewReader(raw))
+	if err != nil {
+		return contract.ImageGenerationResponse{}, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+apiKey)
+
+	resp, err := s.client.Do(httpReq)
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return contract.ImageGenerationResponse{}, contract.ProviderError{Class: "timeout", StatusCode: http.StatusGatewayTimeout, Message: "provider request timed out"}
+		}
+		return contract.ImageGenerationResponse{}, contract.ProviderError{Class: "network_error", StatusCode: http.StatusBadGateway, Message: "provider request failed"}
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
+	if err != nil {
+		return contract.ImageGenerationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response read failed"}
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return contract.ImageGenerationResponse{}, classifyProviderHTTPError(resp.StatusCode, body)
+	}
+	return parseOpenAICompatibleImages(body, resp.StatusCode, req.Mapping.UpstreamModelName, req)
+}
+
+func (s *Service) invokeReverseProxyOpenAICompatibleImages(ctx context.Context, req contract.ImageGenerationRequest, baseURL string) (contract.ImageGenerationResponse, error) {
+	if s.reverseProxy == nil {
+		return contract.ImageGenerationResponse{}, contract.ProviderError{Class: "network_error", StatusCode: http.StatusBadGateway, Message: "reverse proxy runtime unavailable"}
+	}
+	raw, err := json.Marshal(openAIImageGenerationPayload(req))
+	if err != nil {
+		return contract.ImageGenerationResponse{}, err
+	}
+	runtimeResp, err := s.reverseProxy.Do(ctx, reverseproxycontract.Request{
+		Account: reverseproxycontract.AccountRuntime{
+			AccountID:      req.Account.ID,
+			RuntimeClass:   string(req.Account.RuntimeClass),
+			UpstreamClient: req.Account.UpstreamClient,
+			ProxyID:        req.Account.ProxyID,
+			UserAgent:      mapString(req.Account.Metadata, "user_agent"),
+			Credential:     req.Credential,
+		},
+		Method: http.MethodPost,
+		URL:    strings.TrimRight(baseURL, "/") + "/images/generations",
+		Headers: http.Header{
+			"Content-Type": {"application/json"},
+		},
+		Body: raw,
+	})
+	if err != nil {
+		return contract.ImageGenerationResponse{}, providerErrorFromReverseProxy(err)
+	}
+	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
+		return contract.ImageGenerationResponse{}, classifyProviderHTTPError(runtimeResp.StatusCode, runtimeResp.Body)
+	}
+	return parseOpenAICompatibleImages(runtimeResp.Body, runtimeResp.StatusCode, req.Mapping.UpstreamModelName, req)
 }
 
 func (s *Service) invokeGeminiCompatible(ctx context.Context, req contract.TextRequest, baseURL string) (contract.TextResponse, error) {
@@ -828,6 +912,18 @@ type openAIEmbeddingRequest struct {
 	User           string   `json:"user,omitempty"`
 }
 
+type openAIImageGenerationRequest struct {
+	Model          string         `json:"model"`
+	Prompt         string         `json:"prompt"`
+	N              int            `json:"n,omitempty"`
+	Size           string         `json:"size,omitempty"`
+	Quality        string         `json:"quality,omitempty"`
+	Style          string         `json:"style,omitempty"`
+	ResponseFormat string         `json:"response_format,omitempty"`
+	User           string         `json:"user,omitempty"`
+	Extra          map[string]any `json:"-"`
+}
+
 type openAIStreamOptions struct {
 	IncludeUsage bool `json:"include_usage"`
 }
@@ -868,6 +964,39 @@ func openAIEmbeddingPayload(req contract.EmbeddingRequest) openAIEmbeddingReques
 		Dimensions:     cloneIntPtr(req.Dimensions),
 		User:           strings.TrimSpace(req.User),
 	}
+}
+
+func openAIImageGenerationPayload(req contract.ImageGenerationRequest) openAIImageGenerationRequest {
+	return openAIImageGenerationRequest{
+		Model:          req.Mapping.UpstreamModelName,
+		Prompt:         strings.TrimSpace(req.Prompt),
+		N:              req.Count,
+		Size:           strings.TrimSpace(req.Size),
+		Quality:        strings.TrimSpace(req.Quality),
+		Style:          strings.TrimSpace(req.Style),
+		ResponseFormat: strings.TrimSpace(req.ResponseFormat),
+		User:           strings.TrimSpace(req.User),
+		Extra:          cloneMap(req.Extra),
+	}
+}
+
+func (r openAIImageGenerationRequest) MarshalJSON() ([]byte, error) {
+	type alias openAIImageGenerationRequest
+	raw, err := json.Marshal(alias(r))
+	if err != nil {
+		return nil, err
+	}
+	payload := map[string]any{}
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return nil, err
+	}
+	delete(payload, "Extra")
+	for key, value := range r.Extra {
+		if _, exists := payload[key]; !exists {
+			payload[key] = value
+		}
+	}
+	return json.Marshal(payload)
 }
 
 func openAICompatibleMessages(req contract.TextRequest) []openAIChatMessage {
@@ -960,6 +1089,18 @@ type openAIEmbeddingResponse struct {
 	Usage openAIUsage `json:"usage"`
 }
 
+type openAIImageGenerationResponse struct {
+	Created int64 `json:"created"`
+	Data    []struct {
+		URL           string         `json:"url"`
+		Base64JSON    string         `json:"b64_json"`
+		RevisedPrompt string         `json:"revised_prompt"`
+		Extra         map[string]any `json:"-"`
+	} `json:"data"`
+	Model string      `json:"model"`
+	Usage openAIUsage `json:"usage"`
+}
+
 func (r openAIChatCompletionResponse) FirstText() string {
 	if len(r.Choices) == 0 {
 		return ""
@@ -1006,6 +1147,83 @@ func parseOpenAIEmbeddingValue(raw json.RawMessage) (contract.Embedding, error) 
 		return contract.Embedding{Base64Vector: strings.TrimSpace(encoded)}, nil
 	}
 	return contract.Embedding{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response contained invalid embedding vector"}
+}
+
+func parseOpenAICompatibleImages(body []byte, statusCode int, fallbackModel string, req contract.ImageGenerationRequest) (contract.ImageGenerationResponse, error) {
+	var decoded openAIImageGenerationResponse
+	if err := json.Unmarshal(body, &decoded); err != nil {
+		return contract.ImageGenerationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider returned invalid json"}
+	}
+	data := make([]contract.Image, 0, len(decoded.Data))
+	for _, item := range decoded.Data {
+		image := contract.Image{
+			URL:           strings.TrimSpace(item.URL),
+			Base64JSON:    strings.TrimSpace(item.Base64JSON),
+			RevisedPrompt: strings.TrimSpace(item.RevisedPrompt),
+			Metadata:      cloneMap(item.Extra),
+		}
+		if image.URL == "" && image.Base64JSON == "" {
+			return contract.ImageGenerationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response contained image without url or b64_json"}
+		}
+		data = append(data, image)
+	}
+	if len(data) == 0 {
+		return contract.ImageGenerationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response contained no images"}
+	}
+	created := decoded.Created
+	if created == 0 {
+		created = time.Now().Unix()
+	}
+	model := strings.TrimSpace(decoded.Model)
+	if model == "" {
+		model = strings.TrimSpace(fallbackModel)
+	}
+	return contract.ImageGenerationResponse{
+		Created:    created,
+		Data:       data,
+		Model:      model,
+		StatusCode: statusCode,
+		Usage:      decoded.Usage.ToImageUsage(req),
+	}, nil
+}
+
+func (r *openAIImageGenerationResponse) UnmarshalJSON(body []byte) error {
+	var raw struct {
+		Created int64            `json:"created"`
+		Data    []map[string]any `json:"data"`
+		Model   string           `json:"model"`
+		Usage   openAIUsage      `json:"usage"`
+	}
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return err
+	}
+	r.Created = raw.Created
+	r.Model = raw.Model
+	r.Usage = raw.Usage
+	r.Data = make([]struct {
+		URL           string         `json:"url"`
+		Base64JSON    string         `json:"b64_json"`
+		RevisedPrompt string         `json:"revised_prompt"`
+		Extra         map[string]any `json:"-"`
+	}, 0, len(raw.Data))
+	for _, item := range raw.Data {
+		image := struct {
+			URL           string         `json:"url"`
+			Base64JSON    string         `json:"b64_json"`
+			RevisedPrompt string         `json:"revised_prompt"`
+			Extra         map[string]any `json:"-"`
+		}{
+			URL:           mapString(item, "url"),
+			Base64JSON:    mapString(item, "b64_json"),
+			RevisedPrompt: mapString(item, "revised_prompt"),
+			Extra:         cloneMap(item),
+		}
+		delete(image.Extra, "url")
+		delete(image.Extra, "b64_json")
+		delete(image.Extra, "revised_prompt")
+		r.Data = append(r.Data, image)
+	}
+	return nil
 }
 
 type openAIChatCompletionStreamChunk struct {
@@ -1064,6 +1282,24 @@ func (u openAIUsage) ToEmbeddingUsage(input []string) contract.Usage {
 	usage := u.ToUsage(strings.Join(input, "\n"))
 	usage.OutputTokens = 0
 	return usage
+}
+
+func (u openAIUsage) ToImageUsage(req contract.ImageGenerationRequest) contract.Usage {
+	if !u.HasTokenUsage() {
+		return estimatedImageUsage(req)
+	}
+	usage := u.ToUsage(req.Prompt)
+	return usage
+}
+
+func (u openAIUsage) HasTokenUsage() bool {
+	return u.PromptTokens != nil ||
+		u.CompletionTokens != nil ||
+		u.TotalTokens != nil ||
+		u.InputTokens != nil ||
+		u.OutputTokens != nil ||
+		u.CachedTokens != nil ||
+		(u.PromptTokensDetails != nil && u.PromptTokensDetails.CachedTokens != nil)
 }
 
 func parseOpenAICompatibleStream(body []byte, statusCode int) (contract.TextResponse, error) {
@@ -1404,6 +1640,17 @@ func upstreamBaseURLEmbeddings(req contract.EmbeddingRequest) string {
 	return ""
 }
 
+func upstreamBaseURLImages(req contract.ImageGenerationRequest) string {
+	for _, values := range []map[string]any{req.Account.Metadata, req.Provider.ConfigSchema, req.Provider.Capabilities} {
+		for _, key := range []string{"base_url", "upstream_base_url", "openai_base_url", "images_base_url"} {
+			if value := mapString(values, key); value != "" {
+				return strings.TrimRight(value, "/")
+			}
+		}
+	}
+	return ""
+}
+
 func isGeminiCompatible(req contract.TextRequest) bool {
 	for _, value := range []string{req.Provider.Protocol, req.Provider.AdapterType} {
 		switch strings.ToLower(strings.TrimSpace(value)) {
@@ -1433,6 +1680,14 @@ func isReverseProxyRuntime(req contract.TextRequest) bool {
 }
 
 func isReverseProxyEmbeddingRuntime(req contract.EmbeddingRequest) bool {
+	runtimeClass := strings.TrimSpace(string(req.Account.RuntimeClass))
+	if runtimeClass != "" && runtimeClass != "api_key" {
+		return true
+	}
+	return strings.HasPrefix(strings.TrimSpace(req.Provider.AdapterType), "reverse-proxy-")
+}
+
+func isReverseProxyImageRuntime(req contract.ImageGenerationRequest) bool {
 	runtimeClass := strings.TrimSpace(string(req.Account.RuntimeClass))
 	if runtimeClass != "" && runtimeClass != "api_key" {
 		return true
@@ -1743,6 +1998,27 @@ func synthesizeLocalEmbeddings(req contract.EmbeddingRequest) contract.Embedding
 	}
 }
 
+func synthesizeLocalImages(req contract.ImageGenerationRequest) contract.ImageGenerationResponse {
+	count := req.Count
+	if count <= 0 {
+		count = 1
+	}
+	data := make([]contract.Image, 0, count)
+	for idx := 0; idx < count; idx++ {
+		data = append(data, contract.Image{
+			URL:           fmt.Sprintf("srapi://local-image/%s/%d", url.PathEscape(req.Mapping.UpstreamModelName), idx),
+			RevisedPrompt: strings.TrimSpace(req.Prompt),
+		})
+	}
+	return contract.ImageGenerationResponse{
+		Created:    time.Now().Unix(),
+		Data:       data,
+		Model:      req.Mapping.UpstreamModelName,
+		StatusCode: http.StatusOK,
+		Usage:      estimatedImageUsage(req),
+	}
+}
+
 func deterministicEmbeddingVector(value string, index int) []float32 {
 	total := 0
 	for _, r := range value {
@@ -1756,6 +2032,18 @@ func estimatedEmbeddingUsage(input []string) contract.Usage {
 	return contract.Usage{
 		InputTokens: estimateTokens(strings.Join(input, "\n")),
 		Estimated:   true,
+	}
+}
+
+func estimatedImageUsage(req contract.ImageGenerationRequest) contract.Usage {
+	output := req.Count
+	if output <= 0 {
+		output = 1
+	}
+	return contract.Usage{
+		InputTokens:  estimateTokens(req.Prompt),
+		OutputTokens: output,
+		Estimated:    true,
 	}
 }
 

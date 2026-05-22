@@ -35,14 +35,15 @@ last_completed:
 - WP-260: Ops SLO and alert control plane v1 now includes durable SLO definitions, alert events, computed availability/burn-rate evidence from usage logs, CSRF-protected admin APIs, safe audit records, Ent/Postgres persistence, and generated OpenAPI/SDK parity.
 - WP-270: Embeddings passthrough runtime v1 now exposes OpenAI-compatible `/v1/embeddings`, provider alias routing, canonical embeddings normalization/rendering, OpenAI-compatible upstream `/embeddings` adapter dispatch, usage/billing/Scheduler feedback evidence, and generated OpenAPI/SDK parity.
 - WP-280: HTTP runtime partitioning split the 7750-line catch-all runtime into route-family files and added an architecture harness that keeps `runtime_http.go` thin and caps `runtime_*.go` file size.
+- WP-290: Images generations runtime v1 now exposes OpenAI-compatible `/v1/images/generations`, provider alias routing, canonical image normalization/rendering, OpenAI-compatible upstream `/images/generations` adapter dispatch, explicit `images` Scheduler capability filtering, usage/billing/Scheduler feedback evidence, and generated OpenAPI/SDK parity.
 
 current:
 
-- package: WP-290+
+- package: WP-300+
 - status: pending
 - objective: split the next advanced endpoint and provider expansion package from the roadmap.
 
-next_recommended: WP-290+
+next_recommended: WP-300+
 
 last_gates:
 
@@ -97,6 +98,8 @@ notes:
 - WP-270 also identified `apps/api/internal/httpserver/runtime_http.go` as oversized at 7750 lines; WP-280 is dedicated to partitioning this file and adding a harness check so this does not remain accepted architecture.
 - WP-280 reduced `apps/api/internal/httpserver/runtime_http.go` from 7750 lines to a package shell and split implementation across `runtime_state.go`, `runtime_user_handlers.go`, `runtime_admin_*`, `runtime_gateway_*`, `runtime_metrics.go`, helper/mapping/filter files.
 - WP-280 added `TestHTTPRuntimeFilesStayPartitioned`, enforcing `runtime_http.go` <= 120 lines and each `runtime_*.go` <= 2200 lines.
+- WP-290 added `images` to the canonical capability registry and provider convenience key mapping, so Scheduler requires explicit image endpoint support before routing image generation requests.
+- WP-290 added `TestOpenAICompatibleAdapterInvokesImageGenerationsUpstream`, `TestGatewayImageGenerationRouteTargetsOpenAICompatibleUpstream`, and `TestGatewayImageGenerationAliasForcesProviderContext`.
 
 ## Work Package Ledger
 
@@ -131,4 +134,5 @@ notes:
 | WP-260 | completed | Durable SLO definitions, alert events, computed burn-rate evidence, admin APIs, and safe ack audit are covered. |
 | WP-270 | completed | Embeddings passthrough runtime v1. |
 | WP-280 | completed | HTTP runtime partition and size harness. |
-| WP-290+ | pending | Remaining advanced endpoint and provider expansion packages. |
+| WP-290 | completed | Images generations runtime v1. |
+| WP-300+ | pending | Remaining advanced endpoint and provider expansion packages. |

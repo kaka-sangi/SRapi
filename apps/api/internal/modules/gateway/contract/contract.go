@@ -15,6 +15,7 @@ const (
 	EndpointResponses             SourceEndpoint = "/v1/responses"
 	EndpointMessages              SourceEndpoint = "/v1/messages"
 	EndpointEmbeddings            SourceEndpoint = "/v1/embeddings"
+	EndpointImagesGenerations     SourceEndpoint = "/v1/images/generations"
 	EndpointGeminiGenerateContent SourceEndpoint = "/v1beta/models/{model}:generateContent"
 	EndpointGeminiStreamContent   SourceEndpoint = "/v1beta/models/{model}:streamGenerateContent"
 )
@@ -71,6 +72,14 @@ type CanonicalRequest struct {
 	EmbeddingEncoding     string
 	EmbeddingDimensions   *int
 	EmbeddingUser         string
+	ImagePrompt           string
+	ImageCount            int
+	ImageSize             string
+	ImageQuality          string
+	ImageStyle            string
+	ImageResponseFormat   string
+	ImageUser             string
+	ImageExtra            map[string]any
 	Prompt                string
 	CompatibilityWarnings []string
 	RequestCapabilities   []RequestCapability
@@ -106,6 +115,24 @@ type EmbeddingResponse struct {
 	Model                 string
 	CanonicalModel        string
 	Data                  []Embedding
+	Usage                 Usage
+	CompatibilityWarnings []string
+}
+
+type Image struct {
+	URL           string
+	Base64JSON    string
+	RevisedPrompt string
+	Metadata      map[string]any
+}
+
+type ImageGenerationResponse struct {
+	ID                    string
+	RequestID             string
+	Model                 string
+	CanonicalModel        string
+	Created               int64
+	Data                  []Image
 	Usage                 Usage
 	CompatibilityWarnings []string
 }

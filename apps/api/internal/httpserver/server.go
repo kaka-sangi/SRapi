@@ -256,6 +256,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("POST /v1/responses", server.handleCreateResponse)
 	mux.HandleFunc("POST /v1/messages", server.handleCreateMessage)
 	mux.HandleFunc("POST /v1/embeddings", server.handleCreateEmbedding)
+	mux.HandleFunc("POST /v1/images/generations", server.handleCreateImageGeneration)
 	mux.HandleFunc("POST /v1beta/models/", server.handleGeminiModelAction)
 	server.registerGatewayProviderAliases(mux)
 
@@ -384,6 +385,7 @@ func (s *Server) registerGatewayProviderAliases(mux *http.ServeMux) {
 			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "responses", s.handleCreateResponse, preset.PlatformFamily == providerpreset.PlatformFamilyOpenAICompatible)
 			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "messages", s.handleCreateMessage, true)
 			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "embeddings", s.handleCreateEmbedding, preset.PlatformFamily == providerpreset.PlatformFamilyOpenAICompatible)
+			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "images/generations", s.handleCreateImageGeneration, preset.PlatformFamily == providerpreset.PlatformFamilyOpenAICompatible)
 		}
 	}
 }

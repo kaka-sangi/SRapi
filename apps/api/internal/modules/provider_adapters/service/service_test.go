@@ -137,6 +137,74 @@ func TestOpenAICompatibleAdapterInvokesEmbeddingsUpstream(t *testing.T) {
 	}
 }
 
+func TestOpenAICompatibleAdapterInvokesImageGenerationsUpstream(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/images/generations" {
+			t.Fatalf("unexpected upstream path %s", r.URL.Path)
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer images-secret" {
+			t.Fatalf("unexpected auth header %q", got)
+		}
+		var payload struct {
+			Model          string `json:"model"`
+			Prompt         string `json:"prompt"`
+			N              int    `json:"n"`
+			Size           string `json:"size"`
+			Quality        string `json:"quality"`
+			Style          string `json:"style"`
+			ResponseFormat string `json:"response_format"`
+			User           string `json:"user"`
+			Background     string `json:"background"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		if payload.Model != "image-upstream" || payload.Prompt != "draw a precise test image" || payload.N != 2 || payload.Size != "1024x1024" {
+			t.Fatalf("unexpected image payload: %+v", payload)
+		}
+		if payload.Quality != "high" || payload.Style != "vivid" || payload.ResponseFormat != "url" || payload.User != "user-123" || payload.Background != "transparent" {
+			t.Fatalf("expected image conversion fields, got %+v", payload)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"created":1710000000,"data":[{"url":"https://example.test/image-1.png","revised_prompt":"draw a precise test image, revised"},{"b64_json":"aW1hZ2UtMg=="}],"model":"image-upstream","usage":{"prompt_tokens":11,"completion_tokens":2,"total_tokens":13}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeImageGeneration(context.Background(), contract.ImageGenerationRequest{
+		RequestID:      "req_images",
+		Model:          "image-local",
+		Prompt:         "draw a precise test image",
+		Count:          2,
+		Size:           "1024x1024",
+		Quality:        "high",
+		Style:          "vivid",
+		ResponseFormat: "url",
+		User:           "user-123",
+		Extra:          map[string]any{"background": "transparent"},
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "openai-compatible",
+			Protocol:    "openai-compatible",
+		},
+		Account:    accountcontract.ProviderAccount{ID: 1, Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "image-upstream"},
+		Credential: map[string]any{"api_key": "images-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke image generation upstream: %v", err)
+	}
+	if resp.Model != "image-upstream" || resp.Created != 1710000000 || len(resp.Data) != 2 || resp.Data[0].URL == "" || resp.Data[1].Base64JSON == "" {
+		t.Fatalf("unexpected image generation response: %+v", resp)
+	}
+	if resp.Usage.Estimated || resp.Usage.InputTokens != 11 || resp.Usage.OutputTokens != 2 {
+		t.Fatalf("unexpected image usage: %+v", resp.Usage)
+	}
+}
+
 func TestOpenAICompatibleAdapterForwardsConversionFields(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var payload struct {
