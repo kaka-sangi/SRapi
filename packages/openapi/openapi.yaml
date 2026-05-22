@@ -2931,6 +2931,87 @@ paths:
         default:
           $ref: "#/components/responses/GeminiGatewayError"
 
+  /api/provider/antigravity/v1beta/models/{model}:generateContent:
+    post:
+      tags:
+        - Gateway
+      operationId: generateAntigravityGeminiContentAlias
+      summary: Generate Gemini-compatible content with Antigravity provider context.
+      description: Provider alias route. It reuses the standard Gemini-compatible runtime and forces the `antigravity` provider context.
+      security:
+        - gatewayBearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GeminiModel"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GeminiGenerateContentRequest"
+      responses:
+        "200":
+          description: Gemini-compatible generateContent response.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeminiGenerateContentResponse"
+        "400":
+          $ref: "#/components/responses/GeminiGatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GeminiGatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GeminiGatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GeminiGatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GeminiGatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GeminiGatewayError"
+
+  /api/provider/antigravity/v1beta/models/{model}:streamGenerateContent:
+    post:
+      tags:
+        - Gateway
+      operationId: streamAntigravityGeminiContentAlias
+      summary: Stream Gemini-compatible content with Antigravity provider context.
+      description: Provider alias route. It reuses the standard Gemini-compatible streaming runtime and forces the `antigravity` provider context.
+      security:
+        - gatewayBearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GeminiModel"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GeminiGenerateContentRequest"
+      responses:
+        "200":
+          description: Gemini-compatible SSE stream.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: SSE stream of Gemini-compatible GenerateContentResponse chunks.
+        "400":
+          $ref: "#/components/responses/GeminiGatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GeminiGatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GeminiGatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GeminiGatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GeminiGatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GeminiGatewayError"
+
   /api/provider/openai-compatible/v1/chat/completions:
     post:
       tags:

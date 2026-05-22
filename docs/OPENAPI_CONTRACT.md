@@ -584,6 +584,8 @@ POST /api/provider/rerank-compatible/v1/rerank
 POST /api/provider/anthropic-compatible/v1/messages
 POST /api/provider/antigravity/v1/chat/completions
 POST /api/provider/antigravity/v1/messages
+POST /api/provider/antigravity/v1beta/models/{model}:generateContent
+POST /api/provider/antigravity/v1beta/models/{model}:streamGenerateContent
 ```
 
 第一阶段必须优先实现标准四个 Gateway 入口；已暴露的 Provider alias 必须复用同一 Gateway runtime，只改变 provider context。

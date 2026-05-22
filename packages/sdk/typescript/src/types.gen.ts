@@ -4599,6 +4599,106 @@ export type StreamGeminiContentResponses = {
 
 export type StreamGeminiContentResponse = StreamGeminiContentResponses[keyof StreamGeminiContentResponses];
 
+export type GenerateAntigravityGeminiContentAliasData = {
+    body: GeminiGenerateContentRequest;
+    path: {
+        /**
+         * Gemini model id from the path. SRapi runtime accepts slash-qualified ids when the HTTP router passes them through.
+         */
+        model: string;
+    };
+    query?: never;
+    url: '/api/provider/antigravity/v1beta/models/{model}:generateContent';
+};
+
+export type GenerateAntigravityGeminiContentAliasErrors = {
+    /**
+     * Invalid Gemini gateway request.
+     */
+    400: GeminiErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GeminiErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GeminiErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GeminiErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GeminiErrorResponse;
+    /**
+     * Google-style Gemini gateway error.
+     */
+    default: GeminiErrorResponse;
+};
+
+export type GenerateAntigravityGeminiContentAliasError = GenerateAntigravityGeminiContentAliasErrors[keyof GenerateAntigravityGeminiContentAliasErrors];
+
+export type GenerateAntigravityGeminiContentAliasResponses = {
+    /**
+     * Gemini-compatible generateContent response.
+     */
+    200: GeminiGenerateContentResponse;
+};
+
+export type GenerateAntigravityGeminiContentAliasResponse = GenerateAntigravityGeminiContentAliasResponses[keyof GenerateAntigravityGeminiContentAliasResponses];
+
+export type StreamAntigravityGeminiContentAliasData = {
+    body: GeminiGenerateContentRequest;
+    path: {
+        /**
+         * Gemini model id from the path. SRapi runtime accepts slash-qualified ids when the HTTP router passes them through.
+         */
+        model: string;
+    };
+    query?: never;
+    url: '/api/provider/antigravity/v1beta/models/{model}:streamGenerateContent';
+};
+
+export type StreamAntigravityGeminiContentAliasErrors = {
+    /**
+     * Invalid Gemini gateway request.
+     */
+    400: GeminiErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GeminiErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GeminiErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GeminiErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GeminiErrorResponse;
+    /**
+     * Google-style Gemini gateway error.
+     */
+    default: GeminiErrorResponse;
+};
+
+export type StreamAntigravityGeminiContentAliasError = StreamAntigravityGeminiContentAliasErrors[keyof StreamAntigravityGeminiContentAliasErrors];
+
+export type StreamAntigravityGeminiContentAliasResponses = {
+    /**
+     * SSE stream of Gemini-compatible GenerateContentResponse chunks.
+     */
+    200: string;
+};
+
+export type StreamAntigravityGeminiContentAliasResponse = StreamAntigravityGeminiContentAliasResponses[keyof StreamAntigravityGeminiContentAliasResponses];
+
 export type CreateOpenAiCompatibleChatCompletionAliasData = {
     body: ChatCompletionRequest;
     path?: never;

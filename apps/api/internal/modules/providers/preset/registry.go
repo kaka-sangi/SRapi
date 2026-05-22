@@ -40,6 +40,7 @@ type Preset struct {
 	PlatformFamily       PlatformFamily
 	DisplayName          string
 	RouteAliases         []string
+	GeminiRouteAliases   []string
 	DefaultBaseURL       string
 	AuthModes            []AuthMode
 	ModelCatalogOwner    string
@@ -112,6 +113,7 @@ func antigravityPreset() Preset {
 		[]string{"/antigravity/v1", "/api/provider/antigravity", "/api/provider/antigravity/v1"},
 		antigravityCapabilities(),
 	)
+	preset.GeminiRouteAliases = []string{"/antigravity/v1beta", "/api/provider/antigravity/v1beta"}
 	preset.AuthModes = []AuthMode{AuthModeBearer, AuthModeCustomHeader}
 	preset.AccountTypeAllowlist = []AccountType{
 		AccountTypeDesktopClientToken,
@@ -235,6 +237,7 @@ func (r *Registry) List() []Preset {
 func clonePreset(preset Preset) Preset {
 	cloned := preset
 	cloned.RouteAliases = append([]string(nil), preset.RouteAliases...)
+	cloned.GeminiRouteAliases = append([]string(nil), preset.GeminiRouteAliases...)
 	cloned.AuthModes = append([]AuthMode(nil), preset.AuthModes...)
 	cloned.AccountTypeAllowlist = append([]AccountType(nil), preset.AccountTypeAllowlist...)
 	if preset.Capabilities != nil {

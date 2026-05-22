@@ -61,9 +61,11 @@ Anthropic-compatible preset:
 Antigravity preset:
   POST {alias}/v1/chat/completions
   POST {alias}/v1/messages
+  POST {gemini_alias}/models/{model}:generateContent
+  POST {gemini_alias}/models/{model}:streamGenerateContent
 ```
 
-`{alias}` 来自 `COMPATIBLE_PROVIDER_REGISTRY_SPEC.md` 的 `route_aliases`。例如 `/api/provider/deepseek/v1/chat/completions` 强制 `provider_key=deepseek`，但仍复用标准 Gateway runtime、API Key policy、model visibility、Scheduler、usage 和 decision 记录。
+`{alias}` 来自 `COMPATIBLE_PROVIDER_REGISTRY_SPEC.md` 的 `route_aliases`；`{gemini_alias}` 来自同一 preset 的 Gemini model-action aliases。例如 `/api/provider/deepseek/v1/chat/completions` 强制 `provider_key=deepseek`，但仍复用标准 Gateway runtime、API Key policy、model visibility、Scheduler、usage 和 decision 记录。
 
 ## 4. Provider alias 规划
 
@@ -155,8 +157,12 @@ Scheduler / Provider Adapter / Reverse Proxy Runtime。上游子协议由 `provi
 WP-360 起，Antigravity 文本 alias 已实现：`/antigravity/v1/chat/completions`、
 `/api/provider/antigravity/v1/chat/completions`、`/antigravity/v1/messages` 和
 `/api/provider/antigravity/v1/messages` 强制 `provider_key=antigravity`，仍复用标准
-Gateway runtime。`/antigravity/v1beta/*` 与 `/api/provider/antigravity/v1beta/*` 的
-Gemini model-action alias 仍是后续 route-parser package。
+Gateway runtime。WP-370 起，Antigravity Gemini model-action alias 已实现：
+`/antigravity/v1beta/models/{model}:generateContent`、
+`/antigravity/v1beta/models/{model}:streamGenerateContent`、
+`/api/provider/antigravity/v1beta/models/{model}:generateContent` 和
+`/api/provider/antigravity/v1beta/models/{model}:streamGenerateContent` 强制
+`provider_key=antigravity`，并复用标准 Gemini-native Gateway handler。
 
 ## 5. Route Matrix
 

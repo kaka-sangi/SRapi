@@ -98,8 +98,10 @@ WP-360 起，Antigravity 文本 provider alias（例如
 `/api/provider/antigravity/v1/chat/completions` 和
 `/api/provider/antigravity/v1/messages`）只强制 `provider_key=antigravity`；
 OpenAI/Anthropic/Gemini 的上游子协议仍由 `provider.protocol` 决定。
-Gemini-native `/antigravity/v1beta/models/{model}:generateContent` alias 需要单独的
-model-action route parser，仍归后续包。
+WP-370 起，Gemini-native Antigravity provider alias（例如
+`/api/provider/antigravity/v1beta/models/{model}:generateContent` 和
+`/api/provider/antigravity/v1beta/models/{model}:streamGenerateContent`）复用同一个
+Gemini Gateway handler，只改写 provider context 和保留原始 alias source endpoint。
 
 ## 3. 端点转换架构
 

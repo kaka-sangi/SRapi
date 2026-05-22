@@ -396,6 +396,13 @@ func (s *Server) registerGatewayProviderAliases(mux *http.ServeMux) {
 			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "moderations", s.handleCreateModeration, presetSupports(preset, capabilitiescontract.KeyModerations))
 			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "rerank", s.handleCreateRerank, presetSupports(preset, capabilitiescontract.KeyRerank))
 		}
+		for _, alias := range preset.GeminiRouteAliases {
+			prefix := strings.TrimRight(alias, "/")
+			if prefix == "" {
+				continue
+			}
+			s.registerGatewayGeminiAliasRoute(mux, seen, preset.ProviderKey, prefix)
+		}
 	}
 }
 
@@ -417,6 +424,34 @@ func (s *Server) registerGatewayAliasRoute(mux *http.ServeMux, seen map[string]s
 	}
 	seen[pattern] = struct{}{}
 	mux.HandleFunc(pattern, s.withGatewayProviderAlias(providerKey, handler))
+}
+
+func (s *Server) registerGatewayGeminiAliasRoute(mux *http.ServeMux, seen map[string]struct{}, providerKey, prefix string) {
+	path := prefix + "/models/"
+	pattern := "POST " + path
+	if _, ok := seen[pattern]; ok {
+		return
+	}
+	seen[pattern] = struct{}{}
+	mux.HandleFunc(pattern, s.withGatewayGeminiProviderAlias(providerKey, prefix))
+}
+
+func (s *Server) withGatewayGeminiProviderAlias(providerKey string, prefix string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		aliasPath := r.URL.Path
+		runtimePath := "/v1beta" + strings.TrimPrefix(aliasPath, prefix)
+		route := gatewayRouteContext{
+			ForcedProviderKey: strings.TrimSpace(providerKey),
+			SourceEndpoint:    aliasPath,
+		}
+		cloned := r.Clone(context.WithValue(r.Context(), gatewayRouteContextKey{}, route))
+		cloned.URL.Path = runtimePath
+		cloned.RequestURI = runtimePath
+		if r.URL.RawQuery != "" {
+			cloned.RequestURI += "?" + r.URL.RawQuery
+		}
+		s.handleGeminiModelAction(w, cloned)
+	}
 }
 
 func newRequestID() string {

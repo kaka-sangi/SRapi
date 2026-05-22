@@ -1347,11 +1347,59 @@ Required gates:
 - `make secret-scan`
 - `git diff --check`
 
-## WP-370+: Ecosystem And Remaining Advanced Surface
+## WP-370: Antigravity Gemini Model-Action Alias Routes v1
+
+Objective: complete the Antigravity provider-prefixed Gateway alias surface for Gemini-native GenerateContent and StreamGenerateContent routes by routing Antigravity `/v1beta/models/{model}:...` aliases through the existing Gemini Gateway handler, Scheduler, Provider Adapter, and Reverse Proxy Runtime without adding Gateway-local DTOs.
+
+Read first:
+
+- `docs/OPENAPI_CONTRACT.md`
+- `docs/GATEWAY_ROUTE_MATRIX.md`
+- `docs/AI_ENDPOINT_COMPATIBILITY.md`
+- `docs/COMPATIBLE_PROVIDER_REGISTRY_SPEC.md`
+- `docs/PROVIDER_ADAPTER_SPEC.md`
+- `docs/REVERSE_PROXY_SPEC.md`
+- `packages/openapi/openapi.yaml`
+- `apps/api/internal/modules/providers/preset`
+- `apps/api/internal/modules/provider_adapters`
+- `apps/api/internal/modules/reverse_proxy`
+- `apps/api/internal/httpserver`
+
+Owns:
+
+- Antigravity Gemini model-action alias metadata in the provider preset registry
+- HTTP route registration for `/antigravity/v1beta/models/{model}:generateContent`, `/antigravity/v1beta/models/{model}:streamGenerateContent`, `/api/provider/antigravity/v1beta/models/{model}:generateContent`, and `/api/provider/antigravity/v1beta/models/{model}:streamGenerateContent`
+- OpenAPI representative contracts for `/api/provider/antigravity/v1beta/models/{model}:generateContent` and `/api/provider/antigravity/v1beta/models/{model}:streamGenerateContent`
+- Gateway regressions proving Antigravity Gemini aliases force `provider_key=antigravity`, preserve alias source endpoints, and still dispatch through `reverse-proxy-antigravity` using `provider.protocol = gemini-compatible`
+- route matrix/provider registry/compatibility docs and status updates
+
+Definition of Done:
+
+- Antigravity Gemini model-action aliases are registered from preset metadata instead of a provider-specific branch in Scheduler or Provider Adapter code.
+- Non-streaming Antigravity Gemini alias requests normalize the Gemini request, schedule only Provider records named `antigravity`, dispatch to upstream `models/{mapped_model}:generateContent`, render Gemini-shaped responses, and record usage/decision evidence with the alias source endpoint.
+- Streaming Antigravity Gemini alias requests dispatch to upstream `models/{mapped_model}:streamGenerateContent`, render Gemini SSE chunks, and preserve Scheduler/usage evidence.
+- Standard `/v1beta/models/{model}:generateContent` and `/v1beta/models/{model}:streamGenerateContent` behavior remains unchanged.
+- No Gateway-local Antigravity request/response DTO is introduced; `provider.protocol` continues to select the target upstream protocol.
+- No frontend visuals are added.
+
+Required gates:
+
+- `make openapi-lint`
+- `make openapi-bundle`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/modules/providers/preset ./internal/modules/provider_adapters/... ./internal/modules/reverse_proxy/... ./internal/httpserver`
+- `cd apps/api && go test ./...`
+- `make architecture-check`
+- `make code-quality-check`
+- `make secret-scan`
+- `git diff --check`
+
+## WP-380+: Ecosystem And Remaining Advanced Surface
 
 Use `ROADMAP.md` Phase 7 through Phase 8 to split future packages for:
 
-- Antigravity Gemini `/v1beta/models/{model}:generateContent` and `:streamGenerateContent` provider aliases
 - realtime/websocket
 - SDK examples
 - migration guides

@@ -93,12 +93,19 @@ anthropic-compatible -> /messages
 gemini-compatible    -> models/{model}:generateContent
 ```
 
-当前 registry 只为 Antigravity 暴露 text alias：
+当前 registry 为 Antigravity 暴露 text alias：
 
 ```txt
 /antigravity/v1
 /api/provider/antigravity
 /api/provider/antigravity/v1
+```
+
+WP-370 起还暴露 Gemini model-action alias：
+
+```txt
+/antigravity/v1beta
+/api/provider/antigravity/v1beta
 ```
 
 允许账号类型：
@@ -110,9 +117,8 @@ custom_reverse_proxy
 ```
 
 `antigravity` preset 不提供通用 `default_base_url`；管理员必须在 Provider Account
-metadata 中配置实际 `base_url`。`/antigravity/v1beta/*` 和
-`/api/provider/antigravity/v1beta/*` 的 Gemini model-action alias 需要单独 route-parser
-支持，不由本 text alias preset 注册。
+metadata 中配置实际 `base_url`。Gemini model-action aliases 只复用标准 Gemini Gateway
+handler，并保留 alias source endpoint 作为 usage log 与 scheduler decision 证据。
 
 ## 7. Preset Schema
 

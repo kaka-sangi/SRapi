@@ -82,6 +82,9 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	if !antigravityPreset.MatchesPath("/api/provider/antigravity/v1/chat/completions") || !antigravityPreset.MatchesPath("/antigravity/v1/messages") {
 		t.Fatalf("expected antigravity text route aliases to match paths")
 	}
+	if !reflect.DeepEqual(antigravityPreset.GeminiRouteAliases, []string{"/antigravity/v1beta", "/api/provider/antigravity/v1beta"}) {
+		t.Fatalf("unexpected antigravity Gemini aliases: %v", antigravityPreset.GeminiRouteAliases)
+	}
 	if !containsAccountType(antigravityPreset.AccountTypeAllowlist, AccountTypeDesktopClientToken) || !containsAccountType(antigravityPreset.AccountTypeAllowlist, AccountTypeIdePluginToken) {
 		t.Fatalf("expected antigravity allowlist to include desktop and IDE token accounts")
 	}
