@@ -2052,3 +2052,52 @@ Required gates:
 - `make code-quality-check`
 - `make secret-scan`
 - `git diff --check`
+
+## WP-520: Images Edits Streaming Events v1
+
+Objective: add OpenAI-compatible image edit streaming events to the existing `/v1/images/edits` runtime without introducing a new provider-specific shortcut or bypassing Gateway auth, Scheduler, Provider Adapter, usage evidence, or the current multipart/JSON compatibility behavior.
+
+Read first:
+
+- `docs/OPENAPI_CONTRACT.md`
+- `docs/GATEWAY_ROUTE_MATRIX.md`
+- `docs/AI_ENDPOINT_COMPATIBILITY.md`
+- `docs/PROVIDER_ADAPTER_SPEC.md`
+- `packages/openapi/openapi.yaml`
+- `/home/senran/Desktop/chatgpt2api/test/test_v1_images_edits.py`
+- `/home/senran/Desktop/chatgpt2api/services/protocol/conversation.py`
+- `apps/api/internal/httpserver/runtime_gateway_media_handlers.go`
+- `apps/api/internal/modules/provider_adapters/service/image_edits.go`
+- `apps/api/internal/modules/provider_adapters/service/service.go`
+
+Owns:
+
+- OpenAPI description of image edit SSE/streaming behavior and request fields already reserved for streaming
+- HTTP runtime support for `stream=true` and `partial_images` on `/v1/images/edits`
+- Provider adapter support for streaming image edit outputs and SSE forwarding where upstream supports it
+- Focused regressions proving streaming and non-streaming image edit paths both preserve Gateway evidence and return OpenAI-shaped outputs
+- Docs/status updates for the streaming compatibility boundary
+
+Definition of Done:
+
+- `POST /v1/images/edits` accepts `stream=true` with multipart and JSON bodies and returns `text/event-stream` for streaming calls.
+- `partial_images` is honored or preserved as supported by the existing upstream path, with explicit rejection if an upstream/provider cannot handle it.
+- Streaming image edit events are relayed or synthesized through the same Gateway auth, model policy, entitlement, Scheduler, Provider Adapter, usage, billing, and feedback path as non-streaming edits.
+- Existing non-streaming image edit behavior remains unchanged, including JSON local references from WP-510.
+- Remote URL and `file_id` rejection behavior from WP-510 remains unchanged.
+- No frontend visuals are added.
+
+Required gates:
+
+- `make openapi-lint`
+- `make openapi-bundle`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/httpserver -run 'TestGatewayImageEdit' -count=1`
+- `cd apps/api && go test ./internal/modules/gateway/... ./internal/modules/provider_adapters/... ./internal/httpserver`
+- `cd apps/api && go test ./...`
+- `make architecture-check`
+- `make code-quality-check`
+- `make secret-scan`
+- `git diff --check`

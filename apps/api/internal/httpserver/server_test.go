@@ -3324,6 +3324,114 @@ func TestGatewayImageEditAcceptsJSONImageReferences(t *testing.T) {
 	}
 }
 
+func TestGatewayImageEditStreamReturnsSSE(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseMultipartForm(16 << 20); err != nil {
+			t.Fatalf("parse upstream multipart: %v", err)
+		}
+		if got := r.FormValue("stream"); got != "" {
+			t.Fatalf("expected stream to stay local, got %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"created":1710000500,"data":[{"b64_json":"c3RyZWFtLWVkaXQ=","revised_prompt":"stream edit"}],"model":"image-edit-stream-upstream","usage":{"input_tokens":22,"output_tokens":6,"total_tokens":28}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"wp520-openai","display_name":"WP520 OpenAI","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active","capabilities":{"images":true}}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"wp520-image-edit-stream-model","display_name":"WP520 Image Edit Stream Model","status":"active","capabilities":[{"key":"images","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"image-edit-stream-upstream","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"wp520-image-edit-stream-account","runtime_class":"api_key","credential":{"api_key":"image-edit-stream-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
+
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	rec := mustGatewayImageEditRequest(t, handler, apiKey, "/v1/images/edits", map[string]string{
+		"model":          "wp520-image-edit-stream-model",
+		"prompt":         "stream the edit",
+		"stream":         "true",
+		"partial_images": "2",
+		"n":              "1",
+	}, "source.png", "image/png", []byte("PNG-stream-source"), "", "", nil)
+	if got := rec.Header().Get("Content-Type"); got != "text/event-stream" {
+		t.Fatalf("expected event stream content type, got %q", got)
+	}
+	body := rec.Body.String()
+	for _, expected := range []string{"data:", "image.generation.result", "stream edit", "data: [DONE]"} {
+		if !strings.Contains(body, expected) {
+			t.Fatalf("expected SSE body to contain %q, got %s", expected, body)
+		}
+	}
+
+	usageReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/usage-logs?model=wp520-image-edit-stream-model", nil)
+	usageReq.AddCookie(sessionCookie)
+	usageRec := httptest.NewRecorder()
+	handler.ServeHTTP(usageRec, usageReq)
+	if usageRec.Code != http.StatusOK {
+		t.Fatalf("expected usage logs 200, got %d", usageRec.Code)
+	}
+	var usageResp apiopenapi.UsageLogListResponse
+	if err := json.NewDecoder(usageRec.Body).Decode(&usageResp); err != nil {
+		t.Fatalf("decode usage logs: %v", err)
+	}
+	if len(usageResp.Data) != 1 {
+		t.Fatalf("expected one stream image edit usage record, got %+v", usageResp.Data)
+	}
+	usage := usageResp.Data[0]
+	if !usage.Success || usage.SourceEndpoint != "/v1/images/edits" || usage.ProviderId == nil || *usage.ProviderId != string(providerResp.Data.Id) || usage.AccountId == nil || *usage.AccountId != string(accountResp.Data.Id) || usage.TotalTokens != 28 {
+		t.Fatalf("unexpected stream image edit usage evidence: %+v", usage)
+	}
+}
+
+func TestGatewayImageEditJSONStreamReturnsSSE(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseMultipartForm(16 << 20); err != nil {
+			t.Fatalf("parse upstream multipart: %v", err)
+		}
+		if got := r.FormValue("stream"); got != "" {
+			t.Fatalf("expected stream to stay local, got %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"created":1710000600,"data":[{"url":"https://example.test/wp520-json-stream.png","revised_prompt":"json stream edit"}],"model":"image-edit-json-stream-upstream","usage":{"input_tokens":23,"output_tokens":7,"total_tokens":30}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"wp520-json-openai","display_name":"WP520 JSON OpenAI","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active","capabilities":{"images":true}}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"wp520-image-edit-json-stream-model","display_name":"WP520 Image Edit JSON Stream Model","status":"active","capabilities":[{"key":"images","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"image-edit-json-stream-upstream","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"wp520-image-edit-json-stream-account","runtime_class":"api_key","credential":{"api_key":"image-edit-json-stream-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
+
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	body := `{"model":"wp520-image-edit-json-stream-model","prompt":"json stream the edit","stream":true,"images":[{"image_url":"data:image/png;base64,UE5HLWpzb24tc3RyZWFt"}]}`
+	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/images/edits", body)
+	if got := rec.Header().Get("Content-Type"); got != "text/event-stream" {
+		t.Fatalf("expected event stream content type, got %q", got)
+	}
+	if got := rec.Body.String(); !strings.Contains(got, "image.generation.result") || !strings.Contains(got, "json stream edit") || !strings.Contains(got, "data: [DONE]") {
+		t.Fatalf("unexpected SSE body: %s", got)
+	}
+
+	usageReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/usage-logs?model=wp520-image-edit-json-stream-model", nil)
+	usageReq.AddCookie(sessionCookie)
+	usageRec := httptest.NewRecorder()
+	handler.ServeHTTP(usageRec, usageReq)
+	if usageRec.Code != http.StatusOK {
+		t.Fatalf("expected usage logs 200, got %d", usageRec.Code)
+	}
+	var usageResp apiopenapi.UsageLogListResponse
+	if err := json.NewDecoder(usageRec.Body).Decode(&usageResp); err != nil {
+		t.Fatalf("decode usage logs: %v", err)
+	}
+	if len(usageResp.Data) != 1 {
+		t.Fatalf("expected one json stream usage record, got %+v", usageResp.Data)
+	}
+	usage := usageResp.Data[0]
+	if !usage.Success || usage.SourceEndpoint != "/v1/images/edits" || usage.ProviderId == nil || *usage.ProviderId != string(providerResp.Data.Id) || usage.AccountId == nil || *usage.AccountId != string(accountResp.Data.Id) || usage.TotalTokens != 30 {
+		t.Fatalf("unexpected json stream image edit usage evidence: %+v", usage)
+	}
+}
+
 func TestGatewayImageEditRejectsUnsupportedJSONReferences(t *testing.T) {
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)

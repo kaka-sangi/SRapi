@@ -2901,7 +2901,7 @@ paths:
                   response_format: b64_json
       responses:
         "200":
-          description: OpenAI-compatible image edit response.
+          description: OpenAI-compatible image edit response, or SSE stream when stream is true.
           headers:
             X-Request-ID:
               $ref: "#/components/headers/RequestIdHeader"
@@ -2909,6 +2909,9 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ImageGenerationResponse"
+            text/event-stream:
+              schema:
+                $ref: "#/components/schemas/ImageGenerationStreamEvent"
         "400":
           $ref: "#/components/responses/GatewayBadRequest"
         "401":
@@ -3837,7 +3840,7 @@ paths:
               $ref: "#/components/schemas/ImageEditJsonRequest"
       responses:
         "200":
-          description: OpenAI-compatible image edit response.
+          description: OpenAI-compatible image edit response, or SSE stream when stream is true.
           headers:
             X-Request-ID:
               $ref: "#/components/headers/RequestIdHeader"
@@ -3845,6 +3848,9 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ImageGenerationResponse"
+            text/event-stream:
+              schema:
+                $ref: "#/components/schemas/ImageGenerationStreamEvent"
         "400":
           $ref: "#/components/responses/GatewayBadRequest"
         "401":
@@ -7563,12 +7569,12 @@ components:
         stream:
           type: boolean
           default: false
-          description: Reserved for future image edit streaming support.
+          description: When true, returns text/event-stream with a final image.generation.result chunk.
         partial_images:
           type: integer
           minimum: 0
           maximum: 3
-          description: Reserved for future image edit streaming support.
+          description: Forwarded to upstream when provided; the current v1 renderer emits only the final image.generation.result chunk.
         user:
           type: string
       additionalProperties: true
@@ -7629,12 +7635,12 @@ components:
         stream:
           type: boolean
           default: false
-          description: Reserved for future image edit streaming support.
+          description: When true, returns text/event-stream with a final image.generation.result chunk.
         partial_images:
           type: integer
           minimum: 0
           maximum: 3
-          description: Reserved for future image edit streaming support.
+          description: Forwarded to upstream when provided; the current v1 renderer emits only the final image.generation.result chunk.
         user:
           type: string
       additionalProperties: true
@@ -7725,6 +7731,34 @@ components:
         created:
           type: integer
           format: int64
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImageGenerationObject"
+
+    ImageGenerationStreamEvent:
+      type: object
+      required:
+        - object
+        - created
+        - model
+        - index
+        - total
+        - data
+      properties:
+        object:
+          type: string
+          enum:
+            - image.generation.result
+        created:
+          type: integer
+          format: int64
+        model:
+          type: string
+        index:
+          type: integer
+        total:
+          type: integer
         data:
           type: array
           items:

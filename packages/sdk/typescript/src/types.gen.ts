@@ -1220,11 +1220,11 @@ export type ImageEditRequest = {
     moderation?: string;
     input_fidelity?: string;
     /**
-     * Reserved for future image edit streaming support.
+     * When true, returns text/event-stream with a final image.generation.result chunk.
      */
     stream?: boolean;
     /**
-     * Reserved for future image edit streaming support.
+     * Forwarded to upstream when provided; the current v1 renderer emits only the final image.generation.result chunk.
      */
     partial_images?: number;
     user?: string;
@@ -1258,11 +1258,11 @@ export type ImageEditJsonRequest = {
     moderation?: string;
     input_fidelity?: string;
     /**
-     * Reserved for future image edit streaming support.
+     * When true, returns text/event-stream with a final image.generation.result chunk.
      */
     stream?: boolean;
     /**
-     * Reserved for future image edit streaming support.
+     * Forwarded to upstream when provided; the current v1 renderer emits only the final image.generation.result chunk.
      */
     partial_images?: number;
     user?: string;
@@ -1303,6 +1303,15 @@ export type ImageGenerationObject = {
 
 export type ImageGenerationResponse = {
     created: number;
+    data: Array<ImageGenerationObject>;
+};
+
+export type ImageGenerationStreamEvent = {
+    object: 'image.generation.result';
+    created: number;
+    model: string;
+    index: number;
+    total: number;
     data: Array<ImageGenerationObject>;
 };
 
@@ -4681,7 +4690,7 @@ export type CreateImageEditError = CreateImageEditErrors[keyof CreateImageEditEr
 
 export type CreateImageEditResponses = {
     /**
-     * OpenAI-compatible image edit response.
+     * OpenAI-compatible image edit response, or SSE stream when stream is true.
      */
     200: ImageGenerationResponse;
 };
@@ -5646,7 +5655,7 @@ export type CreateOpenAiCompatibleImageEditAliasError = CreateOpenAiCompatibleIm
 
 export type CreateOpenAiCompatibleImageEditAliasResponses = {
     /**
-     * OpenAI-compatible image edit response.
+     * OpenAI-compatible image edit response, or SSE stream when stream is true.
      */
     200: ImageGenerationResponse;
 };

@@ -164,7 +164,7 @@ func writeImageEditFilePart(writer *multipart.Writer, fieldName string, image co
 
 func reservedImageEditField(key string) bool {
 	switch strings.TrimSpace(key) {
-	case "image", "image[]", "mask", "model", "prompt", "n", "size", "quality", "response_format", "user":
+	case "image", "image[]", "mask", "model", "prompt", "n", "size", "quality", "response_format", "stream", "user":
 		return true
 	default:
 		return false

@@ -58,6 +58,7 @@ last_completed:
 - WP-490: Images variations runtime v1 now exposes OpenAI-compatible multipart `POST /v1/images/variations`, provider alias routing, canonical image variation normalization/rendering, OpenAI-compatible upstream `/images/variations` multipart adapter dispatch, explicit `images` Scheduler capability filtering, usage/billing/Scheduler feedback evidence, and generated OpenAPI/SDK parity.
 - WP-500: Antigravity 2api model discovery now lets `reverse-proxy-antigravity` accounts POST `{base_url}/v1internal:fetchAvailableModels` through Reverse Proxy Runtime, parses model catalogs, persists `supported_models` when requested, and keeps the discovery endpoint credential-free in responses.
 - WP-510: Images edits JSON references now let `/v1/images/edits` and OpenAI-compatible image edit aliases accept application/json local data URL / base64 image references, decode them into the existing canonical image edit path, forward upstream multipart `/images/edits`, and explicitly reject remote URLs and `file_id` references.
+- WP-520: Images edits streaming events now let `/v1/images/edits` and OpenAI-compatible image edit aliases return `text/event-stream` when `stream=true`, synthesize a final `image.generation.result` SSE chunk through the existing Gateway/auth/Scheduler/Provider Adapter/usage path, and keep remote URL / `file_id` rejection unchanged.
 
 current:
 
@@ -247,4 +248,5 @@ notes:
 | WP-490 | completed | Images variations runtime v1. |
 | WP-500 | completed | Antigravity 2api model discovery v1. |
 | WP-510 | completed | Images edits JSON references v1. |
+| WP-520 | completed | Images edits streaming events v1. |
 | WP-500+ | pending | Remaining ecosystem and advanced endpoint packages. |

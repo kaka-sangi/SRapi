@@ -497,6 +497,39 @@ func (s *Service) BuildCanonicalImageGenerationResponse(req gatewaycontract.Cano
 	}
 }
 
+func (s *Service) RenderImageGenerationStreamEvents(resp gatewaycontract.ImageGenerationResponse) []StreamEvent {
+	data := make([]apiopenapi.ImageGenerationObject, 0, len(resp.Data))
+	for _, item := range resp.Data {
+		image := apiopenapi.ImageGenerationObject{
+			AdditionalProperties: cloneMap(item.Metadata),
+		}
+		if value := strings.TrimSpace(item.URL); value != "" {
+			image.Url = &value
+		}
+		if value := strings.TrimSpace(item.Base64JSON); value != "" {
+			image.B64Json = &value
+		}
+		if value := strings.TrimSpace(item.RevisedPrompt); value != "" {
+			image.RevisedPrompt = &value
+		}
+		data = append(data, image)
+	}
+	total := len(data)
+	if total == 0 {
+		total = 1
+	}
+	return []StreamEvent{{
+		Data: map[string]any{
+			"object":  "image.generation.result",
+			"created": resp.Created,
+			"model":   resp.Model,
+			"index":   1,
+			"total":   total,
+			"data":    data,
+		},
+	}}
+}
+
 func (s *Service) BuildCanonicalModerationResponse(req gatewaycontract.CanonicalRequest, id string, results []gatewaycontract.ModerationResult, usage gatewaycontract.Usage) gatewaycontract.ModerationResponse {
 	model := strings.TrimSpace(req.Model)
 	if model == "" {

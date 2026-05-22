@@ -415,6 +415,11 @@ func (s *Server) handleCreateImageEdit(w http.ResponseWriter, r *http.Request) {
 		Pricing:               pricing,
 		CompatibilityWarnings: canonicalResp.CompatibilityWarnings,
 	})
+	streamRequested := body.Stream != nil && *body.Stream
+	if streamRequested {
+		writeSSEEvents(w, s.runtime.gateway.RenderImageGenerationStreamEvents(canonicalResp))
+		return
+	}
 	writeJSONAny(w, http.StatusOK, s.runtime.gateway.RenderImageGeneration(canonicalResp))
 }
 

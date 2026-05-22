@@ -761,6 +761,21 @@ func (e ImageGenerationRequestStyle) Valid() bool {
 	}
 }
 
+// Defines values for ImageGenerationStreamEventObject.
+const (
+	ImageGenerationResult ImageGenerationStreamEventObject = "image.generation.result"
+)
+
+// Valid indicates whether the value is a known member of the ImageGenerationStreamEventObject enum.
+func (e ImageGenerationStreamEventObject) Valid() bool {
+	switch e {
+	case ImageGenerationResult:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ImageVariationRequestResponseFormat.
 const (
 	ImageVariationRequestResponseFormatB64JSON ImageVariationRequestResponseFormat = "b64_json"
@@ -2363,7 +2378,7 @@ type ImageEditJsonRequest struct {
 	// OutputFormat Provider-specific encoded output format such as `png`, `jpeg`, or `webp`.
 	OutputFormat *string `json:"output_format,omitempty"`
 
-	// PartialImages Reserved for future image edit streaming support.
+	// PartialImages Forwarded to upstream when provided; the current v1 renderer emits only the final image.generation.result chunk.
 	PartialImages *int   `json:"partial_images,omitempty"`
 	Prompt        string `json:"prompt"`
 
@@ -2374,7 +2389,7 @@ type ImageEditJsonRequest struct {
 	// Size Provider-specific output size such as `1024x1024`, `1024x1536`, `1536x1024`, or `auto`.
 	Size *string `json:"size,omitempty"`
 
-	// Stream Reserved for future image edit streaming support.
+	// Stream When true, returns text/event-stream with a final image.generation.result chunk.
 	Stream               *bool                  `json:"stream,omitempty"`
 	User                 *string                `json:"user,omitempty"`
 	AdditionalProperties map[string]interface{} `json:"-"`
@@ -2401,7 +2416,7 @@ type ImageEditRequest struct {
 	// OutputFormat Provider-specific encoded output format such as `png`, `jpeg`, or `webp`.
 	OutputFormat *string `json:"output_format,omitempty"`
 
-	// PartialImages Reserved for future image edit streaming support.
+	// PartialImages Forwarded to upstream when provided; the current v1 renderer emits only the final image.generation.result chunk.
 	PartialImages *int   `json:"partial_images,omitempty"`
 	Prompt        string `json:"prompt"`
 
@@ -2412,7 +2427,7 @@ type ImageEditRequest struct {
 	// Size Provider-specific output size such as `1024x1024`, `1024x1536`, `1536x1024`, or `auto`.
 	Size *string `json:"size,omitempty"`
 
-	// Stream Reserved for future image edit streaming support.
+	// Stream When true, returns text/event-stream with a final image.generation.result chunk.
 	Stream               *bool                  `json:"stream,omitempty"`
 	User                 *string                `json:"user,omitempty"`
 	AdditionalProperties map[string]interface{} `json:"-"`
@@ -2459,6 +2474,19 @@ type ImageGenerationResponse struct {
 	Created int64                   `json:"created"`
 	Data    []ImageGenerationObject `json:"data"`
 }
+
+// ImageGenerationStreamEvent defines model for ImageGenerationStreamEvent.
+type ImageGenerationStreamEvent struct {
+	Created int64                            `json:"created"`
+	Data    []ImageGenerationObject          `json:"data"`
+	Index   int                              `json:"index"`
+	Model   string                           `json:"model"`
+	Object  ImageGenerationStreamEventObject `json:"object"`
+	Total   int                              `json:"total"`
+}
+
+// ImageGenerationStreamEventObject defines model for ImageGenerationStreamEvent.Object.
+type ImageGenerationStreamEventObject string
 
 // ImageVariationRequest defines model for ImageVariationRequest.
 type ImageVariationRequest struct {
