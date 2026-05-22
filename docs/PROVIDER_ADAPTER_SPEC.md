@@ -105,9 +105,18 @@ openai-compatible       -> /chat/completions
 anthropic-compatible    -> /messages
 gemini-compatible       -> /models/{model}:generateContent 或 :streamGenerateContent
 native-gemini           -> /models/{model}:generateContent 或 :streamGenerateContent
+reverse-proxy-chatgpt-web -> Reverse Proxy Runtime + ChatGPT Web /backend-api/conversation payload
 reverse-proxy-gemini-cli -> Reverse Proxy Runtime + Gemini GenerateContent payload
 reverse-proxy-antigravity -> Reverse Proxy Runtime + provider.protocol 选择的 OpenAI/Anthropic/Gemini payload
 ```
+
+WP-430 ChatGPT Web 2api boundary:
+
+- `reverse-proxy-chatgpt-web` dispatches OpenAI-compatible text requests through Reverse Proxy Runtime, not through direct API-key HTTP.
+- The upstream endpoint is `{chatgpt_origin}/backend-api/conversation`; account metadata should store `base_url` at the ChatGPT Web origin, not at `/v1/chat/completions`.
+- Adapter-owned official-client shape includes browser `Origin` / `Referer` / `Sec-*`, `OAI-*`, `X-OpenAI-Target-*`, Sentinel requirements headers, and ChatGPT Web Conversation body fields such as `action`, `parent_message_id`, `conversation_mode`, `force_use_sse`, timezone, and `client_contextual_info`.
+- Runtime-owned transport still injects the selected account credential as OAuth/Web-session bearer or cookie and strips caller/SRapi headers; adapter must not forward caller `Authorization`.
+- `runtime_class = api_key` is rejected for this adapter because ChatGPT Web 2api means official Web OAuth/session simulation, not OpenAI API-key mode.
 
 WP-420 Claude Code 2api boundary:
 
@@ -641,6 +650,7 @@ Audio speech dispatch must send JSON with mapped upstream `model`, `input`, `voi
 `reverse-proxy-*` 类 Adapter 必须遵守 `REVERSE_PROXY_SPEC.md`：
 
 - “反代 / 2api”的权威定义见 `2API_REVERSE_PROXY_DEFINITION.md`：Adapter 必须构造目标官方客户端形态的上游请求，例如 Codex CLI、Claude Code CLI、Gemini CLI 或 Antigravity Desktop / IDE，而不是把下游请求简单透传到兼容 API。
+- `reverse-proxy-chatgpt-web` 文本请求必须构造 ChatGPT Web Conversation / official-client 形态，POST 到 ChatGPT Web origin 下的 `/backend-api/conversation`，并通过 Reverse Proxy Runtime 注入选中账号 OAuth/session token 身份；不得退化为 OpenAI-compatible `/chat/completions`，也不得接受 `runtime_class = api_key` 作为 2api 身份。
 - `reverse-proxy-codex-cli` 文本请求必须构造 Codex Responses / official-client 形态，POST 到配置的 Codex base URL 下的 `/responses`，并通过 Reverse Proxy Runtime 注入选中账号 OAuth/session/CLI token 身份；不得退化为 OpenAI-compatible `/chat/completions`，也不得接受 `runtime_class = api_key` 作为 2api 身份。
 - `reverse-proxy-codex-cli` realtime 请求必须通过 `PrepareRealtime` 构造 Codex Responses WebSocket session：从 Codex base URL 派生 `ws/wss` `/responses`，设置 Codex official-client headers，生成带 `type: response.create` 和 mapped upstream model 的首帧，并继续拒绝 `runtime_class = api_key`。
 - 上游请求必须通过 Reverse Proxy Runtime 发起，不得使用裸 `net/http` 默认客户端。

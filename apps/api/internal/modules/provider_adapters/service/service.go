@@ -533,6 +533,9 @@ func (s *Service) invokeReverseProxyOpenAICompatible(ctx context.Context, req co
 	if s.reverseProxy == nil {
 		return contract.TextResponse{}, contract.ProviderError{Class: "network_error", StatusCode: http.StatusBadGateway, Message: "reverse proxy runtime unavailable"}
 	}
+	if isChatGPTWebReverseProxy(req) {
+		return s.invokeReverseProxyChatGPTWebConversation(ctx, req, baseURL)
+	}
 	payload := openAICompatiblePayload(req)
 	if req.Stream {
 		payload.StreamOptions = &openAIStreamOptions{IncludeUsage: true}

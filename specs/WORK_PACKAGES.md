@@ -1618,7 +1618,51 @@ Required gates:
 - `make secret-scan`
 - `git diff --check`
 
-## WP-430+: Ecosystem And Remaining Advanced Surface
+## WP-430: ChatGPT Web 2api Conversation Upstream Shape v1
+
+Objective: make `reverse-proxy-chatgpt-web` construct the ChatGPT Web official-client Conversation shape and send it through Reverse Proxy Runtime with selected OAuth/session credentials, instead of treating ChatGPT Web 2api as generic OpenAI-compatible `/chat/completions`.
+
+Read first:
+
+- `docs/2API_REVERSE_PROXY_DEFINITION.md`
+- `docs/REVERSE_PROXY_SPEC.md`
+- `docs/PROVIDER_ADAPTER_SPEC.md`
+- `apps/api/internal/modules/provider_adapters/contract`
+- `apps/api/internal/modules/provider_adapters/service`
+- `apps/api/internal/modules/reverse_proxy/contract`
+- local reference: `/home/senran/Desktop/chatgpt2api/services/openai_backend_api.py`
+- local reference: `/home/senran/Desktop/chatgpt2api/services/protocol/conversation.py`
+
+Owns:
+
+- ChatGPT Web reverse-proxy adapter dispatch for OpenAI-compatible text requests.
+- ChatGPT Web upstream endpoint derivation: `{chatgpt_origin}/backend-api/conversation`.
+- ChatGPT Web official-client headers: browser `Origin` / `Referer` / `Sec-*`, `OAI-Device-Id`, `OAI-Session-Id`, `OAI-Language`, `OAI-Client-Version`, `OAI-Client-Build-Number`, `X-OpenAI-Target-Path`, `X-OpenAI-Target-Route`, and Sentinel chat requirements headers.
+- ChatGPT Web Conversation body shape: `action: next`, Web conversation `messages`, mapped upstream model, `parent_message_id`, `conversation_mode`, `force_use_sse`, timezone, `websocket_request_id`, and client contextual info.
+- Reverse Proxy Runtime credential injection for OAuth/session/token runtime classes; `api_key` remains official API-key adapter behavior and is not a ChatGPT Web 2api credential source.
+- ChatGPT Web SSE/JSON parsing from conversation payloads into `TextResponse`.
+- Focused adapter and Gateway regressions proving selected account credentials/UA reach upstream while caller/SRapi auth does not.
+
+Definition of Done:
+
+- `reverse-proxy-chatgpt-web` text requests call `/backend-api/conversation` and must not call generic OpenAI-compatible `/chat/completions`.
+- Runtime receives selected account context and injects account credentials; caller auth must not be forwarded.
+- `reverse-proxy-chatgpt-web` rejects `runtime_class = api_key` and requires OAuth/session/client-token style account credentials.
+- Upstream body includes mapped upstream model and ChatGPT Web Conversation payload with no Gateway-local ChatGPT DTOs.
+- Adapter requires a Sentinel chat requirements token from credential/account metadata for v1; automatic bootstrap, PoW, Turnstile, and requirements fetching remain follow-up work.
+- Gateway regression proves `/v1/chat/completions` can schedule a ChatGPT Web reverse-proxy account, send OAuth bearer upstream, and record Scheduler/usage evidence.
+- No frontend visuals are added.
+
+Required gates:
+
+- `cd apps/api && go test ./internal/modules/provider_adapters/... ./internal/modules/reverse_proxy/... ./internal/httpserver`
+- `cd apps/api && go test ./...`
+- `make architecture-check`
+- `make code-quality-check`
+- `make secret-scan`
+- `git diff --check`
+
+## WP-440+: Ecosystem And Remaining Advanced Surface
 
 Use `ROADMAP.md` Phase 7 through Phase 8 to split future packages for:
 

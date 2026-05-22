@@ -49,14 +49,15 @@ last_completed:
 - WP-400: Codex CLI 2api HTTP text path now sends `reverse-proxy-codex-cli` requests through Reverse Proxy Runtime to Codex `/responses` official-client shape, parses Codex Responses SSE/JSON output, keeps generic OpenAI-compatible reverse proxy on `/chat/completions`, and enforces the OAuth/session/client-token credential boundary instead of treating API keys as 2api identity.
 - WP-410: Codex CLI 2api Responses WebSocket relay now lets explicitly requested `/v1/responses/ws` calls schedule an eligible `reverse-proxy-codex-cli` account, derive Codex `wss://.../responses`, send Codex official-client headers and a `response.create` upstream-model frame through Reverse Proxy Runtime, and record Scheduler/usage evidence from upstream WebSocket frames.
 - WP-420: Claude Code CLI 2api HTTP Messages path now sends `reverse-proxy-claude-code-cli` requests through Reverse Proxy Runtime to `/messages?beta=true`, builds Claude Code beta/version/stainless/session headers plus system/billing blocks, and enforces the OAuth/session/client-token credential boundary instead of treating API keys as 2api identity.
+- WP-430: ChatGPT Web 2api HTTP Conversation path now sends `reverse-proxy-chatgpt-web` requests through Reverse Proxy Runtime to `/backend-api/conversation`, builds browser/OAI/Sentinel headers plus ChatGPT Web Conversation body, and enforces the OAuth/session/client-token credential boundary instead of treating API keys as 2api identity.
 
 current:
 
-- package: WP-430+
+- package: WP-440+
 - status: pending
 - objective: split the next ecosystem or remaining advanced endpoint package from the roadmap.
 
-next_recommended: WP-430+
+next_recommended: WP-440+
 
 last_gates:
 
@@ -141,6 +142,8 @@ notes:
 - WP-410 intentionally keeps WebSocket relay opt-in via `upstream_ws` / `codex_responses_websocket` flags and account metadata; persistent Codex session reuse, local Codex CLI ingress, and Claude/Antigravity WebSocket adapters remain follow-up work.
 - WP-420 added `TestReverseProxyClaudeCodeCLIAdapterUsesOfficialClientMessagesShape`, `TestReverseProxyClaudeCodeCLIRejectsAPIKeyRuntime`, and `TestGatewayClaudeCodeReverseProxyUsesOfficialClientMessagesShape`, proving Claude Code 2api uses selected account OAuth/CLI token credentials, Claude Code official-client headers/body, `/messages?beta=true`, and Scheduler/usage evidence without Gateway-local DTOs.
 - WP-420 refreshed `docs/2API_REVERSE_PROXY_DEFINITION.md` to define SRapi 2api/反代 from the local reference projects `sub2api`, `CLIProxyAPI`, and `chatgpt2api`: upstream official-client request simulation with OAuth/session/client-token identity, not local Codex/Claude/Antigravity client ingress.
+- WP-430 added `TestReverseProxyChatGPTWebAdapterUsesConversationOfficialClientShape`, `TestReverseProxyChatGPTWebRejectsAPIKeyRuntime`, and `TestGatewayChatGPTWebReverseProxyUsesConversationOfficialClientShape`, proving ChatGPT Web 2api uses selected account OAuth/session credentials, browser/OAI/Sentinel headers, `/backend-api/conversation`, ChatGPT Web Conversation body, and Scheduler/usage evidence without Gateway-local DTOs.
+- WP-430 intentionally requires a configured Sentinel chat requirements token in credential/account metadata for v1; automatic bootstrap, PoW, Turnstile, and requirements fetching remain follow-up work.
 
 ## Work Package Ledger
 
@@ -189,4 +192,5 @@ notes:
 | WP-400 | completed | Codex CLI 2api Responses upstream shape v1 with OAuth/session/client-token boundary. |
 | WP-410 | completed | Codex CLI 2api Responses WebSocket upstream relay v1 with OAuth/session/client-token boundary. |
 | WP-420 | completed | Claude Code CLI 2api Messages upstream shape v1 with OAuth/session/client-token boundary. |
-| WP-430+ | pending | Remaining ecosystem and advanced endpoint packages. |
+| WP-430 | completed | ChatGPT Web 2api Conversation upstream shape v1 with OAuth/session/client-token boundary. |
+| WP-440+ | pending | Remaining ecosystem and advanced endpoint packages. |

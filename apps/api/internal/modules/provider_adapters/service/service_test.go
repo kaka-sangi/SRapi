@@ -1372,6 +1372,167 @@ func TestReverseProxyOpenAICompatibleAdapterUsesRuntimeForNonAPIKeyAccount(t *te
 	}
 }
 
+func TestReverseProxyChatGPTWebAdapterUsesConversationOfficialClientShape(t *testing.T) {
+	const chatGPTUserAgent = "Mozilla/5.0 ChatGPTWeb/1.0"
+	var upstreamHeaders http.Header
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamHeaders = r.Header.Clone()
+		if r.URL.Path != "/backend-api/conversation" {
+			t.Fatalf("unexpected chatgpt web upstream path %s", r.URL.Path)
+		}
+		if r.Header.Get("Authorization") != "Bearer chatgpt-web-token" {
+			t.Fatalf("expected chatgpt bearer token, got %q", r.Header.Get("Authorization"))
+		}
+		if r.Header.Get("User-Agent") != chatGPTUserAgent ||
+			r.Header.Get("Accept") != "text/event-stream" ||
+			r.Header.Get("Content-Type") != "application/json" ||
+			r.Header.Get("X-OpenAI-Target-Path") != "/backend-api/conversation" ||
+			r.Header.Get("X-OpenAI-Target-Route") != "/backend-api/conversation" ||
+			r.Header.Get("OAI-Device-Id") != "device-123" ||
+			r.Header.Get("OAI-Session-Id") != "session-123" ||
+			r.Header.Get("OAI-Client-Version") != "client-version-123" ||
+			r.Header.Get("OAI-Client-Build-Number") != "build-123" ||
+			r.Header.Get("OpenAI-Sentinel-Chat-Requirements-Token") != "requirements-token" {
+			t.Fatalf("unexpected chatgpt web headers: %+v", r.Header)
+		}
+		if r.Header.Get("X-Request-ID") != "" || r.Header.Get("X-SRapi-Test") != "" || strings.Contains(r.Header.Get("User-Agent"), "SRapi") {
+			t.Fatalf("unexpected SRapi header leakage: %+v", r.Header)
+		}
+		var payload struct {
+			Action             string `json:"action"`
+			Model              string `json:"model"`
+			ForceUseSSE        bool   `json:"force_use_sse"`
+			Timezone           string `json:"timezone"`
+			TimezoneOffsetMin  int    `json:"timezone_offset_min"`
+			ParentMessageID    string `json:"parent_message_id"`
+			WebsocketRequestID string `json:"websocket_request_id"`
+			ConversationMode   struct {
+				Kind string `json:"kind"`
+			} `json:"conversation_mode"`
+			ClientContextualInfo struct {
+				PageWidth int `json:"page_width"`
+			} `json:"client_contextual_info"`
+			Messages []struct {
+				Author struct {
+					Role string `json:"role"`
+				} `json:"author"`
+				Content struct {
+					ContentType string   `json:"content_type"`
+					Parts       []string `json:"parts"`
+				} `json:"content"`
+			} `json:"messages"`
+			StreamOptions any `json:"stream_options"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode chatgpt web payload: %v", err)
+		}
+		if payload.Action != "next" ||
+			payload.Model != "gpt-5-chat-web" ||
+			!payload.ForceUseSSE ||
+			payload.Timezone != "Asia/Shanghai" ||
+			payload.TimezoneOffsetMin != -480 ||
+			payload.ConversationMode.Kind != "primary_assistant" ||
+			payload.ClientContextualInfo.PageWidth != 1400 ||
+			payload.ParentMessageID == "" ||
+			payload.WebsocketRequestID == "" ||
+			payload.StreamOptions != nil ||
+			len(payload.Messages) != 1 ||
+			payload.Messages[0].Author.Role != "user" ||
+			payload.Messages[0].Content.ContentType != "text" ||
+			len(payload.Messages[0].Content.Parts) != 1 ||
+			payload.Messages[0].Content.Parts[0] != "hello chatgpt web" {
+			t.Fatalf("unexpected chatgpt web payload: %+v", payload)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte(
+			"data: {\"message\":{\"author\":{\"role\":\"assistant\"},\"content\":{\"parts\":[\"chatgpt web response\"]}}}\n\n" +
+				"data: [DONE]\n\n",
+		))
+	}))
+	defer upstream.Close()
+
+	runtime, err := reverseproxyservice.New(nil)
+	if err != nil {
+		t.Fatalf("create reverse proxy runtime: %v", err)
+	}
+	svc, err := service.NewWithReverseProxy(nil, runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeText(context.Background(), contract.TextRequest{
+		RequestID: "req_chatgpt_web_proxy",
+		Model:     "chatgpt-local",
+		Prompt:    "hello chatgpt web",
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "reverse-proxy-chatgpt-web",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             11,
+			RuntimeClass:   accountcontract.RuntimeClassOauthRefresh,
+			UpstreamClient: ptrString("chatgpt_web"),
+			Metadata: map[string]any{
+				"base_url":                    upstream.URL,
+				"user_agent":                  chatGPTUserAgent,
+				"chatgpt_requirements_token":  "requirements-token",
+				"oai_device_id":               "device-123",
+				"oai_session_id":              "session-123",
+				"chatgpt_client_version":      "client-version-123",
+				"chatgpt_client_build_number": "build-123",
+			},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-5-chat-web"},
+		Credential: map[string]any{"access_token": "chatgpt-web-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke chatgpt web reverse proxy adapter: %v", err)
+	}
+	if resp.Text != "chatgpt web response" || !resp.Usage.Estimated {
+		t.Fatalf("unexpected chatgpt web response: %+v", resp)
+	}
+	if upstreamHeaders.Get("Authorization") != "Bearer chatgpt-web-token" {
+		t.Fatalf("expected runtime to inject chatgpt auth, got %+v", upstreamHeaders)
+	}
+	if metrics := runtime.Metrics(); metrics.RequestTotal != 1 || metrics.RequestSuccessTotal != 1 {
+		t.Fatalf("expected reverse proxy runtime metrics, got %+v", metrics)
+	}
+}
+
+func TestReverseProxyChatGPTWebRejectsAPIKeyRuntime(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body:       []byte(`{"message":{"content":{"parts":["should not be called"]}}}`),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeText(context.Background(), contract.TextRequest{
+		RequestID: "req_chatgpt_web_api_key_runtime",
+		Model:     "chatgpt-local",
+		Prompt:    "hello",
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-chatgpt-web",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             11,
+			RuntimeClass:   accountcontract.RuntimeClassAPIKey,
+			UpstreamClient: ptrString("chatgpt_web"),
+			Metadata:       map[string]any{"base_url": "https://chatgpt.example", "chatgpt_requirements_token": "requirements-token"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-5-chat-web"},
+		Credential: map[string]any{"api_key": "sk-secret"},
+	})
+	assertProviderError(t, err, "invalid_request", http.StatusBadRequest)
+	if runtime.request.URL != "" {
+		t.Fatalf("reverse proxy runtime should not be called, got %+v", runtime.request)
+	}
+}
+
 func TestReverseProxyCodexCLIAdapterUsesResponsesOfficialClientShape(t *testing.T) {
 	const codexUserAgent = "codex_cli_rs/0.118.0 (Mac OS 26.3.1; arm64) iTerm.app/3.6.9"
 	var upstreamHeaders http.Header

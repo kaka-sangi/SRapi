@@ -58,6 +58,7 @@ SRapi 2api 反代不是：
 
 | Adapter | 上游身份 | 典型上游形态 |
 | --- | --- | --- |
+| `reverse-proxy-chatgpt-web` | ChatGPT Web 客户端 | ChatGPT `/backend-api/conversation`，browser / OAI device-session / Sentinel requirements headers，ChatGPT Web Conversation body，ChatGPT OAuth / Web session credential。 |
 | `reverse-proxy-codex-cli` | Codex CLI / ChatGPT Codex 客户端 | Codex `/backend-api/codex/responses` 或 Responses WebSocket，Codex headers、session/cache headers、Codex OAuth / device / CLI client token。 |
 | `reverse-proxy-claude-code-cli` | Claude Code 客户端 | Anthropic Messages 端点上的 Claude Code OAuth / setup-token credential header、Claude Code beta/version/cache/signing/body conventions。 |
 | `reverse-proxy-gemini-cli` | Gemini CLI / Code Assist 客户端 | Gemini Code Assist / Cloud Code endpoints、project/user context、Google OAuth credential behavior。 |
@@ -69,6 +70,7 @@ Implementation status:
 - WP-400 implements the HTTP Codex CLI 2api path for text requests: `reverse-proxy-codex-cli` builds a Codex Responses request and sends `base_url + "/responses"` through Reverse Proxy Runtime.
 - WP-410 implements the Codex CLI 2api Responses WebSocket upstream relay for explicitly requested `/v1/responses/ws` calls: SRapi schedules an eligible Codex reverse-proxy account, derives Codex `ws/wss` `/responses`, sends Codex official-client headers plus a `response.create` frame with the mapped upstream model, and uses the selected account OAuth/session/CLI credential through Reverse Proxy Runtime.
 - WP-420 implements the Claude Code CLI 2api Messages HTTP path: `reverse-proxy-claude-code-cli` builds `/messages?beta=true`, Claude Code OAuth/beta/version/stainless/session headers, and Claude Code system/billing blocks, while Reverse Proxy Runtime injects the selected OAuth/CLI token.
+- WP-430 implements the ChatGPT Web 2api Conversation HTTP path: `reverse-proxy-chatgpt-web` builds `/backend-api/conversation`, browser/OAI/Sentinel headers, and ChatGPT Web Conversation body, while Reverse Proxy Runtime injects the selected OAuth/Web-session token.
 - Persistent Codex WebSocket session reuse, richer prompt-cache policy, local Codex CLI client ingress, Claude Code WebSocket adapters, and Antigravity WebSocket adapters are still follow-up work.
 
 ## 6. Boundary Rules

@@ -3963,8 +3963,14 @@ func TestGatewayVisionRequestUsesCapabilityTaxonomy(t *testing.T) {
 
 func TestGatewayReverseProxyAccountAutoProtectsOnSessionInvalid(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/backend-api/conversation" {
+			t.Fatalf("expected chatgpt web conversation path, got %s", r.URL.Path)
+		}
 		if r.Header.Get("Authorization") != "Bearer oauth-access" {
 			t.Fatalf("expected reverse proxy bearer token, got %q", r.Header.Get("Authorization"))
+		}
+		if r.Header.Get("OpenAI-Sentinel-Chat-Requirements-Token") != "requirements-token" {
+			t.Fatalf("expected chatgpt requirements token, got %+v", r.Header)
 		}
 		if r.Header.Get("X-Request-ID") != "" || strings.Contains(r.Header.Get("User-Agent"), "SRapi") {
 			t.Fatalf("unexpected SRapi header leakage: %+v", r.Header)
@@ -4015,7 +4021,7 @@ func TestGatewayReverseProxyAccountAutoProtectsOnSessionInvalid(t *testing.T) {
 		t.Fatalf("expected mapping create 201, got %d", mappingRec.Code)
 	}
 
-	accountBody := `{"provider_id":"` + string(providerResp.Data.Id) + `","name":"reverse-account","runtime_class":"oauth_refresh","upstream_client":"chatgpt_web","credential":{"access_token":"oauth-access","refresh_token":"refresh-token"},"metadata":{"base_url":"` + upstream.URL + `/v1","user_agent":"ChatGPT/1.0"},"status":"active"}`
+	accountBody := `{"provider_id":"` + string(providerResp.Data.Id) + `","name":"reverse-account","runtime_class":"oauth_refresh","upstream_client":"chatgpt_web","credential":{"access_token":"oauth-access","refresh_token":"refresh-token"},"metadata":{"base_url":"` + upstream.URL + `","user_agent":"ChatGPT/1.0","chatgpt_requirements_token":"requirements-token"},"status":"active"}`
 	accountReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts", strings.NewReader(accountBody))
 	accountReq.Header.Set("Content-Type", "application/json")
 	accountReq.AddCookie(sessionCookie)
@@ -4072,6 +4078,9 @@ func TestGatewayReverseProxyBanSignalDisablesAccountAndStopsScheduling(t *testin
 	upstreamCalls := 0
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		upstreamCalls++
+		if r.URL.Path != "/backend-api/conversation" {
+			t.Fatalf("expected chatgpt web conversation path, got %s", r.URL.Path)
+		}
 		w.WriteHeader(http.StatusForbidden)
 		_, _ = w.Write([]byte(`{"error":{"code":"account_banned","message":"account banned"}}`))
 	}))
@@ -4083,7 +4092,7 @@ func TestGatewayReverseProxyBanSignalDisablesAccountAndStopsScheduling(t *testin
 	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"banned-provider","display_name":"Banned Provider","adapter_type":"reverse-proxy-chatgpt-web","protocol":"openai-compatible","status":"active"}`)
 	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"banned-model","display_name":"Banned Model","status":"active"}`)
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"banned-upstream","status":"active"}`)
-	accountBody := `{"provider_id":"` + string(providerResp.Data.Id) + `","name":"banned-account","runtime_class":"oauth_refresh","upstream_client":"chatgpt_web","credential":{"access_token":"oauth-access","refresh_token":"refresh-token"},"metadata":{"base_url":"` + upstream.URL + `/v1","user_agent":"ChatGPT/1.0"},"status":"active"}`
+	accountBody := `{"provider_id":"` + string(providerResp.Data.Id) + `","name":"banned-account","runtime_class":"oauth_refresh","upstream_client":"chatgpt_web","credential":{"access_token":"oauth-access","refresh_token":"refresh-token"},"metadata":{"base_url":"` + upstream.URL + `","user_agent":"ChatGPT/1.0","chatgpt_requirements_token":"requirements-token"},"status":"active"}`
 	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, accountBody)
 
 	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
@@ -4128,6 +4137,148 @@ func TestGatewayReverseProxyBanSignalDisablesAccountAndStopsScheduling(t *testin
 	handler.ServeHTTP(metricsRec, metricsReq)
 	if !strings.Contains(metricsRec.Body.String(), `reverse_proxy_account_banned_total 1`) {
 		t.Fatalf("expected reverse proxy banned metric, got:\n%s", metricsRec.Body.String())
+	}
+}
+
+func TestGatewayChatGPTWebReverseProxyUsesConversationOfficialClientShape(t *testing.T) {
+	type upstreamCall struct {
+		Path              string
+		Authorization     string
+		UserAgent         string
+		Accept            string
+		TargetPath        string
+		RequirementsToken string
+		DeviceID          string
+		SessionID         string
+		Model             string
+		Action            string
+		ForceUseSSE       bool
+		Message           string
+	}
+	var (
+		mu    sync.Mutex
+		calls []upstreamCall
+	)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload struct {
+			Action      string `json:"action"`
+			Model       string `json:"model"`
+			ForceUseSSE bool   `json:"force_use_sse"`
+			Messages    []struct {
+				Content struct {
+					Parts []string `json:"parts"`
+				} `json:"content"`
+			} `json:"messages"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		call := upstreamCall{
+			Path:              r.URL.Path,
+			Authorization:     r.Header.Get("Authorization"),
+			UserAgent:         r.Header.Get("User-Agent"),
+			Accept:            r.Header.Get("Accept"),
+			TargetPath:        r.Header.Get("X-OpenAI-Target-Path"),
+			RequirementsToken: r.Header.Get("OpenAI-Sentinel-Chat-Requirements-Token"),
+			DeviceID:          r.Header.Get("OAI-Device-Id"),
+			SessionID:         r.Header.Get("OAI-Session-Id"),
+			Model:             payload.Model,
+			Action:            payload.Action,
+			ForceUseSSE:       payload.ForceUseSSE,
+		}
+		if len(payload.Messages) > 0 && len(payload.Messages[0].Content.Parts) > 0 {
+			call.Message = payload.Messages[0].Content.Parts[0]
+		}
+		if r.Header.Get("X-Request-ID") != "" || r.Header.Get("X-SRapi-Test") != "" || strings.Contains(call.UserAgent, "SRapi") {
+			t.Fatalf("unexpected SRapi header leakage: %+v", r.Header)
+		}
+		mu.Lock()
+		calls = append(calls, call)
+		mu.Unlock()
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: {\"message\":{\"author\":{\"role\":\"assistant\"},\"content\":{\"parts\":[\"chatgpt web gateway ok\"]}}}\n\ndata: [DONE]\n\n"))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"wp430-chatgpt-web","display_name":"WP430 ChatGPT Web","adapter_type":"reverse-proxy-chatgpt-web","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"wp430-chatgpt-web-model","display_name":"WP430 ChatGPT Web Model","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"gpt-5-chat-web","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"wp430-chatgpt-web-account","runtime_class":"oauth_refresh","upstream_client":"chatgpt_web","credential":{"access_token":"chatgpt-web-token","refresh_token":"refresh-token"},"metadata":{"base_url":"`+upstream.URL+`","user_agent":"Mozilla/5.0 ChatGPTWeb/1.0","chatgpt_requirements_token":"requirements-token","oai_device_id":"device-gateway-123","oai_session_id":"session-gateway-123","chatgpt_client_version":"client-version-gateway","chatgpt_client_build_number":"build-gateway"},"status":"active"}`)
+
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	chatReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"wp430-chatgpt-web-model","messages":[{"role":"user","content":"hello chatgpt web gateway"}]}`))
+	chatReq.Header.Set("Content-Type", "application/json")
+	chatReq.Header.Set("Authorization", "Bearer "+apiKey)
+	chatReq.Header.Set("X-Request-ID", "req_chatgpt_web_gateway")
+	chatReq.Header.Set("X-SRapi-Test", "must-not-forward")
+	chatRec := httptest.NewRecorder()
+	handler.ServeHTTP(chatRec, chatReq)
+	if chatRec.Code != http.StatusOK {
+		t.Fatalf("expected ChatGPT Web gateway success 200, got %d body=%s", chatRec.Code, chatRec.Body.String())
+	}
+	var chatResp apiopenapi.ChatCompletionResponse
+	if err := json.NewDecoder(chatRec.Body).Decode(&chatResp); err != nil {
+		t.Fatalf("decode chat response: %v", err)
+	}
+	if len(chatResp.Choices) != 1 || decodeChatMessageText(t, chatResp.Choices[0].Message.Content) != "chatgpt web gateway ok" {
+		t.Fatalf("unexpected ChatGPT Web chat response: %+v", chatResp)
+	}
+
+	mu.Lock()
+	gotCalls := append([]upstreamCall(nil), calls...)
+	mu.Unlock()
+	if len(gotCalls) != 1 {
+		t.Fatalf("expected one upstream call, got %+v", gotCalls)
+	}
+	call := gotCalls[0]
+	if call.Path != "/backend-api/conversation" ||
+		call.Authorization != "Bearer chatgpt-web-token" ||
+		call.UserAgent != "Mozilla/5.0 ChatGPTWeb/1.0" ||
+		call.Accept != "text/event-stream" ||
+		call.TargetPath != "/backend-api/conversation" ||
+		call.RequirementsToken != "requirements-token" ||
+		call.DeviceID != "device-gateway-123" ||
+		call.SessionID != "session-gateway-123" {
+		t.Fatalf("unexpected ChatGPT Web upstream route/auth/headers: %+v", call)
+	}
+	if call.Model != "gpt-5-chat-web" || call.Action != "next" || !call.ForceUseSSE || call.Message != "hello chatgpt web gateway" {
+		t.Fatalf("unexpected ChatGPT Web upstream payload: %+v", call)
+	}
+
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=wp430-chatgpt-web-model", nil)
+	decisionsReq.AddCookie(sessionCookie)
+	decisionsRec := httptest.NewRecorder()
+	handler.ServeHTTP(decisionsRec, decisionsReq)
+	if decisionsRec.Code != http.StatusOK {
+		t.Fatalf("expected decisions 200, got %d body=%s", decisionsRec.Code, decisionsRec.Body.String())
+	}
+	var decisionsResp apiopenapi.SchedulerDecisionListResponse
+	if err := json.NewDecoder(decisionsRec.Body).Decode(&decisionsResp); err != nil {
+		t.Fatalf("decode decisions: %v", err)
+	}
+	if len(decisionsResp.Data) != 1 {
+		t.Fatalf("expected one ChatGPT Web decision, got %+v", decisionsResp.Data)
+	}
+	decision := decisionsResp.Data[0]
+	if decision.SelectedProviderId == nil || *decision.SelectedProviderId != string(providerResp.Data.Id) || decision.SelectedAccountId == nil || *decision.SelectedAccountId != string(accountResp.Data.Id) || decision.TargetProtocol != "openai-compatible" {
+		t.Fatalf("expected ChatGPT Web scheduler evidence, got %+v", decision)
+	}
+
+	usageReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/usage-logs?model=wp430-chatgpt-web-model", nil)
+	usageReq.AddCookie(sessionCookie)
+	usageRec := httptest.NewRecorder()
+	handler.ServeHTTP(usageRec, usageReq)
+	if usageRec.Code != http.StatusOK {
+		t.Fatalf("expected usage logs 200, got %d body=%s", usageRec.Code, usageRec.Body.String())
+	}
+	var usageResp apiopenapi.UsageLogListResponse
+	if err := json.NewDecoder(usageRec.Body).Decode(&usageResp); err != nil {
+		t.Fatalf("decode usage logs: %v", err)
+	}
+	if len(usageResp.Data) != 1 || !usageResp.Data[0].Success || usageResp.Data[0].TargetProtocol == nil || *usageResp.Data[0].TargetProtocol != "openai-compatible" || !usageResp.Data[0].UsageEstimated {
+		t.Fatalf("expected ChatGPT Web usage evidence, got %+v", usageResp.Data)
 	}
 }
 
@@ -4198,9 +4349,12 @@ func TestGatewayAntigravityReverseProxyUsesDesktopRuntimeIdentity(t *testing.T) 
 
 func TestGatewayReverseProxyOAuthRefreshPersistsCredentialAndAudits(t *testing.T) {
 	var gotAuthorization string
+	var gotPath string
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotAuthorization = r.Header.Get("Authorization")
-		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"refreshed ok"}}],"usage":{"input_tokens":2,"output_tokens":3}}`))
+		gotPath = r.URL.Path
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: {\"type\":\"conversation.delta\",\"delta\":\"refreshed ok\"}\n\ndata: [DONE]\n\n"))
 	}))
 	defer upstream.Close()
 
@@ -4211,7 +4365,7 @@ func TestGatewayReverseProxyOAuthRefreshPersistsCredentialAndAudits(t *testing.T
 	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"refresh-model","display_name":"Refresh Model","status":"active"}`)
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"refresh-upstream","status":"active"}`)
 
-	accountBody := `{"provider_id":"` + string(providerResp.Data.Id) + `","name":"refresh-account","runtime_class":"oauth_refresh","upstream_client":"chatgpt_web","credential":{"access_token":"expired-token","refresh_token":"fresh-token","expires_at":"2000-01-01T00:00:00Z"},"metadata":{"base_url":"` + upstream.URL + `/v1","user_agent":"ChatGPT/1.0"},"status":"active"}`
+	accountBody := `{"provider_id":"` + string(providerResp.Data.Id) + `","name":"refresh-account","runtime_class":"oauth_refresh","upstream_client":"chatgpt_web","credential":{"access_token":"expired-token","refresh_token":"fresh-token","expires_at":"2000-01-01T00:00:00Z"},"metadata":{"base_url":"` + upstream.URL + `","user_agent":"ChatGPT/1.0","chatgpt_requirements_token":"requirements-token"},"status":"active"}`
 	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, accountBody)
 
 	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
@@ -4225,6 +4379,9 @@ func TestGatewayReverseProxyOAuthRefreshPersistsCredentialAndAudits(t *testing.T
 	}
 	if gotAuthorization != "Bearer fresh-token" {
 		t.Fatalf("expected refreshed bearer token, got %q", gotAuthorization)
+	}
+	if gotPath != "/backend-api/conversation" {
+		t.Fatalf("expected ChatGPT Web conversation path, got %q", gotPath)
 	}
 
 	auditReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/audit-logs", nil)
