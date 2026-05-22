@@ -34,14 +34,15 @@ last_completed:
 - WP-250: Provider Account upstream model discovery now exposes `POST /api/v1/admin/accounts/{id}/discover-models`, persists discovered `supported_models` metadata, and feeds provider-neutral candidate filtering without leaking credentials.
 - WP-260: Ops SLO and alert control plane v1 now includes durable SLO definitions, alert events, computed availability/burn-rate evidence from usage logs, CSRF-protected admin APIs, safe audit records, Ent/Postgres persistence, and generated OpenAPI/SDK parity.
 - WP-270: Embeddings passthrough runtime v1 now exposes OpenAI-compatible `/v1/embeddings`, provider alias routing, canonical embeddings normalization/rendering, OpenAI-compatible upstream `/embeddings` adapter dispatch, usage/billing/Scheduler feedback evidence, and generated OpenAPI/SDK parity.
+- WP-280: HTTP runtime partitioning split the 7750-line catch-all runtime into route-family files and added an architecture harness that keeps `runtime_http.go` thin and caps `runtime_*.go` file size.
 
 current:
 
-- package: WP-280
+- package: WP-290+
 - status: pending
-- objective: split the oversized HTTP runtime into route-family files and add architecture harness coverage for runtime file size/ownership.
+- objective: split the next advanced endpoint and provider expansion package from the roadmap.
 
-next_recommended: WP-280
+next_recommended: WP-290+
 
 last_gates:
 
@@ -52,7 +53,7 @@ last_gates:
 - `make sdk-ts-typecheck`: pass
 - `make ent-generate-check`: pass
 - `make migration-check`: pass
-- `cd apps/api && go test ./internal/modules/provider_adapters/... ./internal/modules/gateway/... ./internal/httpserver`: pass
+- `cd apps/api && go test ./internal/httpserver ./internal/architecture`: pass
 - `cd apps/api && go test ./...`: pass
 - `make architecture-check`: pass
 - `make secret-scan`: pass
@@ -94,6 +95,8 @@ notes:
 - WP-260 alert ack audit intentionally records only safe alert summaries, not `details_json`.
 - WP-270 added `POST /v1/embeddings` and OpenAI-compatible provider alias embeddings routes; token-array input is intentionally rejected until a later compatibility package.
 - WP-270 also identified `apps/api/internal/httpserver/runtime_http.go` as oversized at 7750 lines; WP-280 is dedicated to partitioning this file and adding a harness check so this does not remain accepted architecture.
+- WP-280 reduced `apps/api/internal/httpserver/runtime_http.go` from 7750 lines to a package shell and split implementation across `runtime_state.go`, `runtime_user_handlers.go`, `runtime_admin_*`, `runtime_gateway_*`, `runtime_metrics.go`, helper/mapping/filter files.
+- WP-280 added `TestHTTPRuntimeFilesStayPartitioned`, enforcing `runtime_http.go` <= 120 lines and each `runtime_*.go` <= 2200 lines.
 
 ## Work Package Ledger
 
@@ -127,5 +130,5 @@ notes:
 | WP-250 | completed | Provider Account upstream model discovery and supported-model candidate filtering. |
 | WP-260 | completed | Durable SLO definitions, alert events, computed burn-rate evidence, admin APIs, and safe ack audit are covered. |
 | WP-270 | completed | Embeddings passthrough runtime v1. |
-| WP-280 | pending | HTTP runtime partition and size harness. |
+| WP-280 | completed | HTTP runtime partition and size harness. |
 | WP-290+ | pending | Remaining advanced endpoint and provider expansion packages. |

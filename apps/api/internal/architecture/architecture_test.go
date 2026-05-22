@@ -11,6 +11,8 @@ import (
 
 const moduleImportPrefix = "github.com/srapi/srapi/apps/api/internal/modules/"
 const requiredGoVersion = "1.26.3"
+const maxRuntimeHTTPCompatibilityLines = 120
+const maxRuntimeFileLines = 2200
 
 var allowedContractImports = map[string]map[string]bool{
 	"auth": {
@@ -267,6 +269,37 @@ func TestHTTPServerDoesNotImportEnt(t *testing.T) {
 	}
 }
 
+func TestHTTPRuntimeFilesStayPartitioned(t *testing.T) {
+	root := filepath.Clean("../httpserver")
+	var violations []string
+	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || filepath.Ext(path) != ".go" || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		base := filepath.Base(path)
+		lines, err := fileLineCount(path)
+		if err != nil {
+			return err
+		}
+		switch {
+		case base == "runtime_http.go" && lines > maxRuntimeHTTPCompatibilityLines:
+			violations = append(violations, path+": runtime_http.go must remain a thin compatibility shell; split route-family code into runtime_*.go files")
+		case strings.HasPrefix(base, "runtime_") && lines > maxRuntimeFileLines:
+			violations = append(violations, path+": runtime route-family file is too large; split by ownership before adding more handlers")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(violations) > 0 {
+		t.Fatalf("HTTP runtime partition violations:\n%s", strings.Join(violations, "\n"))
+	}
+}
+
 func TestWorkersOnlyDependOnContractsAndServices(t *testing.T) {
 	root := filepath.Clean("../workers")
 	var violations []string
@@ -447,4 +480,19 @@ func fileImports(path string) ([]string, error) {
 		imports = append(imports, strings.Trim(spec.Path.Value, `"`))
 	}
 	return imports, nil
+}
+
+func fileLineCount(path string) (int, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return 0, err
+	}
+	if len(raw) == 0 {
+		return 0, nil
+	}
+	lines := strings.Count(string(raw), "\n")
+	if raw[len(raw)-1] != '\n' {
+		lines++
+	}
+	return lines, nil
 }
