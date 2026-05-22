@@ -285,6 +285,70 @@ func TestOpenAICompatibleAdapterInvokesImageEditsUpstream(t *testing.T) {
 	}
 }
 
+func TestOpenAICompatibleAdapterInvokesImageVariationsUpstream(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/images/variations" {
+			t.Fatalf("unexpected upstream path %s", r.URL.Path)
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer image-variation-secret" {
+			t.Fatalf("unexpected auth header %q", got)
+		}
+		if err := r.ParseMultipartForm(16 << 20); err != nil {
+			t.Fatalf("parse upstream multipart: %v", err)
+		}
+		imageFile, imageHeader, err := r.FormFile("image")
+		if err != nil {
+			t.Fatalf("expected upstream image: %v", err)
+		}
+		defer imageFile.Close()
+		imageBytes, err := io.ReadAll(imageFile)
+		if err != nil {
+			t.Fatalf("read upstream image: %v", err)
+		}
+		if imageHeader.Filename != "source.png" || imageHeader.Header.Get("Content-Type") != "image/png" || string(imageBytes) != "PNG-source" {
+			t.Fatalf("unexpected upstream image file filename=%q content_type=%q data=%q", imageHeader.Filename, imageHeader.Header.Get("Content-Type"), string(imageBytes))
+		}
+		if r.FormValue("model") != "image-variation-upstream" || r.FormValue("n") != "2" || r.FormValue("size") != "1024x1024" || r.FormValue("response_format") != "url" || r.FormValue("user") != "user-123" || r.FormValue("style_hint") != "studio" {
+			t.Fatalf("unexpected upstream image variation fields: model=%q n=%q size=%q response_format=%q user=%q style_hint=%q", r.FormValue("model"), r.FormValue("n"), r.FormValue("size"), r.FormValue("response_format"), r.FormValue("user"), r.FormValue("style_hint"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"created":1710000300,"data":[{"url":"https://example.test/wp490-variation.png"}],"model":"image-variation-upstream","usage":{"input_tokens":15,"output_tokens":2,"total_tokens":17}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeImageVariation(context.Background(), contract.ImageVariationRequest{
+		RequestID:      "req_image_variation",
+		Model:          "image-variation-local",
+		Image:          contract.ImageInput{FileName: "source.png", ContentType: "image/png", Bytes: []byte("PNG-source")},
+		Count:          2,
+		Size:           "1024x1024",
+		ResponseFormat: "url",
+		User:           "user-123",
+		Extra:          map[string]any{"style_hint": "studio"},
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "openai-compatible",
+			Protocol:    "openai-compatible",
+		},
+		Account:    accountcontract.ProviderAccount{ID: 1, Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "image-variation-upstream"},
+		Credential: map[string]any{"api_key": "image-variation-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke image variation upstream: %v", err)
+	}
+	if resp.Model != "image-variation-upstream" || resp.Created != 1710000300 || len(resp.Data) != 1 || resp.Data[0].URL == "" {
+		t.Fatalf("unexpected image variation response: %+v", resp)
+	}
+	if resp.Usage.Estimated || resp.Usage.InputTokens != 15 || resp.Usage.OutputTokens != 2 {
+		t.Fatalf("unexpected image variation usage: %+v", resp.Usage)
+	}
+}
+
 func TestOpenAICompatibleAdapterInvokesAudioTranscriptionsUpstream(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/audio/transcriptions" {

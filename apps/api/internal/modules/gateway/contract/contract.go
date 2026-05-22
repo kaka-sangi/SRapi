@@ -17,6 +17,7 @@ const (
 	EndpointEmbeddings            SourceEndpoint = "/v1/embeddings"
 	EndpointImagesGenerations     SourceEndpoint = "/v1/images/generations"
 	EndpointImagesEdits           SourceEndpoint = "/v1/images/edits"
+	EndpointImagesVariations      SourceEndpoint = "/v1/images/variations"
 	EndpointAudioTranscriptions   SourceEndpoint = "/v1/audio/transcriptions"
 	EndpointAudioSpeech           SourceEndpoint = "/v1/audio/speech"
 	EndpointModerations           SourceEndpoint = "/v1/moderations"

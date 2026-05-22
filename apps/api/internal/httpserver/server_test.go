@@ -3093,6 +3093,159 @@ func TestGatewayImageEditAliasForcesProviderContext(t *testing.T) {
 	}
 }
 
+func TestGatewayImageVariationRouteTargetsOpenAICompatibleUpstream(t *testing.T) {
+	type upstreamCall struct {
+		Path           string
+		Authorization  string
+		Model          string
+		Count          string
+		Size           string
+		ResponseFormat string
+		Filename       string
+		ContentType    string
+		Image          string
+	}
+	var (
+		mu    sync.Mutex
+		calls []upstreamCall
+	)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseMultipartForm(16 << 20); err != nil {
+			t.Fatalf("parse upstream multipart: %v", err)
+		}
+		imageFile, imageHeader, err := r.FormFile("image")
+		if err != nil {
+			t.Fatalf("expected upstream image: %v", err)
+		}
+		defer imageFile.Close()
+		imageBytes, err := io.ReadAll(imageFile)
+		if err != nil {
+			t.Fatalf("read upstream image: %v", err)
+		}
+		mu.Lock()
+		calls = append(calls, upstreamCall{
+			Path:           r.URL.Path,
+			Authorization:  r.Header.Get("Authorization"),
+			Model:          r.FormValue("model"),
+			Count:          r.FormValue("n"),
+			Size:           r.FormValue("size"),
+			ResponseFormat: r.FormValue("response_format"),
+			Filename:       imageHeader.Filename,
+			ContentType:    imageHeader.Header.Get("Content-Type"),
+			Image:          string(imageBytes),
+		})
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"created":1710000300,"data":[{"url":"https://example.test/wp490-variation.png"}],"model":"image-variation-upstream","usage":{"input_tokens":18,"output_tokens":2,"total_tokens":20}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"wp490-openai","display_name":"WP490 OpenAI","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active","capabilities":{"images":true}}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"wp490-image-variation-model","display_name":"WP490 Image Variation Model","status":"active","capabilities":[{"key":"images","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"image-variation-upstream","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"wp490-image-variation-account","runtime_class":"api_key","credential":{"api_key":"image-variation-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
+
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	rec := mustGatewayImageVariationRequest(t, handler, apiKey, "/v1/images/variations", map[string]string{
+		"model":           "wp490-image-variation-model",
+		"n":               "2",
+		"size":            "1024x1024",
+		"response_format": "url",
+	}, "source.png", "image/png", []byte("PNG-source"))
+	var imageResp apiopenapi.ImageGenerationResponse
+	if err := json.NewDecoder(rec.Body).Decode(&imageResp); err != nil {
+		t.Fatalf("decode image variation response: %v", err)
+	}
+	if imageResp.Created != 1710000300 || len(imageResp.Data) != 1 || imageResp.Data[0].Url == nil || *imageResp.Data[0].Url != "https://example.test/wp490-variation.png" {
+		t.Fatalf("unexpected image variation response: %+v", imageResp)
+	}
+
+	mu.Lock()
+	gotCalls := append([]upstreamCall(nil), calls...)
+	mu.Unlock()
+	if len(gotCalls) != 1 {
+		t.Fatalf("expected one upstream call, got %+v", gotCalls)
+	}
+	if gotCalls[0].Path != "/v1/images/variations" || gotCalls[0].Authorization != "Bearer image-variation-secret" || gotCalls[0].Model != "image-variation-upstream" {
+		t.Fatalf("unexpected upstream image variation call: %+v", gotCalls[0])
+	}
+	if gotCalls[0].Count != "2" || gotCalls[0].Size != "1024x1024" || gotCalls[0].ResponseFormat != "url" || gotCalls[0].Filename != "source.png" || gotCalls[0].ContentType != "image/png" || gotCalls[0].Image != "PNG-source" {
+		t.Fatalf("unexpected upstream image variation details: %+v", gotCalls[0])
+	}
+
+	usageReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/usage-logs?model=wp490-image-variation-model", nil)
+	usageReq.AddCookie(sessionCookie)
+	usageRec := httptest.NewRecorder()
+	handler.ServeHTTP(usageRec, usageReq)
+	if usageRec.Code != http.StatusOK {
+		t.Fatalf("expected usage logs 200, got %d", usageRec.Code)
+	}
+	var usageResp apiopenapi.UsageLogListResponse
+	if err := json.NewDecoder(usageRec.Body).Decode(&usageResp); err != nil {
+		t.Fatalf("decode usage logs: %v", err)
+	}
+	if len(usageResp.Data) != 1 {
+		t.Fatalf("expected one image variation usage record, got %+v", usageResp.Data)
+	}
+	usage := usageResp.Data[0]
+	if !usage.Success || usage.SourceEndpoint != "/v1/images/variations" || usage.ProviderId == nil || *usage.ProviderId != string(providerResp.Data.Id) || usage.AccountId == nil || *usage.AccountId != string(accountResp.Data.Id) || usage.TotalTokens != 20 {
+		t.Fatalf("unexpected image variation usage evidence: %+v", usage)
+	}
+
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=wp490-image-variation-model", nil)
+	decisionsReq.AddCookie(sessionCookie)
+	decisionsRec := httptest.NewRecorder()
+	handler.ServeHTTP(decisionsRec, decisionsReq)
+	if decisionsRec.Code != http.StatusOK {
+		t.Fatalf("expected decisions 200, got %d body=%s", decisionsRec.Code, decisionsRec.Body.String())
+	}
+	var decisionsResp apiopenapi.SchedulerDecisionListResponse
+	if err := json.NewDecoder(decisionsRec.Body).Decode(&decisionsResp); err != nil {
+		t.Fatalf("decode decisions: %v", err)
+	}
+	if len(decisionsResp.Data) != 1 || decisionsResp.Data[0].SourceEndpoint != "/v1/images/variations" || decisionsResp.Data[0].CandidateCount != 1 {
+		t.Fatalf("unexpected image variation decision evidence: %+v", decisionsResp.Data)
+	}
+}
+
+func TestGatewayImageVariationAliasForcesProviderContext(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	openaiProvider := mustFindProviderByName(t, handler, sessionCookie, "openai-compatible")
+	fallbackProvider := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"image-variation-fallback-provider","display_name":"Image Variation Fallback","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active","capabilities":{"images":true}}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"wp490-alias-image-variation-model","display_name":"WP490 Alias Image Variation Model","status":"active","capabilities":[{"key":"images","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","upstream_model_name":"fallback-image-variation","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","name":"image-variation-fallback-account","runtime_class":"api_key","credential":{"api_key":"fallback-secret"},"status":"active","priority":100}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(openaiProvider.Id)+`","upstream_model_name":"alias-image-variation","status":"active"}`)
+
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	mustGatewayImageVariationRequest(t, handler, apiKey, "/api/provider/openai-compatible/v1/images/variations", map[string]string{"model": "wp490-alias-image-variation-model"}, "alias.png", "image/png", []byte("PNG-alias"))
+
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=wp490-alias-image-variation-model", nil)
+	decisionsReq.AddCookie(sessionCookie)
+	decisionsRec := httptest.NewRecorder()
+	handler.ServeHTTP(decisionsRec, decisionsReq)
+	if decisionsRec.Code != http.StatusOK {
+		t.Fatalf("expected decisions 200, got %d body=%s", decisionsRec.Code, decisionsRec.Body.String())
+	}
+	var decisionsResp apiopenapi.SchedulerDecisionListResponse
+	if err := json.NewDecoder(decisionsRec.Body).Decode(&decisionsResp); err != nil {
+		t.Fatalf("decode decisions: %v", err)
+	}
+	if len(decisionsResp.Data) != 1 {
+		t.Fatalf("expected one alias image variation decision, got %+v", decisionsResp.Data)
+	}
+	decision := decisionsResp.Data[0]
+	if decision.SelectedProviderId == nil || *decision.SelectedProviderId != string(openaiProvider.Id) || decision.CandidateCount != 1 {
+		t.Fatalf("expected image variation alias to force openai-compatible provider, got %+v", decision)
+	}
+	if decision.SourceEndpoint != "/api/provider/openai-compatible/v1/images/variations" {
+		t.Fatalf("expected alias source endpoint, got %q", decision.SourceEndpoint)
+	}
+}
+
 func TestGatewayModerationRouteTargetsOpenAICompatibleUpstream(t *testing.T) {
 	type upstreamCall struct {
 		Path          string
@@ -4786,6 +4939,30 @@ func mustGatewayImageEditRequest(t *testing.T, handler http.Handler, apiKey, pat
 	if len(maskPayload) > 0 {
 		writeMultipartTestFile(t, writer, "mask", maskFilename, maskContentType, maskPayload)
 	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close multipart writer: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, path, &body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected POST %s 200, got %d body=%s", path, rec.Code, rec.Body.String())
+	}
+	return rec
+}
+
+func mustGatewayImageVariationRequest(t *testing.T, handler http.Handler, apiKey, path string, fields map[string]string, imageFilename string, imageContentType string, imagePayload []byte) *httptest.ResponseRecorder {
+	t.Helper()
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	for key, value := range fields {
+		if err := writer.WriteField(key, value); err != nil {
+			t.Fatalf("write multipart field: %v", err)
+		}
+	}
+	writeMultipartTestFile(t, writer, "image", imageFilename, imageContentType, imagePayload)
 	if err := writer.Close(); err != nil {
 		t.Fatalf("close multipart writer: %v", err)
 	}

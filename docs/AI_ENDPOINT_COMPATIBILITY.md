@@ -37,6 +37,7 @@ POST /v1/responses
 POST /v1/embeddings
 POST /v1/images/generations
 POST /v1/images/edits
+POST /v1/images/variations
 POST /v1/audio/transcriptions
 POST /v1/audio/speech
 POST /v1/rerank
@@ -501,7 +502,23 @@ Images edits endpoint
 - Scheduler 继续使用 `images` endpoint capability；Provider 或 account/mapping 必须显式声明 image 能力，text-only provider 不会被误选。
 - OpenAI-compatible provider alias（例如 `/api/provider/openai-compatible/v1/images/edits`）强制 provider context。
 - OpenAI-compatible API-key 和 reverse-proxy accounts 上游调用 multipart `/images/edits`，并解析 `url`、`b64_json` 和 `revised_prompt`。
-- JSON image references、streaming image edit events 和 variations 留给后续兼容包。
+- JSON image references 和 streaming image edit events 留给后续兼容包。
+
+WP-490 已实现：
+
+```txt
+Images variations endpoint
+```
+
+边界：
+
+- `POST /v1/images/variations` 接受 OpenAI-compatible multipart form-data：单个 `image`、`model`、`n`、`size`、`response_format` 和 `user`。
+- OpenAI 官方 upstream 当前说明该 endpoint 仅支持 `dall-e-2`；SRapi 不在 Gateway 层硬编码模型名，而是通过模型映射把本地 canonical model 映射到上游模型。
+- 请求仍进入 API Key auth、模型可见性、entitlement、Scheduler、Provider Adapter、usage、billing 和 feedback 证据链。
+- Scheduler 继续使用 `images` endpoint capability；Provider 或 account/mapping 必须显式声明 image 能力，text-only provider 不会被误选。
+- OpenAI-compatible provider alias（例如 `/api/provider/openai-compatible/v1/images/variations`）强制 provider context。
+- OpenAI-compatible API-key 和 reverse-proxy accounts 上游调用 multipart `/images/variations`，并解析 `url`、`b64_json` 和 `revised_prompt`。
+- 多图 variation、JSON image references、streaming image variation events 和 frontend visuals 留给后续包。
 
 WP-310 已实现：
 

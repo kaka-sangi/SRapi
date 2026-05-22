@@ -55,19 +55,20 @@ last_completed:
 - WP-460: Realtime slot lifecycle v1 now adds a provider-neutral realtime module, acquires `/v1/responses/ws` slots after Gateway auth and before WebSocket upgrade, releases slots on close/error, enforces deploy-level global/per-API-key slot limits, and exposes realtime slot metrics without storing raw affinity keys or provider DTOs.
 - WP-470: OpenAI-compatible Realtime WebSocket relay v1 now exposes `GET /v1/realtime`, schedules accounts with `realtime_websocket` capability, derives upstream `/realtime?model=<mapped_upstream_model>`, and relays frames through Reverse Proxy Runtime using selected OAuth/session/client-token credentials rather than caller headers or Gateway-local DTOs.
 - WP-480: Images edits runtime v1 now exposes OpenAI-compatible multipart `POST /v1/images/edits`, provider alias routing, canonical image edit normalization/rendering, OpenAI-compatible upstream `/images/edits` multipart adapter dispatch, explicit `images` Scheduler capability filtering, usage/billing/Scheduler feedback evidence, and generated OpenAPI/SDK parity.
+- WP-490: Images variations runtime v1 now exposes OpenAI-compatible multipart `POST /v1/images/variations`, provider alias routing, canonical image variation normalization/rendering, OpenAI-compatible upstream `/images/variations` multipart adapter dispatch, explicit `images` Scheduler capability filtering, usage/billing/Scheduler feedback evidence, and generated OpenAPI/SDK parity.
 
 current:
 
-- package: WP-490+
+- package: WP-500+
 - status: pending
 - objective: split the next ecosystem or remaining advanced endpoint package from the roadmap.
 
-next_recommended: WP-490+
+next_recommended: WP-500+
 
 last_gates:
 
-- `cd apps/api && go test ./internal/modules/provider_adapters/... -run TestOpenAICompatibleAdapterInvokesImageEditsUpstream -count=1`: pass
-- `cd apps/api && go test ./internal/httpserver -run 'TestGatewayImageEdit(RouteTargetsOpenAICompatibleUpstream|AliasForcesProviderContext)' -count=1`: pass
+- `cd apps/api && go test ./internal/modules/provider_adapters/... -run TestOpenAICompatibleAdapterInvokesImageVariationsUpstream -count=1`: pass
+- `cd apps/api && go test ./internal/httpserver -run 'TestGatewayImageVariation(RouteTargetsOpenAICompatibleUpstream|AliasForcesProviderContext)' -count=1`: pass
 - `cd apps/api && go test ./internal/modules/gateway/... -run Test -count=1`: pass
 - `make openapi-lint`: pass
 - `make openapi-bundle`: pass
@@ -159,6 +160,9 @@ notes:
 - WP-470 intentionally does not add official API-key Realtime, persistent upstream session pools, local client ingress, or Claude Code / Antigravity provider-native realtime adapters.
 - WP-480 added `TestOpenAICompatibleAdapterInvokesImageEditsUpstream`, `TestGatewayImageEditRouteTargetsOpenAICompatibleUpstream`, and `TestGatewayImageEditAliasForcesProviderContext`, proving multipart `image` / optional `mask`, mapped upstream model, provider alias context, usage logs, and Scheduler decisions for `/v1/images/edits`.
 - WP-480 intentionally does not add JSON image references, streaming image edit events, image variations, or frontend visuals.
+- WP-490 verified the current OpenAI OpenAPI spec for `/images/variations`: multipart `POST`, required single `image`, optional `n`, `size`, `response_format`, and `user`, with upstream support currently limited to `dall-e-2`.
+- WP-490 added `TestOpenAICompatibleAdapterInvokesImageVariationsUpstream`, `TestGatewayImageVariationRouteTargetsOpenAICompatibleUpstream`, and `TestGatewayImageVariationAliasForcesProviderContext`, proving multipart `image`, mapped upstream model, provider alias context, usage logs, and Scheduler decisions for `/v1/images/variations`.
+- WP-490 intentionally does not add multi-image variations, JSON image references, streaming image variation events, or frontend visuals.
 
 ## Work Package Ledger
 
@@ -213,4 +217,5 @@ notes:
 | WP-460 | completed | Realtime slot lifecycle v1. |
 | WP-470 | completed | OpenAI-compatible Realtime WebSocket relay v1 with OAuth/session/client-token Reverse Proxy Runtime boundary. |
 | WP-480 | completed | Images edits runtime v1. |
-| WP-490+ | pending | Remaining ecosystem and advanced endpoint packages. |
+| WP-490 | completed | Images variations runtime v1. |
+| WP-500+ | pending | Remaining ecosystem and advanced endpoint packages. |

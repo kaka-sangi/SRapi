@@ -2911,6 +2911,54 @@ paths:
         default:
           $ref: "#/components/responses/GatewayError"
 
+  /v1/images/variations:
+    post:
+      tags:
+        - Gateway
+      operationId: createImageVariation
+      summary: Create OpenAI-compatible image variations.
+      description: OpenAI-compatible image variation route. SRapi validates the gateway API key, applies model policy and entitlement, schedules an eligible provider account, forwards a multipart source image to the selected OpenAI-compatible provider adapter, and records media usage and Scheduler evidence. The OpenAI upstream endpoint currently only supports `dall-e-2`.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/ImageVariationRequest"
+            encoding:
+              image:
+                contentType: image/*
+            examples:
+              basic:
+                value:
+                  model: dall-e-2
+                  image: source.png
+                  n: 1
+                  size: 1024x1024
+      responses:
+        "200":
+          description: OpenAI-compatible image variation response.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImageGenerationResponse"
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
   /v1/audio/transcriptions:
     post:
       tags:
@@ -3776,6 +3824,47 @@ paths:
       responses:
         "200":
           description: OpenAI-compatible image edit response.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImageGenerationResponse"
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /api/provider/openai-compatible/v1/images/variations:
+    post:
+      tags:
+        - Gateway
+      operationId: createOpenAICompatibleImageVariationAlias
+      summary: Create OpenAI-compatible image variations with openai-compatible provider context.
+      description: Provider alias route. It reuses the standard image variation runtime and forces the `openai-compatible` provider context.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/ImageVariationRequest"
+            encoding:
+              image:
+                contentType: image/*
+      responses:
+        "200":
+          description: OpenAI-compatible image variation response.
           headers:
             X-Request-ID:
               $ref: "#/components/headers/RequestIdHeader"
@@ -7465,6 +7554,46 @@ components:
           minimum: 0
           maximum: 3
           description: Reserved for future image edit streaming support.
+        user:
+          type: string
+      additionalProperties: true
+
+    ImageVariationRequest:
+      type: object
+      required:
+        - image
+        - model
+      properties:
+        image:
+          type: string
+          format: binary
+          description: Source image to use for variation generation. OpenAI currently supports this endpoint for `dall-e-2`.
+        model:
+          type: string
+        n:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 1
+        size:
+          type: string
+          enum:
+            - 256x256
+            - 512x512
+            - 1024x1024
+          x-enum-varnames:
+            - ImageVariationRequestSize256x256
+            - ImageVariationRequestSize512x512
+            - ImageVariationRequestSize1024x1024
+        response_format:
+          type: string
+          enum:
+            - url
+            - b64_json
+          x-enum-varnames:
+            - ImageVariationRequestResponseFormatURL
+            - ImageVariationRequestResponseFormatB64JSON
+          default: url
         user:
           type: string
       additionalProperties: true

@@ -1231,6 +1231,19 @@ export type ImageEditRequest = {
     [key: string]: unknown;
 };
 
+export type ImageVariationRequest = {
+    /**
+     * Source image to use for variation generation. OpenAI currently supports this endpoint for `dall-e-2`.
+     */
+    image: Blob | File;
+    model: string;
+    n?: number;
+    size?: '256x256' | '512x512' | '1024x1024';
+    response_format?: 'url' | 'b64_json';
+    user?: string;
+    [key: string]: unknown;
+};
+
 export type ImageGenerationObject = {
     url?: string;
     b64_json?: string;
@@ -4625,6 +4638,51 @@ export type CreateImageEditResponses = {
 
 export type CreateImageEditResponse = CreateImageEditResponses[keyof CreateImageEditResponses];
 
+export type CreateImageVariationData = {
+    body: ImageVariationRequest;
+    path?: never;
+    query?: never;
+    url: '/v1/images/variations';
+};
+
+export type CreateImageVariationErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateImageVariationError = CreateImageVariationErrors[keyof CreateImageVariationErrors];
+
+export type CreateImageVariationResponses = {
+    /**
+     * OpenAI-compatible image variation response.
+     */
+    200: ImageGenerationResponse;
+};
+
+export type CreateImageVariationResponse = CreateImageVariationResponses[keyof CreateImageVariationResponses];
+
 export type CreateAudioTranscriptionData = {
     body: AudioTranscriptionRequest;
     path?: never;
@@ -5544,6 +5602,51 @@ export type CreateOpenAiCompatibleImageEditAliasResponses = {
 };
 
 export type CreateOpenAiCompatibleImageEditAliasResponse = CreateOpenAiCompatibleImageEditAliasResponses[keyof CreateOpenAiCompatibleImageEditAliasResponses];
+
+export type CreateOpenAiCompatibleImageVariationAliasData = {
+    body: ImageVariationRequest;
+    path?: never;
+    query?: never;
+    url: '/api/provider/openai-compatible/v1/images/variations';
+};
+
+export type CreateOpenAiCompatibleImageVariationAliasErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateOpenAiCompatibleImageVariationAliasError = CreateOpenAiCompatibleImageVariationAliasErrors[keyof CreateOpenAiCompatibleImageVariationAliasErrors];
+
+export type CreateOpenAiCompatibleImageVariationAliasResponses = {
+    /**
+     * OpenAI-compatible image variation response.
+     */
+    200: ImageGenerationResponse;
+};
+
+export type CreateOpenAiCompatibleImageVariationAliasResponse = CreateOpenAiCompatibleImageVariationAliasResponses[keyof CreateOpenAiCompatibleImageVariationAliasResponses];
 
 export type CreateAnthropicCompatibleMessageAliasData = {
     body: AnthropicMessagesRequest;

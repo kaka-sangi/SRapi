@@ -295,6 +295,39 @@ func (s *Service) NormalizeImageEdit(req apiopenapi.ImageEditRequest, meta Reque
 	return canonical, nil
 }
 
+func (s *Service) NormalizeImageVariation(req apiopenapi.ImageVariationRequest, meta RequestMeta) (gatewaycontract.CanonicalRequest, error) {
+	model := strings.TrimSpace(req.Model)
+	if model == "" {
+		return gatewaycontract.CanonicalRequest{}, fmt.Errorf("image variation model is empty")
+	}
+	image := imageInputFromOpenAPI(&req.Image)
+	if image == nil {
+		return gatewaycontract.CanonicalRequest{}, fmt.Errorf("image variation input image is missing")
+	}
+	count := 1
+	if req.N != nil {
+		count = *req.N
+	}
+	if count < 1 || count > 10 {
+		return gatewaycontract.CanonicalRequest{}, fmt.Errorf("image n must be between 1 and 10")
+	}
+	format := enumString(req.ResponseFormat)
+	if format == "" {
+		format = "url"
+	}
+	canonical := canonical(meta, gatewaycontract.ProtocolOpenAICompatible, gatewaycontract.ProtocolOpenAICompatible, model, "", false, "", nil, imageVariationContentBlocks(*image), "", nil)
+	canonical.ImageInputs = []gatewaycontract.ImageInput{*image}
+	canonical.ImageCount = count
+	canonical.ImageSize = enumString(req.Size)
+	canonical.ImageResponseFormat = format
+	if req.User != nil {
+		canonical.ImageUser = strings.TrimSpace(*req.User)
+	}
+	canonical.ImageExtra = cloneMap(req.AdditionalProperties)
+	canonical.RequestCapabilities = append(canonical.RequestCapabilities, gatewaycontract.RequestCapability{Key: capabilitiescontract.KeyImages, Version: "v1"})
+	return canonical, nil
+}
+
 func (s *Service) NormalizeAudioTranscription(req apiopenapi.AudioTranscriptionRequest, meta RequestMeta) (gatewaycontract.CanonicalRequest, error) {
 	model := strings.TrimSpace(req.Model)
 	if model == "" {
@@ -1221,6 +1254,17 @@ func imageEditContentBlocks(prompt string, images []gatewaycontract.ImageInput) 
 		blocks = append(blocks, gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockImage, Role: "user", Metadata: metadata})
 	}
 	return blocks
+}
+
+func imageVariationContentBlocks(image gatewaycontract.ImageInput) []gatewaycontract.ContentBlock {
+	metadata := map[string]any{}
+	if filename := strings.TrimSpace(image.FileName); filename != "" {
+		metadata["filename"] = filename
+	}
+	if contentType := strings.TrimSpace(image.ContentType); contentType != "" {
+		metadata["content_type"] = contentType
+	}
+	return []gatewaycontract.ContentBlock{{Type: gatewaycontract.ContentBlockImage, Role: "user", Metadata: metadata}}
 }
 
 func validAudioTranscriptionResponseFormat(format string) bool {

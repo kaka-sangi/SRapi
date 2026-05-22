@@ -1094,6 +1094,28 @@ func (rt *runtimeState) invokeProviderImageEdit(ctx context.Context, req provide
 	return resp, nil
 }
 
+func (rt *runtimeState) invokeProviderImageVariation(ctx context.Context, req provideradaptercontract.ImageVariationRequest) (provideradaptercontract.ImageGenerationResponse, error) {
+	if req.Account.ID <= 0 {
+		return provideradaptercontract.ImageGenerationResponse{}, provideradaptercontract.ProviderError{Class: "no_available_account", StatusCode: http.StatusServiceUnavailable, Message: "provider account missing"}
+	}
+	credential, err := rt.accounts.DecryptCredential(ctx, req.Account.ID)
+	if err != nil {
+		return provideradaptercontract.ImageGenerationResponse{}, provideradaptercontract.ProviderError{Class: "credential_error", StatusCode: http.StatusBadGateway, Message: "provider credential unavailable"}
+	}
+	if refreshed, ok, err := rt.refreshReverseProxyCredential(ctx, req.Account, credential); err != nil {
+		return provideradaptercontract.ImageGenerationResponse{}, provideradaptercontract.ProviderError{Class: "auth_failed", StatusCode: http.StatusBadGateway, Message: "provider credential refresh failed"}
+	} else if ok {
+		credential = refreshed
+	}
+	req.Credential = credential
+	resp, err := rt.adapters.InvokeImageVariation(ctx, req)
+	if err != nil {
+		rt.applyProviderAccountProtection(ctx, req.Account, err)
+		return provideradaptercontract.ImageGenerationResponse{}, err
+	}
+	return resp, nil
+}
+
 func (rt *runtimeState) invokeProviderAudioTranscription(ctx context.Context, req provideradaptercontract.AudioTranscriptionRequest) (provideradaptercontract.AudioTranscriptionResponse, error) {
 	if req.Account.ID <= 0 {
 		return provideradaptercontract.AudioTranscriptionResponse{}, provideradaptercontract.ProviderError{Class: "no_available_account", StatusCode: http.StatusServiceUnavailable, Message: "provider account missing"}
@@ -1253,6 +1275,24 @@ func providerImageEditRequest(req gatewaycontract.CanonicalRequest, candidate sc
 		Count:          req.ImageCount,
 		Size:           req.ImageSize,
 		Quality:        req.ImageQuality,
+		ResponseFormat: req.ImageResponseFormat,
+		User:           req.ImageUser,
+		Extra:          cloneAnyMap(req.ImageExtra),
+		Provider:       candidate.Provider,
+		Account:        candidate.Account,
+		Mapping:        candidate.Mapping,
+	}
+}
+
+func providerImageVariationRequest(req gatewaycontract.CanonicalRequest, candidate schedulercontract.Candidate) provideradaptercontract.ImageVariationRequest {
+	return provideradaptercontract.ImageVariationRequest{
+		RequestID:      req.RequestID,
+		SourceProtocol: string(req.SourceProtocol),
+		SourceEndpoint: req.SourceEndpoint,
+		Model:          req.CanonicalModel,
+		Image:          providerImageInputValue(req.ImageInputs),
+		Count:          req.ImageCount,
+		Size:           req.ImageSize,
 		ResponseFormat: req.ImageResponseFormat,
 		User:           req.ImageUser,
 		Extra:          cloneAnyMap(req.ImageExtra),
@@ -1603,6 +1643,18 @@ func providerImageInputPtr(value *gatewaycontract.ImageInput) *provideradapterco
 		return nil
 	}
 	return &provideradaptercontract.ImageInput{
+		FileName:    value.FileName,
+		ContentType: value.ContentType,
+		Bytes:       append([]byte(nil), value.Bytes...),
+	}
+}
+
+func providerImageInputValue(values []gatewaycontract.ImageInput) provideradaptercontract.ImageInput {
+	if len(values) == 0 {
+		return provideradaptercontract.ImageInput{}
+	}
+	value := values[0]
+	return provideradaptercontract.ImageInput{
 		FileName:    value.FileName,
 		ContentType: value.ContentType,
 		Bytes:       append([]byte(nil), value.Bytes...),

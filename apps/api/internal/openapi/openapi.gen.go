@@ -740,6 +740,45 @@ func (e ImageGenerationRequestStyle) Valid() bool {
 	}
 }
 
+// Defines values for ImageVariationRequestResponseFormat.
+const (
+	ImageVariationRequestResponseFormatB64JSON ImageVariationRequestResponseFormat = "b64_json"
+	ImageVariationRequestResponseFormatURL     ImageVariationRequestResponseFormat = "url"
+)
+
+// Valid indicates whether the value is a known member of the ImageVariationRequestResponseFormat enum.
+func (e ImageVariationRequestResponseFormat) Valid() bool {
+	switch e {
+	case ImageVariationRequestResponseFormatB64JSON:
+		return true
+	case ImageVariationRequestResponseFormatURL:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ImageVariationRequestSize.
+const (
+	ImageVariationRequestSize1024x1024 ImageVariationRequestSize = "1024x1024"
+	ImageVariationRequestSize256x256   ImageVariationRequestSize = "256x256"
+	ImageVariationRequestSize512x512   ImageVariationRequestSize = "512x512"
+)
+
+// Valid indicates whether the value is a known member of the ImageVariationRequestSize enum.
+func (e ImageVariationRequestSize) Valid() bool {
+	switch e {
+	case ImageVariationRequestSize1024x1024:
+		return true
+	case ImageVariationRequestSize256x256:
+		return true
+	case ImageVariationRequestSize512x512:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for OpenAIModelObject.
 const (
 	OpenAIModelObjectModel OpenAIModelObject = "model"
@@ -2332,6 +2371,24 @@ type ImageGenerationResponse struct {
 	Data    []ImageGenerationObject `json:"data"`
 }
 
+// ImageVariationRequest defines model for ImageVariationRequest.
+type ImageVariationRequest struct {
+	// Image Source image to use for variation generation. OpenAI currently supports this endpoint for `dall-e-2`.
+	Image                openapi_types.File                   `json:"image"`
+	Model                string                               `json:"model"`
+	N                    *int                                 `json:"n,omitempty"`
+	ResponseFormat       *ImageVariationRequestResponseFormat `json:"response_format,omitempty"`
+	Size                 *ImageVariationRequestSize           `json:"size,omitempty"`
+	User                 *string                              `json:"user,omitempty"`
+	AdditionalProperties map[string]interface{}               `json:"-"`
+}
+
+// ImageVariationRequestResponseFormat defines model for ImageVariationRequest.ResponseFormat.
+type ImageVariationRequestResponseFormat string
+
+// ImageVariationRequestSize defines model for ImageVariationRequest.Size.
+type ImageVariationRequestSize string
+
 // JsonObject defines model for JsonObject.
 type JsonObject map[string]interface{}
 
@@ -3545,6 +3602,9 @@ type CreateOpenAICompatibleImageEditAliasMultipartRequestBody = ImageEditRequest
 // CreateOpenAICompatibleImageGenerationAliasJSONRequestBody defines body for CreateOpenAICompatibleImageGenerationAlias for application/json ContentType.
 type CreateOpenAICompatibleImageGenerationAliasJSONRequestBody = ImageGenerationRequest
 
+// CreateOpenAICompatibleImageVariationAliasMultipartRequestBody defines body for CreateOpenAICompatibleImageVariationAlias for multipart/form-data ContentType.
+type CreateOpenAICompatibleImageVariationAliasMultipartRequestBody = ImageVariationRequest
+
 // CreateOpenAICompatibleMessageAliasJSONRequestBody defines body for CreateOpenAICompatibleMessageAlias for application/json ContentType.
 type CreateOpenAICompatibleMessageAliasJSONRequestBody = AnthropicMessagesRequest
 
@@ -3649,6 +3709,9 @@ type CreateImageEditMultipartRequestBody = ImageEditRequest
 
 // CreateImageGenerationJSONRequestBody defines body for CreateImageGeneration for application/json ContentType.
 type CreateImageGenerationJSONRequestBody = ImageGenerationRequest
+
+// CreateImageVariationMultipartRequestBody defines body for CreateImageVariation for multipart/form-data ContentType.
+type CreateImageVariationMultipartRequestBody = ImageVariationRequest
 
 // CreateMessageJSONRequestBody defines body for CreateMessage for application/json ContentType.
 type CreateMessageJSONRequestBody = AnthropicMessagesRequest
@@ -6292,6 +6355,145 @@ func (a ImageGenerationRequest) MarshalJSON() ([]byte, error) {
 	return json.Marshal(object)
 }
 
+// Getter for additional properties for ImageVariationRequest. Returns the specified
+// element and whether it was found
+func (a ImageVariationRequest) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for ImageVariationRequest
+func (a *ImageVariationRequest) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for ImageVariationRequest to handle AdditionalProperties
+func (a *ImageVariationRequest) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["image"]; found {
+		err = json.Unmarshal(raw, &a.Image)
+		if err != nil {
+			return fmt.Errorf("error reading 'image': %w", err)
+		}
+		delete(object, "image")
+	}
+
+	if raw, found := object["model"]; found {
+		err = json.Unmarshal(raw, &a.Model)
+		if err != nil {
+			return fmt.Errorf("error reading 'model': %w", err)
+		}
+		delete(object, "model")
+	}
+
+	if raw, found := object["n"]; found {
+		err = json.Unmarshal(raw, &a.N)
+		if err != nil {
+			return fmt.Errorf("error reading 'n': %w", err)
+		}
+		delete(object, "n")
+	}
+
+	if raw, found := object["response_format"]; found {
+		err = json.Unmarshal(raw, &a.ResponseFormat)
+		if err != nil {
+			return fmt.Errorf("error reading 'response_format': %w", err)
+		}
+		delete(object, "response_format")
+	}
+
+	if raw, found := object["size"]; found {
+		err = json.Unmarshal(raw, &a.Size)
+		if err != nil {
+			return fmt.Errorf("error reading 'size': %w", err)
+		}
+		delete(object, "size")
+	}
+
+	if raw, found := object["user"]; found {
+		err = json.Unmarshal(raw, &a.User)
+		if err != nil {
+			return fmt.Errorf("error reading 'user': %w", err)
+		}
+		delete(object, "user")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for ImageVariationRequest to handle AdditionalProperties
+func (a ImageVariationRequest) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	object["image"], err = json.Marshal(a.Image)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'image': %w", err)
+	}
+
+	object["model"], err = json.Marshal(a.Model)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'model': %w", err)
+	}
+
+	if a.N != nil {
+		object["n"], err = json.Marshal(a.N)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'n': %w", err)
+		}
+	}
+
+	if a.ResponseFormat != nil {
+		object["response_format"], err = json.Marshal(a.ResponseFormat)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'response_format': %w", err)
+		}
+	}
+
+	if a.Size != nil {
+		object["size"], err = json.Marshal(a.Size)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'size': %w", err)
+		}
+	}
+
+	if a.User != nil {
+		object["user"], err = json.Marshal(a.User)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'user': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
 // Getter for additional properties for ModerationRequest. Returns the specified
 // element and whether it was found
 func (a ModerationRequest) Get(fieldName string) (value interface{}, found bool) {
@@ -7964,6 +8166,9 @@ type ServerInterface interface {
 	// Create OpenAI-compatible image generations with openai-compatible provider context.
 	// (POST /api/provider/openai-compatible/v1/images/generations)
 	CreateOpenAICompatibleImageGenerationAlias(w http.ResponseWriter, r *http.Request)
+	// Create OpenAI-compatible image variations with openai-compatible provider context.
+	// (POST /api/provider/openai-compatible/v1/images/variations)
+	CreateOpenAICompatibleImageVariationAlias(w http.ResponseWriter, r *http.Request)
 	// Create an Anthropic Messages-compatible message with openai-compatible provider context.
 	// (POST /api/provider/openai-compatible/v1/messages)
 	CreateOpenAICompatibleMessageAlias(w http.ResponseWriter, r *http.Request)
@@ -8195,6 +8400,9 @@ type ServerInterface interface {
 	// Create OpenAI-compatible image generations.
 	// (POST /v1/images/generations)
 	CreateImageGeneration(w http.ResponseWriter, r *http.Request)
+	// Create OpenAI-compatible image variations.
+	// (POST /v1/images/variations)
+	CreateImageVariation(w http.ResponseWriter, r *http.Request)
 	// Create an Anthropic Messages-compatible message.
 	// (POST /v1/messages)
 	CreateMessage(w http.ResponseWriter, r *http.Request)
@@ -8468,6 +8676,26 @@ func (siw *ServerInterfaceWrapper) CreateOpenAICompatibleImageGenerationAlias(w 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateOpenAICompatibleImageGenerationAlias(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateOpenAICompatibleImageVariationAlias operation middleware
+func (siw *ServerInterfaceWrapper) CreateOpenAICompatibleImageVariationAlias(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateOpenAICompatibleImageVariationAlias(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -11393,6 +11621,26 @@ func (siw *ServerInterfaceWrapper) CreateImageGeneration(w http.ResponseWriter, 
 	handler.ServeHTTP(w, r)
 }
 
+// CreateImageVariation operation middleware
+func (siw *ServerInterfaceWrapper) CreateImageVariation(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateImageVariation(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // CreateMessage operation middleware
 func (siw *ServerInterfaceWrapper) CreateMessage(w http.ResponseWriter, r *http.Request) {
 
@@ -11865,6 +12113,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/embeddings", wrapper.CreateOpenAICompatibleEmbeddingAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/images/edits", wrapper.CreateOpenAICompatibleImageEditAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/images/generations", wrapper.CreateOpenAICompatibleImageGenerationAlias)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/images/variations", wrapper.CreateOpenAICompatibleImageVariationAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/messages", wrapper.CreateOpenAICompatibleMessageAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/moderations", wrapper.CreateOpenAICompatibleModerationAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/responses", wrapper.CreateOpenAICompatibleResponseAlias)
@@ -11942,6 +12191,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/embeddings", wrapper.CreateEmbedding)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/images/edits", wrapper.CreateImageEdit)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/images/generations", wrapper.CreateImageGeneration)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/images/variations", wrapper.CreateImageVariation)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/messages", wrapper.CreateMessage)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/models", wrapper.ListModels)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/moderations", wrapper.CreateModeration)

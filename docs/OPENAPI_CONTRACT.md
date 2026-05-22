@@ -98,6 +98,7 @@ packages/openapi/
 /v1/embeddings
 /v1/images/generations
 /v1/images/edits
+/v1/images/variations
 /v1/audio/transcriptions
 /v1/audio/speech
 /v1/moderations
@@ -583,6 +584,7 @@ POST /api/provider/openai-compatible/v1/messages
 POST /api/provider/openai-compatible/v1/embeddings
 POST /api/provider/openai-compatible/v1/images/generations
 POST /api/provider/openai-compatible/v1/images/edits
+POST /api/provider/openai-compatible/v1/images/variations
 POST /api/provider/openai-compatible/v1/moderations
 POST /api/provider/rerank-compatible/v1/rerank
 POST /api/provider/anthropic-compatible/v1/messages

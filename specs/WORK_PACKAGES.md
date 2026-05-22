@@ -1895,13 +1895,61 @@ Required gates:
 - `make secret-scan`
 - `git diff --check`
 
-## WP-490+: Ecosystem And Remaining Advanced Surface
+## WP-490: Images Variations Runtime v1
+
+Objective: add OpenAI-compatible image variations through the standard Gateway auth, model policy, entitlement, Scheduler, Provider Adapter, usage evidence, and generated contract path.
+
+Read first:
+
+- `docs/OPENAPI_CONTRACT.md`
+- `docs/GATEWAY_ROUTE_MATRIX.md`
+- `docs/AI_ENDPOINT_COMPATIBILITY.md`
+- `docs/PROVIDER_ADAPTER_SPEC.md`
+- `packages/openapi/openapi.yaml`
+- OpenAI official image variations OpenAPI spec
+- `apps/api/internal/modules/gateway`
+- `apps/api/internal/modules/provider_adapters`
+- `apps/api/internal/httpserver`
+
+Owns:
+
+- OpenAPI `POST /v1/images/variations` and OpenAI-compatible provider alias contract
+- Gateway multipart image variation normalization/rendering
+- Provider Adapter multipart image variation dispatch for OpenAI-compatible API-key and reverse-proxy accounts
+- HTTP runtime handler/tests and Gateway route matrix/docs/status updates
+
+Definition of Done:
+
+- `POST /v1/images/variations` is OpenAPI-described, generated, and secured with `gatewayBearerAuth`.
+- OpenAI-compatible provider alias routes, including `/api/provider/openai-compatible/v1/images/variations`, reuse the same runtime while forcing provider context.
+- Requests minimally validate `model` and a single image file; `n`, `size`, `response_format`, `user`, and extra multipart form fields are preserved where supported.
+- Runtime follows the standard Gateway path: API key auth, model visibility, entitlement admission, Scheduler candidate selection, provider credential materialization, Provider Adapter invocation, usage log, billing metadata, Scheduler feedback, and outbox event.
+- OpenAI-compatible API-key and reverse-proxy accounts dispatch upstream to multipart `/images/variations`, pass the mapped upstream model, parse `url` and `b64_json` image outputs, and return OpenAI-shaped image responses.
+- The endpoint reuses the explicit `images` endpoint capability so Scheduler can reject text-only candidates.
+- Provider and validation errors use the existing OpenAI-compatible Gateway error envelope and preserve request IDs.
+- Focused regressions prove standard route success, provider alias forced context, upstream multipart request/response parsing, and usage/decision evidence.
+- Multi-image variations, JSON image references, streaming image variation events, and frontend visuals are left to later packages.
+
+Required gates:
+
+- `make openapi-lint`
+- `make openapi-bundle`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/modules/gateway/... ./internal/modules/provider_adapters/... ./internal/httpserver`
+- `cd apps/api && go test ./...`
+- `make architecture-check`
+- `make code-quality-check`
+- `make secret-scan`
+- `git diff --check`
+
+## WP-500+: Ecosystem And Remaining Advanced Surface
 
 Use `ROADMAP.md` Phase 7 through Phase 8 to split future packages for:
 
 - provider-native realtime protocol adapters and richer slot lifecycle
-- image variations and image edit streaming / JSON reference compatibility
-- SDK examples
-- migration guides
+- image edit streaming / JSON reference compatibility
+- SDK examples and migration guides
 
 Each new package must be added here before implementation starts.
