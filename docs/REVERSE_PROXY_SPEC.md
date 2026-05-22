@@ -2,6 +2,8 @@
 
 ## 1. 目标
 
+术语边界以 `2API_REVERSE_PROXY_DEFINITION.md` 为准：SRapi 的“反代 / 2api”指 SRapi 使用选中 Provider Account 模拟目标官方客户端请求上游，而不是把本地 Codex / Claude Code / Antigravity 客户端作为下游入口。
+
 SRapi 的核心差异化能力之一，是像 `sub2api`、`claude2api`、`chatgpt2api`、`gemini2api`、`grok2api`、`cursor2api`、`augment2api`、`copilot2api`、`antigravity2api` 这类 2api 项目一样，把上游 AI 厂商的 **Web 会话、桌面客户端 OAuth、CLI/IDE 设备码 token** 反向暴露为统一的 OpenAI / Anthropic / Gemini 兼容 API。
 
 这与传统 API Key Gateway 的关键差别：
@@ -18,14 +20,14 @@ SRapi 的核心差异化能力之一，是像 `sub2api`、`claude2api`、`chatgp
 反代运行时的真实含义：
 
 ```txt
-用户客户端 -> SRapi 兼容端点 -> Canonical AI Request -> Provider Adapter -> Reverse Proxy Runtime -> 上游官方客户端端点
+用户客户端 -> SRapi 兼容端点 -> Canonical AI Request -> Provider Adapter 构造官方客户端形态 -> Reverse Proxy Runtime -> 上游官方客户端端点
 ```
 
 特点：
 
 - 用户客户端可以是任意 OpenAI / Anthropic 兼容 SDK。
-- SRapi 在内部把请求翻译为 **目标上游官方客户端会发出的请求**。
-- 反代运行时负责把这个请求“包装”成与官方客户端字节级一致或接近一致的样子。
+- SRapi 在内部把请求翻译为 **目标上游官方客户端会发出的请求**，例如 Codex CLI、Claude Code CLI、Gemini CLI、Antigravity Desktop / IDE 的请求形态。
+- Provider Adapter 负责上游官方客户端 payload / endpoint / protocol shape；Reverse Proxy Runtime 负责把这个请求“包装”成与官方客户端传输特征一致或接近一致的样子。
 - 流式响应必须按上游官方客户端的格式向客户端原样输出，再转换回客户端协议。
 
 反代运行时只服务于 `runtime_class != api_key` 的账号。`runtime_class = api_key` 的账号走简单官方 API SDK 路径，反代约束放宽。
