@@ -4,6 +4,8 @@
 
 术语边界以 `2API_REVERSE_PROXY_DEFINITION.md` 为准：SRapi 的“反代 / 2api”只按本地 `/home/senran/Desktop/sub2api`、`/home/senran/Desktop/CLIProxyAPI`、`/home/senran/Desktop/chatgpt2api` 的 2api 做法解释，即 SRapi 使用选中 Provider Account 模拟目标官方客户端请求上游，而不是把本地 Codex / Claude Code / Antigravity 客户端作为下游入口，也不是按通用网络 reverse proxy 定义重新解释。
 
+实现时不要再把“反代”解释成 Gateway service 本地 DTO、本地 CLI 进程代理、或普通 API-key upstream fallback。SRapi 2api 的判定点是：Provider Adapter 构造目标官方客户端 upstream endpoint/header/body/stream/WSS shape，Reverse Proxy Runtime 使用选中账号的 OAuth/session/desktop/CLI/IDE credential 发给真实上游。
+
 SRapi 的核心差异化能力之一，是像 `sub2api`、`claude2api`、`chatgpt2api`、`gemini2api`、`grok2api`、`cursor2api`、`augment2api`、`copilot2api`、`antigravity2api` 这类 2api 项目一样，把上游 AI 厂商的 **Web 会话、桌面客户端 OAuth、CLI/IDE 设备码 token** 反向暴露为统一的 OpenAI / Anthropic / Gemini 兼容 API。
 
 这与传统 API Key Gateway 的关键差别：
