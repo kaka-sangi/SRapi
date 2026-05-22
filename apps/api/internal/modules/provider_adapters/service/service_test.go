@@ -1496,6 +1496,70 @@ func TestReverseProxyCodexCLIAdapterPassesCliRuntimeContext(t *testing.T) {
 	}
 }
 
+func TestReverseProxyCodexCLIPrepareRealtimeBuildsResponsesWebSocketSession(t *testing.T) {
+	svc, err := service.New(nil)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	session, err := svc.PrepareRealtime(context.Background(), contract.RealtimeRequest{
+		RequestID:      "req_codex_ws",
+		Model:          "codex-local",
+		RequestPayload: []byte(`{"model":"codex-local","input":"hello codex ws","stream":true}`),
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata: map[string]any{
+				"base_url":                                     "https://chatgpt.example/backend-api/codex",
+				"user_agent":                                   "codex-cli/0.118.0 (Mac OS)",
+				"chatgpt_account_id":                           "chatgpt-account",
+				"codex_session_id":                             "session-123",
+				"codex_beta_features":                          "feature-a",
+				"codex_version":                                "0.118.0",
+				"codex_turn_metadata":                          `{"cwd":"/repo"}`,
+				"codex_client_request_id":                      "client-req-123",
+				"x_responsesapi_include_timing_metrics":        "true",
+				"openai_oauth_responses_websockets_v2_enabled": true,
+			},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+		Credential: map[string]any{"cli_client_token": "cli-token"},
+	})
+	if err != nil {
+		t.Fatalf("prepare codex realtime: %v", err)
+	}
+	if session.URL != "wss://chatgpt.example/backend-api/codex/responses" {
+		t.Fatalf("unexpected codex websocket URL %q", session.URL)
+	}
+	if headerValue(session.Headers, "OpenAI-Beta") != "responses_websockets=2026-02-06" ||
+		headerValue(session.Headers, "Originator") != "codex_cli_rs" ||
+		headerValue(session.Headers, "ChatGPT-Account-ID") != "chatgpt-account" ||
+		headerValue(session.Headers, "X-Codex-Beta-Features") != "feature-a" ||
+		headerValue(session.Headers, "Version") != "0.118.0" ||
+		headerValue(session.Headers, "X-Codex-Turn-Metadata") != `{"cwd":"/repo"}` ||
+		headerValue(session.Headers, "X-Client-Request-Id") != "client-req-123" ||
+		headerValue(session.Headers, "X-ResponsesAPI-Include-Timing-Metrics") != "true" {
+		t.Fatalf("unexpected codex websocket headers: %+v", session.Headers)
+	}
+	if headerValue(session.Headers, "session_id") != "session-123" {
+		t.Fatalf("unexpected codex websocket session_id header: %+v", session.Headers)
+	}
+	if session.Headers.Get("Authorization") != "" {
+		t.Fatalf("adapter should leave auth injection to reverse proxy runtime, got %+v", session.Headers)
+	}
+	var frame map[string]any
+	if err := json.Unmarshal(session.InitialFrame, &frame); err != nil {
+		t.Fatalf("decode initial frame: %v", err)
+	}
+	if frame["type"] != "response.create" || frame["model"] != "codex-upstream" || frame["input"] != "hello codex ws" || frame["stream"] != true {
+		t.Fatalf("unexpected codex websocket initial frame: %+v", frame)
+	}
+}
+
 func TestReverseProxyCodexCLIRejectsAPIKeyRuntime(t *testing.T) {
 	runtime := capturingRuntime{
 		response: reverseproxycontract.Response{
@@ -1537,6 +1601,31 @@ func TestReverseProxyCodexCLIRejectsAPIKeyRuntime(t *testing.T) {
 	if runtime.request.URL != "" {
 		t.Fatalf("reverse proxy runtime should not be called, got %+v", runtime.request)
 	}
+}
+
+func TestReverseProxyCodexCLIPrepareRealtimeRejectsAPIKeyRuntime(t *testing.T) {
+	svc, err := service.New(nil)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.PrepareRealtime(context.Background(), contract.RealtimeRequest{
+		RequestID:      "req_codex_ws_api_key_runtime",
+		Model:          "codex-local",
+		RequestPayload: []byte(`{"model":"codex-local","input":"hello"}`),
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassAPIKey,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": "https://chatgpt.example/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+		Credential: map[string]any{"api_key": "sk-secret"},
+	})
+	assertProviderError(t, err, "invalid_request", http.StatusBadRequest)
 }
 
 func TestReverseProxyAntigravityOpenAIAdapterDispatchesThroughRuntime(t *testing.T) {
@@ -1865,6 +1954,23 @@ func assertProviderError(t *testing.T, err error, class string, statusCode int) 
 	if providerErr.Class != class || providerErr.StatusCode != statusCode {
 		t.Fatalf("expected provider error %s/%d, got %+v", class, statusCode, providerErr)
 	}
+}
+
+func headerValue(headers http.Header, key string) string {
+	for existingKey, values := range headers {
+		if !strings.EqualFold(existingKey, key) {
+			continue
+		}
+		for _, value := range values {
+			if trimmed := strings.TrimSpace(value); trimmed != "" {
+				return trimmed
+			}
+		}
+	}
+	if value := strings.TrimSpace(headers.Get(key)); value != "" {
+		return value
+	}
+	return ""
 }
 
 func ptrString(value string) *string {

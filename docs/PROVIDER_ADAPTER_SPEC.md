@@ -634,6 +634,7 @@ Audio speech dispatch must send JSON with mapped upstream `model`, `input`, `voi
 
 - “反代 / 2api”的权威定义见 `2API_REVERSE_PROXY_DEFINITION.md`：Adapter 必须构造目标官方客户端形态的上游请求，例如 Codex CLI、Claude Code CLI、Gemini CLI 或 Antigravity Desktop / IDE，而不是把下游请求简单透传到兼容 API。
 - `reverse-proxy-codex-cli` 文本请求必须构造 Codex Responses / official-client 形态，POST 到配置的 Codex base URL 下的 `/responses`，并通过 Reverse Proxy Runtime 注入选中账号 OAuth/session/CLI token 身份；不得退化为 OpenAI-compatible `/chat/completions`，也不得接受 `runtime_class = api_key` 作为 2api 身份。
+- `reverse-proxy-codex-cli` realtime 请求必须通过 `PrepareRealtime` 构造 Codex Responses WebSocket session：从 Codex base URL 派生 `ws/wss` `/responses`，设置 Codex official-client headers，生成带 `type: response.create` 和 mapped upstream model 的首帧，并继续拒绝 `runtime_class = api_key`。
 - 上游请求必须通过 Reverse Proxy Runtime 发起，不得使用裸 `net/http` 默认客户端。
 - TLS / HTTP/2 / Header / cookie / User-Agent / 出口 IP 必须由 Egress Profile 决定，不得在 Adapter 内硬编码。
 - 不得向上游泄漏 SRapi 内部标识（`X-Request-ID`、`X-Forwarded-*`、`Via`、`X-SRapi-*` 等）。

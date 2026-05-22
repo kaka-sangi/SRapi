@@ -3,7 +3,7 @@
 ## Current Snapshot
 
 status_version: 1
-updated_at: 2026-05-22
+updated_at: 2026-05-23
 
 last_completed:
 
@@ -47,14 +47,15 @@ last_completed:
 - WP-380: Responses WebSocket runtime foundation now exposes `GET /v1/responses/ws`, accepts raw `ResponsesRequest` or `response.create` frames, executes each request through the existing Responses Gateway runtime, forwards streaming Responses events as WebSocket JSON frames, and preserves Scheduler/usage source endpoint evidence.
 - WP-390: Reverse Proxy Runtime now exposes a `WebSocketRuntime.RelayWebSocket` primitive for direct upstream WSS relay with per-account client/proxy/cookie context, credential-driven auth injection, forbidden-header hygiene, text/binary message relay, and relay accounting.
 - WP-400: Codex CLI 2api HTTP text path now sends `reverse-proxy-codex-cli` requests through Reverse Proxy Runtime to Codex `/responses` official-client shape, parses Codex Responses SSE/JSON output, keeps generic OpenAI-compatible reverse proxy on `/chat/completions`, and enforces the OAuth/session/client-token credential boundary instead of treating API keys as 2api identity.
+- WP-410: Codex CLI 2api Responses WebSocket relay now lets explicitly requested `/v1/responses/ws` calls schedule an eligible `reverse-proxy-codex-cli` account, derive Codex `wss://.../responses`, send Codex official-client headers and a `response.create` upstream-model frame through Reverse Proxy Runtime, and record Scheduler/usage evidence from upstream WebSocket frames.
 
 current:
 
-- package: WP-410+
+- package: WP-420+
 - status: pending
 - objective: split the next ecosystem or remaining advanced endpoint package from the roadmap.
 
-next_recommended: WP-410+
+next_recommended: WP-420+
 
 last_gates:
 
@@ -135,6 +136,8 @@ notes:
 - WP-390 intentionally does not add Gateway route binding or provider-native realtime schema adapters; those are next-stage realtime packages that can now depend on the runtime primitive.
 - WP-400 added `TestReverseProxyCodexCLIAdapterUsesResponsesOfficialClientShape`, proving Codex 2api sends `base_url + "/responses"` with selected account token, Codex official-client headers, Responses-style body, and Codex SSE parsing, without adding Gateway-local Codex DTOs.
 - WP-400 also added `TestRuntimeDoesNotInjectAPIKeyRuntimeCredentials` and `TestReverseProxyCodexCLIRejectsAPIKeyRuntime`, so SRapi's 2api reverse-proxy boundary stays aligned with OAuth/session/client-token accounts rather than official API-key adapters.
+- WP-410 added `TestReverseProxyCodexCLIPrepareRealtimeBuildsResponsesWebSocketSession`, `TestReverseProxyCodexCLIPrepareRealtimeRejectsAPIKeyRuntime`, and `TestGatewayResponsesWebSocketRelaysCodexUpstreamWebSocket`, proving Codex Responses WebSocket 2api uses selected account OAuth/CLI token credentials, Codex official-client headers, mapped upstream model frames, and `/v1/responses/ws` Scheduler/usage evidence.
+- WP-410 intentionally keeps WebSocket relay opt-in via `upstream_ws` / `codex_responses_websocket` flags and account metadata; persistent Codex session reuse, local Codex CLI ingress, and Claude/Antigravity WebSocket adapters remain follow-up work.
 
 ## Work Package Ledger
 
@@ -181,4 +184,5 @@ notes:
 | WP-380 | completed | Responses WebSocket runtime foundation v1. |
 | WP-390 | completed | Reverse Proxy WSS relay foundation v1. |
 | WP-400 | completed | Codex CLI 2api Responses upstream shape v1 with OAuth/session/client-token boundary. |
-| WP-410+ | pending | Remaining ecosystem and advanced endpoint packages. |
+| WP-410 | completed | Codex CLI 2api Responses WebSocket upstream relay v1 with OAuth/session/client-token boundary. |
+| WP-420+ | pending | Remaining ecosystem and advanced endpoint packages. |

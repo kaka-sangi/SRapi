@@ -1528,7 +1528,54 @@ Required gates:
 - `make secret-scan`
 - `git diff --check`
 
-## WP-410+: Ecosystem And Remaining Advanced Surface
+## WP-410: Codex CLI 2api Responses WebSocket Upstream Relay v1
+
+Objective: bind `/v1/responses/ws` to the Reverse Proxy Runtime WebSocket primitive for explicitly requested Codex CLI 2api accounts, so SRapi simulates Codex official-client Responses WebSocket requests upstream using selected OAuth/session/CLI credentials.
+
+Read first:
+
+- `docs/2API_REVERSE_PROXY_DEFINITION.md`
+- `docs/REVERSE_PROXY_SPEC.md`
+- `docs/PROVIDER_ADAPTER_SPEC.md`
+- `docs/GATEWAY_ROUTE_MATRIX.md`
+- `docs/AI_ENDPOINT_COMPATIBILITY.md`
+- `apps/api/internal/httpserver/runtime_gateway_websocket.go`
+- `apps/api/internal/modules/provider_adapters/contract`
+- `apps/api/internal/modules/provider_adapters/service`
+- `apps/api/internal/modules/reverse_proxy/contract`
+- local reference: `/home/senran/Desktop/CLIProxyAPI/internal/runtime/executor/codex_websockets_executor.go`
+
+Owns:
+
+- Provider Adapter realtime contract and Codex CLI `PrepareRealtime` behavior.
+- Codex Responses WebSocket URL derivation from configured Codex base URL.
+- Codex WebSocket official-client headers including `OpenAI-Beta: responses_websockets=2026-02-06`, `Originator`, `X-Client-Request-Id`, `Version`, `session_id`, timing and account headers when account metadata provides them.
+- Initial upstream text frame construction by injecting `type: response.create` and replacing SRapi's local model with the mapped upstream model.
+- `/v1/responses/ws` explicit opt-in via `upstream_ws` / `codex_responses_websocket` query or SRapi headers, followed by normal API key auth, model policy, entitlement, Scheduler, and selected-account checks.
+- Usage and Scheduler evidence for the WebSocket source endpoint.
+- Focused tests proving selected account credentials reach upstream, caller/SRapi headers do not define upstream auth, and usage evidence is recorded from upstream Responses WebSocket frames.
+
+Definition of Done:
+
+- Codex upstream WebSocket relay is only attempted when explicitly requested and a scheduled `reverse-proxy-codex-cli` account has websocket support metadata enabled.
+- The upstream WebSocket request uses the selected account's OAuth/session/CLI credential through Reverse Proxy Runtime; `runtime_class = api_key` remains rejected for Codex 2api.
+- The upstream URL is `base_url + "/responses"` with `http -> ws` and `https -> wss` scheme mapping.
+- The initial upstream message is Codex Responses WebSocket shape, not a Gateway-local DTO and not an OpenAI Chat Completions payload.
+- The local SRapi model name is not leaked upstream; the frame uses the selected mapping's `upstream_model_name`.
+- Success and failure paths preserve `/v1/responses/ws` as source endpoint and record Scheduler/usage evidence.
+- This package does not implement local Codex CLI client ingress, persistent multi-turn WebSocket session reuse, or Claude/Antigravity WebSocket adapters.
+- No frontend visuals are added.
+
+Required gates:
+
+- `cd apps/api && go test ./internal/modules/provider_adapters/... ./internal/modules/reverse_proxy/... ./internal/httpserver`
+- `cd apps/api && go test ./...`
+- `make architecture-check`
+- `make code-quality-check`
+- `make secret-scan`
+- `git diff --check`
+
+## WP-420+: Ecosystem And Remaining Advanced Surface
 
 Use `ROADMAP.md` Phase 7 through Phase 8 to split future packages for:
 

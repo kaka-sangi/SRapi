@@ -69,6 +69,20 @@ func (s *Service) InvokeText(ctx context.Context, req contract.TextRequest) (con
 	}, nil
 }
 
+func (s *Service) PrepareRealtime(ctx context.Context, req contract.RealtimeRequest) (contract.RealtimeSession, error) {
+	if strings.TrimSpace(req.RequestID) == "" || strings.TrimSpace(req.Model) == "" || strings.TrimSpace(req.Mapping.UpstreamModelName) == "" {
+		return contract.RealtimeSession{}, ErrInvalidInput
+	}
+	baseURL := upstreamBaseURLRealtime(req)
+	if baseURL == "" {
+		return contract.RealtimeSession{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "realtime upstream base url missing"}
+	}
+	if isCodexRealtimeReverseProxy(req) {
+		return s.prepareCodexRealtime(ctx, req, baseURL)
+	}
+	return contract.RealtimeSession{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "realtime reverse proxy adapter unsupported"}
+}
+
 func (s *Service) InvokeEmbeddings(ctx context.Context, req contract.EmbeddingRequest) (contract.EmbeddingResponse, error) {
 	if strings.TrimSpace(req.RequestID) == "" || strings.TrimSpace(req.Model) == "" || strings.TrimSpace(req.Mapping.UpstreamModelName) == "" || len(req.Input) == 0 {
 		return contract.EmbeddingResponse{}, ErrInvalidInput
@@ -1638,6 +1652,17 @@ func upstreamBaseURL(req contract.TextRequest) string {
 	return ""
 }
 
+func upstreamBaseURLRealtime(req contract.RealtimeRequest) string {
+	for _, values := range []map[string]any{req.Account.Metadata, req.Provider.ConfigSchema, req.Provider.Capabilities} {
+		for _, key := range []string{"base_url", "upstream_base_url", "openai_base_url", "anthropic_base_url", "gemini_base_url"} {
+			if value := mapString(values, key); value != "" {
+				return strings.TrimRight(value, "/")
+			}
+		}
+	}
+	return ""
+}
+
 func upstreamBaseURLEmbeddings(req contract.EmbeddingRequest) string {
 	for _, values := range []map[string]any{req.Account.Metadata, req.Provider.ConfigSchema, req.Provider.Capabilities} {
 		for _, key := range []string{"base_url", "upstream_base_url", "openai_base_url"} {
@@ -1681,6 +1706,10 @@ func isAnthropicCompatible(req contract.TextRequest) bool {
 }
 
 func isCodexReverseProxy(req contract.TextRequest) bool {
+	return strings.EqualFold(strings.TrimSpace(req.Provider.AdapterType), "reverse-proxy-codex-cli")
+}
+
+func isCodexRealtimeReverseProxy(req contract.RealtimeRequest) bool {
 	return strings.EqualFold(strings.TrimSpace(req.Provider.AdapterType), "reverse-proxy-codex-cli")
 }
 

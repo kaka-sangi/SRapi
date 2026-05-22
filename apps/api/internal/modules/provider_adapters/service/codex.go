@@ -5,7 +5,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"net/url"
 	"sort"
 	"strings"
 
@@ -14,6 +16,7 @@ import (
 )
 
 const codexOriginator = "codex_cli_rs"
+const codexResponsesWebsocketBetaHeaderValue = "responses_websockets=2026-02-06"
 
 type codexResponsesRequest struct {
 	Model           string                    `json:"model"`
@@ -104,6 +107,25 @@ func (s *Service) invokeReverseProxyCodexResponses(ctx context.Context, req cont
 		return contract.TextResponse{}, classifyProviderHTTPError(runtimeResp.StatusCode, runtimeResp.Body)
 	}
 	return parseCodexResponsesBody(runtimeResp.Body, runtimeResp.StatusCode)
+}
+
+func (s *Service) prepareCodexRealtime(_ context.Context, req contract.RealtimeRequest, baseURL string) (contract.RealtimeSession, error) {
+	if codexRealtimeRuntimeIsAPIKey(req) {
+		return contract.RealtimeSession{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "codex websocket reverse proxy requires OAuth/session/client-token runtime credentials"}
+	}
+	if len(bytes.TrimSpace(req.RequestPayload)) == 0 {
+		return contract.RealtimeSession{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "codex websocket request payload missing"}
+	}
+	wsURL, err := codexResponsesWebSocketURL(strings.TrimRight(baseURL, "/") + "/responses")
+	if err != nil {
+		return contract.RealtimeSession{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: err.Error()}
+	}
+	headers := codexRealtimeHeaders(req)
+	return contract.RealtimeSession{
+		URL:          wsURL,
+		Headers:      headers,
+		InitialFrame: codexRealtimeInitialFrame(req.RequestPayload, req.Mapping.UpstreamModelName),
+	}, nil
 }
 
 func codexResponsesPayload(req contract.TextRequest) codexResponsesRequest {
@@ -229,6 +251,10 @@ func codexReverseProxyRuntimeIsAPIKey(req contract.TextRequest) bool {
 	return strings.EqualFold(strings.TrimSpace(string(req.Account.RuntimeClass)), "api_key")
 }
 
+func codexRealtimeRuntimeIsAPIKey(req contract.RealtimeRequest) bool {
+	return strings.EqualFold(strings.TrimSpace(string(req.Account.RuntimeClass)), "api_key")
+}
+
 func codexReverseProxyAccount(req contract.TextRequest) reverseproxycontract.AccountRuntime {
 	return reverseproxycontract.AccountRuntime{
 		AccountID:      req.Account.ID,
@@ -238,6 +264,93 @@ func codexReverseProxyAccount(req contract.TextRequest) reverseproxycontract.Acc
 		UserAgent:      mapString(req.Account.Metadata, "user_agent"),
 		Credential:     req.Credential,
 	}
+}
+
+func codexRealtimeHeaders(req contract.RealtimeRequest) http.Header {
+	headers := http.Header{
+		"OpenAI-Beta": {codexResponsesWebsocketBetaHeaderValue},
+	}
+	headers.Set("Originator", codexOriginator)
+	if accountID := realtimeSetting(req, "chatgpt_account_id", "account_id"); accountID != "" {
+		headers.Set("ChatGPT-Account-ID", accountID)
+	}
+	if betaFeatures := realtimeSetting(req, "codex_beta_features", "x_codex_beta_features", "X-Codex-Beta-Features"); betaFeatures != "" {
+		headers.Set("X-Codex-Beta-Features", betaFeatures)
+	}
+	if version := realtimeSetting(req, "codex_version", "version", "Version"); version != "" {
+		headers.Set("Version", version)
+	}
+	if turnMetadata := realtimeSetting(req, "codex_turn_metadata", "x_codex_turn_metadata", "X-Codex-Turn-Metadata"); turnMetadata != "" {
+		headers.Set("X-Codex-Turn-Metadata", turnMetadata)
+	}
+	if requestID := realtimeSetting(req, "codex_client_request_id", "x_client_request_id", "X-Client-Request-Id"); requestID != "" {
+		headers.Set("X-Client-Request-Id", requestID)
+	} else if strings.TrimSpace(req.RequestID) != "" {
+		headers.Set("X-Client-Request-Id", strings.TrimSpace(req.RequestID))
+	}
+	if includeTiming := realtimeSetting(req, "x_responsesapi_include_timing_metrics", "X-ResponsesAPI-Include-Timing-Metrics"); includeTiming != "" {
+		headers.Set("X-ResponsesAPI-Include-Timing-Metrics", includeTiming)
+	}
+	if sessionID := realtimeSetting(req, "codex_session_id", "session_id", "Session_id"); sessionID != "" {
+		headers.Set("session_id", sessionID)
+	} else if strings.Contains(realtimeSetting(req, "user_agent"), "Mac OS") && strings.TrimSpace(req.RequestID) != "" {
+		headers.Set("session_id", strings.TrimSpace(req.RequestID))
+	}
+	return headers
+}
+
+func codexRealtimeInitialFrame(payload []byte, upstreamModel string) []byte {
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(bytes.TrimSpace(payload), &object); err != nil {
+		return append([]byte(nil), payload...)
+	}
+	encodedType, err := json.Marshal("response.create")
+	if err != nil {
+		return append([]byte(nil), payload...)
+	}
+	object["type"] = encodedType
+	if model := strings.TrimSpace(upstreamModel); model != "" {
+		encodedModel, err := json.Marshal(model)
+		if err != nil {
+			return append([]byte(nil), payload...)
+		}
+		object["model"] = encodedModel
+	}
+	encoded, err := json.Marshal(object)
+	if err != nil {
+		return append([]byte(nil), payload...)
+	}
+	return encoded
+}
+
+func codexResponsesWebSocketURL(rawURL string) (string, error) {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil {
+		return "", err
+	}
+	switch strings.ToLower(parsed.Scheme) {
+	case "http":
+		parsed.Scheme = "ws"
+	case "https":
+		parsed.Scheme = "wss"
+	default:
+		return "", fmt.Errorf("codex websocket upstream URL scheme %q is unsupported", parsed.Scheme)
+	}
+	if strings.TrimSpace(parsed.Host) == "" {
+		return "", fmt.Errorf("codex websocket upstream URL host is empty")
+	}
+	return parsed.String(), nil
+}
+
+func realtimeSetting(req contract.RealtimeRequest, keys ...string) string {
+	for _, values := range []map[string]any{req.Credential, req.Account.Metadata, req.Provider.ConfigSchema, req.Provider.Capabilities} {
+		for _, key := range keys {
+			if value := mapString(values, key); value != "" {
+				return value
+			}
+		}
+	}
+	return ""
 }
 
 func parseCodexResponsesBody(body []byte, statusCode int) (contract.TextResponse, error) {

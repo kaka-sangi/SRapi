@@ -65,7 +65,8 @@ SRapi 2api 反代不是：
 Implementation status:
 
 - WP-400 implements the HTTP Codex CLI 2api path for text requests: `reverse-proxy-codex-cli` builds a Codex Responses request and sends `base_url + "/responses"` through Reverse Proxy Runtime.
-- Codex Responses WebSocket upstream relay and richer prompt-cache/session policy are still follow-up work.
+- WP-410 implements the Codex CLI 2api Responses WebSocket upstream relay for explicitly requested `/v1/responses/ws` calls: SRapi schedules an eligible Codex reverse-proxy account, derives Codex `ws/wss` `/responses`, sends Codex official-client headers plus a `response.create` frame with the mapped upstream model, and uses the selected account OAuth/session/CLI credential through Reverse Proxy Runtime.
+- Persistent Codex WebSocket session reuse, richer prompt-cache policy, local Codex CLI client ingress, Claude Code WebSocket adapters, and Antigravity WebSocket adapters are still follow-up work.
 
 ## 6. Boundary Rules
 

@@ -2,6 +2,7 @@ package contract
 
 import (
 	"context"
+	"net/http"
 
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
@@ -248,6 +249,24 @@ type TextResponse struct {
 	Usage      Usage
 }
 
+type RealtimeRequest struct {
+	RequestID      string
+	SourceProtocol string
+	SourceEndpoint string
+	Model          string
+	RequestPayload []byte
+	Provider       providercontract.Provider
+	Account        accountcontract.ProviderAccount
+	Mapping        modelcontract.ModelProviderMapping
+	Credential     map[string]any
+}
+
+type RealtimeSession struct {
+	URL          string
+	Headers      http.Header
+	InitialFrame []byte
+}
+
 type ProviderError struct {
 	Class      string
 	StatusCode int
@@ -266,6 +285,10 @@ func (e ProviderError) Error() string {
 
 type TextAdapter interface {
 	InvokeText(ctx context.Context, req TextRequest) (TextResponse, error)
+}
+
+type RealtimeAdapter interface {
+	PrepareRealtime(ctx context.Context, req RealtimeRequest) (RealtimeSession, error)
 }
 
 type EmbeddingAdapter interface {
