@@ -783,7 +783,49 @@ Required gates:
 - `cd apps/api && go test ./internal/modules/provider_adapters/... ./internal/httpserver`
 - `make architecture-check`
 
-## WP-250+: Advanced Endpoint And Provider Expansion
+## WP-250: Provider Model Discovery v1
+
+Objective: let operators safely discover upstream model catalogs for Provider Accounts and optionally persist the discovered IDs as account `supported_models` metadata without bypassing existing Gateway/Scheduler boundaries.
+
+Read first:
+
+- `docs/COMPATIBLE_PROVIDER_REGISTRY_SPEC.md`
+- `docs/CAPABILITY_TAXONOMY_SPEC.md`
+- `docs/OPENAPI_CONTRACT.md`
+- `docs/ARCHITECTURE.md`
+- `docs/MODULE_INTERFACE_CONTRACTS.md`
+
+Owns:
+
+- `packages/openapi/openapi.yaml`
+- generated Go OpenAPI types and generated TypeScript SDK
+- `apps/api/internal/httpserver`
+- account discovery HTTP client logic for OpenAI-compatible, Anthropic-compatible, and Gemini-compatible model-list shapes
+- account metadata persistence for discovered `supported_models`
+- admin audit/test evidence for discovery attempts
+- provider registry docs/status updates for the live discovery behavior
+
+Definition of Done:
+
+- Admin route `POST /api/v1/admin/accounts/{id}/discover-models` is OpenAPI-described, generated, CSRF-protected, and available without frontend changes.
+- API-key Provider Accounts can discover model IDs from OpenAI-compatible `/models`, Anthropic-compatible `/models`, and Gemini-compatible `/models` upstream responses.
+- The route supports preview-only discovery by default and `persist=true` to update account metadata with `supported_models`, `model_discovery_source`, and `model_discovery_last_seen_at`.
+- Persisted `supported_models` participates in later provider-neutral candidate filtering so discovery changes routing only through existing Gateway/Scheduler boundaries.
+- Discovery injects provider credentials according to existing auth-mode metadata without returning or logging credential values.
+- Unsupported runtime/provider combinations fail with explicit control-plane errors rather than leaking upstream internals.
+- Focused HTTP regressions prove success, persistence, secret hygiene, and unsupported runtime/provider handling.
+- No Scheduler provider-specific logic and no frontend visuals are added.
+
+Required gates:
+
+- `make openapi-lint`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/httpserver ./internal/modules/accounts/...`
+- `make architecture-check`
+
+## WP-260+: Advanced Endpoint And Provider Expansion
 
 Use `ROADMAP.md` Phase 5 through Phase 8 to split future packages for:
 

@@ -186,6 +186,8 @@ components:
 - 导出 metadata 必须递归移除敏感键，例如 `api_key`、`access_token`、`refresh_token`、`authorization`、`cookie`、`secret`、`password`、`token`。
 - `POST /api/v1/admin/accounts/import` 的凭证字段是 write-only 输入；服务端必须通过 Provider Account 凭证加密边界持久化，不得在响应、audit before/after、错误 details 或日志中回显。
 - import/export 写语义以 OpenAPI schema 为准：export 是读接口使用 `cookieAuth`，import 是写接口必须使用 `cookieAuth` + `csrfHeader`。
+- `POST /api/v1/admin/accounts/{id}/discover-models` 用于发现 upstream model catalog；默认只返回预览结果，`persist=true` 才写入 `supported_models`、`model_discovery_source` 和 `model_discovery_last_seen_at`。
+- 该 discovery 结果必须用于后续 Provider Account model 选择，保持 `supported_models` 与现有 Scheduler/Gateway 边界一致。
 
 ### 4.6 RBAC Matrix
 
@@ -515,6 +517,7 @@ POST  /api/v1/admin/accounts
 GET   /api/v1/admin/accounts/{id}
 PATCH /api/v1/admin/accounts/{id}
 POST  /api/v1/admin/accounts/{id}/test
+POST  /api/v1/admin/accounts/{id}/discover-models
 POST  /api/v1/admin/accounts/{id}/disable
 POST  /api/v1/admin/accounts/{id}/enable
 GET   /api/v1/admin/accounts/{id}/health

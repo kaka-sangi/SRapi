@@ -742,6 +742,32 @@ export type ProviderAccountListResponse = {
     request_id: RequestId;
 };
 
+export type DiscoverAccountModelsRequest = {
+    /**
+     * Persist discovered model IDs to account metadata.
+     */
+    persist?: boolean;
+    /**
+     * Maximum number of discovered model IDs to return.
+     */
+    limit?: number;
+};
+
+export type AccountModelDiscovery = {
+    provider_id: Id;
+    account_id: Id;
+    source: 'openai-compatible' | 'anthropic-compatible' | 'gemini-compatible';
+    endpoint: string;
+    model_ids: Array<string>;
+    persisted: boolean;
+    checked_at: Timestamp;
+};
+
+export type AccountModelDiscoveryResponse = {
+    data: AccountModelDiscovery;
+    request_id: RequestId;
+};
+
 export type CapabilityDefinition = {
     key: string;
     version: string;
@@ -1565,6 +1591,10 @@ export type GetPaymentOrderErrors = {
      * Resource was not found.
      */
     404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    502: ErrorResponse;
     /**
      * Standard SRapi error.
      */
@@ -2503,6 +2533,49 @@ export type TestAdminAccountResponses = {
 };
 
 export type TestAdminAccountResponse = TestAdminAccountResponses[keyof TestAdminAccountResponses];
+
+export type DiscoverAdminAccountModelsData = {
+    body?: DiscoverAccountModelsRequest;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/accounts/{id}/discover-models';
+};
+
+export type DiscoverAdminAccountModelsErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DiscoverAdminAccountModelsError = DiscoverAdminAccountModelsErrors[keyof DiscoverAdminAccountModelsErrors];
+
+export type DiscoverAdminAccountModelsResponses = {
+    /**
+     * Account model discovery result.
+     */
+    200: AccountModelDiscoveryResponse;
+};
+
+export type DiscoverAdminAccountModelsResponse = DiscoverAdminAccountModelsResponses[keyof DiscoverAdminAccountModelsResponses];
 
 export type RecoverAdminAccountData = {
     body?: never;

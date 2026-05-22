@@ -1750,6 +1750,66 @@ func (s *Server) handleTestAdminAccount(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
+func (s *Server) handleDiscoverAdminAccountModels(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	accountID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || accountID <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid account id", requestID)
+		return
+	}
+	var body apiopenapi.DiscoverAccountModelsRequest
+	if r.Body != nil && r.ContentLength != 0 {
+		if err := s.decodeJSONBody(w, r, &body); err != nil {
+			writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid model discovery request", requestID)
+			return
+		}
+	}
+	account, err := s.runtime.accounts.FindByID(r.Context(), accountID)
+	if err != nil {
+		writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "account not found", requestID)
+		return
+	}
+	provider, err := s.runtime.providers.FindByID(r.Context(), account.ProviderID)
+	if err != nil {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "provider not found", requestID)
+		return
+	}
+	discovery, err := s.runtime.discoverAccountModels(r.Context(), provider, account, body)
+	if err != nil {
+		switch {
+		case errors.Is(err, errModelDiscoveryUnsupported), errors.Is(err, errModelDiscoveryInvalidInput):
+			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, err.Error(), requestID)
+		case errors.Is(err, errModelDiscoveryAuth):
+			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "account credential is not usable for model discovery", requestID)
+		case errors.Is(err, errModelDiscoveryUpstream):
+			writeStandardError(w, http.StatusBadGateway, apiopenapi.INTERNALERROR, "upstream model discovery failed", requestID)
+		default:
+			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to discover account models", requestID)
+		}
+		return
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "provider_account.discover_models", "provider_account", strconv.Itoa(account.ID), nil, map[string]any{
+		"provider_id": account.ProviderID,
+		"account_id":  account.ID,
+		"source":      discovery.Source,
+		"model_count": len(discovery.ModelIds),
+		"persisted":   discovery.Persisted,
+	}))
+	writeJSONAny(w, http.StatusOK, apiopenapi.AccountModelDiscoveryResponse{
+		Data:      discovery,
+		RequestId: requestID,
+	})
+}
+
 func (s *Server) handleSetAdminAccountStatus(w http.ResponseWriter, r *http.Request, status accountcontract.Status, action string) {
 	requestID := requestIDFromContext(r.Context())
 	session, err := s.requireAdminSession(r)
@@ -4192,6 +4252,58 @@ func metadataStringListContains(metadata map[string]any, key string, target stri
 	return false
 }
 
+func metadataStringList(metadata map[string]any, key string) ([]string, bool) {
+	if metadata == nil {
+		return nil, false
+	}
+	value, ok := metadata[key]
+	if !ok || value == nil {
+		return nil, false
+	}
+	switch value := value.(type) {
+	case []string:
+		out := make([]string, 0, len(value))
+		for _, item := range value {
+			out = append(out, strings.TrimSpace(item))
+		}
+		return out, true
+	case []any:
+		out := make([]string, 0, len(value))
+		for _, item := range value {
+			out = append(out, strings.TrimSpace(fmt.Sprint(item)))
+		}
+		return out, true
+	case string:
+		out := make([]string, 0)
+		for _, item := range strings.Split(value, ",") {
+			out = append(out, strings.TrimSpace(item))
+		}
+		return out, true
+	default:
+		return []string{strings.TrimSpace(fmt.Sprint(value))}, true
+	}
+}
+
+func accountSupportsUpstreamModel(metadata map[string]any, upstreamModelName string) bool {
+	supportedModels, ok := metadataStringList(metadata, "supported_models")
+	if !ok {
+		return true
+	}
+	if len(supportedModels) == 0 {
+		return false
+	}
+	target := normalizeDiscoveredModelID(upstreamModelName)
+	if target == "" {
+		return false
+	}
+	for _, supported := range supportedModels {
+		if strings.EqualFold(normalizeDiscoveredModelID(supported), target) {
+			return true
+		}
+	}
+	return false
+}
+
 func (rt *runtimeState) gatewayCandidates(ctx context.Context, modelID int, forcedProviderKey string, apiKey apikeycontract.APIKey) ([]schedulercontract.Candidate, error) {
 	model, err := rt.models.FindByID(ctx, modelID)
 	if err != nil {
@@ -4217,6 +4329,9 @@ func (rt *runtimeState) gatewayCandidates(ctx context.Context, modelID int, forc
 		}
 		for _, account := range accounts {
 			if account.ProviderID != mapping.ProviderID {
+				continue
+			}
+			if !accountSupportsUpstreamModel(account.Metadata, mapping.UpstreamModelName) {
 				continue
 			}
 			allowed, err := rt.apiKeyAllowsAccount(ctx, apiKey, account.ID)

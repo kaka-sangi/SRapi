@@ -41,6 +41,27 @@ func (e AccountGroupStatus) Valid() bool {
 	}
 }
 
+// Defines values for AccountModelDiscoverySource.
+const (
+	AccountModelDiscoverySourceAnthropicCompatible AccountModelDiscoverySource = "anthropic-compatible"
+	AccountModelDiscoverySourceGeminiCompatible    AccountModelDiscoverySource = "gemini-compatible"
+	AccountModelDiscoverySourceOpenaiCompatible    AccountModelDiscoverySource = "openai-compatible"
+)
+
+// Valid indicates whether the value is a known member of the AccountModelDiscoverySource enum.
+func (e AccountModelDiscoverySource) Valid() bool {
+	switch e {
+	case AccountModelDiscoverySourceAnthropicCompatible:
+		return true
+	case AccountModelDiscoverySourceGeminiCompatible:
+		return true
+	case AccountModelDiscoverySourceOpenaiCompatible:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for AdminTestResultStatus.
 const (
 	AdminTestResultStatusFailed AdminTestResultStatus = "failed"
@@ -679,19 +700,19 @@ func (e ProviderAdapterType) Valid() bool {
 
 // Defines values for ProviderProtocol.
 const (
-	ProviderProtocolAnthropicCompatible ProviderProtocol = "anthropic-compatible"
-	ProviderProtocolGeminiCompatible    ProviderProtocol = "gemini-compatible"
-	ProviderProtocolOpenaiCompatible    ProviderProtocol = "openai-compatible"
+	AnthropicCompatible ProviderProtocol = "anthropic-compatible"
+	GeminiCompatible    ProviderProtocol = "gemini-compatible"
+	OpenaiCompatible    ProviderProtocol = "openai-compatible"
 )
 
 // Valid indicates whether the value is a known member of the ProviderProtocol enum.
 func (e ProviderProtocol) Valid() bool {
 	switch e {
-	case ProviderProtocolAnthropicCompatible:
+	case AnthropicCompatible:
 		return true
-	case ProviderProtocolGeminiCompatible:
+	case GeminiCompatible:
 		return true
-	case ProviderProtocolOpenaiCompatible:
+	case OpenaiCompatible:
 		return true
 	default:
 		return false
@@ -999,6 +1020,26 @@ type AccountHealthSnapshot struct {
 	Status              string       `json:"status"`
 	SuccessRate         float32      `json:"success_rate"`
 	TimeoutCount        int          `json:"timeout_count"`
+}
+
+// AccountModelDiscovery defines model for AccountModelDiscovery.
+type AccountModelDiscovery struct {
+	AccountId  Id                          `json:"account_id"`
+	CheckedAt  Timestamp                   `json:"checked_at"`
+	Endpoint   string                      `json:"endpoint"`
+	ModelIds   []string                    `json:"model_ids"`
+	Persisted  bool                        `json:"persisted"`
+	ProviderId Id                          `json:"provider_id"`
+	Source     AccountModelDiscoverySource `json:"source"`
+}
+
+// AccountModelDiscoverySource defines model for AccountModelDiscovery.Source.
+type AccountModelDiscoverySource string
+
+// AccountModelDiscoveryResponse defines model for AccountModelDiscoveryResponse.
+type AccountModelDiscoveryResponse struct {
+	Data      AccountModelDiscovery `json:"data"`
+	RequestId RequestId             `json:"request_id"`
 }
 
 // AccountQuotaListResponse defines model for AccountQuotaListResponse.
@@ -1503,6 +1544,15 @@ type CreateUserSubscriptionRequest struct {
 	StartsAt   *time.Time              `json:"starts_at,omitempty"`
 	Status     *UserSubscriptionStatus `json:"status,omitempty"`
 	UserId     Id                      `json:"user_id"`
+}
+
+// DiscoverAccountModelsRequest defines model for DiscoverAccountModelsRequest.
+type DiscoverAccountModelsRequest struct {
+	// Limit Maximum number of discovered model IDs to return.
+	Limit *int `json:"limit,omitempty"`
+
+	// Persist Persist discovered model IDs to account metadata.
+	Persist *bool `json:"persist,omitempty"`
 }
 
 // DomainEventOutbox defines model for DomainEventOutbox.
@@ -2636,6 +2686,9 @@ type ImportAdminAccountsJSONRequestBody = ProviderAccountImportRequest
 
 // UpdateAdminAccountJSONRequestBody defines body for UpdateAdminAccount for application/json ContentType.
 type UpdateAdminAccountJSONRequestBody = UpdateProviderAccountRequest
+
+// DiscoverAdminAccountModelsJSONRequestBody defines body for DiscoverAdminAccountModels for application/json ContentType.
+type DiscoverAdminAccountModelsJSONRequestBody = DiscoverAccountModelsRequest
 
 // BindAdminAccountProxyJSONRequestBody defines body for BindAdminAccountProxy for application/json ContentType.
 type BindAdminAccountProxyJSONRequestBody = BindProviderAccountProxyRequest
@@ -4795,6 +4848,9 @@ type ServerInterface interface {
 	// Disable a provider account.
 	// (POST /api/v1/admin/accounts/{id}/disable)
 	DisableAdminAccount(w http.ResponseWriter, r *http.Request, id Id)
+	// Discover upstream models for a provider account.
+	// (POST /api/v1/admin/accounts/{id}/discover-models)
+	DiscoverAdminAccountModels(w http.ResponseWriter, r *http.Request, id Id)
 	// Enable a provider account.
 	// (POST /api/v1/admin/accounts/{id}/enable)
 	EnableAdminAccount(w http.ResponseWriter, r *http.Request, id Id)
@@ -5446,6 +5502,40 @@ func (siw *ServerInterfaceWrapper) DisableAdminAccount(w http.ResponseWriter, r 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.DisableAdminAccount(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DiscoverAdminAccountModels operation middleware
+func (siw *ServerInterfaceWrapper) DiscoverAdminAccountModels(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DiscoverAdminAccountModels(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -7793,6 +7883,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/{id}", wrapper.GetAdminAccount)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/accounts/{id}", wrapper.UpdateAdminAccount)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/disable", wrapper.DisableAdminAccount)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/discover-models", wrapper.DiscoverAdminAccountModels)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/enable", wrapper.EnableAdminAccount)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/health", wrapper.GetAdminAccountHealth)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/proxy", wrapper.BindAdminAccountProxy)

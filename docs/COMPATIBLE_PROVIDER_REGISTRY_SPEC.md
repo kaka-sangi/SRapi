@@ -157,6 +157,7 @@ Provider alias 进入 Scheduler 前必须先应用 API Key policy，包括 `allo
 5. 通用 fallback catalog。
 
 `/v1/models` 必须按 API Key group、provider、model visibility 合并后返回。
+`POST /api/v1/admin/accounts/{id}/discover-models` 可以把 live discovery 结果写入 Account `supported_models`，供后续 Provider-neutral 候选选择使用。
 
 ## 9. Upstream Endpoint Derivation
 

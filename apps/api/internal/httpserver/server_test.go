@@ -615,6 +615,246 @@ func TestAdminAccountInspectAndExportStaySecretSafe(t *testing.T) {
 	}
 }
 
+func TestAdminAccountModelDiscoveryPreviewOpenAICompatible(t *testing.T) {
+	var upstreamSeenAuth string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/models" {
+			t.Fatalf("unexpected discovery path %s", r.URL.Path)
+		}
+		upstreamSeenAuth = r.Header.Get("Authorization")
+		if r.Header.Get("X-Request-ID") != "" || r.Header.Get("Cookie") != "" || strings.Contains(r.Header.Get("User-Agent"), "SRapi") {
+			t.Fatalf("unexpected SRapi/client header leakage: %+v", r.Header)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"object":"list","data":[{"id":"z-model"},{"id":"a-model"},{"id":"a-model"}]}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"discovery-openai-provider","display_name":"Discovery OpenAI","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"discovery-openai-account","runtime_class":"api_key","credential":{"api_key":"discovery-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/"+string(accountResp.Data.Id)+"/discover-models", strings.NewReader(`{"limit":2}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	req.AddCookie(sessionCookie)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected discovery 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if upstreamSeenAuth != "Bearer discovery-secret" {
+		t.Fatalf("expected upstream bearer auth, got %q", upstreamSeenAuth)
+	}
+	if strings.Contains(rec.Body.String(), "discovery-secret") {
+		t.Fatalf("discovery response leaked credential: %s", rec.Body.String())
+	}
+	var resp apiopenapi.AccountModelDiscoveryResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode discovery response: %v", err)
+	}
+	if resp.Data.Source != apiopenapi.AccountModelDiscoverySourceOpenaiCompatible || resp.Data.Persisted || len(resp.Data.ModelIds) != 2 || resp.Data.ModelIds[0] != "a-model" || resp.Data.ModelIds[1] != "z-model" {
+		t.Fatalf("unexpected discovery response: %+v", resp.Data)
+	}
+
+	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts/"+string(accountResp.Data.Id), nil)
+	getReq.AddCookie(sessionCookie)
+	getRec := httptest.NewRecorder()
+	handler.ServeHTTP(getRec, getReq)
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("expected account inspect 200, got %d body=%s", getRec.Code, getRec.Body.String())
+	}
+	var getResp apiopenapi.ProviderAccountResponse
+	if err := json.NewDecoder(getRec.Body).Decode(&getResp); err != nil {
+		t.Fatalf("decode account response: %v", err)
+	}
+	if getResp.Data.Metadata != nil && jsonObjectContainsString(*getResp.Data.Metadata, "a-model") {
+		t.Fatalf("preview discovery should not persist supported models: %+v", getResp.Data.Metadata)
+	}
+}
+
+func TestAdminAccountModelDiscoveryPersistsGeminiCompatible(t *testing.T) {
+	var upstreamSeenKey string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1beta/models" {
+			t.Fatalf("unexpected discovery path %s", r.URL.Path)
+		}
+		upstreamSeenKey = r.URL.Query().Get("key")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"models":[{"name":"models/gemini-1.5-pro"},{"name":"models/gemini-1.5-flash"}]}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"discovery-gemini-provider","display_name":"Discovery Gemini","adapter_type":"gemini-compatible","protocol":"gemini-compatible","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"discovery-gemini-account","runtime_class":"api_key","credential":{"api_key":"gemini-discovery-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1beta"},"status":"active"}`)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/"+string(accountResp.Data.Id)+"/discover-models", strings.NewReader(`{"persist":true}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	req.AddCookie(sessionCookie)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected discovery 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if upstreamSeenKey != "gemini-discovery-secret" {
+		t.Fatalf("expected Gemini API key query, got %q", upstreamSeenKey)
+	}
+	if strings.Contains(rec.Body.String(), "gemini-discovery-secret") {
+		t.Fatalf("discovery response leaked credential: %s", rec.Body.String())
+	}
+	var resp apiopenapi.AccountModelDiscoveryResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode discovery response: %v", err)
+	}
+	if resp.Data.Source != apiopenapi.AccountModelDiscoverySourceGeminiCompatible || !resp.Data.Persisted || !stringSliceContains(resp.Data.ModelIds, "gemini-1.5-pro") || !stringSliceContains(resp.Data.ModelIds, "gemini-1.5-flash") {
+		t.Fatalf("unexpected Gemini discovery response: %+v", resp.Data)
+	}
+
+	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts/"+string(accountResp.Data.Id), nil)
+	getReq.AddCookie(sessionCookie)
+	getRec := httptest.NewRecorder()
+	handler.ServeHTTP(getRec, getReq)
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("expected account inspect 200, got %d body=%s", getRec.Code, getRec.Body.String())
+	}
+	var getResp apiopenapi.ProviderAccountResponse
+	if err := json.NewDecoder(getRec.Body).Decode(&getResp); err != nil {
+		t.Fatalf("decode account response: %v", err)
+	}
+	if getResp.Data.Metadata == nil || !jsonObjectContainsString(*getResp.Data.Metadata, "gemini-1.5-pro") || (*getResp.Data.Metadata)["model_discovery_source"] != "gemini-compatible" || (*getResp.Data.Metadata)["model_discovery_last_seen_at"] == "" {
+		t.Fatalf("expected persisted discovery metadata, got %+v", getResp.Data.Metadata)
+	}
+
+	auditReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/audit-logs", nil)
+	auditReq.AddCookie(sessionCookie)
+	auditRec := httptest.NewRecorder()
+	handler.ServeHTTP(auditRec, auditReq)
+	if auditRec.Code != http.StatusOK {
+		t.Fatalf("expected audit logs 200, got %d body=%s", auditRec.Code, auditRec.Body.String())
+	}
+	if strings.Contains(auditRec.Body.String(), "gemini-discovery-secret") {
+		t.Fatalf("audit log leaked discovery credential: %s", auditRec.Body.String())
+	}
+	var auditResp apiopenapi.AuditLogListResponse
+	if err := json.NewDecoder(auditRec.Body).Decode(&auditResp); err != nil {
+		t.Fatalf("decode audit logs: %v", err)
+	}
+	discoveryAudit := mustFindAuditLog(t, auditResp.Data, "provider_account.discover_models")
+	if discoveryAudit.After["model_count"] != float64(2) && discoveryAudit.After["model_count"] != 2 {
+		t.Fatalf("expected model_count audit evidence, got %+v", discoveryAudit.After)
+	}
+}
+
+func TestAdminAccountModelDiscoveryRejectsUnsupportedRuntime(t *testing.T) {
+	upstreamCalled := false
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamCalled = true
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"discovery-reverse-provider","display_name":"Discovery Reverse","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"discovery-reverse-account","runtime_class":"oauth_refresh","upstream_client":"codex_cli","credential":{"access_token":"oauth-access","refresh_token":"oauth-refresh"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/"+string(accountResp.Data.Id)+"/discover-models", strings.NewReader(`{"persist":true}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	req.AddCookie(sessionCookie)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected unsupported discovery 400, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if upstreamCalled {
+		t.Fatal("unsupported runtime should not call upstream")
+	}
+}
+
+func TestGatewayUsesDiscoveredSupportedModelsForCandidateFiltering(t *testing.T) {
+	var (
+		mu        sync.Mutex
+		modelAuth string
+		chatAuth  string
+	)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		switch r.URL.Path {
+		case "/v1/models":
+			modelAuth = r.Header.Get("Authorization")
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"object":"list","data":[{"id":"discovered-upstream"}]}`))
+		case "/v1/chat/completions":
+			chatAuth = r.Header.Get("Authorization")
+			if chatAuth != "Bearer discovered-secret" {
+				w.WriteHeader(http.StatusUnauthorized)
+				_, _ = w.Write([]byte(`{"error":{"message":"wrong account"}}`))
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"routed through discovered account"}}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`))
+		default:
+			t.Fatalf("unexpected upstream path %s", r.URL.Path)
+		}
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"discovery-routing-provider","display_name":"Discovery Routing Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"discovery-routing-model","display_name":"Discovery Routing Model","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"discovered-upstream","status":"active"}`)
+	discoveredAccount := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"discovered-account","runtime_class":"api_key","credential":{"api_key":"discovered-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1","health_score":0.1},"status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"blocked-account","runtime_class":"api_key","credential":{"api_key":"blocked-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1","health_score":0.99,"supported_models":["other-upstream"]},"status":"active"}`)
+
+	discoverReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/"+string(discoveredAccount.Data.Id)+"/discover-models", strings.NewReader(`{"persist":true}`))
+	discoverReq.Header.Set("Content-Type", "application/json")
+	discoverReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	discoverReq.AddCookie(sessionCookie)
+	discoverRec := httptest.NewRecorder()
+	handler.ServeHTTP(discoverRec, discoverReq)
+	if discoverRec.Code != http.StatusOK {
+		t.Fatalf("expected discovery 200, got %d body=%s", discoverRec.Code, discoverRec.Body.String())
+	}
+	if modelAuth != "Bearer discovered-secret" {
+		t.Fatalf("expected discovery upstream auth, got %q", modelAuth)
+	}
+
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	chatReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"discovery-routing-model","messages":[{"role":"user","content":"route with discovered catalog"}]}`))
+	chatReq.Header.Set("Content-Type", "application/json")
+	chatReq.Header.Set("Authorization", "Bearer "+apiKey)
+	chatRec := httptest.NewRecorder()
+	handler.ServeHTTP(chatRec, chatReq)
+	if chatRec.Code != http.StatusOK {
+		t.Fatalf("expected chat completion 200, got %d body=%s", chatRec.Code, chatRec.Body.String())
+	}
+	if chatAuth != "Bearer discovered-secret" {
+		t.Fatalf("expected discovered account to be selected, got auth %q", chatAuth)
+	}
+
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=discovery-routing-model", nil)
+	decisionsReq.AddCookie(sessionCookie)
+	decisionsRec := httptest.NewRecorder()
+	handler.ServeHTTP(decisionsRec, decisionsReq)
+	if decisionsRec.Code != http.StatusOK {
+		t.Fatalf("expected decisions 200, got %d body=%s", decisionsRec.Code, decisionsRec.Body.String())
+	}
+	var decisionsResp apiopenapi.SchedulerDecisionListResponse
+	if err := json.NewDecoder(decisionsRec.Body).Decode(&decisionsResp); err != nil {
+		t.Fatalf("decode decisions: %v", err)
+	}
+	if len(decisionsResp.Data) != 1 || decisionsResp.Data[0].SelectedAccountId == nil || *decisionsResp.Data[0].SelectedAccountId != string(discoveredAccount.Data.Id) {
+		t.Fatalf("expected discovered account to win scheduling, got %+v", decisionsResp.Data)
+	}
+}
+
 type stubDependencyPinger struct {
 	err error
 }

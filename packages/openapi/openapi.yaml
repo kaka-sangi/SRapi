@@ -333,6 +333,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+        "502":
+          $ref: "#/components/responses/StandardError"
         default:
           $ref: "#/components/responses/StandardError"
 
@@ -1198,6 +1200,53 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AdminTestResultResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/accounts/{id}/discover-models:
+    post:
+      tags:
+        - AdminAccounts
+      operationId: discoverAdminAccountModels
+      summary: Discover upstream models for a provider account.
+      description: Preview upstream model IDs by default. When `persist` is true, the discovered model IDs are written to the account metadata as `supported_models`.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+        operator: read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DiscoverAccountModelsRequest"
+      responses:
+        "200":
+          description: Account model discovery result.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountModelDiscoveryResponse"
         "400":
           $ref: "#/components/responses/ValidationError"
         "401":
@@ -4884,6 +4933,65 @@ components:
             $ref: "#/components/schemas/ProviderAccount"
         pagination:
           $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    DiscoverAccountModelsRequest:
+      type: object
+      properties:
+        persist:
+          type: boolean
+          default: false
+          description: Persist discovered model IDs to account metadata.
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 1000
+          default: 200
+          description: Maximum number of discovered model IDs to return.
+
+    AccountModelDiscovery:
+      type: object
+      required:
+        - provider_id
+        - account_id
+        - source
+        - endpoint
+        - model_ids
+        - persisted
+        - checked_at
+      properties:
+        provider_id:
+          $ref: "#/components/schemas/Id"
+        account_id:
+          $ref: "#/components/schemas/Id"
+        source:
+          type: string
+          enum:
+            - openai-compatible
+            - anthropic-compatible
+            - gemini-compatible
+        endpoint:
+          type: string
+          format: uri
+        model_ids:
+          type: array
+          items:
+            type: string
+          default: []
+        persisted:
+          type: boolean
+        checked_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    AccountModelDiscoveryResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/AccountModelDiscovery"
         request_id:
           $ref: "#/components/schemas/RequestId"
 
