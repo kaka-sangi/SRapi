@@ -24,6 +24,12 @@ type AccountHealthSnapshot func(*sql.Selector)
 // AccountQuotaSnapshot is the predicate function for accountquotasnapshot builders.
 type AccountQuotaSnapshot func(*sql.Selector)
 
+// AffiliateLedger is the predicate function for affiliateledger builders.
+type AffiliateLedger func(*sql.Selector)
+
+// AffiliateRule is the predicate function for affiliaterule builders.
+type AffiliateRule func(*sql.Selector)
+
 // AuditLog is the predicate function for auditlog builders.
 type AuditLog func(*sql.Selector)
 
@@ -41,6 +47,12 @@ type DomainEventsOutbox func(*sql.Selector)
 
 // IdempotencyRecord is the predicate function for idempotencyrecord builders.
 type IdempotencyRecord func(*sql.Selector)
+
+// InviteCode is the predicate function for invitecode builders.
+type InviteCode func(*sql.Selector)
+
+// InviteRelationship is the predicate function for inviterelationship builders.
+type InviteRelationship func(*sql.Selector)
 
 // ModelAlias is the predicate function for modelalias builders.
 type ModelAlias func(*sql.Selector)

@@ -201,6 +201,90 @@ var (
 			},
 		},
 	}
+	// AffiliateLedgersColumns holds the columns for the "affiliate_ledgers" table.
+	AffiliateLedgersColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "user_id", Type: field.TypeInt},
+		{Name: "related_user_id", Type: field.TypeInt},
+		{Name: "payment_order_id", Type: field.TypeInt, Nullable: true},
+		{Name: "subscription_id", Type: field.TypeInt, Nullable: true},
+		{Name: "type", Type: field.TypeString},
+		{Name: "amount", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "currency", Type: field.TypeString, Default: "USD"},
+		{Name: "status", Type: field.TypeString, Default: "pending"},
+		{Name: "reference_id", Type: field.TypeString},
+		{Name: "metadata_json", Type: field.TypeJSON, Nullable: true},
+		{Name: "settled_at", Type: field.TypeTime, Nullable: true},
+	}
+	// AffiliateLedgersTable holds the schema information for the "affiliate_ledgers" table.
+	AffiliateLedgersTable = &schema.Table{
+		Name:       "affiliate_ledgers",
+		Columns:    AffiliateLedgersColumns,
+		PrimaryKey: []*schema.Column{AffiliateLedgersColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "affiliateledger_reference_id",
+				Unique:  true,
+				Columns: []*schema.Column{AffiliateLedgersColumns[11]},
+			},
+			{
+				Name:    "affiliateledger_user_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{AffiliateLedgersColumns[3], AffiliateLedgersColumns[1]},
+			},
+			{
+				Name:    "affiliateledger_related_user_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{AffiliateLedgersColumns[4], AffiliateLedgersColumns[1]},
+			},
+			{
+				Name:    "affiliateledger_payment_order_id",
+				Unique:  false,
+				Columns: []*schema.Column{AffiliateLedgersColumns[5]},
+			},
+			{
+				Name:    "affiliateledger_type_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{AffiliateLedgersColumns[7], AffiliateLedgersColumns[1]},
+			},
+		},
+	}
+	// AffiliateRulesColumns holds the columns for the "affiliate_rules" table.
+	AffiliateRulesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "name", Type: field.TypeString},
+		{Name: "status", Type: field.TypeString, Default: "active"},
+		{Name: "trigger_type", Type: field.TypeString},
+		{Name: "rate", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "fixed_amount", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "currency", Type: field.TypeString, Default: "USD"},
+		{Name: "max_rebate_amount", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "valid_from", Type: field.TypeTime, Nullable: true},
+		{Name: "valid_to", Type: field.TypeTime, Nullable: true},
+		{Name: "metadata_json", Type: field.TypeJSON, Nullable: true},
+	}
+	// AffiliateRulesTable holds the schema information for the "affiliate_rules" table.
+	AffiliateRulesTable = &schema.Table{
+		Name:       "affiliate_rules",
+		Columns:    AffiliateRulesColumns,
+		PrimaryKey: []*schema.Column{AffiliateRulesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "affiliaterule_trigger_type_currency_status",
+				Unique:  false,
+				Columns: []*schema.Column{AffiliateRulesColumns[5], AffiliateRulesColumns[8], AffiliateRulesColumns[4]},
+			},
+			{
+				Name:    "affiliaterule_valid_from_valid_to",
+				Unique:  false,
+				Columns: []*schema.Column{AffiliateRulesColumns[10], AffiliateRulesColumns[11]},
+			},
+		},
+	}
 	// AuditLogsColumns holds the columns for the "audit_logs" table.
 	AuditLogsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -423,6 +507,78 @@ var (
 				Name:    "idempotencyrecord_expires_at",
 				Unique:  false,
 				Columns: []*schema.Column{IdempotencyRecordsColumns[10]},
+			},
+		},
+	}
+	// InviteCodesColumns holds the columns for the "invite_codes" table.
+	InviteCodesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "user_id", Type: field.TypeInt},
+		{Name: "code", Type: field.TypeString},
+		{Name: "status", Type: field.TypeString, Default: "active"},
+		{Name: "expires_at", Type: field.TypeTime, Nullable: true},
+	}
+	// InviteCodesTable holds the schema information for the "invite_codes" table.
+	InviteCodesTable = &schema.Table{
+		Name:       "invite_codes",
+		Columns:    InviteCodesColumns,
+		PrimaryKey: []*schema.Column{InviteCodesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "invitecode_code",
+				Unique:  true,
+				Columns: []*schema.Column{InviteCodesColumns[4]},
+			},
+			{
+				Name:    "invitecode_user_id_status",
+				Unique:  false,
+				Columns: []*schema.Column{InviteCodesColumns[3], InviteCodesColumns[5]},
+			},
+			{
+				Name:    "invitecode_expires_at",
+				Unique:  false,
+				Columns: []*schema.Column{InviteCodesColumns[6]},
+			},
+		},
+	}
+	// InviteRelationshipsColumns holds the columns for the "invite_relationships" table.
+	InviteRelationshipsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "inviter_user_id", Type: field.TypeInt},
+		{Name: "invitee_user_id", Type: field.TypeInt},
+		{Name: "invite_code_id", Type: field.TypeInt},
+		{Name: "status", Type: field.TypeString, Default: "active"},
+		{Name: "first_paid_at", Type: field.TypeTime, Nullable: true},
+	}
+	// InviteRelationshipsTable holds the schema information for the "invite_relationships" table.
+	InviteRelationshipsTable = &schema.Table{
+		Name:       "invite_relationships",
+		Columns:    InviteRelationshipsColumns,
+		PrimaryKey: []*schema.Column{InviteRelationshipsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "inviterelationship_invitee_user_id",
+				Unique:  true,
+				Columns: []*schema.Column{InviteRelationshipsColumns[4]},
+			},
+			{
+				Name:    "inviterelationship_inviter_user_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{InviteRelationshipsColumns[3], InviteRelationshipsColumns[1]},
+			},
+			{
+				Name:    "inviterelationship_invite_code_id",
+				Unique:  false,
+				Columns: []*schema.Column{InviteRelationshipsColumns[5]},
+			},
+			{
+				Name:    "inviterelationship_status_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{InviteRelationshipsColumns[6], InviteRelationshipsColumns[1]},
 			},
 		},
 	}
@@ -1172,12 +1328,16 @@ var (
 		AccountGroupMembersTable,
 		AccountHealthSnapshotsTable,
 		AccountQuotaSnapshotsTable,
+		AffiliateLedgersTable,
+		AffiliateRulesTable,
 		AuditLogsTable,
 		BillingLedgersTable,
 		CapabilityDefinitionsTable,
 		DomainEventsInboxesTable,
 		DomainEventsOutboxesTable,
 		IdempotencyRecordsTable,
+		InviteCodesTable,
+		InviteRelationshipsTable,
 		ModelAliasTable,
 		ModelProviderMappingsTable,
 		ModelRegistriesTable,

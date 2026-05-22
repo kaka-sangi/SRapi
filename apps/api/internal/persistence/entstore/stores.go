@@ -5,6 +5,7 @@ import (
 
 	"github.com/srapi/srapi/apps/api/ent"
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
+	affiliatecontract "github.com/srapi/srapi/apps/api/internal/modules/affiliate/contract"
 	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
 	auditcontract "github.com/srapi/srapi/apps/api/internal/modules/audit/contract"
 	billingcontract "github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
@@ -17,6 +18,7 @@ import (
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
 	userscontract "github.com/srapi/srapi/apps/api/internal/modules/users/contract"
 	accountstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/accounts"
+	affiliatestore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/affiliate"
 	apikeystore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/apikeys"
 	auditstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/audit"
 	billingstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/billing"
@@ -33,18 +35,19 @@ import (
 var ErrInvalidClient = errors.New("invalid ent store client")
 
 type Stores struct {
-	Users     userscontract.Store
-	APIKeys   apikeycontract.Store
-	Providers providercontract.Store
-	Models    modelcontract.Store
-	Accounts  accountcontract.Store
-	Audit     auditcontract.Store
-	Billing   billingcontract.Store
-	Events    eventscontract.Store
-	Payments  paymentcontract.Store
-	Scheduler schedulercontract.Store
+	Users         userscontract.Store
+	APIKeys       apikeycontract.Store
+	Affiliate     affiliatecontract.Store
+	Providers     providercontract.Store
+	Models        modelcontract.Store
+	Accounts      accountcontract.Store
+	Audit         auditcontract.Store
+	Billing       billingcontract.Store
+	Events        eventscontract.Store
+	Payments      paymentcontract.Store
+	Scheduler     schedulercontract.Store
 	Subscriptions subscriptioncontract.Store
-	Usage     usagecontract.Store
+	Usage         usagecontract.Store
 }
 
 func New(client *ent.Client) (Stores, error) {
@@ -56,6 +59,10 @@ func New(client *ent.Client) (Stores, error) {
 		return Stores{}, err
 	}
 	apiKeys, err := apikeystore.New(client)
+	if err != nil {
+		return Stores{}, err
+	}
+	affiliate, err := affiliatestore.New(client)
 	if err != nil {
 		return Stores{}, err
 	}
@@ -100,17 +107,18 @@ func New(client *ent.Client) (Stores, error) {
 		return Stores{}, err
 	}
 	return Stores{
-		Users:     users,
-		APIKeys:   apiKeys,
-		Providers: providers,
-		Models:    models,
-		Accounts:  accounts,
-		Audit:     audit,
-		Billing:   billing,
-		Events:    events,
-		Payments:  payments,
-		Scheduler: scheduler,
+		Users:         users,
+		APIKeys:       apiKeys,
+		Affiliate:     affiliate,
+		Providers:     providers,
+		Models:        models,
+		Accounts:      accounts,
+		Audit:         audit,
+		Billing:       billing,
+		Events:        events,
+		Payments:      payments,
+		Scheduler:     scheduler,
 		Subscriptions: subscriptions,
-		Usage:     usage,
+		Usage:         usage,
 	}, nil
 }

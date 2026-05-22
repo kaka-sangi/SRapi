@@ -476,6 +476,7 @@ func (s *Service) enqueueRefunded(ctx context.Context, order contract.PaymentOrd
 	if s.deps.Events == nil {
 		return
 	}
+	refundID := "refund_" + order.OrderNo + "_" + strings.ReplaceAll(refundAmount, ".", "_")
 	_, _ = s.deps.Events.Enqueue(ctx, eventscontract.EnqueueRequest{
 		EventType:      "PaymentOrderRefunded",
 		EventVersion:   "v1",
@@ -485,7 +486,7 @@ func (s *Service) enqueueRefunded(ctx context.Context, order contract.PaymentOrd
 		IdempotencyKey: "payment_refunded:" + order.OrderNo + ":" + refundAmount,
 		Payload: map[string]any{
 			"order_id":      order.ID,
-			"refund_id":     "refund_" + order.OrderNo,
+			"refund_id":     refundID,
 			"user_id":       order.UserID,
 			"amount":        refundAmount,
 			"currency":      order.Currency,

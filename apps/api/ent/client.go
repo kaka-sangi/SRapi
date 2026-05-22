@@ -18,6 +18,8 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/accountgroupmember"
 	"github.com/srapi/srapi/apps/api/ent/accounthealthsnapshot"
 	"github.com/srapi/srapi/apps/api/ent/accountquotasnapshot"
+	"github.com/srapi/srapi/apps/api/ent/affiliateledger"
+	"github.com/srapi/srapi/apps/api/ent/affiliaterule"
 	"github.com/srapi/srapi/apps/api/ent/apikey"
 	"github.com/srapi/srapi/apps/api/ent/apikeygroup"
 	"github.com/srapi/srapi/apps/api/ent/auditlog"
@@ -26,6 +28,8 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/domaineventsinbox"
 	"github.com/srapi/srapi/apps/api/ent/domaineventsoutbox"
 	"github.com/srapi/srapi/apps/api/ent/idempotencyrecord"
+	"github.com/srapi/srapi/apps/api/ent/invitecode"
+	"github.com/srapi/srapi/apps/api/ent/inviterelationship"
 	"github.com/srapi/srapi/apps/api/ent/modelalias"
 	"github.com/srapi/srapi/apps/api/ent/modelprovidermapping"
 	"github.com/srapi/srapi/apps/api/ent/modelregistry"
@@ -64,6 +68,10 @@ type Client struct {
 	AccountHealthSnapshot *AccountHealthSnapshotClient
 	// AccountQuotaSnapshot is the client for interacting with the AccountQuotaSnapshot builders.
 	AccountQuotaSnapshot *AccountQuotaSnapshotClient
+	// AffiliateLedger is the client for interacting with the AffiliateLedger builders.
+	AffiliateLedger *AffiliateLedgerClient
+	// AffiliateRule is the client for interacting with the AffiliateRule builders.
+	AffiliateRule *AffiliateRuleClient
 	// AuditLog is the client for interacting with the AuditLog builders.
 	AuditLog *AuditLogClient
 	// BillingLedger is the client for interacting with the BillingLedger builders.
@@ -76,6 +84,10 @@ type Client struct {
 	DomainEventsOutbox *DomainEventsOutboxClient
 	// IdempotencyRecord is the client for interacting with the IdempotencyRecord builders.
 	IdempotencyRecord *IdempotencyRecordClient
+	// InviteCode is the client for interacting with the InviteCode builders.
+	InviteCode *InviteCodeClient
+	// InviteRelationship is the client for interacting with the InviteRelationship builders.
+	InviteRelationship *InviteRelationshipClient
 	// ModelAlias is the client for interacting with the ModelAlias builders.
 	ModelAlias *ModelAliasClient
 	// ModelProviderMapping is the client for interacting with the ModelProviderMapping builders.
@@ -131,12 +143,16 @@ func (c *Client) init() {
 	c.AccountGroupMember = NewAccountGroupMemberClient(c.config)
 	c.AccountHealthSnapshot = NewAccountHealthSnapshotClient(c.config)
 	c.AccountQuotaSnapshot = NewAccountQuotaSnapshotClient(c.config)
+	c.AffiliateLedger = NewAffiliateLedgerClient(c.config)
+	c.AffiliateRule = NewAffiliateRuleClient(c.config)
 	c.AuditLog = NewAuditLogClient(c.config)
 	c.BillingLedger = NewBillingLedgerClient(c.config)
 	c.CapabilityDefinition = NewCapabilityDefinitionClient(c.config)
 	c.DomainEventsInbox = NewDomainEventsInboxClient(c.config)
 	c.DomainEventsOutbox = NewDomainEventsOutboxClient(c.config)
 	c.IdempotencyRecord = NewIdempotencyRecordClient(c.config)
+	c.InviteCode = NewInviteCodeClient(c.config)
+	c.InviteRelationship = NewInviteRelationshipClient(c.config)
 	c.ModelAlias = NewModelAliasClient(c.config)
 	c.ModelProviderMapping = NewModelProviderMappingClient(c.config)
 	c.ModelRegistry = NewModelRegistryClient(c.config)
@@ -254,12 +270,16 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		AccountGroupMember:      NewAccountGroupMemberClient(cfg),
 		AccountHealthSnapshot:   NewAccountHealthSnapshotClient(cfg),
 		AccountQuotaSnapshot:    NewAccountQuotaSnapshotClient(cfg),
+		AffiliateLedger:         NewAffiliateLedgerClient(cfg),
+		AffiliateRule:           NewAffiliateRuleClient(cfg),
 		AuditLog:                NewAuditLogClient(cfg),
 		BillingLedger:           NewBillingLedgerClient(cfg),
 		CapabilityDefinition:    NewCapabilityDefinitionClient(cfg),
 		DomainEventsInbox:       NewDomainEventsInboxClient(cfg),
 		DomainEventsOutbox:      NewDomainEventsOutboxClient(cfg),
 		IdempotencyRecord:       NewIdempotencyRecordClient(cfg),
+		InviteCode:              NewInviteCodeClient(cfg),
+		InviteRelationship:      NewInviteRelationshipClient(cfg),
 		ModelAlias:              NewModelAliasClient(cfg),
 		ModelProviderMapping:    NewModelProviderMappingClient(cfg),
 		ModelRegistry:           NewModelRegistryClient(cfg),
@@ -304,12 +324,16 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		AccountGroupMember:      NewAccountGroupMemberClient(cfg),
 		AccountHealthSnapshot:   NewAccountHealthSnapshotClient(cfg),
 		AccountQuotaSnapshot:    NewAccountQuotaSnapshotClient(cfg),
+		AffiliateLedger:         NewAffiliateLedgerClient(cfg),
+		AffiliateRule:           NewAffiliateRuleClient(cfg),
 		AuditLog:                NewAuditLogClient(cfg),
 		BillingLedger:           NewBillingLedgerClient(cfg),
 		CapabilityDefinition:    NewCapabilityDefinitionClient(cfg),
 		DomainEventsInbox:       NewDomainEventsInboxClient(cfg),
 		DomainEventsOutbox:      NewDomainEventsOutboxClient(cfg),
 		IdempotencyRecord:       NewIdempotencyRecordClient(cfg),
+		InviteCode:              NewInviteCodeClient(cfg),
+		InviteRelationship:      NewInviteRelationshipClient(cfg),
 		ModelAlias:              NewModelAliasClient(cfg),
 		ModelProviderMapping:    NewModelProviderMappingClient(cfg),
 		ModelRegistry:           NewModelRegistryClient(cfg),
@@ -359,9 +383,10 @@ func (c *Client) Close() error {
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
 		c.APIKey, c.APIKeyGroup, c.AccountGroup, c.AccountGroupMember,
-		c.AccountHealthSnapshot, c.AccountQuotaSnapshot, c.AuditLog, c.BillingLedger,
-		c.CapabilityDefinition, c.DomainEventsInbox, c.DomainEventsOutbox,
-		c.IdempotencyRecord, c.ModelAlias, c.ModelProviderMapping, c.ModelRegistry,
+		c.AccountHealthSnapshot, c.AccountQuotaSnapshot, c.AffiliateLedger,
+		c.AffiliateRule, c.AuditLog, c.BillingLedger, c.CapabilityDefinition,
+		c.DomainEventsInbox, c.DomainEventsOutbox, c.IdempotencyRecord, c.InviteCode,
+		c.InviteRelationship, c.ModelAlias, c.ModelProviderMapping, c.ModelRegistry,
 		c.PaymentAuditLog, c.PaymentOrder, c.PaymentProviderInstance, c.PricingRule,
 		c.Provider, c.ProviderAccount, c.Role, c.SchedulerDecision,
 		c.SchedulerFeedback, c.SchedulerStrategy, c.Setting, c.SubscriptionPlan,
@@ -376,9 +401,10 @@ func (c *Client) Use(hooks ...Hook) {
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
 		c.APIKey, c.APIKeyGroup, c.AccountGroup, c.AccountGroupMember,
-		c.AccountHealthSnapshot, c.AccountQuotaSnapshot, c.AuditLog, c.BillingLedger,
-		c.CapabilityDefinition, c.DomainEventsInbox, c.DomainEventsOutbox,
-		c.IdempotencyRecord, c.ModelAlias, c.ModelProviderMapping, c.ModelRegistry,
+		c.AccountHealthSnapshot, c.AccountQuotaSnapshot, c.AffiliateLedger,
+		c.AffiliateRule, c.AuditLog, c.BillingLedger, c.CapabilityDefinition,
+		c.DomainEventsInbox, c.DomainEventsOutbox, c.IdempotencyRecord, c.InviteCode,
+		c.InviteRelationship, c.ModelAlias, c.ModelProviderMapping, c.ModelRegistry,
 		c.PaymentAuditLog, c.PaymentOrder, c.PaymentProviderInstance, c.PricingRule,
 		c.Provider, c.ProviderAccount, c.Role, c.SchedulerDecision,
 		c.SchedulerFeedback, c.SchedulerStrategy, c.Setting, c.SubscriptionPlan,
@@ -403,6 +429,10 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.AccountHealthSnapshot.mutate(ctx, m)
 	case *AccountQuotaSnapshotMutation:
 		return c.AccountQuotaSnapshot.mutate(ctx, m)
+	case *AffiliateLedgerMutation:
+		return c.AffiliateLedger.mutate(ctx, m)
+	case *AffiliateRuleMutation:
+		return c.AffiliateRule.mutate(ctx, m)
 	case *AuditLogMutation:
 		return c.AuditLog.mutate(ctx, m)
 	case *BillingLedgerMutation:
@@ -415,6 +445,10 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.DomainEventsOutbox.mutate(ctx, m)
 	case *IdempotencyRecordMutation:
 		return c.IdempotencyRecord.mutate(ctx, m)
+	case *InviteCodeMutation:
+		return c.InviteCode.mutate(ctx, m)
+	case *InviteRelationshipMutation:
+		return c.InviteRelationship.mutate(ctx, m)
 	case *ModelAliasMutation:
 		return c.ModelAlias.mutate(ctx, m)
 	case *ModelProviderMappingMutation:
@@ -1256,6 +1290,272 @@ func (c *AccountQuotaSnapshotClient) mutate(ctx context.Context, m *AccountQuota
 	}
 }
 
+// AffiliateLedgerClient is a client for the AffiliateLedger schema.
+type AffiliateLedgerClient struct {
+	config
+}
+
+// NewAffiliateLedgerClient returns a client for the AffiliateLedger from the given config.
+func NewAffiliateLedgerClient(c config) *AffiliateLedgerClient {
+	return &AffiliateLedgerClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `affiliateledger.Hooks(f(g(h())))`.
+func (c *AffiliateLedgerClient) Use(hooks ...Hook) {
+	c.hooks.AffiliateLedger = append(c.hooks.AffiliateLedger, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `affiliateledger.Intercept(f(g(h())))`.
+func (c *AffiliateLedgerClient) Intercept(interceptors ...Interceptor) {
+	c.inters.AffiliateLedger = append(c.inters.AffiliateLedger, interceptors...)
+}
+
+// Create returns a builder for creating a AffiliateLedger entity.
+func (c *AffiliateLedgerClient) Create() *AffiliateLedgerCreate {
+	mutation := newAffiliateLedgerMutation(c.config, OpCreate)
+	return &AffiliateLedgerCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of AffiliateLedger entities.
+func (c *AffiliateLedgerClient) CreateBulk(builders ...*AffiliateLedgerCreate) *AffiliateLedgerCreateBulk {
+	return &AffiliateLedgerCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *AffiliateLedgerClient) MapCreateBulk(slice any, setFunc func(*AffiliateLedgerCreate, int)) *AffiliateLedgerCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &AffiliateLedgerCreateBulk{err: fmt.Errorf("calling to AffiliateLedgerClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*AffiliateLedgerCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &AffiliateLedgerCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for AffiliateLedger.
+func (c *AffiliateLedgerClient) Update() *AffiliateLedgerUpdate {
+	mutation := newAffiliateLedgerMutation(c.config, OpUpdate)
+	return &AffiliateLedgerUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *AffiliateLedgerClient) UpdateOne(_m *AffiliateLedger) *AffiliateLedgerUpdateOne {
+	mutation := newAffiliateLedgerMutation(c.config, OpUpdateOne, withAffiliateLedger(_m))
+	return &AffiliateLedgerUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *AffiliateLedgerClient) UpdateOneID(id int) *AffiliateLedgerUpdateOne {
+	mutation := newAffiliateLedgerMutation(c.config, OpUpdateOne, withAffiliateLedgerID(id))
+	return &AffiliateLedgerUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for AffiliateLedger.
+func (c *AffiliateLedgerClient) Delete() *AffiliateLedgerDelete {
+	mutation := newAffiliateLedgerMutation(c.config, OpDelete)
+	return &AffiliateLedgerDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *AffiliateLedgerClient) DeleteOne(_m *AffiliateLedger) *AffiliateLedgerDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *AffiliateLedgerClient) DeleteOneID(id int) *AffiliateLedgerDeleteOne {
+	builder := c.Delete().Where(affiliateledger.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &AffiliateLedgerDeleteOne{builder}
+}
+
+// Query returns a query builder for AffiliateLedger.
+func (c *AffiliateLedgerClient) Query() *AffiliateLedgerQuery {
+	return &AffiliateLedgerQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeAffiliateLedger},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a AffiliateLedger entity by its id.
+func (c *AffiliateLedgerClient) Get(ctx context.Context, id int) (*AffiliateLedger, error) {
+	return c.Query().Where(affiliateledger.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *AffiliateLedgerClient) GetX(ctx context.Context, id int) *AffiliateLedger {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *AffiliateLedgerClient) Hooks() []Hook {
+	return c.hooks.AffiliateLedger
+}
+
+// Interceptors returns the client interceptors.
+func (c *AffiliateLedgerClient) Interceptors() []Interceptor {
+	return c.inters.AffiliateLedger
+}
+
+func (c *AffiliateLedgerClient) mutate(ctx context.Context, m *AffiliateLedgerMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&AffiliateLedgerCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&AffiliateLedgerUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&AffiliateLedgerUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&AffiliateLedgerDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown AffiliateLedger mutation op: %q", m.Op())
+	}
+}
+
+// AffiliateRuleClient is a client for the AffiliateRule schema.
+type AffiliateRuleClient struct {
+	config
+}
+
+// NewAffiliateRuleClient returns a client for the AffiliateRule from the given config.
+func NewAffiliateRuleClient(c config) *AffiliateRuleClient {
+	return &AffiliateRuleClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `affiliaterule.Hooks(f(g(h())))`.
+func (c *AffiliateRuleClient) Use(hooks ...Hook) {
+	c.hooks.AffiliateRule = append(c.hooks.AffiliateRule, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `affiliaterule.Intercept(f(g(h())))`.
+func (c *AffiliateRuleClient) Intercept(interceptors ...Interceptor) {
+	c.inters.AffiliateRule = append(c.inters.AffiliateRule, interceptors...)
+}
+
+// Create returns a builder for creating a AffiliateRule entity.
+func (c *AffiliateRuleClient) Create() *AffiliateRuleCreate {
+	mutation := newAffiliateRuleMutation(c.config, OpCreate)
+	return &AffiliateRuleCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of AffiliateRule entities.
+func (c *AffiliateRuleClient) CreateBulk(builders ...*AffiliateRuleCreate) *AffiliateRuleCreateBulk {
+	return &AffiliateRuleCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *AffiliateRuleClient) MapCreateBulk(slice any, setFunc func(*AffiliateRuleCreate, int)) *AffiliateRuleCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &AffiliateRuleCreateBulk{err: fmt.Errorf("calling to AffiliateRuleClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*AffiliateRuleCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &AffiliateRuleCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for AffiliateRule.
+func (c *AffiliateRuleClient) Update() *AffiliateRuleUpdate {
+	mutation := newAffiliateRuleMutation(c.config, OpUpdate)
+	return &AffiliateRuleUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *AffiliateRuleClient) UpdateOne(_m *AffiliateRule) *AffiliateRuleUpdateOne {
+	mutation := newAffiliateRuleMutation(c.config, OpUpdateOne, withAffiliateRule(_m))
+	return &AffiliateRuleUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *AffiliateRuleClient) UpdateOneID(id int) *AffiliateRuleUpdateOne {
+	mutation := newAffiliateRuleMutation(c.config, OpUpdateOne, withAffiliateRuleID(id))
+	return &AffiliateRuleUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for AffiliateRule.
+func (c *AffiliateRuleClient) Delete() *AffiliateRuleDelete {
+	mutation := newAffiliateRuleMutation(c.config, OpDelete)
+	return &AffiliateRuleDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *AffiliateRuleClient) DeleteOne(_m *AffiliateRule) *AffiliateRuleDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *AffiliateRuleClient) DeleteOneID(id int) *AffiliateRuleDeleteOne {
+	builder := c.Delete().Where(affiliaterule.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &AffiliateRuleDeleteOne{builder}
+}
+
+// Query returns a query builder for AffiliateRule.
+func (c *AffiliateRuleClient) Query() *AffiliateRuleQuery {
+	return &AffiliateRuleQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeAffiliateRule},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a AffiliateRule entity by its id.
+func (c *AffiliateRuleClient) Get(ctx context.Context, id int) (*AffiliateRule, error) {
+	return c.Query().Where(affiliaterule.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *AffiliateRuleClient) GetX(ctx context.Context, id int) *AffiliateRule {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *AffiliateRuleClient) Hooks() []Hook {
+	return c.hooks.AffiliateRule
+}
+
+// Interceptors returns the client interceptors.
+func (c *AffiliateRuleClient) Interceptors() []Interceptor {
+	return c.inters.AffiliateRule
+}
+
+func (c *AffiliateRuleClient) mutate(ctx context.Context, m *AffiliateRuleMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&AffiliateRuleCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&AffiliateRuleUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&AffiliateRuleUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&AffiliateRuleDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown AffiliateRule mutation op: %q", m.Op())
+	}
+}
+
 // AuditLogClient is a client for the AuditLog schema.
 type AuditLogClient struct {
 	config
@@ -2051,6 +2351,272 @@ func (c *IdempotencyRecordClient) mutate(ctx context.Context, m *IdempotencyReco
 		return (&IdempotencyRecordDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown IdempotencyRecord mutation op: %q", m.Op())
+	}
+}
+
+// InviteCodeClient is a client for the InviteCode schema.
+type InviteCodeClient struct {
+	config
+}
+
+// NewInviteCodeClient returns a client for the InviteCode from the given config.
+func NewInviteCodeClient(c config) *InviteCodeClient {
+	return &InviteCodeClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `invitecode.Hooks(f(g(h())))`.
+func (c *InviteCodeClient) Use(hooks ...Hook) {
+	c.hooks.InviteCode = append(c.hooks.InviteCode, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `invitecode.Intercept(f(g(h())))`.
+func (c *InviteCodeClient) Intercept(interceptors ...Interceptor) {
+	c.inters.InviteCode = append(c.inters.InviteCode, interceptors...)
+}
+
+// Create returns a builder for creating a InviteCode entity.
+func (c *InviteCodeClient) Create() *InviteCodeCreate {
+	mutation := newInviteCodeMutation(c.config, OpCreate)
+	return &InviteCodeCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of InviteCode entities.
+func (c *InviteCodeClient) CreateBulk(builders ...*InviteCodeCreate) *InviteCodeCreateBulk {
+	return &InviteCodeCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *InviteCodeClient) MapCreateBulk(slice any, setFunc func(*InviteCodeCreate, int)) *InviteCodeCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &InviteCodeCreateBulk{err: fmt.Errorf("calling to InviteCodeClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*InviteCodeCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &InviteCodeCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for InviteCode.
+func (c *InviteCodeClient) Update() *InviteCodeUpdate {
+	mutation := newInviteCodeMutation(c.config, OpUpdate)
+	return &InviteCodeUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *InviteCodeClient) UpdateOne(_m *InviteCode) *InviteCodeUpdateOne {
+	mutation := newInviteCodeMutation(c.config, OpUpdateOne, withInviteCode(_m))
+	return &InviteCodeUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *InviteCodeClient) UpdateOneID(id int) *InviteCodeUpdateOne {
+	mutation := newInviteCodeMutation(c.config, OpUpdateOne, withInviteCodeID(id))
+	return &InviteCodeUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for InviteCode.
+func (c *InviteCodeClient) Delete() *InviteCodeDelete {
+	mutation := newInviteCodeMutation(c.config, OpDelete)
+	return &InviteCodeDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *InviteCodeClient) DeleteOne(_m *InviteCode) *InviteCodeDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *InviteCodeClient) DeleteOneID(id int) *InviteCodeDeleteOne {
+	builder := c.Delete().Where(invitecode.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &InviteCodeDeleteOne{builder}
+}
+
+// Query returns a query builder for InviteCode.
+func (c *InviteCodeClient) Query() *InviteCodeQuery {
+	return &InviteCodeQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeInviteCode},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a InviteCode entity by its id.
+func (c *InviteCodeClient) Get(ctx context.Context, id int) (*InviteCode, error) {
+	return c.Query().Where(invitecode.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *InviteCodeClient) GetX(ctx context.Context, id int) *InviteCode {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *InviteCodeClient) Hooks() []Hook {
+	return c.hooks.InviteCode
+}
+
+// Interceptors returns the client interceptors.
+func (c *InviteCodeClient) Interceptors() []Interceptor {
+	return c.inters.InviteCode
+}
+
+func (c *InviteCodeClient) mutate(ctx context.Context, m *InviteCodeMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&InviteCodeCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&InviteCodeUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&InviteCodeUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&InviteCodeDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown InviteCode mutation op: %q", m.Op())
+	}
+}
+
+// InviteRelationshipClient is a client for the InviteRelationship schema.
+type InviteRelationshipClient struct {
+	config
+}
+
+// NewInviteRelationshipClient returns a client for the InviteRelationship from the given config.
+func NewInviteRelationshipClient(c config) *InviteRelationshipClient {
+	return &InviteRelationshipClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `inviterelationship.Hooks(f(g(h())))`.
+func (c *InviteRelationshipClient) Use(hooks ...Hook) {
+	c.hooks.InviteRelationship = append(c.hooks.InviteRelationship, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `inviterelationship.Intercept(f(g(h())))`.
+func (c *InviteRelationshipClient) Intercept(interceptors ...Interceptor) {
+	c.inters.InviteRelationship = append(c.inters.InviteRelationship, interceptors...)
+}
+
+// Create returns a builder for creating a InviteRelationship entity.
+func (c *InviteRelationshipClient) Create() *InviteRelationshipCreate {
+	mutation := newInviteRelationshipMutation(c.config, OpCreate)
+	return &InviteRelationshipCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of InviteRelationship entities.
+func (c *InviteRelationshipClient) CreateBulk(builders ...*InviteRelationshipCreate) *InviteRelationshipCreateBulk {
+	return &InviteRelationshipCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *InviteRelationshipClient) MapCreateBulk(slice any, setFunc func(*InviteRelationshipCreate, int)) *InviteRelationshipCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &InviteRelationshipCreateBulk{err: fmt.Errorf("calling to InviteRelationshipClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*InviteRelationshipCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &InviteRelationshipCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for InviteRelationship.
+func (c *InviteRelationshipClient) Update() *InviteRelationshipUpdate {
+	mutation := newInviteRelationshipMutation(c.config, OpUpdate)
+	return &InviteRelationshipUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *InviteRelationshipClient) UpdateOne(_m *InviteRelationship) *InviteRelationshipUpdateOne {
+	mutation := newInviteRelationshipMutation(c.config, OpUpdateOne, withInviteRelationship(_m))
+	return &InviteRelationshipUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *InviteRelationshipClient) UpdateOneID(id int) *InviteRelationshipUpdateOne {
+	mutation := newInviteRelationshipMutation(c.config, OpUpdateOne, withInviteRelationshipID(id))
+	return &InviteRelationshipUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for InviteRelationship.
+func (c *InviteRelationshipClient) Delete() *InviteRelationshipDelete {
+	mutation := newInviteRelationshipMutation(c.config, OpDelete)
+	return &InviteRelationshipDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *InviteRelationshipClient) DeleteOne(_m *InviteRelationship) *InviteRelationshipDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *InviteRelationshipClient) DeleteOneID(id int) *InviteRelationshipDeleteOne {
+	builder := c.Delete().Where(inviterelationship.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &InviteRelationshipDeleteOne{builder}
+}
+
+// Query returns a query builder for InviteRelationship.
+func (c *InviteRelationshipClient) Query() *InviteRelationshipQuery {
+	return &InviteRelationshipQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeInviteRelationship},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a InviteRelationship entity by its id.
+func (c *InviteRelationshipClient) Get(ctx context.Context, id int) (*InviteRelationship, error) {
+	return c.Query().Where(inviterelationship.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *InviteRelationshipClient) GetX(ctx context.Context, id int) *InviteRelationship {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *InviteRelationshipClient) Hooks() []Hook {
+	return c.hooks.InviteRelationship
+}
+
+// Interceptors returns the client interceptors.
+func (c *InviteRelationshipClient) Interceptors() []Interceptor {
+	return c.inters.InviteRelationship
+}
+
+func (c *InviteRelationshipClient) mutate(ctx context.Context, m *InviteRelationshipMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&InviteRelationshipCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&InviteRelationshipUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&InviteRelationshipUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&InviteRelationshipDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown InviteRelationship mutation op: %q", m.Op())
 	}
 }
 
@@ -4585,20 +5151,22 @@ func (c *UserSubscriptionClient) mutate(ctx context.Context, m *UserSubscription
 type (
 	hooks struct {
 		APIKey, APIKeyGroup, AccountGroup, AccountGroupMember, AccountHealthSnapshot,
-		AccountQuotaSnapshot, AuditLog, BillingLedger, CapabilityDefinition,
-		DomainEventsInbox, DomainEventsOutbox, IdempotencyRecord, ModelAlias,
-		ModelProviderMapping, ModelRegistry, PaymentAuditLog, PaymentOrder,
-		PaymentProviderInstance, PricingRule, Provider, ProviderAccount, Role,
-		SchedulerDecision, SchedulerFeedback, SchedulerStrategy, Setting,
-		SubscriptionPlan, UsageLog, User, UserRole, UserSubscription []ent.Hook
+		AccountQuotaSnapshot, AffiliateLedger, AffiliateRule, AuditLog, BillingLedger,
+		CapabilityDefinition, DomainEventsInbox, DomainEventsOutbox, IdempotencyRecord,
+		InviteCode, InviteRelationship, ModelAlias, ModelProviderMapping,
+		ModelRegistry, PaymentAuditLog, PaymentOrder, PaymentProviderInstance,
+		PricingRule, Provider, ProviderAccount, Role, SchedulerDecision,
+		SchedulerFeedback, SchedulerStrategy, Setting, SubscriptionPlan, UsageLog,
+		User, UserRole, UserSubscription []ent.Hook
 	}
 	inters struct {
 		APIKey, APIKeyGroup, AccountGroup, AccountGroupMember, AccountHealthSnapshot,
-		AccountQuotaSnapshot, AuditLog, BillingLedger, CapabilityDefinition,
-		DomainEventsInbox, DomainEventsOutbox, IdempotencyRecord, ModelAlias,
-		ModelProviderMapping, ModelRegistry, PaymentAuditLog, PaymentOrder,
-		PaymentProviderInstance, PricingRule, Provider, ProviderAccount, Role,
-		SchedulerDecision, SchedulerFeedback, SchedulerStrategy, Setting,
-		SubscriptionPlan, UsageLog, User, UserRole, UserSubscription []ent.Interceptor
+		AccountQuotaSnapshot, AffiliateLedger, AffiliateRule, AuditLog, BillingLedger,
+		CapabilityDefinition, DomainEventsInbox, DomainEventsOutbox, IdempotencyRecord,
+		InviteCode, InviteRelationship, ModelAlias, ModelProviderMapping,
+		ModelRegistry, PaymentAuditLog, PaymentOrder, PaymentProviderInstance,
+		PricingRule, Provider, ProviderAccount, Role, SchedulerDecision,
+		SchedulerFeedback, SchedulerStrategy, Setting, SubscriptionPlan, UsageLog,
+		User, UserRole, UserSubscription []ent.Interceptor
 	}
 )

@@ -8,11 +8,12 @@ import (
 type LedgerType string
 
 const (
-	LedgerTypeUsageCharge   LedgerType = "usage_charge"
-	LedgerTypePaymentCredit LedgerType = "payment_credit"
-	LedgerTypeRefund        LedgerType = "refund"
-	LedgerTypeAdjustment    LedgerType = "adjustment"
-	LedgerTypeCompensation  LedgerType = "compensation"
+	LedgerTypeUsageCharge       LedgerType = "usage_charge"
+	LedgerTypePaymentCredit     LedgerType = "payment_credit"
+	LedgerTypeRefund            LedgerType = "refund"
+	LedgerTypeAdjustment        LedgerType = "adjustment"
+	LedgerTypeCompensation      LedgerType = "compensation"
+	LedgerTypeAffiliateTransfer LedgerType = "affiliate_transfer"
 )
 
 type LedgerEntry struct {

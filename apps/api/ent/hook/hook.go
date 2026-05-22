@@ -81,6 +81,30 @@ func (f AccountQuotaSnapshotFunc) Mutate(ctx context.Context, m ent.Mutation) (e
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.AccountQuotaSnapshotMutation", m)
 }
 
+// The AffiliateLedgerFunc type is an adapter to allow the use of ordinary
+// function as AffiliateLedger mutator.
+type AffiliateLedgerFunc func(context.Context, *ent.AffiliateLedgerMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f AffiliateLedgerFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.AffiliateLedgerMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.AffiliateLedgerMutation", m)
+}
+
+// The AffiliateRuleFunc type is an adapter to allow the use of ordinary
+// function as AffiliateRule mutator.
+type AffiliateRuleFunc func(context.Context, *ent.AffiliateRuleMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f AffiliateRuleFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.AffiliateRuleMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.AffiliateRuleMutation", m)
+}
+
 // The AuditLogFunc type is an adapter to allow the use of ordinary
 // function as AuditLog mutator.
 type AuditLogFunc func(context.Context, *ent.AuditLogMutation) (ent.Value, error)
@@ -151,6 +175,30 @@ func (f IdempotencyRecordFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.
 		return f(ctx, mv)
 	}
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.IdempotencyRecordMutation", m)
+}
+
+// The InviteCodeFunc type is an adapter to allow the use of ordinary
+// function as InviteCode mutator.
+type InviteCodeFunc func(context.Context, *ent.InviteCodeMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f InviteCodeFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.InviteCodeMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.InviteCodeMutation", m)
+}
+
+// The InviteRelationshipFunc type is an adapter to allow the use of ordinary
+// function as InviteRelationship mutator.
+type InviteRelationshipFunc func(context.Context, *ent.InviteRelationshipMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f InviteRelationshipFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.InviteRelationshipMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.InviteRelationshipMutation", m)
 }
 
 // The ModelAliasFunc type is an adapter to allow the use of ordinary

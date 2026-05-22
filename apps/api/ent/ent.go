@@ -16,6 +16,8 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/accountgroupmember"
 	"github.com/srapi/srapi/apps/api/ent/accounthealthsnapshot"
 	"github.com/srapi/srapi/apps/api/ent/accountquotasnapshot"
+	"github.com/srapi/srapi/apps/api/ent/affiliateledger"
+	"github.com/srapi/srapi/apps/api/ent/affiliaterule"
 	"github.com/srapi/srapi/apps/api/ent/apikey"
 	"github.com/srapi/srapi/apps/api/ent/apikeygroup"
 	"github.com/srapi/srapi/apps/api/ent/auditlog"
@@ -24,6 +26,8 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/domaineventsinbox"
 	"github.com/srapi/srapi/apps/api/ent/domaineventsoutbox"
 	"github.com/srapi/srapi/apps/api/ent/idempotencyrecord"
+	"github.com/srapi/srapi/apps/api/ent/invitecode"
+	"github.com/srapi/srapi/apps/api/ent/inviterelationship"
 	"github.com/srapi/srapi/apps/api/ent/modelalias"
 	"github.com/srapi/srapi/apps/api/ent/modelprovidermapping"
 	"github.com/srapi/srapi/apps/api/ent/modelregistry"
@@ -109,12 +113,16 @@ func checkColumn(t, c string) error {
 			accountgroupmember.Table:      accountgroupmember.ValidColumn,
 			accounthealthsnapshot.Table:   accounthealthsnapshot.ValidColumn,
 			accountquotasnapshot.Table:    accountquotasnapshot.ValidColumn,
+			affiliateledger.Table:         affiliateledger.ValidColumn,
+			affiliaterule.Table:           affiliaterule.ValidColumn,
 			auditlog.Table:                auditlog.ValidColumn,
 			billingledger.Table:           billingledger.ValidColumn,
 			capabilitydefinition.Table:    capabilitydefinition.ValidColumn,
 			domaineventsinbox.Table:       domaineventsinbox.ValidColumn,
 			domaineventsoutbox.Table:      domaineventsoutbox.ValidColumn,
 			idempotencyrecord.Table:       idempotencyrecord.ValidColumn,
+			invitecode.Table:              invitecode.ValidColumn,
+			inviterelationship.Table:      inviterelationship.ValidColumn,
 			modelalias.Table:              modelalias.ValidColumn,
 			modelprovidermapping.Table:    modelprovidermapping.ValidColumn,
 			modelregistry.Table:           modelregistry.ValidColumn,

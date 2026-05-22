@@ -13,8 +13,8 @@ import (
 
 	"entgo.io/ent/dialect"
 	entschema "entgo.io/ent/dialect/sql/schema"
-	"github.com/srapi/srapi/apps/api/ent/migrate"
 	"github.com/srapi/srapi/apps/api/ent/enttest"
+	"github.com/srapi/srapi/apps/api/ent/migrate"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -57,6 +57,8 @@ func TestEntSchemaAppliesToEmptyDatabase(t *testing.T) {
 		"account_groups",
 		"account_health_snapshots",
 		"account_quota_snapshots",
+		"affiliate_ledgers",
+		"affiliate_rules",
 		"api_key_groups",
 		"api_keys",
 		"audit_logs",
@@ -65,6 +67,8 @@ func TestEntSchemaAppliesToEmptyDatabase(t *testing.T) {
 		"domain_events_inboxes",
 		"domain_events_outboxes",
 		"idempotency_records",
+		"invite_codes",
+		"invite_relationships",
 		"model_alias",
 		"model_provider_mappings",
 		"model_registries",

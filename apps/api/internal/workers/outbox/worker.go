@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	affiliatecontract "github.com/srapi/srapi/apps/api/internal/modules/affiliate/contract"
+	auditcontract "github.com/srapi/srapi/apps/api/internal/modules/audit/contract"
 	"github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	"github.com/srapi/srapi/apps/api/internal/modules/events/service"
 )
@@ -20,12 +22,14 @@ const (
 )
 
 type Config struct {
-	Interval      time.Duration
-	Limit         int
-	RetryBackoff  time.Duration
-	ConsumerName  string
-	EventHandler  service.OutboxHandler
-	DispatchClock service.Clock
+	Interval       time.Duration
+	Limit          int
+	RetryBackoff   time.Duration
+	ConsumerName   string
+	EventHandler   service.OutboxHandler
+	DispatchClock  service.Clock
+	AffiliateStore affiliatecontract.Store
+	AuditStore     auditcontract.Store
 }
 
 type Worker struct {
@@ -58,9 +62,10 @@ func New(store contract.Store, logger *slog.Logger, cfg Config) (*Worker, error)
 	}
 	handler := cfg.EventHandler
 	if handler == nil {
-		handler = service.OutboxHandlerFunc(func(context.Context, contract.OutboxEvent) error {
-			return nil
-		})
+		handler, err = defaultEventHandler(events, cfg)
+		if err != nil {
+			return nil, err
+		}
 	}
 	handler = inboxHandler{
 		events:       events,

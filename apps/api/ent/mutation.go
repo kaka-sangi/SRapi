@@ -15,6 +15,8 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/accountgroupmember"
 	"github.com/srapi/srapi/apps/api/ent/accounthealthsnapshot"
 	"github.com/srapi/srapi/apps/api/ent/accountquotasnapshot"
+	"github.com/srapi/srapi/apps/api/ent/affiliateledger"
+	"github.com/srapi/srapi/apps/api/ent/affiliaterule"
 	"github.com/srapi/srapi/apps/api/ent/apikey"
 	"github.com/srapi/srapi/apps/api/ent/apikeygroup"
 	"github.com/srapi/srapi/apps/api/ent/auditlog"
@@ -23,6 +25,8 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/domaineventsinbox"
 	"github.com/srapi/srapi/apps/api/ent/domaineventsoutbox"
 	"github.com/srapi/srapi/apps/api/ent/idempotencyrecord"
+	"github.com/srapi/srapi/apps/api/ent/invitecode"
+	"github.com/srapi/srapi/apps/api/ent/inviterelationship"
 	"github.com/srapi/srapi/apps/api/ent/modelalias"
 	"github.com/srapi/srapi/apps/api/ent/modelprovidermapping"
 	"github.com/srapi/srapi/apps/api/ent/modelregistry"
@@ -60,12 +64,16 @@ const (
 	TypeAccountGroupMember      = "AccountGroupMember"
 	TypeAccountHealthSnapshot   = "AccountHealthSnapshot"
 	TypeAccountQuotaSnapshot    = "AccountQuotaSnapshot"
+	TypeAffiliateLedger         = "AffiliateLedger"
+	TypeAffiliateRule           = "AffiliateRule"
 	TypeAuditLog                = "AuditLog"
 	TypeBillingLedger           = "BillingLedger"
 	TypeCapabilityDefinition    = "CapabilityDefinition"
 	TypeDomainEventsInbox       = "DomainEventsInbox"
 	TypeDomainEventsOutbox      = "DomainEventsOutbox"
 	TypeIdempotencyRecord       = "IdempotencyRecord"
+	TypeInviteCode              = "InviteCode"
+	TypeInviteRelationship      = "InviteRelationship"
 	TypeModelAlias              = "ModelAlias"
 	TypeModelProviderMapping    = "ModelProviderMapping"
 	TypeModelRegistry           = "ModelRegistry"
@@ -5337,6 +5345,2176 @@ func (m *AccountQuotaSnapshotMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *AccountQuotaSnapshotMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown AccountQuotaSnapshot edge %s", name)
+}
+
+// AffiliateLedgerMutation represents an operation that mutates the AffiliateLedger nodes in the graph.
+type AffiliateLedgerMutation struct {
+	config
+	op                  Op
+	typ                 string
+	id                  *int
+	created_at          *time.Time
+	updated_at          *time.Time
+	user_id             *int
+	adduser_id          *int
+	related_user_id     *int
+	addrelated_user_id  *int
+	payment_order_id    *int
+	addpayment_order_id *int
+	subscription_id     *int
+	addsubscription_id  *int
+	_type               *string
+	amount              *string
+	currency            *string
+	status              *string
+	reference_id        *string
+	metadata_json       *map[string]interface{}
+	settled_at          *time.Time
+	clearedFields       map[string]struct{}
+	done                bool
+	oldValue            func(context.Context) (*AffiliateLedger, error)
+	predicates          []predicate.AffiliateLedger
+}
+
+var _ ent.Mutation = (*AffiliateLedgerMutation)(nil)
+
+// affiliateledgerOption allows management of the mutation configuration using functional options.
+type affiliateledgerOption func(*AffiliateLedgerMutation)
+
+// newAffiliateLedgerMutation creates new mutation for the AffiliateLedger entity.
+func newAffiliateLedgerMutation(c config, op Op, opts ...affiliateledgerOption) *AffiliateLedgerMutation {
+	m := &AffiliateLedgerMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeAffiliateLedger,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withAffiliateLedgerID sets the ID field of the mutation.
+func withAffiliateLedgerID(id int) affiliateledgerOption {
+	return func(m *AffiliateLedgerMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *AffiliateLedger
+		)
+		m.oldValue = func(ctx context.Context) (*AffiliateLedger, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().AffiliateLedger.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withAffiliateLedger sets the old AffiliateLedger of the mutation.
+func withAffiliateLedger(node *AffiliateLedger) affiliateledgerOption {
+	return func(m *AffiliateLedgerMutation) {
+		m.oldValue = func(context.Context) (*AffiliateLedger, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m AffiliateLedgerMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m AffiliateLedgerMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *AffiliateLedgerMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *AffiliateLedgerMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().AffiliateLedger.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *AffiliateLedgerMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *AffiliateLedgerMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the AffiliateLedger entity.
+// If the AffiliateLedger object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AffiliateLedgerMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *AffiliateLedgerMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *AffiliateLedgerMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *AffiliateLedgerMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the AffiliateLedger entity.
+// If the AffiliateLedger object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AffiliateLedgerMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *AffiliateLedgerMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetUserID sets the "user_id" field.
+func (m *AffiliateLedgerMutation) SetUserID(i int) {
+	m.user_id = &i
+	m.adduser_id = nil
+}
+
+// UserID returns the value of the "user_id" field in the mutation.
+func (m *AffiliateLedgerMutation) UserID() (r int, exists bool) {
+	v := m.user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUserID returns the old "user_id" field's value of the AffiliateLedger entity.
+// If the AffiliateLedger object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AffiliateLedgerMutation) OldUserID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUserID: %w", err)
+	}
+	return oldValue.UserID, nil
+}
+
+// AddUserID adds i to the "user_id" field.
+func (m *AffiliateLedgerMutation) AddUserID(i int) {
+	if m.adduser_id != nil {
+		*m.adduser_id += i
+	} else {
+		m.adduser_id = &i
+	}
+}
+
+// AddedUserID returns the value that was added to the "user_id" field in this mutation.
+func (m *AffiliateLedgerMutation) AddedUserID() (r int, exists bool) {
+	v := m.adduser_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetUserID resets all changes to the "user_id" field.
+func (m *AffiliateLedgerMutation) ResetUserID() {
+	m.user_id = nil
+	m.adduser_id = nil
+}
+
+// SetRelatedUserID sets the "related_user_id" field.
+func (m *AffiliateLedgerMutation) SetRelatedUserID(i int) {
+	m.related_user_id = &i
+	m.addrelated_user_id = nil
+}
+
+// RelatedUserID returns the value of the "related_user_id" field in the mutation.
+func (m *AffiliateLedgerMutation) RelatedUserID() (r int, exists bool) {
+	v := m.related_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRelatedUserID returns the old "related_user_id" field's value of the AffiliateLedger entity.
+// If the AffiliateLedger object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AffiliateLedgerMutation) OldRelatedUserID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRelatedUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRelatedUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRelatedUserID: %w", err)
+	}
+	return oldValue.RelatedUserID, nil
+}
+
+// AddRelatedUserID adds i to the "related_user_id" field.
+func (m *AffiliateLedgerMutation) AddRelatedUserID(i int) {
+	if m.addrelated_user_id != nil {
+		*m.addrelated_user_id += i
+	} else {
+		m.addrelated_user_id = &i
+	}
+}
+
+// AddedRelatedUserID returns the value that was added to the "related_user_id" field in this mutation.
+func (m *AffiliateLedgerMutation) AddedRelatedUserID() (r int, exists bool) {
+	v := m.addrelated_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetRelatedUserID resets all changes to the "related_user_id" field.
+func (m *AffiliateLedgerMutation) ResetRelatedUserID() {
+	m.related_user_id = nil
+	m.addrelated_user_id = nil
+}
+
+// SetPaymentOrderID sets the "payment_order_id" field.
+func (m *AffiliateLedgerMutation) SetPaymentOrderID(i int) {
+	m.payment_order_id = &i
+	m.addpayment_order_id = nil
+}
+
+// PaymentOrderID returns the value of the "payment_order_id" field in the mutation.
+func (m *AffiliateLedgerMutation) PaymentOrderID() (r int, exists bool) {
+	v := m.payment_order_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPaymentOrderID returns the old "payment_order_id" field's value of the AffiliateLedger entity.
+// If the AffiliateLedger object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AffiliateLedgerMutation) OldPaymentOrderID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPaymentOrderID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPaymentOrderID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPaymentOrderID: %w", err)
+	}
+	return oldValue.PaymentOrderID, nil
+}
+
+// AddPaymentOrderID adds i to the "payment_order_id" field.
+func (m *AffiliateLedgerMutation) AddPaymentOrderID(i int) {
+	if m.addpayment_order_id != nil {
+		*m.addpayment_order_id += i
+	} else {
+		m.addpayment_order_id = &i
+	}
+}
+
+// AddedPaymentOrderID returns the value that was added to the "payment_order_id" field in this mutation.
+func (m *AffiliateLedgerMutation) AddedPaymentOrderID() (r int, exists bool) {
+	v := m.addpayment_order_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearPaymentOrderID clears the value of the "payment_order_id" field.
+func (m *AffiliateLedgerMutation) ClearPaymentOrderID() {
+	m.payment_order_id = nil
+	m.addpayment_order_id = nil
+	m.clearedFields[affiliateledger.FieldPaymentOrderID] = struct{}{}
+}
+
+// PaymentOrderIDCleared returns if the "payment_order_id" field was cleared in this mutation.
+func (m *AffiliateLedgerMutation) PaymentOrderIDCleared() bool {
+	_, ok := m.clearedFields[affiliateledger.FieldPaymentOrderID]
+	return ok
+}
+
+// ResetPaymentOrderID resets all changes to the "payment_order_id" field.
+func (m *AffiliateLedgerMutation) ResetPaymentOrderID() {
+	m.payment_order_id = nil
+	m.addpayment_order_id = nil
+	delete(m.clearedFields, affiliateledger.FieldPaymentOrderID)
+}
+
+// SetSubscriptionID sets the "subscription_id" field.
+func (m *AffiliateLedgerMutation) SetSubscriptionID(i int) {
+	m.subscription_id = &i
+	m.addsubscription_id = nil
+}
+
+// SubscriptionID returns the value of the "subscription_id" field in the mutation.
+func (m *AffiliateLedgerMutation) SubscriptionID() (r int, exists bool) {
+	v := m.subscription_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSubscriptionID returns the old "subscription_id" field's value of the AffiliateLedger entity.
+// If the AffiliateLedger object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AffiliateLedgerMutation) OldSubscriptionID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSubscriptionID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSubscriptionID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSubscriptionID: %w", err)
+	}
+	return oldValue.SubscriptionID, nil
+}
+
+// AddSubscriptionID adds i to the "subscription_id" field.
+func (m *AffiliateLedgerMutation) AddSubscriptionID(i int) {
+	if m.addsubscription_id != nil {
+		*m.addsubscription_id += i
+	} else {
+		m.addsubscription_id = &i
+	}
+}
+
+// AddedSubscriptionID returns the value that was added to the "subscription_id" field in this mutation.
+func (m *AffiliateLedgerMutation) AddedSubscriptionID() (r int, exists bool) {
+	v := m.addsubscription_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearSubscriptionID clears the value of the "subscription_id" field.
+func (m *AffiliateLedgerMutation) ClearSubscriptionID() {
+	m.subscription_id = nil
+	m.addsubscription_id = nil
+	m.clearedFields[affiliateledger.FieldSubscriptionID] = struct{}{}
+}
+
+// SubscriptionIDCleared returns if the "subscription_id" field was cleared in this mutation.
+func (m *AffiliateLedgerMutation) SubscriptionIDCleared() bool {
+	_, ok := m.clearedFields[affiliateledger.FieldSubscriptionID]
+	return ok
+}
+
+// ResetSubscriptionID resets all changes to the "subscription_id" field.
+func (m *AffiliateLedgerMutation) ResetSubscriptionID() {
+	m.subscription_id = nil
+	m.addsubscription_id = nil
+	delete(m.clearedFields, affiliateledger.FieldSubscriptionID)
+}
+
+// SetType sets the "type" field.
+func (m *AffiliateLedgerMutation) SetType(s string) {
+	m._type = &s
+}
+
+// GetType returns the value of the "type" field in the mutation.
+func (m *AffiliateLedgerMutation) GetType() (r string, exists bool) {
+	v := m._type
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldType returns the old "type" field's value of the AffiliateLedger entity.
+// If the AffiliateLedger object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AffiliateLedgerMutation) OldType(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldType is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldType requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldType: %w", err)
+	}
+	return oldValue.Type, nil
+}
+
+// ResetType resets all changes to the "type" field.
+func (m *AffiliateLedgerMutation) ResetType() {
+	m._type = nil
+}
+
+// SetAmount sets the "amount" field.
+func (m *AffiliateLedgerMutation) SetAmount(s string) {
+	m.amount = &s
+}
+
+// Amount returns the value of the "amount" field in the mutation.
+func (m *AffiliateLedgerMutation) Amount() (r string, exists bool) {
+	v := m.amount
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAmount returns the old "amount" field's value of the AffiliateLedger entity.
+// If the AffiliateLedger object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AffiliateLedgerMutation) OldAmount(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAmount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAmount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAmount: %w", err)
+	}
+	return oldValue.Amount, nil
+}
+
+// ResetAmount resets all changes to the "amount" field.
+func (m *AffiliateLedgerMutation) ResetAmount() {
+	m.amount = nil
+}
+
+// SetCurrency sets the "currency" field.
+func (m *AffiliateLedgerMutation) SetCurrency(s string) {
+	m.currency = &s
+}
+
+// Currency returns the value of the "currency" field in the mutation.
+func (m *AffiliateLedgerMutation) Currency() (r string, exists bool) {
+	v := m.currency
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCurrency returns the old "currency" field's value of the AffiliateLedger entity.
+// If the AffiliateLedger object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AffiliateLedgerMutation) OldCurrency(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCurrency is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCurrency requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCurrency: %w", err)
+	}
+	return oldValue.Currency, nil
+}
+
+// ResetCurrency resets all changes to the "currency" field.
+func (m *AffiliateLedgerMutation) ResetCurrency() {
+	m.currency = nil
+}
+
+// SetStatus sets the "status" field.
+func (m *AffiliateLedgerMutation) SetStatus(s string) {
+	m.status = &s
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *AffiliateLedgerMutation) Status() (r string, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the AffiliateLedger entity.
+// If the AffiliateLedger object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AffiliateLedgerMutation) OldStatus(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *AffiliateLedgerMutation) ResetStatus() {
+	m.status = nil
+}
+
+// SetReferenceID sets the "reference_id" field.
+func (m *AffiliateLedgerMutation) SetReferenceID(s string) {
+	m.reference_id = &s
+}
+
+// ReferenceID returns the value of the "reference_id" field in the mutation.
+func (m *AffiliateLedgerMutation) ReferenceID() (r string, exists bool) {
+	v := m.reference_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReferenceID returns the old "reference_id" field's value of the AffiliateLedger entity.
+// If the AffiliateLedger object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AffiliateLedgerMutation) OldReferenceID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReferenceID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReferenceID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReferenceID: %w", err)
+	}
+	return oldValue.ReferenceID, nil
+}
+
+// ResetReferenceID resets all changes to the "reference_id" field.
+func (m *AffiliateLedgerMutation) ResetReferenceID() {
+	m.reference_id = nil
+}
+
+// SetMetadataJSON sets the "metadata_json" field.
+func (m *AffiliateLedgerMutation) SetMetadataJSON(value map[string]interface{}) {
+	m.metadata_json = &value
+}
+
+// MetadataJSON returns the value of the "metadata_json" field in the mutation.
+func (m *AffiliateLedgerMutation) MetadataJSON() (r map[string]interface{}, exists bool) {
+	v := m.metadata_json
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMetadataJSON returns the old "metadata_json" field's value of the AffiliateLedger entity.
+// If the AffiliateLedger object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AffiliateLedgerMutation) OldMetadataJSON(ctx context.Context) (v map[string]interface{}, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMetadataJSON is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMetadataJSON requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMetadataJSON: %w", err)
+	}
+	return oldValue.MetadataJSON, nil
+}
+
+// ClearMetadataJSON clears the value of the "metadata_json" field.
+func (m *AffiliateLedgerMutation) ClearMetadataJSON() {
+	m.metadata_json = nil
+	m.clearedFields[affiliateledger.FieldMetadataJSON] = struct{}{}
+}
+
+// MetadataJSONCleared returns if the "metadata_json" field was cleared in this mutation.
+func (m *AffiliateLedgerMutation) MetadataJSONCleared() bool {
+	_, ok := m.clearedFields[affiliateledger.FieldMetadataJSON]
+	return ok
+}
+
+// ResetMetadataJSON resets all changes to the "metadata_json" field.
+func (m *AffiliateLedgerMutation) ResetMetadataJSON() {
+	m.metadata_json = nil
+	delete(m.clearedFields, affiliateledger.FieldMetadataJSON)
+}
+
+// SetSettledAt sets the "settled_at" field.
+func (m *AffiliateLedgerMutation) SetSettledAt(t time.Time) {
+	m.settled_at = &t
+}
+
+// SettledAt returns the value of the "settled_at" field in the mutation.
+func (m *AffiliateLedgerMutation) SettledAt() (r time.Time, exists bool) {
+	v := m.settled_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSettledAt returns the old "settled_at" field's value of the AffiliateLedger entity.
+// If the AffiliateLedger object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AffiliateLedgerMutation) OldSettledAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSettledAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSettledAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSettledAt: %w", err)
+	}
+	return oldValue.SettledAt, nil
+}
+
+// ClearSettledAt clears the value of the "settled_at" field.
+func (m *AffiliateLedgerMutation) ClearSettledAt() {
+	m.settled_at = nil
+	m.clearedFields[affiliateledger.FieldSettledAt] = struct{}{}
+}
+
+// SettledAtCleared returns if the "settled_at" field was cleared in this mutation.
+func (m *AffiliateLedgerMutation) SettledAtCleared() bool {
+	_, ok := m.clearedFields[affiliateledger.FieldSettledAt]
+	return ok
+}
+
+// ResetSettledAt resets all changes to the "settled_at" field.
+func (m *AffiliateLedgerMutation) ResetSettledAt() {
+	m.settled_at = nil
+	delete(m.clearedFields, affiliateledger.FieldSettledAt)
+}
+
+// Where appends a list predicates to the AffiliateLedgerMutation builder.
+func (m *AffiliateLedgerMutation) Where(ps ...predicate.AffiliateLedger) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the AffiliateLedgerMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *AffiliateLedgerMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.AffiliateLedger, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *AffiliateLedgerMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *AffiliateLedgerMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (AffiliateLedger).
+func (m *AffiliateLedgerMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *AffiliateLedgerMutation) Fields() []string {
+	fields := make([]string, 0, 13)
+	if m.created_at != nil {
+		fields = append(fields, affiliateledger.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, affiliateledger.FieldUpdatedAt)
+	}
+	if m.user_id != nil {
+		fields = append(fields, affiliateledger.FieldUserID)
+	}
+	if m.related_user_id != nil {
+		fields = append(fields, affiliateledger.FieldRelatedUserID)
+	}
+	if m.payment_order_id != nil {
+		fields = append(fields, affiliateledger.FieldPaymentOrderID)
+	}
+	if m.subscription_id != nil {
+		fields = append(fields, affiliateledger.FieldSubscriptionID)
+	}
+	if m._type != nil {
+		fields = append(fields, affiliateledger.FieldType)
+	}
+	if m.amount != nil {
+		fields = append(fields, affiliateledger.FieldAmount)
+	}
+	if m.currency != nil {
+		fields = append(fields, affiliateledger.FieldCurrency)
+	}
+	if m.status != nil {
+		fields = append(fields, affiliateledger.FieldStatus)
+	}
+	if m.reference_id != nil {
+		fields = append(fields, affiliateledger.FieldReferenceID)
+	}
+	if m.metadata_json != nil {
+		fields = append(fields, affiliateledger.FieldMetadataJSON)
+	}
+	if m.settled_at != nil {
+		fields = append(fields, affiliateledger.FieldSettledAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *AffiliateLedgerMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case affiliateledger.FieldCreatedAt:
+		return m.CreatedAt()
+	case affiliateledger.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case affiliateledger.FieldUserID:
+		return m.UserID()
+	case affiliateledger.FieldRelatedUserID:
+		return m.RelatedUserID()
+	case affiliateledger.FieldPaymentOrderID:
+		return m.PaymentOrderID()
+	case affiliateledger.FieldSubscriptionID:
+		return m.SubscriptionID()
+	case affiliateledger.FieldType:
+		return m.GetType()
+	case affiliateledger.FieldAmount:
+		return m.Amount()
+	case affiliateledger.FieldCurrency:
+		return m.Currency()
+	case affiliateledger.FieldStatus:
+		return m.Status()
+	case affiliateledger.FieldReferenceID:
+		return m.ReferenceID()
+	case affiliateledger.FieldMetadataJSON:
+		return m.MetadataJSON()
+	case affiliateledger.FieldSettledAt:
+		return m.SettledAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *AffiliateLedgerMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case affiliateledger.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case affiliateledger.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case affiliateledger.FieldUserID:
+		return m.OldUserID(ctx)
+	case affiliateledger.FieldRelatedUserID:
+		return m.OldRelatedUserID(ctx)
+	case affiliateledger.FieldPaymentOrderID:
+		return m.OldPaymentOrderID(ctx)
+	case affiliateledger.FieldSubscriptionID:
+		return m.OldSubscriptionID(ctx)
+	case affiliateledger.FieldType:
+		return m.OldType(ctx)
+	case affiliateledger.FieldAmount:
+		return m.OldAmount(ctx)
+	case affiliateledger.FieldCurrency:
+		return m.OldCurrency(ctx)
+	case affiliateledger.FieldStatus:
+		return m.OldStatus(ctx)
+	case affiliateledger.FieldReferenceID:
+		return m.OldReferenceID(ctx)
+	case affiliateledger.FieldMetadataJSON:
+		return m.OldMetadataJSON(ctx)
+	case affiliateledger.FieldSettledAt:
+		return m.OldSettledAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown AffiliateLedger field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *AffiliateLedgerMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case affiliateledger.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case affiliateledger.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case affiliateledger.FieldUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUserID(v)
+		return nil
+	case affiliateledger.FieldRelatedUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRelatedUserID(v)
+		return nil
+	case affiliateledger.FieldPaymentOrderID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPaymentOrderID(v)
+		return nil
+	case affiliateledger.FieldSubscriptionID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSubscriptionID(v)
+		return nil
+	case affiliateledger.FieldType:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetType(v)
+		return nil
+	case affiliateledger.FieldAmount:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAmount(v)
+		return nil
+	case affiliateledger.FieldCurrency:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCurrency(v)
+		return nil
+	case affiliateledger.FieldStatus:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case affiliateledger.FieldReferenceID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReferenceID(v)
+		return nil
+	case affiliateledger.FieldMetadataJSON:
+		v, ok := value.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMetadataJSON(v)
+		return nil
+	case affiliateledger.FieldSettledAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSettledAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown AffiliateLedger field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *AffiliateLedgerMutation) AddedFields() []string {
+	var fields []string
+	if m.adduser_id != nil {
+		fields = append(fields, affiliateledger.FieldUserID)
+	}
+	if m.addrelated_user_id != nil {
+		fields = append(fields, affiliateledger.FieldRelatedUserID)
+	}
+	if m.addpayment_order_id != nil {
+		fields = append(fields, affiliateledger.FieldPaymentOrderID)
+	}
+	if m.addsubscription_id != nil {
+		fields = append(fields, affiliateledger.FieldSubscriptionID)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *AffiliateLedgerMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case affiliateledger.FieldUserID:
+		return m.AddedUserID()
+	case affiliateledger.FieldRelatedUserID:
+		return m.AddedRelatedUserID()
+	case affiliateledger.FieldPaymentOrderID:
+		return m.AddedPaymentOrderID()
+	case affiliateledger.FieldSubscriptionID:
+		return m.AddedSubscriptionID()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *AffiliateLedgerMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case affiliateledger.FieldUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddUserID(v)
+		return nil
+	case affiliateledger.FieldRelatedUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddRelatedUserID(v)
+		return nil
+	case affiliateledger.FieldPaymentOrderID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddPaymentOrderID(v)
+		return nil
+	case affiliateledger.FieldSubscriptionID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddSubscriptionID(v)
+		return nil
+	}
+	return fmt.Errorf("unknown AffiliateLedger numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *AffiliateLedgerMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(affiliateledger.FieldPaymentOrderID) {
+		fields = append(fields, affiliateledger.FieldPaymentOrderID)
+	}
+	if m.FieldCleared(affiliateledger.FieldSubscriptionID) {
+		fields = append(fields, affiliateledger.FieldSubscriptionID)
+	}
+	if m.FieldCleared(affiliateledger.FieldMetadataJSON) {
+		fields = append(fields, affiliateledger.FieldMetadataJSON)
+	}
+	if m.FieldCleared(affiliateledger.FieldSettledAt) {
+		fields = append(fields, affiliateledger.FieldSettledAt)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *AffiliateLedgerMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *AffiliateLedgerMutation) ClearField(name string) error {
+	switch name {
+	case affiliateledger.FieldPaymentOrderID:
+		m.ClearPaymentOrderID()
+		return nil
+	case affiliateledger.FieldSubscriptionID:
+		m.ClearSubscriptionID()
+		return nil
+	case affiliateledger.FieldMetadataJSON:
+		m.ClearMetadataJSON()
+		return nil
+	case affiliateledger.FieldSettledAt:
+		m.ClearSettledAt()
+		return nil
+	}
+	return fmt.Errorf("unknown AffiliateLedger nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *AffiliateLedgerMutation) ResetField(name string) error {
+	switch name {
+	case affiliateledger.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case affiliateledger.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case affiliateledger.FieldUserID:
+		m.ResetUserID()
+		return nil
+	case affiliateledger.FieldRelatedUserID:
+		m.ResetRelatedUserID()
+		return nil
+	case affiliateledger.FieldPaymentOrderID:
+		m.ResetPaymentOrderID()
+		return nil
+	case affiliateledger.FieldSubscriptionID:
+		m.ResetSubscriptionID()
+		return nil
+	case affiliateledger.FieldType:
+		m.ResetType()
+		return nil
+	case affiliateledger.FieldAmount:
+		m.ResetAmount()
+		return nil
+	case affiliateledger.FieldCurrency:
+		m.ResetCurrency()
+		return nil
+	case affiliateledger.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case affiliateledger.FieldReferenceID:
+		m.ResetReferenceID()
+		return nil
+	case affiliateledger.FieldMetadataJSON:
+		m.ResetMetadataJSON()
+		return nil
+	case affiliateledger.FieldSettledAt:
+		m.ResetSettledAt()
+		return nil
+	}
+	return fmt.Errorf("unknown AffiliateLedger field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *AffiliateLedgerMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *AffiliateLedgerMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *AffiliateLedgerMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *AffiliateLedgerMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *AffiliateLedgerMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *AffiliateLedgerMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *AffiliateLedgerMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown AffiliateLedger unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *AffiliateLedgerMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown AffiliateLedger edge %s", name)
+}
+
+// AffiliateRuleMutation represents an operation that mutates the AffiliateRule nodes in the graph.
+type AffiliateRuleMutation struct {
+	config
+	op                Op
+	typ               string
+	id                *int
+	created_at        *time.Time
+	updated_at        *time.Time
+	name              *string
+	status            *string
+	trigger_type      *string
+	rate              *string
+	fixed_amount      *string
+	currency          *string
+	max_rebate_amount *string
+	valid_from        *time.Time
+	valid_to          *time.Time
+	metadata_json     *map[string]interface{}
+	clearedFields     map[string]struct{}
+	done              bool
+	oldValue          func(context.Context) (*AffiliateRule, error)
+	predicates        []predicate.AffiliateRule
+}
+
+var _ ent.Mutation = (*AffiliateRuleMutation)(nil)
+
+// affiliateruleOption allows management of the mutation configuration using functional options.
+type affiliateruleOption func(*AffiliateRuleMutation)
+
+// newAffiliateRuleMutation creates new mutation for the AffiliateRule entity.
+func newAffiliateRuleMutation(c config, op Op, opts ...affiliateruleOption) *AffiliateRuleMutation {
+	m := &AffiliateRuleMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeAffiliateRule,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withAffiliateRuleID sets the ID field of the mutation.
+func withAffiliateRuleID(id int) affiliateruleOption {
+	return func(m *AffiliateRuleMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *AffiliateRule
+		)
+		m.oldValue = func(ctx context.Context) (*AffiliateRule, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().AffiliateRule.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withAffiliateRule sets the old AffiliateRule of the mutation.
+func withAffiliateRule(node *AffiliateRule) affiliateruleOption {
+	return func(m *AffiliateRuleMutation) {
+		m.oldValue = func(context.Context) (*AffiliateRule, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m AffiliateRuleMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m AffiliateRuleMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *AffiliateRuleMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *AffiliateRuleMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().AffiliateRule.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *AffiliateRuleMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *AffiliateRuleMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the AffiliateRule entity.
+// If the AffiliateRule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AffiliateRuleMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *AffiliateRuleMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *AffiliateRuleMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *AffiliateRuleMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the AffiliateRule entity.
+// If the AffiliateRule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AffiliateRuleMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *AffiliateRuleMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetName sets the "name" field.
+func (m *AffiliateRuleMutation) SetName(s string) {
+	m.name = &s
+}
+
+// Name returns the value of the "name" field in the mutation.
+func (m *AffiliateRuleMutation) Name() (r string, exists bool) {
+	v := m.name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldName returns the old "name" field's value of the AffiliateRule entity.
+// If the AffiliateRule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AffiliateRuleMutation) OldName(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldName: %w", err)
+	}
+	return oldValue.Name, nil
+}
+
+// ResetName resets all changes to the "name" field.
+func (m *AffiliateRuleMutation) ResetName() {
+	m.name = nil
+}
+
+// SetStatus sets the "status" field.
+func (m *AffiliateRuleMutation) SetStatus(s string) {
+	m.status = &s
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *AffiliateRuleMutation) Status() (r string, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the AffiliateRule entity.
+// If the AffiliateRule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AffiliateRuleMutation) OldStatus(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *AffiliateRuleMutation) ResetStatus() {
+	m.status = nil
+}
+
+// SetTriggerType sets the "trigger_type" field.
+func (m *AffiliateRuleMutation) SetTriggerType(s string) {
+	m.trigger_type = &s
+}
+
+// TriggerType returns the value of the "trigger_type" field in the mutation.
+func (m *AffiliateRuleMutation) TriggerType() (r string, exists bool) {
+	v := m.trigger_type
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTriggerType returns the old "trigger_type" field's value of the AffiliateRule entity.
+// If the AffiliateRule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AffiliateRuleMutation) OldTriggerType(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTriggerType is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTriggerType requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTriggerType: %w", err)
+	}
+	return oldValue.TriggerType, nil
+}
+
+// ResetTriggerType resets all changes to the "trigger_type" field.
+func (m *AffiliateRuleMutation) ResetTriggerType() {
+	m.trigger_type = nil
+}
+
+// SetRate sets the "rate" field.
+func (m *AffiliateRuleMutation) SetRate(s string) {
+	m.rate = &s
+}
+
+// Rate returns the value of the "rate" field in the mutation.
+func (m *AffiliateRuleMutation) Rate() (r string, exists bool) {
+	v := m.rate
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRate returns the old "rate" field's value of the AffiliateRule entity.
+// If the AffiliateRule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AffiliateRuleMutation) OldRate(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRate is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRate requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRate: %w", err)
+	}
+	return oldValue.Rate, nil
+}
+
+// ResetRate resets all changes to the "rate" field.
+func (m *AffiliateRuleMutation) ResetRate() {
+	m.rate = nil
+}
+
+// SetFixedAmount sets the "fixed_amount" field.
+func (m *AffiliateRuleMutation) SetFixedAmount(s string) {
+	m.fixed_amount = &s
+}
+
+// FixedAmount returns the value of the "fixed_amount" field in the mutation.
+func (m *AffiliateRuleMutation) FixedAmount() (r string, exists bool) {
+	v := m.fixed_amount
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFixedAmount returns the old "fixed_amount" field's value of the AffiliateRule entity.
+// If the AffiliateRule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AffiliateRuleMutation) OldFixedAmount(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFixedAmount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFixedAmount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFixedAmount: %w", err)
+	}
+	return oldValue.FixedAmount, nil
+}
+
+// ResetFixedAmount resets all changes to the "fixed_amount" field.
+func (m *AffiliateRuleMutation) ResetFixedAmount() {
+	m.fixed_amount = nil
+}
+
+// SetCurrency sets the "currency" field.
+func (m *AffiliateRuleMutation) SetCurrency(s string) {
+	m.currency = &s
+}
+
+// Currency returns the value of the "currency" field in the mutation.
+func (m *AffiliateRuleMutation) Currency() (r string, exists bool) {
+	v := m.currency
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCurrency returns the old "currency" field's value of the AffiliateRule entity.
+// If the AffiliateRule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AffiliateRuleMutation) OldCurrency(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCurrency is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCurrency requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCurrency: %w", err)
+	}
+	return oldValue.Currency, nil
+}
+
+// ResetCurrency resets all changes to the "currency" field.
+func (m *AffiliateRuleMutation) ResetCurrency() {
+	m.currency = nil
+}
+
+// SetMaxRebateAmount sets the "max_rebate_amount" field.
+func (m *AffiliateRuleMutation) SetMaxRebateAmount(s string) {
+	m.max_rebate_amount = &s
+}
+
+// MaxRebateAmount returns the value of the "max_rebate_amount" field in the mutation.
+func (m *AffiliateRuleMutation) MaxRebateAmount() (r string, exists bool) {
+	v := m.max_rebate_amount
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMaxRebateAmount returns the old "max_rebate_amount" field's value of the AffiliateRule entity.
+// If the AffiliateRule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AffiliateRuleMutation) OldMaxRebateAmount(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMaxRebateAmount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMaxRebateAmount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMaxRebateAmount: %w", err)
+	}
+	return oldValue.MaxRebateAmount, nil
+}
+
+// ResetMaxRebateAmount resets all changes to the "max_rebate_amount" field.
+func (m *AffiliateRuleMutation) ResetMaxRebateAmount() {
+	m.max_rebate_amount = nil
+}
+
+// SetValidFrom sets the "valid_from" field.
+func (m *AffiliateRuleMutation) SetValidFrom(t time.Time) {
+	m.valid_from = &t
+}
+
+// ValidFrom returns the value of the "valid_from" field in the mutation.
+func (m *AffiliateRuleMutation) ValidFrom() (r time.Time, exists bool) {
+	v := m.valid_from
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldValidFrom returns the old "valid_from" field's value of the AffiliateRule entity.
+// If the AffiliateRule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AffiliateRuleMutation) OldValidFrom(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldValidFrom is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldValidFrom requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldValidFrom: %w", err)
+	}
+	return oldValue.ValidFrom, nil
+}
+
+// ClearValidFrom clears the value of the "valid_from" field.
+func (m *AffiliateRuleMutation) ClearValidFrom() {
+	m.valid_from = nil
+	m.clearedFields[affiliaterule.FieldValidFrom] = struct{}{}
+}
+
+// ValidFromCleared returns if the "valid_from" field was cleared in this mutation.
+func (m *AffiliateRuleMutation) ValidFromCleared() bool {
+	_, ok := m.clearedFields[affiliaterule.FieldValidFrom]
+	return ok
+}
+
+// ResetValidFrom resets all changes to the "valid_from" field.
+func (m *AffiliateRuleMutation) ResetValidFrom() {
+	m.valid_from = nil
+	delete(m.clearedFields, affiliaterule.FieldValidFrom)
+}
+
+// SetValidTo sets the "valid_to" field.
+func (m *AffiliateRuleMutation) SetValidTo(t time.Time) {
+	m.valid_to = &t
+}
+
+// ValidTo returns the value of the "valid_to" field in the mutation.
+func (m *AffiliateRuleMutation) ValidTo() (r time.Time, exists bool) {
+	v := m.valid_to
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldValidTo returns the old "valid_to" field's value of the AffiliateRule entity.
+// If the AffiliateRule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AffiliateRuleMutation) OldValidTo(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldValidTo is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldValidTo requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldValidTo: %w", err)
+	}
+	return oldValue.ValidTo, nil
+}
+
+// ClearValidTo clears the value of the "valid_to" field.
+func (m *AffiliateRuleMutation) ClearValidTo() {
+	m.valid_to = nil
+	m.clearedFields[affiliaterule.FieldValidTo] = struct{}{}
+}
+
+// ValidToCleared returns if the "valid_to" field was cleared in this mutation.
+func (m *AffiliateRuleMutation) ValidToCleared() bool {
+	_, ok := m.clearedFields[affiliaterule.FieldValidTo]
+	return ok
+}
+
+// ResetValidTo resets all changes to the "valid_to" field.
+func (m *AffiliateRuleMutation) ResetValidTo() {
+	m.valid_to = nil
+	delete(m.clearedFields, affiliaterule.FieldValidTo)
+}
+
+// SetMetadataJSON sets the "metadata_json" field.
+func (m *AffiliateRuleMutation) SetMetadataJSON(value map[string]interface{}) {
+	m.metadata_json = &value
+}
+
+// MetadataJSON returns the value of the "metadata_json" field in the mutation.
+func (m *AffiliateRuleMutation) MetadataJSON() (r map[string]interface{}, exists bool) {
+	v := m.metadata_json
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMetadataJSON returns the old "metadata_json" field's value of the AffiliateRule entity.
+// If the AffiliateRule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AffiliateRuleMutation) OldMetadataJSON(ctx context.Context) (v map[string]interface{}, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMetadataJSON is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMetadataJSON requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMetadataJSON: %w", err)
+	}
+	return oldValue.MetadataJSON, nil
+}
+
+// ClearMetadataJSON clears the value of the "metadata_json" field.
+func (m *AffiliateRuleMutation) ClearMetadataJSON() {
+	m.metadata_json = nil
+	m.clearedFields[affiliaterule.FieldMetadataJSON] = struct{}{}
+}
+
+// MetadataJSONCleared returns if the "metadata_json" field was cleared in this mutation.
+func (m *AffiliateRuleMutation) MetadataJSONCleared() bool {
+	_, ok := m.clearedFields[affiliaterule.FieldMetadataJSON]
+	return ok
+}
+
+// ResetMetadataJSON resets all changes to the "metadata_json" field.
+func (m *AffiliateRuleMutation) ResetMetadataJSON() {
+	m.metadata_json = nil
+	delete(m.clearedFields, affiliaterule.FieldMetadataJSON)
+}
+
+// Where appends a list predicates to the AffiliateRuleMutation builder.
+func (m *AffiliateRuleMutation) Where(ps ...predicate.AffiliateRule) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the AffiliateRuleMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *AffiliateRuleMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.AffiliateRule, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *AffiliateRuleMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *AffiliateRuleMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (AffiliateRule).
+func (m *AffiliateRuleMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *AffiliateRuleMutation) Fields() []string {
+	fields := make([]string, 0, 12)
+	if m.created_at != nil {
+		fields = append(fields, affiliaterule.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, affiliaterule.FieldUpdatedAt)
+	}
+	if m.name != nil {
+		fields = append(fields, affiliaterule.FieldName)
+	}
+	if m.status != nil {
+		fields = append(fields, affiliaterule.FieldStatus)
+	}
+	if m.trigger_type != nil {
+		fields = append(fields, affiliaterule.FieldTriggerType)
+	}
+	if m.rate != nil {
+		fields = append(fields, affiliaterule.FieldRate)
+	}
+	if m.fixed_amount != nil {
+		fields = append(fields, affiliaterule.FieldFixedAmount)
+	}
+	if m.currency != nil {
+		fields = append(fields, affiliaterule.FieldCurrency)
+	}
+	if m.max_rebate_amount != nil {
+		fields = append(fields, affiliaterule.FieldMaxRebateAmount)
+	}
+	if m.valid_from != nil {
+		fields = append(fields, affiliaterule.FieldValidFrom)
+	}
+	if m.valid_to != nil {
+		fields = append(fields, affiliaterule.FieldValidTo)
+	}
+	if m.metadata_json != nil {
+		fields = append(fields, affiliaterule.FieldMetadataJSON)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *AffiliateRuleMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case affiliaterule.FieldCreatedAt:
+		return m.CreatedAt()
+	case affiliaterule.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case affiliaterule.FieldName:
+		return m.Name()
+	case affiliaterule.FieldStatus:
+		return m.Status()
+	case affiliaterule.FieldTriggerType:
+		return m.TriggerType()
+	case affiliaterule.FieldRate:
+		return m.Rate()
+	case affiliaterule.FieldFixedAmount:
+		return m.FixedAmount()
+	case affiliaterule.FieldCurrency:
+		return m.Currency()
+	case affiliaterule.FieldMaxRebateAmount:
+		return m.MaxRebateAmount()
+	case affiliaterule.FieldValidFrom:
+		return m.ValidFrom()
+	case affiliaterule.FieldValidTo:
+		return m.ValidTo()
+	case affiliaterule.FieldMetadataJSON:
+		return m.MetadataJSON()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *AffiliateRuleMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case affiliaterule.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case affiliaterule.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case affiliaterule.FieldName:
+		return m.OldName(ctx)
+	case affiliaterule.FieldStatus:
+		return m.OldStatus(ctx)
+	case affiliaterule.FieldTriggerType:
+		return m.OldTriggerType(ctx)
+	case affiliaterule.FieldRate:
+		return m.OldRate(ctx)
+	case affiliaterule.FieldFixedAmount:
+		return m.OldFixedAmount(ctx)
+	case affiliaterule.FieldCurrency:
+		return m.OldCurrency(ctx)
+	case affiliaterule.FieldMaxRebateAmount:
+		return m.OldMaxRebateAmount(ctx)
+	case affiliaterule.FieldValidFrom:
+		return m.OldValidFrom(ctx)
+	case affiliaterule.FieldValidTo:
+		return m.OldValidTo(ctx)
+	case affiliaterule.FieldMetadataJSON:
+		return m.OldMetadataJSON(ctx)
+	}
+	return nil, fmt.Errorf("unknown AffiliateRule field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *AffiliateRuleMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case affiliaterule.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case affiliaterule.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case affiliaterule.FieldName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetName(v)
+		return nil
+	case affiliaterule.FieldStatus:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case affiliaterule.FieldTriggerType:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTriggerType(v)
+		return nil
+	case affiliaterule.FieldRate:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRate(v)
+		return nil
+	case affiliaterule.FieldFixedAmount:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFixedAmount(v)
+		return nil
+	case affiliaterule.FieldCurrency:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCurrency(v)
+		return nil
+	case affiliaterule.FieldMaxRebateAmount:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMaxRebateAmount(v)
+		return nil
+	case affiliaterule.FieldValidFrom:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetValidFrom(v)
+		return nil
+	case affiliaterule.FieldValidTo:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetValidTo(v)
+		return nil
+	case affiliaterule.FieldMetadataJSON:
+		v, ok := value.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMetadataJSON(v)
+		return nil
+	}
+	return fmt.Errorf("unknown AffiliateRule field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *AffiliateRuleMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *AffiliateRuleMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *AffiliateRuleMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown AffiliateRule numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *AffiliateRuleMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(affiliaterule.FieldValidFrom) {
+		fields = append(fields, affiliaterule.FieldValidFrom)
+	}
+	if m.FieldCleared(affiliaterule.FieldValidTo) {
+		fields = append(fields, affiliaterule.FieldValidTo)
+	}
+	if m.FieldCleared(affiliaterule.FieldMetadataJSON) {
+		fields = append(fields, affiliaterule.FieldMetadataJSON)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *AffiliateRuleMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *AffiliateRuleMutation) ClearField(name string) error {
+	switch name {
+	case affiliaterule.FieldValidFrom:
+		m.ClearValidFrom()
+		return nil
+	case affiliaterule.FieldValidTo:
+		m.ClearValidTo()
+		return nil
+	case affiliaterule.FieldMetadataJSON:
+		m.ClearMetadataJSON()
+		return nil
+	}
+	return fmt.Errorf("unknown AffiliateRule nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *AffiliateRuleMutation) ResetField(name string) error {
+	switch name {
+	case affiliaterule.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case affiliaterule.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case affiliaterule.FieldName:
+		m.ResetName()
+		return nil
+	case affiliaterule.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case affiliaterule.FieldTriggerType:
+		m.ResetTriggerType()
+		return nil
+	case affiliaterule.FieldRate:
+		m.ResetRate()
+		return nil
+	case affiliaterule.FieldFixedAmount:
+		m.ResetFixedAmount()
+		return nil
+	case affiliaterule.FieldCurrency:
+		m.ResetCurrency()
+		return nil
+	case affiliaterule.FieldMaxRebateAmount:
+		m.ResetMaxRebateAmount()
+		return nil
+	case affiliaterule.FieldValidFrom:
+		m.ResetValidFrom()
+		return nil
+	case affiliaterule.FieldValidTo:
+		m.ResetValidTo()
+		return nil
+	case affiliaterule.FieldMetadataJSON:
+		m.ResetMetadataJSON()
+		return nil
+	}
+	return fmt.Errorf("unknown AffiliateRule field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *AffiliateRuleMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *AffiliateRuleMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *AffiliateRuleMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *AffiliateRuleMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *AffiliateRuleMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *AffiliateRuleMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *AffiliateRuleMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown AffiliateRule unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *AffiliateRuleMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown AffiliateRule edge %s", name)
 }
 
 // AuditLogMutation represents an operation that mutates the AuditLog nodes in the graph.
@@ -11089,6 +13267,1434 @@ func (m *IdempotencyRecordMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *IdempotencyRecordMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown IdempotencyRecord edge %s", name)
+}
+
+// InviteCodeMutation represents an operation that mutates the InviteCode nodes in the graph.
+type InviteCodeMutation struct {
+	config
+	op            Op
+	typ           string
+	id            *int
+	created_at    *time.Time
+	updated_at    *time.Time
+	user_id       *int
+	adduser_id    *int
+	code          *string
+	status        *string
+	expires_at    *time.Time
+	clearedFields map[string]struct{}
+	done          bool
+	oldValue      func(context.Context) (*InviteCode, error)
+	predicates    []predicate.InviteCode
+}
+
+var _ ent.Mutation = (*InviteCodeMutation)(nil)
+
+// invitecodeOption allows management of the mutation configuration using functional options.
+type invitecodeOption func(*InviteCodeMutation)
+
+// newInviteCodeMutation creates new mutation for the InviteCode entity.
+func newInviteCodeMutation(c config, op Op, opts ...invitecodeOption) *InviteCodeMutation {
+	m := &InviteCodeMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeInviteCode,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withInviteCodeID sets the ID field of the mutation.
+func withInviteCodeID(id int) invitecodeOption {
+	return func(m *InviteCodeMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *InviteCode
+		)
+		m.oldValue = func(ctx context.Context) (*InviteCode, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().InviteCode.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withInviteCode sets the old InviteCode of the mutation.
+func withInviteCode(node *InviteCode) invitecodeOption {
+	return func(m *InviteCodeMutation) {
+		m.oldValue = func(context.Context) (*InviteCode, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m InviteCodeMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m InviteCodeMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *InviteCodeMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *InviteCodeMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().InviteCode.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *InviteCodeMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *InviteCodeMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the InviteCode entity.
+// If the InviteCode object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InviteCodeMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *InviteCodeMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *InviteCodeMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *InviteCodeMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the InviteCode entity.
+// If the InviteCode object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InviteCodeMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *InviteCodeMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetUserID sets the "user_id" field.
+func (m *InviteCodeMutation) SetUserID(i int) {
+	m.user_id = &i
+	m.adduser_id = nil
+}
+
+// UserID returns the value of the "user_id" field in the mutation.
+func (m *InviteCodeMutation) UserID() (r int, exists bool) {
+	v := m.user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUserID returns the old "user_id" field's value of the InviteCode entity.
+// If the InviteCode object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InviteCodeMutation) OldUserID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUserID: %w", err)
+	}
+	return oldValue.UserID, nil
+}
+
+// AddUserID adds i to the "user_id" field.
+func (m *InviteCodeMutation) AddUserID(i int) {
+	if m.adduser_id != nil {
+		*m.adduser_id += i
+	} else {
+		m.adduser_id = &i
+	}
+}
+
+// AddedUserID returns the value that was added to the "user_id" field in this mutation.
+func (m *InviteCodeMutation) AddedUserID() (r int, exists bool) {
+	v := m.adduser_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetUserID resets all changes to the "user_id" field.
+func (m *InviteCodeMutation) ResetUserID() {
+	m.user_id = nil
+	m.adduser_id = nil
+}
+
+// SetCode sets the "code" field.
+func (m *InviteCodeMutation) SetCode(s string) {
+	m.code = &s
+}
+
+// Code returns the value of the "code" field in the mutation.
+func (m *InviteCodeMutation) Code() (r string, exists bool) {
+	v := m.code
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCode returns the old "code" field's value of the InviteCode entity.
+// If the InviteCode object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InviteCodeMutation) OldCode(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCode is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCode requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCode: %w", err)
+	}
+	return oldValue.Code, nil
+}
+
+// ResetCode resets all changes to the "code" field.
+func (m *InviteCodeMutation) ResetCode() {
+	m.code = nil
+}
+
+// SetStatus sets the "status" field.
+func (m *InviteCodeMutation) SetStatus(s string) {
+	m.status = &s
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *InviteCodeMutation) Status() (r string, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the InviteCode entity.
+// If the InviteCode object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InviteCodeMutation) OldStatus(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *InviteCodeMutation) ResetStatus() {
+	m.status = nil
+}
+
+// SetExpiresAt sets the "expires_at" field.
+func (m *InviteCodeMutation) SetExpiresAt(t time.Time) {
+	m.expires_at = &t
+}
+
+// ExpiresAt returns the value of the "expires_at" field in the mutation.
+func (m *InviteCodeMutation) ExpiresAt() (r time.Time, exists bool) {
+	v := m.expires_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExpiresAt returns the old "expires_at" field's value of the InviteCode entity.
+// If the InviteCode object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InviteCodeMutation) OldExpiresAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExpiresAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExpiresAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExpiresAt: %w", err)
+	}
+	return oldValue.ExpiresAt, nil
+}
+
+// ClearExpiresAt clears the value of the "expires_at" field.
+func (m *InviteCodeMutation) ClearExpiresAt() {
+	m.expires_at = nil
+	m.clearedFields[invitecode.FieldExpiresAt] = struct{}{}
+}
+
+// ExpiresAtCleared returns if the "expires_at" field was cleared in this mutation.
+func (m *InviteCodeMutation) ExpiresAtCleared() bool {
+	_, ok := m.clearedFields[invitecode.FieldExpiresAt]
+	return ok
+}
+
+// ResetExpiresAt resets all changes to the "expires_at" field.
+func (m *InviteCodeMutation) ResetExpiresAt() {
+	m.expires_at = nil
+	delete(m.clearedFields, invitecode.FieldExpiresAt)
+}
+
+// Where appends a list predicates to the InviteCodeMutation builder.
+func (m *InviteCodeMutation) Where(ps ...predicate.InviteCode) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the InviteCodeMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *InviteCodeMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.InviteCode, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *InviteCodeMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *InviteCodeMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (InviteCode).
+func (m *InviteCodeMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *InviteCodeMutation) Fields() []string {
+	fields := make([]string, 0, 6)
+	if m.created_at != nil {
+		fields = append(fields, invitecode.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, invitecode.FieldUpdatedAt)
+	}
+	if m.user_id != nil {
+		fields = append(fields, invitecode.FieldUserID)
+	}
+	if m.code != nil {
+		fields = append(fields, invitecode.FieldCode)
+	}
+	if m.status != nil {
+		fields = append(fields, invitecode.FieldStatus)
+	}
+	if m.expires_at != nil {
+		fields = append(fields, invitecode.FieldExpiresAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *InviteCodeMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case invitecode.FieldCreatedAt:
+		return m.CreatedAt()
+	case invitecode.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case invitecode.FieldUserID:
+		return m.UserID()
+	case invitecode.FieldCode:
+		return m.Code()
+	case invitecode.FieldStatus:
+		return m.Status()
+	case invitecode.FieldExpiresAt:
+		return m.ExpiresAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *InviteCodeMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case invitecode.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case invitecode.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case invitecode.FieldUserID:
+		return m.OldUserID(ctx)
+	case invitecode.FieldCode:
+		return m.OldCode(ctx)
+	case invitecode.FieldStatus:
+		return m.OldStatus(ctx)
+	case invitecode.FieldExpiresAt:
+		return m.OldExpiresAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown InviteCode field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *InviteCodeMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case invitecode.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case invitecode.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case invitecode.FieldUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUserID(v)
+		return nil
+	case invitecode.FieldCode:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCode(v)
+		return nil
+	case invitecode.FieldStatus:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case invitecode.FieldExpiresAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExpiresAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown InviteCode field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *InviteCodeMutation) AddedFields() []string {
+	var fields []string
+	if m.adduser_id != nil {
+		fields = append(fields, invitecode.FieldUserID)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *InviteCodeMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case invitecode.FieldUserID:
+		return m.AddedUserID()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *InviteCodeMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case invitecode.FieldUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddUserID(v)
+		return nil
+	}
+	return fmt.Errorf("unknown InviteCode numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *InviteCodeMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(invitecode.FieldExpiresAt) {
+		fields = append(fields, invitecode.FieldExpiresAt)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *InviteCodeMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *InviteCodeMutation) ClearField(name string) error {
+	switch name {
+	case invitecode.FieldExpiresAt:
+		m.ClearExpiresAt()
+		return nil
+	}
+	return fmt.Errorf("unknown InviteCode nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *InviteCodeMutation) ResetField(name string) error {
+	switch name {
+	case invitecode.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case invitecode.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case invitecode.FieldUserID:
+		m.ResetUserID()
+		return nil
+	case invitecode.FieldCode:
+		m.ResetCode()
+		return nil
+	case invitecode.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case invitecode.FieldExpiresAt:
+		m.ResetExpiresAt()
+		return nil
+	}
+	return fmt.Errorf("unknown InviteCode field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *InviteCodeMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *InviteCodeMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *InviteCodeMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *InviteCodeMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *InviteCodeMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *InviteCodeMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *InviteCodeMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown InviteCode unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *InviteCodeMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown InviteCode edge %s", name)
+}
+
+// InviteRelationshipMutation represents an operation that mutates the InviteRelationship nodes in the graph.
+type InviteRelationshipMutation struct {
+	config
+	op                 Op
+	typ                string
+	id                 *int
+	created_at         *time.Time
+	updated_at         *time.Time
+	inviter_user_id    *int
+	addinviter_user_id *int
+	invitee_user_id    *int
+	addinvitee_user_id *int
+	invite_code_id     *int
+	addinvite_code_id  *int
+	status             *string
+	first_paid_at      *time.Time
+	clearedFields      map[string]struct{}
+	done               bool
+	oldValue           func(context.Context) (*InviteRelationship, error)
+	predicates         []predicate.InviteRelationship
+}
+
+var _ ent.Mutation = (*InviteRelationshipMutation)(nil)
+
+// inviterelationshipOption allows management of the mutation configuration using functional options.
+type inviterelationshipOption func(*InviteRelationshipMutation)
+
+// newInviteRelationshipMutation creates new mutation for the InviteRelationship entity.
+func newInviteRelationshipMutation(c config, op Op, opts ...inviterelationshipOption) *InviteRelationshipMutation {
+	m := &InviteRelationshipMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeInviteRelationship,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withInviteRelationshipID sets the ID field of the mutation.
+func withInviteRelationshipID(id int) inviterelationshipOption {
+	return func(m *InviteRelationshipMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *InviteRelationship
+		)
+		m.oldValue = func(ctx context.Context) (*InviteRelationship, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().InviteRelationship.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withInviteRelationship sets the old InviteRelationship of the mutation.
+func withInviteRelationship(node *InviteRelationship) inviterelationshipOption {
+	return func(m *InviteRelationshipMutation) {
+		m.oldValue = func(context.Context) (*InviteRelationship, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m InviteRelationshipMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m InviteRelationshipMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *InviteRelationshipMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *InviteRelationshipMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().InviteRelationship.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *InviteRelationshipMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *InviteRelationshipMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the InviteRelationship entity.
+// If the InviteRelationship object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InviteRelationshipMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *InviteRelationshipMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *InviteRelationshipMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *InviteRelationshipMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the InviteRelationship entity.
+// If the InviteRelationship object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InviteRelationshipMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *InviteRelationshipMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetInviterUserID sets the "inviter_user_id" field.
+func (m *InviteRelationshipMutation) SetInviterUserID(i int) {
+	m.inviter_user_id = &i
+	m.addinviter_user_id = nil
+}
+
+// InviterUserID returns the value of the "inviter_user_id" field in the mutation.
+func (m *InviteRelationshipMutation) InviterUserID() (r int, exists bool) {
+	v := m.inviter_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldInviterUserID returns the old "inviter_user_id" field's value of the InviteRelationship entity.
+// If the InviteRelationship object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InviteRelationshipMutation) OldInviterUserID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldInviterUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldInviterUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldInviterUserID: %w", err)
+	}
+	return oldValue.InviterUserID, nil
+}
+
+// AddInviterUserID adds i to the "inviter_user_id" field.
+func (m *InviteRelationshipMutation) AddInviterUserID(i int) {
+	if m.addinviter_user_id != nil {
+		*m.addinviter_user_id += i
+	} else {
+		m.addinviter_user_id = &i
+	}
+}
+
+// AddedInviterUserID returns the value that was added to the "inviter_user_id" field in this mutation.
+func (m *InviteRelationshipMutation) AddedInviterUserID() (r int, exists bool) {
+	v := m.addinviter_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetInviterUserID resets all changes to the "inviter_user_id" field.
+func (m *InviteRelationshipMutation) ResetInviterUserID() {
+	m.inviter_user_id = nil
+	m.addinviter_user_id = nil
+}
+
+// SetInviteeUserID sets the "invitee_user_id" field.
+func (m *InviteRelationshipMutation) SetInviteeUserID(i int) {
+	m.invitee_user_id = &i
+	m.addinvitee_user_id = nil
+}
+
+// InviteeUserID returns the value of the "invitee_user_id" field in the mutation.
+func (m *InviteRelationshipMutation) InviteeUserID() (r int, exists bool) {
+	v := m.invitee_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldInviteeUserID returns the old "invitee_user_id" field's value of the InviteRelationship entity.
+// If the InviteRelationship object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InviteRelationshipMutation) OldInviteeUserID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldInviteeUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldInviteeUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldInviteeUserID: %w", err)
+	}
+	return oldValue.InviteeUserID, nil
+}
+
+// AddInviteeUserID adds i to the "invitee_user_id" field.
+func (m *InviteRelationshipMutation) AddInviteeUserID(i int) {
+	if m.addinvitee_user_id != nil {
+		*m.addinvitee_user_id += i
+	} else {
+		m.addinvitee_user_id = &i
+	}
+}
+
+// AddedInviteeUserID returns the value that was added to the "invitee_user_id" field in this mutation.
+func (m *InviteRelationshipMutation) AddedInviteeUserID() (r int, exists bool) {
+	v := m.addinvitee_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetInviteeUserID resets all changes to the "invitee_user_id" field.
+func (m *InviteRelationshipMutation) ResetInviteeUserID() {
+	m.invitee_user_id = nil
+	m.addinvitee_user_id = nil
+}
+
+// SetInviteCodeID sets the "invite_code_id" field.
+func (m *InviteRelationshipMutation) SetInviteCodeID(i int) {
+	m.invite_code_id = &i
+	m.addinvite_code_id = nil
+}
+
+// InviteCodeID returns the value of the "invite_code_id" field in the mutation.
+func (m *InviteRelationshipMutation) InviteCodeID() (r int, exists bool) {
+	v := m.invite_code_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldInviteCodeID returns the old "invite_code_id" field's value of the InviteRelationship entity.
+// If the InviteRelationship object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InviteRelationshipMutation) OldInviteCodeID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldInviteCodeID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldInviteCodeID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldInviteCodeID: %w", err)
+	}
+	return oldValue.InviteCodeID, nil
+}
+
+// AddInviteCodeID adds i to the "invite_code_id" field.
+func (m *InviteRelationshipMutation) AddInviteCodeID(i int) {
+	if m.addinvite_code_id != nil {
+		*m.addinvite_code_id += i
+	} else {
+		m.addinvite_code_id = &i
+	}
+}
+
+// AddedInviteCodeID returns the value that was added to the "invite_code_id" field in this mutation.
+func (m *InviteRelationshipMutation) AddedInviteCodeID() (r int, exists bool) {
+	v := m.addinvite_code_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetInviteCodeID resets all changes to the "invite_code_id" field.
+func (m *InviteRelationshipMutation) ResetInviteCodeID() {
+	m.invite_code_id = nil
+	m.addinvite_code_id = nil
+}
+
+// SetStatus sets the "status" field.
+func (m *InviteRelationshipMutation) SetStatus(s string) {
+	m.status = &s
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *InviteRelationshipMutation) Status() (r string, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the InviteRelationship entity.
+// If the InviteRelationship object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InviteRelationshipMutation) OldStatus(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *InviteRelationshipMutation) ResetStatus() {
+	m.status = nil
+}
+
+// SetFirstPaidAt sets the "first_paid_at" field.
+func (m *InviteRelationshipMutation) SetFirstPaidAt(t time.Time) {
+	m.first_paid_at = &t
+}
+
+// FirstPaidAt returns the value of the "first_paid_at" field in the mutation.
+func (m *InviteRelationshipMutation) FirstPaidAt() (r time.Time, exists bool) {
+	v := m.first_paid_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFirstPaidAt returns the old "first_paid_at" field's value of the InviteRelationship entity.
+// If the InviteRelationship object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InviteRelationshipMutation) OldFirstPaidAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFirstPaidAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFirstPaidAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFirstPaidAt: %w", err)
+	}
+	return oldValue.FirstPaidAt, nil
+}
+
+// ClearFirstPaidAt clears the value of the "first_paid_at" field.
+func (m *InviteRelationshipMutation) ClearFirstPaidAt() {
+	m.first_paid_at = nil
+	m.clearedFields[inviterelationship.FieldFirstPaidAt] = struct{}{}
+}
+
+// FirstPaidAtCleared returns if the "first_paid_at" field was cleared in this mutation.
+func (m *InviteRelationshipMutation) FirstPaidAtCleared() bool {
+	_, ok := m.clearedFields[inviterelationship.FieldFirstPaidAt]
+	return ok
+}
+
+// ResetFirstPaidAt resets all changes to the "first_paid_at" field.
+func (m *InviteRelationshipMutation) ResetFirstPaidAt() {
+	m.first_paid_at = nil
+	delete(m.clearedFields, inviterelationship.FieldFirstPaidAt)
+}
+
+// Where appends a list predicates to the InviteRelationshipMutation builder.
+func (m *InviteRelationshipMutation) Where(ps ...predicate.InviteRelationship) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the InviteRelationshipMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *InviteRelationshipMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.InviteRelationship, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *InviteRelationshipMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *InviteRelationshipMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (InviteRelationship).
+func (m *InviteRelationshipMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *InviteRelationshipMutation) Fields() []string {
+	fields := make([]string, 0, 7)
+	if m.created_at != nil {
+		fields = append(fields, inviterelationship.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, inviterelationship.FieldUpdatedAt)
+	}
+	if m.inviter_user_id != nil {
+		fields = append(fields, inviterelationship.FieldInviterUserID)
+	}
+	if m.invitee_user_id != nil {
+		fields = append(fields, inviterelationship.FieldInviteeUserID)
+	}
+	if m.invite_code_id != nil {
+		fields = append(fields, inviterelationship.FieldInviteCodeID)
+	}
+	if m.status != nil {
+		fields = append(fields, inviterelationship.FieldStatus)
+	}
+	if m.first_paid_at != nil {
+		fields = append(fields, inviterelationship.FieldFirstPaidAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *InviteRelationshipMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case inviterelationship.FieldCreatedAt:
+		return m.CreatedAt()
+	case inviterelationship.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case inviterelationship.FieldInviterUserID:
+		return m.InviterUserID()
+	case inviterelationship.FieldInviteeUserID:
+		return m.InviteeUserID()
+	case inviterelationship.FieldInviteCodeID:
+		return m.InviteCodeID()
+	case inviterelationship.FieldStatus:
+		return m.Status()
+	case inviterelationship.FieldFirstPaidAt:
+		return m.FirstPaidAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *InviteRelationshipMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case inviterelationship.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case inviterelationship.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case inviterelationship.FieldInviterUserID:
+		return m.OldInviterUserID(ctx)
+	case inviterelationship.FieldInviteeUserID:
+		return m.OldInviteeUserID(ctx)
+	case inviterelationship.FieldInviteCodeID:
+		return m.OldInviteCodeID(ctx)
+	case inviterelationship.FieldStatus:
+		return m.OldStatus(ctx)
+	case inviterelationship.FieldFirstPaidAt:
+		return m.OldFirstPaidAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown InviteRelationship field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *InviteRelationshipMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case inviterelationship.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case inviterelationship.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case inviterelationship.FieldInviterUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetInviterUserID(v)
+		return nil
+	case inviterelationship.FieldInviteeUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetInviteeUserID(v)
+		return nil
+	case inviterelationship.FieldInviteCodeID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetInviteCodeID(v)
+		return nil
+	case inviterelationship.FieldStatus:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case inviterelationship.FieldFirstPaidAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFirstPaidAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown InviteRelationship field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *InviteRelationshipMutation) AddedFields() []string {
+	var fields []string
+	if m.addinviter_user_id != nil {
+		fields = append(fields, inviterelationship.FieldInviterUserID)
+	}
+	if m.addinvitee_user_id != nil {
+		fields = append(fields, inviterelationship.FieldInviteeUserID)
+	}
+	if m.addinvite_code_id != nil {
+		fields = append(fields, inviterelationship.FieldInviteCodeID)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *InviteRelationshipMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case inviterelationship.FieldInviterUserID:
+		return m.AddedInviterUserID()
+	case inviterelationship.FieldInviteeUserID:
+		return m.AddedInviteeUserID()
+	case inviterelationship.FieldInviteCodeID:
+		return m.AddedInviteCodeID()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *InviteRelationshipMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case inviterelationship.FieldInviterUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddInviterUserID(v)
+		return nil
+	case inviterelationship.FieldInviteeUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddInviteeUserID(v)
+		return nil
+	case inviterelationship.FieldInviteCodeID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddInviteCodeID(v)
+		return nil
+	}
+	return fmt.Errorf("unknown InviteRelationship numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *InviteRelationshipMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(inviterelationship.FieldFirstPaidAt) {
+		fields = append(fields, inviterelationship.FieldFirstPaidAt)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *InviteRelationshipMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *InviteRelationshipMutation) ClearField(name string) error {
+	switch name {
+	case inviterelationship.FieldFirstPaidAt:
+		m.ClearFirstPaidAt()
+		return nil
+	}
+	return fmt.Errorf("unknown InviteRelationship nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *InviteRelationshipMutation) ResetField(name string) error {
+	switch name {
+	case inviterelationship.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case inviterelationship.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case inviterelationship.FieldInviterUserID:
+		m.ResetInviterUserID()
+		return nil
+	case inviterelationship.FieldInviteeUserID:
+		m.ResetInviteeUserID()
+		return nil
+	case inviterelationship.FieldInviteCodeID:
+		m.ResetInviteCodeID()
+		return nil
+	case inviterelationship.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case inviterelationship.FieldFirstPaidAt:
+		m.ResetFirstPaidAt()
+		return nil
+	}
+	return fmt.Errorf("unknown InviteRelationship field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *InviteRelationshipMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *InviteRelationshipMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *InviteRelationshipMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *InviteRelationshipMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *InviteRelationshipMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *InviteRelationshipMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *InviteRelationshipMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown InviteRelationship unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *InviteRelationshipMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown InviteRelationship edge %s", name)
 }
 
 // ModelAliasMutation represents an operation that mutates the ModelAlias nodes in the graph.

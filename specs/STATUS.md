@@ -26,22 +26,19 @@ last_completed:
 - WP-170: Account operations parity now covers account groups, safe inspect/export/import, proxy binding, recovery, persisted health/quota snapshots, CSRF coverage, and generated SDK/OpenAPI parity.
 - WP-180: Subscription and pricing foundations now include subscription plans, user subscriptions, decimal-safe pricing rules, Gateway entitlement/pricing admission, billing metadata linkage, admin/current-user control-plane APIs, and generated SDK/OpenAPI parity.
 - WP-190: Payment order foundations now include encrypted provider instances, current-user order APIs, signed/idempotent webhooks, refund hooks, fulfillment into billing/subscription state, audit/outbox evidence, Ent/Postgres persistence, and generated SDK/OpenAPI parity.
+- WP-200: Affiliate rebate Phase 2 now includes invite codes, invite relationships, affiliate rules, idempotent payment-paid accrual, refund compensation ledgers, transfer-to-balance accounting, audit/outbox evidence, Ent/Postgres persistence, and migration/data-model parity.
 
 current:
 
-- package: WP-200
+- package: WP-210
 - status: pending
-- objective: implement invitation and rebate ledger after payment correctness exists.
+- objective: production operations.
 
-next_recommended: WP-200
+next_recommended: WP-210
 
 last_gates:
 
-- `make openapi-lint`: pass
-- `make openapi-bundle`: pass
-- `make openapi-codegen-check`: pass
-- `make openapi-ts-codegen-check`: pass
-- `make sdk-ts-typecheck`: pass
+- `cd apps/api && go test ./internal/modules/payments/... ./internal/modules/affiliate/... ./internal/persistence/entstore/affiliate ./internal/workers/outbox`: pass
 - `make ent-generate-check`: pass
 - `make migration-check`: pass
 - `cd apps/api && go test ./...`: pass
@@ -69,6 +66,8 @@ notes:
 - WP-170 added account group operations, account inspect/export/import, proxy bind, recover, persisted test/gateway health and quota snapshots, recursive export metadata sanitization, expanded CSRF regression coverage, and generated SDK methods for account operations.
 - WP-180 added `GET /api/v1/me/subscriptions`, admin subscription plan/user subscription/pricing rule APIs, entitlement rejection before Scheduler lease consumption, decimal-normalized pricing rule responses, pricing metadata on billing ledger entries, generated SDK methods, Ent/migration parity, and CSRF coverage for new console writes.
 - WP-190 added current-user and admin payment APIs, encrypted payment provider config, legal order state transitions, signed/idempotent webhook handling, fulfillment-side billing/subscription/audit/outbox effects, refund hooks, Ent/Postgres persistence, migration drift coverage, and generated SDK/OpenAPI parity.
+- WP-200 added the affiliate module, Ent schemas and PostgreSQL tables for invite/affiliate ledgers, payment outbox dispatch into affiliate accrual/compensation, refund compensation capping, and transfer-to-balance tests proving affiliate ledger, billing ledger, user balance, and audit evidence stay aligned.
+- WP-200 did not add frontend visuals per explicit user instruction. OpenAPI user/admin affiliate routes remain a later control-plane surface because this package closed the backend accounting and event path first.
 
 ## Work Package Ledger
 
@@ -94,6 +93,6 @@ notes:
 | WP-170 | completed | Account groups, account test/recovery, proxy binding, safe import/export, and persisted health/quota snapshots are covered. |
 | WP-180 | completed | Subscription plans, user subscriptions, entitlement admission, decimal pricing rules, billing metadata linkage, admin/current-user APIs, and generated SDK/OpenAPI parity are covered. |
 | WP-190 | completed | Encrypted payment providers, payment orders, signed/idempotent webhooks, fulfillment, refunds, persistence, and generated API/SDK parity are covered. |
-| WP-200 | pending | Affiliate rebate Phase 2. |
+| WP-200 | completed | Invite/rebate persistence, idempotent payment accrual, refund compensation, transfer-to-balance accounting, audit/outbox evidence, and migration/data-model parity are covered. |
 | WP-210 | pending | Production operations. |
 | WP-220+ | pending | Advanced endpoint and provider expansion. |

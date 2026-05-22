@@ -9,6 +9,8 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/accountgroupmember"
 	"github.com/srapi/srapi/apps/api/ent/accounthealthsnapshot"
 	"github.com/srapi/srapi/apps/api/ent/accountquotasnapshot"
+	"github.com/srapi/srapi/apps/api/ent/affiliateledger"
+	"github.com/srapi/srapi/apps/api/ent/affiliaterule"
 	"github.com/srapi/srapi/apps/api/ent/apikey"
 	"github.com/srapi/srapi/apps/api/ent/apikeygroup"
 	"github.com/srapi/srapi/apps/api/ent/auditlog"
@@ -17,6 +19,8 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/domaineventsinbox"
 	"github.com/srapi/srapi/apps/api/ent/domaineventsoutbox"
 	"github.com/srapi/srapi/apps/api/ent/idempotencyrecord"
+	"github.com/srapi/srapi/apps/api/ent/invitecode"
+	"github.com/srapi/srapi/apps/api/ent/inviterelationship"
 	"github.com/srapi/srapi/apps/api/ent/modelalias"
 	"github.com/srapi/srapi/apps/api/ent/modelprovidermapping"
 	"github.com/srapi/srapi/apps/api/ent/modelregistry"
@@ -187,6 +191,84 @@ func init() {
 	accountquotasnapshotDescRemainingRatio := accountquotasnapshotFields[6].Descriptor()
 	// accountquotasnapshot.DefaultRemainingRatio holds the default value on creation for the remaining_ratio field.
 	accountquotasnapshot.DefaultRemainingRatio = accountquotasnapshotDescRemainingRatio.Default.(float64)
+	affiliateledgerMixin := schema.AffiliateLedger{}.Mixin()
+	affiliateledgerMixinFields0 := affiliateledgerMixin[0].Fields()
+	_ = affiliateledgerMixinFields0
+	affiliateledgerFields := schema.AffiliateLedger{}.Fields()
+	_ = affiliateledgerFields
+	// affiliateledgerDescCreatedAt is the schema descriptor for created_at field.
+	affiliateledgerDescCreatedAt := affiliateledgerMixinFields0[0].Descriptor()
+	// affiliateledger.DefaultCreatedAt holds the default value on creation for the created_at field.
+	affiliateledger.DefaultCreatedAt = affiliateledgerDescCreatedAt.Default.(func() time.Time)
+	// affiliateledgerDescUpdatedAt is the schema descriptor for updated_at field.
+	affiliateledgerDescUpdatedAt := affiliateledgerMixinFields0[1].Descriptor()
+	// affiliateledger.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	affiliateledger.DefaultUpdatedAt = affiliateledgerDescUpdatedAt.Default.(func() time.Time)
+	// affiliateledger.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	affiliateledger.UpdateDefaultUpdatedAt = affiliateledgerDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// affiliateledgerDescType is the schema descriptor for type field.
+	affiliateledgerDescType := affiliateledgerFields[4].Descriptor()
+	// affiliateledger.TypeValidator is a validator for the "type" field. It is called by the builders before save.
+	affiliateledger.TypeValidator = affiliateledgerDescType.Validators[0].(func(string) error)
+	// affiliateledgerDescAmount is the schema descriptor for amount field.
+	affiliateledgerDescAmount := affiliateledgerFields[5].Descriptor()
+	// affiliateledger.DefaultAmount holds the default value on creation for the amount field.
+	affiliateledger.DefaultAmount = affiliateledgerDescAmount.Default.(string)
+	// affiliateledgerDescCurrency is the schema descriptor for currency field.
+	affiliateledgerDescCurrency := affiliateledgerFields[6].Descriptor()
+	// affiliateledger.DefaultCurrency holds the default value on creation for the currency field.
+	affiliateledger.DefaultCurrency = affiliateledgerDescCurrency.Default.(string)
+	// affiliateledgerDescStatus is the schema descriptor for status field.
+	affiliateledgerDescStatus := affiliateledgerFields[7].Descriptor()
+	// affiliateledger.DefaultStatus holds the default value on creation for the status field.
+	affiliateledger.DefaultStatus = affiliateledgerDescStatus.Default.(string)
+	// affiliateledgerDescReferenceID is the schema descriptor for reference_id field.
+	affiliateledgerDescReferenceID := affiliateledgerFields[8].Descriptor()
+	// affiliateledger.ReferenceIDValidator is a validator for the "reference_id" field. It is called by the builders before save.
+	affiliateledger.ReferenceIDValidator = affiliateledgerDescReferenceID.Validators[0].(func(string) error)
+	affiliateruleMixin := schema.AffiliateRule{}.Mixin()
+	affiliateruleMixinFields0 := affiliateruleMixin[0].Fields()
+	_ = affiliateruleMixinFields0
+	affiliateruleFields := schema.AffiliateRule{}.Fields()
+	_ = affiliateruleFields
+	// affiliateruleDescCreatedAt is the schema descriptor for created_at field.
+	affiliateruleDescCreatedAt := affiliateruleMixinFields0[0].Descriptor()
+	// affiliaterule.DefaultCreatedAt holds the default value on creation for the created_at field.
+	affiliaterule.DefaultCreatedAt = affiliateruleDescCreatedAt.Default.(func() time.Time)
+	// affiliateruleDescUpdatedAt is the schema descriptor for updated_at field.
+	affiliateruleDescUpdatedAt := affiliateruleMixinFields0[1].Descriptor()
+	// affiliaterule.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	affiliaterule.DefaultUpdatedAt = affiliateruleDescUpdatedAt.Default.(func() time.Time)
+	// affiliaterule.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	affiliaterule.UpdateDefaultUpdatedAt = affiliateruleDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// affiliateruleDescName is the schema descriptor for name field.
+	affiliateruleDescName := affiliateruleFields[0].Descriptor()
+	// affiliaterule.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	affiliaterule.NameValidator = affiliateruleDescName.Validators[0].(func(string) error)
+	// affiliateruleDescStatus is the schema descriptor for status field.
+	affiliateruleDescStatus := affiliateruleFields[1].Descriptor()
+	// affiliaterule.DefaultStatus holds the default value on creation for the status field.
+	affiliaterule.DefaultStatus = affiliateruleDescStatus.Default.(string)
+	// affiliateruleDescTriggerType is the schema descriptor for trigger_type field.
+	affiliateruleDescTriggerType := affiliateruleFields[2].Descriptor()
+	// affiliaterule.TriggerTypeValidator is a validator for the "trigger_type" field. It is called by the builders before save.
+	affiliaterule.TriggerTypeValidator = affiliateruleDescTriggerType.Validators[0].(func(string) error)
+	// affiliateruleDescRate is the schema descriptor for rate field.
+	affiliateruleDescRate := affiliateruleFields[3].Descriptor()
+	// affiliaterule.DefaultRate holds the default value on creation for the rate field.
+	affiliaterule.DefaultRate = affiliateruleDescRate.Default.(string)
+	// affiliateruleDescFixedAmount is the schema descriptor for fixed_amount field.
+	affiliateruleDescFixedAmount := affiliateruleFields[4].Descriptor()
+	// affiliaterule.DefaultFixedAmount holds the default value on creation for the fixed_amount field.
+	affiliaterule.DefaultFixedAmount = affiliateruleDescFixedAmount.Default.(string)
+	// affiliateruleDescCurrency is the schema descriptor for currency field.
+	affiliateruleDescCurrency := affiliateruleFields[5].Descriptor()
+	// affiliaterule.DefaultCurrency holds the default value on creation for the currency field.
+	affiliaterule.DefaultCurrency = affiliateruleDescCurrency.Default.(string)
+	// affiliateruleDescMaxRebateAmount is the schema descriptor for max_rebate_amount field.
+	affiliateruleDescMaxRebateAmount := affiliateruleFields[6].Descriptor()
+	// affiliaterule.DefaultMaxRebateAmount holds the default value on creation for the max_rebate_amount field.
+	affiliaterule.DefaultMaxRebateAmount = affiliateruleDescMaxRebateAmount.Default.(string)
 	auditlogMixin := schema.AuditLog{}.Mixin()
 	auditlogMixinFields0 := auditlogMixin[0].Fields()
 	_ = auditlogMixinFields0
@@ -433,6 +515,48 @@ func init() {
 	idempotencyrecordDescStatus := idempotencyrecordFields[4].Descriptor()
 	// idempotencyrecord.DefaultStatus holds the default value on creation for the status field.
 	idempotencyrecord.DefaultStatus = idempotencyrecordDescStatus.Default.(string)
+	invitecodeMixin := schema.InviteCode{}.Mixin()
+	invitecodeMixinFields0 := invitecodeMixin[0].Fields()
+	_ = invitecodeMixinFields0
+	invitecodeFields := schema.InviteCode{}.Fields()
+	_ = invitecodeFields
+	// invitecodeDescCreatedAt is the schema descriptor for created_at field.
+	invitecodeDescCreatedAt := invitecodeMixinFields0[0].Descriptor()
+	// invitecode.DefaultCreatedAt holds the default value on creation for the created_at field.
+	invitecode.DefaultCreatedAt = invitecodeDescCreatedAt.Default.(func() time.Time)
+	// invitecodeDescUpdatedAt is the schema descriptor for updated_at field.
+	invitecodeDescUpdatedAt := invitecodeMixinFields0[1].Descriptor()
+	// invitecode.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	invitecode.DefaultUpdatedAt = invitecodeDescUpdatedAt.Default.(func() time.Time)
+	// invitecode.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	invitecode.UpdateDefaultUpdatedAt = invitecodeDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// invitecodeDescCode is the schema descriptor for code field.
+	invitecodeDescCode := invitecodeFields[1].Descriptor()
+	// invitecode.CodeValidator is a validator for the "code" field. It is called by the builders before save.
+	invitecode.CodeValidator = invitecodeDescCode.Validators[0].(func(string) error)
+	// invitecodeDescStatus is the schema descriptor for status field.
+	invitecodeDescStatus := invitecodeFields[2].Descriptor()
+	// invitecode.DefaultStatus holds the default value on creation for the status field.
+	invitecode.DefaultStatus = invitecodeDescStatus.Default.(string)
+	inviterelationshipMixin := schema.InviteRelationship{}.Mixin()
+	inviterelationshipMixinFields0 := inviterelationshipMixin[0].Fields()
+	_ = inviterelationshipMixinFields0
+	inviterelationshipFields := schema.InviteRelationship{}.Fields()
+	_ = inviterelationshipFields
+	// inviterelationshipDescCreatedAt is the schema descriptor for created_at field.
+	inviterelationshipDescCreatedAt := inviterelationshipMixinFields0[0].Descriptor()
+	// inviterelationship.DefaultCreatedAt holds the default value on creation for the created_at field.
+	inviterelationship.DefaultCreatedAt = inviterelationshipDescCreatedAt.Default.(func() time.Time)
+	// inviterelationshipDescUpdatedAt is the schema descriptor for updated_at field.
+	inviterelationshipDescUpdatedAt := inviterelationshipMixinFields0[1].Descriptor()
+	// inviterelationship.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	inviterelationship.DefaultUpdatedAt = inviterelationshipDescUpdatedAt.Default.(func() time.Time)
+	// inviterelationship.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	inviterelationship.UpdateDefaultUpdatedAt = inviterelationshipDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// inviterelationshipDescStatus is the schema descriptor for status field.
+	inviterelationshipDescStatus := inviterelationshipFields[3].Descriptor()
+	// inviterelationship.DefaultStatus holds the default value on creation for the status field.
+	inviterelationship.DefaultStatus = inviterelationshipDescStatus.Default.(string)
 	modelaliasMixin := schema.ModelAlias{}.Mixin()
 	modelaliasMixinFields0 := modelaliasMixin[0].Fields()
 	_ = modelaliasMixinFields0

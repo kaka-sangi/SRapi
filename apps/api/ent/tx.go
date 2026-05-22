@@ -24,6 +24,10 @@ type Tx struct {
 	AccountHealthSnapshot *AccountHealthSnapshotClient
 	// AccountQuotaSnapshot is the client for interacting with the AccountQuotaSnapshot builders.
 	AccountQuotaSnapshot *AccountQuotaSnapshotClient
+	// AffiliateLedger is the client for interacting with the AffiliateLedger builders.
+	AffiliateLedger *AffiliateLedgerClient
+	// AffiliateRule is the client for interacting with the AffiliateRule builders.
+	AffiliateRule *AffiliateRuleClient
 	// AuditLog is the client for interacting with the AuditLog builders.
 	AuditLog *AuditLogClient
 	// BillingLedger is the client for interacting with the BillingLedger builders.
@@ -36,6 +40,10 @@ type Tx struct {
 	DomainEventsOutbox *DomainEventsOutboxClient
 	// IdempotencyRecord is the client for interacting with the IdempotencyRecord builders.
 	IdempotencyRecord *IdempotencyRecordClient
+	// InviteCode is the client for interacting with the InviteCode builders.
+	InviteCode *InviteCodeClient
+	// InviteRelationship is the client for interacting with the InviteRelationship builders.
+	InviteRelationship *InviteRelationshipClient
 	// ModelAlias is the client for interacting with the ModelAlias builders.
 	ModelAlias *ModelAliasClient
 	// ModelProviderMapping is the client for interacting with the ModelProviderMapping builders.
@@ -211,12 +219,16 @@ func (tx *Tx) init() {
 	tx.AccountGroupMember = NewAccountGroupMemberClient(tx.config)
 	tx.AccountHealthSnapshot = NewAccountHealthSnapshotClient(tx.config)
 	tx.AccountQuotaSnapshot = NewAccountQuotaSnapshotClient(tx.config)
+	tx.AffiliateLedger = NewAffiliateLedgerClient(tx.config)
+	tx.AffiliateRule = NewAffiliateRuleClient(tx.config)
 	tx.AuditLog = NewAuditLogClient(tx.config)
 	tx.BillingLedger = NewBillingLedgerClient(tx.config)
 	tx.CapabilityDefinition = NewCapabilityDefinitionClient(tx.config)
 	tx.DomainEventsInbox = NewDomainEventsInboxClient(tx.config)
 	tx.DomainEventsOutbox = NewDomainEventsOutboxClient(tx.config)
 	tx.IdempotencyRecord = NewIdempotencyRecordClient(tx.config)
+	tx.InviteCode = NewInviteCodeClient(tx.config)
+	tx.InviteRelationship = NewInviteRelationshipClient(tx.config)
 	tx.ModelAlias = NewModelAliasClient(tx.config)
 	tx.ModelProviderMapping = NewModelProviderMappingClient(tx.config)
 	tx.ModelRegistry = NewModelRegistryClient(tx.config)

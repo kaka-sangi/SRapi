@@ -854,7 +854,96 @@ index(order_id, created_at)
 index(event_type, created_at)
 ```
 
-### 13.4 affiliate_ledger
+### 13.4 invite_codes
+
+邀请码表，受 `AFFILIATE_REBATE_SPEC.md` 约束。
+
+```txt
+id
+user_id
+code
+status
+expires_at
+created_at
+updated_at
+```
+
+索引：
+
+```txt
+unique(code)
+index(user_id, status)
+index(expires_at)
+```
+
+规则：
+
+- 一个用户可以有多个邀请码。
+- 公开入口只能接受 active 且未过期的邀请码。
+
+### 13.5 invite_relationships
+
+邀请绑定关系表。
+
+```txt
+id
+inviter_user_id
+invitee_user_id
+invite_code_id
+status
+first_paid_at
+created_at
+updated_at
+```
+
+索引：
+
+```txt
+unique(invitee_user_id)
+index(inviter_user_id, created_at)
+index(invite_code_id)
+index(status, created_at)
+```
+
+规则：
+
+- 一个 invitee 只能绑定一个 inviter。
+- 自邀请必须拒绝。
+- 关系默认不可改绑，管理员调整必须写审计。
+
+### 13.6 affiliate_rules
+
+返利规则表。
+
+```txt
+id
+name
+status
+trigger_type
+rate
+fixed_amount
+currency
+max_rebate_amount
+valid_from
+valid_to
+metadata_json
+created_at
+updated_at
+```
+
+索引：
+
+```txt
+index(trigger_type, currency, status)
+index(valid_from, valid_to)
+```
+
+规则：
+
+- 支付成功返利使用 `trigger_type=payment_paid` 的 active 规则。
+- 金额字段使用 fixed decimal string，不使用 float。
+
+### 13.7 affiliate_ledgers
 
 邀请返利账本，受 `AFFILIATE_REBATE_SPEC.md` 约束。
 
@@ -877,6 +966,7 @@ settled_at
 索引：
 
 ```txt
+unique(reference_id)
 index(user_id, created_at)
 index(related_user_id, created_at)
 index(payment_order_id)

@@ -8,6 +8,9 @@ import (
 	"testing"
 	"time"
 
+	affiliatecontract "github.com/srapi/srapi/apps/api/internal/modules/affiliate/contract"
+	affiliateservice "github.com/srapi/srapi/apps/api/internal/modules/affiliate/service"
+	affiliatememory "github.com/srapi/srapi/apps/api/internal/modules/affiliate/store/memory"
 	"github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	eventsservice "github.com/srapi/srapi/apps/api/internal/modules/events/service"
 	eventsmemory "github.com/srapi/srapi/apps/api/internal/modules/events/store/memory"
@@ -166,6 +169,82 @@ func TestWorkerSkipsAlreadyProcessedInbox(t *testing.T) {
 	}
 	if len(inboxRows) != 1 || inboxRows[0].Status != contract.InboxStatusProcessed || inboxRows[0].AttemptCount != 0 {
 		t.Fatalf("expected processed inbox to remain unchanged, got %+v", inboxRows)
+	}
+}
+
+func TestWorkerDispatchesPaymentEventsToAffiliate(t *testing.T) {
+	store := eventsmemory.New()
+	clock := &fixedClock{now: time.Date(2026, 5, 22, 12, 0, 0, 0, time.UTC)}
+	events, err := eventsservice.New(store, clock)
+	if err != nil {
+		t.Fatalf("new events service: %v", err)
+	}
+	affiliateStore := affiliatememory.New()
+	affiliateSvc, err := affiliateservice.New(affiliateStore, affiliateservice.Dependencies{}, clock)
+	if err != nil {
+		t.Fatalf("new affiliate service: %v", err)
+	}
+	if _, err := affiliateSvc.CreateInviteCode(t.Context(), affiliatecontract.CreateInviteCodeRequest{UserID: 10, Code: "INVITE10"}); err != nil {
+		t.Fatalf("create invite code: %v", err)
+	}
+	if _, err := affiliateSvc.BindInvite(t.Context(), affiliatecontract.BindInviteRequest{InviteeUserID: 20, Code: "INVITE10"}); err != nil {
+		t.Fatalf("bind invite: %v", err)
+	}
+	if _, err := affiliateSvc.CreateRule(t.Context(), affiliatecontract.CreateRuleRequest{
+		Name:        "ten-percent",
+		TriggerType: affiliatecontract.TriggerTypePaymentPaid,
+		Rate:        "0.10",
+		Currency:    "USD",
+	}); err != nil {
+		t.Fatalf("create rule: %v", err)
+	}
+	if _, err := events.Enqueue(t.Context(), contract.EnqueueRequest{
+		EventType:      "PaymentOrderPaid",
+		ProducerModule: "payments",
+		AggregateType:  "payment_order",
+		AggregateID:    "pay_1",
+		IdempotencyKey: "payment_paid:pay_1",
+		Payload: map[string]any{
+			"order_id":                1,
+			"order_no":                "pay_1",
+			"user_id":                 20,
+			"amount":                  "100.00000000",
+			"currency":                "USD",
+			"paid_at":                 clock.now.Format(time.RFC3339Nano),
+			"provider_transaction_id": "txn_1",
+		},
+	}); err != nil {
+		t.Fatalf("enqueue payment event: %v", err)
+	}
+
+	worker, err := outbox.New(store, discardLogger(), outbox.Config{
+		ConsumerName:   "affiliate-consumer",
+		DispatchClock:  clock,
+		AffiliateStore: affiliateStore,
+	})
+	if err != nil {
+		t.Fatalf("new worker: %v", err)
+	}
+	result, err := worker.RunOnce(t.Context())
+	if err != nil {
+		t.Fatalf("run worker once: %v", err)
+	}
+	if result.Selected != 1 || result.Published != 1 || result.Failed != 0 {
+		t.Fatalf("unexpected dispatch result: %+v", result)
+	}
+	ledgers, err := affiliateSvc.ListLedgers(t.Context())
+	if err != nil {
+		t.Fatalf("list affiliate ledgers: %v", err)
+	}
+	if len(ledgers) != 1 || ledgers[0].Amount != "10.00000000" || ledgers[0].ReferenceID != "payment_paid:pay_1" {
+		t.Fatalf("expected one affiliate accrual ledger, got %+v", ledgers)
+	}
+	outboxRows, err := events.ListOutbox(t.Context())
+	if err != nil {
+		t.Fatalf("list outbox: %v", err)
+	}
+	if len(outboxRows) != 2 || outboxRows[0].EventType != "PaymentOrderPaid" || outboxRows[0].Status != contract.OutboxStatusPublished || outboxRows[1].EventType != "AffiliateRebateAccrued" {
+		t.Fatalf("expected payment published and affiliate accrued pending, got %+v", outboxRows)
 	}
 }
 
