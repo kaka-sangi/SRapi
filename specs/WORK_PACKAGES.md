@@ -1043,12 +1043,62 @@ Required gates:
 - `make check`
 - `git diff --check`
 
-## WP-310+: Advanced Endpoint And Provider Expansion
+## WP-310: Moderations Runtime v1
+
+Objective: add the first OpenAI-compatible moderation runtime so safety classification requests use SRapi auth, model policy, entitlement, Scheduler, Provider Adapter dispatch, usage, billing, and operational evidence instead of bypassing the platform.
+
+Read first:
+
+- `docs/OPENAPI_CONTRACT.md`
+- `docs/GATEWAY_ROUTE_MATRIX.md`
+- `docs/AI_ENDPOINT_COMPATIBILITY.md`
+- `docs/PROVIDER_ADAPTER_SPEC.md`
+- `docs/CAPABILITY_TAXONOMY_SPEC.md`
+- `packages/openapi/openapi.yaml`
+- `apps/api/internal/modules/gateway`
+- `apps/api/internal/modules/provider_adapters`
+- `apps/api/internal/httpserver`
+
+Owns:
+
+- OpenAPI `POST /v1/moderations` and OpenAI-compatible provider alias contract
+- Gateway moderation request normalization/rendering
+- Provider Adapter moderation dispatch for OpenAI-compatible API-key and reverse-proxy accounts
+- HTTP runtime handler/tests, capability taxonomy, and Gateway route matrix/docs/status updates
+
+Definition of Done:
+
+- `POST /v1/moderations` is OpenAPI-described, generated, and secured with `gatewayBearerAuth`.
+- OpenAI-compatible provider alias routes, including `/api/provider/openai-compatible/v1/moderations`, reuse the same runtime while forcing provider context.
+- Requests minimally validate `model` and text/string-array `input`; image multimodal moderation input remains a later compatibility package.
+- Runtime follows the standard Gateway path: API key auth, model visibility, entitlement admission, Scheduler candidate selection, provider credential materialization, Provider Adapter invocation, usage log, billing metadata, Scheduler feedback, and outbox event.
+- OpenAI-compatible API-key and reverse-proxy accounts dispatch upstream to `/moderations`, pass the mapped upstream model, parse `flagged`, `categories`, `category_scores`, and `category_applied_input_types`, and return OpenAI-shaped moderation responses.
+- The request capability taxonomy includes an explicit moderation endpoint capability so Scheduler can reject generation-only candidates.
+- Provider and validation errors use the existing OpenAI-compatible Gateway error envelope and preserve request IDs.
+- Focused regressions prove standard route success, provider alias forced context, upstream request/response parsing, and usage/decision evidence.
+- Audio, rerank, image moderation input, realtime, and SDK examples are left to later packages.
+- No frontend visuals are added.
+
+Required gates:
+
+- `make openapi-lint`
+- `make openapi-bundle`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/modules/gateway/... ./internal/modules/provider_adapters/... ./internal/httpserver`
+- `cd apps/api && go test ./...`
+- `make architecture-check`
+- `make code-quality-check`
+- `make secret-scan`
+- `git diff --check`
+
+## WP-320+: Advanced Endpoint And Provider Expansion
 
 Use `ROADMAP.md` Phase 7 through Phase 8 to split future packages for:
 
 - rerank
-- audio and moderation
+- audio
 - realtime/websocket
 - SDK examples
 - migration guides

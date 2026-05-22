@@ -241,6 +241,20 @@ func (s *Service) NormalizeImageGeneration(req apiopenapi.ImageGenerationRequest
 	return canonical, nil
 }
 
+func (s *Service) NormalizeModerations(req apiopenapi.ModerationRequest, meta RequestMeta) (gatewaycontract.CanonicalRequest, error) {
+	input, err := moderationInput(req.Input)
+	if err != nil {
+		return gatewaycontract.CanonicalRequest{}, err
+	}
+	canonical := canonical(meta, gatewaycontract.ProtocolOpenAICompatible, gatewaycontract.ProtocolOpenAICompatible, req.Model, "", false, strings.Join(input, "\n"), nil, moderationContentBlocks(input), "", nil)
+	canonical.ModerationInput = append([]string(nil), input...)
+	if req.User != nil {
+		canonical.ModerationUser = strings.TrimSpace(*req.User)
+	}
+	canonical.RequestCapabilities = append(canonical.RequestCapabilities, gatewaycontract.RequestCapability{Key: capabilitiescontract.KeyModerations, Version: "v1"})
+	return canonical, nil
+}
+
 func (s *Service) BuildTextResponse(model, canonicalModel, text string, warnings []string) gatewaycontract.CanonicalResponse {
 	return s.buildTextResponse("", model, canonicalModel, text, estimateUsage(text), warnings)
 }
@@ -322,6 +336,33 @@ func (s *Service) BuildCanonicalImageGenerationResponse(req gatewaycontract.Cano
 		CanonicalModel:        canonicalModel,
 		Created:               created,
 		Data:                  cloneImages(images),
+		Usage:                 usage,
+		CompatibilityWarnings: uniqueStrings(req.CompatibilityWarnings),
+	}
+}
+
+func (s *Service) BuildCanonicalModerationResponse(req gatewaycontract.CanonicalRequest, id string, results []gatewaycontract.ModerationResult, usage gatewaycontract.Usage) gatewaycontract.ModerationResponse {
+	model := strings.TrimSpace(req.Model)
+	if model == "" {
+		model = req.CanonicalModel
+	}
+	canonicalModel := strings.TrimSpace(req.CanonicalModel)
+	if canonicalModel == "" {
+		canonicalModel = model
+	}
+	id = strings.TrimSpace(id)
+	if id == "" {
+		id = "modr_" + randomHexString(12)
+	}
+	if usage.InputTokens == 0 && usage.OutputTokens == 0 && usage.CachedTokens == 0 {
+		usage = moderationEstimatedUsage(req.ModerationInput)
+	}
+	return gatewaycontract.ModerationResponse{
+		ID:                    id,
+		RequestID:             strings.TrimSpace(req.RequestID),
+		Model:                 model,
+		CanonicalModel:        canonicalModel,
+		Results:               cloneModerationResults(results),
 		Usage:                 usage,
 		CompatibilityWarnings: uniqueStrings(req.CompatibilityWarnings),
 	}
@@ -459,6 +500,27 @@ func (s *Service) RenderImageGeneration(resp gatewaycontract.ImageGenerationResp
 	return apiopenapi.ImageGenerationResponse{
 		Created: resp.Created,
 		Data:    data,
+	}
+}
+
+func (s *Service) RenderModerations(resp gatewaycontract.ModerationResponse) apiopenapi.ModerationResponse {
+	results := make([]apiopenapi.ModerationResult, 0, len(resp.Results))
+	for _, item := range resp.Results {
+		result := apiopenapi.ModerationResult{
+			Categories:     cloneBoolMap(item.Categories),
+			CategoryScores: cloneFloat32Map(item.CategoryScores),
+			Flagged:        item.Flagged,
+		}
+		if len(item.CategoryAppliedInputTypes) > 0 {
+			applied := cloneStringSliceMap(item.CategoryAppliedInputTypes)
+			result.CategoryAppliedInputTypes = &applied
+		}
+		results = append(results, result)
+	}
+	return apiopenapi.ModerationResponse{
+		Id:      resp.ID,
+		Model:   resp.Model,
+		Results: results,
 	}
 }
 
@@ -901,6 +963,42 @@ func imageContentBlocks(prompt string) []gatewaycontract.ContentBlock {
 	return []gatewaycontract.ContentBlock{{Type: gatewaycontract.ContentBlockText, Role: "user", Text: prompt}}
 }
 
+func moderationInput(input apiopenapi.ModerationRequest_Input) ([]string, error) {
+	if text, err := input.AsModerationRequestInput0(); err == nil {
+		text = strings.TrimSpace(text)
+		if text == "" {
+			return nil, fmt.Errorf("moderation input is empty")
+		}
+		return []string{text}, nil
+	}
+	if values, err := input.AsModerationRequestInput1(); err == nil {
+		out := make([]string, 0, len(values))
+		for _, value := range values {
+			value = strings.TrimSpace(value)
+			if value != "" {
+				out = append(out, value)
+			}
+		}
+		if len(out) == 0 {
+			return nil, fmt.Errorf("moderation input is empty")
+		}
+		return out, nil
+	}
+	return nil, fmt.Errorf("moderation input must be a string or string array")
+}
+
+func moderationContentBlocks(values []string) []gatewaycontract.ContentBlock {
+	out := make([]gatewaycontract.ContentBlock, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		out = append(out, gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockText, Role: "user", Text: value})
+	}
+	return out
+}
+
 func embeddingEstimatedUsage(values []string) gatewaycontract.Usage {
 	return gatewaycontract.Usage{
 		InputTokens: estimateTokens(strings.Join(values, "\n")),
@@ -917,6 +1015,13 @@ func imageEstimatedUsage(req gatewaycontract.CanonicalRequest) gatewaycontract.U
 		InputTokens:  estimateTokens(req.ImagePrompt),
 		OutputTokens: output,
 		Estimated:    true,
+	}
+}
+
+func moderationEstimatedUsage(values []string) gatewaycontract.Usage {
+	return gatewaycontract.Usage{
+		InputTokens: estimateTokens(strings.Join(values, "\n")),
+		Estimated:   true,
 	}
 }
 
@@ -940,6 +1045,55 @@ func cloneImages(values []gatewaycontract.Image) []gatewaycontract.Image {
 	for idx, value := range values {
 		out[idx] = value
 		out[idx].Metadata = cloneMap(value.Metadata)
+	}
+	return out
+}
+
+func cloneModerationResults(values []gatewaycontract.ModerationResult) []gatewaycontract.ModerationResult {
+	if values == nil {
+		return nil
+	}
+	out := make([]gatewaycontract.ModerationResult, len(values))
+	for idx, value := range values {
+		out[idx] = gatewaycontract.ModerationResult{
+			Flagged:                   value.Flagged,
+			Categories:                cloneBoolMap(value.Categories),
+			CategoryScores:            cloneFloat32Map(value.CategoryScores),
+			CategoryAppliedInputTypes: cloneStringSliceMap(value.CategoryAppliedInputTypes),
+		}
+	}
+	return out
+}
+
+func cloneBoolMap(values map[string]bool) map[string]bool {
+	if values == nil {
+		return nil
+	}
+	out := make(map[string]bool, len(values))
+	for key, value := range values {
+		out[key] = value
+	}
+	return out
+}
+
+func cloneFloat32Map(values map[string]float32) map[string]float32 {
+	if values == nil {
+		return nil
+	}
+	out := make(map[string]float32, len(values))
+	for key, value := range values {
+		out[key] = value
+	}
+	return out
+}
+
+func cloneStringSliceMap(values map[string][]string) map[string][]string {
+	if values == nil {
+		return nil
+	}
+	out := make(map[string][]string, len(values))
+	for key, value := range values {
+		out[key] = append([]string(nil), value...)
 	}
 	return out
 }

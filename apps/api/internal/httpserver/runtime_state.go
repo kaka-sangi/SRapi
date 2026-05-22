@@ -327,7 +327,7 @@ func (rt *runtimeState) bootstrapGatewayCatalog(ctx context.Context) error {
 			AdapterType:  "openai-compatible",
 			Protocol:     "openai-compatible",
 			Status:       ptrProviderStatus(providercontract.StatusActive),
-			Capabilities: map[string]any{capabilitiescontract.KeyEmbeddings: true, capabilitiescontract.KeyImages: true},
+			Capabilities: map[string]any{capabilitiescontract.KeyEmbeddings: true, capabilitiescontract.KeyImages: true, capabilitiescontract.KeyModerations: true},
 		}); err != nil {
 			return err
 		}
@@ -362,10 +362,11 @@ func (rt *runtimeState) bootstrapGatewayCatalog(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if provider.Capabilities[capabilitiescontract.KeyEmbeddings] != true || provider.Capabilities[capabilitiescontract.KeyImages] != true {
+	if provider.Capabilities[capabilitiescontract.KeyEmbeddings] != true || provider.Capabilities[capabilitiescontract.KeyImages] != true || provider.Capabilities[capabilitiescontract.KeyModerations] != true {
 		capabilities := cloneAnyMap(provider.Capabilities)
 		capabilities[capabilitiescontract.KeyEmbeddings] = true
 		capabilities[capabilitiescontract.KeyImages] = true
+		capabilities[capabilitiescontract.KeyModerations] = true
 		if _, err := rt.providers.Update(ctx, provider.ID, providercontract.UpdateRequest{Capabilities: &capabilities}); err != nil {
 			return err
 		}

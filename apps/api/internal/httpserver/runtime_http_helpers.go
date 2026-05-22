@@ -104,6 +104,39 @@ func cloneAnyMap(value map[string]any) map[string]any {
 	return out
 }
 
+func cloneBoolMap(value map[string]bool) map[string]bool {
+	if value == nil {
+		return nil
+	}
+	out := make(map[string]bool, len(value))
+	for key, item := range value {
+		out[key] = item
+	}
+	return out
+}
+
+func cloneFloat32Map(value map[string]float32) map[string]float32 {
+	if value == nil {
+		return nil
+	}
+	out := make(map[string]float32, len(value))
+	for key, item := range value {
+		out[key] = item
+	}
+	return out
+}
+
+func cloneStringSliceMap(value map[string][]string) map[string][]string {
+	if value == nil {
+		return nil
+	}
+	out := make(map[string][]string, len(value))
+	for key, item := range value {
+		out[key] = append([]string(nil), item...)
+	}
+	return out
+}
+
 func cloneAnyValue(value any) any {
 	switch typed := value.(type) {
 	case map[string]any:

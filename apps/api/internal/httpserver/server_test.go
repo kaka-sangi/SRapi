@@ -2768,6 +2768,145 @@ func TestGatewayImageGenerationAliasForcesProviderContext(t *testing.T) {
 	}
 }
 
+func TestGatewayModerationRouteTargetsOpenAICompatibleUpstream(t *testing.T) {
+	type upstreamCall struct {
+		Path          string
+		Authorization string
+		Model         string
+		Input         []string
+		User          string
+	}
+	var (
+		mu    sync.Mutex
+		calls []upstreamCall
+	)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload struct {
+			Model string   `json:"model"`
+			Input []string `json:"input"`
+			User  string   `json:"user"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		mu.Lock()
+		calls = append(calls, upstreamCall{
+			Path:          r.URL.Path,
+			Authorization: r.Header.Get("Authorization"),
+			Model:         payload.Model,
+			Input:         append([]string(nil), payload.Input...),
+			User:          payload.User,
+		})
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"modr_wp310","model":"moderation-upstream","results":[{"flagged":false,"categories":{"violence":false,"self-harm":false},"category_scores":{"violence":0.01,"self-harm":0.02},"category_applied_input_types":{"violence":["text"]}}],"usage":{"prompt_tokens":7,"total_tokens":7}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"wp310-openai","display_name":"WP310 OpenAI","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active","capabilities":{"moderations":true}}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"wp310-moderation-model","display_name":"WP310 Moderation Model","status":"active","capabilities":[{"key":"moderations","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"moderation-upstream","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"wp310-moderation-account","runtime_class":"api_key","credential":{"api_key":"moderation-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
+
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/moderations", `{"model":"wp310-moderation-model","input":["first safe input","second safe input"],"user":"user-123"}`)
+	var moderationResp apiopenapi.ModerationResponse
+	if err := json.NewDecoder(rec.Body).Decode(&moderationResp); err != nil {
+		t.Fatalf("decode moderation response: %v", err)
+	}
+	if moderationResp.Id != "modr_wp310" || moderationResp.Model != "wp310-moderation-model" || len(moderationResp.Results) != 1 || moderationResp.Results[0].Flagged || moderationResp.Results[0].Categories["violence"] {
+		t.Fatalf("unexpected moderation response: %+v", moderationResp)
+	}
+	if moderationResp.Results[0].CategoryScores["self-harm"] <= 0 || moderationResp.Results[0].CategoryAppliedInputTypes == nil || len((*moderationResp.Results[0].CategoryAppliedInputTypes)["violence"]) != 1 {
+		t.Fatalf("expected moderation category details, got %+v", moderationResp.Results[0])
+	}
+
+	mu.Lock()
+	gotCalls := append([]upstreamCall(nil), calls...)
+	mu.Unlock()
+	if len(gotCalls) != 1 {
+		t.Fatalf("expected one upstream call, got %+v", gotCalls)
+	}
+	if gotCalls[0].Path != "/v1/moderations" || gotCalls[0].Authorization != "Bearer moderation-secret" || gotCalls[0].Model != "moderation-upstream" {
+		t.Fatalf("unexpected upstream moderation call: %+v", gotCalls[0])
+	}
+	if len(gotCalls[0].Input) != 2 || gotCalls[0].Input[0] != "first safe input" || gotCalls[0].User != "user-123" {
+		t.Fatalf("unexpected upstream moderation details: %+v", gotCalls[0])
+	}
+
+	usageReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/usage-logs?model=wp310-moderation-model", nil)
+	usageReq.AddCookie(sessionCookie)
+	usageRec := httptest.NewRecorder()
+	handler.ServeHTTP(usageRec, usageReq)
+	if usageRec.Code != http.StatusOK {
+		t.Fatalf("expected usage logs 200, got %d", usageRec.Code)
+	}
+	var usageResp apiopenapi.UsageLogListResponse
+	if err := json.NewDecoder(usageRec.Body).Decode(&usageResp); err != nil {
+		t.Fatalf("decode usage logs: %v", err)
+	}
+	if len(usageResp.Data) != 1 {
+		t.Fatalf("expected one moderation usage record, got %+v", usageResp.Data)
+	}
+	usage := usageResp.Data[0]
+	if !usage.Success || usage.SourceEndpoint != "/v1/moderations" || usage.ProviderId == nil || *usage.ProviderId != string(providerResp.Data.Id) || usage.AccountId == nil || *usage.AccountId != string(accountResp.Data.Id) || usage.TotalTokens != 7 {
+		t.Fatalf("unexpected moderation usage evidence: %+v", usage)
+	}
+
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=wp310-moderation-model", nil)
+	decisionsReq.AddCookie(sessionCookie)
+	decisionsRec := httptest.NewRecorder()
+	handler.ServeHTTP(decisionsRec, decisionsReq)
+	if decisionsRec.Code != http.StatusOK {
+		t.Fatalf("expected decisions 200, got %d body=%s", decisionsRec.Code, decisionsRec.Body.String())
+	}
+	var decisionsResp apiopenapi.SchedulerDecisionListResponse
+	if err := json.NewDecoder(decisionsRec.Body).Decode(&decisionsResp); err != nil {
+		t.Fatalf("decode decisions: %v", err)
+	}
+	if len(decisionsResp.Data) != 1 || decisionsResp.Data[0].SourceEndpoint != "/v1/moderations" || decisionsResp.Data[0].CandidateCount != 1 {
+		t.Fatalf("unexpected moderation decision evidence: %+v", decisionsResp.Data)
+	}
+}
+
+func TestGatewayModerationAliasForcesProviderContext(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	openaiProvider := mustFindProviderByName(t, handler, sessionCookie, "openai-compatible")
+	fallbackProvider := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"moderation-fallback-provider","display_name":"Moderation Fallback","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active","capabilities":{"moderations":true}}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"wp310-alias-moderation-model","display_name":"WP310 Alias Moderation Model","status":"active","capabilities":[{"key":"moderations","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","upstream_model_name":"fallback-moderation","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","name":"moderation-fallback-account","runtime_class":"api_key","credential":{"api_key":"fallback-secret"},"status":"active","priority":100}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(openaiProvider.Id)+`","upstream_model_name":"alias-moderation","status":"active"}`)
+
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/api/provider/openai-compatible/v1/moderations", `{"model":"wp310-alias-moderation-model","input":"alias moderation input"}`)
+
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=wp310-alias-moderation-model", nil)
+	decisionsReq.AddCookie(sessionCookie)
+	decisionsRec := httptest.NewRecorder()
+	handler.ServeHTTP(decisionsRec, decisionsReq)
+	if decisionsRec.Code != http.StatusOK {
+		t.Fatalf("expected decisions 200, got %d body=%s", decisionsRec.Code, decisionsRec.Body.String())
+	}
+	var decisionsResp apiopenapi.SchedulerDecisionListResponse
+	if err := json.NewDecoder(decisionsRec.Body).Decode(&decisionsResp); err != nil {
+		t.Fatalf("decode decisions: %v", err)
+	}
+	if len(decisionsResp.Data) != 1 {
+		t.Fatalf("expected one alias moderation decision, got %+v", decisionsResp.Data)
+	}
+	decision := decisionsResp.Data[0]
+	if decision.SelectedProviderId == nil || *decision.SelectedProviderId != string(openaiProvider.Id) || decision.CandidateCount != 1 {
+		t.Fatalf("expected moderation alias to force openai-compatible provider, got %+v", decision)
+	}
+	if decision.SourceEndpoint != "/api/provider/openai-compatible/v1/moderations" {
+		t.Fatalf("expected alias source endpoint, got %q", decision.SourceEndpoint)
+	}
+}
+
 func TestGatewayModelAliasAndSessionAffinityFeedScheduler(t *testing.T) {
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)

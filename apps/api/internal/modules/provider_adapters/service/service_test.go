@@ -205,6 +205,62 @@ func TestOpenAICompatibleAdapterInvokesImageGenerationsUpstream(t *testing.T) {
 	}
 }
 
+func TestOpenAICompatibleAdapterInvokesModerationsUpstream(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/moderations" {
+			t.Fatalf("unexpected upstream path %s", r.URL.Path)
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer moderations-secret" {
+			t.Fatalf("unexpected auth header %q", got)
+		}
+		var payload struct {
+			Model string   `json:"model"`
+			Input []string `json:"input"`
+			User  string   `json:"user"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		if payload.Model != "moderation-upstream" || len(payload.Input) != 2 || payload.Input[0] != "first safe input" || payload.Input[1] != "second safe input" || payload.User != "user-123" {
+			t.Fatalf("unexpected moderation payload: %+v", payload)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"modr_test","model":"moderation-upstream","results":[{"flagged":false,"categories":{"violence":false,"self-harm":false},"category_scores":{"violence":0.01,"self-harm":0.02},"category_applied_input_types":{"violence":["text"]}}],"usage":{"prompt_tokens":8,"total_tokens":8}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeModerations(context.Background(), contract.ModerationRequest{
+		RequestID: "req_moderations",
+		Model:     "moderation-local",
+		Input:     []string{"first safe input", "second safe input"},
+		User:      "user-123",
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "openai-compatible",
+			Protocol:    "openai-compatible",
+		},
+		Account:    accountcontract.ProviderAccount{ID: 1, Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "moderation-upstream"},
+		Credential: map[string]any{"api_key": "moderations-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke moderation upstream: %v", err)
+	}
+	if resp.ID != "modr_test" || resp.Model != "moderation-upstream" || len(resp.Results) != 1 || resp.Results[0].Flagged || resp.Results[0].Categories["violence"] {
+		t.Fatalf("unexpected moderation response: %+v", resp)
+	}
+	if resp.Results[0].CategoryScores["self-harm"] <= 0 || len(resp.Results[0].CategoryAppliedInputTypes["violence"]) != 1 {
+		t.Fatalf("expected moderation category details, got %+v", resp.Results[0])
+	}
+	if resp.Usage.Estimated || resp.Usage.InputTokens != 8 || resp.Usage.OutputTokens != 0 {
+		t.Fatalf("unexpected moderation usage: %+v", resp.Usage)
+	}
+}
+
 func TestOpenAICompatibleAdapterForwardsConversionFields(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var payload struct {

@@ -1292,6 +1292,12 @@ func (u openAIUsage) ToImageUsage(req contract.ImageGenerationRequest) contract.
 	return usage
 }
 
+func (u openAIUsage) ToModerationUsage(input []string) contract.Usage {
+	usage := u.ToUsage(strings.Join(input, "\n"))
+	usage.OutputTokens = 0
+	return usage
+}
+
 func (u openAIUsage) HasTokenUsage() bool {
 	return u.PromptTokens != nil ||
 		u.CompletionTokens != nil ||

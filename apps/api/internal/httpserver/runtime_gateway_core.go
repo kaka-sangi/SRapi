@@ -777,7 +777,7 @@ func effectiveCapabilities(model modelcontract.Model, mapping modelcontract.Mode
 			}
 		}
 	}
-	for _, key := range []string{capabilitiescontract.KeyEmbeddings, capabilitiescontract.KeyImages} {
+	for _, key := range []string{capabilitiescontract.KeyEmbeddings, capabilitiescontract.KeyImages, capabilitiescontract.KeyModerations} {
 		if _, ok := providerScoped[key]; !ok {
 			delete(merged, key)
 		}
@@ -1072,6 +1072,28 @@ func (rt *runtimeState) invokeProviderImageGeneration(ctx context.Context, req p
 	return resp, nil
 }
 
+func (rt *runtimeState) invokeProviderModerations(ctx context.Context, req provideradaptercontract.ModerationRequest) (provideradaptercontract.ModerationResponse, error) {
+	if req.Account.ID <= 0 {
+		return provideradaptercontract.ModerationResponse{}, provideradaptercontract.ProviderError{Class: "no_available_account", StatusCode: http.StatusServiceUnavailable, Message: "provider account missing"}
+	}
+	credential, err := rt.accounts.DecryptCredential(ctx, req.Account.ID)
+	if err != nil {
+		return provideradaptercontract.ModerationResponse{}, provideradaptercontract.ProviderError{Class: "credential_error", StatusCode: http.StatusBadGateway, Message: "provider credential unavailable"}
+	}
+	if refreshed, ok, err := rt.refreshReverseProxyCredential(ctx, req.Account, credential); err != nil {
+		return provideradaptercontract.ModerationResponse{}, provideradaptercontract.ProviderError{Class: "auth_failed", StatusCode: http.StatusBadGateway, Message: "provider credential refresh failed"}
+	} else if ok {
+		credential = refreshed
+	}
+	req.Credential = credential
+	resp, err := rt.adapters.InvokeModerations(ctx, req)
+	if err != nil {
+		rt.applyProviderAccountProtection(ctx, req.Account, err)
+		return provideradaptercontract.ModerationResponse{}, err
+	}
+	return resp, nil
+}
+
 func providerTextRequest(req gatewaycontract.CanonicalRequest, candidate schedulercontract.Candidate) provideradaptercontract.TextRequest {
 	return provideradaptercontract.TextRequest{
 		RequestID:       req.RequestID,
@@ -1125,6 +1147,20 @@ func providerImageGenerationRequest(req gatewaycontract.CanonicalRequest, candid
 		ResponseFormat: req.ImageResponseFormat,
 		User:           req.ImageUser,
 		Extra:          cloneAnyMap(req.ImageExtra),
+		Provider:       candidate.Provider,
+		Account:        candidate.Account,
+		Mapping:        candidate.Mapping,
+	}
+}
+
+func providerModerationRequest(req gatewaycontract.CanonicalRequest, candidate schedulercontract.Candidate) provideradaptercontract.ModerationRequest {
+	return provideradaptercontract.ModerationRequest{
+		RequestID:      req.RequestID,
+		SourceProtocol: string(req.SourceProtocol),
+		SourceEndpoint: req.SourceEndpoint,
+		Model:          req.CanonicalModel,
+		Input:          append([]string(nil), req.ModerationInput...),
+		User:           req.ModerationUser,
 		Provider:       candidate.Provider,
 		Account:        candidate.Account,
 		Mapping:        candidate.Mapping,
@@ -1305,6 +1341,15 @@ func gatewayUsageFromImageProvider(resp provideradaptercontract.ImageGenerationR
 	}
 }
 
+func gatewayUsageFromModerationProvider(resp provideradaptercontract.ModerationResponse) gatewaycontract.Usage {
+	return gatewaycontract.Usage{
+		InputTokens:  resp.Usage.InputTokens,
+		OutputTokens: resp.Usage.OutputTokens,
+		CachedTokens: resp.Usage.CachedTokens,
+		Estimated:    resp.Usage.Estimated,
+	}
+}
+
 func gatewayEmbeddingsFromProvider(resp provideradaptercontract.EmbeddingResponse) []gatewaycontract.Embedding {
 	out := make([]gatewaycontract.Embedding, 0, len(resp.Data))
 	for _, item := range resp.Data {
@@ -1325,6 +1370,19 @@ func gatewayImagesFromProvider(resp provideradaptercontract.ImageGenerationRespo
 			Base64JSON:    item.Base64JSON,
 			RevisedPrompt: item.RevisedPrompt,
 			Metadata:      cloneAnyMap(item.Metadata),
+		})
+	}
+	return out
+}
+
+func gatewayModerationResultsFromProvider(resp provideradaptercontract.ModerationResponse) []gatewaycontract.ModerationResult {
+	out := make([]gatewaycontract.ModerationResult, 0, len(resp.Results))
+	for _, item := range resp.Results {
+		out = append(out, gatewaycontract.ModerationResult{
+			Flagged:                   item.Flagged,
+			Categories:                cloneBoolMap(item.Categories),
+			CategoryScores:            cloneFloat32Map(item.CategoryScores),
+			CategoryAppliedInputTypes: cloneStringSliceMap(item.CategoryAppliedInputTypes),
 		})
 	}
 	return out

@@ -16,6 +16,7 @@ const (
 	EndpointMessages              SourceEndpoint = "/v1/messages"
 	EndpointEmbeddings            SourceEndpoint = "/v1/embeddings"
 	EndpointImagesGenerations     SourceEndpoint = "/v1/images/generations"
+	EndpointModerations           SourceEndpoint = "/v1/moderations"
 	EndpointGeminiGenerateContent SourceEndpoint = "/v1beta/models/{model}:generateContent"
 	EndpointGeminiStreamContent   SourceEndpoint = "/v1beta/models/{model}:streamGenerateContent"
 )
@@ -80,6 +81,8 @@ type CanonicalRequest struct {
 	ImageResponseFormat   string
 	ImageUser             string
 	ImageExtra            map[string]any
+	ModerationInput       []string
+	ModerationUser        string
 	Prompt                string
 	CompatibilityWarnings []string
 	RequestCapabilities   []RequestCapability
@@ -133,6 +136,23 @@ type ImageGenerationResponse struct {
 	CanonicalModel        string
 	Created               int64
 	Data                  []Image
+	Usage                 Usage
+	CompatibilityWarnings []string
+}
+
+type ModerationResult struct {
+	Flagged                   bool
+	Categories                map[string]bool
+	CategoryScores            map[string]float32
+	CategoryAppliedInputTypes map[string][]string
+}
+
+type ModerationResponse struct {
+	ID                    string
+	RequestID             string
+	Model                 string
+	CanonicalModel        string
+	Results               []ModerationResult
 	Usage                 Usage
 	CompatibilityWarnings []string
 }

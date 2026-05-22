@@ -76,6 +76,19 @@ type ImageGenerationRequest struct {
 	Credential     map[string]any
 }
 
+type ModerationRequest struct {
+	RequestID      string
+	SourceProtocol string
+	SourceEndpoint string
+	Model          string
+	Input          []string
+	User           string
+	Provider       providercontract.Provider
+	Account        accountcontract.ProviderAccount
+	Mapping        modelcontract.ModelProviderMapping
+	Credential     map[string]any
+}
+
 type Embedding struct {
 	Index        int
 	Vector       []float32
@@ -99,6 +112,21 @@ type Image struct {
 type ImageGenerationResponse struct {
 	Created    int64
 	Data       []Image
+	Model      string
+	StatusCode int
+	Usage      Usage
+}
+
+type ModerationResult struct {
+	Flagged                   bool
+	Categories                map[string]bool
+	CategoryScores            map[string]float32
+	CategoryAppliedInputTypes map[string][]string
+}
+
+type ModerationResponse struct {
+	ID         string
+	Results    []ModerationResult
 	Model      string
 	StatusCode int
 	Usage      Usage
@@ -136,4 +164,8 @@ type EmbeddingAdapter interface {
 
 type ImageGenerationAdapter interface {
 	InvokeImageGeneration(ctx context.Context, req ImageGenerationRequest) (ImageGenerationResponse, error)
+}
+
+type ModerationAdapter interface {
+	InvokeModerations(ctx context.Context, req ModerationRequest) (ModerationResponse, error)
 }

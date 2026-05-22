@@ -49,6 +49,7 @@ const (
 	KeyMessages        = "messages"
 	KeyEmbeddings      = "embeddings"
 	KeyImages          = "images"
+	KeyModerations     = "moderations"
 )
 
 type DefinitionStatus string
@@ -87,6 +88,7 @@ var defaultDefinitions = []Definition{
 	{Key: KeyMessages, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports Messages-compatible generation."},
 	{Key: KeyEmbeddings, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports embeddings."},
 	{Key: KeyImages, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports image generation."},
+	{Key: KeyModerations, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports moderation classification."},
 }
 
 var knownKeys = func() map[string]Definition {
@@ -120,6 +122,9 @@ var convenienceKeys = map[string]string{
 	"supports_messages":            KeyMessages,
 	"supports_embeddings":          KeyEmbeddings,
 	"supports_images":              KeyImages,
+	"supports_moderations":         KeyModerations,
+	"supports_moderation":          KeyModerations,
+	"moderation":                   KeyModerations,
 }
 
 func DefaultDefinitions() []Definition {

@@ -471,6 +471,21 @@ Images generations endpoint
 - OpenAI-compatible API-key 和 reverse-proxy accounts 上游调用 `/images/generations` 并解析 `url`、`b64_json` 和 `revised_prompt`。
 - Image edits 和 variations 不在 WP-290 范围内。
 
+WP-310 已实现：
+
+```txt
+Moderations endpoint
+```
+
+边界：
+
+- `POST /v1/moderations` 接受 OpenAI-compatible 的 `model` 和 string / string-array `input`。
+- image/multimodal moderation input 暂不支持，留给后续兼容包。
+- 请求仍进入 API Key auth、模型可见性、entitlement、Scheduler、Provider Adapter、usage、billing 和 feedback 证据链。
+- Scheduler 使用 `moderations` endpoint capability；Provider 或 account/mapping 必须显式声明 moderation 能力，generation-only provider 不会被误选。
+- OpenAI-compatible provider alias（例如 `/api/provider/openai-compatible/v1/moderations`）强制 provider context。
+- OpenAI-compatible API-key 和 reverse-proxy accounts 上游调用 `/moderations` 并解析 `flagged`、`categories`、`category_scores` 和 `category_applied_input_types`。
+
 Phase 2 继续实现：
 
 ```txt

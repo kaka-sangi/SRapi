@@ -2937,6 +2937,50 @@ paths:
         default:
           $ref: "#/components/responses/GatewayError"
 
+  /v1/moderations:
+    post:
+      tags:
+        - Gateway
+      operationId: createModeration
+      summary: Create OpenAI-compatible moderation classifications.
+      description: OpenAI-compatible moderation route. SRapi validates the gateway API key, applies model policy and entitlement, schedules an eligible provider account, invokes the selected OpenAI-compatible provider adapter, and records usage and Scheduler evidence.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModerationRequest"
+            examples:
+              basic:
+                value:
+                  model: omni-moderation-latest
+                  input:
+                    - I want to keep this discussion safe.
+      responses:
+        "200":
+          description: OpenAI-compatible moderation response.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModerationResponse"
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
   /api/provider/openai-compatible/v1/embeddings:
     post:
       tags:
@@ -2962,6 +3006,44 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/EmbeddingResponse"
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /api/provider/openai-compatible/v1/moderations:
+    post:
+      tags:
+        - Gateway
+      operationId: createOpenAICompatibleModerationAlias
+      summary: Create OpenAI-compatible moderation classifications with openai-compatible provider context.
+      description: Provider alias route. It reuses the standard moderation runtime and forces the `openai-compatible` provider context.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModerationRequest"
+      responses:
+        "200":
+          description: OpenAI-compatible moderation response.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModerationResponse"
         "400":
           $ref: "#/components/responses/GatewayBadRequest"
         "401":
@@ -6639,6 +6721,68 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ImageGenerationObject"
+
+    ModerationRequest:
+      type: object
+      required:
+        - model
+        - input
+      properties:
+        model:
+          type: string
+        input:
+          oneOf:
+            - type: string
+            - type: array
+              minItems: 1
+              items:
+                type: string
+        user:
+          type: string
+      additionalProperties: true
+
+    ModerationResult:
+      type: object
+      required:
+        - flagged
+        - categories
+        - category_scores
+      properties:
+        flagged:
+          type: boolean
+        categories:
+          type: object
+          additionalProperties:
+            type: boolean
+        category_scores:
+          type: object
+          additionalProperties:
+            type: number
+            format: float
+        category_applied_input_types:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+      additionalProperties: true
+
+    ModerationResponse:
+      type: object
+      required:
+        - id
+        - model
+        - results
+      properties:
+        id:
+          type: string
+        model:
+          type: string
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModerationResult"
+      additionalProperties: true
 
     ChatMessage:
       type: object

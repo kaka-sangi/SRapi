@@ -168,6 +168,7 @@ supports_messages
 supports_generate_content
 supports_embeddings
 supports_images
+supports_moderations
 supports_stream
 supports_tools
 supports_parallel_tool_calls
@@ -185,6 +186,8 @@ quota_model
 ```
 
 WP-290 起，`supports_images` 映射到 canonical `images` endpoint capability。Gateway image generation 请求必须带 `images` request capability；OpenAI-compatible API-key 和 reverse-proxy accounts 使用 `/images/generations` 上游路径，并解析 `url` / `b64_json` image outputs。
+
+WP-310 起，`supports_moderations` 映射到 canonical `moderations` endpoint capability。Gateway moderation 请求必须带 `moderations` request capability；OpenAI-compatible API-key 和 reverse-proxy accounts 使用 `/moderations` 上游路径，并解析 `flagged`、`categories`、`category_scores` 和 `category_applied_input_types`。
 
 WP-270 embeddings adapter boundary:
 

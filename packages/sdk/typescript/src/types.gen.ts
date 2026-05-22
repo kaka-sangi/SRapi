@@ -1202,6 +1202,34 @@ export type ImageGenerationResponse = {
     data: Array<ImageGenerationObject>;
 };
 
+export type ModerationRequest = {
+    model: string;
+    input: string | Array<string>;
+    user?: string;
+    [key: string]: unknown;
+};
+
+export type ModerationResult = {
+    flagged: boolean;
+    categories: {
+        [key: string]: boolean;
+    };
+    category_scores: {
+        [key: string]: number;
+    };
+    category_applied_input_types?: {
+        [key: string]: Array<string>;
+    };
+    [key: string]: unknown;
+};
+
+export type ModerationResponse = {
+    id: string;
+    model: string;
+    results: Array<ModerationResult>;
+    [key: string]: unknown;
+};
+
 export type ChatMessage = {
     role: 'system' | 'developer' | 'user' | 'assistant' | 'tool';
     content: string | Array<ContentBlock>;
@@ -4526,6 +4554,51 @@ export type CreateOpenAiCompatibleMessageAliasResponses = {
 
 export type CreateOpenAiCompatibleMessageAliasResponse = CreateOpenAiCompatibleMessageAliasResponses[keyof CreateOpenAiCompatibleMessageAliasResponses];
 
+export type CreateModerationData = {
+    body: ModerationRequest;
+    path?: never;
+    query?: never;
+    url: '/v1/moderations';
+};
+
+export type CreateModerationErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateModerationError = CreateModerationErrors[keyof CreateModerationErrors];
+
+export type CreateModerationResponses = {
+    /**
+     * OpenAI-compatible moderation response.
+     */
+    200: ModerationResponse;
+};
+
+export type CreateModerationResponse = CreateModerationResponses[keyof CreateModerationResponses];
+
 export type CreateOpenAiCompatibleEmbeddingAliasData = {
     body: EmbeddingRequest;
     path?: never;
@@ -4570,6 +4643,51 @@ export type CreateOpenAiCompatibleEmbeddingAliasResponses = {
 };
 
 export type CreateOpenAiCompatibleEmbeddingAliasResponse = CreateOpenAiCompatibleEmbeddingAliasResponses[keyof CreateOpenAiCompatibleEmbeddingAliasResponses];
+
+export type CreateOpenAiCompatibleModerationAliasData = {
+    body: ModerationRequest;
+    path?: never;
+    query?: never;
+    url: '/api/provider/openai-compatible/v1/moderations';
+};
+
+export type CreateOpenAiCompatibleModerationAliasErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateOpenAiCompatibleModerationAliasError = CreateOpenAiCompatibleModerationAliasErrors[keyof CreateOpenAiCompatibleModerationAliasErrors];
+
+export type CreateOpenAiCompatibleModerationAliasResponses = {
+    /**
+     * OpenAI-compatible moderation response.
+     */
+    200: ModerationResponse;
+};
+
+export type CreateOpenAiCompatibleModerationAliasResponse = CreateOpenAiCompatibleModerationAliasResponses[keyof CreateOpenAiCompatibleModerationAliasResponses];
 
 export type CreateOpenAiCompatibleImageGenerationAliasData = {
     body: ImageGenerationRequest;

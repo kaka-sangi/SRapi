@@ -2184,6 +2184,42 @@ type ModelResponse struct {
 	RequestId RequestId `json:"request_id"`
 }
 
+// ModerationRequest defines model for ModerationRequest.
+type ModerationRequest struct {
+	Input                ModerationRequest_Input `json:"input"`
+	Model                string                  `json:"model"`
+	User                 *string                 `json:"user,omitempty"`
+	AdditionalProperties map[string]interface{}  `json:"-"`
+}
+
+// ModerationRequestInput0 defines model for .
+type ModerationRequestInput0 = string
+
+// ModerationRequestInput1 defines model for .
+type ModerationRequestInput1 = []string
+
+// ModerationRequest_Input defines model for ModerationRequest.Input.
+type ModerationRequest_Input struct {
+	union json.RawMessage
+}
+
+// ModerationResponse defines model for ModerationResponse.
+type ModerationResponse struct {
+	Id                   string                 `json:"id"`
+	Model                string                 `json:"model"`
+	Results              []ModerationResult     `json:"results"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// ModerationResult defines model for ModerationResult.
+type ModerationResult struct {
+	Categories                map[string]bool        `json:"categories"`
+	CategoryAppliedInputTypes *map[string][]string   `json:"category_applied_input_types,omitempty"`
+	CategoryScores            map[string]float32     `json:"category_scores"`
+	Flagged                   bool                   `json:"flagged"`
+	AdditionalProperties      map[string]interface{} `json:"-"`
+}
+
 // OpenAIModel defines model for OpenAIModel.
 type OpenAIModel struct {
 	Created *int              `json:"created,omitempty"`
@@ -3191,6 +3227,9 @@ type CreateOpenAICompatibleImageGenerationAliasJSONRequestBody = ImageGeneration
 // CreateOpenAICompatibleMessageAliasJSONRequestBody defines body for CreateOpenAICompatibleMessageAlias for application/json ContentType.
 type CreateOpenAICompatibleMessageAliasJSONRequestBody = AnthropicMessagesRequest
 
+// CreateOpenAICompatibleModerationAliasJSONRequestBody defines body for CreateOpenAICompatibleModerationAlias for application/json ContentType.
+type CreateOpenAICompatibleModerationAliasJSONRequestBody = ModerationRequest
+
 // CreateOpenAICompatibleResponseAliasJSONRequestBody defines body for CreateOpenAICompatibleResponseAlias for application/json ContentType.
 type CreateOpenAICompatibleResponseAliasJSONRequestBody = ResponsesRequest
 
@@ -3280,6 +3319,9 @@ type CreateImageGenerationJSONRequestBody = ImageGenerationRequest
 
 // CreateMessageJSONRequestBody defines body for CreateMessage for application/json ContentType.
 type CreateMessageJSONRequestBody = AnthropicMessagesRequest
+
+// CreateModerationJSONRequestBody defines body for CreateModeration for application/json ContentType.
+type CreateModerationJSONRequestBody = ModerationRequest
 
 // CreateResponseJSONRequestBody defines body for CreateResponse for application/json ContentType.
 type CreateResponseJSONRequestBody = ResponsesRequest
@@ -4975,6 +5017,305 @@ func (a ImageGenerationRequest) MarshalJSON() ([]byte, error) {
 	return json.Marshal(object)
 }
 
+// Getter for additional properties for ModerationRequest. Returns the specified
+// element and whether it was found
+func (a ModerationRequest) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for ModerationRequest
+func (a *ModerationRequest) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for ModerationRequest to handle AdditionalProperties
+func (a *ModerationRequest) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["input"]; found {
+		err = json.Unmarshal(raw, &a.Input)
+		if err != nil {
+			return fmt.Errorf("error reading 'input': %w", err)
+		}
+		delete(object, "input")
+	}
+
+	if raw, found := object["model"]; found {
+		err = json.Unmarshal(raw, &a.Model)
+		if err != nil {
+			return fmt.Errorf("error reading 'model': %w", err)
+		}
+		delete(object, "model")
+	}
+
+	if raw, found := object["user"]; found {
+		err = json.Unmarshal(raw, &a.User)
+		if err != nil {
+			return fmt.Errorf("error reading 'user': %w", err)
+		}
+		delete(object, "user")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for ModerationRequest to handle AdditionalProperties
+func (a ModerationRequest) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	object["input"], err = json.Marshal(a.Input)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'input': %w", err)
+	}
+
+	object["model"], err = json.Marshal(a.Model)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'model': %w", err)
+	}
+
+	if a.User != nil {
+		object["user"], err = json.Marshal(a.User)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'user': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for ModerationResponse. Returns the specified
+// element and whether it was found
+func (a ModerationResponse) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for ModerationResponse
+func (a *ModerationResponse) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for ModerationResponse to handle AdditionalProperties
+func (a *ModerationResponse) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["id"]; found {
+		err = json.Unmarshal(raw, &a.Id)
+		if err != nil {
+			return fmt.Errorf("error reading 'id': %w", err)
+		}
+		delete(object, "id")
+	}
+
+	if raw, found := object["model"]; found {
+		err = json.Unmarshal(raw, &a.Model)
+		if err != nil {
+			return fmt.Errorf("error reading 'model': %w", err)
+		}
+		delete(object, "model")
+	}
+
+	if raw, found := object["results"]; found {
+		err = json.Unmarshal(raw, &a.Results)
+		if err != nil {
+			return fmt.Errorf("error reading 'results': %w", err)
+		}
+		delete(object, "results")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for ModerationResponse to handle AdditionalProperties
+func (a ModerationResponse) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	object["id"], err = json.Marshal(a.Id)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'id': %w", err)
+	}
+
+	object["model"], err = json.Marshal(a.Model)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'model': %w", err)
+	}
+
+	if a.Results != nil {
+		object["results"], err = json.Marshal(a.Results)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'results': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for ModerationResult. Returns the specified
+// element and whether it was found
+func (a ModerationResult) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for ModerationResult
+func (a *ModerationResult) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for ModerationResult to handle AdditionalProperties
+func (a *ModerationResult) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["categories"]; found {
+		err = json.Unmarshal(raw, &a.Categories)
+		if err != nil {
+			return fmt.Errorf("error reading 'categories': %w", err)
+		}
+		delete(object, "categories")
+	}
+
+	if raw, found := object["category_applied_input_types"]; found {
+		err = json.Unmarshal(raw, &a.CategoryAppliedInputTypes)
+		if err != nil {
+			return fmt.Errorf("error reading 'category_applied_input_types': %w", err)
+		}
+		delete(object, "category_applied_input_types")
+	}
+
+	if raw, found := object["category_scores"]; found {
+		err = json.Unmarshal(raw, &a.CategoryScores)
+		if err != nil {
+			return fmt.Errorf("error reading 'category_scores': %w", err)
+		}
+		delete(object, "category_scores")
+	}
+
+	if raw, found := object["flagged"]; found {
+		err = json.Unmarshal(raw, &a.Flagged)
+		if err != nil {
+			return fmt.Errorf("error reading 'flagged': %w", err)
+		}
+		delete(object, "flagged")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for ModerationResult to handle AdditionalProperties
+func (a ModerationResult) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.Categories != nil {
+		object["categories"], err = json.Marshal(a.Categories)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'categories': %w", err)
+		}
+	}
+
+	if a.CategoryAppliedInputTypes != nil {
+		object["category_applied_input_types"], err = json.Marshal(a.CategoryAppliedInputTypes)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'category_applied_input_types': %w", err)
+		}
+	}
+
+	if a.CategoryScores != nil {
+		object["category_scores"], err = json.Marshal(a.CategoryScores)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'category_scores': %w", err)
+		}
+	}
+
+	object["flagged"], err = json.Marshal(a.Flagged)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'flagged': %w", err)
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
 // Getter for additional properties for ResponsesOutputItem. Returns the specified
 // element and whether it was found
 func (a ResponsesOutputItem) Get(fieldName string) (value interface{}, found bool) {
@@ -5785,6 +6126,68 @@ func (t *EmbeddingVector) UnmarshalJSON(b []byte) error {
 	return err
 }
 
+// AsModerationRequestInput0 returns the union data inside the ModerationRequest_Input as a ModerationRequestInput0
+func (t ModerationRequest_Input) AsModerationRequestInput0() (ModerationRequestInput0, error) {
+	var body ModerationRequestInput0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromModerationRequestInput0 overwrites any union data inside the ModerationRequest_Input as the provided ModerationRequestInput0
+func (t *ModerationRequest_Input) FromModerationRequestInput0(v ModerationRequestInput0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeModerationRequestInput0 performs a merge with any union data inside the ModerationRequest_Input, using the provided ModerationRequestInput0
+func (t *ModerationRequest_Input) MergeModerationRequestInput0(v ModerationRequestInput0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsModerationRequestInput1 returns the union data inside the ModerationRequest_Input as a ModerationRequestInput1
+func (t ModerationRequest_Input) AsModerationRequestInput1() (ModerationRequestInput1, error) {
+	var body ModerationRequestInput1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromModerationRequestInput1 overwrites any union data inside the ModerationRequest_Input as the provided ModerationRequestInput1
+func (t *ModerationRequest_Input) FromModerationRequestInput1(v ModerationRequestInput1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeModerationRequestInput1 performs a merge with any union data inside the ModerationRequest_Input, using the provided ModerationRequestInput1
+func (t *ModerationRequest_Input) MergeModerationRequestInput1(v ModerationRequestInput1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t ModerationRequest_Input) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *ModerationRequest_Input) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsResponsesRequestInput0 returns the union data inside the ResponsesRequest_Input as a ResponsesRequestInput0
 func (t ResponsesRequest_Input) AsResponsesRequestInput0() (ResponsesRequestInput0, error) {
 	var body ResponsesRequestInput0
@@ -5864,6 +6267,9 @@ type ServerInterface interface {
 	// Create an Anthropic Messages-compatible message with openai-compatible provider context.
 	// (POST /api/provider/openai-compatible/v1/messages)
 	CreateOpenAICompatibleMessageAlias(w http.ResponseWriter, r *http.Request)
+	// Create OpenAI-compatible moderation classifications with openai-compatible provider context.
+	// (POST /api/provider/openai-compatible/v1/moderations)
+	CreateOpenAICompatibleModerationAlias(w http.ResponseWriter, r *http.Request)
 	// Create an OpenAI Responses-compatible response with openai-compatible provider context.
 	// (POST /api/provider/openai-compatible/v1/responses)
 	CreateOpenAICompatibleResponseAlias(w http.ResponseWriter, r *http.Request)
@@ -6083,6 +6489,9 @@ type ServerInterface interface {
 	// List models available to the gateway API key.
 	// (GET /v1/models)
 	ListModels(w http.ResponseWriter, r *http.Request)
+	// Create OpenAI-compatible moderation classifications.
+	// (POST /v1/moderations)
+	CreateModeration(w http.ResponseWriter, r *http.Request)
 	// Create an OpenAI Responses-compatible response.
 	// (POST /v1/responses)
 	CreateResponse(w http.ResponseWriter, r *http.Request)
@@ -6194,6 +6603,26 @@ func (siw *ServerInterfaceWrapper) CreateOpenAICompatibleMessageAlias(w http.Res
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateOpenAICompatibleMessageAlias(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateOpenAICompatibleModerationAlias operation middleware
+func (siw *ServerInterfaceWrapper) CreateOpenAICompatibleModerationAlias(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateOpenAICompatibleModerationAlias(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -9039,6 +9468,26 @@ func (siw *ServerInterfaceWrapper) ListModels(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// CreateModeration operation middleware
+func (siw *ServerInterfaceWrapper) CreateModeration(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateModeration(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // CreateResponse operation middleware
 func (siw *ServerInterfaceWrapper) CreateResponse(w http.ResponseWriter, r *http.Request) {
 
@@ -9248,6 +9697,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/embeddings", wrapper.CreateOpenAICompatibleEmbeddingAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/images/generations", wrapper.CreateOpenAICompatibleImageGenerationAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/messages", wrapper.CreateOpenAICompatibleMessageAlias)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/moderations", wrapper.CreateOpenAICompatibleModerationAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/responses", wrapper.CreateOpenAICompatibleResponseAlias)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/account-groups", wrapper.ListAdminAccountGroups)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/account-groups", wrapper.CreateAdminAccountGroup)
@@ -9321,6 +9771,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/images/generations", wrapper.CreateImageGeneration)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/messages", wrapper.CreateMessage)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/models", wrapper.ListModels)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/moderations", wrapper.CreateModeration)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/responses", wrapper.CreateResponse)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1beta/models/{model}:generateContent", wrapper.GenerateGeminiContent)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1beta/models/{model}:streamGenerateContent", wrapper.StreamGeminiContent)

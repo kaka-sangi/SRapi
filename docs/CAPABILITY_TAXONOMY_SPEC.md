@@ -95,6 +95,21 @@ moderation_output
 structured_output
 ```
 
+### 4.2.1 端点族能力
+
+Endpoint capability 用于调度路由族，不替代输入/输出能力：
+
+```txt
+chat_completions
+responses
+messages
+embeddings
+images
+moderations
+```
+
+`moderations` 表示 Provider Account 能处理 `/v1/moderations` 兼容端点；`moderation_output` 表示模型/Provider 能产出审核分类结果。Gateway moderation 请求必须要求 `moderations.v1`，避免只具备文本生成能力的候选账号被误选。
+
 ### 4.3 交互能力
 
 ```txt

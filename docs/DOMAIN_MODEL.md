@@ -340,6 +340,7 @@ supports_json
 supports_audio
 supports_image_generation
 supports_embeddings
+supports_moderations
 supports_prompt_cache
 supports_context_cache
 supports_batch
@@ -567,6 +568,7 @@ anthropic_messages
 gemini_generate_content
 embeddings
 images
+moderations
 audio
 batch
 realtime

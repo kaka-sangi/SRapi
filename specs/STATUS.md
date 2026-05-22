@@ -37,14 +37,15 @@ last_completed:
 - WP-280: HTTP runtime partitioning split the 7750-line catch-all runtime into route-family files and added an architecture harness that keeps `runtime_http.go` thin and caps `runtime_*.go` file size.
 - WP-290: Images generations runtime v1 now exposes OpenAI-compatible `/v1/images/generations`, provider alias routing, canonical image normalization/rendering, OpenAI-compatible upstream `/images/generations` adapter dispatch, explicit `images` Scheduler capability filtering, usage/billing/Scheduler feedback evidence, and generated OpenAPI/SDK parity.
 - WP-300: Go code-quality harness now adds `make code-quality-check`, runs it from `make check`, and enforces gofmt drift, `go vet ./...`, production file-size, and production function-size thresholds.
+- WP-310: Moderations runtime v1 now exposes OpenAI-compatible `/v1/moderations`, provider alias routing, canonical moderation normalization/rendering, OpenAI-compatible upstream `/moderations` adapter dispatch, explicit `moderations` Scheduler capability filtering, usage/billing/Scheduler feedback evidence, and generated OpenAPI/SDK parity.
 
 current:
 
-- package: WP-310+
+- package: WP-320+
 - status: pending
 - objective: split the next advanced endpoint and provider expansion package from the roadmap.
 
-next_recommended: WP-310+
+next_recommended: WP-320+
 
 last_gates:
 
@@ -103,6 +104,8 @@ notes:
 - WP-290 added `images` to the canonical capability registry and provider convenience key mapping, so Scheduler requires explicit image endpoint support before routing image generation requests.
 - WP-290 added `TestOpenAICompatibleAdapterInvokesImageGenerationsUpstream`, `TestGatewayImageGenerationRouteTargetsOpenAICompatibleUpstream`, and `TestGatewayImageGenerationAliasForcesProviderContext`.
 - WP-300 calibrated code-quality thresholds to current production code: non-generated production Go files must stay at or below 2200 lines, and non-generated production functions must stay at or below 220 lines.
+- WP-310 added `moderations` to the canonical capability registry and provider convenience key mapping, so Scheduler requires explicit moderation endpoint support before routing moderation requests.
+- WP-310 added `TestOpenAICompatibleAdapterInvokesModerationsUpstream`, `TestGatewayModerationRouteTargetsOpenAICompatibleUpstream`, and `TestGatewayModerationAliasForcesProviderContext`.
 
 ## Work Package Ledger
 
@@ -139,4 +142,5 @@ notes:
 | WP-280 | completed | HTTP runtime partition and size harness. |
 | WP-290 | completed | Images generations runtime v1. |
 | WP-300 | completed | Go code-quality harness. |
-| WP-310+ | pending | Remaining advanced endpoint and provider expansion packages. |
+| WP-310 | completed | Moderations runtime v1. |
+| WP-320+ | pending | Remaining advanced endpoint and provider expansion packages. |
