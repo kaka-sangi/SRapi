@@ -1704,7 +1704,54 @@ Required gates:
 - `make secret-scan`
 - `git diff --check`
 
-## WP-450+: Ecosystem And Remaining Advanced Surface
+## WP-450: Antigravity Official-Client Upstream Shape v1
+
+Objective: make `reverse-proxy-antigravity` construct the Antigravity / Google Cloud Code official-client `v1internal` upstream shape through Reverse Proxy Runtime, instead of treating Antigravity 2api as generic OpenAI/Anthropic/Gemini compatible upstream HTTP.
+
+Read first:
+
+- `docs/2API_REVERSE_PROXY_DEFINITION.md`
+- `docs/REVERSE_PROXY_SPEC.md`
+- `docs/PROVIDER_ADAPTER_SPEC.md`
+- `docs/AI_ENDPOINT_COMPATIBILITY.md`
+- `docs/GATEWAY_ROUTE_MATRIX.md`
+- `apps/api/internal/modules/provider_adapters/contract`
+- `apps/api/internal/modules/provider_adapters/service`
+- `apps/api/internal/modules/reverse_proxy/contract`
+- local reference: `/home/senran/Desktop/CLIProxyAPI/internal/runtime/executor/antigravity_executor.go`
+- local reference: `/home/senran/Desktop/sub2api/backend/internal/pkg/antigravity/request_transformer.go`
+- local reference: `/home/senran/Desktop/sub2api/backend/internal/service/antigravity_gateway_service.go`
+
+Owns:
+
+- Antigravity reverse-proxy adapter dispatch for text requests.
+- Antigravity upstream endpoint derivation: `{base_url}/v1internal:generateContent` and `{base_url}/v1internal:streamGenerateContent?alt=sse`.
+- Antigravity official-client request envelope: `project`, `requestId`, `userAgent`, `requestType`, `model`, and nested Gemini `request`.
+- OpenAI-compatible, Anthropic-compatible, and Gemini-compatible canonical text inputs mapped into the nested Gemini request without Gateway-local Antigravity DTOs.
+- Reverse Proxy Runtime credential injection for desktop/IDE/OAuth/client-token runtime classes; `api_key` remains official API-key adapter behavior and is not an Antigravity 2api credential source.
+- v1internal response unwrapping and parsing into the caller's existing OpenAI/Anthropic/Gemini downstream response rendering path.
+- Focused adapter and Gateway regressions proving selected account credentials reach upstream while caller/SRapi auth does not.
+
+Definition of Done:
+
+- `reverse-proxy-antigravity` text requests call Cloud Code `v1internal` endpoints and must not call generic `/chat/completions`, `/messages`, or public Gemini `models/{model}:generateContent` upstream paths.
+- Runtime receives selected account context and injects account credentials; caller auth must not be forwarded.
+- `reverse-proxy-antigravity` rejects `runtime_class = api_key` and requires OAuth/session/desktop/IDE/client-token style account credentials.
+- Upstream body includes mapped upstream model, configured `project_id`, generated Antigravity request/session IDs, and nested Gemini-compatible request payload with no SRapi internal fields.
+- Gateway regression proves `/v1/chat/completions` can schedule an Antigravity reverse-proxy account, send desktop bearer upstream to `/v1internal:generateContent`, and record Scheduler/usage evidence.
+- This package does not implement Antigravity OAuth onboarding, project discovery, credit overage retry policy, full tool-schema cleaning, or persistent realtime session lifecycle.
+- No frontend visuals are added.
+
+Required gates:
+
+- `cd apps/api && go test ./internal/modules/provider_adapters/... ./internal/modules/reverse_proxy/... ./internal/httpserver`
+- `cd apps/api && go test ./...`
+- `make architecture-check`
+- `make code-quality-check`
+- `make secret-scan`
+- `git diff --check`
+
+## WP-460+: Ecosystem And Remaining Advanced Surface
 
 Use `ROADMAP.md` Phase 7 through Phase 8 to split future packages for:
 

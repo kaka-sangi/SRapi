@@ -51,25 +51,21 @@ last_completed:
 - WP-420: Claude Code CLI 2api HTTP Messages path now sends `reverse-proxy-claude-code-cli` requests through Reverse Proxy Runtime to `/messages?beta=true`, builds Claude Code beta/version/stainless/session headers plus system/billing blocks, and enforces the OAuth/session/client-token credential boundary instead of treating API keys as 2api identity.
 - WP-430: ChatGPT Web 2api HTTP Conversation path now sends `reverse-proxy-chatgpt-web` requests through Reverse Proxy Runtime to `/backend-api/conversation`, builds browser/OAI/Sentinel headers plus ChatGPT Web Conversation body, and enforces the OAuth/session/client-token credential boundary instead of treating API keys as 2api identity.
 - WP-440: ChatGPT Web 2api now auto-fetches Sentinel chat requirements through Reverse Proxy Runtime when a static requirements token is absent, including homepage bootstrap, legacy requirements `p` generation, optional PoW proof token generation, and Arkose/Turnstile challenge classification.
+- WP-450: Antigravity 2api HTTP text path now sends `reverse-proxy-antigravity` requests through Reverse Proxy Runtime to Google Cloud Code `/v1internal:generateContent` or `/v1internal:streamGenerateContent?alt=sse`, builds the Antigravity `project`/`requestId`/`userAgent`/`requestType` envelope with nested Gemini request payload, and enforces the desktop/IDE/OAuth credential boundary instead of treating API keys as 2api identity.
 
 current:
 
-- package: WP-450+
+- package: WP-460+
 - status: pending
 - objective: split the next ecosystem or remaining advanced endpoint package from the roadmap.
 
-next_recommended: WP-450+
+next_recommended: WP-460+
 
 last_gates:
 
-- `make openapi-lint`: pass
-- `make openapi-bundle`: pass
-- `make openapi-codegen-check`: pass
-- `make openapi-ts-codegen-check`: pass
-- `make sdk-ts-typecheck`: pass
-- `make ent-generate-check`: pass
-- `make migration-check`: pass
-- `cd apps/api && go test ./internal/httpserver ./internal/architecture`: pass
+- `cd apps/api && go test ./internal/modules/provider_adapters/... -run 'TestReverseProxyAntigravity|TestReverseProxyAdapterStreamsThroughRuntime'`: pass
+- `cd apps/api && go test ./internal/httpserver -run 'TestGatewayAntigravity|TestGateway.*Antigravity'`: pass
+- `cd apps/api && go test ./internal/modules/provider_adapters/... ./internal/modules/reverse_proxy/... ./internal/httpserver`: pass
 - `cd apps/api && go test ./...`: pass
 - `make architecture-check`: pass
 - `make code-quality-check`: pass
@@ -146,6 +142,8 @@ notes:
 - WP-430 added `TestReverseProxyChatGPTWebAdapterUsesConversationOfficialClientShape`, `TestReverseProxyChatGPTWebRejectsAPIKeyRuntime`, and `TestGatewayChatGPTWebReverseProxyUsesConversationOfficialClientShape`, proving ChatGPT Web 2api uses selected account OAuth/session credentials, browser/OAI/Sentinel headers, `/backend-api/conversation`, ChatGPT Web Conversation body, and Scheduler/usage evidence without Gateway-local DTOs.
 - WP-440 added `TestReverseProxyChatGPTWebAdapterAutoFetchesRequirements`, `TestReverseProxyChatGPTWebMissingRequirementsCanDisableAutoFetch`, and updated `TestGatewayChatGPTWebReverseProxyUsesConversationOfficialClientShape`, proving missing static requirements tokens trigger selected-account bootstrap and `/backend-api/sentinel/chat-requirements` before conversation without Gateway-local DTOs.
 - WP-440 intentionally does not implement external Arkose/Turnstile solving, challenge token persistence, or browser TLS impersonation.
+- WP-450 added Antigravity official-client upstream shape coverage across OpenAI-compatible, Anthropic-compatible, Gemini-compatible adapter inputs plus `TestReverseProxyAntigravityRejectsAPIKeyRuntime` and an updated Gateway regression proving `/v1/chat/completions` schedules an Antigravity desktop account and sends `/v1internal:generateContent` with selected account bearer credentials.
+- WP-450 intentionally does not implement Antigravity OAuth onboarding, project discovery, credit overage retry policy, full tool-schema cleaning, or persistent realtime session lifecycle.
 
 ## Work Package Ledger
 
@@ -196,4 +194,5 @@ notes:
 | WP-420 | completed | Claude Code CLI 2api Messages upstream shape v1 with OAuth/session/client-token boundary. |
 | WP-430 | completed | ChatGPT Web 2api Conversation upstream shape v1 with OAuth/session/client-token boundary. |
 | WP-440 | completed | ChatGPT Web Sentinel requirements auto-fetch v1 through Reverse Proxy Runtime. |
-| WP-450+ | pending | Remaining ecosystem and advanced endpoint packages. |
+| WP-450 | completed | Antigravity official-client v1internal upstream shape v1 through Reverse Proxy Runtime. |
+| WP-460+ | pending | Remaining ecosystem and advanced endpoint packages. |

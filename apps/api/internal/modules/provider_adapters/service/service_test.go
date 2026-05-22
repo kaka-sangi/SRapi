@@ -1981,7 +1981,7 @@ func TestReverseProxyAntigravityOpenAIAdapterDispatchesThroughRuntime(t *testing
 	runtime := capturingRuntime{
 		response: reverseproxycontract.Response{
 			StatusCode: http.StatusOK,
-			Body:       []byte(`{"choices":[{"message":{"role":"assistant","content":"antigravity openai response"}}],"usage":{"input_tokens":2,"output_tokens":3}}`),
+			Body:       []byte(`{"response":{"candidates":[{"content":{"parts":[{"text":"antigravity openai response"}]}}],"usageMetadata":{"promptTokenCount":2,"candidatesTokenCount":3}},"traceId":"trace-1"}`),
 		},
 	}
 	svc, err := service.NewWithReverseProxy(nil, &runtime)
@@ -2000,7 +2000,7 @@ func TestReverseProxyAntigravityOpenAIAdapterDispatchesThroughRuntime(t *testing
 			ID:             15,
 			RuntimeClass:   accountcontract.RuntimeClassDesktopClientToken,
 			UpstreamClient: ptrString("antigravity_desktop"),
-			Metadata:       map[string]any{"base_url": "https://antigravity.example/openai/v1"},
+			Metadata:       map[string]any{"base_url": "https://antigravity.example", "project_id": "project-1"},
 		},
 		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "antigravity-openai-upstream"},
 		Credential: map[string]any{"access_token": "desktop-token"},
@@ -2011,8 +2011,11 @@ func TestReverseProxyAntigravityOpenAIAdapterDispatchesThroughRuntime(t *testing
 	if resp.Text != "antigravity openai response" || resp.Usage.InputTokens != 2 || resp.Usage.OutputTokens != 3 {
 		t.Fatalf("unexpected antigravity openai response: %+v", resp)
 	}
-	if runtime.request.Method != http.MethodPost || runtime.request.URL != "https://antigravity.example/openai/v1/chat/completions" {
+	if runtime.request.Method != http.MethodPost || runtime.request.URL != "https://antigravity.example/v1internal:generateContent" {
 		t.Fatalf("unexpected antigravity openai request: %+v", runtime.request)
+	}
+	if runtime.request.Headers.Get("Content-Type") != "application/json" || runtime.request.Headers.Get("Authorization") != "" {
+		t.Fatalf("adapter should leave antigravity auth injection to runtime, got %+v", runtime.request.Headers)
 	}
 	if runtime.request.Account.RuntimeClass != string(accountcontract.RuntimeClassDesktopClientToken) ||
 		runtime.request.Account.UpstreamClient == nil ||
@@ -2021,15 +2024,43 @@ func TestReverseProxyAntigravityOpenAIAdapterDispatchesThroughRuntime(t *testing
 		t.Fatalf("expected antigravity desktop runtime context, got %+v", runtime.request.Account)
 	}
 	var payload struct {
-		Model    string `json:"model"`
-		Messages []struct {
-			Content string `json:"content"`
-		} `json:"messages"`
+		Project     string `json:"project"`
+		RequestID   string `json:"requestId"`
+		UserAgent   string `json:"userAgent"`
+		RequestType string `json:"requestType"`
+		Model       string `json:"model"`
+		Request     struct {
+			SessionID        string `json:"sessionId"`
+			GenerationConfig struct {
+				MaxOutputTokens int `json:"maxOutputTokens"`
+			} `json:"generationConfig"`
+			Contents []struct {
+				Role  string `json:"role"`
+				Parts []struct {
+					Text string `json:"text"`
+				} `json:"parts"`
+			} `json:"contents"`
+			SafetySettings []struct {
+				Threshold string `json:"threshold"`
+			} `json:"safetySettings"`
+		} `json:"request"`
 	}
 	if err := json.Unmarshal(runtime.request.Body, &payload); err != nil {
 		t.Fatalf("decode antigravity openai payload: %v", err)
 	}
-	if payload.Model != "antigravity-openai-upstream" || len(payload.Messages) != 1 || payload.Messages[0].Content != "hello" {
+	if payload.Project != "project-1" ||
+		!strings.HasPrefix(payload.RequestID, "agent-") ||
+		payload.UserAgent != "antigravity" ||
+		payload.RequestType != "agent" ||
+		payload.Model != "antigravity-openai-upstream" ||
+		payload.Request.SessionID == "" ||
+		payload.Request.GenerationConfig.MaxOutputTokens != 0 ||
+		len(payload.Request.Contents) != 1 ||
+		payload.Request.Contents[0].Role != "user" ||
+		len(payload.Request.Contents[0].Parts) != 1 ||
+		payload.Request.Contents[0].Parts[0].Text != "hello" ||
+		len(payload.Request.SafetySettings) == 0 ||
+		payload.Request.SafetySettings[0].Threshold != "OFF" {
 		t.Fatalf("unexpected antigravity openai payload: %+v", payload)
 	}
 }
@@ -2038,7 +2069,7 @@ func TestReverseProxyAntigravityAnthropicAdapterDispatchesThroughRuntime(t *test
 	runtime := capturingRuntime{
 		response: reverseproxycontract.Response{
 			StatusCode: http.StatusOK,
-			Body:       []byte(`{"content":[{"type":"text","text":"antigravity anthropic response"}],"usage":{"input_tokens":3,"output_tokens":4}}`),
+			Body:       []byte(`{"response":{"candidates":[{"content":{"parts":[{"text":"antigravity anthropic response"}]}}],"usageMetadata":{"promptTokenCount":3,"candidatesTokenCount":4}}}`),
 		},
 	}
 	svc, err := service.NewWithReverseProxy(nil, &runtime)
@@ -2057,7 +2088,7 @@ func TestReverseProxyAntigravityAnthropicAdapterDispatchesThroughRuntime(t *test
 			ID:             17,
 			RuntimeClass:   accountcontract.RuntimeClassDesktopClientToken,
 			UpstreamClient: ptrString("antigravity_desktop"),
-			Metadata:       map[string]any{"base_url": "https://antigravity.example/anthropic/v1"},
+			Metadata:       map[string]any{"base_url": "https://antigravity.example", "project_id": "project-1"},
 		},
 		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "claude-upstream"},
 		Credential: map[string]any{"access_token": "desktop-token"},
@@ -2068,10 +2099,10 @@ func TestReverseProxyAntigravityAnthropicAdapterDispatchesThroughRuntime(t *test
 	if resp.Text != "antigravity anthropic response" || resp.Usage.InputTokens != 3 || resp.Usage.OutputTokens != 4 {
 		t.Fatalf("unexpected antigravity anthropic response: %+v", resp)
 	}
-	if runtime.request.Method != http.MethodPost || runtime.request.URL != "https://antigravity.example/anthropic/v1/messages" {
+	if runtime.request.Method != http.MethodPost || runtime.request.URL != "https://antigravity.example/v1internal:generateContent" {
 		t.Fatalf("unexpected antigravity anthropic request: %+v", runtime.request)
 	}
-	if runtime.request.Headers.Get("anthropic-version") == "" || runtime.request.Headers.Get("x-api-key") != "" || runtime.request.Headers.Get("Authorization") != "" {
+	if runtime.request.Headers.Get("anthropic-version") != "" || runtime.request.Headers.Get("x-api-key") != "" || runtime.request.Headers.Get("Authorization") != "" {
 		t.Fatalf("unexpected antigravity anthropic headers: %+v", runtime.request.Headers)
 	}
 	if runtime.request.Account.RuntimeClass != string(accountcontract.RuntimeClassDesktopClientToken) ||
@@ -2081,15 +2112,27 @@ func TestReverseProxyAntigravityAnthropicAdapterDispatchesThroughRuntime(t *test
 		t.Fatalf("expected antigravity desktop runtime context, got %+v", runtime.request.Account)
 	}
 	var payload struct {
-		Model    string `json:"model"`
-		Messages []struct {
-			Content string `json:"content"`
-		} `json:"messages"`
+		Model   string `json:"model"`
+		Request struct {
+			Contents []struct {
+				Parts []struct {
+					Text string `json:"text"`
+				} `json:"parts"`
+			} `json:"contents"`
+			ToolConfig *struct {
+				FunctionCallingConfig map[string]string `json:"functionCallingConfig"`
+			} `json:"toolConfig"`
+		} `json:"request"`
 	}
 	if err := json.Unmarshal(runtime.request.Body, &payload); err != nil {
 		t.Fatalf("decode antigravity anthropic payload: %v", err)
 	}
-	if payload.Model != "claude-upstream" || len(payload.Messages) != 1 || payload.Messages[0].Content != "hello anthropic" {
+	if payload.Model != "claude-upstream" ||
+		len(payload.Request.Contents) != 1 ||
+		len(payload.Request.Contents[0].Parts) != 1 ||
+		payload.Request.Contents[0].Parts[0].Text != "hello anthropic" ||
+		payload.Request.ToolConfig == nil ||
+		payload.Request.ToolConfig.FunctionCallingConfig["mode"] != "VALIDATED" {
 		t.Fatalf("unexpected antigravity anthropic payload: %+v", payload)
 	}
 }
@@ -2098,7 +2141,7 @@ func TestReverseProxyAntigravityGeminiAdapterDispatchesThroughRuntime(t *testing
 	runtime := capturingRuntime{
 		response: reverseproxycontract.Response{
 			StatusCode: http.StatusOK,
-			Body:       []byte(`{"candidates":[{"content":{"parts":[{"text":"antigravity gemini response"}]}}],"usageMetadata":{"promptTokenCount":4,"candidatesTokenCount":5}}`),
+			Body:       []byte(`{"response":{"candidates":[{"content":{"parts":[{"text":"antigravity gemini response"}]}}],"usageMetadata":{"promptTokenCount":4,"candidatesTokenCount":5}}}`),
 		},
 	}
 	svc, err := service.NewWithReverseProxy(nil, &runtime)
@@ -2117,7 +2160,7 @@ func TestReverseProxyAntigravityGeminiAdapterDispatchesThroughRuntime(t *testing
 			ID:             16,
 			RuntimeClass:   accountcontract.RuntimeClassDesktopClientToken,
 			UpstreamClient: ptrString("antigravity_desktop"),
-			Metadata:       map[string]any{"base_url": "https://antigravity.example/v1beta"},
+			Metadata:       map[string]any{"base_url": "https://antigravity.example", "project_id": "project-1"},
 		},
 		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gemini-pro"},
 		Credential: map[string]any{"access_token": "desktop-token"},
@@ -2128,7 +2171,7 @@ func TestReverseProxyAntigravityGeminiAdapterDispatchesThroughRuntime(t *testing
 	if resp.Text != "antigravity gemini response" || resp.Usage.InputTokens != 4 || resp.Usage.OutputTokens != 5 {
 		t.Fatalf("unexpected antigravity gemini response: %+v", resp)
 	}
-	if runtime.request.Method != http.MethodPost || runtime.request.URL != "https://antigravity.example/v1beta/models/gemini-pro:generateContent" {
+	if runtime.request.Method != http.MethodPost || runtime.request.URL != "https://antigravity.example/v1internal:generateContent" {
 		t.Fatalf("unexpected antigravity gemini request: %+v", runtime.request)
 	}
 	if runtime.request.Account.RuntimeClass != string(accountcontract.RuntimeClassDesktopClientToken) ||
@@ -2138,17 +2181,146 @@ func TestReverseProxyAntigravityGeminiAdapterDispatchesThroughRuntime(t *testing
 		t.Fatalf("expected antigravity desktop runtime context, got %+v", runtime.request.Account)
 	}
 	var payload struct {
-		Contents []struct {
-			Parts []struct {
-				Text string `json:"text"`
-			} `json:"parts"`
-		} `json:"contents"`
+		Model   string `json:"model"`
+		Request struct {
+			Contents []struct {
+				Parts []struct {
+					Text string `json:"text"`
+				} `json:"parts"`
+			} `json:"contents"`
+		} `json:"request"`
 	}
 	if err := json.Unmarshal(runtime.request.Body, &payload); err != nil {
 		t.Fatalf("decode antigravity gemini payload: %v", err)
 	}
-	if len(payload.Contents) != 1 || len(payload.Contents[0].Parts) != 1 || payload.Contents[0].Parts[0].Text != "hello gemini" {
+	if payload.Model != "gemini-pro" || len(payload.Request.Contents) != 1 || len(payload.Request.Contents[0].Parts) != 1 || payload.Request.Contents[0].Parts[0].Text != "hello gemini" {
 		t.Fatalf("unexpected antigravity gemini payload: %+v", payload)
+	}
+}
+
+func TestReverseProxyAntigravityCleansToolSchemas(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body:       []byte(`{"response":{"candidates":[{"content":{"parts":[{"text":"schema response"}]}}],"usageMetadata":{"promptTokenCount":1,"candidatesTokenCount":1}}}`),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeText(context.Background(), contract.TextRequest{
+		RequestID: "req_antigravity_schema",
+		Model:     "antigravity-local",
+		Prompt:    "hello",
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-antigravity",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             15,
+			RuntimeClass:   accountcontract.RuntimeClassDesktopClientToken,
+			UpstreamClient: ptrString("antigravity_desktop"),
+			Metadata:       map[string]any{"base_url": "https://antigravity.example", "project_id": "project-1"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "antigravity-openai-upstream"},
+		Credential: map[string]any{"access_token": "desktop-token"},
+		Tools: []map[string]any{
+			{
+				"type": "function",
+				"function": map[string]any{
+					"name":        "lookup",
+					"description": "lookup data",
+					"parameters": map[string]any{
+						"$schema":    "https://json-schema.org/draft/2020-12/schema",
+						"type":       "object",
+						"nullable":   true,
+						"enumTitles": []any{"unused"},
+						"properties": map[string]any{
+							"query": map[string]any{
+								"type":       "string",
+								"nullable":   true,
+								"deprecated": true,
+								"prefill":    "x",
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("invoke antigravity schema adapter: %v", err)
+	}
+	var payload struct {
+		Request struct {
+			Tools []struct {
+				FunctionDeclarations []struct {
+					Parameters map[string]any `json:"parameters"`
+				} `json:"functionDeclarations"`
+			} `json:"tools"`
+		} `json:"request"`
+	}
+	if err := json.Unmarshal(runtime.request.Body, &payload); err != nil {
+		t.Fatalf("decode antigravity schema payload: %v", err)
+	}
+	if len(payload.Request.Tools) != 1 || len(payload.Request.Tools[0].FunctionDeclarations) != 1 {
+		t.Fatalf("unexpected antigravity tools payload: %+v", payload)
+	}
+	params := payload.Request.Tools[0].FunctionDeclarations[0].Parameters
+	if _, ok := params["$schema"]; ok {
+		t.Fatalf("schema key should be removed: %+v", params)
+	}
+	if _, ok := params["enumTitles"]; ok {
+		t.Fatalf("enumTitles should be removed: %+v", params)
+	}
+	if got, ok := params["type"].([]any); !ok || len(got) != 2 || got[0] != "object" || got[1] != "null" {
+		t.Fatalf("nullable object type should be normalized, got %+v", params["type"])
+	}
+	props := params["properties"].(map[string]any)
+	query := props["query"].(map[string]any)
+	if _, ok := query["deprecated"]; ok {
+		t.Fatalf("nested deprecated should be removed: %+v", query)
+	}
+	if _, ok := query["prefill"]; ok {
+		t.Fatalf("nested prefill should be removed: %+v", query)
+	}
+	if got, ok := query["type"].([]any); !ok || len(got) != 2 || got[0] != "string" || got[1] != "null" {
+		t.Fatalf("nullable string type should be normalized, got %+v", query["type"])
+	}
+}
+
+func TestReverseProxyAntigravityRejectsAPIKeyRuntime(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body:       []byte(`{"response":{"candidates":[{"content":{"parts":[{"text":"should not call"}]}}]}}`),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeText(context.Background(), contract.TextRequest{
+		RequestID: "req_antigravity_api_key_runtime",
+		Model:     "antigravity-local",
+		Prompt:    "hello",
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-antigravity",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             15,
+			RuntimeClass:   accountcontract.RuntimeClassAPIKey,
+			UpstreamClient: ptrString("antigravity_desktop"),
+			Metadata:       map[string]any{"base_url": "https://antigravity.example", "project_id": "project-1"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "antigravity-openai-upstream"},
+		Credential: map[string]any{"api_key": "sk-secret"},
+	})
+	assertProviderError(t, err, "invalid_request", http.StatusBadRequest)
+	if runtime.request.URL != "" {
+		t.Fatalf("reverse proxy runtime should not be called for api_key runtime, got %+v", runtime.request)
 	}
 }
 

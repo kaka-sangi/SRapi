@@ -153,7 +153,9 @@ Antigravity 可承载 Claude-shaped 和 Gemini-shaped 端点，必须在 route m
 一阶后端反代身份已实现：管理员可配置 `adapter_type = reverse-proxy-antigravity`、
 `runtime_class = desktop_client_token` 或 `ide_plugin_token`、`upstream_client = antigravity_desktop`，
 并通过现有 `/v1/chat/completions`、`/v1/messages` 或 Gemini-native Gateway 路径进入
-Scheduler / Provider Adapter / Reverse Proxy Runtime。上游子协议由 `provider.protocol` 决定。
+Scheduler / Provider Adapter / Reverse Proxy Runtime。WP-450 起，上游请求由 Provider Adapter
+转换为 Antigravity / Google Cloud Code `v1internal` official-client shape；`provider.protocol`
+只决定下游协议归一化和响应渲染。
 WP-360 起，Antigravity 文本 alias 已实现：`/antigravity/v1/chat/completions`、
 `/api/provider/antigravity/v1/chat/completions`、`/antigravity/v1/messages` 和
 `/api/provider/antigravity/v1/messages` 强制 `provider_key=antigravity`，仍复用标准

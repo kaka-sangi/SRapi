@@ -72,7 +72,8 @@ Implementation status:
 - WP-420 implements the Claude Code CLI 2api Messages HTTP path: `reverse-proxy-claude-code-cli` builds `/messages?beta=true`, Claude Code OAuth/beta/version/stainless/session headers, and Claude Code system/billing blocks, while Reverse Proxy Runtime injects the selected OAuth/CLI token.
 - WP-430 implements the ChatGPT Web 2api Conversation HTTP path: `reverse-proxy-chatgpt-web` builds `/backend-api/conversation`, browser/OAI/Sentinel headers, and ChatGPT Web Conversation body, while Reverse Proxy Runtime injects the selected OAuth/Web-session token.
 - WP-440 adds ChatGPT Web Sentinel requirements auto fetch: if the selected account has no static requirements token, the adapter bootstraps ChatGPT Web and posts `/backend-api/sentinel/chat-requirements` through Reverse Proxy Runtime before the conversation request.
-- Persistent Codex WebSocket session reuse, richer prompt-cache policy, local Codex CLI client ingress, Claude Code WebSocket adapters, and Antigravity WebSocket adapters are still follow-up work.
+- WP-450 implements the Antigravity Desktop/IDE 2api HTTP text path: `reverse-proxy-antigravity` builds Google Cloud Code `/v1internal:generateContent` or `/v1internal:streamGenerateContent?alt=sse` requests with Antigravity `project`/`requestId`/`userAgent`/`requestType` envelope, while Reverse Proxy Runtime injects the selected desktop/IDE/OAuth token.
+- Persistent Codex WebSocket session reuse, richer prompt-cache policy, local Codex CLI client ingress, Claude Code WebSocket adapters, Antigravity WebSocket adapters, Antigravity OAuth onboarding, and project discovery are still follow-up work.
 
 ## 6. Boundary Rules
 

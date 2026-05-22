@@ -107,7 +107,7 @@ gemini-compatible       -> /models/{model}:generateContent 或 :streamGenerateCo
 native-gemini           -> /models/{model}:generateContent 或 :streamGenerateContent
 reverse-proxy-chatgpt-web -> Reverse Proxy Runtime + ChatGPT Web /backend-api/conversation payload
 reverse-proxy-gemini-cli -> Reverse Proxy Runtime + Gemini GenerateContent payload
-reverse-proxy-antigravity -> Reverse Proxy Runtime + provider.protocol 选择的 OpenAI/Anthropic/Gemini payload
+reverse-proxy-antigravity -> Reverse Proxy Runtime + Antigravity / Google Cloud Code v1internal payload
 ```
 
 WP-430 ChatGPT Web 2api boundary:
@@ -128,11 +128,15 @@ WP-420 Claude Code 2api boundary:
 - Runtime-owned transport still injects the selected account credential as OAuth/CLI bearer and strips caller/SRapi headers; adapter must not forward caller `Authorization` or add `x-api-key`.
 - `runtime_class = api_key` is rejected for this adapter because Claude Code 2api means official-client OAuth/session/client-token simulation, not Anthropic API-key mode.
 
-`reverse-proxy-antigravity` 是客户端身份，不是独立文本协议。Adapter 必须继续通过
-`provider.protocol` 选择目标上游形状：`openai-compatible` 走 `/chat/completions`，
-`anthropic-compatible` 走 `/messages`，`gemini-compatible` 走 Gemini `generateContent`。
-对应账号推荐使用 `runtime_class = desktop_client_token` 或 `ide_plugin_token`，
-`upstream_client = antigravity_desktop`。
+WP-450 Antigravity 2api boundary:
+
+- `reverse-proxy-antigravity` dispatches text requests through Reverse Proxy Runtime to Antigravity / Google Cloud Code `v1internal` endpoints, not to generic `/chat/completions`, `/messages`, or public Gemini `models/{model}:generateContent`.
+- `provider.protocol` still describes the downstream/client source protocol and Gateway normalization path, but Antigravity upstream text dispatch always uses the official-client envelope with nested Gemini request fields.
+- The upstream endpoint is `{base_url}/v1internal:generateContent` or `{base_url}/v1internal:streamGenerateContent?alt=sse`; account metadata should store `base_url` at the Cloud Code origin such as `https://cloudcode-pa.googleapis.com`.
+- Adapter-owned official-client shape includes `project`, `requestId`, `userAgent: antigravity`, `requestType`, mapped upstream `model`, nested `request.contents`, optional `systemInstruction`, `generationConfig`, `tools`, `toolConfig`, safety settings, and `sessionId`.
+- Runtime-owned transport injects the selected account credential as desktop/IDE/OAuth bearer and strips caller/SRapi headers; adapter must not forward caller `Authorization`.
+- `runtime_class = api_key` is rejected for this adapter because Antigravity 2api means official desktop/IDE/OAuth simulation, not Google/Gemini API-key mode.
+- Antigravity OAuth onboarding, project discovery, credit overage retry policy, full schema cleaning, and persistent realtime session lifecycle remain follow-up packages.
 
 ## 4. Adapter 生命周期
 

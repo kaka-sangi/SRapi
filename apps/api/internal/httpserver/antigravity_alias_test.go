@@ -17,6 +17,8 @@ func TestGatewayAntigravityProviderAliasTargetsOpenAIReverseProxy(t *testing.T) 
 		Path          string
 		Authorization string
 		UserAgent     string
+		Project       string
+		RequestID     string
 		Model         string
 		Prompt        string
 	}
@@ -26,28 +28,40 @@ func TestGatewayAntigravityProviderAliasTargetsOpenAIReverseProxy(t *testing.T) 
 	)
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var payload struct {
-			Model    string `json:"model"`
-			Messages []struct {
-				Content string `json:"content"`
-			} `json:"messages"`
+			Project   string `json:"project"`
+			RequestID string `json:"requestId"`
+			UserAgent string `json:"userAgent"`
+			Model     string `json:"model"`
+			Request   struct {
+				Contents []struct {
+					Parts []struct {
+						Text string `json:"text"`
+					} `json:"parts"`
+				} `json:"contents"`
+			} `json:"request"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 			t.Fatalf("decode upstream request: %v", err)
+		}
+		if payload.UserAgent != "antigravity" {
+			t.Fatalf("expected antigravity v1internal userAgent, got %+v", payload)
 		}
 		call := upstreamCall{
 			Path:          r.URL.Path,
 			Authorization: r.Header.Get("Authorization"),
 			UserAgent:     r.Header.Get("User-Agent"),
+			Project:       payload.Project,
+			RequestID:     payload.RequestID,
 			Model:         payload.Model,
 		}
-		if len(payload.Messages) > 0 {
-			call.Prompt = payload.Messages[0].Content
+		if len(payload.Request.Contents) > 0 && len(payload.Request.Contents[0].Parts) > 0 {
+			call.Prompt = payload.Request.Contents[0].Parts[0].Text
 		}
 		mu.Lock()
 		calls = append(calls, call)
 		mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"antigravity alias ok"}}],"usage":{"input_tokens":8,"output_tokens":9}}`))
+		_, _ = w.Write([]byte(`{"response":{"candidates":[{"content":{"parts":[{"text":"antigravity alias ok"}]}}],"usageMetadata":{"promptTokenCount":8,"candidatesTokenCount":9,"totalTokenCount":17}}}`))
 	}))
 	defer upstream.Close()
 
@@ -59,7 +73,7 @@ func TestGatewayAntigravityProviderAliasTargetsOpenAIReverseProxy(t *testing.T) 
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","upstream_model_name":"fallback-upstream","status":"active"}`)
 	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","name":"antigravity-fallback-account","runtime_class":"api_key","credential":{"api_key":"fallback-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active","priority":100}`)
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"antigravity-upstream","status":"active"}`)
-	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"antigravity-alias-account","runtime_class":"desktop_client_token","upstream_client":"antigravity_desktop","credential":{"access_token":"desktop-token"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active","priority":10}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"antigravity-alias-account","runtime_class":"desktop_client_token","upstream_client":"antigravity_desktop","credential":{"access_token":"desktop-token"},"metadata":{"base_url":"`+upstream.URL+`","project_id":"project-1"},"status":"active","priority":10}`)
 
 	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
 	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/api/provider/antigravity/v1/chat/completions", `{"model":"antigravity-alias-model","messages":[{"role":"user","content":"alias antigravity"}]}`)
@@ -78,7 +92,13 @@ func TestGatewayAntigravityProviderAliasTargetsOpenAIReverseProxy(t *testing.T) 
 		t.Fatalf("expected one upstream call, got %+v", gotCalls)
 	}
 	call := gotCalls[0]
-	if call.Path != "/v1/chat/completions" || call.Authorization != "Bearer desktop-token" || call.UserAgent != "Antigravity/1.0" || call.Model != "antigravity-upstream" || call.Prompt != "alias antigravity" {
+	if call.Path != "/v1internal:generateContent" ||
+		call.Authorization != "Bearer desktop-token" ||
+		call.UserAgent != "Antigravity/1.0" ||
+		call.Project != "project-1" ||
+		!strings.HasPrefix(call.RequestID, "agent-") ||
+		call.Model != "antigravity-upstream" ||
+		call.Prompt != "alias antigravity" {
 		t.Fatalf("unexpected Antigravity upstream call: %+v", call)
 	}
 
@@ -90,7 +110,7 @@ func TestGatewayAntigravityProviderAliasTargetsAnthropicReverseProxy(t *testing.
 		Path          string
 		Authorization string
 		UserAgent     string
-		Version       string
+		Project       string
 		Model         string
 		System        string
 		MaxTokens     int
@@ -102,12 +122,23 @@ func TestGatewayAntigravityProviderAliasTargetsAnthropicReverseProxy(t *testing.
 	)
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var payload struct {
-			Model     string `json:"model"`
-			System    string `json:"system"`
-			MaxTokens int    `json:"max_tokens"`
-			Messages  []struct {
-				Content string `json:"content"`
-			} `json:"messages"`
+			Project string `json:"project"`
+			Model   string `json:"model"`
+			Request struct {
+				SystemInstruction *struct {
+					Parts []struct {
+						Text string `json:"text"`
+					} `json:"parts"`
+				} `json:"systemInstruction"`
+				GenerationConfig struct {
+					MaxOutputTokens int `json:"maxOutputTokens"`
+				} `json:"generationConfig"`
+				Contents []struct {
+					Parts []struct {
+						Text string `json:"text"`
+					} `json:"parts"`
+				} `json:"contents"`
+			} `json:"request"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 			t.Fatalf("decode upstream request: %v", err)
@@ -116,19 +147,19 @@ func TestGatewayAntigravityProviderAliasTargetsAnthropicReverseProxy(t *testing.
 			Path:          r.URL.Path,
 			Authorization: r.Header.Get("Authorization"),
 			UserAgent:     r.Header.Get("User-Agent"),
-			Version:       r.Header.Get("anthropic-version"),
+			Project:       payload.Project,
 			Model:         payload.Model,
-			System:        payload.System,
-			MaxTokens:     payload.MaxTokens,
+			System:        geminiSystemInstructionText(payload.Request.SystemInstruction),
+			MaxTokens:     payload.Request.GenerationConfig.MaxOutputTokens,
 		}
-		if len(payload.Messages) > 0 {
-			call.Message = payload.Messages[0].Content
+		if len(payload.Request.Contents) > 0 && len(payload.Request.Contents[0].Parts) > 0 {
+			call.Message = payload.Request.Contents[0].Parts[0].Text
 		}
 		mu.Lock()
 		calls = append(calls, call)
 		mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"content":[{"type":"text","text":"antigravity messages ok"}],"usage":{"input_tokens":5,"output_tokens":6}}`))
+		_, _ = w.Write([]byte(`{"response":{"candidates":[{"content":{"parts":[{"text":"antigravity messages ok"}]}}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":6,"totalTokenCount":11}}}`))
 	}))
 	defer upstream.Close()
 
@@ -140,7 +171,7 @@ func TestGatewayAntigravityProviderAliasTargetsAnthropicReverseProxy(t *testing.
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","upstream_model_name":"fallback-claude","status":"active"}`)
 	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","name":"antigravity-messages-fallback-account","runtime_class":"api_key","credential":{"api_key":"fallback-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active","priority":100}`)
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"antigravity-claude","status":"active"}`)
-	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"antigravity-messages-account","runtime_class":"desktop_client_token","upstream_client":"antigravity_desktop","credential":{"access_token":"desktop-token"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active","priority":10}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"antigravity-messages-account","runtime_class":"desktop_client_token","upstream_client":"antigravity_desktop","credential":{"access_token":"desktop-token"},"metadata":{"base_url":"`+upstream.URL+`","project_id":"project-1"},"status":"active","priority":10}`)
 
 	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
 	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/antigravity/v1/messages", `{"model":"antigravity-messages-model","system":"be direct","max_tokens":48,"messages":[{"role":"user","content":"alias messages"}]}`)
@@ -159,7 +190,14 @@ func TestGatewayAntigravityProviderAliasTargetsAnthropicReverseProxy(t *testing.
 		t.Fatalf("expected one upstream call, got %+v", gotCalls)
 	}
 	call := gotCalls[0]
-	if call.Path != "/v1/messages" || call.Authorization != "Bearer desktop-token" || call.UserAgent != "Antigravity/1.0" || call.Version == "" || call.Model != "antigravity-claude" || call.System != "be direct" || call.MaxTokens != 48 || call.Message != "alias messages" {
+	if call.Path != "/v1internal:generateContent" ||
+		call.Authorization != "Bearer desktop-token" ||
+		call.UserAgent != "Antigravity/1.0" ||
+		call.Project != "project-1" ||
+		call.Model != "antigravity-claude" ||
+		call.System != "be direct" ||
+		call.MaxTokens != 48 ||
+		call.Message != "alias messages" {
 		t.Fatalf("unexpected Antigravity Messages upstream call: %+v", call)
 	}
 
@@ -173,20 +211,22 @@ func TestGatewayAntigravityGeminiAliasTargetsReverseProxy(t *testing.T) {
 	)
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var payload struct {
-			Contents []struct {
-				Role  string `json:"role"`
-				Parts []struct {
-					Text string `json:"text"`
-				} `json:"parts"`
-			} `json:"contents"`
-			SystemInstruction *struct {
-				Parts []struct {
-					Text string `json:"text"`
-				} `json:"parts"`
-			} `json:"systemInstruction"`
-			GenerationConfig struct {
-				MaxOutputTokens int `json:"maxOutputTokens"`
-			} `json:"generationConfig"`
+			Request struct {
+				Contents []struct {
+					Role  string `json:"role"`
+					Parts []struct {
+						Text string `json:"text"`
+					} `json:"parts"`
+				} `json:"contents"`
+				SystemInstruction *struct {
+					Parts []struct {
+						Text string `json:"text"`
+					} `json:"parts"`
+				} `json:"systemInstruction"`
+				GenerationConfig struct {
+					MaxOutputTokens int `json:"maxOutputTokens"`
+				} `json:"generationConfig"`
+			} `json:"request"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 			t.Fatalf("decode upstream request: %v", err)
@@ -195,13 +235,13 @@ func TestGatewayAntigravityGeminiAliasTargetsReverseProxy(t *testing.T) {
 		calls = append(calls, upstreamNativeGeminiCall{
 			Path:       r.URL.Path,
 			APIKey:     r.URL.Query().Get("key"),
-			Contents:   payload.Contents,
-			SystemText: geminiSystemInstructionText(payload.SystemInstruction),
-			MaxTokens:  payload.GenerationConfig.MaxOutputTokens,
+			Contents:   payload.Request.Contents,
+			SystemText: geminiSystemInstructionText(payload.Request.SystemInstruction),
+			MaxTokens:  payload.Request.GenerationConfig.MaxOutputTokens,
 		})
 		mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"candidates":[{"content":{"parts":[{"text":"antigravity gemini alias ok"}]}}],"usageMetadata":{"promptTokenCount":6,"candidatesTokenCount":7,"totalTokenCount":13}}`))
+		_, _ = w.Write([]byte(`{"response":{"candidates":[{"content":{"parts":[{"text":"antigravity gemini alias ok"}]}}],"usageMetadata":{"promptTokenCount":6,"candidatesTokenCount":7,"totalTokenCount":13}}}`))
 	}))
 	defer upstream.Close()
 
@@ -213,7 +253,7 @@ func TestGatewayAntigravityGeminiAliasTargetsReverseProxy(t *testing.T) {
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","upstream_model_name":"fallback-gemini","status":"active"}`)
 	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","name":"antigravity-gemini-fallback-account","runtime_class":"api_key","credential":{"api_key":"fallback-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1beta"},"status":"active","priority":100}`)
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"antigravity-gemini-upstream","status":"active"}`)
-	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"antigravity-gemini-account","runtime_class":"desktop_client_token","upstream_client":"antigravity_desktop","credential":{"access_token":"desktop-token"},"metadata":{"base_url":"`+upstream.URL+`/v1beta"},"status":"active","priority":10}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"antigravity-gemini-account","runtime_class":"desktop_client_token","upstream_client":"antigravity_desktop","credential":{"access_token":"desktop-token"},"metadata":{"base_url":"`+upstream.URL+`","project_id":"project-1"},"status":"active","priority":10}`)
 
 	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
 	body := `{"systemInstruction":{"parts":[{"text":"stay concise"}]},"contents":[{"role":"user","parts":[{"text":"alias gemini"}]}],"generationConfig":{"maxOutputTokens":24}}`
@@ -233,7 +273,7 @@ func TestGatewayAntigravityGeminiAliasTargetsReverseProxy(t *testing.T) {
 		t.Fatalf("expected one upstream call, got %+v", gotCalls)
 	}
 	call := gotCalls[0]
-	if call.Path != "/v1beta/models/antigravity-gemini-upstream:generateContent" || call.APIKey != "" || call.MaxTokens != 24 || call.SystemText != "stay concise" {
+	if call.Path != "/v1internal:generateContent" || call.APIKey != "" || call.MaxTokens != 0 || call.SystemText != "stay concise" {
 		t.Fatalf("unexpected Antigravity Gemini upstream call: %+v", call)
 	}
 	if len(call.Contents) != 1 || call.Contents[0].Role != "user" || call.Contents[0].Parts[0].Text != "alias gemini" {
@@ -244,32 +284,46 @@ func TestGatewayAntigravityGeminiAliasTargetsReverseProxy(t *testing.T) {
 }
 
 func TestGatewayAntigravityGeminiStreamAliasTargetsReverseProxy(t *testing.T) {
+	type streamCall struct {
+		Path     string
+		Alt      string
+		APIKey   string
+		Contents []struct {
+			Role  string `json:"role"`
+			Parts []struct {
+				Text string `json:"text"`
+			} `json:"parts"`
+		}
+	}
 	var (
 		mu    sync.Mutex
-		calls []upstreamNativeGeminiCall
+		calls []streamCall
 	)
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var payload struct {
-			Contents []struct {
-				Role  string `json:"role"`
-				Parts []struct {
-					Text string `json:"text"`
-				} `json:"parts"`
-			} `json:"contents"`
+			Request struct {
+				Contents []struct {
+					Role  string `json:"role"`
+					Parts []struct {
+						Text string `json:"text"`
+					} `json:"parts"`
+				} `json:"contents"`
+			} `json:"request"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 			t.Fatalf("decode upstream stream request: %v", err)
 		}
 		mu.Lock()
-		calls = append(calls, upstreamNativeGeminiCall{
+		calls = append(calls, streamCall{
 			Path:     r.URL.Path,
+			Alt:      r.URL.Query().Get("alt"),
 			APIKey:   r.URL.Query().Get("key"),
-			Contents: payload.Contents,
+			Contents: payload.Request.Contents,
 		})
 		mu.Unlock()
 		w.Header().Set("Content-Type", "text/event-stream")
-		_, _ = w.Write([]byte("data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"antigravity stream\"}]}}]}\n\n"))
-		_, _ = w.Write([]byte("data: {\"candidates\":[],\"usageMetadata\":{\"promptTokenCount\":4,\"candidatesTokenCount\":5,\"totalTokenCount\":9}}\n\n"))
+		_, _ = w.Write([]byte("data: {\"response\":{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"antigravity stream\"}]}}]}}\n\n"))
+		_, _ = w.Write([]byte("data: {\"response\":{\"candidates\":[],\"usageMetadata\":{\"promptTokenCount\":4,\"candidatesTokenCount\":5,\"totalTokenCount\":9}}}\n\n"))
 		_, _ = w.Write([]byte("data: [DONE]\n\n"))
 	}))
 	defer upstream.Close()
@@ -279,7 +333,7 @@ func TestGatewayAntigravityGeminiStreamAliasTargetsReverseProxy(t *testing.T) {
 	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"antigravity","display_name":"Antigravity","adapter_type":"reverse-proxy-antigravity","protocol":"gemini-compatible","status":"active"}`)
 	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"antigravity-gemini-stream-model","display_name":"Antigravity Gemini Stream Model","status":"active","capabilities":[{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"antigravity-gemini-stream-upstream","status":"active"}`)
-	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"antigravity-gemini-stream-account","runtime_class":"desktop_client_token","upstream_client":"antigravity_desktop","credential":{"access_token":"desktop-token"},"metadata":{"base_url":"`+upstream.URL+`/v1beta"},"status":"active","priority":10}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"antigravity-gemini-stream-account","runtime_class":"desktop_client_token","upstream_client":"antigravity_desktop","credential":{"access_token":"desktop-token"},"metadata":{"base_url":"`+upstream.URL+`","project_id":"project-1"},"status":"active","priority":10}`)
 
 	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
 	path := "/antigravity/v1beta/models/antigravity-gemini-stream-model:streamGenerateContent"
@@ -295,13 +349,13 @@ func TestGatewayAntigravityGeminiStreamAliasTargetsReverseProxy(t *testing.T) {
 	}
 
 	mu.Lock()
-	gotCalls := append([]upstreamNativeGeminiCall(nil), calls...)
+	gotCalls := append([]streamCall(nil), calls...)
 	mu.Unlock()
 	if len(gotCalls) != 1 {
 		t.Fatalf("expected one stream upstream call, got %+v", gotCalls)
 	}
 	call := gotCalls[0]
-	if call.Path != "/v1beta/models/antigravity-gemini-stream-upstream:streamGenerateContent" || call.APIKey != "" {
+	if call.Path != "/v1internal:streamGenerateContent" || call.Alt != "sse" || call.APIKey != "" {
 		t.Fatalf("unexpected Antigravity Gemini stream upstream call: %+v", call)
 	}
 	if len(call.Contents) != 1 || call.Contents[0].Role != "user" || call.Contents[0].Parts[0].Text != "stream alias" {

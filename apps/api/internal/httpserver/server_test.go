@@ -4326,6 +4326,8 @@ func TestGatewayAntigravityReverseProxyUsesDesktopRuntimeIdentity(t *testing.T) 
 	var upstreamUserAgent string
 	var upstreamModel string
 	var upstreamPrompt string
+	var upstreamProject string
+	var upstreamRequestID string
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		upstreamPath = r.URL.Path
 		upstreamAuthorization = r.Header.Get("Authorization")
@@ -4334,20 +4336,32 @@ func TestGatewayAntigravityReverseProxyUsesDesktopRuntimeIdentity(t *testing.T) 
 			t.Fatalf("unexpected SRapi header leakage: %+v", r.Header)
 		}
 		var payload struct {
-			Model    string `json:"model"`
-			Messages []struct {
-				Content string `json:"content"`
-			} `json:"messages"`
+			Project   string `json:"project"`
+			RequestID string `json:"requestId"`
+			UserAgent string `json:"userAgent"`
+			Model     string `json:"model"`
+			Request   struct {
+				Contents []struct {
+					Parts []struct {
+						Text string `json:"text"`
+					} `json:"parts"`
+				} `json:"contents"`
+			} `json:"request"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 			t.Fatalf("decode upstream request: %v", err)
 		}
+		if payload.UserAgent != "antigravity" {
+			t.Fatalf("expected antigravity v1internal body userAgent, got %+v", payload)
+		}
+		upstreamProject = payload.Project
+		upstreamRequestID = payload.RequestID
 		upstreamModel = payload.Model
-		if len(payload.Messages) > 0 {
-			upstreamPrompt = payload.Messages[0].Content
+		if len(payload.Request.Contents) > 0 && len(payload.Request.Contents[0].Parts) > 0 {
+			upstreamPrompt = payload.Request.Contents[0].Parts[0].Text
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"antigravity ok"}}],"usage":{"input_tokens":6,"output_tokens":7}}`))
+		_, _ = w.Write([]byte(`{"response":{"candidates":[{"content":{"parts":[{"text":"antigravity ok"}]}}],"usageMetadata":{"promptTokenCount":6,"candidatesTokenCount":7}}}`))
 	}))
 	defer upstream.Close()
 
@@ -4357,7 +4371,7 @@ func TestGatewayAntigravityReverseProxyUsesDesktopRuntimeIdentity(t *testing.T) 
 	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"antigravity-provider","display_name":"Antigravity Provider","adapter_type":"reverse-proxy-antigravity","protocol":"openai-compatible","status":"active"}`)
 	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"antigravity-model","display_name":"Antigravity Model","status":"active"}`)
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"antigravity-upstream","status":"active"}`)
-	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"antigravity-account","runtime_class":"desktop_client_token","upstream_client":"antigravity_desktop","credential":{"access_token":"desktop-token"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"antigravity-account","runtime_class":"desktop_client_token","upstream_client":"antigravity_desktop","credential":{"access_token":"desktop-token"},"metadata":{"base_url":"`+upstream.URL+`","project_id":"project-1"},"status":"active"}`)
 
 	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
 	chatReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"antigravity-model","messages":[{"role":"user","content":"call antigravity"}]}`))
@@ -4370,11 +4384,11 @@ func TestGatewayAntigravityReverseProxyUsesDesktopRuntimeIdentity(t *testing.T) 
 	if chatRec.Code != http.StatusOK {
 		t.Fatalf("expected antigravity gateway success 200, got %d body=%s", chatRec.Code, chatRec.Body.String())
 	}
-	if upstreamPath != "/v1/chat/completions" || upstreamAuthorization != "Bearer desktop-token" || upstreamUserAgent != "Antigravity/1.0" {
+	if upstreamPath != "/v1internal:generateContent" || upstreamAuthorization != "Bearer desktop-token" || upstreamUserAgent != "Antigravity/1.0" {
 		t.Fatalf("unexpected antigravity upstream request path=%q auth=%q ua=%q", upstreamPath, upstreamAuthorization, upstreamUserAgent)
 	}
-	if upstreamModel != "antigravity-upstream" || upstreamPrompt != "call antigravity" {
-		t.Fatalf("unexpected antigravity upstream payload model=%q prompt=%q", upstreamModel, upstreamPrompt)
+	if upstreamProject != "project-1" || !strings.HasPrefix(upstreamRequestID, "agent-") || upstreamModel != "antigravity-upstream" || upstreamPrompt != "call antigravity" {
+		t.Fatalf("unexpected antigravity upstream payload project=%q request_id=%q model=%q prompt=%q", upstreamProject, upstreamRequestID, upstreamModel, upstreamPrompt)
 	}
 	var chatResp apiopenapi.ChatCompletionResponse
 	if err := json.NewDecoder(chatRec.Body).Decode(&chatResp); err != nil {

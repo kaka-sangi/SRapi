@@ -91,13 +91,16 @@ provider.adapter_type = openrouter / openai-compatible / native-grok / reverse-p
 provider.protocol     = openai-compatible / anthropic-compatible / gemini-compatible
 ```
 
-Antigravity 反代账号使用 `reverse-proxy-antigravity` 表示客户端身份，仍由
-`provider.protocol` 决定上游端点形状。它不得绕过 Canonical AI Request、Scheduler、
-Provider Adapter 或 Reverse Proxy Runtime，也不得新增 Gateway-local DTO。
+Antigravity 反代账号使用 `reverse-proxy-antigravity` 表示客户端身份。WP-450 起，
+它的上游 text dispatch 使用 Antigravity / Google Cloud Code `v1internal`
+official-client shape；`provider.protocol` 仍决定下游请求如何进入 Canonical AI Request
+以及如何渲染回客户端协议。它不得绕过 Canonical AI Request、Scheduler、Provider Adapter
+或 Reverse Proxy Runtime，也不得新增 Gateway-local DTO。
 WP-360 起，Antigravity 文本 provider alias（例如
 `/api/provider/antigravity/v1/chat/completions` 和
 `/api/provider/antigravity/v1/messages`）只强制 `provider_key=antigravity`；
-OpenAI/Anthropic/Gemini 的上游子协议仍由 `provider.protocol` 决定。
+OpenAI/Anthropic/Gemini 的下游协议仍由 `provider.protocol` 决定，Antigravity 上游
+统一由 adapter 转为 `v1internal` envelope。
 WP-370 起，Gemini-native Antigravity provider alias（例如
 `/api/provider/antigravity/v1beta/models/{model}:generateContent` 和
 `/api/provider/antigravity/v1beta/models/{model}:streamGenerateContent`）复用同一个

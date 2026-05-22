@@ -41,6 +41,9 @@ func (s *Service) InvokeText(ctx context.Context, req contract.TextRequest) (con
 		if isCodexReverseProxy(req) {
 			return s.invokeReverseProxyCodexResponses(ctx, req, baseURL)
 		}
+		if isAntigravityReverseProxy(req) {
+			return s.invokeReverseProxyAntigravity(ctx, req, baseURL)
+		}
 		if isGeminiCompatible(req) {
 			if isReverseProxyRuntime(req) {
 				return s.invokeReverseProxyGeminiCompatible(ctx, req, baseURL)
