@@ -173,6 +173,21 @@ make smoke-health
 make smoke-gateway
 ```
 
+发布前本地 smoke test：
+
+```bash
+make smoke-release
+```
+
+`make smoke-release` 会额外检查 `/livez`、`/readyz` 和 `/metrics` 基线指标，适合在 Docker Compose 或单机 release 配置启动后执行。
+
+PostgreSQL 手动备份和恢复：
+
+```bash
+make backup-postgres BACKUP_FILE=backups/srapi.dump
+make restore-postgres BACKUP_FILE=backups/srapi.dump
+```
+
 本地默认管理员由 `.env.example` 中的 `BOOTSTRAP_ADMIN_EMAIL` 和 `BOOTSTRAP_ADMIN_PASSWORD` 初始化。当前开发骨架会 seed 一个 OpenAI-compatible Provider、`gpt-4o-mini` 模型和本地 mock Provider Account，因此 `make smoke-gateway` 不需要真实上游 API Key。该 smoke 会覆盖 `/v1/models`、`/v1/chat/completions`、`/v1/responses` 和 `/v1/messages` 的最小本地闭环。
 
 Windows PowerShell 基础入口：

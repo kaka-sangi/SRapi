@@ -27,24 +27,23 @@ last_completed:
 - WP-180: Subscription and pricing foundations now include subscription plans, user subscriptions, decimal-safe pricing rules, Gateway entitlement/pricing admission, billing metadata linkage, admin/current-user control-plane APIs, and generated SDK/OpenAPI parity.
 - WP-190: Payment order foundations now include encrypted provider instances, current-user order APIs, signed/idempotent webhooks, refund hooks, fulfillment into billing/subscription state, audit/outbox evidence, Ent/Postgres persistence, and generated SDK/OpenAPI parity.
 - WP-200: Affiliate rebate Phase 2 now includes invite codes, invite relationships, affiliate rules, idempotent payment-paid accrual, refund compensation ledgers, transfer-to-balance accounting, audit/outbox evidence, Ent/Postgres persistence, and migration/data-model parity.
+- WP-210: Production operations now includes baseline Prometheus `/metrics`, release-mode weak secret/default admin password rejection, data retention cleanup worker, PostgreSQL backup/restore targets, release smoke script coverage, and deployment/config docs.
 
 current:
 
-- package: WP-210
+- package: WP-220+
 - status: pending
-- objective: production operations.
+- objective: advanced endpoint and provider expansion.
 
-next_recommended: WP-210
+next_recommended: WP-220+
 
 last_gates:
 
-- `cd apps/api && go test ./internal/modules/payments/... ./internal/modules/affiliate/... ./internal/persistence/entstore/affiliate ./internal/workers/outbox`: pass
-- `make ent-generate-check`: pass
-- `make migration-check`: pass
-- `cd apps/api && go test ./...`: pass
+- `cd apps/api && go test ./internal/config ./internal/modules/operations/... ./internal/persistence/entstore/operations ./internal/workers/retention ./internal/app ./internal/httpserver`: pass
 - `make architecture-check`: pass
-- `make secret-scan`: pass
+- `make check`: pass
 - `git diff --check`: pass
+- Docker Compose smoke: blocked because this host has `docker` but neither the `docker compose` plugin nor `docker-compose` binary.
 
 notes:
 
@@ -68,6 +67,10 @@ notes:
 - WP-190 added current-user and admin payment APIs, encrypted payment provider config, legal order state transitions, signed/idempotent webhook handling, fulfillment-side billing/subscription/audit/outbox effects, refund hooks, Ent/Postgres persistence, migration drift coverage, and generated SDK/OpenAPI parity.
 - WP-200 added the affiliate module, Ent schemas and PostgreSQL tables for invite/affiliate ledgers, payment outbox dispatch into affiliate accrual/compensation, refund compensation capping, and transfer-to-balance tests proving affiliate ledger, billing ledger, user balance, and audit evidence stay aligned.
 - WP-200 did not add frontend visuals per explicit user instruction. OpenAPI user/admin affiliate routes remain a later control-plane surface because this package closed the backend accounting and event path first.
+- WP-210 added `/metrics` baseline samples from usage logs, scheduler decisions/leases, and reverse-proxy runtime signals; release smoke checks health/readiness/metrics plus mock Gateway flow.
+- WP-210 added retention cleanup for usage logs, scheduler decisions/feedbacks, audit logs, and account health snapshots; financial ledgers, payment records, affiliate ledgers, credentials, and user state remain excluded from automatic cleanup.
+- WP-210 added `make backup-postgres` and `make restore-postgres` with checksum support; secret material such as `SRAPI_MASTER_KEY` remains outside database backups and must be backed up through the deployment secret store.
+- WP-210 Docker Compose smoke could not be executed in this environment because `docker compose` and `docker-compose` are unavailable.
 
 ## Work Package Ledger
 
@@ -94,5 +97,5 @@ notes:
 | WP-180 | completed | Subscription plans, user subscriptions, entitlement admission, decimal pricing rules, billing metadata linkage, admin/current-user APIs, and generated SDK/OpenAPI parity are covered. |
 | WP-190 | completed | Encrypted payment providers, payment orders, signed/idempotent webhooks, fulfillment, refunds, persistence, and generated API/SDK parity are covered. |
 | WP-200 | completed | Invite/rebate persistence, idempotent payment accrual, refund compensation, transfer-to-balance accounting, audit/outbox evidence, and migration/data-model parity are covered. |
-| WP-210 | pending | Production operations. |
+| WP-210 | completed | Metrics baseline, release config validation, retention cleanup, backup/restore targets, release smoke script, and ops docs are covered. |
 | WP-220+ | pending | Advanced endpoint and provider expansion. |

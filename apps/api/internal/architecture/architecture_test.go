@@ -213,6 +213,7 @@ func TestAppBootstrapOnlyImportsBootstrapPackages(t *testing.T) {
 		"github.com/srapi/srapi/apps/api/internal/platform/db":                      true,
 		"github.com/srapi/srapi/apps/api/internal/platform/redis":                   true,
 		"github.com/srapi/srapi/apps/api/internal/workers/outbox":                   true,
+		"github.com/srapi/srapi/apps/api/internal/workers/retention":                true,
 	}
 
 	var violations []string

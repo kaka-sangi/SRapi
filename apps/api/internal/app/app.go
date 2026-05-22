@@ -16,17 +16,19 @@ import (
 	platformdb "github.com/srapi/srapi/apps/api/internal/platform/db"
 	platformredis "github.com/srapi/srapi/apps/api/internal/platform/redis"
 	outboxworker "github.com/srapi/srapi/apps/api/internal/workers/outbox"
+	retentionworker "github.com/srapi/srapi/apps/api/internal/workers/retention"
 )
 
 const defaultReadHeaderTimeout = 10 * time.Second
 
 type App struct {
-	cfg    config.Config
-	logger *slog.Logger
-	server *http.Server
-	db     *platformdb.Client
-	redis  *platformredis.Client
-	outbox *outboxworker.Worker
+	cfg       config.Config
+	logger    *slog.Logger
+	server    *http.Server
+	db        *platformdb.Client
+	redis     *platformredis.Client
+	outbox    *outboxworker.Worker
+	retention *retentionworker.Worker
 }
 
 func New(cfg config.Config, logger *slog.Logger) (*App, error) {
@@ -44,7 +46,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		return nil, err
 	}
 
-	handler, outbox, err := newHandler(cfg, logger, dbClient, redisClient)
+	handler, outbox, retention, err := newHandler(cfg, logger, dbClient, redisClient)
 	if err != nil {
 		_ = dbClient.Close()
 		_ = redisClient.Close()
@@ -57,12 +59,13 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		ReadHeaderTimeout: defaultReadHeaderTimeout,
 	}
 	return &App{
-		cfg:    cfg,
-		logger: logger,
-		server: server,
-		db:     dbClient,
-		redis:  redisClient,
-		outbox: outbox,
+		cfg:       cfg,
+		logger:    logger,
+		server:    server,
+		db:        dbClient,
+		redis:     redisClient,
+		outbox:    outbox,
+		retention: retention,
 	}, nil
 }
 
@@ -107,7 +110,7 @@ func Healthcheck(ctx context.Context, cfg config.Config) error {
 	return httpserver.Healthcheck(ctx, cfg.HealthcheckAddress())
 }
 
-func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Client, redisClient *platformredis.Client) (http.Handler, *outboxworker.Worker, error) {
+func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Client, redisClient *platformredis.Client) (http.Handler, *outboxworker.Worker, *retentionworker.Worker, error) {
 	var (
 		handler http.Handler
 		err     error
@@ -119,11 +122,15 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 	}
 	stores, err := persistentStores(context.Background(), cfg, logger, dbClient, redisClient)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	outbox, err := domainEventsWorker(stores, logger)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
+	}
+	retention, err := retentionCleanupWorker(cfg, stores, logger)
+	if err != nil {
+		return nil, nil, nil, err
 	}
 	if stores != nil {
 		options = append(options,
@@ -151,7 +158,7 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 		handler = httpserver.New(cfg, logger, options...)
 	}()
 
-	return handler, outbox, err
+	return handler, outbox, retention, err
 }
 
 func persistentStores(ctx context.Context, cfg config.Config, logger *slog.Logger, dbClient *platformdb.Client, redisClient *platformredis.Client) (*entstore.Stores, error) {
@@ -224,18 +231,43 @@ func domainEventsWorker(stores *entstore.Stores, logger *slog.Logger) (*outboxwo
 	})
 }
 
+func retentionCleanupWorker(cfg config.Config, stores *entstore.Stores, logger *slog.Logger) (*retentionworker.Worker, error) {
+	if stores == nil || stores.Operations == nil {
+		return nil, nil
+	}
+	return retentionworker.New(stores.Operations, logger, retentionworker.Config{
+		UsageLogsDays:              cfg.Retention.UsageLogsDays,
+		SchedulerDecisionsDays:     cfg.Retention.SchedulerDecisionsDays,
+		SchedulerFeedbacksDays:     cfg.Retention.SchedulerFeedbacksDays,
+		AuditLogsDays:              cfg.Retention.AuditLogsDays,
+		AccountHealthSnapshotsDays: cfg.Retention.AccountHealthSnapshotsDays,
+	})
+}
+
 func (a *App) startWorkers() {
-	if a == nil || a.outbox == nil {
+	if a == nil {
 		return
 	}
-	a.outbox.Start(context.Background())
+	if a.outbox != nil {
+		a.outbox.Start(context.Background())
+	}
+	if a.retention != nil {
+		a.retention.Start(context.Background())
+	}
 }
 
 func (a *App) stopWorkers(ctx context.Context) error {
-	if a == nil || a.outbox == nil {
+	if a == nil {
 		return nil
 	}
-	return a.outbox.Shutdown(ctx)
+	var errs []error
+	if a.outbox != nil {
+		errs = append(errs, a.outbox.Shutdown(ctx))
+	}
+	if a.retention != nil {
+		errs = append(errs, a.retention.Shutdown(ctx))
+	}
+	return errors.Join(errs...)
 }
 
 type dependencyPinger interface {

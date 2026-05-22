@@ -119,6 +119,50 @@ func TestReadyzUsesInjectedDependencyProbes(t *testing.T) {
 	}
 }
 
+func TestMetricsExposeBaselineSRapiSignals(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	chatReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"gpt-4o-mini","messages":[{"role":"user","content":"metrics smoke"}]}`))
+	chatReq.Header.Set("Content-Type", "application/json")
+	chatReq.Header.Set("Authorization", "Bearer "+apiKey)
+	chatRec := httptest.NewRecorder()
+	handler.ServeHTTP(chatRec, chatReq)
+	if chatRec.Code != http.StatusOK {
+		t.Fatalf("expected gateway success 200, got %d body=%s", chatRec.Code, chatRec.Body.String())
+	}
+
+	metricsReq := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	metricsRec := httptest.NewRecorder()
+	handler.ServeHTTP(metricsRec, metricsReq)
+	if metricsRec.Code != http.StatusOK {
+		t.Fatalf("expected metrics 200, got %d", metricsRec.Code)
+	}
+	body := metricsRec.Body.String()
+	for _, metric := range []string{
+		"srapi_gateway_requests_total",
+		"srapi_gateway_request_duration_seconds_count",
+		"srapi_gateway_request_duration_seconds_sum",
+		"srapi_gateway_inflight_requests",
+		"srapi_gateway_errors_total",
+		"srapi_scheduler_decisions_total",
+		"srapi_provider_errors_total",
+		"srapi_usage_tokens_total",
+		"srapi_reverse_proxy_ban_signals_total",
+	} {
+		if !strings.Contains(body, metric) {
+			t.Fatalf("expected metrics body to contain %s, got:\n%s", metric, body)
+		}
+	}
+	if !strings.Contains(body, `srapi_gateway_requests_total{endpoint_family="chat_completions",model="gpt-4o-mini",provider_protocol="openai-compatible",result="success"} 1`) {
+		t.Fatalf("expected gateway request metric, got:\n%s", body)
+	}
+	if !strings.Contains(body, `srapi_usage_tokens_total{model="gpt-4o-mini",provider_protocol="openai-compatible",token_kind="input"}`) {
+		t.Fatalf("expected usage token metric, got:\n%s", body)
+	}
+}
+
 func TestAuthAndGatewayFlow(t *testing.T) {
 	handler := New(config.Load(), nil)
 

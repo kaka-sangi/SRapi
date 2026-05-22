@@ -11,6 +11,7 @@ import (
 	billingcontract "github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
 	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
+	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
 	paymentcontract "github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
@@ -24,6 +25,7 @@ import (
 	billingstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/billing"
 	eventsstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/events"
 	modelstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/models"
+	operationsstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/operations"
 	paymentstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/payments"
 	providerstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/providers"
 	schedulerstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/scheduler"
@@ -44,6 +46,7 @@ type Stores struct {
 	Audit         auditcontract.Store
 	Billing       billingcontract.Store
 	Events        eventscontract.Store
+	Operations    operationscontract.RetentionStore
 	Payments      paymentcontract.Store
 	Scheduler     schedulercontract.Store
 	Subscriptions subscriptioncontract.Store
@@ -90,6 +93,10 @@ func New(client *ent.Client) (Stores, error) {
 	if err != nil {
 		return Stores{}, err
 	}
+	operations, err := operationsstore.New(client)
+	if err != nil {
+		return Stores{}, err
+	}
 	payments, err := paymentstore.New(client)
 	if err != nil {
 		return Stores{}, err
@@ -116,6 +123,7 @@ func New(client *ent.Client) (Stores, error) {
 		Audit:         audit,
 		Billing:       billing,
 		Events:        events,
+		Operations:    operations,
 		Payments:      payments,
 		Scheduler:     scheduler,
 		Subscriptions: subscriptions,

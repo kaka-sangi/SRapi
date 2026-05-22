@@ -23,6 +23,7 @@ type Config struct {
 	Gateway   GatewayConfig
 	Security  SecurityConfig
 	Bootstrap BootstrapConfig
+	Retention RetentionConfig
 }
 
 type ServerConfig struct {
@@ -58,6 +59,14 @@ type BootstrapConfig struct {
 	AdminEmail    string
 	AdminPassword string
 	AdminName     string
+}
+
+type RetentionConfig struct {
+	UsageLogsDays              int
+	SchedulerDecisionsDays     int
+	SchedulerFeedbacksDays     int
+	AuditLogsDays              int
+	AccountHealthSnapshotsDays int
 }
 
 func Load() Config {
@@ -98,6 +107,13 @@ func Load() Config {
 			AdminPassword: getEnv("BOOTSTRAP_ADMIN_PASSWORD", "password123"),
 			AdminName:     getEnv("BOOTSTRAP_ADMIN_NAME", "Admin"),
 		},
+		Retention: RetentionConfig{
+			UsageLogsDays:              getIntEnv("DATA_RETENTION_USAGE_LOGS_DAYS", 90),
+			SchedulerDecisionsDays:     getIntEnv("DATA_RETENTION_SCHEDULER_DECISIONS_DAYS", 90),
+			SchedulerFeedbacksDays:     getIntEnv("DATA_RETENTION_SCHEDULER_FEEDBACKS_DAYS", 90),
+			AuditLogsDays:              getIntEnv("DATA_RETENTION_AUDIT_LOGS_DAYS", 365),
+			AccountHealthSnapshotsDays: getIntEnv("DATA_RETENTION_ACCOUNT_HEALTH_SNAPSHOTS_DAYS", 90),
+		},
 	}
 }
 
@@ -125,6 +141,21 @@ func (c Config) Validate() error {
 	if c.Gateway.StreamIdleTimeout <= 0 {
 		return fmt.Errorf("GATEWAY_STREAM_IDLE_TIMEOUT_SECONDS must be positive")
 	}
+	if c.Retention.UsageLogsDays < 0 {
+		return fmt.Errorf("DATA_RETENTION_USAGE_LOGS_DAYS must be zero or positive")
+	}
+	if c.Retention.SchedulerDecisionsDays < 0 {
+		return fmt.Errorf("DATA_RETENTION_SCHEDULER_DECISIONS_DAYS must be zero or positive")
+	}
+	if c.Retention.SchedulerFeedbacksDays < 0 {
+		return fmt.Errorf("DATA_RETENTION_SCHEDULER_FEEDBACKS_DAYS must be zero or positive")
+	}
+	if c.Retention.AuditLogsDays < 0 {
+		return fmt.Errorf("DATA_RETENTION_AUDIT_LOGS_DAYS must be zero or positive")
+	}
+	if c.Retention.AccountHealthSnapshotsDays < 0 {
+		return fmt.Errorf("DATA_RETENTION_ACCOUNT_HEALTH_SNAPSHOTS_DAYS must be zero or positive")
+	}
 	if c.Server.Mode == "release" {
 		if weakSecret(c.Security.JWTSecret) {
 			return fmt.Errorf("JWT_SECRET must be strong and at least 32 bytes in release mode")
@@ -137,6 +168,9 @@ func (c Config) Validate() error {
 		}
 		if c.Database.Password == "" || isWeakDevelopmentSecret(c.Database.Password) {
 			return fmt.Errorf("DATABASE_PASSWORD must be set to a non-development value in release mode")
+		}
+		if weakBootstrapPassword(c.Bootstrap.AdminPassword) {
+			return fmt.Errorf("BOOTSTRAP_ADMIN_PASSWORD must be changed to a non-development value in release mode")
 		}
 	}
 	return nil
@@ -184,4 +218,17 @@ func isWeakDevelopmentSecret(value string) bool {
 
 func weakSecret(value string) bool {
 	return len(value) < 32 || isWeakDevelopmentSecret(value)
+}
+
+func weakBootstrapPassword(value string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	if len(value) < 12 || isWeakDevelopmentSecret(value) {
+		return true
+	}
+	switch normalized {
+	case "password123", "admin", "admin123", "srapi_admin_password_change_me":
+		return true
+	default:
+		return false
+	}
 }

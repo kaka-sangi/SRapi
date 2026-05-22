@@ -123,3 +123,13 @@ func TestDomainEventsWorkerDispatchesPersistentOutbox(t *testing.T) {
 		t.Fatalf("expected outbox worker to record inbox, got %+v", inbox)
 	}
 }
+
+func TestRetentionWorkerRequiresPersistentOperationsStore(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	if worker, err := retentionCleanupWorker(config.Load(), nil, logger); err != nil || worker != nil {
+		t.Fatalf("expected nil worker without persistent stores, worker=%v err=%v", worker, err)
+	}
+	if worker, err := retentionCleanupWorker(config.Load(), &entstore.Stores{}, logger); err != nil || worker != nil {
+		t.Fatalf("expected nil worker without operations store, worker=%v err=%v", worker, err)
+	}
+}

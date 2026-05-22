@@ -3,11 +3,15 @@
 const baseURL = process.env.SRAPI_BASE_URL || `http://127.0.0.1:${process.env.SERVER_PORT || '8080'}`;
 const adminEmail = process.env.BOOTSTRAP_ADMIN_EMAIL || 'admin@srapi.local';
 const adminPassword = process.env.BOOTSTRAP_ADMIN_PASSWORD || 'password123';
+const releaseSmoke = process.argv.includes('--release');
 
 async function main() {
   const health = await request('GET', '/api/v1/health');
   if (!health.body?.request_id || health.body?.data?.status === undefined) {
     throw new Error('health response missing request_id or status');
+  }
+  if (releaseSmoke) {
+    await smokeReleaseEndpoints();
   }
 
   const login = await request('POST', '/api/v1/auth/login', {
@@ -84,6 +88,35 @@ async function main() {
   console.log(`health request_id: ${health.body.request_id}`);
   console.log(`models: ${models.body.data.map((model) => model.id).join(', ')}`);
   console.log('gateway endpoints: chat_completions, responses, messages');
+  if (releaseSmoke) {
+    console.log('release endpoints: livez, readyz, metrics');
+  }
+}
+
+async function smokeReleaseEndpoints() {
+  const livez = await request('GET', '/livez');
+  if (livez.body?.data?.status !== 'ok') {
+    throw new Error('/livez did not report ok');
+  }
+  const readyz = await request('GET', '/readyz');
+  if (readyz.body?.data?.status !== 'ok') {
+    throw new Error('/readyz did not report ok');
+  }
+  const metrics = await rawRequest('GET', '/metrics');
+  for (const metric of [
+    'srapi_gateway_requests_total',
+    'srapi_gateway_request_duration_seconds',
+    'srapi_gateway_inflight_requests',
+    'srapi_gateway_errors_total',
+    'srapi_scheduler_decisions_total',
+    'srapi_provider_errors_total',
+    'srapi_usage_tokens_total',
+    'srapi_reverse_proxy_ban_signals_total',
+  ]) {
+    if (!metrics.text.includes(metric)) {
+      throw new Error(`/metrics missing ${metric}`);
+    }
+  }
 }
 
 async function request(method, path, options = {}) {
@@ -122,6 +155,15 @@ async function request(method, path, options = {}) {
     throw new Error(`${method} ${path} expected ${expectedStatus}, got ${response.status}: ${text}`);
   }
   return { body, headers: response.headers };
+}
+
+async function rawRequest(method, path) {
+  const response = await fetch(new URL(path, baseURL), { method });
+  const text = await response.text();
+  if (response.status !== 200) {
+    throw new Error(`${method} ${path} expected 200, got ${response.status}: ${text}`);
+  }
+  return { text, headers: response.headers };
 }
 
 function sessionCookie(headers) {

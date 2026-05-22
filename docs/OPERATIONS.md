@@ -42,6 +42,12 @@ GET /api/v1/health
 
 `/readyz` 不得在数据库不可用、迁移未完成、Redis 连接失败、关键配置缺失时返回 200。
 
+当前实现：
+
+- `/livez` 只验证 HTTP server 可响应。
+- `/readyz` 通过注入 pinger 或 TCP fallback 检查 PostgreSQL 和 Redis。
+- release 模式在启动前拒绝弱 `JWT_SECRET`、`SRAPI_MASTER_KEY`、`API_KEY_PEPPER`、`DATABASE_PASSWORD` 和默认 `BOOTSTRAP_ADMIN_PASSWORD`。
+
 ## 4. 启动就绪门禁
 
 HTTP listener 可以启动，但 Gateway 流量不得在以下条件满足前进入主流程：
@@ -89,6 +95,14 @@ secret scan
 Docker image smoke test
 ```
 
+本仓库发布 smoke 入口：
+
+```bash
+make smoke-release
+```
+
+该 smoke 在已启动的 API 上检查 `/livez`、`/readyz`、`/metrics` 基线指标、管理员登录、API Key 创建，以及本地 mock Gateway 的 `/v1/models`、Chat Completions、Responses、Messages 闭环。
+
 ## 6. 备份与恢复
 
 ### 6.1 备份对象
@@ -115,6 +129,14 @@ Redis 只保存可重建运行时状态，默认不作为长期备份对象。
 - 备份校验和。
 - 恢复前互斥锁，防止恢复期间继续写入。
 
+当前单机 PostgreSQL 手动备份入口：
+
+```bash
+make backup-postgres BACKUP_FILE=backups/srapi-$(date +%Y%m%d%H%M%S).dump
+```
+
+该命令使用 `pg_dump --format custom` 生成备份，并写入同名 `.sha256` 校验文件。`SRAPI_MASTER_KEY`、外部 KMS key id、对象存储凭证等不写入备份文件，必须由部署者在 secret manager 或离线密钥库中独立备份。
+
 ### 6.3 恢复要求
 
 恢复流程必须确保：
@@ -124,6 +146,15 @@ Redis 只保存可重建运行时状态，默认不作为长期备份对象。
 - 恢复后清理 Redis 可重建状态。
 - 恢复后重新构建 Scheduler snapshot。
 - 恢复后验证管理员登录、API Key 鉴权、一次 mock Gateway 请求。
+
+当前单机 PostgreSQL 恢复入口：
+
+```bash
+make restore-postgres BACKUP_FILE=backups/srapi-20260522120000.dump
+make smoke-release
+```
+
+恢复前必须停止 Gateway 写流量和后台 worker。恢复后应重启 API 以重建 Redis scheduler lease / cache 状态，并重新运行迁移检查与 release smoke。
 
 ## 7. 数据生命周期矩阵
 
@@ -141,6 +172,16 @@ Redis 只保存可重建运行时状态，默认不作为长期备份对象。
 | `account_health_snapshots` | Scheduler / Ops | 聚合后清理 | 可用于容量规划。 |
 | `content_moderation_logs` | Risk Control | 可配置短保留 | prompt excerpt 视为敏感数据。 |
 | `backup_records` | Operations | 与备份对象一致 | 删除备份时同步记录状态。 |
+
+当前 retention worker 在持久化 store 可用时随 API 进程启动，每 24 小时清理一次：
+
+- `usage_logs`: `DATA_RETENTION_USAGE_LOGS_DAYS`，默认 90。
+- `scheduler_decisions`: `DATA_RETENTION_SCHEDULER_DECISIONS_DAYS`，默认 90。
+- `scheduler_feedbacks`: `DATA_RETENTION_SCHEDULER_FEEDBACKS_DAYS`，默认 90。
+- `audit_logs`: `DATA_RETENTION_AUDIT_LOGS_DAYS`，默认 365。
+- `account_health_snapshots`: `DATA_RETENTION_ACCOUNT_HEALTH_SNAPSHOTS_DAYS`，默认 90。
+
+保留天数为 `0` 时对应数据集不自动删除。账务、支付、affiliate ledger、provider credential 密文和用户核心状态不自动清理。
 
 ## 8. 日志与脱敏
 
@@ -178,6 +219,8 @@ srapi_reverse_proxy_ban_signals_total
 ```
 
 AI Gateway 专项指标以 `OBSERVABILITY_SPEC.md` 为准。
+
+当前 `/metrics` 使用 Prometheus text format，基于持久化 usage logs、scheduler decisions/leases 和 Reverse Proxy Runtime 快照聚合，避免使用 API Key、用户邮箱、账号名、prompt 或 credential 作为 label。
 
 ## 10. 安全运营
 
@@ -233,3 +276,5 @@ MVP 必须至少实现：
 - Provider 凭证和 API Key 脱敏测试。
 
 Phase 2 起必须补齐 `/metrics`、备份恢复、发布 smoke、数据生命周期清理和 SLO 告警。
+
+当前 Phase 2 已补齐 `/metrics`、PostgreSQL 手动备份/恢复入口、release smoke 和基础数据生命周期清理；SLO 告警仍按 `OBSERVABILITY_SPEC.md` 在后续运维包继续展开。

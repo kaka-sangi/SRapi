@@ -11,7 +11,7 @@ SECRETLINT ?= npx --yes -p secretlint@13.0.2 -p @secretlint/secretlint-rule-pres
 ENT ?= go run entgo.io/ent/cmd/ent@v0.14.6
 API_DIR ?= apps/api
 
-.PHONY: help bootstrap-env openapi-lint openapi-bundle openapi-codegen openapi-codegen-check openapi-ts-codegen openapi-ts-codegen-check sdk-ts-typecheck ent-generate ent-generate-check migration-check api-test api-run dev-up dev-down dev-logs smoke-health smoke-gateway secret-scan architecture-check check
+.PHONY: help bootstrap-env openapi-lint openapi-bundle openapi-codegen openapi-codegen-check openapi-ts-codegen openapi-ts-codegen-check sdk-ts-typecheck ent-generate ent-generate-check migration-check api-test api-run dev-up dev-down dev-logs smoke-health smoke-gateway smoke-release backup-postgres restore-postgres secret-scan architecture-check check
 
 help:
 	@printf '%s\n' \
@@ -33,6 +33,9 @@ help:
 		'  make dev-down        Stop local Docker Compose services' \
 		'  make smoke-health    Curl /api/v1/health on localhost' \
 		'  make smoke-gateway   Login, create an API key, and smoke test local gateway endpoints' \
+		'  make smoke-release   Validate health, readiness, metrics, and gateway smoke on localhost' \
+		'  make backup-postgres BACKUP_FILE=...   Create a PostgreSQL custom-format backup' \
+		'  make restore-postgres BACKUP_FILE=...  Restore a PostgreSQL custom-format backup' \
 		'  make architecture-check  Run architecture and startup harness tests' \
 		'  make secret-scan     Scan source files for committed secrets' \
 		'  make check           Run current contract and API checks'
@@ -111,6 +114,34 @@ smoke-health:
 
 smoke-gateway:
 	node tools/smoke-local.mjs
+
+smoke-release:
+	node tools/smoke-local.mjs --release
+
+backup-postgres:
+	@test -n "$(BACKUP_FILE)" || (echo 'BACKUP_FILE is required' >&2; exit 2)
+	@mkdir -p "$$(dirname "$(BACKUP_FILE)")"
+	PGPASSWORD="$${DATABASE_PASSWORD:-srapi_dev_password_change_me}" pg_dump \
+		--host "$${DATABASE_HOST:-localhost}" \
+		--port "$${DATABASE_PORT:-5432}" \
+		--username "$${DATABASE_USER:-srapi}" \
+		--dbname "$${DATABASE_DBNAME:-srapi}" \
+		--format custom \
+		--file "$(BACKUP_FILE)"
+	sha256sum "$(BACKUP_FILE)" > "$(BACKUP_FILE).sha256"
+
+restore-postgres:
+	@test -n "$(BACKUP_FILE)" || (echo 'BACKUP_FILE is required' >&2; exit 2)
+	@test -f "$(BACKUP_FILE)" || (echo 'BACKUP_FILE does not exist: $(BACKUP_FILE)' >&2; exit 2)
+	@if test -f "$(BACKUP_FILE).sha256"; then sha256sum -c "$(BACKUP_FILE).sha256"; else echo 'No checksum file found; skipping checksum verification.'; fi
+	PGPASSWORD="$${DATABASE_PASSWORD:-srapi_dev_password_change_me}" pg_restore \
+		--host "$${DATABASE_HOST:-localhost}" \
+		--port "$${DATABASE_PORT:-5432}" \
+		--username "$${DATABASE_USER:-srapi}" \
+		--dbname "$${DATABASE_DBNAME:-srapi}" \
+		--clean \
+		--if-exists \
+		"$(BACKUP_FILE)"
 
 secret-scan:
 	$(SECRETLINT) "**/*"

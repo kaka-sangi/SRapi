@@ -38,6 +38,12 @@ func TestValidateRejectsReleaseWeakSecrets(t *testing.T) {
 	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "DATABASE_PASSWORD") {
 		t.Fatalf("expected weak database password rejection, got %v", err)
 	}
+
+	cfg = validReleaseConfig()
+	cfg.Bootstrap.AdminPassword = "password123"
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "BOOTSTRAP_ADMIN_PASSWORD") {
+		t.Fatalf("expected default bootstrap admin password rejection, got %v", err)
+	}
 }
 
 func TestValidateAcceptsReleaseStrongSecrets(t *testing.T) {
@@ -99,6 +105,41 @@ func TestValidateRejectsInvalidGatewayTimeouts(t *testing.T) {
 	}
 }
 
+func TestRetentionDefaultsOverridesAndValidation(t *testing.T) {
+	t.Setenv("DATA_RETENTION_USAGE_LOGS_DAYS", "")
+	t.Setenv("DATA_RETENTION_SCHEDULER_DECISIONS_DAYS", "")
+	t.Setenv("DATA_RETENTION_SCHEDULER_FEEDBACKS_DAYS", "")
+	t.Setenv("DATA_RETENTION_AUDIT_LOGS_DAYS", "")
+	t.Setenv("DATA_RETENTION_ACCOUNT_HEALTH_SNAPSHOTS_DAYS", "")
+	cfg := Load()
+	if cfg.Retention.UsageLogsDays != 90 ||
+		cfg.Retention.SchedulerDecisionsDays != 90 ||
+		cfg.Retention.SchedulerFeedbacksDays != 90 ||
+		cfg.Retention.AuditLogsDays != 365 ||
+		cfg.Retention.AccountHealthSnapshotsDays != 90 {
+		t.Fatalf("unexpected retention defaults: %+v", cfg.Retention)
+	}
+
+	t.Setenv("DATA_RETENTION_USAGE_LOGS_DAYS", "30")
+	t.Setenv("DATA_RETENTION_SCHEDULER_DECISIONS_DAYS", "31")
+	t.Setenv("DATA_RETENTION_SCHEDULER_FEEDBACKS_DAYS", "32")
+	t.Setenv("DATA_RETENTION_AUDIT_LOGS_DAYS", "180")
+	t.Setenv("DATA_RETENTION_ACCOUNT_HEALTH_SNAPSHOTS_DAYS", "45")
+	cfg = Load()
+	if cfg.Retention.UsageLogsDays != 30 ||
+		cfg.Retention.SchedulerDecisionsDays != 31 ||
+		cfg.Retention.SchedulerFeedbacksDays != 32 ||
+		cfg.Retention.AuditLogsDays != 180 ||
+		cfg.Retention.AccountHealthSnapshotsDays != 45 {
+		t.Fatalf("unexpected retention overrides: %+v", cfg.Retention)
+	}
+
+	cfg.Retention.UsageLogsDays = -1
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "DATA_RETENTION_USAGE_LOGS_DAYS") {
+		t.Fatalf("expected retention validation failure, got %v", err)
+	}
+}
+
 func validReleaseConfig() Config {
 	cfg := Load()
 	cfg.Server.Mode = "release"
@@ -106,5 +147,6 @@ func validReleaseConfig() Config {
 	cfg.Security.MasterKey = "master_key_release_value_32_bytes_min"
 	cfg.Security.APIKeyPepper = "api_key_pepper_release_value_32_bytes_min"
 	cfg.Database.Password = "postgres_release_password_32_bytes_min"
+	cfg.Bootstrap.AdminPassword = "bootstrap_admin_release_password_minimum"
 	return cfg
 }
