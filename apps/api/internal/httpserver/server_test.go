@@ -3828,7 +3828,7 @@ func TestGatewayReverseProxyAccountAutoProtectsOnSessionInvalid(t *testing.T) {
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
 
-	providerReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/providers", strings.NewReader(`{"name":"reverse-provider","display_name":"Reverse Provider","adapter_type":"reverse-proxy-codex-cli","protocol":"openai-compatible","status":"active"}`))
+	providerReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/providers", strings.NewReader(`{"name":"reverse-provider","display_name":"Reverse Provider","adapter_type":"reverse-proxy-chatgpt-web","protocol":"openai-compatible","status":"active"}`))
 	providerReq.Header.Set("Content-Type", "application/json")
 	providerReq.AddCookie(sessionCookie)
 	providerReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
@@ -3866,7 +3866,7 @@ func TestGatewayReverseProxyAccountAutoProtectsOnSessionInvalid(t *testing.T) {
 		t.Fatalf("expected mapping create 201, got %d", mappingRec.Code)
 	}
 
-	accountBody := `{"provider_id":"` + string(providerResp.Data.Id) + `","name":"reverse-account","runtime_class":"oauth_refresh","upstream_client":"codex_cli","credential":{"access_token":"oauth-access","refresh_token":"refresh-token"},"metadata":{"base_url":"` + upstream.URL + `/v1","user_agent":"Codex/1.0"},"status":"active"}`
+	accountBody := `{"provider_id":"` + string(providerResp.Data.Id) + `","name":"reverse-account","runtime_class":"oauth_refresh","upstream_client":"chatgpt_web","credential":{"access_token":"oauth-access","refresh_token":"refresh-token"},"metadata":{"base_url":"` + upstream.URL + `/v1","user_agent":"ChatGPT/1.0"},"status":"active"}`
 	accountReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts", strings.NewReader(accountBody))
 	accountReq.Header.Set("Content-Type", "application/json")
 	accountReq.AddCookie(sessionCookie)
@@ -3931,10 +3931,10 @@ func TestGatewayReverseProxyBanSignalDisablesAccountAndStopsScheduling(t *testin
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
 
-	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"banned-provider","display_name":"Banned Provider","adapter_type":"reverse-proxy-codex-cli","protocol":"openai-compatible","status":"active"}`)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"banned-provider","display_name":"Banned Provider","adapter_type":"reverse-proxy-chatgpt-web","protocol":"openai-compatible","status":"active"}`)
 	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"banned-model","display_name":"Banned Model","status":"active"}`)
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"banned-upstream","status":"active"}`)
-	accountBody := `{"provider_id":"` + string(providerResp.Data.Id) + `","name":"banned-account","runtime_class":"oauth_refresh","upstream_client":"codex_cli","credential":{"access_token":"oauth-access","refresh_token":"refresh-token"},"metadata":{"base_url":"` + upstream.URL + `/v1","user_agent":"Codex/1.0"},"status":"active"}`
+	accountBody := `{"provider_id":"` + string(providerResp.Data.Id) + `","name":"banned-account","runtime_class":"oauth_refresh","upstream_client":"chatgpt_web","credential":{"access_token":"oauth-access","refresh_token":"refresh-token"},"metadata":{"base_url":"` + upstream.URL + `/v1","user_agent":"ChatGPT/1.0"},"status":"active"}`
 	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, accountBody)
 
 	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
@@ -4058,11 +4058,11 @@ func TestGatewayReverseProxyOAuthRefreshPersistsCredentialAndAudits(t *testing.T
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
 
-	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"refresh-provider","display_name":"Refresh Provider","adapter_type":"reverse-proxy-codex-cli","protocol":"openai-compatible","status":"active"}`)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"refresh-provider","display_name":"Refresh Provider","adapter_type":"reverse-proxy-chatgpt-web","protocol":"openai-compatible","status":"active"}`)
 	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"refresh-model","display_name":"Refresh Model","status":"active"}`)
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"refresh-upstream","status":"active"}`)
 
-	accountBody := `{"provider_id":"` + string(providerResp.Data.Id) + `","name":"refresh-account","runtime_class":"oauth_refresh","upstream_client":"codex_cli","credential":{"access_token":"expired-token","refresh_token":"fresh-token","expires_at":"2000-01-01T00:00:00Z"},"metadata":{"base_url":"` + upstream.URL + `/v1","user_agent":"Codex/1.0"},"status":"active"}`
+	accountBody := `{"provider_id":"` + string(providerResp.Data.Id) + `","name":"refresh-account","runtime_class":"oauth_refresh","upstream_client":"chatgpt_web","credential":{"access_token":"expired-token","refresh_token":"fresh-token","expires_at":"2000-01-01T00:00:00Z"},"metadata":{"base_url":"` + upstream.URL + `/v1","user_agent":"ChatGPT/1.0"},"status":"active"}`
 	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, accountBody)
 
 	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
@@ -4114,11 +4114,11 @@ func TestGatewayReverseProxyOAuthRefreshFailureDoesNotPersistCredential(t *testi
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
 
-	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"refresh-fail-provider","display_name":"Refresh Fail Provider","adapter_type":"reverse-proxy-codex-cli","protocol":"openai-compatible","status":"active"}`)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"refresh-fail-provider","display_name":"Refresh Fail Provider","adapter_type":"reverse-proxy-chatgpt-web","protocol":"openai-compatible","status":"active"}`)
 	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"refresh-fail-model","display_name":"Refresh Fail Model","status":"active"}`)
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"refresh-fail-upstream","status":"active"}`)
 
-	accountBody := `{"provider_id":"` + string(providerResp.Data.Id) + `","name":"refresh-fail-account","runtime_class":"oauth_refresh","upstream_client":"codex_cli","credential":{"access_token":"expired-token","expires_at":"2000-01-01T00:00:00Z"},"metadata":{"base_url":"` + upstream.URL + `/v1","user_agent":"Codex/1.0"},"status":"active"}`
+	accountBody := `{"provider_id":"` + string(providerResp.Data.Id) + `","name":"refresh-fail-account","runtime_class":"oauth_refresh","upstream_client":"chatgpt_web","credential":{"access_token":"expired-token","expires_at":"2000-01-01T00:00:00Z"},"metadata":{"base_url":"` + upstream.URL + `/v1","user_agent":"ChatGPT/1.0"},"status":"active"}`
 	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, accountBody)
 
 	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)

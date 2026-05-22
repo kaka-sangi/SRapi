@@ -30,7 +30,9 @@ SRapi 的核心差异化能力之一，是像 `sub2api`、`claude2api`、`chatgp
 - Provider Adapter 负责上游官方客户端 payload / endpoint / protocol shape；Reverse Proxy Runtime 负责把这个请求“包装”成与官方客户端传输特征一致或接近一致的样子。
 - 流式响应必须按上游官方客户端的格式向客户端原样输出，再转换回客户端协议。
 
-反代运行时只服务于 `runtime_class != api_key` 的账号。`runtime_class = api_key` 的账号走简单官方 API SDK 路径，反代约束放宽。
+WP-400 起，`reverse-proxy-codex-cli` 的 HTTP text path 已按上述定义实现：Adapter 构造 Codex Responses body/headers，Reverse Proxy Runtime 负责把选中账号身份发往配置的 Codex base URL `/responses`。这不是把本地 Codex CLI 接入 SRapi，也不是把下游请求原样转发到 OpenAI-compatible `/chat/completions`。
+
+反代运行时默认服务于 `runtime_class != api_key` 的账号。`runtime_class = api_key` 的账号默认走简单官方 API SDK 路径；如果 Provider 明确配置为 `reverse-proxy-*` adapter，则仍可通过 Reverse Proxy Runtime 发出对应官方客户端形态请求，并由 Runtime 从选中账号凭证注入 API key。
 
 ## 3. 账号运行时分类
 

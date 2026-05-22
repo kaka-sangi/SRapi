@@ -1486,7 +1486,48 @@ Required gates:
 - `make secret-scan`
 - `git diff --check`
 
-## WP-400+: Ecosystem And Remaining Advanced Surface
+## WP-400: Codex CLI 2api Responses Upstream Shape v1
+
+Objective: make `reverse-proxy-codex-cli` construct the Codex official-client HTTP Responses shape and send it through Reverse Proxy Runtime, instead of treating Codex 2api as generic OpenAI-compatible `/chat/completions`.
+
+Read first:
+
+- `docs/2API_REVERSE_PROXY_DEFINITION.md`
+- `docs/REVERSE_PROXY_SPEC.md`
+- `docs/PROVIDER_ADAPTER_SPEC.md`
+- `apps/api/internal/modules/provider_adapters/contract`
+- `apps/api/internal/modules/provider_adapters/service`
+- `apps/api/internal/modules/reverse_proxy/contract`
+- local reference: `/home/senran/Desktop/CLIProxyAPI/internal/runtime/executor/codex_executor.go`
+
+Owns:
+
+- Codex CLI reverse-proxy adapter dispatch for text requests.
+- Codex `/backend-api/codex/responses` request body construction from Canonical AI Request.
+- Codex official-client headers such as `Accept: text/event-stream`, `Originator`, `X-Client-Request-Id`, `Session_id`, `Version`, `X-Codex-Beta-Features`, and `Chatgpt-Account-Id` when account metadata provides them.
+- Reverse Proxy Runtime credential injection for `api_key` accounts, plus existing CLI/OAuth token runtime classes.
+- Codex Responses SSE/JSON parsing into `TextResponse`, including `response.output_text.delta`, `response.output_item.done`, `response.completed`, and usage.
+- Focused tests proving Codex uses `/responses`, generic reverse-proxy OpenAI-compatible behavior still uses `/chat/completions`, and selected account credentials/UA reach upstream.
+
+Definition of Done:
+
+- `reverse-proxy-codex-cli` text requests call `base_url + "/responses"` with `stream: true`; they must not call `/chat/completions`.
+- Codex request body includes mapped upstream `model`, Responses-style `input`, non-null `instructions`, supported sampling/tool/output fields, and no OpenAI Chat Completions `stream_options`.
+- Runtime receives selected account context and injects account credentials; caller auth must not be forwarded.
+- Parser accepts Codex SSE and JSON response shapes and returns text/usage without Gateway-local Codex DTOs.
+- This package does not implement Codex Responses WebSocket upstream relay or local Codex CLI client ingress; those remain follow-up packages.
+- No frontend visuals are added.
+
+Required gates:
+
+- `cd apps/api && go test ./internal/modules/provider_adapters/... ./internal/modules/reverse_proxy/...`
+- `cd apps/api && go test ./...`
+- `make architecture-check`
+- `make code-quality-check`
+- `make secret-scan`
+- `git diff --check`
+
+## WP-410+: Ecosystem And Remaining Advanced Surface
 
 Use `ROADMAP.md` Phase 7 through Phase 8 to split future packages for:
 

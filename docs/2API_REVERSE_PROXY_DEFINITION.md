@@ -62,6 +62,11 @@ SRapi 2api 反代不是：
 | `reverse-proxy-antigravity` | Antigravity Desktop / IDE 客户端 | Google Cloud Code / Antigravity internal endpoints、desktop/IDE token, user-agent, HTTP behavior, protocol-specific payload. |
 | `custom_reverse_proxy` | Operator-defined upstream client | Explicit endpoint and egress profile defined by operator metadata. |
 
+Implementation status:
+
+- WP-400 implements the HTTP Codex CLI 2api path for text requests: `reverse-proxy-codex-cli` builds a Codex Responses request and sends `base_url + "/responses"` through Reverse Proxy Runtime.
+- Codex Responses WebSocket upstream relay and richer prompt-cache/session policy are still follow-up work.
+
 ## 6. Boundary Rules
 
 1. `runtime_class = api_key` defaults to official API-key adapter behavior unless an explicit adapter says otherwise.
@@ -87,4 +92,3 @@ A valid 2api reverse-proxy test should prove at least:
 - Cloudflare: https://www.cloudflare.com/learning/cdn/glossary/reverse-proxy/
 - 2api.ai public positioning for unified AI API proxy / control plane: https://2api.ai/
 - Sub2API public description as a proxy consolidating Claude, OpenAI, Gemini, and Antigravity API access: https://shyft.ai/skills/sub2api
-

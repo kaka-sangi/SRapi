@@ -1254,10 +1254,13 @@ func TestReverseProxyAnthropicCompatibleAdapterUsesMessagesEndpoint(t *testing.T
 	}
 }
 
-func TestReverseProxyAdapterUsesRuntimeForNonAPIKeyAccount(t *testing.T) {
+func TestReverseProxyOpenAICompatibleAdapterUsesRuntimeForNonAPIKeyAccount(t *testing.T) {
 	var upstreamHeaders http.Header
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		upstreamHeaders = r.Header.Clone()
+		if r.URL.Path != "/v1/chat/completions" {
+			t.Fatalf("unexpected upstream path %s", r.URL.Path)
+		}
 		if r.Header.Get("Authorization") != "Bearer oauth-access" {
 			t.Fatalf("expected oauth bearer token, got %q", r.Header.Get("Authorization"))
 		}
@@ -1282,7 +1285,7 @@ func TestReverseProxyAdapterUsesRuntimeForNonAPIKeyAccount(t *testing.T) {
 		Prompt:    "hello",
 		Provider: providercontract.Provider{
 			ID:          1,
-			AdapterType: "reverse-proxy-codex-cli",
+			AdapterType: "reverse-proxy-openai-compatible",
 			Protocol:    "openai-compatible",
 		},
 		Account: accountcontract.ProviderAccount{
@@ -1310,11 +1313,126 @@ func TestReverseProxyAdapterUsesRuntimeForNonAPIKeyAccount(t *testing.T) {
 	}
 }
 
-func TestReverseProxyAdapterPassesCliRuntimeContext(t *testing.T) {
+func TestReverseProxyCodexCLIAdapterUsesResponsesOfficialClientShape(t *testing.T) {
+	const codexUserAgent = "codex_cli_rs/0.118.0 (Mac OS 26.3.1; arm64) iTerm.app/3.6.9"
+	var upstreamHeaders http.Header
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamHeaders = r.Header.Clone()
+		if r.URL.Path != "/backend-api/codex/responses" {
+			t.Fatalf("unexpected codex upstream path %s", r.URL.Path)
+		}
+		if r.Header.Get("Authorization") != "Bearer codex-token" {
+			t.Fatalf("expected codex bearer token, got %q", r.Header.Get("Authorization"))
+		}
+		if r.Header.Get("Originator") != "codex_cli_rs" ||
+			r.Header.Get("User-Agent") != codexUserAgent ||
+			r.Header.Get("Accept") != "text/event-stream" ||
+			r.Header.Get("Chatgpt-Account-Id") != "chatgpt-account" ||
+			r.Header.Get("Session_id") != "session-123" ||
+			r.Header.Get("X-Client-Request-Id") != "req_codex_proxy" ||
+			r.Header.Get("X-Codex-Beta-Features") != "feature-a" ||
+			r.Header.Get("Version") != "0.118.0" {
+			t.Fatalf("unexpected codex headers: %+v", r.Header)
+		}
+		var payload struct {
+			Model        string `json:"model"`
+			Instructions string `json:"instructions"`
+			Stream       bool   `json:"stream"`
+			Input        []struct {
+				Type    string `json:"type"`
+				Role    string `json:"role"`
+				Content []struct {
+					Type string `json:"type"`
+					Text string `json:"text"`
+				} `json:"content"`
+			} `json:"input"`
+			StreamOptions any `json:"stream_options"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode codex payload: %v", err)
+		}
+		if payload.Model != "codex-upstream" ||
+			payload.Instructions != "be concise\nsystem guardrail" ||
+			!payload.Stream ||
+			payload.StreamOptions != nil ||
+			len(payload.Input) != 1 ||
+			payload.Input[0].Type != "message" ||
+			payload.Input[0].Role != "user" ||
+			len(payload.Input[0].Content) != 1 ||
+			payload.Input[0].Content[0].Type != "input_text" ||
+			payload.Input[0].Content[0].Text != "hello codex" {
+			t.Fatalf("unexpected codex payload: %+v", payload)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte(
+			"data: {\"type\":\"response.output_text.delta\",\"delta\":\"ignored \"}\n\n" +
+				"data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"type\":\"message\",\"content\":[{\"type\":\"output_text\",\"text\":\"codex response\"}]}}\n\n" +
+				"data: {\"type\":\"response.completed\",\"response\":{\"output\":[],\"usage\":{\"input_tokens\":4,\"output_tokens\":5,\"cached_tokens\":1}}}\n\n" +
+				"data: [DONE]\n\n",
+		))
+	}))
+	defer upstream.Close()
+
+	runtime, err := reverseproxyservice.New(nil)
+	if err != nil {
+		t.Fatalf("create reverse proxy runtime: %v", err)
+	}
+	svc, err := service.NewWithReverseProxy(nil, runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeText(context.Background(), contract.TextRequest{
+		RequestID:    "req_codex_proxy",
+		Model:        "codex-local",
+		Instructions: "be concise",
+		Messages: []contract.TextMessage{
+			{Role: "system", Content: "system guardrail"},
+			{Role: "user", Content: "hello codex"},
+		},
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata: map[string]any{
+				"base_url":            upstream.URL + "/backend-api/codex",
+				"user_agent":          codexUserAgent,
+				"chatgpt_account_id":  "chatgpt-account",
+				"codex_session_id":    "session-123",
+				"codex_beta_features": "feature-a",
+				"codex_version":       "0.118.0",
+			},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+		Credential: map[string]any{"cli_client_token": "codex-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke codex reverse proxy adapter: %v", err)
+	}
+	if resp.Text != "codex response" || resp.Usage.Estimated || resp.Usage.InputTokens != 4 || resp.Usage.OutputTokens != 5 || resp.Usage.CachedTokens != 1 {
+		t.Fatalf("unexpected codex response: %+v", resp)
+	}
+	if upstreamHeaders.Get("Authorization") != "Bearer codex-token" {
+		t.Fatalf("expected runtime to inject codex auth, got %+v", upstreamHeaders)
+	}
+	if metrics := runtime.Metrics(); metrics.RequestTotal != 1 || metrics.RequestSuccessTotal != 1 {
+		t.Fatalf("expected reverse proxy runtime metrics, got %+v", metrics)
+	}
+}
+
+func TestReverseProxyCodexCLIAdapterPassesCliRuntimeContext(t *testing.T) {
 	runtime := capturingRuntime{
 		response: reverseproxycontract.Response{
 			StatusCode: http.StatusOK,
-			Body:       []byte(`{"choices":[{"message":{"role":"assistant","content":"cli response"}}],"usage":{"input_tokens":1,"output_tokens":2}}`),
+			Body: []byte(
+				"data: {\"type\":\"response.output_text.delta\",\"delta\":\"cli \"}\n\n" +
+					"data: {\"type\":\"response.output_text.delta\",\"delta\":\"response\"}\n\n" +
+					"data: [DONE]\n\n",
+			),
 		},
 	}
 	svc, err := service.NewWithReverseProxy(nil, &runtime)
@@ -1333,7 +1451,7 @@ func TestReverseProxyAdapterPassesCliRuntimeContext(t *testing.T) {
 			ID:             9,
 			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
 			UpstreamClient: ptrString("codex_cli"),
-			Metadata:       map[string]any{"base_url": "https://upstream.example/v1"},
+			Metadata:       map[string]any{"base_url": "https://upstream.example/backend-api/codex"},
 		},
 		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
 		Credential: map[string]any{"cli_client_token": "cli-token"},
@@ -1343,6 +1461,32 @@ func TestReverseProxyAdapterPassesCliRuntimeContext(t *testing.T) {
 	}
 	if resp.Text != "cli response" {
 		t.Fatalf("unexpected cli response: %+v", resp)
+	}
+	if runtime.request.Method != http.MethodPost || runtime.request.URL != "https://upstream.example/backend-api/codex/responses" || !runtime.request.ExpectStream {
+		t.Fatalf("unexpected codex runtime request: %+v", runtime.request)
+	}
+	if runtime.request.Headers.Get("Accept") != "text/event-stream" ||
+		runtime.request.Headers.Get("Originator") != "codex_cli_rs" ||
+		runtime.request.Headers.Get("Authorization") != "" {
+		t.Fatalf("unexpected codex runtime headers before auth injection: %+v", runtime.request.Headers)
+	}
+	var payload struct {
+		Model         string `json:"model"`
+		Stream        bool   `json:"stream"`
+		StreamOptions any    `json:"stream_options"`
+		Input         []struct {
+			Role    string `json:"role"`
+			Content []struct {
+				Type string `json:"type"`
+				Text string `json:"text"`
+			} `json:"content"`
+		} `json:"input"`
+	}
+	if err := json.Unmarshal(runtime.request.Body, &payload); err != nil {
+		t.Fatalf("decode codex runtime payload: %v", err)
+	}
+	if payload.Model != "codex-upstream" || !payload.Stream || payload.StreamOptions != nil || len(payload.Input) != 1 || payload.Input[0].Role != "user" || payload.Input[0].Content[0].Text != "hello" {
+		t.Fatalf("unexpected codex runtime payload: %+v", payload)
 	}
 	if runtime.request.Account.RuntimeClass != string(accountcontract.RuntimeClassCliClientToken) ||
 		runtime.request.Account.UpstreamClient == nil ||
@@ -1549,7 +1693,7 @@ func TestReverseProxyAdapterStreamsThroughRuntime(t *testing.T) {
 		Prompt:    "hello",
 		Stream:    true,
 		Provider: providercontract.Provider{
-			AdapterType: "reverse-proxy-codex-cli",
+			AdapterType: "reverse-proxy-openai-compatible",
 			Protocol:    "openai-compatible",
 		},
 		Account: accountcontract.ProviderAccount{
@@ -1593,7 +1737,7 @@ func TestReverseProxyAdapterMapsRuntimeErrors(t *testing.T) {
 		RequestID: "req_reverse_error",
 		Model:     "rp-local",
 		Provider: providercontract.Provider{
-			AdapterType: "reverse-proxy-codex-cli",
+			AdapterType: "reverse-proxy-openai-compatible",
 			Protocol:    "openai-compatible",
 		},
 		Account: accountcontract.ProviderAccount{
@@ -1626,7 +1770,7 @@ func TestReverseProxyAdapterNormalizesLegacyUpstreamError(t *testing.T) {
 		RequestID: "req_reverse_legacy",
 		Model:     "rp-local",
 		Provider: providercontract.Provider{
-			AdapterType: "reverse-proxy-codex-cli",
+			AdapterType: "reverse-proxy-openai-compatible",
 			Protocol:    "openai-compatible",
 		},
 		Account: accountcontract.ProviderAccount{

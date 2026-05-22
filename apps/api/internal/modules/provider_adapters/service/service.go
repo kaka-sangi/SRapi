@@ -38,6 +38,9 @@ func (s *Service) InvokeText(ctx context.Context, req contract.TextRequest) (con
 		return contract.TextResponse{}, ErrInvalidInput
 	}
 	if baseURL := upstreamBaseURL(req); baseURL != "" {
+		if isCodexReverseProxy(req) {
+			return s.invokeReverseProxyCodexResponses(ctx, req, baseURL)
+		}
 		if isGeminiCompatible(req) {
 			if isReverseProxyRuntime(req) {
 				return s.invokeReverseProxyGeminiCompatible(ctx, req, baseURL)
@@ -1670,11 +1673,15 @@ func isGeminiCompatible(req contract.TextRequest) bool {
 func isAnthropicCompatible(req contract.TextRequest) bool {
 	for _, value := range []string{req.Provider.Protocol, req.Provider.AdapterType} {
 		switch strings.ToLower(strings.TrimSpace(value)) {
-		case "anthropic-compatible":
+		case "anthropic-compatible", "reverse-proxy-claude-code-cli":
 			return true
 		}
 	}
 	return false
+}
+
+func isCodexReverseProxy(req contract.TextRequest) bool {
+	return strings.EqualFold(strings.TrimSpace(req.Provider.AdapterType), "reverse-proxy-codex-cli")
 }
 
 func isReverseProxyRuntime(req contract.TextRequest) bool {

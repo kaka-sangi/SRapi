@@ -464,6 +464,10 @@ func forbiddenHeader(key string, values []string) bool {
 
 func injectAuth(headers http.Header, account contract.AccountRuntime) {
 	switch account.RuntimeClass {
+	case "api_key":
+		if token := firstCredentialString(account.Credential, "api_key", "upstream_api_key", "access_token"); token != "" {
+			headers.Set("Authorization", "Bearer "+token)
+		}
 	case "cli_client_token":
 		if token := firstCredentialString(account.Credential, "cli_client_token", "cli_token", "device_token", "access_token"); token != "" {
 			headers.Set("Authorization", "Bearer "+token)
