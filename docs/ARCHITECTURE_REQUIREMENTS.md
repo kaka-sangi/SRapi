@@ -112,9 +112,24 @@ make migration-check
 make check
 ```
 
-它继续作为完整质量门禁，覆盖 OpenAPI、SDK、Ent、migration check、Go test 和 secret scan。
+它继续作为完整质量门禁，覆盖 OpenAPI、SDK、Ent、migration check、code-quality-check、Go test 和 secret scan。
 
-### 3.4 本地 Gateway Smoke
+### 3.4 代码质量门禁
+
+```txt
+make code-quality-check
+```
+
+它当前覆盖：
+
+- Go 文件 `gofmt` 漂移。
+- `go vet ./...`。
+- 非生成生产 Go 文件最大 2200 行。
+- 非生成生产 Go 函数最大 220 行。
+
+`code-quality-check` 和 `architecture-check` 分工不同：前者卡住代码形态和静态质量，后者卡住模块边界、启动装配、persistence/worker/HTTP ownership 等架构不变量。生成代码不进入 size 阈值，但仍必须通过对应 codegen drift check。
+
+### 3.5 本地 Gateway Smoke
 
 ```txt
 make smoke-gateway

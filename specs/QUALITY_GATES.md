@@ -12,6 +12,7 @@ Before finalizing a package:
 
 ```bash
 make architecture-check
+make code-quality-check
 ```
 
 For broad or cross-cutting changes:
@@ -76,6 +77,27 @@ Rules:
 - Ent access remains in `internal/persistence/entstore`.
 - Workers use contracts/services, not handlers.
 - Provider-specific behavior must not leak into Scheduler core.
+
+## 4.1 Go Code Quality Harness
+
+Required for backend implementation packages and always run by `make check`:
+
+```bash
+make code-quality-check
+```
+
+It covers:
+
+- `gofmt -l` drift across Go files.
+- `go vet ./...`.
+- Production Go file-size thresholds, excluding generated Ent/OpenAPI code.
+- Production Go function-size thresholds, excluding tests and generated Ent/OpenAPI code.
+
+Rules:
+
+- Treat failures as harness findings, not as optional style advice.
+- If a threshold is hit by new code, split by ownership or extract helpers before merging.
+- Threshold changes must be documented in `docs/ARCHITECTURE_REQUIREMENTS.md` and justified in `specs/STATUS.md`.
 
 ## 5. Gateway Gates
 
@@ -199,4 +221,3 @@ A package is done when:
 - Docs are updated.
 - `specs/STATUS.md` is updated.
 - Any skipped gate has a clear reason.
-

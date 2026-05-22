@@ -1006,7 +1006,44 @@ Required gates:
 - `make secret-scan`
 - `git diff --check`
 
-## WP-300+: Advanced Endpoint And Provider Expansion
+## WP-300: Go Code Quality Harness
+
+Objective: add an explicit code-quality harness so formatting, static checks, and size guardrails are executable gates rather than informal review expectations.
+
+Read first:
+
+- `docs/ARCHITECTURE.md`
+- `docs/ARCHITECTURE_REQUIREMENTS.md`
+- `docs/MODULE_INTERFACE_CONTRACTS.md`
+- `specs/QUALITY_GATES.md`
+- `Makefile`
+- `apps/api/internal/architecture`
+
+Owns:
+
+- `Makefile`
+- `apps/api/internal/codequality`
+- `specs/QUALITY_GATES.md`
+- architecture requirements/status updates
+
+Definition of Done:
+
+- `make code-quality-check` exists and is documented in `make help`.
+- Code-quality check runs as part of `make check`.
+- Harness verifies Go formatting drift, `go vet ./...`, production Go file size, and production function size while excluding generated Go output from size thresholds.
+- Thresholds are calibrated to current code so the harness prevents further uncontrolled growth without forcing unrelated refactors in this package.
+- Documentation explains what code-quality-check covers and how it differs from architecture-check.
+- No frontend visuals are added.
+
+Required gates:
+
+- `make code-quality-check`
+- `make architecture-check`
+- `cd apps/api && go test ./...`
+- `make check`
+- `git diff --check`
+
+## WP-310+: Advanced Endpoint And Provider Expansion
 
 Use `ROADMAP.md` Phase 7 through Phase 8 to split future packages for:
 

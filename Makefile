@@ -11,7 +11,7 @@ SECRETLINT ?= npx --yes -p secretlint@13.0.2 -p @secretlint/secretlint-rule-pres
 ENT ?= go run entgo.io/ent/cmd/ent@v0.14.6
 API_DIR ?= apps/api
 
-.PHONY: help bootstrap-env openapi-lint openapi-bundle openapi-codegen openapi-codegen-check openapi-ts-codegen openapi-ts-codegen-check sdk-ts-typecheck ent-generate ent-generate-check migration-check api-test api-run dev-up dev-down dev-logs smoke-health smoke-gateway smoke-release backup-postgres restore-postgres secret-scan architecture-check check
+.PHONY: help bootstrap-env openapi-lint openapi-bundle openapi-codegen openapi-codegen-check openapi-ts-codegen openapi-ts-codegen-check sdk-ts-typecheck ent-generate ent-generate-check migration-check api-test api-run dev-up dev-down dev-logs smoke-health smoke-gateway smoke-release backup-postgres restore-postgres secret-scan architecture-check code-quality-check check
 
 help:
 	@printf '%s\n' \
@@ -37,6 +37,7 @@ help:
 		'  make backup-postgres BACKUP_FILE=...   Create a PostgreSQL custom-format backup' \
 		'  make restore-postgres BACKUP_FILE=...  Restore a PostgreSQL custom-format backup' \
 		'  make architecture-check  Run architecture and startup harness tests' \
+		'  make code-quality-check  Run gofmt, go vet, and size harness tests' \
 		'  make secret-scan     Scan source files for committed secrets' \
 		'  make check           Run current contract and API checks'
 
@@ -97,6 +98,9 @@ api-run:
 architecture-check:
 	cd $(API_DIR) && go test ./internal/config ./internal/architecture ./internal/app ./internal/platform/crypto ./internal/platform/db ./internal/platform/logger ./internal/platform/redis ./internal/modules/providers/preset ./internal/persistence/entstore/... ./internal/persistence/redisstore/... ./internal/workers/... ./internal/httpserver
 
+code-quality-check:
+	cd $(API_DIR) && go test ./internal/codequality
+
 dev-up: bootstrap-env
 	@test -n "$(COMPOSE)" || (echo 'Docker Compose is required: install the docker compose plugin or docker-compose.' >&2; exit 127)
 	$(COMPOSE) --env-file .env -f deploy/docker-compose.yml up --build
@@ -146,4 +150,4 @@ restore-postgres:
 secret-scan:
 	$(SECRETLINT) "**/*"
 
-check: openapi-lint openapi-bundle openapi-codegen-check openapi-ts-codegen-check sdk-ts-typecheck ent-generate-check migration-check api-test secret-scan
+check: openapi-lint openapi-bundle openapi-codegen-check openapi-ts-codegen-check sdk-ts-typecheck ent-generate-check migration-check code-quality-check api-test secret-scan
