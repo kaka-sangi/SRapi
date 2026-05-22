@@ -1296,10 +1296,62 @@ Required gates:
 - `make secret-scan`
 - `git diff --check`
 
-## WP-360+: Ecosystem And Remaining Advanced Surface
+## WP-360: Antigravity Text Provider Alias Routes v1
+
+Objective: promote Antigravity text provider aliases from the route matrix planning state to implemented backend behavior so operators can expose Antigravity desktop/IDE reverse-proxy accounts through provider-prefixed OpenAI Chat Completions and Anthropic Messages routes without adding Gateway-local DTOs or provider-specific Scheduler branches.
+
+Read first:
+
+- `docs/OPENAPI_CONTRACT.md`
+- `docs/GATEWAY_ROUTE_MATRIX.md`
+- `docs/AI_ENDPOINT_COMPATIBILITY.md`
+- `docs/COMPATIBLE_PROVIDER_REGISTRY_SPEC.md`
+- `docs/PROVIDER_ADAPTER_SPEC.md`
+- `docs/REVERSE_PROXY_SPEC.md`
+- `packages/openapi/openapi.yaml`
+- `apps/api/internal/modules/providers/preset`
+- `apps/api/internal/modules/provider_adapters`
+- `apps/api/internal/modules/reverse_proxy`
+- `apps/api/internal/httpserver`
+
+Owns:
+
+- Provider preset registry entry for `antigravity`
+- capability-driven provider alias route registration
+- Antigravity text aliases for `/antigravity/v1/*`, `/api/provider/antigravity/*`, and `/api/provider/antigravity/v1/*`
+- OpenAPI representative contracts for `/api/provider/antigravity/v1/chat/completions` and `/api/provider/antigravity/v1/messages`
+- Gateway regressions proving Antigravity aliases force the `antigravity` provider key and still route through Scheduler, Provider Adapter, and Reverse Proxy Runtime
+- route matrix/provider registry/compatibility docs and status updates
+
+Definition of Done:
+
+- `provider_key = antigravity` is seeded with text route aliases, `reverse_proxy_antigravity` platform metadata, and desktop/IDE reverse-proxy account type allowlist.
+- `/api/provider/antigravity/v1/chat/completions` and `/antigravity/v1/chat/completions` schedule only Provider records named `antigravity` and dispatch OpenAI-compatible payloads through `reverse-proxy-antigravity` when the selected provider uses `protocol = openai-compatible`.
+- `/api/provider/antigravity/v1/messages` schedules only Provider records named `antigravity` and dispatches Anthropic Messages payloads through `reverse-proxy-antigravity` when the selected provider uses `protocol = anthropic-compatible`.
+- Gateway usage logs and Scheduler decisions preserve the alias source endpoint and selected Provider/Account evidence.
+- No Gateway-local Antigravity request/response DTO is introduced; `provider.protocol` continues to select the target upstream protocol.
+- Gemini `/antigravity/v1beta/models/{model}:generateContent` aliases remain a follow-up route-parser package unless this package explicitly adds Gemini model-action alias parsing.
+- No frontend visuals are added.
+
+Required gates:
+
+- `make openapi-lint`
+- `make openapi-bundle`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/modules/providers/preset ./internal/modules/provider_adapters/... ./internal/modules/reverse_proxy/... ./internal/httpserver`
+- `cd apps/api && go test ./...`
+- `make architecture-check`
+- `make code-quality-check`
+- `make secret-scan`
+- `git diff --check`
+
+## WP-370+: Ecosystem And Remaining Advanced Surface
 
 Use `ROADMAP.md` Phase 7 through Phase 8 to split future packages for:
 
+- Antigravity Gemini `/v1beta/models/{model}:generateContent` and `:streamGenerateContent` provider aliases
 - realtime/websocket
 - SDK examples
 - migration guides

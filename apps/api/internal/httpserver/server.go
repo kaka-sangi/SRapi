@@ -18,6 +18,7 @@ import (
 	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
 	auditcontract "github.com/srapi/srapi/apps/api/internal/modules/audit/contract"
 	billingcontract "github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
+	capabilitiescontract "github.com/srapi/srapi/apps/api/internal/modules/capabilities/contract"
 	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
 	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
@@ -385,17 +386,21 @@ func (s *Server) registerGatewayProviderAliases(mux *http.ServeMux) {
 			if prefix == "" {
 				continue
 			}
-			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "chat/completions", s.handleCreateChatCompletion, preset.PlatformFamily == providerpreset.PlatformFamilyOpenAICompatible)
-			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "responses", s.handleCreateResponse, preset.PlatformFamily == providerpreset.PlatformFamilyOpenAICompatible)
-			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "messages", s.handleCreateMessage, true)
-			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "embeddings", s.handleCreateEmbedding, preset.PlatformFamily == providerpreset.PlatformFamilyOpenAICompatible)
-			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "images/generations", s.handleCreateImageGeneration, preset.PlatformFamily == providerpreset.PlatformFamilyOpenAICompatible)
-			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "audio/transcriptions", s.handleCreateAudioTranscription, preset.PlatformFamily == providerpreset.PlatformFamilyOpenAICompatible)
-			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "audio/speech", s.handleCreateAudioSpeech, preset.PlatformFamily == providerpreset.PlatformFamilyOpenAICompatible)
-			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "moderations", s.handleCreateModeration, preset.PlatformFamily == providerpreset.PlatformFamilyOpenAICompatible)
-			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "rerank", s.handleCreateRerank, preset.PlatformFamily == providerpreset.PlatformFamilyRerankCompatible)
+			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "chat/completions", s.handleCreateChatCompletion, presetSupports(preset, capabilitiescontract.KeyChatCompletions))
+			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "responses", s.handleCreateResponse, presetSupports(preset, capabilitiescontract.KeyResponses))
+			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "messages", s.handleCreateMessage, presetSupports(preset, capabilitiescontract.KeyMessages))
+			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "embeddings", s.handleCreateEmbedding, presetSupports(preset, capabilitiescontract.KeyEmbeddings))
+			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "images/generations", s.handleCreateImageGeneration, presetSupports(preset, capabilitiescontract.KeyImages))
+			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "audio/transcriptions", s.handleCreateAudioTranscription, presetSupports(preset, capabilitiescontract.KeyAudioTranscriptions))
+			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "audio/speech", s.handleCreateAudioSpeech, presetSupports(preset, capabilitiescontract.KeyAudioSpeech))
+			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "moderations", s.handleCreateModeration, presetSupports(preset, capabilitiescontract.KeyModerations))
+			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "rerank", s.handleCreateRerank, presetSupports(preset, capabilitiescontract.KeyRerank))
 		}
 	}
+}
+
+func presetSupports(preset providerpreset.Preset, capabilityKey string) bool {
+	return preset.Capabilities != nil && preset.Capabilities[capabilityKey]
 }
 
 func (s *Server) registerGatewayAliasRoute(mux *http.ServeMux, seen map[string]struct{}, providerKey, prefix, endpoint string, handler http.HandlerFunc, enabled bool) {

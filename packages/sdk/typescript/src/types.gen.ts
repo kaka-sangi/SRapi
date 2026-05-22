@@ -4734,6 +4734,96 @@ export type CreateOpenAiCompatibleMessageAliasResponses = {
 
 export type CreateOpenAiCompatibleMessageAliasResponse = CreateOpenAiCompatibleMessageAliasResponses[keyof CreateOpenAiCompatibleMessageAliasResponses];
 
+export type CreateAntigravityChatCompletionAliasData = {
+    body: ChatCompletionRequest;
+    path?: never;
+    query?: never;
+    url: '/api/provider/antigravity/v1/chat/completions';
+};
+
+export type CreateAntigravityChatCompletionAliasErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateAntigravityChatCompletionAliasError = CreateAntigravityChatCompletionAliasErrors[keyof CreateAntigravityChatCompletionAliasErrors];
+
+export type CreateAntigravityChatCompletionAliasResponses = {
+    /**
+     * Chat completion response, or SSE stream when stream is true.
+     */
+    200: ChatCompletionResponse;
+};
+
+export type CreateAntigravityChatCompletionAliasResponse = CreateAntigravityChatCompletionAliasResponses[keyof CreateAntigravityChatCompletionAliasResponses];
+
+export type CreateAntigravityMessageAliasData = {
+    body: AnthropicMessagesRequest;
+    path?: never;
+    query?: never;
+    url: '/api/provider/antigravity/v1/messages';
+};
+
+export type CreateAntigravityMessageAliasErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateAntigravityMessageAliasError = CreateAntigravityMessageAliasErrors[keyof CreateAntigravityMessageAliasErrors];
+
+export type CreateAntigravityMessageAliasResponses = {
+    /**
+     * Anthropic-compatible response, or SSE stream when stream is true.
+     */
+    200: AnthropicMessagesResponse;
+};
+
+export type CreateAntigravityMessageAliasResponse = CreateAntigravityMessageAliasResponses[keyof CreateAntigravityMessageAliasResponses];
+
 export type CreateModerationData = {
     body: ModerationRequest;
     path?: never;

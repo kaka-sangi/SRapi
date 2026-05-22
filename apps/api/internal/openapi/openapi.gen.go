@@ -3384,6 +3384,12 @@ type ListPaymentOrdersParams struct {
 // CreateAnthropicCompatibleMessageAliasJSONRequestBody defines body for CreateAnthropicCompatibleMessageAlias for application/json ContentType.
 type CreateAnthropicCompatibleMessageAliasJSONRequestBody = AnthropicMessagesRequest
 
+// CreateAntigravityChatCompletionAliasJSONRequestBody defines body for CreateAntigravityChatCompletionAlias for application/json ContentType.
+type CreateAntigravityChatCompletionAliasJSONRequestBody = ChatCompletionRequest
+
+// CreateAntigravityMessageAliasJSONRequestBody defines body for CreateAntigravityMessageAlias for application/json ContentType.
+type CreateAntigravityMessageAliasJSONRequestBody = AnthropicMessagesRequest
+
 // CreateOpenAICompatibleAudioSpeechAliasJSONRequestBody defines body for CreateOpenAICompatibleAudioSpeechAlias for application/json ContentType.
 type CreateOpenAICompatibleAudioSpeechAliasJSONRequestBody = AudioSpeechRequest
 
@@ -7496,6 +7502,12 @@ type ServerInterface interface {
 	// Create an Anthropic Messages-compatible message with anthropic-compatible provider context.
 	// (POST /api/provider/anthropic-compatible/v1/messages)
 	CreateAnthropicCompatibleMessageAlias(w http.ResponseWriter, r *http.Request)
+	// Create an OpenAI-compatible chat completion with Antigravity provider context.
+	// (POST /api/provider/antigravity/v1/chat/completions)
+	CreateAntigravityChatCompletionAlias(w http.ResponseWriter, r *http.Request)
+	// Create an Anthropic Messages-compatible message with Antigravity provider context.
+	// (POST /api/provider/antigravity/v1/messages)
+	CreateAntigravityMessageAlias(w http.ResponseWriter, r *http.Request)
 	// Create speech audio with openai-compatible provider context.
 	// (POST /api/provider/openai-compatible/v1/audio/speech)
 	CreateOpenAICompatibleAudioSpeechAlias(w http.ResponseWriter, r *http.Request)
@@ -7782,6 +7794,46 @@ func (siw *ServerInterfaceWrapper) CreateAnthropicCompatibleMessageAlias(w http.
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateAnthropicCompatibleMessageAlias(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAntigravityChatCompletionAlias operation middleware
+func (siw *ServerInterfaceWrapper) CreateAntigravityChatCompletionAlias(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAntigravityChatCompletionAlias(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAntigravityMessageAlias operation middleware
+func (siw *ServerInterfaceWrapper) CreateAntigravityMessageAlias(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAntigravityMessageAlias(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -11072,6 +11124,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	}
 
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/anthropic-compatible/v1/messages", wrapper.CreateAnthropicCompatibleMessageAlias)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/antigravity/v1/chat/completions", wrapper.CreateAntigravityChatCompletionAlias)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/antigravity/v1/messages", wrapper.CreateAntigravityMessageAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/audio/speech", wrapper.CreateOpenAICompatibleAudioSpeechAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/audio/transcriptions", wrapper.CreateOpenAICompatibleAudioTranscriptionAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/chat/completions", wrapper.CreateOpenAICompatibleChatCompletionAlias)

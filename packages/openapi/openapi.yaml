@@ -3057,6 +3057,90 @@ paths:
         default:
           $ref: "#/components/responses/GatewayError"
 
+  /api/provider/antigravity/v1/chat/completions:
+    post:
+      tags:
+        - Gateway
+      operationId: createAntigravityChatCompletionAlias
+      summary: Create an OpenAI-compatible chat completion with Antigravity provider context.
+      description: Provider alias route. It reuses the standard chat completion runtime and forces the `antigravity` provider context.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatCompletionRequest"
+      responses:
+        "200":
+          description: Chat completion response, or SSE stream when stream is true.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatCompletionResponse"
+            text/event-stream:
+              schema:
+                type: string
+                description: OpenAI-compatible SSE chunks.
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /api/provider/antigravity/v1/messages:
+    post:
+      tags:
+        - Gateway
+      operationId: createAntigravityMessageAlias
+      summary: Create an Anthropic Messages-compatible message with Antigravity provider context.
+      description: Provider alias route. It reuses the standard Messages runtime and forces the `antigravity` provider context.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnthropicMessagesRequest"
+      responses:
+        "200":
+          description: Anthropic-compatible response, or SSE stream when stream is true.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnthropicMessagesResponse"
+            text/event-stream:
+              schema:
+                type: string
+                description: Anthropic-compatible SSE events.
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
   /v1/moderations:
     post:
       tags:

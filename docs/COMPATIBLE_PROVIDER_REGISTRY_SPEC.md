@@ -76,7 +76,45 @@ WP-320 起建议内置：
 
 Rerank-compatible preset 只注册 rerank 路由别名，不自动暴露 chat、responses、images 或 moderation route。
 
-## 6. Preset Schema
+## 6. Antigravity reverse-proxy preset
+
+WP-360 起内置：
+
+| provider_key | 默认用途 | 阶段 |
+| --- | --- | --- |
+| `antigravity` | Antigravity desktop/IDE reverse-proxy text alias | WP-360 |
+
+`antigravity` 是 reverse-proxy 客户端身份 preset，不是新的文本协议。它必须通过
+`provider.protocol` 选择目标上游协议：
+
+```txt
+openai-compatible    -> /chat/completions
+anthropic-compatible -> /messages
+gemini-compatible    -> models/{model}:generateContent
+```
+
+当前 registry 只为 Antigravity 暴露 text alias：
+
+```txt
+/antigravity/v1
+/api/provider/antigravity
+/api/provider/antigravity/v1
+```
+
+允许账号类型：
+
+```txt
+desktop_client_token
+ide_plugin_token
+custom_reverse_proxy
+```
+
+`antigravity` preset 不提供通用 `default_base_url`；管理员必须在 Provider Account
+metadata 中配置实际 `base_url`。`/antigravity/v1beta/*` 和
+`/api/provider/antigravity/v1beta/*` 的 Gemini model-action alias 需要单独 route-parser
+支持，不由本 text alias preset 注册。
+
+## 7. Preset Schema
 
 ```yaml
 provider_key: deepseek
@@ -105,6 +143,7 @@ capabilities:
 ```txt
 anthropic
 anthropic-compatible
+antigravity
 anyrouter
 cerebras
 deepseek
@@ -124,9 +163,9 @@ zhipu
 zhipu-anthropic
 ```
 
-`deepseek` 的 OpenAI-compatible 默认 base URL 为 `https://api.deepseek.com`；`deepseek-anthropic` 为 `https://api.deepseek.com/anthropic`。其他 preset 必须同样保留显式 `default_base_url`，避免 Gateway 运行时按 provider 名称硬编码。
+`deepseek` 的 OpenAI-compatible 默认 base URL 为 `https://api.deepseek.com`；`deepseek-anthropic` 为 `https://api.deepseek.com/anthropic`。除 `antigravity` 这类必须由账号 metadata 指向实际客户端/反代上游的 reverse-proxy identity preset 外，其他 preset 必须同样保留显式 `default_base_url`，避免 Gateway 运行时按 provider 名称硬编码。
 
-## 7. Auth Modes
+## 8. Auth Modes
 
 | auth mode | Header |
 | --- | --- |
@@ -137,7 +176,7 @@ zhipu-anthropic
 
 凭证值必须只存加密密文。
 
-## 8. Route Alias 规则
+## 9. Route Alias 规则
 
 Provider alias 只改变 platform context，不新增 runtime。
 

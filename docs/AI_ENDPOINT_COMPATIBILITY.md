@@ -94,6 +94,12 @@ provider.protocol     = openai-compatible / anthropic-compatible / gemini-compat
 Antigravity 反代账号使用 `reverse-proxy-antigravity` 表示客户端身份，仍由
 `provider.protocol` 决定上游端点形状。它不得绕过 Canonical AI Request、Scheduler、
 Provider Adapter 或 Reverse Proxy Runtime，也不得新增 Gateway-local DTO。
+WP-360 起，Antigravity 文本 provider alias（例如
+`/api/provider/antigravity/v1/chat/completions` 和
+`/api/provider/antigravity/v1/messages`）只强制 `provider_key=antigravity`；
+OpenAI/Anthropic/Gemini 的上游子协议仍由 `provider.protocol` 决定。
+Gemini-native `/antigravity/v1beta/models/{model}:generateContent` alias 需要单独的
+model-action route parser，仍归后续包。
 
 ## 3. 端点转换架构
 

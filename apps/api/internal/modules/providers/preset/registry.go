@@ -10,9 +10,10 @@ import (
 type PlatformFamily string
 
 const (
-	PlatformFamilyOpenAICompatible    PlatformFamily = "openai_compatible"
-	PlatformFamilyAnthropicCompatible PlatformFamily = "anthropic_compatible"
-	PlatformFamilyRerankCompatible    PlatformFamily = "rerank_compatible"
+	PlatformFamilyOpenAICompatible        PlatformFamily = "openai_compatible"
+	PlatformFamilyAnthropicCompatible     PlatformFamily = "anthropic_compatible"
+	PlatformFamilyReverseProxyAntigravity PlatformFamily = "reverse_proxy_antigravity"
+	PlatformFamilyRerankCompatible        PlatformFamily = "rerank_compatible"
 )
 
 type AuthMode string
@@ -30,6 +31,8 @@ const (
 	AccountTypeAPIKey             AccountType = "api_key"
 	AccountTypeUpstream           AccountType = "upstream"
 	AccountTypeCustomReverseProxy AccountType = "custom_reverse_proxy"
+	AccountTypeDesktopClientToken AccountType = "desktop_client_token"
+	AccountTypeIdePluginToken     AccountType = "ide_plugin_token"
 )
 
 type Preset struct {
@@ -67,6 +70,7 @@ func Default() *Registry {
 	return New(
 		anthropicPreset("anthropic", "Anthropic", "https://api.anthropic.com/v1", []string{"/anthropic/v1", "/api/provider/anthropic", "/api/provider/anthropic/v1"}),
 		anthropicPreset("anthropic-compatible", "Anthropic Compatible", "https://api.anthropic.com/v1", []string{"/api/provider/anthropic-compatible", "/api/provider/anthropic-compatible/v1", "/api/provider/claude-compatible", "/api/provider/claude-compatible/v1"}),
+		antigravityPreset(),
 		anthropicPreset("deepseek-anthropic", "DeepSeek Anthropic Compatible", "https://api.deepseek.com/anthropic", providerAliases("deepseek-anthropic")),
 		anthropicPreset("moonshot-anthropic", "Moonshot Anthropic Compatible", "https://api.moonshot.ai/anthropic", providerAliases("moonshot-anthropic")),
 		anthropicPreset("zai-anthropic", "Z.AI Anthropic Compatible", "https://api.z.ai/api/anthropic", providerAliases("zai-anthropic")),
@@ -97,6 +101,24 @@ func anthropicPreset(providerKey string, displayName string, defaultBaseURL stri
 
 func rerankPreset(providerKey string, displayName string, defaultBaseURL string, routeAliases []string) Preset {
 	return compatiblePreset(providerKey, PlatformFamilyRerankCompatible, displayName, defaultBaseURL, routeAliases, rerankCapabilities())
+}
+
+func antigravityPreset() Preset {
+	preset := compatiblePreset(
+		"antigravity",
+		PlatformFamilyReverseProxyAntigravity,
+		"Antigravity",
+		"",
+		[]string{"/antigravity/v1", "/api/provider/antigravity", "/api/provider/antigravity/v1"},
+		antigravityCapabilities(),
+	)
+	preset.AuthModes = []AuthMode{AuthModeBearer, AuthModeCustomHeader}
+	preset.AccountTypeAllowlist = []AccountType{
+		AccountTypeDesktopClientToken,
+		AccountTypeIdePluginToken,
+		AccountTypeCustomReverseProxy,
+	}
+	return preset
 }
 
 func compatiblePreset(providerKey string, platformFamily PlatformFamily, displayName string, defaultBaseURL string, routeAliases []string, capabilities map[string]bool) Preset {
@@ -131,6 +153,7 @@ func openAICapabilities() map[string]bool {
 		capabilitiescontract.KeyResponses:           true,
 		capabilitiescontract.KeyMessages:            true,
 		capabilitiescontract.KeyEmbeddings:          true,
+		capabilitiescontract.KeyImages:              true,
 		capabilitiescontract.KeyAudioTranscriptions: true,
 		capabilitiescontract.KeyAudioSpeech:         true,
 		capabilitiescontract.KeyModerations:         true,
@@ -155,6 +178,17 @@ func anthropicCapabilities() map[string]bool {
 func rerankCapabilities() map[string]bool {
 	return map[string]bool{
 		capabilitiescontract.KeyRerank: true,
+	}
+}
+
+func antigravityCapabilities() map[string]bool {
+	return map[string]bool{
+		capabilitiescontract.KeyChatCompletions:  true,
+		capabilitiescontract.KeyMessages:         true,
+		capabilitiescontract.KeyStreaming:        true,
+		capabilitiescontract.KeyToolCalling:      true,
+		capabilitiescontract.KeyStructuredOutput: true,
+		capabilitiescontract.KeyVisionInput:      true,
 	}
 }
 

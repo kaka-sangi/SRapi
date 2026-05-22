@@ -42,14 +42,15 @@ last_completed:
 - WP-330: Audio transcriptions runtime v1 now exposes OpenAI-compatible `/v1/audio/transcriptions`, provider alias routing, canonical audio transcription normalization/rendering, OpenAI-compatible upstream multipart `/audio/transcriptions` adapter dispatch, explicit `audio_transcriptions` Scheduler capability filtering, usage/billing/Scheduler feedback evidence, and generated OpenAPI/SDK parity.
 - WP-340: Audio speech runtime v1 now exposes OpenAI-compatible `/v1/audio/speech`, provider alias routing, canonical audio speech normalization, binary audio rendering, OpenAI-compatible upstream JSON `/audio/speech` adapter dispatch, explicit `audio_speech` Scheduler capability filtering, usage/billing/Scheduler feedback evidence, and generated OpenAPI/SDK parity.
 - WP-350: Antigravity reverse proxy runtime identity now adds `reverse-proxy-antigravity` to the OpenAPI/SDK adapter enum, default `antigravity_desktop` Reverse Proxy Runtime identity, OpenAI/Gemini protocol dispatch tests, and a Gateway regression proving desktop-token Antigravity accounts route through Scheduler and Reverse Proxy Runtime.
+- WP-360: Antigravity text provider aliases now seed an `antigravity` provider preset, register text aliases from capability metadata, expose representative OpenAPI/SDK alias contracts, and prove OpenAI Chat/Anthropic Messages alias requests still route through Scheduler, Provider Adapter, and Reverse Proxy Runtime without Gateway-local DTOs.
 
 current:
 
-- package: WP-360+
+- package: WP-370+
 - status: pending
-- objective: split the next ecosystem or remaining advanced endpoint package from the roadmap.
+- objective: split the next ecosystem or remaining advanced endpoint package from the roadmap, with Antigravity Gemini `/v1beta` model-action aliases as the next known route-registry gap.
 
-next_recommended: WP-360+
+next_recommended: WP-370+
 
 last_gates:
 
@@ -118,7 +119,10 @@ notes:
 - WP-340 added `TestOpenAICompatibleAdapterInvokesAudioSpeechUpstream`, `TestGatewayAudioSpeechRouteTargetsOpenAICompatibleUpstream`, and `TestGatewayAudioSpeechAliasForcesProviderContext`.
 - WP-350 verified local client shape without reading credentials: Codex CLI is installed as `codex-cli 0.133.0`, Claude Code is installed as `2.1.144 (Claude Code)`, and Antigravity is installed as desktop app metadata `Antigravity 1.107.0`.
 - WP-350 added `TestRuntimeInjectsAntigravityDesktopTokenAndDefaultUserAgent`, `TestReverseProxyAntigravityOpenAIAdapterDispatchesThroughRuntime`, `TestReverseProxyAntigravityAnthropicAdapterDispatchesThroughRuntime`, `TestReverseProxyAntigravityGeminiAdapterDispatchesThroughRuntime`, and `TestGatewayAntigravityReverseProxyUsesDesktopRuntimeIdentity`.
-- WP-350 intentionally keeps Antigravity-specific `/api/provider/antigravity/*` route aliases as a later route-registry package; configured Antigravity accounts work through existing Gateway routes and `provider.protocol`.
+- WP-360 added the `antigravity` preset with `/antigravity/v1`, `/api/provider/antigravity`, and `/api/provider/antigravity/v1` text aliases plus desktop/IDE reverse-proxy account allowlist.
+- WP-360 changed provider alias registration to read endpoint capabilities from preset metadata; the registry test now guards OpenAI image/audio capabilities so dynamic alias coverage does not regress.
+- WP-360 added `TestGatewayAntigravityProviderAliasTargetsOpenAIReverseProxy` and `TestGatewayAntigravityProviderAliasTargetsAnthropicReverseProxy`, proving Antigravity aliases force `provider_key=antigravity`, preserve alias source endpoints, and dispatch through Reverse Proxy Runtime using `provider.protocol`.
+- WP-360 intentionally leaves Antigravity Gemini `/antigravity/v1beta/models/{model}:generateContent` aliases to a later route-parser package; configured Antigravity Gemini accounts continue to work through the standard Gemini-native Gateway path and `provider.protocol`.
 
 ## Work Package Ledger
 
@@ -160,4 +164,5 @@ notes:
 | WP-330 | completed | Audio transcriptions runtime v1. |
 | WP-340 | completed | Audio speech runtime v1. |
 | WP-350 | completed | Antigravity reverse proxy runtime identity v1. |
-| WP-360+ | pending | Remaining ecosystem and advanced endpoint packages. |
+| WP-360 | completed | Antigravity text provider alias routes v1. |
+| WP-370+ | pending | Remaining ecosystem and advanced endpoint packages. |

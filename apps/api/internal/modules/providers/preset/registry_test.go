@@ -15,6 +15,7 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	wantKeys := []string{
 		"anthropic",
 		"anthropic-compatible",
+		"antigravity",
 		"anyrouter",
 		"cerebras",
 		"deepseek",
@@ -50,8 +51,8 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	if !containsAccountType(openaiPreset.AccountTypeAllowlist, AccountTypeCustomReverseProxy) {
 		t.Fatalf("expected openai-compatible allowlist to include custom_reverse_proxy")
 	}
-	if !openaiPreset.Capabilities["audio_speech"] {
-		t.Fatalf("expected openai-compatible preset to advertise audio_speech")
+	if !openaiPreset.Capabilities["images"] || !openaiPreset.Capabilities["audio_speech"] {
+		t.Fatalf("expected openai-compatible preset to advertise images and audio_speech")
 	}
 
 	anthropicPreset, ok := registry.Lookup("anthropic-compatible")
@@ -66,6 +67,26 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	}
 	if !containsAuthMode(anthropicPreset.AuthModes, AuthModeCustomHeader) {
 		t.Fatalf("expected anthropic-compatible auth modes to include custom_header")
+	}
+
+	antigravityPreset, ok := registry.Lookup("antigravity")
+	if !ok {
+		t.Fatalf("missing antigravity preset")
+	}
+	if antigravityPreset.PlatformFamily != PlatformFamilyReverseProxyAntigravity {
+		t.Fatalf("expected antigravity reverse proxy platform family, got %s", antigravityPreset.PlatformFamily)
+	}
+	if antigravityPreset.DefaultBaseURL != "" {
+		t.Fatalf("expected antigravity preset to require account base_url, got %q", antigravityPreset.DefaultBaseURL)
+	}
+	if !antigravityPreset.MatchesPath("/api/provider/antigravity/v1/chat/completions") || !antigravityPreset.MatchesPath("/antigravity/v1/messages") {
+		t.Fatalf("expected antigravity text route aliases to match paths")
+	}
+	if !containsAccountType(antigravityPreset.AccountTypeAllowlist, AccountTypeDesktopClientToken) || !containsAccountType(antigravityPreset.AccountTypeAllowlist, AccountTypeIdePluginToken) {
+		t.Fatalf("expected antigravity allowlist to include desktop and IDE token accounts")
+	}
+	if !antigravityPreset.Capabilities["chat_completions"] || !antigravityPreset.Capabilities["messages"] || antigravityPreset.Capabilities["embeddings"] {
+		t.Fatalf("unexpected antigravity capabilities: %+v", antigravityPreset.Capabilities)
 	}
 
 	deepseekPreset, ok := registry.Lookup("deepseek")

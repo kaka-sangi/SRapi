@@ -57,6 +57,10 @@ OpenAI-compatible preset:
 
 Anthropic-compatible preset:
   POST {alias}/v1/messages
+
+Antigravity preset:
+  POST {alias}/v1/chat/completions
+  POST {alias}/v1/messages
 ```
 
 `{alias}` 来自 `COMPATIBLE_PROVIDER_REGISTRY_SPEC.md` 的 `route_aliases`。例如 `/api/provider/deepseek/v1/chat/completions` 强制 `provider_key=deepseek`，但仍复用标准 Gateway runtime、API Key policy、model visibility、Scheduler、usage 和 decision 记录。
@@ -148,7 +152,11 @@ Antigravity 可承载 Claude-shaped 和 Gemini-shaped 端点，必须在 route m
 `runtime_class = desktop_client_token` 或 `ide_plugin_token`、`upstream_client = antigravity_desktop`，
 并通过现有 `/v1/chat/completions`、`/v1/messages` 或 Gemini-native Gateway 路径进入
 Scheduler / Provider Adapter / Reverse Proxy Runtime。上游子协议由 `provider.protocol` 决定。
-本节列出的 Antigravity 专属 alias 路径仍是规划项，需后续 route-registry package 落地。
+WP-360 起，Antigravity 文本 alias 已实现：`/antigravity/v1/chat/completions`、
+`/api/provider/antigravity/v1/chat/completions`、`/antigravity/v1/messages` 和
+`/api/provider/antigravity/v1/messages` 强制 `provider_key=antigravity`，仍复用标准
+Gateway runtime。`/antigravity/v1beta/*` 与 `/api/provider/antigravity/v1beta/*` 的
+Gemini model-action alias 仍是后续 route-parser package。
 
 ## 5. Route Matrix
 
