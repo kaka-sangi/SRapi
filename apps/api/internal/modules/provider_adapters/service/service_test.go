@@ -388,6 +388,256 @@ func TestOpenAICompatibleAdapterClassifiesInvalidRequest(t *testing.T) {
 	assertProviderError(t, err, "invalid_request", http.StatusBadRequest)
 }
 
+func TestGeminiCompatibleAdapterInvokesGenerateContentUpstream(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1beta/models/gemini-pro:generateContent" {
+			t.Fatalf("unexpected upstream path %s", r.URL.Path)
+		}
+		if got := r.URL.Query().Get("key"); got != "gemini-secret" {
+			t.Fatalf("unexpected api key query %q", got)
+		}
+		if r.Header.Get("X-Request-ID") != "" || strings.Contains(r.Header.Get("User-Agent"), "SRapi") {
+			t.Fatalf("unexpected SRapi header leakage: %+v", r.Header)
+		}
+		var payload struct {
+			Contents []struct {
+				Role  string `json:"role"`
+				Parts []struct {
+					Text string `json:"text"`
+				} `json:"parts"`
+			} `json:"contents"`
+			SystemInstruction *struct {
+				Parts []struct {
+					Text string `json:"text"`
+				} `json:"parts"`
+			} `json:"systemInstruction"`
+			GenerationConfig *struct {
+				MaxOutputTokens int      `json:"maxOutputTokens"`
+				Temperature     float32  `json:"temperature"`
+				TopP            float32  `json:"topP"`
+				StopSequences   []string `json:"stopSequences"`
+			} `json:"generationConfig"`
+			Tools []map[string]any `json:"tools"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		if len(payload.Contents) != 2 || payload.Contents[0].Role != "user" || payload.Contents[0].Parts[0].Text != "hello gemini" || payload.Contents[1].Role != "model" || payload.Contents[1].Parts[0].Text != "prior answer" {
+			t.Fatalf("unexpected Gemini contents: %+v", payload.Contents)
+		}
+		if payload.SystemInstruction == nil || len(payload.SystemInstruction.Parts) != 1 || payload.SystemInstruction.Parts[0].Text != "be concise" {
+			t.Fatalf("expected system instruction, got %+v", payload.SystemInstruction)
+		}
+		if payload.GenerationConfig == nil || payload.GenerationConfig.MaxOutputTokens != 64 || payload.GenerationConfig.Temperature != 0.3 || payload.GenerationConfig.TopP != 0.7 || len(payload.GenerationConfig.StopSequences) != 1 || payload.GenerationConfig.StopSequences[0] != "stop" {
+			t.Fatalf("unexpected generation config: %+v", payload.GenerationConfig)
+		}
+		if len(payload.Tools) != 1 {
+			t.Fatalf("expected one Gemini tool wrapper, got %+v", payload.Tools)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"candidates":[{"content":{"role":"model","parts":[{"text":"gemini says hi"}]}}],"usageMetadata":{"promptTokenCount":9,"candidatesTokenCount":4,"totalTokenCount":14,"cachedContentTokenCount":1}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeText(context.Background(), contract.TextRequest{
+		RequestID:       "req_gemini_adapter",
+		Model:           "gemini-local",
+		Instructions:    "be concise",
+		MaxOutputTokens: ptrInt(64),
+		Temperature:     ptrFloat32(0.3),
+		TopP:            ptrFloat32(0.7),
+		Stop:            []string{"stop"},
+		Messages: []contract.TextMessage{
+			{Role: "user", Content: "hello gemini"},
+			{Role: "assistant", Content: "prior answer"},
+		},
+		Tools: []map[string]any{{
+			"type": "function",
+			"function": map[string]any{
+				"name":       "lookup",
+				"parameters": map[string]any{"type": "object"},
+			},
+		}},
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "gemini-compatible",
+			Protocol:    "gemini-compatible",
+		},
+		Account:    accountcontract.ProviderAccount{ID: 1, Metadata: map[string]any{"base_url": upstream.URL + "/v1beta"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "models/gemini-pro"},
+		Credential: map[string]any{"api_key": "gemini-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke gemini upstream: %v", err)
+	}
+	if resp.Text != "gemini says hi" || resp.Usage.Estimated || resp.Usage.InputTokens != 9 || resp.Usage.OutputTokens != 4 || resp.Usage.CachedTokens != 1 {
+		t.Fatalf("unexpected gemini response: %+v", resp)
+	}
+}
+
+func TestGeminiCompatibleAdapterStreamsUpstream(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1beta/models/gemini-pro:streamGenerateContent" {
+			t.Fatalf("unexpected upstream path %s", r.URL.Path)
+		}
+		var payload struct {
+			Contents []struct {
+				Parts []struct {
+					Text string `json:"text"`
+				} `json:"parts"`
+			} `json:"contents"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode stream payload: %v", err)
+		}
+		if len(payload.Contents) != 1 || payload.Contents[0].Parts[0].Text != "stream gemini" {
+			t.Fatalf("unexpected stream payload: %+v", payload)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"hello\"}]}}]}\n\n"))
+		_, _ = w.Write([]byte("data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\" stream\"}]}}],\"usageMetadata\":{\"promptTokenCount\":5,\"candidatesTokenCount\":6,\"totalTokenCount\":11}}\n\n"))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeText(context.Background(), contract.TextRequest{
+		RequestID: "req_gemini_stream",
+		Model:     "gemini-local",
+		Prompt:    "stream gemini",
+		Stream:    true,
+		Provider: providercontract.Provider{
+			AdapterType: "native-gemini",
+			Protocol:    "gemini-compatible",
+		},
+		Account:    accountcontract.ProviderAccount{ID: 1, Metadata: map[string]any{"base_url": upstream.URL + "/v1beta"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gemini-pro"},
+		Credential: map[string]any{"api_key": "gemini-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke gemini stream: %v", err)
+	}
+	if resp.Text != "hello stream" || resp.Usage.Estimated || resp.Usage.InputTokens != 5 || resp.Usage.OutputTokens != 6 {
+		t.Fatalf("unexpected gemini stream response: %+v", resp)
+	}
+}
+
+func TestGeminiCompatibleAdapterAcceptsModelsBaseURL(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1beta/models/gemini-pro:generateContent" {
+			t.Fatalf("unexpected upstream path %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"candidates":[{"content":{"parts":[{"text":"ok"}]}}]}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeText(context.Background(), contract.TextRequest{
+		RequestID:  "req_gemini_models_base",
+		Model:      "gemini-local",
+		Prompt:     "hello",
+		Provider:   providercontract.Provider{AdapterType: "gemini-compatible", Protocol: "gemini-compatible"},
+		Account:    accountcontract.ProviderAccount{ID: 1, Metadata: map[string]any{"base_url": upstream.URL + "/v1beta/models"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gemini-pro"},
+		Credential: map[string]any{"api_key": "gemini-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke gemini upstream: %v", err)
+	}
+	if resp.Text != "ok" {
+		t.Fatalf("unexpected gemini response: %+v", resp)
+	}
+}
+
+func TestGeminiCompatibleAdapterClassifiesGoogleError(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`{"error":{"code":429,"message":"quota exhausted","status":"RESOURCE_EXHAUSTED"}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeText(context.Background(), contract.TextRequest{
+		RequestID:  "req_gemini_error",
+		Model:      "gemini-local",
+		Prompt:     "hello",
+		Provider:   providercontract.Provider{AdapterType: "gemini-compatible", Protocol: "gemini-compatible"},
+		Account:    accountcontract.ProviderAccount{ID: 1, Metadata: map[string]any{"base_url": upstream.URL + "/v1beta"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gemini-pro"},
+		Credential: map[string]any{"api_key": "gemini-secret"},
+	})
+	assertProviderError(t, err, "rate_limit", http.StatusTooManyRequests)
+}
+
+func TestReverseProxyGeminiAdapterDispatchesThroughRuntime(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body:       []byte(`{"candidates":[{"content":{"parts":[{"text":"gemini runtime response"}]}}],"usageMetadata":{"promptTokenCount":2,"candidatesTokenCount":3}}`),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeText(context.Background(), contract.TextRequest{
+		RequestID: "req_reverse_gemini",
+		Model:     "gemini-local",
+		Prompt:    "hello",
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-gemini-cli",
+			Protocol:    "gemini-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("gemini_cli"),
+			Metadata:       map[string]any{"base_url": "https://generativelanguage.googleapis.com/v1beta", "user_agent": "GeminiCLI/1.0"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gemini-pro"},
+		Credential: map[string]any{"cli_client_token": "cli-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke reverse gemini adapter: %v", err)
+	}
+	if resp.Text != "gemini runtime response" || resp.Usage.InputTokens != 2 || resp.Usage.OutputTokens != 3 {
+		t.Fatalf("unexpected reverse gemini response: %+v", resp)
+	}
+	if runtime.request.Method != http.MethodPost || runtime.request.URL != "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent" || runtime.request.ExpectStream {
+		t.Fatalf("unexpected reverse gemini request: %+v", runtime.request)
+	}
+	if runtime.request.Account.RuntimeClass != string(accountcontract.RuntimeClassCliClientToken) || runtime.request.Account.UpstreamClient == nil || *runtime.request.Account.UpstreamClient != "gemini_cli" {
+		t.Fatalf("expected gemini runtime context, got %+v", runtime.request.Account)
+	}
+	var payload struct {
+		Contents []struct {
+			Parts []struct {
+				Text string `json:"text"`
+			} `json:"parts"`
+		} `json:"contents"`
+	}
+	if err := json.Unmarshal(runtime.request.Body, &payload); err != nil {
+		t.Fatalf("decode reverse gemini payload: %v", err)
+	}
+	if len(payload.Contents) != 1 || payload.Contents[0].Parts[0].Text != "hello" {
+		t.Fatalf("unexpected reverse gemini payload: %+v", payload)
+	}
+}
+
 func TestAnthropicCompatibleAdapterInvokesMessagesUpstream(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/messages" {
@@ -880,5 +1130,9 @@ func ptrString(value string) *string {
 }
 
 func ptrInt(value int) *int {
+	return &value
+}
+
+func ptrFloat32(value float32) *float32 {
 	return &value
 }

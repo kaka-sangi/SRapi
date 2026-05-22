@@ -76,7 +76,7 @@ POST /v1beta/models/{model}:generateContent
 POST /v1beta/models/{model}:streamGenerateContent
 ```
 
-这些路由先完成客户端侧 Gemini GenerateContent 与 Canonical AI Request / Response 的转换，并复用 Gateway API Key、模型策略、Scheduler、Provider Adapter、usage 和 decision 记录。Gemini 原生上游 `generateContent` adapter 仍在后续 Provider Expansion 中实现。
+这些路由完成客户端侧 Gemini GenerateContent 与 Canonical AI Request / Response 的转换，并复用 Gateway API Key、模型策略、Scheduler、Provider Adapter、usage 和 decision 记录。WP-240 起，目标 Provider 为 `gemini-compatible` / `native-gemini` / `reverse-proxy-gemini-cli` 时，Provider Adapter 会调用 Gemini `generateContent` 或 `streamGenerateContent` 上游。
 
 ### 2.4 OpenRouter 与其他聚合协议
 
@@ -317,7 +317,7 @@ SRapi 返回 OpenAI Chat Completions 响应格式
 
 ```txt
 客户端调用 /v1beta/models/{model}:generateContent
-上游实际调用 /v1/chat/completions 或其他可调度 Provider Adapter
+上游实际调用 /v1/chat/completions、Anthropic /v1/messages、Gemini generateContent 或其他可调度 Provider Adapter
 SRapi 返回 Gemini GenerateContent 响应格式
 ```
 
@@ -445,7 +445,6 @@ Canonical AI Response -> OpenAI Chat / Responses / Anthropic Messages response
 Phase 2 继续实现：
 
 ```txt
-Gemini native generateContent upstream conversion
 Gemini native models/list endpoint
 Embeddings endpoint
 Images endpoint

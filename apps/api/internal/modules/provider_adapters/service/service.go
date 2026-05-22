@@ -38,6 +38,12 @@ func (s *Service) InvokeText(ctx context.Context, req contract.TextRequest) (con
 		return contract.TextResponse{}, ErrInvalidInput
 	}
 	if baseURL := upstreamBaseURL(req); baseURL != "" {
+		if isGeminiCompatible(req) {
+			if isReverseProxyRuntime(req) {
+				return s.invokeReverseProxyGeminiCompatible(ctx, req, baseURL)
+			}
+			return s.invokeGeminiCompatible(ctx, req, baseURL)
+		}
 		if isAnthropicCompatible(req) {
 			if isReverseProxyRuntime(req) {
 				return s.invokeReverseProxyAnthropicCompatible(ctx, req, baseURL)
@@ -57,6 +63,62 @@ func (s *Service) InvokeText(ctx context.Context, req contract.TextRequest) (con
 		Text:       text,
 		StatusCode: http.StatusOK,
 		Usage:      estimatedUsage(text),
+	}, nil
+}
+
+func (s *Service) invokeGeminiCompatible(ctx context.Context, req contract.TextRequest, baseURL string) (contract.TextResponse, error) {
+	apiKey := geminiAPIKey(req)
+	if apiKey == "" {
+		return contract.TextResponse{}, contract.ProviderError{Class: "auth_failed", StatusCode: http.StatusUnauthorized, Message: "provider api key missing"}
+	}
+	payload := geminiCompatiblePayload(req)
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return contract.TextResponse{}, err
+	}
+	endpoint := geminiEndpoint(baseURL, req.Mapping.UpstreamModelName, req.Stream)
+	headers := geminiCompatibleHeaders(req, apiKey, &endpoint)
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(raw))
+	if err != nil {
+		return contract.TextResponse{}, err
+	}
+	httpReq.Header = headers
+
+	resp, err := s.client.Do(httpReq)
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return contract.TextResponse{}, contract.ProviderError{Class: "timeout", StatusCode: http.StatusGatewayTimeout, Message: "provider request timed out"}
+		}
+		return contract.TextResponse{}, contract.ProviderError{Class: "network_error", StatusCode: http.StatusBadGateway, Message: "provider request failed"}
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
+	if err != nil {
+		if req.Stream {
+			return contract.TextResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream interrupted"}
+		}
+		return contract.TextResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response read failed"}
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return contract.TextResponse{}, classifyGeminiProviderHTTPError(resp.StatusCode, body)
+	}
+	if req.Stream {
+		return parseGeminiCompatibleStream(body, resp.StatusCode)
+	}
+
+	var decoded geminiGenerateContentResponse
+	if err := json.Unmarshal(body, &decoded); err != nil {
+		return contract.TextResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider returned invalid json"}
+	}
+	text := strings.TrimSpace(decoded.FirstText())
+	if text == "" {
+		return contract.TextResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response contained no text"}
+	}
+	return contract.TextResponse{
+		Text:       text,
+		StatusCode: resp.StatusCode,
+		Usage:      decoded.UsageMetadata.ToUsage(text),
 	}, nil
 }
 
@@ -174,6 +236,56 @@ func (s *Service) invokeOpenAICompatible(ctx context.Context, req contract.TextR
 	}, nil
 }
 
+func (s *Service) invokeReverseProxyGeminiCompatible(ctx context.Context, req contract.TextRequest, baseURL string) (contract.TextResponse, error) {
+	if s.reverseProxy == nil {
+		return contract.TextResponse{}, contract.ProviderError{Class: "network_error", StatusCode: http.StatusBadGateway, Message: "reverse proxy runtime unavailable"}
+	}
+	payload := geminiCompatiblePayload(req)
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return contract.TextResponse{}, err
+	}
+	endpoint := geminiEndpoint(baseURL, req.Mapping.UpstreamModelName, req.Stream)
+	headers := geminiCompatibleHeaders(req, "", &endpoint)
+	runtimeResp, err := s.reverseProxy.Do(ctx, reverseproxycontract.Request{
+		Account: reverseproxycontract.AccountRuntime{
+			AccountID:      req.Account.ID,
+			RuntimeClass:   string(req.Account.RuntimeClass),
+			UpstreamClient: req.Account.UpstreamClient,
+			ProxyID:        req.Account.ProxyID,
+			UserAgent:      mapString(req.Account.Metadata, "user_agent"),
+			Credential:     req.Credential,
+		},
+		Method:       http.MethodPost,
+		URL:          endpoint,
+		Headers:      headers,
+		Body:         raw,
+		ExpectStream: req.Stream,
+	})
+	if err != nil {
+		return contract.TextResponse{}, providerErrorFromReverseProxy(err)
+	}
+	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
+		return contract.TextResponse{}, classifyGeminiProviderHTTPError(runtimeResp.StatusCode, runtimeResp.Body)
+	}
+	if req.Stream {
+		return parseGeminiCompatibleStream(runtimeResp.Body, runtimeResp.StatusCode)
+	}
+	var decoded geminiGenerateContentResponse
+	if err := json.Unmarshal(runtimeResp.Body, &decoded); err != nil {
+		return contract.TextResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider returned invalid json"}
+	}
+	text := strings.TrimSpace(decoded.FirstText())
+	if text == "" {
+		return contract.TextResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response contained no text"}
+	}
+	return contract.TextResponse{
+		Text:       text,
+		StatusCode: runtimeResp.StatusCode,
+		Usage:      decoded.UsageMetadata.ToUsage(text),
+	}, nil
+}
+
 func (s *Service) invokeReverseProxyAnthropicCompatible(ctx context.Context, req contract.TextRequest, baseURL string) (contract.TextResponse, error) {
 	if s.reverseProxy == nil {
 		return contract.TextResponse{}, contract.ProviderError{Class: "network_error", StatusCode: http.StatusBadGateway, Message: "reverse proxy runtime unavailable"}
@@ -269,6 +381,197 @@ func (s *Service) invokeReverseProxyOpenAICompatible(ctx context.Context, req co
 		StatusCode: runtimeResp.StatusCode,
 		Usage:      decoded.Usage.ToUsage(text),
 	}, nil
+}
+
+type geminiGenerateContentRequest struct {
+	Contents          []geminiContent         `json:"contents"`
+	SystemInstruction *geminiContent          `json:"systemInstruction,omitempty"`
+	GenerationConfig  *geminiGenerationConfig `json:"generationConfig,omitempty"`
+	Tools             []map[string]any        `json:"tools,omitempty"`
+	ToolConfig        any                     `json:"toolConfig,omitempty"`
+}
+
+type geminiContent struct {
+	Role  string       `json:"role,omitempty"`
+	Parts []geminiPart `json:"parts"`
+}
+
+type geminiPart struct {
+	Text string `json:"text,omitempty"`
+}
+
+type geminiGenerationConfig struct {
+	Temperature      *float32       `json:"temperature,omitempty"`
+	TopP             *float32       `json:"topP,omitempty"`
+	MaxOutputTokens  *int           `json:"maxOutputTokens,omitempty"`
+	StopSequences    []string       `json:"stopSequences,omitempty"`
+	ResponseMimeType string         `json:"responseMimeType,omitempty"`
+	ResponseSchema   map[string]any `json:"responseSchema,omitempty"`
+}
+
+func geminiCompatiblePayload(req contract.TextRequest) geminiGenerateContentRequest {
+	payload := geminiGenerateContentRequest{
+		Contents:         geminiCompatibleContents(req),
+		GenerationConfig: geminiCompatibleGenerationConfig(req),
+		Tools:            geminiCompatibleTools(req.Tools),
+		ToolConfig:       geminiCompatibleToolConfig(req.ToolChoice),
+	}
+	if system := geminiCompatibleSystem(req); system != "" {
+		payload.SystemInstruction = &geminiContent{
+			Parts: []geminiPart{{Text: system}},
+		}
+	}
+	return payload
+}
+
+func geminiCompatibleContents(req contract.TextRequest) []geminiContent {
+	out := make([]geminiContent, 0, len(req.Messages)+1)
+	hasConversationMessage := false
+	for _, message := range req.Messages {
+		role := geminiRole(message.Role)
+		if role == "system" {
+			continue
+		}
+		content := strings.TrimSpace(message.Content)
+		if content == "" {
+			continue
+		}
+		out = append(out, geminiContent{Role: role, Parts: []geminiPart{{Text: content}}})
+		hasConversationMessage = true
+	}
+	if !hasConversationMessage {
+		prompt := strings.TrimSpace(req.Prompt)
+		if prompt == "" {
+			prompt = strings.TrimSpace(req.Instructions)
+		}
+		out = append(out, geminiContent{Role: "user", Parts: []geminiPart{{Text: prompt}}})
+	}
+	return out
+}
+
+func geminiRole(role string) string {
+	switch strings.TrimSpace(role) {
+	case "assistant", "model":
+		return "model"
+	case "system":
+		return "system"
+	default:
+		return "user"
+	}
+}
+
+func geminiCompatibleSystem(req contract.TextRequest) string {
+	parts := make([]string, 0, len(req.Messages)+1)
+	if instructions := strings.TrimSpace(req.Instructions); instructions != "" {
+		parts = append(parts, instructions)
+	}
+	for _, message := range req.Messages {
+		if strings.TrimSpace(message.Role) != "system" {
+			continue
+		}
+		if content := strings.TrimSpace(message.Content); content != "" {
+			parts = append(parts, content)
+		}
+	}
+	return strings.Join(uniqueTrimmedStrings(parts), "\n")
+}
+
+func geminiCompatibleGenerationConfig(req contract.TextRequest) *geminiGenerationConfig {
+	cfg := &geminiGenerationConfig{
+		Temperature:     req.Temperature,
+		TopP:            req.TopP,
+		MaxOutputTokens: req.MaxOutputTokens,
+		StopSequences:   cloneStrings(req.Stop),
+	}
+	if len(req.ResponseFormat) > 0 {
+		cfg.ResponseMimeType = geminiResponseMimeType(req.ResponseFormat)
+		cfg.ResponseSchema = geminiResponseSchema(req.ResponseFormat)
+	}
+	if cfg.Temperature == nil && cfg.TopP == nil && cfg.MaxOutputTokens == nil && len(cfg.StopSequences) == 0 && cfg.ResponseMimeType == "" && len(cfg.ResponseSchema) == 0 {
+		return nil
+	}
+	return cfg
+}
+
+func geminiResponseMimeType(format map[string]any) string {
+	for _, key := range []string{"responseMimeType", "response_mime_type", "mime_type", "type"} {
+		value := strings.TrimSpace(fmt.Sprint(format[key]))
+		if value != "" && value != "<nil>" {
+			if value == "json_object" || value == "json_schema" {
+				return "application/json"
+			}
+			return value
+		}
+	}
+	if len(format) > 0 {
+		return "application/json"
+	}
+	return ""
+}
+
+func geminiResponseSchema(format map[string]any) map[string]any {
+	for _, key := range []string{"responseSchema", "response_schema", "schema"} {
+		if value, ok := format[key].(map[string]any); ok {
+			return cloneMap(value)
+		}
+	}
+	if value, ok := format["json_schema"].(map[string]any); ok {
+		if schema, ok := value["schema"].(map[string]any); ok {
+			return cloneMap(schema)
+		}
+		return cloneMap(value)
+	}
+	return nil
+}
+
+func geminiCompatibleTools(values []map[string]any) []map[string]any {
+	if len(values) == 0 {
+		return nil
+	}
+	functionDeclarations := make([]map[string]any, 0, len(values))
+	out := make([]map[string]any, 0, len(values))
+	for _, value := range values {
+		if value == nil {
+			continue
+		}
+		if declaration := geminiFunctionDeclaration(value); len(declaration) > 0 {
+			functionDeclarations = append(functionDeclarations, declaration)
+			continue
+		}
+		out = append(out, cloneMap(value))
+	}
+	if len(functionDeclarations) > 0 {
+		out = append(out, map[string]any{"functionDeclarations": functionDeclarations})
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func geminiFunctionDeclaration(value map[string]any) map[string]any {
+	function, ok := value["function"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	declaration := map[string]any{}
+	if name := strings.TrimSpace(fmt.Sprint(function["name"])); name != "" && name != "<nil>" {
+		declaration["name"] = name
+	}
+	if description := strings.TrimSpace(fmt.Sprint(function["description"])); description != "" && description != "<nil>" {
+		declaration["description"] = description
+	}
+	if parameters, ok := function["parameters"]; ok && parameters != nil {
+		declaration["parameters"] = cloneAny(parameters)
+	}
+	return declaration
+}
+
+func geminiCompatibleToolConfig(value any) any {
+	if value == nil {
+		return nil
+	}
+	return cloneAny(value)
 }
 
 type anthropicMessagesRequest struct {
@@ -654,6 +957,132 @@ func parseOpenAICompatibleStream(body []byte, statusCode int) (contract.TextResp
 	}, nil
 }
 
+type geminiGenerateContentResponse struct {
+	Candidates []struct {
+		Content geminiContent `json:"content"`
+	} `json:"candidates"`
+	UsageMetadata geminiUsageMetadata `json:"usageMetadata"`
+}
+
+func (r geminiGenerateContentResponse) FirstText() string {
+	parts := make([]string, 0, len(r.Candidates))
+	for _, candidate := range r.Candidates {
+		for _, part := range candidate.Content.Parts {
+			if strings.TrimSpace(part.Text) != "" {
+				parts = append(parts, strings.TrimSpace(part.Text))
+			}
+		}
+	}
+	return strings.Join(parts, "\n")
+}
+
+func (r geminiGenerateContentResponse) StreamText() string {
+	var builder strings.Builder
+	for _, candidate := range r.Candidates {
+		for _, part := range candidate.Content.Parts {
+			if strings.TrimSpace(part.Text) != "" {
+				builder.WriteString(part.Text)
+			}
+		}
+	}
+	return builder.String()
+}
+
+type geminiUsageMetadata struct {
+	PromptTokenCount        *int `json:"promptTokenCount"`
+	CandidatesTokenCount    *int `json:"candidatesTokenCount"`
+	TotalTokenCount         *int `json:"totalTokenCount"`
+	CachedContentTokenCount *int `json:"cachedContentTokenCount"`
+}
+
+func (u geminiUsageMetadata) ToUsage(text string) contract.Usage {
+	input := valueOrZero(u.PromptTokenCount)
+	output := valueOrZero(u.CandidatesTokenCount)
+	cached := valueOrZero(u.CachedContentTokenCount)
+	total := input + output + cached
+	if u.TotalTokenCount != nil && *u.TotalTokenCount > 0 && total == 0 {
+		total = *u.TotalTokenCount
+	}
+	if total > 0 && output == 0 {
+		output = max(0, total-input-cached)
+	}
+	if input == 0 && output == 0 && cached == 0 {
+		return estimatedUsage(text)
+	}
+	return contract.Usage{
+		InputTokens:  input,
+		OutputTokens: output,
+		CachedTokens: cached,
+		Estimated:    false,
+	}
+}
+
+func (u *geminiUsageMetadata) Merge(next geminiUsageMetadata) {
+	if u == nil {
+		return
+	}
+	if next.PromptTokenCount != nil {
+		u.PromptTokenCount = cloneIntPtr(next.PromptTokenCount)
+	}
+	if next.CandidatesTokenCount != nil {
+		u.CandidatesTokenCount = cloneIntPtr(next.CandidatesTokenCount)
+	}
+	if next.TotalTokenCount != nil {
+		u.TotalTokenCount = cloneIntPtr(next.TotalTokenCount)
+	}
+	if next.CachedContentTokenCount != nil {
+		u.CachedContentTokenCount = cloneIntPtr(next.CachedContentTokenCount)
+	}
+}
+
+func parseGeminiCompatibleStream(body []byte, statusCode int) (contract.TextResponse, error) {
+	scanner := bufio.NewScanner(bytes.NewReader(body))
+	scanner.Buffer(make([]byte, 0, 64*1024), 4<<20)
+	var builder strings.Builder
+	var usage geminiUsageMetadata
+	seenChunk := false
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, ":") || strings.HasPrefix(line, "event:") {
+			continue
+		}
+		if !strings.HasPrefix(line, "data:") {
+			continue
+		}
+		data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+		if data == "" {
+			continue
+		}
+		if data == "[DONE]" {
+			break
+		}
+		var chunk geminiGenerateContentResponse
+		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
+			return contract.TextResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider returned invalid stream json"}
+		}
+		seenChunk = true
+		if text := chunk.StreamText(); strings.TrimSpace(text) != "" {
+			builder.WriteString(text)
+		}
+		usage.Merge(chunk.UsageMetadata)
+	}
+	if err := scanner.Err(); err != nil {
+		return contract.TextResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream interrupted"}
+	}
+	if !seenChunk {
+		return contract.TextResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream ended before chunk"}
+	}
+	text := strings.TrimSpace(builder.String())
+	if text == "" {
+		return contract.TextResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider stream contained no text"}
+	}
+	return contract.TextResponse{
+		Text:       text,
+		StatusCode: statusCode,
+		Usage:      usage.ToUsage(text),
+	}, nil
+}
+
 type anthropicMessagesResponse struct {
 	Content []anthropicContentBlock `json:"content"`
 	Usage   anthropicUsage          `json:"usage"`
@@ -791,13 +1220,23 @@ func parseAnthropicCompatibleStream(body []byte, statusCode int) (contract.TextR
 
 func upstreamBaseURL(req contract.TextRequest) string {
 	for _, values := range []map[string]any{req.Account.Metadata, req.Provider.ConfigSchema, req.Provider.Capabilities} {
-		for _, key := range []string{"base_url", "upstream_base_url", "openai_base_url", "anthropic_base_url"} {
+		for _, key := range []string{"base_url", "upstream_base_url", "openai_base_url", "anthropic_base_url", "gemini_base_url"} {
 			if value := mapString(values, key); value != "" {
 				return strings.TrimRight(value, "/")
 			}
 		}
 	}
 	return ""
+}
+
+func isGeminiCompatible(req contract.TextRequest) bool {
+	for _, value := range []string{req.Provider.Protocol, req.Provider.AdapterType} {
+		switch strings.ToLower(strings.TrimSpace(value)) {
+		case "gemini-compatible", "native-gemini", "reverse-proxy-gemini-cli":
+			return true
+		}
+	}
+	return false
 }
 
 func isAnthropicCompatible(req contract.TextRequest) bool {
@@ -816,6 +1255,64 @@ func isReverseProxyRuntime(req contract.TextRequest) bool {
 		return true
 	}
 	return strings.HasPrefix(strings.TrimSpace(req.Provider.AdapterType), "reverse-proxy-")
+}
+
+func geminiAPIKey(req contract.TextRequest) string {
+	for _, key := range []string{"api_key", "gemini_api_key", "google_api_key", "access_token"} {
+		if value := credentialString(req.Credential, key); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func geminiCompatibleHeaders(req contract.TextRequest, apiKey string, endpoint *string) http.Header {
+	headers := http.Header{
+		"Content-Type": {"application/json"},
+	}
+	if apiKey == "" {
+		return headers
+	}
+	switch strings.ToLower(requestSetting(req, "auth_mode")) {
+	case "bearer":
+		headers.Set("Authorization", "Bearer "+apiKey)
+	case "custom_header":
+		headerName := requestSetting(req, "custom_header_name", "auth_header", "api_key_header")
+		if headerName == "" {
+			headerName = "x-goog-api-key"
+		}
+		headers.Set(headerName, apiKey)
+	case "api_key_header", "x_goog_api_key":
+		headers.Set("x-goog-api-key", apiKey)
+	case "api_key_query", "":
+		if endpoint != nil {
+			*endpoint = appendAPIKeyQuery(*endpoint, apiKey, requestSetting(req, "api_key_query_param", "query_param"))
+		}
+	default:
+		if endpoint != nil {
+			*endpoint = appendAPIKeyQuery(*endpoint, apiKey, "key")
+		}
+	}
+	return headers
+}
+
+func geminiEndpoint(baseURL string, model string, stream bool) string {
+	action := ":generateContent"
+	if stream {
+		action = ":streamGenerateContent"
+	}
+	baseURL = strings.TrimRight(baseURL, "/")
+	model = strings.Trim(strings.TrimSpace(model), "/")
+	model = strings.TrimPrefix(model, "models/")
+	escapedModel := strings.ReplaceAll(url.PathEscape(model), "%2F", "/")
+	if strings.Contains(baseURL, "/models/") || strings.HasSuffix(baseURL, "/models") || strings.HasSuffix(baseURL, ":generateContent") || strings.HasSuffix(baseURL, ":streamGenerateContent") {
+		if strings.HasSuffix(baseURL, ":generateContent") || strings.HasSuffix(baseURL, ":streamGenerateContent") {
+			idx := strings.LastIndex(baseURL, ":")
+			return baseURL[:idx] + action
+		}
+		return baseURL + "/" + escapedModel + action
+	}
+	return baseURL + "/models/" + escapedModel + action
 }
 
 func anthropicAPIKey(req contract.TextRequest) string {
@@ -939,6 +1436,47 @@ func classifyAnthropicProviderHTTPError(statusCode int, body []byte) contract.Pr
 		message = http.StatusText(statusCode)
 	}
 	return contract.ProviderError{Class: class, StatusCode: statusCode, Message: message}
+}
+
+func classifyGeminiProviderHTTPError(statusCode int, body []byte) contract.ProviderError {
+	var decoded struct {
+		Error struct {
+			Status  string `json:"status"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	message := strings.TrimSpace(string(body))
+	class := providerClassForHTTPStatus(statusCode)
+	if err := json.Unmarshal(body, &decoded); err == nil {
+		if decoded.Error.Message != "" {
+			message = strings.TrimSpace(decoded.Error.Message)
+		}
+		if decoded.Error.Status != "" {
+			class = providerClassForGeminiStatus(decoded.Error.Status, statusCode)
+		}
+	}
+	if message == "" {
+		message = http.StatusText(statusCode)
+	}
+	return contract.ProviderError{Class: class, StatusCode: statusCode, Message: message}
+}
+
+func providerClassForGeminiStatus(status string, statusCode int) string {
+	switch strings.ToUpper(strings.TrimSpace(status)) {
+	case "INVALID_ARGUMENT", "FAILED_PRECONDITION", "OUT_OF_RANGE":
+		return "invalid_request"
+	case "UNAUTHENTICATED", "PERMISSION_DENIED":
+		return "auth_failed"
+	case "RESOURCE_EXHAUSTED":
+		return "rate_limit"
+	case "NOT_FOUND":
+		return "model_unavailable"
+	case "DEADLINE_EXCEEDED":
+		return "timeout"
+	case "UNAVAILABLE", "INTERNAL", "UNKNOWN":
+		return "provider_5xx"
+	}
+	return providerClassForHTTPStatus(statusCode)
 }
 
 func providerClassForAnthropicError(errorType string, statusCode int) string {

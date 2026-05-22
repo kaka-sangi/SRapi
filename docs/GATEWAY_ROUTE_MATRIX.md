@@ -116,7 +116,7 @@ POST /v1beta/models/{model}:generateContent
 POST /v1beta/models/{model}:streamGenerateContent
 ```
 
-这两个路由复用标准 Gateway runtime：API Key 鉴权、模型可见性、entitlement、Scheduler、Provider Adapter、usage log、scheduler decision / feedback 均与 OpenAI/Anthropic 兼容入口一致。当前阶段负责 Gemini request/response/error 的边缘转换；Gemini 原生上游 `generateContent` adapter 仍归属后续 Provider Expansion。
+这两个路由复用标准 Gateway runtime：API Key 鉴权、模型可见性、entitlement、Scheduler、Provider Adapter、usage log、scheduler decision / feedback 均与 OpenAI/Anthropic 兼容入口一致。WP-240 起，当 Scheduler 选择 `gemini-compatible`、`native-gemini` 或 `reverse-proxy-gemini-cli` Provider Account 时，Provider Adapter 会调用 Gemini `models/{model}:generateContent` 或 `models/{model}:streamGenerateContent` 上游。
 
 ### 4.4 Grok
 
@@ -156,6 +156,7 @@ Antigravity 可承载 Claude-shaped 和 Gemini-shaped 端点，必须在 route m
 | `/v1/responses/ws` | Realtime/WS runtime | 长连接、粘性账号、slot 生命周期。 | Phase 3 |
 | Gemini `/v1beta/models/*:generateContent` | Compatible text runtime | Google-shaped request/response/error，复用 Canonical/Scheduler/Provider Adapter。 | WP-230 |
 | Gemini `/v1beta/models/*:streamGenerateContent` | Compatible text runtime | Google-shaped SSE response/error，复用 Canonical/Scheduler/Provider Adapter。 | WP-230 |
+| Gemini upstream `generateContent` | Provider Adapter | Canonical text request 转 Gemini payload，解析 Gemini response/SSE/error/usage。 | WP-240 |
 | Native `count_tokens` | Provider native runtime | 计数请求，不进入生成用量。 | Phase 2 |
 
 ## 6. Passthrough 规则

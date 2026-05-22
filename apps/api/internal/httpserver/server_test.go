@@ -1550,6 +1550,97 @@ func TestGatewayGeminiGenerateContentUsesCanonicalPipeline(t *testing.T) {
 	}
 }
 
+func TestGatewayGeminiGenerateContentSchedulesGeminiCompatibleUpstream(t *testing.T) {
+	var (
+		mu    sync.Mutex
+		calls []upstreamNativeGeminiCall
+	)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload struct {
+			Contents []struct {
+				Role  string `json:"role"`
+				Parts []struct {
+					Text string `json:"text"`
+				} `json:"parts"`
+			} `json:"contents"`
+			SystemInstruction *struct {
+				Parts []struct {
+					Text string `json:"text"`
+				} `json:"parts"`
+			} `json:"systemInstruction"`
+			GenerationConfig *struct {
+				MaxOutputTokens int `json:"maxOutputTokens"`
+			} `json:"generationConfig"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode gemini upstream request: %v", err)
+		}
+		mu.Lock()
+		calls = append(calls, upstreamNativeGeminiCall{
+			Path:       r.URL.Path,
+			APIKey:     r.URL.Query().Get("key"),
+			Contents:   payload.Contents,
+			SystemText: geminiSystemInstructionText(payload.SystemInstruction),
+			MaxTokens:  payload.GenerationConfig.MaxOutputTokens,
+		})
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"candidates":[{"content":{"role":"model","parts":[{"text":"native gemini upstream response"}]}}],"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":5,"totalTokenCount":15}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp, modelResp, accountResp := mustCreateNativeGeminiGatewayTarget(t, handler, sessionCookie, loginResp.Data.CsrfToken, upstream.URL)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	body := `{"systemInstruction":{"parts":[{"text":"answer tersely"}]},"contents":[{"role":"user","parts":[{"text":"native gemini prompt"}]}],"generationConfig":{"maxOutputTokens":48}}`
+	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1beta/models/native-gemini-route-model:generateContent", body)
+	var resp apiopenapi.GeminiGenerateContentResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode gemini response: %v", err)
+	}
+	if len(resp.Candidates) != 1 || len(resp.Candidates[0].Content.Parts) != 1 || resp.Candidates[0].Content.Parts[0].Text == nil || *resp.Candidates[0].Content.Parts[0].Text != "native gemini upstream response" {
+		t.Fatalf("unexpected native gemini response: %+v", resp)
+	}
+
+	mu.Lock()
+	gotCalls := append([]upstreamNativeGeminiCall(nil), calls...)
+	mu.Unlock()
+	if len(gotCalls) != 1 {
+		t.Fatalf("expected one native gemini upstream call, got %+v", gotCalls)
+	}
+	call := gotCalls[0]
+	if call.Path != "/v1beta/models/gemini-native-upstream:generateContent" || call.APIKey != "native-gemini-secret" || call.MaxTokens != 48 {
+		t.Fatalf("unexpected native gemini call: %+v", call)
+	}
+	if call.SystemText != "answer tersely" || len(call.Contents) != 1 || call.Contents[0].Role != "user" || call.Contents[0].Parts[0].Text != "native gemini prompt" {
+		t.Fatalf("expected canonical Gemini payload, got %+v", call)
+	}
+
+	usageReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/usage-logs?model=native-gemini-route-model", nil)
+	usageReq.AddCookie(sessionCookie)
+	usageRec := httptest.NewRecorder()
+	handler.ServeHTTP(usageRec, usageReq)
+	if usageRec.Code != http.StatusOK {
+		t.Fatalf("expected usage logs 200, got %d body=%s", usageRec.Code, usageRec.Body.String())
+	}
+	var usageResp apiopenapi.UsageLogListResponse
+	if err := json.NewDecoder(usageRec.Body).Decode(&usageResp); err != nil {
+		t.Fatalf("decode usage logs: %v", err)
+	}
+	if len(usageResp.Data) != 1 {
+		t.Fatalf("expected one usage record, got %+v", usageResp.Data)
+	}
+	usage := usageResp.Data[0]
+	if !usage.Success || usage.TargetProtocol == nil || *usage.TargetProtocol != "gemini-compatible" || usage.TotalTokens != 15 || usage.UsageEstimated {
+		t.Fatalf("unexpected native gemini usage record: %+v", usage)
+	}
+	if usage.ProviderId == nil || *usage.ProviderId != providerResp.Data.Id || usage.AccountId == nil || *usage.AccountId != accountResp.Data.Id || usage.Model != modelResp.Data.CanonicalName {
+		t.Fatalf("expected provider/account/model evidence, got %+v", usage)
+	}
+}
+
 func TestGatewayGeminiStreamGenerateContentEmitsGeminiSSE(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
@@ -2843,6 +2934,30 @@ type upstreamGeminiCall struct {
 	MaxTokens     int
 }
 
+type upstreamNativeGeminiCall struct {
+	Path     string
+	APIKey   string
+	Contents []struct {
+		Role  string `json:"role"`
+		Parts []struct {
+			Text string `json:"text"`
+		} `json:"parts"`
+	}
+	SystemText string
+	MaxTokens  int
+}
+
+func geminiSystemInstructionText(value *struct {
+	Parts []struct {
+		Text string `json:"text"`
+	} `json:"parts"`
+}) string {
+	if value == nil || len(value.Parts) == 0 {
+		return ""
+	}
+	return value.Parts[0].Text
+}
+
 func mustCreateGeminiGatewayTarget(t *testing.T, handler http.Handler, sessionCookie *http.Cookie, csrfToken, upstreamURL string, unique bool) (apiopenapi.ProviderResponse, apiopenapi.ModelResponse, apiopenapi.ProviderAccountResponse) {
 	t.Helper()
 	suffix := ""
@@ -2853,6 +2968,15 @@ func mustCreateGeminiGatewayTarget(t *testing.T, handler http.Handler, sessionCo
 	modelResp := mustCreateModel(t, handler, sessionCookie, csrfToken, `{"canonical_name":"gemini-route-model`+suffix+`","display_name":"Gemini Route Model","status":"active","capabilities":[{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
 	mustCreateMapping(t, handler, sessionCookie, csrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"gemini-route-upstream","status":"active"}`)
 	accountResp := mustCreateAccount(t, handler, sessionCookie, csrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"gemini-route-account`+suffix+`","runtime_class":"api_key","credential":{"api_key":"gemini-route-upstream-secret"},"metadata":{"base_url":"`+upstreamURL+`/v1"},"status":"active"}`)
+	return providerResp, modelResp, accountResp
+}
+
+func mustCreateNativeGeminiGatewayTarget(t *testing.T, handler http.Handler, sessionCookie *http.Cookie, csrfToken, upstreamURL string) (apiopenapi.ProviderResponse, apiopenapi.ModelResponse, apiopenapi.ProviderAccountResponse) {
+	t.Helper()
+	providerResp := mustCreateProvider(t, handler, sessionCookie, csrfToken, `{"name":"native-gemini-route-provider","display_name":"Native Gemini Route Provider","adapter_type":"gemini-compatible","protocol":"gemini-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, csrfToken, `{"canonical_name":"native-gemini-route-model","display_name":"Native Gemini Route Model","status":"active","capabilities":[{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, csrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"gemini-native-upstream","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, csrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"native-gemini-route-account","runtime_class":"api_key","credential":{"api_key":"native-gemini-secret"},"metadata":{"base_url":"`+upstreamURL+`/v1beta"},"status":"active"}`)
 	return providerResp, modelResp, accountResp
 }
 

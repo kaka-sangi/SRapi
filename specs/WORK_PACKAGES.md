@@ -746,11 +746,47 @@ Required gates:
 - `cd apps/api && go test ./internal/modules/gateway/... ./internal/httpserver`
 - `make architecture-check`
 
-## WP-240+: Advanced Endpoint And Provider Expansion
+## WP-240: Gemini Native Upstream Adapter
+
+Objective: allow scheduled Gemini-compatible and native-gemini Provider Accounts to invoke Gemini `generateContent` / `streamGenerateContent` upstream endpoints from the Canonical AI Request path.
+
+Read first:
+
+- `docs/PROVIDER_ADAPTER_SPEC.md`
+- `docs/AI_ENDPOINT_COMPATIBILITY.md`
+- `docs/GATEWAY_ROUTE_MATRIX.md`
+- `docs/CAPABILITY_TAXONOMY_SPEC.md`
+
+Owns:
+
+- `apps/api/internal/modules/provider_adapters`
+- Gemini GenerateContent request payload construction from `contract.TextRequest`
+- Gemini non-streaming response parsing, usage normalization, and error classification
+- Gemini SSE stream aggregation and usage normalization
+- API-key auth injection for Gemini-compatible accounts
+- reverse-proxy Gemini dispatch through Reverse Proxy Runtime
+- focused Gateway regression proving the WP-230 Gemini native route can schedule a Gemini-compatible upstream account
+- provider adapter and route/provider docs when behavior changes
+
+Definition of Done:
+
+- `provider.protocol` or `provider.adapter_type` of `gemini-compatible` / `native-gemini` targets Gemini `models/{model}:generateContent` or `models/{model}:streamGenerateContent`, not OpenAI Chat Completions.
+- API-key accounts inject Gemini-compatible credentials without leaking SRapi request headers or credentials.
+- Non-streaming and SSE streaming Gemini responses parse text plus `usageMetadata` prompt/candidates/cache tokens.
+- Gemini error objects map to internal provider error classes.
+- Reverse-proxy runtime accounts preserve Gemini protocol dispatch.
+- Gateway `/v1beta/models/{model}:generateContent` can schedule a Gemini-compatible account and record usage/decision evidence.
+- No frontend visuals.
+
+Required gates:
+
+- `cd apps/api && go test ./internal/modules/provider_adapters/... ./internal/httpserver`
+- `make architecture-check`
+
+## WP-250+: Advanced Endpoint And Provider Expansion
 
 Use `ROADMAP.md` Phase 5 through Phase 8 to split future packages for:
 
-- Gemini native upstream adapter
 - images and media runtime
 - embeddings and rerank
 - realtime/websocket

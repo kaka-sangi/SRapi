@@ -30,14 +30,15 @@ last_completed:
 - WP-210: Production operations now includes baseline Prometheus `/metrics`, release-mode weak secret/default admin password rejection, data retention cleanup worker, PostgreSQL backup/restore targets, release smoke script coverage, and deployment/config docs.
 - WP-220: Anthropic-compatible upstream adapter now dispatches Messages payloads to `/messages`, parses non-streaming and SSE usage, classifies Anthropic error objects, preserves reverse-proxy runtime dispatch, and proves provider aliases record Scheduler/usage evidence.
 - WP-230: Gemini-native Gateway route foundation now exposes GenerateContent and StreamGenerateContent routes, converts Gemini requests to Canonical AI Request, renders Gemini JSON/SSE responses, returns Google-style errors, and proves Gateway auth/model policy/Scheduler/usage evidence.
+- WP-240: Gemini-compatible/native-gemini upstream adapter now dispatches GenerateContent and StreamGenerateContent payloads to Gemini APIs, parses usage metadata, classifies Google errors, preserves reverse-proxy Gemini runtime dispatch, and proves Gateway Gemini routes schedule Gemini-compatible upstream accounts.
 
 current:
 
-- package: WP-240+
+- package: WP-250+
 - status: pending
 - objective: advanced endpoint and provider expansion.
 
-next_recommended: WP-240+
+next_recommended: WP-250+
 
 last_gates:
 
@@ -81,6 +82,8 @@ notes:
 - WP-220 added `TestGatewayAnthropicProviderAliasTargetsMessagesUpstream` to prove `/api/provider/anthropic-compatible/v1/messages` forces the Anthropic-compatible provider while reusing Gateway auth, model policy, Scheduler decisions, and usage evidence.
 - WP-230 added `/v1beta/models/{model}:generateContent` and `/v1beta/models/{model}:streamGenerateContent` as Gateway routes, including OpenAPI/SDK schemas, generated Go/TypeScript artifacts, Canonical conversion, Gemini response/SSE rendering, Google RPC-style error rendering, usage/decision evidence, and docs alignment.
 - WP-230 intentionally stops short of a Gemini-native upstream `generateContent` provider adapter; that belongs to WP-240+ Provider Expansion.
+- WP-240 added Gemini-compatible/native-gemini adapter dispatch to `/models/{model}:generateContent` and `/models/{model}:streamGenerateContent`, API-key query/header/bearer auth handling, Gemini usageMetadata parsing, Google error classification, and reverse-proxy-gemini-cli runtime dispatch.
+- WP-240 added `TestGatewayGeminiGenerateContentSchedulesGeminiCompatibleUpstream` to prove Gemini Gateway routes can schedule Gemini-compatible upstream accounts while preserving usage and Scheduler decision evidence.
 
 ## Work Package Ledger
 
@@ -110,4 +113,5 @@ notes:
 | WP-210 | completed | Metrics baseline, release config validation, retention cleanup, backup/restore targets, release smoke script, and ops docs are covered. |
 | WP-220 | completed | Anthropic-compatible upstream adapter dispatch for Messages runtime and provider aliases. |
 | WP-230 | completed | Gemini native Gateway route foundation, including GenerateContent JSON/SSE routes and Google-style error rendering. |
-| WP-240+ | pending | Advanced endpoint and provider expansion. |
+| WP-240 | completed | Gemini native upstream adapter dispatch for API-key and reverse-proxy accounts. |
+| WP-250+ | pending | Advanced endpoint and provider expansion. |

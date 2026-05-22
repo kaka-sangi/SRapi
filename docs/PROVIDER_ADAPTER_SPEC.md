@@ -97,6 +97,16 @@ anthropic-compatible endpoint rendering
 native-openai 或 openrouter
 ```
 
+已实现的文本上游 dispatch：
+
+```txt
+openai-compatible       -> /chat/completions
+anthropic-compatible    -> /messages
+gemini-compatible       -> /models/{model}:generateContent 或 :streamGenerateContent
+native-gemini           -> /models/{model}:generateContent 或 :streamGenerateContent
+reverse-proxy-gemini-cli -> Reverse Proxy Runtime + Gemini GenerateContent payload
+```
+
 ## 4. Adapter 生命周期
 
 ```txt
