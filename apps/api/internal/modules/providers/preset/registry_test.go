@@ -54,6 +54,9 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	if !openaiPreset.Capabilities["images"] || !openaiPreset.Capabilities["audio_speech"] {
 		t.Fatalf("expected openai-compatible preset to advertise images and audio_speech")
 	}
+	if openaiPreset.Capabilities["realtime_websocket"] {
+		t.Fatalf("expected realtime_websocket to require explicit provider/account capability opt-in")
+	}
 
 	anthropicPreset, ok := registry.Lookup("anthropic-compatible")
 	if !ok {

@@ -22,6 +22,7 @@ import (
 )
 
 const responsesWebSocketSourceEndpoint = "/v1/responses/ws"
+const realtimeWebSocketSourceEndpoint = "/v1/realtime"
 const statusClientClosedRequest = 499
 
 type gatewayCaptureResponse struct {
@@ -171,6 +172,223 @@ func (s *Server) acquireResponsesWebSocketSlot(ctx context.Context, r *http.Requ
 func (s *Server) releaseResponsesWebSocketSlot(ctx context.Context, slotID string) {
 	if _, err := s.runtime.realtime.Release(ctx, slotID); err != nil && !errors.Is(err, realtimeservice.ErrSlotNotFound) {
 		s.logger.Warn("failed to release responses websocket slot", "error", err, "slot_id", slotID)
+	}
+}
+
+func (s *Server) handleRealtimeWebSocket(w http.ResponseWriter, r *http.Request) {
+	startedAt := time.Now()
+	requestID := requestIDFromContext(r.Context())
+	authed, err := s.requireGatewayKey(r)
+	if err != nil {
+		writeGatewayAuthError(w, err, requestID)
+		return
+	}
+	modelName := strings.TrimSpace(r.URL.Query().Get("model"))
+	if modelName == "" {
+		writeGatewayError(w, http.StatusBadRequest, apiopenapi.InvalidRequestError, "realtime websocket model query parameter is required", "invalid_request")
+		return
+	}
+	modelResolution, err := s.runtime.models.ResolveModelReference(r.Context(), modelName)
+	if err != nil {
+		writeGatewayError(w, http.StatusNotFound, apiopenapi.InvalidRequestError, "model not found", "model_not_found")
+		return
+	}
+	if !apiKeyAllowsModelReference(authed.Key.AllowedModels, modelResolution) {
+		writeGatewayError(w, http.StatusForbidden, apiopenapi.PermissionError, "model not allowed for this api key", "model_not_allowed")
+		return
+	}
+	slot, err := s.acquireRealtimeWebSocketSlot(r.Context(), r, authed)
+	if err != nil {
+		status := http.StatusInternalServerError
+		code := "internal_error"
+		message := "failed to acquire realtime slot"
+		errorType := apiopenapi.InternalError
+		if errors.Is(err, realtimeservice.ErrLimitExceeded) {
+			status = http.StatusTooManyRequests
+			code = "rate_limit"
+			message = "realtime websocket slot limit exceeded"
+			errorType = apiopenapi.RateLimitError
+		}
+		writeGatewayError(w, status, errorType, message, code)
+		return
+	}
+	defer s.releaseResponsesWebSocketSlot(r.Context(), slot.ID)
+
+	canonical := s.runtime.gateway.NormalizeRealtimeWebSocket(modelName, gatewayservice.RequestMeta{
+		RequestID:      requestID,
+		SourceEndpoint: realtimeWebSocketSourceEndpoint,
+		UserID:         authed.UserID,
+		APIKeyID:       authed.Key.ID,
+		CanonicalModel: modelResolution.Model.CanonicalName,
+	})
+	admission, err := s.runtime.prepareGatewayAdmission(r.Context(), canonical, modelResolution, modelResolution.Model.ID)
+	if err != nil {
+		writeGatewayError(w, http.StatusBadRequest, apiopenapi.InvalidRequestError, err.Error(), "invalid_request")
+		return
+	}
+	if !admission.Entitlement.Allowed {
+		writeGatewayError(w, http.StatusForbidden, apiopenapi.PermissionError, gatewayEntitlementMessage(gatewayEntitlementErrorClass(admission.Entitlement)), gatewayEntitlementErrorClass(admission.Entitlement))
+		return
+	}
+	scheduleReq := gatewayScheduleRequest(r, canonical, modelResolution)
+	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
+	result, err := s.runtime.scheduleGatewayRequest(r.Context(), scheduleReq, modelResolution.Model.ID, gatewayForcedProviderKey(r.Context()), authed.Key)
+	if err != nil {
+		s.runtime.recordGatewayUsage(r.Context(), responsesWebSocketUsageRecord(authed, canonical, result, nil, false, "no_available_account", http.StatusServiceUnavailable, elapsedMillis(startedAt), admission, nil))
+		writeGatewayError(w, http.StatusServiceUnavailable, apiopenapi.ServiceUnavailableError, "no available provider account", "no_available_account")
+		return
+	}
+	session, credential, err := s.runtime.prepareProviderRealtime(r.Context(), providerRealtimeRequest(canonical, result.Candidate, nil, realtimeWebSocketHeaders(r)))
+	if err != nil {
+		errorClass, upstreamStatus, _ := providerGatewayError(err)
+		s.runtime.recordGatewayUsage(r.Context(), responsesWebSocketUsageRecord(authed, canonical, result, &result.Candidate, false, errorClass, upstreamStatus, elapsedMillis(startedAt), admission, nil))
+		writeGatewayError(w, providerStatusFromError(err), gatewayErrorTypeForProviderClass(errorClass), providerGatewayMessage(errorClass), errorClass)
+		return
+	}
+	session.Account.Credential = credential
+
+	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
+		CompressionMode: websocket.CompressionDisabled,
+	})
+	if err != nil {
+		s.logger.Warn("failed to accept realtime websocket", "error", err, "request_id", requestID)
+		return
+	}
+	defer conn.Close(websocket.StatusNormalClosure, "")
+	if s.cfg.Gateway.MaxBodySize > 0 {
+		conn.SetReadLimit(s.cfg.Gateway.MaxBodySize)
+	}
+	success, errorClass, statusCode := s.relayRealtimeWebSocket(r.Context(), conn, session)
+	s.runtime.recordGatewayUsage(r.Context(), responsesWebSocketUsageRecord(authed, canonical, result, &result.Candidate, success, errorClass, statusCode, elapsedMillis(startedAt), admission, nil))
+}
+
+func (s *Server) acquireRealtimeWebSocketSlot(ctx context.Context, r *http.Request, authed apikeycontract.AuthResult) (realtimecontract.Slot, error) {
+	stickyAccountID, stickyStrength, affinityKey, affinitySource := gatewaySessionAffinity(r)
+	return s.runtime.realtime.Acquire(ctx, realtimecontract.AcquireRequest{
+		Kind:                  realtimecontract.SlotKindRealtimeWebSocket,
+		RequestID:             requestIDFromContext(ctx),
+		UserID:                authed.UserID,
+		APIKeyID:              authed.Key.ID,
+		SourceEndpoint:        realtimeWebSocketSourceEndpoint,
+		SessionAffinityKey:    affinityKey,
+		SessionAffinitySource: affinitySource,
+		StickyAccountID:       stickyAccountID,
+		StickyStrength:        string(stickyStrength),
+	})
+}
+
+func realtimeWebSocketHeaders(r *http.Request) http.Header {
+	headers := http.Header{}
+	if safetyID := strings.TrimSpace(r.Header.Get("OpenAI-Safety-Identifier")); safetyID != "" {
+		headers.Set("OpenAI-Safety-Identifier", safetyID)
+	}
+	return headers
+}
+
+func (s *Server) relayRealtimeWebSocket(ctx context.Context, conn *websocket.Conn, session providerRealtimeSession) (bool, string, int) {
+	clientToUpstream := make(chan reverseproxycontract.WebSocketMessage, 32)
+	upstreamToClient := make(chan reverseproxycontract.WebSocketMessage, 32)
+	relayCtx, cancelRelay := context.WithCancel(ctx)
+	defer cancelRelay()
+	relayDone := make(chan responsesWebSocketRelayResult, 1)
+	go func() {
+		result, err := s.runtime.reverseProxy.RelayWebSocket(relayCtx, reverseproxycontract.WebSocketRelayRequest{
+			Account:          session.Account,
+			URL:              session.URL,
+			Headers:          session.Headers,
+			ClientToUpstream: clientToUpstream,
+			UpstreamToClient: upstreamToClient,
+		})
+		relayDone <- responsesWebSocketRelayResult{result: result, err: err}
+	}()
+	clientDone := make(chan error, 1)
+	go readRealtimeWebSocketClient(ctx, conn, clientToUpstream, clientDone)
+
+	var relayResult *responsesWebSocketRelayResult
+	relayDoneCh := relayDone
+	for {
+		select {
+		case msg, ok := <-upstreamToClient:
+			if !ok {
+				if relayResult == nil && relayDoneCh != nil {
+					select {
+					case result := <-relayDoneCh:
+						relayResult = &result
+					case <-ctx.Done():
+						return false, "client_closed", statusClientClosedRequest
+					}
+				}
+				if relayResult != nil && relayResult.err != nil {
+					return false, errorClassName(relayResult.err), providerStatusFromError(relayResult.err)
+				}
+				return true, "", http.StatusOK
+			}
+			messageType := websocket.MessageText
+			if msg.Type == reverseproxycontract.WebSocketMessageBinary {
+				messageType = websocket.MessageBinary
+			}
+			if err := conn.Write(ctx, messageType, msg.Data); err != nil {
+				cancelRelay()
+				return false, "client_closed", statusClientClosedRequest
+			}
+		case err := <-clientDone:
+			cancelRelay()
+			if err != nil {
+				return false, "client_closed", statusClientClosedRequest
+			}
+			if relayDoneCh != nil {
+				select {
+				case result := <-relayDoneCh:
+					relayResult = &result
+					relayDoneCh = nil
+				case <-time.After(100 * time.Millisecond):
+				}
+			}
+			if relayResult != nil && relayResult.err != nil {
+				return false, errorClassName(relayResult.err), providerStatusFromError(relayResult.err)
+			}
+			return true, "", http.StatusOK
+		case result := <-relayDoneCh:
+			relayResult = &result
+			relayDoneCh = nil
+			if relayResult.err != nil {
+				cancelRelay()
+				return false, errorClassName(relayResult.err), providerStatusFromError(relayResult.err)
+			}
+		case <-ctx.Done():
+			cancelRelay()
+			return false, "client_closed", statusClientClosedRequest
+		}
+	}
+}
+
+func readRealtimeWebSocketClient(ctx context.Context, conn *websocket.Conn, clientToUpstream chan<- reverseproxycontract.WebSocketMessage, done chan<- error) {
+	defer close(clientToUpstream)
+	defer close(done)
+	for {
+		messageType, payload, err := conn.Read(ctx)
+		if err != nil {
+			if status := websocket.CloseStatus(err); status == websocket.StatusNormalClosure || status == websocket.StatusGoingAway {
+				done <- nil
+				return
+			}
+			if errors.Is(err, context.Canceled) {
+				done <- nil
+				return
+			}
+			done <- err
+			return
+		}
+		msgType := reverseproxycontract.WebSocketMessageText
+		if messageType == websocket.MessageBinary {
+			msgType = reverseproxycontract.WebSocketMessageBinary
+		}
+		select {
+		case clientToUpstream <- reverseproxycontract.WebSocketMessage{Type: msgType, Data: payload}:
+		case <-ctx.Done():
+			done <- nil
+			return
+		}
 	}
 }
 
@@ -357,6 +575,17 @@ func responsesWebSocketUsageRecord(authed apikeycontract.AuthResult, canonical g
 	return rec
 }
 
+func cloneHTTPHeader(headers http.Header) http.Header {
+	if headers == nil {
+		return nil
+	}
+	out := make(http.Header, len(headers))
+	for key, values := range headers {
+		out[key] = append([]string(nil), values...)
+	}
+	return out
+}
+
 func (rt *runtimeState) prepareProviderRealtime(ctx context.Context, req provideradaptercontract.RealtimeRequest) (providerRealtimeSession, map[string]any, error) {
 	if req.Account.ID <= 0 {
 		return providerRealtimeSession{}, nil, provideradaptercontract.ProviderError{Class: "no_available_account", StatusCode: http.StatusServiceUnavailable, Message: "provider account missing"}
@@ -384,13 +613,18 @@ func (rt *runtimeState) prepareProviderRealtime(ctx context.Context, req provide
 	}, credential, nil
 }
 
-func providerRealtimeRequest(req gatewaycontract.CanonicalRequest, candidate schedulercontract.Candidate, payload []byte) provideradaptercontract.RealtimeRequest {
+func providerRealtimeRequest(req gatewaycontract.CanonicalRequest, candidate schedulercontract.Candidate, payload []byte, headers ...http.Header) provideradaptercontract.RealtimeRequest {
+	var clonedHeaders http.Header
+	if len(headers) > 0 {
+		clonedHeaders = cloneHTTPHeader(headers[0])
+	}
 	return provideradaptercontract.RealtimeRequest{
 		RequestID:      req.RequestID,
 		SourceProtocol: string(req.SourceProtocol),
 		SourceEndpoint: req.SourceEndpoint,
 		Model:          req.CanonicalModel,
 		RequestPayload: append([]byte(nil), payload...),
+		Headers:        clonedHeaders,
 		Provider:       candidate.Provider,
 		Account:        candidate.Account,
 		Mapping:        candidate.Mapping,

@@ -9,6 +9,7 @@ type SlotKind string
 
 const (
 	SlotKindResponsesWebSocket SlotKind = "responses_websocket"
+	SlotKindRealtimeWebSocket  SlotKind = "realtime_websocket"
 )
 
 type Slot struct {

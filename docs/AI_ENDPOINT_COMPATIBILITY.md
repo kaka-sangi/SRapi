@@ -40,7 +40,7 @@ POST /v1/audio/transcriptions
 POST /v1/audio/speech
 POST /v1/rerank
 POST /v1/batches
-POST /v1/realtime
+GET  /v1/realtime  (WebSocket upgrade)
 ```
 
 ### 2.2 Anthropic-compatible
@@ -563,6 +563,20 @@ Responses WebSocket transport
 - WP-460 起，`/v1/responses/ws` 在 WebSocket upgrade 前获得 provider-neutral realtime slot，并在连接关闭、上游 relay 完成、客户端断开或 handler error 时释放；slot 只保存 request/user/API key/source endpoint/sticky metadata 和 session affinity hash，不保存原始 affinity key。
 - 复杂 persistent upstream session reuse、local Codex CLI client ingress，以及 Claude Code / Antigravity provider-native realtime 协议仍是后续包。
 
+WP-470 已实现：
+
+```txt
+OpenAI-compatible Realtime WebSocket relay
+```
+
+边界：
+
+- `GET /v1/realtime?model=<model>` 建立 OpenAI-compatible Realtime WebSocket；不是 `POST /v1/realtime`。
+- Gateway 先执行 API Key auth、模型可见性、entitlement、Scheduler、`realtime_websocket` capability 过滤和 realtime slot acquisition，再 upgrade WebSocket。
+- Provider Adapter 从选中账号和模型映射构造上游 `ws/wss` `/realtime?model=<mapped_upstream_model>` session；Reverse Proxy Runtime 用选中账号 OAuth/session/client-token credential 注入上游身份并双向 relay text/binary frames。
+- 当前 2api Realtime 路径拒绝 `runtime_class = api_key`；官方 API-key Realtime Adapter 属后续能力，不与 2api/OAuth 反代混用。
+- 只允许 `OpenAI-Safety-Identifier` 等显式白名单握手 header 进入上游；caller `Authorization`、`Cookie`、`Sec-WebSocket-*`、`X-SRapi-*` 和 Gateway headers 不得定义上游身份。
+
 Phase 2 继续实现：
 
 ```txt
@@ -575,7 +589,7 @@ Phase 3+ 继续实现：
 ```txt
 Audio
 Batch
-Provider-native realtime and direct upstream WSS relay
+Provider-native Claude Code / Antigravity realtime protocol adapters
 Fine-tuning
 Provider-native built-in tools
 Advanced stateful responses

@@ -84,6 +84,28 @@ func TestNormalizeResponsesPreservesInstructionsAndWarnings(t *testing.T) {
 	}
 }
 
+func TestNormalizeRealtimeWebSocketRequiresRealtimeCapability(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	canonical := svc.NormalizeRealtimeWebSocket("gpt-realtime-2", RequestMeta{
+		RequestID:      "req_realtime",
+		SourceEndpoint: string(gatewaycontract.EndpointRealtime),
+		UserID:         7,
+		APIKeyID:       11,
+		CanonicalModel: "gpt-realtime-2",
+	})
+
+	if canonical.SourceEndpoint != string(gatewaycontract.EndpointRealtime) || !canonical.Stream {
+		t.Fatalf("unexpected realtime canonical request: %+v", canonical)
+	}
+	if !requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyRealtimeWebSocket) ||
+		!requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyStreaming) {
+		t.Fatalf("expected realtime websocket and streaming capabilities, got %+v", canonical.RequestCapabilities)
+	}
+}
+
 func TestNormalizeGeminiGenerateContentProducesCanonicalRequest(t *testing.T) {
 	svc, err := New()
 	if err != nil {

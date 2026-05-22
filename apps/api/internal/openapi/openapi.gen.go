@@ -1286,18 +1286,36 @@ func (e UserSubscriptionStatus) Valid() bool {
 	}
 }
 
+// Defines values for ConnectRealtimeWebSocketParamsStickyStrength.
+const (
+	ConnectRealtimeWebSocketParamsStickyStrengthHard ConnectRealtimeWebSocketParamsStickyStrength = "hard"
+	ConnectRealtimeWebSocketParamsStickyStrengthSoft ConnectRealtimeWebSocketParamsStickyStrength = "soft"
+)
+
+// Valid indicates whether the value is a known member of the ConnectRealtimeWebSocketParamsStickyStrength enum.
+func (e ConnectRealtimeWebSocketParamsStickyStrength) Valid() bool {
+	switch e {
+	case ConnectRealtimeWebSocketParamsStickyStrengthHard:
+		return true
+	case ConnectRealtimeWebSocketParamsStickyStrengthSoft:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ConnectResponsesWebSocketParamsStickyStrength.
 const (
-	Hard ConnectResponsesWebSocketParamsStickyStrength = "hard"
-	Soft ConnectResponsesWebSocketParamsStickyStrength = "soft"
+	ConnectResponsesWebSocketParamsStickyStrengthHard ConnectResponsesWebSocketParamsStickyStrength = "hard"
+	ConnectResponsesWebSocketParamsStickyStrengthSoft ConnectResponsesWebSocketParamsStickyStrength = "soft"
 )
 
 // Valid indicates whether the value is a known member of the ConnectResponsesWebSocketParamsStickyStrength enum.
 func (e ConnectResponsesWebSocketParamsStickyStrength) Valid() bool {
 	switch e {
-	case Hard:
+	case ConnectResponsesWebSocketParamsStickyStrengthHard:
 		return true
-	case Soft:
+	case ConnectResponsesWebSocketParamsStickyStrengthSoft:
 		return true
 	default:
 		return false
@@ -3398,6 +3416,27 @@ type ListPaymentOrdersParams struct {
 	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
 	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
 }
+
+// ConnectRealtimeWebSocketParams defines parameters for ConnectRealtimeWebSocket.
+type ConnectRealtimeWebSocketParams struct {
+	// Model Model name requested by the downstream realtime client.
+	Model string `form:"model" json:"model"`
+
+	// SessionAffinityKey Optional stable affinity key used by Scheduler sticky routing.
+	SessionAffinityKey *string `form:"session_affinity_key,omitempty" json:"session_affinity_key,omitempty"`
+
+	// StickyStrength Optional sticky routing strength for this WebSocket session.
+	StickyStrength *ConnectRealtimeWebSocketParamsStickyStrength `form:"sticky_strength,omitempty" json:"sticky_strength,omitempty"`
+
+	// StickyAccountId Optional explicit sticky account preference for this WebSocket session.
+	StickyAccountId *int `form:"sticky_account_id,omitempty" json:"sticky_account_id,omitempty"`
+
+	// OpenAISafetyIdentifier Optional safety identifier forwarded to compatible OpenAI Realtime upstreams.
+	OpenAISafetyIdentifier *string `json:"OpenAI-Safety-Identifier,omitempty"`
+}
+
+// ConnectRealtimeWebSocketParamsStickyStrength defines parameters for ConnectRealtimeWebSocket.
+type ConnectRealtimeWebSocketParamsStickyStrength string
 
 // ConnectResponsesWebSocketParams defines parameters for ConnectResponsesWebSocket.
 type ConnectResponsesWebSocketParams struct {
@@ -7808,6 +7847,9 @@ type ServerInterface interface {
 	// Create OpenAI-compatible moderation classifications.
 	// (POST /v1/moderations)
 	CreateModeration(w http.ResponseWriter, r *http.Request)
+	// Connect to the OpenAI-compatible Realtime WebSocket gateway.
+	// (GET /v1/realtime)
+	ConnectRealtimeWebSocket(w http.ResponseWriter, r *http.Request, params ConnectRealtimeWebSocketParams)
 	// Rerank documents by query relevance.
 	// (POST /v1/rerank)
 	CreateRerank(w http.ResponseWriter, r *http.Request)
@@ -11014,6 +11056,105 @@ func (siw *ServerInterfaceWrapper) CreateModeration(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// ConnectRealtimeWebSocket operation middleware
+func (siw *ServerInterfaceWrapper) ConnectRealtimeWebSocket(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ConnectRealtimeWebSocketParams
+
+	// ------------- Required query parameter "model" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "model", r.URL.Query(), &params.Model, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "model"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "model", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "session_affinity_key" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "session_affinity_key", r.URL.Query(), &params.SessionAffinityKey, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "session_affinity_key"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "session_affinity_key", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "sticky_strength" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "sticky_strength", r.URL.Query(), &params.StickyStrength, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "sticky_strength"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sticky_strength", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "sticky_account_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "sticky_account_id", r.URL.Query(), &params.StickyAccountId, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "sticky_account_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sticky_account_id", Err: err})
+		}
+		return
+	}
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "OpenAI-Safety-Identifier" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("OpenAI-Safety-Identifier")]; found {
+		var OpenAISafetyIdentifier string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "OpenAI-Safety-Identifier", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "OpenAI-Safety-Identifier", valueList[0], &OpenAISafetyIdentifier, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "OpenAI-Safety-Identifier", Err: err})
+			return
+		}
+
+		params.OpenAISafetyIdentifier = &OpenAISafetyIdentifier
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ConnectRealtimeWebSocket(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // CreateRerank operation middleware
 func (siw *ServerInterfaceWrapper) CreateRerank(w http.ResponseWriter, r *http.Request) {
 
@@ -11405,6 +11546,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/messages", wrapper.CreateMessage)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/models", wrapper.ListModels)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/moderations", wrapper.CreateModeration)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/realtime", wrapper.ConnectRealtimeWebSocket)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/rerank", wrapper.CreateRerank)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/responses", wrapper.CreateResponse)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/responses/ws", wrapper.ConnectResponsesWebSocket)

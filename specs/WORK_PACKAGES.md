@@ -1575,6 +1575,57 @@ Required gates:
 - `make secret-scan`
 - `git diff --check`
 
+## WP-470: OpenAI-compatible Realtime WebSocket Relay v1
+
+Objective: expose `GET /v1/realtime` as an OpenAI-compatible Realtime WebSocket gateway route that schedules realtime-capable accounts and relays frames through Reverse Proxy Runtime using selected OAuth/session/client-token credentials.
+
+Read first:
+
+- `docs/2API_REVERSE_PROXY_DEFINITION.md`
+- `docs/REVERSE_PROXY_SPEC.md`
+- `docs/PROVIDER_ADAPTER_SPEC.md`
+- `docs/GATEWAY_ROUTE_MATRIX.md`
+- `docs/AI_ENDPOINT_COMPATIBILITY.md`
+- `packages/openapi/openapi.yaml`
+- `apps/api/internal/httpserver/runtime_gateway_websocket.go`
+- `apps/api/internal/modules/provider_adapters/contract`
+- `apps/api/internal/modules/provider_adapters/service`
+- local reference: `/home/senran/Desktop/sub2api/backend/internal/service/openai_ws_protocol_resolver_test.go`
+- local reference: `/home/senran/Desktop/CLIProxyAPI/sdk/api/handlers/openai/openai_responses_websocket_test.go`
+
+Owns:
+
+- `GET /v1/realtime` OpenAPI contract and docs alignment; this route is WebSocket upgrade, not `POST /v1/realtime`.
+- Canonical realtime request normalization with required `realtime_websocket` and `streaming` capabilities.
+- Provider Adapter `PrepareRealtime` for OpenAI-compatible OAuth/session/client-token accounts, deriving upstream `ws/wss` `/realtime?model=<mapped_upstream_model>`.
+- Reverse Proxy Runtime relay binding for bidirectional text/binary frames.
+- Realtime slot acquisition/release before/after upgrade using provider-neutral slot manager.
+- Scheduler/usage evidence preserving `/v1/realtime` source endpoint.
+- Tests proving selected account credentials define upstream auth and caller/SRapi headers do not leak upstream.
+
+Definition of Done:
+
+- `/v1/realtime?model=...` requires Gateway API Key auth, model policy, entitlement, `realtime_websocket` capability, and realtime slot capacity before upgrade.
+- The scheduled Provider Account supplies the upstream OAuth/session/client-token credential through Reverse Proxy Runtime; `runtime_class = api_key` remains rejected for this 2api route.
+- The upstream URL uses the selected mapping's `upstream_model_name`, not the local SRapi model name.
+- Caller `Authorization`, `Cookie`, `Sec-WebSocket-*`, `X-SRapi-*`, and gateway headers do not define upstream identity.
+- Success and failure paths preserve `/v1/realtime` in Scheduler decisions and usage logs.
+- This package does not implement official API-key Realtime, persistent upstream session pools, local client ingress, or Claude Code / Antigravity provider-native realtime adapters.
+- No frontend visuals are added.
+
+Required gates:
+
+- `cd apps/api && go test ./internal/modules/gateway/... ./internal/modules/provider_adapters/... ./internal/modules/reverse_proxy/... ./internal/httpserver`
+- `make openapi-lint`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./...`
+- `make architecture-check`
+- `make code-quality-check`
+- `make secret-scan`
+- `git diff --check`
+
 ## WP-420: Claude Code CLI 2api Messages Upstream Shape v1
 
 Objective: make `reverse-proxy-claude-code-cli` construct the Claude Code official-client HTTP Messages shape and send it through Reverse Proxy Runtime with selected OAuth/CLI credentials, instead of treating Claude Code 2api as generic Anthropic-compatible API-key dispatch.

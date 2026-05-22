@@ -255,6 +255,7 @@ type RealtimeRequest struct {
 	SourceEndpoint string
 	Model          string
 	RequestPayload []byte
+	Headers        http.Header
 	Provider       providercontract.Provider
 	Account        accountcontract.ProviderAccount
 	Mapping        modelcontract.ModelProviderMapping

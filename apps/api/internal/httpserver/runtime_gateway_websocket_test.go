@@ -338,6 +338,126 @@ func TestGatewayResponsesWebSocketRelaysCodexUpstreamWebSocket(t *testing.T) {
 	}
 }
 
+func TestGatewayRealtimeWebSocketRelaysOpenAIUpstreamWebSocket(t *testing.T) {
+	type upstreamObservation struct {
+		Path             string
+		QueryModel       string
+		Authorization    string
+		SafetyIdentifier string
+		UserAgent        string
+		LeakedHeader     string
+		ClientFrame      []byte
+	}
+	observations := make(chan upstreamObservation, 1)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{CompressionMode: websocket.CompressionDisabled})
+		if err != nil {
+			t.Errorf("accept realtime upstream websocket: %v", err)
+			return
+		}
+		defer conn.Close(websocket.StatusNormalClosure, "")
+
+		msgType, payload, err := conn.Read(r.Context())
+		if err != nil {
+			t.Errorf("read realtime upstream frame: %v", err)
+			return
+		}
+		if msgType != websocket.MessageText {
+			t.Errorf("expected realtime upstream text frame, got %v", msgType)
+			return
+		}
+		observations <- upstreamObservation{
+			Path:             r.URL.Path,
+			QueryModel:       r.URL.Query().Get("model"),
+			Authorization:    r.Header.Get("Authorization"),
+			SafetyIdentifier: r.Header.Get("OpenAI-Safety-Identifier"),
+			UserAgent:        r.Header.Get("User-Agent"),
+			LeakedHeader:     r.Header.Get("X-SRapi-Leak"),
+			ClientFrame:      append([]byte(nil), payload...),
+		}
+		if err := conn.Write(r.Context(), websocket.MessageText, []byte(`{"type":"session.created","session":{"id":"sess_realtime"}}`)); err != nil {
+			t.Errorf("write realtime upstream frame: %v", err)
+			return
+		}
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"wp470-realtime-provider","display_name":"WP470 Realtime Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active","capabilities":{"realtime_websocket":true,"streaming":true}}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"wp470-realtime-model","display_name":"WP470 Realtime Model","status":"active","capabilities":[{"key":"realtime_websocket","level":"required","status":"experimental","version":"v1"},{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"gpt-realtime-2","status":"active","capability_override":[{"key":"realtime_websocket","level":"required","status":"experimental","version":"v1"},{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"wp470-realtime-account","runtime_class":"oauth_refresh","upstream_client":"codex_cli","credential":{"access_token":"realtime-access-token","refresh_token":"refresh-token"},"metadata":{"base_url":"`+upstream.URL+`/v1","user_agent":"OpenAI-Realtime-Test/1.0","capability_realtime_websocket":true},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	conn := mustDialRealtimeWebSocket(t, server.URL+"/v1/realtime?model=wp470-realtime-model&session_affinity_key=wp470-realtime-session", apiKey, http.Header{
+		"OpenAI-Safety-Identifier": {"safe-user-hash"},
+		"X-SRapi-Leak":             {"leaked"},
+	})
+	defer conn.Close(websocket.StatusNormalClosure, "")
+
+	writeWebSocketJSON(t, conn, map[string]any{
+		"type": "session.update",
+		"session": map[string]any{
+			"type":         "realtime",
+			"instructions": "be concise",
+		},
+	})
+	event := readWebSocketEvent(t, conn)
+	if event["type"] != "session.created" {
+		t.Fatalf("expected session.created event, got %+v", event)
+	}
+
+	var obs upstreamObservation
+	select {
+	case obs = <-observations:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for realtime upstream observation")
+	}
+	if obs.Path != "/v1/realtime" ||
+		obs.QueryModel != "gpt-realtime-2" ||
+		obs.Authorization != "Bearer realtime-access-token" ||
+		obs.SafetyIdentifier != "safe-user-hash" ||
+		obs.UserAgent != "OpenAI-Realtime-Test/1.0" ||
+		obs.LeakedHeader != "" {
+		t.Fatalf("unexpected realtime upstream request: %+v", obs)
+	}
+	var clientFrame map[string]any
+	if err := json.Unmarshal(obs.ClientFrame, &clientFrame); err != nil {
+		t.Fatalf("decode realtime upstream frame: %v", err)
+	}
+	if clientFrame["type"] != "session.update" || !strings.Contains(mustMarshalString(t, clientFrame), "be concise") {
+		t.Fatalf("unexpected realtime upstream frame: %+v", clientFrame)
+	}
+	conn.Close(websocket.StatusNormalClosure, "")
+
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=wp470-realtime-model", nil)
+	decisionsReq.AddCookie(sessionCookie)
+	decisionsRec := httptest.NewRecorder()
+	handler.ServeHTTP(decisionsRec, decisionsReq)
+	if decisionsRec.Code != http.StatusOK {
+		t.Fatalf("expected scheduler decisions 200, got %d body=%s", decisionsRec.Code, decisionsRec.Body.String())
+	}
+	var decisionsResp apiopenapi.SchedulerDecisionListResponse
+	if err := json.NewDecoder(decisionsRec.Body).Decode(&decisionsResp); err != nil {
+		t.Fatalf("decode decisions: %v", err)
+	}
+	if len(decisionsResp.Data) != 1 {
+		t.Fatalf("expected one scheduler decision, got %+v", decisionsResp.Data)
+	}
+	decision := decisionsResp.Data[0]
+	if decision.SourceEndpoint != realtimeWebSocketSourceEndpoint || decision.SelectedAccountId == nil || *decision.SelectedAccountId != string(accountResp.Data.Id) {
+		t.Fatalf("expected realtime scheduler evidence, got %+v", decision)
+	}
+
+	usageResp := waitForRealtimeUsageLog(t, handler, sessionCookie, "wp470-realtime-model")
+	if len(usageResp.Data) != 1 || !usageResp.Data[0].Success || usageResp.Data[0].SourceEndpoint != realtimeWebSocketSourceEndpoint {
+		t.Fatalf("unexpected realtime usage record: %+v", usageResp.Data)
+	}
+}
+
 func TestGatewayResponsesWebSocketEnforcesRealtimeSlotLimit(t *testing.T) {
 	cfg := config.Load()
 	cfg.Gateway.RealtimeMaxOpenSlots = 1
@@ -372,6 +492,49 @@ func TestGatewayResponsesWebSocketEnforcesRealtimeSlotLimit(t *testing.T) {
 		!strings.Contains(metrics, `srapi_realtime_slots_total{event="rejected"} 1`) {
 		t.Fatalf("expected realtime slot lifecycle metrics, got:\n%s", metrics)
 	}
+}
+
+func mustDialRealtimeWebSocket(t *testing.T, rawURL, apiKey string, extra http.Header) *websocket.Conn {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+	defer cancel()
+	headers := http.Header{}
+	headers.Set("Authorization", "Bearer "+apiKey)
+	for key, values := range extra {
+		for _, value := range values {
+			headers.Add(key, value)
+		}
+	}
+	conn, _, err := websocket.Dial(ctx, httpToWebSocketURL(rawURL), &websocket.DialOptions{HTTPHeader: headers})
+	if err != nil {
+		t.Fatalf("dial realtime websocket: %v", err)
+	}
+	return conn
+}
+
+func waitForRealtimeUsageLog(t *testing.T, handler http.Handler, sessionCookie *http.Cookie, model string) apiopenapi.UsageLogListResponse {
+	t.Helper()
+	deadline := time.Now().Add(3 * time.Second)
+	var last apiopenapi.UsageLogListResponse
+	for time.Now().Before(deadline) {
+		usageReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/usage-logs?model="+model, nil)
+		usageReq.AddCookie(sessionCookie)
+		usageRec := httptest.NewRecorder()
+		handler.ServeHTTP(usageRec, usageReq)
+		if usageRec.Code != http.StatusOK {
+			t.Fatalf("expected usage logs 200, got %d body=%s", usageRec.Code, usageRec.Body.String())
+		}
+		var usageResp apiopenapi.UsageLogListResponse
+		if err := json.NewDecoder(usageRec.Body).Decode(&usageResp); err != nil {
+			t.Fatalf("decode usage logs: %v", err)
+		}
+		if len(usageResp.Data) > 0 {
+			return usageResp
+		}
+		last = usageResp
+		time.Sleep(20 * time.Millisecond)
+	}
+	return last
 }
 
 func mustDialResponsesWebSocket(t *testing.T, rawURL, apiKey string) *websocket.Conn {

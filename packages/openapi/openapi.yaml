@@ -2660,6 +2660,74 @@ paths:
         default:
           $ref: "#/components/responses/GatewayError"
 
+  /v1/realtime:
+    get:
+      tags:
+        - Gateway
+      operationId: connectRealtimeWebSocket
+      summary: Connect to the OpenAI-compatible Realtime WebSocket gateway.
+      description: >
+        Upgrades to an OpenAI-compatible Realtime WebSocket transport. The
+        model is supplied as the required `model` query parameter and the
+        WebSocket frames are relayed bidirectionally through the selected
+        Provider Account using Reverse Proxy Runtime credentials. SRapi keeps
+        Gateway API key authentication, model policy, Scheduler decisions,
+        realtime slot limits, and usage evidence on this route.
+      security:
+        - gatewayBearerAuth: []
+      parameters:
+        - name: model
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Model name requested by the downstream realtime client.
+        - name: session_affinity_key
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Optional stable affinity key used by Scheduler sticky routing.
+        - name: sticky_strength
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - soft
+              - hard
+          description: Optional sticky routing strength for this WebSocket session.
+        - name: sticky_account_id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Optional explicit sticky account preference for this WebSocket session.
+        - name: OpenAI-Safety-Identifier
+          in: header
+          required: false
+          schema:
+            type: string
+          description: Optional safety identifier forwarded to compatible OpenAI Realtime upstreams.
+      responses:
+        "101":
+          description: WebSocket upgrade accepted. Subsequent messages are OpenAI Realtime JSON text or binary frames.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
   /v1/messages:
     post:
       tags:

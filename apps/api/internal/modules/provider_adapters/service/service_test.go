@@ -1977,6 +1977,69 @@ func TestReverseProxyCodexCLIPrepareRealtimeRejectsAPIKeyRuntime(t *testing.T) {
 	assertProviderError(t, err, "invalid_request", http.StatusBadRequest)
 }
 
+func TestOpenAICompatiblePrepareRealtimeBuildsRealtimeWebSocketSession(t *testing.T) {
+	svc, err := service.New(nil)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	headers := http.Header{}
+	headers.Set("OpenAI-Safety-Identifier", "safe-user-hash")
+	headers.Set("Authorization", "Bearer leaked")
+	session, err := svc.PrepareRealtime(context.Background(), contract.RealtimeRequest{
+		RequestID: "req_openai_realtime_ws",
+		Model:     "local-realtime",
+		Headers:   headers,
+		Provider: providercontract.Provider{
+			AdapterType: "openai-compatible",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:           10,
+			RuntimeClass: accountcontract.RuntimeClassOauthRefresh,
+			Metadata: map[string]any{
+				"base_url": "https://api.openai.example/v1",
+			},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-realtime-2"},
+		Credential: map[string]any{"access_token": "oauth-token"},
+	})
+	if err != nil {
+		t.Fatalf("prepare openai realtime: %v", err)
+	}
+	if session.URL != "wss://api.openai.example/v1/realtime?model=gpt-realtime-2" {
+		t.Fatalf("unexpected realtime websocket URL %q", session.URL)
+	}
+	if session.Headers.Get("OpenAI-Safety-Identifier") != "safe-user-hash" {
+		t.Fatalf("expected safety identifier header, got %+v", session.Headers)
+	}
+	if session.Headers.Get("Authorization") != "" || session.InitialFrame != nil {
+		t.Fatalf("expected adapter to leave auth and initial frame empty, got headers=%+v frame=%s", session.Headers, session.InitialFrame)
+	}
+}
+
+func TestOpenAICompatiblePrepareRealtimeRejectsAPIKeyRuntime(t *testing.T) {
+	svc, err := service.New(nil)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.PrepareRealtime(context.Background(), contract.RealtimeRequest{
+		RequestID: "req_openai_realtime_api_key",
+		Model:     "local-realtime",
+		Provider: providercontract.Provider{
+			AdapterType: "openai-compatible",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:           10,
+			RuntimeClass: accountcontract.RuntimeClassAPIKey,
+			Metadata:     map[string]any{"base_url": "https://api.openai.example/v1"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-realtime-2"},
+		Credential: map[string]any{"api_key": "sk-secret"},
+	})
+	assertProviderError(t, err, "invalid_request", http.StatusBadRequest)
+}
+
 func TestReverseProxyAntigravityOpenAIAdapterDispatchesThroughRuntime(t *testing.T) {
 	runtime := capturingRuntime{
 		response: reverseproxycontract.Response{

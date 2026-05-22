@@ -34,6 +34,7 @@ const (
 	KeyTextInput         = "text_input"
 	KeyTextOutput        = "text_output"
 	KeyStreaming         = "streaming"
+	KeyRealtimeWebSocket = "realtime_websocket"
 	KeyToolCalling       = "tool_calling"
 	KeyParallelToolCalls = "parallel_tool_calls"
 	KeyVisionInput       = "vision_input"
@@ -77,6 +78,7 @@ var defaultDefinitions = []Definition{
 	{Key: KeyTextInput, Version: "v1", Category: "input", Status: DefinitionStatusStable, Description: "Model can consume text input."},
 	{Key: KeyTextOutput, Version: "v1", Category: "output", Status: DefinitionStatusStable, Description: "Model can produce text output."},
 	{Key: KeyStreaming, Version: "v1", Category: "interaction", Status: DefinitionStatusStable, Description: "Model or provider can return streaming token events."},
+	{Key: KeyRealtimeWebSocket, Version: "v1", Category: "interaction", Status: DefinitionStatusExperimental, Description: "Model or provider can support bidirectional realtime WebSocket sessions."},
 	{Key: KeyToolCalling, Version: "v1", Category: "interaction", Status: DefinitionStatusStable, Description: "Model or provider can accept tool definitions and produce tool calls."},
 	{Key: KeyParallelToolCalls, Version: "v1", Category: "interaction", Status: DefinitionStatusStable, Description: "Model or provider can produce parallel tool calls."},
 	{Key: KeyVisionInput, Version: "v1", Category: "input", Status: DefinitionStatusStable, Description: "Model or provider can consume image inputs."},
@@ -108,6 +110,12 @@ var knownKeys = func() map[string]Definition {
 var convenienceKeys = map[string]string{
 	"supports_stream":               KeyStreaming,
 	"stream":                        KeyStreaming,
+	"supports_realtime":             KeyRealtimeWebSocket,
+	"supports_realtime_websocket":   KeyRealtimeWebSocket,
+	"realtime":                      KeyRealtimeWebSocket,
+	"realtime_websocket":            KeyRealtimeWebSocket,
+	"websocket":                     KeyRealtimeWebSocket,
+	"supports_websockets":           KeyRealtimeWebSocket,
 	"supports_tools":                KeyToolCalling,
 	"tools":                         KeyToolCalling,
 	"supports_parallel_tool_calls":  KeyParallelToolCalls,

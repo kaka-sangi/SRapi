@@ -93,6 +93,16 @@ func (s *Service) NormalizeResponses(req apiopenapi.ResponsesRequest, meta Reque
 	return canonical
 }
 
+func (s *Service) NormalizeRealtimeWebSocket(model string, meta RequestMeta) gatewaycontract.CanonicalRequest {
+	canonical := canonical(meta, gatewaycontract.ProtocolOpenAICompatible, gatewaycontract.ProtocolOpenAICompatible, model, "", true, "", nil, nil, "", nil)
+	canonical.RequestCapabilities = append(canonical.RequestCapabilities,
+		gatewaycontract.RequestCapability{Key: capabilitiescontract.KeyRealtimeWebSocket, Version: "v1"},
+		gatewaycontract.RequestCapability{Key: capabilitiescontract.KeyStreaming, Version: "v1"},
+	)
+	canonical.RequestCapabilities = dedupeRequestCapabilities(canonical.RequestCapabilities)
+	return canonical
+}
+
 func (s *Service) NormalizeAnthropicMessages(req apiopenapi.AnthropicMessagesRequest, meta RequestMeta) gatewaycontract.CanonicalRequest {
 	var warnings []string
 	var parts []string

@@ -256,6 +256,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("POST /v1/chat/completions", server.handleCreateChatCompletion)
 	mux.HandleFunc("POST /v1/responses", server.handleCreateResponse)
 	mux.HandleFunc("GET /v1/responses/ws", server.handleResponsesWebSocket)
+	mux.HandleFunc("GET /v1/realtime", server.handleRealtimeWebSocket)
 	mux.HandleFunc("POST /v1/messages", server.handleCreateMessage)
 	mux.HandleFunc("POST /v1/embeddings", server.handleCreateEmbedding)
 	mux.HandleFunc("POST /v1/images/generations", server.handleCreateImageGeneration)

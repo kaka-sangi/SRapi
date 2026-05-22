@@ -777,7 +777,7 @@ func effectiveCapabilities(model modelcontract.Model, mapping modelcontract.Mode
 			}
 		}
 	}
-	for _, key := range []string{capabilitiescontract.KeyEmbeddings, capabilitiescontract.KeyImages, capabilitiescontract.KeyAudioTranscriptions, capabilitiescontract.KeyAudioSpeech, capabilitiescontract.KeyModerations, capabilitiescontract.KeyRerank} {
+	for _, key := range []string{capabilitiescontract.KeyEmbeddings, capabilitiescontract.KeyImages, capabilitiescontract.KeyAudioTranscriptions, capabilitiescontract.KeyAudioSpeech, capabilitiescontract.KeyModerations, capabilitiescontract.KeyRerank, capabilitiescontract.KeyRealtimeWebSocket} {
 		if _, ok := providerScoped[key]; !ok {
 			delete(merged, key)
 		}

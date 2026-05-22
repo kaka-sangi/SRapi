@@ -4336,6 +4336,74 @@ export type ConnectResponsesWebSocketResponses = {
 
 export type ConnectResponsesWebSocketResponse = ConnectResponsesWebSocketResponses[keyof ConnectResponsesWebSocketResponses];
 
+export type ConnectRealtimeWebSocketData = {
+    body?: never;
+    headers?: {
+        /**
+         * Optional safety identifier forwarded to compatible OpenAI Realtime upstreams.
+         */
+        'OpenAI-Safety-Identifier'?: string;
+    };
+    path?: never;
+    query: {
+        /**
+         * Model name requested by the downstream realtime client.
+         */
+        model: string;
+        /**
+         * Optional stable affinity key used by Scheduler sticky routing.
+         */
+        session_affinity_key?: string;
+        /**
+         * Optional sticky routing strength for this WebSocket session.
+         */
+        sticky_strength?: 'soft' | 'hard';
+        /**
+         * Optional explicit sticky account preference for this WebSocket session.
+         */
+        sticky_account_id?: number;
+    };
+    url: '/v1/realtime';
+};
+
+export type ConnectRealtimeWebSocketErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type ConnectRealtimeWebSocketError = ConnectRealtimeWebSocketErrors[keyof ConnectRealtimeWebSocketErrors];
+
+export type ConnectRealtimeWebSocketResponses = {
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type ConnectRealtimeWebSocketResponse = ConnectRealtimeWebSocketResponses[keyof ConnectRealtimeWebSocketResponses];
+
 export type CreateMessageData = {
     body: AnthropicMessagesRequest;
     path?: never;

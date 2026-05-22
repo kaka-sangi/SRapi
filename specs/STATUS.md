@@ -53,14 +53,15 @@ last_completed:
 - WP-440: ChatGPT Web 2api now auto-fetches Sentinel chat requirements through Reverse Proxy Runtime when a static requirements token is absent, including homepage bootstrap, legacy requirements `p` generation, optional PoW proof token generation, and Arkose/Turnstile challenge classification.
 - WP-450: Antigravity 2api HTTP text path now sends `reverse-proxy-antigravity` requests through Reverse Proxy Runtime to Google Cloud Code `/v1internal:generateContent` or `/v1internal:streamGenerateContent?alt=sse`, builds the Antigravity `project`/`requestId`/`userAgent`/`requestType` envelope with nested Gemini request payload, and enforces the desktop/IDE/OAuth credential boundary instead of treating API keys as 2api identity.
 - WP-460: Realtime slot lifecycle v1 now adds a provider-neutral realtime module, acquires `/v1/responses/ws` slots after Gateway auth and before WebSocket upgrade, releases slots on close/error, enforces deploy-level global/per-API-key slot limits, and exposes realtime slot metrics without storing raw affinity keys or provider DTOs.
+- WP-470: OpenAI-compatible Realtime WebSocket relay v1 now exposes `GET /v1/realtime`, schedules accounts with `realtime_websocket` capability, derives upstream `/realtime?model=<mapped_upstream_model>`, and relays frames through Reverse Proxy Runtime using selected OAuth/session/client-token credentials rather than caller headers or Gateway-local DTOs.
 
 current:
 
-- package: WP-470+
+- package: WP-480+
 - status: pending
 - objective: split the next ecosystem or remaining advanced endpoint package from the roadmap.
 
-next_recommended: WP-470+
+next_recommended: WP-480+
 
 last_gates:
 
@@ -146,6 +147,8 @@ notes:
 - WP-450 intentionally does not implement Antigravity OAuth onboarding, project discovery, credit overage retry policy, full tool-schema cleaning, or persistent realtime session lifecycle.
 - WP-460 added `TestAcquireReleaseTracksRealtimeSlotLifecycle`, global/per-API-key slot-limit tests, and `TestGatewayResponsesWebSocketEnforcesRealtimeSlotLimit`, proving raw session affinity keys are hashed and excess WebSocket handshakes fail with 429 before upgrade.
 - WP-460 intentionally does not add Claude Code or Antigravity provider-native realtime adapters, persistent upstream session reuse, or distributed Redis-backed slot storage.
+- WP-470 added `TestNormalizeRealtimeWebSocketRequiresRealtimeCapability`, `TestOpenAICompatiblePrepareRealtimeBuildsRealtimeWebSocketSession`, `TestOpenAICompatiblePrepareRealtimeRejectsAPIKeyRuntime`, and `TestGatewayRealtimeWebSocketRelaysOpenAIUpstreamWebSocket`, proving `/v1/realtime` uses selected account OAuth identity, mapped upstream model query, allowed Realtime headers, realtime slot lifecycle, Scheduler decisions, and usage evidence.
+- WP-470 intentionally does not add official API-key Realtime, persistent upstream session pools, local client ingress, or Claude Code / Antigravity provider-native realtime adapters.
 
 ## Work Package Ledger
 
@@ -198,4 +201,5 @@ notes:
 | WP-440 | completed | ChatGPT Web Sentinel requirements auto-fetch v1 through Reverse Proxy Runtime. |
 | WP-450 | completed | Antigravity official-client v1internal upstream shape v1 through Reverse Proxy Runtime. |
 | WP-460 | completed | Realtime slot lifecycle v1. |
-| WP-470+ | pending | Remaining ecosystem and advanced endpoint packages. |
+| WP-470 | completed | OpenAI-compatible Realtime WebSocket relay v1 with OAuth/session/client-token Reverse Proxy Runtime boundary. |
+| WP-480+ | pending | Remaining ecosystem and advanced endpoint packages. |

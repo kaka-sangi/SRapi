@@ -20,6 +20,7 @@ const (
 	EndpointAudioSpeech           SourceEndpoint = "/v1/audio/speech"
 	EndpointModerations           SourceEndpoint = "/v1/moderations"
 	EndpointRerank                SourceEndpoint = "/v1/rerank"
+	EndpointRealtime              SourceEndpoint = "/v1/realtime"
 	EndpointGeminiGenerateContent SourceEndpoint = "/v1beta/models/{model}:generateContent"
 	EndpointGeminiStreamContent   SourceEndpoint = "/v1beta/models/{model}:streamGenerateContent"
 )
