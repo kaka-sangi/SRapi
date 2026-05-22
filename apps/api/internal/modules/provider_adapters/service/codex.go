@@ -82,6 +82,9 @@ func (s *Service) invokeReverseProxyCodexResponses(ctx context.Context, req cont
 	if s.reverseProxy == nil {
 		return contract.TextResponse{}, contract.ProviderError{Class: "network_error", StatusCode: http.StatusBadGateway, Message: "reverse proxy runtime unavailable"}
 	}
+	if codexReverseProxyRuntimeIsAPIKey(req) {
+		return contract.TextResponse{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "codex reverse proxy requires OAuth/session/client-token runtime credentials"}
+	}
 	raw, err := json.Marshal(codexResponsesPayload(req))
 	if err != nil {
 		return contract.TextResponse{}, err
@@ -196,11 +199,9 @@ func codexResponsesHeaders(req contract.TextRequest) http.Header {
 		"Accept":       {"text/event-stream"},
 		"Content-Type": {"application/json"},
 	}
-	if !codexCredentialUsesAPIKey(req) {
-		headers.Set("Originator", codexOriginator)
-		if accountID := requestSetting(req, "chatgpt_account_id", "account_id"); accountID != "" {
-			headers.Set("Chatgpt-Account-Id", accountID)
-		}
+	headers.Set("Originator", codexOriginator)
+	if accountID := requestSetting(req, "chatgpt_account_id", "account_id"); accountID != "" {
+		headers.Set("Chatgpt-Account-Id", accountID)
 	}
 	if betaFeatures := requestSetting(req, "codex_beta_features", "x_codex_beta_features", "X-Codex-Beta-Features"); betaFeatures != "" {
 		headers.Set("X-Codex-Beta-Features", betaFeatures)
@@ -224,8 +225,8 @@ func codexResponsesHeaders(req contract.TextRequest) http.Header {
 	return headers
 }
 
-func codexCredentialUsesAPIKey(req contract.TextRequest) bool {
-	return credentialString(req.Credential, "api_key") != "" || credentialString(req.Credential, "codex_api_key") != ""
+func codexReverseProxyRuntimeIsAPIKey(req contract.TextRequest) bool {
+	return strings.EqualFold(strings.TrimSpace(string(req.Account.RuntimeClass)), "api_key")
 }
 
 func codexReverseProxyAccount(req contract.TextRequest) reverseproxycontract.AccountRuntime {

@@ -32,7 +32,7 @@ SRapi 的核心差异化能力之一，是像 `sub2api`、`claude2api`、`chatgp
 
 WP-400 起，`reverse-proxy-codex-cli` 的 HTTP text path 已按上述定义实现：Adapter 构造 Codex Responses body/headers，Reverse Proxy Runtime 负责把选中账号身份发往配置的 Codex base URL `/responses`。这不是把本地 Codex CLI 接入 SRapi，也不是把下游请求原样转发到 OpenAI-compatible `/chat/completions`。
 
-反代运行时默认服务于 `runtime_class != api_key` 的账号。`runtime_class = api_key` 的账号默认走简单官方 API SDK 路径；如果 Provider 明确配置为 `reverse-proxy-*` adapter，则仍可通过 Reverse Proxy Runtime 发出对应官方客户端形态请求，并由 Runtime 从选中账号凭证注入 API key。
+反代运行时服务于 `runtime_class != api_key` 的账号。`runtime_class = api_key` 的账号必须走官方 API-key Adapter 路径，不属于 SRapi 2api 反代；`reverse-proxy-*` Adapter 不得依赖 Reverse Proxy Runtime 从 API key 凭证注入上游身份。
 
 ## 3. 账号运行时分类
 

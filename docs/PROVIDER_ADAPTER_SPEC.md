@@ -64,6 +64,7 @@ reverse-proxy-antigravity
 ```
 
 `reverse-proxy-*` 类 Adapter 必须经由 `REVERSE_PROXY_SPEC.md` 定义的 Reverse Proxy Runtime 发起上游请求。
+`reverse-proxy-*` 是 2api / official-client simulation 路径，必须使用 OAuth、session、desktop、CLI 或 IDE token 等非 API-key 运行时身份；`runtime_class = api_key` 必须使用对应官方 API-key Adapter，不得作为 2api 反代账号进入 Reverse Proxy Runtime。
 
 每个 Adapter 必须声明 runtime_class：
 
@@ -632,7 +633,7 @@ Audio speech dispatch must send JSON with mapped upstream `model`, `input`, `voi
 `reverse-proxy-*` 类 Adapter 必须遵守 `REVERSE_PROXY_SPEC.md`：
 
 - “反代 / 2api”的权威定义见 `2API_REVERSE_PROXY_DEFINITION.md`：Adapter 必须构造目标官方客户端形态的上游请求，例如 Codex CLI、Claude Code CLI、Gemini CLI 或 Antigravity Desktop / IDE，而不是把下游请求简单透传到兼容 API。
-- `reverse-proxy-codex-cli` 文本请求必须构造 Codex Responses / official-client 形态，POST 到配置的 Codex base URL 下的 `/responses`，并通过 Reverse Proxy Runtime 注入选中账号身份；不得退化为 OpenAI-compatible `/chat/completions`。
+- `reverse-proxy-codex-cli` 文本请求必须构造 Codex Responses / official-client 形态，POST 到配置的 Codex base URL 下的 `/responses`，并通过 Reverse Proxy Runtime 注入选中账号 OAuth/session/CLI token 身份；不得退化为 OpenAI-compatible `/chat/completions`，也不得接受 `runtime_class = api_key` 作为 2api 身份。
 - 上游请求必须通过 Reverse Proxy Runtime 发起，不得使用裸 `net/http` 默认客户端。
 - TLS / HTTP/2 / Header / cookie / User-Agent / 出口 IP 必须由 Egress Profile 决定，不得在 Adapter 内硬编码。
 - 不得向上游泄漏 SRapi 内部标识（`X-Request-ID`、`X-Forwarded-*`、`Via`、`X-SRapi-*` 等）。

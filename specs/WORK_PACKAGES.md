@@ -1505,7 +1505,7 @@ Owns:
 - Codex CLI reverse-proxy adapter dispatch for text requests.
 - Codex `/backend-api/codex/responses` request body construction from Canonical AI Request.
 - Codex official-client headers such as `Accept: text/event-stream`, `Originator`, `X-Client-Request-Id`, `Session_id`, `Version`, `X-Codex-Beta-Features`, and `Chatgpt-Account-Id` when account metadata provides them.
-- Reverse Proxy Runtime credential injection for `api_key` accounts, plus existing CLI/OAuth token runtime classes.
+- Reverse Proxy Runtime credential injection for CLI/OAuth/session token runtime classes; `api_key` remains official API-key adapter behavior and is not a 2api reverse-proxy credential source.
 - Codex Responses SSE/JSON parsing into `TextResponse`, including `response.output_text.delta`, `response.output_item.done`, `response.completed`, and usage.
 - Focused tests proving Codex uses `/responses`, generic reverse-proxy OpenAI-compatible behavior still uses `/chat/completions`, and selected account credentials/UA reach upstream.
 
@@ -1514,6 +1514,7 @@ Definition of Done:
 - `reverse-proxy-codex-cli` text requests call `base_url + "/responses"` with `stream: true`; they must not call `/chat/completions`.
 - Codex request body includes mapped upstream `model`, Responses-style `input`, non-null `instructions`, supported sampling/tool/output fields, and no OpenAI Chat Completions `stream_options`.
 - Runtime receives selected account context and injects account credentials; caller auth must not be forwarded.
+- `reverse-proxy-codex-cli` rejects `runtime_class = api_key` and requires OAuth/session/CLI-token style account credentials.
 - Parser accepts Codex SSE and JSON response shapes and returns text/usage without Gateway-local Codex DTOs.
 - This package does not implement Codex Responses WebSocket upstream relay or local Codex CLI client ingress; those remain follow-up packages.
 - No frontend visuals are added.

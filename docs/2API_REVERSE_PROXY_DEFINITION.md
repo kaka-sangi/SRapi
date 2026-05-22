@@ -56,8 +56,8 @@ SRapi 2api 反代不是：
 
 | Adapter | 上游身份 | 典型上游形态 |
 | --- | --- | --- |
-| `reverse-proxy-codex-cli` | Codex CLI / ChatGPT Codex 客户端 | Codex `/backend-api/codex/responses` 或 Responses WebSocket，Codex headers、session/cache headers、Codex OAuth/API token。 |
-| `reverse-proxy-claude-code-cli` | Claude Code 客户端 | Anthropic Messages 端点上的 Claude Code OAuth/API-key header、Claude Code beta/version/cache/signing/body conventions。 |
+| `reverse-proxy-codex-cli` | Codex CLI / ChatGPT Codex 客户端 | Codex `/backend-api/codex/responses` 或 Responses WebSocket，Codex headers、session/cache headers、Codex OAuth / device / CLI client token。 |
+| `reverse-proxy-claude-code-cli` | Claude Code 客户端 | Anthropic Messages 端点上的 Claude Code OAuth / setup-token credential header、Claude Code beta/version/cache/signing/body conventions。 |
 | `reverse-proxy-gemini-cli` | Gemini CLI / Code Assist 客户端 | Gemini Code Assist / Cloud Code endpoints、project/user context、Google OAuth credential behavior。 |
 | `reverse-proxy-antigravity` | Antigravity Desktop / IDE 客户端 | Google Cloud Code / Antigravity internal endpoints、desktop/IDE token, user-agent, HTTP behavior, protocol-specific payload. |
 | `custom_reverse_proxy` | Operator-defined upstream client | Explicit endpoint and egress profile defined by operator metadata. |
@@ -69,12 +69,13 @@ Implementation status:
 
 ## 6. Boundary Rules
 
-1. `runtime_class = api_key` defaults to official API-key adapter behavior unless an explicit adapter says otherwise.
-2. `runtime_class != api_key` under a `reverse-proxy-*` adapter must use Reverse Proxy Runtime for all upstream HTTP/WSS calls.
-3. Provider Adapter owns upstream official-client payload shape. Reverse Proxy Runtime must not invent business DTOs.
-4. Reverse Proxy Runtime owns transport behavior: account credential injection, forbidden header stripping, user-agent selection, proxy binding, cookie jar, timeout, relay accounting, and runtime error classes.
-5. Client Response Renderer owns downstream response shape. Upstream official-client SSE/WSS frames may be transformed only after the runtime has received them.
-6. Every successful or failed 2api call must still produce Scheduler decision/feedback and usage evidence.
+1. `runtime_class = api_key` is official API-key adapter behavior, not SRapi 2api reverse proxy behavior.
+2. `reverse-proxy-*` 2api adapters require OAuth/session/client-token style account credentials (`runtime_class != api_key`) and must reject or avoid scheduling `api_key` runtime accounts.
+3. `runtime_class != api_key` under a `reverse-proxy-*` adapter must use Reverse Proxy Runtime for all upstream HTTP/WSS calls.
+4. Provider Adapter owns upstream official-client payload shape. Reverse Proxy Runtime must not invent business DTOs.
+5. Reverse Proxy Runtime owns transport behavior: account credential injection, forbidden header stripping, user-agent selection, proxy binding, cookie jar, timeout, relay accounting, and runtime error classes.
+6. Client Response Renderer owns downstream response shape. Upstream official-client SSE/WSS frames may be transformed only after the runtime has received them.
+7. Every successful or failed 2api call must still produce Scheduler decision/feedback and usage evidence.
 
 ## 7. Implementation Test Implications
 

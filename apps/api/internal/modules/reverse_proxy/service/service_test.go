@@ -107,7 +107,7 @@ func TestRuntimeInjectsCliClientTokenAndDefaultClientUserAgent(t *testing.T) {
 	}
 }
 
-func TestRuntimeInjectsAPIKeyRuntimeBearerToken(t *testing.T) {
+func TestRuntimeDoesNotInjectAPIKeyRuntimeCredentials(t *testing.T) {
 	var gotHeader http.Header
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotHeader = r.Header.Clone()
@@ -136,8 +136,8 @@ func TestRuntimeInjectsAPIKeyRuntimeBearerToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("runtime request: %v", err)
 	}
-	if gotHeader.Get("Authorization") != "Bearer api-key-token" {
-		t.Fatalf("expected api key bearer auth, got %q", gotHeader.Get("Authorization"))
+	if gotHeader.Get("Authorization") != "" {
+		t.Fatalf("expected no api key auth injection, got %q", gotHeader.Get("Authorization"))
 	}
 	if gotHeader.Get("User-Agent") != "Codex/1.0" {
 		t.Fatalf("expected codex user agent, got %q", gotHeader.Get("User-Agent"))

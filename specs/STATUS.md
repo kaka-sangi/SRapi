@@ -46,7 +46,7 @@ last_completed:
 - WP-370: Antigravity Gemini model-action aliases now route `/antigravity/v1beta` and `/api/provider/antigravity/v1beta` GenerateContent/StreamGenerateContent requests through the standard Gemini Gateway handler while forcing `provider_key=antigravity`, preserving alias evidence, and avoiding Gateway-local DTOs.
 - WP-380: Responses WebSocket runtime foundation now exposes `GET /v1/responses/ws`, accepts raw `ResponsesRequest` or `response.create` frames, executes each request through the existing Responses Gateway runtime, forwards streaming Responses events as WebSocket JSON frames, and preserves Scheduler/usage source endpoint evidence.
 - WP-390: Reverse Proxy Runtime now exposes a `WebSocketRuntime.RelayWebSocket` primitive for direct upstream WSS relay with per-account client/proxy/cookie context, credential-driven auth injection, forbidden-header hygiene, text/binary message relay, and relay accounting.
-- WP-400: Codex CLI 2api HTTP text path now sends `reverse-proxy-codex-cli` requests through Reverse Proxy Runtime to Codex `/responses` official-client shape, parses Codex Responses SSE/JSON output, and keeps generic OpenAI-compatible reverse proxy on `/chat/completions`.
+- WP-400: Codex CLI 2api HTTP text path now sends `reverse-proxy-codex-cli` requests through Reverse Proxy Runtime to Codex `/responses` official-client shape, parses Codex Responses SSE/JSON output, keeps generic OpenAI-compatible reverse proxy on `/chat/completions`, and enforces the OAuth/session/client-token credential boundary instead of treating API keys as 2api identity.
 
 current:
 
@@ -134,7 +134,7 @@ notes:
 - WP-390 added `TestRuntimeRelaysWebSocketWithAccountContextAndHeaderHygiene` and `TestRuntimeRelaysWebSocketWebSessionCookieFromCredential`, proving direct upstream WebSocket relay uses account credentials, default upstream-client User-Agent, subprotocol negotiation, text/binary message relay, metrics, and sanitized handshake headers.
 - WP-390 intentionally does not add Gateway route binding or provider-native realtime schema adapters; those are next-stage realtime packages that can now depend on the runtime primitive.
 - WP-400 added `TestReverseProxyCodexCLIAdapterUsesResponsesOfficialClientShape`, proving Codex 2api sends `base_url + "/responses"` with selected account token, Codex official-client headers, Responses-style body, and Codex SSE parsing, without adding Gateway-local Codex DTOs.
-- WP-400 also added `TestRuntimeInjectsAPIKeyRuntimeBearerToken`, so Reverse Proxy Runtime can inject `api_key` credentials when an explicit reverse-proxy adapter chooses that runtime shape.
+- WP-400 also added `TestRuntimeDoesNotInjectAPIKeyRuntimeCredentials` and `TestReverseProxyCodexCLIRejectsAPIKeyRuntime`, so SRapi's 2api reverse-proxy boundary stays aligned with OAuth/session/client-token accounts rather than official API-key adapters.
 
 ## Work Package Ledger
 
@@ -180,5 +180,5 @@ notes:
 | WP-370 | completed | Antigravity Gemini model-action alias routes v1. |
 | WP-380 | completed | Responses WebSocket runtime foundation v1. |
 | WP-390 | completed | Reverse Proxy WSS relay foundation v1. |
-| WP-400 | completed | Codex CLI 2api Responses upstream shape v1. |
+| WP-400 | completed | Codex CLI 2api Responses upstream shape v1 with OAuth/session/client-token boundary. |
 | WP-410+ | pending | Remaining ecosystem and advanced endpoint packages. |

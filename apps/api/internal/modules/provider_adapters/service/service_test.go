@@ -1496,6 +1496,49 @@ func TestReverseProxyCodexCLIAdapterPassesCliRuntimeContext(t *testing.T) {
 	}
 }
 
+func TestReverseProxyCodexCLIRejectsAPIKeyRuntime(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body:       []byte(`{"output_text":"should not be called"}`),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeText(context.Background(), contract.TextRequest{
+		RequestID: "req_codex_api_key_runtime",
+		Model:     "codex-local",
+		Prompt:    "hello",
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassAPIKey,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": "https://upstream.example/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+		Credential: map[string]any{"api_key": "sk-secret"},
+	})
+	if err == nil {
+		t.Fatalf("expected api_key runtime rejection")
+	}
+	providerErr, ok := err.(contract.ProviderError)
+	if !ok {
+		t.Fatalf("expected provider error, got %T %v", err, err)
+	}
+	if providerErr.Class != "invalid_request" || providerErr.StatusCode != http.StatusBadRequest {
+		t.Fatalf("unexpected provider error: %+v", providerErr)
+	}
+	if runtime.request.URL != "" {
+		t.Fatalf("reverse proxy runtime should not be called, got %+v", runtime.request)
+	}
+}
+
 func TestReverseProxyAntigravityOpenAIAdapterDispatchesThroughRuntime(t *testing.T) {
 	runtime := capturingRuntime{
 		response: reverseproxycontract.Response{
