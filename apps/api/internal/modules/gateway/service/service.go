@@ -290,7 +290,7 @@ func (s *Service) NormalizeImageEdit(req apiopenapi.ImageEditRequest, meta Reque
 	if req.User != nil {
 		canonical.ImageUser = strings.TrimSpace(*req.User)
 	}
-	canonical.ImageExtra = cloneMap(req.AdditionalProperties)
+	canonical.ImageExtra = imageEditExtra(req)
 	canonical.RequestCapabilities = append(canonical.RequestCapabilities, gatewaycontract.RequestCapability{Key: capabilitiescontract.KeyImages, Version: "v1"})
 	return canonical, nil
 }
@@ -1647,6 +1647,45 @@ func imageInputFromOpenAPI(value *openapi_types.File) *gatewaycontract.ImageInpu
 		FileName: strings.TrimSpace(value.Filename()),
 		Bytes:    fileBytes,
 	}
+}
+
+func imageEditExtra(req apiopenapi.ImageEditRequest) map[string]any {
+	extra := cloneMap(req.AdditionalProperties)
+	if extra == nil {
+		extra = map[string]any{}
+	}
+	setOptionalString(extra, "output_format", req.OutputFormat)
+	setOptionalInt(extra, "output_compression", req.OutputCompression)
+	setOptionalString(extra, "background", req.Background)
+	setOptionalString(extra, "moderation", req.Moderation)
+	setOptionalString(extra, "input_fidelity", req.InputFidelity)
+	setOptionalBool(extra, "stream", req.Stream)
+	setOptionalInt(extra, "partial_images", req.PartialImages)
+	if len(extra) == 0 {
+		return nil
+	}
+	return extra
+}
+
+func setOptionalString(values map[string]any, key string, value *string) {
+	if value == nil || strings.TrimSpace(*value) == "" {
+		return
+	}
+	values[key] = strings.TrimSpace(*value)
+}
+
+func setOptionalInt(values map[string]any, key string, value *int) {
+	if value == nil {
+		return
+	}
+	values[key] = *value
+}
+
+func setOptionalBool(values map[string]any, key string, value *bool) {
+	if value == nil {
+		return
+	}
+	values[key] = *value
 }
 
 func cloneFloat32(value *float32) *float32 {

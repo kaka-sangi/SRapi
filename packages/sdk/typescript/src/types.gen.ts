@@ -1231,6 +1231,56 @@ export type ImageEditRequest = {
     [key: string]: unknown;
 };
 
+export type ImageEditJsonRequest = {
+    image?: ImageEditJsonReference;
+    /**
+     * One or more local image references to edit. SRapi accepts data URLs and base64 JSON payloads; remote URLs and file IDs are rejected until a dedicated secure fetch/files boundary exists.
+     */
+    images?: Array<ImageEditJsonReference>;
+    model: string;
+    prompt: string;
+    n?: number;
+    /**
+     * Provider-specific output size such as `1024x1024`, `1024x1536`, `1536x1024`, or `auto`.
+     */
+    size?: string;
+    /**
+     * Provider-specific image quality such as `low`, `medium`, `high`, `standard`, `hd`, or `auto`.
+     */
+    quality?: string;
+    response_format?: 'url' | 'b64_json';
+    /**
+     * Provider-specific encoded output format such as `png`, `jpeg`, or `webp`.
+     */
+    output_format?: string;
+    output_compression?: number;
+    background?: string;
+    moderation?: string;
+    input_fidelity?: string;
+    /**
+     * Reserved for future image edit streaming support.
+     */
+    stream?: boolean;
+    /**
+     * Reserved for future image edit streaming support.
+     */
+    partial_images?: number;
+    user?: string;
+    [key: string]: unknown;
+};
+
+export type ImageEditJsonReference = string | {
+    image_url?: string | {
+        url?: string;
+        [key: string]: unknown;
+    };
+    b64_json?: string;
+    mime_type?: string;
+    filename?: string;
+    file_id?: string;
+    [key: string]: unknown;
+};
+
 export type ImageVariationRequest = {
     /**
      * Source image to use for variation generation. OpenAI currently supports this endpoint for `dall-e-2`.
@@ -4594,7 +4644,7 @@ export type CreateImageGenerationResponses = {
 export type CreateImageGenerationResponse = CreateImageGenerationResponses[keyof CreateImageGenerationResponses];
 
 export type CreateImageEditData = {
-    body: ImageEditRequest;
+    body: ImageEditJsonRequest;
     path?: never;
     query?: never;
     url: '/v1/images/edits';
@@ -5559,7 +5609,7 @@ export type CreateOpenAiCompatibleImageGenerationAliasResponses = {
 export type CreateOpenAiCompatibleImageGenerationAliasResponse = CreateOpenAiCompatibleImageGenerationAliasResponses[keyof CreateOpenAiCompatibleImageGenerationAliasResponses];
 
 export type CreateOpenAiCompatibleImageEditAliasData = {
-    body: ImageEditRequest;
+    body: ImageEditJsonRequest;
     path?: never;
     query?: never;
     url: '/api/provider/openai-compatible/v1/images/edits';

@@ -1078,15 +1078,14 @@ export const createImageGeneration = <ThrowOnError extends boolean = false>(opti
 /**
  * Create OpenAI-compatible image edits.
  *
- * OpenAI-compatible image edit route. SRapi validates the gateway API key, applies model policy and entitlement, schedules an eligible provider account, forwards multipart image edit inputs to the selected OpenAI-compatible provider adapter, and records media usage and Scheduler evidence.
+ * OpenAI-compatible image edit route. SRapi validates the gateway API key, applies model policy and entitlement, schedules an eligible provider account, forwards image edit inputs to the selected OpenAI-compatible provider adapter as multipart upstream requests, and records media usage and Scheduler evidence. JSON bodies may use local data URL or base64 image references; remote URLs and file IDs are rejected until a dedicated secure fetch/files boundary exists.
  */
 export const createImageEdit = <ThrowOnError extends boolean = false>(options: Options<CreateImageEditData, ThrowOnError>) => (options.client ?? client).post<CreateImageEditResponses, CreateImageEditErrors, ThrowOnError>({
-    ...formDataBodySerializer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v1/images/edits',
     ...options,
     headers: {
-        'Content-Type': null,
+        'Content-Type': 'application/json',
         ...options.headers
     }
 });
@@ -1397,15 +1396,14 @@ export const createOpenAiCompatibleImageGenerationAlias = <ThrowOnError extends 
 /**
  * Create OpenAI-compatible image edits with openai-compatible provider context.
  *
- * Provider alias route. It reuses the standard image edit runtime and forces the `openai-compatible` provider context.
+ * Provider alias route. It reuses the standard image edit runtime and forces the `openai-compatible` provider context. JSON bodies may use local data URL or base64 image references; remote URLs and file IDs are rejected until a dedicated secure fetch/files boundary exists.
  */
 export const createOpenAiCompatibleImageEditAlias = <ThrowOnError extends boolean = false>(options: Options<CreateOpenAiCompatibleImageEditAliasData, ThrowOnError>) => (options.client ?? client).post<CreateOpenAiCompatibleImageEditAliasResponses, CreateOpenAiCompatibleImageEditAliasErrors, ThrowOnError>({
-    ...formDataBodySerializer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/api/provider/openai-compatible/v1/images/edits',
     ...options,
     headers: {
-        'Content-Type': null,
+        'Content-Type': 'application/json',
         ...options.headers
     }
 });

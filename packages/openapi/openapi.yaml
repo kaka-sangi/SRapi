@@ -2866,7 +2866,7 @@ paths:
         - Gateway
       operationId: createImageEdit
       summary: Create OpenAI-compatible image edits.
-      description: OpenAI-compatible image edit route. SRapi validates the gateway API key, applies model policy and entitlement, schedules an eligible provider account, forwards multipart image edit inputs to the selected OpenAI-compatible provider adapter, and records media usage and Scheduler evidence.
+      description: OpenAI-compatible image edit route. SRapi validates the gateway API key, applies model policy and entitlement, schedules an eligible provider account, forwards image edit inputs to the selected OpenAI-compatible provider adapter as multipart upstream requests, and records media usage and Scheduler evidence. JSON bodies may use local data URL or base64 image references; remote URLs and file IDs are rejected until a dedicated secure fetch/files boundary exists.
       security:
         - gatewayBearerAuth: []
       requestBody:
@@ -2888,6 +2888,17 @@ paths:
                     - source.png
                   prompt: Replace the background with a clean studio setting
                   size: 1024x1024
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImageEditJsonRequest"
+            examples:
+              data_url:
+                value:
+                  model: gpt-image-1
+                  prompt: Replace the background with a clean studio setting
+                  images:
+                    - image_url: data:image/png;base64,iVBORw0KGgo=
+                  response_format: b64_json
       responses:
         "200":
           description: OpenAI-compatible image edit response.
@@ -3807,7 +3818,7 @@ paths:
         - Gateway
       operationId: createOpenAICompatibleImageEditAlias
       summary: Create OpenAI-compatible image edits with openai-compatible provider context.
-      description: Provider alias route. It reuses the standard image edit runtime and forces the `openai-compatible` provider context.
+      description: Provider alias route. It reuses the standard image edit runtime and forces the `openai-compatible` provider context. JSON bodies may use local data URL or base64 image references; remote URLs and file IDs are rejected until a dedicated secure fetch/files boundary exists.
       security:
         - gatewayBearerAuth: []
       requestBody:
@@ -3821,6 +3832,9 @@ paths:
                 contentType: image/*
               mask:
                 contentType: image/*
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImageEditJsonRequest"
       responses:
         "200":
           description: OpenAI-compatible image edit response.
@@ -7558,6 +7572,97 @@ components:
         user:
           type: string
       additionalProperties: true
+
+    ImageEditJsonRequest:
+      type: object
+      required:
+        - model
+        - prompt
+      properties:
+        image:
+          $ref: "#/components/schemas/ImageEditJsonReference"
+          description: Single local image reference. Prefer `images` for multiple references.
+        images:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/ImageEditJsonReference"
+          description: One or more local image references to edit. SRapi accepts data URLs and base64 JSON payloads; remote URLs and file IDs are rejected until a dedicated secure fetch/files boundary exists.
+        model:
+          type: string
+        prompt:
+          type: string
+          minLength: 1
+        n:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 1
+        size:
+          type: string
+          description: Provider-specific output size such as `1024x1024`, `1024x1536`, `1536x1024`, or `auto`.
+        quality:
+          type: string
+          description: Provider-specific image quality such as `low`, `medium`, `high`, `standard`, `hd`, or `auto`.
+        response_format:
+          type: string
+          enum:
+            - url
+            - b64_json
+          x-enum-varnames:
+            - ImageEditJsonRequestResponseFormatURL
+            - ImageEditJsonRequestResponseFormatB64JSON
+          default: url
+        output_format:
+          type: string
+          description: Provider-specific encoded output format such as `png`, `jpeg`, or `webp`.
+        output_compression:
+          type: integer
+          minimum: 0
+          maximum: 100
+        background:
+          type: string
+        moderation:
+          type: string
+        input_fidelity:
+          type: string
+        stream:
+          type: boolean
+          default: false
+          description: Reserved for future image edit streaming support.
+        partial_images:
+          type: integer
+          minimum: 0
+          maximum: 3
+          description: Reserved for future image edit streaming support.
+        user:
+          type: string
+      additionalProperties: true
+
+    ImageEditJsonReference:
+      oneOf:
+        - type: string
+          description: Data URL containing a base64-encoded image.
+        - type: object
+          additionalProperties: true
+          properties:
+            image_url:
+              oneOf:
+                - type: string
+                - type: object
+                  additionalProperties: true
+                  properties:
+                    url:
+                      type: string
+            b64_json:
+              type: string
+            mime_type:
+              type: string
+            filename:
+              type: string
+            file_id:
+              type: string
+          description: Local image reference object. `file_id` and remote URLs are explicitly rejected by the runtime in WP-510.
 
     ImageVariationRequest:
       type: object

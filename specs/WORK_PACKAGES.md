@@ -2002,3 +2002,53 @@ Use `ROADMAP.md` Phase 7 through Phase 8 to split future packages for:
 - SDK examples and migration guides
 
 Each new package must be added here before implementation starts.
+
+## WP-510: Images Edits JSON References v1
+
+Objective: extend the existing OpenAI-compatible `/v1/images/edits` runtime so JSON callers can provide local image references without bypassing Gateway auth, model policy, Scheduler, Provider Adapter, usage evidence, or the OpenAPI-first contract.
+
+Read first:
+
+- `docs/OPENAPI_CONTRACT.md`
+- `docs/GATEWAY_ROUTE_MATRIX.md`
+- `docs/AI_ENDPOINT_COMPATIBILITY.md`
+- `docs/PROVIDER_ADAPTER_SPEC.md`
+- `packages/openapi/openapi.yaml`
+- `/home/senran/Desktop/chatgpt2api/test/test_v1_images_edits_json.py`
+- `/home/senran/Desktop/chatgpt2api/test/test_v1_images_edits_api.py`
+- `apps/api/internal/httpserver/runtime_gateway_media_handlers.go`
+- `apps/api/internal/modules/gateway`
+- `apps/api/internal/modules/provider_adapters`
+
+Owns:
+
+- OpenAPI schema support for JSON image edit references alongside existing multipart image edits
+- HTTP image edit JSON decoder for `image`, `images`, `image_url`, and `b64_json` local references
+- Runtime rejection for remote `image_url` and `file_id` references until an explicit Files/remote-fetch package exists
+- Focused HTTP regressions proving JSON references become upstream multipart image edit calls and existing multipart behavior remains unchanged
+- Docs/status updates for the compatibility boundary
+
+Definition of Done:
+
+- `POST /v1/images/edits` and OpenAI-compatible provider alias routes accept `application/json` bodies in addition to multipart form-data.
+- JSON callers can send a single `image` or multiple `images` using data URLs, `{ "image_url": "data:..." }`, `{ "image_url": { "url": "data:..." } }`, or `{ "b64_json": "...", "mime_type": "...", "filename": "..." }`.
+- JSON image references are decoded into the existing canonical image edit request and then forwarded upstream as multipart `/images/edits`; no new Gateway-local DTO path is added.
+- Remote HTTP(S) image URLs and `file_id` references fail with explicit 400 errors because SRapi does not yet have the Files API / remote-fetch security boundary for this endpoint.
+- `model`, `prompt`, `n`, `size`, `quality`, `response_format`, output options, `stream`, `partial_images`, `user`, and extra JSON properties preserve current behavior where applicable.
+- Existing multipart `image`, `image[]`, and `mask` image edit requests continue to pass unchanged.
+- This package does not implement image edit SSE streaming, remote URL fetching, Files API lookup, persistent image storage, or frontend visuals.
+
+Required gates:
+
+- `make openapi-lint`
+- `make openapi-bundle`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/httpserver -run 'TestGatewayImageEdit' -count=1`
+- `cd apps/api && go test ./internal/modules/gateway/... ./internal/modules/provider_adapters/... ./internal/httpserver`
+- `cd apps/api && go test ./...`
+- `make architecture-check`
+- `make code-quality-check`
+- `make secret-scan`
+- `git diff --check`

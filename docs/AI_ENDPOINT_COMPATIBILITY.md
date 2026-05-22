@@ -502,11 +502,12 @@ Images edits endpoint
 边界：
 
 - `POST /v1/images/edits` 接受 OpenAI-compatible multipart form-data：`model`、`prompt`、一个或多个 `image` / `image[]`、可选 `mask`、`n`、`size`、`quality`、`response_format`、`output_format`、`output_compression`、`background`、`moderation`、`input_fidelity` 和 `user`。
+- WP-510 起，同一路由也接受 JSON image references：单个 `image` 或多个 `images` 可使用 data URL、`{"image_url":"data:..."}`、`{"image_url":{"url":"data:..."}}` 或 `{"b64_json":"...","mime_type":"...","filename":"..."}`。JSON references 会解码进同一个 canonical image edit request，并以上游 multipart `/images/edits` 发出。
 - 请求仍进入 API Key auth、模型可见性、entitlement、Scheduler、Provider Adapter、usage、billing 和 feedback 证据链。
 - Scheduler 继续使用 `images` endpoint capability；Provider 或 account/mapping 必须显式声明 image 能力，text-only provider 不会被误选。
 - OpenAI-compatible provider alias（例如 `/api/provider/openai-compatible/v1/images/edits`）强制 provider context。
 - OpenAI-compatible API-key 和 reverse-proxy accounts 上游调用 multipart `/images/edits`，并解析 `url`、`b64_json` 和 `revised_prompt`。
-- JSON image references 和 streaming image edit events 留给后续兼容包。
+- Remote `image_url` 和 `file_id` references 仍明确拒绝，直到后续 Files API / remote-fetch 安全边界实现；streaming image edit events 也留给后续兼容包。
 
 WP-490 已实现：
 

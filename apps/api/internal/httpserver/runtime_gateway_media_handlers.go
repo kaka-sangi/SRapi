@@ -1,9 +1,14 @@
 package httpserver
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"mime/multipart"
 	"net/http"
+	"net/url"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -223,7 +228,7 @@ func (s *Server) handleCreateImageEdit(w http.ResponseWriter, r *http.Request) {
 		writeGatewayAuthError(w, err, requestID)
 		return
 	}
-	body, imageMeta, err := s.decodeImageEditMultipart(w, r)
+	body, imageMeta, err := s.decodeImageEditRequest(w, r)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:      requestID,
@@ -236,7 +241,7 @@ func (s *Server) handleCreateImageEdit(w http.ResponseWriter, r *http.Request) {
 			LatencyMS:      elapsedMillis(startedAt),
 			UsageEstimated: true,
 		})
-		writeGatewayError(w, imageEditDecodeStatus(err), apiopenapi.InvalidRequestError, "invalid image edit request", "invalid_request")
+		writeGatewayError(w, imageEditDecodeStatus(err), apiopenapi.InvalidRequestError, imageEditDecodeMessage(err), "invalid_request")
 		return
 	}
 	modelResolution, err := s.runtime.models.ResolveModelReference(r.Context(), body.Model)
@@ -620,6 +625,13 @@ type imageEditMultipartMetadata struct {
 	MaskContentType   string
 }
 
+func (s *Server) decodeImageEditRequest(w http.ResponseWriter, r *http.Request) (apiopenapi.ImageEditRequest, imageEditMultipartMetadata, error) {
+	if strings.Contains(strings.ToLower(r.Header.Get("Content-Type")), "application/json") {
+		return s.decodeImageEditJSON(w, r)
+	}
+	return s.decodeImageEditMultipart(w, r)
+}
+
 func (s *Server) decodeImageEditMultipart(w http.ResponseWriter, r *http.Request) (apiopenapi.ImageEditRequest, imageEditMultipartMetadata, error) {
 	limited := http.MaxBytesReader(w, r.Body, s.cfg.Gateway.MaxBodySize)
 	r.Body = limited
@@ -667,6 +679,36 @@ func (s *Server) decodeImageEditMultipart(w http.ResponseWriter, r *http.Request
 	return body, meta, nil
 }
 
+func (s *Server) decodeImageEditJSON(w http.ResponseWriter, r *http.Request) (apiopenapi.ImageEditRequest, imageEditMultipartMetadata, error) {
+	var raw imageEditJSONRequest
+	if err := s.decodeJSONBody(w, r, &raw); err != nil {
+		return apiopenapi.ImageEditRequest{}, imageEditMultipartMetadata{}, err
+	}
+	images, contentTypes, err := imageEditJSONImages(raw)
+	if err != nil {
+		return apiopenapi.ImageEditRequest{}, imageEditMultipartMetadata{}, err
+	}
+	body := apiopenapi.ImageEditRequest{
+		Image:                images,
+		Model:                strings.TrimSpace(raw.Model),
+		Prompt:               strings.TrimSpace(raw.Prompt),
+		N:                    raw.N,
+		Size:                 optionalJSONString(raw.Size),
+		Quality:              optionalJSONString(raw.Quality),
+		ResponseFormat:       optionalImageEditJSONResponseFormat(raw.ResponseFormat),
+		OutputFormat:         optionalJSONString(raw.OutputFormat),
+		OutputCompression:    raw.OutputCompression,
+		Background:           optionalJSONString(raw.Background),
+		Moderation:           optionalJSONString(raw.Moderation),
+		InputFidelity:        optionalJSONString(raw.InputFidelity),
+		Stream:               raw.Stream,
+		PartialImages:        raw.PartialImages,
+		User:                 optionalJSONString(raw.User),
+		AdditionalProperties: imageEditJSONAdditionalProperties(raw.AdditionalProperties),
+	}
+	return body, imageEditMultipartMetadata{ImageContentTypes: contentTypes}, nil
+}
+
 func applyImageEditMultipartMetadata(canonical *gatewaycontract.CanonicalRequest, meta imageEditMultipartMetadata) {
 	for idx := range canonical.ImageInputs {
 		if idx < len(meta.ImageContentTypes) {
@@ -676,6 +718,214 @@ func applyImageEditMultipartMetadata(canonical *gatewaycontract.CanonicalRequest
 	if canonical.ImageMask != nil {
 		canonical.ImageMask.ContentType = meta.MaskContentType
 	}
+}
+
+type imageEditJSONRequest struct {
+	Image                json.RawMessage        `json:"image"`
+	Images               []json.RawMessage      `json:"images"`
+	Model                string                 `json:"model"`
+	Prompt               string                 `json:"prompt"`
+	N                    *int                   `json:"n"`
+	Size                 string                 `json:"size"`
+	Quality              string                 `json:"quality"`
+	ResponseFormat       string                 `json:"response_format"`
+	OutputFormat         string                 `json:"output_format"`
+	OutputCompression    *int                   `json:"output_compression"`
+	Background           string                 `json:"background"`
+	Moderation           string                 `json:"moderation"`
+	InputFidelity        string                 `json:"input_fidelity"`
+	Stream               *bool                  `json:"stream"`
+	PartialImages        *int                   `json:"partial_images"`
+	User                 string                 `json:"user"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+func (r *imageEditJSONRequest) UnmarshalJSON(data []byte) error {
+	type alias imageEditJSONRequest
+	var known alias
+	if err := json.Unmarshal(data, &known); err != nil {
+		return err
+	}
+	var all map[string]interface{}
+	if err := json.Unmarshal(data, &all); err != nil {
+		return err
+	}
+	for _, key := range []string{"image", "images", "model", "prompt", "n", "size", "quality", "response_format", "output_format", "output_compression", "background", "moderation", "input_fidelity", "stream", "partial_images", "user"} {
+		delete(all, key)
+	}
+	*r = imageEditJSONRequest(known)
+	if len(all) > 0 {
+		r.AdditionalProperties = all
+	}
+	return nil
+}
+
+func imageEditJSONImages(req imageEditJSONRequest) ([]openapi_types.File, []string, error) {
+	refs := append([]json.RawMessage(nil), req.Images...)
+	if len(req.Image) > 0 && string(req.Image) != "null" {
+		refs = append([]json.RawMessage{req.Image}, refs...)
+	}
+	if len(refs) == 0 {
+		return nil, nil, fmt.Errorf("image file is required")
+	}
+	images := make([]openapi_types.File, 0, len(refs))
+	contentTypes := make([]string, 0, len(refs))
+	for idx, raw := range refs {
+		image, contentType, err := imageEditJSONReference(raw, idx+1)
+		if err != nil {
+			return nil, nil, err
+		}
+		images = append(images, image)
+		contentTypes = append(contentTypes, contentType)
+	}
+	return images, contentTypes, nil
+}
+
+func imageEditJSONReference(raw json.RawMessage, index int) (openapi_types.File, string, error) {
+	var asString string
+	if err := json.Unmarshal(raw, &asString); err == nil {
+		return imageEditFileFromDataURL(asString, "", index)
+	}
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &obj); err != nil {
+		return openapi_types.File{}, "", fmt.Errorf("image reference is invalid")
+	}
+	if _, ok := obj["file_id"]; ok {
+		return openapi_types.File{}, "", fmt.Errorf("file_id image references are not supported")
+	}
+	filename := jsonRawString(obj["filename"])
+	mimeType := jsonRawString(obj["mime_type"])
+	if b64Value := jsonRawString(obj["b64_json"]); b64Value != "" {
+		return imageEditFileFromBase64(b64Value, mimeType, filename, index)
+	}
+	if imageURLRaw, ok := obj["image_url"]; ok {
+		imageURL, err := imageEditJSONImageURL(imageURLRaw)
+		if err != nil {
+			return openapi_types.File{}, "", err
+		}
+		return imageEditFileFromDataURL(imageURL, filename, index)
+	}
+	return openapi_types.File{}, "", fmt.Errorf("image reference is unsupported")
+}
+
+func imageEditJSONImageURL(raw json.RawMessage) (string, error) {
+	var asString string
+	if err := json.Unmarshal(raw, &asString); err == nil {
+		return strings.TrimSpace(asString), nil
+	}
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &obj); err != nil {
+		return "", fmt.Errorf("image_url reference is invalid")
+	}
+	urlValue := jsonRawString(obj["url"])
+	if urlValue == "" {
+		return "", fmt.Errorf("image_url reference is invalid")
+	}
+	return urlValue, nil
+}
+
+func imageEditFileFromDataURL(value, filename string, index int) (openapi_types.File, string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return openapi_types.File{}, "", fmt.Errorf("image reference is empty")
+	}
+	if !strings.HasPrefix(value, "data:") {
+		if parsed, err := url.Parse(value); err == nil && (parsed.Scheme == "http" || parsed.Scheme == "https") {
+			return openapi_types.File{}, "", fmt.Errorf("remote image URLs are not supported")
+		}
+		return openapi_types.File{}, "", fmt.Errorf("image_url must be a data URL")
+	}
+	header, encoded, ok := strings.Cut(value, ",")
+	if !ok || !strings.Contains(header, ";base64") {
+		return openapi_types.File{}, "", fmt.Errorf("image data URL must be base64 encoded")
+	}
+	mimeType := strings.TrimSpace(strings.Split(strings.TrimPrefix(header, "data:"), ";")[0])
+	if mimeType == "" {
+		mimeType = "application/octet-stream"
+	}
+	return imageEditFileFromBase64(encoded, mimeType, filename, index)
+}
+
+func imageEditFileFromBase64(value, mimeType, filename string, index int) (openapi_types.File, string, error) {
+	data, err := base64.StdEncoding.DecodeString(strings.TrimSpace(value))
+	if err != nil {
+		return openapi_types.File{}, "", fmt.Errorf("image reference base64 is invalid")
+	}
+	if len(data) == 0 {
+		return openapi_types.File{}, "", fmt.Errorf("image reference is empty")
+	}
+	mimeType = strings.TrimSpace(mimeType)
+	if mimeType == "" {
+		mimeType = "application/octet-stream"
+	}
+	filename = imageEditJSONFilename(filename, mimeType, index)
+	var file openapi_types.File
+	file.InitFromBytes(data, filename)
+	return file, mimeType, nil
+}
+
+func imageEditJSONFilename(filename, mimeType string, index int) string {
+	filename = strings.TrimSpace(filename)
+	if filename != "" {
+		return filepath.Base(filename)
+	}
+	ext := ".bin"
+	switch strings.ToLower(strings.TrimSpace(mimeType)) {
+	case "image/png":
+		ext = ".png"
+	case "image/jpeg", "image/jpg":
+		ext = ".jpg"
+	case "image/webp":
+		ext = ".webp"
+	case "image/gif":
+		ext = ".gif"
+	}
+	return fmt.Sprintf("image_%d%s", index, ext)
+}
+
+func jsonRawString(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var value string
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(value)
+}
+
+func optionalJSONString(value string) *string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	return &value
+}
+
+func optionalImageEditJSONResponseFormat(value string) *apiopenapi.ImageEditRequestResponseFormat {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	format := apiopenapi.ImageEditRequestResponseFormat(value)
+	return &format
+}
+
+func imageEditJSONAdditionalProperties(values map[string]interface{}) map[string]interface{} {
+	if len(values) == 0 {
+		return nil
+	}
+	out := map[string]interface{}{}
+	for key, value := range values {
+		if key == "" || value == nil {
+			continue
+		}
+		out[key] = value
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func (s *Server) decodeImageVariationMultipart(w http.ResponseWriter, r *http.Request) (apiopenapi.ImageVariationRequest, string, error) {
@@ -712,6 +962,20 @@ func imageEditDecodeStatus(err error) int {
 		return http.StatusRequestEntityTooLarge
 	}
 	return http.StatusBadRequest
+}
+
+func imageEditDecodeMessage(err error) string {
+	if err == nil {
+		return "invalid image edit request"
+	}
+	if errors.Is(err, errRequestTooLarge) {
+		return "image edit request is too large"
+	}
+	message := strings.TrimSpace(err.Error())
+	if message == "" {
+		return "invalid image edit request"
+	}
+	return message
 }
 
 func optionalImageEditResponseFormat(value string) *apiopenapi.ImageEditRequestResponseFormat {

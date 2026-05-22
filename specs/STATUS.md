@@ -57,6 +57,7 @@ last_completed:
 - WP-480: Images edits runtime v1 now exposes OpenAI-compatible multipart `POST /v1/images/edits`, provider alias routing, canonical image edit normalization/rendering, OpenAI-compatible upstream `/images/edits` multipart adapter dispatch, explicit `images` Scheduler capability filtering, usage/billing/Scheduler feedback evidence, and generated OpenAPI/SDK parity.
 - WP-490: Images variations runtime v1 now exposes OpenAI-compatible multipart `POST /v1/images/variations`, provider alias routing, canonical image variation normalization/rendering, OpenAI-compatible upstream `/images/variations` multipart adapter dispatch, explicit `images` Scheduler capability filtering, usage/billing/Scheduler feedback evidence, and generated OpenAPI/SDK parity.
 - WP-500: Antigravity 2api model discovery now lets `reverse-proxy-antigravity` accounts POST `{base_url}/v1internal:fetchAvailableModels` through Reverse Proxy Runtime, parses model catalogs, persists `supported_models` when requested, and keeps the discovery endpoint credential-free in responses.
+- WP-510: Images edits JSON references now let `/v1/images/edits` and OpenAI-compatible image edit aliases accept application/json local data URL / base64 image references, decode them into the existing canonical image edit path, forward upstream multipart `/images/edits`, and explicitly reject remote URLs and `file_id` references.
 
 current:
 
@@ -68,6 +69,18 @@ next_recommended: WP-500+
 
 last_gates:
 
+- `cd apps/api && go test ./internal/httpserver -run 'TestGatewayImageEdit' -count=1`: pass
+- `make openapi-lint`: pass
+- `make openapi-bundle`: pass
+- `make openapi-codegen-check`: pass
+- `make openapi-ts-codegen-check`: pass
+- `make sdk-ts-typecheck`: pass
+- `cd apps/api && go test ./internal/modules/gateway/... ./internal/modules/provider_adapters/... ./internal/httpserver -run 'TestGatewayImageEdit|TestOpenAICompatibleAdapterInvokesImageEditsUpstream|Test' -count=1`: pass
+- `cd apps/api && go test ./...`: pass
+- `make architecture-check`: pass
+- `make code-quality-check`: pass
+- `make secret-scan`: pass
+- `git diff --check`: pass
 - `cd apps/api && go test ./internal/modules/provider_adapters/... -run TestOpenAICompatibleAdapterInvokesImageVariationsUpstream -count=1`: pass
 - `cd apps/api && go test ./internal/httpserver -run 'TestGatewayImageVariation(RouteTargetsOpenAICompatibleUpstream|AliasForcesProviderContext)' -count=1`: pass
 - `cd apps/api && go test ./internal/modules/gateway/... -run Test -count=1`: pass
@@ -233,4 +246,5 @@ notes:
 | WP-480 | completed | Images edits runtime v1. |
 | WP-490 | completed | Images variations runtime v1. |
 | WP-500 | completed | Antigravity 2api model discovery v1. |
+| WP-510 | completed | Images edits JSON references v1. |
 | WP-500+ | pending | Remaining ecosystem and advanced endpoint packages. |

@@ -3226,6 +3226,132 @@ func TestGatewayImageEditRouteTargetsOpenAICompatibleUpstream(t *testing.T) {
 	}
 }
 
+func TestGatewayImageEditAcceptsJSONImageReferences(t *testing.T) {
+	type upstreamCall struct {
+		Path              string
+		Authorization     string
+		Model             string
+		Prompt            string
+		Count             string
+		Size              string
+		Quality           string
+		ResponseFormat    string
+		OutputFormat      string
+		OutputCompression string
+		Background        string
+		Filenames         []string
+		ContentTypes      []string
+		Images            []string
+	}
+	var (
+		mu    sync.Mutex
+		calls []upstreamCall
+	)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseMultipartForm(16 << 20); err != nil {
+			t.Fatalf("parse upstream multipart: %v", err)
+		}
+		files := append([]*multipart.FileHeader(nil), r.MultipartForm.File["image"]...)
+		files = append(files, r.MultipartForm.File["image[]"]...)
+		call := upstreamCall{
+			Path:              r.URL.Path,
+			Authorization:     r.Header.Get("Authorization"),
+			Model:             r.FormValue("model"),
+			Prompt:            r.FormValue("prompt"),
+			Count:             r.FormValue("n"),
+			Size:              r.FormValue("size"),
+			Quality:           r.FormValue("quality"),
+			ResponseFormat:    r.FormValue("response_format"),
+			OutputFormat:      r.FormValue("output_format"),
+			OutputCompression: r.FormValue("output_compression"),
+			Background:        r.FormValue("background"),
+		}
+		for _, header := range files {
+			file, err := header.Open()
+			if err != nil {
+				t.Fatalf("open upstream image: %v", err)
+			}
+			imageBytes, err := io.ReadAll(file)
+			_ = file.Close()
+			if err != nil {
+				t.Fatalf("read upstream image: %v", err)
+			}
+			call.Filenames = append(call.Filenames, header.Filename)
+			call.ContentTypes = append(call.ContentTypes, header.Header.Get("Content-Type"))
+			call.Images = append(call.Images, string(imageBytes))
+		}
+		mu.Lock()
+		calls = append(calls, call)
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"created":1710000400,"data":[{"b64_json":"aW1hZ2UtanNvbi1lZGl0"}],"model":"image-edit-json-upstream","usage":{"input_tokens":21,"output_tokens":5,"total_tokens":26}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"wp510-openai","display_name":"WP510 OpenAI","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active","capabilities":{"images":true}}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"wp510-image-edit-json-model","display_name":"WP510 Image Edit JSON Model","status":"active","capabilities":[{"key":"images","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"image-edit-json-upstream","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"wp510-image-edit-json-account","runtime_class":"api_key","credential":{"api_key":"image-edit-json-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	jsonBody := `{"model":"wp510-image-edit-json-model","prompt":"combine references","n":1,"size":"1024x1536","quality":"high","response_format":"b64_json","output_format":"webp","output_compression":88,"background":"transparent","images":[{"image_url":"data:image/png;base64,UE5HLWpzb24="},{"b64_json":"SlBFRy1qc29u","mime_type":"image/jpeg","filename":"two.jpg"}]}`
+	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/images/edits", jsonBody)
+	var imageResp apiopenapi.ImageGenerationResponse
+	if err := json.NewDecoder(rec.Body).Decode(&imageResp); err != nil {
+		t.Fatalf("decode image edit json response: %v", err)
+	}
+	if imageResp.Created != 1710000400 || len(imageResp.Data) != 1 || imageResp.Data[0].B64Json == nil || *imageResp.Data[0].B64Json == "" {
+		t.Fatalf("unexpected image edit json response: %+v", imageResp)
+	}
+
+	mu.Lock()
+	gotCalls := append([]upstreamCall(nil), calls...)
+	mu.Unlock()
+	if len(gotCalls) != 1 {
+		t.Fatalf("expected one upstream call, got %+v", gotCalls)
+	}
+	got := gotCalls[0]
+	if got.Path != "/v1/images/edits" || got.Authorization != "Bearer image-edit-json-secret" || got.Model != "image-edit-json-upstream" || got.Prompt != "combine references" {
+		t.Fatalf("unexpected upstream image edit json call: %+v", got)
+	}
+	if got.Count != "1" || got.Size != "1024x1536" || got.Quality != "high" || got.ResponseFormat != "b64_json" || got.OutputFormat != "webp" || got.OutputCompression != "88" || got.Background != "transparent" {
+		t.Fatalf("unexpected upstream image edit json fields: %+v", got)
+	}
+	if len(got.Images) != 2 || got.Images[0] != "PNG-json" || got.Images[1] != "JPEG-json" || got.Filenames[0] != "image_1.png" || got.Filenames[1] != "two.jpg" || got.ContentTypes[0] != "image/png" || got.ContentTypes[1] != "image/jpeg" {
+		t.Fatalf("unexpected upstream image edit json images: %+v", got)
+	}
+}
+
+func TestGatewayImageEditRejectsUnsupportedJSONReferences(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	for name, body := range map[string]string{
+		"remote_url": `{"model":"gpt-image-1","prompt":"edit","images":[{"image_url":"https://example.com/image.png"}]}`,
+		"file_id":    `{"model":"gpt-image-1","prompt":"edit","images":[{"file_id":"file-abc123"}]}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/v1/images/edits", strings.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer "+apiKey)
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("expected 400, got %d body=%s", rec.Code, rec.Body.String())
+			}
+			if name == "remote_url" && !strings.Contains(rec.Body.String(), "remote image URLs are not supported") {
+				t.Fatalf("expected remote URL rejection, got %s", rec.Body.String())
+			}
+			if name == "file_id" && !strings.Contains(rec.Body.String(), "file_id image references are not supported") {
+				t.Fatalf("expected file_id rejection, got %s", rec.Body.String())
+			}
+		})
+	}
+}
+
 func TestGatewayImageEditAliasForcesProviderContext(t *testing.T) {
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)

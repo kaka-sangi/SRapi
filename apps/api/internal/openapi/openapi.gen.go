@@ -626,6 +626,24 @@ func (e HealthDependencyStatus) Valid() bool {
 	}
 }
 
+// Defines values for ImageEditJsonRequestResponseFormat.
+const (
+	ImageEditJsonRequestResponseFormatB64JSON ImageEditJsonRequestResponseFormat = "b64_json"
+	ImageEditJsonRequestResponseFormatURL     ImageEditJsonRequestResponseFormat = "url"
+)
+
+// Valid indicates whether the value is a known member of the ImageEditJsonRequestResponseFormat enum.
+func (e ImageEditJsonRequestResponseFormat) Valid() bool {
+	switch e {
+	case ImageEditJsonRequestResponseFormatB64JSON:
+		return true
+	case ImageEditJsonRequestResponseFormatURL:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ImageEditRequestResponseFormat.
 const (
 	ImageEditRequestResponseFormatB64JSON ImageEditRequestResponseFormat = "b64_json"
@@ -2297,6 +2315,74 @@ type HealthResponse struct {
 // Id defines model for Id.
 type Id = string
 
+// ImageEditJsonReference defines model for ImageEditJsonReference.
+type ImageEditJsonReference struct {
+	union json.RawMessage
+}
+
+// ImageEditJsonReference0 Data URL containing a base64-encoded image.
+type ImageEditJsonReference0 = string
+
+// ImageEditJsonReference1 Local image reference object. `file_id` and remote URLs are explicitly rejected by the runtime in WP-510.
+type ImageEditJsonReference1 struct {
+	B64Json              *string                            `json:"b64_json,omitempty"`
+	FileId               *string                            `json:"file_id,omitempty"`
+	Filename             *string                            `json:"filename,omitempty"`
+	ImageUrl             *ImageEditJsonReference_1_ImageUrl `json:"image_url,omitempty"`
+	MimeType             *string                            `json:"mime_type,omitempty"`
+	AdditionalProperties map[string]interface{}             `json:"-"`
+}
+
+// ImageEditJsonReference1ImageUrl0 defines model for .
+type ImageEditJsonReference1ImageUrl0 = string
+
+// ImageEditJsonReference1ImageUrl1 defines model for .
+type ImageEditJsonReference1ImageUrl1 struct {
+	Url                  *string                `json:"url,omitempty"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// ImageEditJsonReference_1_ImageUrl defines model for ImageEditJsonReference.1.ImageUrl.
+type ImageEditJsonReference_1_ImageUrl struct {
+	union json.RawMessage
+}
+
+// ImageEditJsonRequest defines model for ImageEditJsonRequest.
+type ImageEditJsonRequest struct {
+	Background *string                 `json:"background,omitempty"`
+	Image      *ImageEditJsonReference `json:"image,omitempty"`
+
+	// Images One or more local image references to edit. SRapi accepts data URLs and base64 JSON payloads; remote URLs and file IDs are rejected until a dedicated secure fetch/files boundary exists.
+	Images            *[]ImageEditJsonReference `json:"images,omitempty"`
+	InputFidelity     *string                   `json:"input_fidelity,omitempty"`
+	Model             string                    `json:"model"`
+	Moderation        *string                   `json:"moderation,omitempty"`
+	N                 *int                      `json:"n,omitempty"`
+	OutputCompression *int                      `json:"output_compression,omitempty"`
+
+	// OutputFormat Provider-specific encoded output format such as `png`, `jpeg`, or `webp`.
+	OutputFormat *string `json:"output_format,omitempty"`
+
+	// PartialImages Reserved for future image edit streaming support.
+	PartialImages *int   `json:"partial_images,omitempty"`
+	Prompt        string `json:"prompt"`
+
+	// Quality Provider-specific image quality such as `low`, `medium`, `high`, `standard`, `hd`, or `auto`.
+	Quality        *string                             `json:"quality,omitempty"`
+	ResponseFormat *ImageEditJsonRequestResponseFormat `json:"response_format,omitempty"`
+
+	// Size Provider-specific output size such as `1024x1024`, `1024x1536`, `1536x1024`, or `auto`.
+	Size *string `json:"size,omitempty"`
+
+	// Stream Reserved for future image edit streaming support.
+	Stream               *bool                  `json:"stream,omitempty"`
+	User                 *string                `json:"user,omitempty"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// ImageEditJsonRequestResponseFormat defines model for ImageEditJsonRequest.ResponseFormat.
+type ImageEditJsonRequestResponseFormat string
+
 // ImageEditRequest defines model for ImageEditRequest.
 type ImageEditRequest struct {
 	Background *string `json:"background,omitempty"`
@@ -3599,6 +3685,9 @@ type CreateOpenAICompatibleChatCompletionAliasJSONRequestBody = ChatCompletionRe
 // CreateOpenAICompatibleEmbeddingAliasJSONRequestBody defines body for CreateOpenAICompatibleEmbeddingAlias for application/json ContentType.
 type CreateOpenAICompatibleEmbeddingAliasJSONRequestBody = EmbeddingRequest
 
+// CreateOpenAICompatibleImageEditAliasJSONRequestBody defines body for CreateOpenAICompatibleImageEditAlias for application/json ContentType.
+type CreateOpenAICompatibleImageEditAliasJSONRequestBody = ImageEditJsonRequest
+
 // CreateOpenAICompatibleImageEditAliasMultipartRequestBody defines body for CreateOpenAICompatibleImageEditAlias for multipart/form-data ContentType.
 type CreateOpenAICompatibleImageEditAliasMultipartRequestBody = ImageEditRequest
 
@@ -3706,6 +3795,9 @@ type CreateChatCompletionJSONRequestBody = ChatCompletionRequest
 
 // CreateEmbeddingJSONRequestBody defines body for CreateEmbedding for application/json ContentType.
 type CreateEmbeddingJSONRequestBody = EmbeddingRequest
+
+// CreateImageEditJSONRequestBody defines body for CreateImageEdit for application/json ContentType.
+type CreateImageEditJSONRequestBody = ImageEditJsonRequest
 
 // CreateImageEditMultipartRequestBody defines body for CreateImageEdit for multipart/form-data ContentType.
 type CreateImageEditMultipartRequestBody = ImageEditRequest
@@ -5790,6 +5882,491 @@ func (a GeminiSafetyRating) MarshalJSON() ([]byte, error) {
 		object["probability"], err = json.Marshal(a.Probability)
 		if err != nil {
 			return nil, fmt.Errorf("error marshaling 'probability': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for ImageEditJsonReference1. Returns the specified
+// element and whether it was found
+func (a ImageEditJsonReference1) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for ImageEditJsonReference1
+func (a *ImageEditJsonReference1) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for ImageEditJsonReference1 to handle AdditionalProperties
+func (a *ImageEditJsonReference1) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["b64_json"]; found {
+		err = json.Unmarshal(raw, &a.B64Json)
+		if err != nil {
+			return fmt.Errorf("error reading 'b64_json': %w", err)
+		}
+		delete(object, "b64_json")
+	}
+
+	if raw, found := object["file_id"]; found {
+		err = json.Unmarshal(raw, &a.FileId)
+		if err != nil {
+			return fmt.Errorf("error reading 'file_id': %w", err)
+		}
+		delete(object, "file_id")
+	}
+
+	if raw, found := object["filename"]; found {
+		err = json.Unmarshal(raw, &a.Filename)
+		if err != nil {
+			return fmt.Errorf("error reading 'filename': %w", err)
+		}
+		delete(object, "filename")
+	}
+
+	if raw, found := object["image_url"]; found {
+		err = json.Unmarshal(raw, &a.ImageUrl)
+		if err != nil {
+			return fmt.Errorf("error reading 'image_url': %w", err)
+		}
+		delete(object, "image_url")
+	}
+
+	if raw, found := object["mime_type"]; found {
+		err = json.Unmarshal(raw, &a.MimeType)
+		if err != nil {
+			return fmt.Errorf("error reading 'mime_type': %w", err)
+		}
+		delete(object, "mime_type")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for ImageEditJsonReference1 to handle AdditionalProperties
+func (a ImageEditJsonReference1) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.B64Json != nil {
+		object["b64_json"], err = json.Marshal(a.B64Json)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'b64_json': %w", err)
+		}
+	}
+
+	if a.FileId != nil {
+		object["file_id"], err = json.Marshal(a.FileId)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'file_id': %w", err)
+		}
+	}
+
+	if a.Filename != nil {
+		object["filename"], err = json.Marshal(a.Filename)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'filename': %w", err)
+		}
+	}
+
+	if a.ImageUrl != nil {
+		object["image_url"], err = json.Marshal(a.ImageUrl)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'image_url': %w", err)
+		}
+	}
+
+	if a.MimeType != nil {
+		object["mime_type"], err = json.Marshal(a.MimeType)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'mime_type': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for ImageEditJsonReference1ImageUrl1. Returns the specified
+// element and whether it was found
+func (a ImageEditJsonReference1ImageUrl1) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for ImageEditJsonReference1ImageUrl1
+func (a *ImageEditJsonReference1ImageUrl1) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for ImageEditJsonReference1ImageUrl1 to handle AdditionalProperties
+func (a *ImageEditJsonReference1ImageUrl1) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["url"]; found {
+		err = json.Unmarshal(raw, &a.Url)
+		if err != nil {
+			return fmt.Errorf("error reading 'url': %w", err)
+		}
+		delete(object, "url")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for ImageEditJsonReference1ImageUrl1 to handle AdditionalProperties
+func (a ImageEditJsonReference1ImageUrl1) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.Url != nil {
+		object["url"], err = json.Marshal(a.Url)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'url': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for ImageEditJsonRequest. Returns the specified
+// element and whether it was found
+func (a ImageEditJsonRequest) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for ImageEditJsonRequest
+func (a *ImageEditJsonRequest) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for ImageEditJsonRequest to handle AdditionalProperties
+func (a *ImageEditJsonRequest) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["background"]; found {
+		err = json.Unmarshal(raw, &a.Background)
+		if err != nil {
+			return fmt.Errorf("error reading 'background': %w", err)
+		}
+		delete(object, "background")
+	}
+
+	if raw, found := object["image"]; found {
+		err = json.Unmarshal(raw, &a.Image)
+		if err != nil {
+			return fmt.Errorf("error reading 'image': %w", err)
+		}
+		delete(object, "image")
+	}
+
+	if raw, found := object["images"]; found {
+		err = json.Unmarshal(raw, &a.Images)
+		if err != nil {
+			return fmt.Errorf("error reading 'images': %w", err)
+		}
+		delete(object, "images")
+	}
+
+	if raw, found := object["input_fidelity"]; found {
+		err = json.Unmarshal(raw, &a.InputFidelity)
+		if err != nil {
+			return fmt.Errorf("error reading 'input_fidelity': %w", err)
+		}
+		delete(object, "input_fidelity")
+	}
+
+	if raw, found := object["model"]; found {
+		err = json.Unmarshal(raw, &a.Model)
+		if err != nil {
+			return fmt.Errorf("error reading 'model': %w", err)
+		}
+		delete(object, "model")
+	}
+
+	if raw, found := object["moderation"]; found {
+		err = json.Unmarshal(raw, &a.Moderation)
+		if err != nil {
+			return fmt.Errorf("error reading 'moderation': %w", err)
+		}
+		delete(object, "moderation")
+	}
+
+	if raw, found := object["n"]; found {
+		err = json.Unmarshal(raw, &a.N)
+		if err != nil {
+			return fmt.Errorf("error reading 'n': %w", err)
+		}
+		delete(object, "n")
+	}
+
+	if raw, found := object["output_compression"]; found {
+		err = json.Unmarshal(raw, &a.OutputCompression)
+		if err != nil {
+			return fmt.Errorf("error reading 'output_compression': %w", err)
+		}
+		delete(object, "output_compression")
+	}
+
+	if raw, found := object["output_format"]; found {
+		err = json.Unmarshal(raw, &a.OutputFormat)
+		if err != nil {
+			return fmt.Errorf("error reading 'output_format': %w", err)
+		}
+		delete(object, "output_format")
+	}
+
+	if raw, found := object["partial_images"]; found {
+		err = json.Unmarshal(raw, &a.PartialImages)
+		if err != nil {
+			return fmt.Errorf("error reading 'partial_images': %w", err)
+		}
+		delete(object, "partial_images")
+	}
+
+	if raw, found := object["prompt"]; found {
+		err = json.Unmarshal(raw, &a.Prompt)
+		if err != nil {
+			return fmt.Errorf("error reading 'prompt': %w", err)
+		}
+		delete(object, "prompt")
+	}
+
+	if raw, found := object["quality"]; found {
+		err = json.Unmarshal(raw, &a.Quality)
+		if err != nil {
+			return fmt.Errorf("error reading 'quality': %w", err)
+		}
+		delete(object, "quality")
+	}
+
+	if raw, found := object["response_format"]; found {
+		err = json.Unmarshal(raw, &a.ResponseFormat)
+		if err != nil {
+			return fmt.Errorf("error reading 'response_format': %w", err)
+		}
+		delete(object, "response_format")
+	}
+
+	if raw, found := object["size"]; found {
+		err = json.Unmarshal(raw, &a.Size)
+		if err != nil {
+			return fmt.Errorf("error reading 'size': %w", err)
+		}
+		delete(object, "size")
+	}
+
+	if raw, found := object["stream"]; found {
+		err = json.Unmarshal(raw, &a.Stream)
+		if err != nil {
+			return fmt.Errorf("error reading 'stream': %w", err)
+		}
+		delete(object, "stream")
+	}
+
+	if raw, found := object["user"]; found {
+		err = json.Unmarshal(raw, &a.User)
+		if err != nil {
+			return fmt.Errorf("error reading 'user': %w", err)
+		}
+		delete(object, "user")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for ImageEditJsonRequest to handle AdditionalProperties
+func (a ImageEditJsonRequest) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.Background != nil {
+		object["background"], err = json.Marshal(a.Background)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'background': %w", err)
+		}
+	}
+
+	if a.Image != nil {
+		object["image"], err = json.Marshal(a.Image)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'image': %w", err)
+		}
+	}
+
+	if a.Images != nil {
+		object["images"], err = json.Marshal(a.Images)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'images': %w", err)
+		}
+	}
+
+	if a.InputFidelity != nil {
+		object["input_fidelity"], err = json.Marshal(a.InputFidelity)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'input_fidelity': %w", err)
+		}
+	}
+
+	object["model"], err = json.Marshal(a.Model)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'model': %w", err)
+	}
+
+	if a.Moderation != nil {
+		object["moderation"], err = json.Marshal(a.Moderation)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'moderation': %w", err)
+		}
+	}
+
+	if a.N != nil {
+		object["n"], err = json.Marshal(a.N)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'n': %w", err)
+		}
+	}
+
+	if a.OutputCompression != nil {
+		object["output_compression"], err = json.Marshal(a.OutputCompression)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'output_compression': %w", err)
+		}
+	}
+
+	if a.OutputFormat != nil {
+		object["output_format"], err = json.Marshal(a.OutputFormat)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'output_format': %w", err)
+		}
+	}
+
+	if a.PartialImages != nil {
+		object["partial_images"], err = json.Marshal(a.PartialImages)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'partial_images': %w", err)
+		}
+	}
+
+	object["prompt"], err = json.Marshal(a.Prompt)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'prompt': %w", err)
+	}
+
+	if a.Quality != nil {
+		object["quality"], err = json.Marshal(a.Quality)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'quality': %w", err)
+		}
+	}
+
+	if a.ResponseFormat != nil {
+		object["response_format"], err = json.Marshal(a.ResponseFormat)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'response_format': %w", err)
+		}
+	}
+
+	if a.Size != nil {
+		object["size"], err = json.Marshal(a.Size)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'size': %w", err)
+		}
+	}
+
+	if a.Stream != nil {
+		object["stream"], err = json.Marshal(a.Stream)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'stream': %w", err)
+		}
+	}
+
+	if a.User != nil {
+		object["user"], err = json.Marshal(a.User)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'user': %w", err)
 		}
 	}
 
@@ -7944,6 +8521,130 @@ func (t EmbeddingVector) MarshalJSON() ([]byte, error) {
 }
 
 func (t *EmbeddingVector) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsImageEditJsonReference0 returns the union data inside the ImageEditJsonReference as a ImageEditJsonReference0
+func (t ImageEditJsonReference) AsImageEditJsonReference0() (ImageEditJsonReference0, error) {
+	var body ImageEditJsonReference0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromImageEditJsonReference0 overwrites any union data inside the ImageEditJsonReference as the provided ImageEditJsonReference0
+func (t *ImageEditJsonReference) FromImageEditJsonReference0(v ImageEditJsonReference0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeImageEditJsonReference0 performs a merge with any union data inside the ImageEditJsonReference, using the provided ImageEditJsonReference0
+func (t *ImageEditJsonReference) MergeImageEditJsonReference0(v ImageEditJsonReference0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsImageEditJsonReference1 returns the union data inside the ImageEditJsonReference as a ImageEditJsonReference1
+func (t ImageEditJsonReference) AsImageEditJsonReference1() (ImageEditJsonReference1, error) {
+	var body ImageEditJsonReference1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromImageEditJsonReference1 overwrites any union data inside the ImageEditJsonReference as the provided ImageEditJsonReference1
+func (t *ImageEditJsonReference) FromImageEditJsonReference1(v ImageEditJsonReference1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeImageEditJsonReference1 performs a merge with any union data inside the ImageEditJsonReference, using the provided ImageEditJsonReference1
+func (t *ImageEditJsonReference) MergeImageEditJsonReference1(v ImageEditJsonReference1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t ImageEditJsonReference) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *ImageEditJsonReference) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsImageEditJsonReference1ImageUrl0 returns the union data inside the ImageEditJsonReference_1_ImageUrl as a ImageEditJsonReference1ImageUrl0
+func (t ImageEditJsonReference_1_ImageUrl) AsImageEditJsonReference1ImageUrl0() (ImageEditJsonReference1ImageUrl0, error) {
+	var body ImageEditJsonReference1ImageUrl0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromImageEditJsonReference1ImageUrl0 overwrites any union data inside the ImageEditJsonReference_1_ImageUrl as the provided ImageEditJsonReference1ImageUrl0
+func (t *ImageEditJsonReference_1_ImageUrl) FromImageEditJsonReference1ImageUrl0(v ImageEditJsonReference1ImageUrl0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeImageEditJsonReference1ImageUrl0 performs a merge with any union data inside the ImageEditJsonReference_1_ImageUrl, using the provided ImageEditJsonReference1ImageUrl0
+func (t *ImageEditJsonReference_1_ImageUrl) MergeImageEditJsonReference1ImageUrl0(v ImageEditJsonReference1ImageUrl0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsImageEditJsonReference1ImageUrl1 returns the union data inside the ImageEditJsonReference_1_ImageUrl as a ImageEditJsonReference1ImageUrl1
+func (t ImageEditJsonReference_1_ImageUrl) AsImageEditJsonReference1ImageUrl1() (ImageEditJsonReference1ImageUrl1, error) {
+	var body ImageEditJsonReference1ImageUrl1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromImageEditJsonReference1ImageUrl1 overwrites any union data inside the ImageEditJsonReference_1_ImageUrl as the provided ImageEditJsonReference1ImageUrl1
+func (t *ImageEditJsonReference_1_ImageUrl) FromImageEditJsonReference1ImageUrl1(v ImageEditJsonReference1ImageUrl1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeImageEditJsonReference1ImageUrl1 performs a merge with any union data inside the ImageEditJsonReference_1_ImageUrl, using the provided ImageEditJsonReference1ImageUrl1
+func (t *ImageEditJsonReference_1_ImageUrl) MergeImageEditJsonReference1ImageUrl1(v ImageEditJsonReference1ImageUrl1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t ImageEditJsonReference_1_ImageUrl) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *ImageEditJsonReference_1_ImageUrl) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
