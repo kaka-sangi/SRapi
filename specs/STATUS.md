@@ -48,14 +48,15 @@ last_completed:
 - WP-390: Reverse Proxy Runtime now exposes a `WebSocketRuntime.RelayWebSocket` primitive for direct upstream WSS relay with per-account client/proxy/cookie context, credential-driven auth injection, forbidden-header hygiene, text/binary message relay, and relay accounting.
 - WP-400: Codex CLI 2api HTTP text path now sends `reverse-proxy-codex-cli` requests through Reverse Proxy Runtime to Codex `/responses` official-client shape, parses Codex Responses SSE/JSON output, keeps generic OpenAI-compatible reverse proxy on `/chat/completions`, and enforces the OAuth/session/client-token credential boundary instead of treating API keys as 2api identity.
 - WP-410: Codex CLI 2api Responses WebSocket relay now lets explicitly requested `/v1/responses/ws` calls schedule an eligible `reverse-proxy-codex-cli` account, derive Codex `wss://.../responses`, send Codex official-client headers and a `response.create` upstream-model frame through Reverse Proxy Runtime, and record Scheduler/usage evidence from upstream WebSocket frames.
+- WP-420: Claude Code CLI 2api HTTP Messages path now sends `reverse-proxy-claude-code-cli` requests through Reverse Proxy Runtime to `/messages?beta=true`, builds Claude Code beta/version/stainless/session headers plus system/billing blocks, and enforces the OAuth/session/client-token credential boundary instead of treating API keys as 2api identity.
 
 current:
 
-- package: WP-420+
+- package: WP-430+
 - status: pending
 - objective: split the next ecosystem or remaining advanced endpoint package from the roadmap.
 
-next_recommended: WP-420+
+next_recommended: WP-430+
 
 last_gates:
 
@@ -138,6 +139,8 @@ notes:
 - WP-400 also added `TestRuntimeDoesNotInjectAPIKeyRuntimeCredentials` and `TestReverseProxyCodexCLIRejectsAPIKeyRuntime`, so SRapi's 2api reverse-proxy boundary stays aligned with OAuth/session/client-token accounts rather than official API-key adapters.
 - WP-410 added `TestReverseProxyCodexCLIPrepareRealtimeBuildsResponsesWebSocketSession`, `TestReverseProxyCodexCLIPrepareRealtimeRejectsAPIKeyRuntime`, and `TestGatewayResponsesWebSocketRelaysCodexUpstreamWebSocket`, proving Codex Responses WebSocket 2api uses selected account OAuth/CLI token credentials, Codex official-client headers, mapped upstream model frames, and `/v1/responses/ws` Scheduler/usage evidence.
 - WP-410 intentionally keeps WebSocket relay opt-in via `upstream_ws` / `codex_responses_websocket` flags and account metadata; persistent Codex session reuse, local Codex CLI ingress, and Claude/Antigravity WebSocket adapters remain follow-up work.
+- WP-420 added `TestReverseProxyClaudeCodeCLIAdapterUsesOfficialClientMessagesShape`, `TestReverseProxyClaudeCodeCLIRejectsAPIKeyRuntime`, and `TestGatewayClaudeCodeReverseProxyUsesOfficialClientMessagesShape`, proving Claude Code 2api uses selected account OAuth/CLI token credentials, Claude Code official-client headers/body, `/messages?beta=true`, and Scheduler/usage evidence without Gateway-local DTOs.
+- WP-420 refreshed `docs/2API_REVERSE_PROXY_DEFINITION.md` to define SRapi 2api/反代 from the local reference projects `sub2api`, `CLIProxyAPI`, and `chatgpt2api`: upstream official-client request simulation with OAuth/session/client-token identity, not local Codex/Claude/Antigravity client ingress.
 
 ## Work Package Ledger
 
@@ -185,4 +188,5 @@ notes:
 | WP-390 | completed | Reverse Proxy WSS relay foundation v1. |
 | WP-400 | completed | Codex CLI 2api Responses upstream shape v1 with OAuth/session/client-token boundary. |
 | WP-410 | completed | Codex CLI 2api Responses WebSocket upstream relay v1 with OAuth/session/client-token boundary. |
-| WP-420+ | pending | Remaining ecosystem and advanced endpoint packages. |
+| WP-420 | completed | Claude Code CLI 2api Messages upstream shape v1 with OAuth/session/client-token boundary. |
+| WP-430+ | pending | Remaining ecosystem and advanced endpoint packages. |

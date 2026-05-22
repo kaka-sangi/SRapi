@@ -1575,7 +1575,50 @@ Required gates:
 - `make secret-scan`
 - `git diff --check`
 
-## WP-420+: Ecosystem And Remaining Advanced Surface
+## WP-420: Claude Code CLI 2api Messages Upstream Shape v1
+
+Objective: make `reverse-proxy-claude-code-cli` construct the Claude Code official-client HTTP Messages shape and send it through Reverse Proxy Runtime with selected OAuth/CLI credentials, instead of treating Claude Code 2api as generic Anthropic-compatible API-key dispatch.
+
+Read first:
+
+- `docs/2API_REVERSE_PROXY_DEFINITION.md`
+- `docs/REVERSE_PROXY_SPEC.md`
+- `docs/PROVIDER_ADAPTER_SPEC.md`
+- `apps/api/internal/modules/provider_adapters/contract`
+- `apps/api/internal/modules/provider_adapters/service`
+- `apps/api/internal/modules/reverse_proxy/contract`
+- local reference: `/home/senran/Desktop/CLIProxyAPI/internal/runtime/executor/claude_executor.go`
+- local reference: `/home/senran/Desktop/sub2api/backend/internal/service/gateway_service.go`
+
+Owns:
+
+- Claude Code reverse-proxy adapter dispatch for Anthropic Messages text requests.
+- Claude Code upstream endpoint derivation: `{base_url}/messages?beta=true`.
+- Claude Code official-client headers: `Anthropic-Beta`, `Anthropic-Version`, `X-App`, `X-Stainless-*`, `X-Claude-Code-Session-Id`, `x-client-request-id`, and stream/non-stream `Accept`.
+- Claude Code system/billing blocks in the upstream Messages body.
+- Reverse Proxy Runtime credential injection for OAuth/session/CLI-token runtime classes; `api_key` remains official API-key adapter behavior and is not a Claude Code 2api credential source.
+- Focused adapter and Gateway regressions proving selected account credentials/UA reach upstream while caller/SRapi auth does not.
+
+Definition of Done:
+
+- `reverse-proxy-claude-code-cli` text requests call `base_url + "/messages?beta=true"` and must not send generic direct Anthropic API-key headers.
+- Runtime receives selected account context and injects account credentials; caller auth must not be forwarded.
+- `reverse-proxy-claude-code-cli` rejects `runtime_class = api_key` and requires OAuth/session/CLI-token style account credentials.
+- Upstream body includes mapped upstream model, Anthropic Messages payload, Claude Code system/billing blocks, and no Gateway-local Claude DTOs.
+- Gateway regression proves `/v1/messages` can schedule a Claude Code reverse-proxy account, send OAuth/CLI bearer upstream, and record Scheduler/usage evidence.
+- This package does not implement Claude Code WebSocket/session slot lifecycle, full tool-name signing/remapping, or local Claude CLI client ingress.
+- No frontend visuals are added.
+
+Required gates:
+
+- `cd apps/api && go test ./internal/modules/provider_adapters/... ./internal/modules/reverse_proxy/... ./internal/httpserver`
+- `cd apps/api && go test ./...`
+- `make architecture-check`
+- `make code-quality-check`
+- `make secret-scan`
+- `git diff --check`
+
+## WP-430+: Ecosystem And Remaining Advanced Surface
 
 Use `ROADMAP.md` Phase 7 through Phase 8 to split future packages for:
 

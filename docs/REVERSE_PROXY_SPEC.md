@@ -30,7 +30,7 @@ SRapi 的核心差异化能力之一，是像 `sub2api`、`claude2api`、`chatgp
 - Provider Adapter 负责上游官方客户端 payload / endpoint / protocol shape；Reverse Proxy Runtime 负责把这个请求“包装”成与官方客户端传输特征一致或接近一致的样子。
 - 流式响应必须按上游官方客户端的格式向客户端原样输出，再转换回客户端协议。
 
-WP-400 起，`reverse-proxy-codex-cli` 的 HTTP text path 已按上述定义实现：Adapter 构造 Codex Responses body/headers，Reverse Proxy Runtime 负责把选中账号身份发往配置的 Codex base URL `/responses`。WP-410 起，显式请求的 `/v1/responses/ws` 也可调度启用 WebSocket 的 Codex 反代账号，并以 Codex Responses WebSocket 官方客户端形态连接上游 `/responses`。这不是把本地 Codex CLI 接入 SRapi，也不是把下游请求原样转发到 OpenAI-compatible `/chat/completions`。
+WP-400 起，`reverse-proxy-codex-cli` 的 HTTP text path 已按上述定义实现：Adapter 构造 Codex Responses body/headers，Reverse Proxy Runtime 负责把选中账号身份发往配置的 Codex base URL `/responses`。WP-410 起，显式请求的 `/v1/responses/ws` 也可调度启用 WebSocket 的 Codex 反代账号，并以 Codex Responses WebSocket 官方客户端形态连接上游 `/responses`。WP-420 起，`reverse-proxy-claude-code-cli` 的 HTTP Messages path 构造 Claude Code 官方客户端形态：`/messages?beta=true`、Claude Code beta/version/stainless/session headers、Claude Code system/billing blocks，并由 Reverse Proxy Runtime 注入选中账号的 OAuth/CLI token。这不是把本地 Codex/Claude CLI 接入 SRapi，也不是把下游请求原样转发到 OpenAI/Anthropic-compatible 普通 API。
 
 反代运行时服务于 `runtime_class != api_key` 的账号。`runtime_class = api_key` 的账号必须走官方 API-key Adapter 路径，不属于 SRapi 2api 反代；`reverse-proxy-*` Adapter 不得依赖 Reverse Proxy Runtime 从 API key 凭证注入上游身份。
 
@@ -247,6 +247,7 @@ WP-390 起，Reverse Proxy Runtime 提供直接 WebSocket relay primitive：
 - `Authorization`、`Cookie`、`Sec-WebSocket-*`、`X-Request-ID`、`X-Forwarded-*`、`Via`、`X-SRapi-*`、`X-Gateway-*` 等 caller/gateway header 不得透传；认证材料只能来自选中账号的 credential。
 - relay 支持 text/binary message 透传并返回基础 message/byte accounting。provider-native realtime event schema、slot lifecycle 和 Gateway binding 仍由后续 adapter/runtime package 实现。
 - WP-410 将该 primitive 绑定到 Codex Responses WebSocket 2api 路径：Gateway 只在 `upstream_ws` / `codex_responses_websocket` 明确启用时尝试，Provider Adapter 生成 Codex WebSocket URL/headers/首帧，Runtime 负责使用选中账号凭证拨号和 relay。更复杂的 session reuse、slot lifecycle、Claude Code 和 Antigravity WebSocket 协议仍是后续包。
+- WP-420 将 Claude Code HTTP Messages 2api 绑定到 Reverse Proxy Runtime：Provider Adapter 生成 `/messages?beta=true`、Claude Code 官方客户端 headers/body；Runtime 负责使用选中账号凭证发出请求。Claude Code WebSocket/session slot 生命周期仍是后续包。
 
 ## 11. 出口 IP 与代理绑定
 

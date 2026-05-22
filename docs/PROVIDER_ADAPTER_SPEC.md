@@ -109,6 +109,14 @@ reverse-proxy-gemini-cli -> Reverse Proxy Runtime + Gemini GenerateContent paylo
 reverse-proxy-antigravity -> Reverse Proxy Runtime + provider.protocol 选择的 OpenAI/Anthropic/Gemini payload
 ```
 
+WP-420 Claude Code 2api boundary:
+
+- `reverse-proxy-claude-code-cli` dispatches Anthropic Messages-shaped text requests through Reverse Proxy Runtime, not through direct API-key HTTP.
+- The upstream endpoint is `{base_url}/messages?beta=true`; account metadata should store `base_url` at the `/v1` prefix.
+- Adapter-owned official-client shape includes Claude Code `Anthropic-Beta`, `Anthropic-Version`, `X-App`, `X-Stainless-*`, `X-Claude-Code-Session-Id`, `x-client-request-id`, stream/non-stream `Accept`, and Claude Code system/billing blocks.
+- Runtime-owned transport still injects the selected account credential as OAuth/CLI bearer and strips caller/SRapi headers; adapter must not forward caller `Authorization` or add `x-api-key`.
+- `runtime_class = api_key` is rejected for this adapter because Claude Code 2api means official-client OAuth/session/client-token simulation, not Anthropic API-key mode.
+
 `reverse-proxy-antigravity` 是客户端身份，不是独立文本协议。Adapter 必须继续通过
 `provider.protocol` 选择目标上游形状：`openai-compatible` 走 `/chat/completions`，
 `anthropic-compatible` 走 `/messages`，`gemini-compatible` 走 Gemini `generateContent`。

@@ -1194,7 +1194,7 @@ func TestAnthropicCompatibleAdapterClassifiesRateLimitErrorObject(t *testing.T) 
 	assertProviderError(t, err, "rate_limit", http.StatusTooManyRequests)
 }
 
-func TestReverseProxyAnthropicCompatibleAdapterUsesMessagesEndpoint(t *testing.T) {
+func TestReverseProxyClaudeCodeCLIAdapterUsesOfficialClientMessagesShape(t *testing.T) {
 	runtime := capturingRuntime{
 		response: reverseproxycontract.Response{
 			StatusCode: http.StatusOK,
@@ -1217,7 +1217,15 @@ func TestReverseProxyAnthropicCompatibleAdapterUsesMessagesEndpoint(t *testing.T
 			ID:             12,
 			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
 			UpstreamClient: ptrString("claude_code_cli"),
-			Metadata:       map[string]any{"base_url": "https://upstream.example/v1", "user_agent": "Claude-Code/1.0"},
+			Metadata: map[string]any{
+				"base_url":                 "https://upstream.example/v1",
+				"user_agent":               "Claude-Code/1.0",
+				"claude_code_session_id":   "session-123",
+				"claude_client_request_id": "client-req-123",
+				"claude_code_version":      "2.1.63",
+				"claude_code_build":        "abc123",
+				"claude_code_entrypoint":   "cli",
+			},
 		},
 		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "claude-upstream"},
 		Credential: map[string]any{"cli_client_token": "cli-token"},
@@ -1228,14 +1236,31 @@ func TestReverseProxyAnthropicCompatibleAdapterUsesMessagesEndpoint(t *testing.T
 	if resp.Text != "reverse anthropic response" || resp.Usage.InputTokens != 2 || resp.Usage.OutputTokens != 3 {
 		t.Fatalf("unexpected reverse anthropic response: %+v", resp)
 	}
-	if runtime.request.URL != "https://upstream.example/v1/messages" {
-		t.Fatalf("expected Anthropic messages endpoint, got %s", runtime.request.URL)
+	if runtime.request.URL != "https://upstream.example/v1/messages?beta=true" {
+		t.Fatalf("expected Claude Code messages endpoint, got %s", runtime.request.URL)
 	}
-	if runtime.request.Headers.Get("anthropic-version") == "" || runtime.request.Headers.Get("x-api-key") != "" || runtime.request.Headers.Get("Authorization") != "" {
-		t.Fatalf("unexpected reverse anthropic headers: %+v", runtime.request.Headers)
+	if headerValue(runtime.request.Headers, "Anthropic-Version") != "2023-06-01" ||
+		!strings.Contains(headerValue(runtime.request.Headers, "Anthropic-Beta"), "claude-code-20250219") ||
+		!strings.Contains(headerValue(runtime.request.Headers, "Anthropic-Beta"), "oauth-2025-04-20") ||
+		headerValue(runtime.request.Headers, "X-App") != "cli" ||
+		headerValue(runtime.request.Headers, "X-Stainless-Retry-Count") != "0" ||
+		headerValue(runtime.request.Headers, "X-Stainless-Runtime") != "node" ||
+		headerValue(runtime.request.Headers, "X-Stainless-Lang") != "js" ||
+		headerValue(runtime.request.Headers, "X-Stainless-Timeout") != "600" ||
+		headerValue(runtime.request.Headers, "X-Claude-Code-Session-Id") != "session-123" ||
+		headerValue(runtime.request.Headers, "x-client-request-id") != "client-req-123" ||
+		headerValue(runtime.request.Headers, "Accept") != "application/json" {
+		t.Fatalf("unexpected Claude Code headers: %+v", runtime.request.Headers)
+	}
+	if runtime.request.Headers.Get("x-api-key") != "" || runtime.request.Headers.Get("Authorization") != "" {
+		t.Fatalf("adapter must leave auth injection to runtime, got %+v", runtime.request.Headers)
 	}
 	var payload struct {
-		Model    string `json:"model"`
+		Model  string `json:"model"`
+		System []struct {
+			Type string `json:"type"`
+			Text string `json:"text"`
+		} `json:"system"`
 		Messages []struct {
 			Content string `json:"content"`
 		} `json:"messages"`
@@ -1246,11 +1271,45 @@ func TestReverseProxyAnthropicCompatibleAdapterUsesMessagesEndpoint(t *testing.T
 	if payload.Model != "claude-upstream" || len(payload.Messages) != 1 || payload.Messages[0].Content != "hello" {
 		t.Fatalf("unexpected reverse anthropic payload: %+v", payload)
 	}
+	if len(payload.System) < 2 ||
+		!strings.HasPrefix(payload.System[0].Text, "x-anthropic-billing-header: cc_version=2.1.63.abc123; cc_entrypoint=cli; cch=") ||
+		payload.System[1].Text != "You are Claude Code, Anthropic's official CLI for Claude." {
+		t.Fatalf("expected Claude Code system blocks, got %+v", payload.System)
+	}
 	if runtime.request.Account.RuntimeClass != string(accountcontract.RuntimeClassCliClientToken) ||
 		runtime.request.Account.UpstreamClient == nil ||
 		*runtime.request.Account.UpstreamClient != "claude_code_cli" ||
 		runtime.request.Account.Credential["cli_client_token"] != "cli-token" {
 		t.Fatalf("expected claude runtime context, got %+v", runtime.request.Account)
+	}
+}
+
+func TestReverseProxyClaudeCodeCLIRejectsAPIKeyRuntime(t *testing.T) {
+	runtime := capturingRuntime{}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeText(context.Background(), contract.TextRequest{
+		RequestID: "req_reverse_claude_api_key",
+		Model:     "claude-local",
+		Prompt:    "hello",
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-claude-code-cli",
+			Protocol:    "anthropic-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             12,
+			RuntimeClass:   accountcontract.RuntimeClassAPIKey,
+			UpstreamClient: ptrString("claude_code_cli"),
+			Metadata:       map[string]any{"base_url": "https://upstream.example/v1"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "claude-upstream"},
+		Credential: map[string]any{"api_key": "anthropic-secret"},
+	})
+	assertProviderError(t, err, "invalid_request", http.StatusBadRequest)
+	if runtime.request.URL != "" {
+		t.Fatalf("runtime should not be called for api_key Claude Code reverse proxy, got %s", runtime.request.URL)
 	}
 }
 

@@ -475,6 +475,9 @@ func (s *Service) invokeReverseProxyAnthropicCompatible(ctx context.Context, req
 	if s.reverseProxy == nil {
 		return contract.TextResponse{}, contract.ProviderError{Class: "network_error", StatusCode: http.StatusBadGateway, Message: "reverse proxy runtime unavailable"}
 	}
+	if isClaudeCodeReverseProxy(req) && claudeCodeReverseProxyRuntimeIsAPIKey(req) {
+		return contract.TextResponse{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "Claude Code reverse proxy requires OAuth or client-token runtime"}
+	}
 	payload := anthropicCompatiblePayload(req)
 	raw, err := json.Marshal(payload)
 	if err != nil {
@@ -482,6 +485,14 @@ func (s *Service) invokeReverseProxyAnthropicCompatible(ctx context.Context, req
 	}
 	endpoint := strings.TrimRight(baseURL, "/") + "/messages"
 	headers := anthropicCompatibleHeaders(req, "", &endpoint)
+	if isClaudeCodeReverseProxy(req) {
+		raw, err = claudeCodeMessagesPayload(req, raw)
+		if err != nil {
+			return contract.TextResponse{}, err
+		}
+		endpoint = claudeCodeMessagesEndpoint(baseURL)
+		headers = claudeCodeMessagesHeaders(req)
+	}
 	runtimeResp, err := s.reverseProxy.Do(ctx, reverseproxycontract.Request{
 		Account: reverseproxycontract.AccountRuntime{
 			AccountID:      req.Account.ID,

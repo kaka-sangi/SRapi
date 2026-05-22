@@ -2481,6 +2481,155 @@ func TestGatewayAnthropicProviderAliasTargetsMessagesUpstream(t *testing.T) {
 	}
 }
 
+func TestGatewayClaudeCodeReverseProxyUsesOfficialClientMessagesShape(t *testing.T) {
+	type upstreamCall struct {
+		Path             string
+		RawQuery         string
+		Authorization    string
+		UserAgent        string
+		Version          string
+		Beta             string
+		App              string
+		StainlessRuntime string
+		StainlessLang    string
+		SessionID        string
+		ClientRequestID  string
+		Model            string
+		System           []struct {
+			Type string `json:"type"`
+			Text string `json:"text"`
+		}
+		MaxTokens int
+		Message   string
+	}
+	var (
+		mu    sync.Mutex
+		calls []upstreamCall
+	)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload struct {
+			Model  string `json:"model"`
+			System []struct {
+				Type string `json:"type"`
+				Text string `json:"text"`
+			} `json:"system"`
+			MaxTokens int `json:"max_tokens"`
+			Messages  []struct {
+				Content string `json:"content"`
+			} `json:"messages"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		call := upstreamCall{
+			Path:             r.URL.Path,
+			RawQuery:         r.URL.RawQuery,
+			Authorization:    r.Header.Get("Authorization"),
+			UserAgent:        r.Header.Get("User-Agent"),
+			Version:          r.Header.Get("anthropic-version"),
+			Beta:             r.Header.Get("anthropic-beta"),
+			App:              r.Header.Get("x-app"),
+			StainlessRuntime: r.Header.Get("x-stainless-runtime"),
+			StainlessLang:    r.Header.Get("x-stainless-lang"),
+			SessionID:        r.Header.Get("x-claude-code-session-id"),
+			ClientRequestID:  r.Header.Get("x-client-request-id"),
+			Model:            payload.Model,
+			System:           payload.System,
+			MaxTokens:        payload.MaxTokens,
+		}
+		if len(payload.Messages) > 0 {
+			call.Message = payload.Messages[0].Content
+		}
+		mu.Lock()
+		calls = append(calls, call)
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"content":[{"type":"text","text":"claude code 2api ok"}],"usage":{"input_tokens":7,"output_tokens":8}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"wp420-claude-code","display_name":"WP420 Claude Code","adapter_type":"reverse-proxy-claude-code-cli","protocol":"anthropic-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"wp420-claude-code-model","display_name":"WP420 Claude Code Model","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"claude-upstream","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"wp420-claude-code-account","runtime_class":"cli_client_token","upstream_client":"claude_code_cli","credential":{"cli_client_token":"claude-code-token"},"metadata":{"base_url":"`+upstream.URL+`/v1","user_agent":"claude-cli/2.1.63 (external, cli)","claude_code_session_id":"session-gateway-123","claude_client_request_id":"client-req-gateway-123","claude_code_version":"2.1.63","claude_code_build":"abc123"},"status":"active"}`)
+
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	messageRec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/messages", `{"model":"wp420-claude-code-model","system":"be direct","max_tokens":64,"messages":[{"role":"user","content":"hello claude code"}]}`)
+	var messageResp apiopenapi.AnthropicMessagesResponse
+	if err := json.NewDecoder(messageRec.Body).Decode(&messageResp); err != nil {
+		t.Fatalf("decode messages response: %v", err)
+	}
+	if len(messageResp.Content) == 0 || messageResp.Content[0].Text == nil || *messageResp.Content[0].Text != "claude code 2api ok" {
+		t.Fatalf("unexpected Claude Code response: %+v", messageResp.Content)
+	}
+
+	mu.Lock()
+	gotCalls := append([]upstreamCall(nil), calls...)
+	mu.Unlock()
+	if len(gotCalls) != 1 {
+		t.Fatalf("expected one upstream call, got %+v", gotCalls)
+	}
+	call := gotCalls[0]
+	if call.Path != "/v1/messages" || call.RawQuery != "beta=true" || call.Authorization != "Bearer claude-code-token" || call.UserAgent != "claude-cli/2.1.63 (external, cli)" {
+		t.Fatalf("unexpected Claude Code upstream route/auth: %+v", call)
+	}
+	if call.Version != "2023-06-01" ||
+		!strings.Contains(call.Beta, "claude-code-20250219") ||
+		!strings.Contains(call.Beta, "oauth-2025-04-20") ||
+		call.App != "cli" ||
+		call.StainlessRuntime != "node" ||
+		call.StainlessLang != "js" ||
+		call.SessionID != "session-gateway-123" ||
+		call.ClientRequestID != "client-req-gateway-123" {
+		t.Fatalf("unexpected Claude Code upstream headers: %+v", call)
+	}
+	if call.Model != "claude-upstream" || call.MaxTokens != 64 || call.Message != "hello claude code" {
+		t.Fatalf("unexpected Claude Code upstream payload: %+v", call)
+	}
+	if len(call.System) < 3 ||
+		!strings.HasPrefix(call.System[0].Text, "x-anthropic-billing-header: cc_version=2.1.63.abc123; cc_entrypoint=cli; cch=") ||
+		call.System[1].Text != "You are Claude Code, Anthropic's official CLI for Claude." ||
+		call.System[2].Text != "be direct" {
+		t.Fatalf("unexpected Claude Code system blocks: %+v", call.System)
+	}
+
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=wp420-claude-code-model", nil)
+	decisionsReq.AddCookie(sessionCookie)
+	decisionsRec := httptest.NewRecorder()
+	handler.ServeHTTP(decisionsRec, decisionsReq)
+	if decisionsRec.Code != http.StatusOK {
+		t.Fatalf("expected decisions 200, got %d body=%s", decisionsRec.Code, decisionsRec.Body.String())
+	}
+	var decisionsResp apiopenapi.SchedulerDecisionListResponse
+	if err := json.NewDecoder(decisionsRec.Body).Decode(&decisionsResp); err != nil {
+		t.Fatalf("decode decisions: %v", err)
+	}
+	if len(decisionsResp.Data) != 1 {
+		t.Fatalf("expected one Claude Code decision, got %+v", decisionsResp.Data)
+	}
+	decision := decisionsResp.Data[0]
+	if decision.SelectedProviderId == nil || *decision.SelectedProviderId != string(providerResp.Data.Id) || decision.SelectedAccountId == nil || *decision.SelectedAccountId != string(accountResp.Data.Id) || decision.TargetProtocol != "anthropic-compatible" {
+		t.Fatalf("expected Claude Code scheduler evidence, got %+v", decision)
+	}
+
+	usageReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/usage-logs?model=wp420-claude-code-model", nil)
+	usageReq.AddCookie(sessionCookie)
+	usageRec := httptest.NewRecorder()
+	handler.ServeHTTP(usageRec, usageReq)
+	if usageRec.Code != http.StatusOK {
+		t.Fatalf("expected usage logs 200, got %d body=%s", usageRec.Code, usageRec.Body.String())
+	}
+	var usageResp apiopenapi.UsageLogListResponse
+	if err := json.NewDecoder(usageRec.Body).Decode(&usageResp); err != nil {
+		t.Fatalf("decode usage logs: %v", err)
+	}
+	if len(usageResp.Data) != 1 || !usageResp.Data[0].Success || usageResp.Data[0].TargetProtocol == nil || *usageResp.Data[0].TargetProtocol != "anthropic-compatible" || usageResp.Data[0].TotalTokens != 15 {
+		t.Fatalf("expected Claude Code usage evidence, got %+v", usageResp.Data)
+	}
+}
+
 func TestGatewayEmbeddingsRouteTargetsOpenAICompatibleUpstream(t *testing.T) {
 	type upstreamCall struct {
 		Path          string
