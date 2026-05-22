@@ -44,9 +44,11 @@ type DependencyConfig struct {
 }
 
 type GatewayConfig struct {
-	MaxBodySize       int64
-	RequestTimeout    time.Duration
-	StreamIdleTimeout time.Duration
+	MaxBodySize                int64
+	RequestTimeout             time.Duration
+	StreamIdleTimeout          time.Duration
+	RealtimeMaxOpenSlots       int
+	RealtimeMaxOpenSlotsPerKey int
 }
 
 type SecurityConfig struct {
@@ -93,9 +95,11 @@ func Load() Config {
 			Database: getEnv("REDIS_DB", "0"),
 		},
 		Gateway: GatewayConfig{
-			MaxBodySize:       int64(getIntEnv("GATEWAY_MAX_BODY_SIZE", defaultGatewayBodySize)),
-			RequestTimeout:    time.Duration(getIntEnv("GATEWAY_REQUEST_TIMEOUT_SECONDS", 600)) * time.Second,
-			StreamIdleTimeout: time.Duration(getIntEnv("GATEWAY_STREAM_IDLE_TIMEOUT_SECONDS", 120)) * time.Second,
+			MaxBodySize:                int64(getIntEnv("GATEWAY_MAX_BODY_SIZE", defaultGatewayBodySize)),
+			RequestTimeout:             time.Duration(getIntEnv("GATEWAY_REQUEST_TIMEOUT_SECONDS", 600)) * time.Second,
+			StreamIdleTimeout:          time.Duration(getIntEnv("GATEWAY_STREAM_IDLE_TIMEOUT_SECONDS", 120)) * time.Second,
+			RealtimeMaxOpenSlots:       getIntEnv("GATEWAY_REALTIME_MAX_OPEN_SLOTS", 0),
+			RealtimeMaxOpenSlotsPerKey: getIntEnv("GATEWAY_REALTIME_MAX_OPEN_SLOTS_PER_API_KEY", 0),
 		},
 		Security: SecurityConfig{
 			JWTSecret:    getEnv("JWT_SECRET", ""),
@@ -140,6 +144,12 @@ func (c Config) Validate() error {
 	}
 	if c.Gateway.StreamIdleTimeout <= 0 {
 		return fmt.Errorf("GATEWAY_STREAM_IDLE_TIMEOUT_SECONDS must be positive")
+	}
+	if c.Gateway.RealtimeMaxOpenSlots < 0 {
+		return fmt.Errorf("GATEWAY_REALTIME_MAX_OPEN_SLOTS must be zero or positive")
+	}
+	if c.Gateway.RealtimeMaxOpenSlotsPerKey < 0 {
+		return fmt.Errorf("GATEWAY_REALTIME_MAX_OPEN_SLOTS_PER_API_KEY must be zero or positive")
 	}
 	if c.Retention.UsageLogsDays < 0 {
 		return fmt.Errorf("DATA_RETENTION_USAGE_LOGS_DAYS must be zero or positive")

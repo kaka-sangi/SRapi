@@ -1751,7 +1751,51 @@ Required gates:
 - `make secret-scan`
 - `git diff --check`
 
-## WP-460+: Ecosystem And Remaining Advanced Surface
+## WP-460: Realtime Slot Lifecycle v1
+
+Objective: make Responses WebSocket and future provider-native realtime adapters use an explicit backend realtime slot lifecycle instead of relying on an implicit handler loop, while preserving the Gateway -> Scheduler -> Provider Adapter -> Reverse Proxy Runtime evidence path.
+
+Read first:
+
+- `docs/AI_ENDPOINT_COMPATIBILITY.md`
+- `docs/GATEWAY_ROUTE_MATRIX.md`
+- `docs/REVERSE_PROXY_SPEC.md`
+- `docs/PROVIDER_ADAPTER_SPEC.md`
+- `docs/MODULE_INTERFACE_CONTRACTS.md`
+- `apps/api/internal/httpserver/runtime_gateway_websocket.go`
+- `apps/api/internal/modules/reverse_proxy/contract`
+- `apps/api/internal/modules/provider_adapters/contract`
+
+Owns:
+
+- Backend realtime slot manager contract/service with acquire/release lifecycle.
+- Responses WebSocket runtime integration with slot acquisition before WebSocket accept and release on close/error.
+- Deploy-level realtime WebSocket slot limits, including global and per-API-key limits.
+- Realtime lifecycle metrics for active/acquired/released/rejected slots.
+- Focused unit and HTTP regressions proving limit enforcement and lifecycle release.
+
+Definition of Done:
+
+- `/v1/responses/ws` acquires a realtime slot after Gateway API key auth and before accepting the WebSocket.
+- Slots record request id, user/API key ids, source endpoint, sticky account hint, sticky strength, and hashed session affinity key; raw affinity keys must not be stored.
+- Slots are released on normal close, client disconnect, upstream relay completion, or handler error.
+- Global and per-API-key slot limits reject excess WebSocket handshakes with a gateway 429 response before the upgrade.
+- `/metrics` exposes active, acquired, released, and rejected realtime slot counters/gauges.
+- Slot management remains provider-neutral and does not add Gateway-local provider DTOs.
+- This package does not implement Claude Code or Antigravity provider-native realtime adapters, persistent upstream session reuse, or distributed Redis-backed slot storage.
+- No frontend visuals are added.
+
+Required gates:
+
+- `cd apps/api && go test ./internal/modules/realtime/... ./internal/httpserver -run 'TestGatewayResponsesWebSocket|TestGatewayResponsesWebSocketEnforcesRealtimeSlotLimit'`
+- `cd apps/api && go test ./internal/httpserver ./internal/modules/realtime/... ./internal/modules/reverse_proxy/... ./internal/modules/provider_adapters/...`
+- `cd apps/api && go test ./...`
+- `make architecture-check`
+- `make code-quality-check`
+- `make secret-scan`
+- `git diff --check`
+
+## WP-470+: Ecosystem And Remaining Advanced Surface
 
 Use `ROADMAP.md` Phase 7 through Phase 8 to split future packages for:
 

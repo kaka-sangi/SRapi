@@ -13,6 +13,8 @@ import (
 	gatewaycontract "github.com/srapi/srapi/apps/api/internal/modules/gateway/contract"
 	gatewayservice "github.com/srapi/srapi/apps/api/internal/modules/gateway/service"
 	provideradaptercontract "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
+	realtimecontract "github.com/srapi/srapi/apps/api/internal/modules/realtime/contract"
+	realtimeservice "github.com/srapi/srapi/apps/api/internal/modules/realtime/service"
 	reverseproxycontract "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
@@ -65,6 +67,22 @@ func (s *Server) handleResponsesWebSocket(w http.ResponseWriter, r *http.Request
 		writeGatewayAuthError(w, err, requestID)
 		return
 	}
+	slot, err := s.acquireResponsesWebSocketSlot(r.Context(), r, authed)
+	if err != nil {
+		status := http.StatusInternalServerError
+		code := "internal_error"
+		message := "failed to acquire realtime slot"
+		errorType := apiopenapi.InternalError
+		if errors.Is(err, realtimeservice.ErrLimitExceeded) {
+			status = http.StatusTooManyRequests
+			code = "rate_limit"
+			message = "realtime websocket slot limit exceeded"
+			errorType = apiopenapi.RateLimitError
+		}
+		writeGatewayError(w, status, errorType, message, code)
+		return
+	}
+	defer s.releaseResponsesWebSocketSlot(r.Context(), slot.ID)
 
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
 		CompressionMode: websocket.CompressionDisabled,
@@ -132,6 +150,27 @@ func (s *Server) handleResponsesWebSocket(w http.ResponseWriter, r *http.Request
 		if err := writeCapturedResponsesWebSocket(r.Context(), conn, captured); err != nil {
 			return
 		}
+	}
+}
+
+func (s *Server) acquireResponsesWebSocketSlot(ctx context.Context, r *http.Request, authed apikeycontract.AuthResult) (realtimecontract.Slot, error) {
+	stickyAccountID, stickyStrength, affinityKey, affinitySource := gatewaySessionAffinity(r)
+	return s.runtime.realtime.Acquire(ctx, realtimecontract.AcquireRequest{
+		Kind:                  realtimecontract.SlotKindResponsesWebSocket,
+		RequestID:             requestIDFromContext(ctx),
+		UserID:                authed.UserID,
+		APIKeyID:              authed.Key.ID,
+		SourceEndpoint:        responsesWebSocketSourceEndpoint,
+		SessionAffinityKey:    affinityKey,
+		SessionAffinitySource: affinitySource,
+		StickyAccountID:       stickyAccountID,
+		StickyStrength:        string(stickyStrength),
+	})
+}
+
+func (s *Server) releaseResponsesWebSocketSlot(ctx context.Context, slotID string) {
+	if _, err := s.runtime.realtime.Release(ctx, slotID); err != nil && !errors.Is(err, realtimeservice.ErrSlotNotFound) {
+		s.logger.Warn("failed to release responses websocket slot", "error", err, "slot_id", slotID)
 	}
 }
 

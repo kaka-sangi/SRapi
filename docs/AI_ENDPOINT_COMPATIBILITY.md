@@ -560,7 +560,8 @@ Responses WebSocket transport
 - `stream:true` 的 Responses SSE 事件会转成同名 JSON WebSocket frame；非流式响应返回 `response.completed` frame。
 - `session_affinity_key`、`sticky_strength`、`sticky_account_id` query/header 继续作为 Scheduler sticky routing hint；Gateway 不直接选择账号。
 - WP-410 进一步实现 Codex CLI 2api Responses WebSocket upstream relay：当请求显式带 `upstream_ws` 或 `codex_responses_websocket`，且调度出的 `reverse-proxy-codex-cli` 账号 metadata 启用 Codex Responses WebSocket 时，SRapi 通过 Reverse Proxy Runtime 连接 Codex `ws/wss` `/responses`，使用选中账号 OAuth/session/CLI token 凭证、Codex official-client headers，以及包含 mapped upstream model 的 `response.create` 首帧。
-- 复杂 slot 生命周期、persistent upstream session reuse、local Codex CLI client ingress，以及 Claude Code / Antigravity provider-native realtime 协议仍是后续包。
+- WP-460 起，`/v1/responses/ws` 在 WebSocket upgrade 前获得 provider-neutral realtime slot，并在连接关闭、上游 relay 完成、客户端断开或 handler error 时释放；slot 只保存 request/user/API key/source endpoint/sticky metadata 和 session affinity hash，不保存原始 affinity key。
+- 复杂 persistent upstream session reuse、local Codex CLI client ingress，以及 Claude Code / Antigravity provider-native realtime 协议仍是后续包。
 
 Phase 2 继续实现：
 

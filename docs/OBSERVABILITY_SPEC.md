@@ -100,6 +100,16 @@ reverse_proxy_geo_blocked_total
 reverse_proxy_upstream_client_outdated_total
 ```
 
+### 3.6 Realtime slot 指标
+
+```txt
+srapi_realtime_active_slots
+srapi_realtime_active_slots_by_endpoint
+srapi_realtime_slots_total{event="acquired|released|rejected"}
+```
+
+Realtime slot 指标只记录连接生命周期和低基数 endpoint 标签，不得包含原始 session affinity key、API key、credential、prompt 或 provider-specific payload。
+
 ## 4. 错误归因
 
 错误必须按 owner 分类：

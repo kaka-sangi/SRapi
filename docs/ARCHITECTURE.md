@@ -363,6 +363,8 @@ Gateway 不应该做复杂账号选择，只调用 Scheduler。
 
 Gateway 对外路由族、Provider-prefixed alias、passthrough、WebSocket 和阶段边界以 `GATEWAY_ROUTE_MATRIX.md` 为准。
 
+WebSocket / realtime 连接必须在 Gateway auth 后获取 Realtime slot，并在关闭或错误时释放；slot 管理只负责生命周期、限额和匿名化 sticky/session 证据，不负责账号选择或 provider-specific protocol DTO。
+
 ### 7.7 Scheduler
 
 负责候选账号构建、策略过滤、评分、Lease、反馈。

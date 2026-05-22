@@ -248,6 +248,7 @@ WP-390 起，Reverse Proxy Runtime 提供直接 WebSocket relay primitive：
 - relay 支持 text/binary message 透传并返回基础 message/byte accounting。provider-native realtime event schema、slot lifecycle 和 Gateway binding 仍由后续 adapter/runtime package 实现。
 - WP-410 将该 primitive 绑定到 Codex Responses WebSocket 2api 路径：Gateway 只在 `upstream_ws` / `codex_responses_websocket` 明确启用时尝试，Provider Adapter 生成 Codex WebSocket URL/headers/首帧，Runtime 负责使用选中账号凭证拨号和 relay。更复杂的 session reuse、slot lifecycle、Claude Code 和 Antigravity WebSocket 协议仍是后续包。
 - WP-420 将 Claude Code HTTP Messages 2api 绑定到 Reverse Proxy Runtime：Provider Adapter 生成 `/messages?beta=true`、Claude Code 官方客户端 headers/body；Runtime 负责使用选中账号凭证发出请求。Claude Code WebSocket/session slot 生命周期仍是后续包。
+- WP-460 将 provider-neutral realtime slot lifecycle 绑定到 `/v1/responses/ws`：Gateway 在 WebSocket upgrade 前获取 slot、在关闭/错误时释放，并通过 deploy-level global/per-API-key 限额保护长连接资源。Reverse Proxy Runtime 仍只负责上游 WSS relay；slot manager 不包含 provider-specific DTO。
 
 ## 11. 出口 IP 与代理绑定
 

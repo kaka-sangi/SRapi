@@ -236,7 +236,19 @@ StrategyRegistry.GetStrategy
 
 策略扩展以 `SCHEDULER_STRATEGY_EXTENSION_SPEC.md` 为准。
 
-### 6.8 Billing
+### 6.8 Realtime
+
+对外 contract：
+
+```txt
+RealtimeSlotManager.Acquire
+RealtimeSlotManager.Release
+RealtimeSlotManager.Snapshot
+```
+
+Realtime 模块只管理长连接 slot 生命周期、限额和匿名化 sticky/session 证据。它不得选择 Provider Account，不得解密 Provider credential，不得包含 Codex / Claude Code / Antigravity 等 provider-specific Gateway DTO。
+
+### 6.9 Billing
 
 对外 contract：
 
@@ -250,7 +262,7 @@ BillingCommand.ApplyRefundDebit
 
 Billing 可以提供用户余额、套餐权益和成本策略给 Scheduler，但不得参与账号选择。
 
-### 6.9 Payments
+### 6.10 Payments
 
 对外 contract：
 
@@ -263,7 +275,7 @@ PaymentWebhookCommand.HandleWebhook
 
 支付完成、退款完成等跨模块后续动作应通过领域事件驱动。
 
-### 6.10 Affiliate
+### 6.11 Affiliate
 
 对外 contract：
 
@@ -276,7 +288,7 @@ AffiliateBalanceCommand.TransferToBalance
 
 Affiliate 不得直接修改 Payment Order 状态。
 
-### 6.11 Observability
+### 6.12 Observability
 
 对外 contract：
 

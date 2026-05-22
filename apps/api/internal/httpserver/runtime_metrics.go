@@ -26,6 +26,12 @@ func (rt *runtimeState) metricsLines(ctx context.Context) []string {
 		"# TYPE srapi_gateway_request_duration_seconds summary",
 		"# HELP srapi_gateway_inflight_requests Gateway requests with pending scheduler leases.",
 		"# TYPE srapi_gateway_inflight_requests gauge",
+		"# HELP srapi_realtime_active_slots Active realtime WebSocket slots.",
+		"# TYPE srapi_realtime_active_slots gauge",
+		"# HELP srapi_realtime_active_slots_by_endpoint Active realtime WebSocket slots by source endpoint.",
+		"# TYPE srapi_realtime_active_slots_by_endpoint gauge",
+		"# HELP srapi_realtime_slots_total Realtime WebSocket slot lifecycle events.",
+		"# TYPE srapi_realtime_slots_total counter",
 		"# HELP srapi_gateway_errors_total Gateway request errors recorded by error class.",
 		"# TYPE srapi_gateway_errors_total counter",
 		"# HELP srapi_scheduler_decisions_total Scheduler decisions by strategy and outcome.",
@@ -64,6 +70,16 @@ func (rt *runtimeState) metricsLines(ctx context.Context) []string {
 	} else {
 		rt.logger.Warn("failed to collect scheduler lease metrics", "error", leaseErr)
 		lines = append(lines, "srapi_gateway_inflight_requests 0")
+	}
+	realtimeSnapshot := rt.realtime.Snapshot(ctx)
+	lines = append(lines,
+		fmt.Sprintf("srapi_realtime_active_slots %d", realtimeSnapshot.ActiveSlots),
+		fmt.Sprintf(`srapi_realtime_slots_total{event="acquired"} %d`, realtimeSnapshot.AcquiredTotal),
+		fmt.Sprintf(`srapi_realtime_slots_total{event="released"} %d`, realtimeSnapshot.ReleasedTotal),
+		fmt.Sprintf(`srapi_realtime_slots_total{event="rejected"} %d`, realtimeSnapshot.RejectedTotal),
+	)
+	for endpoint, count := range realtimeSnapshot.ActiveByEndpoint {
+		lines = append(lines, fmt.Sprintf("srapi_realtime_active_slots_by_endpoint{source_endpoint=%q} %d", endpoint, count))
 	}
 
 	metrics := rt.reverseProxy.Metrics()
@@ -289,6 +305,8 @@ func appendZeroValueBaselineMetrics(lines []string) []string {
 		`srapi_gateway_request_duration_seconds_count{endpoint_family="unknown",model="unknown",provider_protocol="unknown",result="success"} 0`,
 		`srapi_gateway_request_duration_seconds_sum{endpoint_family="unknown",model="unknown",provider_protocol="unknown",result="success"} 0.000000`,
 		`srapi_gateway_inflight_requests 0`,
+		`srapi_realtime_active_slots 0`,
+		`srapi_realtime_slots_total{event="acquired"} 0`,
 		`srapi_gateway_errors_total{error_class="unknown"} 0`,
 		`srapi_scheduler_decisions_total{strategy="unknown",outcome="selected",reason="selected"} 0`,
 		`srapi_provider_errors_total{provider_protocol="unknown",error_class="unknown"} 0`,

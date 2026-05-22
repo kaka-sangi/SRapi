@@ -52,20 +52,20 @@ last_completed:
 - WP-430: ChatGPT Web 2api HTTP Conversation path now sends `reverse-proxy-chatgpt-web` requests through Reverse Proxy Runtime to `/backend-api/conversation`, builds browser/OAI/Sentinel headers plus ChatGPT Web Conversation body, and enforces the OAuth/session/client-token credential boundary instead of treating API keys as 2api identity.
 - WP-440: ChatGPT Web 2api now auto-fetches Sentinel chat requirements through Reverse Proxy Runtime when a static requirements token is absent, including homepage bootstrap, legacy requirements `p` generation, optional PoW proof token generation, and Arkose/Turnstile challenge classification.
 - WP-450: Antigravity 2api HTTP text path now sends `reverse-proxy-antigravity` requests through Reverse Proxy Runtime to Google Cloud Code `/v1internal:generateContent` or `/v1internal:streamGenerateContent?alt=sse`, builds the Antigravity `project`/`requestId`/`userAgent`/`requestType` envelope with nested Gemini request payload, and enforces the desktop/IDE/OAuth credential boundary instead of treating API keys as 2api identity.
+- WP-460: Realtime slot lifecycle v1 now adds a provider-neutral realtime module, acquires `/v1/responses/ws` slots after Gateway auth and before WebSocket upgrade, releases slots on close/error, enforces deploy-level global/per-API-key slot limits, and exposes realtime slot metrics without storing raw affinity keys or provider DTOs.
 
 current:
 
-- package: WP-460+
+- package: WP-470+
 - status: pending
 - objective: split the next ecosystem or remaining advanced endpoint package from the roadmap.
 
-next_recommended: WP-460+
+next_recommended: WP-470+
 
 last_gates:
 
-- `cd apps/api && go test ./internal/modules/provider_adapters/... -run 'TestReverseProxyAntigravity|TestReverseProxyAdapterStreamsThroughRuntime'`: pass
-- `cd apps/api && go test ./internal/httpserver -run 'TestGatewayAntigravity|TestGateway.*Antigravity'`: pass
-- `cd apps/api && go test ./internal/modules/provider_adapters/... ./internal/modules/reverse_proxy/... ./internal/httpserver`: pass
+- `cd apps/api && go test ./internal/modules/realtime/... ./internal/httpserver -run 'TestGatewayResponsesWebSocket|TestGatewayResponsesWebSocketEnforcesRealtimeSlotLimit'`: pass
+- `cd apps/api && go test ./internal/httpserver ./internal/modules/realtime/... ./internal/modules/reverse_proxy/... ./internal/modules/provider_adapters/...`: pass
 - `cd apps/api && go test ./...`: pass
 - `make architecture-check`: pass
 - `make code-quality-check`: pass
@@ -144,6 +144,8 @@ notes:
 - WP-440 intentionally does not implement external Arkose/Turnstile solving, challenge token persistence, or browser TLS impersonation.
 - WP-450 added Antigravity official-client upstream shape coverage across OpenAI-compatible, Anthropic-compatible, Gemini-compatible adapter inputs plus `TestReverseProxyAntigravityRejectsAPIKeyRuntime` and an updated Gateway regression proving `/v1/chat/completions` schedules an Antigravity desktop account and sends `/v1internal:generateContent` with selected account bearer credentials.
 - WP-450 intentionally does not implement Antigravity OAuth onboarding, project discovery, credit overage retry policy, full tool-schema cleaning, or persistent realtime session lifecycle.
+- WP-460 added `TestAcquireReleaseTracksRealtimeSlotLifecycle`, global/per-API-key slot-limit tests, and `TestGatewayResponsesWebSocketEnforcesRealtimeSlotLimit`, proving raw session affinity keys are hashed and excess WebSocket handshakes fail with 429 before upgrade.
+- WP-460 intentionally does not add Claude Code or Antigravity provider-native realtime adapters, persistent upstream session reuse, or distributed Redis-backed slot storage.
 
 ## Work Package Ledger
 
@@ -195,4 +197,5 @@ notes:
 | WP-430 | completed | ChatGPT Web 2api Conversation upstream shape v1 with OAuth/session/client-token boundary. |
 | WP-440 | completed | ChatGPT Web Sentinel requirements auto-fetch v1 through Reverse Proxy Runtime. |
 | WP-450 | completed | Antigravity official-client v1internal upstream shape v1 through Reverse Proxy Runtime. |
-| WP-460+ | pending | Remaining ecosystem and advanced endpoint packages. |
+| WP-460 | completed | Realtime slot lifecycle v1. |
+| WP-470+ | pending | Remaining ecosystem and advanced endpoint packages. |

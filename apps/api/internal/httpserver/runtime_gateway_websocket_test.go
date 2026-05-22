@@ -338,6 +338,42 @@ func TestGatewayResponsesWebSocketRelaysCodexUpstreamWebSocket(t *testing.T) {
 	}
 }
 
+func TestGatewayResponsesWebSocketEnforcesRealtimeSlotLimit(t *testing.T) {
+	cfg := config.Load()
+	cfg.Gateway.RealtimeMaxOpenSlots = 1
+	cfg.Gateway.RealtimeMaxOpenSlotsPerKey = 1
+	handler := New(cfg, nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	first := mustDialResponsesWebSocket(t, server.URL+"/v1/responses/ws", apiKey)
+	defer first.Close(websocket.StatusNormalClosure, "")
+
+	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+	defer cancel()
+	headers := http.Header{}
+	headers.Set("Authorization", "Bearer "+apiKey)
+	second, resp, err := websocket.Dial(ctx, httpToWebSocketURL(server.URL+"/v1/responses/ws"), &websocket.DialOptions{HTTPHeader: headers})
+	if err == nil {
+		second.Close(websocket.StatusNormalClosure, "")
+		t.Fatal("expected second websocket dial to be rejected")
+	}
+	if resp == nil || resp.StatusCode != http.StatusTooManyRequests {
+		t.Fatalf("expected realtime slot limit 429, got resp=%v err=%v", resp, err)
+	}
+
+	first.Close(websocket.StatusNormalClosure, "")
+	waitForMetricValue(t, handler, "srapi_realtime_active_slots 0")
+	metrics := metricsBody(t, handler)
+	if !strings.Contains(metrics, `srapi_realtime_slots_total{event="acquired"} 1`) ||
+		!strings.Contains(metrics, `srapi_realtime_slots_total{event="released"} 1`) ||
+		!strings.Contains(metrics, `srapi_realtime_slots_total{event="rejected"} 1`) {
+		t.Fatalf("expected realtime slot lifecycle metrics, got:\n%s", metrics)
+	}
+}
+
 func mustDialResponsesWebSocket(t *testing.T, rawURL, apiKey string) *websocket.Conn {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
@@ -400,4 +436,27 @@ func mustMarshalString(t *testing.T, value any) string {
 		t.Fatalf("marshal value: %v", err)
 	}
 	return strconv.Quote(string(encoded))
+}
+
+func metricsBody(t *testing.T, handler http.Handler) string {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected metrics 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	return rec.Body.String()
+}
+
+func waitForMetricValue(t *testing.T, handler http.Handler, expected string) {
+	t.Helper()
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		if strings.Contains(metricsBody(t, handler), expected) {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatalf("timed out waiting for metric %q, got:\n%s", expected, metricsBody(t, handler))
 }
