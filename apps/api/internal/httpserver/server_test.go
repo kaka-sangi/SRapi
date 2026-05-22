@@ -4160,6 +4160,41 @@ func TestGatewayChatGPTWebReverseProxyUsesConversationOfficialClientShape(t *tes
 		calls []upstreamCall
 	)
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" {
+			mu.Lock()
+			calls = append(calls, upstreamCall{Path: r.URL.Path, Authorization: r.Header.Get("Authorization"), UserAgent: r.Header.Get("User-Agent"), Accept: r.Header.Get("Accept")})
+			mu.Unlock()
+			_, _ = w.Write([]byte(`<html data-build="build-123"><script src="/assets/c/test/_build.js"></script></html>`))
+			return
+		}
+		if r.URL.Path == "/backend-api/sentinel/chat-requirements" {
+			if r.Header.Get("Authorization") != "Bearer chatgpt-web-token" ||
+				r.Header.Get("X-OpenAI-Target-Path") != "/backend-api/sentinel/chat-requirements" {
+				t.Fatalf("unexpected requirements request headers: %+v", r.Header)
+			}
+			var body struct {
+				P string `json:"p"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatalf("decode requirements request: %v", err)
+			}
+			if !strings.HasPrefix(body.P, "gAAAAAC") {
+				t.Fatalf("expected generated legacy requirements token, got %q", body.P)
+			}
+			mu.Lock()
+			calls = append(calls, upstreamCall{
+				Path:              r.URL.Path,
+				Authorization:     r.Header.Get("Authorization"),
+				UserAgent:         r.Header.Get("User-Agent"),
+				Accept:            r.Header.Get("Accept"),
+				TargetPath:        r.Header.Get("X-OpenAI-Target-Path"),
+				RequirementsToken: body.P,
+			})
+			mu.Unlock()
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"token":"requirements-token-auto","so_token":"so-token"}`))
+			return
+		}
 		var payload struct {
 			Action      string `json:"action"`
 			Model       string `json:"model"`
@@ -4205,7 +4240,7 @@ func TestGatewayChatGPTWebReverseProxyUsesConversationOfficialClientShape(t *tes
 	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"wp430-chatgpt-web","display_name":"WP430 ChatGPT Web","adapter_type":"reverse-proxy-chatgpt-web","protocol":"openai-compatible","status":"active"}`)
 	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"wp430-chatgpt-web-model","display_name":"WP430 ChatGPT Web Model","status":"active"}`)
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"gpt-5-chat-web","status":"active"}`)
-	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"wp430-chatgpt-web-account","runtime_class":"oauth_refresh","upstream_client":"chatgpt_web","credential":{"access_token":"chatgpt-web-token","refresh_token":"refresh-token"},"metadata":{"base_url":"`+upstream.URL+`","user_agent":"Mozilla/5.0 ChatGPTWeb/1.0","chatgpt_requirements_token":"requirements-token","oai_device_id":"device-gateway-123","oai_session_id":"session-gateway-123","chatgpt_client_version":"client-version-gateway","chatgpt_client_build_number":"build-gateway"},"status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"wp430-chatgpt-web-account","runtime_class":"oauth_refresh","upstream_client":"chatgpt_web","credential":{"access_token":"chatgpt-web-token","refresh_token":"refresh-token"},"metadata":{"base_url":"`+upstream.URL+`","user_agent":"Mozilla/5.0 ChatGPTWeb/1.0","oai_device_id":"device-gateway-123","oai_session_id":"session-gateway-123","chatgpt_client_version":"client-version-gateway","chatgpt_client_build_number":"build-gateway"},"status":"active"}`)
 
 	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
 	chatReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"wp430-chatgpt-web-model","messages":[{"role":"user","content":"hello chatgpt web gateway"}]}`))
@@ -4229,16 +4264,19 @@ func TestGatewayChatGPTWebReverseProxyUsesConversationOfficialClientShape(t *tes
 	mu.Lock()
 	gotCalls := append([]upstreamCall(nil), calls...)
 	mu.Unlock()
-	if len(gotCalls) != 1 {
+	if len(gotCalls) != 3 {
 		t.Fatalf("expected one upstream call, got %+v", gotCalls)
 	}
-	call := gotCalls[0]
+	if gotCalls[0].Path != "/" || gotCalls[1].Path != "/backend-api/sentinel/chat-requirements" {
+		t.Fatalf("expected bootstrap and requirements before conversation, got %+v", gotCalls)
+	}
+	call := gotCalls[2]
 	if call.Path != "/backend-api/conversation" ||
 		call.Authorization != "Bearer chatgpt-web-token" ||
 		call.UserAgent != "Mozilla/5.0 ChatGPTWeb/1.0" ||
 		call.Accept != "text/event-stream" ||
 		call.TargetPath != "/backend-api/conversation" ||
-		call.RequirementsToken != "requirements-token" ||
+		call.RequirementsToken != "requirements-token-auto" ||
 		call.DeviceID != "device-gateway-123" ||
 		call.SessionID != "session-gateway-123" {
 		t.Fatalf("unexpected ChatGPT Web upstream route/auth/headers: %+v", call)

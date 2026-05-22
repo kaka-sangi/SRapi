@@ -1662,7 +1662,49 @@ Required gates:
 - `make secret-scan`
 - `git diff --check`
 
-## WP-440+: Ecosystem And Remaining Advanced Surface
+## WP-440: ChatGPT Web Sentinel Requirements Auto Fetch v1
+
+Objective: make `reverse-proxy-chatgpt-web` obtain ChatGPT Web Sentinel chat requirements through the same selected-account Reverse Proxy Runtime path when a static requirements token is not configured, so ChatGPT Web 2api does not require operators to pre-inject short-lived request tokens for every text call.
+
+Read first:
+
+- `docs/2API_REVERSE_PROXY_DEFINITION.md`
+- `docs/REVERSE_PROXY_SPEC.md`
+- `docs/PROVIDER_ADAPTER_SPEC.md`
+- `apps/api/internal/modules/provider_adapters/service/chatgpt_web.go`
+- `apps/api/internal/modules/reverse_proxy/contract`
+- local reference: `/home/senran/Desktop/chatgpt2api/services/openai_backend_api.py`
+- local reference: `/home/senran/Desktop/chatgpt2api/utils/pow.py`
+
+Owns:
+
+- ChatGPT Web homepage bootstrap through Reverse Proxy Runtime to collect PoW script/build context.
+- ChatGPT Web legacy requirements `p` body generation and `/backend-api/sentinel/chat-requirements` request shape.
+- Optional PoW proof token generation for requirements responses that require `proofofwork`.
+- Challenge classification for Arkose and Turnstile requirements when an external token is not already configured.
+- Conversation request header merge using auto-fetched requirements token, proof token, turnstile token, and SO token.
+- Focused adapter and Gateway regressions proving bootstrap, requirements, and conversation all use the selected account runtime identity.
+
+Definition of Done:
+
+- Missing `chatgpt_requirements_token` no longer fails by default; the adapter first sends official-client bootstrap and requirements requests through Reverse Proxy Runtime.
+- Operators can still disable auto fetch with `chatgpt_requirements_auto=false`, in which case missing requirements remains a clear `invalid_request`.
+- Automatic requirements fetch must not add Gateway-local DTOs or bypass Reverse Proxy Runtime.
+- Arkose requirements map to `challenge_required`; missing Turnstile token maps to `captcha_required`.
+- Gateway regression proves `/v1/chat/completions` can schedule a ChatGPT Web account without a static requirements token and still record Scheduler/usage evidence.
+- This package does not implement external Turnstile/Arkose solving, challenge token persistence, or browser TLS impersonation.
+- No frontend visuals are added.
+
+Required gates:
+
+- `cd apps/api && go test ./internal/modules/provider_adapters/... ./internal/modules/reverse_proxy/... ./internal/httpserver`
+- `cd apps/api && go test ./...`
+- `make architecture-check`
+- `make code-quality-check`
+- `make secret-scan`
+- `git diff --check`
+
+## WP-450+: Ecosystem And Remaining Advanced Surface
 
 Use `ROADMAP.md` Phase 7 through Phase 8 to split future packages for:
 

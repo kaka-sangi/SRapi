@@ -5,15 +5,19 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
 	reverseproxycontract "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"
+	"golang.org/x/crypto/sha3"
 )
 
 const (
@@ -25,6 +29,14 @@ const (
 	chatGPTWebDefaultTimezoneOffsetMinutes = -480
 	chatGPTWebDefaultClientVersion         = "prod-be885abbfcfe7b1f511e88b3003d9ee44757fbad"
 	chatGPTWebDefaultClientBuildNumber     = "5955942"
+	chatGPTWebDefaultPoWScript             = "https://chatgpt.com/backend-api/sentinel/sdk.js"
+	chatGPTWebPoWLimit                     = 500000
+)
+
+var (
+	chatGPTWebScriptSrcRE = regexp.MustCompile(`<script[^>]+src=["']([^"']+)`)
+	chatGPTWebDataBuildRE = regexp.MustCompile(`<html[^>]*data-build=["']([^"']*)`)
+	chatGPTWebScriptBuild = regexp.MustCompile(`c/[^/]*/_`)
 )
 
 type chatGPTWebConversationRequest struct {
@@ -76,6 +88,30 @@ type chatGPTWebClientContext struct {
 	AppName         string  `json:"app_name,omitempty"`
 }
 
+type chatGPTWebSentinelRequirements struct {
+	Token          string
+	ProofToken     string
+	TurnstileToken string
+	SOToken        string
+}
+
+type chatGPTWebRequirementsResponse struct {
+	Token       string `json:"token"`
+	SOToken     string `json:"so_token"`
+	ProofOfWork struct {
+		Required   bool   `json:"required"`
+		Seed       string `json:"seed"`
+		Difficulty string `json:"difficulty"`
+	} `json:"proofofwork"`
+	Turnstile struct {
+		Required bool   `json:"required"`
+		DX       string `json:"dx"`
+	} `json:"turnstile"`
+	Arkose struct {
+		Required bool `json:"required"`
+	} `json:"arkose"`
+}
+
 func (s *Service) invokeReverseProxyChatGPTWebConversation(ctx context.Context, req contract.TextRequest, baseURL string) (contract.TextResponse, error) {
 	if s.reverseProxy == nil {
 		return contract.TextResponse{}, contract.ProviderError{Class: "network_error", StatusCode: http.StatusBadGateway, Message: "reverse proxy runtime unavailable"}
@@ -84,7 +120,7 @@ func (s *Service) invokeReverseProxyChatGPTWebConversation(ctx context.Context, 
 		return contract.TextResponse{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "chatgpt web reverse proxy requires OAuth/session/client-token runtime credentials"}
 	}
 	path := chatGPTWebPath(req)
-	headers, err := chatGPTWebConversationHeaders(req, baseURL, path)
+	headers, err := s.chatGPTWebConversationHeaders(ctx, req, baseURL, path)
 	if err != nil {
 		return contract.TextResponse{}, err
 	}
@@ -182,15 +218,111 @@ func chatGPTWebMessages(req contract.TextRequest) []chatGPTWebMessage {
 	return out
 }
 
-func chatGPTWebConversationHeaders(req contract.TextRequest, baseURL string, path string) (http.Header, error) {
-	requirementsToken := requestSetting(req, "chatgpt_requirements_token", "openai_sentinel_chat_requirements_token", "sentinel_chat_requirements_token")
-	if requirementsToken == "" {
-		return nil, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "chatgpt web requirements token missing"}
+func (s *Service) chatGPTWebConversationHeaders(ctx context.Context, req contract.TextRequest, baseURL string, path string) (http.Header, error) {
+	requirements, err := s.chatGPTWebRequirements(ctx, req, baseURL)
+	if err != nil {
+		return nil, err
 	}
+	headers := chatGPTWebBaseHeaders(req, baseURL, path)
+	headers.Set("Accept", "text/event-stream")
+	headers.Set("Content-Type", "application/json")
+	headers.Set("OpenAI-Sentinel-Chat-Requirements-Token", requirements.Token)
+	if requirements.ProofToken != "" {
+		headers.Set("OpenAI-Sentinel-Proof-Token", requirements.ProofToken)
+	}
+	if requirements.TurnstileToken != "" {
+		headers.Set("OpenAI-Sentinel-Turnstile-Token", requirements.TurnstileToken)
+	}
+	if requirements.SOToken != "" {
+		headers.Set("OpenAI-Sentinel-SO-Token", requirements.SOToken)
+	}
+	return headers, nil
+}
+
+func (s *Service) chatGPTWebRequirements(ctx context.Context, req contract.TextRequest, baseURL string) (chatGPTWebSentinelRequirements, error) {
+	requirements := chatGPTWebSentinelRequirements{
+		Token:          requestSetting(req, "chatgpt_requirements_token", "openai_sentinel_chat_requirements_token", "sentinel_chat_requirements_token"),
+		ProofToken:     requestSetting(req, "chatgpt_proof_token", "openai_sentinel_proof_token", "sentinel_proof_token"),
+		TurnstileToken: requestSetting(req, "chatgpt_turnstile_token", "openai_sentinel_turnstile_token", "sentinel_turnstile_token"),
+		SOToken:        requestSetting(req, "chatgpt_so_token", "openai_sentinel_so_token", "sentinel_so_token"),
+	}
+	if requirements.Token != "" {
+		return requirements, nil
+	}
+	if !chatGPTWebAutoRequirementsEnabled(req) {
+		return chatGPTWebSentinelRequirements{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "chatgpt web requirements token missing"}
+	}
+	return s.fetchChatGPTWebRequirements(ctx, req, baseURL)
+}
+
+func (s *Service) fetchChatGPTWebRequirements(ctx context.Context, req contract.TextRequest, baseURL string) (chatGPTWebSentinelRequirements, error) {
 	origin := chatGPTWebOrigin(baseURL)
-	headers := http.Header{
+	bootstrapResp, err := s.reverseProxy.Do(ctx, reverseproxycontract.Request{
+		Account: chatGPTWebReverseProxyAccount(req),
+		Method:  http.MethodGet,
+		URL:     strings.TrimRight(origin, "/") + "/",
+		Headers: chatGPTWebBootstrapHeaders(req, origin),
+	})
+	if err != nil {
+		return chatGPTWebSentinelRequirements{}, providerErrorFromReverseProxy(err)
+	}
+	powSources, dataBuild := chatGPTWebPoWResources(bootstrapResp.Body)
+	legacyToken := requestSetting(req, "chatgpt_requirements_p", "chatgpt_legacy_requirements_token", "sentinel_requirements_p")
+	if legacyToken == "" {
+		legacyToken = chatGPTWebLegacyRequirementsToken(req, powSources, dataBuild)
+	}
+	raw, err := json.Marshal(map[string]string{"p": legacyToken})
+	if err != nil {
+		return chatGPTWebSentinelRequirements{}, err
+	}
+	path := chatGPTWebRequirementsPath(req)
+	requirementsResp, err := s.reverseProxy.Do(ctx, reverseproxycontract.Request{
+		Account: chatGPTWebReverseProxyAccount(req),
+		Method:  http.MethodPost,
+		URL:     strings.TrimRight(origin, "/") + path,
+		Headers: chatGPTWebJSONHeaders(req, baseURL, path),
+		Body:    raw,
+	})
+	if err != nil {
+		return chatGPTWebSentinelRequirements{}, providerErrorFromReverseProxy(err)
+	}
+	var decoded chatGPTWebRequirementsResponse
+	if err := json.Unmarshal(requirementsResp.Body, &decoded); err != nil {
+		return chatGPTWebSentinelRequirements{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "chatgpt web requirements returned invalid json"}
+	}
+	return chatGPTWebBuildRequirements(req, decoded, legacyToken, powSources, dataBuild)
+}
+
+func chatGPTWebBuildRequirements(req contract.TextRequest, decoded chatGPTWebRequirementsResponse, legacyToken string, powSources []string, dataBuild string) (chatGPTWebSentinelRequirements, error) {
+	requirements := chatGPTWebSentinelRequirements{
+		Token:          strings.TrimSpace(decoded.Token),
+		TurnstileToken: requestSetting(req, "chatgpt_turnstile_token", "openai_sentinel_turnstile_token", "sentinel_turnstile_token"),
+		SOToken:        strings.TrimSpace(decoded.SOToken),
+	}
+	if requirements.Token == "" {
+		return chatGPTWebSentinelRequirements{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "chatgpt web requirements response contained no token"}
+	}
+	if decoded.Arkose.Required {
+		return chatGPTWebSentinelRequirements{}, contract.ProviderError{Class: "challenge_required", StatusCode: http.StatusForbidden, Message: "chatgpt web requirements require arkose challenge"}
+	}
+	if decoded.Turnstile.Required && requirements.TurnstileToken == "" {
+		return chatGPTWebSentinelRequirements{}, contract.ProviderError{Class: "captcha_required", StatusCode: http.StatusForbidden, Message: "chatgpt web requirements require turnstile token"}
+	}
+	if decoded.ProofOfWork.Required {
+		proofToken, err := chatGPTWebProofToken(req, decoded.ProofOfWork.Seed, decoded.ProofOfWork.Difficulty, powSources, dataBuild)
+		if err != nil {
+			return chatGPTWebSentinelRequirements{}, err
+		}
+		requirements.ProofToken = proofToken
+	}
+	_ = legacyToken
+	return requirements, nil
+}
+
+func chatGPTWebBaseHeaders(req contract.TextRequest, baseURL string, path string) http.Header {
+	origin := chatGPTWebOrigin(baseURL)
+	return http.Header{
 		"Accept":                      {"text/event-stream"},
-		"Content-Type":                {"application/json"},
 		"Origin":                      {origin},
 		"Referer":                     {strings.TrimRight(origin, "/") + "/"},
 		"Accept-Language":             {chatGPTWebStringSetting(req, chatGPTWebDefaultAcceptLanguage, "chatgpt_accept_language", "accept_language")},
@@ -216,18 +348,176 @@ func chatGPTWebConversationHeaders(req contract.TextRequest, baseURL string, pat
 		"OAI-Client-Build-Number":     {chatGPTWebStringSetting(req, chatGPTWebDefaultClientBuildNumber, "oai_client_build_number", "chatgpt_client_build_number")},
 		"X-OpenAI-Target-Path":        {path},
 		"X-OpenAI-Target-Route":       {path},
-		"OpenAI-Sentinel-Chat-Requirements-Token": {requirementsToken},
 	}
-	if proofToken := requestSetting(req, "chatgpt_proof_token", "openai_sentinel_proof_token", "sentinel_proof_token"); proofToken != "" {
-		headers.Set("OpenAI-Sentinel-Proof-Token", proofToken)
+}
+
+func chatGPTWebJSONHeaders(req contract.TextRequest, baseURL string, path string) http.Header {
+	headers := chatGPTWebBaseHeaders(req, baseURL, path)
+	headers.Set("Accept", "application/json")
+	headers.Set("Content-Type", "application/json")
+	return headers
+}
+
+func chatGPTWebBootstrapHeaders(req contract.TextRequest, origin string) http.Header {
+	return http.Header{
+		"User-Agent":                {chatGPTWebUserAgent(req)},
+		"Accept":                    {"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"},
+		"Accept-Language":           {chatGPTWebStringSetting(req, chatGPTWebDefaultAcceptLanguage, "chatgpt_accept_language", "accept_language")},
+		"Sec-Ch-Ua":                 {chatGPTWebStringSetting(req, `"Microsoft Edge";v="143", "Chromium";v="143", "Not A(Brand";v="24"`, "sec_ch_ua", "Sec-Ch-Ua")},
+		"Sec-Ch-Ua-Mobile":          {chatGPTWebStringSetting(req, "?0", "sec_ch_ua_mobile", "Sec-Ch-Ua-Mobile")},
+		"Sec-Ch-Ua-Platform":        {chatGPTWebStringSetting(req, `"Windows"`, "sec_ch_ua_platform", "Sec-Ch-Ua-Platform")},
+		"Sec-Fetch-Dest":            {"document"},
+		"Sec-Fetch-Mode":            {"navigate"},
+		"Sec-Fetch-Site":            {"none"},
+		"Sec-Fetch-User":            {"?1"},
+		"Upgrade-Insecure-Requests": {"1"},
+		"Origin":                    {origin},
+		"Referer":                   {strings.TrimRight(origin, "/") + "/"},
 	}
-	if turnstileToken := requestSetting(req, "chatgpt_turnstile_token", "openai_sentinel_turnstile_token", "sentinel_turnstile_token"); turnstileToken != "" {
-		headers.Set("OpenAI-Sentinel-Turnstile-Token", turnstileToken)
+}
+
+func chatGPTWebPoWResources(body []byte) ([]string, string) {
+	text := string(body)
+	sources := make([]string, 0, 4)
+	for _, match := range chatGPTWebScriptSrcRE.FindAllStringSubmatch(text, -1) {
+		if len(match) > 1 && strings.TrimSpace(match[1]) != "" {
+			source := strings.TrimSpace(match[1])
+			sources = append(sources, source)
+		}
 	}
-	if soToken := requestSetting(req, "chatgpt_so_token", "openai_sentinel_so_token", "sentinel_so_token"); soToken != "" {
-		headers.Set("OpenAI-Sentinel-SO-Token", soToken)
+	if len(sources) == 0 {
+		sources = append(sources, chatGPTWebDefaultPoWScript)
 	}
-	return headers, nil
+	dataBuild := ""
+	for _, source := range sources {
+		if match := chatGPTWebScriptBuild.FindString(source); match != "" {
+			dataBuild = match
+			break
+		}
+	}
+	if dataBuild == "" {
+		if match := chatGPTWebDataBuildRE.FindStringSubmatch(text); len(match) > 1 {
+			dataBuild = strings.TrimSpace(match[1])
+		}
+	}
+	return sources, dataBuild
+}
+
+func chatGPTWebLegacyRequirementsToken(req contract.TextRequest, scriptSources []string, dataBuild string) string {
+	seed := fmt.Sprintf("0.%d", time.Now().UnixNano())
+	config := chatGPTWebPoWConfig(req, scriptSources, dataBuild)
+	answer, _ := chatGPTWebPoWGenerate(seed, "0fffff", config, chatGPTWebPoWLimit)
+	return "gAAAAAC" + answer
+}
+
+func chatGPTWebProofToken(req contract.TextRequest, seed string, difficulty string, scriptSources []string, dataBuild string) (string, error) {
+	seed = strings.TrimSpace(seed)
+	difficulty = strings.TrimSpace(difficulty)
+	if seed == "" || difficulty == "" {
+		return "", contract.ProviderError{Class: "challenge_required", StatusCode: http.StatusForbidden, Message: "chatgpt web proof token challenge missing seed or difficulty"}
+	}
+	config := chatGPTWebPoWConfig(req, scriptSources, dataBuild)
+	answer, solved := chatGPTWebPoWGenerate(seed, difficulty, config, chatGPTWebPoWLimit)
+	if !solved {
+		return "", contract.ProviderError{Class: "challenge_required", StatusCode: http.StatusForbidden, Message: "chatgpt web proof token challenge not solved within budget"}
+	}
+	return "gAAAAAB" + answer, nil
+}
+
+func chatGPTWebPoWGenerate(seed string, difficulty string, config []any, limit int) (string, bool) {
+	target, err := parseHexDifficulty(difficulty)
+	if err != nil || len(target) == 0 {
+		return chatGPTWebPoWFallback(seed), false
+	}
+	diffLen := len(target)
+	seedBytes := []byte(seed)
+	for i := range limit {
+		config[3] = i
+		config[9] = i >> 1
+		raw, err := json.Marshal(config)
+		if err != nil {
+			return chatGPTWebPoWFallback(seed), false
+		}
+		encoded := base64.StdEncoding.EncodeToString(raw)
+		digest := sha3.Sum512(append(seedBytes, []byte(encoded)...))
+		if bytes.Compare(digest[:diffLen], target) <= 0 {
+			return encoded, true
+		}
+	}
+	return chatGPTWebPoWFallback(seed), false
+}
+
+func parseHexDifficulty(difficulty string) ([]byte, error) {
+	if len(difficulty)%2 != 0 {
+		difficulty = "0" + difficulty
+	}
+	out := make([]byte, len(difficulty)/2)
+	for i := range out {
+		parsed, err := strconv.ParseUint(difficulty[i*2:i*2+2], 16, 8)
+		if err != nil {
+			return nil, err
+		}
+		out[i] = byte(parsed)
+	}
+	return out, nil
+}
+
+func chatGPTWebPoWFallback(seed string) string {
+	raw, err := json.Marshal(seed)
+	if err != nil {
+		raw = []byte(strconv.Quote(seed))
+	}
+	return "wQ8Lk5FbGpA2NcR9dShT6gYjU7VxZ4D" + base64.StdEncoding.EncodeToString(raw)
+}
+
+func chatGPTWebPoWConfig(req contract.TextRequest, scriptSources []string, dataBuild string) []any {
+	scriptSource := chatGPTWebDefaultPoWScript
+	if len(scriptSources) > 0 && strings.TrimSpace(scriptSources[0]) != "" {
+		scriptSource = strings.TrimSpace(scriptSources[0])
+	}
+	now := time.Now()
+	return []any{
+		4000,
+		now.UTC().Format("Mon Jan 02 2006 15:04:05") + " GMT-0500 (Eastern Standard Time)",
+		4294705152,
+		0,
+		chatGPTWebUserAgent(req),
+		scriptSource,
+		dataBuild,
+		"en-US",
+		"en-US,es-US,en,es",
+		0,
+		"webdriver-false",
+		"_reactListeningo743lnnpvdg",
+		"window",
+		float64(now.UnixNano()/int64(time.Millisecond)) / 1000,
+		chatGPTWebStableID(req, fmt.Sprintf("pow-%d", now.UnixNano())),
+		"",
+		32,
+		float64(now.UnixNano()/int64(time.Millisecond)) / 1000,
+	}
+}
+
+func chatGPTWebAutoRequirementsEnabled(req contract.TextRequest) bool {
+	value := strings.ToLower(requestSetting(req, "chatgpt_requirements_auto", "requirements_auto"))
+	return value != "false" && value != "0" && value != "disabled"
+}
+
+func chatGPTWebRequirementsPath(req contract.TextRequest) string {
+	if strings.EqualFold(requestSetting(req, "chatgpt_anon", "anonymous"), "true") {
+		return "/backend-anon/sentinel/chat-requirements"
+	}
+	if path := requestSetting(req, "chatgpt_requirements_path", "requirements_path"); strings.HasPrefix(path, "/") {
+		return path
+	}
+	return "/backend-api/sentinel/chat-requirements"
+}
+
+func chatGPTWebUserAgent(req contract.TextRequest) string {
+	if value := requestSetting(req, "user_agent", "chatgpt_user_agent"); value != "" {
+		return value
+	}
+	return "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0"
 }
 
 func parseChatGPTWebConversationBody(body []byte, statusCode int) (contract.TextResponse, error) {

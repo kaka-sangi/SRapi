@@ -71,6 +71,7 @@ Implementation status:
 - WP-410 implements the Codex CLI 2api Responses WebSocket upstream relay for explicitly requested `/v1/responses/ws` calls: SRapi schedules an eligible Codex reverse-proxy account, derives Codex `ws/wss` `/responses`, sends Codex official-client headers plus a `response.create` frame with the mapped upstream model, and uses the selected account OAuth/session/CLI credential through Reverse Proxy Runtime.
 - WP-420 implements the Claude Code CLI 2api Messages HTTP path: `reverse-proxy-claude-code-cli` builds `/messages?beta=true`, Claude Code OAuth/beta/version/stainless/session headers, and Claude Code system/billing blocks, while Reverse Proxy Runtime injects the selected OAuth/CLI token.
 - WP-430 implements the ChatGPT Web 2api Conversation HTTP path: `reverse-proxy-chatgpt-web` builds `/backend-api/conversation`, browser/OAI/Sentinel headers, and ChatGPT Web Conversation body, while Reverse Proxy Runtime injects the selected OAuth/Web-session token.
+- WP-440 adds ChatGPT Web Sentinel requirements auto fetch: if the selected account has no static requirements token, the adapter bootstraps ChatGPT Web and posts `/backend-api/sentinel/chat-requirements` through Reverse Proxy Runtime before the conversation request.
 - Persistent Codex WebSocket session reuse, richer prompt-cache policy, local Codex CLI client ingress, Claude Code WebSocket adapters, and Antigravity WebSocket adapters are still follow-up work.
 
 ## 6. Boundary Rules

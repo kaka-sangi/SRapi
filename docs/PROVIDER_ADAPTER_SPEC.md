@@ -115,6 +115,8 @@ WP-430 ChatGPT Web 2api boundary:
 - `reverse-proxy-chatgpt-web` dispatches OpenAI-compatible text requests through Reverse Proxy Runtime, not through direct API-key HTTP.
 - The upstream endpoint is `{chatgpt_origin}/backend-api/conversation`; account metadata should store `base_url` at the ChatGPT Web origin, not at `/v1/chat/completions`.
 - Adapter-owned official-client shape includes browser `Origin` / `Referer` / `Sec-*`, `OAI-*`, `X-OpenAI-Target-*`, Sentinel requirements headers, and ChatGPT Web Conversation body fields such as `action`, `parent_message_id`, `conversation_mode`, `force_use_sse`, timezone, and `client_contextual_info`.
+- If no static Sentinel requirements token is configured, the adapter bootstraps ChatGPT Web and requests `/backend-api/sentinel/chat-requirements` through Reverse Proxy Runtime before the conversation request; `chatgpt_requirements_auto=false` disables this behavior.
+- Arkose and Turnstile requirements are surfaced as reverse-proxy challenge classes unless an operator-provided challenge token is already available.
 - Runtime-owned transport still injects the selected account credential as OAuth/Web-session bearer or cookie and strips caller/SRapi headers; adapter must not forward caller `Authorization`.
 - `runtime_class = api_key` is rejected for this adapter because ChatGPT Web 2api means official Web OAuth/session simulation, not OpenAI API-key mode.
 
