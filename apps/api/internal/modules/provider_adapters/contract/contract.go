@@ -77,6 +77,32 @@ type ImageGenerationRequest struct {
 	Credential     map[string]any
 }
 
+type ImageInput struct {
+	FileName    string
+	ContentType string
+	Bytes       []byte
+}
+
+type ImageEditRequest struct {
+	RequestID      string
+	SourceProtocol string
+	SourceEndpoint string
+	Model          string
+	Prompt         string
+	Images         []ImageInput
+	Mask           *ImageInput
+	Count          int
+	Size           string
+	Quality        string
+	ResponseFormat string
+	User           string
+	Extra          map[string]any
+	Provider       providercontract.Provider
+	Account        accountcontract.ProviderAccount
+	Mapping        modelcontract.ModelProviderMapping
+	Credential     map[string]any
+}
+
 type AudioTranscriptionRequest struct {
 	RequestID      string
 	SourceProtocol string
@@ -298,6 +324,10 @@ type EmbeddingAdapter interface {
 
 type ImageGenerationAdapter interface {
 	InvokeImageGeneration(ctx context.Context, req ImageGenerationRequest) (ImageGenerationResponse, error)
+}
+
+type ImageEditAdapter interface {
+	InvokeImageEdit(ctx context.Context, req ImageEditRequest) (ImageGenerationResponse, error)
 }
 
 type AudioTranscriptionAdapter interface {

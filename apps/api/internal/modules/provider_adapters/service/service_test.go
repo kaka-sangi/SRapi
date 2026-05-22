@@ -206,6 +206,85 @@ func TestOpenAICompatibleAdapterInvokesImageGenerationsUpstream(t *testing.T) {
 	}
 }
 
+func TestOpenAICompatibleAdapterInvokesImageEditsUpstream(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/images/edits" {
+			t.Fatalf("unexpected upstream path %s", r.URL.Path)
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer image-edit-secret" {
+			t.Fatalf("unexpected auth header %q", got)
+		}
+		if err := r.ParseMultipartForm(16 << 20); err != nil {
+			t.Fatalf("parse upstream multipart: %v", err)
+		}
+		imageFile, imageHeader, err := r.FormFile("image")
+		if err != nil {
+			t.Fatalf("expected upstream image: %v", err)
+		}
+		defer imageFile.Close()
+		imageBytes, err := io.ReadAll(imageFile)
+		if err != nil {
+			t.Fatalf("read upstream image: %v", err)
+		}
+		maskFile, maskHeader, err := r.FormFile("mask")
+		if err != nil {
+			t.Fatalf("expected upstream mask: %v", err)
+		}
+		defer maskFile.Close()
+		maskBytes, err := io.ReadAll(maskFile)
+		if err != nil {
+			t.Fatalf("read upstream mask: %v", err)
+		}
+		if imageHeader.Filename != "source.png" || imageHeader.Header.Get("Content-Type") != "image/png" || string(imageBytes) != "PNG-source" {
+			t.Fatalf("unexpected upstream image file filename=%q content_type=%q data=%q", imageHeader.Filename, imageHeader.Header.Get("Content-Type"), string(imageBytes))
+		}
+		if maskHeader.Filename != "mask.png" || maskHeader.Header.Get("Content-Type") != "image/png" || string(maskBytes) != "PNG-mask" {
+			t.Fatalf("unexpected upstream mask file filename=%q content_type=%q data=%q", maskHeader.Filename, maskHeader.Header.Get("Content-Type"), string(maskBytes))
+		}
+		if r.FormValue("model") != "image-edit-upstream" || r.FormValue("prompt") != "replace the background" || r.FormValue("n") != "1" || r.FormValue("size") != "1024x1024" || r.FormValue("quality") != "high" || r.FormValue("response_format") != "b64_json" || r.FormValue("user") != "user-123" || r.FormValue("background") != "transparent" {
+			t.Fatalf("unexpected upstream image edit fields: model=%q prompt=%q n=%q size=%q quality=%q response_format=%q user=%q background=%q", r.FormValue("model"), r.FormValue("prompt"), r.FormValue("n"), r.FormValue("size"), r.FormValue("quality"), r.FormValue("response_format"), r.FormValue("user"), r.FormValue("background"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"created":1710000100,"data":[{"b64_json":"aW1hZ2UtZWRpdA==","revised_prompt":"replace the background, revised"}],"model":"image-edit-upstream","usage":{"input_tokens":22,"output_tokens":3,"total_tokens":25}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeImageEdit(context.Background(), contract.ImageEditRequest{
+		RequestID:      "req_image_edit",
+		Model:          "image-edit-local",
+		Prompt:         "replace the background",
+		Images:         []contract.ImageInput{{FileName: "source.png", ContentType: "image/png", Bytes: []byte("PNG-source")}},
+		Mask:           &contract.ImageInput{FileName: "mask.png", ContentType: "image/png", Bytes: []byte("PNG-mask")},
+		Count:          1,
+		Size:           "1024x1024",
+		Quality:        "high",
+		ResponseFormat: "b64_json",
+		User:           "user-123",
+		Extra:          map[string]any{"background": "transparent"},
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "openai-compatible",
+			Protocol:    "openai-compatible",
+		},
+		Account:    accountcontract.ProviderAccount{ID: 1, Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "image-edit-upstream"},
+		Credential: map[string]any{"api_key": "image-edit-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke image edit upstream: %v", err)
+	}
+	if resp.Model != "image-edit-upstream" || resp.Created != 1710000100 || len(resp.Data) != 1 || resp.Data[0].Base64JSON == "" {
+		t.Fatalf("unexpected image edit response: %+v", resp)
+	}
+	if resp.Usage.Estimated || resp.Usage.InputTokens != 22 || resp.Usage.OutputTokens != 3 {
+		t.Fatalf("unexpected image edit usage: %+v", resp.Usage)
+	}
+}
+
 func TestOpenAICompatibleAdapterInvokesAudioTranscriptionsUpstream(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/audio/transcriptions" {

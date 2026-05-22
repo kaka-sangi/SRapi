@@ -1072,6 +1072,28 @@ func (rt *runtimeState) invokeProviderImageGeneration(ctx context.Context, req p
 	return resp, nil
 }
 
+func (rt *runtimeState) invokeProviderImageEdit(ctx context.Context, req provideradaptercontract.ImageEditRequest) (provideradaptercontract.ImageGenerationResponse, error) {
+	if req.Account.ID <= 0 {
+		return provideradaptercontract.ImageGenerationResponse{}, provideradaptercontract.ProviderError{Class: "no_available_account", StatusCode: http.StatusServiceUnavailable, Message: "provider account missing"}
+	}
+	credential, err := rt.accounts.DecryptCredential(ctx, req.Account.ID)
+	if err != nil {
+		return provideradaptercontract.ImageGenerationResponse{}, provideradaptercontract.ProviderError{Class: "credential_error", StatusCode: http.StatusBadGateway, Message: "provider credential unavailable"}
+	}
+	if refreshed, ok, err := rt.refreshReverseProxyCredential(ctx, req.Account, credential); err != nil {
+		return provideradaptercontract.ImageGenerationResponse{}, provideradaptercontract.ProviderError{Class: "auth_failed", StatusCode: http.StatusBadGateway, Message: "provider credential refresh failed"}
+	} else if ok {
+		credential = refreshed
+	}
+	req.Credential = credential
+	resp, err := rt.adapters.InvokeImageEdit(ctx, req)
+	if err != nil {
+		rt.applyProviderAccountProtection(ctx, req.Account, err)
+		return provideradaptercontract.ImageGenerationResponse{}, err
+	}
+	return resp, nil
+}
+
 func (rt *runtimeState) invokeProviderAudioTranscription(ctx context.Context, req provideradaptercontract.AudioTranscriptionRequest) (provideradaptercontract.AudioTranscriptionResponse, error) {
 	if req.Account.ID <= 0 {
 		return provideradaptercontract.AudioTranscriptionResponse{}, provideradaptercontract.ProviderError{Class: "no_available_account", StatusCode: http.StatusServiceUnavailable, Message: "provider account missing"}
@@ -1210,6 +1232,27 @@ func providerImageGenerationRequest(req gatewaycontract.CanonicalRequest, candid
 		Size:           req.ImageSize,
 		Quality:        req.ImageQuality,
 		Style:          req.ImageStyle,
+		ResponseFormat: req.ImageResponseFormat,
+		User:           req.ImageUser,
+		Extra:          cloneAnyMap(req.ImageExtra),
+		Provider:       candidate.Provider,
+		Account:        candidate.Account,
+		Mapping:        candidate.Mapping,
+	}
+}
+
+func providerImageEditRequest(req gatewaycontract.CanonicalRequest, candidate schedulercontract.Candidate) provideradaptercontract.ImageEditRequest {
+	return provideradaptercontract.ImageEditRequest{
+		RequestID:      req.RequestID,
+		SourceProtocol: string(req.SourceProtocol),
+		SourceEndpoint: req.SourceEndpoint,
+		Model:          req.CanonicalModel,
+		Prompt:         req.ImagePrompt,
+		Images:         providerImageInputs(req.ImageInputs),
+		Mask:           providerImageInputPtr(req.ImageMask),
+		Count:          req.ImageCount,
+		Size:           req.ImageSize,
+		Quality:        req.ImageQuality,
 		ResponseFormat: req.ImageResponseFormat,
 		User:           req.ImageUser,
 		Extra:          cloneAnyMap(req.ImageExtra),
@@ -1538,6 +1581,32 @@ func gatewayImagesFromProvider(resp provideradaptercontract.ImageGenerationRespo
 		})
 	}
 	return out
+}
+
+func providerImageInputs(values []gatewaycontract.ImageInput) []provideradaptercontract.ImageInput {
+	if values == nil {
+		return nil
+	}
+	out := make([]provideradaptercontract.ImageInput, len(values))
+	for idx, value := range values {
+		out[idx] = provideradaptercontract.ImageInput{
+			FileName:    value.FileName,
+			ContentType: value.ContentType,
+			Bytes:       append([]byte(nil), value.Bytes...),
+		}
+	}
+	return out
+}
+
+func providerImageInputPtr(value *gatewaycontract.ImageInput) *provideradaptercontract.ImageInput {
+	if value == nil {
+		return nil
+	}
+	return &provideradaptercontract.ImageInput{
+		FileName:    value.FileName,
+		ContentType: value.ContentType,
+		Bytes:       append([]byte(nil), value.Bytes...),
+	}
 }
 
 func gatewayAudioTranscriptionSegmentsFromProvider(resp provideradaptercontract.AudioTranscriptionResponse) []gatewaycontract.AudioTranscriptionSegment {

@@ -2921,6 +2921,178 @@ func TestGatewayImageGenerationAliasForcesProviderContext(t *testing.T) {
 	}
 }
 
+func TestGatewayImageEditRouteTargetsOpenAICompatibleUpstream(t *testing.T) {
+	type upstreamCall struct {
+		Path           string
+		Authorization  string
+		Model          string
+		Prompt         string
+		Count          string
+		Size           string
+		Quality        string
+		ResponseFormat string
+		Filename       string
+		ContentType    string
+		Image          string
+		MaskFilename   string
+		Mask           string
+	}
+	var (
+		mu    sync.Mutex
+		calls []upstreamCall
+	)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseMultipartForm(16 << 20); err != nil {
+			t.Fatalf("parse upstream multipart: %v", err)
+		}
+		imageFile, imageHeader, err := r.FormFile("image")
+		if err != nil {
+			t.Fatalf("expected upstream image: %v", err)
+		}
+		defer imageFile.Close()
+		imageBytes, err := io.ReadAll(imageFile)
+		if err != nil {
+			t.Fatalf("read upstream image: %v", err)
+		}
+		maskFile, maskHeader, err := r.FormFile("mask")
+		if err != nil {
+			t.Fatalf("expected upstream mask: %v", err)
+		}
+		defer maskFile.Close()
+		maskBytes, err := io.ReadAll(maskFile)
+		if err != nil {
+			t.Fatalf("read upstream mask: %v", err)
+		}
+		mu.Lock()
+		calls = append(calls, upstreamCall{
+			Path:           r.URL.Path,
+			Authorization:  r.Header.Get("Authorization"),
+			Model:          r.FormValue("model"),
+			Prompt:         r.FormValue("prompt"),
+			Count:          r.FormValue("n"),
+			Size:           r.FormValue("size"),
+			Quality:        r.FormValue("quality"),
+			ResponseFormat: r.FormValue("response_format"),
+			Filename:       imageHeader.Filename,
+			ContentType:    imageHeader.Header.Get("Content-Type"),
+			Image:          string(imageBytes),
+			MaskFilename:   maskHeader.Filename,
+			Mask:           string(maskBytes),
+		})
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"created":1710000200,"data":[{"url":"https://example.test/wp480-edit.png","revised_prompt":"edited prompt"}],"model":"image-edit-upstream","usage":{"input_tokens":20,"output_tokens":4,"total_tokens":24}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"wp480-openai","display_name":"WP480 OpenAI","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active","capabilities":{"images":true}}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"wp480-image-edit-model","display_name":"WP480 Image Edit Model","status":"active","capabilities":[{"key":"images","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"image-edit-upstream","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"wp480-image-edit-account","runtime_class":"api_key","credential":{"api_key":"image-edit-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
+
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	rec := mustGatewayImageEditRequest(t, handler, apiKey, "/v1/images/edits", map[string]string{
+		"model":           "wp480-image-edit-model",
+		"prompt":          "replace the background",
+		"n":               "1",
+		"size":            "1024x1024",
+		"quality":         "high",
+		"response_format": "url",
+	}, "source.png", "image/png", []byte("PNG-source"), "mask.png", "image/png", []byte("PNG-mask"))
+	var imageResp apiopenapi.ImageGenerationResponse
+	if err := json.NewDecoder(rec.Body).Decode(&imageResp); err != nil {
+		t.Fatalf("decode image edit response: %v", err)
+	}
+	if imageResp.Created != 1710000200 || len(imageResp.Data) != 1 || imageResp.Data[0].Url == nil || *imageResp.Data[0].Url != "https://example.test/wp480-edit.png" {
+		t.Fatalf("unexpected image edit response: %+v", imageResp)
+	}
+
+	mu.Lock()
+	gotCalls := append([]upstreamCall(nil), calls...)
+	mu.Unlock()
+	if len(gotCalls) != 1 {
+		t.Fatalf("expected one upstream call, got %+v", gotCalls)
+	}
+	if gotCalls[0].Path != "/v1/images/edits" || gotCalls[0].Authorization != "Bearer image-edit-secret" || gotCalls[0].Model != "image-edit-upstream" {
+		t.Fatalf("unexpected upstream image edit call: %+v", gotCalls[0])
+	}
+	if gotCalls[0].Prompt != "replace the background" || gotCalls[0].Count != "1" || gotCalls[0].Size != "1024x1024" || gotCalls[0].Quality != "high" || gotCalls[0].ResponseFormat != "url" || gotCalls[0].Filename != "source.png" || gotCalls[0].ContentType != "image/png" || gotCalls[0].Image != "PNG-source" || gotCalls[0].MaskFilename != "mask.png" || gotCalls[0].Mask != "PNG-mask" {
+		t.Fatalf("unexpected upstream image edit details: %+v", gotCalls[0])
+	}
+
+	usageReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/usage-logs?model=wp480-image-edit-model", nil)
+	usageReq.AddCookie(sessionCookie)
+	usageRec := httptest.NewRecorder()
+	handler.ServeHTTP(usageRec, usageReq)
+	if usageRec.Code != http.StatusOK {
+		t.Fatalf("expected usage logs 200, got %d", usageRec.Code)
+	}
+	var usageResp apiopenapi.UsageLogListResponse
+	if err := json.NewDecoder(usageRec.Body).Decode(&usageResp); err != nil {
+		t.Fatalf("decode usage logs: %v", err)
+	}
+	if len(usageResp.Data) != 1 {
+		t.Fatalf("expected one image edit usage record, got %+v", usageResp.Data)
+	}
+	usage := usageResp.Data[0]
+	if !usage.Success || usage.SourceEndpoint != "/v1/images/edits" || usage.ProviderId == nil || *usage.ProviderId != string(providerResp.Data.Id) || usage.AccountId == nil || *usage.AccountId != string(accountResp.Data.Id) || usage.TotalTokens != 24 {
+		t.Fatalf("unexpected image edit usage evidence: %+v", usage)
+	}
+
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=wp480-image-edit-model", nil)
+	decisionsReq.AddCookie(sessionCookie)
+	decisionsRec := httptest.NewRecorder()
+	handler.ServeHTTP(decisionsRec, decisionsReq)
+	if decisionsRec.Code != http.StatusOK {
+		t.Fatalf("expected decisions 200, got %d body=%s", decisionsRec.Code, decisionsRec.Body.String())
+	}
+	var decisionsResp apiopenapi.SchedulerDecisionListResponse
+	if err := json.NewDecoder(decisionsRec.Body).Decode(&decisionsResp); err != nil {
+		t.Fatalf("decode decisions: %v", err)
+	}
+	if len(decisionsResp.Data) != 1 || decisionsResp.Data[0].SourceEndpoint != "/v1/images/edits" || decisionsResp.Data[0].CandidateCount != 1 {
+		t.Fatalf("unexpected image edit decision evidence: %+v", decisionsResp.Data)
+	}
+}
+
+func TestGatewayImageEditAliasForcesProviderContext(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	openaiProvider := mustFindProviderByName(t, handler, sessionCookie, "openai-compatible")
+	fallbackProvider := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"image-edit-fallback-provider","display_name":"Image Edit Fallback","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active","capabilities":{"images":true}}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"wp480-alias-image-edit-model","display_name":"WP480 Alias Image Edit Model","status":"active","capabilities":[{"key":"images","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","upstream_model_name":"fallback-image-edit","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","name":"image-edit-fallback-account","runtime_class":"api_key","credential":{"api_key":"fallback-secret"},"status":"active","priority":100}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(openaiProvider.Id)+`","upstream_model_name":"alias-image-edit","status":"active"}`)
+
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	mustGatewayImageEditRequest(t, handler, apiKey, "/api/provider/openai-compatible/v1/images/edits", map[string]string{"model": "wp480-alias-image-edit-model", "prompt": "alias image edit prompt"}, "alias.png", "image/png", []byte("PNG-alias"), "", "", nil)
+
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=wp480-alias-image-edit-model", nil)
+	decisionsReq.AddCookie(sessionCookie)
+	decisionsRec := httptest.NewRecorder()
+	handler.ServeHTTP(decisionsRec, decisionsReq)
+	if decisionsRec.Code != http.StatusOK {
+		t.Fatalf("expected decisions 200, got %d body=%s", decisionsRec.Code, decisionsRec.Body.String())
+	}
+	var decisionsResp apiopenapi.SchedulerDecisionListResponse
+	if err := json.NewDecoder(decisionsRec.Body).Decode(&decisionsResp); err != nil {
+		t.Fatalf("decode decisions: %v", err)
+	}
+	if len(decisionsResp.Data) != 1 {
+		t.Fatalf("expected one alias image edit decision, got %+v", decisionsResp.Data)
+	}
+	decision := decisionsResp.Data[0]
+	if decision.SelectedProviderId == nil || *decision.SelectedProviderId != string(openaiProvider.Id) || decision.CandidateCount != 1 {
+		t.Fatalf("expected image edit alias to force openai-compatible provider, got %+v", decision)
+	}
+	if decision.SourceEndpoint != "/api/provider/openai-compatible/v1/images/edits" {
+		t.Fatalf("expected alias source endpoint, got %q", decision.SourceEndpoint)
+	}
+}
+
 func TestGatewayModerationRouteTargetsOpenAICompatibleUpstream(t *testing.T) {
 	type upstreamCall struct {
 		Path          string
@@ -4599,6 +4771,47 @@ func mustGatewayMultipartRequest(t *testing.T, handler http.Handler, apiKey, pat
 		t.Fatalf("expected POST %s 200, got %d body=%s", path, rec.Code, rec.Body.String())
 	}
 	return rec
+}
+
+func mustGatewayImageEditRequest(t *testing.T, handler http.Handler, apiKey, path string, fields map[string]string, imageFilename string, imageContentType string, imagePayload []byte, maskFilename string, maskContentType string, maskPayload []byte) *httptest.ResponseRecorder {
+	t.Helper()
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	for key, value := range fields {
+		if err := writer.WriteField(key, value); err != nil {
+			t.Fatalf("write multipart field: %v", err)
+		}
+	}
+	writeMultipartTestFile(t, writer, "image", imageFilename, imageContentType, imagePayload)
+	if len(maskPayload) > 0 {
+		writeMultipartTestFile(t, writer, "mask", maskFilename, maskContentType, maskPayload)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close multipart writer: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, path, &body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected POST %s 200, got %d body=%s", path, rec.Code, rec.Body.String())
+	}
+	return rec
+}
+
+func writeMultipartTestFile(t *testing.T, writer *multipart.Writer, fieldName string, filename string, contentType string, payload []byte) {
+	t.Helper()
+	header := make(textproto.MIMEHeader)
+	header.Set("Content-Disposition", `form-data; name="`+fieldName+`"; filename="`+filename+`"`)
+	header.Set("Content-Type", contentType)
+	part, err := writer.CreatePart(header)
+	if err != nil {
+		t.Fatalf("create multipart file: %v", err)
+	}
+	if _, err := part.Write(payload); err != nil {
+		t.Fatalf("write multipart file: %v", err)
+	}
 }
 
 func seedUsageLog(t *testing.T, store usagecontract.Store, input usagecontract.UsageLog) {

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	openapi_types "github.com/oapi-codegen/runtime/types"
 	capabilitiescontract "github.com/srapi/srapi/apps/api/internal/modules/capabilities/contract"
 	gatewaycontract "github.com/srapi/srapi/apps/api/internal/modules/gateway/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
@@ -243,6 +244,49 @@ func (s *Service) NormalizeImageGeneration(req apiopenapi.ImageGenerationRequest
 	if canonical.ImageResponseFormat == "" {
 		canonical.ImageResponseFormat = "url"
 	}
+	if req.User != nil {
+		canonical.ImageUser = strings.TrimSpace(*req.User)
+	}
+	canonical.ImageExtra = cloneMap(req.AdditionalProperties)
+	canonical.RequestCapabilities = append(canonical.RequestCapabilities, gatewaycontract.RequestCapability{Key: capabilitiescontract.KeyImages, Version: "v1"})
+	return canonical, nil
+}
+
+func (s *Service) NormalizeImageEdit(req apiopenapi.ImageEditRequest, meta RequestMeta) (gatewaycontract.CanonicalRequest, error) {
+	model := strings.TrimSpace(req.Model)
+	if model == "" {
+		return gatewaycontract.CanonicalRequest{}, fmt.Errorf("image edit model is empty")
+	}
+	prompt := strings.TrimSpace(req.Prompt)
+	if prompt == "" {
+		return gatewaycontract.CanonicalRequest{}, fmt.Errorf("image edit prompt is empty")
+	}
+	images, err := imageInputsFromOpenAPI(req.Image)
+	if err != nil {
+		return gatewaycontract.CanonicalRequest{}, err
+	}
+	if len(images) == 0 {
+		return gatewaycontract.CanonicalRequest{}, fmt.Errorf("image edit input image is missing")
+	}
+	count := 1
+	if req.N != nil {
+		count = *req.N
+	}
+	if count < 1 || count > 10 {
+		return gatewaycontract.CanonicalRequest{}, fmt.Errorf("image n must be between 1 and 10")
+	}
+	format := enumString(req.ResponseFormat)
+	if format == "" {
+		format = "url"
+	}
+	canonical := canonical(meta, gatewaycontract.ProtocolOpenAICompatible, gatewaycontract.ProtocolOpenAICompatible, model, "", false, prompt, nil, imageEditContentBlocks(prompt, images), "", nil)
+	canonical.ImagePrompt = prompt
+	canonical.ImageInputs = cloneImageInputs(images)
+	canonical.ImageMask = imageInputFromOpenAPI(req.Mask)
+	canonical.ImageCount = count
+	canonical.ImageSize = stringPtrValue(req.Size)
+	canonical.ImageQuality = stringPtrValue(req.Quality)
+	canonical.ImageResponseFormat = format
 	if req.User != nil {
 		canonical.ImageUser = strings.TrimSpace(*req.User)
 	}
@@ -1164,6 +1208,21 @@ func imageContentBlocks(prompt string) []gatewaycontract.ContentBlock {
 	return []gatewaycontract.ContentBlock{{Type: gatewaycontract.ContentBlockText, Role: "user", Text: prompt}}
 }
 
+func imageEditContentBlocks(prompt string, images []gatewaycontract.ImageInput) []gatewaycontract.ContentBlock {
+	blocks := imageContentBlocks(prompt)
+	for _, image := range images {
+		metadata := map[string]any{}
+		if filename := strings.TrimSpace(image.FileName); filename != "" {
+			metadata["filename"] = filename
+		}
+		if contentType := strings.TrimSpace(image.ContentType); contentType != "" {
+			metadata["content_type"] = contentType
+		}
+		blocks = append(blocks, gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockImage, Role: "user", Metadata: metadata})
+	}
+	return blocks
+}
+
 func validAudioTranscriptionResponseFormat(format string) bool {
 	switch strings.TrimSpace(format) {
 	case "json", "text", "srt", "verbose_json", "vtt", "diarized_json":
@@ -1309,8 +1368,17 @@ func imageEstimatedUsage(req gatewaycontract.CanonicalRequest) gatewaycontract.U
 	if output <= 0 {
 		output = 1
 	}
+	input := estimateTokens(req.ImagePrompt)
+	for _, image := range req.ImageInputs {
+		if len(image.Bytes) > 0 {
+			input += max(1, len(image.Bytes)/1024)
+		}
+	}
+	if req.ImageMask != nil && len(req.ImageMask.Bytes) > 0 {
+		input += max(1, len(req.ImageMask.Bytes)/1024)
+	}
 	return gatewaycontract.Usage{
-		InputTokens:  estimateTokens(req.ImagePrompt),
+		InputTokens:  input,
 		OutputTokens: output,
 		Estimated:    true,
 	}
@@ -1361,6 +1429,18 @@ func cloneImages(values []gatewaycontract.Image) []gatewaycontract.Image {
 	for idx, value := range values {
 		out[idx] = value
 		out[idx].Metadata = cloneMap(value.Metadata)
+	}
+	return out
+}
+
+func cloneImageInputs(values []gatewaycontract.ImageInput) []gatewaycontract.ImageInput {
+	if values == nil {
+		return nil
+	}
+	out := make([]gatewaycontract.ImageInput, len(values))
+	for idx, value := range values {
+		out[idx] = value
+		out[idx].Bytes = append([]byte(nil), value.Bytes...)
 	}
 	return out
 }
@@ -1481,6 +1561,48 @@ func enumString[T ~string](value *T) string {
 		return ""
 	}
 	return strings.TrimSpace(string(*value))
+}
+
+func stringPtrValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return strings.TrimSpace(*value)
+}
+
+func imageInputsFromOpenAPI(values []openapi_types.File) ([]gatewaycontract.ImageInput, error) {
+	if len(values) == 0 {
+		return nil, nil
+	}
+	out := make([]gatewaycontract.ImageInput, 0, len(values))
+	for _, value := range values {
+		fileBytes, err := value.Bytes()
+		if err != nil {
+			return nil, fmt.Errorf("image edit input image is unreadable")
+		}
+		if len(fileBytes) == 0 {
+			return nil, fmt.Errorf("image edit input image is empty")
+		}
+		out = append(out, gatewaycontract.ImageInput{
+			FileName: strings.TrimSpace(value.Filename()),
+			Bytes:    fileBytes,
+		})
+	}
+	return out, nil
+}
+
+func imageInputFromOpenAPI(value *openapi_types.File) *gatewaycontract.ImageInput {
+	if value == nil {
+		return nil
+	}
+	fileBytes, err := value.Bytes()
+	if err != nil || len(fileBytes) == 0 {
+		return nil
+	}
+	return &gatewaycontract.ImageInput{
+		FileName: strings.TrimSpace(value.Filename()),
+		Bytes:    fileBytes,
+	}
 }
 
 func cloneFloat32(value *float32) *float32 {

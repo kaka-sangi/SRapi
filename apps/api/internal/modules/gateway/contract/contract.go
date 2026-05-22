@@ -16,6 +16,7 @@ const (
 	EndpointMessages              SourceEndpoint = "/v1/messages"
 	EndpointEmbeddings            SourceEndpoint = "/v1/embeddings"
 	EndpointImagesGenerations     SourceEndpoint = "/v1/images/generations"
+	EndpointImagesEdits           SourceEndpoint = "/v1/images/edits"
 	EndpointAudioTranscriptions   SourceEndpoint = "/v1/audio/transcriptions"
 	EndpointAudioSpeech           SourceEndpoint = "/v1/audio/speech"
 	EndpointModerations           SourceEndpoint = "/v1/moderations"
@@ -79,6 +80,8 @@ type CanonicalRequest struct {
 	EmbeddingDimensions   *int
 	EmbeddingUser         string
 	ImagePrompt           string
+	ImageInputs           []ImageInput
+	ImageMask             *ImageInput
 	ImageCount            int
 	ImageSize             string
 	ImageQuality          string
@@ -112,6 +115,12 @@ type CanonicalRequest struct {
 	Prompt                string
 	CompatibilityWarnings []string
 	RequestCapabilities   []RequestCapability
+}
+
+type ImageInput struct {
+	FileName    string
+	ContentType string
+	Bytes       []byte
 }
 
 type Usage struct {

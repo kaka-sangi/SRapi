@@ -54,19 +54,27 @@ last_completed:
 - WP-450: Antigravity 2api HTTP text path now sends `reverse-proxy-antigravity` requests through Reverse Proxy Runtime to Google Cloud Code `/v1internal:generateContent` or `/v1internal:streamGenerateContent?alt=sse`, builds the Antigravity `project`/`requestId`/`userAgent`/`requestType` envelope with nested Gemini request payload, and enforces the desktop/IDE/OAuth credential boundary instead of treating API keys as 2api identity.
 - WP-460: Realtime slot lifecycle v1 now adds a provider-neutral realtime module, acquires `/v1/responses/ws` slots after Gateway auth and before WebSocket upgrade, releases slots on close/error, enforces deploy-level global/per-API-key slot limits, and exposes realtime slot metrics without storing raw affinity keys or provider DTOs.
 - WP-470: OpenAI-compatible Realtime WebSocket relay v1 now exposes `GET /v1/realtime`, schedules accounts with `realtime_websocket` capability, derives upstream `/realtime?model=<mapped_upstream_model>`, and relays frames through Reverse Proxy Runtime using selected OAuth/session/client-token credentials rather than caller headers or Gateway-local DTOs.
+- WP-480: Images edits runtime v1 now exposes OpenAI-compatible multipart `POST /v1/images/edits`, provider alias routing, canonical image edit normalization/rendering, OpenAI-compatible upstream `/images/edits` multipart adapter dispatch, explicit `images` Scheduler capability filtering, usage/billing/Scheduler feedback evidence, and generated OpenAPI/SDK parity.
 
 current:
 
-- package: WP-480+
+- package: WP-490+
 - status: pending
 - objective: split the next ecosystem or remaining advanced endpoint package from the roadmap.
 
-next_recommended: WP-480+
+next_recommended: WP-490+
 
 last_gates:
 
-- `cd apps/api && go test ./internal/modules/realtime/... ./internal/httpserver -run 'TestGatewayResponsesWebSocket|TestGatewayResponsesWebSocketEnforcesRealtimeSlotLimit'`: pass
-- `cd apps/api && go test ./internal/httpserver ./internal/modules/realtime/... ./internal/modules/reverse_proxy/... ./internal/modules/provider_adapters/...`: pass
+- `cd apps/api && go test ./internal/modules/provider_adapters/... -run TestOpenAICompatibleAdapterInvokesImageEditsUpstream -count=1`: pass
+- `cd apps/api && go test ./internal/httpserver -run 'TestGatewayImageEdit(RouteTargetsOpenAICompatibleUpstream|AliasForcesProviderContext)' -count=1`: pass
+- `cd apps/api && go test ./internal/modules/gateway/... -run Test -count=1`: pass
+- `make openapi-lint`: pass
+- `make openapi-bundle`: pass
+- `make openapi-codegen-check`: pass
+- `make openapi-ts-codegen-check`: pass
+- `make sdk-ts-typecheck`: pass
+- `cd apps/api && go test ./internal/modules/gateway/... ./internal/modules/provider_adapters/... ./internal/httpserver`: pass
 - `cd apps/api && go test ./...`: pass
 - `make architecture-check`: pass
 - `make code-quality-check`: pass
@@ -149,6 +157,8 @@ notes:
 - WP-460 intentionally does not add Claude Code or Antigravity provider-native realtime adapters, persistent upstream session reuse, or distributed Redis-backed slot storage.
 - WP-470 added `TestNormalizeRealtimeWebSocketRequiresRealtimeCapability`, `TestOpenAICompatiblePrepareRealtimeBuildsRealtimeWebSocketSession`, `TestOpenAICompatiblePrepareRealtimeRejectsAPIKeyRuntime`, and `TestGatewayRealtimeWebSocketRelaysOpenAIUpstreamWebSocket`, proving `/v1/realtime` uses selected account OAuth identity, mapped upstream model query, allowed Realtime headers, realtime slot lifecycle, Scheduler decisions, and usage evidence.
 - WP-470 intentionally does not add official API-key Realtime, persistent upstream session pools, local client ingress, or Claude Code / Antigravity provider-native realtime adapters.
+- WP-480 added `TestOpenAICompatibleAdapterInvokesImageEditsUpstream`, `TestGatewayImageEditRouteTargetsOpenAICompatibleUpstream`, and `TestGatewayImageEditAliasForcesProviderContext`, proving multipart `image` / optional `mask`, mapped upstream model, provider alias context, usage logs, and Scheduler decisions for `/v1/images/edits`.
+- WP-480 intentionally does not add JSON image references, streaming image edit events, image variations, or frontend visuals.
 
 ## Work Package Ledger
 
@@ -202,4 +212,5 @@ notes:
 | WP-450 | completed | Antigravity official-client v1internal upstream shape v1 through Reverse Proxy Runtime. |
 | WP-460 | completed | Realtime slot lifecycle v1. |
 | WP-470 | completed | OpenAI-compatible Realtime WebSocket relay v1 with OAuth/session/client-token Reverse Proxy Runtime boundary. |
-| WP-480+ | pending | Remaining ecosystem and advanced endpoint packages. |
+| WP-480 | completed | Images edits runtime v1. |
+| WP-490+ | pending | Remaining ecosystem and advanced endpoint packages. |

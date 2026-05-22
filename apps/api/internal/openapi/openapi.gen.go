@@ -623,6 +623,24 @@ func (e HealthDependencyStatus) Valid() bool {
 	}
 }
 
+// Defines values for ImageEditRequestResponseFormat.
+const (
+	ImageEditRequestResponseFormatB64JSON ImageEditRequestResponseFormat = "b64_json"
+	ImageEditRequestResponseFormatURL     ImageEditRequestResponseFormat = "url"
+)
+
+// Valid indicates whether the value is a known member of the ImageEditRequestResponseFormat enum.
+func (e ImageEditRequestResponseFormat) Valid() bool {
+	switch e {
+	case ImageEditRequestResponseFormatB64JSON:
+		return true
+	case ImageEditRequestResponseFormatURL:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ImageGenerationRequestQuality.
 const (
 	ImageGenerationRequestQualityAuto     ImageGenerationRequestQuality = "auto"
@@ -2237,6 +2255,44 @@ type HealthResponse struct {
 // Id defines model for Id.
 type Id = string
 
+// ImageEditRequest defines model for ImageEditRequest.
+type ImageEditRequest struct {
+	Background *string `json:"background,omitempty"`
+
+	// Image One or more source images to edit or use as references. SRapi accepts both `image` and OpenAI SDK style `image[]` multipart field names at runtime.
+	Image         []openapi_types.File `json:"image"`
+	InputFidelity *string              `json:"input_fidelity,omitempty"`
+
+	// Mask Optional mask image. When multiple source images are provided, OpenAI-compatible providers apply the mask to the first image.
+	Mask              *openapi_types.File `json:"mask,omitempty"`
+	Model             string              `json:"model"`
+	Moderation        *string             `json:"moderation,omitempty"`
+	N                 *int                `json:"n,omitempty"`
+	OutputCompression *int                `json:"output_compression,omitempty"`
+
+	// OutputFormat Provider-specific encoded output format such as `png`, `jpeg`, or `webp`.
+	OutputFormat *string `json:"output_format,omitempty"`
+
+	// PartialImages Reserved for future image edit streaming support.
+	PartialImages *int   `json:"partial_images,omitempty"`
+	Prompt        string `json:"prompt"`
+
+	// Quality Provider-specific image quality such as `low`, `medium`, `high`, `standard`, `hd`, or `auto`.
+	Quality        *string                         `json:"quality,omitempty"`
+	ResponseFormat *ImageEditRequestResponseFormat `json:"response_format,omitempty"`
+
+	// Size Provider-specific output size such as `1024x1024`, `1024x1536`, `1536x1024`, or `auto`.
+	Size *string `json:"size,omitempty"`
+
+	// Stream Reserved for future image edit streaming support.
+	Stream               *bool                  `json:"stream,omitempty"`
+	User                 *string                `json:"user,omitempty"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// ImageEditRequestResponseFormat defines model for ImageEditRequest.ResponseFormat.
+type ImageEditRequestResponseFormat string
+
 // ImageGenerationObject defines model for ImageGenerationObject.
 type ImageGenerationObject struct {
 	B64Json              *string                `json:"b64_json,omitempty"`
@@ -3483,6 +3539,9 @@ type CreateOpenAICompatibleChatCompletionAliasJSONRequestBody = ChatCompletionRe
 // CreateOpenAICompatibleEmbeddingAliasJSONRequestBody defines body for CreateOpenAICompatibleEmbeddingAlias for application/json ContentType.
 type CreateOpenAICompatibleEmbeddingAliasJSONRequestBody = EmbeddingRequest
 
+// CreateOpenAICompatibleImageEditAliasMultipartRequestBody defines body for CreateOpenAICompatibleImageEditAlias for multipart/form-data ContentType.
+type CreateOpenAICompatibleImageEditAliasMultipartRequestBody = ImageEditRequest
+
 // CreateOpenAICompatibleImageGenerationAliasJSONRequestBody defines body for CreateOpenAICompatibleImageGenerationAlias for application/json ContentType.
 type CreateOpenAICompatibleImageGenerationAliasJSONRequestBody = ImageGenerationRequest
 
@@ -3584,6 +3643,9 @@ type CreateChatCompletionJSONRequestBody = ChatCompletionRequest
 
 // CreateEmbeddingJSONRequestBody defines body for CreateEmbedding for application/json ContentType.
 type CreateEmbeddingJSONRequestBody = EmbeddingRequest
+
+// CreateImageEditMultipartRequestBody defines body for CreateImageEdit for multipart/form-data ContentType.
+type CreateImageEditMultipartRequestBody = ImageEditRequest
 
 // CreateImageGenerationJSONRequestBody defines body for CreateImageGeneration for application/json ContentType.
 type CreateImageGenerationJSONRequestBody = ImageGenerationRequest
@@ -5674,6 +5736,295 @@ func (a GeminiSafetyRating) MarshalJSON() ([]byte, error) {
 	return json.Marshal(object)
 }
 
+// Getter for additional properties for ImageEditRequest. Returns the specified
+// element and whether it was found
+func (a ImageEditRequest) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for ImageEditRequest
+func (a *ImageEditRequest) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for ImageEditRequest to handle AdditionalProperties
+func (a *ImageEditRequest) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["background"]; found {
+		err = json.Unmarshal(raw, &a.Background)
+		if err != nil {
+			return fmt.Errorf("error reading 'background': %w", err)
+		}
+		delete(object, "background")
+	}
+
+	if raw, found := object["image"]; found {
+		err = json.Unmarshal(raw, &a.Image)
+		if err != nil {
+			return fmt.Errorf("error reading 'image': %w", err)
+		}
+		delete(object, "image")
+	}
+
+	if raw, found := object["input_fidelity"]; found {
+		err = json.Unmarshal(raw, &a.InputFidelity)
+		if err != nil {
+			return fmt.Errorf("error reading 'input_fidelity': %w", err)
+		}
+		delete(object, "input_fidelity")
+	}
+
+	if raw, found := object["mask"]; found {
+		err = json.Unmarshal(raw, &a.Mask)
+		if err != nil {
+			return fmt.Errorf("error reading 'mask': %w", err)
+		}
+		delete(object, "mask")
+	}
+
+	if raw, found := object["model"]; found {
+		err = json.Unmarshal(raw, &a.Model)
+		if err != nil {
+			return fmt.Errorf("error reading 'model': %w", err)
+		}
+		delete(object, "model")
+	}
+
+	if raw, found := object["moderation"]; found {
+		err = json.Unmarshal(raw, &a.Moderation)
+		if err != nil {
+			return fmt.Errorf("error reading 'moderation': %w", err)
+		}
+		delete(object, "moderation")
+	}
+
+	if raw, found := object["n"]; found {
+		err = json.Unmarshal(raw, &a.N)
+		if err != nil {
+			return fmt.Errorf("error reading 'n': %w", err)
+		}
+		delete(object, "n")
+	}
+
+	if raw, found := object["output_compression"]; found {
+		err = json.Unmarshal(raw, &a.OutputCompression)
+		if err != nil {
+			return fmt.Errorf("error reading 'output_compression': %w", err)
+		}
+		delete(object, "output_compression")
+	}
+
+	if raw, found := object["output_format"]; found {
+		err = json.Unmarshal(raw, &a.OutputFormat)
+		if err != nil {
+			return fmt.Errorf("error reading 'output_format': %w", err)
+		}
+		delete(object, "output_format")
+	}
+
+	if raw, found := object["partial_images"]; found {
+		err = json.Unmarshal(raw, &a.PartialImages)
+		if err != nil {
+			return fmt.Errorf("error reading 'partial_images': %w", err)
+		}
+		delete(object, "partial_images")
+	}
+
+	if raw, found := object["prompt"]; found {
+		err = json.Unmarshal(raw, &a.Prompt)
+		if err != nil {
+			return fmt.Errorf("error reading 'prompt': %w", err)
+		}
+		delete(object, "prompt")
+	}
+
+	if raw, found := object["quality"]; found {
+		err = json.Unmarshal(raw, &a.Quality)
+		if err != nil {
+			return fmt.Errorf("error reading 'quality': %w", err)
+		}
+		delete(object, "quality")
+	}
+
+	if raw, found := object["response_format"]; found {
+		err = json.Unmarshal(raw, &a.ResponseFormat)
+		if err != nil {
+			return fmt.Errorf("error reading 'response_format': %w", err)
+		}
+		delete(object, "response_format")
+	}
+
+	if raw, found := object["size"]; found {
+		err = json.Unmarshal(raw, &a.Size)
+		if err != nil {
+			return fmt.Errorf("error reading 'size': %w", err)
+		}
+		delete(object, "size")
+	}
+
+	if raw, found := object["stream"]; found {
+		err = json.Unmarshal(raw, &a.Stream)
+		if err != nil {
+			return fmt.Errorf("error reading 'stream': %w", err)
+		}
+		delete(object, "stream")
+	}
+
+	if raw, found := object["user"]; found {
+		err = json.Unmarshal(raw, &a.User)
+		if err != nil {
+			return fmt.Errorf("error reading 'user': %w", err)
+		}
+		delete(object, "user")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for ImageEditRequest to handle AdditionalProperties
+func (a ImageEditRequest) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.Background != nil {
+		object["background"], err = json.Marshal(a.Background)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'background': %w", err)
+		}
+	}
+
+	if a.Image != nil {
+		object["image"], err = json.Marshal(a.Image)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'image': %w", err)
+		}
+	}
+
+	if a.InputFidelity != nil {
+		object["input_fidelity"], err = json.Marshal(a.InputFidelity)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'input_fidelity': %w", err)
+		}
+	}
+
+	if a.Mask != nil {
+		object["mask"], err = json.Marshal(a.Mask)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'mask': %w", err)
+		}
+	}
+
+	object["model"], err = json.Marshal(a.Model)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'model': %w", err)
+	}
+
+	if a.Moderation != nil {
+		object["moderation"], err = json.Marshal(a.Moderation)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'moderation': %w", err)
+		}
+	}
+
+	if a.N != nil {
+		object["n"], err = json.Marshal(a.N)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'n': %w", err)
+		}
+	}
+
+	if a.OutputCompression != nil {
+		object["output_compression"], err = json.Marshal(a.OutputCompression)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'output_compression': %w", err)
+		}
+	}
+
+	if a.OutputFormat != nil {
+		object["output_format"], err = json.Marshal(a.OutputFormat)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'output_format': %w", err)
+		}
+	}
+
+	if a.PartialImages != nil {
+		object["partial_images"], err = json.Marshal(a.PartialImages)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'partial_images': %w", err)
+		}
+	}
+
+	object["prompt"], err = json.Marshal(a.Prompt)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'prompt': %w", err)
+	}
+
+	if a.Quality != nil {
+		object["quality"], err = json.Marshal(a.Quality)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'quality': %w", err)
+		}
+	}
+
+	if a.ResponseFormat != nil {
+		object["response_format"], err = json.Marshal(a.ResponseFormat)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'response_format': %w", err)
+		}
+	}
+
+	if a.Size != nil {
+		object["size"], err = json.Marshal(a.Size)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'size': %w", err)
+		}
+	}
+
+	if a.Stream != nil {
+		object["stream"], err = json.Marshal(a.Stream)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'stream': %w", err)
+		}
+	}
+
+	if a.User != nil {
+		object["user"], err = json.Marshal(a.User)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'user': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
 // Getter for additional properties for ImageGenerationObject. Returns the specified
 // element and whether it was found
 func (a ImageGenerationObject) Get(fieldName string) (value interface{}, found bool) {
@@ -7607,6 +7958,9 @@ type ServerInterface interface {
 	// Create OpenAI-compatible embeddings with openai-compatible provider context.
 	// (POST /api/provider/openai-compatible/v1/embeddings)
 	CreateOpenAICompatibleEmbeddingAlias(w http.ResponseWriter, r *http.Request)
+	// Create OpenAI-compatible image edits with openai-compatible provider context.
+	// (POST /api/provider/openai-compatible/v1/images/edits)
+	CreateOpenAICompatibleImageEditAlias(w http.ResponseWriter, r *http.Request)
 	// Create OpenAI-compatible image generations with openai-compatible provider context.
 	// (POST /api/provider/openai-compatible/v1/images/generations)
 	CreateOpenAICompatibleImageGenerationAlias(w http.ResponseWriter, r *http.Request)
@@ -7835,6 +8189,9 @@ type ServerInterface interface {
 	// Create OpenAI-compatible embeddings.
 	// (POST /v1/embeddings)
 	CreateEmbedding(w http.ResponseWriter, r *http.Request)
+	// Create OpenAI-compatible image edits.
+	// (POST /v1/images/edits)
+	CreateImageEdit(w http.ResponseWriter, r *http.Request)
 	// Create OpenAI-compatible image generations.
 	// (POST /v1/images/generations)
 	CreateImageGeneration(w http.ResponseWriter, r *http.Request)
@@ -8071,6 +8428,26 @@ func (siw *ServerInterfaceWrapper) CreateOpenAICompatibleEmbeddingAlias(w http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateOpenAICompatibleEmbeddingAlias(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateOpenAICompatibleImageEditAlias operation middleware
+func (siw *ServerInterfaceWrapper) CreateOpenAICompatibleImageEditAlias(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateOpenAICompatibleImageEditAlias(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -10976,6 +11353,26 @@ func (siw *ServerInterfaceWrapper) CreateEmbedding(w http.ResponseWriter, r *htt
 	handler.ServeHTTP(w, r)
 }
 
+// CreateImageEdit operation middleware
+func (siw *ServerInterfaceWrapper) CreateImageEdit(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateImageEdit(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // CreateImageGeneration operation middleware
 func (siw *ServerInterfaceWrapper) CreateImageGeneration(w http.ResponseWriter, r *http.Request) {
 
@@ -11466,6 +11863,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/audio/transcriptions", wrapper.CreateOpenAICompatibleAudioTranscriptionAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/chat/completions", wrapper.CreateOpenAICompatibleChatCompletionAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/embeddings", wrapper.CreateOpenAICompatibleEmbeddingAlias)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/images/edits", wrapper.CreateOpenAICompatibleImageEditAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/images/generations", wrapper.CreateOpenAICompatibleImageGenerationAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/messages", wrapper.CreateOpenAICompatibleMessageAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/moderations", wrapper.CreateOpenAICompatibleModerationAlias)
@@ -11542,6 +11940,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/audio/transcriptions", wrapper.CreateAudioTranscription)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/chat/completions", wrapper.CreateChatCompletion)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/embeddings", wrapper.CreateEmbedding)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/images/edits", wrapper.CreateImageEdit)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/images/generations", wrapper.CreateImageGeneration)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/messages", wrapper.CreateMessage)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/models", wrapper.ListModels)

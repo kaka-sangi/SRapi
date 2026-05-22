@@ -1190,6 +1190,47 @@ export type ImageGenerationRequest = {
     [key: string]: unknown;
 };
 
+export type ImageEditRequest = {
+    /**
+     * One or more source images to edit or use as references. SRapi accepts both `image` and OpenAI SDK style `image[]` multipart field names at runtime.
+     */
+    image: Array<Blob | File>;
+    /**
+     * Optional mask image. When multiple source images are provided, OpenAI-compatible providers apply the mask to the first image.
+     */
+    mask?: Blob | File;
+    model: string;
+    prompt: string;
+    n?: number;
+    /**
+     * Provider-specific output size such as `1024x1024`, `1024x1536`, `1536x1024`, or `auto`.
+     */
+    size?: string;
+    /**
+     * Provider-specific image quality such as `low`, `medium`, `high`, `standard`, `hd`, or `auto`.
+     */
+    quality?: string;
+    response_format?: 'url' | 'b64_json';
+    /**
+     * Provider-specific encoded output format such as `png`, `jpeg`, or `webp`.
+     */
+    output_format?: string;
+    output_compression?: number;
+    background?: string;
+    moderation?: string;
+    input_fidelity?: string;
+    /**
+     * Reserved for future image edit streaming support.
+     */
+    stream?: boolean;
+    /**
+     * Reserved for future image edit streaming support.
+     */
+    partial_images?: number;
+    user?: string;
+    [key: string]: unknown;
+};
+
 export type ImageGenerationObject = {
     url?: string;
     b64_json?: string;
@@ -4539,6 +4580,51 @@ export type CreateImageGenerationResponses = {
 
 export type CreateImageGenerationResponse = CreateImageGenerationResponses[keyof CreateImageGenerationResponses];
 
+export type CreateImageEditData = {
+    body: ImageEditRequest;
+    path?: never;
+    query?: never;
+    url: '/v1/images/edits';
+};
+
+export type CreateImageEditErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateImageEditError = CreateImageEditErrors[keyof CreateImageEditErrors];
+
+export type CreateImageEditResponses = {
+    /**
+     * OpenAI-compatible image edit response.
+     */
+    200: ImageGenerationResponse;
+};
+
+export type CreateImageEditResponse = CreateImageEditResponses[keyof CreateImageEditResponses];
+
 export type CreateAudioTranscriptionData = {
     body: AudioTranscriptionRequest;
     path?: never;
@@ -5413,6 +5499,51 @@ export type CreateOpenAiCompatibleImageGenerationAliasResponses = {
 };
 
 export type CreateOpenAiCompatibleImageGenerationAliasResponse = CreateOpenAiCompatibleImageGenerationAliasResponses[keyof CreateOpenAiCompatibleImageGenerationAliasResponses];
+
+export type CreateOpenAiCompatibleImageEditAliasData = {
+    body: ImageEditRequest;
+    path?: never;
+    query?: never;
+    url: '/api/provider/openai-compatible/v1/images/edits';
+};
+
+export type CreateOpenAiCompatibleImageEditAliasErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateOpenAiCompatibleImageEditAliasError = CreateOpenAiCompatibleImageEditAliasErrors[keyof CreateOpenAiCompatibleImageEditAliasErrors];
+
+export type CreateOpenAiCompatibleImageEditAliasResponses = {
+    /**
+     * OpenAI-compatible image edit response.
+     */
+    200: ImageGenerationResponse;
+};
+
+export type CreateOpenAiCompatibleImageEditAliasResponse = CreateOpenAiCompatibleImageEditAliasResponses[keyof CreateOpenAiCompatibleImageEditAliasResponses];
 
 export type CreateAnthropicCompatibleMessageAliasData = {
     body: AnthropicMessagesRequest;

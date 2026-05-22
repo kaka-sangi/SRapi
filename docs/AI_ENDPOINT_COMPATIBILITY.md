@@ -36,6 +36,7 @@ POST /v1/responses
 ```txt
 POST /v1/embeddings
 POST /v1/images/generations
+POST /v1/images/edits
 POST /v1/audio/transcriptions
 POST /v1/audio/speech
 POST /v1/rerank
@@ -486,6 +487,21 @@ Images generations endpoint
 - OpenAI-compatible provider alias（例如 `/api/provider/openai-compatible/v1/images/generations`）强制 provider context。
 - OpenAI-compatible API-key 和 reverse-proxy accounts 上游调用 `/images/generations` 并解析 `url`、`b64_json` 和 `revised_prompt`。
 - Image edits 和 variations 不在 WP-290 范围内。
+
+WP-480 已实现：
+
+```txt
+Images edits endpoint
+```
+
+边界：
+
+- `POST /v1/images/edits` 接受 OpenAI-compatible multipart form-data：`model`、`prompt`、一个或多个 `image` / `image[]`、可选 `mask`、`n`、`size`、`quality`、`response_format`、`output_format`、`output_compression`、`background`、`moderation`、`input_fidelity` 和 `user`。
+- 请求仍进入 API Key auth、模型可见性、entitlement、Scheduler、Provider Adapter、usage、billing 和 feedback 证据链。
+- Scheduler 继续使用 `images` endpoint capability；Provider 或 account/mapping 必须显式声明 image 能力，text-only provider 不会被误选。
+- OpenAI-compatible provider alias（例如 `/api/provider/openai-compatible/v1/images/edits`）强制 provider context。
+- OpenAI-compatible API-key 和 reverse-proxy accounts 上游调用 multipart `/images/edits`，并解析 `url`、`b64_json` 和 `revised_prompt`。
+- JSON image references、streaming image edit events 和 variations 留给后续兼容包。
 
 WP-310 已实现：
 

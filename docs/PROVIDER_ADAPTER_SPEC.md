@@ -218,7 +218,7 @@ rate_limit_model
 quota_model
 ```
 
-WP-290 起，`supports_images` 映射到 canonical `images` endpoint capability。Gateway image generation 请求必须带 `images` request capability；OpenAI-compatible API-key 和 reverse-proxy accounts 使用 `/images/generations` 上游路径，并解析 `url` / `b64_json` image outputs。
+WP-290 起，`supports_images` 映射到 canonical `images` endpoint capability。Gateway image generation 请求必须带 `images` request capability；OpenAI-compatible API-key 和 reverse-proxy accounts 使用 `/images/generations` 上游路径，并解析 `url` / `b64_json` image outputs。WP-480 起，Gateway image edit 请求也使用 `images` request capability；OpenAI-compatible API-key 和 reverse-proxy accounts 使用 multipart `/images/edits` 上游路径，转发 `image` / `image[]`、可选 `mask` 和输出选项，并解析同一 OpenAI-compatible image response。
 
 WP-310 起，`supports_moderations` 映射到 canonical `moderations` endpoint capability。Gateway moderation 请求必须带 `moderations` request capability；OpenAI-compatible API-key 和 reverse-proxy accounts 使用 `/moderations` 上游路径，并解析 `flagged`、`categories`、`category_scores` 和 `category_applied_input_types`。
 
@@ -630,6 +630,7 @@ Advanced endpoint adapter coverage now also includes OpenAI-compatible passthrou
 ```txt
 Embeddings -> OpenAI-compatible /embeddings
 Images generations -> OpenAI-compatible /images/generations
+Images edits -> OpenAI-compatible /images/edits
 Moderations -> OpenAI-compatible /moderations
 Audio transcriptions -> OpenAI-compatible /audio/transcriptions
 Rerank -> rerank-compatible /rerank
