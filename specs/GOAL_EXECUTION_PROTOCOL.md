@@ -89,6 +89,7 @@ Codex should make conservative choices using existing SRapi rules:
 - Module contracts for cross-module calls.
 - Provider-neutral Scheduler core.
 - Reverse Proxy Runtime for non-API-key account classes.
+- For “反代 / 2api”, use only `docs/2API_REVERSE_PROXY_DEFINITION.md` and the local references `/home/senran/Desktop/sub2api`, `/home/senran/Desktop/CLIProxyAPI`, `/home/senran/Desktop/chatgpt2api`; do not substitute a generic reverse-proxy definition or local-client-ingress interpretation.
 - PostgreSQL as source of truth; Redis as rebuildable runtime state.
 - Security and observability built into the first implementation, not deferred when touching sensitive paths.
 
@@ -130,4 +131,3 @@ Audit current state:
 ```txt
 审计 SRapi 当前实现相对 specs/FINAL_STATE.md 和 specs/ROADMAP.md 的差距，更新 specs/STATUS.md，不做代码改动。
 ```
-

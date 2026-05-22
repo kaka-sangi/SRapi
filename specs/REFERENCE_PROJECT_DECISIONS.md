@@ -2,7 +2,7 @@
 
 ## 1. Purpose
 
-SRapi uses `/home/senran/Desktop/sub2api` and `/home/senran/Desktop/CLIProxyAPI` as references, not templates.
+SRapi uses `/home/senran/Desktop/sub2api`, `/home/senran/Desktop/CLIProxyAPI`, and `/home/senran/Desktop/chatgpt2api` as references, not templates.
 
 This file records what to adopt, what to improve, and what to avoid.
 
@@ -65,7 +65,27 @@ Avoid:
 - Management routes that bypass the SRapi auth/RBAC model.
 - Per-provider translators that cannot converge through Canonical AI IR.
 
-## 4. SRapi Decision Table
+## 4. Lessons From chatgpt2api
+
+Adopt:
+
+- ChatGPT Web upstream simulation through access tokens, browser-style headers, OAI device/session IDs, Sentinel requirements, and backend API routes.
+- OpenAI-compatible downstream rendering over ChatGPT Web conversation and SSE upstream behavior.
+- Account-scoped fingerprint, proxy, and requirements-token handling ideas.
+
+Improve:
+
+- Keep ChatGPT Web behavior inside Provider Adapter and Reverse Proxy Runtime boundaries.
+- Make account state durable through Provider Account contracts instead of ad hoc service globals.
+- Preserve Scheduler decision, usage, and account feedback evidence for every call.
+
+Avoid:
+
+- Treating ChatGPT Web 2api as normal OpenAI API-key dispatch.
+- Letting Web-specific request state leak into Gateway-local DTOs.
+- Bypassing SRapi auth, entitlement, billing, audit, or Scheduler evidence.
+
+## 5. SRapi Decision Table
 
 | Concern | sub2api reference | CLIProxyAPI reference | SRapi decision |
 | --- | --- | --- | --- |
@@ -78,7 +98,9 @@ Avoid:
 | Payments | Built-in commercial system | Out of scope | Phase 2 commercial plane after Gateway correctness. |
 | Frontend | Full admin dashboard | optional management UI/TUI | Modern console using generated SDK and SRapi design system. |
 
-## 5. Rule For Future References
+For ChatGPT Web specific reverse-proxy behavior, `chatgpt2api` is the local source reference for upstream browser/OAI/Sentinel request simulation and compatible rendering.
+
+## 6. Rule For Future References
 
 When copying an idea from a reference project, Codex must answer:
 
@@ -89,4 +111,3 @@ When copying an idea from a reference project, Codex must answer:
 5. Does it preserve OpenAPI-first, Provider-neutral Scheduler, and credential safety?
 
 If any answer is unclear, implement the abstraction first, not the feature shortcut.
-

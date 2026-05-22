@@ -6,6 +6,13 @@ SRapi 中的“反代”按 AI 2api 语境使用，不等同于普通 API Gatewa
 
 本定义是后续 `reverse-proxy-*` Provider Adapter、Reverse Proxy Runtime、Scheduler evidence 和测试 harness 的约束来源。实现时如果与本文冲突，以本文为准。
 
+硬规则：
+
+- 在 SRapi 项目内，“反代 / 2api”只按 `/home/senran/Desktop/sub2api`、`/home/senran/Desktop/CLIProxyAPI`、`/home/senran/Desktop/chatgpt2api` 的做法解释。
+- 不再用通用网络 reverse proxy 定义替代本定义。
+- 不再把“接入本地 Codex / Claude Code / Antigravity 客户端”当作 SRapi 反代目标。
+- 不在 Gateway service 增加 Codex / Claude Code / Antigravity 本地 DTO；官方客户端请求模拟属于 Provider Adapter 和 Reverse Proxy Runtime。
+
 ## 2. SRapi 反代定义来源
 
 SRapi 的“反代 / 2api”定义以本地参考项目为准：
@@ -17,6 +24,13 @@ SRapi 的“反代 / 2api”定义以本地参考项目为准：
 这些项目的共同做法就是本项目采用的 2api 反代定义：下游暴露 OpenAI / Anthropic / Gemini 兼容 API，上游直接模拟官方 Web、桌面、CLI、IDE 客户端请求形态，并使用 OAuth、session、desktop token、CLI token 或 IDE token 请求真实上游。
 
 通用网络术语里的 reverse proxy 只说明“在客户端和服务器之间转发”。在 SRapi 中，决策依据不是这个宽泛定义，而是上述本地 2api 项目的 official-client upstream simulation 做法。
+
+也就是说，SRapi 的反代判断标准不是“有没有一个代理服务器”，而是：
+
+- 下游是否仍使用兼容 API。
+- SRapi 是否选择账号池里的非 API-key 账号身份。
+- Adapter 是否构造目标官方客户端会发出的 upstream endpoint、headers、body、stream/WSS 形态。
+- Reverse Proxy Runtime 是否使用该账号的 OAuth/session/desktop/CLI/IDE credential 和传输上下文发给真实上游。
 
 ## 3. SRapi 里的 2api 反代定义
 
@@ -75,7 +89,17 @@ Implementation status:
 - WP-450 implements the Antigravity Desktop/IDE 2api HTTP text path: `reverse-proxy-antigravity` builds Google Cloud Code `/v1internal:generateContent` or `/v1internal:streamGenerateContent?alt=sse` requests with Antigravity `project`/`requestId`/`userAgent`/`requestType` envelope, while Reverse Proxy Runtime injects the selected desktop/IDE/OAuth token.
 - Persistent Codex WebSocket session reuse, richer prompt-cache policy, local Codex CLI client ingress, Claude Code WebSocket adapters, Antigravity WebSocket adapters, Antigravity OAuth onboarding, and project discovery are still follow-up work.
 
-## 6. Boundary Rules
+## 6. Local Reference Interpretation Rules
+
+When a future implementation package touches 2api behavior, the local references mean the following:
+
+- `sub2api`: account-pool driven 2api service behavior, Claude Code mimicry, Antigravity forwarding, model/account fallback, quota/cooldown handling, and compatible API rendering.
+- `CLIProxyAPI`: OAuth/device/runtime executors for Codex, Claude Code, Gemini, Antigravity, request translators, session affinity, streaming/WebSocket behavior, and account-scoped proxy handling.
+- `chatgpt2api`: ChatGPT Web upstream simulation through access token, browser headers, OAI device/session IDs, Sentinel requirements, backend API routes, SSE parsing, and compatible OpenAI-style rendering.
+
+These are references for SRapi's 2api semantics, not architecture templates. SRapi must still preserve its own Gateway -> Canonical AI Request -> Scheduler -> Provider Adapter -> Reverse Proxy Runtime boundaries.
+
+## 7. Boundary Rules
 
 1. `runtime_class = api_key` is official API-key adapter behavior, not SRapi 2api reverse proxy behavior.
 2. `reverse-proxy-*` 2api adapters require OAuth/session/client-token style account credentials (`runtime_class != api_key`) and must reject or avoid scheduling `api_key` runtime accounts.
@@ -85,7 +109,7 @@ Implementation status:
 6. Client Response Renderer owns downstream response shape. Upstream official-client SSE/WSS frames may be transformed only after the runtime has received them.
 7. Every successful or failed 2api call must still produce Scheduler decision/feedback and usage evidence.
 
-## 7. Implementation Test Implications
+## 8. Implementation Test Implications
 
 A valid 2api reverse-proxy test should prove at least:
 
@@ -95,7 +119,7 @@ A valid 2api reverse-proxy test should prove at least:
 - Scheduler decision and usage evidence preserve the original downstream source endpoint.
 - Failure classes such as `session_invalid`, `account_locked`, `account_banned`, `device_unrecognized`, `challenge_required`, `geo_blocked`, `timeout`, and `network_error` are mapped into account protection and feedback paths.
 
-## 8. Source References
+## 9. Source References
 
 - `/home/senran/Desktop/CLIProxyAPI/internal/runtime/executor/codex_executor.go`: Codex official-client/OAuth upstream request shape.
 - `/home/senran/Desktop/CLIProxyAPI/internal/runtime/executor/claude_executor.go`: Claude Code official-client/OAuth upstream request shape.
