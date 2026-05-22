@@ -42,6 +42,12 @@ type Tx struct {
 	ModelProviderMapping *ModelProviderMappingClient
 	// ModelRegistry is the client for interacting with the ModelRegistry builders.
 	ModelRegistry *ModelRegistryClient
+	// PaymentAuditLog is the client for interacting with the PaymentAuditLog builders.
+	PaymentAuditLog *PaymentAuditLogClient
+	// PaymentOrder is the client for interacting with the PaymentOrder builders.
+	PaymentOrder *PaymentOrderClient
+	// PaymentProviderInstance is the client for interacting with the PaymentProviderInstance builders.
+	PaymentProviderInstance *PaymentProviderInstanceClient
 	// PricingRule is the client for interacting with the PricingRule builders.
 	PricingRule *PricingRuleClient
 	// Provider is the client for interacting with the Provider builders.
@@ -214,6 +220,9 @@ func (tx *Tx) init() {
 	tx.ModelAlias = NewModelAliasClient(tx.config)
 	tx.ModelProviderMapping = NewModelProviderMappingClient(tx.config)
 	tx.ModelRegistry = NewModelRegistryClient(tx.config)
+	tx.PaymentAuditLog = NewPaymentAuditLogClient(tx.config)
+	tx.PaymentOrder = NewPaymentOrderClient(tx.config)
+	tx.PaymentProviderInstance = NewPaymentProviderInstanceClient(tx.config)
 	tx.PricingRule = NewPricingRuleClient(tx.config)
 	tx.Provider = NewProviderClient(tx.config)
 	tx.ProviderAccount = NewProviderAccountClient(tx.config)

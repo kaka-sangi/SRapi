@@ -135,6 +135,7 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 			httpserver.WithAuditStore(stores.Audit),
 			httpserver.WithBillingStore(stores.Billing),
 			httpserver.WithEventStore(stores.Events),
+			httpserver.WithPaymentStore(stores.Payments),
 			httpserver.WithSchedulerStore(stores.Scheduler),
 			httpserver.WithSubscriptionStore(stores.Subscriptions),
 			httpserver.WithUsageStore(stores.Usage),

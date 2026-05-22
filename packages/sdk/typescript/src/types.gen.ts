@@ -165,6 +165,125 @@ export type ApiKeyResponse = {
     request_id: RequestId;
 };
 
+export type PaymentProviderStatus = 'active' | 'disabled' | 'archived';
+
+export type PaymentOrderStatus = 'pending' | 'paid' | 'fulfilled' | 'partially_refunded' | 'refunded' | 'expired' | 'canceled' | 'failed';
+
+export type PaymentProductType = 'balance_credit' | 'subscription_plan';
+
+export type PaymentMethod = {
+    method: string;
+    provider: string;
+    provider_instance_id: Id;
+    name: string;
+    metadata: JsonObject;
+};
+
+export type PaymentMethodListResponse = {
+    data: Array<PaymentMethod>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type PaymentProviderInstance = {
+    id: Id;
+    provider: string;
+    name: string;
+    status: PaymentProviderStatus;
+    config_version: number;
+    supported_methods: Array<string>;
+    limits: JsonObject;
+    sort_order: number;
+    metadata: JsonObject;
+    created_at: Timestamp;
+    updated_at: Timestamp;
+};
+
+export type CreatePaymentProviderInstanceRequest = {
+    provider: string;
+    name: string;
+    status?: PaymentProviderStatus;
+    config: JsonObject;
+    supported_methods?: Array<string>;
+    limits?: JsonObject;
+    sort_order?: number;
+    metadata?: JsonObject;
+};
+
+export type PaymentProviderInstanceResponse = {
+    data: PaymentProviderInstance;
+    request_id: RequestId;
+};
+
+export type PaymentProviderInstanceListResponse = {
+    data: Array<PaymentProviderInstance>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type PaymentOrder = {
+    id: Id;
+    user_id: Id;
+    order_no: string;
+    provider_instance_id: Id;
+    amount: string;
+    currency: string;
+    status: PaymentOrderStatus;
+    product_type: PaymentProductType;
+    product_id: string;
+    provider_transaction_id?: string | null;
+    provider_snapshot: JsonObject;
+    expires_at?: string | null;
+    paid_at?: string | null;
+    closed_at?: string | null;
+    metadata: JsonObject;
+    created_at: Timestamp;
+    updated_at: Timestamp;
+};
+
+export type CreatePaymentOrderRequest = {
+    method: string;
+    amount: string;
+    currency?: string;
+    product_type: PaymentProductType;
+    product_id?: string;
+    expires_at?: string;
+    metadata?: JsonObject;
+};
+
+export type PaymentOrderResponse = {
+    data: PaymentOrder;
+    request_id: RequestId;
+};
+
+export type PaymentOrderListResponse = {
+    data: Array<PaymentOrder>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type PaymentWebhookRequest = {
+    [key: string]: unknown;
+};
+
+export type PaymentWebhookResult = {
+    order: PaymentOrder;
+    handled: boolean;
+};
+
+export type PaymentWebhookResponse = {
+    data: PaymentWebhookResult;
+    request_id: RequestId;
+};
+
+export type RefundPaymentOrderRequest = {
+    /**
+     * Decimal refund amount. Empty or omitted means full refund.
+     */
+    amount?: string;
+    reason?: string;
+};
+
 export type SubscriptionPlanStatus = 'active' | 'disabled' | 'archived';
 
 export type UserSubscriptionStatus = 'active' | 'expired' | 'cancelled' | 'suspended';
@@ -740,7 +859,7 @@ export type AuditLogListResponse = {
 export type BillingLedgerEntry = {
     id: Id;
     user_id: Id;
-    type: 'usage_charge' | 'refund' | 'adjustment' | 'compensation';
+    type: 'usage_charge' | 'payment_credit' | 'refund' | 'adjustment' | 'compensation';
     amount: string;
     currency: string;
     balance_before: string;
@@ -1247,6 +1366,217 @@ export type GetCurrentUserSubscriptionsResponses = {
 };
 
 export type GetCurrentUserSubscriptionsResponse = GetCurrentUserSubscriptionsResponses[keyof GetCurrentUserSubscriptionsResponses];
+
+export type ListPaymentMethodsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/payment/methods';
+};
+
+export type ListPaymentMethodsErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListPaymentMethodsError = ListPaymentMethodsErrors[keyof ListPaymentMethodsErrors];
+
+export type ListPaymentMethodsResponses = {
+    /**
+     * Available payment methods.
+     */
+    200: PaymentMethodListResponse;
+};
+
+export type ListPaymentMethodsResponse = ListPaymentMethodsResponses[keyof ListPaymentMethodsResponses];
+
+export type ListPaymentOrdersData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        page_size?: number;
+    };
+    url: '/api/v1/payment/orders';
+};
+
+export type ListPaymentOrdersErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListPaymentOrdersError = ListPaymentOrdersErrors[keyof ListPaymentOrdersErrors];
+
+export type ListPaymentOrdersResponses = {
+    /**
+     * Current user payment orders.
+     */
+    200: PaymentOrderListResponse;
+};
+
+export type ListPaymentOrdersResponse = ListPaymentOrdersResponses[keyof ListPaymentOrdersResponses];
+
+export type CreatePaymentOrderData = {
+    body: CreatePaymentOrderRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/payment/orders';
+};
+
+export type CreatePaymentOrderErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type CreatePaymentOrderError = CreatePaymentOrderErrors[keyof CreatePaymentOrderErrors];
+
+export type CreatePaymentOrderResponses = {
+    /**
+     * Payment order created.
+     */
+    201: PaymentOrderResponse;
+};
+
+export type CreatePaymentOrderResponse = CreatePaymentOrderResponses[keyof CreatePaymentOrderResponses];
+
+export type GetPaymentOrderData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/payment/orders/{id}';
+};
+
+export type GetPaymentOrderErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetPaymentOrderError = GetPaymentOrderErrors[keyof GetPaymentOrderErrors];
+
+export type GetPaymentOrderResponses = {
+    /**
+     * Payment order.
+     */
+    200: PaymentOrderResponse;
+};
+
+export type GetPaymentOrderResponse = GetPaymentOrderResponses[keyof GetPaymentOrderResponses];
+
+export type CancelPaymentOrderData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/payment/orders/{id}/cancel';
+};
+
+export type CancelPaymentOrderErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type CancelPaymentOrderError = CancelPaymentOrderErrors[keyof CancelPaymentOrderErrors];
+
+export type CancelPaymentOrderResponses = {
+    /**
+     * Payment order canceled.
+     */
+    200: PaymentOrderResponse;
+};
+
+export type CancelPaymentOrderResponse = CancelPaymentOrderResponses[keyof CancelPaymentOrderResponses];
+
+export type HandlePaymentWebhookData = {
+    body: PaymentWebhookRequest;
+    path: {
+        provider: string;
+    };
+    query?: never;
+    url: '/api/v1/webhooks/payments/{provider}';
+};
+
+export type HandlePaymentWebhookErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type HandlePaymentWebhookError = HandlePaymentWebhookErrors[keyof HandlePaymentWebhookErrors];
+
+export type HandlePaymentWebhookResponses = {
+    /**
+     * Webhook was accepted or already handled.
+     */
+    200: PaymentWebhookResponse;
+};
+
+export type HandlePaymentWebhookResponse = HandlePaymentWebhookResponses[keyof HandlePaymentWebhookResponses];
 
 export type ListApiKeysData = {
     body?: never;
@@ -2621,6 +2951,160 @@ export type ListAdminBillingLedgerResponses = {
 };
 
 export type ListAdminBillingLedgerResponse = ListAdminBillingLedgerResponses[keyof ListAdminBillingLedgerResponses];
+
+export type ListAdminPaymentProvidersData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        page_size?: number;
+    };
+    url: '/api/v1/admin/payments/providers';
+};
+
+export type ListAdminPaymentProvidersErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminPaymentProvidersError = ListAdminPaymentProvidersErrors[keyof ListAdminPaymentProvidersErrors];
+
+export type ListAdminPaymentProvidersResponses = {
+    /**
+     * Payment provider instance list.
+     */
+    200: PaymentProviderInstanceListResponse;
+};
+
+export type ListAdminPaymentProvidersResponse = ListAdminPaymentProvidersResponses[keyof ListAdminPaymentProvidersResponses];
+
+export type CreateAdminPaymentProviderData = {
+    body: CreatePaymentProviderInstanceRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/payments/providers';
+};
+
+export type CreateAdminPaymentProviderErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type CreateAdminPaymentProviderError = CreateAdminPaymentProviderErrors[keyof CreateAdminPaymentProviderErrors];
+
+export type CreateAdminPaymentProviderResponses = {
+    /**
+     * Payment provider instance created.
+     */
+    201: PaymentProviderInstanceResponse;
+};
+
+export type CreateAdminPaymentProviderResponse = CreateAdminPaymentProviderResponses[keyof CreateAdminPaymentProviderResponses];
+
+export type ListAdminPaymentOrdersData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        page_size?: number;
+        user_id?: Id;
+        status?: PaymentOrderStatus;
+    };
+    url: '/api/v1/admin/payments/orders';
+};
+
+export type ListAdminPaymentOrdersErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminPaymentOrdersError = ListAdminPaymentOrdersErrors[keyof ListAdminPaymentOrdersErrors];
+
+export type ListAdminPaymentOrdersResponses = {
+    /**
+     * Payment order list.
+     */
+    200: PaymentOrderListResponse;
+};
+
+export type ListAdminPaymentOrdersResponse = ListAdminPaymentOrdersResponses[keyof ListAdminPaymentOrdersResponses];
+
+export type RefundAdminPaymentOrderData = {
+    body: RefundPaymentOrderRequest;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/payments/orders/{id}/refund';
+};
+
+export type RefundAdminPaymentOrderErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type RefundAdminPaymentOrderError = RefundAdminPaymentOrderErrors[keyof RefundAdminPaymentOrderErrors];
+
+export type RefundAdminPaymentOrderResponses = {
+    /**
+     * Payment order refunded.
+     */
+    200: PaymentOrderResponse;
+};
+
+export type RefundAdminPaymentOrderResponse = RefundAdminPaymentOrderResponses[keyof RefundAdminPaymentOrderResponses];
 
 export type ListAdminSubscriptionPlansData = {
     body?: never;

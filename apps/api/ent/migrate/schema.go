@@ -523,6 +523,143 @@ var (
 			},
 		},
 	}
+	// PaymentAuditLogsColumns holds the columns for the "payment_audit_logs" table.
+	PaymentAuditLogsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "order_id", Type: field.TypeInt, Default: 0},
+		{Name: "provider_instance_id", Type: field.TypeInt, Default: 0},
+		{Name: "event_type", Type: field.TypeString},
+		{Name: "idempotency_key", Type: field.TypeString},
+		{Name: "payload_json", Type: field.TypeJSON, Nullable: true},
+		{Name: "signature_valid", Type: field.TypeBool, Default: false},
+	}
+	// PaymentAuditLogsTable holds the schema information for the "payment_audit_logs" table.
+	PaymentAuditLogsTable = &schema.Table{
+		Name:       "payment_audit_logs",
+		Columns:    PaymentAuditLogsColumns,
+		PrimaryKey: []*schema.Column{PaymentAuditLogsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "paymentauditlog_idempotency_key",
+				Unique:  true,
+				Columns: []*schema.Column{PaymentAuditLogsColumns[6]},
+			},
+			{
+				Name:    "paymentauditlog_order_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{PaymentAuditLogsColumns[3], PaymentAuditLogsColumns[1]},
+			},
+			{
+				Name:    "paymentauditlog_provider_instance_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{PaymentAuditLogsColumns[4], PaymentAuditLogsColumns[1]},
+			},
+			{
+				Name:    "paymentauditlog_event_type_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{PaymentAuditLogsColumns[5], PaymentAuditLogsColumns[1]},
+			},
+		},
+	}
+	// PaymentOrdersColumns holds the columns for the "payment_orders" table.
+	PaymentOrdersColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "user_id", Type: field.TypeInt},
+		{Name: "order_no", Type: field.TypeString},
+		{Name: "provider_instance_id", Type: field.TypeInt},
+		{Name: "amount", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "currency", Type: field.TypeString, Default: "USD"},
+		{Name: "status", Type: field.TypeString, Default: "pending"},
+		{Name: "product_type", Type: field.TypeString},
+		{Name: "product_id", Type: field.TypeString, Default: ""},
+		{Name: "provider_transaction_id", Type: field.TypeString, Nullable: true},
+		{Name: "provider_snapshot_json", Type: field.TypeJSON, Nullable: true},
+		{Name: "expires_at", Type: field.TypeTime, Nullable: true},
+		{Name: "paid_at", Type: field.TypeTime, Nullable: true},
+		{Name: "closed_at", Type: field.TypeTime, Nullable: true},
+		{Name: "metadata_json", Type: field.TypeJSON, Nullable: true},
+	}
+	// PaymentOrdersTable holds the schema information for the "payment_orders" table.
+	PaymentOrdersTable = &schema.Table{
+		Name:       "payment_orders",
+		Columns:    PaymentOrdersColumns,
+		PrimaryKey: []*schema.Column{PaymentOrdersColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "paymentorder_order_no",
+				Unique:  true,
+				Columns: []*schema.Column{PaymentOrdersColumns[4]},
+			},
+			{
+				Name:    "paymentorder_user_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{PaymentOrdersColumns[3], PaymentOrdersColumns[1]},
+			},
+			{
+				Name:    "paymentorder_status_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{PaymentOrdersColumns[8], PaymentOrdersColumns[1]},
+			},
+			{
+				Name:    "paymentorder_provider_transaction_id",
+				Unique:  false,
+				Columns: []*schema.Column{PaymentOrdersColumns[11]},
+			},
+			{
+				Name:    "paymentorder_provider_instance_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{PaymentOrdersColumns[5], PaymentOrdersColumns[1]},
+			},
+			{
+				Name:    "paymentorder_expires_at",
+				Unique:  false,
+				Columns: []*schema.Column{PaymentOrdersColumns[13]},
+			},
+		},
+	}
+	// PaymentProviderInstancesColumns holds the columns for the "payment_provider_instances" table.
+	PaymentProviderInstancesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "deleted_at", Type: field.TypeTime, Nullable: true},
+		{Name: "provider", Type: field.TypeString},
+		{Name: "name", Type: field.TypeString},
+		{Name: "status", Type: field.TypeString, Default: "active"},
+		{Name: "config_ciphertext", Type: field.TypeBytes, Nullable: true},
+		{Name: "config_version", Type: field.TypeInt, Default: 1},
+		{Name: "supported_methods_json", Type: field.TypeJSON, Nullable: true},
+		{Name: "limits_json", Type: field.TypeJSON, Nullable: true},
+		{Name: "sort_order", Type: field.TypeInt, Default: 0},
+		{Name: "metadata_json", Type: field.TypeJSON, Nullable: true},
+	}
+	// PaymentProviderInstancesTable holds the schema information for the "payment_provider_instances" table.
+	PaymentProviderInstancesTable = &schema.Table{
+		Name:       "payment_provider_instances",
+		Columns:    PaymentProviderInstancesColumns,
+		PrimaryKey: []*schema.Column{PaymentProviderInstancesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "paymentproviderinstance_provider_name",
+				Unique:  true,
+				Columns: []*schema.Column{PaymentProviderInstancesColumns[4], PaymentProviderInstancesColumns[5]},
+			},
+			{
+				Name:    "paymentproviderinstance_provider_status",
+				Unique:  false,
+				Columns: []*schema.Column{PaymentProviderInstancesColumns[4], PaymentProviderInstancesColumns[6]},
+			},
+			{
+				Name:    "paymentproviderinstance_status_sort_order",
+				Unique:  false,
+				Columns: []*schema.Column{PaymentProviderInstancesColumns[6], PaymentProviderInstancesColumns[11]},
+			},
+		},
+	}
 	// PricingRulesColumns holds the columns for the "pricing_rules" table.
 	PricingRulesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -1044,6 +1181,9 @@ var (
 		ModelAliasTable,
 		ModelProviderMappingsTable,
 		ModelRegistriesTable,
+		PaymentAuditLogsTable,
+		PaymentOrdersTable,
+		PaymentProviderInstancesTable,
 		PricingRulesTable,
 		ProvidersTable,
 		ProviderAccountsTable,

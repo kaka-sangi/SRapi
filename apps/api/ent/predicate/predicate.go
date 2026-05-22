@@ -51,6 +51,15 @@ type ModelProviderMapping func(*sql.Selector)
 // ModelRegistry is the predicate function for modelregistry builders.
 type ModelRegistry func(*sql.Selector)
 
+// PaymentAuditLog is the predicate function for paymentauditlog builders.
+type PaymentAuditLog func(*sql.Selector)
+
+// PaymentOrder is the predicate function for paymentorder builders.
+type PaymentOrder func(*sql.Selector)
+
+// PaymentProviderInstance is the predicate function for paymentproviderinstance builders.
+type PaymentProviderInstance func(*sql.Selector)
+
 // PricingRule is the predicate function for pricingrule builders.
 type PricingRule func(*sql.Selector)
 

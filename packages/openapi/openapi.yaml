@@ -40,6 +40,10 @@ tags:
     description: Billing ledger administration endpoints.
   - name: AdminSubscriptions
     description: Subscription plan, user subscription, and pricing rule administration endpoints.
+  - name: Payment
+    description: Current-user payment methods and payment order endpoints.
+  - name: AdminPayments
+    description: Payment provider and order administration endpoints.
   - name: AdminOps
     description: Operational event administration endpoints.
   - name: Gateway
@@ -217,6 +221,191 @@ paths:
                 $ref: "#/components/schemas/UserSubscriptionListResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/payment/methods:
+    get:
+      tags:
+        - Payment
+      operationId: listPaymentMethods
+      summary: List available payment methods for the current user.
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Available payment methods.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentMethodListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/payment/orders:
+    get:
+      tags:
+        - Payment
+      operationId: listPaymentOrders
+      summary: List payment orders for the current user.
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: Current user payment orders.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentOrderListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        default:
+          $ref: "#/components/responses/StandardError"
+    post:
+      tags:
+        - Payment
+      operationId: createPaymentOrder
+      summary: Create a payment order for the current user.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePaymentOrderRequest"
+      responses:
+        "201":
+          description: Payment order created.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentOrderResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/payment/orders/{id}:
+    get:
+      tags:
+        - Payment
+      operationId: getPaymentOrder
+      summary: Get a payment order owned by the current user.
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Payment order.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentOrderResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/payment/orders/{id}/cancel:
+    post:
+      tags:
+        - Payment
+      operationId: cancelPaymentOrder
+      summary: Cancel a pending payment order owned by the current user.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Payment order canceled.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentOrderResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/webhooks/payments/{provider}:
+    post:
+      tags:
+        - Payment
+      operationId: handlePaymentWebhook
+      summary: Handle a signed payment provider webhook.
+      security: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaymentWebhookRequest"
+      responses:
+        "200":
+          description: Webhook was accepted or already handled.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentWebhookResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         default:
           $ref: "#/components/responses/StandardError"
 
@@ -1518,6 +1707,156 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/payments/providers:
+    get:
+      tags:
+        - AdminPayments
+      operationId: listAdminPaymentProviders
+      summary: List payment provider instances.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: Payment provider instance list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentProviderInstanceListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+    post:
+      tags:
+        - AdminPayments
+      operationId: createAdminPaymentProvider
+      summary: Create an encrypted payment provider instance.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePaymentProviderInstanceRequest"
+      responses:
+        "201":
+          description: Payment provider instance created.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentProviderInstanceResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/payments/orders:
+    get:
+      tags:
+        - AdminPayments
+      operationId: listAdminPaymentOrders
+      summary: List payment orders.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - name: user_id
+          in: query
+          schema:
+            $ref: "#/components/schemas/Id"
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/PaymentOrderStatus"
+      responses:
+        "200":
+          description: Payment order list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentOrderListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/payments/orders/{id}/refund:
+    post:
+      tags:
+        - AdminPayments
+      operationId: refundAdminPaymentOrder
+      summary: Refund a fulfilled or paid payment order.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefundPaymentOrderRequest"
+      responses:
+        "200":
+          description: Payment order refunded.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentOrderResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         default:
           $ref: "#/components/responses/StandardError"
 
@@ -2845,6 +3184,313 @@ components:
           $ref: "#/components/schemas/ApiKey"
         request_id:
           $ref: "#/components/schemas/RequestId"
+
+    PaymentProviderStatus:
+      type: string
+      enum:
+        - active
+        - disabled
+        - archived
+
+    PaymentOrderStatus:
+      type: string
+      enum:
+        - pending
+        - paid
+        - fulfilled
+        - partially_refunded
+        - refunded
+        - expired
+        - canceled
+        - failed
+
+    PaymentProductType:
+      type: string
+      enum:
+        - balance_credit
+        - subscription_plan
+
+    PaymentMethod:
+      type: object
+      required:
+        - method
+        - provider
+        - provider_instance_id
+        - name
+        - metadata
+      properties:
+        method:
+          type: string
+        provider:
+          type: string
+        provider_instance_id:
+          $ref: "#/components/schemas/Id"
+        name:
+          type: string
+        metadata:
+          $ref: "#/components/schemas/JsonObject"
+
+    PaymentMethodListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaymentMethod"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    PaymentProviderInstance:
+      type: object
+      required:
+        - id
+        - provider
+        - name
+        - status
+        - config_version
+        - supported_methods
+        - limits
+        - sort_order
+        - metadata
+        - created_at
+        - updated_at
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        provider:
+          type: string
+        name:
+          type: string
+        status:
+          $ref: "#/components/schemas/PaymentProviderStatus"
+        config_version:
+          type: integer
+          minimum: 1
+        supported_methods:
+          type: array
+          items:
+            type: string
+        limits:
+          $ref: "#/components/schemas/JsonObject"
+        sort_order:
+          type: integer
+        metadata:
+          $ref: "#/components/schemas/JsonObject"
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+        updated_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    CreatePaymentProviderInstanceRequest:
+      type: object
+      required:
+        - provider
+        - name
+        - config
+      properties:
+        provider:
+          type: string
+          minLength: 1
+        name:
+          type: string
+          minLength: 1
+        status:
+          $ref: "#/components/schemas/PaymentProviderStatus"
+        config:
+          $ref: "#/components/schemas/JsonObject"
+        supported_methods:
+          type: array
+          items:
+            type: string
+        limits:
+          $ref: "#/components/schemas/JsonObject"
+        sort_order:
+          type: integer
+        metadata:
+          $ref: "#/components/schemas/JsonObject"
+
+    PaymentProviderInstanceResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/PaymentProviderInstance"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    PaymentProviderInstanceListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaymentProviderInstance"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    PaymentOrder:
+      type: object
+      required:
+        - id
+        - user_id
+        - order_no
+        - provider_instance_id
+        - amount
+        - currency
+        - status
+        - product_type
+        - product_id
+        - provider_snapshot
+        - metadata
+        - created_at
+        - updated_at
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        user_id:
+          $ref: "#/components/schemas/Id"
+        order_no:
+          type: string
+        provider_instance_id:
+          $ref: "#/components/schemas/Id"
+        amount:
+          type: string
+          example: "10.00000000"
+        currency:
+          type: string
+          example: USD
+        status:
+          $ref: "#/components/schemas/PaymentOrderStatus"
+        product_type:
+          $ref: "#/components/schemas/PaymentProductType"
+        product_id:
+          type: string
+        provider_transaction_id:
+          type: string
+          nullable: true
+        provider_snapshot:
+          $ref: "#/components/schemas/JsonObject"
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        paid_at:
+          type: string
+          format: date-time
+          nullable: true
+        closed_at:
+          type: string
+          format: date-time
+          nullable: true
+        metadata:
+          $ref: "#/components/schemas/JsonObject"
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+        updated_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    CreatePaymentOrderRequest:
+      type: object
+      required:
+        - method
+        - amount
+        - product_type
+      properties:
+        method:
+          type: string
+          minLength: 1
+        amount:
+          type: string
+          example: "10.00"
+        currency:
+          type: string
+          example: USD
+        product_type:
+          $ref: "#/components/schemas/PaymentProductType"
+        product_id:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+        metadata:
+          $ref: "#/components/schemas/JsonObject"
+
+    PaymentOrderResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/PaymentOrder"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    PaymentOrderListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaymentOrder"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    PaymentWebhookRequest:
+      type: object
+      additionalProperties: true
+
+    PaymentWebhookResult:
+      type: object
+      required:
+        - order
+        - handled
+      properties:
+        order:
+          $ref: "#/components/schemas/PaymentOrder"
+        handled:
+          type: boolean
+
+    PaymentWebhookResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/PaymentWebhookResult"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    RefundPaymentOrderRequest:
+      type: object
+      properties:
+        amount:
+          type: string
+          description: Decimal refund amount. Empty or omitted means full refund.
+        reason:
+          type: string
+          maxLength: 500
 
     SubscriptionPlanStatus:
       type: string
@@ -4458,6 +5104,7 @@ components:
           type: string
           enum:
             - usage_charge
+            - payment_credit
             - refund
             - adjustment
             - compensation

@@ -154,10 +154,11 @@ func (e ApiKeyStatus) Valid() bool {
 
 // Defines values for BillingLedgerEntryType.
 const (
-	Adjustment   BillingLedgerEntryType = "adjustment"
-	Compensation BillingLedgerEntryType = "compensation"
-	Refund       BillingLedgerEntryType = "refund"
-	UsageCharge  BillingLedgerEntryType = "usage_charge"
+	Adjustment    BillingLedgerEntryType = "adjustment"
+	Compensation  BillingLedgerEntryType = "compensation"
+	PaymentCredit BillingLedgerEntryType = "payment_credit"
+	Refund        BillingLedgerEntryType = "refund"
+	UsageCharge   BillingLedgerEntryType = "usage_charge"
 )
 
 // Valid indicates whether the value is a known member of the BillingLedgerEntryType enum.
@@ -166,6 +167,8 @@ func (e BillingLedgerEntryType) Valid() bool {
 	case Adjustment:
 		return true
 	case Compensation:
+		return true
+	case PaymentCredit:
 		return true
 	case Refund:
 		return true
@@ -497,6 +500,81 @@ const (
 func (e OpenAIModelListObject) Valid() bool {
 	switch e {
 	case List:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PaymentOrderStatus.
+const (
+	PaymentOrderStatusCanceled          PaymentOrderStatus = "canceled"
+	PaymentOrderStatusExpired           PaymentOrderStatus = "expired"
+	PaymentOrderStatusFailed            PaymentOrderStatus = "failed"
+	PaymentOrderStatusFulfilled         PaymentOrderStatus = "fulfilled"
+	PaymentOrderStatusPaid              PaymentOrderStatus = "paid"
+	PaymentOrderStatusPartiallyRefunded PaymentOrderStatus = "partially_refunded"
+	PaymentOrderStatusPending           PaymentOrderStatus = "pending"
+	PaymentOrderStatusRefunded          PaymentOrderStatus = "refunded"
+)
+
+// Valid indicates whether the value is a known member of the PaymentOrderStatus enum.
+func (e PaymentOrderStatus) Valid() bool {
+	switch e {
+	case PaymentOrderStatusCanceled:
+		return true
+	case PaymentOrderStatusExpired:
+		return true
+	case PaymentOrderStatusFailed:
+		return true
+	case PaymentOrderStatusFulfilled:
+		return true
+	case PaymentOrderStatusPaid:
+		return true
+	case PaymentOrderStatusPartiallyRefunded:
+		return true
+	case PaymentOrderStatusPending:
+		return true
+	case PaymentOrderStatusRefunded:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PaymentProductType.
+const (
+	PaymentProductTypeBalanceCredit    PaymentProductType = "balance_credit"
+	PaymentProductTypeSubscriptionPlan PaymentProductType = "subscription_plan"
+)
+
+// Valid indicates whether the value is a known member of the PaymentProductType enum.
+func (e PaymentProductType) Valid() bool {
+	switch e {
+	case PaymentProductTypeBalanceCredit:
+		return true
+	case PaymentProductTypeSubscriptionPlan:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PaymentProviderStatus.
+const (
+	PaymentProviderStatusActive   PaymentProviderStatus = "active"
+	PaymentProviderStatusArchived PaymentProviderStatus = "archived"
+	PaymentProviderStatusDisabled PaymentProviderStatus = "disabled"
+)
+
+// Valid indicates whether the value is a known member of the PaymentProviderStatus enum.
+func (e PaymentProviderStatus) Valid() bool {
+	switch e {
+	case PaymentProviderStatusActive:
+		return true
+	case PaymentProviderStatusArchived:
+		return true
+	case PaymentProviderStatusDisabled:
 		return true
 	default:
 		return false
@@ -1321,6 +1399,29 @@ type CreateModelRequest struct {
 	Status          *ResourceStatus         `json:"status,omitempty"`
 }
 
+// CreatePaymentOrderRequest defines model for CreatePaymentOrderRequest.
+type CreatePaymentOrderRequest struct {
+	Amount      string             `json:"amount"`
+	Currency    *string            `json:"currency,omitempty"`
+	ExpiresAt   *time.Time         `json:"expires_at,omitempty"`
+	Metadata    *JsonObject        `json:"metadata,omitempty"`
+	Method      string             `json:"method"`
+	ProductId   *string            `json:"product_id,omitempty"`
+	ProductType PaymentProductType `json:"product_type"`
+}
+
+// CreatePaymentProviderInstanceRequest defines model for CreatePaymentProviderInstanceRequest.
+type CreatePaymentProviderInstanceRequest struct {
+	Config           JsonObject             `json:"config"`
+	Limits           *JsonObject            `json:"limits,omitempty"`
+	Metadata         *JsonObject            `json:"metadata,omitempty"`
+	Name             string                 `json:"name"`
+	Provider         string                 `json:"provider"`
+	SortOrder        *int                   `json:"sort_order,omitempty"`
+	Status           *PaymentProviderStatus `json:"status,omitempty"`
+	SupportedMethods *[]string              `json:"supported_methods,omitempty"`
+}
+
 // CreatePricingRuleRequest defines model for CreatePricingRuleRequest.
 type CreatePricingRuleRequest struct {
 	CacheReadPricePerMillionTokens  string     `json:"cache_read_price_per_million_tokens"`
@@ -1581,6 +1682,108 @@ type Pagination struct {
 	Total    int  `json:"total"`
 }
 
+// PaymentMethod defines model for PaymentMethod.
+type PaymentMethod struct {
+	Metadata           JsonObject `json:"metadata"`
+	Method             string     `json:"method"`
+	Name               string     `json:"name"`
+	Provider           string     `json:"provider"`
+	ProviderInstanceId Id         `json:"provider_instance_id"`
+}
+
+// PaymentMethodListResponse defines model for PaymentMethodListResponse.
+type PaymentMethodListResponse struct {
+	Data       []PaymentMethod `json:"data"`
+	Pagination Pagination      `json:"pagination"`
+	RequestId  RequestId       `json:"request_id"`
+}
+
+// PaymentOrder defines model for PaymentOrder.
+type PaymentOrder struct {
+	Amount                string             `json:"amount"`
+	ClosedAt              *time.Time         `json:"closed_at,omitempty"`
+	CreatedAt             Timestamp          `json:"created_at"`
+	Currency              string             `json:"currency"`
+	ExpiresAt             *time.Time         `json:"expires_at,omitempty"`
+	Id                    Id                 `json:"id"`
+	Metadata              JsonObject         `json:"metadata"`
+	OrderNo               string             `json:"order_no"`
+	PaidAt                *time.Time         `json:"paid_at,omitempty"`
+	ProductId             string             `json:"product_id"`
+	ProductType           PaymentProductType `json:"product_type"`
+	ProviderInstanceId    Id                 `json:"provider_instance_id"`
+	ProviderSnapshot      JsonObject         `json:"provider_snapshot"`
+	ProviderTransactionId *string            `json:"provider_transaction_id,omitempty"`
+	Status                PaymentOrderStatus `json:"status"`
+	UpdatedAt             Timestamp          `json:"updated_at"`
+	UserId                Id                 `json:"user_id"`
+}
+
+// PaymentOrderListResponse defines model for PaymentOrderListResponse.
+type PaymentOrderListResponse struct {
+	Data       []PaymentOrder `json:"data"`
+	Pagination Pagination     `json:"pagination"`
+	RequestId  RequestId      `json:"request_id"`
+}
+
+// PaymentOrderResponse defines model for PaymentOrderResponse.
+type PaymentOrderResponse struct {
+	Data      PaymentOrder `json:"data"`
+	RequestId RequestId    `json:"request_id"`
+}
+
+// PaymentOrderStatus defines model for PaymentOrderStatus.
+type PaymentOrderStatus string
+
+// PaymentProductType defines model for PaymentProductType.
+type PaymentProductType string
+
+// PaymentProviderInstance defines model for PaymentProviderInstance.
+type PaymentProviderInstance struct {
+	ConfigVersion    int                   `json:"config_version"`
+	CreatedAt        Timestamp             `json:"created_at"`
+	Id               Id                    `json:"id"`
+	Limits           JsonObject            `json:"limits"`
+	Metadata         JsonObject            `json:"metadata"`
+	Name             string                `json:"name"`
+	Provider         string                `json:"provider"`
+	SortOrder        int                   `json:"sort_order"`
+	Status           PaymentProviderStatus `json:"status"`
+	SupportedMethods []string              `json:"supported_methods"`
+	UpdatedAt        Timestamp             `json:"updated_at"`
+}
+
+// PaymentProviderInstanceListResponse defines model for PaymentProviderInstanceListResponse.
+type PaymentProviderInstanceListResponse struct {
+	Data       []PaymentProviderInstance `json:"data"`
+	Pagination Pagination                `json:"pagination"`
+	RequestId  RequestId                 `json:"request_id"`
+}
+
+// PaymentProviderInstanceResponse defines model for PaymentProviderInstanceResponse.
+type PaymentProviderInstanceResponse struct {
+	Data      PaymentProviderInstance `json:"data"`
+	RequestId RequestId               `json:"request_id"`
+}
+
+// PaymentProviderStatus defines model for PaymentProviderStatus.
+type PaymentProviderStatus string
+
+// PaymentWebhookRequest defines model for PaymentWebhookRequest.
+type PaymentWebhookRequest map[string]interface{}
+
+// PaymentWebhookResponse defines model for PaymentWebhookResponse.
+type PaymentWebhookResponse struct {
+	Data      PaymentWebhookResult `json:"data"`
+	RequestId RequestId            `json:"request_id"`
+}
+
+// PaymentWebhookResult defines model for PaymentWebhookResult.
+type PaymentWebhookResult struct {
+	Handled bool         `json:"handled"`
+	Order   PaymentOrder `json:"order"`
+}
+
 // PricingRule defines model for PricingRule.
 type PricingRule struct {
 	CacheReadPricePerMillionTokens  string     `json:"cache_read_price_per_million_tokens"`
@@ -1729,6 +1932,13 @@ type ProviderProtocol string
 type ProviderResponse struct {
 	Data      Provider  `json:"data"`
 	RequestId RequestId `json:"request_id"`
+}
+
+// RefundPaymentOrderRequest defines model for RefundPaymentOrderRequest.
+type RefundPaymentOrderRequest struct {
+	// Amount Decimal refund amount. Empty or omitted means full refund.
+	Amount *string `json:"amount,omitempty"`
+	Reason *string `json:"reason,omitempty"`
 }
 
 // RequestId defines model for RequestId.
@@ -2181,6 +2391,20 @@ type ListAdminOutboxEventsParams struct {
 	EventType *string   `form:"event_type,omitempty" json:"event_type,omitempty"`
 }
 
+// ListAdminPaymentOrdersParams defines parameters for ListAdminPaymentOrders.
+type ListAdminPaymentOrdersParams struct {
+	Page     *Page               `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *PageSize           `form:"page_size,omitempty" json:"page_size,omitempty"`
+	UserId   *Id                 `form:"user_id,omitempty" json:"user_id,omitempty"`
+	Status   *PaymentOrderStatus `form:"status,omitempty" json:"status,omitempty"`
+}
+
+// ListAdminPaymentProvidersParams defines parameters for ListAdminPaymentProviders.
+type ListAdminPaymentProvidersParams struct {
+	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
+
 // ListAdminPricingRulesParams defines parameters for ListAdminPricingRules.
 type ListAdminPricingRulesParams struct {
 	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
@@ -2251,6 +2475,12 @@ type GetCurrentUserUsageParams struct {
 	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
 }
 
+// ListPaymentOrdersParams defines parameters for ListPaymentOrders.
+type ListPaymentOrdersParams struct {
+	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
+
 // CreateAnthropicCompatibleMessageAliasJSONRequestBody defines body for CreateAnthropicCompatibleMessageAlias for application/json ContentType.
 type CreateAnthropicCompatibleMessageAliasJSONRequestBody = AnthropicMessagesRequest
 
@@ -2293,6 +2523,12 @@ type CreateAdminModelAliasJSONRequestBody = CreateModelAliasRequest
 // CreateAdminModelMappingJSONRequestBody defines body for CreateAdminModelMapping for application/json ContentType.
 type CreateAdminModelMappingJSONRequestBody = CreateModelProviderMappingRequest
 
+// RefundAdminPaymentOrderJSONRequestBody defines body for RefundAdminPaymentOrder for application/json ContentType.
+type RefundAdminPaymentOrderJSONRequestBody = RefundPaymentOrderRequest
+
+// CreateAdminPaymentProviderJSONRequestBody defines body for CreateAdminPaymentProvider for application/json ContentType.
+type CreateAdminPaymentProviderJSONRequestBody = CreatePaymentProviderInstanceRequest
+
 // CreateAdminPricingRuleJSONRequestBody defines body for CreateAdminPricingRule for application/json ContentType.
 type CreateAdminPricingRuleJSONRequestBody = CreatePricingRuleRequest
 
@@ -2316,6 +2552,12 @@ type UpdateApiKeyJSONRequestBody = UpdateApiKeyRequest
 
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = LoginRequest
+
+// CreatePaymentOrderJSONRequestBody defines body for CreatePaymentOrder for application/json ContentType.
+type CreatePaymentOrderJSONRequestBody = CreatePaymentOrderRequest
+
+// HandlePaymentWebhookJSONRequestBody defines body for HandlePaymentWebhook for application/json ContentType.
+type HandlePaymentWebhookJSONRequestBody = PaymentWebhookRequest
 
 // CreateChatCompletionJSONRequestBody defines body for CreateChatCompletion for application/json ContentType.
 type CreateChatCompletionJSONRequestBody = ChatCompletionRequest
@@ -3749,6 +3991,18 @@ type ServerInterface interface {
 	// Get admin overview counters.
 	// (GET /api/v1/admin/overview)
 	GetAdminOverview(w http.ResponseWriter, r *http.Request)
+	// List payment orders.
+	// (GET /api/v1/admin/payments/orders)
+	ListAdminPaymentOrders(w http.ResponseWriter, r *http.Request, params ListAdminPaymentOrdersParams)
+	// Refund a fulfilled or paid payment order.
+	// (POST /api/v1/admin/payments/orders/{id}/refund)
+	RefundAdminPaymentOrder(w http.ResponseWriter, r *http.Request, id Id)
+	// List payment provider instances.
+	// (GET /api/v1/admin/payments/providers)
+	ListAdminPaymentProviders(w http.ResponseWriter, r *http.Request, params ListAdminPaymentProvidersParams)
+	// Create an encrypted payment provider instance.
+	// (POST /api/v1/admin/payments/providers)
+	CreateAdminPaymentProvider(w http.ResponseWriter, r *http.Request)
 	// List pricing rules.
 	// (GET /api/v1/admin/pricing-rules)
 	ListAdminPricingRules(w http.ResponseWriter, r *http.Request, params ListAdminPricingRulesParams)
@@ -3818,6 +4072,24 @@ type ServerInterface interface {
 	// List usage logs for the current console user.
 	// (GET /api/v1/me/usage)
 	GetCurrentUserUsage(w http.ResponseWriter, r *http.Request, params GetCurrentUserUsageParams)
+	// List available payment methods for the current user.
+	// (GET /api/v1/payment/methods)
+	ListPaymentMethods(w http.ResponseWriter, r *http.Request)
+	// List payment orders for the current user.
+	// (GET /api/v1/payment/orders)
+	ListPaymentOrders(w http.ResponseWriter, r *http.Request, params ListPaymentOrdersParams)
+	// Create a payment order for the current user.
+	// (POST /api/v1/payment/orders)
+	CreatePaymentOrder(w http.ResponseWriter, r *http.Request)
+	// Get a payment order owned by the current user.
+	// (GET /api/v1/payment/orders/{id})
+	GetPaymentOrder(w http.ResponseWriter, r *http.Request, id Id)
+	// Cancel a pending payment order owned by the current user.
+	// (POST /api/v1/payment/orders/{id}/cancel)
+	CancelPaymentOrder(w http.ResponseWriter, r *http.Request, id Id)
+	// Handle a signed payment provider webhook.
+	// (POST /api/v1/webhooks/payments/{provider})
+	HandlePaymentWebhook(w http.ResponseWriter, r *http.Request, provider string)
 	// Create an OpenAI-compatible chat completion.
 	// (POST /v1/chat/completions)
 	CreateChatCompletion(w http.ResponseWriter, r *http.Request)
@@ -5059,6 +5331,192 @@ func (siw *ServerInterfaceWrapper) GetAdminOverview(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// ListAdminPaymentOrders operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminPaymentOrders(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminPaymentOrdersParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "user_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "user_id", r.URL.Query(), &params.UserId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "user_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminPaymentOrders(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RefundAdminPaymentOrder operation middleware
+func (siw *ServerInterfaceWrapper) RefundAdminPaymentOrder(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RefundAdminPaymentOrder(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAdminPaymentProviders operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminPaymentProviders(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminPaymentProvidersParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminPaymentProviders(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAdminPaymentProvider operation middleware
+func (siw *ServerInterfaceWrapper) CreateAdminPaymentProvider(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAdminPaymentProvider(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListAdminPricingRules operation middleware
 func (siw *ServerInterfaceWrapper) ListAdminPricingRules(w http.ResponseWriter, r *http.Request) {
 
@@ -6011,6 +6469,192 @@ func (siw *ServerInterfaceWrapper) GetCurrentUserUsage(w http.ResponseWriter, r 
 	handler.ServeHTTP(w, r)
 }
 
+// ListPaymentMethods operation middleware
+func (siw *ServerInterfaceWrapper) ListPaymentMethods(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListPaymentMethods(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListPaymentOrders operation middleware
+func (siw *ServerInterfaceWrapper) ListPaymentOrders(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListPaymentOrdersParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListPaymentOrders(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreatePaymentOrder operation middleware
+func (siw *ServerInterfaceWrapper) CreatePaymentOrder(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreatePaymentOrder(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetPaymentOrder operation middleware
+func (siw *ServerInterfaceWrapper) GetPaymentOrder(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetPaymentOrder(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CancelPaymentOrder operation middleware
+func (siw *ServerInterfaceWrapper) CancelPaymentOrder(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CancelPaymentOrder(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// HandlePaymentWebhook operation middleware
+func (siw *ServerInterfaceWrapper) HandlePaymentWebhook(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "provider" -------------
+	var provider string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "provider", r.PathValue("provider"), &provider, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "provider", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.HandlePaymentWebhook(w, r, provider)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // CreateChatCompletion operation middleware
 func (siw *ServerInterfaceWrapper) CreateChatCompletion(w http.ResponseWriter, r *http.Request) {
 
@@ -6243,6 +6887,10 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/models/{id}/mappings", wrapper.CreateAdminModelMapping)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/events/outbox", wrapper.ListAdminOutboxEvents)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/overview", wrapper.GetAdminOverview)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/payments/orders", wrapper.ListAdminPaymentOrders)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/payments/orders/{id}/refund", wrapper.RefundAdminPaymentOrder)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/payments/providers", wrapper.ListAdminPaymentProviders)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/payments/providers", wrapper.CreateAdminPaymentProvider)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/pricing-rules", wrapper.ListAdminPricingRules)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/pricing-rules", wrapper.CreateAdminPricingRule)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/providers", wrapper.ListAdminProviders)
@@ -6266,6 +6914,12 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me", wrapper.GetCurrentUser)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/subscriptions", wrapper.GetCurrentUserSubscriptions)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/usage", wrapper.GetCurrentUserUsage)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/payment/methods", wrapper.ListPaymentMethods)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/payment/orders", wrapper.ListPaymentOrders)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/payment/orders", wrapper.CreatePaymentOrder)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/payment/orders/{id}", wrapper.GetPaymentOrder)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/payment/orders/{id}/cancel", wrapper.CancelPaymentOrder)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/webhooks/payments/{provider}", wrapper.HandlePaymentWebhook)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/chat/completions", wrapper.CreateChatCompletion)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/messages", wrapper.CreateMessage)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/models", wrapper.ListModels)

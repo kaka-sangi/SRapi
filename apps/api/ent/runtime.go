@@ -20,6 +20,9 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/modelalias"
 	"github.com/srapi/srapi/apps/api/ent/modelprovidermapping"
 	"github.com/srapi/srapi/apps/api/ent/modelregistry"
+	"github.com/srapi/srapi/apps/api/ent/paymentauditlog"
+	"github.com/srapi/srapi/apps/api/ent/paymentorder"
+	"github.com/srapi/srapi/apps/api/ent/paymentproviderinstance"
 	"github.com/srapi/srapi/apps/api/ent/pricingrule"
 	"github.com/srapi/srapi/apps/api/ent/provider"
 	"github.com/srapi/srapi/apps/api/ent/provideraccount"
@@ -515,6 +518,115 @@ func init() {
 	modelregistryDescStatus := modelregistryFields[6].Descriptor()
 	// modelregistry.DefaultStatus holds the default value on creation for the status field.
 	modelregistry.DefaultStatus = modelregistryDescStatus.Default.(string)
+	paymentauditlogMixin := schema.PaymentAuditLog{}.Mixin()
+	paymentauditlogMixinFields0 := paymentauditlogMixin[0].Fields()
+	_ = paymentauditlogMixinFields0
+	paymentauditlogFields := schema.PaymentAuditLog{}.Fields()
+	_ = paymentauditlogFields
+	// paymentauditlogDescCreatedAt is the schema descriptor for created_at field.
+	paymentauditlogDescCreatedAt := paymentauditlogMixinFields0[0].Descriptor()
+	// paymentauditlog.DefaultCreatedAt holds the default value on creation for the created_at field.
+	paymentauditlog.DefaultCreatedAt = paymentauditlogDescCreatedAt.Default.(func() time.Time)
+	// paymentauditlogDescUpdatedAt is the schema descriptor for updated_at field.
+	paymentauditlogDescUpdatedAt := paymentauditlogMixinFields0[1].Descriptor()
+	// paymentauditlog.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	paymentauditlog.DefaultUpdatedAt = paymentauditlogDescUpdatedAt.Default.(func() time.Time)
+	// paymentauditlog.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	paymentauditlog.UpdateDefaultUpdatedAt = paymentauditlogDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// paymentauditlogDescOrderID is the schema descriptor for order_id field.
+	paymentauditlogDescOrderID := paymentauditlogFields[0].Descriptor()
+	// paymentauditlog.DefaultOrderID holds the default value on creation for the order_id field.
+	paymentauditlog.DefaultOrderID = paymentauditlogDescOrderID.Default.(int)
+	// paymentauditlogDescProviderInstanceID is the schema descriptor for provider_instance_id field.
+	paymentauditlogDescProviderInstanceID := paymentauditlogFields[1].Descriptor()
+	// paymentauditlog.DefaultProviderInstanceID holds the default value on creation for the provider_instance_id field.
+	paymentauditlog.DefaultProviderInstanceID = paymentauditlogDescProviderInstanceID.Default.(int)
+	// paymentauditlogDescEventType is the schema descriptor for event_type field.
+	paymentauditlogDescEventType := paymentauditlogFields[2].Descriptor()
+	// paymentauditlog.EventTypeValidator is a validator for the "event_type" field. It is called by the builders before save.
+	paymentauditlog.EventTypeValidator = paymentauditlogDescEventType.Validators[0].(func(string) error)
+	// paymentauditlogDescIdempotencyKey is the schema descriptor for idempotency_key field.
+	paymentauditlogDescIdempotencyKey := paymentauditlogFields[3].Descriptor()
+	// paymentauditlog.IdempotencyKeyValidator is a validator for the "idempotency_key" field. It is called by the builders before save.
+	paymentauditlog.IdempotencyKeyValidator = paymentauditlogDescIdempotencyKey.Validators[0].(func(string) error)
+	// paymentauditlogDescSignatureValid is the schema descriptor for signature_valid field.
+	paymentauditlogDescSignatureValid := paymentauditlogFields[5].Descriptor()
+	// paymentauditlog.DefaultSignatureValid holds the default value on creation for the signature_valid field.
+	paymentauditlog.DefaultSignatureValid = paymentauditlogDescSignatureValid.Default.(bool)
+	paymentorderMixin := schema.PaymentOrder{}.Mixin()
+	paymentorderMixinFields0 := paymentorderMixin[0].Fields()
+	_ = paymentorderMixinFields0
+	paymentorderFields := schema.PaymentOrder{}.Fields()
+	_ = paymentorderFields
+	// paymentorderDescCreatedAt is the schema descriptor for created_at field.
+	paymentorderDescCreatedAt := paymentorderMixinFields0[0].Descriptor()
+	// paymentorder.DefaultCreatedAt holds the default value on creation for the created_at field.
+	paymentorder.DefaultCreatedAt = paymentorderDescCreatedAt.Default.(func() time.Time)
+	// paymentorderDescUpdatedAt is the schema descriptor for updated_at field.
+	paymentorderDescUpdatedAt := paymentorderMixinFields0[1].Descriptor()
+	// paymentorder.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	paymentorder.DefaultUpdatedAt = paymentorderDescUpdatedAt.Default.(func() time.Time)
+	// paymentorder.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	paymentorder.UpdateDefaultUpdatedAt = paymentorderDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// paymentorderDescOrderNo is the schema descriptor for order_no field.
+	paymentorderDescOrderNo := paymentorderFields[1].Descriptor()
+	// paymentorder.OrderNoValidator is a validator for the "order_no" field. It is called by the builders before save.
+	paymentorder.OrderNoValidator = paymentorderDescOrderNo.Validators[0].(func(string) error)
+	// paymentorderDescAmount is the schema descriptor for amount field.
+	paymentorderDescAmount := paymentorderFields[3].Descriptor()
+	// paymentorder.DefaultAmount holds the default value on creation for the amount field.
+	paymentorder.DefaultAmount = paymentorderDescAmount.Default.(string)
+	// paymentorderDescCurrency is the schema descriptor for currency field.
+	paymentorderDescCurrency := paymentorderFields[4].Descriptor()
+	// paymentorder.DefaultCurrency holds the default value on creation for the currency field.
+	paymentorder.DefaultCurrency = paymentorderDescCurrency.Default.(string)
+	// paymentorderDescStatus is the schema descriptor for status field.
+	paymentorderDescStatus := paymentorderFields[5].Descriptor()
+	// paymentorder.DefaultStatus holds the default value on creation for the status field.
+	paymentorder.DefaultStatus = paymentorderDescStatus.Default.(string)
+	// paymentorderDescProductType is the schema descriptor for product_type field.
+	paymentorderDescProductType := paymentorderFields[6].Descriptor()
+	// paymentorder.ProductTypeValidator is a validator for the "product_type" field. It is called by the builders before save.
+	paymentorder.ProductTypeValidator = paymentorderDescProductType.Validators[0].(func(string) error)
+	// paymentorderDescProductID is the schema descriptor for product_id field.
+	paymentorderDescProductID := paymentorderFields[7].Descriptor()
+	// paymentorder.DefaultProductID holds the default value on creation for the product_id field.
+	paymentorder.DefaultProductID = paymentorderDescProductID.Default.(string)
+	paymentproviderinstanceMixin := schema.PaymentProviderInstance{}.Mixin()
+	paymentproviderinstanceMixinFields0 := paymentproviderinstanceMixin[0].Fields()
+	_ = paymentproviderinstanceMixinFields0
+	paymentproviderinstanceFields := schema.PaymentProviderInstance{}.Fields()
+	_ = paymentproviderinstanceFields
+	// paymentproviderinstanceDescCreatedAt is the schema descriptor for created_at field.
+	paymentproviderinstanceDescCreatedAt := paymentproviderinstanceMixinFields0[0].Descriptor()
+	// paymentproviderinstance.DefaultCreatedAt holds the default value on creation for the created_at field.
+	paymentproviderinstance.DefaultCreatedAt = paymentproviderinstanceDescCreatedAt.Default.(func() time.Time)
+	// paymentproviderinstanceDescUpdatedAt is the schema descriptor for updated_at field.
+	paymentproviderinstanceDescUpdatedAt := paymentproviderinstanceMixinFields0[1].Descriptor()
+	// paymentproviderinstance.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	paymentproviderinstance.DefaultUpdatedAt = paymentproviderinstanceDescUpdatedAt.Default.(func() time.Time)
+	// paymentproviderinstance.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	paymentproviderinstance.UpdateDefaultUpdatedAt = paymentproviderinstanceDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// paymentproviderinstanceDescProvider is the schema descriptor for provider field.
+	paymentproviderinstanceDescProvider := paymentproviderinstanceFields[0].Descriptor()
+	// paymentproviderinstance.ProviderValidator is a validator for the "provider" field. It is called by the builders before save.
+	paymentproviderinstance.ProviderValidator = paymentproviderinstanceDescProvider.Validators[0].(func(string) error)
+	// paymentproviderinstanceDescName is the schema descriptor for name field.
+	paymentproviderinstanceDescName := paymentproviderinstanceFields[1].Descriptor()
+	// paymentproviderinstance.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	paymentproviderinstance.NameValidator = paymentproviderinstanceDescName.Validators[0].(func(string) error)
+	// paymentproviderinstanceDescStatus is the schema descriptor for status field.
+	paymentproviderinstanceDescStatus := paymentproviderinstanceFields[2].Descriptor()
+	// paymentproviderinstance.DefaultStatus holds the default value on creation for the status field.
+	paymentproviderinstance.DefaultStatus = paymentproviderinstanceDescStatus.Default.(string)
+	// paymentproviderinstanceDescConfigVersion is the schema descriptor for config_version field.
+	paymentproviderinstanceDescConfigVersion := paymentproviderinstanceFields[4].Descriptor()
+	// paymentproviderinstance.DefaultConfigVersion holds the default value on creation for the config_version field.
+	paymentproviderinstance.DefaultConfigVersion = paymentproviderinstanceDescConfigVersion.Default.(int)
+	// paymentproviderinstanceDescSortOrder is the schema descriptor for sort_order field.
+	paymentproviderinstanceDescSortOrder := paymentproviderinstanceFields[7].Descriptor()
+	// paymentproviderinstance.DefaultSortOrder holds the default value on creation for the sort_order field.
+	paymentproviderinstance.DefaultSortOrder = paymentproviderinstanceDescSortOrder.Default.(int)
 	pricingruleMixin := schema.PricingRule{}.Mixin()
 	pricingruleMixinFields0 := pricingruleMixin[0].Fields()
 	_ = pricingruleMixinFields0

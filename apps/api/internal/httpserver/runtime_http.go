@@ -40,6 +40,9 @@ import (
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
 	modelservice "github.com/srapi/srapi/apps/api/internal/modules/models/service"
 	modelmemory "github.com/srapi/srapi/apps/api/internal/modules/models/store/memory"
+	paymentcontract "github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
+	paymentservice "github.com/srapi/srapi/apps/api/internal/modules/payments/service"
+	paymentmemory "github.com/srapi/srapi/apps/api/internal/modules/payments/store/memory"
 	provideradaptercontract "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
 	provideradapterservice "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/service"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
@@ -87,6 +90,7 @@ type runtimeState struct {
 	accounts          *accountservice.Service
 	scheduler         *schedulerservice.Service
 	subscriptions     *subscriptionservice.Service
+	payments          *paymentservice.Service
 	usage             *usageservice.Service
 	userStore         userscontract.Store
 	sessionStore      *authmemory.Store
@@ -97,6 +101,7 @@ type runtimeState struct {
 	providerStore     providercontract.Store
 	modelStore        modelcontract.Store
 	accountStore      accountcontract.Store
+	paymentStore      paymentcontract.Store
 	schedulerStore    schedulercontract.Store
 	subscriptionStore subscriptioncontract.Store
 	usageStore        usagecontract.Store
@@ -222,6 +227,20 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 		return nil, err
 	}
 
+	paymentStore := opts.payments
+	if paymentStore == nil {
+		paymentStore = paymentmemory.New()
+	}
+	paymentsSvc, err := paymentservice.New(paymentStore, cfg.Security.MasterKey, paymentservice.Dependencies{
+		Billing:       billingSvc,
+		Subscriptions: subscriptionSvc,
+		Audit:         auditSvc,
+		Events:        eventsSvc,
+	}, nil)
+	if err != nil {
+		return nil, err
+	}
+
 	usageStore := opts.usage
 	if usageStore == nil {
 		usageStore = usagememory.New()
@@ -248,6 +267,7 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 		accounts:          accountsSvc,
 		scheduler:         schedulerSvc,
 		subscriptions:     subscriptionSvc,
+		payments:          paymentsSvc,
 		usage:             usageSvc,
 		userStore:         userStore,
 		sessionStore:      sessionStore,
@@ -258,6 +278,7 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 		providerStore:     providerStore,
 		modelStore:        modelStore,
 		accountStore:      accountStore,
+		paymentStore:      paymentStore,
 		schedulerStore:    schedulerStore,
 		subscriptionStore: subscriptionStore,
 		usageStore:        usageStore,
@@ -546,6 +567,167 @@ func (s *Server) handleCurrentUserSubscriptions(w http.ResponseWriter, r *http.R
 		Data:       data,
 		Pagination: pagination(len(data)),
 		RequestId:  requestID,
+	})
+}
+
+func (s *Server) handleListPaymentMethods(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	if _, err := s.requireConsoleSession(r); err != nil {
+		writeStandardError(w, http.StatusUnauthorized, apiopenapi.UNAUTHORIZED, "unauthorized", requestID)
+		return
+	}
+	items, err := s.runtime.payments.ListMethods(r.Context())
+	if err != nil {
+		writePaymentServiceError(w, err, requestID)
+		return
+	}
+	data := make([]apiopenapi.PaymentMethod, 0, len(items))
+	for _, item := range items {
+		data = append(data, toAPIPaymentMethod(item))
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.PaymentMethodListResponse{
+		Data:       data,
+		Pagination: pagination(len(data)),
+		RequestId:  requestID,
+	})
+}
+
+func (s *Server) handleCreatePaymentOrder(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireConsoleSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusUnauthorized, apiopenapi.UNAUTHORIZED, "unauthorized", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	var body apiopenapi.CreatePaymentOrderRequest
+	if err := s.decodeJSONBody(w, r, &body); err != nil {
+		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid payment order request", requestID)
+		return
+	}
+	order, err := s.runtime.payments.CreateOrder(r.Context(), paymentcontract.CreateOrderRequest{
+		UserID:      session.User.ID,
+		Method:      body.Method,
+		Amount:      body.Amount,
+		Currency:    optionalStringValue(body.Currency),
+		ProductType: paymentcontract.ProductType(body.ProductType),
+		ProductID:   optionalStringValue(body.ProductId),
+		ExpiresAt:   body.ExpiresAt,
+		Metadata:    jsonObjectToMap(body.Metadata),
+	})
+	if err != nil {
+		writePaymentServiceError(w, err, requestID)
+		return
+	}
+	writeJSONAny(w, http.StatusCreated, apiopenapi.PaymentOrderResponse{
+		Data:      toAPIPaymentOrder(order),
+		RequestId: requestID,
+	})
+}
+
+func (s *Server) handleListPaymentOrders(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireConsoleSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusUnauthorized, apiopenapi.UNAUTHORIZED, "unauthorized", requestID)
+		return
+	}
+	items, err := s.runtime.payments.ListOrdersByUser(r.Context(), session.User.ID)
+	if err != nil {
+		writePaymentServiceError(w, err, requestID)
+		return
+	}
+	data := make([]apiopenapi.PaymentOrder, 0, len(items))
+	for _, item := range items {
+		data = append(data, toAPIPaymentOrder(item))
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.PaymentOrderListResponse{
+		Data:       data,
+		Pagination: pagination(len(data)),
+		RequestId:  requestID,
+	})
+}
+
+func (s *Server) handleGetPaymentOrder(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireConsoleSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusUnauthorized, apiopenapi.UNAUTHORIZED, "unauthorized", requestID)
+		return
+	}
+	orderID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || orderID <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid payment order id", requestID)
+		return
+	}
+	order, err := s.runtime.payments.FindOrderByID(r.Context(), orderID)
+	if err != nil {
+		writePaymentServiceError(w, err, requestID)
+		return
+	}
+	if order.UserID != session.User.ID {
+		writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "payment order not found", requestID)
+		return
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.PaymentOrderResponse{
+		Data:      toAPIPaymentOrder(order),
+		RequestId: requestID,
+	})
+}
+
+func (s *Server) handleCancelPaymentOrder(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireConsoleSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusUnauthorized, apiopenapi.UNAUTHORIZED, "unauthorized", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	orderID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || orderID <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid payment order id", requestID)
+		return
+	}
+	order, err := s.runtime.payments.CancelOrder(r.Context(), session.User.ID, orderID)
+	if err != nil {
+		writePaymentServiceError(w, err, requestID)
+		return
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.PaymentOrderResponse{
+		Data:      toAPIPaymentOrder(order),
+		RequestId: requestID,
+	})
+}
+
+func (s *Server) handlePaymentWebhook(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	provider := strings.TrimSpace(r.PathValue("provider"))
+	var body apiopenapi.PaymentWebhookRequest
+	if err := s.decodeJSONBody(w, r, &body); err != nil {
+		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid payment webhook request", requestID)
+		return
+	}
+	result, err := s.runtime.payments.HandleWebhook(r.Context(), paymentcontract.WebhookRequest{
+		Provider: provider,
+		Headers:  singleValueHeaders(r.Header),
+		Payload:  map[string]any(body),
+	})
+	if err != nil {
+		writePaymentServiceError(w, err, requestID)
+		return
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.PaymentWebhookResponse{
+		Data: apiopenapi.PaymentWebhookResult{
+			Handled: result.Handled,
+			Order:   toAPIPaymentOrder(result.Order),
+		},
+		RequestId: requestID,
 	})
 }
 
@@ -1900,6 +2082,144 @@ func (s *Server) handleListAdminBillingLedger(w http.ResponseWriter, r *http.Req
 		Data:       data,
 		Pagination: pagination(len(data)),
 		RequestId:  requestID,
+	})
+}
+
+func (s *Server) handleListAdminPaymentProviders(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	if _, err := s.requireAdminSession(r); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	items, err := s.runtime.payments.ListProviderInstances(r.Context())
+	if err != nil {
+		writePaymentServiceError(w, err, requestID)
+		return
+	}
+	data := make([]apiopenapi.PaymentProviderInstance, 0, len(items))
+	for _, item := range items {
+		data = append(data, toAPIPaymentProviderInstance(item))
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.PaymentProviderInstanceListResponse{
+		Data:       data,
+		Pagination: pagination(len(data)),
+		RequestId:  requestID,
+	})
+}
+
+func (s *Server) handleCreateAdminPaymentProvider(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	var body apiopenapi.CreatePaymentProviderInstanceRequest
+	if err := s.decodeJSONBody(w, r, &body); err != nil {
+		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid payment provider request", requestID)
+		return
+	}
+	provider, err := s.runtime.payments.CreateProviderInstance(r.Context(), paymentcontract.CreateProviderInstanceRequest{
+		Provider:         body.Provider,
+		Name:             body.Name,
+		Status:           toPaymentProviderStatusPtr(body.Status),
+		Config:           jsonObjectValueToMap(body.Config),
+		SupportedMethods: derefStrings(body.SupportedMethods),
+		Limits:           jsonObjectToMap(body.Limits),
+		SortOrder:        body.SortOrder,
+		Metadata:         jsonObjectToMap(body.Metadata),
+	})
+	if err != nil {
+		writePaymentServiceError(w, err, requestID)
+		return
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "payment_provider.create", "payment_provider", strconv.Itoa(provider.ID), nil, map[string]any{
+		"provider":          provider.Provider,
+		"name":              provider.Name,
+		"status":            provider.Status,
+		"supported_methods": provider.SupportedMethods,
+		"sort_order":        provider.SortOrder,
+	}))
+	writeJSONAny(w, http.StatusCreated, apiopenapi.PaymentProviderInstanceResponse{
+		Data:      toAPIPaymentProviderInstance(provider),
+		RequestId: requestID,
+	})
+}
+
+func (s *Server) handleListAdminPaymentOrders(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	if _, err := s.requireAdminSession(r); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	var (
+		items []paymentcontract.PaymentOrder
+		err   error
+	)
+	if userIDRaw := strings.TrimSpace(r.URL.Query().Get("user_id")); userIDRaw != "" {
+		userID, parseErr := strconv.Atoi(userIDRaw)
+		if parseErr != nil || userID <= 0 {
+			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid user id", requestID)
+			return
+		}
+		items, err = s.runtime.payments.ListOrdersByUser(r.Context(), userID)
+	} else {
+		items, err = s.runtime.payments.ListOrders(r.Context())
+	}
+	if err != nil {
+		writePaymentServiceError(w, err, requestID)
+		return
+	}
+	items = filterPaymentOrders(items, r.URL.Query().Get("status"))
+	data := make([]apiopenapi.PaymentOrder, 0, len(items))
+	for _, item := range items {
+		data = append(data, toAPIPaymentOrder(item))
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.PaymentOrderListResponse{
+		Data:       data,
+		Pagination: pagination(len(data)),
+		RequestId:  requestID,
+	})
+}
+
+func (s *Server) handleRefundAdminPaymentOrder(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	orderID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || orderID <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid payment order id", requestID)
+		return
+	}
+	var body apiopenapi.RefundPaymentOrderRequest
+	if err := s.decodeJSONBody(w, r, &body); err != nil {
+		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid refund request", requestID)
+		return
+	}
+	order, err := s.runtime.payments.RequestRefund(r.Context(), paymentcontract.RefundRequest{
+		ActorUserID: session.User.ID,
+		OrderID:     orderID,
+		Amount:      optionalStringValue(body.Amount),
+		Reason:      optionalStringValue(body.Reason),
+	})
+	if err != nil {
+		writePaymentServiceError(w, err, requestID)
+		return
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.PaymentOrderResponse{
+		Data:      toAPIPaymentOrder(order),
+		RequestId: requestID,
 	})
 }
 
@@ -4688,6 +5008,23 @@ func writeGatewayAuthError(w http.ResponseWriter, err error, requestID string) {
 	_ = requestID
 }
 
+func writePaymentServiceError(w http.ResponseWriter, err error, requestID string) {
+	switch {
+	case errors.Is(err, paymentservice.ErrInvalidInput), errors.Is(err, paymentservice.ErrInvalidTransition), errors.Is(err, paymentservice.ErrOrderMismatch):
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid payment request", requestID)
+	case errors.Is(err, paymentservice.ErrSignatureInvalid):
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid payment webhook signature", requestID)
+	case errors.Is(err, paymentservice.ErrProviderUnavailable):
+		writeStandardError(w, http.StatusConflict, apiopenapi.RESOURCECONFLICT, "payment provider unavailable", requestID)
+	case errors.Is(err, paymentcontract.ErrNotFound):
+		writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "payment resource not found", requestID)
+	case errors.Is(err, paymentcontract.ErrConflict):
+		writeStandardError(w, http.StatusConflict, apiopenapi.RESOURCECONFLICT, "payment resource conflict", requestID)
+	default:
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "payment service error", requestID)
+	}
+}
+
 func validateCSRF(session authcontract.Session, token string) error {
 	return authservice.ValidateCSRF(session, token)
 }
@@ -5095,6 +5432,54 @@ func toAPIBillingLedgerEntry(entry billingcontract.LedgerEntry) apiopenapi.Billi
 	}
 }
 
+func toAPIPaymentMethod(method paymentcontract.PaymentMethod) apiopenapi.PaymentMethod {
+	return apiopenapi.PaymentMethod{
+		Metadata:           jsonObject(method.Metadata),
+		Method:             method.Method,
+		Name:               method.Name,
+		Provider:           method.Provider,
+		ProviderInstanceId: apiopenapi.Id(strconv.Itoa(method.ProviderInstanceID)),
+	}
+}
+
+func toAPIPaymentProviderInstance(provider paymentcontract.PaymentProviderInstance) apiopenapi.PaymentProviderInstance {
+	return apiopenapi.PaymentProviderInstance{
+		ConfigVersion:    provider.ConfigVersion,
+		CreatedAt:        provider.CreatedAt,
+		Id:               apiopenapi.Id(strconv.Itoa(provider.ID)),
+		Limits:           jsonObject(provider.Limits),
+		Metadata:         jsonObject(provider.Metadata),
+		Name:             provider.Name,
+		Provider:         provider.Provider,
+		SortOrder:        provider.SortOrder,
+		Status:           apiopenapi.PaymentProviderStatus(provider.Status),
+		SupportedMethods: append([]string(nil), provider.SupportedMethods...),
+		UpdatedAt:        provider.UpdatedAt,
+	}
+}
+
+func toAPIPaymentOrder(order paymentcontract.PaymentOrder) apiopenapi.PaymentOrder {
+	return apiopenapi.PaymentOrder{
+		Amount:                order.Amount,
+		ClosedAt:              cloneTimePtr(order.ClosedAt),
+		CreatedAt:             order.CreatedAt,
+		Currency:              order.Currency,
+		ExpiresAt:             cloneTimePtr(order.ExpiresAt),
+		Id:                    apiopenapi.Id(strconv.Itoa(order.ID)),
+		Metadata:              jsonObject(order.Metadata),
+		OrderNo:               order.OrderNo,
+		PaidAt:                cloneTimePtr(order.PaidAt),
+		ProductId:             order.ProductID,
+		ProductType:           apiopenapi.PaymentProductType(order.ProductType),
+		ProviderInstanceId:    apiopenapi.Id(strconv.Itoa(order.ProviderInstanceID)),
+		ProviderSnapshot:      jsonObject(order.ProviderSnapshot),
+		ProviderTransactionId: cloneStringPtr(order.ProviderTransactionID),
+		Status:                apiopenapi.PaymentOrderStatus(order.Status),
+		UpdatedAt:             order.UpdatedAt,
+		UserId:                apiopenapi.Id(strconv.Itoa(order.UserID)),
+	}
+}
+
 func toAPISubscriptionPlan(plan subscriptioncontract.SubscriptionPlan) apiopenapi.SubscriptionPlan {
 	return apiopenapi.SubscriptionPlan{
 		CreatedAt:    plan.CreatedAt,
@@ -5264,6 +5649,13 @@ func jsonObjectToMap(value *apiopenapi.JsonObject) map[string]any {
 	return map[string]any(*value)
 }
 
+func jsonObjectValueToMap(value apiopenapi.JsonObject) map[string]any {
+	if value == nil {
+		return nil
+	}
+	return map[string]any(value)
+}
+
 func jsonObjectToMapPtr(value *apiopenapi.JsonObject) *map[string]any {
 	if value == nil {
 		return nil
@@ -5308,6 +5700,13 @@ func optionalString(value string) *string {
 		return nil
 	}
 	return &value
+}
+
+func optionalStringValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return strings.TrimSpace(*value)
 }
 
 func optionalNullableString(value *string) **string {
@@ -5405,6 +5804,14 @@ func toUserSubscriptionStatusPtr(value *apiopenapi.UserSubscriptionStatus) *subs
 	return &status
 }
 
+func toPaymentProviderStatusPtr(value *apiopenapi.PaymentProviderStatus) *paymentcontract.ProviderStatus {
+	if value == nil {
+		return nil
+	}
+	status := paymentcontract.ProviderStatus(*value)
+	return &status
+}
+
 func toAccountRuntimeClassPtr(value *apiopenapi.RuntimeClass) *accountcontract.RuntimeClass {
 	if value == nil {
 		return nil
@@ -5450,6 +5857,14 @@ func ptrModelStatus(value modelcontract.Status) *modelcontract.Status { return &
 func ptrAccountStatus(value accountcontract.Status) *accountcontract.Status { return &value }
 
 func cloneTimePtr(value *time.Time) *time.Time {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
+}
+
+func cloneStringPtr(value *string) *string {
 	if value == nil {
 		return nil
 	}
@@ -5553,6 +5968,20 @@ func filterBillingLedger(items []billingcontract.LedgerEntry, userID, referenceT
 			continue
 		}
 		out = append(out, item)
+	}
+	return out
+}
+
+func filterPaymentOrders(items []paymentcontract.PaymentOrder, status string) []paymentcontract.PaymentOrder {
+	status = strings.TrimSpace(status)
+	if status == "" {
+		return items
+	}
+	out := make([]paymentcontract.PaymentOrder, 0, len(items))
+	for _, item := range items {
+		if string(item.Status) == status {
+			out = append(out, item)
+		}
 	}
 	return out
 }
@@ -5842,6 +6271,19 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func singleValueHeaders(headers http.Header) map[string]string {
+	out := make(map[string]string, len(headers)*2)
+	for key, values := range headers {
+		if len(values) == 0 {
+			continue
+		}
+		value := values[0]
+		out[key] = value
+		out[http.CanonicalHeaderKey(key)] = value
+	}
+	return out
 }
 
 func writeSSEJSON(w http.ResponseWriter, payload any) {

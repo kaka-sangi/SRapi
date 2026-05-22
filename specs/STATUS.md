@@ -25,26 +25,29 @@ last_completed:
 - WP-150: Admin diagnostics now expose Scheduler overview/decision evidence and account health summaries with runtime class, recent error class, quota, cooldown, latency, and circuit state.
 - WP-170: Account operations parity now covers account groups, safe inspect/export/import, proxy binding, recovery, persisted health/quota snapshots, CSRF coverage, and generated SDK/OpenAPI parity.
 - WP-180: Subscription and pricing foundations now include subscription plans, user subscriptions, decimal-safe pricing rules, Gateway entitlement/pricing admission, billing metadata linkage, admin/current-user control-plane APIs, and generated SDK/OpenAPI parity.
+- WP-190: Payment order foundations now include encrypted provider instances, current-user order APIs, signed/idempotent webhooks, refund hooks, fulfillment into billing/subscription state, audit/outbox evidence, Ent/Postgres persistence, and generated SDK/OpenAPI parity.
 
 current:
 
-- package: WP-190
+- package: WP-200
 - status: pending
-- objective: implement payment orders and at least one provider integration path.
+- objective: implement invitation and rebate ledger after payment correctness exists.
 
-next_recommended: WP-190
+next_recommended: WP-200
 
 last_gates:
 
 - `make openapi-lint`: pass
+- `make openapi-bundle`: pass
 - `make openapi-codegen-check`: pass
 - `make openapi-ts-codegen-check`: pass
 - `make sdk-ts-typecheck`: pass
 - `make ent-generate-check`: pass
 - `make migration-check`: pass
-- `cd apps/api && go test ./internal/httpserver -run 'Test(AdminSubscriptionPricingControlPlane|ConsoleWriteRoutesRequireCSRF|GatewaySubscriptionEntitlementRejectsBeforeSchedulerConsumesAccount)' -count=1`: pass
-- `cd apps/api && go test ./internal/httpserver ./internal/modules/subscriptions/... ./internal/persistence/entstore/subscriptions -count=1`: pass
+- `cd apps/api && go test ./...`: pass
 - `make architecture-check`: pass
+- `make secret-scan`: pass
+- `git diff --check`: pass
 
 notes:
 
@@ -65,6 +68,7 @@ notes:
 - WP-160 is deferred by explicit user instruction: frontend visual implementation will be handled later by Gemini. Continue backend work at WP-170.
 - WP-170 added account group operations, account inspect/export/import, proxy bind, recover, persisted test/gateway health and quota snapshots, recursive export metadata sanitization, expanded CSRF regression coverage, and generated SDK methods for account operations.
 - WP-180 added `GET /api/v1/me/subscriptions`, admin subscription plan/user subscription/pricing rule APIs, entitlement rejection before Scheduler lease consumption, decimal-normalized pricing rule responses, pricing metadata on billing ledger entries, generated SDK methods, Ent/migration parity, and CSRF coverage for new console writes.
+- WP-190 added current-user and admin payment APIs, encrypted payment provider config, legal order state transitions, signed/idempotent webhook handling, fulfillment-side billing/subscription/audit/outbox effects, refund hooks, Ent/Postgres persistence, migration drift coverage, and generated SDK/OpenAPI parity.
 
 ## Work Package Ledger
 
@@ -89,7 +93,7 @@ notes:
 | WP-160 | deferred | Frontend visual implementation intentionally deferred per user instruction; backend work continues. |
 | WP-170 | completed | Account groups, account test/recovery, proxy binding, safe import/export, and persisted health/quota snapshots are covered. |
 | WP-180 | completed | Subscription plans, user subscriptions, entitlement admission, decimal pricing rules, billing metadata linkage, admin/current-user APIs, and generated SDK/OpenAPI parity are covered. |
-| WP-190 | pending | Payment system Phase 2. |
+| WP-190 | completed | Encrypted payment providers, payment orders, signed/idempotent webhooks, fulfillment, refunds, persistence, and generated API/SDK parity are covered. |
 | WP-200 | pending | Affiliate rebate Phase 2. |
 | WP-210 | pending | Production operations. |
 | WP-220+ | pending | Advanced endpoint and provider expansion. |

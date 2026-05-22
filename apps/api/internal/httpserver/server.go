@@ -20,6 +20,7 @@ import (
 	billingcontract "github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
 	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
+	paymentcontract "github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	providerpreset "github.com/srapi/srapi/apps/api/internal/modules/providers/preset"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
@@ -53,6 +54,7 @@ type runtimeOptions struct {
 	audit         auditcontract.Store
 	billing       billingcontract.Store
 	events        eventscontract.Store
+	payments      paymentcontract.Store
 	scheduler     schedulercontract.Store
 	subscriptions subscriptioncontract.Store
 	usage         usagecontract.Store
@@ -118,6 +120,12 @@ func WithEventStore(store eventscontract.Store) Option {
 	}
 }
 
+func WithPaymentStore(store paymentcontract.Store) Option {
+	return func(opts *runtimeOptions) {
+		opts.payments = store
+	}
+}
+
 func WithSchedulerStore(store schedulercontract.Store) Option {
 	return func(opts *runtimeOptions) {
 		opts.scheduler = store
@@ -174,6 +182,12 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("GET /api/v1/me", server.handleCurrentUser)
 	mux.HandleFunc("GET /api/v1/me/usage", server.handleCurrentUserUsage)
 	mux.HandleFunc("GET /api/v1/me/subscriptions", server.handleCurrentUserSubscriptions)
+	mux.HandleFunc("GET /api/v1/payment/methods", server.handleListPaymentMethods)
+	mux.HandleFunc("POST /api/v1/payment/orders", server.handleCreatePaymentOrder)
+	mux.HandleFunc("GET /api/v1/payment/orders", server.handleListPaymentOrders)
+	mux.HandleFunc("GET /api/v1/payment/orders/{id}", server.handleGetPaymentOrder)
+	mux.HandleFunc("POST /api/v1/payment/orders/{id}/cancel", server.handleCancelPaymentOrder)
+	mux.HandleFunc("POST /api/v1/webhooks/payments/{provider}", server.handlePaymentWebhook)
 	mux.HandleFunc("GET /api/v1/api-keys", server.handleListApiKeys)
 	mux.HandleFunc("POST /api/v1/api-keys", server.handleCreateApiKey)
 	mux.HandleFunc("PATCH /api/v1/api-keys/{id}", server.handleUpdateApiKey)
@@ -208,6 +222,10 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("GET /api/v1/admin/usage-logs", server.handleListAdminUsageLogs)
 	mux.HandleFunc("GET /api/v1/admin/audit-logs", server.handleListAdminAuditLogs)
 	mux.HandleFunc("GET /api/v1/admin/billing-ledger", server.handleListAdminBillingLedger)
+	mux.HandleFunc("GET /api/v1/admin/payments/providers", server.handleListAdminPaymentProviders)
+	mux.HandleFunc("POST /api/v1/admin/payments/providers", server.handleCreateAdminPaymentProvider)
+	mux.HandleFunc("GET /api/v1/admin/payments/orders", server.handleListAdminPaymentOrders)
+	mux.HandleFunc("POST /api/v1/admin/payments/orders/{id}/refund", server.handleRefundAdminPaymentOrder)
 	mux.HandleFunc("GET /api/v1/admin/subscription-plans", server.handleListAdminSubscriptionPlans)
 	mux.HandleFunc("POST /api/v1/admin/subscription-plans", server.handleCreateAdminSubscriptionPlan)
 	mux.HandleFunc("GET /api/v1/admin/user-subscriptions", server.handleListAdminUserSubscriptions)

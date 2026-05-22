@@ -27,6 +27,9 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/modelalias"
 	"github.com/srapi/srapi/apps/api/ent/modelprovidermapping"
 	"github.com/srapi/srapi/apps/api/ent/modelregistry"
+	"github.com/srapi/srapi/apps/api/ent/paymentauditlog"
+	"github.com/srapi/srapi/apps/api/ent/paymentorder"
+	"github.com/srapi/srapi/apps/api/ent/paymentproviderinstance"
 	"github.com/srapi/srapi/apps/api/ent/pricingrule"
 	"github.com/srapi/srapi/apps/api/ent/provider"
 	"github.com/srapi/srapi/apps/api/ent/provideraccount"
@@ -100,34 +103,37 @@ var (
 func checkColumn(t, c string) error {
 	initCheck.Do(func() {
 		columnCheck = sql.NewColumnCheck(map[string]func(string) bool{
-			apikey.Table:                apikey.ValidColumn,
-			apikeygroup.Table:           apikeygroup.ValidColumn,
-			accountgroup.Table:          accountgroup.ValidColumn,
-			accountgroupmember.Table:    accountgroupmember.ValidColumn,
-			accounthealthsnapshot.Table: accounthealthsnapshot.ValidColumn,
-			accountquotasnapshot.Table:  accountquotasnapshot.ValidColumn,
-			auditlog.Table:              auditlog.ValidColumn,
-			billingledger.Table:         billingledger.ValidColumn,
-			capabilitydefinition.Table:  capabilitydefinition.ValidColumn,
-			domaineventsinbox.Table:     domaineventsinbox.ValidColumn,
-			domaineventsoutbox.Table:    domaineventsoutbox.ValidColumn,
-			idempotencyrecord.Table:     idempotencyrecord.ValidColumn,
-			modelalias.Table:            modelalias.ValidColumn,
-			modelprovidermapping.Table:  modelprovidermapping.ValidColumn,
-			modelregistry.Table:         modelregistry.ValidColumn,
-			pricingrule.Table:           pricingrule.ValidColumn,
-			provider.Table:              provider.ValidColumn,
-			provideraccount.Table:       provideraccount.ValidColumn,
-			role.Table:                  role.ValidColumn,
-			schedulerdecision.Table:     schedulerdecision.ValidColumn,
-			schedulerfeedback.Table:     schedulerfeedback.ValidColumn,
-			schedulerstrategy.Table:     schedulerstrategy.ValidColumn,
-			setting.Table:               setting.ValidColumn,
-			subscriptionplan.Table:      subscriptionplan.ValidColumn,
-			usagelog.Table:              usagelog.ValidColumn,
-			user.Table:                  user.ValidColumn,
-			userrole.Table:              userrole.ValidColumn,
-			usersubscription.Table:      usersubscription.ValidColumn,
+			apikey.Table:                  apikey.ValidColumn,
+			apikeygroup.Table:             apikeygroup.ValidColumn,
+			accountgroup.Table:            accountgroup.ValidColumn,
+			accountgroupmember.Table:      accountgroupmember.ValidColumn,
+			accounthealthsnapshot.Table:   accounthealthsnapshot.ValidColumn,
+			accountquotasnapshot.Table:    accountquotasnapshot.ValidColumn,
+			auditlog.Table:                auditlog.ValidColumn,
+			billingledger.Table:           billingledger.ValidColumn,
+			capabilitydefinition.Table:    capabilitydefinition.ValidColumn,
+			domaineventsinbox.Table:       domaineventsinbox.ValidColumn,
+			domaineventsoutbox.Table:      domaineventsoutbox.ValidColumn,
+			idempotencyrecord.Table:       idempotencyrecord.ValidColumn,
+			modelalias.Table:              modelalias.ValidColumn,
+			modelprovidermapping.Table:    modelprovidermapping.ValidColumn,
+			modelregistry.Table:           modelregistry.ValidColumn,
+			paymentauditlog.Table:         paymentauditlog.ValidColumn,
+			paymentorder.Table:            paymentorder.ValidColumn,
+			paymentproviderinstance.Table: paymentproviderinstance.ValidColumn,
+			pricingrule.Table:             pricingrule.ValidColumn,
+			provider.Table:                provider.ValidColumn,
+			provideraccount.Table:         provideraccount.ValidColumn,
+			role.Table:                    role.ValidColumn,
+			schedulerdecision.Table:       schedulerdecision.ValidColumn,
+			schedulerfeedback.Table:       schedulerfeedback.ValidColumn,
+			schedulerstrategy.Table:       schedulerstrategy.ValidColumn,
+			setting.Table:                 setting.ValidColumn,
+			subscriptionplan.Table:        subscriptionplan.ValidColumn,
+			usagelog.Table:                usagelog.ValidColumn,
+			user.Table:                    user.ValidColumn,
+			userrole.Table:                userrole.ValidColumn,
+			usersubscription.Table:        usersubscription.ValidColumn,
 		})
 	})
 	return columnCheck(t, c)
