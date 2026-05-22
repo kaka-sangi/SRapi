@@ -45,14 +45,15 @@ last_completed:
 - WP-360: Antigravity text provider aliases now seed an `antigravity` provider preset, register text aliases from capability metadata, expose representative OpenAPI/SDK alias contracts, and prove OpenAI Chat/Anthropic Messages alias requests still route through Scheduler, Provider Adapter, and Reverse Proxy Runtime without Gateway-local DTOs.
 - WP-370: Antigravity Gemini model-action aliases now route `/antigravity/v1beta` and `/api/provider/antigravity/v1beta` GenerateContent/StreamGenerateContent requests through the standard Gemini Gateway handler while forcing `provider_key=antigravity`, preserving alias evidence, and avoiding Gateway-local DTOs.
 - WP-380: Responses WebSocket runtime foundation now exposes `GET /v1/responses/ws`, accepts raw `ResponsesRequest` or `response.create` frames, executes each request through the existing Responses Gateway runtime, forwards streaming Responses events as WebSocket JSON frames, and preserves Scheduler/usage source endpoint evidence.
+- WP-390: Reverse Proxy Runtime now exposes a `WebSocketRuntime.RelayWebSocket` primitive for direct upstream WSS relay with per-account client/proxy/cookie context, credential-driven auth injection, forbidden-header hygiene, text/binary message relay, and relay accounting.
 
 current:
 
-- package: WP-390+
+- package: WP-400+
 - status: pending
 - objective: split the next ecosystem or remaining advanced endpoint package from the roadmap.
 
-next_recommended: WP-390+
+next_recommended: WP-400+
 
 last_gates:
 
@@ -129,6 +130,8 @@ notes:
 - WP-380 added `TestGatewayResponsesWebSocketTargetsResponsesRuntime` and `TestGatewayResponsesWebSocketForwardsStreamingEvents`, proving WebSocket non-streaming and streaming requests reuse `/v1/responses` auth/model policy/Scheduler/Provider Adapter/usage paths and preserve `/v1/responses/ws` as the source endpoint.
 - WP-380 added `nhooyr.io/websocket` only for transport handshake/frame handling; business protocol stays in the existing Responses runtime and direct upstream WSS relay remains a follow-up package.
 - Local client availability is confirmed in PATH for `codex`, `claude`, and `antigravity`. Codex CLI and Claude Code CLI reverse-proxy runtime identities already exist (`reverse-proxy-codex-cli`, `reverse-proxy-claude-code-cli`) and Antigravity alias routing now covers OpenAI-compatible, Anthropic-compatible, and Gemini-compatible routes; actual reverse-proxy use still requires configured Provider/Account/base_url/token records.
+- WP-390 added `TestRuntimeRelaysWebSocketWithAccountContextAndHeaderHygiene` and `TestRuntimeRelaysWebSocketWebSessionCookieFromCredential`, proving direct upstream WebSocket relay uses account credentials, default upstream-client User-Agent, subprotocol negotiation, text/binary message relay, metrics, and sanitized handshake headers.
+- WP-390 intentionally does not add Gateway route binding or provider-native realtime schema adapters; those are next-stage realtime packages that can now depend on the runtime primitive.
 
 ## Work Package Ledger
 
@@ -173,4 +176,5 @@ notes:
 | WP-360 | completed | Antigravity text provider alias routes v1. |
 | WP-370 | completed | Antigravity Gemini model-action alias routes v1. |
 | WP-380 | completed | Responses WebSocket runtime foundation v1. |
-| WP-390+ | pending | Remaining ecosystem and advanced endpoint packages. |
+| WP-390 | completed | Reverse Proxy WSS relay foundation v1. |
+| WP-400+ | pending | Remaining ecosystem and advanced endpoint packages. |

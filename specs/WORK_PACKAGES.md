@@ -1444,11 +1444,53 @@ Required gates:
 - `make secret-scan`
 - `git diff --check`
 
-## WP-390+: Ecosystem And Remaining Advanced Surface
+## WP-390: Reverse Proxy WSS Relay Foundation v1
+
+Objective: add the first Reverse Proxy Runtime primitive for direct upstream WebSocket/WSS relay so future provider-native realtime adapters can use the same per-account client, credential injection, header hygiene, proxy binding, and metrics path as HTTP reverse-proxy requests.
+
+Read first:
+
+- `docs/REVERSE_PROXY_SPEC.md`
+- `docs/PROVIDER_ADAPTER_SPEC.md`
+- `docs/GATEWAY_ROUTE_MATRIX.md`
+- `docs/MODULE_INTERFACE_CONTRACTS.md`
+- `apps/api/internal/modules/reverse_proxy/contract`
+- `apps/api/internal/modules/reverse_proxy/service`
+
+Owns:
+
+- Reverse Proxy Runtime contract for WebSocket relay
+- runtime implementation that dials upstream WebSocket endpoints with per-account HTTP client/proxy/cookie context
+- header/auth/User-Agent hygiene for WebSocket handshakes
+- bidirectional text/binary message relay primitives and relay accounting
+- focused tests proving relay behavior, credential-source precedence, and no leaked SRapi/client auth headers
+- reverse proxy docs and status updates
+
+Definition of Done:
+
+- `reverse_proxy/contract` exposes a WebSocket relay interface without changing existing HTTP `Runtime.Do` call sites or fakes.
+- `reverse_proxy/service.Service` implements both existing HTTP runtime and WebSocket relay runtime.
+- WebSocket handshakes reuse sanitized headers, account credential auth injection, default upstream-client User-Agent, per-account client/proxy/cookie context, and compression-disabled behavior.
+- Caller-provided `Authorization`, `Cookie`, `Sec-WebSocket-*`, `X-Request-ID`, `X-Forwarded-*`, `Via`, `X-SRapi-*`, and `X-Gateway-*` headers do not leak upstream; credentials are injected only from the selected account runtime.
+- Relay supports text and binary messages from upstream and client directions, returns basic message/byte accounting, and records reverse-proxy request/success/error metrics.
+- This package does not implement provider-native realtime protocol adapters, Gateway route binding, or rich slot lifecycle; those remain follow-up packages.
+- No frontend visuals are added.
+
+Required gates:
+
+- `cd apps/api && go test ./internal/modules/reverse_proxy/...`
+- `cd apps/api && go test ./internal/modules/provider_adapters/... ./internal/httpserver`
+- `cd apps/api && go test ./...`
+- `make architecture-check`
+- `make code-quality-check`
+- `make secret-scan`
+- `git diff --check`
+
+## WP-400+: Ecosystem And Remaining Advanced Surface
 
 Use `ROADMAP.md` Phase 7 through Phase 8 to split future packages for:
 
-- direct upstream WSS relay and richer realtime slot lifecycle
+- provider-native realtime protocol adapters and richer slot lifecycle
 - SDK examples
 - migration guides
 

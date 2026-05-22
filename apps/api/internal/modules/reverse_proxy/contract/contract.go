@@ -3,6 +3,7 @@ package contract
 import (
 	"context"
 	"net/http"
+	"time"
 )
 
 type AccountRuntime struct {
@@ -31,6 +32,42 @@ type Response struct {
 
 type Runtime interface {
 	Do(ctx context.Context, req Request) (Response, error)
+}
+
+type WebSocketMessageType string
+
+const (
+	WebSocketMessageText   WebSocketMessageType = "text"
+	WebSocketMessageBinary WebSocketMessageType = "binary"
+)
+
+type WebSocketMessage struct {
+	Type WebSocketMessageType
+	Data []byte
+}
+
+type WebSocketRelayRequest struct {
+	Account          AccountRuntime
+	URL              string
+	Headers          http.Header
+	Subprotocols     []string
+	ClientToUpstream <-chan WebSocketMessage
+	UpstreamToClient chan<- WebSocketMessage
+}
+
+type WebSocketRelayResult struct {
+	UpstreamStatusCode int
+	Subprotocol        string
+	StartedAt          time.Time
+	EndedAt            time.Time
+	MessagesUpstream   int
+	MessagesDownstream int
+	BytesUpstream      int
+	BytesDownstream    int
+}
+
+type WebSocketRuntime interface {
+	RelayWebSocket(ctx context.Context, req WebSocketRelayRequest) (WebSocketRelayResult, error)
 }
 
 type RefreshRequest struct {

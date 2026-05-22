@@ -16,9 +16,13 @@ import (
 	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"
+	"nhooyr.io/websocket"
 )
 
-const maxReverseProxyResponseBytes = 8 << 20
+const (
+	maxReverseProxyResponseBytes = 8 << 20
+	statusClientClosedRequest    = 499
+)
 
 type ClientFactory func(account contract.AccountRuntime) (*http.Client, error)
 
@@ -36,6 +40,11 @@ type Service struct {
 	bannedTotal    int
 	refreshTotal   map[string]int
 }
+
+var (
+	_ contract.Runtime          = (*Service)(nil)
+	_ contract.WebSocketRuntime = (*Service)(nil)
+)
 
 func New(factory ClientFactory) (*Service, error) {
 	defaultClient, err := newIsolatedClient(contract.AccountRuntime{})
@@ -115,6 +124,73 @@ func (s *Service) Do(ctx context.Context, req contract.Request) (contract.Respon
 	}, nil
 }
 
+func (s *Service) RelayWebSocket(ctx context.Context, req contract.WebSocketRelayRequest) (contract.WebSocketRelayResult, error) {
+	if req.Account.AccountID <= 0 || strings.TrimSpace(req.URL) == "" || req.ClientToUpstream == nil || req.UpstreamToClient == nil {
+		return contract.WebSocketRelayResult{}, ErrInvalidInput
+	}
+	headers := sanitizeHeaders(req.Headers)
+	injectAuth(headers, req.Account)
+	if headers.Get("User-Agent") == "" {
+		headers.Set("User-Agent", userAgent(req.Account))
+	}
+	client, err := s.clientFor(req.Account)
+	if err != nil {
+		s.recordError("network_error")
+		return contract.WebSocketRelayResult{}, err
+	}
+	startedAt := time.Now().UTC()
+	s.recordRequest()
+	conn, resp, err := websocket.Dial(ctx, req.URL, &websocket.DialOptions{
+		HTTPClient:      client,
+		HTTPHeader:      headers,
+		Subprotocols:    append([]string(nil), req.Subprotocols...),
+		CompressionMode: websocket.CompressionDisabled,
+	})
+	if err != nil {
+		class := "network_error"
+		statusCode := http.StatusBadGateway
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			class = "timeout"
+			statusCode = http.StatusGatewayTimeout
+		} else if resp != nil && resp.StatusCode > 0 {
+			statusCode = resp.StatusCode
+		}
+		runtimeErr := contract.RuntimeError{Class: class, StatusCode: statusCode, Message: "reverse proxy websocket dial failed"}
+		s.recordError(runtimeErr.Class)
+		return contract.WebSocketRelayResult{}, runtimeErr
+	}
+	defer conn.Close(websocket.StatusNormalClosure, "")
+
+	result := contract.WebSocketRelayResult{
+		UpstreamStatusCode: http.StatusSwitchingProtocols,
+		Subprotocol:        conn.Subprotocol(),
+		StartedAt:          startedAt,
+	}
+	if resp != nil && resp.StatusCode > 0 {
+		result.UpstreamStatusCode = resp.StatusCode
+	}
+
+	stats := &webSocketRelayStats{}
+	err = relayWebSocketMessages(ctx, conn, req.ClientToUpstream, req.UpstreamToClient, stats)
+	statsSnapshot := stats.snapshot()
+	result.MessagesUpstream = statsSnapshot.messagesUpstream
+	result.MessagesDownstream = statsSnapshot.messagesDownstream
+	result.BytesUpstream = statsSnapshot.bytesUpstream
+	result.BytesDownstream = statsSnapshot.bytesDownstream
+	result.EndedAt = time.Now().UTC()
+	if err != nil {
+		runtimeErr := websocketRelayError(ctx, err)
+		if runtimeErr.Class != "" {
+			s.recordError(runtimeErr.Class)
+			return result, runtimeErr
+		}
+		s.recordSuccess()
+		return result, nil
+	}
+	s.recordSuccess()
+	return result, nil
+}
+
 func (s *Service) Refresh(ctx context.Context, req contract.RefreshRequest) (contract.RefreshResponse, error) {
 	if req.Account.AccountID <= 0 {
 		s.recordRefresh("invalid_request")
@@ -136,6 +212,143 @@ func (s *Service) Refresh(ctx context.Context, req contract.RefreshRequest) (con
 	_ = ctx
 	s.recordRefresh("success")
 	return contract.RefreshResponse{AccountID: req.Account.AccountID, Credential: refreshed, RefreshedAt: now}, nil
+}
+
+type webSocketRelayStats struct {
+	mu                 sync.Mutex
+	messagesUpstream   int
+	messagesDownstream int
+	bytesUpstream      int
+	bytesDownstream    int
+}
+
+func (s *webSocketRelayStats) recordUpstream(bytes int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.messagesUpstream++
+	s.bytesUpstream += bytes
+}
+
+func (s *webSocketRelayStats) recordDownstream(bytes int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.messagesDownstream++
+	s.bytesDownstream += bytes
+}
+
+func (s *webSocketRelayStats) snapshot() webSocketRelayStats {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return webSocketRelayStats{
+		messagesUpstream:   s.messagesUpstream,
+		messagesDownstream: s.messagesDownstream,
+		bytesUpstream:      s.bytesUpstream,
+		bytesDownstream:    s.bytesDownstream,
+	}
+}
+
+type webSocketRelayDirection string
+
+const (
+	webSocketRelayClient   webSocketRelayDirection = "client"
+	webSocketRelayUpstream webSocketRelayDirection = "upstream"
+)
+
+type webSocketRelayDone struct {
+	direction webSocketRelayDirection
+	err       error
+}
+
+func relayWebSocketMessages(ctx context.Context, conn *websocket.Conn, clientToUpstream <-chan contract.WebSocketMessage, upstreamToClient chan<- contract.WebSocketMessage, stats *webSocketRelayStats) error {
+	doneCh := make(chan webSocketRelayDone, 2)
+	relayCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	go func() {
+		doneCh <- webSocketRelayDone{direction: webSocketRelayClient, err: relayClientWebSocketMessages(relayCtx, conn, clientToUpstream, stats)}
+	}()
+	go func() {
+		doneCh <- webSocketRelayDone{direction: webSocketRelayUpstream, err: relayUpstreamWebSocketMessages(relayCtx, conn, upstreamToClient, stats)}
+	}()
+	first := <-doneCh
+	if first.err != nil || first.direction == webSocketRelayUpstream {
+		cancel()
+		<-doneCh
+		return first.err
+	}
+	second := <-doneCh
+	return second.err
+}
+
+func relayClientWebSocketMessages(ctx context.Context, conn *websocket.Conn, in <-chan contract.WebSocketMessage, stats *webSocketRelayStats) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case msg, ok := <-in:
+			if !ok {
+				return nil
+			}
+			if err := conn.Write(ctx, websocketMessageType(msg.Type), msg.Data); err != nil {
+				return err
+			}
+			stats.recordUpstream(len(msg.Data))
+		}
+	}
+}
+
+func relayUpstreamWebSocketMessages(ctx context.Context, conn *websocket.Conn, out chan<- contract.WebSocketMessage, stats *webSocketRelayStats) error {
+	defer close(out)
+	for {
+		msgType, payload, err := conn.Read(ctx)
+		if err != nil {
+			if status := websocket.CloseStatus(err); status == websocket.StatusNormalClosure || status == websocket.StatusGoingAway {
+				return nil
+			}
+			return err
+		}
+		msg := contract.WebSocketMessage{Type: contractWebSocketMessageType(msgType), Data: append([]byte(nil), payload...)}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case out <- msg:
+		}
+		stats.recordDownstream(len(payload))
+	}
+}
+
+func websocketMessageType(value contract.WebSocketMessageType) websocket.MessageType {
+	switch value {
+	case contract.WebSocketMessageBinary:
+		return websocket.MessageBinary
+	default:
+		return websocket.MessageText
+	}
+}
+
+func contractWebSocketMessageType(value websocket.MessageType) contract.WebSocketMessageType {
+	switch value {
+	case websocket.MessageBinary:
+		return contract.WebSocketMessageBinary
+	default:
+		return contract.WebSocketMessageText
+	}
+}
+
+func websocketRelayError(ctx context.Context, err error) contract.RuntimeError {
+	if err == nil {
+		return contract.RuntimeError{}
+	}
+	if errors.Is(err, context.Canceled) || errors.Is(ctx.Err(), context.Canceled) {
+		return contract.RuntimeError{Class: "client_closed", StatusCode: statusClientClosedRequest, Message: "websocket relay closed"}
+	}
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return contract.RuntimeError{Class: "timeout", StatusCode: http.StatusGatewayTimeout, Message: "websocket relay timed out"}
+	}
+	status := websocket.CloseStatus(err)
+	if status == websocket.StatusNormalClosure || status == websocket.StatusGoingAway {
+		return contract.RuntimeError{}
+	}
+	return contract.RuntimeError{Class: "network_error", StatusCode: http.StatusBadGateway, Message: "websocket relay failed"}
 }
 
 func (s *Service) Metrics() contract.MetricsSnapshot {
@@ -225,6 +438,15 @@ func forbiddenHeader(key string, values []string) bool {
 	canonical := http.CanonicalHeaderKey(strings.TrimSpace(key))
 	lower := strings.ToLower(canonical)
 	if lower == "x-request-id" || lower == "x-forwarded-for" || lower == "x-forwarded-host" || lower == "x-forwarded-proto" || lower == "forwarded" || lower == "via" || lower == "server" {
+		return true
+	}
+	if lower == "authorization" || lower == "cookie" {
+		return true
+	}
+	if lower == "connection" || lower == "upgrade" || lower == "te" || lower == "trailer" || lower == "transfer-encoding" {
+		return true
+	}
+	if strings.HasPrefix(lower, "sec-websocket-") {
 		return true
 	}
 	if strings.HasPrefix(lower, "x-srapi-") || strings.HasPrefix(lower, "x-gateway-") {

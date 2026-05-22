@@ -636,5 +636,5 @@ Audio speech dispatch must send JSON with mapped upstream `model`, `input`, `voi
 - 不得向上游泄漏 SRapi 内部标识（`X-Request-ID`、`X-Forwarded-*`、`Via`、`X-SRapi-*` 等）。
 - 必须处理 `challenge_required`、`session_invalid`、`account_locked`、`account_banned`、`abuse_detected`、`geo_blocked`、`device_unrecognized`、`upstream_client_outdated` 等反代特有错误，并按规范触发账号状态变更。
 - 必须每账号独立 cookie jar、HTTP client、proxy、UA，不得跨账号共享。
-- SSE / WSS 必须字节级透传，禁止 SRapi 二次合并或重压缩。
+- SSE / WSS 必须字节级透传，禁止 SRapi 二次合并或重压缩。WP-390 起，provider-native realtime adapter 必须使用 Reverse Proxy Runtime 的 `WebSocketRuntime.RelayWebSocket` primitive，而不是在 Adapter 内直接拨号。
 - OAuth refresh / Device Code 流程必须通过反代运行时的统一接口完成，禁止在 Adapter 内单独实现凭证轮换。

@@ -236,6 +236,13 @@ User-Agent: SRapi/*     永久禁止
 
 Gateway 在将上游 chunk 渲染回客户端协议时（例如把 Claude Web 的 SSE 渲染为 OpenAI Chat Completions SSE），转换必须在 **Client Response Renderer** 层进行，反代运行时本身只保证“原样接收上游”。
 
+WP-390 起，Reverse Proxy Runtime 提供直接 WebSocket relay primitive：
+
+- 调用方通过 `WebSocketRuntime.RelayWebSocket` 传入已选中的账号 runtime context、目标 WebSocket URL、可选子协议和双向 message channel。
+- runtime 使用与 HTTP 反代相同的 per-account client/proxy/cookie jar、Credential auth injection、User-Agent 选择和 forbidden-header 过滤。
+- `Authorization`、`Cookie`、`Sec-WebSocket-*`、`X-Request-ID`、`X-Forwarded-*`、`Via`、`X-SRapi-*`、`X-Gateway-*` 等 caller/gateway header 不得透传；认证材料只能来自选中账号的 credential。
+- relay 支持 text/binary message 透传并返回基础 message/byte accounting。provider-native realtime event schema、slot lifecycle 和 Gateway binding 仍由后续 adapter/runtime package 实现。
+
 ## 11. 出口 IP 与代理绑定
 
 要求：
@@ -379,6 +386,7 @@ reverse_proxy_challenge_total{upstream_client, strategy}
 reverse_proxy_account_locked_total{upstream_client}
 reverse_proxy_account_banned_total{upstream_client}
 reverse_proxy_oauth_refresh_total{upstream_client, status}
+reverse_proxy_websocket_relay_total{upstream_client, status}
 reverse_proxy_proxy_failure_total{proxy_type}
 reverse_proxy_ja3_mismatch_total
 reverse_proxy_h2_mismatch_total
