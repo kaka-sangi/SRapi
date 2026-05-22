@@ -27,6 +27,7 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 		"openai",
 		"openai-compatible",
 		"openrouter",
+		"rerank-compatible",
 		"zai",
 		"zai-anthropic",
 		"zhipu",
@@ -95,6 +96,17 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	}
 	if !containsAccountType(groqPreset.AccountTypeAllowlist, AccountTypeAPIKey) || !containsAuthMode(groqPreset.AuthModes, AuthModeBearer) {
 		t.Fatalf("expected groq preset to include bearer api_key support")
+	}
+
+	rerankPreset, ok := registry.Lookup("rerank-compatible")
+	if !ok {
+		t.Fatalf("missing rerank-compatible preset")
+	}
+	if rerankPreset.PlatformFamily != PlatformFamilyRerankCompatible || !rerankPreset.Capabilities["rerank"] {
+		t.Fatalf("expected rerank-compatible preset capabilities, got %+v", rerankPreset)
+	}
+	if !rerankPreset.MatchesPath("/api/provider/rerank-compatible/v1/rerank") {
+		t.Fatalf("expected rerank-compatible route alias to match path")
 	}
 }
 

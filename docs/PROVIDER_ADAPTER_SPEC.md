@@ -169,6 +169,7 @@ supports_generate_content
 supports_embeddings
 supports_images
 supports_moderations
+supports_rerank
 supports_stream
 supports_tools
 supports_parallel_tool_calls
@@ -188,6 +189,16 @@ quota_model
 WP-290 起，`supports_images` 映射到 canonical `images` endpoint capability。Gateway image generation 请求必须带 `images` request capability；OpenAI-compatible API-key 和 reverse-proxy accounts 使用 `/images/generations` 上游路径，并解析 `url` / `b64_json` image outputs。
 
 WP-310 起，`supports_moderations` 映射到 canonical `moderations` endpoint capability。Gateway moderation 请求必须带 `moderations` request capability；OpenAI-compatible API-key 和 reverse-proxy accounts 使用 `/moderations` 上游路径，并解析 `flagged`、`categories`、`category_scores` 和 `category_applied_input_types`。
+
+WP-320 起，`supports_rerank` 映射到 canonical `rerank` endpoint capability。Gateway rerank 请求必须带 `rerank` request capability；rerank-compatible API-key 和 reverse-proxy accounts 使用 `/rerank` 上游路径，并解析 `index`、`relevance_score`、可选 `document` 和可选 usage。
+
+WP-320 rerank adapter boundary:
+
+- Rerank-compatible API-key accounts dispatch rerank requests to `{base_url}/rerank`.
+- Reverse-proxy rerank-compatible accounts use the same route through Reverse Proxy Runtime with account runtime context.
+- Adapter input includes mapped upstream model, query, string/object documents, optional `top_n`, optional `return_documents`, and optional user.
+- Adapter output preserves upstream result order, index, relevance score, optional returned document, and usage when present.
+- Providers that do not advertise `rerank` capability are not eligible for rerank Gateway scheduling.
 
 WP-270 embeddings adapter boundary:
 

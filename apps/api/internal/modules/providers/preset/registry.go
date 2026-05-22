@@ -12,6 +12,7 @@ type PlatformFamily string
 const (
 	PlatformFamilyOpenAICompatible    PlatformFamily = "openai_compatible"
 	PlatformFamilyAnthropicCompatible PlatformFamily = "anthropic_compatible"
+	PlatformFamilyRerankCompatible    PlatformFamily = "rerank_compatible"
 )
 
 type AuthMode string
@@ -80,6 +81,7 @@ func Default() *Registry {
 		openAIPreset("openai", "OpenAI", "https://api.openai.com/v1", []string{"/openai/v1", "/api/provider/openai", "/api/provider/openai/v1"}),
 		openAIPreset("openai-compatible", "OpenAI Compatible", "https://api.openai.com/v1", []string{"/api/provider/openai-compatible", "/api/provider/openai-compatible/v1"}),
 		openAIPreset("openrouter", "OpenRouter", "https://openrouter.ai/api/v1", providerAliases("openrouter")),
+		rerankPreset("rerank-compatible", "Rerank Compatible", "https://api.cohere.com/v2", []string{"/api/provider/rerank-compatible", "/api/provider/rerank-compatible/v1"}),
 		openAIPreset("zai", "Z.AI", "https://api.z.ai/api/paas/v4", providerAliases("zai")),
 		openAIPreset("zhipu", "Zhipu", "https://open.bigmodel.cn/api/paas/v4", providerAliases("zhipu")),
 	)
@@ -91,6 +93,10 @@ func openAIPreset(providerKey string, displayName string, defaultBaseURL string,
 
 func anthropicPreset(providerKey string, displayName string, defaultBaseURL string, routeAliases []string) Preset {
 	return compatiblePreset(providerKey, PlatformFamilyAnthropicCompatible, displayName, defaultBaseURL, routeAliases, anthropicCapabilities())
+}
+
+func rerankPreset(providerKey string, displayName string, defaultBaseURL string, routeAliases []string) Preset {
+	return compatiblePreset(providerKey, PlatformFamilyRerankCompatible, displayName, defaultBaseURL, routeAliases, rerankCapabilities())
 }
 
 func compatiblePreset(providerKey string, platformFamily PlatformFamily, displayName string, defaultBaseURL string, routeAliases []string, capabilities map[string]bool) Preset {
@@ -141,6 +147,12 @@ func anthropicCapabilities() map[string]bool {
 		capabilitiescontract.KeyToolCalling:      true,
 		capabilitiescontract.KeyStructuredOutput: true,
 		capabilitiescontract.KeyVisionInput:      true,
+	}
+}
+
+func rerankCapabilities() map[string]bool {
+	return map[string]bool{
+		capabilitiescontract.KeyRerank: true,
 	}
 }
 

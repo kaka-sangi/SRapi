@@ -255,6 +255,32 @@ func (s *Service) NormalizeModerations(req apiopenapi.ModerationRequest, meta Re
 	return canonical, nil
 }
 
+func (s *Service) NormalizeRerank(req apiopenapi.RerankRequest, meta RequestMeta) (gatewaycontract.CanonicalRequest, error) {
+	query := strings.TrimSpace(req.Query)
+	if query == "" {
+		return gatewaycontract.CanonicalRequest{}, fmt.Errorf("rerank query is empty")
+	}
+	documents, err := rerankDocuments(req.Documents)
+	if err != nil {
+		return gatewaycontract.CanonicalRequest{}, err
+	}
+	if req.TopN != nil && (*req.TopN < 1 || *req.TopN > len(documents)) {
+		return gatewaycontract.CanonicalRequest{}, fmt.Errorf("rerank top_n must be between 1 and document count")
+	}
+	canonical := canonical(meta, gatewaycontract.ProtocolOpenAICompatible, gatewaycontract.ProtocolOpenAICompatible, req.Model, "", false, rerankPrompt(query, documents), nil, rerankContentBlocks(query, documents), "", nil)
+	canonical.RerankQuery = query
+	canonical.RerankDocuments = cloneRerankDocuments(documents)
+	canonical.RerankTopN = cloneInt(req.TopN)
+	if req.ReturnDocuments != nil {
+		canonical.RerankReturnDocuments = *req.ReturnDocuments
+	}
+	if req.User != nil {
+		canonical.RerankUser = strings.TrimSpace(*req.User)
+	}
+	canonical.RequestCapabilities = append(canonical.RequestCapabilities, gatewaycontract.RequestCapability{Key: capabilitiescontract.KeyRerank, Version: "v1"})
+	return canonical, nil
+}
+
 func (s *Service) BuildTextResponse(model, canonicalModel, text string, warnings []string) gatewaycontract.CanonicalResponse {
 	return s.buildTextResponse("", model, canonicalModel, text, estimateUsage(text), warnings)
 }
@@ -363,6 +389,33 @@ func (s *Service) BuildCanonicalModerationResponse(req gatewaycontract.Canonical
 		Model:                 model,
 		CanonicalModel:        canonicalModel,
 		Results:               cloneModerationResults(results),
+		Usage:                 usage,
+		CompatibilityWarnings: uniqueStrings(req.CompatibilityWarnings),
+	}
+}
+
+func (s *Service) BuildCanonicalRerankResponse(req gatewaycontract.CanonicalRequest, id string, results []gatewaycontract.RerankResult, usage gatewaycontract.Usage) gatewaycontract.RerankResponse {
+	model := strings.TrimSpace(req.Model)
+	if model == "" {
+		model = req.CanonicalModel
+	}
+	canonicalModel := strings.TrimSpace(req.CanonicalModel)
+	if canonicalModel == "" {
+		canonicalModel = model
+	}
+	id = strings.TrimSpace(id)
+	if id == "" {
+		id = "rerank_" + randomHexString(12)
+	}
+	if usage.InputTokens == 0 && usage.OutputTokens == 0 && usage.CachedTokens == 0 {
+		usage = rerankEstimatedUsage(req.RerankQuery, req.RerankDocuments)
+	}
+	return gatewaycontract.RerankResponse{
+		ID:                    id,
+		RequestID:             strings.TrimSpace(req.RequestID),
+		Model:                 model,
+		CanonicalModel:        canonicalModel,
+		Results:               cloneRerankResults(results),
 		Usage:                 usage,
 		CompatibilityWarnings: uniqueStrings(req.CompatibilityWarnings),
 	}
@@ -521,6 +574,28 @@ func (s *Service) RenderModerations(resp gatewaycontract.ModerationResponse) api
 		Id:      resp.ID,
 		Model:   resp.Model,
 		Results: results,
+	}
+}
+
+func (s *Service) RenderRerank(resp gatewaycontract.RerankResponse) apiopenapi.RerankResponse {
+	results := make([]apiopenapi.RerankResult, 0, len(resp.Results))
+	for _, item := range resp.Results {
+		result := apiopenapi.RerankResult{
+			Index:                item.Index,
+			RelevanceScore:       item.RelevanceScore,
+			AdditionalProperties: cloneMap(item.Metadata),
+		}
+		if item.Document != nil {
+			document := rerankDocumentObject(*item.Document)
+			result.Document = &document
+		}
+		results = append(results, result)
+	}
+	return apiopenapi.RerankResponse{
+		Id:      resp.ID,
+		Model:   resp.Model,
+		Results: results,
+		Usage:   tokenUsage(resp.Usage),
 	}
 }
 
@@ -999,6 +1074,67 @@ func moderationContentBlocks(values []string) []gatewaycontract.ContentBlock {
 	return out
 }
 
+func rerankDocuments(values []apiopenapi.RerankDocument) ([]gatewaycontract.RerankDocument, error) {
+	out := make([]gatewaycontract.RerankDocument, 0, len(values))
+	for _, value := range values {
+		if text, err := value.AsRerankDocument0(); err == nil {
+			text = strings.TrimSpace(text)
+			if text != "" {
+				out = append(out, gatewaycontract.RerankDocument{Text: text, Original: text})
+			}
+			continue
+		}
+		object, err := value.AsJsonObject()
+		if err != nil {
+			return nil, fmt.Errorf("rerank document must be a string or object")
+		}
+		fields := cloneMap(object)
+		text := rerankDocumentText(fields)
+		if text == "" {
+			return nil, fmt.Errorf("rerank document object must contain text")
+		}
+		out = append(out, gatewaycontract.RerankDocument{Text: text, Fields: fields, Original: cloneMap(fields)})
+	}
+	if len(out) == 0 {
+		return nil, fmt.Errorf("rerank documents are empty")
+	}
+	return out, nil
+}
+
+func rerankDocumentText(fields map[string]any) string {
+	for _, key := range []string{"text", "content", "document"} {
+		if value, ok := fields[key]; ok {
+			if text := strings.TrimSpace(fmt.Sprint(value)); text != "" {
+				return text
+			}
+		}
+	}
+	return ""
+}
+
+func rerankPrompt(query string, documents []gatewaycontract.RerankDocument) string {
+	parts := make([]string, 0, len(documents)+1)
+	parts = append(parts, strings.TrimSpace(query))
+	for _, doc := range documents {
+		if text := strings.TrimSpace(doc.Text); text != "" {
+			parts = append(parts, text)
+		}
+	}
+	return strings.Join(parts, "\n")
+}
+
+func rerankContentBlocks(query string, documents []gatewaycontract.RerankDocument) []gatewaycontract.ContentBlock {
+	out := []gatewaycontract.ContentBlock{{Type: gatewaycontract.ContentBlockText, Role: "user", Text: strings.TrimSpace(query)}}
+	for _, doc := range documents {
+		text := strings.TrimSpace(doc.Text)
+		if text == "" {
+			continue
+		}
+		out = append(out, gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockText, Role: "user", Text: text})
+	}
+	return out
+}
+
 func embeddingEstimatedUsage(values []string) gatewaycontract.Usage {
 	return gatewaycontract.Usage{
 		InputTokens: estimateTokens(strings.Join(values, "\n")),
@@ -1021,6 +1157,13 @@ func imageEstimatedUsage(req gatewaycontract.CanonicalRequest) gatewaycontract.U
 func moderationEstimatedUsage(values []string) gatewaycontract.Usage {
 	return gatewaycontract.Usage{
 		InputTokens: estimateTokens(strings.Join(values, "\n")),
+		Estimated:   true,
+	}
+}
+
+func rerankEstimatedUsage(query string, documents []gatewaycontract.RerankDocument) gatewaycontract.Usage {
+	return gatewaycontract.Usage{
+		InputTokens: estimateTokens(rerankPrompt(query, documents)),
 		Estimated:   true,
 	}
 }
@@ -1063,6 +1206,47 @@ func cloneModerationResults(values []gatewaycontract.ModerationResult) []gateway
 		}
 	}
 	return out
+}
+
+func cloneRerankDocuments(values []gatewaycontract.RerankDocument) []gatewaycontract.RerankDocument {
+	if values == nil {
+		return nil
+	}
+	out := make([]gatewaycontract.RerankDocument, len(values))
+	for idx, value := range values {
+		out[idx] = gatewaycontract.RerankDocument{
+			Text:     value.Text,
+			Fields:   cloneMap(value.Fields),
+			Original: cloneAny(value.Original),
+		}
+	}
+	return out
+}
+
+func cloneRerankResults(values []gatewaycontract.RerankResult) []gatewaycontract.RerankResult {
+	if values == nil {
+		return nil
+	}
+	out := make([]gatewaycontract.RerankResult, len(values))
+	for idx, value := range values {
+		out[idx] = gatewaycontract.RerankResult{
+			Index:          value.Index,
+			RelevanceScore: value.RelevanceScore,
+			Metadata:       cloneMap(value.Metadata),
+		}
+		if value.Document != nil {
+			document := cloneRerankDocuments([]gatewaycontract.RerankDocument{*value.Document})[0]
+			out[idx].Document = &document
+		}
+	}
+	return out
+}
+
+func rerankDocumentObject(value gatewaycontract.RerankDocument) apiopenapi.JsonObject {
+	if len(value.Fields) > 0 {
+		return cloneMap(value.Fields)
+	}
+	return apiopenapi.JsonObject{"text": value.Text}
 }
 
 func cloneBoolMap(values map[string]bool) map[string]bool {

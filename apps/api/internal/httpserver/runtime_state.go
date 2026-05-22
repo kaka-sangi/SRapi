@@ -332,7 +332,6 @@ func (rt *runtimeState) bootstrapGatewayCatalog(ctx context.Context) error {
 			return err
 		}
 	}
-
 	model, err := rt.modelStore.FindByCanonicalName(ctx, "gpt-4o-mini")
 	if err != nil {
 		if _, err := rt.models.Create(ctx, modelcontract.CreateRequest{

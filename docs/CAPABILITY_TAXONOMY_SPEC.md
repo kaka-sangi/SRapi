@@ -106,9 +106,12 @@ messages
 embeddings
 images
 moderations
+rerank
 ```
 
 `moderations` 表示 Provider Account 能处理 `/v1/moderations` 兼容端点；`moderation_output` 表示模型/Provider 能产出审核分类结果。Gateway moderation 请求必须要求 `moderations.v1`，避免只具备文本生成能力的候选账号被误选。
+
+`rerank` 表示 Provider Account 能处理 `/v1/rerank` 兼容端点；`rerank_output` 表示模型/Provider 能产出排序评分。Gateway rerank 请求必须要求 `rerank.v1`，避免 generation-only 或 embedding-only provider 被误选。
 
 ### 4.3 交互能力
 

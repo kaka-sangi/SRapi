@@ -15,7 +15,7 @@ Provider preset 的目标是减少硬编码分叉：
 | 概念 | 说明 |
 | --- | --- |
 | `provider_key` | 内部稳定标识，如 `openai-compatible`、`deepseek`。 |
-| `platform_family` | 兼容协议族，如 `openai_compatible`、`claude_compatible`。 |
+| `platform_family` | 兼容协议族，如 `openai_compatible`、`anthropic_compatible`、`rerank_compatible`。 |
 | `route_aliases` | 可强制绑定该 preset 的路径前缀。 |
 | `default_base_url` | 默认上游地址。 |
 | `auth_modes` | 支持的认证方式。 |
@@ -66,7 +66,17 @@ custom_reverse_proxy
 
 Anthropic-compatible preset 不得进入 Claude Web / Claude Code OAuth mimicry runtime。`claude-compatible` 只能作为历史兼容 route alias，不能作为新的 adapter_type 或 provider.protocol。
 
-## 5. Preset Schema
+## 5. Rerank-compatible preset
+
+WP-320 起建议内置：
+
+| provider_key | 默认用途 | 阶段 |
+| --- | --- | --- |
+| `rerank-compatible` | 通用 rerank 上游，兼容 Cohere/Jina 风格 `query` + `documents` 请求 | WP-320 |
+
+Rerank-compatible preset 只注册 rerank 路由别名，不自动暴露 chat、responses、images 或 moderation route。
+
+## 6. Preset Schema
 
 ```yaml
 provider_key: deepseek
@@ -107,6 +117,7 @@ moonshot-anthropic
 openai
 openai-compatible
 openrouter
+rerank-compatible
 zai
 zai-anthropic
 zhipu
@@ -115,7 +126,7 @@ zhipu-anthropic
 
 `deepseek` 的 OpenAI-compatible 默认 base URL 为 `https://api.deepseek.com`；`deepseek-anthropic` 为 `https://api.deepseek.com/anthropic`。其他 preset 必须同样保留显式 `default_base_url`，避免 Gateway 运行时按 provider 名称硬编码。
 
-## 6. Auth Modes
+## 7. Auth Modes
 
 | auth mode | Header |
 | --- | --- |
@@ -126,7 +137,7 @@ zhipu-anthropic
 
 凭证值必须只存加密密文。
 
-## 7. Route Alias 规则
+## 8. Route Alias 规则
 
 Provider alias 只改变 platform context，不新增 runtime。
 
@@ -146,7 +157,7 @@ Handler 不得复制 Provider-specific 转发逻辑。
 
 Provider alias 进入 Scheduler 前必须先应用 API Key policy，包括 `allowed_models` 与 `group_ids`。当 API Key 绑定了 `group_ids` 时，候选账号必须属于至少一个绑定的 account group；未绑定 group 的账号不得被 alias 路径调度。
 
-## 8. 模型目录优先级
+## 9. 模型目录优先级
 
 模型目录来源优先级：
 
@@ -159,7 +170,7 @@ Provider alias 进入 Scheduler 前必须先应用 API Key policy，包括 `allo
 `/v1/models` 必须按 API Key group、provider、model visibility 合并后返回。
 `POST /api/v1/admin/accounts/{id}/discover-models` 可以把 live discovery 结果写入 Account `supported_models`，供后续 Provider-neutral 候选选择使用。
 
-## 9. Upstream Endpoint Derivation
+## 10. Upstream Endpoint Derivation
 
 Provider Adapter 根据 preset 派生：
 
@@ -169,11 +180,12 @@ responses_url        = base_url + /responses
 messages_url         = base_url + /messages
 models_url           = base_url + /models
 embeddings_url       = base_url + /embeddings
+rerank_url           = base_url + /rerank
 ```
 
 如果上游路径不兼容，preset 必须提供 explicit endpoint override。
 
-## 10. Capability Override
+## 11. Capability Override
 
 能力来源按优先级合并：
 
@@ -202,7 +214,7 @@ max_context_tokens
 max_output_tokens
 ```
 
-## 11. 新增 Preset 流程
+## 12. 新增 Preset 流程
 
 1. 添加 preset 定义。
 2. 添加 route_aliases。
@@ -215,7 +227,7 @@ max_output_tokens
 9. 添加 stream test。
 10. 更新 `GATEWAY_ROUTE_MATRIX.md`。
 
-## 12. 安全边界
+## 13. 安全边界
 
 禁止：
 

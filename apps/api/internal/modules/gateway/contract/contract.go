@@ -17,6 +17,7 @@ const (
 	EndpointEmbeddings            SourceEndpoint = "/v1/embeddings"
 	EndpointImagesGenerations     SourceEndpoint = "/v1/images/generations"
 	EndpointModerations           SourceEndpoint = "/v1/moderations"
+	EndpointRerank                SourceEndpoint = "/v1/rerank"
 	EndpointGeminiGenerateContent SourceEndpoint = "/v1beta/models/{model}:generateContent"
 	EndpointGeminiStreamContent   SourceEndpoint = "/v1beta/models/{model}:streamGenerateContent"
 )
@@ -83,6 +84,11 @@ type CanonicalRequest struct {
 	ImageExtra            map[string]any
 	ModerationInput       []string
 	ModerationUser        string
+	RerankQuery           string
+	RerankDocuments       []RerankDocument
+	RerankTopN            *int
+	RerankReturnDocuments bool
+	RerankUser            string
 	Prompt                string
 	CompatibilityWarnings []string
 	RequestCapabilities   []RequestCapability
@@ -153,6 +159,29 @@ type ModerationResponse struct {
 	Model                 string
 	CanonicalModel        string
 	Results               []ModerationResult
+	Usage                 Usage
+	CompatibilityWarnings []string
+}
+
+type RerankDocument struct {
+	Text     string
+	Fields   map[string]any
+	Original any
+}
+
+type RerankResult struct {
+	Index          int
+	RelevanceScore float32
+	Document       *RerankDocument
+	Metadata       map[string]any
+}
+
+type RerankResponse struct {
+	ID                    string
+	RequestID             string
+	Model                 string
+	CanonicalModel        string
+	Results               []RerankResult
 	Usage                 Usage
 	CompatibilityWarnings []string
 }

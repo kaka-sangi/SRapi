@@ -153,7 +153,7 @@ Antigravity 可承载 Claude-shaped 和 Gemini-shaped 端点，必须在 route m
 | `/v1/images/edits`, `/v1/images/variations` | Media runtime | 图片编辑和 variation。 | Phase 3 |
 | `/v1/audio/*` | Passthrough/media runtime | 音频 transcription/speech。 | Phase 3 |
 | `/v1/moderations` | Moderation runtime | 最小解析 OpenAI moderation body，调度后调用 OpenAI-compatible `/moderations`，记录用量和调度证据。 | WP-310 |
-| `/v1/rerank` | Passthrough runtime | 兼容 rerank provider。 | Phase 3 |
+| `/v1/rerank` | Passthrough runtime | 最小解析 query/documents/top_n，调度后调用 rerank-compatible `/rerank`，记录用量和调度证据。 | WP-320 |
 | `/v1/responses/ws` | Realtime/WS runtime | 长连接、粘性账号、slot 生命周期。 | Phase 3 |
 | Gemini `/v1beta/models/*:generateContent` | Compatible text runtime | Google-shaped request/response/error，复用 Canonical/Scheduler/Provider Adapter。 | WP-230 |
 | Gemini `/v1beta/models/*:streamGenerateContent` | Compatible text runtime | Google-shaped SSE response/error，复用 Canonical/Scheduler/Provider Adapter。 | WP-230 |

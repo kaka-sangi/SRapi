@@ -777,7 +777,7 @@ func effectiveCapabilities(model modelcontract.Model, mapping modelcontract.Mode
 			}
 		}
 	}
-	for _, key := range []string{capabilitiescontract.KeyEmbeddings, capabilitiescontract.KeyImages, capabilitiescontract.KeyModerations} {
+	for _, key := range []string{capabilitiescontract.KeyEmbeddings, capabilitiescontract.KeyImages, capabilitiescontract.KeyModerations, capabilitiescontract.KeyRerank} {
 		if _, ok := providerScoped[key]; !ok {
 			delete(merged, key)
 		}
@@ -1094,6 +1094,28 @@ func (rt *runtimeState) invokeProviderModerations(ctx context.Context, req provi
 	return resp, nil
 }
 
+func (rt *runtimeState) invokeProviderRerank(ctx context.Context, req provideradaptercontract.RerankRequest) (provideradaptercontract.RerankResponse, error) {
+	if req.Account.ID <= 0 {
+		return provideradaptercontract.RerankResponse{}, provideradaptercontract.ProviderError{Class: "no_available_account", StatusCode: http.StatusServiceUnavailable, Message: "provider account missing"}
+	}
+	credential, err := rt.accounts.DecryptCredential(ctx, req.Account.ID)
+	if err != nil {
+		return provideradaptercontract.RerankResponse{}, provideradaptercontract.ProviderError{Class: "credential_error", StatusCode: http.StatusBadGateway, Message: "provider credential unavailable"}
+	}
+	if refreshed, ok, err := rt.refreshReverseProxyCredential(ctx, req.Account, credential); err != nil {
+		return provideradaptercontract.RerankResponse{}, provideradaptercontract.ProviderError{Class: "auth_failed", StatusCode: http.StatusBadGateway, Message: "provider credential refresh failed"}
+	} else if ok {
+		credential = refreshed
+	}
+	req.Credential = credential
+	resp, err := rt.adapters.InvokeRerank(ctx, req)
+	if err != nil {
+		rt.applyProviderAccountProtection(ctx, req.Account, err)
+		return provideradaptercontract.RerankResponse{}, err
+	}
+	return resp, nil
+}
+
 func providerTextRequest(req gatewaycontract.CanonicalRequest, candidate schedulercontract.Candidate) provideradaptercontract.TextRequest {
 	return provideradaptercontract.TextRequest{
 		RequestID:       req.RequestID,
@@ -1165,6 +1187,38 @@ func providerModerationRequest(req gatewaycontract.CanonicalRequest, candidate s
 		Account:        candidate.Account,
 		Mapping:        candidate.Mapping,
 	}
+}
+
+func providerRerankRequest(req gatewaycontract.CanonicalRequest, candidate schedulercontract.Candidate) provideradaptercontract.RerankRequest {
+	return provideradaptercontract.RerankRequest{
+		RequestID:       req.RequestID,
+		SourceProtocol:  string(req.SourceProtocol),
+		SourceEndpoint:  req.SourceEndpoint,
+		Model:           req.CanonicalModel,
+		Query:           req.RerankQuery,
+		Documents:       providerRerankDocuments(req.RerankDocuments),
+		TopN:            cloneIntPtr(req.RerankTopN),
+		ReturnDocuments: req.RerankReturnDocuments,
+		User:            req.RerankUser,
+		Provider:        candidate.Provider,
+		Account:         candidate.Account,
+		Mapping:         candidate.Mapping,
+	}
+}
+
+func providerRerankDocuments(values []gatewaycontract.RerankDocument) []provideradaptercontract.RerankDocument {
+	if values == nil {
+		return nil
+	}
+	out := make([]provideradaptercontract.RerankDocument, len(values))
+	for idx, value := range values {
+		out[idx] = provideradaptercontract.RerankDocument{
+			Text:     value.Text,
+			Fields:   cloneAnyMap(value.Fields),
+			Original: cloneAnyValue(value.Original),
+		}
+	}
+	return out
 }
 
 func providerTextMessages(req gatewaycontract.CanonicalRequest) []provideradaptercontract.TextMessage {
@@ -1350,6 +1404,15 @@ func gatewayUsageFromModerationProvider(resp provideradaptercontract.ModerationR
 	}
 }
 
+func gatewayUsageFromRerankProvider(resp provideradaptercontract.RerankResponse) gatewaycontract.Usage {
+	return gatewaycontract.Usage{
+		InputTokens:  resp.Usage.InputTokens,
+		OutputTokens: resp.Usage.OutputTokens,
+		CachedTokens: resp.Usage.CachedTokens,
+		Estimated:    resp.Usage.Estimated,
+	}
+}
+
 func gatewayEmbeddingsFromProvider(resp provideradaptercontract.EmbeddingResponse) []gatewaycontract.Embedding {
 	out := make([]gatewaycontract.Embedding, 0, len(resp.Data))
 	for _, item := range resp.Data {
@@ -1386,6 +1449,31 @@ func gatewayModerationResultsFromProvider(resp provideradaptercontract.Moderatio
 		})
 	}
 	return out
+}
+
+func gatewayRerankResultsFromProvider(resp provideradaptercontract.RerankResponse) []gatewaycontract.RerankResult {
+	out := make([]gatewaycontract.RerankResult, 0, len(resp.Results))
+	for _, item := range resp.Results {
+		result := gatewaycontract.RerankResult{
+			Index:          item.Index,
+			RelevanceScore: item.RelevanceScore,
+			Metadata:       cloneAnyMap(item.Metadata),
+		}
+		if item.Document != nil {
+			document := gatewayRerankDocumentFromProvider(*item.Document)
+			result.Document = &document
+		}
+		out = append(out, result)
+	}
+	return out
+}
+
+func gatewayRerankDocumentFromProvider(value provideradaptercontract.RerankDocument) gatewaycontract.RerankDocument {
+	return gatewaycontract.RerankDocument{
+		Text:     value.Text,
+		Fields:   cloneAnyMap(value.Fields),
+		Original: cloneAnyValue(value.Original),
+	}
 }
 
 func providerGatewayError(err error) (string, int, apiopenapi.GatewayErrorObjectType) {

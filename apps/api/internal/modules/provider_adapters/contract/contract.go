@@ -89,6 +89,28 @@ type ModerationRequest struct {
 	Credential     map[string]any
 }
 
+type RerankDocument struct {
+	Text     string
+	Fields   map[string]any
+	Original any
+}
+
+type RerankRequest struct {
+	RequestID       string
+	SourceProtocol  string
+	SourceEndpoint  string
+	Model           string
+	Query           string
+	Documents       []RerankDocument
+	TopN            *int
+	ReturnDocuments bool
+	User            string
+	Provider        providercontract.Provider
+	Account         accountcontract.ProviderAccount
+	Mapping         modelcontract.ModelProviderMapping
+	Credential      map[string]any
+}
+
 type Embedding struct {
 	Index        int
 	Vector       []float32
@@ -132,6 +154,21 @@ type ModerationResponse struct {
 	Usage      Usage
 }
 
+type RerankResult struct {
+	Index          int
+	RelevanceScore float32
+	Document       *RerankDocument
+	Metadata       map[string]any
+}
+
+type RerankResponse struct {
+	ID         string
+	Results    []RerankResult
+	Model      string
+	StatusCode int
+	Usage      Usage
+}
+
 type TextResponse struct {
 	Text       string
 	StatusCode int
@@ -168,4 +205,8 @@ type ImageGenerationAdapter interface {
 
 type ModerationAdapter interface {
 	InvokeModerations(ctx context.Context, req ModerationRequest) (ModerationResponse, error)
+}
+
+type RerankAdapter interface {
+	InvokeRerank(ctx context.Context, req RerankRequest) (RerankResponse, error)
 }

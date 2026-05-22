@@ -416,9 +416,9 @@ export type PricingRuleListResponse = {
     request_id: RequestId;
 };
 
-export type ProviderProtocol = 'openai-compatible' | 'anthropic-compatible' | 'gemini-compatible';
+export type ProviderProtocol = 'openai-compatible' | 'anthropic-compatible' | 'gemini-compatible' | 'rerank-compatible';
 
-export type ProviderAdapterType = 'openai-compatible' | 'anthropic-compatible' | 'gemini-compatible' | 'native-openai' | 'native-anthropic' | 'native-gemini' | 'openrouter' | 'reverse-proxy-chatgpt-web' | 'reverse-proxy-codex-cli' | 'reverse-proxy-claude-web' | 'reverse-proxy-claude-code-cli' | 'reverse-proxy-gemini-cli' | 'custom';
+export type ProviderAdapterType = 'openai-compatible' | 'anthropic-compatible' | 'gemini-compatible' | 'rerank-compatible' | 'native-openai' | 'native-anthropic' | 'native-gemini' | 'openrouter' | 'reverse-proxy-chatgpt-web' | 'reverse-proxy-codex-cli' | 'reverse-proxy-claude-web' | 'reverse-proxy-claude-code-cli' | 'reverse-proxy-gemini-cli' | 'custom';
 
 export type Provider = {
     id: Id;
@@ -1230,6 +1230,33 @@ export type ModerationResponse = {
     [key: string]: unknown;
 };
 
+export type RerankDocument = string | JsonObject;
+
+export type RerankRequest = {
+    model: string;
+    query: string;
+    documents: Array<RerankDocument>;
+    top_n?: number;
+    return_documents?: boolean;
+    user?: string;
+    [key: string]: unknown;
+};
+
+export type RerankResult = {
+    index: number;
+    relevance_score: number;
+    document?: JsonObject;
+    [key: string]: unknown;
+};
+
+export type RerankResponse = {
+    id: string;
+    model: string;
+    results: Array<RerankResult>;
+    usage?: TokenUsage;
+    [key: string]: unknown;
+};
+
 export type ChatMessage = {
     role: 'system' | 'developer' | 'user' | 'assistant' | 'tool';
     content: string | Array<ContentBlock>;
@@ -1479,6 +1506,8 @@ export type ProviderAccountImportItemWritable = {
 export type ProviderAccountImportRequestWritable = {
     accounts: Array<ProviderAccountImportItemWritable>;
 };
+
+export type RerankDocumentWritable = string | JsonObject;
 
 export type Page = number;
 
@@ -4599,6 +4628,51 @@ export type CreateModerationResponses = {
 
 export type CreateModerationResponse = CreateModerationResponses[keyof CreateModerationResponses];
 
+export type CreateRerankData = {
+    body: RerankRequest;
+    path?: never;
+    query?: never;
+    url: '/v1/rerank';
+};
+
+export type CreateRerankErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateRerankError = CreateRerankErrors[keyof CreateRerankErrors];
+
+export type CreateRerankResponses = {
+    /**
+     * Rerank response ordered by relevance.
+     */
+    200: RerankResponse;
+};
+
+export type CreateRerankResponse = CreateRerankResponses[keyof CreateRerankResponses];
+
 export type CreateOpenAiCompatibleEmbeddingAliasData = {
     body: EmbeddingRequest;
     path?: never;
@@ -4688,6 +4762,51 @@ export type CreateOpenAiCompatibleModerationAliasResponses = {
 };
 
 export type CreateOpenAiCompatibleModerationAliasResponse = CreateOpenAiCompatibleModerationAliasResponses[keyof CreateOpenAiCompatibleModerationAliasResponses];
+
+export type CreateRerankCompatibleRerankAliasData = {
+    body: RerankRequest;
+    path?: never;
+    query?: never;
+    url: '/api/provider/rerank-compatible/v1/rerank';
+};
+
+export type CreateRerankCompatibleRerankAliasErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateRerankCompatibleRerankAliasError = CreateRerankCompatibleRerankAliasErrors[keyof CreateRerankCompatibleRerankAliasErrors];
+
+export type CreateRerankCompatibleRerankAliasResponses = {
+    /**
+     * Rerank response ordered by relevance.
+     */
+    200: RerankResponse;
+};
+
+export type CreateRerankCompatibleRerankAliasResponse = CreateRerankCompatibleRerankAliasResponses[keyof CreateRerankCompatibleRerankAliasResponses];
 
 export type CreateOpenAiCompatibleImageGenerationAliasData = {
     body: ImageGenerationRequest;

@@ -38,6 +38,7 @@ POST /v1/embeddings
 POST /v1/images/generations
 POST /v1/audio/transcriptions
 POST /v1/audio/speech
+POST /v1/rerank
 POST /v1/batches
 POST /v1/realtime
 ```
@@ -485,6 +486,20 @@ Moderations endpoint
 - Scheduler 使用 `moderations` endpoint capability；Provider 或 account/mapping 必须显式声明 moderation 能力，generation-only provider 不会被误选。
 - OpenAI-compatible provider alias（例如 `/api/provider/openai-compatible/v1/moderations`）强制 provider context。
 - OpenAI-compatible API-key 和 reverse-proxy accounts 上游调用 `/moderations` 并解析 `flagged`、`categories`、`category_scores` 和 `category_applied_input_types`。
+
+WP-320 已实现：
+
+```txt
+Rerank endpoint
+```
+
+边界：
+
+- `POST /v1/rerank` 接受 `model`、非空 `query`、string/object `documents`、可选 `top_n`、可选 `return_documents` 和可选 `user`。
+- 请求仍进入 API Key auth、模型可见性、entitlement、Scheduler、Provider Adapter、usage、billing 和 feedback 证据链。
+- Scheduler 使用 `rerank` endpoint capability；Provider 或 account/mapping 必须显式声明 rerank 能力，generation-only provider 不会被误选。
+- Rerank-compatible provider alias（例如 `/api/provider/rerank-compatible/v1/rerank`）强制 provider context。
+- Rerank-compatible API-key 和 reverse-proxy accounts 上游调用 `/rerank` 并解析 `index`、`relevance_score`、可选 `document` 和 usage。
 
 Phase 2 继续实现：
 

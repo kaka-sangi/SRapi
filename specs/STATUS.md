@@ -38,14 +38,15 @@ last_completed:
 - WP-290: Images generations runtime v1 now exposes OpenAI-compatible `/v1/images/generations`, provider alias routing, canonical image normalization/rendering, OpenAI-compatible upstream `/images/generations` adapter dispatch, explicit `images` Scheduler capability filtering, usage/billing/Scheduler feedback evidence, and generated OpenAPI/SDK parity.
 - WP-300: Go code-quality harness now adds `make code-quality-check`, runs it from `make check`, and enforces gofmt drift, `go vet ./...`, production file-size, and production function-size thresholds.
 - WP-310: Moderations runtime v1 now exposes OpenAI-compatible `/v1/moderations`, provider alias routing, canonical moderation normalization/rendering, OpenAI-compatible upstream `/moderations` adapter dispatch, explicit `moderations` Scheduler capability filtering, usage/billing/Scheduler feedback evidence, and generated OpenAPI/SDK parity.
+- WP-320: Rerank runtime v1 now exposes `/v1/rerank`, rerank-compatible provider alias routing, canonical rerank normalization/rendering, rerank-compatible upstream `/rerank` adapter dispatch, explicit `rerank` Scheduler capability filtering, usage/billing/Scheduler feedback evidence, and generated OpenAPI/SDK parity.
 
 current:
 
-- package: WP-320+
+- package: WP-330+
 - status: pending
-- objective: split the next advanced endpoint and provider expansion package from the roadmap.
+- objective: split the next advanced endpoint and ecosystem package from the roadmap.
 
-next_recommended: WP-320+
+next_recommended: WP-330+
 
 last_gates:
 
@@ -106,6 +107,8 @@ notes:
 - WP-300 calibrated code-quality thresholds to current production code: non-generated production Go files must stay at or below 2200 lines, and non-generated production functions must stay at or below 220 lines.
 - WP-310 added `moderations` to the canonical capability registry and provider convenience key mapping, so Scheduler requires explicit moderation endpoint support before routing moderation requests.
 - WP-310 added `TestOpenAICompatibleAdapterInvokesModerationsUpstream`, `TestGatewayModerationRouteTargetsOpenAICompatibleUpstream`, and `TestGatewayModerationAliasForcesProviderContext`.
+- WP-320 added `rerank` to the canonical capability registry and provider convenience key mapping, so Scheduler requires explicit rerank endpoint support before routing rerank requests.
+- WP-320 added `TestRerankCompatibleAdapterInvokesRerankUpstream`, `TestGatewayRerankRouteTargetsRerankCompatibleUpstream`, and `TestGatewayRerankAliasForcesProviderContext`.
 
 ## Work Package Ledger
 
@@ -143,4 +146,5 @@ notes:
 | WP-290 | completed | Images generations runtime v1. |
 | WP-300 | completed | Go code-quality harness. |
 | WP-310 | completed | Moderations runtime v1. |
-| WP-320+ | pending | Remaining advanced endpoint and provider expansion packages. |
+| WP-320 | completed | Rerank runtime v1. |
+| WP-330+ | pending | Remaining advanced endpoint and ecosystem packages. |

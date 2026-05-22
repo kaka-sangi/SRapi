@@ -921,6 +921,7 @@ const (
 	ProviderAdapterTypeNativeOpenai              ProviderAdapterType = "native-openai"
 	ProviderAdapterTypeOpenaiCompatible          ProviderAdapterType = "openai-compatible"
 	ProviderAdapterTypeOpenrouter                ProviderAdapterType = "openrouter"
+	ProviderAdapterTypeRerankCompatible          ProviderAdapterType = "rerank-compatible"
 	ProviderAdapterTypeReverseProxyChatgptWeb    ProviderAdapterType = "reverse-proxy-chatgpt-web"
 	ProviderAdapterTypeReverseProxyClaudeCodeCli ProviderAdapterType = "reverse-proxy-claude-code-cli"
 	ProviderAdapterTypeReverseProxyClaudeWeb     ProviderAdapterType = "reverse-proxy-claude-web"
@@ -947,6 +948,8 @@ func (e ProviderAdapterType) Valid() bool {
 		return true
 	case ProviderAdapterTypeOpenrouter:
 		return true
+	case ProviderAdapterTypeRerankCompatible:
+		return true
 	case ProviderAdapterTypeReverseProxyChatgptWeb:
 		return true
 	case ProviderAdapterTypeReverseProxyClaudeCodeCli:
@@ -967,6 +970,7 @@ const (
 	AnthropicCompatible ProviderProtocol = "anthropic-compatible"
 	GeminiCompatible    ProviderProtocol = "gemini-compatible"
 	OpenaiCompatible    ProviderProtocol = "openai-compatible"
+	RerankCompatible    ProviderProtocol = "rerank-compatible"
 )
 
 // Valid indicates whether the value is a known member of the ProviderProtocol enum.
@@ -977,6 +981,8 @@ func (e ProviderProtocol) Valid() bool {
 	case GeminiCompatible:
 		return true
 	case OpenaiCompatible:
+		return true
+	case RerankCompatible:
 		return true
 	default:
 		return false
@@ -2628,6 +2634,42 @@ type RefundPaymentOrderRequest struct {
 // RequestId defines model for RequestId.
 type RequestId = string
 
+// RerankDocument defines model for RerankDocument.
+type RerankDocument struct {
+	union json.RawMessage
+}
+
+// RerankDocument0 defines model for .
+type RerankDocument0 = string
+
+// RerankRequest defines model for RerankRequest.
+type RerankRequest struct {
+	Documents            []RerankDocument       `json:"documents"`
+	Model                string                 `json:"model"`
+	Query                string                 `json:"query"`
+	ReturnDocuments      *bool                  `json:"return_documents,omitempty"`
+	TopN                 *int                   `json:"top_n,omitempty"`
+	User                 *string                `json:"user,omitempty"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// RerankResponse defines model for RerankResponse.
+type RerankResponse struct {
+	Id                   string                 `json:"id"`
+	Model                string                 `json:"model"`
+	Results              []RerankResult         `json:"results"`
+	Usage                *TokenUsage            `json:"usage,omitempty"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// RerankResult defines model for RerankResult.
+type RerankResult struct {
+	Document             *JsonObject            `json:"document,omitempty"`
+	Index                int                    `json:"index"`
+	RelevanceScore       float32                `json:"relevance_score"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
 // ResourceStatus defines model for ResourceStatus.
 type ResourceStatus string
 
@@ -3233,6 +3275,9 @@ type CreateOpenAICompatibleModerationAliasJSONRequestBody = ModerationRequest
 // CreateOpenAICompatibleResponseAliasJSONRequestBody defines body for CreateOpenAICompatibleResponseAlias for application/json ContentType.
 type CreateOpenAICompatibleResponseAliasJSONRequestBody = ResponsesRequest
 
+// CreateRerankCompatibleRerankAliasJSONRequestBody defines body for CreateRerankCompatibleRerankAlias for application/json ContentType.
+type CreateRerankCompatibleRerankAliasJSONRequestBody = RerankRequest
+
 // CreateAdminAccountGroupJSONRequestBody defines body for CreateAdminAccountGroup for application/json ContentType.
 type CreateAdminAccountGroupJSONRequestBody = CreateAccountGroupRequest
 
@@ -3322,6 +3367,9 @@ type CreateMessageJSONRequestBody = AnthropicMessagesRequest
 
 // CreateModerationJSONRequestBody defines body for CreateModeration for application/json ContentType.
 type CreateModerationJSONRequestBody = ModerationRequest
+
+// CreateRerankJSONRequestBody defines body for CreateRerank for application/json ContentType.
+type CreateRerankJSONRequestBody = RerankRequest
 
 // CreateResponseJSONRequestBody defines body for CreateResponse for application/json ContentType.
 type CreateResponseJSONRequestBody = ResponsesRequest
@@ -5316,6 +5364,348 @@ func (a ModerationResult) MarshalJSON() ([]byte, error) {
 	return json.Marshal(object)
 }
 
+// Getter for additional properties for RerankRequest. Returns the specified
+// element and whether it was found
+func (a RerankRequest) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for RerankRequest
+func (a *RerankRequest) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for RerankRequest to handle AdditionalProperties
+func (a *RerankRequest) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["documents"]; found {
+		err = json.Unmarshal(raw, &a.Documents)
+		if err != nil {
+			return fmt.Errorf("error reading 'documents': %w", err)
+		}
+		delete(object, "documents")
+	}
+
+	if raw, found := object["model"]; found {
+		err = json.Unmarshal(raw, &a.Model)
+		if err != nil {
+			return fmt.Errorf("error reading 'model': %w", err)
+		}
+		delete(object, "model")
+	}
+
+	if raw, found := object["query"]; found {
+		err = json.Unmarshal(raw, &a.Query)
+		if err != nil {
+			return fmt.Errorf("error reading 'query': %w", err)
+		}
+		delete(object, "query")
+	}
+
+	if raw, found := object["return_documents"]; found {
+		err = json.Unmarshal(raw, &a.ReturnDocuments)
+		if err != nil {
+			return fmt.Errorf("error reading 'return_documents': %w", err)
+		}
+		delete(object, "return_documents")
+	}
+
+	if raw, found := object["top_n"]; found {
+		err = json.Unmarshal(raw, &a.TopN)
+		if err != nil {
+			return fmt.Errorf("error reading 'top_n': %w", err)
+		}
+		delete(object, "top_n")
+	}
+
+	if raw, found := object["user"]; found {
+		err = json.Unmarshal(raw, &a.User)
+		if err != nil {
+			return fmt.Errorf("error reading 'user': %w", err)
+		}
+		delete(object, "user")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for RerankRequest to handle AdditionalProperties
+func (a RerankRequest) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.Documents != nil {
+		object["documents"], err = json.Marshal(a.Documents)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'documents': %w", err)
+		}
+	}
+
+	object["model"], err = json.Marshal(a.Model)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'model': %w", err)
+	}
+
+	object["query"], err = json.Marshal(a.Query)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'query': %w", err)
+	}
+
+	if a.ReturnDocuments != nil {
+		object["return_documents"], err = json.Marshal(a.ReturnDocuments)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'return_documents': %w", err)
+		}
+	}
+
+	if a.TopN != nil {
+		object["top_n"], err = json.Marshal(a.TopN)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'top_n': %w", err)
+		}
+	}
+
+	if a.User != nil {
+		object["user"], err = json.Marshal(a.User)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'user': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for RerankResponse. Returns the specified
+// element and whether it was found
+func (a RerankResponse) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for RerankResponse
+func (a *RerankResponse) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for RerankResponse to handle AdditionalProperties
+func (a *RerankResponse) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["id"]; found {
+		err = json.Unmarshal(raw, &a.Id)
+		if err != nil {
+			return fmt.Errorf("error reading 'id': %w", err)
+		}
+		delete(object, "id")
+	}
+
+	if raw, found := object["model"]; found {
+		err = json.Unmarshal(raw, &a.Model)
+		if err != nil {
+			return fmt.Errorf("error reading 'model': %w", err)
+		}
+		delete(object, "model")
+	}
+
+	if raw, found := object["results"]; found {
+		err = json.Unmarshal(raw, &a.Results)
+		if err != nil {
+			return fmt.Errorf("error reading 'results': %w", err)
+		}
+		delete(object, "results")
+	}
+
+	if raw, found := object["usage"]; found {
+		err = json.Unmarshal(raw, &a.Usage)
+		if err != nil {
+			return fmt.Errorf("error reading 'usage': %w", err)
+		}
+		delete(object, "usage")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for RerankResponse to handle AdditionalProperties
+func (a RerankResponse) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	object["id"], err = json.Marshal(a.Id)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'id': %w", err)
+	}
+
+	object["model"], err = json.Marshal(a.Model)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'model': %w", err)
+	}
+
+	if a.Results != nil {
+		object["results"], err = json.Marshal(a.Results)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'results': %w", err)
+		}
+	}
+
+	if a.Usage != nil {
+		object["usage"], err = json.Marshal(a.Usage)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'usage': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for RerankResult. Returns the specified
+// element and whether it was found
+func (a RerankResult) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for RerankResult
+func (a *RerankResult) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for RerankResult to handle AdditionalProperties
+func (a *RerankResult) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["document"]; found {
+		err = json.Unmarshal(raw, &a.Document)
+		if err != nil {
+			return fmt.Errorf("error reading 'document': %w", err)
+		}
+		delete(object, "document")
+	}
+
+	if raw, found := object["index"]; found {
+		err = json.Unmarshal(raw, &a.Index)
+		if err != nil {
+			return fmt.Errorf("error reading 'index': %w", err)
+		}
+		delete(object, "index")
+	}
+
+	if raw, found := object["relevance_score"]; found {
+		err = json.Unmarshal(raw, &a.RelevanceScore)
+		if err != nil {
+			return fmt.Errorf("error reading 'relevance_score': %w", err)
+		}
+		delete(object, "relevance_score")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for RerankResult to handle AdditionalProperties
+func (a RerankResult) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.Document != nil {
+		object["document"], err = json.Marshal(a.Document)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'document': %w", err)
+		}
+	}
+
+	object["index"], err = json.Marshal(a.Index)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'index': %w", err)
+	}
+
+	object["relevance_score"], err = json.Marshal(a.RelevanceScore)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'relevance_score': %w", err)
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
 // Getter for additional properties for ResponsesOutputItem. Returns the specified
 // element and whether it was found
 func (a ResponsesOutputItem) Get(fieldName string) (value interface{}, found bool) {
@@ -6188,6 +6578,68 @@ func (t *ModerationRequest_Input) UnmarshalJSON(b []byte) error {
 	return err
 }
 
+// AsRerankDocument0 returns the union data inside the RerankDocument as a RerankDocument0
+func (t RerankDocument) AsRerankDocument0() (RerankDocument0, error) {
+	var body RerankDocument0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRerankDocument0 overwrites any union data inside the RerankDocument as the provided RerankDocument0
+func (t *RerankDocument) FromRerankDocument0(v RerankDocument0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRerankDocument0 performs a merge with any union data inside the RerankDocument, using the provided RerankDocument0
+func (t *RerankDocument) MergeRerankDocument0(v RerankDocument0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsJsonObject returns the union data inside the RerankDocument as a JsonObject
+func (t RerankDocument) AsJsonObject() (JsonObject, error) {
+	var body JsonObject
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromJsonObject overwrites any union data inside the RerankDocument as the provided JsonObject
+func (t *RerankDocument) FromJsonObject(v JsonObject) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeJsonObject performs a merge with any union data inside the RerankDocument, using the provided JsonObject
+func (t *RerankDocument) MergeJsonObject(v JsonObject) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RerankDocument) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RerankDocument) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsResponsesRequestInput0 returns the union data inside the ResponsesRequest_Input as a ResponsesRequestInput0
 func (t ResponsesRequest_Input) AsResponsesRequestInput0() (ResponsesRequestInput0, error) {
 	var body ResponsesRequestInput0
@@ -6273,6 +6725,9 @@ type ServerInterface interface {
 	// Create an OpenAI Responses-compatible response with openai-compatible provider context.
 	// (POST /api/provider/openai-compatible/v1/responses)
 	CreateOpenAICompatibleResponseAlias(w http.ResponseWriter, r *http.Request)
+	// Rerank documents with rerank-compatible provider context.
+	// (POST /api/provider/rerank-compatible/v1/rerank)
+	CreateRerankCompatibleRerankAlias(w http.ResponseWriter, r *http.Request)
 	// List provider account groups.
 	// (GET /api/v1/admin/account-groups)
 	ListAdminAccountGroups(w http.ResponseWriter, r *http.Request)
@@ -6492,6 +6947,9 @@ type ServerInterface interface {
 	// Create OpenAI-compatible moderation classifications.
 	// (POST /v1/moderations)
 	CreateModeration(w http.ResponseWriter, r *http.Request)
+	// Rerank documents by query relevance.
+	// (POST /v1/rerank)
+	CreateRerank(w http.ResponseWriter, r *http.Request)
 	// Create an OpenAI Responses-compatible response.
 	// (POST /v1/responses)
 	CreateResponse(w http.ResponseWriter, r *http.Request)
@@ -6643,6 +7101,26 @@ func (siw *ServerInterfaceWrapper) CreateOpenAICompatibleResponseAlias(w http.Re
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateOpenAICompatibleResponseAlias(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateRerankCompatibleRerankAlias operation middleware
+func (siw *ServerInterfaceWrapper) CreateRerankCompatibleRerankAlias(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateRerankCompatibleRerankAlias(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -9488,6 +9966,26 @@ func (siw *ServerInterfaceWrapper) CreateModeration(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// CreateRerank operation middleware
+func (siw *ServerInterfaceWrapper) CreateRerank(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateRerank(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // CreateResponse operation middleware
 func (siw *ServerInterfaceWrapper) CreateResponse(w http.ResponseWriter, r *http.Request) {
 
@@ -9699,6 +10197,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/messages", wrapper.CreateOpenAICompatibleMessageAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/moderations", wrapper.CreateOpenAICompatibleModerationAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/responses", wrapper.CreateOpenAICompatibleResponseAlias)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/rerank-compatible/v1/rerank", wrapper.CreateRerankCompatibleRerankAlias)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/account-groups", wrapper.ListAdminAccountGroups)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/account-groups", wrapper.CreateAdminAccountGroup)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/account-groups/{id}", wrapper.UpdateAdminAccountGroup)
@@ -9772,6 +10271,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/messages", wrapper.CreateMessage)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/models", wrapper.ListModels)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/moderations", wrapper.CreateModeration)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/rerank", wrapper.CreateRerank)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/responses", wrapper.CreateResponse)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1beta/models/{model}:generateContent", wrapper.GenerateGeminiContent)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1beta/models/{model}:streamGenerateContent", wrapper.StreamGeminiContent)

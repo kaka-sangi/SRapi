@@ -261,6 +261,68 @@ func TestOpenAICompatibleAdapterInvokesModerationsUpstream(t *testing.T) {
 	}
 }
 
+func TestRerankCompatibleAdapterInvokesRerankUpstream(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/rerank" {
+			t.Fatalf("unexpected upstream path %s", r.URL.Path)
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer rerank-secret" {
+			t.Fatalf("unexpected auth header %q", got)
+		}
+		var payload struct {
+			Model           string `json:"model"`
+			Query           string `json:"query"`
+			Documents       []any  `json:"documents"`
+			TopN            *int   `json:"top_n"`
+			ReturnDocuments bool   `json:"return_documents"`
+			User            string `json:"user"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		if payload.Model != "rerank-upstream" || payload.Query != "what is srapi" || len(payload.Documents) != 2 || payload.TopN == nil || *payload.TopN != 1 || !payload.ReturnDocuments || payload.User != "user-123" {
+			t.Fatalf("unexpected rerank payload: %+v", payload)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"rerank_test","model":"rerank-upstream","results":[{"index":1,"relevance_score":0.92,"document":{"text":"SRapi routes requests through Scheduler.","source":"docs"}}],"usage":{"prompt_tokens":9,"total_tokens":9}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeRerank(context.Background(), contract.RerankRequest{
+		RequestID:       "req_rerank",
+		Model:           "rerank-local",
+		Query:           "what is srapi",
+		Documents:       []contract.RerankDocument{{Text: "Payments settle orders."}, {Text: "SRapi routes requests through Scheduler.", Fields: map[string]any{"text": "SRapi routes requests through Scheduler.", "source": "docs"}}},
+		TopN:            ptrInt(1),
+		ReturnDocuments: true,
+		User:            "user-123",
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "rerank-compatible",
+			Protocol:    "rerank-compatible",
+		},
+		Account:    accountcontract.ProviderAccount{ID: 1, Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "rerank-upstream"},
+		Credential: map[string]any{"api_key": "rerank-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke rerank upstream: %v", err)
+	}
+	if resp.ID != "rerank_test" || resp.Model != "rerank-upstream" || len(resp.Results) != 1 || resp.Results[0].Index != 1 || resp.Results[0].RelevanceScore <= 0.9 || resp.Results[0].Document == nil {
+		t.Fatalf("unexpected rerank response: %+v", resp)
+	}
+	if resp.Results[0].Document.Fields["source"] != "docs" {
+		t.Fatalf("expected returned document fields, got %+v", resp.Results[0].Document)
+	}
+	if resp.Usage.Estimated || resp.Usage.InputTokens != 9 || resp.Usage.OutputTokens != 0 {
+		t.Fatalf("unexpected rerank usage: %+v", resp.Usage)
+	}
+}
+
 func TestOpenAICompatibleAdapterForwardsConversionFields(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var payload struct {

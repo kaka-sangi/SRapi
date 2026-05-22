@@ -98,6 +98,7 @@ packages/openapi/
 /v1/embeddings
 /v1/images/generations
 /v1/moderations
+/v1/rerank
 ```
 
 这些接口面向 API 客户端，必须兼容 OpenAI Chat Completions、OpenAI Responses、Anthropic Messages 等主流 AI 端点风格。
@@ -577,12 +578,13 @@ POST /api/provider/openai-compatible/v1/messages
 POST /api/provider/openai-compatible/v1/embeddings
 POST /api/provider/openai-compatible/v1/images/generations
 POST /api/provider/openai-compatible/v1/moderations
+POST /api/provider/rerank-compatible/v1/rerank
 POST /api/provider/anthropic-compatible/v1/messages
 ```
 
 第一阶段必须优先实现标准四个 Gateway 入口；已暴露的 Provider alias 必须复用同一 Gateway runtime，只改变 provider context。
 
-后续更多 Provider alias、passthrough、Gemini native、WebSocket、audio、rerank 等路由以 `GATEWAY_ROUTE_MATRIX.md` 为准。
+后续更多 Provider alias、passthrough、Gemini native、WebSocket、audio 等路由以 `GATEWAY_ROUTE_MATRIX.md` 为准。
 
 ### 16.9 Admin Subscriptions
 

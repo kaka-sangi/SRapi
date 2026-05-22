@@ -2907,6 +2907,152 @@ func TestGatewayModerationAliasForcesProviderContext(t *testing.T) {
 	}
 }
 
+func TestGatewayRerankRouteTargetsRerankCompatibleUpstream(t *testing.T) {
+	type upstreamCall struct {
+		Path            string
+		Authorization   string
+		Model           string
+		Query           string
+		Documents       []any
+		TopN            *int
+		ReturnDocuments bool
+	}
+	var (
+		mu    sync.Mutex
+		calls []upstreamCall
+	)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload struct {
+			Model           string `json:"model"`
+			Query           string `json:"query"`
+			Documents       []any  `json:"documents"`
+			TopN            *int   `json:"top_n"`
+			ReturnDocuments bool   `json:"return_documents"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		mu.Lock()
+		calls = append(calls, upstreamCall{
+			Path:            r.URL.Path,
+			Authorization:   r.Header.Get("Authorization"),
+			Model:           payload.Model,
+			Query:           payload.Query,
+			Documents:       append([]any(nil), payload.Documents...),
+			TopN:            payload.TopN,
+			ReturnDocuments: payload.ReturnDocuments,
+		})
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"rerank_wp320","model":"rerank-upstream","results":[{"index":1,"relevance_score":0.93,"document":{"text":"SRapi is a self-hosted AI API gateway.","source":"docs"}}],"usage":{"prompt_tokens":11,"total_tokens":11}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"wp320-rerank","display_name":"WP320 Rerank","adapter_type":"rerank-compatible","protocol":"rerank-compatible","status":"active","capabilities":{"rerank":true}}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"wp320-rerank-model","display_name":"WP320 Rerank Model","status":"active","capabilities":[{"key":"rerank","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"rerank-upstream","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"wp320-rerank-account","runtime_class":"api_key","credential":{"api_key":"rerank-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
+
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/rerank", `{"model":"wp320-rerank-model","query":"what is srapi","documents":["Payment processors settle card orders.",{"text":"SRapi is a self-hosted AI API gateway.","source":"docs"}],"top_n":1,"return_documents":true}`)
+	var rerankResp apiopenapi.RerankResponse
+	if err := json.NewDecoder(rec.Body).Decode(&rerankResp); err != nil {
+		t.Fatalf("decode rerank response: %v", err)
+	}
+	if rerankResp.Id != "rerank_wp320" || rerankResp.Model != "wp320-rerank-model" || len(rerankResp.Results) != 1 || rerankResp.Results[0].Index != 1 || rerankResp.Results[0].RelevanceScore <= 0.9 || rerankResp.Results[0].Document == nil {
+		t.Fatalf("unexpected rerank response: %+v", rerankResp)
+	}
+	if (*rerankResp.Results[0].Document)["source"] != "docs" || rerankResp.Usage == nil || rerankResp.Usage.PromptTokens == nil || *rerankResp.Usage.PromptTokens != 11 {
+		t.Fatalf("expected rerank document and usage details, got %+v", rerankResp)
+	}
+
+	mu.Lock()
+	gotCalls := append([]upstreamCall(nil), calls...)
+	mu.Unlock()
+	if len(gotCalls) != 1 {
+		t.Fatalf("expected one upstream call, got %+v", gotCalls)
+	}
+	if gotCalls[0].Path != "/v1/rerank" || gotCalls[0].Authorization != "Bearer rerank-secret" || gotCalls[0].Model != "rerank-upstream" || gotCalls[0].Query != "what is srapi" {
+		t.Fatalf("unexpected upstream rerank call: %+v", gotCalls[0])
+	}
+	if gotCalls[0].TopN == nil || *gotCalls[0].TopN != 1 || !gotCalls[0].ReturnDocuments || len(gotCalls[0].Documents) != 2 {
+		t.Fatalf("unexpected upstream rerank details: %+v", gotCalls[0])
+	}
+
+	usageReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/usage-logs?model=wp320-rerank-model", nil)
+	usageReq.AddCookie(sessionCookie)
+	usageRec := httptest.NewRecorder()
+	handler.ServeHTTP(usageRec, usageReq)
+	if usageRec.Code != http.StatusOK {
+		t.Fatalf("expected usage logs 200, got %d", usageRec.Code)
+	}
+	var usageResp apiopenapi.UsageLogListResponse
+	if err := json.NewDecoder(usageRec.Body).Decode(&usageResp); err != nil {
+		t.Fatalf("decode usage logs: %v", err)
+	}
+	if len(usageResp.Data) != 1 {
+		t.Fatalf("expected one rerank usage record, got %+v", usageResp.Data)
+	}
+	usage := usageResp.Data[0]
+	if !usage.Success || usage.SourceEndpoint != "/v1/rerank" || usage.ProviderId == nil || *usage.ProviderId != string(providerResp.Data.Id) || usage.AccountId == nil || *usage.AccountId != string(accountResp.Data.Id) || usage.TotalTokens != 11 {
+		t.Fatalf("unexpected rerank usage evidence: %+v", usage)
+	}
+
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=wp320-rerank-model", nil)
+	decisionsReq.AddCookie(sessionCookie)
+	decisionsRec := httptest.NewRecorder()
+	handler.ServeHTTP(decisionsRec, decisionsReq)
+	if decisionsRec.Code != http.StatusOK {
+		t.Fatalf("expected decisions 200, got %d body=%s", decisionsRec.Code, decisionsRec.Body.String())
+	}
+	var decisionsResp apiopenapi.SchedulerDecisionListResponse
+	if err := json.NewDecoder(decisionsRec.Body).Decode(&decisionsResp); err != nil {
+		t.Fatalf("decode decisions: %v", err)
+	}
+	if len(decisionsResp.Data) != 1 || decisionsResp.Data[0].SourceEndpoint != "/v1/rerank" || decisionsResp.Data[0].CandidateCount != 1 {
+		t.Fatalf("unexpected rerank decision evidence: %+v", decisionsResp.Data)
+	}
+}
+
+func TestGatewayRerankAliasForcesProviderContext(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	rerankProvider := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"rerank-compatible","display_name":"Rerank Compatible","adapter_type":"rerank-compatible","protocol":"rerank-compatible","status":"active","capabilities":{"rerank":true}}`)
+	fallbackProvider := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"rerank-fallback-provider","display_name":"Rerank Fallback","adapter_type":"rerank-compatible","protocol":"rerank-compatible","status":"active","capabilities":{"rerank":true}}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"wp320-alias-rerank-model","display_name":"WP320 Alias Rerank Model","status":"active","capabilities":[{"key":"rerank","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","upstream_model_name":"fallback-rerank","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","name":"rerank-fallback-account","runtime_class":"api_key","credential":{"api_key":"fallback-secret"},"status":"active","priority":100}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(rerankProvider.Data.Id)+`","upstream_model_name":"alias-rerank","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(rerankProvider.Data.Id)+`","name":"rerank-alias-account","runtime_class":"api_key","credential":{"api_key":"alias-secret"},"status":"active"}`)
+
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/api/provider/rerank-compatible/v1/rerank", `{"model":"wp320-alias-rerank-model","query":"alias rerank","documents":["first document","second document"],"top_n":1}`)
+
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=wp320-alias-rerank-model", nil)
+	decisionsReq.AddCookie(sessionCookie)
+	decisionsRec := httptest.NewRecorder()
+	handler.ServeHTTP(decisionsRec, decisionsReq)
+	if decisionsRec.Code != http.StatusOK {
+		t.Fatalf("expected decisions 200, got %d body=%s", decisionsRec.Code, decisionsRec.Body.String())
+	}
+	var decisionsResp apiopenapi.SchedulerDecisionListResponse
+	if err := json.NewDecoder(decisionsRec.Body).Decode(&decisionsResp); err != nil {
+		t.Fatalf("decode decisions: %v", err)
+	}
+	if len(decisionsResp.Data) != 1 {
+		t.Fatalf("expected one alias rerank decision, got %+v", decisionsResp.Data)
+	}
+	decision := decisionsResp.Data[0]
+	if decision.SelectedProviderId == nil || *decision.SelectedProviderId != string(rerankProvider.Data.Id) || decision.CandidateCount != 1 {
+		t.Fatalf("expected rerank alias to force rerank-compatible provider, got %+v", decision)
+	}
+	if decision.SourceEndpoint != "/api/provider/rerank-compatible/v1/rerank" {
+		t.Fatalf("expected alias source endpoint, got %q", decision.SourceEndpoint)
+	}
+}
+
 func TestGatewayModelAliasAndSessionAffinityFeedScheduler(t *testing.T) {
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
