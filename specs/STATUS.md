@@ -28,22 +28,23 @@ last_completed:
 - WP-190: Payment order foundations now include encrypted provider instances, current-user order APIs, signed/idempotent webhooks, refund hooks, fulfillment into billing/subscription state, audit/outbox evidence, Ent/Postgres persistence, and generated SDK/OpenAPI parity.
 - WP-200: Affiliate rebate Phase 2 now includes invite codes, invite relationships, affiliate rules, idempotent payment-paid accrual, refund compensation ledgers, transfer-to-balance accounting, audit/outbox evidence, Ent/Postgres persistence, and migration/data-model parity.
 - WP-210: Production operations now includes baseline Prometheus `/metrics`, release-mode weak secret/default admin password rejection, data retention cleanup worker, PostgreSQL backup/restore targets, release smoke script coverage, and deployment/config docs.
+- WP-220: Anthropic-compatible upstream adapter now dispatches Messages payloads to `/messages`, parses non-streaming and SSE usage, classifies Anthropic error objects, preserves reverse-proxy runtime dispatch, and proves provider aliases record Scheduler/usage evidence.
 
 current:
 
-- package: WP-220+
+- package: WP-230+
 - status: pending
 - objective: advanced endpoint and provider expansion.
 
-next_recommended: WP-220+
+next_recommended: WP-230+
 
 last_gates:
 
-- `cd apps/api && go test ./internal/config ./internal/modules/operations/... ./internal/persistence/entstore/operations ./internal/workers/retention ./internal/app ./internal/httpserver`: pass
+- `cd apps/api && go test ./internal/modules/provider_adapters/... ./internal/httpserver`: pass
 - `make architecture-check`: pass
+- `cd apps/api && go test ./...`: pass
 - `make check`: pass
 - `git diff --check`: pass
-- Docker Compose smoke: blocked because this host has `docker` but neither the `docker compose` plugin nor `docker-compose` binary.
 
 notes:
 
@@ -71,6 +72,8 @@ notes:
 - WP-210 added retention cleanup for usage logs, scheduler decisions/feedbacks, audit logs, and account health snapshots; financial ledgers, payment records, affiliate ledgers, credentials, and user state remain excluded from automatic cleanup.
 - WP-210 added `make backup-postgres` and `make restore-postgres` with checksum support; secret material such as `SRAPI_MASTER_KEY` remains outside database backups and must be backed up through the deployment secret store.
 - WP-210 Docker Compose smoke could not be executed in this environment because `docker compose` and `docker-compose` are unavailable.
+- WP-220 added Anthropic-compatible Adapter dispatch for API-key and reverse-proxy accounts, including `x-api-key`/`anthropic-version` API-key headers, `/messages` endpoint derivation, Anthropic usage/cache token parsing, SSE aggregation, and Anthropic error classification.
+- WP-220 added `TestGatewayAnthropicProviderAliasTargetsMessagesUpstream` to prove `/api/provider/anthropic-compatible/v1/messages` forces the Anthropic-compatible provider while reusing Gateway auth, model policy, Scheduler decisions, and usage evidence.
 
 ## Work Package Ledger
 
@@ -98,4 +101,5 @@ notes:
 | WP-190 | completed | Encrypted payment providers, payment orders, signed/idempotent webhooks, fulfillment, refunds, persistence, and generated API/SDK parity are covered. |
 | WP-200 | completed | Invite/rebate persistence, idempotent payment accrual, refund compensation, transfer-to-balance accounting, audit/outbox evidence, and migration/data-model parity are covered. |
 | WP-210 | completed | Metrics baseline, release config validation, retention cleanup, backup/restore targets, release smoke script, and ops docs are covered. |
-| WP-220+ | pending | Advanced endpoint and provider expansion. |
+| WP-220 | completed | Anthropic-compatible upstream adapter dispatch for Messages runtime and provider aliases. |
+| WP-230+ | pending | Advanced endpoint and provider expansion. |

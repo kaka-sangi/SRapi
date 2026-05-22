@@ -673,7 +673,41 @@ Required gates:
 - Docker Compose smoke.
 - Secret scan.
 
-## WP-220+: Advanced Endpoint And Provider Expansion
+## WP-220: Anthropic-Compatible Upstream Adapter
+
+Objective: complete Anthropic-compatible upstream dispatch for the existing `/v1/messages` Gateway runtime and provider aliases.
+
+Read first:
+
+- `docs/COMPATIBLE_PROVIDER_REGISTRY_SPEC.md`
+- `docs/PROVIDER_ADAPTER_SPEC.md`
+- `docs/AI_ENDPOINT_COMPATIBILITY.md`
+- `docs/GATEWAY_ROUTE_MATRIX.md`
+- `docs/CAPABILITY_TAXONOMY_SPEC.md`
+
+Owns:
+
+- `apps/api/internal/modules/provider_adapters`
+- Anthropic-compatible request/response and SSE parsing
+- reverse-proxy adapter dispatch for Anthropic-compatible accounts
+- focused Gateway regressions for `/v1/messages` and Anthropic provider aliases
+- route/provider docs when behavior changes
+
+Definition of Done:
+
+- `anthropic-compatible` Provider targets use Anthropic Messages `/messages` upstream payloads, not OpenAI Chat Completions payloads.
+- API-key accounts inject Anthropic-compatible credentials without leaking SRapi request headers or credentials.
+- Non-streaming and SSE streaming Anthropic Messages responses parse text and usage.
+- Upstream Anthropic error objects map to internal provider error classes.
+- Reverse-proxy runtime accounts preserve Anthropic protocol dispatch.
+- Gateway `/v1/messages` and Anthropic provider aliases can schedule an Anthropic-compatible account and record usage/decision evidence.
+
+Required gates:
+
+- `cd apps/api && go test ./internal/modules/provider_adapters/... ./internal/httpserver`
+- `make architecture-check`
+
+## WP-230+: Advanced Endpoint And Provider Expansion
 
 Use `ROADMAP.md` Phase 5 through Phase 8 to split future packages for:
 
@@ -687,4 +721,3 @@ Use `ROADMAP.md` Phase 5 through Phase 8 to split future packages for:
 - migration guides
 
 Each new package must be added here before implementation starts.
-

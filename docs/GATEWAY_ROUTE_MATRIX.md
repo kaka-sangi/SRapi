@@ -91,7 +91,7 @@ Anthropic-compatible preset:
 /api/provider/anthropic-compatible/v1/*
 ```
 
-Anthropic-compatible preset 的 auth、base_url、model catalog 由 `COMPATIBLE_PROVIDER_REGISTRY_SPEC.md` 管理。`/api/provider/claude-compatible/*` 只是兼容路由别名，不是新的 adapter 类型。
+Anthropic-compatible preset 的 auth、base_url、model catalog 由 `COMPATIBLE_PROVIDER_REGISTRY_SPEC.md` 管理。进入 `/v1/messages` 或 Anthropic provider alias 后，Gateway 仍复用统一鉴权、模型策略、Scheduler、usage 和 decision 记录；Provider Adapter 必须把目标协议为 `anthropic-compatible` 的候选账号转为 Anthropic Messages `/messages` 上游请求，并默认使用 `x-api-key` 与 `anthropic-version` 协议头。`/api/provider/claude-compatible/*` 只是兼容路由别名，不是新的 adapter 类型。
 
 ### 4.3 Gemini / Google
 

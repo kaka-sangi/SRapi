@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -37,6 +38,12 @@ func (s *Service) InvokeText(ctx context.Context, req contract.TextRequest) (con
 		return contract.TextResponse{}, ErrInvalidInput
 	}
 	if baseURL := upstreamBaseURL(req); baseURL != "" {
+		if isAnthropicCompatible(req) {
+			if isReverseProxyRuntime(req) {
+				return s.invokeReverseProxyAnthropicCompatible(ctx, req, baseURL)
+			}
+			return s.invokeAnthropicCompatible(ctx, req, baseURL)
+		}
 		if isReverseProxyRuntime(req) {
 			return s.invokeReverseProxyOpenAICompatible(ctx, req, baseURL)
 		}
@@ -50,6 +57,62 @@ func (s *Service) InvokeText(ctx context.Context, req contract.TextRequest) (con
 		Text:       text,
 		StatusCode: http.StatusOK,
 		Usage:      estimatedUsage(text),
+	}, nil
+}
+
+func (s *Service) invokeAnthropicCompatible(ctx context.Context, req contract.TextRequest, baseURL string) (contract.TextResponse, error) {
+	apiKey := anthropicAPIKey(req)
+	if apiKey == "" {
+		return contract.TextResponse{}, contract.ProviderError{Class: "auth_failed", StatusCode: http.StatusUnauthorized, Message: "provider api key missing"}
+	}
+	payload := anthropicCompatiblePayload(req)
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return contract.TextResponse{}, err
+	}
+	endpoint := strings.TrimRight(baseURL, "/") + "/messages"
+	headers := anthropicCompatibleHeaders(req, apiKey, &endpoint)
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(raw))
+	if err != nil {
+		return contract.TextResponse{}, err
+	}
+	httpReq.Header = headers
+
+	resp, err := s.client.Do(httpReq)
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return contract.TextResponse{}, contract.ProviderError{Class: "timeout", StatusCode: http.StatusGatewayTimeout, Message: "provider request timed out"}
+		}
+		return contract.TextResponse{}, contract.ProviderError{Class: "network_error", StatusCode: http.StatusBadGateway, Message: "provider request failed"}
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
+	if err != nil {
+		if req.Stream {
+			return contract.TextResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream interrupted"}
+		}
+		return contract.TextResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response read failed"}
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return contract.TextResponse{}, classifyAnthropicProviderHTTPError(resp.StatusCode, body)
+	}
+	if req.Stream {
+		return parseAnthropicCompatibleStream(body, resp.StatusCode)
+	}
+
+	var decoded anthropicMessagesResponse
+	if err := json.Unmarshal(body, &decoded); err != nil {
+		return contract.TextResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider returned invalid json"}
+	}
+	text := strings.TrimSpace(decoded.FirstText())
+	if text == "" {
+		return contract.TextResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response contained no text"}
+	}
+	return contract.TextResponse{
+		Text:       text,
+		StatusCode: resp.StatusCode,
+		Usage:      decoded.Usage.ToUsage(text),
 	}, nil
 }
 
@@ -111,6 +174,53 @@ func (s *Service) invokeOpenAICompatible(ctx context.Context, req contract.TextR
 	}, nil
 }
 
+func (s *Service) invokeReverseProxyAnthropicCompatible(ctx context.Context, req contract.TextRequest, baseURL string) (contract.TextResponse, error) {
+	if s.reverseProxy == nil {
+		return contract.TextResponse{}, contract.ProviderError{Class: "network_error", StatusCode: http.StatusBadGateway, Message: "reverse proxy runtime unavailable"}
+	}
+	payload := anthropicCompatiblePayload(req)
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return contract.TextResponse{}, err
+	}
+	endpoint := strings.TrimRight(baseURL, "/") + "/messages"
+	headers := anthropicCompatibleHeaders(req, "", &endpoint)
+	runtimeResp, err := s.reverseProxy.Do(ctx, reverseproxycontract.Request{
+		Account: reverseproxycontract.AccountRuntime{
+			AccountID:      req.Account.ID,
+			RuntimeClass:   string(req.Account.RuntimeClass),
+			UpstreamClient: req.Account.UpstreamClient,
+			ProxyID:        req.Account.ProxyID,
+			UserAgent:      mapString(req.Account.Metadata, "user_agent"),
+			Credential:     req.Credential,
+		},
+		Method:       http.MethodPost,
+		URL:          endpoint,
+		Headers:      headers,
+		Body:         raw,
+		ExpectStream: req.Stream,
+	})
+	if err != nil {
+		return contract.TextResponse{}, providerErrorFromReverseProxy(err)
+	}
+	if req.Stream {
+		return parseAnthropicCompatibleStream(runtimeResp.Body, runtimeResp.StatusCode)
+	}
+	var decoded anthropicMessagesResponse
+	if err := json.Unmarshal(runtimeResp.Body, &decoded); err != nil {
+		return contract.TextResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider returned invalid json"}
+	}
+	text := strings.TrimSpace(decoded.FirstText())
+	if text == "" {
+		return contract.TextResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response contained no text"}
+	}
+	return contract.TextResponse{
+		Text:       text,
+		StatusCode: runtimeResp.StatusCode,
+		Usage:      decoded.Usage.ToUsage(text),
+	}, nil
+}
+
 func (s *Service) invokeReverseProxyOpenAICompatible(ctx context.Context, req contract.TextRequest, baseURL string) (contract.TextResponse, error) {
 	if s.reverseProxy == nil {
 		return contract.TextResponse{}, contract.ProviderError{Class: "network_error", StatusCode: http.StatusBadGateway, Message: "reverse proxy runtime unavailable"}
@@ -159,6 +269,154 @@ func (s *Service) invokeReverseProxyOpenAICompatible(ctx context.Context, req co
 		StatusCode: runtimeResp.StatusCode,
 		Usage:      decoded.Usage.ToUsage(text),
 	}, nil
+}
+
+type anthropicMessagesRequest struct {
+	Model         string             `json:"model"`
+	Messages      []anthropicMessage `json:"messages"`
+	System        string             `json:"system,omitempty"`
+	Stream        bool               `json:"stream"`
+	MaxTokens     int                `json:"max_tokens"`
+	Temperature   *float32           `json:"temperature,omitempty"`
+	TopP          *float32           `json:"top_p,omitempty"`
+	StopSequences []string           `json:"stop_sequences,omitempty"`
+	Tools         []map[string]any   `json:"tools,omitempty"`
+	ToolChoice    any                `json:"tool_choice,omitempty"`
+}
+
+type anthropicMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+func anthropicCompatiblePayload(req contract.TextRequest) anthropicMessagesRequest {
+	maxTokens := 1024
+	if req.MaxOutputTokens != nil && *req.MaxOutputTokens > 0 {
+		maxTokens = *req.MaxOutputTokens
+	}
+	return anthropicMessagesRequest{
+		Model:         req.Mapping.UpstreamModelName,
+		Messages:      anthropicCompatibleMessages(req),
+		System:        anthropicCompatibleSystem(req),
+		Stream:        req.Stream,
+		MaxTokens:     maxTokens,
+		Temperature:   req.Temperature,
+		TopP:          req.TopP,
+		StopSequences: cloneStrings(req.Stop),
+		Tools:         anthropicCompatibleTools(req.Tools),
+		ToolChoice:    anthropicCompatibleToolChoice(req.ToolChoice),
+	}
+}
+
+func anthropicCompatibleMessages(req contract.TextRequest) []anthropicMessage {
+	out := make([]anthropicMessage, 0, len(req.Messages)+1)
+	hasConversationMessage := false
+	for _, message := range req.Messages {
+		role := strings.TrimSpace(message.Role)
+		switch role {
+		case "":
+			role = "user"
+		case "system":
+			continue
+		}
+		content := strings.TrimSpace(message.Content)
+		if content == "" {
+			continue
+		}
+		out = append(out, anthropicMessage{Role: role, Content: content})
+		hasConversationMessage = true
+	}
+	if !hasConversationMessage {
+		out = append(out, anthropicMessage{Role: "user", Content: strings.TrimSpace(req.Prompt)})
+	}
+	return out
+}
+
+func anthropicCompatibleSystem(req contract.TextRequest) string {
+	parts := make([]string, 0, len(req.Messages)+1)
+	if instructions := strings.TrimSpace(req.Instructions); instructions != "" {
+		parts = append(parts, instructions)
+	}
+	for _, message := range req.Messages {
+		if strings.TrimSpace(message.Role) != "system" {
+			continue
+		}
+		if content := strings.TrimSpace(message.Content); content != "" {
+			parts = append(parts, content)
+		}
+	}
+	return strings.Join(uniqueTrimmedStrings(parts), "\n")
+}
+
+func anthropicCompatibleTools(values []map[string]any) []map[string]any {
+	if len(values) == 0 {
+		return nil
+	}
+	out := make([]map[string]any, 0, len(values))
+	for _, value := range values {
+		if value == nil {
+			continue
+		}
+		if function, ok := value["function"].(map[string]any); ok {
+			tool := map[string]any{}
+			if name := strings.TrimSpace(fmt.Sprint(function["name"])); name != "" && name != "<nil>" {
+				tool["name"] = name
+			}
+			if description := strings.TrimSpace(fmt.Sprint(function["description"])); description != "" && description != "<nil>" {
+				tool["description"] = description
+			}
+			if parameters, ok := function["parameters"]; ok && parameters != nil {
+				tool["input_schema"] = cloneAny(parameters)
+			}
+			if len(tool) > 0 {
+				out = append(out, tool)
+			}
+			continue
+		}
+		tool := cloneMap(value)
+		delete(tool, "type")
+		if len(tool) > 0 {
+			out = append(out, tool)
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func anthropicCompatibleToolChoice(value any) any {
+	switch typed := value.(type) {
+	case nil:
+		return nil
+	case string:
+		switch strings.TrimSpace(typed) {
+		case "auto":
+			return map[string]any{"type": "auto"}
+		case "required", "any":
+			return map[string]any{"type": "any"}
+		case "none":
+			return map[string]any{"type": "none"}
+		default:
+			return nil
+		}
+	case map[string]any:
+		if choiceType, ok := typed["type"].(string); ok {
+			switch strings.TrimSpace(choiceType) {
+			case "auto", "any", "none":
+				return cloneMap(typed)
+			case "function":
+				if function, ok := typed["function"].(map[string]any); ok {
+					if name := strings.TrimSpace(fmt.Sprint(function["name"])); name != "" && name != "<nil>" {
+						return map[string]any{"type": "tool", "name": name}
+					}
+				}
+			}
+		}
+		return cloneMap(typed)
+	default:
+		return cloneAny(value)
+	}
 }
 
 type openAIChatCompletionRequest struct {
@@ -396,9 +654,144 @@ func parseOpenAICompatibleStream(body []byte, statusCode int) (contract.TextResp
 	}, nil
 }
 
+type anthropicMessagesResponse struct {
+	Content []anthropicContentBlock `json:"content"`
+	Usage   anthropicUsage          `json:"usage"`
+}
+
+func (r anthropicMessagesResponse) FirstText() string {
+	parts := make([]string, 0, len(r.Content))
+	for _, block := range r.Content {
+		if strings.TrimSpace(block.Text) != "" {
+			parts = append(parts, strings.TrimSpace(block.Text))
+		}
+	}
+	return strings.Join(parts, "\n")
+}
+
+type anthropicContentBlock struct {
+	Type string `json:"type"`
+	Text string `json:"text"`
+}
+
+type anthropicStreamChunk struct {
+	Type         string                 `json:"type"`
+	ContentBlock *anthropicContentBlock `json:"content_block"`
+	Delta        struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	} `json:"delta"`
+	Message *struct {
+		Usage anthropicUsage `json:"usage"`
+	} `json:"message"`
+	Usage *anthropicUsage `json:"usage"`
+}
+
+type anthropicUsage struct {
+	InputTokens              *int `json:"input_tokens"`
+	OutputTokens             *int `json:"output_tokens"`
+	CacheCreationInputTokens *int `json:"cache_creation_input_tokens"`
+	CacheReadInputTokens     *int `json:"cache_read_input_tokens"`
+}
+
+func (u anthropicUsage) ToUsage(text string) contract.Usage {
+	input := valueOrZero(u.InputTokens)
+	output := valueOrZero(u.OutputTokens)
+	cached := valueOrZero(u.CacheCreationInputTokens) + valueOrZero(u.CacheReadInputTokens)
+	if input == 0 && output == 0 && cached == 0 {
+		return estimatedUsage(text)
+	}
+	return contract.Usage{
+		InputTokens:  input,
+		OutputTokens: output,
+		CachedTokens: cached,
+		Estimated:    false,
+	}
+}
+
+func (u *anthropicUsage) Merge(next anthropicUsage) {
+	if u == nil {
+		return
+	}
+	if next.InputTokens != nil {
+		u.InputTokens = cloneIntPtr(next.InputTokens)
+	}
+	if next.OutputTokens != nil {
+		u.OutputTokens = cloneIntPtr(next.OutputTokens)
+	}
+	if next.CacheCreationInputTokens != nil {
+		u.CacheCreationInputTokens = cloneIntPtr(next.CacheCreationInputTokens)
+	}
+	if next.CacheReadInputTokens != nil {
+		u.CacheReadInputTokens = cloneIntPtr(next.CacheReadInputTokens)
+	}
+}
+
+func parseAnthropicCompatibleStream(body []byte, statusCode int) (contract.TextResponse, error) {
+	scanner := bufio.NewScanner(bytes.NewReader(body))
+	scanner.Buffer(make([]byte, 0, 64*1024), 4<<20)
+	var builder strings.Builder
+	var usage anthropicUsage
+	done := false
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, ":") || strings.HasPrefix(line, "event:") {
+			continue
+		}
+		if !strings.HasPrefix(line, "data:") {
+			continue
+		}
+		data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+		if data == "" {
+			continue
+		}
+		if data == "[DONE]" {
+			done = true
+			break
+		}
+		var chunk anthropicStreamChunk
+		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
+			return contract.TextResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider returned invalid stream json"}
+		}
+		switch strings.TrimSpace(chunk.Type) {
+		case "content_block_start":
+			if chunk.ContentBlock != nil && strings.TrimSpace(chunk.ContentBlock.Text) != "" {
+				builder.WriteString(chunk.ContentBlock.Text)
+			}
+		case "content_block_delta":
+			builder.WriteString(chunk.Delta.Text)
+		case "message_start":
+			if chunk.Message != nil {
+				usage.Merge(chunk.Message.Usage)
+			}
+		case "message_delta":
+			if chunk.Usage != nil {
+				usage.Merge(*chunk.Usage)
+			}
+		case "message_stop":
+			done = true
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return contract.TextResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream interrupted"}
+	}
+	if !done {
+		return contract.TextResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream ended before done"}
+	}
+	text := strings.TrimSpace(builder.String())
+	if text == "" {
+		return contract.TextResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider stream contained no text"}
+	}
+	return contract.TextResponse{
+		Text:       text,
+		StatusCode: statusCode,
+		Usage:      usage.ToUsage(text),
+	}, nil
+}
+
 func upstreamBaseURL(req contract.TextRequest) string {
 	for _, values := range []map[string]any{req.Account.Metadata, req.Provider.ConfigSchema, req.Provider.Capabilities} {
-		for _, key := range []string{"base_url", "upstream_base_url", "openai_base_url"} {
+		for _, key := range []string{"base_url", "upstream_base_url", "openai_base_url", "anthropic_base_url"} {
 			if value := mapString(values, key); value != "" {
 				return strings.TrimRight(value, "/")
 			}
@@ -407,12 +800,94 @@ func upstreamBaseURL(req contract.TextRequest) string {
 	return ""
 }
 
+func isAnthropicCompatible(req contract.TextRequest) bool {
+	for _, value := range []string{req.Provider.Protocol, req.Provider.AdapterType} {
+		switch strings.ToLower(strings.TrimSpace(value)) {
+		case "anthropic-compatible":
+			return true
+		}
+	}
+	return false
+}
+
 func isReverseProxyRuntime(req contract.TextRequest) bool {
 	runtimeClass := strings.TrimSpace(string(req.Account.RuntimeClass))
 	if runtimeClass != "" && runtimeClass != "api_key" {
 		return true
 	}
 	return strings.HasPrefix(strings.TrimSpace(req.Provider.AdapterType), "reverse-proxy-")
+}
+
+func anthropicAPIKey(req contract.TextRequest) string {
+	for _, key := range []string{"api_key", "x_api_key", "anthropic_api_key", "access_token"} {
+		if value := credentialString(req.Credential, key); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func anthropicCompatibleHeaders(req contract.TextRequest, apiKey string, endpoint *string) http.Header {
+	headers := http.Header{
+		"Content-Type": {"application/json"},
+	}
+	version := requestSetting(req, "anthropic_version", "anthropic-version")
+	if version == "" {
+		version = "2023-06-01"
+	}
+	headers.Set("anthropic-version", version)
+	if apiKey == "" {
+		return headers
+	}
+	switch strings.ToLower(requestSetting(req, "auth_mode")) {
+	case "bearer":
+		headers.Set("Authorization", "Bearer "+apiKey)
+	case "api_key_query":
+		if endpoint != nil {
+			*endpoint = appendAPIKeyQuery(*endpoint, apiKey, requestSetting(req, "api_key_query_param", "query_param"))
+		}
+	case "custom_header":
+		headerName := requestSetting(req, "custom_header_name", "auth_header", "api_key_header")
+		if headerName == "" {
+			headerName = "x-api-key"
+		}
+		headers.Set(headerName, apiKey)
+	case "x_api_key", "":
+		headers.Set("x-api-key", apiKey)
+	default:
+		headers.Set("x-api-key", apiKey)
+	}
+	return headers
+}
+
+func appendAPIKeyQuery(rawURL string, apiKey string, queryParam string) string {
+	queryParam = strings.TrimSpace(queryParam)
+	if queryParam == "" {
+		queryParam = "key"
+	}
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		separator := "?"
+		if strings.Contains(rawURL, "?") {
+			separator = "&"
+		}
+		return rawURL + separator + url.QueryEscape(queryParam) + "=" + url.QueryEscape(apiKey)
+	}
+	query := parsed.Query()
+	query.Set(queryParam, apiKey)
+	parsed.RawQuery = query.Encode()
+	return parsed.String()
+}
+
+func requestSetting(req contract.TextRequest, keys ...string) string {
+	for _, values := range []map[string]any{req.Credential, req.Account.Metadata, req.Provider.ConfigSchema, req.Provider.Capabilities} {
+		for _, key := range keys {
+			if value := mapString(values, key); value != "" {
+				return value
+			}
+		}
+	}
+	return ""
 }
 
 func credentialString(values map[string]any, key string) string {
@@ -441,6 +916,45 @@ func classifyProviderHTTPError(statusCode int, body []byte) contract.ProviderErr
 		message = http.StatusText(statusCode)
 	}
 	return contract.ProviderError{Class: providerClassForHTTPStatus(statusCode), StatusCode: statusCode, Message: message}
+}
+
+func classifyAnthropicProviderHTTPError(statusCode int, body []byte) contract.ProviderError {
+	var decoded struct {
+		Error struct {
+			Type    string `json:"type"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	message := strings.TrimSpace(string(body))
+	class := providerClassForHTTPStatus(statusCode)
+	if err := json.Unmarshal(body, &decoded); err == nil {
+		if decoded.Error.Message != "" {
+			message = strings.TrimSpace(decoded.Error.Message)
+		}
+		if decoded.Error.Type != "" {
+			class = providerClassForAnthropicError(decoded.Error.Type, statusCode)
+		}
+	}
+	if message == "" {
+		message = http.StatusText(statusCode)
+	}
+	return contract.ProviderError{Class: class, StatusCode: statusCode, Message: message}
+}
+
+func providerClassForAnthropicError(errorType string, statusCode int) string {
+	switch strings.ToLower(strings.TrimSpace(errorType)) {
+	case "authentication_error", "permission_error":
+		return "auth_failed"
+	case "rate_limit_error":
+		return "rate_limit"
+	case "invalid_request_error":
+		return "invalid_request"
+	case "not_found_error":
+		return "model_unavailable"
+	case "overloaded_error", "api_error":
+		return "provider_5xx"
+	}
+	return providerClassForHTTPStatus(statusCode)
 }
 
 func providerClassForHTTPStatus(statusCode int) string {
@@ -521,6 +1035,32 @@ func valueOrZero(value *int) int {
 		return 0
 	}
 	return *value
+}
+
+func cloneIntPtr(value *int) *int {
+	if value == nil {
+		return nil
+	}
+	out := *value
+	return &out
+}
+
+func uniqueTrimmedStrings(values []string) []string {
+	seen := map[string]struct{}{}
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			continue
+		}
+		key := strings.ToLower(trimmed)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, trimmed)
+	}
+	return out
 }
 
 func max(a, b int) int {

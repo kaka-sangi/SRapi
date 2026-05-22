@@ -388,6 +388,242 @@ func TestOpenAICompatibleAdapterClassifiesInvalidRequest(t *testing.T) {
 	assertProviderError(t, err, "invalid_request", http.StatusBadRequest)
 }
 
+func TestAnthropicCompatibleAdapterInvokesMessagesUpstream(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/messages" {
+			t.Fatalf("unexpected upstream path %s", r.URL.Path)
+		}
+		if got := r.Header.Get("x-api-key"); got != "anthropic-secret" {
+			t.Fatalf("unexpected x-api-key %q", got)
+		}
+		if got := r.Header.Get("anthropic-version"); got != "2023-06-01" {
+			t.Fatalf("unexpected anthropic-version %q", got)
+		}
+		if r.Header.Get("Authorization") != "" || r.Header.Get("X-Request-ID") != "" || strings.Contains(r.Header.Get("User-Agent"), "SRapi") {
+			t.Fatalf("unexpected SRapi/auth header leakage: %+v", r.Header)
+		}
+		var payload struct {
+			Model     string `json:"model"`
+			System    string `json:"system"`
+			Stream    bool   `json:"stream"`
+			MaxTokens int    `json:"max_tokens"`
+			Messages  []struct {
+				Role    string `json:"role"`
+				Content string `json:"content"`
+			} `json:"messages"`
+			Tools      []map[string]any `json:"tools"`
+			ToolChoice map[string]any   `json:"tool_choice"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		if payload.Model != "claude-upstream" || payload.System != "be concise\nsystem from chat" || payload.MaxTokens != 128 {
+			t.Fatalf("unexpected upstream payload: %+v", payload)
+		}
+		if len(payload.Messages) != 1 || payload.Messages[0].Role != "user" || payload.Messages[0].Content != "hello anthropic" {
+			t.Fatalf("unexpected upstream messages: %+v", payload.Messages)
+		}
+		if len(payload.Tools) != 1 || payload.Tools[0]["name"] != "lookup" || payload.Tools[0]["input_schema"] == nil {
+			t.Fatalf("expected Anthropic tool schema, got %+v", payload.Tools)
+		}
+		if payload.ToolChoice["type"] != "tool" || payload.ToolChoice["name"] != "lookup" {
+			t.Fatalf("expected Anthropic tool_choice, got %+v", payload.ToolChoice)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"content":[{"type":"text","text":"anthropic says hi"}],"usage":{"input_tokens":6,"output_tokens":7,"cache_read_input_tokens":2}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeText(context.Background(), contract.TextRequest{
+		RequestID:       "req_anthropic",
+		Model:           "claude-local",
+		Prompt:          "hello anthropic",
+		Instructions:    "be concise",
+		MaxOutputTokens: ptrInt(128),
+		Messages: []contract.TextMessage{
+			{Role: "system", Content: "system from chat"},
+			{Role: "user", Content: "hello anthropic"},
+		},
+		Tools: []map[string]any{{
+			"type": "function",
+			"function": map[string]any{
+				"name": "lookup",
+				"parameters": map[string]any{
+					"type": "object",
+				},
+			},
+		}},
+		ToolChoice: map[string]any{
+			"type": "function",
+			"function": map[string]any{
+				"name": "lookup",
+			},
+		},
+		Provider: providercontract.Provider{
+			ID:          2,
+			AdapterType: "anthropic-compatible",
+			Protocol:    "anthropic-compatible",
+		},
+		Account:    accountcontract.ProviderAccount{ID: 2, Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "claude-upstream"},
+		Credential: map[string]any{"api_key": "anthropic-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke anthropic upstream: %v", err)
+	}
+	if resp.Text != "anthropic says hi" || resp.Usage.Estimated || resp.Usage.InputTokens != 6 || resp.Usage.OutputTokens != 7 || resp.Usage.CachedTokens != 2 {
+		t.Fatalf("unexpected anthropic adapter response: %+v", resp)
+	}
+}
+
+func TestAnthropicCompatibleAdapterStreamsUpstream(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/messages" {
+			t.Fatalf("unexpected upstream path %s", r.URL.Path)
+		}
+		var payload struct {
+			Model     string `json:"model"`
+			Stream    bool   `json:"stream"`
+			MaxTokens int    `json:"max_tokens"`
+			Messages  []struct {
+				Content string `json:"content"`
+			} `json:"messages"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		if payload.Model != "claude-upstream" || !payload.Stream || payload.MaxTokens != 1024 {
+			t.Fatalf("unexpected stream payload: %+v", payload)
+		}
+		if len(payload.Messages) != 1 || payload.Messages[0].Content != "hello stream" {
+			t.Fatalf("unexpected stream messages: %+v", payload.Messages)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":5,\"output_tokens\":0}}}\n\n"))
+		_, _ = w.Write([]byte("event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"hello\"}}\n\n"))
+		_, _ = w.Write([]byte("event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\" stream\"}}\n\n"))
+		_, _ = w.Write([]byte("event: message_delta\ndata: {\"type\":\"message_delta\",\"usage\":{\"output_tokens\":6,\"cache_creation_input_tokens\":1}}\n\n"))
+		_, _ = w.Write([]byte("event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeText(context.Background(), contract.TextRequest{
+		RequestID: "req_anthropic_stream",
+		Model:     "claude-local",
+		Prompt:    "hello stream",
+		Stream:    true,
+		Provider: providercontract.Provider{
+			ID:          2,
+			AdapterType: "anthropic-compatible",
+			Protocol:    "anthropic-compatible",
+		},
+		Account:    accountcontract.ProviderAccount{ID: 2, Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "claude-upstream"},
+		Credential: map[string]any{"api_key": "anthropic-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke anthropic stream upstream: %v", err)
+	}
+	if resp.Text != "hello stream" || resp.Usage.Estimated || resp.Usage.InputTokens != 5 || resp.Usage.OutputTokens != 6 || resp.Usage.CachedTokens != 1 {
+		t.Fatalf("unexpected anthropic stream response: %+v", resp)
+	}
+}
+
+func TestAnthropicCompatibleAdapterClassifiesRateLimitErrorObject(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`{"error":{"type":"rate_limit_error","message":"slow down"}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeText(context.Background(), contract.TextRequest{
+		RequestID: "req_anthropic_rate",
+		Model:     "claude-local",
+		Prompt:    "hello",
+		Provider: providercontract.Provider{
+			AdapterType: "anthropic-compatible",
+			Protocol:    "anthropic-compatible",
+		},
+		Account:    accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "claude-upstream"},
+		Credential: map[string]any{"api_key": "anthropic-secret"},
+	})
+	assertProviderError(t, err, "rate_limit", http.StatusTooManyRequests)
+}
+
+func TestReverseProxyAnthropicCompatibleAdapterUsesMessagesEndpoint(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body:       []byte(`{"content":[{"type":"text","text":"reverse anthropic response"}],"usage":{"input_tokens":2,"output_tokens":3}}`),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeText(context.Background(), contract.TextRequest{
+		RequestID: "req_reverse_anthropic",
+		Model:     "claude-local",
+		Prompt:    "hello",
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-claude-code-cli",
+			Protocol:    "anthropic-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             12,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("claude_code_cli"),
+			Metadata:       map[string]any{"base_url": "https://upstream.example/v1", "user_agent": "Claude-Code/1.0"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "claude-upstream"},
+		Credential: map[string]any{"cli_client_token": "cli-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke reverse anthropic adapter: %v", err)
+	}
+	if resp.Text != "reverse anthropic response" || resp.Usage.InputTokens != 2 || resp.Usage.OutputTokens != 3 {
+		t.Fatalf("unexpected reverse anthropic response: %+v", resp)
+	}
+	if runtime.request.URL != "https://upstream.example/v1/messages" {
+		t.Fatalf("expected Anthropic messages endpoint, got %s", runtime.request.URL)
+	}
+	if runtime.request.Headers.Get("anthropic-version") == "" || runtime.request.Headers.Get("x-api-key") != "" || runtime.request.Headers.Get("Authorization") != "" {
+		t.Fatalf("unexpected reverse anthropic headers: %+v", runtime.request.Headers)
+	}
+	var payload struct {
+		Model    string `json:"model"`
+		Messages []struct {
+			Content string `json:"content"`
+		} `json:"messages"`
+	}
+	if err := json.Unmarshal(runtime.request.Body, &payload); err != nil {
+		t.Fatalf("decode runtime payload: %v", err)
+	}
+	if payload.Model != "claude-upstream" || len(payload.Messages) != 1 || payload.Messages[0].Content != "hello" {
+		t.Fatalf("unexpected reverse anthropic payload: %+v", payload)
+	}
+	if runtime.request.Account.RuntimeClass != string(accountcontract.RuntimeClassCliClientToken) ||
+		runtime.request.Account.UpstreamClient == nil ||
+		*runtime.request.Account.UpstreamClient != "claude_code_cli" ||
+		runtime.request.Account.Credential["cli_client_token"] != "cli-token" {
+		t.Fatalf("expected claude runtime context, got %+v", runtime.request.Account)
+	}
+}
+
 func TestReverseProxyAdapterUsesRuntimeForNonAPIKeyAccount(t *testing.T) {
 	var upstreamHeaders http.Header
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

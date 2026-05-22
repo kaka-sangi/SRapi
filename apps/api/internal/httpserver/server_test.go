@@ -1723,6 +1723,125 @@ func TestGatewayProviderAliasUsesPresetProviderKey(t *testing.T) {
 	}
 }
 
+func TestGatewayAnthropicProviderAliasTargetsMessagesUpstream(t *testing.T) {
+	type upstreamCall struct {
+		Path      string
+		APIKey    string
+		Version   string
+		Model     string
+		System    string
+		MaxTokens int
+		Messages  []struct {
+			Role    string `json:"role"`
+			Content string `json:"content"`
+		}
+	}
+	var (
+		mu    sync.Mutex
+		calls []upstreamCall
+	)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload struct {
+			Model     string `json:"model"`
+			System    string `json:"system"`
+			MaxTokens int    `json:"max_tokens"`
+			Messages  []struct {
+				Role    string `json:"role"`
+				Content string `json:"content"`
+			} `json:"messages"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		mu.Lock()
+		calls = append(calls, upstreamCall{
+			Path:      r.URL.Path,
+			APIKey:    r.Header.Get("x-api-key"),
+			Version:   r.Header.Get("anthropic-version"),
+			Model:     payload.Model,
+			System:    payload.System,
+			MaxTokens: payload.MaxTokens,
+			Messages:  payload.Messages,
+		})
+		mu.Unlock()
+		content := "anthropic alias response"
+		if len(payload.Messages) > 0 {
+			content = "anthropic echo: " + payload.Messages[len(payload.Messages)-1].Content
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"content":[{"type":"text","text":` + strconv.Quote(content) + `}],"usage":{"input_tokens":4,"output_tokens":5}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	anthropicProvider := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"anthropic-compatible","display_name":"Anthropic Compatible","adapter_type":"anthropic-compatible","protocol":"anthropic-compatible","status":"active"}`)
+	fallbackProvider := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"anthropic-fallback-provider","display_name":"Anthropic Fallback","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"anthropic-alias-model","display_name":"Anthropic Alias Model","status":"active","capabilities":[{"key":"streaming","level":"optional","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","upstream_model_name":"fallback-upstream","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","name":"anthropic-fallback-account","runtime_class":"api_key","credential":{"api_key":"fallback-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active","priority":100}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(anthropicProvider.Data.Id)+`","upstream_model_name":"claude-upstream","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(anthropicProvider.Data.Id)+`","name":"anthropic-alias-account","runtime_class":"api_key","credential":{"api_key":"anthropic-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active","priority":10}`)
+
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	messageRec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/api/provider/anthropic-compatible/v1/messages", `{"model":"anthropic-alias-model","system":"respond briefly","max_tokens":32,"messages":[{"role":"user","content":"alias messages"}]}`)
+	var messageResp apiopenapi.AnthropicMessagesResponse
+	if err := json.NewDecoder(messageRec.Body).Decode(&messageResp); err != nil {
+		t.Fatalf("decode messages response: %v", err)
+	}
+	if len(messageResp.Content) == 0 || messageResp.Content[0].Text == nil || !strings.Contains(*messageResp.Content[0].Text, "alias messages") {
+		t.Fatalf("expected messages response from Anthropic upstream, got %v", messageResp.Content)
+	}
+
+	mu.Lock()
+	gotCalls := append([]upstreamCall(nil), calls...)
+	mu.Unlock()
+	if len(gotCalls) != 1 {
+		t.Fatalf("expected one upstream call, got %+v", gotCalls)
+	}
+	call := gotCalls[0]
+	if call.Path != "/v1/messages" || call.APIKey != "anthropic-secret" || call.Version == "" || call.Model != "claude-upstream" || call.System != "respond briefly" || call.MaxTokens != 32 {
+		t.Fatalf("unexpected Anthropic upstream call: %+v", call)
+	}
+	if len(call.Messages) != 1 || call.Messages[0].Role != "user" || call.Messages[0].Content != "alias messages" {
+		t.Fatalf("unexpected Anthropic upstream messages: %+v", call.Messages)
+	}
+
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=anthropic-alias-model", nil)
+	decisionsReq.AddCookie(sessionCookie)
+	decisionsRec := httptest.NewRecorder()
+	handler.ServeHTTP(decisionsRec, decisionsReq)
+	if decisionsRec.Code != http.StatusOK {
+		t.Fatalf("expected decisions 200, got %d body=%s", decisionsRec.Code, decisionsRec.Body.String())
+	}
+	var decisionsResp apiopenapi.SchedulerDecisionListResponse
+	if err := json.NewDecoder(decisionsRec.Body).Decode(&decisionsResp); err != nil {
+		t.Fatalf("decode decisions: %v", err)
+	}
+	if len(decisionsResp.Data) != 1 {
+		t.Fatalf("expected one Anthropic alias decision, got %+v", decisionsResp.Data)
+	}
+	decision := decisionsResp.Data[0]
+	if decision.SelectedProviderId == nil || *decision.SelectedProviderId != string(anthropicProvider.Data.Id) || decision.TargetProtocol != "anthropic-compatible" || decision.SourceEndpoint != "/api/provider/anthropic-compatible/v1/messages" {
+		t.Fatalf("expected Anthropic alias scheduler evidence, got %+v", decision)
+	}
+
+	usageReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/usage-logs?model=anthropic-alias-model", nil)
+	usageReq.AddCookie(sessionCookie)
+	usageRec := httptest.NewRecorder()
+	handler.ServeHTTP(usageRec, usageReq)
+	if usageRec.Code != http.StatusOK {
+		t.Fatalf("expected usage logs 200, got %d body=%s", usageRec.Code, usageRec.Body.String())
+	}
+	var usageResp apiopenapi.UsageLogListResponse
+	if err := json.NewDecoder(usageRec.Body).Decode(&usageResp); err != nil {
+		t.Fatalf("decode usage logs: %v", err)
+	}
+	if len(usageResp.Data) != 1 || !usageResp.Data[0].Success || usageResp.Data[0].TargetProtocol == nil || *usageResp.Data[0].TargetProtocol != "anthropic-compatible" || usageResp.Data[0].TotalTokens != 9 {
+		t.Fatalf("expected Anthropic usage evidence, got %+v", usageResp.Data)
+	}
+}
+
 func TestGatewayModelAliasAndSessionAffinityFeedScheduler(t *testing.T) {
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
