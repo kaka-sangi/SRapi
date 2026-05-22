@@ -514,7 +514,22 @@ Audio transcriptions endpoint
 - Scheduler 使用 `audio_transcriptions` endpoint capability；Provider 或 account/mapping 必须显式声明 audio transcription 能力，text-only provider 不会被误选。
 - OpenAI-compatible provider alias（例如 `/api/provider/openai-compatible/v1/audio/transcriptions`）强制 provider context。
 - OpenAI-compatible API-key 和 reverse-proxy accounts 上游调用 `/audio/transcriptions` 并解析 JSON/verbose JSON transcription response；plain text 上游响应会被包装为稳定 transcription response。
-- Speech synthesis、streaming transcription、speaker diarization 深度语义、audio moderation 和 realtime 不在 WP-330 范围内。
+- Streaming transcription、speaker diarization 深度语义、audio moderation 和 realtime 不在 WP-330 范围内。
+
+WP-340 已实现：
+
+```txt
+Audio speech endpoint
+```
+
+边界：
+
+- `POST /v1/audio/speech` 接受 OpenAI-compatible JSON `model`、`input`、`voice`、可选 `response_format`、`speed`、`instructions` 和 `user`。
+- 请求仍进入 API Key auth、模型可见性、entitlement、Scheduler、Provider Adapter、usage、billing 和 feedback 证据链。
+- Scheduler 使用 `audio_speech` endpoint capability；Provider 或 account/mapping 必须显式声明 speech synthesis 能力，transcription-only 或 text-only provider 不会被误选。
+- OpenAI-compatible provider alias（例如 `/api/provider/openai-compatible/v1/audio/speech`）强制 provider context。
+- OpenAI-compatible API-key 和 reverse-proxy accounts 上游调用 `/audio/speech`，保留 voice/format/speed/instructions/user 与 passthrough extension fields，并把上游 binary audio bytes 与 content type 直接返回给客户端。
+- Speech response usage 目前按输入文本和音频字节长度估算；如上游后续暴露稳定 token/audio usage header，应在 adapter 层补解析。
 
 Phase 2 继续实现：
 

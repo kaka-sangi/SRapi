@@ -272,6 +272,72 @@ func TestOpenAICompatibleAdapterInvokesAudioTranscriptionsUpstream(t *testing.T)
 	}
 }
 
+func TestOpenAICompatibleAdapterInvokesAudioSpeechUpstream(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/audio/speech" {
+			t.Fatalf("unexpected upstream path %s", r.URL.Path)
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer speech-secret" {
+			t.Fatalf("unexpected auth header %q", got)
+		}
+		var payload struct {
+			Model          string   `json:"model"`
+			Input          string   `json:"input"`
+			Voice          string   `json:"voice"`
+			ResponseFormat string   `json:"response_format"`
+			Speed          *float32 `json:"speed"`
+			Instructions   string   `json:"instructions"`
+			User           string   `json:"user"`
+			Accent         string   `json:"accent"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		if payload.Model != "speech-upstream" || payload.Input != "say this aloud" || payload.Voice != "alloy" || payload.ResponseFormat != "wav" {
+			t.Fatalf("unexpected speech payload: %+v", payload)
+		}
+		if payload.Speed == nil || *payload.Speed < 1.19 || *payload.Speed > 1.21 || payload.Instructions != "warm" || payload.User != "user-123" || payload.Accent != "neutral" {
+			t.Fatalf("expected speech conversion fields, got %+v", payload)
+		}
+		w.Header().Set("Content-Type", "audio/wav; charset=binary")
+		_, _ = w.Write([]byte("RIFF-speech-audio"))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeAudioSpeech(context.Background(), contract.AudioSpeechRequest{
+		RequestID:      "req_speech",
+		Model:          "speech-local",
+		Input:          "say this aloud",
+		Voice:          "alloy",
+		ResponseFormat: "wav",
+		Speed:          ptrFloat32(1.2),
+		Instructions:   "warm",
+		User:           "user-123",
+		Extra:          map[string]any{"accent": "neutral"},
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "openai-compatible",
+			Protocol:    "openai-compatible",
+		},
+		Account:    accountcontract.ProviderAccount{ID: 1, Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "speech-upstream"},
+		Credential: map[string]any{"api_key": "speech-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke audio speech upstream: %v", err)
+	}
+	if resp.Model != "speech-upstream" || resp.ContentType != "audio/wav" || string(resp.Audio) != "RIFF-speech-audio" {
+		t.Fatalf("unexpected audio speech response: %+v", resp)
+	}
+	if !resp.Usage.Estimated || resp.Usage.InputTokens <= 0 || resp.Usage.OutputTokens <= 0 {
+		t.Fatalf("unexpected audio speech usage: %+v", resp.Usage)
+	}
+}
+
 func TestOpenAICompatibleAdapterInvokesModerationsUpstream(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/moderations" {

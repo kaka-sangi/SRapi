@@ -106,11 +106,14 @@ messages
 embeddings
 images
 audio_transcriptions
+audio_speech
 moderations
 rerank
 ```
 
 `audio_transcriptions` 表示 Provider Account 能处理 `/v1/audio/transcriptions` 兼容端点；`audio_input` 表示模型/Provider 能消费音频输入，`text_output` 表示可产出转写文本。Gateway audio transcription 请求必须要求 `audio_transcriptions.v1`，避免 text-only 或 image-only provider 被误选。
+
+`audio_speech` 表示 Provider Account 能处理 `/v1/audio/speech` 兼容端点；`text_input` 表示模型/Provider 能消费待合成文本，`audio_output` 表示可产出音频。Gateway audio speech 请求必须要求 `audio_speech.v1`，避免 transcription-only 或 text-only provider 被误选。
 
 `moderations` 表示 Provider Account 能处理 `/v1/moderations` 兼容端点；`moderation_output` 表示模型/Provider 能产出审核分类结果。Gateway moderation 请求必须要求 `moderations.v1`，避免只具备文本生成能力的候选账号被误选。
 

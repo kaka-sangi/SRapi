@@ -50,6 +50,9 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	if !containsAccountType(openaiPreset.AccountTypeAllowlist, AccountTypeCustomReverseProxy) {
 		t.Fatalf("expected openai-compatible allowlist to include custom_reverse_proxy")
 	}
+	if !openaiPreset.Capabilities["audio_speech"] {
+		t.Fatalf("expected openai-compatible preset to advertise audio_speech")
+	}
 
 	anthropicPreset, ok := registry.Lookup("anthropic-compatible")
 	if !ok {

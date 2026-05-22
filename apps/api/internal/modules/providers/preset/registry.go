@@ -132,6 +132,7 @@ func openAICapabilities() map[string]bool {
 		capabilitiescontract.KeyMessages:            true,
 		capabilitiescontract.KeyEmbeddings:          true,
 		capabilitiescontract.KeyAudioTranscriptions: true,
+		capabilitiescontract.KeyAudioSpeech:         true,
 		capabilitiescontract.KeyModerations:         true,
 		capabilitiescontract.KeyStreaming:           true,
 		capabilitiescontract.KeyToolCalling:         true,

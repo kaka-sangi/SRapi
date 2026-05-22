@@ -180,6 +180,7 @@ responses_url        = base_url + /responses
 messages_url         = base_url + /messages
 models_url           = base_url + /models
 embeddings_url       = base_url + /embeddings
+audio_speech_url     = base_url + /audio/speech
 rerank_url           = base_url + /rerank
 ```
 
@@ -204,6 +205,7 @@ embeddings
 images
 audio
 audio_transcriptions
+audio_speech
 rerank
 tools
 structured_output

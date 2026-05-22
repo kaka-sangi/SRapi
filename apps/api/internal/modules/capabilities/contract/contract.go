@@ -50,6 +50,7 @@ const (
 	KeyEmbeddings          = "embeddings"
 	KeyImages              = "images"
 	KeyAudioTranscriptions = "audio_transcriptions"
+	KeyAudioSpeech         = "audio_speech"
 	KeyModerations         = "moderations"
 	KeyRerank              = "rerank"
 )
@@ -91,6 +92,7 @@ var defaultDefinitions = []Definition{
 	{Key: KeyEmbeddings, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports embeddings."},
 	{Key: KeyImages, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports image generation."},
 	{Key: KeyAudioTranscriptions, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports audio transcription."},
+	{Key: KeyAudioSpeech, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports audio speech synthesis."},
 	{Key: KeyModerations, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports moderation classification."},
 	{Key: KeyRerank, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports document reranking."},
 }
@@ -131,6 +133,12 @@ var convenienceKeys = map[string]string{
 	"audio":                         KeyAudioTranscriptions,
 	"audio_transcriptions":          KeyAudioTranscriptions,
 	"transcriptions":                KeyAudioTranscriptions,
+	"supports_audio_speech":         KeyAudioSpeech,
+	"supports_speech":               KeyAudioSpeech,
+	"audio_speech":                  KeyAudioSpeech,
+	"speech":                        KeyAudioSpeech,
+	"tts":                           KeyAudioSpeech,
+	"text_to_speech":                KeyAudioSpeech,
 	"supports_moderations":          KeyModerations,
 	"supports_moderation":           KeyModerations,
 	"moderation":                    KeyModerations,

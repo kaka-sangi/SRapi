@@ -2784,6 +2784,72 @@ paths:
         default:
           $ref: "#/components/responses/GatewayError"
 
+  /v1/audio/speech:
+    post:
+      tags:
+        - Gateway
+      operationId: createAudioSpeech
+      summary: Create OpenAI-compatible speech audio.
+      description: OpenAI-compatible text-to-speech route. SRapi validates the gateway API key, applies model policy and entitlement, schedules an eligible provider account, invokes the selected OpenAI-compatible provider adapter, and records audio usage and Scheduler evidence.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AudioSpeechRequest"
+            examples:
+              basic:
+                value:
+                  model: gpt-4o-mini-tts
+                  input: Today is a clear day to build.
+                  voice: alloy
+                  response_format: mp3
+      responses:
+        "200":
+          description: Binary audio content.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+            audio/mpeg:
+              schema:
+                type: string
+                format: binary
+            audio/wav:
+              schema:
+                type: string
+                format: binary
+            audio/ogg:
+              schema:
+                type: string
+                format: binary
+            audio/flac:
+              schema:
+                type: string
+                format: binary
+            audio/aac:
+              schema:
+                type: string
+                format: binary
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
   /v1beta/models/{model}:generateContent:
     post:
       tags:
@@ -3193,6 +3259,65 @@ paths:
             text/vtt:
               schema:
                 type: string
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /api/provider/openai-compatible/v1/audio/speech:
+    post:
+      tags:
+        - Gateway
+      operationId: createOpenAICompatibleAudioSpeechAlias
+      summary: Create speech audio with openai-compatible provider context.
+      description: Provider alias route. It reuses the standard audio speech runtime and forces the `openai-compatible` provider context.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AudioSpeechRequest"
+      responses:
+        "200":
+          description: Binary audio content.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+            audio/mpeg:
+              schema:
+                type: string
+                format: binary
+            audio/wav:
+              schema:
+                type: string
+                format: binary
+            audio/ogg:
+              schema:
+                type: string
+                format: binary
+            audio/flac:
+              schema:
+                type: string
+                format: binary
+            audio/aac:
+              schema:
+                type: string
+                format: binary
         "400":
           $ref: "#/components/responses/GatewayBadRequest"
         "401":
@@ -7063,6 +7188,45 @@ components:
             $ref: "#/components/schemas/AudioTranscriptionSegment"
         usage:
           $ref: "#/components/schemas/TokenUsage"
+      additionalProperties: true
+
+    AudioSpeechRequest:
+      type: object
+      required:
+        - model
+        - input
+        - voice
+      properties:
+        model:
+          type: string
+        input:
+          type: string
+          minLength: 1
+          description: Text to synthesize. SRapi does not persist full input text in logs.
+        voice:
+          type: string
+          minLength: 1
+        response_format:
+          type: string
+          enum:
+            - mp3
+            - opus
+            - aac
+            - flac
+            - wav
+            - pcm
+          default: mp3
+        speed:
+          type: number
+          format: float
+          minimum: 0.25
+          maximum: 4
+          default: 1
+        instructions:
+          type: string
+          description: Optional voice style instructions. SRapi does not persist full instruction text in logs.
+        user:
+          type: string
       additionalProperties: true
 
     RerankDocument:

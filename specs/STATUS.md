@@ -40,14 +40,15 @@ last_completed:
 - WP-310: Moderations runtime v1 now exposes OpenAI-compatible `/v1/moderations`, provider alias routing, canonical moderation normalization/rendering, OpenAI-compatible upstream `/moderations` adapter dispatch, explicit `moderations` Scheduler capability filtering, usage/billing/Scheduler feedback evidence, and generated OpenAPI/SDK parity.
 - WP-320: Rerank runtime v1 now exposes `/v1/rerank`, rerank-compatible provider alias routing, canonical rerank normalization/rendering, rerank-compatible upstream `/rerank` adapter dispatch, explicit `rerank` Scheduler capability filtering, usage/billing/Scheduler feedback evidence, and generated OpenAPI/SDK parity.
 - WP-330: Audio transcriptions runtime v1 now exposes OpenAI-compatible `/v1/audio/transcriptions`, provider alias routing, canonical audio transcription normalization/rendering, OpenAI-compatible upstream multipart `/audio/transcriptions` adapter dispatch, explicit `audio_transcriptions` Scheduler capability filtering, usage/billing/Scheduler feedback evidence, and generated OpenAPI/SDK parity.
+- WP-340: Audio speech runtime v1 now exposes OpenAI-compatible `/v1/audio/speech`, provider alias routing, canonical audio speech normalization, binary audio rendering, OpenAI-compatible upstream JSON `/audio/speech` adapter dispatch, explicit `audio_speech` Scheduler capability filtering, usage/billing/Scheduler feedback evidence, and generated OpenAPI/SDK parity.
 
 current:
 
-- package: WP-340+
+- package: WP-350+
 - status: pending
 - objective: split the next ecosystem or remaining advanced endpoint package from the roadmap.
 
-next_recommended: WP-340+
+next_recommended: WP-350+
 
 last_gates:
 
@@ -112,6 +113,8 @@ notes:
 - WP-320 added `TestRerankCompatibleAdapterInvokesRerankUpstream`, `TestGatewayRerankRouteTargetsRerankCompatibleUpstream`, and `TestGatewayRerankAliasForcesProviderContext`.
 - WP-330 added `audio_transcriptions` to the canonical capability registry and provider convenience key mapping, so Scheduler requires explicit audio transcription endpoint support before routing speech-to-text requests.
 - WP-330 added `TestOpenAICompatibleAdapterInvokesAudioTranscriptionsUpstream`, `TestGatewayAudioTranscriptionRouteTargetsOpenAICompatibleUpstream`, and `TestGatewayAudioTranscriptionAliasForcesProviderContext`.
+- WP-340 added `audio_speech` to the canonical capability registry and provider convenience key mapping, so Scheduler requires explicit speech synthesis endpoint support before routing text-to-speech requests.
+- WP-340 added `TestOpenAICompatibleAdapterInvokesAudioSpeechUpstream`, `TestGatewayAudioSpeechRouteTargetsOpenAICompatibleUpstream`, and `TestGatewayAudioSpeechAliasForcesProviderContext`.
 
 ## Work Package Ledger
 
@@ -151,4 +154,5 @@ notes:
 | WP-310 | completed | Moderations runtime v1. |
 | WP-320 | completed | Rerank runtime v1. |
 | WP-330 | completed | Audio transcriptions runtime v1. |
-| WP-340+ | pending | Remaining ecosystem and advanced endpoint packages. |
+| WP-340 | completed | Audio speech runtime v1. |
+| WP-350+ | pending | Remaining ecosystem and advanced endpoint packages. |

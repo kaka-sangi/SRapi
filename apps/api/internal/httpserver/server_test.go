@@ -3199,6 +3199,156 @@ func TestGatewayAudioTranscriptionTextResponseFormatReturnsPlainText(t *testing.
 	}
 }
 
+func TestGatewayAudioSpeechRouteTargetsOpenAICompatibleUpstream(t *testing.T) {
+	type upstreamCall struct {
+		Path           string
+		Authorization  string
+		Model          string
+		Input          string
+		Voice          string
+		ResponseFormat string
+		Speed          *float32
+		Instructions   string
+		User           string
+		Accent         string
+	}
+	var (
+		mu    sync.Mutex
+		calls []upstreamCall
+	)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload struct {
+			Model          string   `json:"model"`
+			Input          string   `json:"input"`
+			Voice          string   `json:"voice"`
+			ResponseFormat string   `json:"response_format"`
+			Speed          *float32 `json:"speed"`
+			Instructions   string   `json:"instructions"`
+			User           string   `json:"user"`
+			Accent         string   `json:"accent"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream speech request: %v", err)
+		}
+		mu.Lock()
+		calls = append(calls, upstreamCall{
+			Path:           r.URL.Path,
+			Authorization:  r.Header.Get("Authorization"),
+			Model:          payload.Model,
+			Input:          payload.Input,
+			Voice:          payload.Voice,
+			ResponseFormat: payload.ResponseFormat,
+			Speed:          payload.Speed,
+			Instructions:   payload.Instructions,
+			User:           payload.User,
+			Accent:         payload.Accent,
+		})
+		mu.Unlock()
+		w.Header().Set("Content-Type", "audio/wav")
+		_, _ = w.Write([]byte("RIFF-gateway-speech"))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"wp340-openai","display_name":"WP340 OpenAI","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active","capabilities":{"audio_speech":true}}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"wp340-speech-model","display_name":"WP340 Speech Model","status":"active","capabilities":[{"key":"audio_speech","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"speech-upstream","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"wp340-speech-account","runtime_class":"api_key","credential":{"api_key":"speech-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
+
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/audio/speech", `{"model":"wp340-speech-model","input":"speak gateway audio","voice":"alloy","response_format":"wav","speed":1.2,"instructions":"warm voice","user":"user-123","accent":"neutral"}`)
+	if contentType := rec.Header().Get("Content-Type"); !strings.HasPrefix(contentType, "audio/wav") {
+		t.Fatalf("expected audio/wav content type, got %q", contentType)
+	}
+	if body := rec.Body.String(); body != "RIFF-gateway-speech" {
+		t.Fatalf("unexpected audio speech body %q", body)
+	}
+
+	mu.Lock()
+	gotCalls := append([]upstreamCall(nil), calls...)
+	mu.Unlock()
+	if len(gotCalls) != 1 {
+		t.Fatalf("expected one upstream speech call, got %+v", gotCalls)
+	}
+	if gotCalls[0].Path != "/v1/audio/speech" || gotCalls[0].Authorization != "Bearer speech-secret" || gotCalls[0].Model != "speech-upstream" || gotCalls[0].Input != "speak gateway audio" || gotCalls[0].Voice != "alloy" || gotCalls[0].ResponseFormat != "wav" {
+		t.Fatalf("unexpected upstream speech call: %+v", gotCalls[0])
+	}
+	if gotCalls[0].Speed == nil || *gotCalls[0].Speed < 1.19 || *gotCalls[0].Speed > 1.21 || gotCalls[0].Instructions != "warm voice" || gotCalls[0].User != "user-123" || gotCalls[0].Accent != "neutral" {
+		t.Fatalf("unexpected upstream speech details: %+v", gotCalls[0])
+	}
+
+	usageReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/usage-logs?model=wp340-speech-model", nil)
+	usageReq.AddCookie(sessionCookie)
+	usageRec := httptest.NewRecorder()
+	handler.ServeHTTP(usageRec, usageReq)
+	if usageRec.Code != http.StatusOK {
+		t.Fatalf("expected usage logs 200, got %d", usageRec.Code)
+	}
+	var usageResp apiopenapi.UsageLogListResponse
+	if err := json.NewDecoder(usageRec.Body).Decode(&usageResp); err != nil {
+		t.Fatalf("decode usage logs: %v", err)
+	}
+	if len(usageResp.Data) != 1 {
+		t.Fatalf("expected one audio speech usage record, got %+v", usageResp.Data)
+	}
+	usage := usageResp.Data[0]
+	if !usage.Success || usage.SourceEndpoint != "/v1/audio/speech" || usage.ProviderId == nil || *usage.ProviderId != string(providerResp.Data.Id) || usage.AccountId == nil || *usage.AccountId != string(accountResp.Data.Id) || usage.TotalTokens <= 0 {
+		t.Fatalf("unexpected audio speech usage evidence: %+v", usage)
+	}
+
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=wp340-speech-model", nil)
+	decisionsReq.AddCookie(sessionCookie)
+	decisionsRec := httptest.NewRecorder()
+	handler.ServeHTTP(decisionsRec, decisionsReq)
+	if decisionsRec.Code != http.StatusOK {
+		t.Fatalf("expected decisions 200, got %d body=%s", decisionsRec.Code, decisionsRec.Body.String())
+	}
+	var decisionsResp apiopenapi.SchedulerDecisionListResponse
+	if err := json.NewDecoder(decisionsRec.Body).Decode(&decisionsResp); err != nil {
+		t.Fatalf("decode decisions: %v", err)
+	}
+	if len(decisionsResp.Data) != 1 || decisionsResp.Data[0].SourceEndpoint != "/v1/audio/speech" || decisionsResp.Data[0].CandidateCount != 1 {
+		t.Fatalf("unexpected audio speech decision evidence: %+v", decisionsResp.Data)
+	}
+}
+
+func TestGatewayAudioSpeechAliasForcesProviderContext(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	openaiProvider := mustFindProviderByName(t, handler, sessionCookie, "openai-compatible")
+	fallbackProvider := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"speech-fallback-provider","display_name":"Speech Fallback","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active","capabilities":{"audio_speech":true}}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"wp340-alias-speech-model","display_name":"WP340 Alias Speech Model","status":"active","capabilities":[{"key":"audio_speech","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","upstream_model_name":"fallback-speech","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","name":"speech-fallback-account","runtime_class":"api_key","credential":{"api_key":"fallback-secret"},"status":"active","priority":100}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(openaiProvider.Id)+`","upstream_model_name":"alias-speech","status":"active"}`)
+
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/api/provider/openai-compatible/v1/audio/speech", `{"model":"wp340-alias-speech-model","input":"alias speech","voice":"alloy","response_format":"mp3"}`)
+
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=wp340-alias-speech-model", nil)
+	decisionsReq.AddCookie(sessionCookie)
+	decisionsRec := httptest.NewRecorder()
+	handler.ServeHTTP(decisionsRec, decisionsReq)
+	if decisionsRec.Code != http.StatusOK {
+		t.Fatalf("expected decisions 200, got %d body=%s", decisionsRec.Code, decisionsRec.Body.String())
+	}
+	var decisionsResp apiopenapi.SchedulerDecisionListResponse
+	if err := json.NewDecoder(decisionsRec.Body).Decode(&decisionsResp); err != nil {
+		t.Fatalf("decode decisions: %v", err)
+	}
+	if len(decisionsResp.Data) != 1 {
+		t.Fatalf("expected one alias audio speech decision, got %+v", decisionsResp.Data)
+	}
+	decision := decisionsResp.Data[0]
+	if decision.SelectedProviderId == nil || *decision.SelectedProviderId != string(openaiProvider.Id) || decision.CandidateCount != 1 {
+		t.Fatalf("expected audio speech alias to force openai-compatible provider, got %+v", decision)
+	}
+	if decision.SourceEndpoint != "/api/provider/openai-compatible/v1/audio/speech" {
+		t.Fatalf("expected alias source endpoint, got %q", decision.SourceEndpoint)
+	}
+}
+
 func TestGatewayRerankAliasForcesProviderContext(t *testing.T) {
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)

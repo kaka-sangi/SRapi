@@ -1274,6 +1274,23 @@ export type AudioTranscriptionResponse = {
     [key: string]: unknown;
 };
 
+export type AudioSpeechRequest = {
+    model: string;
+    /**
+     * Text to synthesize. SRapi does not persist full input text in logs.
+     */
+    input: string;
+    voice: string;
+    response_format?: 'mp3' | 'opus' | 'aac' | 'flac' | 'wav' | 'pcm';
+    speed?: number;
+    /**
+     * Optional voice style instructions. SRapi does not persist full instruction text in logs.
+     */
+    instructions?: string;
+    user?: string;
+    [key: string]: unknown;
+};
+
 export type RerankDocument = string | JsonObject;
 
 export type RerankRequest = {
@@ -4437,6 +4454,51 @@ export type CreateAudioTranscriptionResponses = {
 
 export type CreateAudioTranscriptionResponse = CreateAudioTranscriptionResponses[keyof CreateAudioTranscriptionResponses];
 
+export type CreateAudioSpeechData = {
+    body: AudioSpeechRequest;
+    path?: never;
+    query?: never;
+    url: '/v1/audio/speech';
+};
+
+export type CreateAudioSpeechErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateAudioSpeechError = CreateAudioSpeechErrors[keyof CreateAudioSpeechErrors];
+
+export type CreateAudioSpeechResponses = {
+    /**
+     * Binary audio content.
+     */
+    200: Blob | File;
+};
+
+export type CreateAudioSpeechResponse = CreateAudioSpeechResponses[keyof CreateAudioSpeechResponses];
+
 export type GenerateGeminiContentData = {
     body: GeminiGenerateContentRequest;
     path: {
@@ -4896,6 +4958,51 @@ export type CreateOpenAiCompatibleAudioTranscriptionAliasResponses = {
 };
 
 export type CreateOpenAiCompatibleAudioTranscriptionAliasResponse = CreateOpenAiCompatibleAudioTranscriptionAliasResponses[keyof CreateOpenAiCompatibleAudioTranscriptionAliasResponses];
+
+export type CreateOpenAiCompatibleAudioSpeechAliasData = {
+    body: AudioSpeechRequest;
+    path?: never;
+    query?: never;
+    url: '/api/provider/openai-compatible/v1/audio/speech';
+};
+
+export type CreateOpenAiCompatibleAudioSpeechAliasErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateOpenAiCompatibleAudioSpeechAliasError = CreateOpenAiCompatibleAudioSpeechAliasErrors[keyof CreateOpenAiCompatibleAudioSpeechAliasErrors];
+
+export type CreateOpenAiCompatibleAudioSpeechAliasResponses = {
+    /**
+     * Binary audio content.
+     */
+    200: Blob | File;
+};
+
+export type CreateOpenAiCompatibleAudioSpeechAliasResponse = CreateOpenAiCompatibleAudioSpeechAliasResponses[keyof CreateOpenAiCompatibleAudioSpeechAliasResponses];
 
 export type CreateRerankCompatibleRerankAliasData = {
     body: RerankRequest;

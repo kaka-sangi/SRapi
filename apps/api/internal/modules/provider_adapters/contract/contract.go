@@ -96,6 +96,24 @@ type AudioTranscriptionRequest struct {
 	Credential     map[string]any
 }
 
+type AudioSpeechRequest struct {
+	RequestID      string
+	SourceProtocol string
+	SourceEndpoint string
+	Model          string
+	Input          string
+	Voice          string
+	ResponseFormat string
+	Speed          *float32
+	Instructions   string
+	User           string
+	Extra          map[string]any
+	Provider       providercontract.Provider
+	Account        accountcontract.ProviderAccount
+	Mapping        modelcontract.ModelProviderMapping
+	Credential     map[string]any
+}
+
 type ModerationRequest struct {
 	RequestID      string
 	SourceProtocol string
@@ -200,6 +218,15 @@ type AudioTranscriptionResponse struct {
 	Usage      Usage
 }
 
+type AudioSpeechResponse struct {
+	ID          string
+	Audio       []byte
+	ContentType string
+	Model       string
+	StatusCode  int
+	Usage       Usage
+}
+
 type RerankResult struct {
 	Index          int
 	RelevanceScore float32
@@ -251,6 +278,10 @@ type ImageGenerationAdapter interface {
 
 type AudioTranscriptionAdapter interface {
 	InvokeAudioTranscription(ctx context.Context, req AudioTranscriptionRequest) (AudioTranscriptionResponse, error)
+}
+
+type AudioSpeechAdapter interface {
+	InvokeAudioSpeech(ctx context.Context, req AudioSpeechRequest) (AudioSpeechResponse, error)
 }
 
 type ModerationAdapter interface {

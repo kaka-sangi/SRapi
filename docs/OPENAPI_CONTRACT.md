@@ -98,6 +98,7 @@ packages/openapi/
 /v1/embeddings
 /v1/images/generations
 /v1/audio/transcriptions
+/v1/audio/speech
 /v1/moderations
 /v1/rerank
 ```

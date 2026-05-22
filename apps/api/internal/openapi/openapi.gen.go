@@ -173,6 +173,36 @@ func (e ApiKeyStatus) Valid() bool {
 	}
 }
 
+// Defines values for AudioSpeechRequestResponseFormat.
+const (
+	Aac  AudioSpeechRequestResponseFormat = "aac"
+	Flac AudioSpeechRequestResponseFormat = "flac"
+	Mp3  AudioSpeechRequestResponseFormat = "mp3"
+	Opus AudioSpeechRequestResponseFormat = "opus"
+	Pcm  AudioSpeechRequestResponseFormat = "pcm"
+	Wav  AudioSpeechRequestResponseFormat = "wav"
+)
+
+// Valid indicates whether the value is a known member of the AudioSpeechRequestResponseFormat enum.
+func (e AudioSpeechRequestResponseFormat) Valid() bool {
+	switch e {
+	case Aac:
+		return true
+	case Flac:
+		return true
+	case Mp3:
+		return true
+	case Opus:
+		return true
+	case Pcm:
+		return true
+	case Wav:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for AudioTranscriptionRequestResponseFormat.
 const (
 	AudioTranscriptionRequestResponseFormatDiarizedJson AudioTranscriptionRequestResponseFormat = "diarized_json"
@@ -1524,6 +1554,24 @@ type ApiKeySecretData struct {
 
 // ApiKeyStatus defines model for ApiKeyStatus.
 type ApiKeyStatus string
+
+// AudioSpeechRequest defines model for AudioSpeechRequest.
+type AudioSpeechRequest struct {
+	// Input Text to synthesize. SRapi does not persist full input text in logs.
+	Input string `json:"input"`
+
+	// Instructions Optional voice style instructions. SRapi does not persist full instruction text in logs.
+	Instructions         *string                           `json:"instructions,omitempty"`
+	Model                string                            `json:"model"`
+	ResponseFormat       *AudioSpeechRequestResponseFormat `json:"response_format,omitempty"`
+	Speed                *float32                          `json:"speed,omitempty"`
+	User                 *string                           `json:"user,omitempty"`
+	Voice                string                            `json:"voice"`
+	AdditionalProperties map[string]interface{}            `json:"-"`
+}
+
+// AudioSpeechRequestResponseFormat defines model for AudioSpeechRequest.ResponseFormat.
+type AudioSpeechRequestResponseFormat string
 
 // AudioTranscriptionRequest defines model for AudioTranscriptionRequest.
 type AudioTranscriptionRequest struct {
@@ -3333,6 +3381,9 @@ type ListPaymentOrdersParams struct {
 // CreateAnthropicCompatibleMessageAliasJSONRequestBody defines body for CreateAnthropicCompatibleMessageAlias for application/json ContentType.
 type CreateAnthropicCompatibleMessageAliasJSONRequestBody = AnthropicMessagesRequest
 
+// CreateOpenAICompatibleAudioSpeechAliasJSONRequestBody defines body for CreateOpenAICompatibleAudioSpeechAlias for application/json ContentType.
+type CreateOpenAICompatibleAudioSpeechAliasJSONRequestBody = AudioSpeechRequest
+
 // CreateOpenAICompatibleAudioTranscriptionAliasMultipartRequestBody defines body for CreateOpenAICompatibleAudioTranscriptionAlias for multipart/form-data ContentType.
 type CreateOpenAICompatibleAudioTranscriptionAliasMultipartRequestBody = AudioTranscriptionRequest
 
@@ -3431,6 +3482,9 @@ type CreatePaymentOrderJSONRequestBody = CreatePaymentOrderRequest
 
 // HandlePaymentWebhookJSONRequestBody defines body for HandlePaymentWebhook for application/json ContentType.
 type HandlePaymentWebhookJSONRequestBody = PaymentWebhookRequest
+
+// CreateAudioSpeechJSONRequestBody defines body for CreateAudioSpeech for application/json ContentType.
+type CreateAudioSpeechJSONRequestBody = AudioSpeechRequest
 
 // CreateAudioTranscriptionMultipartRequestBody defines body for CreateAudioTranscription for multipart/form-data ContentType.
 type CreateAudioTranscriptionMultipartRequestBody = AudioTranscriptionRequest
@@ -3731,6 +3785,158 @@ func (a AnthropicMessagesRequest) MarshalJSON() ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error marshaling 'top_p': %w", err)
 		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for AudioSpeechRequest. Returns the specified
+// element and whether it was found
+func (a AudioSpeechRequest) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for AudioSpeechRequest
+func (a *AudioSpeechRequest) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for AudioSpeechRequest to handle AdditionalProperties
+func (a *AudioSpeechRequest) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["input"]; found {
+		err = json.Unmarshal(raw, &a.Input)
+		if err != nil {
+			return fmt.Errorf("error reading 'input': %w", err)
+		}
+		delete(object, "input")
+	}
+
+	if raw, found := object["instructions"]; found {
+		err = json.Unmarshal(raw, &a.Instructions)
+		if err != nil {
+			return fmt.Errorf("error reading 'instructions': %w", err)
+		}
+		delete(object, "instructions")
+	}
+
+	if raw, found := object["model"]; found {
+		err = json.Unmarshal(raw, &a.Model)
+		if err != nil {
+			return fmt.Errorf("error reading 'model': %w", err)
+		}
+		delete(object, "model")
+	}
+
+	if raw, found := object["response_format"]; found {
+		err = json.Unmarshal(raw, &a.ResponseFormat)
+		if err != nil {
+			return fmt.Errorf("error reading 'response_format': %w", err)
+		}
+		delete(object, "response_format")
+	}
+
+	if raw, found := object["speed"]; found {
+		err = json.Unmarshal(raw, &a.Speed)
+		if err != nil {
+			return fmt.Errorf("error reading 'speed': %w", err)
+		}
+		delete(object, "speed")
+	}
+
+	if raw, found := object["user"]; found {
+		err = json.Unmarshal(raw, &a.User)
+		if err != nil {
+			return fmt.Errorf("error reading 'user': %w", err)
+		}
+		delete(object, "user")
+	}
+
+	if raw, found := object["voice"]; found {
+		err = json.Unmarshal(raw, &a.Voice)
+		if err != nil {
+			return fmt.Errorf("error reading 'voice': %w", err)
+		}
+		delete(object, "voice")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for AudioSpeechRequest to handle AdditionalProperties
+func (a AudioSpeechRequest) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	object["input"], err = json.Marshal(a.Input)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'input': %w", err)
+	}
+
+	if a.Instructions != nil {
+		object["instructions"], err = json.Marshal(a.Instructions)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'instructions': %w", err)
+		}
+	}
+
+	object["model"], err = json.Marshal(a.Model)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'model': %w", err)
+	}
+
+	if a.ResponseFormat != nil {
+		object["response_format"], err = json.Marshal(a.ResponseFormat)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'response_format': %w", err)
+		}
+	}
+
+	if a.Speed != nil {
+		object["speed"], err = json.Marshal(a.Speed)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'speed': %w", err)
+		}
+	}
+
+	if a.User != nil {
+		object["user"], err = json.Marshal(a.User)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'user': %w", err)
+		}
+	}
+
+	object["voice"], err = json.Marshal(a.Voice)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'voice': %w", err)
 	}
 
 	for fieldName, field := range a.AdditionalProperties {
@@ -7287,6 +7493,9 @@ type ServerInterface interface {
 	// Create an Anthropic Messages-compatible message with anthropic-compatible provider context.
 	// (POST /api/provider/anthropic-compatible/v1/messages)
 	CreateAnthropicCompatibleMessageAlias(w http.ResponseWriter, r *http.Request)
+	// Create speech audio with openai-compatible provider context.
+	// (POST /api/provider/openai-compatible/v1/audio/speech)
+	CreateOpenAICompatibleAudioSpeechAlias(w http.ResponseWriter, r *http.Request)
 	// Create an audio transcription with openai-compatible provider context.
 	// (POST /api/provider/openai-compatible/v1/audio/transcriptions)
 	CreateOpenAICompatibleAudioTranscriptionAlias(w http.ResponseWriter, r *http.Request)
@@ -7512,6 +7721,9 @@ type ServerInterface interface {
 	// Handle a signed payment provider webhook.
 	// (POST /api/v1/webhooks/payments/{provider})
 	HandlePaymentWebhook(w http.ResponseWriter, r *http.Request, provider string)
+	// Create OpenAI-compatible speech audio.
+	// (POST /v1/audio/speech)
+	CreateAudioSpeech(w http.ResponseWriter, r *http.Request)
 	// Create an OpenAI-compatible audio transcription.
 	// (POST /v1/audio/transcriptions)
 	CreateAudioTranscription(w http.ResponseWriter, r *http.Request)
@@ -7567,6 +7779,26 @@ func (siw *ServerInterfaceWrapper) CreateAnthropicCompatibleMessageAlias(w http.
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateAnthropicCompatibleMessageAlias(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateOpenAICompatibleAudioSpeechAlias operation middleware
+func (siw *ServerInterfaceWrapper) CreateOpenAICompatibleAudioSpeechAlias(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateOpenAICompatibleAudioSpeechAlias(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -10452,6 +10684,26 @@ func (siw *ServerInterfaceWrapper) HandlePaymentWebhook(w http.ResponseWriter, r
 	handler.ServeHTTP(w, r)
 }
 
+// CreateAudioSpeech operation middleware
+func (siw *ServerInterfaceWrapper) CreateAudioSpeech(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAudioSpeech(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // CreateAudioTranscription operation middleware
 func (siw *ServerInterfaceWrapper) CreateAudioTranscription(w http.ResponseWriter, r *http.Request) {
 
@@ -10817,6 +11069,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	}
 
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/anthropic-compatible/v1/messages", wrapper.CreateAnthropicCompatibleMessageAlias)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/audio/speech", wrapper.CreateOpenAICompatibleAudioSpeechAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/audio/transcriptions", wrapper.CreateOpenAICompatibleAudioTranscriptionAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/chat/completions", wrapper.CreateOpenAICompatibleChatCompletionAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/embeddings", wrapper.CreateOpenAICompatibleEmbeddingAlias)
@@ -10892,6 +11145,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/payment/orders/{id}", wrapper.GetPaymentOrder)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/payment/orders/{id}/cancel", wrapper.CancelPaymentOrder)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/webhooks/payments/{provider}", wrapper.HandlePaymentWebhook)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/audio/speech", wrapper.CreateAudioSpeech)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/audio/transcriptions", wrapper.CreateAudioTranscription)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/chat/completions", wrapper.CreateChatCompletion)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/embeddings", wrapper.CreateEmbedding)

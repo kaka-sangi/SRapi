@@ -17,6 +17,7 @@ const (
 	EndpointEmbeddings            SourceEndpoint = "/v1/embeddings"
 	EndpointImagesGenerations     SourceEndpoint = "/v1/images/generations"
 	EndpointAudioTranscriptions   SourceEndpoint = "/v1/audio/transcriptions"
+	EndpointAudioSpeech           SourceEndpoint = "/v1/audio/speech"
 	EndpointModerations           SourceEndpoint = "/v1/moderations"
 	EndpointRerank                SourceEndpoint = "/v1/rerank"
 	EndpointGeminiGenerateContent SourceEndpoint = "/v1beta/models/{model}:generateContent"
@@ -93,6 +94,13 @@ type CanonicalRequest struct {
 	AudioTemperature      *float32
 	AudioUser             string
 	AudioExtra            map[string]any
+	SpeechInput           string
+	SpeechVoice           string
+	SpeechResponseFormat  string
+	SpeechSpeed           *float32
+	SpeechInstructions    string
+	SpeechUser            string
+	SpeechExtra           map[string]any
 	ModerationInput       []string
 	ModerationUser        string
 	RerankQuery           string
@@ -198,6 +206,17 @@ type AudioTranscriptionResponse struct {
 	Language              string
 	Duration              *float32
 	Segments              []AudioTranscriptionSegment
+	Usage                 Usage
+	CompatibilityWarnings []string
+}
+
+type AudioSpeechResponse struct {
+	ID                    string
+	RequestID             string
+	Model                 string
+	CanonicalModel        string
+	ContentType           string
+	Audio                 []byte
 	Usage                 Usage
 	CompatibilityWarnings []string
 }

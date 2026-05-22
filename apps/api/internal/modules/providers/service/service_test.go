@@ -50,12 +50,12 @@ func TestCreateProviderNormalizesConvenienceCapabilityKeys(t *testing.T) {
 		DisplayName:  "OpenAI Compatible",
 		AdapterType:  "openai-compatible",
 		Protocol:     "openai-compatible",
-		Capabilities: map[string]any{"supports_stream": true, "tools": true},
+		Capabilities: map[string]any{"supports_stream": true, "tools": true, "supports_speech": true},
 	})
 	if err != nil {
 		t.Fatalf("create provider: %v", err)
 	}
-	if created.Capabilities[capabilitiescontract.KeyStreaming] != true || created.Capabilities[capabilitiescontract.KeyToolCalling] != true {
+	if created.Capabilities[capabilitiescontract.KeyStreaming] != true || created.Capabilities[capabilitiescontract.KeyToolCalling] != true || created.Capabilities[capabilitiescontract.KeyAudioSpeech] != true {
 		t.Fatalf("expected canonical provider capability keys, got %+v", created.Capabilities)
 	}
 }

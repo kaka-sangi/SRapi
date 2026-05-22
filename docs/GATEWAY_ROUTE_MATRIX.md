@@ -49,6 +49,11 @@ OpenAI-compatible preset:
   POST {alias}/v1/chat/completions
   POST {alias}/v1/responses
   POST {alias}/v1/messages
+  POST {alias}/v1/embeddings
+  POST {alias}/v1/images/generations
+  POST {alias}/v1/audio/transcriptions
+  POST {alias}/v1/audio/speech
+  POST {alias}/v1/moderations
 
 Anthropic-compatible preset:
   POST {alias}/v1/messages
@@ -139,6 +144,7 @@ Grok API-key/upstream 与 Grok Web session 都归属 `grok` provider，但 runti
 ```
 
 Antigravity 可承载 Claude-shaped 和 Gemini-shaped 端点，必须在 route metadata 中标明目标子协议。
+这些路径当前仍是规划项；在一阶 `reverse-proxy-antigravity` adapter、`antigravity_desktop` runtime context、认证注入规则和回归测试落地前，不视为已实现的 Gateway 入口。
 
 ## 5. Route Matrix
 
@@ -152,7 +158,7 @@ Antigravity 可承载 Claude-shaped 和 Gemini-shaped 端点，必须在 route m
 | `/v1/images/generations` | Media runtime | 最小解析 OpenAI image generation body，调度后调用 OpenAI-compatible `/images/generations`，记录 media/usage 和调度证据。 | WP-290 |
 | `/v1/images/edits`, `/v1/images/variations` | Media runtime | 图片编辑和 variation。 | Phase 3 |
 | `/v1/audio/transcriptions` | Audio runtime | 最小解析 multipart audio transcription body，调度后调用 OpenAI-compatible `/audio/transcriptions`，记录 audio/usage 和调度证据。 | WP-330 |
-| `/v1/audio/speech` | Audio runtime | 语音合成。 | Phase 3 |
+| `/v1/audio/speech` | Audio runtime | 最小解析 OpenAI speech JSON body，调度后调用 OpenAI-compatible `/audio/speech`，返回 binary audio 并记录 usage 和调度证据。 | WP-340 |
 | `/v1/moderations` | Moderation runtime | 最小解析 OpenAI moderation body，调度后调用 OpenAI-compatible `/moderations`，记录用量和调度证据。 | WP-310 |
 | `/v1/rerank` | Passthrough runtime | 最小解析 query/documents/top_n，调度后调用 rerank-compatible `/rerank`，记录用量和调度证据。 | WP-320 |
 | `/v1/responses/ws` | Realtime/WS runtime | 长连接、粘性账号、slot 生命周期。 | Phase 3 |

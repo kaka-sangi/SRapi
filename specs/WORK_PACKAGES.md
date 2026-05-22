@@ -1197,11 +1197,61 @@ Required gates:
 - `make secret-scan`
 - `git diff --check`
 
-## WP-340+: Ecosystem And Remaining Advanced Surface
+## WP-340: Audio Speech Runtime v1
+
+Objective: add OpenAI-compatible audio speech synthesis runtime so text-to-speech requests use SRapi auth, model policy, entitlement, Scheduler, Provider Adapter dispatch, usage, billing, and operational evidence instead of bypassing the platform.
+
+Read first:
+
+- `docs/OPENAPI_CONTRACT.md`
+- `docs/GATEWAY_ROUTE_MATRIX.md`
+- `docs/AI_ENDPOINT_COMPATIBILITY.md`
+- `docs/PROVIDER_ADAPTER_SPEC.md`
+- `docs/COMPATIBLE_PROVIDER_REGISTRY_SPEC.md`
+- `docs/CAPABILITY_TAXONOMY_SPEC.md`
+- `packages/openapi/openapi.yaml`
+- `apps/api/internal/modules/gateway`
+- `apps/api/internal/modules/provider_adapters`
+- `apps/api/internal/httpserver`
+
+Owns:
+
+- OpenAPI `POST /v1/audio/speech` and OpenAI-compatible provider alias contract
+- Gateway audio speech request normalization and binary response rendering
+- Provider Adapter JSON dispatch for OpenAI-compatible API-key and reverse-proxy accounts
+- HTTP runtime handler/tests, capability taxonomy, and Gateway route matrix/docs/status updates
+
+Definition of Done:
+
+- `POST /v1/audio/speech` is OpenAPI-described, generated, and secured with `gatewayBearerAuth`.
+- OpenAI-compatible provider alias routes, including `/api/provider/openai-compatible/v1/audio/speech`, reuse the same runtime while forcing provider context.
+- Requests minimally validate JSON `model`, non-empty `input`, `voice`, optional `response_format`, optional `speed`, optional `instructions`, and optional `user`.
+- Runtime follows the standard Gateway path: API key auth, model visibility, entitlement admission, Scheduler candidate selection, provider credential materialization, Provider Adapter invocation, usage log, billing metadata, Scheduler feedback, and outbox event.
+- OpenAI-compatible API-key and reverse-proxy accounts dispatch upstream to `/audio/speech`, pass the mapped upstream model, preserve voice/format/speed/instructions/user fields, parse binary audio bytes and content type, and return audio bytes to the client.
+- The request capability taxonomy includes an explicit `audio_speech` endpoint capability so Scheduler can reject transcription-only or text-only candidates.
+- Provider and validation errors use the existing OpenAI-compatible Gateway error envelope and preserve request IDs.
+- Focused regressions prove standard route success, provider alias forced context, upstream request/response parsing, binary content type, and usage/decision evidence.
+- Speech streaming, realtime/websocket, SDK examples, migration guides, and frontend visuals are left to later packages.
+- No frontend visuals are added.
+
+Required gates:
+
+- `make openapi-lint`
+- `make openapi-bundle`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/modules/gateway/... ./internal/modules/provider_adapters/... ./internal/modules/providers/... ./internal/httpserver`
+- `cd apps/api && go test ./...`
+- `make architecture-check`
+- `make code-quality-check`
+- `make secret-scan`
+- `git diff --check`
+
+## WP-350+: Ecosystem And Remaining Advanced Surface
 
 Use `ROADMAP.md` Phase 7 through Phase 8 to split future packages for:
 
-- speech synthesis
 - realtime/websocket
 - SDK examples
 - migration guides
