@@ -30,6 +30,8 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/modelalias"
 	"github.com/srapi/srapi/apps/api/ent/modelprovidermapping"
 	"github.com/srapi/srapi/apps/api/ent/modelregistry"
+	"github.com/srapi/srapi/apps/api/ent/obsalertevent"
+	"github.com/srapi/srapi/apps/api/ent/obsslodefinition"
 	"github.com/srapi/srapi/apps/api/ent/paymentauditlog"
 	"github.com/srapi/srapi/apps/api/ent/paymentorder"
 	"github.com/srapi/srapi/apps/api/ent/paymentproviderinstance"
@@ -77,6 +79,8 @@ const (
 	TypeModelAlias              = "ModelAlias"
 	TypeModelProviderMapping    = "ModelProviderMapping"
 	TypeModelRegistry           = "ModelRegistry"
+	TypeObsAlertEvent           = "ObsAlertEvent"
+	TypeObsSLODefinition        = "ObsSLODefinition"
 	TypePaymentAuditLog         = "PaymentAuditLog"
 	TypePaymentOrder            = "PaymentOrder"
 	TypePaymentProviderInstance = "PaymentProviderInstance"
@@ -17284,6 +17288,2090 @@ func (m *ModelRegistryMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *ModelRegistryMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown ModelRegistry edge %s", name)
+}
+
+// ObsAlertEventMutation represents an operation that mutates the ObsAlertEvent nodes in the graph.
+type ObsAlertEventMutation struct {
+	config
+	op                 Op
+	typ                string
+	id                 *int
+	created_at         *time.Time
+	updated_at         *time.Time
+	slo_id             *int
+	addslo_id          *int
+	rule_id            *string
+	severity           *string
+	status             *string
+	fingerprint        *string
+	summary            *string
+	details_json       *map[string]interface{}
+	started_at         *time.Time
+	resolved_at        *time.Time
+	acknowledged_at    *time.Time
+	acknowledged_by    *int
+	addacknowledged_by *int
+	suppressed_by      *string
+	clearedFields      map[string]struct{}
+	done               bool
+	oldValue           func(context.Context) (*ObsAlertEvent, error)
+	predicates         []predicate.ObsAlertEvent
+}
+
+var _ ent.Mutation = (*ObsAlertEventMutation)(nil)
+
+// obsalerteventOption allows management of the mutation configuration using functional options.
+type obsalerteventOption func(*ObsAlertEventMutation)
+
+// newObsAlertEventMutation creates new mutation for the ObsAlertEvent entity.
+func newObsAlertEventMutation(c config, op Op, opts ...obsalerteventOption) *ObsAlertEventMutation {
+	m := &ObsAlertEventMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeObsAlertEvent,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withObsAlertEventID sets the ID field of the mutation.
+func withObsAlertEventID(id int) obsalerteventOption {
+	return func(m *ObsAlertEventMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *ObsAlertEvent
+		)
+		m.oldValue = func(ctx context.Context) (*ObsAlertEvent, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().ObsAlertEvent.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withObsAlertEvent sets the old ObsAlertEvent of the mutation.
+func withObsAlertEvent(node *ObsAlertEvent) obsalerteventOption {
+	return func(m *ObsAlertEventMutation) {
+		m.oldValue = func(context.Context) (*ObsAlertEvent, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m ObsAlertEventMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m ObsAlertEventMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *ObsAlertEventMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *ObsAlertEventMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().ObsAlertEvent.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *ObsAlertEventMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *ObsAlertEventMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the ObsAlertEvent entity.
+// If the ObsAlertEvent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsAlertEventMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *ObsAlertEventMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *ObsAlertEventMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *ObsAlertEventMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the ObsAlertEvent entity.
+// If the ObsAlertEvent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsAlertEventMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *ObsAlertEventMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetSloID sets the "slo_id" field.
+func (m *ObsAlertEventMutation) SetSloID(i int) {
+	m.slo_id = &i
+	m.addslo_id = nil
+}
+
+// SloID returns the value of the "slo_id" field in the mutation.
+func (m *ObsAlertEventMutation) SloID() (r int, exists bool) {
+	v := m.slo_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSloID returns the old "slo_id" field's value of the ObsAlertEvent entity.
+// If the ObsAlertEvent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsAlertEventMutation) OldSloID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSloID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSloID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSloID: %w", err)
+	}
+	return oldValue.SloID, nil
+}
+
+// AddSloID adds i to the "slo_id" field.
+func (m *ObsAlertEventMutation) AddSloID(i int) {
+	if m.addslo_id != nil {
+		*m.addslo_id += i
+	} else {
+		m.addslo_id = &i
+	}
+}
+
+// AddedSloID returns the value that was added to the "slo_id" field in this mutation.
+func (m *ObsAlertEventMutation) AddedSloID() (r int, exists bool) {
+	v := m.addslo_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearSloID clears the value of the "slo_id" field.
+func (m *ObsAlertEventMutation) ClearSloID() {
+	m.slo_id = nil
+	m.addslo_id = nil
+	m.clearedFields[obsalertevent.FieldSloID] = struct{}{}
+}
+
+// SloIDCleared returns if the "slo_id" field was cleared in this mutation.
+func (m *ObsAlertEventMutation) SloIDCleared() bool {
+	_, ok := m.clearedFields[obsalertevent.FieldSloID]
+	return ok
+}
+
+// ResetSloID resets all changes to the "slo_id" field.
+func (m *ObsAlertEventMutation) ResetSloID() {
+	m.slo_id = nil
+	m.addslo_id = nil
+	delete(m.clearedFields, obsalertevent.FieldSloID)
+}
+
+// SetRuleID sets the "rule_id" field.
+func (m *ObsAlertEventMutation) SetRuleID(s string) {
+	m.rule_id = &s
+}
+
+// RuleID returns the value of the "rule_id" field in the mutation.
+func (m *ObsAlertEventMutation) RuleID() (r string, exists bool) {
+	v := m.rule_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRuleID returns the old "rule_id" field's value of the ObsAlertEvent entity.
+// If the ObsAlertEvent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsAlertEventMutation) OldRuleID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRuleID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRuleID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRuleID: %w", err)
+	}
+	return oldValue.RuleID, nil
+}
+
+// ResetRuleID resets all changes to the "rule_id" field.
+func (m *ObsAlertEventMutation) ResetRuleID() {
+	m.rule_id = nil
+}
+
+// SetSeverity sets the "severity" field.
+func (m *ObsAlertEventMutation) SetSeverity(s string) {
+	m.severity = &s
+}
+
+// Severity returns the value of the "severity" field in the mutation.
+func (m *ObsAlertEventMutation) Severity() (r string, exists bool) {
+	v := m.severity
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSeverity returns the old "severity" field's value of the ObsAlertEvent entity.
+// If the ObsAlertEvent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsAlertEventMutation) OldSeverity(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSeverity is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSeverity requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSeverity: %w", err)
+	}
+	return oldValue.Severity, nil
+}
+
+// ResetSeverity resets all changes to the "severity" field.
+func (m *ObsAlertEventMutation) ResetSeverity() {
+	m.severity = nil
+}
+
+// SetStatus sets the "status" field.
+func (m *ObsAlertEventMutation) SetStatus(s string) {
+	m.status = &s
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *ObsAlertEventMutation) Status() (r string, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the ObsAlertEvent entity.
+// If the ObsAlertEvent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsAlertEventMutation) OldStatus(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *ObsAlertEventMutation) ResetStatus() {
+	m.status = nil
+}
+
+// SetFingerprint sets the "fingerprint" field.
+func (m *ObsAlertEventMutation) SetFingerprint(s string) {
+	m.fingerprint = &s
+}
+
+// Fingerprint returns the value of the "fingerprint" field in the mutation.
+func (m *ObsAlertEventMutation) Fingerprint() (r string, exists bool) {
+	v := m.fingerprint
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFingerprint returns the old "fingerprint" field's value of the ObsAlertEvent entity.
+// If the ObsAlertEvent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsAlertEventMutation) OldFingerprint(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFingerprint is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFingerprint requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFingerprint: %w", err)
+	}
+	return oldValue.Fingerprint, nil
+}
+
+// ResetFingerprint resets all changes to the "fingerprint" field.
+func (m *ObsAlertEventMutation) ResetFingerprint() {
+	m.fingerprint = nil
+}
+
+// SetSummary sets the "summary" field.
+func (m *ObsAlertEventMutation) SetSummary(s string) {
+	m.summary = &s
+}
+
+// Summary returns the value of the "summary" field in the mutation.
+func (m *ObsAlertEventMutation) Summary() (r string, exists bool) {
+	v := m.summary
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSummary returns the old "summary" field's value of the ObsAlertEvent entity.
+// If the ObsAlertEvent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsAlertEventMutation) OldSummary(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSummary is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSummary requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSummary: %w", err)
+	}
+	return oldValue.Summary, nil
+}
+
+// ResetSummary resets all changes to the "summary" field.
+func (m *ObsAlertEventMutation) ResetSummary() {
+	m.summary = nil
+}
+
+// SetDetailsJSON sets the "details_json" field.
+func (m *ObsAlertEventMutation) SetDetailsJSON(value map[string]interface{}) {
+	m.details_json = &value
+}
+
+// DetailsJSON returns the value of the "details_json" field in the mutation.
+func (m *ObsAlertEventMutation) DetailsJSON() (r map[string]interface{}, exists bool) {
+	v := m.details_json
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDetailsJSON returns the old "details_json" field's value of the ObsAlertEvent entity.
+// If the ObsAlertEvent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsAlertEventMutation) OldDetailsJSON(ctx context.Context) (v map[string]interface{}, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDetailsJSON is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDetailsJSON requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDetailsJSON: %w", err)
+	}
+	return oldValue.DetailsJSON, nil
+}
+
+// ClearDetailsJSON clears the value of the "details_json" field.
+func (m *ObsAlertEventMutation) ClearDetailsJSON() {
+	m.details_json = nil
+	m.clearedFields[obsalertevent.FieldDetailsJSON] = struct{}{}
+}
+
+// DetailsJSONCleared returns if the "details_json" field was cleared in this mutation.
+func (m *ObsAlertEventMutation) DetailsJSONCleared() bool {
+	_, ok := m.clearedFields[obsalertevent.FieldDetailsJSON]
+	return ok
+}
+
+// ResetDetailsJSON resets all changes to the "details_json" field.
+func (m *ObsAlertEventMutation) ResetDetailsJSON() {
+	m.details_json = nil
+	delete(m.clearedFields, obsalertevent.FieldDetailsJSON)
+}
+
+// SetStartedAt sets the "started_at" field.
+func (m *ObsAlertEventMutation) SetStartedAt(t time.Time) {
+	m.started_at = &t
+}
+
+// StartedAt returns the value of the "started_at" field in the mutation.
+func (m *ObsAlertEventMutation) StartedAt() (r time.Time, exists bool) {
+	v := m.started_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStartedAt returns the old "started_at" field's value of the ObsAlertEvent entity.
+// If the ObsAlertEvent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsAlertEventMutation) OldStartedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStartedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStartedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStartedAt: %w", err)
+	}
+	return oldValue.StartedAt, nil
+}
+
+// ResetStartedAt resets all changes to the "started_at" field.
+func (m *ObsAlertEventMutation) ResetStartedAt() {
+	m.started_at = nil
+}
+
+// SetResolvedAt sets the "resolved_at" field.
+func (m *ObsAlertEventMutation) SetResolvedAt(t time.Time) {
+	m.resolved_at = &t
+}
+
+// ResolvedAt returns the value of the "resolved_at" field in the mutation.
+func (m *ObsAlertEventMutation) ResolvedAt() (r time.Time, exists bool) {
+	v := m.resolved_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldResolvedAt returns the old "resolved_at" field's value of the ObsAlertEvent entity.
+// If the ObsAlertEvent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsAlertEventMutation) OldResolvedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldResolvedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldResolvedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldResolvedAt: %w", err)
+	}
+	return oldValue.ResolvedAt, nil
+}
+
+// ClearResolvedAt clears the value of the "resolved_at" field.
+func (m *ObsAlertEventMutation) ClearResolvedAt() {
+	m.resolved_at = nil
+	m.clearedFields[obsalertevent.FieldResolvedAt] = struct{}{}
+}
+
+// ResolvedAtCleared returns if the "resolved_at" field was cleared in this mutation.
+func (m *ObsAlertEventMutation) ResolvedAtCleared() bool {
+	_, ok := m.clearedFields[obsalertevent.FieldResolvedAt]
+	return ok
+}
+
+// ResetResolvedAt resets all changes to the "resolved_at" field.
+func (m *ObsAlertEventMutation) ResetResolvedAt() {
+	m.resolved_at = nil
+	delete(m.clearedFields, obsalertevent.FieldResolvedAt)
+}
+
+// SetAcknowledgedAt sets the "acknowledged_at" field.
+func (m *ObsAlertEventMutation) SetAcknowledgedAt(t time.Time) {
+	m.acknowledged_at = &t
+}
+
+// AcknowledgedAt returns the value of the "acknowledged_at" field in the mutation.
+func (m *ObsAlertEventMutation) AcknowledgedAt() (r time.Time, exists bool) {
+	v := m.acknowledged_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAcknowledgedAt returns the old "acknowledged_at" field's value of the ObsAlertEvent entity.
+// If the ObsAlertEvent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsAlertEventMutation) OldAcknowledgedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAcknowledgedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAcknowledgedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAcknowledgedAt: %w", err)
+	}
+	return oldValue.AcknowledgedAt, nil
+}
+
+// ClearAcknowledgedAt clears the value of the "acknowledged_at" field.
+func (m *ObsAlertEventMutation) ClearAcknowledgedAt() {
+	m.acknowledged_at = nil
+	m.clearedFields[obsalertevent.FieldAcknowledgedAt] = struct{}{}
+}
+
+// AcknowledgedAtCleared returns if the "acknowledged_at" field was cleared in this mutation.
+func (m *ObsAlertEventMutation) AcknowledgedAtCleared() bool {
+	_, ok := m.clearedFields[obsalertevent.FieldAcknowledgedAt]
+	return ok
+}
+
+// ResetAcknowledgedAt resets all changes to the "acknowledged_at" field.
+func (m *ObsAlertEventMutation) ResetAcknowledgedAt() {
+	m.acknowledged_at = nil
+	delete(m.clearedFields, obsalertevent.FieldAcknowledgedAt)
+}
+
+// SetAcknowledgedBy sets the "acknowledged_by" field.
+func (m *ObsAlertEventMutation) SetAcknowledgedBy(i int) {
+	m.acknowledged_by = &i
+	m.addacknowledged_by = nil
+}
+
+// AcknowledgedBy returns the value of the "acknowledged_by" field in the mutation.
+func (m *ObsAlertEventMutation) AcknowledgedBy() (r int, exists bool) {
+	v := m.acknowledged_by
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAcknowledgedBy returns the old "acknowledged_by" field's value of the ObsAlertEvent entity.
+// If the ObsAlertEvent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsAlertEventMutation) OldAcknowledgedBy(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAcknowledgedBy is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAcknowledgedBy requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAcknowledgedBy: %w", err)
+	}
+	return oldValue.AcknowledgedBy, nil
+}
+
+// AddAcknowledgedBy adds i to the "acknowledged_by" field.
+func (m *ObsAlertEventMutation) AddAcknowledgedBy(i int) {
+	if m.addacknowledged_by != nil {
+		*m.addacknowledged_by += i
+	} else {
+		m.addacknowledged_by = &i
+	}
+}
+
+// AddedAcknowledgedBy returns the value that was added to the "acknowledged_by" field in this mutation.
+func (m *ObsAlertEventMutation) AddedAcknowledgedBy() (r int, exists bool) {
+	v := m.addacknowledged_by
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearAcknowledgedBy clears the value of the "acknowledged_by" field.
+func (m *ObsAlertEventMutation) ClearAcknowledgedBy() {
+	m.acknowledged_by = nil
+	m.addacknowledged_by = nil
+	m.clearedFields[obsalertevent.FieldAcknowledgedBy] = struct{}{}
+}
+
+// AcknowledgedByCleared returns if the "acknowledged_by" field was cleared in this mutation.
+func (m *ObsAlertEventMutation) AcknowledgedByCleared() bool {
+	_, ok := m.clearedFields[obsalertevent.FieldAcknowledgedBy]
+	return ok
+}
+
+// ResetAcknowledgedBy resets all changes to the "acknowledged_by" field.
+func (m *ObsAlertEventMutation) ResetAcknowledgedBy() {
+	m.acknowledged_by = nil
+	m.addacknowledged_by = nil
+	delete(m.clearedFields, obsalertevent.FieldAcknowledgedBy)
+}
+
+// SetSuppressedBy sets the "suppressed_by" field.
+func (m *ObsAlertEventMutation) SetSuppressedBy(s string) {
+	m.suppressed_by = &s
+}
+
+// SuppressedBy returns the value of the "suppressed_by" field in the mutation.
+func (m *ObsAlertEventMutation) SuppressedBy() (r string, exists bool) {
+	v := m.suppressed_by
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSuppressedBy returns the old "suppressed_by" field's value of the ObsAlertEvent entity.
+// If the ObsAlertEvent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsAlertEventMutation) OldSuppressedBy(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSuppressedBy is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSuppressedBy requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSuppressedBy: %w", err)
+	}
+	return oldValue.SuppressedBy, nil
+}
+
+// ClearSuppressedBy clears the value of the "suppressed_by" field.
+func (m *ObsAlertEventMutation) ClearSuppressedBy() {
+	m.suppressed_by = nil
+	m.clearedFields[obsalertevent.FieldSuppressedBy] = struct{}{}
+}
+
+// SuppressedByCleared returns if the "suppressed_by" field was cleared in this mutation.
+func (m *ObsAlertEventMutation) SuppressedByCleared() bool {
+	_, ok := m.clearedFields[obsalertevent.FieldSuppressedBy]
+	return ok
+}
+
+// ResetSuppressedBy resets all changes to the "suppressed_by" field.
+func (m *ObsAlertEventMutation) ResetSuppressedBy() {
+	m.suppressed_by = nil
+	delete(m.clearedFields, obsalertevent.FieldSuppressedBy)
+}
+
+// Where appends a list predicates to the ObsAlertEventMutation builder.
+func (m *ObsAlertEventMutation) Where(ps ...predicate.ObsAlertEvent) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the ObsAlertEventMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *ObsAlertEventMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.ObsAlertEvent, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *ObsAlertEventMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *ObsAlertEventMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (ObsAlertEvent).
+func (m *ObsAlertEventMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *ObsAlertEventMutation) Fields() []string {
+	fields := make([]string, 0, 14)
+	if m.created_at != nil {
+		fields = append(fields, obsalertevent.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, obsalertevent.FieldUpdatedAt)
+	}
+	if m.slo_id != nil {
+		fields = append(fields, obsalertevent.FieldSloID)
+	}
+	if m.rule_id != nil {
+		fields = append(fields, obsalertevent.FieldRuleID)
+	}
+	if m.severity != nil {
+		fields = append(fields, obsalertevent.FieldSeverity)
+	}
+	if m.status != nil {
+		fields = append(fields, obsalertevent.FieldStatus)
+	}
+	if m.fingerprint != nil {
+		fields = append(fields, obsalertevent.FieldFingerprint)
+	}
+	if m.summary != nil {
+		fields = append(fields, obsalertevent.FieldSummary)
+	}
+	if m.details_json != nil {
+		fields = append(fields, obsalertevent.FieldDetailsJSON)
+	}
+	if m.started_at != nil {
+		fields = append(fields, obsalertevent.FieldStartedAt)
+	}
+	if m.resolved_at != nil {
+		fields = append(fields, obsalertevent.FieldResolvedAt)
+	}
+	if m.acknowledged_at != nil {
+		fields = append(fields, obsalertevent.FieldAcknowledgedAt)
+	}
+	if m.acknowledged_by != nil {
+		fields = append(fields, obsalertevent.FieldAcknowledgedBy)
+	}
+	if m.suppressed_by != nil {
+		fields = append(fields, obsalertevent.FieldSuppressedBy)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *ObsAlertEventMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case obsalertevent.FieldCreatedAt:
+		return m.CreatedAt()
+	case obsalertevent.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case obsalertevent.FieldSloID:
+		return m.SloID()
+	case obsalertevent.FieldRuleID:
+		return m.RuleID()
+	case obsalertevent.FieldSeverity:
+		return m.Severity()
+	case obsalertevent.FieldStatus:
+		return m.Status()
+	case obsalertevent.FieldFingerprint:
+		return m.Fingerprint()
+	case obsalertevent.FieldSummary:
+		return m.Summary()
+	case obsalertevent.FieldDetailsJSON:
+		return m.DetailsJSON()
+	case obsalertevent.FieldStartedAt:
+		return m.StartedAt()
+	case obsalertevent.FieldResolvedAt:
+		return m.ResolvedAt()
+	case obsalertevent.FieldAcknowledgedAt:
+		return m.AcknowledgedAt()
+	case obsalertevent.FieldAcknowledgedBy:
+		return m.AcknowledgedBy()
+	case obsalertevent.FieldSuppressedBy:
+		return m.SuppressedBy()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *ObsAlertEventMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case obsalertevent.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case obsalertevent.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case obsalertevent.FieldSloID:
+		return m.OldSloID(ctx)
+	case obsalertevent.FieldRuleID:
+		return m.OldRuleID(ctx)
+	case obsalertevent.FieldSeverity:
+		return m.OldSeverity(ctx)
+	case obsalertevent.FieldStatus:
+		return m.OldStatus(ctx)
+	case obsalertevent.FieldFingerprint:
+		return m.OldFingerprint(ctx)
+	case obsalertevent.FieldSummary:
+		return m.OldSummary(ctx)
+	case obsalertevent.FieldDetailsJSON:
+		return m.OldDetailsJSON(ctx)
+	case obsalertevent.FieldStartedAt:
+		return m.OldStartedAt(ctx)
+	case obsalertevent.FieldResolvedAt:
+		return m.OldResolvedAt(ctx)
+	case obsalertevent.FieldAcknowledgedAt:
+		return m.OldAcknowledgedAt(ctx)
+	case obsalertevent.FieldAcknowledgedBy:
+		return m.OldAcknowledgedBy(ctx)
+	case obsalertevent.FieldSuppressedBy:
+		return m.OldSuppressedBy(ctx)
+	}
+	return nil, fmt.Errorf("unknown ObsAlertEvent field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ObsAlertEventMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case obsalertevent.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case obsalertevent.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case obsalertevent.FieldSloID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSloID(v)
+		return nil
+	case obsalertevent.FieldRuleID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRuleID(v)
+		return nil
+	case obsalertevent.FieldSeverity:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSeverity(v)
+		return nil
+	case obsalertevent.FieldStatus:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case obsalertevent.FieldFingerprint:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFingerprint(v)
+		return nil
+	case obsalertevent.FieldSummary:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSummary(v)
+		return nil
+	case obsalertevent.FieldDetailsJSON:
+		v, ok := value.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDetailsJSON(v)
+		return nil
+	case obsalertevent.FieldStartedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStartedAt(v)
+		return nil
+	case obsalertevent.FieldResolvedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetResolvedAt(v)
+		return nil
+	case obsalertevent.FieldAcknowledgedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAcknowledgedAt(v)
+		return nil
+	case obsalertevent.FieldAcknowledgedBy:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAcknowledgedBy(v)
+		return nil
+	case obsalertevent.FieldSuppressedBy:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSuppressedBy(v)
+		return nil
+	}
+	return fmt.Errorf("unknown ObsAlertEvent field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *ObsAlertEventMutation) AddedFields() []string {
+	var fields []string
+	if m.addslo_id != nil {
+		fields = append(fields, obsalertevent.FieldSloID)
+	}
+	if m.addacknowledged_by != nil {
+		fields = append(fields, obsalertevent.FieldAcknowledgedBy)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *ObsAlertEventMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case obsalertevent.FieldSloID:
+		return m.AddedSloID()
+	case obsalertevent.FieldAcknowledgedBy:
+		return m.AddedAcknowledgedBy()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ObsAlertEventMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case obsalertevent.FieldSloID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddSloID(v)
+		return nil
+	case obsalertevent.FieldAcknowledgedBy:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddAcknowledgedBy(v)
+		return nil
+	}
+	return fmt.Errorf("unknown ObsAlertEvent numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *ObsAlertEventMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(obsalertevent.FieldSloID) {
+		fields = append(fields, obsalertevent.FieldSloID)
+	}
+	if m.FieldCleared(obsalertevent.FieldDetailsJSON) {
+		fields = append(fields, obsalertevent.FieldDetailsJSON)
+	}
+	if m.FieldCleared(obsalertevent.FieldResolvedAt) {
+		fields = append(fields, obsalertevent.FieldResolvedAt)
+	}
+	if m.FieldCleared(obsalertevent.FieldAcknowledgedAt) {
+		fields = append(fields, obsalertevent.FieldAcknowledgedAt)
+	}
+	if m.FieldCleared(obsalertevent.FieldAcknowledgedBy) {
+		fields = append(fields, obsalertevent.FieldAcknowledgedBy)
+	}
+	if m.FieldCleared(obsalertevent.FieldSuppressedBy) {
+		fields = append(fields, obsalertevent.FieldSuppressedBy)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *ObsAlertEventMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *ObsAlertEventMutation) ClearField(name string) error {
+	switch name {
+	case obsalertevent.FieldSloID:
+		m.ClearSloID()
+		return nil
+	case obsalertevent.FieldDetailsJSON:
+		m.ClearDetailsJSON()
+		return nil
+	case obsalertevent.FieldResolvedAt:
+		m.ClearResolvedAt()
+		return nil
+	case obsalertevent.FieldAcknowledgedAt:
+		m.ClearAcknowledgedAt()
+		return nil
+	case obsalertevent.FieldAcknowledgedBy:
+		m.ClearAcknowledgedBy()
+		return nil
+	case obsalertevent.FieldSuppressedBy:
+		m.ClearSuppressedBy()
+		return nil
+	}
+	return fmt.Errorf("unknown ObsAlertEvent nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *ObsAlertEventMutation) ResetField(name string) error {
+	switch name {
+	case obsalertevent.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case obsalertevent.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case obsalertevent.FieldSloID:
+		m.ResetSloID()
+		return nil
+	case obsalertevent.FieldRuleID:
+		m.ResetRuleID()
+		return nil
+	case obsalertevent.FieldSeverity:
+		m.ResetSeverity()
+		return nil
+	case obsalertevent.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case obsalertevent.FieldFingerprint:
+		m.ResetFingerprint()
+		return nil
+	case obsalertevent.FieldSummary:
+		m.ResetSummary()
+		return nil
+	case obsalertevent.FieldDetailsJSON:
+		m.ResetDetailsJSON()
+		return nil
+	case obsalertevent.FieldStartedAt:
+		m.ResetStartedAt()
+		return nil
+	case obsalertevent.FieldResolvedAt:
+		m.ResetResolvedAt()
+		return nil
+	case obsalertevent.FieldAcknowledgedAt:
+		m.ResetAcknowledgedAt()
+		return nil
+	case obsalertevent.FieldAcknowledgedBy:
+		m.ResetAcknowledgedBy()
+		return nil
+	case obsalertevent.FieldSuppressedBy:
+		m.ResetSuppressedBy()
+		return nil
+	}
+	return fmt.Errorf("unknown ObsAlertEvent field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *ObsAlertEventMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *ObsAlertEventMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *ObsAlertEventMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *ObsAlertEventMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *ObsAlertEventMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *ObsAlertEventMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *ObsAlertEventMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown ObsAlertEvent unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *ObsAlertEventMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown ObsAlertEvent edge %s", name)
+}
+
+// ObsSLODefinitionMutation represents an operation that mutates the ObsSLODefinition nodes in the graph.
+type ObsSLODefinitionMutation struct {
+	config
+	op                Op
+	typ               string
+	id                *int
+	created_at        *time.Time
+	updated_at        *time.Time
+	name              *string
+	sli_type          *string
+	objective         *float64
+	addobjective      *float64
+	window_days       *int
+	addwindow_days    *int
+	status            *string
+	filter_json       *map[string]interface{}
+	alert_policy_json *map[string]interface{}
+	clearedFields     map[string]struct{}
+	done              bool
+	oldValue          func(context.Context) (*ObsSLODefinition, error)
+	predicates        []predicate.ObsSLODefinition
+}
+
+var _ ent.Mutation = (*ObsSLODefinitionMutation)(nil)
+
+// obsslodefinitionOption allows management of the mutation configuration using functional options.
+type obsslodefinitionOption func(*ObsSLODefinitionMutation)
+
+// newObsSLODefinitionMutation creates new mutation for the ObsSLODefinition entity.
+func newObsSLODefinitionMutation(c config, op Op, opts ...obsslodefinitionOption) *ObsSLODefinitionMutation {
+	m := &ObsSLODefinitionMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeObsSLODefinition,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withObsSLODefinitionID sets the ID field of the mutation.
+func withObsSLODefinitionID(id int) obsslodefinitionOption {
+	return func(m *ObsSLODefinitionMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *ObsSLODefinition
+		)
+		m.oldValue = func(ctx context.Context) (*ObsSLODefinition, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().ObsSLODefinition.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withObsSLODefinition sets the old ObsSLODefinition of the mutation.
+func withObsSLODefinition(node *ObsSLODefinition) obsslodefinitionOption {
+	return func(m *ObsSLODefinitionMutation) {
+		m.oldValue = func(context.Context) (*ObsSLODefinition, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m ObsSLODefinitionMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m ObsSLODefinitionMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *ObsSLODefinitionMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *ObsSLODefinitionMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().ObsSLODefinition.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *ObsSLODefinitionMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *ObsSLODefinitionMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the ObsSLODefinition entity.
+// If the ObsSLODefinition object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsSLODefinitionMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *ObsSLODefinitionMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *ObsSLODefinitionMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *ObsSLODefinitionMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the ObsSLODefinition entity.
+// If the ObsSLODefinition object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsSLODefinitionMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *ObsSLODefinitionMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetName sets the "name" field.
+func (m *ObsSLODefinitionMutation) SetName(s string) {
+	m.name = &s
+}
+
+// Name returns the value of the "name" field in the mutation.
+func (m *ObsSLODefinitionMutation) Name() (r string, exists bool) {
+	v := m.name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldName returns the old "name" field's value of the ObsSLODefinition entity.
+// If the ObsSLODefinition object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsSLODefinitionMutation) OldName(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldName: %w", err)
+	}
+	return oldValue.Name, nil
+}
+
+// ResetName resets all changes to the "name" field.
+func (m *ObsSLODefinitionMutation) ResetName() {
+	m.name = nil
+}
+
+// SetSliType sets the "sli_type" field.
+func (m *ObsSLODefinitionMutation) SetSliType(s string) {
+	m.sli_type = &s
+}
+
+// SliType returns the value of the "sli_type" field in the mutation.
+func (m *ObsSLODefinitionMutation) SliType() (r string, exists bool) {
+	v := m.sli_type
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSliType returns the old "sli_type" field's value of the ObsSLODefinition entity.
+// If the ObsSLODefinition object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsSLODefinitionMutation) OldSliType(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSliType is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSliType requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSliType: %w", err)
+	}
+	return oldValue.SliType, nil
+}
+
+// ResetSliType resets all changes to the "sli_type" field.
+func (m *ObsSLODefinitionMutation) ResetSliType() {
+	m.sli_type = nil
+}
+
+// SetObjective sets the "objective" field.
+func (m *ObsSLODefinitionMutation) SetObjective(f float64) {
+	m.objective = &f
+	m.addobjective = nil
+}
+
+// Objective returns the value of the "objective" field in the mutation.
+func (m *ObsSLODefinitionMutation) Objective() (r float64, exists bool) {
+	v := m.objective
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldObjective returns the old "objective" field's value of the ObsSLODefinition entity.
+// If the ObsSLODefinition object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsSLODefinitionMutation) OldObjective(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldObjective is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldObjective requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldObjective: %w", err)
+	}
+	return oldValue.Objective, nil
+}
+
+// AddObjective adds f to the "objective" field.
+func (m *ObsSLODefinitionMutation) AddObjective(f float64) {
+	if m.addobjective != nil {
+		*m.addobjective += f
+	} else {
+		m.addobjective = &f
+	}
+}
+
+// AddedObjective returns the value that was added to the "objective" field in this mutation.
+func (m *ObsSLODefinitionMutation) AddedObjective() (r float64, exists bool) {
+	v := m.addobjective
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetObjective resets all changes to the "objective" field.
+func (m *ObsSLODefinitionMutation) ResetObjective() {
+	m.objective = nil
+	m.addobjective = nil
+}
+
+// SetWindowDays sets the "window_days" field.
+func (m *ObsSLODefinitionMutation) SetWindowDays(i int) {
+	m.window_days = &i
+	m.addwindow_days = nil
+}
+
+// WindowDays returns the value of the "window_days" field in the mutation.
+func (m *ObsSLODefinitionMutation) WindowDays() (r int, exists bool) {
+	v := m.window_days
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldWindowDays returns the old "window_days" field's value of the ObsSLODefinition entity.
+// If the ObsSLODefinition object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsSLODefinitionMutation) OldWindowDays(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldWindowDays is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldWindowDays requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldWindowDays: %w", err)
+	}
+	return oldValue.WindowDays, nil
+}
+
+// AddWindowDays adds i to the "window_days" field.
+func (m *ObsSLODefinitionMutation) AddWindowDays(i int) {
+	if m.addwindow_days != nil {
+		*m.addwindow_days += i
+	} else {
+		m.addwindow_days = &i
+	}
+}
+
+// AddedWindowDays returns the value that was added to the "window_days" field in this mutation.
+func (m *ObsSLODefinitionMutation) AddedWindowDays() (r int, exists bool) {
+	v := m.addwindow_days
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetWindowDays resets all changes to the "window_days" field.
+func (m *ObsSLODefinitionMutation) ResetWindowDays() {
+	m.window_days = nil
+	m.addwindow_days = nil
+}
+
+// SetStatus sets the "status" field.
+func (m *ObsSLODefinitionMutation) SetStatus(s string) {
+	m.status = &s
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *ObsSLODefinitionMutation) Status() (r string, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the ObsSLODefinition entity.
+// If the ObsSLODefinition object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsSLODefinitionMutation) OldStatus(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *ObsSLODefinitionMutation) ResetStatus() {
+	m.status = nil
+}
+
+// SetFilterJSON sets the "filter_json" field.
+func (m *ObsSLODefinitionMutation) SetFilterJSON(value map[string]interface{}) {
+	m.filter_json = &value
+}
+
+// FilterJSON returns the value of the "filter_json" field in the mutation.
+func (m *ObsSLODefinitionMutation) FilterJSON() (r map[string]interface{}, exists bool) {
+	v := m.filter_json
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFilterJSON returns the old "filter_json" field's value of the ObsSLODefinition entity.
+// If the ObsSLODefinition object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsSLODefinitionMutation) OldFilterJSON(ctx context.Context) (v map[string]interface{}, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFilterJSON is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFilterJSON requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFilterJSON: %w", err)
+	}
+	return oldValue.FilterJSON, nil
+}
+
+// ClearFilterJSON clears the value of the "filter_json" field.
+func (m *ObsSLODefinitionMutation) ClearFilterJSON() {
+	m.filter_json = nil
+	m.clearedFields[obsslodefinition.FieldFilterJSON] = struct{}{}
+}
+
+// FilterJSONCleared returns if the "filter_json" field was cleared in this mutation.
+func (m *ObsSLODefinitionMutation) FilterJSONCleared() bool {
+	_, ok := m.clearedFields[obsslodefinition.FieldFilterJSON]
+	return ok
+}
+
+// ResetFilterJSON resets all changes to the "filter_json" field.
+func (m *ObsSLODefinitionMutation) ResetFilterJSON() {
+	m.filter_json = nil
+	delete(m.clearedFields, obsslodefinition.FieldFilterJSON)
+}
+
+// SetAlertPolicyJSON sets the "alert_policy_json" field.
+func (m *ObsSLODefinitionMutation) SetAlertPolicyJSON(value map[string]interface{}) {
+	m.alert_policy_json = &value
+}
+
+// AlertPolicyJSON returns the value of the "alert_policy_json" field in the mutation.
+func (m *ObsSLODefinitionMutation) AlertPolicyJSON() (r map[string]interface{}, exists bool) {
+	v := m.alert_policy_json
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAlertPolicyJSON returns the old "alert_policy_json" field's value of the ObsSLODefinition entity.
+// If the ObsSLODefinition object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ObsSLODefinitionMutation) OldAlertPolicyJSON(ctx context.Context) (v map[string]interface{}, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAlertPolicyJSON is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAlertPolicyJSON requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAlertPolicyJSON: %w", err)
+	}
+	return oldValue.AlertPolicyJSON, nil
+}
+
+// ClearAlertPolicyJSON clears the value of the "alert_policy_json" field.
+func (m *ObsSLODefinitionMutation) ClearAlertPolicyJSON() {
+	m.alert_policy_json = nil
+	m.clearedFields[obsslodefinition.FieldAlertPolicyJSON] = struct{}{}
+}
+
+// AlertPolicyJSONCleared returns if the "alert_policy_json" field was cleared in this mutation.
+func (m *ObsSLODefinitionMutation) AlertPolicyJSONCleared() bool {
+	_, ok := m.clearedFields[obsslodefinition.FieldAlertPolicyJSON]
+	return ok
+}
+
+// ResetAlertPolicyJSON resets all changes to the "alert_policy_json" field.
+func (m *ObsSLODefinitionMutation) ResetAlertPolicyJSON() {
+	m.alert_policy_json = nil
+	delete(m.clearedFields, obsslodefinition.FieldAlertPolicyJSON)
+}
+
+// Where appends a list predicates to the ObsSLODefinitionMutation builder.
+func (m *ObsSLODefinitionMutation) Where(ps ...predicate.ObsSLODefinition) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the ObsSLODefinitionMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *ObsSLODefinitionMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.ObsSLODefinition, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *ObsSLODefinitionMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *ObsSLODefinitionMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (ObsSLODefinition).
+func (m *ObsSLODefinitionMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *ObsSLODefinitionMutation) Fields() []string {
+	fields := make([]string, 0, 9)
+	if m.created_at != nil {
+		fields = append(fields, obsslodefinition.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, obsslodefinition.FieldUpdatedAt)
+	}
+	if m.name != nil {
+		fields = append(fields, obsslodefinition.FieldName)
+	}
+	if m.sli_type != nil {
+		fields = append(fields, obsslodefinition.FieldSliType)
+	}
+	if m.objective != nil {
+		fields = append(fields, obsslodefinition.FieldObjective)
+	}
+	if m.window_days != nil {
+		fields = append(fields, obsslodefinition.FieldWindowDays)
+	}
+	if m.status != nil {
+		fields = append(fields, obsslodefinition.FieldStatus)
+	}
+	if m.filter_json != nil {
+		fields = append(fields, obsslodefinition.FieldFilterJSON)
+	}
+	if m.alert_policy_json != nil {
+		fields = append(fields, obsslodefinition.FieldAlertPolicyJSON)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *ObsSLODefinitionMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case obsslodefinition.FieldCreatedAt:
+		return m.CreatedAt()
+	case obsslodefinition.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case obsslodefinition.FieldName:
+		return m.Name()
+	case obsslodefinition.FieldSliType:
+		return m.SliType()
+	case obsslodefinition.FieldObjective:
+		return m.Objective()
+	case obsslodefinition.FieldWindowDays:
+		return m.WindowDays()
+	case obsslodefinition.FieldStatus:
+		return m.Status()
+	case obsslodefinition.FieldFilterJSON:
+		return m.FilterJSON()
+	case obsslodefinition.FieldAlertPolicyJSON:
+		return m.AlertPolicyJSON()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *ObsSLODefinitionMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case obsslodefinition.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case obsslodefinition.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case obsslodefinition.FieldName:
+		return m.OldName(ctx)
+	case obsslodefinition.FieldSliType:
+		return m.OldSliType(ctx)
+	case obsslodefinition.FieldObjective:
+		return m.OldObjective(ctx)
+	case obsslodefinition.FieldWindowDays:
+		return m.OldWindowDays(ctx)
+	case obsslodefinition.FieldStatus:
+		return m.OldStatus(ctx)
+	case obsslodefinition.FieldFilterJSON:
+		return m.OldFilterJSON(ctx)
+	case obsslodefinition.FieldAlertPolicyJSON:
+		return m.OldAlertPolicyJSON(ctx)
+	}
+	return nil, fmt.Errorf("unknown ObsSLODefinition field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ObsSLODefinitionMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case obsslodefinition.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case obsslodefinition.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case obsslodefinition.FieldName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetName(v)
+		return nil
+	case obsslodefinition.FieldSliType:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSliType(v)
+		return nil
+	case obsslodefinition.FieldObjective:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetObjective(v)
+		return nil
+	case obsslodefinition.FieldWindowDays:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetWindowDays(v)
+		return nil
+	case obsslodefinition.FieldStatus:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case obsslodefinition.FieldFilterJSON:
+		v, ok := value.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFilterJSON(v)
+		return nil
+	case obsslodefinition.FieldAlertPolicyJSON:
+		v, ok := value.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAlertPolicyJSON(v)
+		return nil
+	}
+	return fmt.Errorf("unknown ObsSLODefinition field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *ObsSLODefinitionMutation) AddedFields() []string {
+	var fields []string
+	if m.addobjective != nil {
+		fields = append(fields, obsslodefinition.FieldObjective)
+	}
+	if m.addwindow_days != nil {
+		fields = append(fields, obsslodefinition.FieldWindowDays)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *ObsSLODefinitionMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case obsslodefinition.FieldObjective:
+		return m.AddedObjective()
+	case obsslodefinition.FieldWindowDays:
+		return m.AddedWindowDays()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ObsSLODefinitionMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case obsslodefinition.FieldObjective:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddObjective(v)
+		return nil
+	case obsslodefinition.FieldWindowDays:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddWindowDays(v)
+		return nil
+	}
+	return fmt.Errorf("unknown ObsSLODefinition numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *ObsSLODefinitionMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(obsslodefinition.FieldFilterJSON) {
+		fields = append(fields, obsslodefinition.FieldFilterJSON)
+	}
+	if m.FieldCleared(obsslodefinition.FieldAlertPolicyJSON) {
+		fields = append(fields, obsslodefinition.FieldAlertPolicyJSON)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *ObsSLODefinitionMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *ObsSLODefinitionMutation) ClearField(name string) error {
+	switch name {
+	case obsslodefinition.FieldFilterJSON:
+		m.ClearFilterJSON()
+		return nil
+	case obsslodefinition.FieldAlertPolicyJSON:
+		m.ClearAlertPolicyJSON()
+		return nil
+	}
+	return fmt.Errorf("unknown ObsSLODefinition nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *ObsSLODefinitionMutation) ResetField(name string) error {
+	switch name {
+	case obsslodefinition.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case obsslodefinition.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case obsslodefinition.FieldName:
+		m.ResetName()
+		return nil
+	case obsslodefinition.FieldSliType:
+		m.ResetSliType()
+		return nil
+	case obsslodefinition.FieldObjective:
+		m.ResetObjective()
+		return nil
+	case obsslodefinition.FieldWindowDays:
+		m.ResetWindowDays()
+		return nil
+	case obsslodefinition.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case obsslodefinition.FieldFilterJSON:
+		m.ResetFilterJSON()
+		return nil
+	case obsslodefinition.FieldAlertPolicyJSON:
+		m.ResetAlertPolicyJSON()
+		return nil
+	}
+	return fmt.Errorf("unknown ObsSLODefinition field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *ObsSLODefinitionMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *ObsSLODefinitionMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *ObsSLODefinitionMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *ObsSLODefinitionMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *ObsSLODefinitionMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *ObsSLODefinitionMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *ObsSLODefinitionMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown ObsSLODefinition unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *ObsSLODefinitionMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown ObsSLODefinition edge %s", name)
 }
 
 // PaymentAuditLogMutation represents an operation that mutates the PaymentAuditLog nodes in the graph.

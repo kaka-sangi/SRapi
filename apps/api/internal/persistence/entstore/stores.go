@@ -46,7 +46,7 @@ type Stores struct {
 	Audit         auditcontract.Store
 	Billing       billingcontract.Store
 	Events        eventscontract.Store
-	Operations    operationscontract.RetentionStore
+	Operations    operationscontract.Store
 	Payments      paymentcontract.Store
 	Scheduler     schedulercontract.Store
 	Subscriptions subscriptioncontract.Store

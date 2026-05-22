@@ -24,6 +24,8 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/modelalias"
 	"github.com/srapi/srapi/apps/api/ent/modelprovidermapping"
 	"github.com/srapi/srapi/apps/api/ent/modelregistry"
+	"github.com/srapi/srapi/apps/api/ent/obsalertevent"
+	"github.com/srapi/srapi/apps/api/ent/obsslodefinition"
 	"github.com/srapi/srapi/apps/api/ent/paymentauditlog"
 	"github.com/srapi/srapi/apps/api/ent/paymentorder"
 	"github.com/srapi/srapi/apps/api/ent/paymentproviderinstance"
@@ -642,6 +644,72 @@ func init() {
 	modelregistryDescStatus := modelregistryFields[6].Descriptor()
 	// modelregistry.DefaultStatus holds the default value on creation for the status field.
 	modelregistry.DefaultStatus = modelregistryDescStatus.Default.(string)
+	obsalerteventMixin := schema.ObsAlertEvent{}.Mixin()
+	obsalerteventMixinFields0 := obsalerteventMixin[0].Fields()
+	_ = obsalerteventMixinFields0
+	obsalerteventFields := schema.ObsAlertEvent{}.Fields()
+	_ = obsalerteventFields
+	// obsalerteventDescCreatedAt is the schema descriptor for created_at field.
+	obsalerteventDescCreatedAt := obsalerteventMixinFields0[0].Descriptor()
+	// obsalertevent.DefaultCreatedAt holds the default value on creation for the created_at field.
+	obsalertevent.DefaultCreatedAt = obsalerteventDescCreatedAt.Default.(func() time.Time)
+	// obsalerteventDescUpdatedAt is the schema descriptor for updated_at field.
+	obsalerteventDescUpdatedAt := obsalerteventMixinFields0[1].Descriptor()
+	// obsalertevent.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	obsalertevent.DefaultUpdatedAt = obsalerteventDescUpdatedAt.Default.(func() time.Time)
+	// obsalertevent.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	obsalertevent.UpdateDefaultUpdatedAt = obsalerteventDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// obsalerteventDescRuleID is the schema descriptor for rule_id field.
+	obsalerteventDescRuleID := obsalerteventFields[1].Descriptor()
+	// obsalertevent.RuleIDValidator is a validator for the "rule_id" field. It is called by the builders before save.
+	obsalertevent.RuleIDValidator = obsalerteventDescRuleID.Validators[0].(func(string) error)
+	// obsalerteventDescSeverity is the schema descriptor for severity field.
+	obsalerteventDescSeverity := obsalerteventFields[2].Descriptor()
+	// obsalertevent.DefaultSeverity holds the default value on creation for the severity field.
+	obsalertevent.DefaultSeverity = obsalerteventDescSeverity.Default.(string)
+	// obsalerteventDescStatus is the schema descriptor for status field.
+	obsalerteventDescStatus := obsalerteventFields[3].Descriptor()
+	// obsalertevent.DefaultStatus holds the default value on creation for the status field.
+	obsalertevent.DefaultStatus = obsalerteventDescStatus.Default.(string)
+	// obsalerteventDescFingerprint is the schema descriptor for fingerprint field.
+	obsalerteventDescFingerprint := obsalerteventFields[4].Descriptor()
+	// obsalertevent.FingerprintValidator is a validator for the "fingerprint" field. It is called by the builders before save.
+	obsalertevent.FingerprintValidator = obsalerteventDescFingerprint.Validators[0].(func(string) error)
+	// obsalerteventDescSummary is the schema descriptor for summary field.
+	obsalerteventDescSummary := obsalerteventFields[5].Descriptor()
+	// obsalertevent.SummaryValidator is a validator for the "summary" field. It is called by the builders before save.
+	obsalertevent.SummaryValidator = obsalerteventDescSummary.Validators[0].(func(string) error)
+	obsslodefinitionMixin := schema.ObsSLODefinition{}.Mixin()
+	obsslodefinitionMixinFields0 := obsslodefinitionMixin[0].Fields()
+	_ = obsslodefinitionMixinFields0
+	obsslodefinitionFields := schema.ObsSLODefinition{}.Fields()
+	_ = obsslodefinitionFields
+	// obsslodefinitionDescCreatedAt is the schema descriptor for created_at field.
+	obsslodefinitionDescCreatedAt := obsslodefinitionMixinFields0[0].Descriptor()
+	// obsslodefinition.DefaultCreatedAt holds the default value on creation for the created_at field.
+	obsslodefinition.DefaultCreatedAt = obsslodefinitionDescCreatedAt.Default.(func() time.Time)
+	// obsslodefinitionDescUpdatedAt is the schema descriptor for updated_at field.
+	obsslodefinitionDescUpdatedAt := obsslodefinitionMixinFields0[1].Descriptor()
+	// obsslodefinition.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	obsslodefinition.DefaultUpdatedAt = obsslodefinitionDescUpdatedAt.Default.(func() time.Time)
+	// obsslodefinition.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	obsslodefinition.UpdateDefaultUpdatedAt = obsslodefinitionDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// obsslodefinitionDescName is the schema descriptor for name field.
+	obsslodefinitionDescName := obsslodefinitionFields[0].Descriptor()
+	// obsslodefinition.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	obsslodefinition.NameValidator = obsslodefinitionDescName.Validators[0].(func(string) error)
+	// obsslodefinitionDescSliType is the schema descriptor for sli_type field.
+	obsslodefinitionDescSliType := obsslodefinitionFields[1].Descriptor()
+	// obsslodefinition.DefaultSliType holds the default value on creation for the sli_type field.
+	obsslodefinition.DefaultSliType = obsslodefinitionDescSliType.Default.(string)
+	// obsslodefinitionDescWindowDays is the schema descriptor for window_days field.
+	obsslodefinitionDescWindowDays := obsslodefinitionFields[3].Descriptor()
+	// obsslodefinition.DefaultWindowDays holds the default value on creation for the window_days field.
+	obsslodefinition.DefaultWindowDays = obsslodefinitionDescWindowDays.Default.(int)
+	// obsslodefinitionDescStatus is the schema descriptor for status field.
+	obsslodefinitionDescStatus := obsslodefinitionFields[4].Descriptor()
+	// obsslodefinition.DefaultStatus holds the default value on creation for the status field.
+	obsslodefinition.DefaultStatus = obsslodefinitionDescStatus.Default.(string)
 	paymentauditlogMixin := schema.PaymentAuditLog{}.Mixin()
 	paymentauditlogMixinFields0 := paymentauditlogMixin[0].Fields()
 	_ = paymentauditlogMixinFields0

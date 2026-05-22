@@ -41,6 +41,9 @@ import (
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
 	modelservice "github.com/srapi/srapi/apps/api/internal/modules/models/service"
 	modelmemory "github.com/srapi/srapi/apps/api/internal/modules/models/store/memory"
+	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
+	operationsservice "github.com/srapi/srapi/apps/api/internal/modules/operations/service"
+	operationsmemory "github.com/srapi/srapi/apps/api/internal/modules/operations/store/memory"
 	paymentcontract "github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
 	paymentservice "github.com/srapi/srapi/apps/api/internal/modules/payments/service"
 	paymentmemory "github.com/srapi/srapi/apps/api/internal/modules/payments/store/memory"
@@ -92,6 +95,7 @@ type runtimeState struct {
 	scheduler         *schedulerservice.Service
 	subscriptions     *subscriptionservice.Service
 	payments          *paymentservice.Service
+	operations        *operationsservice.Service
 	usage             *usageservice.Service
 	userStore         userscontract.Store
 	sessionStore      *authmemory.Store
@@ -99,6 +103,7 @@ type runtimeState struct {
 	auditStore        auditcontract.Store
 	billingStore      billingcontract.Store
 	eventsStore       eventscontract.Store
+	operationsStore   operationscontract.Store
 	providerStore     providercontract.Store
 	modelStore        modelcontract.Store
 	accountStore      accountcontract.Store
@@ -251,6 +256,15 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 		return nil, err
 	}
 
+	operationsStore := opts.operations
+	if operationsStore == nil {
+		operationsStore = operationsmemory.NewWithUsageStore(usageStore)
+	}
+	operationsSvc, err := operationsservice.NewWithStores(operationsStore, operationsStore, nil)
+	if err != nil {
+		return nil, err
+	}
+
 	rt := &runtimeState{
 		cfg:               cfg,
 		logger:            logger,
@@ -269,6 +283,7 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 		scheduler:         schedulerSvc,
 		subscriptions:     subscriptionSvc,
 		payments:          paymentsSvc,
+		operations:        operationsSvc,
 		usage:             usageSvc,
 		userStore:         userStore,
 		sessionStore:      sessionStore,
@@ -276,6 +291,7 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 		auditStore:        auditStore,
 		billingStore:      billingStore,
 		eventsStore:       eventsStore,
+		operationsStore:   operationsStore,
 		providerStore:     providerStore,
 		modelStore:        modelStore,
 		accountStore:      accountStore,
@@ -2541,6 +2557,162 @@ func (s *Server) handleListAdminOutboxEvents(w http.ResponseWriter, r *http.Requ
 		Data:       data,
 		Pagination: pagination(len(data)),
 		RequestId:  requestID,
+	})
+}
+
+func (s *Server) handleListAdminOpsSLOs(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	if _, err := s.requireAdminSession(r); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	items, err := s.runtime.operations.ListSLOs(r.Context())
+	if err != nil {
+		writeOperationsServiceError(w, err, requestID)
+		return
+	}
+	data := make([]apiopenapi.OpsSLO, 0, len(items))
+	for _, item := range items {
+		data = append(data, toAPIOpsSLO(item))
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.OpsSLOListResponse{
+		Data:       data,
+		Pagination: pagination(len(data)),
+		RequestId:  requestID,
+	})
+}
+
+func (s *Server) handleCreateAdminOpsSLO(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	var body apiopenapi.CreateOpsSLORequest
+	if err := s.decodeJSONBody(w, r, &body); err != nil {
+		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid slo request", requestID)
+		return
+	}
+	createReq, err := toCreateSLORequest(body)
+	if err != nil {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid slo request", requestID)
+		return
+	}
+	created, err := s.runtime.operations.CreateSLO(r.Context(), createReq)
+	if err != nil {
+		writeOperationsServiceError(w, err, requestID)
+		return
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "ops_slo.create", "ops_slo", strconv.Itoa(created.ID), nil, opsSLOAuditSnapshot(created)))
+	writeJSONAny(w, http.StatusCreated, apiopenapi.OpsSLODefinitionResponse{
+		Data:      toAPIOpsSLODefinition(created),
+		RequestId: requestID,
+	})
+}
+
+func (s *Server) handleUpdateAdminOpsSLO(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	sloID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || sloID <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid slo id", requestID)
+		return
+	}
+	current, err := s.runtime.operations.ListSLOs(r.Context())
+	var beforeSnapshot map[string]any
+	if err == nil {
+		for _, item := range current {
+			if item.Definition.ID == sloID {
+				beforeSnapshot = opsSLOAuditSnapshot(item.Definition)
+				break
+			}
+		}
+	}
+	var body apiopenapi.UpdateOpsSLORequest
+	if err := s.decodeJSONBody(w, r, &body); err != nil {
+		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid slo request", requestID)
+		return
+	}
+	updateReq, err := toUpdateSLORequest(body)
+	if err != nil {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid slo request", requestID)
+		return
+	}
+	updated, err := s.runtime.operations.UpdateSLO(r.Context(), sloID, updateReq)
+	if err != nil {
+		writeOperationsServiceError(w, err, requestID)
+		return
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "ops_slo.update", "ops_slo", strconv.Itoa(updated.ID), beforeSnapshot, opsSLOAuditSnapshot(updated)))
+	writeJSONAny(w, http.StatusOK, apiopenapi.OpsSLODefinitionResponse{
+		Data:      toAPIOpsSLODefinition(updated),
+		RequestId: requestID,
+	})
+}
+
+func (s *Server) handleListAdminOpsAlerts(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	if _, err := s.requireAdminSession(r); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	items, err := s.runtime.operations.ListAlerts(r.Context())
+	if err != nil {
+		writeOperationsServiceError(w, err, requestID)
+		return
+	}
+	items = filterOpsAlerts(items, r.URL.Query().Get("status"), r.URL.Query().Get("severity"))
+	data := make([]apiopenapi.OpsAlertEvent, 0, len(items))
+	for _, item := range items {
+		data = append(data, toAPIOpsAlert(item))
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.OpsAlertListResponse{
+		Data:       data,
+		Pagination: pagination(len(data)),
+		RequestId:  requestID,
+	})
+}
+
+func (s *Server) handleAcknowledgeAdminOpsAlert(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	alertID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || alertID <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid alert id", requestID)
+		return
+	}
+	acknowledged, err := s.runtime.operations.AcknowledgeAlert(r.Context(), alertID, operationscontract.AckAlertRequest{
+		ActorUserID: session.User.ID,
+	})
+	if err != nil {
+		writeOperationsServiceError(w, err, requestID)
+		return
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "ops_alert.ack", "ops_alert", strconv.Itoa(acknowledged.ID), nil, opsAlertAckAuditSnapshot(acknowledged)))
+	writeJSONAny(w, http.StatusOK, apiopenapi.OpsAlertResponse{
+		Data:      toAPIOpsAlert(acknowledged),
+		RequestId: requestID,
 	})
 }
 
@@ -5274,6 +5446,66 @@ func auditRecordFromRequest(r *http.Request, actorUserID int, action, resourceTy
 	}
 }
 
+func opsSLOAuditSnapshot(slo operationscontract.SLODefinition) map[string]any {
+	return map[string]any{
+		"name":         slo.Name,
+		"sli_type":     slo.SLIType,
+		"objective":    slo.Objective,
+		"window_days":  slo.WindowDays,
+		"status":       slo.Status,
+		"filter":       opsSLOFilterAuditSnapshot(slo.Filter),
+		"alert_policy": opsAlertPolicyAuditSnapshot(slo.AlertPolicy),
+	}
+}
+
+func opsSLOFilterAuditSnapshot(filter operationscontract.SLOFilter) map[string]any {
+	out := map[string]any{
+		"source_endpoint":     filter.SourceEndpoint,
+		"model":               filter.Model,
+		"error_owner_exclude": nonNilStrings(filter.ErrorOwnerExclude),
+	}
+	if filter.ProviderID != nil {
+		out["provider_id"] = *filter.ProviderID
+	}
+	return out
+}
+
+func opsAlertPolicyAuditSnapshot(policy operationscontract.AlertPolicy) map[string]any {
+	thresholds := make([]map[string]any, 0, len(policy.Thresholds))
+	for _, threshold := range policy.Thresholds {
+		thresholds = append(thresholds, map[string]any{
+			"severity":             threshold.Severity,
+			"short_window_seconds": int(threshold.ShortWindow / time.Second),
+			"long_window_seconds":  int(threshold.LongWindow / time.Second),
+			"burn_rate":            threshold.BurnRate,
+			"min_request_count":    threshold.MinRequestCount,
+		})
+	}
+	return map[string]any{
+		"name":       policy.Name,
+		"thresholds": thresholds,
+	}
+}
+
+func opsAlertAckAuditSnapshot(alert operationscontract.AlertEvent) map[string]any {
+	out := map[string]any{
+		"status":      alert.Status,
+		"fingerprint": alert.Fingerprint,
+		"severity":    alert.Severity,
+		"rule_id":     alert.RuleID,
+	}
+	if alert.SLOID != nil {
+		out["slo_id"] = *alert.SLOID
+	}
+	if alert.AcknowledgedBy != nil {
+		out["acknowledged_by"] = *alert.AcknowledgedBy
+	}
+	if alert.AcknowledgedAt != nil {
+		out["acknowledged_at"] = *alert.AcknowledgedAt
+	}
+	return out
+}
+
 func providerAuditSnapshot(provider providercontract.Provider) map[string]any {
 	return map[string]any{
 		"name":          provider.Name,
@@ -5703,6 +5935,17 @@ func writePaymentServiceError(w http.ResponseWriter, err error, requestID string
 		writeStandardError(w, http.StatusConflict, apiopenapi.RESOURCECONFLICT, "payment resource conflict", requestID)
 	default:
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "payment service error", requestID)
+	}
+}
+
+func writeOperationsServiceError(w http.ResponseWriter, err error, requestID string) {
+	switch {
+	case errors.Is(err, operationsservice.ErrInvalidInput):
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid operations request", requestID)
+	case errors.Is(err, operationscontract.ErrNotFound):
+		writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "operations resource not found", requestID)
+	default:
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "operations service error", requestID)
 	}
 }
 
@@ -6234,6 +6477,88 @@ func toAPIDomainEventOutbox(event eventscontract.OutboxEvent) apiopenapi.DomainE
 	}
 }
 
+func toAPIOpsSLO(item operationscontract.SLOWithEvaluation) apiopenapi.OpsSLO {
+	return apiopenapi.OpsSLO{
+		Definition: toAPIOpsSLODefinition(item.Definition),
+		Evaluation: apiopenapi.OpsSLOEvaluation{
+			BadRequests:         item.Evaluation.BadRequests,
+			BurnRate:            float32(item.Evaluation.BurnRate),
+			ErrorBudgetConsumed: float32(item.Evaluation.ErrorBudgetConsumed),
+			ErrorRate:           float32(item.Evaluation.ErrorRate),
+			GoodRequests:        item.Evaluation.GoodRequests,
+			Objective:           float32(item.Evaluation.Objective),
+			TotalRequests:       item.Evaluation.TotalRequests,
+			WindowEnd:           item.Evaluation.WindowEnd,
+			WindowStart:         item.Evaluation.WindowStart,
+		},
+	}
+}
+
+func toAPIOpsSLODefinition(item operationscontract.SLODefinition) apiopenapi.OpsSLODefinition {
+	return apiopenapi.OpsSLODefinition{
+		AlertPolicy: toAPIOpsAlertPolicy(item.AlertPolicy),
+		CreatedAt:   item.CreatedAt,
+		Filter:      toAPIOpsSLOFilter(item.Filter),
+		Id:          apiopenapi.Id(strconv.Itoa(item.ID)),
+		Name:        item.Name,
+		Objective:   float32(item.Objective),
+		SliType:     apiopenapi.OpsSLIType(item.SLIType),
+		Status:      apiopenapi.OpsSLOStatus(item.Status),
+		UpdatedAt:   item.UpdatedAt,
+		WindowDays:  item.WindowDays,
+	}
+}
+
+func toAPIOpsSLOFilter(filter operationscontract.SLOFilter) apiopenapi.OpsSLOFilter {
+	out := apiopenapi.OpsSLOFilter{
+		ErrorOwnerExclude: make([]apiopenapi.OpsSLOFilterErrorOwnerExclude, 0, len(filter.ErrorOwnerExclude)),
+		Model:             filter.Model,
+		ProviderId:        optionalIDString(filter.ProviderID),
+		SourceEndpoint:    filter.SourceEndpoint,
+	}
+	for _, value := range filter.ErrorOwnerExclude {
+		out.ErrorOwnerExclude = append(out.ErrorOwnerExclude, apiopenapi.OpsSLOFilterErrorOwnerExclude(value))
+	}
+	return out
+}
+
+func toAPIOpsAlertPolicy(policy operationscontract.AlertPolicy) apiopenapi.OpsAlertPolicy {
+	out := apiopenapi.OpsAlertPolicy{
+		Name:       policy.Name,
+		Thresholds: make([]apiopenapi.OpsBurnRateThreshold, 0, len(policy.Thresholds)),
+	}
+	for _, threshold := range policy.Thresholds {
+		out.Thresholds = append(out.Thresholds, apiopenapi.OpsBurnRateThreshold{
+			BurnRate:           float32(threshold.BurnRate),
+			LongWindowSeconds:  int(threshold.LongWindow / time.Second),
+			MinRequestCount:    threshold.MinRequestCount,
+			Severity:           apiopenapi.OpsAlertSeverity(threshold.Severity),
+			ShortWindowSeconds: int(threshold.ShortWindow / time.Second),
+		})
+	}
+	return out
+}
+
+func toAPIOpsAlert(alert operationscontract.AlertEvent) apiopenapi.OpsAlertEvent {
+	return apiopenapi.OpsAlertEvent{
+		AcknowledgedAt: alert.AcknowledgedAt,
+		AcknowledgedBy: optionalIDString(alert.AcknowledgedBy),
+		CreatedAt:      alert.CreatedAt,
+		Details:        jsonObject(alert.Details),
+		Fingerprint:    alert.Fingerprint,
+		Id:             apiopenapi.Id(strconv.Itoa(alert.ID)),
+		ResolvedAt:     alert.ResolvedAt,
+		RuleId:         alert.RuleID,
+		Severity:       apiopenapi.OpsAlertSeverity(alert.Severity),
+		SloId:          optionalIDString(alert.SLOID),
+		StartedAt:      alert.StartedAt,
+		Status:         apiopenapi.OpsAlertStatus(alert.Status),
+		Summary:        alert.Summary,
+		SuppressedBy:   alert.SuppressedBy,
+		UpdatedAt:      alert.UpdatedAt,
+	}
+}
+
 func toAPISchedulerDecision(decision schedulercontract.Decision) apiopenapi.SchedulerDecision {
 	return apiopenapi.SchedulerDecision{
 		ApiKeyId:              apiopenapi.Id(strconv.Itoa(decision.APIKeyID)),
@@ -6493,6 +6818,116 @@ func toPaymentProviderStatusPtr(value *apiopenapi.PaymentProviderStatus) *paymen
 	return &status
 }
 
+func toCreateSLORequest(body apiopenapi.CreateOpsSLORequest) (operationscontract.CreateSLORequest, error) {
+	filter, err := toSLOFilterPtr(body.Filter)
+	if err != nil {
+		return operationscontract.CreateSLORequest{}, err
+	}
+	policy := operationscontract.AlertPolicy{}
+	if body.AlertPolicy != nil {
+		policy = toAlertPolicy(*body.AlertPolicy)
+	}
+	return operationscontract.CreateSLORequest{
+		Name:        body.Name,
+		SLIType:     toSLITypeValue(body.SliType),
+		Objective:   float64(body.Objective),
+		WindowDays:  intValue(body.WindowDays),
+		Status:      toSLOStatusPtr(body.Status),
+		Filter:      filter,
+		AlertPolicy: policy,
+	}, nil
+}
+
+func toUpdateSLORequest(body apiopenapi.UpdateOpsSLORequest) (operationscontract.UpdateSLORequest, error) {
+	var filter *operationscontract.SLOFilter
+	if body.Filter != nil {
+		converted, err := toSLOFilterPtr(body.Filter)
+		if err != nil {
+			return operationscontract.UpdateSLORequest{}, err
+		}
+		filter = &converted
+	}
+	var policy *operationscontract.AlertPolicy
+	if body.AlertPolicy != nil {
+		converted := toAlertPolicy(*body.AlertPolicy)
+		policy = &converted
+	}
+	var objective *float64
+	if body.Objective != nil {
+		converted := float64(*body.Objective)
+		objective = &converted
+	}
+	return operationscontract.UpdateSLORequest{
+		Name:        body.Name,
+		Objective:   objective,
+		WindowDays:  body.WindowDays,
+		Status:      toSLOStatusPtr(body.Status),
+		Filter:      filter,
+		AlertPolicy: policy,
+	}, nil
+}
+
+func toSLOFilterPtr(value *apiopenapi.OpsSLOFilter) (operationscontract.SLOFilter, error) {
+	if value == nil {
+		return operationscontract.SLOFilter{}, nil
+	}
+	filter := operationscontract.SLOFilter{
+		SourceEndpoint: value.SourceEndpoint,
+		Model:          value.Model,
+	}
+	if value.ProviderId != nil {
+		providerID, err := strconv.Atoi(string(*value.ProviderId))
+		if err != nil || providerID <= 0 {
+			return operationscontract.SLOFilter{}, operationsservice.ErrInvalidInput
+		}
+		filter.ProviderID = &providerID
+	}
+	filter.ErrorOwnerExclude = make([]string, 0, len(value.ErrorOwnerExclude))
+	for _, owner := range value.ErrorOwnerExclude {
+		filter.ErrorOwnerExclude = append(filter.ErrorOwnerExclude, string(owner))
+	}
+	return filter, nil
+}
+
+func toAlertPolicy(value apiopenapi.OpsAlertPolicy) operationscontract.AlertPolicy {
+	policy := operationscontract.AlertPolicy{
+		Name:       value.Name,
+		Thresholds: make([]operationscontract.BurnRateThreshold, 0, len(value.Thresholds)),
+	}
+	for _, threshold := range value.Thresholds {
+		policy.Thresholds = append(policy.Thresholds, operationscontract.BurnRateThreshold{
+			Severity:        operationscontract.AlertSeverity(threshold.Severity),
+			ShortWindow:     time.Duration(threshold.ShortWindowSeconds) * time.Second,
+			LongWindow:      time.Duration(threshold.LongWindowSeconds) * time.Second,
+			BurnRate:        float64(threshold.BurnRate),
+			MinRequestCount: threshold.MinRequestCount,
+		})
+	}
+	return policy
+}
+
+func toSLITypeValue(value *apiopenapi.OpsSLIType) operationscontract.SLIType {
+	if value == nil {
+		return ""
+	}
+	return operationscontract.SLIType(*value)
+}
+
+func toSLOStatusPtr(value *apiopenapi.OpsSLOStatus) *operationscontract.SLOStatus {
+	if value == nil {
+		return nil
+	}
+	status := operationscontract.SLOStatus(*value)
+	return &status
+}
+
+func intValue(value *int) int {
+	if value == nil {
+		return 0
+	}
+	return *value
+}
+
 func toAccountRuntimeClassPtr(value *apiopenapi.RuntimeClass) *accountcontract.RuntimeClass {
 	if value == nil {
 		return nil
@@ -6676,6 +7111,22 @@ func filterOutboxEvents(items []eventscontract.OutboxEvent, status, eventType st
 			continue
 		}
 		if eventType != "" && item.EventType != eventType {
+			continue
+		}
+		out = append(out, item)
+	}
+	return out
+}
+
+func filterOpsAlerts(items []operationscontract.AlertEvent, status, severity string) []operationscontract.AlertEvent {
+	status = strings.TrimSpace(status)
+	severity = strings.TrimSpace(severity)
+	out := make([]operationscontract.AlertEvent, 0, len(items))
+	for _, item := range items {
+		if status != "" && string(item.Status) != status {
+			continue
+		}
+		if severity != "" && string(item.Severity) != severity {
 			continue
 		}
 		out = append(out, item)

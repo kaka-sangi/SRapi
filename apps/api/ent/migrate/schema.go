@@ -679,6 +679,83 @@ var (
 			},
 		},
 	}
+	// ObsAlertEventsColumns holds the columns for the "obs_alert_events" table.
+	ObsAlertEventsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "slo_id", Type: field.TypeInt, Nullable: true},
+		{Name: "rule_id", Type: field.TypeString},
+		{Name: "severity", Type: field.TypeString, Default: "warning"},
+		{Name: "status", Type: field.TypeString, Default: "firing"},
+		{Name: "fingerprint", Type: field.TypeString},
+		{Name: "summary", Type: field.TypeString},
+		{Name: "details_json", Type: field.TypeJSON, Nullable: true},
+		{Name: "started_at", Type: field.TypeTime},
+		{Name: "resolved_at", Type: field.TypeTime, Nullable: true},
+		{Name: "acknowledged_at", Type: field.TypeTime, Nullable: true},
+		{Name: "acknowledged_by", Type: field.TypeInt, Nullable: true},
+		{Name: "suppressed_by", Type: field.TypeString, Nullable: true},
+	}
+	// ObsAlertEventsTable holds the schema information for the "obs_alert_events" table.
+	ObsAlertEventsTable = &schema.Table{
+		Name:       "obs_alert_events",
+		Columns:    ObsAlertEventsColumns,
+		PrimaryKey: []*schema.Column{ObsAlertEventsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "obsalertevent_fingerprint_status",
+				Unique:  false,
+				Columns: []*schema.Column{ObsAlertEventsColumns[7], ObsAlertEventsColumns[6]},
+			},
+			{
+				Name:    "obsalertevent_rule_id_started_at",
+				Unique:  false,
+				Columns: []*schema.Column{ObsAlertEventsColumns[4], ObsAlertEventsColumns[10]},
+			},
+			{
+				Name:    "obsalertevent_severity_status",
+				Unique:  false,
+				Columns: []*schema.Column{ObsAlertEventsColumns[5], ObsAlertEventsColumns[6]},
+			},
+			{
+				Name:    "obsalertevent_slo_id_started_at",
+				Unique:  false,
+				Columns: []*schema.Column{ObsAlertEventsColumns[3], ObsAlertEventsColumns[10]},
+			},
+		},
+	}
+	// ObsSloDefinitionsColumns holds the columns for the "obs_slo_definitions" table.
+	ObsSloDefinitionsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "name", Type: field.TypeString},
+		{Name: "sli_type", Type: field.TypeString, Default: "availability"},
+		{Name: "objective", Type: field.TypeFloat64},
+		{Name: "window_days", Type: field.TypeInt, Default: 28},
+		{Name: "status", Type: field.TypeString, Default: "active"},
+		{Name: "filter_json", Type: field.TypeJSON, Nullable: true},
+		{Name: "alert_policy_json", Type: field.TypeJSON, Nullable: true},
+	}
+	// ObsSloDefinitionsTable holds the schema information for the "obs_slo_definitions" table.
+	ObsSloDefinitionsTable = &schema.Table{
+		Name:       "obs_slo_definitions",
+		Columns:    ObsSloDefinitionsColumns,
+		PrimaryKey: []*schema.Column{ObsSloDefinitionsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "obsslodefinition_name",
+				Unique:  true,
+				Columns: []*schema.Column{ObsSloDefinitionsColumns[3]},
+			},
+			{
+				Name:    "obsslodefinition_status_sli_type",
+				Unique:  false,
+				Columns: []*schema.Column{ObsSloDefinitionsColumns[7], ObsSloDefinitionsColumns[4]},
+			},
+		},
+	}
 	// PaymentAuditLogsColumns holds the columns for the "payment_audit_logs" table.
 	PaymentAuditLogsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -1341,6 +1418,8 @@ var (
 		ModelAliasTable,
 		ModelProviderMappingsTable,
 		ModelRegistriesTable,
+		ObsAlertEventsTable,
+		ObsSloDefinitionsTable,
 		PaymentAuditLogsTable,
 		PaymentOrdersTable,
 		PaymentProviderInstancesTable,

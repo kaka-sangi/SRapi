@@ -237,6 +237,30 @@ func (f ModelRegistryFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Valu
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ModelRegistryMutation", m)
 }
 
+// The ObsAlertEventFunc type is an adapter to allow the use of ordinary
+// function as ObsAlertEvent mutator.
+type ObsAlertEventFunc func(context.Context, *ent.ObsAlertEventMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ObsAlertEventFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ObsAlertEventMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ObsAlertEventMutation", m)
+}
+
+// The ObsSLODefinitionFunc type is an adapter to allow the use of ordinary
+// function as ObsSLODefinition mutator.
+type ObsSLODefinitionFunc func(context.Context, *ent.ObsSLODefinitionMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ObsSLODefinitionFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ObsSLODefinitionMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ObsSLODefinitionMutation", m)
+}
+
 // The PaymentAuditLogFunc type is an adapter to allow the use of ordinary
 // function as PaymentAuditLog mutator.
 type PaymentAuditLogFunc func(context.Context, *ent.PaymentAuditLogMutation) (ent.Value, error)

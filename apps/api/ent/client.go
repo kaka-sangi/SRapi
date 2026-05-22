@@ -33,6 +33,8 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/modelalias"
 	"github.com/srapi/srapi/apps/api/ent/modelprovidermapping"
 	"github.com/srapi/srapi/apps/api/ent/modelregistry"
+	"github.com/srapi/srapi/apps/api/ent/obsalertevent"
+	"github.com/srapi/srapi/apps/api/ent/obsslodefinition"
 	"github.com/srapi/srapi/apps/api/ent/paymentauditlog"
 	"github.com/srapi/srapi/apps/api/ent/paymentorder"
 	"github.com/srapi/srapi/apps/api/ent/paymentproviderinstance"
@@ -94,6 +96,10 @@ type Client struct {
 	ModelProviderMapping *ModelProviderMappingClient
 	// ModelRegistry is the client for interacting with the ModelRegistry builders.
 	ModelRegistry *ModelRegistryClient
+	// ObsAlertEvent is the client for interacting with the ObsAlertEvent builders.
+	ObsAlertEvent *ObsAlertEventClient
+	// ObsSLODefinition is the client for interacting with the ObsSLODefinition builders.
+	ObsSLODefinition *ObsSLODefinitionClient
 	// PaymentAuditLog is the client for interacting with the PaymentAuditLog builders.
 	PaymentAuditLog *PaymentAuditLogClient
 	// PaymentOrder is the client for interacting with the PaymentOrder builders.
@@ -156,6 +162,8 @@ func (c *Client) init() {
 	c.ModelAlias = NewModelAliasClient(c.config)
 	c.ModelProviderMapping = NewModelProviderMappingClient(c.config)
 	c.ModelRegistry = NewModelRegistryClient(c.config)
+	c.ObsAlertEvent = NewObsAlertEventClient(c.config)
+	c.ObsSLODefinition = NewObsSLODefinitionClient(c.config)
 	c.PaymentAuditLog = NewPaymentAuditLogClient(c.config)
 	c.PaymentOrder = NewPaymentOrderClient(c.config)
 	c.PaymentProviderInstance = NewPaymentProviderInstanceClient(c.config)
@@ -283,6 +291,8 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		ModelAlias:              NewModelAliasClient(cfg),
 		ModelProviderMapping:    NewModelProviderMappingClient(cfg),
 		ModelRegistry:           NewModelRegistryClient(cfg),
+		ObsAlertEvent:           NewObsAlertEventClient(cfg),
+		ObsSLODefinition:        NewObsSLODefinitionClient(cfg),
 		PaymentAuditLog:         NewPaymentAuditLogClient(cfg),
 		PaymentOrder:            NewPaymentOrderClient(cfg),
 		PaymentProviderInstance: NewPaymentProviderInstanceClient(cfg),
@@ -337,6 +347,8 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		ModelAlias:              NewModelAliasClient(cfg),
 		ModelProviderMapping:    NewModelProviderMappingClient(cfg),
 		ModelRegistry:           NewModelRegistryClient(cfg),
+		ObsAlertEvent:           NewObsAlertEventClient(cfg),
+		ObsSLODefinition:        NewObsSLODefinitionClient(cfg),
 		PaymentAuditLog:         NewPaymentAuditLogClient(cfg),
 		PaymentOrder:            NewPaymentOrderClient(cfg),
 		PaymentProviderInstance: NewPaymentProviderInstanceClient(cfg),
@@ -387,10 +399,11 @@ func (c *Client) Use(hooks ...Hook) {
 		c.AffiliateRule, c.AuditLog, c.BillingLedger, c.CapabilityDefinition,
 		c.DomainEventsInbox, c.DomainEventsOutbox, c.IdempotencyRecord, c.InviteCode,
 		c.InviteRelationship, c.ModelAlias, c.ModelProviderMapping, c.ModelRegistry,
-		c.PaymentAuditLog, c.PaymentOrder, c.PaymentProviderInstance, c.PricingRule,
-		c.Provider, c.ProviderAccount, c.Role, c.SchedulerDecision,
-		c.SchedulerFeedback, c.SchedulerStrategy, c.Setting, c.SubscriptionPlan,
-		c.UsageLog, c.User, c.UserRole, c.UserSubscription,
+		c.ObsAlertEvent, c.ObsSLODefinition, c.PaymentAuditLog, c.PaymentOrder,
+		c.PaymentProviderInstance, c.PricingRule, c.Provider, c.ProviderAccount,
+		c.Role, c.SchedulerDecision, c.SchedulerFeedback, c.SchedulerStrategy,
+		c.Setting, c.SubscriptionPlan, c.UsageLog, c.User, c.UserRole,
+		c.UserSubscription,
 	} {
 		n.Use(hooks...)
 	}
@@ -405,10 +418,11 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.AffiliateRule, c.AuditLog, c.BillingLedger, c.CapabilityDefinition,
 		c.DomainEventsInbox, c.DomainEventsOutbox, c.IdempotencyRecord, c.InviteCode,
 		c.InviteRelationship, c.ModelAlias, c.ModelProviderMapping, c.ModelRegistry,
-		c.PaymentAuditLog, c.PaymentOrder, c.PaymentProviderInstance, c.PricingRule,
-		c.Provider, c.ProviderAccount, c.Role, c.SchedulerDecision,
-		c.SchedulerFeedback, c.SchedulerStrategy, c.Setting, c.SubscriptionPlan,
-		c.UsageLog, c.User, c.UserRole, c.UserSubscription,
+		c.ObsAlertEvent, c.ObsSLODefinition, c.PaymentAuditLog, c.PaymentOrder,
+		c.PaymentProviderInstance, c.PricingRule, c.Provider, c.ProviderAccount,
+		c.Role, c.SchedulerDecision, c.SchedulerFeedback, c.SchedulerStrategy,
+		c.Setting, c.SubscriptionPlan, c.UsageLog, c.User, c.UserRole,
+		c.UserSubscription,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -455,6 +469,10 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.ModelProviderMapping.mutate(ctx, m)
 	case *ModelRegistryMutation:
 		return c.ModelRegistry.mutate(ctx, m)
+	case *ObsAlertEventMutation:
+		return c.ObsAlertEvent.mutate(ctx, m)
+	case *ObsSLODefinitionMutation:
+		return c.ObsSLODefinition.mutate(ctx, m)
 	case *PaymentAuditLogMutation:
 		return c.PaymentAuditLog.mutate(ctx, m)
 	case *PaymentOrderMutation:
@@ -3019,6 +3037,272 @@ func (c *ModelRegistryClient) mutate(ctx context.Context, m *ModelRegistryMutati
 	}
 }
 
+// ObsAlertEventClient is a client for the ObsAlertEvent schema.
+type ObsAlertEventClient struct {
+	config
+}
+
+// NewObsAlertEventClient returns a client for the ObsAlertEvent from the given config.
+func NewObsAlertEventClient(c config) *ObsAlertEventClient {
+	return &ObsAlertEventClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `obsalertevent.Hooks(f(g(h())))`.
+func (c *ObsAlertEventClient) Use(hooks ...Hook) {
+	c.hooks.ObsAlertEvent = append(c.hooks.ObsAlertEvent, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `obsalertevent.Intercept(f(g(h())))`.
+func (c *ObsAlertEventClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ObsAlertEvent = append(c.inters.ObsAlertEvent, interceptors...)
+}
+
+// Create returns a builder for creating a ObsAlertEvent entity.
+func (c *ObsAlertEventClient) Create() *ObsAlertEventCreate {
+	mutation := newObsAlertEventMutation(c.config, OpCreate)
+	return &ObsAlertEventCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ObsAlertEvent entities.
+func (c *ObsAlertEventClient) CreateBulk(builders ...*ObsAlertEventCreate) *ObsAlertEventCreateBulk {
+	return &ObsAlertEventCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ObsAlertEventClient) MapCreateBulk(slice any, setFunc func(*ObsAlertEventCreate, int)) *ObsAlertEventCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ObsAlertEventCreateBulk{err: fmt.Errorf("calling to ObsAlertEventClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ObsAlertEventCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ObsAlertEventCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ObsAlertEvent.
+func (c *ObsAlertEventClient) Update() *ObsAlertEventUpdate {
+	mutation := newObsAlertEventMutation(c.config, OpUpdate)
+	return &ObsAlertEventUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ObsAlertEventClient) UpdateOne(_m *ObsAlertEvent) *ObsAlertEventUpdateOne {
+	mutation := newObsAlertEventMutation(c.config, OpUpdateOne, withObsAlertEvent(_m))
+	return &ObsAlertEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ObsAlertEventClient) UpdateOneID(id int) *ObsAlertEventUpdateOne {
+	mutation := newObsAlertEventMutation(c.config, OpUpdateOne, withObsAlertEventID(id))
+	return &ObsAlertEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ObsAlertEvent.
+func (c *ObsAlertEventClient) Delete() *ObsAlertEventDelete {
+	mutation := newObsAlertEventMutation(c.config, OpDelete)
+	return &ObsAlertEventDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ObsAlertEventClient) DeleteOne(_m *ObsAlertEvent) *ObsAlertEventDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ObsAlertEventClient) DeleteOneID(id int) *ObsAlertEventDeleteOne {
+	builder := c.Delete().Where(obsalertevent.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ObsAlertEventDeleteOne{builder}
+}
+
+// Query returns a query builder for ObsAlertEvent.
+func (c *ObsAlertEventClient) Query() *ObsAlertEventQuery {
+	return &ObsAlertEventQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeObsAlertEvent},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ObsAlertEvent entity by its id.
+func (c *ObsAlertEventClient) Get(ctx context.Context, id int) (*ObsAlertEvent, error) {
+	return c.Query().Where(obsalertevent.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ObsAlertEventClient) GetX(ctx context.Context, id int) *ObsAlertEvent {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ObsAlertEventClient) Hooks() []Hook {
+	return c.hooks.ObsAlertEvent
+}
+
+// Interceptors returns the client interceptors.
+func (c *ObsAlertEventClient) Interceptors() []Interceptor {
+	return c.inters.ObsAlertEvent
+}
+
+func (c *ObsAlertEventClient) mutate(ctx context.Context, m *ObsAlertEventMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ObsAlertEventCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ObsAlertEventUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ObsAlertEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ObsAlertEventDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ObsAlertEvent mutation op: %q", m.Op())
+	}
+}
+
+// ObsSLODefinitionClient is a client for the ObsSLODefinition schema.
+type ObsSLODefinitionClient struct {
+	config
+}
+
+// NewObsSLODefinitionClient returns a client for the ObsSLODefinition from the given config.
+func NewObsSLODefinitionClient(c config) *ObsSLODefinitionClient {
+	return &ObsSLODefinitionClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `obsslodefinition.Hooks(f(g(h())))`.
+func (c *ObsSLODefinitionClient) Use(hooks ...Hook) {
+	c.hooks.ObsSLODefinition = append(c.hooks.ObsSLODefinition, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `obsslodefinition.Intercept(f(g(h())))`.
+func (c *ObsSLODefinitionClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ObsSLODefinition = append(c.inters.ObsSLODefinition, interceptors...)
+}
+
+// Create returns a builder for creating a ObsSLODefinition entity.
+func (c *ObsSLODefinitionClient) Create() *ObsSLODefinitionCreate {
+	mutation := newObsSLODefinitionMutation(c.config, OpCreate)
+	return &ObsSLODefinitionCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ObsSLODefinition entities.
+func (c *ObsSLODefinitionClient) CreateBulk(builders ...*ObsSLODefinitionCreate) *ObsSLODefinitionCreateBulk {
+	return &ObsSLODefinitionCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ObsSLODefinitionClient) MapCreateBulk(slice any, setFunc func(*ObsSLODefinitionCreate, int)) *ObsSLODefinitionCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ObsSLODefinitionCreateBulk{err: fmt.Errorf("calling to ObsSLODefinitionClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ObsSLODefinitionCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ObsSLODefinitionCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ObsSLODefinition.
+func (c *ObsSLODefinitionClient) Update() *ObsSLODefinitionUpdate {
+	mutation := newObsSLODefinitionMutation(c.config, OpUpdate)
+	return &ObsSLODefinitionUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ObsSLODefinitionClient) UpdateOne(_m *ObsSLODefinition) *ObsSLODefinitionUpdateOne {
+	mutation := newObsSLODefinitionMutation(c.config, OpUpdateOne, withObsSLODefinition(_m))
+	return &ObsSLODefinitionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ObsSLODefinitionClient) UpdateOneID(id int) *ObsSLODefinitionUpdateOne {
+	mutation := newObsSLODefinitionMutation(c.config, OpUpdateOne, withObsSLODefinitionID(id))
+	return &ObsSLODefinitionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ObsSLODefinition.
+func (c *ObsSLODefinitionClient) Delete() *ObsSLODefinitionDelete {
+	mutation := newObsSLODefinitionMutation(c.config, OpDelete)
+	return &ObsSLODefinitionDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ObsSLODefinitionClient) DeleteOne(_m *ObsSLODefinition) *ObsSLODefinitionDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ObsSLODefinitionClient) DeleteOneID(id int) *ObsSLODefinitionDeleteOne {
+	builder := c.Delete().Where(obsslodefinition.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ObsSLODefinitionDeleteOne{builder}
+}
+
+// Query returns a query builder for ObsSLODefinition.
+func (c *ObsSLODefinitionClient) Query() *ObsSLODefinitionQuery {
+	return &ObsSLODefinitionQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeObsSLODefinition},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ObsSLODefinition entity by its id.
+func (c *ObsSLODefinitionClient) Get(ctx context.Context, id int) (*ObsSLODefinition, error) {
+	return c.Query().Where(obsslodefinition.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ObsSLODefinitionClient) GetX(ctx context.Context, id int) *ObsSLODefinition {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ObsSLODefinitionClient) Hooks() []Hook {
+	return c.hooks.ObsSLODefinition
+}
+
+// Interceptors returns the client interceptors.
+func (c *ObsSLODefinitionClient) Interceptors() []Interceptor {
+	return c.inters.ObsSLODefinition
+}
+
+func (c *ObsSLODefinitionClient) mutate(ctx context.Context, m *ObsSLODefinitionMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ObsSLODefinitionCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ObsSLODefinitionUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ObsSLODefinitionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ObsSLODefinitionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ObsSLODefinition mutation op: %q", m.Op())
+	}
+}
+
 // PaymentAuditLogClient is a client for the PaymentAuditLog schema.
 type PaymentAuditLogClient struct {
 	config
@@ -5154,19 +5438,19 @@ type (
 		AccountQuotaSnapshot, AffiliateLedger, AffiliateRule, AuditLog, BillingLedger,
 		CapabilityDefinition, DomainEventsInbox, DomainEventsOutbox, IdempotencyRecord,
 		InviteCode, InviteRelationship, ModelAlias, ModelProviderMapping,
-		ModelRegistry, PaymentAuditLog, PaymentOrder, PaymentProviderInstance,
-		PricingRule, Provider, ProviderAccount, Role, SchedulerDecision,
-		SchedulerFeedback, SchedulerStrategy, Setting, SubscriptionPlan, UsageLog,
-		User, UserRole, UserSubscription []ent.Hook
+		ModelRegistry, ObsAlertEvent, ObsSLODefinition, PaymentAuditLog, PaymentOrder,
+		PaymentProviderInstance, PricingRule, Provider, ProviderAccount, Role,
+		SchedulerDecision, SchedulerFeedback, SchedulerStrategy, Setting,
+		SubscriptionPlan, UsageLog, User, UserRole, UserSubscription []ent.Hook
 	}
 	inters struct {
 		APIKey, APIKeyGroup, AccountGroup, AccountGroupMember, AccountHealthSnapshot,
 		AccountQuotaSnapshot, AffiliateLedger, AffiliateRule, AuditLog, BillingLedger,
 		CapabilityDefinition, DomainEventsInbox, DomainEventsOutbox, IdempotencyRecord,
 		InviteCode, InviteRelationship, ModelAlias, ModelProviderMapping,
-		ModelRegistry, PaymentAuditLog, PaymentOrder, PaymentProviderInstance,
-		PricingRule, Provider, ProviderAccount, Role, SchedulerDecision,
-		SchedulerFeedback, SchedulerStrategy, Setting, SubscriptionPlan, UsageLog,
-		User, UserRole, UserSubscription []ent.Interceptor
+		ModelRegistry, ObsAlertEvent, ObsSLODefinition, PaymentAuditLog, PaymentOrder,
+		PaymentProviderInstance, PricingRule, Provider, ProviderAccount, Role,
+		SchedulerDecision, SchedulerFeedback, SchedulerStrategy, Setting,
+		SubscriptionPlan, UsageLog, User, UserRole, UserSubscription []ent.Interceptor
 	}
 )

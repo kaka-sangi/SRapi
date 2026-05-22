@@ -50,6 +50,10 @@ type Tx struct {
 	ModelProviderMapping *ModelProviderMappingClient
 	// ModelRegistry is the client for interacting with the ModelRegistry builders.
 	ModelRegistry *ModelRegistryClient
+	// ObsAlertEvent is the client for interacting with the ObsAlertEvent builders.
+	ObsAlertEvent *ObsAlertEventClient
+	// ObsSLODefinition is the client for interacting with the ObsSLODefinition builders.
+	ObsSLODefinition *ObsSLODefinitionClient
 	// PaymentAuditLog is the client for interacting with the PaymentAuditLog builders.
 	PaymentAuditLog *PaymentAuditLogClient
 	// PaymentOrder is the client for interacting with the PaymentOrder builders.
@@ -232,6 +236,8 @@ func (tx *Tx) init() {
 	tx.ModelAlias = NewModelAliasClient(tx.config)
 	tx.ModelProviderMapping = NewModelProviderMappingClient(tx.config)
 	tx.ModelRegistry = NewModelRegistryClient(tx.config)
+	tx.ObsAlertEvent = NewObsAlertEventClient(tx.config)
+	tx.ObsSLODefinition = NewObsSLODefinitionClient(tx.config)
 	tx.PaymentAuditLog = NewPaymentAuditLogClient(tx.config)
 	tx.PaymentOrder = NewPaymentOrderClient(tx.config)
 	tx.PaymentProviderInstance = NewPaymentProviderInstanceClient(tx.config)

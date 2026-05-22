@@ -200,8 +200,20 @@ components:
 | `/api/v1/admin/models` | yes | yes | read only | no |
 | `/api/v1/admin/accounts` | yes | yes | read/test only | no |
 | `/api/v1/admin/scheduler` | yes | yes | read/simulate only | no |
+| `/api/v1/admin/ops/slo` | yes | yes | read only | no |
+| `/api/v1/admin/ops/alerts` | yes | yes | read only | no |
 | `/api/v1/admin/settings` | yes | yes | no | no |
 | `/api/v1/admin/audit-logs` | yes | yes | no | no |
+
+### 4.7 Ops SLO / Alert APIs
+
+`/api/v1/admin/ops/slo` 和 `/api/v1/admin/ops/alerts` 属于 AdminOps 控制面：
+
+- `GET /api/v1/admin/ops/slo` 返回 SLO definition 以及基于 `usage_logs` 计算的 availability/burn-rate 证据。
+- `POST /api/v1/admin/ops/slo`、`PATCH /api/v1/admin/ops/slo/{id}` 必须使用 `cookieAuth` + `csrfHeader`，并记录安全 audit before/after。
+- SLO `objective` 请求可接受 `0.995` 或 `99.5`；响应统一返回比例值。
+- `GET /api/v1/admin/ops/alerts` 支持 `status`、`severity` 过滤。
+- `POST /api/v1/admin/ops/alerts/{id}/ack` 必须使用 CSRF，并且 audit 只记录 ack 摘要，不复制 alert `details`。
 
 ## 5. 统一响应格式
 

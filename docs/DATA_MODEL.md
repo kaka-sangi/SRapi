@@ -1092,6 +1092,70 @@ index(consumer_name, status, created_at)
 - 事件 envelope、Outbox 状态、Inbox 幂等和死信处理以 `DOMAIN_EVENTS_SPEC.md` 为准。
 - 事件 payload 不得包含明文 API Key、Provider 凭证、cookie、OAuth token 或原始 prompt。
 
+## 15B. 运维观测
+
+### 15B.1 obs_slo_definitions
+
+```txt
+id
+name
+sli_type
+objective
+window_days
+status
+filter_json
+alert_policy_json
+created_at
+updated_at
+```
+
+索引：
+
+```txt
+unique(name)
+index(status, sli_type)
+```
+
+规则：
+
+- `objective` 按比例持久化，例如 `0.995` 表示 `99.5%`；管理 API 可接受 `99.5` 百分比输入并归一化。
+- `filter_json` 只保存低基数字段，例如 `source_endpoint`、`model`、`provider_id` 和 `error_owner_exclude`。
+- `alert_policy_json` 保存多窗口 burn-rate 阈值，不得包含通知凭证或 webhook secret。
+
+### 15B.2 obs_alert_events
+
+```txt
+id
+slo_id
+rule_id
+severity
+status
+fingerprint
+summary
+details_json
+started_at
+resolved_at
+acknowledged_at
+acknowledged_by
+suppressed_by
+created_at
+updated_at
+```
+
+索引：
+
+```txt
+index(fingerprint, status)
+index(rule_id, started_at)
+index(severity, status)
+index(slo_id, started_at)
+```
+
+规则：
+
+- `details_json` 只能保存计算证据、低基数标签和聚合数值，不得保存 prompt、请求体、Authorization header、Cookie、API Key、OAuth token 或 Provider 凭证。
+- ack 操作只更新 `status`、`acknowledged_at` 和 `acknowledged_by`；audit 中不得复制 `details_json`。
+
 ## 16. 系统配置
 
 ### 16.1 settings
@@ -1127,6 +1191,8 @@ account_health_snapshots
 account_quota_snapshots
 domain_events_outbox
 domain_events_inbox
+obs_slo_definitions
+obs_alert_events
 ```
 
 建议：
@@ -1200,6 +1266,8 @@ account_health_snapshots
 account_quota_snapshots
 domain_events_outbox
 domain_events_inbox
+obs_slo_definitions
+obs_alert_events
 settings
 audit_logs
 idempotency_records

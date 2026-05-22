@@ -19,6 +19,9 @@ var allowedContractImports = map[string]map[string]bool{
 	"models": {
 		"capabilities": true,
 	},
+	"operations": {
+		"usage": true,
+	},
 	"provider_adapters": {
 		"accounts":  true,
 		"models":    true,

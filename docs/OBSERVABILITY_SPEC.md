@@ -241,8 +241,8 @@ fallback_chain
 
 ```txt
 obs_slo_definitions
-obs_alert_rules
 obs_alert_events
+obs_alert_rules
 obs_alert_silences
 obs_ai_usage_rollups
 obs_provider_health_snapshots
@@ -252,6 +252,13 @@ obs_notification_deliveries
 ```
 
 原始日志保留期和聚合保留期必须可配置。
+
+当前控制面 v1 已落库 `obs_slo_definitions` 和 `obs_alert_events`：
+
+- `obs_slo_definitions` 持久化 SLO 名称、SLI 类型、比例化 objective、窗口、状态、低基数过滤条件和 burn-rate 阈值。
+- `GET /api/v1/admin/ops/slo` 基于 `usage_logs` 实时返回 availability 评估证据，包括 total/good/bad requests、error rate、burn rate 和 error budget consumed。
+- `obs_alert_events` 持久化告警 severity、status、fingerprint、summary、时间戳和 ack 元数据。
+- `POST /api/v1/admin/ops/alerts/{id}/ack` 只写 ack 状态和 actor；audit 只记录安全摘要，不复制 `details_json`。
 
 ## 11. API 草案
 
@@ -270,6 +277,8 @@ PATCH /api/v1/admin/ops/slo/{id}
 GET  /api/v1/admin/ops/settings
 PATCH /api/v1/admin/ops/settings
 ```
+
+已实现的 SLO 写接口使用控制台 Cookie + CSRF；SLO objective 可输入 `0.995` 或 `99.5`，响应和持久化统一为 `0.995`。
 
 ## 12. 隐私与脱敏
 

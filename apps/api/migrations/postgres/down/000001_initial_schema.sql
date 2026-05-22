@@ -15,6 +15,8 @@ DROP TABLE IF EXISTS "pricing_rules";
 DROP TABLE IF EXISTS "payment_provider_instances";
 DROP TABLE IF EXISTS "payment_orders";
 DROP TABLE IF EXISTS "payment_audit_logs";
+DROP TABLE IF EXISTS "obs_slo_definitions";
+DROP TABLE IF EXISTS "obs_alert_events";
 DROP TABLE IF EXISTS "model_registries";
 DROP TABLE IF EXISTS "model_provider_mappings";
 DROP TABLE IF EXISTS "model_alias";

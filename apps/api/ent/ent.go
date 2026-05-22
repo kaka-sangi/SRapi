@@ -31,6 +31,8 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/modelalias"
 	"github.com/srapi/srapi/apps/api/ent/modelprovidermapping"
 	"github.com/srapi/srapi/apps/api/ent/modelregistry"
+	"github.com/srapi/srapi/apps/api/ent/obsalertevent"
+	"github.com/srapi/srapi/apps/api/ent/obsslodefinition"
 	"github.com/srapi/srapi/apps/api/ent/paymentauditlog"
 	"github.com/srapi/srapi/apps/api/ent/paymentorder"
 	"github.com/srapi/srapi/apps/api/ent/paymentproviderinstance"
@@ -126,6 +128,8 @@ func checkColumn(t, c string) error {
 			modelalias.Table:              modelalias.ValidColumn,
 			modelprovidermapping.Table:    modelprovidermapping.ValidColumn,
 			modelregistry.Table:           modelregistry.ValidColumn,
+			obsalertevent.Table:           obsalertevent.ValidColumn,
+			obsslodefinition.Table:        obsslodefinition.ValidColumn,
 			paymentauditlog.Table:         paymentauditlog.ValidColumn,
 			paymentorder.Table:            paymentorder.ValidColumn,
 			paymentproviderinstance.Table: paymentproviderinstance.ValidColumn,

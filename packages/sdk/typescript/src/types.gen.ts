@@ -940,6 +940,132 @@ export type DomainEventOutboxListResponse = {
     request_id: RequestId;
 };
 
+export type OpsSloStatus = 'active' | 'disabled';
+
+export type OpsSliType = 'availability' | 'latency' | 'freshness' | 'quality';
+
+export type OpsAlertSeverity = 'critical' | 'warning' | 'ticket';
+
+export type OpsAlertStatus = 'firing' | 'acknowledged' | 'resolved' | 'suppressed';
+
+export type OpsSloFilter = {
+    source_endpoint: string;
+    model: string;
+    provider_id?: Id;
+    error_owner_exclude: Array<'client' | 'business' | 'scheduler' | 'reverse_proxy' | 'provider' | 'internal'>;
+};
+
+export type OpsBurnRateThreshold = {
+    severity: OpsAlertSeverity;
+    short_window_seconds: number;
+    long_window_seconds: number;
+    burn_rate: number;
+    min_request_count: number;
+};
+
+export type OpsAlertPolicy = {
+    name: string;
+    thresholds: Array<OpsBurnRateThreshold>;
+};
+
+export type OpsSloDefinition = {
+    id: Id;
+    name: string;
+    sli_type: OpsSliType;
+    /**
+     * Objective stored as a ratio, for example 0.995 for 99.5%.
+     */
+    objective: number;
+    window_days: number;
+    status: OpsSloStatus;
+    filter: OpsSloFilter;
+    alert_policy: OpsAlertPolicy;
+    created_at: Timestamp;
+    updated_at: Timestamp;
+};
+
+export type OpsSloEvaluation = {
+    window_start: Timestamp;
+    window_end: Timestamp;
+    total_requests: number;
+    good_requests: number;
+    bad_requests: number;
+    error_rate: number;
+    burn_rate: number;
+    objective: number;
+    error_budget_consumed: number;
+};
+
+export type OpsSlo = {
+    definition: OpsSloDefinition;
+    evaluation: OpsSloEvaluation;
+};
+
+export type CreateOpsSloRequest = {
+    name: string;
+    sli_type?: OpsSliType;
+    /**
+     * Accepts ratio values like 0.995 or percent values like 99.5; responses store the ratio.
+     */
+    objective: number;
+    window_days?: number;
+    status?: OpsSloStatus;
+    filter?: OpsSloFilter;
+    alert_policy?: OpsAlertPolicy;
+};
+
+export type UpdateOpsSloRequest = {
+    name?: string;
+    /**
+     * Accepts ratio values like 0.995 or percent values like 99.5; responses store the ratio.
+     */
+    objective?: number;
+    window_days?: number;
+    status?: OpsSloStatus;
+    filter?: OpsSloFilter;
+    alert_policy?: OpsAlertPolicy;
+};
+
+export type OpsSloDefinitionResponse = {
+    data: OpsSloDefinition;
+    request_id: RequestId;
+};
+
+export type OpsSloListResponse = {
+    data: Array<OpsSlo>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type OpsAlertEvent = {
+    id: Id;
+    slo_id?: Id;
+    rule_id: string;
+    severity: OpsAlertSeverity;
+    status: OpsAlertStatus;
+    fingerprint: string;
+    summary: string;
+    details: JsonObject;
+    started_at: Timestamp;
+    resolved_at?: string | null;
+    acknowledged_at?: string | null;
+    acknowledged_by?: Id;
+    suppressed_by?: string | null;
+    created_at: Timestamp;
+    updated_at: Timestamp;
+};
+
+export type OpsAlertResponse = {
+    data: OpsAlertEvent;
+    request_id: RequestId;
+};
+
+export type OpsAlertListResponse = {
+    data: Array<OpsAlertEvent>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
 export type SchedulerDecision = {
     id: Id;
     request_id: RequestId;
@@ -3518,6 +3644,199 @@ export type ListAdminOutboxEventsResponses = {
 };
 
 export type ListAdminOutboxEventsResponse = ListAdminOutboxEventsResponses[keyof ListAdminOutboxEventsResponses];
+
+export type ListAdminOpsSlosData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        page_size?: number;
+    };
+    url: '/api/v1/admin/ops/slo';
+};
+
+export type ListAdminOpsSlosErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminOpsSlosError = ListAdminOpsSlosErrors[keyof ListAdminOpsSlosErrors];
+
+export type ListAdminOpsSlosResponses = {
+    /**
+     * SLO list.
+     */
+    200: OpsSloListResponse;
+};
+
+export type ListAdminOpsSlosResponse = ListAdminOpsSlosResponses[keyof ListAdminOpsSlosResponses];
+
+export type CreateAdminOpsSloData = {
+    body: CreateOpsSloRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/ops/slo';
+};
+
+export type CreateAdminOpsSloErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type CreateAdminOpsSloError = CreateAdminOpsSloErrors[keyof CreateAdminOpsSloErrors];
+
+export type CreateAdminOpsSloResponses = {
+    /**
+     * SLO created.
+     */
+    201: OpsSloDefinitionResponse;
+};
+
+export type CreateAdminOpsSloResponse = CreateAdminOpsSloResponses[keyof CreateAdminOpsSloResponses];
+
+export type UpdateAdminOpsSloData = {
+    body: UpdateOpsSloRequest;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/ops/slo/{id}';
+};
+
+export type UpdateAdminOpsSloErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UpdateAdminOpsSloError = UpdateAdminOpsSloErrors[keyof UpdateAdminOpsSloErrors];
+
+export type UpdateAdminOpsSloResponses = {
+    /**
+     * SLO updated.
+     */
+    200: OpsSloDefinitionResponse;
+};
+
+export type UpdateAdminOpsSloResponse = UpdateAdminOpsSloResponses[keyof UpdateAdminOpsSloResponses];
+
+export type ListAdminOpsAlertsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        page_size?: number;
+        status?: OpsAlertStatus;
+        severity?: OpsAlertSeverity;
+    };
+    url: '/api/v1/admin/ops/alerts';
+};
+
+export type ListAdminOpsAlertsErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminOpsAlertsError = ListAdminOpsAlertsErrors[keyof ListAdminOpsAlertsErrors];
+
+export type ListAdminOpsAlertsResponses = {
+    /**
+     * Alert list.
+     */
+    200: OpsAlertListResponse;
+};
+
+export type ListAdminOpsAlertsResponse = ListAdminOpsAlertsResponses[keyof ListAdminOpsAlertsResponses];
+
+export type AcknowledgeAdminOpsAlertData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/ops/alerts/{id}/ack';
+};
+
+export type AcknowledgeAdminOpsAlertErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type AcknowledgeAdminOpsAlertError = AcknowledgeAdminOpsAlertErrors[keyof AcknowledgeAdminOpsAlertErrors];
+
+export type AcknowledgeAdminOpsAlertResponses = {
+    /**
+     * Alert acknowledged.
+     */
+    200: OpsAlertResponse;
+};
+
+export type AcknowledgeAdminOpsAlertResponse = AcknowledgeAdminOpsAlertResponses[keyof AcknowledgeAdminOpsAlertResponses];
 
 export type ListAdminCapabilitiesData = {
     body?: never;

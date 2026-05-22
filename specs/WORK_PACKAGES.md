@@ -825,15 +825,66 @@ Required gates:
 - `cd apps/api && go test ./internal/httpserver ./internal/modules/accounts/...`
 - `make architecture-check`
 
-## WP-260+: Advanced Endpoint And Provider Expansion
+## WP-260: Ops SLO And Alert Control Plane v1
 
-Use `ROADMAP.md` Phase 5 through Phase 8 to split future packages for:
+Objective: add the first durable operations control plane for SLO definitions, SLO evaluation snapshots, and alert acknowledgement so SRapi can move from basic metrics to actionable production governance without adding frontend visuals.
+
+Read first:
+
+- `docs/OBSERVABILITY_SPEC.md`
+- `docs/OPERATIONS.md`
+- `docs/OPENAPI_CONTRACT.md`
+- `docs/DATA_MODEL.md`
+- `docs/SECURITY_MODEL.md`
+- `docs/MODULE_INTERFACE_CONTRACTS.md`
+
+Owns:
+
+- `packages/openapi/openapi.yaml`
+- generated Go OpenAPI types and generated TypeScript SDK
+- `apps/api/ent/schema`
+- `apps/api/migrations/postgres`
+- `apps/api/internal/modules/operations`
+- `apps/api/internal/persistence/entstore/operations`
+- `apps/api/internal/httpserver`
+- operations/observability docs and status updates
+
+Definition of Done:
+
+- Admin Ops exposes OpenAPI-described, generated, cookie-authenticated routes for:
+  - `GET /api/v1/admin/ops/slo`
+  - `POST /api/v1/admin/ops/slo`
+  - `PATCH /api/v1/admin/ops/slo/{id}`
+  - `GET /api/v1/admin/ops/alerts`
+  - `POST /api/v1/admin/ops/alerts/{id}/ack`
+- SLO definitions persist fields from `OBSERVABILITY_SPEC.md`: name, SLI type, objective, window, status, filter, alert policy, and burn-rate thresholds.
+- Alert events persist severity, status, fingerprint, summary, details, started/resolved/acknowledged metadata, and never contain credentials, prompts, API keys, cookies, or Authorization values.
+- SLO list responses include computed availability/burn-rate evidence from existing usage logs for gateway availability SLOs.
+- SLO create/update and alert ack are CSRF-protected admin writes and emit safe audit records.
+- Persistence is implemented through Ent and PostgreSQL migrations with data model docs aligned.
+- Focused service/store/HTTP regressions cover SLO creation/update/list, computed burn-rate evidence, alert ack, CSRF protection, and secret hygiene.
+- No frontend visuals are added.
+
+Required gates:
+
+- `make openapi-lint`
+- `make openapi-bundle`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `make ent-generate-check`
+- `make migration-check`
+- `cd apps/api && go test ./internal/modules/operations/... ./internal/persistence/entstore/operations ./internal/httpserver`
+- `make architecture-check`
+- `git diff --check`
+
+## WP-270+: Advanced Endpoint And Provider Expansion
+
+Use `ROADMAP.md` Phase 7 through Phase 8 to split future packages for:
 
 - images and media runtime
 - embeddings and rerank
 - realtime/websocket
-- provider live discovery
-- SLO and alert center
 - SDK examples
 - migration guides
 

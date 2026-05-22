@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddAdminAccountGroupMemberData, AddAdminAccountGroupMemberErrors, AddAdminAccountGroupMemberResponses, BindAdminAccountProxyData, BindAdminAccountProxyErrors, BindAdminAccountProxyResponses, CancelPaymentOrderData, CancelPaymentOrderErrors, CancelPaymentOrderResponses, CreateAdminAccountData, CreateAdminAccountErrors, CreateAdminAccountGroupData, CreateAdminAccountGroupErrors, CreateAdminAccountGroupResponses, CreateAdminAccountResponses, CreateAdminModelAliasData, CreateAdminModelAliasErrors, CreateAdminModelAliasResponses, CreateAdminModelData, CreateAdminModelErrors, CreateAdminModelMappingData, CreateAdminModelMappingErrors, CreateAdminModelMappingResponses, CreateAdminModelResponses, CreateAdminPaymentProviderData, CreateAdminPaymentProviderErrors, CreateAdminPaymentProviderResponses, CreateAdminPricingRuleData, CreateAdminPricingRuleErrors, CreateAdminPricingRuleResponses, CreateAdminProviderData, CreateAdminProviderErrors, CreateAdminProviderResponses, CreateAdminSubscriptionPlanData, CreateAdminSubscriptionPlanErrors, CreateAdminSubscriptionPlanResponses, CreateAdminUserSubscriptionData, CreateAdminUserSubscriptionErrors, CreateAdminUserSubscriptionResponses, CreateAnthropicCompatibleMessageAliasData, CreateAnthropicCompatibleMessageAliasErrors, CreateAnthropicCompatibleMessageAliasResponses, CreateApiKeyData, CreateApiKeyErrors, CreateApiKeyResponses, CreateChatCompletionData, CreateChatCompletionErrors, CreateChatCompletionResponses, CreateMessageData, CreateMessageErrors, CreateMessageResponses, CreateOpenAiCompatibleChatCompletionAliasData, CreateOpenAiCompatibleChatCompletionAliasErrors, CreateOpenAiCompatibleChatCompletionAliasResponses, CreateOpenAiCompatibleMessageAliasData, CreateOpenAiCompatibleMessageAliasErrors, CreateOpenAiCompatibleMessageAliasResponses, CreateOpenAiCompatibleResponseAliasData, CreateOpenAiCompatibleResponseAliasErrors, CreateOpenAiCompatibleResponseAliasResponses, CreatePaymentOrderData, CreatePaymentOrderErrors, CreatePaymentOrderResponses, CreateResponseData, CreateResponseErrors, CreateResponseResponses, DisableAdminAccountData, DisableAdminAccountErrors, DisableAdminAccountResponses, DiscoverAdminAccountModelsData, DiscoverAdminAccountModelsErrors, DiscoverAdminAccountModelsResponses, EnableAdminAccountData, EnableAdminAccountErrors, EnableAdminAccountResponses, ExportAdminAccountsData, ExportAdminAccountsErrors, ExportAdminAccountsResponses, GenerateGeminiContentData, GenerateGeminiContentErrors, GenerateGeminiContentResponses, GetAdminAccountData, GetAdminAccountErrors, GetAdminAccountHealthData, GetAdminAccountHealthErrors, GetAdminAccountHealthResponses, GetAdminAccountQuotaData, GetAdminAccountQuotaErrors, GetAdminAccountQuotaResponses, GetAdminAccountResponses, GetAdminOverviewData, GetAdminOverviewErrors, GetAdminOverviewResponses, GetAdminSchedulerOverviewData, GetAdminSchedulerOverviewErrors, GetAdminSchedulerOverviewResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetCurrentUserSubscriptionsData, GetCurrentUserSubscriptionsErrors, GetCurrentUserSubscriptionsResponses, GetCurrentUserUsageData, GetCurrentUserUsageErrors, GetCurrentUserUsageResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetPaymentOrderData, GetPaymentOrderErrors, GetPaymentOrderResponses, HandlePaymentWebhookData, HandlePaymentWebhookErrors, HandlePaymentWebhookResponses, ImportAdminAccountsData, ImportAdminAccountsErrors, ImportAdminAccountsResponses, ListAdminAccountGroupsData, ListAdminAccountGroupsErrors, ListAdminAccountGroupsResponses, ListAdminAccountsData, ListAdminAccountsErrors, ListAdminAccountsResponses, ListAdminAuditLogsData, ListAdminAuditLogsErrors, ListAdminAuditLogsResponses, ListAdminBillingLedgerData, ListAdminBillingLedgerErrors, ListAdminBillingLedgerResponses, ListAdminCapabilitiesData, ListAdminCapabilitiesErrors, ListAdminCapabilitiesResponses, ListAdminModelsData, ListAdminModelsErrors, ListAdminModelsResponses, ListAdminOutboxEventsData, ListAdminOutboxEventsErrors, ListAdminOutboxEventsResponses, ListAdminPaymentOrdersData, ListAdminPaymentOrdersErrors, ListAdminPaymentOrdersResponses, ListAdminPaymentProvidersData, ListAdminPaymentProvidersErrors, ListAdminPaymentProvidersResponses, ListAdminPricingRulesData, ListAdminPricingRulesErrors, ListAdminPricingRulesResponses, ListAdminProvidersData, ListAdminProvidersErrors, ListAdminProvidersResponses, ListAdminSchedulerDecisionsData, ListAdminSchedulerDecisionsErrors, ListAdminSchedulerDecisionsResponses, ListAdminSubscriptionPlansData, ListAdminSubscriptionPlansErrors, ListAdminSubscriptionPlansResponses, ListAdminUsageLogsData, ListAdminUsageLogsErrors, ListAdminUsageLogsResponses, ListAdminUserSubscriptionsData, ListAdminUserSubscriptionsErrors, ListAdminUserSubscriptionsResponses, ListApiKeysData, ListApiKeysErrors, ListApiKeysResponses, ListModelsData, ListModelsErrors, ListModelsResponses, ListPaymentMethodsData, ListPaymentMethodsErrors, ListPaymentMethodsResponses, ListPaymentOrdersData, ListPaymentOrdersErrors, ListPaymentOrdersResponses, ListSchedulerStrategiesData, ListSchedulerStrategiesErrors, ListSchedulerStrategiesResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, RecoverAdminAccountData, RecoverAdminAccountErrors, RecoverAdminAccountResponses, RefundAdminPaymentOrderData, RefundAdminPaymentOrderErrors, RefundAdminPaymentOrderResponses, RemoveAdminAccountGroupMemberData, RemoveAdminAccountGroupMemberErrors, RemoveAdminAccountGroupMemberResponses, StreamGeminiContentData, StreamGeminiContentErrors, StreamGeminiContentResponse, StreamGeminiContentResponses, TestAdminAccountData, TestAdminAccountErrors, TestAdminAccountResponses, TestAdminProviderData, TestAdminProviderErrors, TestAdminProviderResponses, UpdateAdminAccountData, UpdateAdminAccountErrors, UpdateAdminAccountGroupData, UpdateAdminAccountGroupErrors, UpdateAdminAccountGroupResponses, UpdateAdminAccountResponses, UpdateAdminModelData, UpdateAdminModelErrors, UpdateAdminModelResponses, UpdateAdminProviderData, UpdateAdminProviderErrors, UpdateAdminProviderResponses, UpdateApiKeyData, UpdateApiKeyErrors, UpdateApiKeyResponses } from './types.gen';
+import type { AcknowledgeAdminOpsAlertData, AcknowledgeAdminOpsAlertErrors, AcknowledgeAdminOpsAlertResponses, AddAdminAccountGroupMemberData, AddAdminAccountGroupMemberErrors, AddAdminAccountGroupMemberResponses, BindAdminAccountProxyData, BindAdminAccountProxyErrors, BindAdminAccountProxyResponses, CancelPaymentOrderData, CancelPaymentOrderErrors, CancelPaymentOrderResponses, CreateAdminAccountData, CreateAdminAccountErrors, CreateAdminAccountGroupData, CreateAdminAccountGroupErrors, CreateAdminAccountGroupResponses, CreateAdminAccountResponses, CreateAdminModelAliasData, CreateAdminModelAliasErrors, CreateAdminModelAliasResponses, CreateAdminModelData, CreateAdminModelErrors, CreateAdminModelMappingData, CreateAdminModelMappingErrors, CreateAdminModelMappingResponses, CreateAdminModelResponses, CreateAdminOpsSloData, CreateAdminOpsSloErrors, CreateAdminOpsSloResponses, CreateAdminPaymentProviderData, CreateAdminPaymentProviderErrors, CreateAdminPaymentProviderResponses, CreateAdminPricingRuleData, CreateAdminPricingRuleErrors, CreateAdminPricingRuleResponses, CreateAdminProviderData, CreateAdminProviderErrors, CreateAdminProviderResponses, CreateAdminSubscriptionPlanData, CreateAdminSubscriptionPlanErrors, CreateAdminSubscriptionPlanResponses, CreateAdminUserSubscriptionData, CreateAdminUserSubscriptionErrors, CreateAdminUserSubscriptionResponses, CreateAnthropicCompatibleMessageAliasData, CreateAnthropicCompatibleMessageAliasErrors, CreateAnthropicCompatibleMessageAliasResponses, CreateApiKeyData, CreateApiKeyErrors, CreateApiKeyResponses, CreateChatCompletionData, CreateChatCompletionErrors, CreateChatCompletionResponses, CreateMessageData, CreateMessageErrors, CreateMessageResponses, CreateOpenAiCompatibleChatCompletionAliasData, CreateOpenAiCompatibleChatCompletionAliasErrors, CreateOpenAiCompatibleChatCompletionAliasResponses, CreateOpenAiCompatibleMessageAliasData, CreateOpenAiCompatibleMessageAliasErrors, CreateOpenAiCompatibleMessageAliasResponses, CreateOpenAiCompatibleResponseAliasData, CreateOpenAiCompatibleResponseAliasErrors, CreateOpenAiCompatibleResponseAliasResponses, CreatePaymentOrderData, CreatePaymentOrderErrors, CreatePaymentOrderResponses, CreateResponseData, CreateResponseErrors, CreateResponseResponses, DisableAdminAccountData, DisableAdminAccountErrors, DisableAdminAccountResponses, DiscoverAdminAccountModelsData, DiscoverAdminAccountModelsErrors, DiscoverAdminAccountModelsResponses, EnableAdminAccountData, EnableAdminAccountErrors, EnableAdminAccountResponses, ExportAdminAccountsData, ExportAdminAccountsErrors, ExportAdminAccountsResponses, GenerateGeminiContentData, GenerateGeminiContentErrors, GenerateGeminiContentResponses, GetAdminAccountData, GetAdminAccountErrors, GetAdminAccountHealthData, GetAdminAccountHealthErrors, GetAdminAccountHealthResponses, GetAdminAccountQuotaData, GetAdminAccountQuotaErrors, GetAdminAccountQuotaResponses, GetAdminAccountResponses, GetAdminOverviewData, GetAdminOverviewErrors, GetAdminOverviewResponses, GetAdminSchedulerOverviewData, GetAdminSchedulerOverviewErrors, GetAdminSchedulerOverviewResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetCurrentUserSubscriptionsData, GetCurrentUserSubscriptionsErrors, GetCurrentUserSubscriptionsResponses, GetCurrentUserUsageData, GetCurrentUserUsageErrors, GetCurrentUserUsageResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetPaymentOrderData, GetPaymentOrderErrors, GetPaymentOrderResponses, HandlePaymentWebhookData, HandlePaymentWebhookErrors, HandlePaymentWebhookResponses, ImportAdminAccountsData, ImportAdminAccountsErrors, ImportAdminAccountsResponses, ListAdminAccountGroupsData, ListAdminAccountGroupsErrors, ListAdminAccountGroupsResponses, ListAdminAccountsData, ListAdminAccountsErrors, ListAdminAccountsResponses, ListAdminAuditLogsData, ListAdminAuditLogsErrors, ListAdminAuditLogsResponses, ListAdminBillingLedgerData, ListAdminBillingLedgerErrors, ListAdminBillingLedgerResponses, ListAdminCapabilitiesData, ListAdminCapabilitiesErrors, ListAdminCapabilitiesResponses, ListAdminModelsData, ListAdminModelsErrors, ListAdminModelsResponses, ListAdminOpsAlertsData, ListAdminOpsAlertsErrors, ListAdminOpsAlertsResponses, ListAdminOpsSlosData, ListAdminOpsSlosErrors, ListAdminOpsSlosResponses, ListAdminOutboxEventsData, ListAdminOutboxEventsErrors, ListAdminOutboxEventsResponses, ListAdminPaymentOrdersData, ListAdminPaymentOrdersErrors, ListAdminPaymentOrdersResponses, ListAdminPaymentProvidersData, ListAdminPaymentProvidersErrors, ListAdminPaymentProvidersResponses, ListAdminPricingRulesData, ListAdminPricingRulesErrors, ListAdminPricingRulesResponses, ListAdminProvidersData, ListAdminProvidersErrors, ListAdminProvidersResponses, ListAdminSchedulerDecisionsData, ListAdminSchedulerDecisionsErrors, ListAdminSchedulerDecisionsResponses, ListAdminSubscriptionPlansData, ListAdminSubscriptionPlansErrors, ListAdminSubscriptionPlansResponses, ListAdminUsageLogsData, ListAdminUsageLogsErrors, ListAdminUsageLogsResponses, ListAdminUserSubscriptionsData, ListAdminUserSubscriptionsErrors, ListAdminUserSubscriptionsResponses, ListApiKeysData, ListApiKeysErrors, ListApiKeysResponses, ListModelsData, ListModelsErrors, ListModelsResponses, ListPaymentMethodsData, ListPaymentMethodsErrors, ListPaymentMethodsResponses, ListPaymentOrdersData, ListPaymentOrdersErrors, ListPaymentOrdersResponses, ListSchedulerStrategiesData, ListSchedulerStrategiesErrors, ListSchedulerStrategiesResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, RecoverAdminAccountData, RecoverAdminAccountErrors, RecoverAdminAccountResponses, RefundAdminPaymentOrderData, RefundAdminPaymentOrderErrors, RefundAdminPaymentOrderResponses, RemoveAdminAccountGroupMemberData, RemoveAdminAccountGroupMemberErrors, RemoveAdminAccountGroupMemberResponses, StreamGeminiContentData, StreamGeminiContentErrors, StreamGeminiContentResponse, StreamGeminiContentResponses, TestAdminAccountData, TestAdminAccountErrors, TestAdminAccountResponses, TestAdminProviderData, TestAdminProviderErrors, TestAdminProviderResponses, UpdateAdminAccountData, UpdateAdminAccountErrors, UpdateAdminAccountGroupData, UpdateAdminAccountGroupErrors, UpdateAdminAccountGroupResponses, UpdateAdminAccountResponses, UpdateAdminModelData, UpdateAdminModelErrors, UpdateAdminModelResponses, UpdateAdminOpsSloData, UpdateAdminOpsSloErrors, UpdateAdminOpsSloResponses, UpdateAdminProviderData, UpdateAdminProviderErrors, UpdateAdminProviderResponses, UpdateApiKeyData, UpdateApiKeyErrors, UpdateApiKeyResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -845,6 +845,79 @@ export const listAdminOutboxEvents = <ThrowOnError extends boolean = false>(opti
             type: 'apiKey'
         }],
     url: '/api/v1/admin/ops/events/outbox',
+    ...options
+});
+
+/**
+ * List operational SLO definitions with current evaluation evidence.
+ */
+export const listAdminOpsSlos = <ThrowOnError extends boolean = false>(options?: Options<ListAdminOpsSlosData, ThrowOnError>) => (options?.client ?? client).get<ListAdminOpsSlosResponses, ListAdminOpsSlosErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'srapi_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/admin/ops/slo',
+    ...options
+});
+
+/**
+ * Create an operational SLO definition.
+ */
+export const createAdminOpsSlo = <ThrowOnError extends boolean = false>(options: Options<CreateAdminOpsSloData, ThrowOnError>) => (options.client ?? client).post<CreateAdminOpsSloResponses, CreateAdminOpsSloErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'srapi_session',
+            type: 'apiKey'
+        }, { name: 'X-CSRF-Token', type: 'apiKey' }],
+    url: '/api/v1/admin/ops/slo',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Update an operational SLO definition.
+ */
+export const updateAdminOpsSlo = <ThrowOnError extends boolean = false>(options: Options<UpdateAdminOpsSloData, ThrowOnError>) => (options.client ?? client).patch<UpdateAdminOpsSloResponses, UpdateAdminOpsSloErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'srapi_session',
+            type: 'apiKey'
+        }, { name: 'X-CSRF-Token', type: 'apiKey' }],
+    url: '/api/v1/admin/ops/slo/{id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * List operational alert events.
+ */
+export const listAdminOpsAlerts = <ThrowOnError extends boolean = false>(options?: Options<ListAdminOpsAlertsData, ThrowOnError>) => (options?.client ?? client).get<ListAdminOpsAlertsResponses, ListAdminOpsAlertsErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'srapi_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/admin/ops/alerts',
+    ...options
+});
+
+/**
+ * Acknowledge an operational alert event.
+ */
+export const acknowledgeAdminOpsAlert = <ThrowOnError extends boolean = false>(options: Options<AcknowledgeAdminOpsAlertData, ThrowOnError>) => (options.client ?? client).post<AcknowledgeAdminOpsAlertResponses, AcknowledgeAdminOpsAlertErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'srapi_session',
+            type: 'apiKey'
+        }, { name: 'X-CSRF-Token', type: 'apiKey' }],
+    url: '/api/v1/admin/ops/alerts/{id}/ack',
     ...options
 });
 

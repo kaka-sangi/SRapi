@@ -2151,6 +2151,195 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/ops/slo:
+    get:
+      tags:
+        - AdminOps
+      operationId: listAdminOpsSLOs
+      summary: List operational SLO definitions with current evaluation evidence.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: SLO list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsSLOListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+    post:
+      tags:
+        - AdminOps
+      operationId: createAdminOpsSLO
+      summary: Create an operational SLO definition.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOpsSLORequest"
+      responses:
+        "201":
+          description: SLO created.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsSLODefinitionResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/ops/slo/{id}:
+    patch:
+      tags:
+        - AdminOps
+      operationId: updateAdminOpsSLO
+      summary: Update an operational SLO definition.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOpsSLORequest"
+      responses:
+        "200":
+          description: SLO updated.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsSLODefinitionResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/ops/alerts:
+    get:
+      tags:
+        - AdminOps
+      operationId: listAdminOpsAlerts
+      summary: List operational alert events.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/OpsAlertStatus"
+        - name: severity
+          in: query
+          schema:
+            $ref: "#/components/schemas/OpsAlertSeverity"
+      responses:
+        "200":
+          description: Alert list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsAlertListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/ops/alerts/{id}/ack:
+    post:
+      tags:
+        - AdminOps
+      operationId: acknowledgeAdminOpsAlert
+      summary: Acknowledge an operational alert event.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Alert acknowledged.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsAlertResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/capabilities:
     get:
       tags:
@@ -5498,6 +5687,350 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/DomainEventOutbox"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    OpsSLOStatus:
+      type: string
+      enum:
+        - active
+        - disabled
+
+    OpsSLIType:
+      type: string
+      enum:
+        - availability
+        - latency
+        - freshness
+        - quality
+
+    OpsAlertSeverity:
+      type: string
+      enum:
+        - critical
+        - warning
+        - ticket
+
+    OpsAlertStatus:
+      type: string
+      enum:
+        - firing
+        - acknowledged
+        - resolved
+        - suppressed
+
+    OpsSLOFilter:
+      type: object
+      required:
+        - source_endpoint
+        - model
+        - error_owner_exclude
+      properties:
+        source_endpoint:
+          type: string
+        model:
+          type: string
+        provider_id:
+          $ref: "#/components/schemas/Id"
+          nullable: true
+        error_owner_exclude:
+          type: array
+          items:
+            type: string
+            enum:
+              - client
+              - business
+              - scheduler
+              - reverse_proxy
+              - provider
+              - internal
+          default: []
+
+    OpsBurnRateThreshold:
+      type: object
+      required:
+        - severity
+        - short_window_seconds
+        - long_window_seconds
+        - burn_rate
+        - min_request_count
+      properties:
+        severity:
+          $ref: "#/components/schemas/OpsAlertSeverity"
+        short_window_seconds:
+          type: integer
+          minimum: 1
+        long_window_seconds:
+          type: integer
+          minimum: 1
+        burn_rate:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+        min_request_count:
+          type: integer
+          minimum: 0
+
+    OpsAlertPolicy:
+      type: object
+      required:
+        - name
+        - thresholds
+      properties:
+        name:
+          type: string
+          example: multi_window_burn_rate
+        thresholds:
+          type: array
+          items:
+            $ref: "#/components/schemas/OpsBurnRateThreshold"
+          default: []
+
+    OpsSLODefinition:
+      type: object
+      required:
+        - id
+        - name
+        - sli_type
+        - objective
+        - window_days
+        - status
+        - filter
+        - alert_policy
+        - created_at
+        - updated_at
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        name:
+          type: string
+        sli_type:
+          $ref: "#/components/schemas/OpsSLIType"
+        objective:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Objective stored as a ratio, for example 0.995 for 99.5%.
+        window_days:
+          type: integer
+          minimum: 1
+          maximum: 365
+        status:
+          $ref: "#/components/schemas/OpsSLOStatus"
+        filter:
+          $ref: "#/components/schemas/OpsSLOFilter"
+        alert_policy:
+          $ref: "#/components/schemas/OpsAlertPolicy"
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+        updated_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    OpsSLOEvaluation:
+      type: object
+      required:
+        - window_start
+        - window_end
+        - total_requests
+        - good_requests
+        - bad_requests
+        - error_rate
+        - burn_rate
+        - objective
+        - error_budget_consumed
+      properties:
+        window_start:
+          $ref: "#/components/schemas/Timestamp"
+        window_end:
+          $ref: "#/components/schemas/Timestamp"
+        total_requests:
+          type: integer
+          minimum: 0
+        good_requests:
+          type: integer
+          minimum: 0
+        bad_requests:
+          type: integer
+          minimum: 0
+        error_rate:
+          type: number
+          minimum: 0
+          maximum: 1
+        burn_rate:
+          type: number
+          minimum: 0
+        objective:
+          type: number
+          minimum: 0
+          maximum: 1
+        error_budget_consumed:
+          type: number
+          minimum: 0
+          maximum: 1
+
+    OpsSLO:
+      type: object
+      required:
+        - definition
+        - evaluation
+      properties:
+        definition:
+          $ref: "#/components/schemas/OpsSLODefinition"
+        evaluation:
+          $ref: "#/components/schemas/OpsSLOEvaluation"
+
+    CreateOpsSLORequest:
+      type: object
+      required:
+        - name
+        - objective
+      properties:
+        name:
+          type: string
+          minLength: 1
+        sli_type:
+          $ref: "#/components/schemas/OpsSLIType"
+        objective:
+          type: number
+          minimum: 0
+          maximum: 100
+          description: Accepts ratio values like 0.995 or percent values like 99.5; responses store the ratio.
+        window_days:
+          type: integer
+          minimum: 1
+          maximum: 365
+        status:
+          $ref: "#/components/schemas/OpsSLOStatus"
+        filter:
+          $ref: "#/components/schemas/OpsSLOFilter"
+        alert_policy:
+          $ref: "#/components/schemas/OpsAlertPolicy"
+
+    UpdateOpsSLORequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        objective:
+          type: number
+          minimum: 0
+          maximum: 100
+          description: Accepts ratio values like 0.995 or percent values like 99.5; responses store the ratio.
+        window_days:
+          type: integer
+          minimum: 1
+          maximum: 365
+        status:
+          $ref: "#/components/schemas/OpsSLOStatus"
+        filter:
+          $ref: "#/components/schemas/OpsSLOFilter"
+        alert_policy:
+          $ref: "#/components/schemas/OpsAlertPolicy"
+
+    OpsSLODefinitionResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/OpsSLODefinition"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    OpsSLOListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/OpsSLO"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    OpsAlertEvent:
+      type: object
+      required:
+        - id
+        - rule_id
+        - severity
+        - status
+        - fingerprint
+        - summary
+        - details
+        - started_at
+        - created_at
+        - updated_at
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        slo_id:
+          $ref: "#/components/schemas/Id"
+          nullable: true
+        rule_id:
+          type: string
+        severity:
+          $ref: "#/components/schemas/OpsAlertSeverity"
+        status:
+          $ref: "#/components/schemas/OpsAlertStatus"
+        fingerprint:
+          type: string
+        summary:
+          type: string
+        details:
+          $ref: "#/components/schemas/JsonObject"
+        started_at:
+          $ref: "#/components/schemas/Timestamp"
+        resolved_at:
+          type: string
+          format: date-time
+          nullable: true
+        acknowledged_at:
+          type: string
+          format: date-time
+          nullable: true
+        acknowledged_by:
+          $ref: "#/components/schemas/Id"
+          nullable: true
+        suppressed_by:
+          type: string
+          nullable: true
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+        updated_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    OpsAlertResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/OpsAlertEvent"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    OpsAlertListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/OpsAlertEvent"
         pagination:
           $ref: "#/components/schemas/Pagination"
         request_id:

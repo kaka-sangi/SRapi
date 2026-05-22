@@ -72,6 +72,8 @@ func TestEntSchemaAppliesToEmptyDatabase(t *testing.T) {
 		"model_alias",
 		"model_provider_mappings",
 		"model_registries",
+		"obs_alert_events",
+		"obs_slo_definitions",
 		"payment_audit_logs",
 		"payment_orders",
 		"payment_provider_instances",

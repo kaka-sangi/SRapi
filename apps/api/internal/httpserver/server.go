@@ -20,6 +20,7 @@ import (
 	billingcontract "github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
 	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
+	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
 	paymentcontract "github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	providerpreset "github.com/srapi/srapi/apps/api/internal/modules/providers/preset"
@@ -54,6 +55,7 @@ type runtimeOptions struct {
 	audit         auditcontract.Store
 	billing       billingcontract.Store
 	events        eventscontract.Store
+	operations    operationscontract.Store
 	payments      paymentcontract.Store
 	scheduler     schedulercontract.Store
 	subscriptions subscriptioncontract.Store
@@ -117,6 +119,12 @@ func WithBillingStore(store billingcontract.Store) Option {
 func WithEventStore(store eventscontract.Store) Option {
 	return func(opts *runtimeOptions) {
 		opts.events = store
+	}
+}
+
+func WithOperationsStore(store operationscontract.Store) Option {
+	return func(opts *runtimeOptions) {
+		opts.operations = store
 	}
 }
 
@@ -234,6 +242,11 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("GET /api/v1/admin/pricing-rules", server.handleListAdminPricingRules)
 	mux.HandleFunc("POST /api/v1/admin/pricing-rules", server.handleCreateAdminPricingRule)
 	mux.HandleFunc("GET /api/v1/admin/ops/events/outbox", server.handleListAdminOutboxEvents)
+	mux.HandleFunc("GET /api/v1/admin/ops/slo", server.handleListAdminOpsSLOs)
+	mux.HandleFunc("POST /api/v1/admin/ops/slo", server.handleCreateAdminOpsSLO)
+	mux.HandleFunc("PATCH /api/v1/admin/ops/slo/{id}", server.handleUpdateAdminOpsSLO)
+	mux.HandleFunc("GET /api/v1/admin/ops/alerts", server.handleListAdminOpsAlerts)
+	mux.HandleFunc("POST /api/v1/admin/ops/alerts/{id}/ack", server.handleAcknowledgeAdminOpsAlert)
 	mux.HandleFunc("GET /api/v1/admin/capabilities", server.handleListAdminCapabilities)
 	mux.HandleFunc("GET /api/v1/admin/scheduler/overview", server.handleAdminSchedulerOverview)
 	mux.HandleFunc("GET /api/v1/admin/scheduler/decisions", server.handleListAdminSchedulerDecisions)

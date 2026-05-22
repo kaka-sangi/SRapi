@@ -10,12 +10,19 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/config"
+	auditcontract "github.com/srapi/srapi/apps/api/internal/modules/audit/contract"
+	auditmemory "github.com/srapi/srapi/apps/api/internal/modules/audit/store/memory"
+	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
+	operationsmemory "github.com/srapi/srapi/apps/api/internal/modules/operations/store/memory"
 	schedulermemory "github.com/srapi/srapi/apps/api/internal/modules/scheduler/store/memory"
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	subscriptionservice "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/service"
 	subscriptionmemory "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/store/memory"
+	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
+	usagememory "github.com/srapi/srapi/apps/api/internal/modules/usage/store/memory"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
 
@@ -396,6 +403,9 @@ func TestConsoleWriteRoutesRequireCSRF(t *testing.T) {
 		{http.MethodPost, "/api/v1/admin/subscription-plans", `{"name":"blocked-plan","price":"1.00","currency":"USD","validity_days":30}`},
 		{http.MethodPost, "/api/v1/admin/user-subscriptions", `{"user_id":"` + string(loginResp.Data.User.Id) + `","plan_id":"1"}`},
 		{http.MethodPost, "/api/v1/admin/pricing-rules", `{"model_id":"` + string(modelResp.Data.Id) + `","provider_id":"` + string(providerResp.Data.Id) + `","input_price_per_million_tokens":"1","output_price_per_million_tokens":"2","cache_read_price_per_million_tokens":"0","cache_write_price_per_million_tokens":"0","currency":"USD"}`},
+		{http.MethodPost, "/api/v1/admin/ops/slo", `{"name":"blocked-slo","objective":99}`},
+		{http.MethodPatch, "/api/v1/admin/ops/slo/1", `{"status":"disabled"}`},
+		{http.MethodPost, "/api/v1/admin/ops/alerts/1/ack", `{}`},
 	}
 
 	for _, route := range writeRoutes {
@@ -406,6 +416,160 @@ func TestConsoleWriteRoutesRequireCSRF(t *testing.T) {
 		handler.ServeHTTP(rec, req)
 		if rec.Code != http.StatusForbidden {
 			t.Fatalf("%s %s without csrf: expected 403, got %d body=%s", route.method, route.path, rec.Code, rec.Body.String())
+		}
+	}
+}
+
+func TestAdminOpsSLOAndAlertControlPlane(t *testing.T) {
+	usageStore := usagememory.New()
+	operationsStore := operationsmemory.NewWithUsageStore(usageStore)
+	auditStore := auditmemory.New()
+	handler := New(config.Load(), nil,
+		WithUsageStore(usageStore),
+		WithOperationsStore(operationsStore),
+		WithAuditStore(auditStore),
+	)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	ctx := t.Context()
+	now := time.Now().UTC().Add(-time.Minute)
+	clientError := "invalid_request"
+	providerError := "rate_limit"
+	seedUsageLog(t, usageStore, usagecontract.UsageLog{
+		RequestID:      "req_ops_good",
+		SourceEndpoint: "/v1/chat/completions",
+		Model:          "ops-model",
+		Success:        true,
+		CreatedAt:      now,
+	})
+	seedUsageLog(t, usageStore, usagecontract.UsageLog{
+		RequestID:      "req_ops_bad",
+		SourceEndpoint: "/v1/chat/completions",
+		Model:          "ops-model",
+		Success:        false,
+		ErrorClass:     &providerError,
+		CreatedAt:      now,
+	})
+	seedUsageLog(t, usageStore, usagecontract.UsageLog{
+		RequestID:      "req_ops_client_bad",
+		SourceEndpoint: "/v1/chat/completions",
+		Model:          "ops-model",
+		Success:        false,
+		ErrorClass:     &clientError,
+		CreatedAt:      now,
+	})
+
+	createReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/ops/slo", strings.NewReader(`{"name":"Gateway availability","sli_type":"availability","objective":99,"window_days":28,"filter":{"source_endpoint":"/v1/chat/completions","model":"ops-model","error_owner_exclude":["client"]},"alert_policy":{"name":"multi_window_burn_rate","thresholds":[{"severity":"critical","short_window_seconds":300,"long_window_seconds":3600,"burn_rate":14,"min_request_count":2}]}}`))
+	createReq.Header.Set("Content-Type", "application/json")
+	createReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	createReq.AddCookie(sessionCookie)
+	createRec := httptest.NewRecorder()
+	handler.ServeHTTP(createRec, createReq)
+	if createRec.Code != http.StatusCreated {
+		t.Fatalf("expected slo create 201, got %d body=%s", createRec.Code, createRec.Body.String())
+	}
+	var createResp apiopenapi.OpsSLODefinitionResponse
+	if err := json.NewDecoder(createRec.Body).Decode(&createResp); err != nil {
+		t.Fatalf("decode slo create: %v", err)
+	}
+	if createResp.Data.Objective < 0.989 || createResp.Data.Objective > 0.991 {
+		t.Fatalf("expected percent objective normalized to ratio, got %+v", createResp.Data)
+	}
+
+	listReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/ops/slo", nil)
+	listReq.AddCookie(sessionCookie)
+	listRec := httptest.NewRecorder()
+	handler.ServeHTTP(listRec, listReq)
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("expected slo list 200, got %d body=%s", listRec.Code, listRec.Body.String())
+	}
+	var listResp apiopenapi.OpsSLOListResponse
+	if err := json.NewDecoder(listRec.Body).Decode(&listResp); err != nil {
+		t.Fatalf("decode slo list: %v", err)
+	}
+	if len(listResp.Data) != 1 || listResp.Data[0].Evaluation.TotalRequests != 2 || listResp.Data[0].Evaluation.BadRequests != 1 {
+		t.Fatalf("expected evaluated slo to count provider-owned failure only, got %+v", listResp.Data)
+	}
+
+	updateReq := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/ops/slo/"+string(createResp.Data.Id), strings.NewReader(`{"status":"disabled","objective":0.995}`))
+	updateReq.Header.Set("Content-Type", "application/json")
+	updateReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	updateReq.AddCookie(sessionCookie)
+	updateRec := httptest.NewRecorder()
+	handler.ServeHTTP(updateRec, updateReq)
+	if updateRec.Code != http.StatusOK {
+		t.Fatalf("expected slo update 200, got %d body=%s", updateRec.Code, updateRec.Body.String())
+	}
+	var updateResp apiopenapi.OpsSLODefinitionResponse
+	if err := json.NewDecoder(updateRec.Body).Decode(&updateResp); err != nil {
+		t.Fatalf("decode slo update: %v", err)
+	}
+	if updateResp.Data.Status != apiopenapi.OpsSLOStatusDisabled || updateResp.Data.Objective < 0.994 || updateResp.Data.Objective > 0.996 {
+		t.Fatalf("unexpected slo update response: %+v", updateResp.Data)
+	}
+
+	sloID, err := strconv.Atoi(string(createResp.Data.Id))
+	if err != nil {
+		t.Fatalf("parse slo id: %v", err)
+	}
+	alert, err := operationsStore.CreateAlert(ctx, operationscontract.AlertEvent{
+		SLOID:       &sloID,
+		RuleID:      "slo.gateway.availability",
+		Severity:    operationscontract.AlertSeverityCritical,
+		Status:      operationscontract.AlertStatusFiring,
+		Fingerprint: "slo:gateway:availability",
+		Summary:     "Gateway availability burn rate high",
+		Details:     map[string]any{"burn_rate": 50, "sample": "not-copied"},
+		StartedAt:   now,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	})
+	if err != nil {
+		t.Fatalf("seed alert: %v", err)
+	}
+
+	alertsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/ops/alerts?status=firing&severity=critical", nil)
+	alertsReq.AddCookie(sessionCookie)
+	alertsRec := httptest.NewRecorder()
+	handler.ServeHTTP(alertsRec, alertsReq)
+	if alertsRec.Code != http.StatusOK {
+		t.Fatalf("expected alert list 200, got %d body=%s", alertsRec.Code, alertsRec.Body.String())
+	}
+	var alertsResp apiopenapi.OpsAlertListResponse
+	if err := json.NewDecoder(alertsRec.Body).Decode(&alertsResp); err != nil {
+		t.Fatalf("decode alert list: %v", err)
+	}
+	if len(alertsResp.Data) != 1 || alertsResp.Data[0].Status != apiopenapi.Firing {
+		t.Fatalf("expected firing critical alert, got %+v", alertsResp.Data)
+	}
+
+	ackReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/ops/alerts/"+strconv.Itoa(alert.ID)+"/ack", nil)
+	ackReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	ackReq.AddCookie(sessionCookie)
+	ackRec := httptest.NewRecorder()
+	handler.ServeHTTP(ackRec, ackReq)
+	if ackRec.Code != http.StatusOK {
+		t.Fatalf("expected alert ack 200, got %d body=%s", ackRec.Code, ackRec.Body.String())
+	}
+	var ackResp apiopenapi.OpsAlertResponse
+	if err := json.NewDecoder(ackRec.Body).Decode(&ackResp); err != nil {
+		t.Fatalf("decode alert ack: %v", err)
+	}
+	if ackResp.Data.Status != apiopenapi.Acknowledged || ackResp.Data.AcknowledgedBy == nil {
+		t.Fatalf("expected acknowledged alert response, got %+v", ackResp.Data)
+	}
+
+	auditLogs, err := auditStore.List(ctx)
+	if err != nil {
+		t.Fatalf("list audit: %v", err)
+	}
+	if !auditContractLogHasAction(auditLogs, "ops_slo.create") || !auditContractLogHasAction(auditLogs, "ops_slo.update") || !auditContractLogHasAction(auditLogs, "ops_alert.ack") {
+		t.Fatalf("expected ops audit actions, got %+v", auditLogs)
+	}
+	for _, item := range auditLogs {
+		if item.Action == "ops_alert.ack" {
+			if _, ok := item.After["details"]; ok {
+				t.Fatalf("alert ack audit must not expose alert details: %+v", item.After)
+			}
 		}
 	}
 }
@@ -449,7 +613,7 @@ func TestAdminSubscriptionPricingControlPlane(t *testing.T) {
 	if err := json.NewDecoder(userSubRec.Body).Decode(&userSubResp); err != nil {
 		t.Fatalf("decode user subscription: %v", err)
 	}
-	if userSubResp.Data.UserId != loginResp.Data.User.Id || userSubResp.Data.PlanId != planResp.Data.Id || userSubResp.Data.Status != apiopenapi.UserSubscriptionStatusActive {
+	if userSubResp.Data.UserId != loginResp.Data.User.Id || userSubResp.Data.PlanId != planResp.Data.Id || userSubResp.Data.Status != apiopenapi.Active {
 		t.Fatalf("unexpected user subscription response: %+v", userSubResp.Data)
 	}
 	if userSubResp.Data.EntitlementsSnapshot["scheduler_strategy"] != "cost_saver" {
@@ -3072,6 +3236,31 @@ func mustGatewayRequest(t *testing.T, handler http.Handler, apiKey, method, path
 	return rec
 }
 
+func seedUsageLog(t *testing.T, store usagecontract.Store, input usagecontract.UsageLog) {
+	t.Helper()
+	if input.UserID == 0 {
+		input.UserID = 1
+	}
+	if input.APIKeyID == 0 {
+		input.APIKeyID = 1
+	}
+	if input.SourceProtocol == "" {
+		input.SourceProtocol = "openai-compatible"
+	}
+	if input.TargetProtocol == "" {
+		input.TargetProtocol = "openai-compatible"
+	}
+	if input.Cost == "" {
+		input.Cost = "0.00000000"
+	}
+	if input.Currency == "" {
+		input.Currency = "USD"
+	}
+	if _, err := store.Create(t.Context(), input); err != nil {
+		t.Fatalf("seed usage log: %v", err)
+	}
+}
+
 func mustCreateProvider(t *testing.T, handler http.Handler, sessionCookie *http.Cookie, csrfToken, body string) apiopenapi.ProviderResponse {
 	t.Helper()
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/providers", strings.NewReader(body))
@@ -3267,6 +3456,15 @@ func assertAdminListContains(t *testing.T, handler http.Handler, sessionCookie *
 }
 
 func auditLogHasAction(items []apiopenapi.AuditLog, action string) bool {
+	for _, item := range items {
+		if item.Action == action {
+			return true
+		}
+	}
+	return false
+}
+
+func auditContractLogHasAction(items []auditcontract.Log, action string) bool {
 	for _, item := range items {
 		if item.Action == action {
 			return true

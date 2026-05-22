@@ -63,6 +63,12 @@ type ModelProviderMapping func(*sql.Selector)
 // ModelRegistry is the predicate function for modelregistry builders.
 type ModelRegistry func(*sql.Selector)
 
+// ObsAlertEvent is the predicate function for obsalertevent builders.
+type ObsAlertEvent func(*sql.Selector)
+
+// ObsSLODefinition is the predicate function for obsslodefinition builders.
+type ObsSLODefinition func(*sql.Selector)
+
 // PaymentAuditLog is the predicate function for paymentauditlog builders.
 type PaymentAuditLog func(*sql.Selector)
 

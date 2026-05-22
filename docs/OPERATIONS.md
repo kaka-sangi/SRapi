@@ -277,4 +277,4 @@ MVP 必须至少实现：
 
 Phase 2 起必须补齐 `/metrics`、备份恢复、发布 smoke、数据生命周期清理和 SLO 告警。
 
-当前 Phase 2 已补齐 `/metrics`、PostgreSQL 手动备份/恢复入口、release smoke 和基础数据生命周期清理；SLO 告警仍按 `OBSERVABILITY_SPEC.md` 在后续运维包继续展开。
+当前 Phase 2 已补齐 `/metrics`、PostgreSQL 手动备份/恢复入口、release smoke、基础数据生命周期清理，以及 SLO/告警控制面 v1。SLO 定义和告警事件落库到 `obs_slo_definitions`、`obs_alert_events`；告警通知、抑制规则和聚合 rollup 仍按 `OBSERVABILITY_SPEC.md` 后续展开。

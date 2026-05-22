@@ -1,5 +1,12 @@
 package service
 
-import "errors"
+import (
+	"errors"
 
-var ErrInvalidInput = errors.New("invalid operations input")
+	"github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
+)
+
+var (
+	ErrInvalidInput = errors.New("invalid operations input")
+	ErrNotFound     = contract.ErrNotFound
+)

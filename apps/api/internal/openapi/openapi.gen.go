@@ -545,6 +545,123 @@ func (e OpenAIModelListObject) Valid() bool {
 	}
 }
 
+// Defines values for OpsAlertSeverity.
+const (
+	Critical OpsAlertSeverity = "critical"
+	Ticket   OpsAlertSeverity = "ticket"
+	Warning  OpsAlertSeverity = "warning"
+)
+
+// Valid indicates whether the value is a known member of the OpsAlertSeverity enum.
+func (e OpsAlertSeverity) Valid() bool {
+	switch e {
+	case Critical:
+		return true
+	case Ticket:
+		return true
+	case Warning:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for OpsAlertStatus.
+const (
+	Acknowledged OpsAlertStatus = "acknowledged"
+	Firing       OpsAlertStatus = "firing"
+	Resolved     OpsAlertStatus = "resolved"
+	Suppressed   OpsAlertStatus = "suppressed"
+)
+
+// Valid indicates whether the value is a known member of the OpsAlertStatus enum.
+func (e OpsAlertStatus) Valid() bool {
+	switch e {
+	case Acknowledged:
+		return true
+	case Firing:
+		return true
+	case Resolved:
+		return true
+	case Suppressed:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for OpsSLIType.
+const (
+	Availability OpsSLIType = "availability"
+	Freshness    OpsSLIType = "freshness"
+	Latency      OpsSLIType = "latency"
+	Quality      OpsSLIType = "quality"
+)
+
+// Valid indicates whether the value is a known member of the OpsSLIType enum.
+func (e OpsSLIType) Valid() bool {
+	switch e {
+	case Availability:
+		return true
+	case Freshness:
+		return true
+	case Latency:
+		return true
+	case Quality:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for OpsSLOFilterErrorOwnerExclude.
+const (
+	OpsSLOFilterErrorOwnerExcludeBusiness     OpsSLOFilterErrorOwnerExclude = "business"
+	OpsSLOFilterErrorOwnerExcludeClient       OpsSLOFilterErrorOwnerExclude = "client"
+	OpsSLOFilterErrorOwnerExcludeInternal     OpsSLOFilterErrorOwnerExclude = "internal"
+	OpsSLOFilterErrorOwnerExcludeProvider     OpsSLOFilterErrorOwnerExclude = "provider"
+	OpsSLOFilterErrorOwnerExcludeReverseProxy OpsSLOFilterErrorOwnerExclude = "reverse_proxy"
+	OpsSLOFilterErrorOwnerExcludeScheduler    OpsSLOFilterErrorOwnerExclude = "scheduler"
+)
+
+// Valid indicates whether the value is a known member of the OpsSLOFilterErrorOwnerExclude enum.
+func (e OpsSLOFilterErrorOwnerExclude) Valid() bool {
+	switch e {
+	case OpsSLOFilterErrorOwnerExcludeBusiness:
+		return true
+	case OpsSLOFilterErrorOwnerExcludeClient:
+		return true
+	case OpsSLOFilterErrorOwnerExcludeInternal:
+		return true
+	case OpsSLOFilterErrorOwnerExcludeProvider:
+		return true
+	case OpsSLOFilterErrorOwnerExcludeReverseProxy:
+		return true
+	case OpsSLOFilterErrorOwnerExcludeScheduler:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for OpsSLOStatus.
+const (
+	OpsSLOStatusActive   OpsSLOStatus = "active"
+	OpsSLOStatusDisabled OpsSLOStatus = "disabled"
+)
+
+// Valid indicates whether the value is a known member of the OpsSLOStatus enum.
+func (e OpsSLOStatus) Valid() bool {
+	switch e {
+	case OpsSLOStatusActive:
+		return true
+	case OpsSLOStatusDisabled:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PaymentOrderStatus.
 const (
 	PaymentOrderStatusCanceled          PaymentOrderStatus = "canceled"
@@ -931,22 +1048,22 @@ func (e UserStatus) Valid() bool {
 
 // Defines values for UserSubscriptionStatus.
 const (
-	UserSubscriptionStatusActive    UserSubscriptionStatus = "active"
-	UserSubscriptionStatusCancelled UserSubscriptionStatus = "cancelled"
-	UserSubscriptionStatusExpired   UserSubscriptionStatus = "expired"
-	UserSubscriptionStatusSuspended UserSubscriptionStatus = "suspended"
+	Active    UserSubscriptionStatus = "active"
+	Cancelled UserSubscriptionStatus = "cancelled"
+	Expired   UserSubscriptionStatus = "expired"
+	Suspended UserSubscriptionStatus = "suspended"
 )
 
 // Valid indicates whether the value is a known member of the UserSubscriptionStatus enum.
 func (e UserSubscriptionStatus) Valid() bool {
 	switch e {
-	case UserSubscriptionStatusActive:
+	case Active:
 		return true
-	case UserSubscriptionStatusCancelled:
+	case Cancelled:
 		return true
-	case UserSubscriptionStatusExpired:
+	case Expired:
 		return true
-	case UserSubscriptionStatusSuspended:
+	case Suspended:
 		return true
 	default:
 		return false
@@ -1458,6 +1575,19 @@ type CreateModelRequest struct {
 	Status          *ResourceStatus         `json:"status,omitempty"`
 }
 
+// CreateOpsSLORequest defines model for CreateOpsSLORequest.
+type CreateOpsSLORequest struct {
+	AlertPolicy *OpsAlertPolicy `json:"alert_policy,omitempty"`
+	Filter      *OpsSLOFilter   `json:"filter,omitempty"`
+	Name        string          `json:"name"`
+
+	// Objective Accepts ratio values like 0.995 or percent values like 99.5; responses store the ratio.
+	Objective  float32       `json:"objective"`
+	SliType    *OpsSLIType   `json:"sli_type,omitempty"`
+	Status     *OpsSLOStatus `json:"status,omitempty"`
+	WindowDays *int          `json:"window_days,omitempty"`
+}
+
 // CreatePaymentOrderRequest defines model for CreatePaymentOrderRequest.
 type CreatePaymentOrderRequest struct {
 	Amount      string             `json:"amount"`
@@ -1831,6 +1961,124 @@ type OpenAIModelList struct {
 
 // OpenAIModelListObject defines model for OpenAIModelList.Object.
 type OpenAIModelListObject string
+
+// OpsAlertEvent defines model for OpsAlertEvent.
+type OpsAlertEvent struct {
+	AcknowledgedAt *time.Time       `json:"acknowledged_at,omitempty"`
+	AcknowledgedBy *Id              `json:"acknowledged_by,omitempty"`
+	CreatedAt      Timestamp        `json:"created_at"`
+	Details        JsonObject       `json:"details"`
+	Fingerprint    string           `json:"fingerprint"`
+	Id             Id               `json:"id"`
+	ResolvedAt     *time.Time       `json:"resolved_at,omitempty"`
+	RuleId         string           `json:"rule_id"`
+	Severity       OpsAlertSeverity `json:"severity"`
+	SloId          *Id              `json:"slo_id,omitempty"`
+	StartedAt      Timestamp        `json:"started_at"`
+	Status         OpsAlertStatus   `json:"status"`
+	Summary        string           `json:"summary"`
+	SuppressedBy   *string          `json:"suppressed_by,omitempty"`
+	UpdatedAt      Timestamp        `json:"updated_at"`
+}
+
+// OpsAlertListResponse defines model for OpsAlertListResponse.
+type OpsAlertListResponse struct {
+	Data       []OpsAlertEvent `json:"data"`
+	Pagination Pagination      `json:"pagination"`
+	RequestId  RequestId       `json:"request_id"`
+}
+
+// OpsAlertPolicy defines model for OpsAlertPolicy.
+type OpsAlertPolicy struct {
+	Name       string                 `json:"name"`
+	Thresholds []OpsBurnRateThreshold `json:"thresholds"`
+}
+
+// OpsAlertResponse defines model for OpsAlertResponse.
+type OpsAlertResponse struct {
+	Data      OpsAlertEvent `json:"data"`
+	RequestId RequestId     `json:"request_id"`
+}
+
+// OpsAlertSeverity defines model for OpsAlertSeverity.
+type OpsAlertSeverity string
+
+// OpsAlertStatus defines model for OpsAlertStatus.
+type OpsAlertStatus string
+
+// OpsBurnRateThreshold defines model for OpsBurnRateThreshold.
+type OpsBurnRateThreshold struct {
+	BurnRate           float32          `json:"burn_rate"`
+	LongWindowSeconds  int              `json:"long_window_seconds"`
+	MinRequestCount    int              `json:"min_request_count"`
+	Severity           OpsAlertSeverity `json:"severity"`
+	ShortWindowSeconds int              `json:"short_window_seconds"`
+}
+
+// OpsSLIType defines model for OpsSLIType.
+type OpsSLIType string
+
+// OpsSLO defines model for OpsSLO.
+type OpsSLO struct {
+	Definition OpsSLODefinition `json:"definition"`
+	Evaluation OpsSLOEvaluation `json:"evaluation"`
+}
+
+// OpsSLODefinition defines model for OpsSLODefinition.
+type OpsSLODefinition struct {
+	AlertPolicy OpsAlertPolicy `json:"alert_policy"`
+	CreatedAt   Timestamp      `json:"created_at"`
+	Filter      OpsSLOFilter   `json:"filter"`
+	Id          Id             `json:"id"`
+	Name        string         `json:"name"`
+
+	// Objective Objective stored as a ratio, for example 0.995 for 99.5%.
+	Objective  float32      `json:"objective"`
+	SliType    OpsSLIType   `json:"sli_type"`
+	Status     OpsSLOStatus `json:"status"`
+	UpdatedAt  Timestamp    `json:"updated_at"`
+	WindowDays int          `json:"window_days"`
+}
+
+// OpsSLODefinitionResponse defines model for OpsSLODefinitionResponse.
+type OpsSLODefinitionResponse struct {
+	Data      OpsSLODefinition `json:"data"`
+	RequestId RequestId        `json:"request_id"`
+}
+
+// OpsSLOEvaluation defines model for OpsSLOEvaluation.
+type OpsSLOEvaluation struct {
+	BadRequests         int       `json:"bad_requests"`
+	BurnRate            float32   `json:"burn_rate"`
+	ErrorBudgetConsumed float32   `json:"error_budget_consumed"`
+	ErrorRate           float32   `json:"error_rate"`
+	GoodRequests        int       `json:"good_requests"`
+	Objective           float32   `json:"objective"`
+	TotalRequests       int       `json:"total_requests"`
+	WindowEnd           Timestamp `json:"window_end"`
+	WindowStart         Timestamp `json:"window_start"`
+}
+
+// OpsSLOFilter defines model for OpsSLOFilter.
+type OpsSLOFilter struct {
+	ErrorOwnerExclude []OpsSLOFilterErrorOwnerExclude `json:"error_owner_exclude"`
+	Model             string                          `json:"model"`
+	ProviderId        *Id                             `json:"provider_id,omitempty"`
+	SourceEndpoint    string                          `json:"source_endpoint"`
+}
+
+// OpsSLOFilterErrorOwnerExclude defines model for OpsSLOFilter.ErrorOwnerExclude.
+type OpsSLOFilterErrorOwnerExclude string
+
+// OpsSLOListResponse defines model for OpsSLOListResponse.
+type OpsSLOListResponse struct {
+	Data       []OpsSLO   `json:"data"`
+	Pagination Pagination `json:"pagination"`
+	RequestId  RequestId  `json:"request_id"`
+}
+
+// OpsSLOStatus defines model for OpsSLOStatus.
+type OpsSLOStatus string
 
 // Pagination defines model for Pagination.
 type Pagination struct {
@@ -2334,6 +2582,18 @@ type UpdateModelRequest struct {
 	Status          *ResourceStatus         `json:"status,omitempty"`
 }
 
+// UpdateOpsSLORequest defines model for UpdateOpsSLORequest.
+type UpdateOpsSLORequest struct {
+	AlertPolicy *OpsAlertPolicy `json:"alert_policy,omitempty"`
+	Filter      *OpsSLOFilter   `json:"filter,omitempty"`
+	Name        *string         `json:"name,omitempty"`
+
+	// Objective Accepts ratio values like 0.995 or percent values like 99.5; responses store the ratio.
+	Objective  *float32      `json:"objective,omitempty"`
+	Status     *OpsSLOStatus `json:"status,omitempty"`
+	WindowDays *int          `json:"window_days,omitempty"`
+}
+
 // UpdateProviderAccountRequest defines model for UpdateProviderAccountRequest.
 type UpdateProviderAccountRequest struct {
 	// Credential Write-only replacement credential payload. It must be encrypted before persistence.
@@ -2562,12 +2822,26 @@ type ListAdminModelsParams struct {
 	Q        *SearchQuery `form:"q,omitempty" json:"q,omitempty"`
 }
 
+// ListAdminOpsAlertsParams defines parameters for ListAdminOpsAlerts.
+type ListAdminOpsAlertsParams struct {
+	Page     *Page             `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *PageSize         `form:"page_size,omitempty" json:"page_size,omitempty"`
+	Status   *OpsAlertStatus   `form:"status,omitempty" json:"status,omitempty"`
+	Severity *OpsAlertSeverity `form:"severity,omitempty" json:"severity,omitempty"`
+}
+
 // ListAdminOutboxEventsParams defines parameters for ListAdminOutboxEvents.
 type ListAdminOutboxEventsParams struct {
 	Page      *Page     `form:"page,omitempty" json:"page,omitempty"`
 	PageSize  *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
 	Status    *string   `form:"status,omitempty" json:"status,omitempty"`
 	EventType *string   `form:"event_type,omitempty" json:"event_type,omitempty"`
+}
+
+// ListAdminOpsSLOsParams defines parameters for ListAdminOpsSLOs.
+type ListAdminOpsSLOsParams struct {
+	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
 }
 
 // ListAdminPaymentOrdersParams defines parameters for ListAdminPaymentOrders.
@@ -2704,6 +2978,12 @@ type CreateAdminModelAliasJSONRequestBody = CreateModelAliasRequest
 
 // CreateAdminModelMappingJSONRequestBody defines body for CreateAdminModelMapping for application/json ContentType.
 type CreateAdminModelMappingJSONRequestBody = CreateModelProviderMappingRequest
+
+// CreateAdminOpsSLOJSONRequestBody defines body for CreateAdminOpsSLO for application/json ContentType.
+type CreateAdminOpsSLOJSONRequestBody = CreateOpsSLORequest
+
+// UpdateAdminOpsSLOJSONRequestBody defines body for UpdateAdminOpsSLO for application/json ContentType.
+type UpdateAdminOpsSLOJSONRequestBody = UpdateOpsSLORequest
 
 // RefundAdminPaymentOrderJSONRequestBody defines body for RefundAdminPaymentOrder for application/json ContentType.
 type RefundAdminPaymentOrderJSONRequestBody = RefundPaymentOrderRequest
@@ -4893,9 +5173,24 @@ type ServerInterface interface {
 	// Create a provider mapping for a model.
 	// (POST /api/v1/admin/models/{id}/mappings)
 	CreateAdminModelMapping(w http.ResponseWriter, r *http.Request, id Id)
+	// List operational alert events.
+	// (GET /api/v1/admin/ops/alerts)
+	ListAdminOpsAlerts(w http.ResponseWriter, r *http.Request, params ListAdminOpsAlertsParams)
+	// Acknowledge an operational alert event.
+	// (POST /api/v1/admin/ops/alerts/{id}/ack)
+	AcknowledgeAdminOpsAlert(w http.ResponseWriter, r *http.Request, id Id)
 	// List domain event outbox entries.
 	// (GET /api/v1/admin/ops/events/outbox)
 	ListAdminOutboxEvents(w http.ResponseWriter, r *http.Request, params ListAdminOutboxEventsParams)
+	// List operational SLO definitions with current evaluation evidence.
+	// (GET /api/v1/admin/ops/slo)
+	ListAdminOpsSLOs(w http.ResponseWriter, r *http.Request, params ListAdminOpsSLOsParams)
+	// Create an operational SLO definition.
+	// (POST /api/v1/admin/ops/slo)
+	CreateAdminOpsSLO(w http.ResponseWriter, r *http.Request)
+	// Update an operational SLO definition.
+	// (PATCH /api/v1/admin/ops/slo/{id})
+	UpdateAdminOpsSLO(w http.ResponseWriter, r *http.Request, id Id)
 	// Get admin overview counters.
 	// (GET /api/v1/admin/overview)
 	GetAdminOverview(w http.ResponseWriter, r *http.Request)
@@ -6181,6 +6476,118 @@ func (siw *ServerInterfaceWrapper) CreateAdminModelMapping(w http.ResponseWriter
 	handler.ServeHTTP(w, r)
 }
 
+// ListAdminOpsAlerts operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminOpsAlerts(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminOpsAlertsParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "severity" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "severity", r.URL.Query(), &params.Severity, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "severity"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "severity", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminOpsAlerts(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AcknowledgeAdminOpsAlert operation middleware
+func (siw *ServerInterfaceWrapper) AcknowledgeAdminOpsAlert(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AcknowledgeAdminOpsAlert(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListAdminOutboxEvents operation middleware
 func (siw *ServerInterfaceWrapper) ListAdminOutboxEvents(w http.ResponseWriter, r *http.Request) {
 
@@ -6250,6 +6657,114 @@ func (siw *ServerInterfaceWrapper) ListAdminOutboxEvents(w http.ResponseWriter, 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListAdminOutboxEvents(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAdminOpsSLOs operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminOpsSLOs(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminOpsSLOsParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminOpsSLOs(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAdminOpsSLO operation middleware
+func (siw *ServerInterfaceWrapper) CreateAdminOpsSLO(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAdminOpsSLO(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateAdminOpsSLO operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAdminOpsSLO(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAdminOpsSLO(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -7898,7 +8413,12 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/models/{id}", wrapper.UpdateAdminModel)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/models/{id}/aliases", wrapper.CreateAdminModelAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/models/{id}/mappings", wrapper.CreateAdminModelMapping)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/alerts", wrapper.ListAdminOpsAlerts)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/ops/alerts/{id}/ack", wrapper.AcknowledgeAdminOpsAlert)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/events/outbox", wrapper.ListAdminOutboxEvents)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/slo", wrapper.ListAdminOpsSLOs)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/ops/slo", wrapper.CreateAdminOpsSLO)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/ops/slo/{id}", wrapper.UpdateAdminOpsSLO)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/overview", wrapper.GetAdminOverview)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/payments/orders", wrapper.ListAdminPaymentOrders)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/payments/orders/{id}/refund", wrapper.RefundAdminPaymentOrder)

@@ -1,6 +1,7 @@
 package operations
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -120,6 +121,120 @@ func TestCleanupDeletesExpiredOperationalRows(t *testing.T) {
 	}
 	if len(remaining) != 1 || remaining[0].RequestID != "req_fresh_usage" {
 		t.Fatalf("expected fresh usage log to remain, got %+v", remaining)
+	}
+}
+
+func TestObservabilityStorePersistsSLOsAlertsAndUsageEvidence(t *testing.T) {
+	client := enttest.Open(t, dialect.SQLite, "file:"+t.TempDir()+"/operations-observability.db?_fk=1")
+	defer client.Close()
+
+	store, err := New(client)
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	ctx := t.Context()
+	now := time.Date(2026, 5, 22, 10, 0, 0, 0, time.UTC)
+	providerID := 42
+	errorClass := "rate_limit"
+	createUsageLog(t, client, "req_ops_good", now.Add(-time.Hour))
+	client.UsageLog.Create().
+		SetRequestID("req_ops_bad").
+		SetUserID(1).
+		SetAPIKeyID(1).
+		SetProviderID(providerID).
+		SetSourceProtocol("openai-compatible").
+		SetSourceEndpoint("/v1/chat/completions").
+		SetTargetProtocol("openai-compatible").
+		SetModel("slo-model").
+		SetInputTokens(1).
+		SetOutputTokens(1).
+		SetCachedTokens(0).
+		SetTotalTokens(2).
+		SetUsageEstimated(false).
+		SetLatencyMs(100).
+		SetSuccess(false).
+		SetErrorClass(errorClass).
+		SetCost("0.00000000").
+		SetCurrency("USD").
+		SetCompatibilityWarningsJSON([]string{"fallback"}).
+		SetCreatedAt(now).
+		SetUpdatedAt(now).
+		SaveX(ctx)
+
+	createdSLO, err := store.CreateSLO(ctx, contract.SLODefinition{
+		Name:       "Gateway availability",
+		SLIType:    contract.SLITypeAvailability,
+		Objective:  0.995,
+		WindowDays: 28,
+		Status:     contract.SLOStatusActive,
+		Filter: contract.SLOFilter{
+			SourceEndpoint:    "/v1/chat/completions",
+			Model:             "slo-model",
+			ProviderID:        &providerID,
+			ErrorOwnerExclude: []string{"client"},
+		},
+		AlertPolicy: contract.AlertPolicy{
+			Name: "multi_window_burn_rate",
+			Thresholds: []contract.BurnRateThreshold{{
+				Severity:        contract.AlertSeverityCritical,
+				ShortWindow:     time.Hour,
+				LongWindow:      6 * time.Hour,
+				BurnRate:        14,
+				MinRequestCount: 25,
+			}},
+		},
+		CreatedAt: now,
+		UpdatedAt: now,
+	})
+	if err != nil {
+		t.Fatalf("create slo: %v", err)
+	}
+	createdSLO.Status = contract.SLOStatusDisabled
+	updatedSLO, err := store.UpdateSLO(ctx, createdSLO)
+	if err != nil {
+		t.Fatalf("update slo: %v", err)
+	}
+	if updatedSLO.ID == 0 || updatedSLO.Status != contract.SLOStatusDisabled || updatedSLO.Filter.ProviderID == nil || len(updatedSLO.AlertPolicy.Thresholds) != 1 {
+		t.Fatalf("unexpected persisted slo: %+v", updatedSLO)
+	}
+
+	alert, err := store.CreateAlert(ctx, contract.AlertEvent{
+		SLOID:       &createdSLO.ID,
+		RuleID:      "slo.gateway.availability",
+		Severity:    contract.AlertSeverityWarning,
+		Status:      contract.AlertStatusFiring,
+		Fingerprint: "slo:gateway:availability",
+		Summary:     "Gateway availability burn rate high",
+		Details:     map[string]any{"burn_rate": 14},
+		StartedAt:   now,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	})
+	if err != nil {
+		t.Fatalf("create alert: %v", err)
+	}
+	ackAt := now.Add(time.Minute)
+	ackBy := 7
+	alert.Status = contract.AlertStatusAcknowledged
+	alert.AcknowledgedAt = &ackAt
+	alert.AcknowledgedBy = &ackBy
+	updatedAlert, err := store.UpdateAlert(ctx, alert)
+	if err != nil {
+		t.Fatalf("update alert: %v", err)
+	}
+	if updatedAlert.AcknowledgedBy == nil || *updatedAlert.AcknowledgedBy != ackBy || updatedAlert.Details["burn_rate"] == nil {
+		t.Fatalf("unexpected persisted alert: %+v", updatedAlert)
+	}
+
+	logs, err := store.ListUsageLogs(ctx)
+	if err != nil {
+		t.Fatalf("list usage logs: %v", err)
+	}
+	if len(logs) != 2 || logs[1].ProviderID == nil || logs[1].ErrorClass == nil {
+		t.Fatalf("expected usage evidence with optional fields, got %+v", logs)
+	}
+	if _, err := store.FindAlertByID(ctx, 999); !errors.Is(err, contract.ErrNotFound) {
+		t.Fatalf("expected not found mapping, got %v", err)
 	}
 }
 
