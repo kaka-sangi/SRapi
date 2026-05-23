@@ -29,6 +29,9 @@ func TestCreateHashesPasswordAndDefaultsRole(t *testing.T) {
 	if len(created.Roles) != 1 || created.Roles[0] != contract.RoleUser {
 		t.Fatalf("expected default user role, got %#v", created.Roles)
 	}
+	if created.Balance != "0.00000000" || created.Currency != "USD" {
+		t.Fatalf("expected default balance, got %s %s", created.Balance, created.Currency)
+	}
 }
 
 func TestAuthenticatePasswordAcceptsValidPassword(t *testing.T) {
@@ -96,5 +99,89 @@ func TestAuthenticatePasswordRejectsDisabledUser(t *testing.T) {
 	_, err = svc.AuthenticatePassword(context.Background(), created.Email, "password123")
 	if !errors.Is(err, ErrUserDisabled) {
 		t.Fatalf("expected ErrUserDisabled, got %v", err)
+	}
+}
+
+func TestUpdateBalanceUsesDecimalMath(t *testing.T) {
+	store := newMemoryStore()
+	svc, err := New(store, nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	created, err := svc.Create(context.Background(), CreateRequest{
+		Email:    "billing@srapi.local",
+		Name:     "Billing",
+		Password: "password123",
+		Balance:  "1.00000000",
+	})
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	updated, err := svc.UpdateBalance(context.Background(), created.ID, BalanceUpdateRequest{
+		Operation: BalanceOperationIncrement,
+		Amount:    "0.33333333",
+	})
+	if err != nil {
+		t.Fatalf("update balance: %v", err)
+	}
+	if updated.Balance != "1.33333333" {
+		t.Fatalf("expected exact decimal balance, got %s", updated.Balance)
+	}
+
+	updated, err = svc.UpdateBalance(context.Background(), created.ID, BalanceUpdateRequest{
+		Operation: BalanceOperationDecrement,
+		Amount:    "0.33333333",
+	})
+	if err != nil {
+		t.Fatalf("update balance: %v", err)
+	}
+	if updated.Balance != "1.00000000" {
+		t.Fatalf("expected exact decimal balance, got %s", updated.Balance)
+	}
+}
+
+func TestListUpdateAndBatchUsers(t *testing.T) {
+	store := newMemoryStore()
+	svc, err := New(store, nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	first, err := svc.Create(context.Background(), CreateRequest{
+		Email:    "first@srapi.local",
+		Name:     "First",
+		Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("create first: %v", err)
+	}
+	second, err := svc.Create(context.Background(), CreateRequest{
+		Email:    "second@srapi.local",
+		Name:     "Second",
+		Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("create second: %v", err)
+	}
+
+	rpmLimit := 120
+	rpmLimitPtr := &rpmLimit
+	status := contract.StatusDisabled
+	roles := []contract.Role{contract.RoleOperator}
+	result := svc.BatchUpdate(context.Background(), BatchUpdateRequest{
+		UserIDs:  []int{first.ID, second.ID},
+		Status:   &status,
+		Roles:    &roles,
+		RPMLimit: &rpmLimitPtr,
+	})
+	if len(result.Errors) != 0 || len(result.Updated) != 2 {
+		t.Fatalf("unexpected batch result: %+v", result)
+	}
+	listed, err := svc.List(context.Background(), ListRequest{Status: &status, Query: "first"})
+	if err != nil {
+		t.Fatalf("list users: %v", err)
+	}
+	if len(listed) != 1 || listed[0].ID != first.ID || listed[0].RPMLimit == nil || *listed[0].RPMLimit != rpmLimit {
+		t.Fatalf("unexpected listed users: %+v", listed)
 	}
 }

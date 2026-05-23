@@ -33,6 +33,8 @@ const (
 	FieldBalance = "balance"
 	// FieldCurrency holds the string denoting the currency field in the database.
 	FieldCurrency = "currency"
+	// FieldRpmLimit holds the string denoting the rpm_limit field in the database.
+	FieldRpmLimit = "rpm_limit"
 	// FieldLastLoginAt holds the string denoting the last_login_at field in the database.
 	FieldLastLoginAt = "last_login_at"
 	// Table holds the table name of the user in the database.
@@ -52,6 +54,7 @@ var Columns = []string{
 	FieldStatus,
 	FieldBalance,
 	FieldCurrency,
+	FieldRpmLimit,
 	FieldLastLoginAt,
 }
 
@@ -140,6 +143,11 @@ func ByBalance(opts ...sql.OrderTermOption) OrderOption {
 // ByCurrency orders the results by the currency field.
 func ByCurrency(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCurrency, opts...).ToFunc()
+}
+
+// ByRpmLimit orders the results by the rpm_limit field.
+func ByRpmLimit(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRpmLimit, opts...).ToFunc()
 }
 
 // ByLastLoginAt orders the results by the last_login_at field.

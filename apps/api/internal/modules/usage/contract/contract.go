@@ -52,6 +52,43 @@ type RecordRequest struct {
 	CompatibilityWarnings []string
 }
 
+type AggregateDimension string
+
+const (
+	AggregateDimensionDay     AggregateDimension = "day"
+	AggregateDimensionModel   AggregateDimension = "model"
+	AggregateDimensionUser    AggregateDimension = "user"
+	AggregateDimensionAccount AggregateDimension = "account"
+)
+
+type QueryFilter struct {
+	Start *time.Time
+	End   *time.Time
+}
+
+type UsageAggregate struct {
+	AggregateID   string
+	AggregateType AggregateDimension
+	RequestCount  int
+	SuccessCount  int
+	ErrorCount    int
+	InputTokens   int
+	OutputTokens  int
+	CachedTokens  int
+	TotalTokens   int
+	TotalCost     string
+	Currency      string
+}
+
+type UsageExport struct {
+	Logs        []UsageLog
+	Daily       []UsageAggregate
+	ByModel     []UsageAggregate
+	ByUser      []UsageAggregate
+	ByAccount   []UsageAggregate
+	GeneratedAt time.Time
+}
+
 type Store interface {
 	Create(ctx context.Context, input UsageLog) (UsageLog, error)
 	List(ctx context.Context) ([]UsageLog, error)

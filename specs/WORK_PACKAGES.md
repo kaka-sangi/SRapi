@@ -2500,3 +2500,41 @@ Required gates:
 - `make code-quality-check`
 - `make secret-scan`
 - `git diff --check`
+
+## WP-620: Antigravity Refresh Token Import And OAuth Lifecycle v1
+
+Objective: extend the refresh-token-only onboarding pattern to Antigravity 2api accounts, preserving the selected Provider Account -> Provider Adapter -> Reverse Proxy Runtime boundary and avoiding local Antigravity client ingress.
+
+Read first:
+
+- `docs/2API_REVERSE_PROXY_DEFINITION.md`
+- `docs/MIGRATION_GUIDE_2API.md`
+- `docs/REVERSE_PROXY_SPEC.md`
+- `apps/api/internal/modules/reverse_proxy/service`
+- `apps/api/internal/modules/provider_adapters/service/antigravity.go`
+- `apps/api/internal/httpserver/runtime_admin_catalog_handlers.go`
+- `/home/senran/Desktop/CLIProxyAPI/internal/auth/antigravity`
+- `/home/senran/Desktop/sub2api/backend/internal/pkg/antigravity`
+
+Owns:
+
+- Antigravity OAuth credential normalization for `runtime_class=oauth_refresh` Provider Accounts.
+- Google OAuth form token refresh request support through Reverse Proxy Runtime, using encrypted credential `oauth_client_secret` / `client_secret` rather than hard-coded client secrets.
+- Admin create/import/update validation for refresh-token-only Antigravity credentials.
+- Gateway regression proving `/v1/chat/completions` can use selected-account OAuth credentials derived from the imported refresh token.
+
+Definition of Done:
+
+- Admin create/import/update accepts Antigravity `refresh_token` without initial `access_token` and obtains the first access token before the account is usable.
+- Gateway text requests using `reverse-proxy-antigravity` dispatch with selected-account OAuth credentials derived from the imported refresh token.
+- Refresh failures do not overwrite previous credentials and do not leak access/refresh tokens/client secrets in responses, audit, logs, metrics, usage, or Scheduler evidence.
+- No local Antigravity client ingress, onboarding UI/API, or Gateway-local Antigravity DTO is added.
+
+Required gates:
+
+- `cd apps/api && go test ./internal/modules/accounts/... ./internal/modules/reverse_proxy/... ./internal/modules/provider_adapters/... ./internal/httpserver -run 'Test.*Antigravity.*Refresh|Test.*Antigravity.*Import|TestGateway.*Antigravity' -count=1`
+- `cd apps/api && go test ./...`
+- `make architecture-check`
+- `make code-quality-check`
+- `make secret-scan`
+- `git diff --check`

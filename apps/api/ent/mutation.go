@@ -34672,6 +34672,8 @@ type UserMutation struct {
 	status            *string
 	balance           *string
 	currency          *string
+	rpm_limit         *int
+	addrpm_limit      *int
 	last_login_at     *time.Time
 	clearedFields     map[string]struct{}
 	done              bool
@@ -35163,6 +35165,76 @@ func (m *UserMutation) ResetCurrency() {
 	m.currency = nil
 }
 
+// SetRpmLimit sets the "rpm_limit" field.
+func (m *UserMutation) SetRpmLimit(i int) {
+	m.rpm_limit = &i
+	m.addrpm_limit = nil
+}
+
+// RpmLimit returns the value of the "rpm_limit" field in the mutation.
+func (m *UserMutation) RpmLimit() (r int, exists bool) {
+	v := m.rpm_limit
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRpmLimit returns the old "rpm_limit" field's value of the User entity.
+// If the User object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UserMutation) OldRpmLimit(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRpmLimit is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRpmLimit requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRpmLimit: %w", err)
+	}
+	return oldValue.RpmLimit, nil
+}
+
+// AddRpmLimit adds i to the "rpm_limit" field.
+func (m *UserMutation) AddRpmLimit(i int) {
+	if m.addrpm_limit != nil {
+		*m.addrpm_limit += i
+	} else {
+		m.addrpm_limit = &i
+	}
+}
+
+// AddedRpmLimit returns the value that was added to the "rpm_limit" field in this mutation.
+func (m *UserMutation) AddedRpmLimit() (r int, exists bool) {
+	v := m.addrpm_limit
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearRpmLimit clears the value of the "rpm_limit" field.
+func (m *UserMutation) ClearRpmLimit() {
+	m.rpm_limit = nil
+	m.addrpm_limit = nil
+	m.clearedFields[user.FieldRpmLimit] = struct{}{}
+}
+
+// RpmLimitCleared returns if the "rpm_limit" field was cleared in this mutation.
+func (m *UserMutation) RpmLimitCleared() bool {
+	_, ok := m.clearedFields[user.FieldRpmLimit]
+	return ok
+}
+
+// ResetRpmLimit resets all changes to the "rpm_limit" field.
+func (m *UserMutation) ResetRpmLimit() {
+	m.rpm_limit = nil
+	m.addrpm_limit = nil
+	delete(m.clearedFields, user.FieldRpmLimit)
+}
+
 // SetLastLoginAt sets the "last_login_at" field.
 func (m *UserMutation) SetLastLoginAt(t time.Time) {
 	m.last_login_at = &t
@@ -35246,7 +35318,7 @@ func (m *UserMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UserMutation) Fields() []string {
-	fields := make([]string, 0, 11)
+	fields := make([]string, 0, 12)
 	if m.created_at != nil {
 		fields = append(fields, user.FieldCreatedAt)
 	}
@@ -35276,6 +35348,9 @@ func (m *UserMutation) Fields() []string {
 	}
 	if m.currency != nil {
 		fields = append(fields, user.FieldCurrency)
+	}
+	if m.rpm_limit != nil {
+		fields = append(fields, user.FieldRpmLimit)
 	}
 	if m.last_login_at != nil {
 		fields = append(fields, user.FieldLastLoginAt)
@@ -35308,6 +35383,8 @@ func (m *UserMutation) Field(name string) (ent.Value, bool) {
 		return m.Balance()
 	case user.FieldCurrency:
 		return m.Currency()
+	case user.FieldRpmLimit:
+		return m.RpmLimit()
 	case user.FieldLastLoginAt:
 		return m.LastLoginAt()
 	}
@@ -35339,6 +35416,8 @@ func (m *UserMutation) OldField(ctx context.Context, name string) (ent.Value, er
 		return m.OldBalance(ctx)
 	case user.FieldCurrency:
 		return m.OldCurrency(ctx)
+	case user.FieldRpmLimit:
+		return m.OldRpmLimit(ctx)
 	case user.FieldLastLoginAt:
 		return m.OldLastLoginAt(ctx)
 	}
@@ -35420,6 +35499,13 @@ func (m *UserMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetCurrency(v)
 		return nil
+	case user.FieldRpmLimit:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRpmLimit(v)
+		return nil
 	case user.FieldLastLoginAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -35434,13 +35520,21 @@ func (m *UserMutation) SetField(name string, value ent.Value) error {
 // AddedFields returns all numeric fields that were incremented/decremented during
 // this mutation.
 func (m *UserMutation) AddedFields() []string {
-	return nil
+	var fields []string
+	if m.addrpm_limit != nil {
+		fields = append(fields, user.FieldRpmLimit)
+	}
+	return fields
 }
 
 // AddedField returns the numeric value that was incremented/decremented on a field
 // with the given name. The second boolean return value indicates that this field
 // was not set, or was not defined in the schema.
 func (m *UserMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case user.FieldRpmLimit:
+		return m.AddedRpmLimit()
+	}
 	return nil, false
 }
 
@@ -35449,6 +35543,13 @@ func (m *UserMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *UserMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case user.FieldRpmLimit:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddRpmLimit(v)
+		return nil
 	}
 	return fmt.Errorf("unknown User numeric field %s", name)
 }
@@ -35462,6 +35563,9 @@ func (m *UserMutation) ClearedFields() []string {
 	}
 	if m.FieldCleared(user.FieldEmailVerifiedAt) {
 		fields = append(fields, user.FieldEmailVerifiedAt)
+	}
+	if m.FieldCleared(user.FieldRpmLimit) {
+		fields = append(fields, user.FieldRpmLimit)
 	}
 	if m.FieldCleared(user.FieldLastLoginAt) {
 		fields = append(fields, user.FieldLastLoginAt)
@@ -35485,6 +35589,9 @@ func (m *UserMutation) ClearField(name string) error {
 		return nil
 	case user.FieldEmailVerifiedAt:
 		m.ClearEmailVerifiedAt()
+		return nil
+	case user.FieldRpmLimit:
+		m.ClearRpmLimit()
 		return nil
 	case user.FieldLastLoginAt:
 		m.ClearLastLoginAt()
@@ -35526,6 +35633,9 @@ func (m *UserMutation) ResetField(name string) error {
 		return nil
 	case user.FieldCurrency:
 		m.ResetCurrency()
+		return nil
+	case user.FieldRpmLimit:
+		m.ResetRpmLimit()
 		return nil
 	case user.FieldLastLoginAt:
 		m.ResetLastLoginAt()

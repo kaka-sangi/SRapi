@@ -1309,6 +1309,7 @@ var (
 		{Name: "status", Type: field.TypeString, Default: "active"},
 		{Name: "balance", Type: field.TypeString, Default: "0.00000000"},
 		{Name: "currency", Type: field.TypeString, Default: "USD"},
+		{Name: "rpm_limit", Type: field.TypeInt, Nullable: true},
 		{Name: "last_login_at", Type: field.TypeTime, Nullable: true},
 	}
 	// UsersTable holds the schema information for the "users" table.

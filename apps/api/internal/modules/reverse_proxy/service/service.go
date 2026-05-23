@@ -25,7 +25,21 @@ const (
 	codexOAuthTokenURL           = "https://auth.openai.com/oauth/token"
 	codexOAuthClientID           = "app_EMoamEEZ73f0CkXaXp7hrann"
 	codexOAuthRefreshScope       = "openid profile email"
+	claudeCodeOAuthTokenURL      = "https://api.anthropic.com/v1/oauth/token"
+	claudeCodeOAuthClientID      = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
+	antigravityOAuthTokenURL     = "https://oauth2.googleapis.com/token"
+	antigravityOAuthClientID     = "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com"
+	oauthRefreshEncodingForm     = "form"
+	oauthRefreshEncodingJSON     = "json"
 )
+
+type oauthRefreshConfig struct {
+	TokenEndpoint string
+	ClientID      string
+	ClientSecret  string
+	Scope         string
+	Encoding      string
+}
 
 type ClientFactory func(account contract.AccountRuntime) (*http.Client, error)
 
@@ -213,26 +227,20 @@ func (s *Service) refreshOAuthCredential(ctx context.Context, req contract.Refre
 		s.recordRefresh("credential_missing")
 		return contract.RefreshResponse{}, contract.RuntimeError{Class: "credential_missing", StatusCode: http.StatusBadRequest, Message: "oauth refresh token missing"}
 	}
-	tokenEndpoint, clientID, scope := oauthRefreshSettings(req.Account)
-	if tokenEndpoint == "" || clientID == "" {
+	config := oauthRefreshSettings(req.Account)
+	if config.TokenEndpoint == "" || config.ClientID == "" {
 		s.recordRefresh("credential_missing")
 		return contract.RefreshResponse{}, contract.RuntimeError{Class: "credential_missing", StatusCode: http.StatusBadRequest, Message: "oauth refresh configuration missing"}
 	}
-	form := url.Values{
-		"client_id":     {clientID},
-		"grant_type":    {"refresh_token"},
-		"refresh_token": {refreshToken},
+	if oauthRefreshRequiresClientSecret(req.Account) && config.ClientSecret == "" {
+		s.recordRefresh("credential_missing")
+		return contract.RefreshResponse{}, contract.RuntimeError{Class: "credential_missing", StatusCode: http.StatusBadRequest, Message: "oauth client secret missing"}
 	}
-	if scope != "" {
-		form.Set("scope", scope)
-	}
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, tokenEndpoint, strings.NewReader(form.Encode()))
+	httpReq, err := newOAuthRefreshHTTPRequest(ctx, config, refreshToken)
 	if err != nil {
 		s.recordRefresh("invalid_request")
 		return contract.RefreshResponse{}, err
 	}
-	httpReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	httpReq.Header.Set("Accept", "application/json")
 	if ua := userAgent(req.Account); ua != "" {
 		httpReq.Header.Set("User-Agent", ua)
 	}
@@ -768,20 +776,97 @@ func supportsOAuthRefresh(runtimeClass string) bool {
 	}
 }
 
-func oauthRefreshSettings(account contract.AccountRuntime) (string, string, string) {
+func oauthRefreshSettings(account contract.AccountRuntime) oauthRefreshConfig {
 	tokenEndpoint := accountSetting(account, "oauth_token_url", "token_url", "oauth_refresh_url", "refresh_url")
-	if tokenEndpoint == "" && upstreamClientIs(account, "codex_cli") {
-		tokenEndpoint = codexOAuthTokenURL
-	}
 	clientID := accountSetting(account, "oauth_client_id", "client_id")
-	if clientID == "" && upstreamClientIs(account, "codex_cli") {
-		clientID = codexOAuthClientID
-	}
 	scope := accountSetting(account, "oauth_scope", "scope")
-	if scope == "" && upstreamClientIs(account, "codex_cli") {
-		scope = codexOAuthRefreshScope
+	config := oauthRefreshConfig{
+		TokenEndpoint: tokenEndpoint,
+		ClientID:      clientID,
+		ClientSecret:  credentialString(account.Credential, "oauth_client_secret"),
+		Scope:         scope,
+		Encoding:      oauthRefreshEncodingForm,
 	}
-	return tokenEndpoint, clientID, scope
+	if config.ClientSecret == "" {
+		config.ClientSecret = credentialString(account.Credential, "client_secret")
+	}
+	switch {
+	case upstreamClientIs(account, "codex_cli"):
+		if config.TokenEndpoint == "" {
+			config.TokenEndpoint = codexOAuthTokenURL
+		}
+		if config.ClientID == "" {
+			config.ClientID = codexOAuthClientID
+		}
+		if config.Scope == "" {
+			config.Scope = codexOAuthRefreshScope
+		}
+	case upstreamClientIs(account, "claude_code_cli"):
+		if config.TokenEndpoint == "" {
+			config.TokenEndpoint = claudeCodeOAuthTokenURL
+		}
+		if config.ClientID == "" {
+			config.ClientID = claudeCodeOAuthClientID
+		}
+		config.Encoding = oauthRefreshEncodingJSON
+	case upstreamClientIs(account, "antigravity_desktop") || upstreamClientIs(account, "antigravity"):
+		if config.TokenEndpoint == "" {
+			config.TokenEndpoint = antigravityOAuthTokenURL
+		}
+		if config.ClientID == "" {
+			config.ClientID = antigravityOAuthClientID
+		}
+	}
+	if encoding := strings.ToLower(accountSetting(account, "oauth_request_encoding", "oauth_encoding", "token_request_encoding")); encoding != "" {
+		config.Encoding = encoding
+	}
+	return config
+}
+
+func newOAuthRefreshHTTPRequest(ctx context.Context, config oauthRefreshConfig, refreshToken string) (*http.Request, error) {
+	if strings.EqualFold(config.Encoding, oauthRefreshEncodingJSON) {
+		payload := map[string]any{
+			"client_id":     config.ClientID,
+			"grant_type":    "refresh_token",
+			"refresh_token": refreshToken,
+		}
+		if config.ClientSecret != "" {
+			payload["client_secret"] = config.ClientSecret
+		}
+		if config.Scope != "" {
+			payload["scope"] = config.Scope
+		}
+		raw, err := json.Marshal(payload)
+		if err != nil {
+			return nil, err
+		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, config.TokenEndpoint, bytes.NewReader(raw))
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "application/json")
+		return req, nil
+	}
+
+	form := url.Values{
+		"client_id":     {config.ClientID},
+		"grant_type":    {"refresh_token"},
+		"refresh_token": {refreshToken},
+	}
+	if config.ClientSecret != "" {
+		form.Set("client_secret", config.ClientSecret)
+	}
+	if config.Scope != "" {
+		form.Set("scope", config.Scope)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, config.TokenEndpoint, strings.NewReader(form.Encode()))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Accept", "application/json")
+	return req, nil
 }
 
 func upstreamClientIs(account contract.AccountRuntime, expected string) bool {
@@ -789,6 +874,10 @@ func upstreamClientIs(account contract.AccountRuntime, expected string) bool {
 		return false
 	}
 	return strings.EqualFold(strings.TrimSpace(*account.UpstreamClient), expected)
+}
+
+func oauthRefreshRequiresClientSecret(account contract.AccountRuntime) bool {
+	return upstreamClientIs(account, "antigravity_desktop") || upstreamClientIs(account, "antigravity")
 }
 
 func classifyOAuthRefreshError(statusCode int, body []byte) contract.RuntimeError {

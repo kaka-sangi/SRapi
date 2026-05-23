@@ -28,6 +28,9 @@ type User struct {
 	Name        string
 	Status      Status
 	Roles       []Role
+	Balance     string
+	Currency    string
+	RPMLimit    *int
 	CreatedAt   time.Time
 	LastLoginAt *time.Time
 }
@@ -36,8 +39,6 @@ type StoredUser struct {
 	User
 	PasswordHash    string
 	EmailVerifiedAt *time.Time
-	Balance         string
-	Currency        string
 }
 
 type CreateStoredUser struct {
@@ -49,12 +50,31 @@ type CreateStoredUser struct {
 	EmailVerifiedAt *time.Time
 	Balance         string
 	Currency        string
+	RPMLimit        *int
+}
+
+type UpdateStoredUser struct {
+	Email        *string
+	Name         *string
+	PasswordHash *string
+	Status       *Status
+	Roles        *[]Role
+	Balance      *string
+	Currency     *string
+	RPMLimit     **int
+}
+
+type ListUsersFilter struct {
+	Status *Status
+	Query  string
 }
 
 type Store interface {
 	Create(ctx context.Context, input CreateStoredUser) (StoredUser, error)
 	FindByID(ctx context.Context, id int) (StoredUser, error)
 	FindByEmail(ctx context.Context, email string) (StoredUser, error)
+	List(ctx context.Context, filter ListUsersFilter) ([]StoredUser, error)
 	ListByIDs(ctx context.Context, ids []int) ([]StoredUser, error)
+	Update(ctx context.Context, id int, input UpdateStoredUser) (StoredUser, error)
 	UpdateLastLogin(ctx context.Context, id int, at time.Time) error
 }

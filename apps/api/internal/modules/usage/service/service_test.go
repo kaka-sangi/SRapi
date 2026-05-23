@@ -94,6 +94,61 @@ func TestRecordRejectsIncompleteGatewayUsageEvidence(t *testing.T) {
 	}
 }
 
+func TestAggregateAndExportUsage(t *testing.T) {
+	clock := fixedClock{now: time.Date(2026, 5, 22, 12, 0, 0, 0, time.UTC)}
+	svc, err := service.New(usagememory.New(), clock)
+	if err != nil {
+		t.Fatalf("new usage service: %v", err)
+	}
+	accountID := 22
+	for _, req := range []contract.RecordRequest{
+		{
+			RequestID:      "req_usage_1",
+			UserID:         1,
+			APIKeyID:       2,
+			AccountID:      &accountID,
+			SourceEndpoint: "/v1/chat/completions",
+			Model:          "gpt-4o-mini",
+			InputTokens:    3,
+			OutputTokens:   4,
+			Success:        true,
+			Cost:           "0.10000000",
+		},
+		{
+			RequestID:      "req_usage_2",
+			UserID:         1,
+			APIKeyID:       2,
+			AccountID:      &accountID,
+			SourceEndpoint: "/v1/chat/completions",
+			Model:          "gpt-4o-mini",
+			InputTokens:    5,
+			OutputTokens:   6,
+			Success:        false,
+			Cost:           "0.20000000",
+		},
+	} {
+		if _, err := svc.Record(t.Context(), req); err != nil {
+			t.Fatalf("record usage: %v", err)
+		}
+	}
+
+	aggregates, err := svc.Aggregate(t.Context(), contract.QueryFilter{}, contract.AggregateDimensionModel)
+	if err != nil {
+		t.Fatalf("aggregate usage: %v", err)
+	}
+	if len(aggregates) != 1 || aggregates[0].AggregateID != "gpt-4o-mini" || aggregates[0].RequestCount != 2 || aggregates[0].SuccessCount != 1 || aggregates[0].ErrorCount != 1 || aggregates[0].TotalTokens != 18 || aggregates[0].TotalCost != "0.30000000" {
+		t.Fatalf("unexpected aggregate: %+v", aggregates)
+	}
+
+	exported, err := svc.Export(t.Context(), contract.QueryFilter{})
+	if err != nil {
+		t.Fatalf("export usage: %v", err)
+	}
+	if !exported.GeneratedAt.Equal(clock.now) || len(exported.Logs) != 2 || len(exported.Daily) != 1 || len(exported.ByAccount) != 1 {
+		t.Fatalf("unexpected export: %+v", exported)
+	}
+}
+
 type fixedClock struct {
 	now time.Time
 }

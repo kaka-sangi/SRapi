@@ -695,6 +695,434 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/dashboard:
+    get:
+      tags:
+        - AdminDashboard
+      operationId: getAdminDashboard
+      summary: Get admin dashboard statistics.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      responses:
+        "200":
+          description: Admin dashboard statistics.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminDashboardResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/users:
+    get:
+      tags:
+        - AdminUsers
+      operationId: listAdminUsers
+      summary: List and search users.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/SearchQuery"
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/UserStatus"
+      responses:
+        "200":
+          description: User list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+    post:
+      tags:
+        - AdminUsers
+      operationId: createAdminUser
+      summary: Create a user.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAdminUserRequest"
+      responses:
+        "201":
+          description: User created.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/users/batch:
+    patch:
+      tags:
+        - AdminUsers
+      operationId: batchUpdateAdminUsers
+      summary: Batch update user attributes.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchUpdateUsersRequest"
+      responses:
+        "200":
+          description: Batch update result.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchUpdateUsersResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/users/{id}:
+    get:
+      tags:
+        - AdminUsers
+      operationId: getAdminUser
+      summary: Get a user.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: User.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+    patch:
+      tags:
+        - AdminUsers
+      operationId: updateAdminUser
+      summary: Update a user.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAdminUserRequest"
+      responses:
+        "200":
+          description: User updated.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/users/{id}/balance:
+    patch:
+      tags:
+        - AdminUsers
+      operationId: updateAdminUserBalance
+      summary: Update user balance.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserBalanceRequest"
+      responses:
+        "200":
+          description: User balance updated.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/users/{id}/balance-history:
+    get:
+      tags:
+        - AdminUsers
+      operationId: getAdminUserBalanceHistory
+      summary: List user balance ledger entries.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: User balance ledger entries.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillingLedgerListResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/users/{id}/rpm-limit:
+    patch:
+      tags:
+        - AdminUsers
+      operationId: updateAdminUserRpmLimit
+      summary: Update user RPM limit.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRpmLimitRequest"
+      responses:
+        "200":
+          description: User RPM limit updated.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/users/{id}/disable:
+    post:
+      tags:
+        - AdminUsers
+      operationId: disableAdminUser
+      summary: Disable a user.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: User disabled.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/users/{id}/enable:
+    post:
+      tags:
+        - AdminUsers
+      operationId: enableAdminUser
+      summary: Enable a user.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: User enabled.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/models:
     get:
       tags:
@@ -1044,6 +1472,43 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/accounts/batch:
+    patch:
+      tags:
+        - AdminAccounts
+      operationId: batchUpdateAdminAccounts
+      summary: Batch update provider account status.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchUpdateAccountsRequest"
+      responses:
+        "200":
+          description: Batch update result.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchUpdateAccountsResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/accounts/{id}:
     get:
       tags:
@@ -1247,6 +1712,123 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AccountModelDiscoveryResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/accounts/{id}/clear-error:
+    post:
+      tags:
+        - AdminAccounts
+      operationId: clearAdminAccountError
+      summary: Clear provider account error state.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Account error state cleared.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderAccountResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/accounts/{id}/rpm-status:
+    get:
+      tags:
+        - AdminAccounts
+      operationId: getAdminAccountRpmStatus
+      summary: Get provider account RPM runtime status.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Account RPM status.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountRpmStatusResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/accounts/{id}/proxy-quality:
+    get:
+      tags:
+        - AdminAccounts
+      operationId: getAdminAccountProxyQuality
+      summary: Get provider account proxy quality summary.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Account proxy quality.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountProxyQualityResponse"
         "400":
           $ref: "#/components/responses/ValidationError"
         "401":
@@ -1674,6 +2256,132 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UsageLogListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/usage/daily:
+    get:
+      tags:
+        - AdminUsage
+      operationId: getAdminUsageDaily
+      summary: Get daily usage aggregates.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - name: start
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: end
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Daily usage aggregates.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsageAggregateListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/usage/aggregates:
+    get:
+      tags:
+        - AdminUsage
+      operationId: getAdminUsageAggregates
+      summary: Get usage aggregates by dimension.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - name: dimension
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/UsageAggregateDimension"
+        - name: start
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: end
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Usage aggregates.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsageAggregateListResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/usage/export:
+    get:
+      tags:
+        - AdminUsage
+      operationId: exportAdminUsage
+      summary: Export usage logs and aggregates.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+      parameters:
+        - name: start
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: end
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Usage export.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsageExportResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -4602,6 +5310,8 @@ components:
         - name
         - status
         - roles
+        - balance
+        - currency
         - created_at
       properties:
         id:
@@ -4617,8 +5327,180 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/UserRole"
+        balance:
+          type: string
+          description: Decimal string balance.
+        currency:
+          type: string
+        rpm_limit:
+          type: integer
+          nullable: true
+          minimum: 0
+        last_login_at:
+          type: string
+          format: date-time
+          nullable: true
         created_at:
           $ref: "#/components/schemas/Timestamp"
+
+    CreateAdminUserRequest:
+      type: object
+      required:
+        - email
+        - name
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+          minLength: 1
+        password:
+          type: string
+          format: password
+          minLength: 8
+        roles:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserRole"
+          default:
+            - user
+        status:
+          $ref: "#/components/schemas/UserStatus"
+        balance:
+          type: string
+          default: "0.00000000"
+        currency:
+          type: string
+          default: USD
+        rpm_limit:
+          type: integer
+          nullable: true
+          minimum: 0
+
+    UpdateAdminUserRequest:
+      type: object
+      minProperties: 1
+      properties:
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+          minLength: 1
+        password:
+          type: string
+          format: password
+          minLength: 8
+        roles:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserRole"
+        status:
+          $ref: "#/components/schemas/UserStatus"
+        rpm_limit:
+          type: integer
+          nullable: true
+          minimum: 0
+
+    UpdateUserBalanceRequest:
+      type: object
+      required:
+        - amount
+        - operation
+      properties:
+        amount:
+          type: string
+          description: Decimal string amount.
+        operation:
+          type: string
+          enum:
+            - set
+            - increment
+            - decrement
+        currency:
+          type: string
+        note:
+          type: string
+
+    UpdateUserRpmLimitRequest:
+      type: object
+      required:
+        - rpm_limit
+      properties:
+        rpm_limit:
+          type: integer
+          nullable: true
+          minimum: 0
+
+    BatchUpdateUsersRequest:
+      type: object
+      required:
+        - user_ids
+      minProperties: 2
+      properties:
+        user_ids:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/Id"
+        status:
+          $ref: "#/components/schemas/UserStatus"
+        rpm_limit:
+          type: integer
+          nullable: true
+          minimum: 0
+        roles:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserRole"
+
+    BatchUpdateUsersResult:
+      type: object
+      required:
+        - updated_count
+        - updated_ids
+        - errors
+      properties:
+        updated_count:
+          type: integer
+          minimum: 0
+        updated_ids:
+          type: array
+          items:
+            $ref: "#/components/schemas/Id"
+        errors:
+          type: array
+          items:
+            type: string
+
+    BatchUpdateUsersResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/BatchUpdateUsersResult"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    UserListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
 
     LoginRequest:
       type: object
@@ -6357,6 +7239,133 @@ components:
         request_id:
           $ref: "#/components/schemas/RequestId"
 
+    BatchUpdateAccountsRequest:
+      type: object
+      required:
+        - account_ids
+        - status
+      properties:
+        account_ids:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/Id"
+        status:
+          $ref: "#/components/schemas/ProviderAccountStatus"
+
+    BatchUpdateAccountsResult:
+      type: object
+      required:
+        - updated_count
+        - updated_ids
+        - errors
+      properties:
+        updated_count:
+          type: integer
+          minimum: 0
+        updated_ids:
+          type: array
+          items:
+            $ref: "#/components/schemas/Id"
+        errors:
+          type: array
+          items:
+            type: string
+
+    BatchUpdateAccountsResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/BatchUpdateAccountsResult"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    AccountRpmStatus:
+      type: object
+      required:
+        - account_id
+        - rpm_used
+        - rpm_limit
+        - window_seconds
+      properties:
+        account_id:
+          $ref: "#/components/schemas/Id"
+        rpm_used:
+          type: integer
+          minimum: 0
+        rpm_limit:
+          type: integer
+          nullable: true
+          minimum: 0
+        window_seconds:
+          type: integer
+          minimum: 1
+        reset_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    AccountRpmStatusResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/AccountRpmStatus"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    AccountProxyQuality:
+      type: object
+      required:
+        - account_id
+        - proxy_id
+        - success_rate
+        - error_rate
+        - latency_p95_ms
+        - sample_count
+      properties:
+        account_id:
+          $ref: "#/components/schemas/Id"
+        proxy_id:
+          type: string
+          nullable: true
+        success_rate:
+          type: number
+          minimum: 0
+          maximum: 1
+        error_rate:
+          type: number
+          minimum: 0
+          maximum: 1
+        latency_p95_ms:
+          type: integer
+          minimum: 0
+        sample_count:
+          type: integer
+          minimum: 0
+        last_checked_at:
+          type: string
+          format: date-time
+          nullable: true
+        metadata:
+          $ref: "#/components/schemas/JsonObject"
+
+    AccountProxyQualityResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/AccountProxyQuality"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
     ProviderAccountResponse:
       type: object
       required:
@@ -6499,6 +7508,11 @@ components:
         - usage_log_count
         - scheduler_decision_count
         - request_success_rate
+        - user_count
+        - total_request_count
+        - total_token_count
+        - total_cost
+        - currency
       properties:
         provider_count:
           type: integer
@@ -6522,6 +7536,19 @@ components:
           type: number
           minimum: 0
           maximum: 1
+        user_count:
+          type: integer
+          minimum: 0
+        total_request_count:
+          type: integer
+          minimum: 0
+        total_token_count:
+          type: integer
+          minimum: 0
+        total_cost:
+          type: string
+        currency:
+          type: string
 
     AdminOverviewResponse:
       type: object
@@ -6531,6 +7558,134 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/AdminOverview"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    AdminDashboard:
+      allOf:
+        - $ref: "#/components/schemas/AdminOverview"
+
+    AdminDashboardResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/AdminDashboard"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    UsageAggregateDimension:
+      type: string
+      enum:
+        - day
+        - model
+        - user
+        - account
+
+    UsageAggregate:
+      type: object
+      required:
+        - aggregate_type
+        - aggregate_id
+        - request_count
+        - success_count
+        - error_count
+        - input_tokens
+        - output_tokens
+        - cached_tokens
+        - total_tokens
+        - total_cost
+        - currency
+      properties:
+        aggregate_type:
+          $ref: "#/components/schemas/UsageAggregateDimension"
+        aggregate_id:
+          type: string
+        request_count:
+          type: integer
+          minimum: 0
+        success_count:
+          type: integer
+          minimum: 0
+        error_count:
+          type: integer
+          minimum: 0
+        input_tokens:
+          type: integer
+          minimum: 0
+        output_tokens:
+          type: integer
+          minimum: 0
+        cached_tokens:
+          type: integer
+          minimum: 0
+        total_tokens:
+          type: integer
+          minimum: 0
+        total_cost:
+          type: string
+        currency:
+          type: string
+
+    UsageAggregateListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/UsageAggregate"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    UsageExport:
+      type: object
+      required:
+        - generated_at
+        - logs
+        - daily
+        - by_model
+        - by_user
+        - by_account
+      properties:
+        generated_at:
+          $ref: "#/components/schemas/Timestamp"
+        logs:
+          type: array
+          items:
+            $ref: "#/components/schemas/UsageLog"
+        daily:
+          type: array
+          items:
+            $ref: "#/components/schemas/UsageAggregate"
+        by_model:
+          type: array
+          items:
+            $ref: "#/components/schemas/UsageAggregate"
+        by_user:
+          type: array
+          items:
+            $ref: "#/components/schemas/UsageAggregate"
+        by_account:
+          type: array
+          items:
+            $ref: "#/components/schemas/UsageAggregate"
+
+    UsageExportResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/UsageExport"
         request_id:
           $ref: "#/components/schemas/RequestId"
 

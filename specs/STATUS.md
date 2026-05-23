@@ -67,18 +67,21 @@ last_completed:
 - WP-580: SDK examples and 2api migration guide v1 now provide curl, TypeScript SDK, and Python requests examples for OpenAI/Anthropic/Gemini-compatible Gateway routes plus AdminOps realtime slot listing, document migration from sub2api / CLIProxyAPI / chatgpt2api style deployments into SRapi Provider Account / Scheduler / Reverse Proxy Runtime boundaries, and add `make examples-check`.
 - WP-590: Distributed realtime slot store v1 now adds a realtime Store contract, in-memory and Redis-backed implementations, app/httpserver wiring that uses Redis in release-capable deployments, distributed slot limit/listing tests, and docs for cross-node AdminOps semantics without provider-native DTOs or local client ingress.
 - WP-600: Codex refresh-token-only import and OAuth lifecycle now lets admin create/import/update accept a Codex OAuth `refresh_token` without an initial `access_token`, exchange it through Reverse Proxy Runtime using the Codex CLI OAuth token shape, persist encrypted access-token state, and immediately dispatch Gateway `/v1/responses` to Codex `/responses` with selected-account OAuth identity and no token leakage in control-plane responses.
+- WP-610: Claude Code refresh-token-only import and OAuth lifecycle now lets admin create/import/update accept a Claude Code OAuth `refresh_token` without an initial `access_token`, exchange it through Reverse Proxy Runtime using the Claude Code JSON OAuth token shape, persist encrypted access-token state, and immediately dispatch Gateway `/v1/messages` with selected-account OAuth identity and no credential leakage in control-plane responses.
+- WP-620: Antigravity refresh-token-only import and OAuth lifecycle now lets admin create/import/update accept an Antigravity OAuth `refresh_token` without an initial `access_token`, exchange it through Reverse Proxy Runtime using the Google OAuth form token shape plus configured client secret, persist encrypted access-token state, and immediately dispatch Gateway text requests with selected-account OAuth identity and no credential leakage in control-plane responses.
 
 current:
 
-- package: WP-610
+- package: WP-500+
 - status: pending
-- objective: extend refresh-token-only import and OAuth lifecycle support to Claude Code 2api Provider Accounts.
+- objective: split and continue the remaining ecosystem and advanced endpoint packages from the roadmap.
 
-next_recommended: WP-610
+next_recommended: WP-500+
 
 last_gates:
 
-- `cd apps/api && go test ./internal/modules/accounts/... ./internal/modules/reverse_proxy/... ./internal/modules/provider_adapters/... ./internal/httpserver -run 'Test.*Codex.*Refresh|Test.*Codex.*Import|TestGateway.*Codex' -count=1`: pass
+- `cd apps/api && go test ./internal/modules/accounts/... ./internal/modules/reverse_proxy/... ./internal/modules/provider_adapters/... ./internal/httpserver -run 'Test.*Claude.*Refresh|Test.*Claude.*Import|TestGateway.*Claude' -count=1`: pass
+- `cd apps/api && go test ./internal/modules/accounts/... ./internal/modules/reverse_proxy/... ./internal/modules/provider_adapters/... ./internal/httpserver -run 'Test.*Antigravity.*Refresh|Test.*Antigravity.*Import|TestGateway.*Antigravity' -count=1`: pass
 - `cd apps/api && go test ./...`: pass
 - `make architecture-check`: pass
 - `make code-quality-check`: pass
@@ -182,7 +185,10 @@ notes:
 - WP-590 added `TestRedisRealtimeStoreEnforcesDistributedSlotLimits`, `TestRedisRealtimeStoreReleaseFromAnotherInstanceFreesCapacity`, `TestRedisRealtimeStoreExpiresSlotsWithoutLeakingSensitiveData`, and app wiring tests proving Redis-backed realtime slots are used when available, required in release mode, and safe to inspect from AdminOps.
 - WP-590 intentionally does not add provider-native Claude Code / Antigravity realtime adapters, persistent upstream session pools, local Codex / Claude Code / Antigravity ingress, or Codex refresh-token-only import automation.
 - WP-600 added `TestRuntimeRefreshUsesPerAccountLockAndDoesNotOverwriteOnFailure`, `TestRuntimeRefreshClassifiesInvalidGrantWithoutOverwritingCredential`, `TestGatewayCodexRefreshTokenOnlyCreateCanRequestResponses`, `TestAdminAccountImportCodexRefreshTokenOnlyExchangesTokenWithoutLeakingCredential`, and `TestGatewayCodexRefreshTokenOnlyUpdateCanRequestResponses`, proving Codex refresh-token-only create/import/update exchanges and persists usable OAuth state before Gateway dispatch.
-- WP-600 intentionally does not add local Codex CLI ingress, Gateway-local Codex DTOs, Claude Code refresh-token-only import, or Antigravity refresh-token-only import.
+- WP-600 intentionally does not add local Codex CLI ingress or Gateway-local Codex DTOs; Claude Code and Antigravity refresh-token-only import landed in WP-610 and WP-620.
+- WP-610 added `TestClaudeRefreshUsesJSONTokenRequest`, `TestGatewayClaudeRefreshTokenOnlyCreateCanRequestMessages`, `TestAdminAccountImportClaudeRefreshTokenOnlyExchangesTokenWithoutLeakingCredential`, and `TestGatewayClaudeRefreshTokenOnlyUpdateCanRequestMessages`, proving Claude Code refresh-token-only create/import/update exchanges and persists usable OAuth state before Gateway `/v1/messages` dispatch.
+- WP-620 added `TestAntigravityRefreshUsesClientSecretFormTokenRequest`, `TestAntigravityRefreshRequiresClientSecret`, `TestGatewayAntigravityRefreshTokenOnlyCreateCanRequestChat`, `TestAdminAccountImportAntigravityRefreshTokenOnlyRequiresClientSecret`, and `TestGatewayAntigravityRefreshTokenOnlyUpdateCanRequestChat`, proving Antigravity refresh-token-only create/update requires configured client secret, exchanges via form OAuth, and persists usable OAuth state before Gateway text dispatch.
+- Antigravity refresh-token-only import requires encrypted credential `oauth_client_secret` / `client_secret`; SRapi intentionally does not hard-code the Google OAuth client secret or expose it through account metadata.
 
 ## Work Package Ledger
 
@@ -249,5 +255,6 @@ notes:
 | WP-580 | completed | SDK examples and 2api migration guide v1 with examples-check harness. |
 | WP-590 | completed | Distributed Redis-backed realtime slot store v1. |
 | WP-600 | completed | Codex refresh-token-only import and OAuth lifecycle v1. |
-| WP-610 | pending | Claude Code refresh-token-only import and OAuth lifecycle v1. |
+| WP-610 | completed | Claude Code refresh-token-only import and OAuth lifecycle v1. |
+| WP-620 | completed | Antigravity refresh-token-only import and OAuth lifecycle v1. |
 | WP-500+ | pending | Remaining ecosystem and advanced endpoint packages. |

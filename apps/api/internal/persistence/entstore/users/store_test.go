@@ -41,6 +41,9 @@ func TestStoreCreatesAndLoadsUserWithRoles(t *testing.T) {
 	if len(created.Roles) != 2 || created.Roles[0] != contract.RoleAdmin || created.Roles[1] != contract.RoleUser {
 		t.Fatalf("unexpected roles: %v", created.Roles)
 	}
+	if created.Balance != "0.00000000" || created.Currency != "USD" {
+		t.Fatalf("unexpected balance: %s %s", created.Balance, created.Currency)
+	}
 
 	loaded, err := store.FindByEmail(ctx, "ADMIN@srapi.local")
 	if err != nil {
@@ -88,6 +91,61 @@ func TestStoreListByIDsPreservesOrder(t *testing.T) {
 	}
 	if len(users) != 2 || users[0].ID != second.ID || users[1].ID != first.ID {
 		t.Fatalf("unexpected order: %+v", users)
+	}
+}
+
+func TestStoreListsAndUpdatesUsers(t *testing.T) {
+	client := enttest.Open(t, dialect.SQLite, sqliteDSN(t))
+	defer client.Close()
+
+	store, err := New(client)
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+
+	ctx := context.Background()
+	created, err := store.Create(ctx, newUser("first@srapi.local"))
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	status := contract.StatusDisabled
+	balance := "5.00000000"
+	currency := "EUR"
+	rpmLimit := 99
+	rpmLimitPtr := &rpmLimit
+	roles := []contract.Role{contract.RoleOperator}
+	updated, err := store.Update(ctx, created.ID, contract.UpdateStoredUser{
+		Status:   &status,
+		Roles:    &roles,
+		Balance:  &balance,
+		Currency: &currency,
+		RPMLimit: &rpmLimitPtr,
+	})
+	if err != nil {
+		t.Fatalf("update user: %v", err)
+	}
+	if updated.Status != status || updated.Balance != balance || updated.Currency != currency || len(updated.Roles) != 1 || updated.Roles[0] != contract.RoleOperator {
+		t.Fatalf("unexpected updated user: %+v", updated)
+	}
+	if updated.RPMLimit == nil || *updated.RPMLimit != rpmLimit {
+		t.Fatalf("expected rpm limit %d, got %v", rpmLimit, updated.RPMLimit)
+	}
+
+	listed, err := store.List(ctx, contract.ListUsersFilter{Status: &status, Query: "first"})
+	if err != nil {
+		t.Fatalf("list users: %v", err)
+	}
+	if len(listed) != 1 || listed[0].ID != created.ID {
+		t.Fatalf("unexpected list result: %+v", listed)
+	}
+
+	var cleared *int
+	updated, err = store.Update(ctx, created.ID, contract.UpdateStoredUser{RPMLimit: &cleared})
+	if err != nil {
+		t.Fatalf("clear rpm limit: %v", err)
+	}
+	if updated.RPMLimit != nil {
+		t.Fatalf("expected cleared rpm limit, got %v", updated.RPMLimit)
 	}
 }
 

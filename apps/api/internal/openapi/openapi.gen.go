@@ -1367,6 +1367,51 @@ func (e SubscriptionPlanStatus) Valid() bool {
 	}
 }
 
+// Defines values for UpdateUserBalanceRequestOperation.
+const (
+	Decrement UpdateUserBalanceRequestOperation = "decrement"
+	Increment UpdateUserBalanceRequestOperation = "increment"
+	Set       UpdateUserBalanceRequestOperation = "set"
+)
+
+// Valid indicates whether the value is a known member of the UpdateUserBalanceRequestOperation enum.
+func (e UpdateUserBalanceRequestOperation) Valid() bool {
+	switch e {
+	case Decrement:
+		return true
+	case Increment:
+		return true
+	case Set:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UsageAggregateDimension.
+const (
+	UsageAggregateDimensionAccount UsageAggregateDimension = "account"
+	UsageAggregateDimensionDay     UsageAggregateDimension = "day"
+	UsageAggregateDimensionModel   UsageAggregateDimension = "model"
+	UsageAggregateDimensionUser    UsageAggregateDimension = "user"
+)
+
+// Valid indicates whether the value is a known member of the UsageAggregateDimension enum.
+func (e UsageAggregateDimension) Valid() bool {
+	switch e {
+	case UsageAggregateDimensionAccount:
+		return true
+	case UsageAggregateDimensionDay:
+		return true
+	case UsageAggregateDimensionModel:
+		return true
+	case UsageAggregateDimensionUser:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for UserRole.
 const (
 	UserRoleAdmin    UserRole = "admin"
@@ -1561,6 +1606,24 @@ type AccountModelDiscoveryResponse struct {
 	RequestId RequestId             `json:"request_id"`
 }
 
+// AccountProxyQuality defines model for AccountProxyQuality.
+type AccountProxyQuality struct {
+	AccountId     Id          `json:"account_id"`
+	ErrorRate     float32     `json:"error_rate"`
+	LastCheckedAt *time.Time  `json:"last_checked_at,omitempty"`
+	LatencyP95Ms  int         `json:"latency_p95_ms"`
+	Metadata      *JsonObject `json:"metadata,omitempty"`
+	ProxyId       *string     `json:"proxy_id"`
+	SampleCount   int         `json:"sample_count"`
+	SuccessRate   float32     `json:"success_rate"`
+}
+
+// AccountProxyQualityResponse defines model for AccountProxyQualityResponse.
+type AccountProxyQualityResponse struct {
+	Data      AccountProxyQuality `json:"data"`
+	RequestId RequestId           `json:"request_id"`
+}
+
 // AccountQuotaListResponse defines model for AccountQuotaListResponse.
 type AccountQuotaListResponse struct {
 	Data       []AccountQuotaSnapshot `json:"data"`
@@ -1581,15 +1644,44 @@ type AccountQuotaSnapshot struct {
 	Used           string     `json:"used"`
 }
 
+// AccountRpmStatus defines model for AccountRpmStatus.
+type AccountRpmStatus struct {
+	AccountId     Id         `json:"account_id"`
+	ResetAt       *time.Time `json:"reset_at,omitempty"`
+	RpmLimit      *int       `json:"rpm_limit"`
+	RpmUsed       int        `json:"rpm_used"`
+	WindowSeconds int        `json:"window_seconds"`
+}
+
+// AccountRpmStatusResponse defines model for AccountRpmStatusResponse.
+type AccountRpmStatusResponse struct {
+	Data      AccountRpmStatus `json:"data"`
+	RequestId RequestId        `json:"request_id"`
+}
+
+// AdminDashboard defines model for AdminDashboard.
+type AdminDashboard = AdminOverview
+
+// AdminDashboardResponse defines model for AdminDashboardResponse.
+type AdminDashboardResponse struct {
+	Data      AdminDashboard `json:"data"`
+	RequestId RequestId      `json:"request_id"`
+}
+
 // AdminOverview defines model for AdminOverview.
 type AdminOverview struct {
 	AccountCount           int     `json:"account_count"`
 	ActiveAccountCount     int     `json:"active_account_count"`
+	Currency               string  `json:"currency"`
 	ModelCount             int     `json:"model_count"`
 	ProviderCount          int     `json:"provider_count"`
 	RequestSuccessRate     float32 `json:"request_success_rate"`
 	SchedulerDecisionCount int     `json:"scheduler_decision_count"`
+	TotalCost              string  `json:"total_cost"`
+	TotalRequestCount      int     `json:"total_request_count"`
+	TotalTokenCount        int     `json:"total_token_count"`
 	UsageLogCount          int     `json:"usage_log_count"`
+	UserCount              int     `json:"user_count"`
 }
 
 // AdminOverviewResponse defines model for AdminOverviewResponse.
@@ -1858,6 +1950,46 @@ type AuditLogListResponse struct {
 	RequestId  RequestId  `json:"request_id"`
 }
 
+// BatchUpdateAccountsRequest defines model for BatchUpdateAccountsRequest.
+type BatchUpdateAccountsRequest struct {
+	AccountIds []Id                  `json:"account_ids"`
+	Status     ProviderAccountStatus `json:"status"`
+}
+
+// BatchUpdateAccountsResponse defines model for BatchUpdateAccountsResponse.
+type BatchUpdateAccountsResponse struct {
+	Data      BatchUpdateAccountsResult `json:"data"`
+	RequestId RequestId                 `json:"request_id"`
+}
+
+// BatchUpdateAccountsResult defines model for BatchUpdateAccountsResult.
+type BatchUpdateAccountsResult struct {
+	Errors       []string `json:"errors"`
+	UpdatedCount int      `json:"updated_count"`
+	UpdatedIds   []Id     `json:"updated_ids"`
+}
+
+// BatchUpdateUsersRequest defines model for BatchUpdateUsersRequest.
+type BatchUpdateUsersRequest struct {
+	Roles    *[]UserRole `json:"roles,omitempty"`
+	RpmLimit *int        `json:"rpm_limit,omitempty"`
+	Status   *UserStatus `json:"status,omitempty"`
+	UserIds  []Id        `json:"user_ids"`
+}
+
+// BatchUpdateUsersResponse defines model for BatchUpdateUsersResponse.
+type BatchUpdateUsersResponse struct {
+	Data      BatchUpdateUsersResult `json:"data"`
+	RequestId RequestId              `json:"request_id"`
+}
+
+// BatchUpdateUsersResult defines model for BatchUpdateUsersResult.
+type BatchUpdateUsersResult struct {
+	Errors       []string `json:"errors"`
+	UpdatedCount int      `json:"updated_count"`
+	UpdatedIds   []Id     `json:"updated_ids"`
+}
+
 // BillingLedgerEntry defines model for BillingLedgerEntry.
 type BillingLedgerEntry struct {
 	Amount        string                 `json:"amount"`
@@ -2021,6 +2153,18 @@ type CreateAccountGroupRequest struct {
 	ProviderScope *JsonObject         `json:"provider_scope,omitempty"`
 	Status        *AccountGroupStatus `json:"status,omitempty"`
 	StrategyHint  *string             `json:"strategy_hint,omitempty"`
+}
+
+// CreateAdminUserRequest defines model for CreateAdminUserRequest.
+type CreateAdminUserRequest struct {
+	Balance  *string             `json:"balance,omitempty"`
+	Currency *string             `json:"currency,omitempty"`
+	Email    openapi_types.Email `json:"email"`
+	Name     string              `json:"name"`
+	Password string              `json:"password"`
+	Roles    *[]UserRole         `json:"roles,omitempty"`
+	RpmLimit *int                `json:"rpm_limit,omitempty"`
+	Status   *UserStatus         `json:"status,omitempty"`
 }
 
 // CreateApiKeyRequest defines model for CreateApiKeyRequest.
@@ -3461,6 +3605,16 @@ type UpdateAccountGroupRequest struct {
 	StrategyHint  *string             `json:"strategy_hint,omitempty"`
 }
 
+// UpdateAdminUserRequest defines model for UpdateAdminUserRequest.
+type UpdateAdminUserRequest struct {
+	Email    *openapi_types.Email `json:"email,omitempty"`
+	Name     *string              `json:"name,omitempty"`
+	Password *string              `json:"password,omitempty"`
+	Roles    *[]UserRole          `json:"roles,omitempty"`
+	RpmLimit *int                 `json:"rpm_limit,omitempty"`
+	Status   *UserStatus          `json:"status,omitempty"`
+}
+
 // UpdateApiKeyRequest defines model for UpdateApiKeyRequest.
 type UpdateApiKeyRequest struct {
 	AllowedModels *[]string     `json:"allowed_models,omitempty"`
@@ -3517,6 +3671,64 @@ type UpdateProviderRequest struct {
 	Status       *ResourceStatus      `json:"status,omitempty"`
 }
 
+// UpdateUserBalanceRequest defines model for UpdateUserBalanceRequest.
+type UpdateUserBalanceRequest struct {
+	// Amount Decimal string amount.
+	Amount    string                            `json:"amount"`
+	Currency  *string                           `json:"currency,omitempty"`
+	Note      *string                           `json:"note,omitempty"`
+	Operation UpdateUserBalanceRequestOperation `json:"operation"`
+}
+
+// UpdateUserBalanceRequestOperation defines model for UpdateUserBalanceRequest.Operation.
+type UpdateUserBalanceRequestOperation string
+
+// UpdateUserRpmLimitRequest defines model for UpdateUserRpmLimitRequest.
+type UpdateUserRpmLimitRequest struct {
+	RpmLimit *int `json:"rpm_limit"`
+}
+
+// UsageAggregate defines model for UsageAggregate.
+type UsageAggregate struct {
+	AggregateId   string                  `json:"aggregate_id"`
+	AggregateType UsageAggregateDimension `json:"aggregate_type"`
+	CachedTokens  int                     `json:"cached_tokens"`
+	Currency      string                  `json:"currency"`
+	ErrorCount    int                     `json:"error_count"`
+	InputTokens   int                     `json:"input_tokens"`
+	OutputTokens  int                     `json:"output_tokens"`
+	RequestCount  int                     `json:"request_count"`
+	SuccessCount  int                     `json:"success_count"`
+	TotalCost     string                  `json:"total_cost"`
+	TotalTokens   int                     `json:"total_tokens"`
+}
+
+// UsageAggregateDimension defines model for UsageAggregateDimension.
+type UsageAggregateDimension string
+
+// UsageAggregateListResponse defines model for UsageAggregateListResponse.
+type UsageAggregateListResponse struct {
+	Data       []UsageAggregate `json:"data"`
+	Pagination Pagination       `json:"pagination"`
+	RequestId  RequestId        `json:"request_id"`
+}
+
+// UsageExport defines model for UsageExport.
+type UsageExport struct {
+	ByAccount   []UsageAggregate `json:"by_account"`
+	ByModel     []UsageAggregate `json:"by_model"`
+	ByUser      []UsageAggregate `json:"by_user"`
+	Daily       []UsageAggregate `json:"daily"`
+	GeneratedAt Timestamp        `json:"generated_at"`
+	Logs        []UsageLog       `json:"logs"`
+}
+
+// UsageExportResponse defines model for UsageExportResponse.
+type UsageExportResponse struct {
+	Data      UsageExport `json:"data"`
+	RequestId RequestId   `json:"request_id"`
+}
+
 // UsageLog defines model for UsageLog.
 type UsageLog struct {
 	AccountId             *string   `json:"account_id,omitempty"`
@@ -3552,12 +3764,24 @@ type UsageLogListResponse struct {
 
 // User defines model for User.
 type User struct {
-	CreatedAt Timestamp           `json:"created_at"`
-	Email     openapi_types.Email `json:"email"`
-	Id        Id                  `json:"id"`
-	Name      string              `json:"name"`
-	Roles     []UserRole          `json:"roles"`
-	Status    UserStatus          `json:"status"`
+	// Balance Decimal string balance.
+	Balance     string              `json:"balance"`
+	CreatedAt   Timestamp           `json:"created_at"`
+	Currency    string              `json:"currency"`
+	Email       openapi_types.Email `json:"email"`
+	Id          Id                  `json:"id"`
+	LastLoginAt *time.Time          `json:"last_login_at,omitempty"`
+	Name        string              `json:"name"`
+	Roles       []UserRole          `json:"roles"`
+	RpmLimit    *int                `json:"rpm_limit,omitempty"`
+	Status      UserStatus          `json:"status"`
+}
+
+// UserListResponse defines model for UserListResponse.
+type UserListResponse struct {
+	Data       []User     `json:"data"`
+	Pagination Pagination `json:"pagination"`
+	RequestId  RequestId  `json:"request_id"`
 }
 
 // UserResponse defines model for UserResponse.
@@ -3807,11 +4031,44 @@ type ListAdminUsageLogsParams struct {
 	Model    *string   `form:"model,omitempty" json:"model,omitempty"`
 }
 
+// GetAdminUsageAggregatesParams defines parameters for GetAdminUsageAggregates.
+type GetAdminUsageAggregatesParams struct {
+	Dimension UsageAggregateDimension `form:"dimension" json:"dimension"`
+	Start     *openapi_types.Date     `form:"start,omitempty" json:"start,omitempty"`
+	End       *openapi_types.Date     `form:"end,omitempty" json:"end,omitempty"`
+}
+
+// GetAdminUsageDailyParams defines parameters for GetAdminUsageDaily.
+type GetAdminUsageDailyParams struct {
+	Start *openapi_types.Date `form:"start,omitempty" json:"start,omitempty"`
+	End   *openapi_types.Date `form:"end,omitempty" json:"end,omitempty"`
+}
+
+// ExportAdminUsageParams defines parameters for ExportAdminUsage.
+type ExportAdminUsageParams struct {
+	Start *openapi_types.Date `form:"start,omitempty" json:"start,omitempty"`
+	End   *openapi_types.Date `form:"end,omitempty" json:"end,omitempty"`
+}
+
 // ListAdminUserSubscriptionsParams defines parameters for ListAdminUserSubscriptions.
 type ListAdminUserSubscriptionsParams struct {
 	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
 	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
 	UserId   *Id       `form:"user_id,omitempty" json:"user_id,omitempty"`
+}
+
+// ListAdminUsersParams defines parameters for ListAdminUsers.
+type ListAdminUsersParams struct {
+	Page     *Page        `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *PageSize    `form:"page_size,omitempty" json:"page_size,omitempty"`
+	Q        *SearchQuery `form:"q,omitempty" json:"q,omitempty"`
+	Status   *UserStatus  `form:"status,omitempty" json:"status,omitempty"`
+}
+
+// GetAdminUserBalanceHistoryParams defines parameters for GetAdminUserBalanceHistory.
+type GetAdminUserBalanceHistoryParams struct {
+	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
 }
 
 // ListApiKeysParams defines parameters for ListApiKeys.
@@ -3950,6 +4207,9 @@ type UpdateAdminAccountGroupJSONRequestBody = UpdateAccountGroupRequest
 // CreateAdminAccountJSONRequestBody defines body for CreateAdminAccount for application/json ContentType.
 type CreateAdminAccountJSONRequestBody = CreateProviderAccountRequest
 
+// BatchUpdateAdminAccountsJSONRequestBody defines body for BatchUpdateAdminAccounts for application/json ContentType.
+type BatchUpdateAdminAccountsJSONRequestBody = BatchUpdateAccountsRequest
+
 // ImportAdminAccountsJSONRequestBody defines body for ImportAdminAccounts for application/json ContentType.
 type ImportAdminAccountsJSONRequestBody = ProviderAccountImportRequest
 
@@ -4000,6 +4260,21 @@ type CreateAdminSubscriptionPlanJSONRequestBody = CreateSubscriptionPlanRequest
 
 // CreateAdminUserSubscriptionJSONRequestBody defines body for CreateAdminUserSubscription for application/json ContentType.
 type CreateAdminUserSubscriptionJSONRequestBody = CreateUserSubscriptionRequest
+
+// CreateAdminUserJSONRequestBody defines body for CreateAdminUser for application/json ContentType.
+type CreateAdminUserJSONRequestBody = CreateAdminUserRequest
+
+// BatchUpdateAdminUsersJSONRequestBody defines body for BatchUpdateAdminUsers for application/json ContentType.
+type BatchUpdateAdminUsersJSONRequestBody = BatchUpdateUsersRequest
+
+// UpdateAdminUserJSONRequestBody defines body for UpdateAdminUser for application/json ContentType.
+type UpdateAdminUserJSONRequestBody = UpdateAdminUserRequest
+
+// UpdateAdminUserBalanceJSONRequestBody defines body for UpdateAdminUserBalance for application/json ContentType.
+type UpdateAdminUserBalanceJSONRequestBody = UpdateUserBalanceRequest
+
+// UpdateAdminUserRpmLimitJSONRequestBody defines body for UpdateAdminUserRpmLimit for application/json ContentType.
+type UpdateAdminUserRpmLimitJSONRequestBody = UpdateUserRpmLimitRequest
 
 // CreateApiKeyJSONRequestBody defines body for CreateApiKey for application/json ContentType.
 type CreateApiKeyJSONRequestBody = CreateApiKeyRequest
@@ -9925,6 +10200,9 @@ type ServerInterface interface {
 	// Create a provider account.
 	// (POST /api/v1/admin/accounts)
 	CreateAdminAccount(w http.ResponseWriter, r *http.Request)
+	// Batch update provider account status.
+	// (PATCH /api/v1/admin/accounts/batch)
+	BatchUpdateAdminAccounts(w http.ResponseWriter, r *http.Request)
 	// Export provider account metadata without credentials.
 	// (GET /api/v1/admin/accounts/export)
 	ExportAdminAccounts(w http.ResponseWriter, r *http.Request)
@@ -9937,6 +10215,9 @@ type ServerInterface interface {
 	// Update a provider account.
 	// (PATCH /api/v1/admin/accounts/{id})
 	UpdateAdminAccount(w http.ResponseWriter, r *http.Request, id Id)
+	// Clear provider account error state.
+	// (POST /api/v1/admin/accounts/{id}/clear-error)
+	ClearAdminAccountError(w http.ResponseWriter, r *http.Request, id Id)
 	// Disable a provider account.
 	// (POST /api/v1/admin/accounts/{id}/disable)
 	DisableAdminAccount(w http.ResponseWriter, r *http.Request, id Id)
@@ -9952,12 +10233,18 @@ type ServerInterface interface {
 	// Bind or clear a provider account proxy.
 	// (PATCH /api/v1/admin/accounts/{id}/proxy)
 	BindAdminAccountProxy(w http.ResponseWriter, r *http.Request, id Id)
+	// Get provider account proxy quality summary.
+	// (GET /api/v1/admin/accounts/{id}/proxy-quality)
+	GetAdminAccountProxyQuality(w http.ResponseWriter, r *http.Request, id Id)
 	// Get provider account quota snapshots.
 	// (GET /api/v1/admin/accounts/{id}/quota)
 	GetAdminAccountQuota(w http.ResponseWriter, r *http.Request, id Id)
 	// Recover a protected provider account after operator remediation.
 	// (POST /api/v1/admin/accounts/{id}/recover)
 	RecoverAdminAccount(w http.ResponseWriter, r *http.Request, id Id)
+	// Get provider account RPM runtime status.
+	// (GET /api/v1/admin/accounts/{id}/rpm-status)
+	GetAdminAccountRpmStatus(w http.ResponseWriter, r *http.Request, id Id)
 	// Test provider account configuration.
 	// (POST /api/v1/admin/accounts/{id}/test)
 	TestAdminAccount(w http.ResponseWriter, r *http.Request, id Id)
@@ -9970,6 +10257,9 @@ type ServerInterface interface {
 	// List capability descriptors.
 	// (GET /api/v1/admin/capabilities)
 	ListAdminCapabilities(w http.ResponseWriter, r *http.Request, params ListAdminCapabilitiesParams)
+	// Get admin dashboard statistics.
+	// (GET /api/v1/admin/dashboard)
+	GetAdminDashboard(w http.ResponseWriter, r *http.Request)
 	// List model registry entries.
 	// (GET /api/v1/admin/models)
 	ListAdminModels(w http.ResponseWriter, r *http.Request, params ListAdminModelsParams)
@@ -10057,12 +10347,51 @@ type ServerInterface interface {
 	// List usage logs.
 	// (GET /api/v1/admin/usage-logs)
 	ListAdminUsageLogs(w http.ResponseWriter, r *http.Request, params ListAdminUsageLogsParams)
+	// Get usage aggregates by dimension.
+	// (GET /api/v1/admin/usage/aggregates)
+	GetAdminUsageAggregates(w http.ResponseWriter, r *http.Request, params GetAdminUsageAggregatesParams)
+	// Get daily usage aggregates.
+	// (GET /api/v1/admin/usage/daily)
+	GetAdminUsageDaily(w http.ResponseWriter, r *http.Request, params GetAdminUsageDailyParams)
+	// Export usage logs and aggregates.
+	// (GET /api/v1/admin/usage/export)
+	ExportAdminUsage(w http.ResponseWriter, r *http.Request, params ExportAdminUsageParams)
 	// List user subscriptions.
 	// (GET /api/v1/admin/user-subscriptions)
 	ListAdminUserSubscriptions(w http.ResponseWriter, r *http.Request, params ListAdminUserSubscriptionsParams)
 	// Create a user subscription from an existing plan.
 	// (POST /api/v1/admin/user-subscriptions)
 	CreateAdminUserSubscription(w http.ResponseWriter, r *http.Request)
+	// List and search users.
+	// (GET /api/v1/admin/users)
+	ListAdminUsers(w http.ResponseWriter, r *http.Request, params ListAdminUsersParams)
+	// Create a user.
+	// (POST /api/v1/admin/users)
+	CreateAdminUser(w http.ResponseWriter, r *http.Request)
+	// Batch update user attributes.
+	// (PATCH /api/v1/admin/users/batch)
+	BatchUpdateAdminUsers(w http.ResponseWriter, r *http.Request)
+	// Get a user.
+	// (GET /api/v1/admin/users/{id})
+	GetAdminUser(w http.ResponseWriter, r *http.Request, id Id)
+	// Update a user.
+	// (PATCH /api/v1/admin/users/{id})
+	UpdateAdminUser(w http.ResponseWriter, r *http.Request, id Id)
+	// Update user balance.
+	// (PATCH /api/v1/admin/users/{id}/balance)
+	UpdateAdminUserBalance(w http.ResponseWriter, r *http.Request, id Id)
+	// List user balance ledger entries.
+	// (GET /api/v1/admin/users/{id}/balance-history)
+	GetAdminUserBalanceHistory(w http.ResponseWriter, r *http.Request, id Id, params GetAdminUserBalanceHistoryParams)
+	// Disable a user.
+	// (POST /api/v1/admin/users/{id}/disable)
+	DisableAdminUser(w http.ResponseWriter, r *http.Request, id Id)
+	// Enable a user.
+	// (POST /api/v1/admin/users/{id}/enable)
+	EnableAdminUser(w http.ResponseWriter, r *http.Request, id Id)
+	// Update user RPM limit.
+	// (PATCH /api/v1/admin/users/{id}/rpm-limit)
+	UpdateAdminUserRpmLimit(w http.ResponseWriter, r *http.Request, id Id)
 	// List API keys visible to the current user.
 	// (GET /api/v1/api-keys)
 	ListApiKeys(w http.ResponseWriter, r *http.Request, params ListApiKeysParams)
@@ -10802,6 +11131,28 @@ func (siw *ServerInterfaceWrapper) CreateAdminAccount(w http.ResponseWriter, r *
 	handler.ServeHTTP(w, r)
 }
 
+// BatchUpdateAdminAccounts operation middleware
+func (siw *ServerInterfaceWrapper) BatchUpdateAdminAccounts(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BatchUpdateAdminAccounts(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ExportAdminAccounts operation middleware
 func (siw *ServerInterfaceWrapper) ExportAdminAccounts(w http.ResponseWriter, r *http.Request) {
 
@@ -10901,6 +11252,40 @@ func (siw *ServerInterfaceWrapper) UpdateAdminAccount(w http.ResponseWriter, r *
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateAdminAccount(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ClearAdminAccountError operation middleware
+func (siw *ServerInterfaceWrapper) ClearAdminAccountError(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ClearAdminAccountError(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -11078,6 +11463,38 @@ func (siw *ServerInterfaceWrapper) BindAdminAccountProxy(w http.ResponseWriter, 
 	handler.ServeHTTP(w, r)
 }
 
+// GetAdminAccountProxyQuality operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminAccountProxyQuality(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminAccountProxyQuality(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetAdminAccountQuota operation middleware
 func (siw *ServerInterfaceWrapper) GetAdminAccountQuota(w http.ResponseWriter, r *http.Request) {
 
@@ -11135,6 +11552,38 @@ func (siw *ServerInterfaceWrapper) RecoverAdminAccount(w http.ResponseWriter, r 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.RecoverAdminAccount(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminAccountRpmStatus operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminAccountRpmStatus(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminAccountRpmStatus(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -11403,6 +11852,26 @@ func (siw *ServerInterfaceWrapper) ListAdminCapabilities(w http.ResponseWriter, 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListAdminCapabilities(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminDashboard operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminDashboard(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminDashboard(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -12740,6 +13209,175 @@ func (siw *ServerInterfaceWrapper) ListAdminUsageLogs(w http.ResponseWriter, r *
 	handler.ServeHTTP(w, r)
 }
 
+// GetAdminUsageAggregates operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminUsageAggregates(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAdminUsageAggregatesParams
+
+	// ------------- Required query parameter "dimension" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "dimension", r.URL.Query(), &params.Dimension, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "dimension"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dimension", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "start" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "start", r.URL.Query(), &params.Start, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "start"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "start", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "end" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "end", r.URL.Query(), &params.End, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "end"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "end", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminUsageAggregates(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminUsageDaily operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminUsageDaily(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAdminUsageDailyParams
+
+	// ------------- Optional query parameter "start" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "start", r.URL.Query(), &params.Start, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "start"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "start", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "end" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "end", r.URL.Query(), &params.End, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "end"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "end", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminUsageDaily(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ExportAdminUsage operation middleware
+func (siw *ServerInterfaceWrapper) ExportAdminUsage(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ExportAdminUsageParams
+
+	// ------------- Optional query parameter "start" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "start", r.URL.Query(), &params.Start, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "start"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "start", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "end" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "end", r.URL.Query(), &params.End, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "end"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "end", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ExportAdminUsage(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListAdminUserSubscriptions operation middleware
 func (siw *ServerInterfaceWrapper) ListAdminUserSubscriptions(w http.ResponseWriter, r *http.Request) {
 
@@ -12818,6 +13456,391 @@ func (siw *ServerInterfaceWrapper) CreateAdminUserSubscription(w http.ResponseWr
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateAdminUserSubscription(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAdminUsers operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminUsers(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminUsersParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "q" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "q", r.URL.Query(), &params.Q, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminUsers(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAdminUser operation middleware
+func (siw *ServerInterfaceWrapper) CreateAdminUser(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAdminUser(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// BatchUpdateAdminUsers operation middleware
+func (siw *ServerInterfaceWrapper) BatchUpdateAdminUsers(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BatchUpdateAdminUsers(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminUser operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminUser(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateAdminUser operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAdminUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAdminUser(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateAdminUserBalance operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAdminUserBalance(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAdminUserBalance(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminUserBalanceHistory operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminUserBalanceHistory(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAdminUserBalanceHistoryParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminUserBalanceHistory(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DisableAdminUser operation middleware
+func (siw *ServerInterfaceWrapper) DisableAdminUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DisableAdminUser(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// EnableAdminUser operation middleware
+func (siw *ServerInterfaceWrapper) EnableAdminUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.EnableAdminUser(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateAdminUserRpmLimit operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAdminUserRpmLimit(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAdminUserRpmLimit(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -14037,21 +15060,26 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/account-groups/{id}/accounts/{account_id}", wrapper.AddAdminAccountGroupMember)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts", wrapper.ListAdminAccounts)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts", wrapper.CreateAdminAccount)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/accounts/batch", wrapper.BatchUpdateAdminAccounts)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/export", wrapper.ExportAdminAccounts)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/import", wrapper.ImportAdminAccounts)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/{id}", wrapper.GetAdminAccount)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/accounts/{id}", wrapper.UpdateAdminAccount)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/clear-error", wrapper.ClearAdminAccountError)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/disable", wrapper.DisableAdminAccount)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/discover-models", wrapper.DiscoverAdminAccountModels)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/enable", wrapper.EnableAdminAccount)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/health", wrapper.GetAdminAccountHealth)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/proxy", wrapper.BindAdminAccountProxy)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/proxy-quality", wrapper.GetAdminAccountProxyQuality)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/quota", wrapper.GetAdminAccountQuota)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/recover", wrapper.RecoverAdminAccount)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/rpm-status", wrapper.GetAdminAccountRpmStatus)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/test", wrapper.TestAdminAccount)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/audit-logs", wrapper.ListAdminAuditLogs)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/billing-ledger", wrapper.ListAdminBillingLedger)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/capabilities", wrapper.ListAdminCapabilities)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/dashboard", wrapper.GetAdminDashboard)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/models", wrapper.ListAdminModels)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/models", wrapper.CreateAdminModel)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/models/{id}", wrapper.UpdateAdminModel)
@@ -14081,8 +15109,21 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/subscription-plans", wrapper.ListAdminSubscriptionPlans)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/subscription-plans", wrapper.CreateAdminSubscriptionPlan)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/usage-logs", wrapper.ListAdminUsageLogs)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/usage/aggregates", wrapper.GetAdminUsageAggregates)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/usage/daily", wrapper.GetAdminUsageDaily)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/usage/export", wrapper.ExportAdminUsage)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/user-subscriptions", wrapper.ListAdminUserSubscriptions)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/user-subscriptions", wrapper.CreateAdminUserSubscription)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/users", wrapper.ListAdminUsers)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/users", wrapper.CreateAdminUser)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/users/batch", wrapper.BatchUpdateAdminUsers)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/users/{id}", wrapper.GetAdminUser)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/users/{id}", wrapper.UpdateAdminUser)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/users/{id}/balance", wrapper.UpdateAdminUserBalance)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/users/{id}/balance-history", wrapper.GetAdminUserBalanceHistory)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/users/{id}/disable", wrapper.DisableAdminUser)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/users/{id}/enable", wrapper.EnableAdminUser)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/users/{id}/rpm-limit", wrapper.UpdateAdminUserRpmLimit)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/api-keys", wrapper.ListApiKeys)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/api-keys", wrapper.CreateApiKey)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/api-keys/{id}", wrapper.UpdateApiKey)

@@ -104,6 +104,30 @@ type AccountQuotaSnapshot struct {
 	SnapshotAt     time.Time
 }
 
+type BatchUpdateResult struct {
+	Updated []ProviderAccount
+	Errors  []string
+}
+
+type RPMStatus struct {
+	AccountID     int
+	RPMUsed       int
+	RPMLimit      *int
+	WindowSeconds int
+	ResetAt       *time.Time
+}
+
+type ProxyQuality struct {
+	AccountID     int
+	ProxyID       *string
+	SuccessRate   float32
+	ErrorRate     float32
+	LatencyP95MS  int
+	SampleCount   int
+	LastCheckedAt *time.Time
+	Metadata      map[string]any
+}
+
 type CreateRequest struct {
 	ProviderID     int
 	Name           string

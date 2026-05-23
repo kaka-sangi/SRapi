@@ -3,6 +3,7 @@ package service
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -544,6 +545,126 @@ func TestRuntimeRefreshUsesPerAccountLockAndDoesNotOverwriteOnFailure(t *testing
 	}
 }
 
+func TestClaudeRefreshUsesJSONTokenRequest(t *testing.T) {
+	var gotUserAgent string
+	var gotPayload map[string]string
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/oauth/token" {
+			t.Fatalf("unexpected Claude token endpoint path %s", r.URL.Path)
+		}
+		if r.Header.Get("Content-Type") != "application/json" || r.Header.Get("Accept") != "application/json" {
+			t.Fatalf("unexpected Claude token headers: %+v", r.Header)
+		}
+		gotUserAgent = r.Header.Get("User-Agent")
+		if err := json.NewDecoder(r.Body).Decode(&gotPayload); err != nil {
+			t.Fatalf("decode Claude refresh body: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"access_token":"claude-access","refresh_token":"claude-refresh-rotated","token_type":"Bearer","expires_in":3600,"account":{"email_address":"claude@example.test"}}`))
+	}))
+	defer tokenServer.Close()
+
+	svc, err := New(nil)
+	if err != nil {
+		t.Fatalf("create runtime: %v", err)
+	}
+	resp, err := svc.Refresh(context.Background(), contract.RefreshRequest{
+		Account: contract.AccountRuntime{
+			AccountID:      3,
+			RuntimeClass:   "oauth_refresh",
+			UpstreamClient: ptrString("claude_code_cli"),
+			Metadata:       map[string]any{"oauth_token_url": tokenServer.URL + "/v1/oauth/token", "user_agent": "claude-cli/test"},
+			Credential:     map[string]any{"refresh_token": "claude-refresh"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("refresh Claude token: %v", err)
+	}
+	if resp.Credential["access_token"] != "claude-access" || resp.Credential["refresh_token"] != "claude-refresh-rotated" {
+		t.Fatalf("unexpected Claude refresh response: %+v", resp)
+	}
+	if gotPayload["grant_type"] != "refresh_token" ||
+		gotPayload["refresh_token"] != "claude-refresh" ||
+		gotPayload["client_id"] != claudeCodeOAuthClientID {
+		t.Fatalf("unexpected Claude refresh payload: %+v", gotPayload)
+	}
+	if gotUserAgent != "claude-cli/test" {
+		t.Fatalf("expected Claude user agent, got %q", gotUserAgent)
+	}
+}
+
+func TestAntigravityRefreshUsesClientSecretFormTokenRequest(t *testing.T) {
+	var gotForm url.Values
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Content-Type") != "application/x-www-form-urlencoded" {
+			t.Fatalf("unexpected Antigravity token headers: %+v", r.Header)
+		}
+		if err := r.ParseForm(); err != nil {
+			t.Fatalf("parse Antigravity refresh form: %v", err)
+		}
+		gotForm = cloneURLValues(r.PostForm)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"access_token":"antigravity-access","refresh_token":"antigravity-refresh-rotated","token_type":"Bearer","expires_in":3600}`))
+	}))
+	defer tokenServer.Close()
+
+	svc, err := New(nil)
+	if err != nil {
+		t.Fatalf("create runtime: %v", err)
+	}
+	resp, err := svc.Refresh(context.Background(), contract.RefreshRequest{
+		Account: contract.AccountRuntime{
+			AccountID:      4,
+			RuntimeClass:   "oauth_refresh",
+			UpstreamClient: ptrString("antigravity_desktop"),
+			Metadata:       map[string]any{"oauth_token_url": tokenServer.URL},
+			Credential:     map[string]any{"refresh_token": "antigravity-refresh", "oauth_client_secret": "antigravity-secret"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("refresh Antigravity token: %v", err)
+	}
+	if resp.Credential["access_token"] != "antigravity-access" || resp.Credential["refresh_token"] != "antigravity-refresh-rotated" {
+		t.Fatalf("unexpected Antigravity refresh response: %+v", resp)
+	}
+	if gotForm.Get("grant_type") != "refresh_token" ||
+		gotForm.Get("refresh_token") != "antigravity-refresh" ||
+		gotForm.Get("client_id") != antigravityOAuthClientID ||
+		gotForm.Get("client_secret") != "antigravity-secret" {
+		t.Fatalf("unexpected Antigravity refresh form: %v", gotForm)
+	}
+}
+
+func TestAntigravityRefreshRequiresClientSecret(t *testing.T) {
+	upstreamCalled := false
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamCalled = true
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer tokenServer.Close()
+
+	svc, err := New(nil)
+	if err != nil {
+		t.Fatalf("create runtime: %v", err)
+	}
+	_, err = svc.Refresh(context.Background(), contract.RefreshRequest{
+		Account: contract.AccountRuntime{
+			AccountID:      5,
+			RuntimeClass:   "oauth_refresh",
+			UpstreamClient: ptrString("antigravity_desktop"),
+			Metadata:       map[string]any{"oauth_token_url": tokenServer.URL, "oauth_client_secret": "metadata-secret"},
+			Credential:     map[string]any{"refresh_token": "antigravity-refresh"},
+		},
+	})
+	var runtimeErr contract.RuntimeError
+	if !errors.As(err, &runtimeErr) || runtimeErr.Class != "credential_missing" {
+		t.Fatalf("expected credential_missing runtime error, got %T %v", err, err)
+	}
+	if upstreamCalled {
+		t.Fatal("missing Antigravity client secret should not call upstream")
+	}
+}
+
 func TestRuntimeRefreshClassifiesInvalidGrantWithoutOverwritingCredential(t *testing.T) {
 	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
@@ -579,4 +700,12 @@ func TestRuntimeRefreshClassifiesInvalidGrantWithoutOverwritingCredential(t *tes
 
 func ptrString(value string) *string {
 	return &value
+}
+
+func cloneURLValues(values url.Values) url.Values {
+	out := make(url.Values, len(values))
+	for key, vals := range values {
+		out[key] = append([]string(nil), vals...)
+	}
+	return out
 }

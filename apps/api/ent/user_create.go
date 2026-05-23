@@ -144,6 +144,20 @@ func (_c *UserCreate) SetNillableCurrency(v *string) *UserCreate {
 	return _c
 }
 
+// SetRpmLimit sets the "rpm_limit" field.
+func (_c *UserCreate) SetRpmLimit(v int) *UserCreate {
+	_c.mutation.SetRpmLimit(v)
+	return _c
+}
+
+// SetNillableRpmLimit sets the "rpm_limit" field if the given value is not nil.
+func (_c *UserCreate) SetNillableRpmLimit(v *int) *UserCreate {
+	if v != nil {
+		_c.SetRpmLimit(*v)
+	}
+	return _c
+}
+
 // SetLastLoginAt sets the "last_login_at" field.
 func (_c *UserCreate) SetLastLoginAt(v time.Time) *UserCreate {
 	_c.mutation.SetLastLoginAt(v)
@@ -315,6 +329,10 @@ func (_c *UserCreate) createSpec() (*User, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Currency(); ok {
 		_spec.SetField(user.FieldCurrency, field.TypeString, value)
 		_node.Currency = value
+	}
+	if value, ok := _c.mutation.RpmLimit(); ok {
+		_spec.SetField(user.FieldRpmLimit, field.TypeInt, value)
+		_node.RpmLimit = &value
 	}
 	if value, ok := _c.mutation.LastLoginAt(); ok {
 		_spec.SetField(user.FieldLastLoginAt, field.TypeTime, value)

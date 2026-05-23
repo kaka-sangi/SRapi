@@ -37,6 +37,8 @@ type User struct {
 	Balance string `json:"balance,omitempty"`
 	// Currency holds the value of the "currency" field.
 	Currency string `json:"currency,omitempty"`
+	// RpmLimit holds the value of the "rpm_limit" field.
+	RpmLimit *int `json:"rpm_limit,omitempty"`
 	// LastLoginAt holds the value of the "last_login_at" field.
 	LastLoginAt  *time.Time `json:"last_login_at,omitempty"`
 	selectValues sql.SelectValues
@@ -47,7 +49,7 @@ func (*User) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case user.FieldID:
+		case user.FieldID, user.FieldRpmLimit:
 			values[i] = new(sql.NullInt64)
 		case user.FieldEmail, user.FieldName, user.FieldPasswordHash, user.FieldStatus, user.FieldBalance, user.FieldCurrency:
 			values[i] = new(sql.NullString)
@@ -136,6 +138,13 @@ func (_m *User) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.Currency = value.String
 			}
+		case user.FieldRpmLimit:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field rpm_limit", values[i])
+			} else if value.Valid {
+				_m.RpmLimit = new(int)
+				*_m.RpmLimit = int(value.Int64)
+			}
 		case user.FieldLastLoginAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field last_login_at", values[i])
@@ -211,6 +220,11 @@ func (_m *User) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("currency=")
 	builder.WriteString(_m.Currency)
+	builder.WriteString(", ")
+	if v := _m.RpmLimit; v != nil {
+		builder.WriteString("rpm_limit=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	if v := _m.LastLoginAt; v != nil {
 		builder.WriteString("last_login_at=")

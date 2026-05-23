@@ -3,10 +3,12 @@ package users
 import (
 	"context"
 	"errors"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/srapi/srapi/apps/api/ent"
+	"github.com/srapi/srapi/apps/api/ent/predicate"
 	entrole "github.com/srapi/srapi/apps/api/ent/role"
 	entuser "github.com/srapi/srapi/apps/api/ent/user"
 	entuserrole "github.com/srapi/srapi/apps/api/ent/userrole"
@@ -41,6 +43,7 @@ func (s *Store) Create(ctx context.Context, input contract.CreateStoredUser) (co
 		SetNillableEmailVerifiedAt(input.EmailVerifiedAt).
 		SetBalance(input.Balance).
 		SetCurrency(input.Currency).
+		SetNillableRpmLimit(input.RPMLimit).
 		Save(ctx)
 	if err != nil {
 		_ = tx.Rollback()
@@ -85,6 +88,36 @@ func (s *Store) FindByEmail(ctx context.Context, email string) (contract.StoredU
 	return s.toStoredUser(ctx, found)
 }
 
+func (s *Store) List(ctx context.Context, filter contract.ListUsersFilter) ([]contract.StoredUser, error) {
+	query := s.client.User.Query().Where(entuser.DeletedAtIsNil())
+	if filter.Status != nil {
+		query.Where(entuser.StatusEQ(string(*filter.Status)))
+	}
+	if q := strings.TrimSpace(filter.Query); q != "" {
+		predicates := []predicate.User{
+			entuser.EmailContainsFold(q),
+			entuser.NameContainsFold(q),
+		}
+		if id, err := strconv.Atoi(q); err == nil && id > 0 {
+			predicates = append(predicates, entuser.IDEQ(id))
+		}
+		query.Where(entuser.Or(predicates...))
+	}
+	rows, err := query.Order(entuser.ByID()).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]contract.StoredUser, 0, len(rows))
+	for _, row := range rows {
+		user, err := s.toStoredUser(ctx, row)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, user)
+	}
+	return out, nil
+}
+
 func (s *Store) ListByIDs(ctx context.Context, ids []int) ([]contract.StoredUser, error) {
 	out := make([]contract.StoredUser, 0, len(ids))
 	for _, id := range ids {
@@ -95,6 +128,65 @@ func (s *Store) ListByIDs(ctx context.Context, ids []int) ([]contract.StoredUser
 		out = append(out, user)
 	}
 	return out, nil
+}
+
+func (s *Store) Update(ctx context.Context, id int, input contract.UpdateStoredUser) (contract.StoredUser, error) {
+	tx, err := s.client.Tx(ctx)
+	if err != nil {
+		return contract.StoredUser{}, err
+	}
+	update := tx.User.UpdateOneID(id).Where(entuser.DeletedAtIsNil())
+	if input.Email != nil {
+		update.SetEmail(strings.ToLower(strings.TrimSpace(*input.Email)))
+	}
+	if input.Name != nil {
+		update.SetName(strings.TrimSpace(*input.Name))
+	}
+	if input.PasswordHash != nil {
+		update.SetPasswordHash(*input.PasswordHash)
+	}
+	if input.Status != nil {
+		update.SetStatus(string(*input.Status))
+	}
+	if input.Balance != nil {
+		update.SetBalance(*input.Balance)
+	}
+	if input.Currency != nil {
+		update.SetCurrency(*input.Currency)
+	}
+	if input.RPMLimit != nil {
+		if *input.RPMLimit == nil {
+			update.ClearRpmLimit()
+		} else {
+			update.SetRpmLimit(**input.RPMLimit)
+		}
+	}
+	updated, err := update.Save(ctx)
+	if err != nil {
+		_ = tx.Rollback()
+		return contract.StoredUser{}, err
+	}
+	if input.Roles != nil {
+		if _, err := tx.UserRole.Delete().Where(entuserrole.UserIDEQ(id)).Exec(ctx); err != nil {
+			_ = tx.Rollback()
+			return contract.StoredUser{}, err
+		}
+		for _, roleName := range normalizeRoles(*input.Roles) {
+			role, err := ensureRole(ctx, tx, roleName)
+			if err != nil {
+				_ = tx.Rollback()
+				return contract.StoredUser{}, err
+			}
+			if _, err := tx.UserRole.Create().SetUserID(id).SetRoleID(role.ID).Save(ctx); err != nil {
+				_ = tx.Rollback()
+				return contract.StoredUser{}, err
+			}
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return contract.StoredUser{}, err
+	}
+	return s.toStoredUser(ctx, updated)
 }
 
 func (s *Store) UpdateLastLogin(ctx context.Context, id int, at time.Time) error {
@@ -117,13 +209,14 @@ func (s *Store) toStoredUser(ctx context.Context, user *ent.User) (contract.Stor
 			Name:        user.Name,
 			Status:      contract.Status(user.Status),
 			Roles:       roles,
+			Balance:     user.Balance,
+			Currency:    user.Currency,
+			RPMLimit:    cloneInt(user.RpmLimit),
 			CreatedAt:   user.CreatedAt,
 			LastLoginAt: user.LastLoginAt,
 		},
 		PasswordHash:    user.PasswordHash,
 		EmailVerifiedAt: user.EmailVerifiedAt,
-		Balance:         user.Balance,
-		Currency:        user.Currency,
 	}, nil
 }
 
@@ -190,4 +283,12 @@ func normalizeRoles(roles []contract.Role) []contract.Role {
 		out = append(out, role)
 	}
 	return out
+}
+
+func cloneInt(value *int) *int {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
 }

@@ -71,9 +71,9 @@ Codex CLI、Claude Code CLI 和 Antigravity 的本地安装可以用于理解官
 - Reverse Proxy Runtime 使用选中 Provider Account 的 OAuth/session/desktop/CLI/IDE credential 请求真实上游。
 - Gateway 继续只处理兼容 API、Canonical AI Request、policy、entitlement 和 Scheduler 证据。
 
-Codex CLI 账号已经支持 sub2api 风格的 refresh-token-only 导入：创建、导入或更新 `runtime_class=oauth_refresh`、`upstream_client=codex_cli`、`adapter_type=reverse-proxy-codex-cli` 的 Provider Account 时，可以只提交 credential 中的 `refresh_token`。SRapi 会先通过 Reverse Proxy Runtime 按 Codex CLI OAuth token endpoint、client ID 和 scope 换取 `access_token`，再加密保存完整 OAuth 状态；管理响应、导出、audit、usage 和 Scheduler evidence 不返回 token 明文。账号 metadata 仍应配置 Codex upstream `base_url`，可选配置 `user_agent`、`proxy_id` 和测试用或私有部署用的 `oauth_token_url` / `oauth_client_id` 覆盖值。
+Codex CLI 和 Claude Code CLI 账号已经支持 sub2api 风格的 refresh-token-only 导入：创建、导入或更新 `runtime_class=oauth_refresh` 且 `upstream_client=codex_cli` / `claude_code_cli` 的 Provider Account 时，可以只提交 credential 中的 `refresh_token`。SRapi 会先通过 Reverse Proxy Runtime 按对应官方客户端 OAuth token endpoint、client ID 和请求体形态换取 `access_token`，再加密保存完整 OAuth 状态；管理响应、导出、audit、usage 和 Scheduler evidence 不返回 token 明文。账号 metadata 仍应配置 upstream `base_url`，可选配置 `user_agent`、`proxy_id` 和测试用或私有部署用的 `oauth_token_url` / `oauth_client_id` 覆盖值。
 
-Claude Code 和 Antigravity 的 refresh-token-only 自动导入仍是后续包；当前可导入已有 access token / desktop / IDE / CLI token 凭证并通过各自 Provider Adapter 与 Reverse Proxy Runtime 发送官方客户端形态请求。
+Antigravity 账号也支持 refresh-token-only 导入：创建、导入或更新 `runtime_class=oauth_refresh`、`upstream_client=antigravity_desktop`、`adapter_type=reverse-proxy-antigravity` 的 Provider Account 时，可以只提交 `refresh_token`，但必须在加密 credential 中提供 `oauth_client_secret` / `client_secret`，SRapi 不硬编码 Google OAuth client secret。Antigravity 账号 metadata 仍需配置 Cloud Code `base_url` 和 `project_id` / `antigravity_project_id` / `cloudaicompanion_project`，项目 bootstrap 仍通过已有 discovery 流程处理。
 
 因此新增这些 provider 能力时，应把 upstream-specific shape 放在 Provider Adapter / runtime adapter 中，把凭证注入、header hygiene、cookie jar、proxy egress 和 WSS relay 放在 Reverse Proxy Runtime 中。Gateway service 不新增 Codex / Claude Code / Antigravity 本地 DTO。
 

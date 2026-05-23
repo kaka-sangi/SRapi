@@ -16,6 +16,8 @@ import (
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	providerservice "github.com/srapi/srapi/apps/api/internal/modules/providers/service"
 	reverseproxycontract "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"
+	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
+	usersservice "github.com/srapi/srapi/apps/api/internal/modules/users/service"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
 
@@ -50,21 +52,50 @@ func (s *Server) handleAdminOverview(w http.ResponseWriter, r *http.Request) {
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list scheduler decisions", requestID)
 		return
 	}
+	users, err := s.runtime.users.List(r.Context(), usersservice.ListRequest{})
+	if err != nil {
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list users", requestID)
+		return
+	}
+	dailyAggregates, err := s.runtime.usage.Aggregate(r.Context(), usagecontract.QueryFilter{}, usagecontract.AggregateDimensionDay)
+	if err != nil {
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to aggregate usage", requestID)
+		return
+	}
 	activeAccounts := 0
 	for _, account := range accounts {
 		if account.Status == accountcontract.StatusActive {
 			activeAccounts++
 		}
 	}
+	totalRequestCount := 0
+	totalTokenCount := 0
+	totalCost := "0.00000000"
+	currency := "USD"
+	if len(dailyAggregates) > 0 {
+		for _, aggregate := range dailyAggregates {
+			totalRequestCount += aggregate.RequestCount
+			totalTokenCount += aggregate.TotalTokens
+			totalCost = addDecimalStrings(totalCost, aggregate.TotalCost)
+			if aggregate.Currency != "" {
+				currency = aggregate.Currency
+			}
+		}
+	}
 	writeJSONAny(w, http.StatusOK, apiopenapi.AdminOverviewResponse{
 		Data: apiopenapi.AdminOverview{
 			AccountCount:           len(accounts),
 			ActiveAccountCount:     activeAccounts,
+			Currency:               currency,
 			ModelCount:             len(models),
 			ProviderCount:          len(providers),
 			RequestSuccessRate:     usageSuccessRate(usageLogs),
 			SchedulerDecisionCount: len(decisions),
+			TotalCost:              totalCost,
+			TotalRequestCount:      totalRequestCount,
+			TotalTokenCount:        totalTokenCount,
 			UsageLogCount:          len(usageLogs),
+			UserCount:              len(users),
 		},
 		RequestId: requestID,
 	})
@@ -509,6 +540,63 @@ func (s *Server) handleGetAdminAccount(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (s *Server) handleAdminAccountRpmStatus(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	if _, err := s.requireAdminSession(r); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	accountID, ok := adminPathID(w, r, requestID, "account")
+	if !ok {
+		return
+	}
+	status, err := s.runtime.accounts.RPMStatus(r.Context(), accountID)
+	if err != nil {
+		writeAccountServiceError(w, err, requestID)
+		return
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.AccountRpmStatusResponse{
+		Data: apiopenapi.AccountRpmStatus{
+			AccountId:     apiopenapi.Id(strconv.Itoa(status.AccountID)),
+			ResetAt:       status.ResetAt,
+			RpmLimit:      status.RPMLimit,
+			RpmUsed:       status.RPMUsed,
+			WindowSeconds: status.WindowSeconds,
+		},
+		RequestId: requestID,
+	})
+}
+
+func (s *Server) handleAdminAccountProxyQuality(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	if _, err := s.requireAdminSession(r); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	accountID, ok := adminPathID(w, r, requestID, "account")
+	if !ok {
+		return
+	}
+	quality, err := s.runtime.accounts.ProxyQuality(r.Context(), accountID)
+	if err != nil {
+		writeAccountServiceError(w, err, requestID)
+		return
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.AccountProxyQualityResponse{
+		Data: apiopenapi.AccountProxyQuality{
+			AccountId:     apiopenapi.Id(strconv.Itoa(quality.AccountID)),
+			ErrorRate:     quality.ErrorRate,
+			LastCheckedAt: quality.LastCheckedAt,
+			LatencyP95Ms:  quality.LatencyP95MS,
+			Metadata:      mapToJsonObjectPtr(quality.Metadata),
+			ProxyId:       quality.ProxyID,
+			SampleCount:   quality.SampleCount,
+			SuccessRate:   quality.SuccessRate,
+		},
+		RequestId: requestID,
+	})
+}
+
 func (s *Server) handleCreateAdminAccount(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	session, err := s.requireAdminSession(r)
@@ -536,9 +624,9 @@ func (s *Server) handleCreateAdminAccount(w http.ResponseWriter, r *http.Request
 	}
 	credential := derefMap(body.Credential)
 	metadata := jsonObjectToMap(body.Metadata)
-	credential, err = s.refreshCodexImportCredential(r.Context(), accountcontract.RuntimeClass(body.RuntimeClass), body.UpstreamClient, metadata, body.ProxyId, credential)
+	credential, err = s.refreshImportCredential(r.Context(), accountcontract.RuntimeClass(body.RuntimeClass), body.UpstreamClient, metadata, body.ProxyId, credential)
 	if err != nil {
-		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "codex oauth refresh failed", requestID)
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "oauth refresh failed", requestID)
 		return
 	}
 	account, err := s.runtime.accounts.Create(r.Context(), accountcontract.CreateRequest{
@@ -648,10 +736,10 @@ func (s *Server) handleImportAdminAccounts(w http.ResponseWriter, r *http.Reques
 			continue
 		}
 		metadata := jsonObjectToMap(item.Metadata)
-		credential, err = s.refreshCodexImportCredential(r.Context(), accountcontract.RuntimeClass(item.RuntimeClass), item.UpstreamClient, metadata, item.ProxyId, credential)
+		credential, err = s.refreshImportCredential(r.Context(), accountcontract.RuntimeClass(item.RuntimeClass), item.UpstreamClient, metadata, item.ProxyId, credential)
 		if err != nil {
 			skipped++
-			importErrors = append(importErrors, fmt.Sprintf("accounts[%d] codex oauth refresh failed", idx))
+			importErrors = append(importErrors, fmt.Sprintf("accounts[%d] oauth refresh failed", idx))
 			continue
 		}
 		account, err := s.runtime.accounts.Create(r.Context(), accountcontract.CreateRequest{
@@ -699,6 +787,49 @@ func (s *Server) handleImportAdminAccounts(w http.ResponseWriter, r *http.Reques
 	})
 }
 
+func (s *Server) handleBatchUpdateAdminAccounts(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	var body apiopenapi.BatchUpdateAccountsRequest
+	if err := s.decodeJSONBody(w, r, &body); err != nil {
+		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid account batch update request", requestID)
+		return
+	}
+	accountIDs, err := apiIDsValueToInts(body.AccountIds)
+	if err != nil {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid account ids", requestID)
+		return
+	}
+	result := s.runtime.accounts.BatchUpdateStatus(r.Context(), accountIDs, accountcontract.Status(body.Status))
+	updatedIDs := make([]apiopenapi.Id, 0, len(result.Updated))
+	for _, updated := range result.Updated {
+		updatedIDs = append(updatedIDs, apiopenapi.Id(strconv.Itoa(updated.ID)))
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "provider_account.batch_update", "provider_account", "bulk", nil, map[string]any{
+		"account_ids":   accountIDs,
+		"status":        body.Status,
+		"updated_ids":   updatedIDs,
+		"updated_count": len(updatedIDs),
+		"errors":        result.Errors,
+	}))
+	writeJSONAny(w, http.StatusOK, apiopenapi.BatchUpdateAccountsResponse{
+		Data: apiopenapi.BatchUpdateAccountsResult{
+			Errors:       result.Errors,
+			UpdatedCount: len(updatedIDs),
+			UpdatedIds:   updatedIDs,
+		},
+		RequestId: requestID,
+	})
+}
+
 func (s *Server) handleUpdateAdminAccount(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	session, err := s.requireAdminSession(r)
@@ -741,9 +872,9 @@ func (s *Server) handleUpdateAdminAccount(w http.ResponseWriter, r *http.Request
 	}
 	if credential != nil {
 		effectiveMetadata := mergeAccountMetadata(before.Metadata, metadata)
-		refreshed, err := s.refreshCodexImportCredential(r.Context(), runtimeClass, upstreamClient, effectiveMetadata, proxyID, *credential)
+		refreshed, err := s.refreshImportCredential(r.Context(), runtimeClass, upstreamClient, effectiveMetadata, proxyID, *credential)
 		if err != nil {
-			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "codex oauth refresh failed", requestID)
+			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "oauth refresh failed", requestID)
 			return
 		}
 		credential = &refreshed
@@ -775,8 +906,8 @@ func (s *Server) handleUpdateAdminAccount(w http.ResponseWriter, r *http.Request
 	})
 }
 
-func (s *Server) refreshCodexImportCredential(ctx context.Context, runtimeClass accountcontract.RuntimeClass, upstreamClient *string, metadata map[string]any, proxyID *string, credential map[string]any) (map[string]any, error) {
-	if !isCodexRefreshTokenOnlyCredential(runtimeClass, upstreamClient, credential) {
+func (s *Server) refreshImportCredential(ctx context.Context, runtimeClass accountcontract.RuntimeClass, upstreamClient *string, metadata map[string]any, proxyID *string, credential map[string]any) (map[string]any, error) {
+	if !isRefreshTokenOnlyImportCredential(runtimeClass, upstreamClient, credential) {
 		return credential, nil
 	}
 	resp, err := s.runtime.reverseProxy.Refresh(ctx, reverseproxycontract.RefreshRequest{
@@ -795,14 +926,26 @@ func (s *Server) refreshCodexImportCredential(ctx context.Context, runtimeClass 
 	return resp.Credential, nil
 }
 
-func isCodexRefreshTokenOnlyCredential(runtimeClass accountcontract.RuntimeClass, upstreamClient *string, credential map[string]any) bool {
+func isRefreshTokenOnlyImportCredential(runtimeClass accountcontract.RuntimeClass, upstreamClient *string, credential map[string]any) bool {
 	if runtimeClass != accountcontract.RuntimeClassOauthRefresh && runtimeClass != accountcontract.RuntimeClassOauthDeviceCode {
 		return false
 	}
-	if upstreamClient == nil || !strings.EqualFold(strings.TrimSpace(*upstreamClient), "codex_cli") {
+	if !supportsRefreshTokenOnlyImport(upstreamClient) {
 		return false
 	}
 	return mapString(credential, "refresh_token") != "" && mapString(credential, "access_token") == ""
+}
+
+func supportsRefreshTokenOnlyImport(upstreamClient *string) bool {
+	if upstreamClient == nil {
+		return false
+	}
+	switch strings.ToLower(strings.TrimSpace(*upstreamClient)) {
+	case "codex_cli", "claude_code_cli", "antigravity_desktop", "antigravity":
+		return true
+	default:
+		return false
+	}
 }
 
 func mergeAccountMetadata(existing map[string]any, incoming *map[string]any) map[string]any {
@@ -892,6 +1035,38 @@ func (s *Server) handleRecoverAdminAccount(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "provider_account.recover", "provider_account", strconv.Itoa(account.ID), accountAuditSnapshot(before), accountAuditSnapshot(account)))
+	writeJSONAny(w, http.StatusOK, apiopenapi.ProviderAccountResponse{
+		Data:      s.apiAccount(r.Context(), account),
+		RequestId: requestID,
+	})
+}
+
+func (s *Server) handleClearAdminAccountError(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	accountID, ok := adminPathID(w, r, requestID, "account")
+	if !ok {
+		return
+	}
+	before, err := s.runtime.accounts.FindByID(r.Context(), accountID)
+	if err != nil {
+		writeAccountServiceError(w, err, requestID)
+		return
+	}
+	account, err := s.runtime.accounts.ClearErrorState(r.Context(), accountID)
+	if err != nil {
+		writeAccountServiceError(w, err, requestID)
+		return
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "provider_account.clear_error", "provider_account", strconv.Itoa(account.ID), accountAuditSnapshot(before), accountAuditSnapshot(account)))
 	writeJSONAny(w, http.StatusOK, apiopenapi.ProviderAccountResponse{
 		Data:      s.apiAccount(r.Context(), account),
 		RequestId: requestID,
@@ -1029,6 +1204,15 @@ func (s *Server) handleSetAdminAccountStatus(w http.ResponseWriter, r *http.Requ
 		Data:      s.apiAccount(r.Context(), account),
 		RequestId: requestID,
 	})
+}
+
+func writeAccountServiceError(w http.ResponseWriter, err error, requestID string) {
+	switch {
+	case errors.Is(err, accountservice.ErrInvalidInput), errors.Is(err, accountservice.ErrCredentialMissing):
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid account request", requestID)
+	default:
+		writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "account not found", requestID)
+	}
 }
 
 func (s *Server) handleAdminAccountHealth(w http.ResponseWriter, r *http.Request) {

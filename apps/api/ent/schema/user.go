@@ -23,6 +23,7 @@ func (User) Fields() []ent.Field {
 		field.String("status").Default("active"),
 		field.String("balance").Default("0.00000000"),
 		field.String("currency").Default("USD"),
+		field.Int("rpm_limit").Optional().Nillable(),
 		field.Time("last_login_at").Optional().Nillable(),
 	}
 }

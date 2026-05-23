@@ -12,6 +12,7 @@ import (
 	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
+	userscontract "github.com/srapi/srapi/apps/api/internal/modules/users/contract"
 )
 
 func (rt *runtimeState) recordAudit(ctx context.Context, req auditcontract.RecordRequest) {
@@ -143,6 +144,21 @@ func accountGroupAuditSnapshot(group accountcontract.AccountGroup) map[string]an
 		"model_scope":    cloneAnyMap(group.ModelScope),
 		"strategy_hint":  group.StrategyHint,
 		"status":         group.Status,
+	}
+}
+
+func userAuditSnapshot(user userscontract.StoredUser) map[string]any {
+	return map[string]any{
+		"email":       user.Email,
+		"name":        user.Name,
+		"status":      user.Status,
+		"roles":       append([]userscontract.Role(nil), user.Roles...),
+		"balance":     user.Balance,
+		"currency":    user.Currency,
+		"rpm_limit":   user.RPMLimit,
+		"last_login":  user.LastLoginAt,
+		"created_at":  user.CreatedAt,
+		"verified_at": user.EmailVerifiedAt,
 	}
 }
 

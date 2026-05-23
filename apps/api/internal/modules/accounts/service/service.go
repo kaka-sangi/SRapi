@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -283,6 +284,116 @@ func (s *Service) Update(ctx context.Context, id int, req contract.UpdateRequest
 	return s.store.Update(ctx, account)
 }
 
+func (s *Service) BatchUpdateStatus(ctx context.Context, ids []int, status contract.Status) contract.BatchUpdateResult {
+	result := contract.BatchUpdateResult{
+		Updated: make([]contract.ProviderAccount, 0, len(ids)),
+		Errors:  make([]string, 0),
+	}
+	if len(ids) == 0 || !validAccountStatus(status) {
+		result.Errors = append(result.Errors, ErrInvalidInput.Error())
+		return result
+	}
+	for _, id := range ids {
+		updated, err := s.Update(ctx, id, contract.UpdateRequest{Status: &status})
+		if err != nil {
+			result.Errors = append(result.Errors, strings.TrimSpace(err.Error()))
+			continue
+		}
+		result.Updated = append(result.Updated, updated)
+	}
+	return result
+}
+
+func (s *Service) ClearErrorState(ctx context.Context, id int) (contract.ProviderAccount, error) {
+	if id <= 0 {
+		return contract.ProviderAccount{}, ErrInvalidInput
+	}
+	account, err := s.store.FindByID(ctx, id)
+	if err != nil {
+		return contract.ProviderAccount{}, err
+	}
+	metadata := cloneMap(account.Metadata)
+	for _, key := range []string{
+		"cooldown_active",
+		"cooldown_reason",
+		"cooldown_until",
+		"circuit_open",
+		"last_error_at",
+		"last_error_class",
+		"last_error_message",
+		"needs_reauth_reason",
+		"quota_exhausted",
+	} {
+		delete(metadata, key)
+	}
+	metadata["last_error_cleared_at"] = s.clock.Now().Format(time.RFC3339)
+	status := account.Status
+	if status == contract.StatusDead || status == contract.StatusNeedsReauth || status == contract.StatusSuspended {
+		status = contract.StatusActive
+	}
+	return s.Update(ctx, id, contract.UpdateRequest{
+		Status:   &status,
+		Metadata: &metadata,
+	})
+}
+
+func (s *Service) RPMStatus(ctx context.Context, accountID int) (contract.RPMStatus, error) {
+	if accountID <= 0 {
+		return contract.RPMStatus{}, ErrInvalidInput
+	}
+	account, err := s.store.FindByID(ctx, accountID)
+	if err != nil {
+		return contract.RPMStatus{}, err
+	}
+	resetAt := metadataOptionalTime(account.Metadata, "rpm_reset_at", "rpm_window_reset_at")
+	windowSeconds := metadataInt(account.Metadata, "rpm_window_seconds", "window_seconds")
+	if windowSeconds <= 0 {
+		windowSeconds = 60
+	}
+	return contract.RPMStatus{
+		AccountID:     account.ID,
+		RPMUsed:       metadataInt(account.Metadata, "rpm_used"),
+		RPMLimit:      metadataOptionalInt(account.Metadata, "rpm_limit"),
+		WindowSeconds: windowSeconds,
+		ResetAt:       resetAt,
+	}, nil
+}
+
+func (s *Service) ProxyQuality(ctx context.Context, accountID int) (contract.ProxyQuality, error) {
+	if accountID <= 0 {
+		return contract.ProxyQuality{}, ErrInvalidInput
+	}
+	account, err := s.store.FindByID(ctx, accountID)
+	if err != nil {
+		return contract.ProxyQuality{}, err
+	}
+	snapshots, err := s.store.ListHealthSnapshotsByAccount(ctx, accountID, 50)
+	if err != nil {
+		return contract.ProxyQuality{}, err
+	}
+	quality := contract.ProxyQuality{
+		AccountID: account.ID,
+		ProxyID:   cloneString(account.ProxyID),
+		Metadata:  proxyQualityMetadata(account.Metadata),
+	}
+	if len(snapshots) > 0 {
+		latest := snapshots[0]
+		quality.SuccessRate = clampRatio(latest.SuccessRate)
+		quality.ErrorRate = clampRatio(latest.ErrorRate)
+		quality.LatencyP95MS = latest.LatencyP95MS
+		quality.SampleCount = len(snapshots)
+		lastCheckedAt := latest.SnapshotAt
+		quality.LastCheckedAt = &lastCheckedAt
+		return quality, nil
+	}
+	quality.SuccessRate = metadataFloat32(account.Metadata, "proxy_success_rate", "success_rate")
+	quality.ErrorRate = metadataFloat32(account.Metadata, "proxy_error_rate", "error_rate")
+	quality.LatencyP95MS = metadataInt(account.Metadata, "proxy_latency_p95_ms", "latency_p95_ms", "p95_latency_ms")
+	quality.SampleCount = metadataInt(account.Metadata, "proxy_sample_count", "sample_count")
+	quality.LastCheckedAt = metadataOptionalTime(account.Metadata, "proxy_last_checked_at", "last_checked_at")
+	return quality, nil
+}
+
 func (s *Service) BindProxy(ctx context.Context, id int, proxyID *string) (contract.ProviderAccount, error) {
 	if id <= 0 {
 		return contract.ProviderAccount{}, ErrInvalidInput
@@ -458,6 +569,15 @@ func validGroupStatus(status contract.GroupStatus) bool {
 	}
 }
 
+func validAccountStatus(status contract.Status) bool {
+	switch status {
+	case contract.StatusActive, contract.StatusDisabled, contract.StatusNeedsReauth, contract.StatusSuspended, contract.StatusDead:
+		return true
+	default:
+		return false
+	}
+}
+
 func clampRatio(value float32) float32 {
 	if value < 0 {
 		return 0
@@ -466,6 +586,130 @@ func clampRatio(value float32) float32 {
 		return 1
 	}
 	return value
+}
+
+func metadataOptionalInt(metadata map[string]any, keys ...string) *int {
+	value, ok := metadataValue(metadata, keys...)
+	if !ok {
+		return nil
+	}
+	parsed := intValue(value)
+	return &parsed
+}
+
+func metadataInt(metadata map[string]any, keys ...string) int {
+	value, ok := metadataValue(metadata, keys...)
+	if !ok {
+		return 0
+	}
+	return intValue(value)
+}
+
+func intValue(value any) int {
+	switch typed := value.(type) {
+	case int:
+		return typed
+	case int64:
+		return int(typed)
+	case float64:
+		return int(typed)
+	case float32:
+		return int(typed)
+	case json.Number:
+		parsed, err := typed.Int64()
+		if err == nil {
+			return int(parsed)
+		}
+	case string:
+		parsed, err := strconv.Atoi(strings.TrimSpace(typed))
+		if err == nil {
+			return parsed
+		}
+		floatValue, err := strconv.ParseFloat(strings.TrimSpace(typed), 64)
+		if err == nil {
+			return int(floatValue)
+		}
+	}
+	return 0
+}
+
+func metadataFloat32(metadata map[string]any, keys ...string) float32 {
+	value, ok := metadataValue(metadata, keys...)
+	if !ok {
+		return 0
+	}
+	switch typed := value.(type) {
+	case float32:
+		return clampRatio(typed)
+	case float64:
+		return clampRatio(float32(typed))
+	case int:
+		return clampRatio(float32(typed))
+	case int64:
+		return clampRatio(float32(typed))
+	case json.Number:
+		parsed, err := typed.Float64()
+		if err == nil {
+			return clampRatio(float32(parsed))
+		}
+	case string:
+		parsed, err := strconv.ParseFloat(strings.TrimSpace(typed), 32)
+		if err == nil {
+			return clampRatio(float32(parsed))
+		}
+	}
+	return 0
+}
+
+func metadataOptionalTime(metadata map[string]any, keys ...string) *time.Time {
+	value, ok := metadataValue(metadata, keys...)
+	if !ok {
+		return nil
+	}
+	switch typed := value.(type) {
+	case time.Time:
+		cloned := typed
+		return &cloned
+	case string:
+		parsed, err := time.Parse(time.RFC3339, strings.TrimSpace(typed))
+		if err == nil {
+			return &parsed
+		}
+	}
+	return nil
+}
+
+func metadataValue(metadata map[string]any, keys ...string) (any, bool) {
+	if metadata == nil {
+		return nil, false
+	}
+	for _, key := range keys {
+		value, ok := metadata[key]
+		if ok {
+			return value, true
+		}
+	}
+	return nil, false
+}
+
+func proxyQualityMetadata(metadata map[string]any) map[string]any {
+	if metadata == nil {
+		return map[string]any{}
+	}
+	out := map[string]any{}
+	for _, key := range []string{
+		"proxy_provider",
+		"proxy_region",
+		"proxy_country",
+		"proxy_city",
+		"proxy_type",
+		"egress_ip_hash",
+	} {
+		if value, ok := metadata[key]; ok {
+			out[key] = value
+		}
+	}
+	return out
 }
 
 func cloneMap(value map[string]any) map[string]any {

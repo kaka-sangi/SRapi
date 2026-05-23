@@ -162,3 +162,71 @@ func TestAccountOperationsManageGroupsProxyRecoveryAndSnapshots(t *testing.T) {
 		t.Fatalf("unexpected quota snapshots: %+v", quotas)
 	}
 }
+
+func TestAdminAccountLifecycleHelpers(t *testing.T) {
+	svc, err := New(accountmemory.New(), "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	ctx := context.Background()
+	proxyID := "proxy-us"
+	resetAt := time.Now().UTC().Add(time.Minute).Truncate(time.Second)
+	account, err := svc.Create(ctx, contract.CreateRequest{
+		ProviderID:   9,
+		Name:         "admin-main",
+		RuntimeClass: contract.RuntimeClassAPIKey,
+		Credential:   map[string]any{"api_key": "secret-value"},
+		ProxyID:      &proxyID,
+		Metadata: map[string]any{
+			"rpm_used":             3,
+			"rpm_limit":            10,
+			"rpm_window_seconds":   60,
+			"rpm_reset_at":         resetAt.Format(time.RFC3339),
+			"last_error_class":     "rate_limit",
+			"last_error_message":   "too many requests",
+			"cooldown_active":      true,
+			"proxy_region":         "us-east",
+			"egress_ip_hash":       "hash",
+			"proxy_sample_count":   4,
+			"proxy_success_rate":   0.75,
+			"proxy_error_rate":     0.25,
+			"proxy_latency_p95_ms": 321,
+		},
+	})
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+
+	rpm, err := svc.RPMStatus(ctx, account.ID)
+	if err != nil {
+		t.Fatalf("rpm status: %v", err)
+	}
+	if rpm.RPMUsed != 3 || rpm.RPMLimit == nil || *rpm.RPMLimit != 10 || rpm.WindowSeconds != 60 || rpm.ResetAt == nil || !rpm.ResetAt.Equal(resetAt) {
+		t.Fatalf("unexpected rpm status: %+v", rpm)
+	}
+
+	quality, err := svc.ProxyQuality(ctx, account.ID)
+	if err != nil {
+		t.Fatalf("proxy quality: %v", err)
+	}
+	if quality.ProxyID == nil || *quality.ProxyID != proxyID || quality.SuccessRate != 0.75 || quality.ErrorRate != 0.25 || quality.LatencyP95MS != 321 || quality.SampleCount != 4 {
+		t.Fatalf("unexpected proxy quality: %+v", quality)
+	}
+	if quality.Metadata["proxy_region"] != "us-east" || quality.Metadata["egress_ip_hash"] != "hash" {
+		t.Fatalf("unexpected proxy quality metadata: %+v", quality.Metadata)
+	}
+
+	cleared, err := svc.ClearErrorState(ctx, account.ID)
+	if err != nil {
+		t.Fatalf("clear error state: %v", err)
+	}
+	if cleared.Metadata["last_error_class"] != nil || cleared.Metadata["cooldown_active"] != nil || cleared.Metadata["last_error_cleared_at"] == nil {
+		t.Fatalf("expected cleared error metadata, got %+v", cleared.Metadata)
+	}
+
+	status := contract.StatusDisabled
+	result := svc.BatchUpdateStatus(ctx, []int{account.ID}, status)
+	if len(result.Errors) != 0 || len(result.Updated) != 1 || result.Updated[0].Status != status {
+		t.Fatalf("unexpected batch status result: %+v", result)
+	}
+}

@@ -799,6 +799,7 @@ CREATE TABLE "users" (
   "status" character varying NOT NULL DEFAULT 'active',
   "balance" character varying NOT NULL DEFAULT '0.00000000',
   "currency" character varying NOT NULL DEFAULT 'USD',
+  "rpm_limit" bigint NULL,
   "last_login_at" timestamptz NULL,
   PRIMARY KEY ("id")
 );

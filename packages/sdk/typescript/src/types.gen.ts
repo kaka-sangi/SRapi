@@ -85,7 +85,72 @@ export type User = {
     name: string;
     status: UserStatus;
     roles: Array<UserRole>;
+    /**
+     * Decimal string balance.
+     */
+    balance: string;
+    currency: string;
+    rpm_limit?: number | null;
+    last_login_at?: string | null;
     created_at: Timestamp;
+};
+
+export type CreateAdminUserRequest = {
+    email: string;
+    name: string;
+    password: string;
+    roles?: Array<UserRole>;
+    status?: UserStatus;
+    balance?: string;
+    currency?: string;
+    rpm_limit?: number | null;
+};
+
+export type UpdateAdminUserRequest = {
+    email?: string;
+    name?: string;
+    password?: string;
+    roles?: Array<UserRole>;
+    status?: UserStatus;
+    rpm_limit?: number | null;
+};
+
+export type UpdateUserBalanceRequest = {
+    /**
+     * Decimal string amount.
+     */
+    amount: string;
+    operation: 'set' | 'increment' | 'decrement';
+    currency?: string;
+    note?: string;
+};
+
+export type UpdateUserRpmLimitRequest = {
+    rpm_limit: number | null;
+};
+
+export type BatchUpdateUsersRequest = {
+    user_ids: Array<Id>;
+    status?: UserStatus;
+    rpm_limit?: number | null;
+    roles?: Array<UserRole>;
+};
+
+export type BatchUpdateUsersResult = {
+    updated_count: number;
+    updated_ids: Array<Id>;
+    errors: Array<string>;
+};
+
+export type BatchUpdateUsersResponse = {
+    data: BatchUpdateUsersResult;
+    request_id: RequestId;
+};
+
+export type UserListResponse = {
+    data: Array<User>;
+    pagination: Pagination;
+    request_id: RequestId;
 };
 
 export type LoginRequest = {
@@ -731,6 +796,51 @@ export type ProviderAccountImportResponse = {
     request_id: RequestId;
 };
 
+export type BatchUpdateAccountsRequest = {
+    account_ids: Array<Id>;
+    status: ProviderAccountStatus;
+};
+
+export type BatchUpdateAccountsResult = {
+    updated_count: number;
+    updated_ids: Array<Id>;
+    errors: Array<string>;
+};
+
+export type BatchUpdateAccountsResponse = {
+    data: BatchUpdateAccountsResult;
+    request_id: RequestId;
+};
+
+export type AccountRpmStatus = {
+    account_id: Id;
+    rpm_used: number;
+    rpm_limit: number | null;
+    window_seconds: number;
+    reset_at?: string | null;
+};
+
+export type AccountRpmStatusResponse = {
+    data: AccountRpmStatus;
+    request_id: RequestId;
+};
+
+export type AccountProxyQuality = {
+    account_id: Id;
+    proxy_id: string | null;
+    success_rate: number;
+    error_rate: number;
+    latency_p95_ms: number;
+    sample_count: number;
+    last_checked_at?: string | null;
+    metadata?: JsonObject;
+};
+
+export type AccountProxyQualityResponse = {
+    data: AccountProxyQuality;
+    request_id: RequestId;
+};
+
 export type ProviderAccountResponse = {
     data: ProviderAccount;
     request_id: RequestId;
@@ -792,10 +902,58 @@ export type AdminOverview = {
     usage_log_count: number;
     scheduler_decision_count: number;
     request_success_rate: number;
+    user_count: number;
+    total_request_count: number;
+    total_token_count: number;
+    total_cost: string;
+    currency: string;
 };
 
 export type AdminOverviewResponse = {
     data: AdminOverview;
+    request_id: RequestId;
+};
+
+export type AdminDashboard = AdminOverview;
+
+export type AdminDashboardResponse = {
+    data: AdminDashboard;
+    request_id: RequestId;
+};
+
+export type UsageAggregateDimension = 'day' | 'model' | 'user' | 'account';
+
+export type UsageAggregate = {
+    aggregate_type: UsageAggregateDimension;
+    aggregate_id: string;
+    request_count: number;
+    success_count: number;
+    error_count: number;
+    input_tokens: number;
+    output_tokens: number;
+    cached_tokens: number;
+    total_tokens: number;
+    total_cost: string;
+    currency: string;
+};
+
+export type UsageAggregateListResponse = {
+    data: Array<UsageAggregate>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type UsageExport = {
+    generated_at: Timestamp;
+    logs: Array<UsageLog>;
+    daily: Array<UsageAggregate>;
+    by_model: Array<UsageAggregate>;
+    by_user: Array<UsageAggregate>;
+    by_account: Array<UsageAggregate>;
+};
+
+export type UsageExportResponse = {
+    data: UsageExport;
     request_id: RequestId;
 };
 
@@ -2516,6 +2674,459 @@ export type GetAdminOverviewResponses = {
 
 export type GetAdminOverviewResponse = GetAdminOverviewResponses[keyof GetAdminOverviewResponses];
 
+export type GetAdminDashboardData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/dashboard';
+};
+
+export type GetAdminDashboardErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminDashboardError = GetAdminDashboardErrors[keyof GetAdminDashboardErrors];
+
+export type GetAdminDashboardResponses = {
+    /**
+     * Admin dashboard statistics.
+     */
+    200: AdminDashboardResponse;
+};
+
+export type GetAdminDashboardResponse = GetAdminDashboardResponses[keyof GetAdminDashboardResponses];
+
+export type ListAdminUsersData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        page_size?: number;
+        q?: string;
+        status?: UserStatus;
+    };
+    url: '/api/v1/admin/users';
+};
+
+export type ListAdminUsersErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminUsersError = ListAdminUsersErrors[keyof ListAdminUsersErrors];
+
+export type ListAdminUsersResponses = {
+    /**
+     * User list.
+     */
+    200: UserListResponse;
+};
+
+export type ListAdminUsersResponse = ListAdminUsersResponses[keyof ListAdminUsersResponses];
+
+export type CreateAdminUserData = {
+    body: CreateAdminUserRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/users';
+};
+
+export type CreateAdminUserErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource conflict.
+     */
+    409: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type CreateAdminUserError = CreateAdminUserErrors[keyof CreateAdminUserErrors];
+
+export type CreateAdminUserResponses = {
+    /**
+     * User created.
+     */
+    201: UserResponse;
+};
+
+export type CreateAdminUserResponse = CreateAdminUserResponses[keyof CreateAdminUserResponses];
+
+export type BatchUpdateAdminUsersData = {
+    body: BatchUpdateUsersRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/users/batch';
+};
+
+export type BatchUpdateAdminUsersErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type BatchUpdateAdminUsersError = BatchUpdateAdminUsersErrors[keyof BatchUpdateAdminUsersErrors];
+
+export type BatchUpdateAdminUsersResponses = {
+    /**
+     * Batch update result.
+     */
+    200: BatchUpdateUsersResponse;
+};
+
+export type BatchUpdateAdminUsersResponse = BatchUpdateAdminUsersResponses[keyof BatchUpdateAdminUsersResponses];
+
+export type GetAdminUserData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/users/{id}';
+};
+
+export type GetAdminUserErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminUserError = GetAdminUserErrors[keyof GetAdminUserErrors];
+
+export type GetAdminUserResponses = {
+    /**
+     * User.
+     */
+    200: UserResponse;
+};
+
+export type GetAdminUserResponse = GetAdminUserResponses[keyof GetAdminUserResponses];
+
+export type UpdateAdminUserData = {
+    body: UpdateAdminUserRequest;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/users/{id}';
+};
+
+export type UpdateAdminUserErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UpdateAdminUserError = UpdateAdminUserErrors[keyof UpdateAdminUserErrors];
+
+export type UpdateAdminUserResponses = {
+    /**
+     * User updated.
+     */
+    200: UserResponse;
+};
+
+export type UpdateAdminUserResponse = UpdateAdminUserResponses[keyof UpdateAdminUserResponses];
+
+export type UpdateAdminUserBalanceData = {
+    body: UpdateUserBalanceRequest;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/users/{id}/balance';
+};
+
+export type UpdateAdminUserBalanceErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UpdateAdminUserBalanceError = UpdateAdminUserBalanceErrors[keyof UpdateAdminUserBalanceErrors];
+
+export type UpdateAdminUserBalanceResponses = {
+    /**
+     * User balance updated.
+     */
+    200: UserResponse;
+};
+
+export type UpdateAdminUserBalanceResponse = UpdateAdminUserBalanceResponses[keyof UpdateAdminUserBalanceResponses];
+
+export type GetAdminUserBalanceHistoryData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: {
+        page?: number;
+        page_size?: number;
+    };
+    url: '/api/v1/admin/users/{id}/balance-history';
+};
+
+export type GetAdminUserBalanceHistoryErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminUserBalanceHistoryError = GetAdminUserBalanceHistoryErrors[keyof GetAdminUserBalanceHistoryErrors];
+
+export type GetAdminUserBalanceHistoryResponses = {
+    /**
+     * User balance ledger entries.
+     */
+    200: BillingLedgerListResponse;
+};
+
+export type GetAdminUserBalanceHistoryResponse = GetAdminUserBalanceHistoryResponses[keyof GetAdminUserBalanceHistoryResponses];
+
+export type UpdateAdminUserRpmLimitData = {
+    body: UpdateUserRpmLimitRequest;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/users/{id}/rpm-limit';
+};
+
+export type UpdateAdminUserRpmLimitErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UpdateAdminUserRpmLimitError = UpdateAdminUserRpmLimitErrors[keyof UpdateAdminUserRpmLimitErrors];
+
+export type UpdateAdminUserRpmLimitResponses = {
+    /**
+     * User RPM limit updated.
+     */
+    200: UserResponse;
+};
+
+export type UpdateAdminUserRpmLimitResponse = UpdateAdminUserRpmLimitResponses[keyof UpdateAdminUserRpmLimitResponses];
+
+export type DisableAdminUserData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/users/{id}/disable';
+};
+
+export type DisableAdminUserErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DisableAdminUserError = DisableAdminUserErrors[keyof DisableAdminUserErrors];
+
+export type DisableAdminUserResponses = {
+    /**
+     * User disabled.
+     */
+    200: UserResponse;
+};
+
+export type DisableAdminUserResponse = DisableAdminUserResponses[keyof DisableAdminUserResponses];
+
+export type EnableAdminUserData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/users/{id}/enable';
+};
+
+export type EnableAdminUserErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type EnableAdminUserError = EnableAdminUserErrors[keyof EnableAdminUserErrors];
+
+export type EnableAdminUserResponses = {
+    /**
+     * User enabled.
+     */
+    200: UserResponse;
+};
+
+export type EnableAdminUserResponse = EnableAdminUserResponses[keyof EnableAdminUserResponses];
+
 export type ListAdminModelsData = {
     body?: never;
     path?: never;
@@ -2881,6 +3492,43 @@ export type ImportAdminAccountsResponses = {
 
 export type ImportAdminAccountsResponse = ImportAdminAccountsResponses[keyof ImportAdminAccountsResponses];
 
+export type BatchUpdateAdminAccountsData = {
+    body: BatchUpdateAccountsRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/accounts/batch';
+};
+
+export type BatchUpdateAdminAccountsErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type BatchUpdateAdminAccountsError = BatchUpdateAdminAccountsErrors[keyof BatchUpdateAdminAccountsErrors];
+
+export type BatchUpdateAdminAccountsResponses = {
+    /**
+     * Batch update result.
+     */
+    200: BatchUpdateAccountsResponse;
+};
+
+export type BatchUpdateAdminAccountsResponse = BatchUpdateAdminAccountsResponses[keyof BatchUpdateAdminAccountsResponses];
+
 export type GetAdminAccountData = {
     body?: never;
     path: {
@@ -3095,6 +3743,135 @@ export type DiscoverAdminAccountModelsResponses = {
 };
 
 export type DiscoverAdminAccountModelsResponse = DiscoverAdminAccountModelsResponses[keyof DiscoverAdminAccountModelsResponses];
+
+export type ClearAdminAccountErrorData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/accounts/{id}/clear-error';
+};
+
+export type ClearAdminAccountErrorErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ClearAdminAccountErrorError = ClearAdminAccountErrorErrors[keyof ClearAdminAccountErrorErrors];
+
+export type ClearAdminAccountErrorResponses = {
+    /**
+     * Account error state cleared.
+     */
+    200: ProviderAccountResponse;
+};
+
+export type ClearAdminAccountErrorResponse = ClearAdminAccountErrorResponses[keyof ClearAdminAccountErrorResponses];
+
+export type GetAdminAccountRpmStatusData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/accounts/{id}/rpm-status';
+};
+
+export type GetAdminAccountRpmStatusErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminAccountRpmStatusError = GetAdminAccountRpmStatusErrors[keyof GetAdminAccountRpmStatusErrors];
+
+export type GetAdminAccountRpmStatusResponses = {
+    /**
+     * Account RPM status.
+     */
+    200: AccountRpmStatusResponse;
+};
+
+export type GetAdminAccountRpmStatusResponse = GetAdminAccountRpmStatusResponses[keyof GetAdminAccountRpmStatusResponses];
+
+export type GetAdminAccountProxyQualityData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/accounts/{id}/proxy-quality';
+};
+
+export type GetAdminAccountProxyQualityErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminAccountProxyQualityError = GetAdminAccountProxyQualityErrors[keyof GetAdminAccountProxyQualityErrors];
+
+export type GetAdminAccountProxyQualityResponses = {
+    /**
+     * Account proxy quality.
+     */
+    200: AccountProxyQualityResponse;
+};
+
+export type GetAdminAccountProxyQualityResponse = GetAdminAccountProxyQualityResponses[keyof GetAdminAccountProxyQualityResponses];
 
 export type RecoverAdminAccountData = {
     body?: never;
@@ -3549,6 +4326,119 @@ export type ListAdminUsageLogsResponses = {
 };
 
 export type ListAdminUsageLogsResponse = ListAdminUsageLogsResponses[keyof ListAdminUsageLogsResponses];
+
+export type GetAdminUsageDailyData = {
+    body?: never;
+    path?: never;
+    query?: {
+        start?: string;
+        end?: string;
+    };
+    url: '/api/v1/admin/usage/daily';
+};
+
+export type GetAdminUsageDailyErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminUsageDailyError = GetAdminUsageDailyErrors[keyof GetAdminUsageDailyErrors];
+
+export type GetAdminUsageDailyResponses = {
+    /**
+     * Daily usage aggregates.
+     */
+    200: UsageAggregateListResponse;
+};
+
+export type GetAdminUsageDailyResponse = GetAdminUsageDailyResponses[keyof GetAdminUsageDailyResponses];
+
+export type GetAdminUsageAggregatesData = {
+    body?: never;
+    path?: never;
+    query: {
+        dimension: UsageAggregateDimension;
+        start?: string;
+        end?: string;
+    };
+    url: '/api/v1/admin/usage/aggregates';
+};
+
+export type GetAdminUsageAggregatesErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminUsageAggregatesError = GetAdminUsageAggregatesErrors[keyof GetAdminUsageAggregatesErrors];
+
+export type GetAdminUsageAggregatesResponses = {
+    /**
+     * Usage aggregates.
+     */
+    200: UsageAggregateListResponse;
+};
+
+export type GetAdminUsageAggregatesResponse = GetAdminUsageAggregatesResponses[keyof GetAdminUsageAggregatesResponses];
+
+export type ExportAdminUsageData = {
+    body?: never;
+    path?: never;
+    query?: {
+        start?: string;
+        end?: string;
+    };
+    url: '/api/v1/admin/usage/export';
+};
+
+export type ExportAdminUsageErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ExportAdminUsageError = ExportAdminUsageErrors[keyof ExportAdminUsageErrors];
+
+export type ExportAdminUsageResponses = {
+    /**
+     * Usage export.
+     */
+    200: UsageExportResponse;
+};
+
+export type ExportAdminUsageResponse = ExportAdminUsageResponses[keyof ExportAdminUsageResponses];
 
 export type ListAdminAuditLogsData = {
     body?: never;

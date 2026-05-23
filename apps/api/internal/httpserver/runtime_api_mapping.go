@@ -173,12 +173,16 @@ func toAPIUser(user userscontract.User) apiopenapi.User {
 		roles = append(roles, apiopenapi.UserRole(role))
 	}
 	return apiopenapi.User{
-		CreatedAt: user.CreatedAt,
-		Email:     openapi_types.Email(user.Email),
-		Id:        apiopenapi.Id(strconv.Itoa(user.ID)),
-		Name:      user.Name,
-		Roles:     roles,
-		Status:    apiopenapi.UserStatus(user.Status),
+		Balance:     user.Balance,
+		CreatedAt:   user.CreatedAt,
+		Currency:    user.Currency,
+		Email:       openapi_types.Email(user.Email),
+		Id:          apiopenapi.Id(strconv.Itoa(user.ID)),
+		LastLoginAt: user.LastLoginAt,
+		Name:        user.Name,
+		Roles:       roles,
+		RpmLimit:    user.RPMLimit,
+		Status:      apiopenapi.UserStatus(user.Status),
 	}
 }
 
@@ -396,6 +400,45 @@ func toAPIUsageLog(log usagecontract.UsageLog) apiopenapi.UsageLog {
 		TotalTokens:           log.TotalTokens,
 		UsageEstimated:        log.UsageEstimated,
 		UserId:                apiopenapi.Id(strconv.Itoa(log.UserID)),
+	}
+}
+
+func toAPIUsageAggregate(aggregate usagecontract.UsageAggregate) apiopenapi.UsageAggregate {
+	return apiopenapi.UsageAggregate{
+		AggregateId:   aggregate.AggregateID,
+		AggregateType: apiopenapi.UsageAggregateDimension(aggregate.AggregateType),
+		CachedTokens:  aggregate.CachedTokens,
+		Currency:      aggregate.Currency,
+		ErrorCount:    aggregate.ErrorCount,
+		InputTokens:   aggregate.InputTokens,
+		OutputTokens:  aggregate.OutputTokens,
+		RequestCount:  aggregate.RequestCount,
+		SuccessCount:  aggregate.SuccessCount,
+		TotalCost:     aggregate.TotalCost,
+		TotalTokens:   aggregate.TotalTokens,
+	}
+}
+
+func toAPIUsageAggregates(aggregates []usagecontract.UsageAggregate) []apiopenapi.UsageAggregate {
+	out := make([]apiopenapi.UsageAggregate, 0, len(aggregates))
+	for _, aggregate := range aggregates {
+		out = append(out, toAPIUsageAggregate(aggregate))
+	}
+	return out
+}
+
+func toAPIUsageExport(exported usagecontract.UsageExport) apiopenapi.UsageExport {
+	logs := make([]apiopenapi.UsageLog, 0, len(exported.Logs))
+	for _, log := range exported.Logs {
+		logs = append(logs, toAPIUsageLog(log))
+	}
+	return apiopenapi.UsageExport{
+		ByAccount:   toAPIUsageAggregates(exported.ByAccount),
+		ByModel:     toAPIUsageAggregates(exported.ByModel),
+		ByUser:      toAPIUsageAggregates(exported.ByUser),
+		Daily:       toAPIUsageAggregates(exported.Daily),
+		GeneratedAt: exported.GeneratedAt,
+		Logs:        logs,
 	}
 }
 
@@ -886,6 +929,14 @@ func toAccountStatusPtr(value *apiopenapi.ProviderAccountStatus) *accountcontrac
 		return nil
 	}
 	status := accountcontract.Status(*value)
+	return &status
+}
+
+func toUserStatusPtr(value *apiopenapi.UserStatus) *userscontract.Status {
+	if value == nil {
+		return nil
+	}
+	status := userscontract.Status(*value)
 	return &status
 }
 
