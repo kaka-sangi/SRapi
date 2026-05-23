@@ -921,6 +921,529 @@ export type AdminDashboardResponse = {
     request_id: RequestId;
 };
 
+export type DeleteResponse = {
+    data: {
+        deleted: boolean;
+    };
+    request_id: RequestId;
+};
+
+export type BatchOperationResult = {
+    requested: number;
+    succeeded: number;
+    failed: number;
+    failed_ids?: Array<Id>;
+};
+
+export type BatchOperationResponse = {
+    data: BatchOperationResult;
+    request_id: RequestId;
+};
+
+export type TimeWindow = {
+    start: Timestamp;
+    end: Timestamp;
+};
+
+export type AdminDashboardInventory = {
+    total_api_keys: number;
+    active_api_keys: number;
+    total_accounts: number;
+    healthy_accounts: number;
+    abnormal_accounts: number;
+};
+
+export type AdminDashboardTraffic = {
+    today_requests: number;
+    total_requests: number;
+    success_requests: number;
+    error_requests: number;
+};
+
+export type AdminDashboardUsers = {
+    today_new_users: number;
+    total_users: number;
+    active_users: number;
+};
+
+export type AdminDashboardCosts = {
+    actual_cost: string;
+    account_cost: string;
+    standard_cost: string;
+    currency: string;
+};
+
+export type AdminDashboardTokens = {
+    today_tokens: number;
+    total_tokens: number;
+    input_tokens: number;
+    output_tokens: number;
+    cached_tokens: number;
+    costs: AdminDashboardCosts;
+};
+
+export type AdminDashboardPerformance = {
+    current_rpm: number;
+    current_tpm: number;
+    peak_rpm: number;
+    peak_tpm: number;
+    average_latency_ms: number;
+    p95_latency_ms: number;
+};
+
+export type DashboardModelDistribution = {
+    model: string;
+    request_count: number;
+    token_count: number;
+    cost: string;
+    currency: string;
+};
+
+export type DashboardTrendPoint = {
+    bucket_start: Timestamp;
+    request_count: number;
+    token_count: number;
+    cost: string;
+};
+
+export type DashboardUserUsageTrend = {
+    user_id: Id;
+    email?: string | null;
+    request_count: number;
+    token_count: number;
+    cost: string;
+};
+
+export type AdminDashboardSnapshot = {
+    window: TimeWindow;
+    inventory: AdminDashboardInventory;
+    traffic: AdminDashboardTraffic;
+    users: AdminDashboardUsers;
+    tokens: AdminDashboardTokens;
+    performance: AdminDashboardPerformance;
+    model_distribution: Array<DashboardModelDistribution>;
+    token_trend: Array<DashboardTrendPoint>;
+    user_usage_trend: Array<DashboardUserUsageTrend>;
+    generated_at: Timestamp;
+};
+
+export type AdminDashboardSnapshotResponse = {
+    data: AdminDashboardSnapshot;
+    request_id: RequestId;
+};
+
+export type OpsOverview = {
+    window: TimeWindow;
+    request_count: number;
+    success_count: number;
+    error_count: number;
+    error_rate: number;
+    latency_p50_ms: number;
+    latency_p95_ms: number;
+    latency_p99_ms: number;
+    average_latency_ms: number;
+    rpm: number;
+    tpm: number;
+    active_users: number;
+    generated_at: Timestamp;
+};
+
+export type OpsOverviewResponse = {
+    data: OpsOverview;
+    request_id: RequestId;
+};
+
+export type OpsThroughputTrendPoint = {
+    bucket_start: Timestamp;
+    request_count: number;
+    token_count: number;
+    rpm: number;
+    tpm: number;
+    cost: string;
+};
+
+export type OpsThroughputTrend = {
+    window: TimeWindow;
+    bucket: 'hour' | 'day';
+    points: Array<OpsThroughputTrendPoint>;
+};
+
+export type OpsThroughputTrendResponse = {
+    data: OpsThroughputTrend;
+    request_id: RequestId;
+};
+
+export type OpsErrorTrendPoint = {
+    bucket_start: Timestamp;
+    request_count: number;
+    error_count: number;
+    error_rate: number;
+};
+
+export type OpsErrorTrend = {
+    window: TimeWindow;
+    bucket: 'hour' | 'day';
+    points: Array<OpsErrorTrendPoint>;
+};
+
+export type OpsErrorTrendResponse = {
+    data: OpsErrorTrend;
+    request_id: RequestId;
+};
+
+export type OpsErrorDistributionItem = {
+    error_class: string;
+    owner: string;
+    count: number;
+    share: number;
+};
+
+export type OpsErrorDistribution = {
+    window: TimeWindow;
+    items: Array<OpsErrorDistributionItem>;
+};
+
+export type OpsErrorDistributionResponse = {
+    data: OpsErrorDistribution;
+    request_id: RequestId;
+};
+
+export type OpsLatencyBucket = {
+    label: string;
+    lower_ms: number;
+    upper_ms?: number | null;
+    count: number;
+    share: number;
+};
+
+export type OpsLatencyHistogram = {
+    window: TimeWindow;
+    buckets: Array<OpsLatencyBucket>;
+};
+
+export type OpsLatencyHistogramResponse = {
+    data: OpsLatencyHistogram;
+    request_id: RequestId;
+};
+
+export type OpsConcurrency = {
+    active_gateway_requests: number;
+    active_realtime_slots: number;
+    active_by_api_key: {
+        [key: string]: number;
+    };
+};
+
+export type OpsConcurrencyResponse = {
+    data: OpsConcurrency;
+    request_id: RequestId;
+};
+
+export type OpsSystemLog = {
+    id: Id;
+    level: 'debug' | 'info' | 'warn' | 'error';
+    message: string;
+    source: string;
+    metadata?: JsonObject;
+    created_at: Timestamp;
+};
+
+export type OpsSystemLogListResponse = {
+    data: Array<OpsSystemLog>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type OpsSettings = {
+    auto_refresh_enabled: boolean;
+    refresh_interval_seconds: number;
+    error_rate_threshold: number;
+    latency_p95_threshold_ms: number;
+    alert_retention_days: number;
+};
+
+export type OpsSettingsResponse = {
+    data: OpsSettings;
+    request_id: RequestId;
+};
+
+export type SecretConfigured = {
+    configured: boolean;
+};
+
+export type AdminSettingsGeneral = {
+    site_name: string;
+    logo_url: string;
+    version_label: string;
+    custom_menus: Array<JsonObject>;
+};
+
+export type AdminSettingsAgreement = {
+    user_agreement: string;
+    privacy_policy: string;
+};
+
+export type AdminSettingsFeatures = {
+    enabled_channels: Array<string>;
+    channel_monitoring_enabled: boolean;
+    invitation_rebate_enabled: boolean;
+    payments_enabled: boolean;
+};
+
+export type AdminSettingsSecurity = {
+    admin_api_key: SecretConfigured;
+    registration_enabled: boolean;
+    oauth_enabled: boolean;
+    oauth_providers: Array<string>;
+};
+
+export type AdminSettingsUsers = {
+    default_balance: string;
+    default_group: string;
+    user_self_delete_enabled: boolean;
+    rpm_limit_default: number;
+};
+
+export type AdminSettingsGateway = {
+    overload_cooldown_seconds: number;
+    rate_limit_cooldown_seconds: number;
+    stream_timeout_seconds: number;
+    request_shaper_enabled: boolean;
+    beta_strategy: string;
+};
+
+export type AdminSettingsPayment = {
+    enabled: boolean;
+    providers: Array<string>;
+    subscription_plans_enabled: boolean;
+};
+
+export type AdminSettingsEmail = {
+    smtp_configured: boolean;
+    templates: {
+        [key: string]: string;
+    };
+};
+
+export type AdminSettingsBackup = {
+    enabled: boolean;
+    last_backup_at?: Timestamp;
+    retention_days: number;
+};
+
+export type AdminSettings = {
+    general: AdminSettingsGeneral;
+    agreement: AdminSettingsAgreement;
+    features: AdminSettingsFeatures;
+    security: AdminSettingsSecurity;
+    users: AdminSettingsUsers;
+    gateway: AdminSettingsGateway;
+    payment: AdminSettingsPayment;
+    email: AdminSettingsEmail;
+    backup: AdminSettingsBackup;
+};
+
+export type AdminSettingsResponse = {
+    data: AdminSettings;
+    request_id: RequestId;
+};
+
+export type AnnouncementStatus = 'draft' | 'published' | 'archived';
+
+export type AnnouncementSeverity = 'info' | 'warning' | 'critical';
+
+export type AnnouncementAudience = 'all' | 'users' | 'admins';
+
+export type Announcement = {
+    id: Id;
+    title: string;
+    content: string;
+    status: AnnouncementStatus;
+    severity: AnnouncementSeverity;
+    audience: AnnouncementAudience;
+    starts_at?: Timestamp;
+    ends_at?: Timestamp;
+    created_at: Timestamp;
+    updated_at: Timestamp;
+};
+
+export type CreateAnnouncementRequest = {
+    title: string;
+    content: string;
+    status?: AnnouncementStatus;
+    severity?: AnnouncementSeverity;
+    audience?: AnnouncementAudience;
+    starts_at?: Timestamp;
+    ends_at?: Timestamp;
+};
+
+export type UpdateAnnouncementRequest = CreateAnnouncementRequest;
+
+export type AnnouncementResponse = {
+    data: Announcement;
+    request_id: RequestId;
+};
+
+export type AnnouncementListResponse = {
+    data: Array<Announcement>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type RedeemCodeStatus = 'active' | 'redeemed' | 'disabled' | 'expired';
+
+export type RedeemCodeType = 'balance' | 'subscription';
+
+export type RedeemCode = {
+    id: Id;
+    code: string;
+    type: RedeemCodeType;
+    status: RedeemCodeStatus;
+    value: string;
+    currency: string;
+    max_redemptions: number;
+    redeemed_count: number;
+    expires_at?: Timestamp;
+    created_at: Timestamp;
+    updated_at: Timestamp;
+};
+
+export type CreateRedeemCodeRequest = {
+    code: string;
+    type: RedeemCodeType;
+    value: string;
+    currency?: string;
+    max_redemptions?: number;
+    expires_at?: Timestamp;
+};
+
+export type BatchGenerateRedeemCodesRequest = {
+    prefix?: string;
+    count: number;
+    type: RedeemCodeType;
+    value: string;
+    currency?: string;
+    max_redemptions?: number;
+    expires_at?: Timestamp;
+};
+
+export type BatchDisableRedeemCodesRequest = {
+    ids: Array<Id>;
+};
+
+export type RedeemCodeResponse = {
+    data: RedeemCode;
+    request_id: RequestId;
+};
+
+export type RedeemCodeListResponse = {
+    data: Array<RedeemCode>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type RedeemCodeStats = {
+    total: number;
+    active: number;
+    redeemed: number;
+    disabled: number;
+    expired: number;
+};
+
+export type RedeemCodeStatsResponse = {
+    data: RedeemCodeStats;
+    request_id: RequestId;
+};
+
+export type PromoCodeStatus = 'active' | 'disabled' | 'expired';
+
+export type PromoDiscountType = 'amount' | 'percent';
+
+export type PromoCode = {
+    id: Id;
+    code: string;
+    status: PromoCodeStatus;
+    discount_type: PromoDiscountType;
+    discount_value: string;
+    currency: string;
+    max_uses: number;
+    used_count: number;
+    starts_at?: Timestamp;
+    expires_at?: Timestamp;
+    created_at: Timestamp;
+    updated_at: Timestamp;
+};
+
+export type CreatePromoCodeRequest = {
+    code: string;
+    discount_type: PromoDiscountType;
+    discount_value: string;
+    currency?: string;
+    max_uses?: number;
+    status?: PromoCodeStatus;
+    starts_at?: Timestamp;
+    expires_at?: Timestamp;
+};
+
+export type UpdatePromoCodeRequest = CreatePromoCodeRequest;
+
+export type PromoCodeResponse = {
+    data: PromoCode;
+    request_id: RequestId;
+};
+
+export type PromoCodeListResponse = {
+    data: Array<PromoCode>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type RiskControlMode = 'monitor' | 'enforce';
+
+export type RiskControlConfig = {
+    enabled: boolean;
+    mode: RiskControlMode;
+    max_failed_requests_per_minute: number;
+    max_cost_per_day: string;
+    cooldown_seconds: number;
+    blocked_countries: Array<string>;
+    blocked_ips: Array<string>;
+};
+
+export type RiskControlConfigResponse = {
+    data: RiskControlConfig;
+    request_id: RequestId;
+};
+
+export type RiskControlStatus = {
+    enabled: boolean;
+    mode: RiskControlMode;
+    active_blocks: number;
+    recent_events: number;
+    evaluated_at: Timestamp;
+};
+
+export type RiskControlStatusResponse = {
+    data: RiskControlStatus;
+    request_id: RequestId;
+};
+
+export type RiskControlLog = {
+    id: Id;
+    level: 'info' | 'warn' | 'block';
+    action: string;
+    reason: string;
+    subject?: string | null;
+    metadata?: JsonObject;
+    created_at: Timestamp;
+};
+
+export type RiskControlLogListResponse = {
+    data: Array<RiskControlLog>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
 export type UsageAggregateDimension = 'day' | 'model' | 'user' | 'account';
 
 export type UsageAggregate = {
@@ -1964,6 +2487,21 @@ export type Status = string;
 export type SearchQuery = string;
 
 /**
+ * Inclusive start time for read-model queries.
+ */
+export type StartTime = string;
+
+/**
+ * Exclusive end time for read-model queries.
+ */
+export type EndTime = string;
+
+/**
+ * Time bucket used by trend endpoints.
+ */
+export type Bucket = 'hour' | 'day';
+
+/**
  * Gemini model id from the path. SRapi runtime accepts slash-qualified ids when the HTTP router passes them through.
  */
 export type GeminiModel = string;
@@ -2706,6 +3244,42 @@ export type GetAdminDashboardResponses = {
 };
 
 export type GetAdminDashboardResponse = GetAdminDashboardResponses[keyof GetAdminDashboardResponses];
+
+export type GetAdminDashboardSnapshotData = {
+    body?: never;
+    path?: never;
+    query?: {
+        start?: string;
+        end?: string;
+    };
+    url: '/api/v1/admin/dashboard/snapshot';
+};
+
+export type GetAdminDashboardSnapshotErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminDashboardSnapshotError = GetAdminDashboardSnapshotErrors[keyof GetAdminDashboardSnapshotErrors];
+
+export type GetAdminDashboardSnapshotResponses = {
+    /**
+     * Admin dashboard snapshot.
+     */
+    200: AdminDashboardSnapshotResponse;
+};
+
+export type GetAdminDashboardSnapshotResponse = GetAdminDashboardSnapshotResponses[keyof GetAdminDashboardSnapshotResponses];
 
 export type ListAdminUsersData = {
     body?: never;
@@ -4928,6 +5502,369 @@ export type ListAdminOutboxEventsResponses = {
 
 export type ListAdminOutboxEventsResponse = ListAdminOutboxEventsResponses[keyof ListAdminOutboxEventsResponses];
 
+export type GetAdminOpsOverviewData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Inclusive start time for read-model queries.
+         */
+        start?: string;
+        /**
+         * Exclusive end time for read-model queries.
+         */
+        end?: string;
+    };
+    url: '/api/v1/admin/ops/overview';
+};
+
+export type GetAdminOpsOverviewErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminOpsOverviewError = GetAdminOpsOverviewErrors[keyof GetAdminOpsOverviewErrors];
+
+export type GetAdminOpsOverviewResponses = {
+    /**
+     * Operational overview.
+     */
+    200: OpsOverviewResponse;
+};
+
+export type GetAdminOpsOverviewResponse = GetAdminOpsOverviewResponses[keyof GetAdminOpsOverviewResponses];
+
+export type GetAdminOpsThroughputTrendData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Inclusive start time for read-model queries.
+         */
+        start?: string;
+        /**
+         * Exclusive end time for read-model queries.
+         */
+        end?: string;
+        /**
+         * Time bucket used by trend endpoints.
+         */
+        bucket?: 'hour' | 'day';
+    };
+    url: '/api/v1/admin/ops/throughput-trend';
+};
+
+export type GetAdminOpsThroughputTrendErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminOpsThroughputTrendError = GetAdminOpsThroughputTrendErrors[keyof GetAdminOpsThroughputTrendErrors];
+
+export type GetAdminOpsThroughputTrendResponses = {
+    /**
+     * Throughput trend.
+     */
+    200: OpsThroughputTrendResponse;
+};
+
+export type GetAdminOpsThroughputTrendResponse = GetAdminOpsThroughputTrendResponses[keyof GetAdminOpsThroughputTrendResponses];
+
+export type GetAdminOpsErrorTrendData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Inclusive start time for read-model queries.
+         */
+        start?: string;
+        /**
+         * Exclusive end time for read-model queries.
+         */
+        end?: string;
+        /**
+         * Time bucket used by trend endpoints.
+         */
+        bucket?: 'hour' | 'day';
+    };
+    url: '/api/v1/admin/ops/error-trend';
+};
+
+export type GetAdminOpsErrorTrendErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminOpsErrorTrendError = GetAdminOpsErrorTrendErrors[keyof GetAdminOpsErrorTrendErrors];
+
+export type GetAdminOpsErrorTrendResponses = {
+    /**
+     * Error trend.
+     */
+    200: OpsErrorTrendResponse;
+};
+
+export type GetAdminOpsErrorTrendResponse = GetAdminOpsErrorTrendResponses[keyof GetAdminOpsErrorTrendResponses];
+
+export type GetAdminOpsErrorDistributionData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Inclusive start time for read-model queries.
+         */
+        start?: string;
+        /**
+         * Exclusive end time for read-model queries.
+         */
+        end?: string;
+    };
+    url: '/api/v1/admin/ops/error-distribution';
+};
+
+export type GetAdminOpsErrorDistributionErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminOpsErrorDistributionError = GetAdminOpsErrorDistributionErrors[keyof GetAdminOpsErrorDistributionErrors];
+
+export type GetAdminOpsErrorDistributionResponses = {
+    /**
+     * Error distribution.
+     */
+    200: OpsErrorDistributionResponse;
+};
+
+export type GetAdminOpsErrorDistributionResponse = GetAdminOpsErrorDistributionResponses[keyof GetAdminOpsErrorDistributionResponses];
+
+export type GetAdminOpsLatencyHistogramData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Inclusive start time for read-model queries.
+         */
+        start?: string;
+        /**
+         * Exclusive end time for read-model queries.
+         */
+        end?: string;
+    };
+    url: '/api/v1/admin/ops/latency-histogram';
+};
+
+export type GetAdminOpsLatencyHistogramErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminOpsLatencyHistogramError = GetAdminOpsLatencyHistogramErrors[keyof GetAdminOpsLatencyHistogramErrors];
+
+export type GetAdminOpsLatencyHistogramResponses = {
+    /**
+     * Latency histogram.
+     */
+    200: OpsLatencyHistogramResponse;
+};
+
+export type GetAdminOpsLatencyHistogramResponse = GetAdminOpsLatencyHistogramResponses[keyof GetAdminOpsLatencyHistogramResponses];
+
+export type GetAdminOpsConcurrencyData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/ops/concurrency';
+};
+
+export type GetAdminOpsConcurrencyErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminOpsConcurrencyError = GetAdminOpsConcurrencyErrors[keyof GetAdminOpsConcurrencyErrors];
+
+export type GetAdminOpsConcurrencyResponses = {
+    /**
+     * Concurrency counters.
+     */
+    200: OpsConcurrencyResponse;
+};
+
+export type GetAdminOpsConcurrencyResponse = GetAdminOpsConcurrencyResponses[keyof GetAdminOpsConcurrencyResponses];
+
+export type ListAdminOpsSystemLogsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        page_size?: number;
+        level?: string;
+    };
+    url: '/api/v1/admin/ops/system-logs';
+};
+
+export type ListAdminOpsSystemLogsErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminOpsSystemLogsError = ListAdminOpsSystemLogsErrors[keyof ListAdminOpsSystemLogsErrors];
+
+export type ListAdminOpsSystemLogsResponses = {
+    /**
+     * System log list.
+     */
+    200: OpsSystemLogListResponse;
+};
+
+export type ListAdminOpsSystemLogsResponse = ListAdminOpsSystemLogsResponses[keyof ListAdminOpsSystemLogsResponses];
+
+export type ListAdminOpsAlertEventsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        page_size?: number;
+        status?: OpsAlertStatus;
+        severity?: OpsAlertSeverity;
+    };
+    url: '/api/v1/admin/ops/alert-events';
+};
+
+export type ListAdminOpsAlertEventsErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminOpsAlertEventsError = ListAdminOpsAlertEventsErrors[keyof ListAdminOpsAlertEventsErrors];
+
+export type ListAdminOpsAlertEventsResponses = {
+    /**
+     * Alert event list.
+     */
+    200: OpsAlertListResponse;
+};
+
+export type ListAdminOpsAlertEventsResponse = ListAdminOpsAlertEventsResponses[keyof ListAdminOpsAlertEventsResponses];
+
+export type UpdateAdminOpsSettingsData = {
+    body: OpsSettings;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/ops/settings';
+};
+
+export type UpdateAdminOpsSettingsErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UpdateAdminOpsSettingsError = UpdateAdminOpsSettingsErrors[keyof UpdateAdminOpsSettingsErrors];
+
+export type UpdateAdminOpsSettingsResponses = {
+    /**
+     * Ops settings updated.
+     */
+    200: OpsSettingsResponse;
+};
+
+export type UpdateAdminOpsSettingsResponse = UpdateAdminOpsSettingsResponses[keyof UpdateAdminOpsSettingsResponses];
+
 export type ListAdminOpsRealtimeSlotsData = {
     body?: never;
     path?: never;
@@ -5156,6 +6093,709 @@ export type AcknowledgeAdminOpsAlertResponses = {
 };
 
 export type AcknowledgeAdminOpsAlertResponse = AcknowledgeAdminOpsAlertResponses[keyof AcknowledgeAdminOpsAlertResponses];
+
+export type GetAdminSettingsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/settings';
+};
+
+export type GetAdminSettingsErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminSettingsError = GetAdminSettingsErrors[keyof GetAdminSettingsErrors];
+
+export type GetAdminSettingsResponses = {
+    /**
+     * System settings.
+     */
+    200: AdminSettingsResponse;
+};
+
+export type GetAdminSettingsResponse = GetAdminSettingsResponses[keyof GetAdminSettingsResponses];
+
+export type UpdateAdminSettingsData = {
+    body: AdminSettings;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/settings';
+};
+
+export type UpdateAdminSettingsErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UpdateAdminSettingsError = UpdateAdminSettingsErrors[keyof UpdateAdminSettingsErrors];
+
+export type UpdateAdminSettingsResponses = {
+    /**
+     * System settings updated.
+     */
+    200: AdminSettingsResponse;
+};
+
+export type UpdateAdminSettingsResponse = UpdateAdminSettingsResponses[keyof UpdateAdminSettingsResponses];
+
+export type ListAdminAnnouncementsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        page_size?: number;
+        status?: AnnouncementStatus;
+    };
+    url: '/api/v1/admin/announcements';
+};
+
+export type ListAdminAnnouncementsErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminAnnouncementsError = ListAdminAnnouncementsErrors[keyof ListAdminAnnouncementsErrors];
+
+export type ListAdminAnnouncementsResponses = {
+    /**
+     * Announcement list.
+     */
+    200: AnnouncementListResponse;
+};
+
+export type ListAdminAnnouncementsResponse = ListAdminAnnouncementsResponses[keyof ListAdminAnnouncementsResponses];
+
+export type CreateAdminAnnouncementData = {
+    body: CreateAnnouncementRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/announcements';
+};
+
+export type CreateAdminAnnouncementErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type CreateAdminAnnouncementError = CreateAdminAnnouncementErrors[keyof CreateAdminAnnouncementErrors];
+
+export type CreateAdminAnnouncementResponses = {
+    /**
+     * Announcement created.
+     */
+    201: AnnouncementResponse;
+};
+
+export type CreateAdminAnnouncementResponse = CreateAdminAnnouncementResponses[keyof CreateAdminAnnouncementResponses];
+
+export type DeleteAdminAnnouncementData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/announcements/{id}';
+};
+
+export type DeleteAdminAnnouncementErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DeleteAdminAnnouncementError = DeleteAdminAnnouncementErrors[keyof DeleteAdminAnnouncementErrors];
+
+export type DeleteAdminAnnouncementResponses = {
+    /**
+     * Announcement deleted.
+     */
+    200: DeleteResponse;
+};
+
+export type DeleteAdminAnnouncementResponse = DeleteAdminAnnouncementResponses[keyof DeleteAdminAnnouncementResponses];
+
+export type UpdateAdminAnnouncementData = {
+    body: UpdateAnnouncementRequest;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/announcements/{id}';
+};
+
+export type UpdateAdminAnnouncementErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UpdateAdminAnnouncementError = UpdateAdminAnnouncementErrors[keyof UpdateAdminAnnouncementErrors];
+
+export type UpdateAdminAnnouncementResponses = {
+    /**
+     * Announcement updated.
+     */
+    200: AnnouncementResponse;
+};
+
+export type UpdateAdminAnnouncementResponse = UpdateAdminAnnouncementResponses[keyof UpdateAdminAnnouncementResponses];
+
+export type ListAdminRedeemCodesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        page_size?: number;
+        status?: RedeemCodeStatus;
+    };
+    url: '/api/v1/admin/redeem-codes';
+};
+
+export type ListAdminRedeemCodesErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminRedeemCodesError = ListAdminRedeemCodesErrors[keyof ListAdminRedeemCodesErrors];
+
+export type ListAdminRedeemCodesResponses = {
+    /**
+     * Redeem code list.
+     */
+    200: RedeemCodeListResponse;
+};
+
+export type ListAdminRedeemCodesResponse = ListAdminRedeemCodesResponses[keyof ListAdminRedeemCodesResponses];
+
+export type CreateAdminRedeemCodeData = {
+    body: CreateRedeemCodeRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/redeem-codes';
+};
+
+export type CreateAdminRedeemCodeErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type CreateAdminRedeemCodeError = CreateAdminRedeemCodeErrors[keyof CreateAdminRedeemCodeErrors];
+
+export type CreateAdminRedeemCodeResponses = {
+    /**
+     * Redeem code created.
+     */
+    201: RedeemCodeResponse;
+};
+
+export type CreateAdminRedeemCodeResponse = CreateAdminRedeemCodeResponses[keyof CreateAdminRedeemCodeResponses];
+
+export type BatchGenerateAdminRedeemCodesData = {
+    body: BatchGenerateRedeemCodesRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/redeem-codes/batch-generate';
+};
+
+export type BatchGenerateAdminRedeemCodesErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type BatchGenerateAdminRedeemCodesError = BatchGenerateAdminRedeemCodesErrors[keyof BatchGenerateAdminRedeemCodesErrors];
+
+export type BatchGenerateAdminRedeemCodesResponses = {
+    /**
+     * Redeem codes generated.
+     */
+    201: RedeemCodeListResponse;
+};
+
+export type BatchGenerateAdminRedeemCodesResponse = BatchGenerateAdminRedeemCodesResponses[keyof BatchGenerateAdminRedeemCodesResponses];
+
+export type BatchDisableAdminRedeemCodesData = {
+    body: BatchDisableRedeemCodesRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/redeem-codes/batch-disable';
+};
+
+export type BatchDisableAdminRedeemCodesErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type BatchDisableAdminRedeemCodesError = BatchDisableAdminRedeemCodesErrors[keyof BatchDisableAdminRedeemCodesErrors];
+
+export type BatchDisableAdminRedeemCodesResponses = {
+    /**
+     * Redeem codes disabled.
+     */
+    200: BatchOperationResponse;
+};
+
+export type BatchDisableAdminRedeemCodesResponse = BatchDisableAdminRedeemCodesResponses[keyof BatchDisableAdminRedeemCodesResponses];
+
+export type GetAdminRedeemCodeStatsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/redeem-codes/stats';
+};
+
+export type GetAdminRedeemCodeStatsErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminRedeemCodeStatsError = GetAdminRedeemCodeStatsErrors[keyof GetAdminRedeemCodeStatsErrors];
+
+export type GetAdminRedeemCodeStatsResponses = {
+    /**
+     * Redeem code statistics.
+     */
+    200: RedeemCodeStatsResponse;
+};
+
+export type GetAdminRedeemCodeStatsResponse = GetAdminRedeemCodeStatsResponses[keyof GetAdminRedeemCodeStatsResponses];
+
+export type ListAdminPromoCodesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        page_size?: number;
+        status?: PromoCodeStatus;
+    };
+    url: '/api/v1/admin/promo-codes';
+};
+
+export type ListAdminPromoCodesErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminPromoCodesError = ListAdminPromoCodesErrors[keyof ListAdminPromoCodesErrors];
+
+export type ListAdminPromoCodesResponses = {
+    /**
+     * Promo code list.
+     */
+    200: PromoCodeListResponse;
+};
+
+export type ListAdminPromoCodesResponse = ListAdminPromoCodesResponses[keyof ListAdminPromoCodesResponses];
+
+export type CreateAdminPromoCodeData = {
+    body: CreatePromoCodeRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/promo-codes';
+};
+
+export type CreateAdminPromoCodeErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type CreateAdminPromoCodeError = CreateAdminPromoCodeErrors[keyof CreateAdminPromoCodeErrors];
+
+export type CreateAdminPromoCodeResponses = {
+    /**
+     * Promo code created.
+     */
+    201: PromoCodeResponse;
+};
+
+export type CreateAdminPromoCodeResponse = CreateAdminPromoCodeResponses[keyof CreateAdminPromoCodeResponses];
+
+export type DeleteAdminPromoCodeData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/promo-codes/{id}';
+};
+
+export type DeleteAdminPromoCodeErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DeleteAdminPromoCodeError = DeleteAdminPromoCodeErrors[keyof DeleteAdminPromoCodeErrors];
+
+export type DeleteAdminPromoCodeResponses = {
+    /**
+     * Promo code deleted.
+     */
+    200: DeleteResponse;
+};
+
+export type DeleteAdminPromoCodeResponse = DeleteAdminPromoCodeResponses[keyof DeleteAdminPromoCodeResponses];
+
+export type UpdateAdminPromoCodeData = {
+    body: UpdatePromoCodeRequest;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/promo-codes/{id}';
+};
+
+export type UpdateAdminPromoCodeErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UpdateAdminPromoCodeError = UpdateAdminPromoCodeErrors[keyof UpdateAdminPromoCodeErrors];
+
+export type UpdateAdminPromoCodeResponses = {
+    /**
+     * Promo code updated.
+     */
+    200: PromoCodeResponse;
+};
+
+export type UpdateAdminPromoCodeResponse = UpdateAdminPromoCodeResponses[keyof UpdateAdminPromoCodeResponses];
+
+export type GetAdminRiskControlConfigData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/risk-control/config';
+};
+
+export type GetAdminRiskControlConfigErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminRiskControlConfigError = GetAdminRiskControlConfigErrors[keyof GetAdminRiskControlConfigErrors];
+
+export type GetAdminRiskControlConfigResponses = {
+    /**
+     * Risk-control configuration.
+     */
+    200: RiskControlConfigResponse;
+};
+
+export type GetAdminRiskControlConfigResponse = GetAdminRiskControlConfigResponses[keyof GetAdminRiskControlConfigResponses];
+
+export type UpdateAdminRiskControlConfigData = {
+    body: RiskControlConfig;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/risk-control/config';
+};
+
+export type UpdateAdminRiskControlConfigErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UpdateAdminRiskControlConfigError = UpdateAdminRiskControlConfigErrors[keyof UpdateAdminRiskControlConfigErrors];
+
+export type UpdateAdminRiskControlConfigResponses = {
+    /**
+     * Risk-control configuration updated.
+     */
+    200: RiskControlConfigResponse;
+};
+
+export type UpdateAdminRiskControlConfigResponse = UpdateAdminRiskControlConfigResponses[keyof UpdateAdminRiskControlConfigResponses];
+
+export type GetAdminRiskControlStatusData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/risk-control/status';
+};
+
+export type GetAdminRiskControlStatusErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminRiskControlStatusError = GetAdminRiskControlStatusErrors[keyof GetAdminRiskControlStatusErrors];
+
+export type GetAdminRiskControlStatusResponses = {
+    /**
+     * Risk-control status.
+     */
+    200: RiskControlStatusResponse;
+};
+
+export type GetAdminRiskControlStatusResponse = GetAdminRiskControlStatusResponses[keyof GetAdminRiskControlStatusResponses];
+
+export type ListAdminRiskControlLogsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        page_size?: number;
+        level?: string;
+    };
+    url: '/api/v1/admin/risk-control/logs';
+};
+
+export type ListAdminRiskControlLogsErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminRiskControlLogsError = ListAdminRiskControlLogsErrors[keyof ListAdminRiskControlLogsErrors];
+
+export type ListAdminRiskControlLogsResponses = {
+    /**
+     * Risk-control event list.
+     */
+    200: RiskControlLogListResponse;
+};
+
+export type ListAdminRiskControlLogsResponse = ListAdminRiskControlLogsResponses[keyof ListAdminRiskControlLogsResponses];
 
 export type ListAdminCapabilitiesData = {
     body?: never;

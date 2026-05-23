@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	admincontrol "github.com/srapi/srapi/apps/api/internal/modules/admin_control/contract"
 	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
 	apikeyservice "github.com/srapi/srapi/apps/api/internal/modules/api_keys/service"
 	authcontract "github.com/srapi/srapi/apps/api/internal/modules/auth/contract"
@@ -379,6 +380,19 @@ func writeOperationsServiceError(w http.ResponseWriter, err error, requestID str
 		writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "operations resource not found", requestID)
 	default:
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "operations service error", requestID)
+	}
+}
+
+func writeAdminControlError(w http.ResponseWriter, err error, requestID string) {
+	switch {
+	case errors.Is(err, admincontrol.ErrInvalidInput):
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid admin control request", requestID)
+	case errors.Is(err, admincontrol.ErrNotFound):
+		writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "admin control resource not found", requestID)
+	case errors.Is(err, admincontrol.ErrConflict):
+		writeStandardError(w, http.StatusConflict, apiopenapi.RESOURCECONFLICT, "admin control resource conflict", requestID)
+	default:
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "admin control service error", requestID)
 	}
 }
 

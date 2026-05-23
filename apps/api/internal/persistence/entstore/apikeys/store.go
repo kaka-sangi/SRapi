@@ -141,6 +141,25 @@ func (s *Store) ListByUser(ctx context.Context, userID int) ([]contract.APIKey, 
 	return out, nil
 }
 
+func (s *Store) List(ctx context.Context) ([]contract.APIKey, error) {
+	keys, err := s.client.APIKey.Query().
+		Where(entapikey.DeletedAtIsNil()).
+		Order(entapikey.ByCreatedAt()).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]contract.APIKey, 0, len(keys))
+	for _, key := range keys {
+		mapped, err := s.toAPIKey(ctx, key)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, mapped)
+	}
+	return out, nil
+}
+
 func (s *Store) TouchLastUsed(ctx context.Context, id int, usedAt time.Time) error {
 	_, err := s.client.APIKey.UpdateOneID(id).
 		Where(entapikey.DeletedAtIsNil()).

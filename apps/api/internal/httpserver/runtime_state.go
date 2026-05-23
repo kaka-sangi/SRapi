@@ -12,6 +12,9 @@ import (
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	accountservice "github.com/srapi/srapi/apps/api/internal/modules/accounts/service"
 	accountmemory "github.com/srapi/srapi/apps/api/internal/modules/accounts/store/memory"
+	admincontrolcontract "github.com/srapi/srapi/apps/api/internal/modules/admin_control/contract"
+	admincontrolservice "github.com/srapi/srapi/apps/api/internal/modules/admin_control/service"
+	admincontrolmemory "github.com/srapi/srapi/apps/api/internal/modules/admin_control/store/memory"
 	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
 	apikeyservice "github.com/srapi/srapi/apps/api/internal/modules/api_keys/service"
 	apikeymemory "github.com/srapi/srapi/apps/api/internal/modules/api_keys/store/memory"
@@ -83,6 +86,7 @@ type runtimeState struct {
 	realtime          *realtimeservice.Service
 	reverseProxy      *reverseproxyservice.Service
 	accounts          *accountservice.Service
+	adminControl      *admincontrolservice.Service
 	scheduler         *schedulerservice.Service
 	subscriptions     *subscriptionservice.Service
 	payments          *paymentservice.Service
@@ -98,6 +102,7 @@ type runtimeState struct {
 	providerStore     providercontract.Store
 	modelStore        modelcontract.Store
 	accountStore      accountcontract.Store
+	adminControlStore admincontrolcontract.Store
 	paymentStore      paymentcontract.Store
 	realtimeStore     realtimecontract.Store
 	schedulerStore    schedulercontract.Store
@@ -220,6 +225,15 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 		return nil, err
 	}
 
+	adminControlStore := opts.adminControl
+	if adminControlStore == nil {
+		adminControlStore = admincontrolmemory.New()
+	}
+	adminControlSvc, err := admincontrolservice.New(adminControlStore, nil)
+	if err != nil {
+		return nil, err
+	}
+
 	schedulerStore := opts.scheduler
 	if schedulerStore == nil {
 		schedulerStore = schedulermemory.New()
@@ -261,36 +275,31 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 		return nil, err
 	}
 
-	operationsStore := opts.operations
-	if operationsStore == nil {
-		operationsStore = operationsmemory.NewWithUsageStore(usageStore)
-	}
-	operationsSvc, err := operationsservice.NewWithStores(operationsStore, operationsStore, nil)
+	operationsStore, operationsSvc, err := newOperationsRuntime(opts.operations, usageStore)
 	if err != nil {
 		return nil, err
 	}
 
-	rt := &runtimeState{
-		cfg:               cfg,
-		logger:            logger,
-		users:             usersSvc,
-		auth:              authSvc,
-		apiKeys:           apiKeysSvc,
-		audit:             auditSvc,
-		billing:           billingSvc,
-		events:            eventsSvc,
-		gateway:           gatewaySvc,
-		providers:         providersSvc,
-		models:            modelsSvc,
-		adapters:          adaptersSvc,
-		realtime:          realtimeSvc,
-		reverseProxy:      reverseProxySvc,
-		accounts:          accountsSvc,
-		scheduler:         schedulerSvc,
-		subscriptions:     subscriptionSvc,
-		payments:          paymentsSvc,
-		operations:        operationsSvc,
-		usage:             usageSvc,
+	rt := assembleRuntimeState(cfg, logger, opts, runtimeAssembly{
+		usersSvc:          usersSvc,
+		authSvc:           authSvc,
+		apiKeysSvc:        apiKeysSvc,
+		auditSvc:          auditSvc,
+		billingSvc:        billingSvc,
+		eventsSvc:         eventsSvc,
+		gatewaySvc:        gatewaySvc,
+		providersSvc:      providersSvc,
+		modelsSvc:         modelsSvc,
+		adaptersSvc:       adaptersSvc,
+		realtimeSvc:       realtimeSvc,
+		reverseProxySvc:   reverseProxySvc,
+		accountsSvc:       accountsSvc,
+		adminControlSvc:   adminControlSvc,
+		schedulerSvc:      schedulerSvc,
+		subscriptionSvc:   subscriptionSvc,
+		paymentsSvc:       paymentsSvc,
+		operationsSvc:     operationsSvc,
+		usageSvc:          usageSvc,
 		userStore:         userStore,
 		sessionStore:      sessionStore,
 		apiKeyStore:       apiKeyStore,
@@ -301,15 +310,12 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 		providerStore:     providerStore,
 		modelStore:        modelStore,
 		accountStore:      accountStore,
+		adminControlStore: adminControlStore,
 		paymentStore:      paymentStore,
-		realtimeStore:     opts.realtime,
 		schedulerStore:    schedulerStore,
 		subscriptionStore: subscriptionStore,
 		usageStore:        usageStore,
-		capabilities:      seedCapabilities(),
-		databaseProbe:     opts.database,
-		redisProbe:        opts.redis,
-	}
+	})
 	if err := rt.bootstrapAdmin(context.Background()); err != nil {
 		return nil, err
 	}
@@ -317,6 +323,99 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 		return nil, err
 	}
 	return rt, nil
+}
+
+type runtimeAssembly struct {
+	usersSvc          *usersservice.Service
+	authSvc           *authservice.Service
+	apiKeysSvc        *apikeyservice.Service
+	auditSvc          *auditservice.Service
+	billingSvc        *billingservice.Service
+	eventsSvc         *eventsservice.Service
+	gatewaySvc        *gatewayservice.Service
+	providersSvc      *providerservice.Service
+	modelsSvc         *modelservice.Service
+	adaptersSvc       *provideradapterservice.Service
+	realtimeSvc       *realtimeservice.Service
+	reverseProxySvc   *reverseproxyservice.Service
+	accountsSvc       *accountservice.Service
+	adminControlSvc   *admincontrolservice.Service
+	schedulerSvc      *schedulerservice.Service
+	subscriptionSvc   *subscriptionservice.Service
+	paymentsSvc       *paymentservice.Service
+	operationsSvc     *operationsservice.Service
+	usageSvc          *usageservice.Service
+	userStore         userscontract.Store
+	sessionStore      *authmemory.Store
+	apiKeyStore       apikeycontract.Store
+	auditStore        auditcontract.Store
+	billingStore      billingcontract.Store
+	eventsStore       eventscontract.Store
+	operationsStore   operationscontract.Store
+	providerStore     providercontract.Store
+	modelStore        modelcontract.Store
+	accountStore      accountcontract.Store
+	adminControlStore admincontrolcontract.Store
+	paymentStore      paymentcontract.Store
+	schedulerStore    schedulercontract.Store
+	subscriptionStore subscriptioncontract.Store
+	usageStore        usagecontract.Store
+}
+
+func assembleRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions, assembly runtimeAssembly) *runtimeState {
+	return &runtimeState{
+		cfg:               cfg,
+		logger:            logger,
+		users:             assembly.usersSvc,
+		auth:              assembly.authSvc,
+		apiKeys:           assembly.apiKeysSvc,
+		audit:             assembly.auditSvc,
+		billing:           assembly.billingSvc,
+		events:            assembly.eventsSvc,
+		gateway:           assembly.gatewaySvc,
+		providers:         assembly.providersSvc,
+		models:            assembly.modelsSvc,
+		adapters:          assembly.adaptersSvc,
+		realtime:          assembly.realtimeSvc,
+		reverseProxy:      assembly.reverseProxySvc,
+		accounts:          assembly.accountsSvc,
+		adminControl:      assembly.adminControlSvc,
+		scheduler:         assembly.schedulerSvc,
+		subscriptions:     assembly.subscriptionSvc,
+		payments:          assembly.paymentsSvc,
+		operations:        assembly.operationsSvc,
+		usage:             assembly.usageSvc,
+		userStore:         assembly.userStore,
+		sessionStore:      assembly.sessionStore,
+		apiKeyStore:       assembly.apiKeyStore,
+		auditStore:        assembly.auditStore,
+		billingStore:      assembly.billingStore,
+		eventsStore:       assembly.eventsStore,
+		operationsStore:   assembly.operationsStore,
+		providerStore:     assembly.providerStore,
+		modelStore:        assembly.modelStore,
+		accountStore:      assembly.accountStore,
+		adminControlStore: assembly.adminControlStore,
+		paymentStore:      assembly.paymentStore,
+		realtimeStore:     opts.realtime,
+		schedulerStore:    assembly.schedulerStore,
+		subscriptionStore: assembly.subscriptionStore,
+		usageStore:        assembly.usageStore,
+		capabilities:      seedCapabilities(),
+		databaseProbe:     opts.database,
+		redisProbe:        opts.redis,
+	}
+}
+
+func newOperationsRuntime(store operationscontract.Store, usageStore usagecontract.Store) (operationscontract.Store, *operationsservice.Service, error) {
+	if store == nil {
+		store = operationsmemory.NewWithUsageStore(usageStore)
+	}
+	service, err := operationsservice.NewWithStores(store, store, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	return store, service, nil
 }
 
 func (rt *runtimeState) bootstrapAdmin(ctx context.Context) error {

@@ -83,6 +83,69 @@ func (e AdminTestResultStatus) Valid() bool {
 	}
 }
 
+// Defines values for AnnouncementAudience.
+const (
+	Admins AnnouncementAudience = "admins"
+	All    AnnouncementAudience = "all"
+	Users  AnnouncementAudience = "users"
+)
+
+// Valid indicates whether the value is a known member of the AnnouncementAudience enum.
+func (e AnnouncementAudience) Valid() bool {
+	switch e {
+	case Admins:
+		return true
+	case All:
+		return true
+	case Users:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AnnouncementSeverity.
+const (
+	AnnouncementSeverityCritical AnnouncementSeverity = "critical"
+	AnnouncementSeverityInfo     AnnouncementSeverity = "info"
+	AnnouncementSeverityWarning  AnnouncementSeverity = "warning"
+)
+
+// Valid indicates whether the value is a known member of the AnnouncementSeverity enum.
+func (e AnnouncementSeverity) Valid() bool {
+	switch e {
+	case AnnouncementSeverityCritical:
+		return true
+	case AnnouncementSeverityInfo:
+		return true
+	case AnnouncementSeverityWarning:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AnnouncementStatus.
+const (
+	AnnouncementStatusArchived  AnnouncementStatus = "archived"
+	AnnouncementStatusDraft     AnnouncementStatus = "draft"
+	AnnouncementStatusPublished AnnouncementStatus = "published"
+)
+
+// Valid indicates whether the value is a known member of the AnnouncementStatus enum.
+func (e AnnouncementStatus) Valid() bool {
+	switch e {
+	case AnnouncementStatusArchived:
+		return true
+	case AnnouncementStatusDraft:
+		return true
+	case AnnouncementStatusPublished:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for AnthropicContentBlockType.
 const (
 	AnthropicContentBlockTypeImage      AnthropicContentBlockType = "image"
@@ -868,19 +931,19 @@ func (e OpenAIModelListObject) Valid() bool {
 
 // Defines values for OpsAlertSeverity.
 const (
-	Critical OpsAlertSeverity = "critical"
-	Ticket   OpsAlertSeverity = "ticket"
-	Warning  OpsAlertSeverity = "warning"
+	OpsAlertSeverityCritical OpsAlertSeverity = "critical"
+	OpsAlertSeverityTicket   OpsAlertSeverity = "ticket"
+	OpsAlertSeverityWarning  OpsAlertSeverity = "warning"
 )
 
 // Valid indicates whether the value is a known member of the OpsAlertSeverity enum.
 func (e OpsAlertSeverity) Valid() bool {
 	switch e {
-	case Critical:
+	case OpsAlertSeverityCritical:
 		return true
-	case Ticket:
+	case OpsAlertSeverityTicket:
 		return true
-	case Warning:
+	case OpsAlertSeverityWarning:
 		return true
 	default:
 		return false
@@ -905,6 +968,24 @@ func (e OpsAlertStatus) Valid() bool {
 	case Resolved:
 		return true
 	case Suppressed:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for OpsErrorTrendBucket.
+const (
+	OpsErrorTrendBucketDay  OpsErrorTrendBucket = "day"
+	OpsErrorTrendBucketHour OpsErrorTrendBucket = "hour"
+)
+
+// Valid indicates whether the value is a known member of the OpsErrorTrendBucket enum.
+func (e OpsErrorTrendBucket) Valid() bool {
+	switch e {
+	case OpsErrorTrendBucketDay:
+		return true
+	case OpsErrorTrendBucketHour:
 		return true
 	default:
 		return false
@@ -983,6 +1064,48 @@ func (e OpsSLOStatus) Valid() bool {
 	}
 }
 
+// Defines values for OpsSystemLogLevel.
+const (
+	OpsSystemLogLevelDebug OpsSystemLogLevel = "debug"
+	OpsSystemLogLevelError OpsSystemLogLevel = "error"
+	OpsSystemLogLevelInfo  OpsSystemLogLevel = "info"
+	OpsSystemLogLevelWarn  OpsSystemLogLevel = "warn"
+)
+
+// Valid indicates whether the value is a known member of the OpsSystemLogLevel enum.
+func (e OpsSystemLogLevel) Valid() bool {
+	switch e {
+	case OpsSystemLogLevelDebug:
+		return true
+	case OpsSystemLogLevelError:
+		return true
+	case OpsSystemLogLevelInfo:
+		return true
+	case OpsSystemLogLevelWarn:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for OpsThroughputTrendBucket.
+const (
+	OpsThroughputTrendBucketDay  OpsThroughputTrendBucket = "day"
+	OpsThroughputTrendBucketHour OpsThroughputTrendBucket = "hour"
+)
+
+// Valid indicates whether the value is a known member of the OpsThroughputTrendBucket enum.
+func (e OpsThroughputTrendBucket) Valid() bool {
+	switch e {
+	case OpsThroughputTrendBucketDay:
+		return true
+	case OpsThroughputTrendBucketHour:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PaymentOrderStatus.
 const (
 	PaymentOrderStatusCanceled          PaymentOrderStatus = "canceled"
@@ -1052,6 +1175,45 @@ func (e PaymentProviderStatus) Valid() bool {
 	case PaymentProviderStatusArchived:
 		return true
 	case PaymentProviderStatusDisabled:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PromoCodeStatus.
+const (
+	PromoCodeStatusActive   PromoCodeStatus = "active"
+	PromoCodeStatusDisabled PromoCodeStatus = "disabled"
+	PromoCodeStatusExpired  PromoCodeStatus = "expired"
+)
+
+// Valid indicates whether the value is a known member of the PromoCodeStatus enum.
+func (e PromoCodeStatus) Valid() bool {
+	switch e {
+	case PromoCodeStatusActive:
+		return true
+	case PromoCodeStatusDisabled:
+		return true
+	case PromoCodeStatusExpired:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PromoDiscountType.
+const (
+	Amount  PromoDiscountType = "amount"
+	Percent PromoDiscountType = "percent"
+)
+
+// Valid indicates whether the value is a known member of the PromoDiscountType enum.
+func (e PromoDiscountType) Valid() bool {
+	switch e {
+	case Amount:
+		return true
+	case Percent:
 		return true
 	default:
 		return false
@@ -1202,6 +1364,48 @@ func (e RealtimeSlotKind) Valid() bool {
 	}
 }
 
+// Defines values for RedeemCodeStatus.
+const (
+	RedeemCodeStatusActive   RedeemCodeStatus = "active"
+	RedeemCodeStatusDisabled RedeemCodeStatus = "disabled"
+	RedeemCodeStatusExpired  RedeemCodeStatus = "expired"
+	RedeemCodeStatusRedeemed RedeemCodeStatus = "redeemed"
+)
+
+// Valid indicates whether the value is a known member of the RedeemCodeStatus enum.
+func (e RedeemCodeStatus) Valid() bool {
+	switch e {
+	case RedeemCodeStatusActive:
+		return true
+	case RedeemCodeStatusDisabled:
+		return true
+	case RedeemCodeStatusExpired:
+		return true
+	case RedeemCodeStatusRedeemed:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RedeemCodeType.
+const (
+	Balance      RedeemCodeType = "balance"
+	Subscription RedeemCodeType = "subscription"
+)
+
+// Valid indicates whether the value is a known member of the RedeemCodeType enum.
+func (e RedeemCodeType) Valid() bool {
+	switch e {
+	case Balance:
+		return true
+	case Subscription:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ResourceStatus.
 const (
 	ResourceStatusActive   ResourceStatus = "active"
@@ -1235,6 +1439,45 @@ const (
 func (e ResponsesResponseObject) Valid() bool {
 	switch e {
 	case Response:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RiskControlLogLevel.
+const (
+	RiskControlLogLevelBlock RiskControlLogLevel = "block"
+	RiskControlLogLevelInfo  RiskControlLogLevel = "info"
+	RiskControlLogLevelWarn  RiskControlLogLevel = "warn"
+)
+
+// Valid indicates whether the value is a known member of the RiskControlLogLevel enum.
+func (e RiskControlLogLevel) Valid() bool {
+	switch e {
+	case RiskControlLogLevelBlock:
+		return true
+	case RiskControlLogLevelInfo:
+		return true
+	case RiskControlLogLevelWarn:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RiskControlMode.
+const (
+	Enforce RiskControlMode = "enforce"
+	Monitor RiskControlMode = "monitor"
+)
+
+// Valid indicates whether the value is a known member of the RiskControlMode enum.
+func (e RiskControlMode) Valid() bool {
+	switch e {
+	case Enforce:
+		return true
+	case Monitor:
 		return true
 	default:
 		return false
@@ -1459,22 +1702,76 @@ func (e UserStatus) Valid() bool {
 
 // Defines values for UserSubscriptionStatus.
 const (
-	Active    UserSubscriptionStatus = "active"
-	Cancelled UserSubscriptionStatus = "cancelled"
-	Expired   UserSubscriptionStatus = "expired"
-	Suspended UserSubscriptionStatus = "suspended"
+	UserSubscriptionStatusActive    UserSubscriptionStatus = "active"
+	UserSubscriptionStatusCancelled UserSubscriptionStatus = "cancelled"
+	UserSubscriptionStatusExpired   UserSubscriptionStatus = "expired"
+	UserSubscriptionStatusSuspended UserSubscriptionStatus = "suspended"
 )
 
 // Valid indicates whether the value is a known member of the UserSubscriptionStatus enum.
 func (e UserSubscriptionStatus) Valid() bool {
 	switch e {
-	case Active:
+	case UserSubscriptionStatusActive:
 		return true
-	case Cancelled:
+	case UserSubscriptionStatusCancelled:
 		return true
-	case Expired:
+	case UserSubscriptionStatusExpired:
 		return true
-	case Suspended:
+	case UserSubscriptionStatusSuspended:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for Bucket.
+const (
+	BucketDay  Bucket = "day"
+	BucketHour Bucket = "hour"
+)
+
+// Valid indicates whether the value is a known member of the Bucket enum.
+func (e Bucket) Valid() bool {
+	switch e {
+	case BucketDay:
+		return true
+	case BucketHour:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetAdminOpsErrorTrendParamsBucket.
+const (
+	GetAdminOpsErrorTrendParamsBucketDay  GetAdminOpsErrorTrendParamsBucket = "day"
+	GetAdminOpsErrorTrendParamsBucketHour GetAdminOpsErrorTrendParamsBucket = "hour"
+)
+
+// Valid indicates whether the value is a known member of the GetAdminOpsErrorTrendParamsBucket enum.
+func (e GetAdminOpsErrorTrendParamsBucket) Valid() bool {
+	switch e {
+	case GetAdminOpsErrorTrendParamsBucketDay:
+		return true
+	case GetAdminOpsErrorTrendParamsBucketHour:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetAdminOpsThroughputTrendParamsBucket.
+const (
+	Day  GetAdminOpsThroughputTrendParamsBucket = "day"
+	Hour GetAdminOpsThroughputTrendParamsBucket = "hour"
+)
+
+// Valid indicates whether the value is a known member of the GetAdminOpsThroughputTrendParamsBucket enum.
+func (e GetAdminOpsThroughputTrendParamsBucket) Valid() bool {
+	switch e {
+	case Day:
+		return true
+	case Hour:
 		return true
 	default:
 		return false
@@ -1662,10 +1959,82 @@ type AccountRpmStatusResponse struct {
 // AdminDashboard defines model for AdminDashboard.
 type AdminDashboard = AdminOverview
 
+// AdminDashboardCosts defines model for AdminDashboardCosts.
+type AdminDashboardCosts struct {
+	AccountCost  string `json:"account_cost"`
+	ActualCost   string `json:"actual_cost"`
+	Currency     string `json:"currency"`
+	StandardCost string `json:"standard_cost"`
+}
+
+// AdminDashboardInventory defines model for AdminDashboardInventory.
+type AdminDashboardInventory struct {
+	AbnormalAccounts int `json:"abnormal_accounts"`
+	ActiveApiKeys    int `json:"active_api_keys"`
+	HealthyAccounts  int `json:"healthy_accounts"`
+	TotalAccounts    int `json:"total_accounts"`
+	TotalApiKeys     int `json:"total_api_keys"`
+}
+
+// AdminDashboardPerformance defines model for AdminDashboardPerformance.
+type AdminDashboardPerformance struct {
+	AverageLatencyMs int `json:"average_latency_ms"`
+	CurrentRpm       int `json:"current_rpm"`
+	CurrentTpm       int `json:"current_tpm"`
+	P95LatencyMs     int `json:"p95_latency_ms"`
+	PeakRpm          int `json:"peak_rpm"`
+	PeakTpm          int `json:"peak_tpm"`
+}
+
 // AdminDashboardResponse defines model for AdminDashboardResponse.
 type AdminDashboardResponse struct {
 	Data      AdminDashboard `json:"data"`
 	RequestId RequestId      `json:"request_id"`
+}
+
+// AdminDashboardSnapshot defines model for AdminDashboardSnapshot.
+type AdminDashboardSnapshot struct {
+	GeneratedAt       Timestamp                    `json:"generated_at"`
+	Inventory         AdminDashboardInventory      `json:"inventory"`
+	ModelDistribution []DashboardModelDistribution `json:"model_distribution"`
+	Performance       AdminDashboardPerformance    `json:"performance"`
+	TokenTrend        []DashboardTrendPoint        `json:"token_trend"`
+	Tokens            AdminDashboardTokens         `json:"tokens"`
+	Traffic           AdminDashboardTraffic        `json:"traffic"`
+	UserUsageTrend    []DashboardUserUsageTrend    `json:"user_usage_trend"`
+	Users             AdminDashboardUsers          `json:"users"`
+	Window            TimeWindow                   `json:"window"`
+}
+
+// AdminDashboardSnapshotResponse defines model for AdminDashboardSnapshotResponse.
+type AdminDashboardSnapshotResponse struct {
+	Data      AdminDashboardSnapshot `json:"data"`
+	RequestId RequestId              `json:"request_id"`
+}
+
+// AdminDashboardTokens defines model for AdminDashboardTokens.
+type AdminDashboardTokens struct {
+	CachedTokens int                 `json:"cached_tokens"`
+	Costs        AdminDashboardCosts `json:"costs"`
+	InputTokens  int                 `json:"input_tokens"`
+	OutputTokens int                 `json:"output_tokens"`
+	TodayTokens  int                 `json:"today_tokens"`
+	TotalTokens  int                 `json:"total_tokens"`
+}
+
+// AdminDashboardTraffic defines model for AdminDashboardTraffic.
+type AdminDashboardTraffic struct {
+	ErrorRequests   int `json:"error_requests"`
+	SuccessRequests int `json:"success_requests"`
+	TodayRequests   int `json:"today_requests"`
+	TotalRequests   int `json:"total_requests"`
+}
+
+// AdminDashboardUsers defines model for AdminDashboardUsers.
+type AdminDashboardUsers struct {
+	ActiveUsers   int `json:"active_users"`
+	TodayNewUsers int `json:"today_new_users"`
+	TotalUsers    int `json:"total_users"`
 }
 
 // AdminOverview defines model for AdminOverview.
@@ -1690,6 +2059,92 @@ type AdminOverviewResponse struct {
 	RequestId RequestId     `json:"request_id"`
 }
 
+// AdminSettings defines model for AdminSettings.
+type AdminSettings struct {
+	Agreement AdminSettingsAgreement `json:"agreement"`
+	Backup    AdminSettingsBackup    `json:"backup"`
+	Email     AdminSettingsEmail     `json:"email"`
+	Features  AdminSettingsFeatures  `json:"features"`
+	Gateway   AdminSettingsGateway   `json:"gateway"`
+	General   AdminSettingsGeneral   `json:"general"`
+	Payment   AdminSettingsPayment   `json:"payment"`
+	Security  AdminSettingsSecurity  `json:"security"`
+	Users     AdminSettingsUsers     `json:"users"`
+}
+
+// AdminSettingsAgreement defines model for AdminSettingsAgreement.
+type AdminSettingsAgreement struct {
+	PrivacyPolicy string `json:"privacy_policy"`
+	UserAgreement string `json:"user_agreement"`
+}
+
+// AdminSettingsBackup defines model for AdminSettingsBackup.
+type AdminSettingsBackup struct {
+	Enabled       bool       `json:"enabled"`
+	LastBackupAt  *Timestamp `json:"last_backup_at,omitempty"`
+	RetentionDays int        `json:"retention_days"`
+}
+
+// AdminSettingsEmail defines model for AdminSettingsEmail.
+type AdminSettingsEmail struct {
+	SmtpConfigured bool              `json:"smtp_configured"`
+	Templates      map[string]string `json:"templates"`
+}
+
+// AdminSettingsFeatures defines model for AdminSettingsFeatures.
+type AdminSettingsFeatures struct {
+	ChannelMonitoringEnabled bool     `json:"channel_monitoring_enabled"`
+	EnabledChannels          []string `json:"enabled_channels"`
+	InvitationRebateEnabled  bool     `json:"invitation_rebate_enabled"`
+	PaymentsEnabled          bool     `json:"payments_enabled"`
+}
+
+// AdminSettingsGateway defines model for AdminSettingsGateway.
+type AdminSettingsGateway struct {
+	BetaStrategy             string `json:"beta_strategy"`
+	OverloadCooldownSeconds  int    `json:"overload_cooldown_seconds"`
+	RateLimitCooldownSeconds int    `json:"rate_limit_cooldown_seconds"`
+	RequestShaperEnabled     bool   `json:"request_shaper_enabled"`
+	StreamTimeoutSeconds     int    `json:"stream_timeout_seconds"`
+}
+
+// AdminSettingsGeneral defines model for AdminSettingsGeneral.
+type AdminSettingsGeneral struct {
+	CustomMenus  []JsonObject `json:"custom_menus"`
+	LogoUrl      string       `json:"logo_url"`
+	SiteName     string       `json:"site_name"`
+	VersionLabel string       `json:"version_label"`
+}
+
+// AdminSettingsPayment defines model for AdminSettingsPayment.
+type AdminSettingsPayment struct {
+	Enabled                  bool     `json:"enabled"`
+	Providers                []string `json:"providers"`
+	SubscriptionPlansEnabled bool     `json:"subscription_plans_enabled"`
+}
+
+// AdminSettingsResponse defines model for AdminSettingsResponse.
+type AdminSettingsResponse struct {
+	Data      AdminSettings `json:"data"`
+	RequestId RequestId     `json:"request_id"`
+}
+
+// AdminSettingsSecurity defines model for AdminSettingsSecurity.
+type AdminSettingsSecurity struct {
+	AdminApiKey         SecretConfigured `json:"admin_api_key"`
+	OauthEnabled        bool             `json:"oauth_enabled"`
+	OauthProviders      []string         `json:"oauth_providers"`
+	RegistrationEnabled bool             `json:"registration_enabled"`
+}
+
+// AdminSettingsUsers defines model for AdminSettingsUsers.
+type AdminSettingsUsers struct {
+	DefaultBalance        string `json:"default_balance"`
+	DefaultGroup          string `json:"default_group"`
+	RpmLimitDefault       int    `json:"rpm_limit_default"`
+	UserSelfDeleteEnabled bool   `json:"user_self_delete_enabled"`
+}
+
 // AdminTestResult defines model for AdminTestResult.
 type AdminTestResult struct {
 	AccountId  *Id                   `json:"account_id,omitempty"`
@@ -1710,6 +2165,42 @@ type AdminTestResultResponse struct {
 	Data      AdminTestResult `json:"data"`
 	RequestId RequestId       `json:"request_id"`
 }
+
+// Announcement defines model for Announcement.
+type Announcement struct {
+	Audience  AnnouncementAudience `json:"audience"`
+	Content   string               `json:"content"`
+	CreatedAt Timestamp            `json:"created_at"`
+	EndsAt    *Timestamp           `json:"ends_at,omitempty"`
+	Id        Id                   `json:"id"`
+	Severity  AnnouncementSeverity `json:"severity"`
+	StartsAt  *Timestamp           `json:"starts_at,omitempty"`
+	Status    AnnouncementStatus   `json:"status"`
+	Title     string               `json:"title"`
+	UpdatedAt Timestamp            `json:"updated_at"`
+}
+
+// AnnouncementAudience defines model for AnnouncementAudience.
+type AnnouncementAudience string
+
+// AnnouncementListResponse defines model for AnnouncementListResponse.
+type AnnouncementListResponse struct {
+	Data       []Announcement `json:"data"`
+	Pagination Pagination     `json:"pagination"`
+	RequestId  RequestId      `json:"request_id"`
+}
+
+// AnnouncementResponse defines model for AnnouncementResponse.
+type AnnouncementResponse struct {
+	Data      Announcement `json:"data"`
+	RequestId RequestId    `json:"request_id"`
+}
+
+// AnnouncementSeverity defines model for AnnouncementSeverity.
+type AnnouncementSeverity string
+
+// AnnouncementStatus defines model for AnnouncementStatus.
+type AnnouncementStatus string
 
 // AnthropicContentBlock defines model for AnthropicContentBlock.
 type AnthropicContentBlock struct {
@@ -1950,6 +2441,36 @@ type AuditLogListResponse struct {
 	RequestId  RequestId  `json:"request_id"`
 }
 
+// BatchDisableRedeemCodesRequest defines model for BatchDisableRedeemCodesRequest.
+type BatchDisableRedeemCodesRequest struct {
+	Ids []Id `json:"ids"`
+}
+
+// BatchGenerateRedeemCodesRequest defines model for BatchGenerateRedeemCodesRequest.
+type BatchGenerateRedeemCodesRequest struct {
+	Count          int            `json:"count"`
+	Currency       *string        `json:"currency,omitempty"`
+	ExpiresAt      *Timestamp     `json:"expires_at,omitempty"`
+	MaxRedemptions *int           `json:"max_redemptions,omitempty"`
+	Prefix         *string        `json:"prefix,omitempty"`
+	Type           RedeemCodeType `json:"type"`
+	Value          string         `json:"value"`
+}
+
+// BatchOperationResponse defines model for BatchOperationResponse.
+type BatchOperationResponse struct {
+	Data      BatchOperationResult `json:"data"`
+	RequestId RequestId            `json:"request_id"`
+}
+
+// BatchOperationResult defines model for BatchOperationResult.
+type BatchOperationResult struct {
+	Failed    int   `json:"failed"`
+	FailedIds *[]Id `json:"failed_ids,omitempty"`
+	Requested int   `json:"requested"`
+	Succeeded int   `json:"succeeded"`
+}
+
 // BatchUpdateAccountsRequest defines model for BatchUpdateAccountsRequest.
 type BatchUpdateAccountsRequest struct {
 	AccountIds []Id                  `json:"account_ids"`
@@ -2167,6 +2688,17 @@ type CreateAdminUserRequest struct {
 	Status   *UserStatus         `json:"status,omitempty"`
 }
 
+// CreateAnnouncementRequest defines model for CreateAnnouncementRequest.
+type CreateAnnouncementRequest struct {
+	Audience *AnnouncementAudience `json:"audience,omitempty"`
+	Content  string                `json:"content"`
+	EndsAt   *Timestamp            `json:"ends_at,omitempty"`
+	Severity *AnnouncementSeverity `json:"severity,omitempty"`
+	StartsAt *Timestamp            `json:"starts_at,omitempty"`
+	Status   *AnnouncementStatus   `json:"status,omitempty"`
+	Title    string                `json:"title"`
+}
+
 // CreateApiKeyRequest defines model for CreateApiKeyRequest.
 type CreateApiKeyRequest struct {
 	AllowedModels *[]string  `json:"allowed_models,omitempty"`
@@ -2262,6 +2794,18 @@ type CreatePricingRuleRequest struct {
 	ProviderId                      Id         `json:"provider_id"`
 }
 
+// CreatePromoCodeRequest defines model for CreatePromoCodeRequest.
+type CreatePromoCodeRequest struct {
+	Code          string            `json:"code"`
+	Currency      *string           `json:"currency,omitempty"`
+	DiscountType  PromoDiscountType `json:"discount_type"`
+	DiscountValue string            `json:"discount_value"`
+	ExpiresAt     *Timestamp        `json:"expires_at,omitempty"`
+	MaxUses       *int              `json:"max_uses,omitempty"`
+	StartsAt      *Timestamp        `json:"starts_at,omitempty"`
+	Status        *PromoCodeStatus  `json:"status,omitempty"`
+}
+
 // CreateProviderAccountRequest defines model for CreateProviderAccountRequest.
 type CreateProviderAccountRequest struct {
 	// Credential Write-only credential payload. It must be encrypted before persistence.
@@ -2288,6 +2832,16 @@ type CreateProviderRequest struct {
 	Status       *ResourceStatus     `json:"status,omitempty"`
 }
 
+// CreateRedeemCodeRequest defines model for CreateRedeemCodeRequest.
+type CreateRedeemCodeRequest struct {
+	Code           string         `json:"code"`
+	Currency       *string        `json:"currency,omitempty"`
+	ExpiresAt      *Timestamp     `json:"expires_at,omitempty"`
+	MaxRedemptions *int           `json:"max_redemptions,omitempty"`
+	Type           RedeemCodeType `json:"type"`
+	Value          string         `json:"value"`
+}
+
 // CreateSubscriptionPlanRequest defines model for CreateSubscriptionPlanRequest.
 type CreateSubscriptionPlanRequest struct {
 	Currency     string      `json:"currency"`
@@ -2312,6 +2866,40 @@ type CreateUserSubscriptionRequest struct {
 	StartsAt   *time.Time              `json:"starts_at,omitempty"`
 	Status     *UserSubscriptionStatus `json:"status,omitempty"`
 	UserId     Id                      `json:"user_id"`
+}
+
+// DashboardModelDistribution defines model for DashboardModelDistribution.
+type DashboardModelDistribution struct {
+	Cost         string `json:"cost"`
+	Currency     string `json:"currency"`
+	Model        string `json:"model"`
+	RequestCount int    `json:"request_count"`
+	TokenCount   int    `json:"token_count"`
+}
+
+// DashboardTrendPoint defines model for DashboardTrendPoint.
+type DashboardTrendPoint struct {
+	BucketStart  Timestamp `json:"bucket_start"`
+	Cost         string    `json:"cost"`
+	RequestCount int       `json:"request_count"`
+	TokenCount   int       `json:"token_count"`
+}
+
+// DashboardUserUsageTrend defines model for DashboardUserUsageTrend.
+type DashboardUserUsageTrend struct {
+	Cost         string  `json:"cost"`
+	Email        *string `json:"email,omitempty"`
+	RequestCount int     `json:"request_count"`
+	TokenCount   int     `json:"token_count"`
+	UserId       Id      `json:"user_id"`
+}
+
+// DeleteResponse defines model for DeleteResponse.
+type DeleteResponse struct {
+	Data struct {
+		Deleted bool `json:"deleted"`
+	} `json:"data"`
+	RequestId RequestId `json:"request_id"`
 }
 
 // DiscoverAccountModelsRequest defines model for DiscoverAccountModelsRequest.
@@ -2976,6 +3564,107 @@ type OpsBurnRateThreshold struct {
 	ShortWindowSeconds int              `json:"short_window_seconds"`
 }
 
+// OpsConcurrency defines model for OpsConcurrency.
+type OpsConcurrency struct {
+	ActiveByApiKey        map[string]int `json:"active_by_api_key"`
+	ActiveGatewayRequests int            `json:"active_gateway_requests"`
+	ActiveRealtimeSlots   int            `json:"active_realtime_slots"`
+}
+
+// OpsConcurrencyResponse defines model for OpsConcurrencyResponse.
+type OpsConcurrencyResponse struct {
+	Data      OpsConcurrency `json:"data"`
+	RequestId RequestId      `json:"request_id"`
+}
+
+// OpsErrorDistribution defines model for OpsErrorDistribution.
+type OpsErrorDistribution struct {
+	Items  []OpsErrorDistributionItem `json:"items"`
+	Window TimeWindow                 `json:"window"`
+}
+
+// OpsErrorDistributionItem defines model for OpsErrorDistributionItem.
+type OpsErrorDistributionItem struct {
+	Count      int     `json:"count"`
+	ErrorClass string  `json:"error_class"`
+	Owner      string  `json:"owner"`
+	Share      float32 `json:"share"`
+}
+
+// OpsErrorDistributionResponse defines model for OpsErrorDistributionResponse.
+type OpsErrorDistributionResponse struct {
+	Data      OpsErrorDistribution `json:"data"`
+	RequestId RequestId            `json:"request_id"`
+}
+
+// OpsErrorTrend defines model for OpsErrorTrend.
+type OpsErrorTrend struct {
+	Bucket OpsErrorTrendBucket  `json:"bucket"`
+	Points []OpsErrorTrendPoint `json:"points"`
+	Window TimeWindow           `json:"window"`
+}
+
+// OpsErrorTrendBucket defines model for OpsErrorTrend.Bucket.
+type OpsErrorTrendBucket string
+
+// OpsErrorTrendPoint defines model for OpsErrorTrendPoint.
+type OpsErrorTrendPoint struct {
+	BucketStart  Timestamp `json:"bucket_start"`
+	ErrorCount   int       `json:"error_count"`
+	ErrorRate    float32   `json:"error_rate"`
+	RequestCount int       `json:"request_count"`
+}
+
+// OpsErrorTrendResponse defines model for OpsErrorTrendResponse.
+type OpsErrorTrendResponse struct {
+	Data      OpsErrorTrend `json:"data"`
+	RequestId RequestId     `json:"request_id"`
+}
+
+// OpsLatencyBucket defines model for OpsLatencyBucket.
+type OpsLatencyBucket struct {
+	Count   int     `json:"count"`
+	Label   string  `json:"label"`
+	LowerMs int     `json:"lower_ms"`
+	Share   float32 `json:"share"`
+	UpperMs *int    `json:"upper_ms,omitempty"`
+}
+
+// OpsLatencyHistogram defines model for OpsLatencyHistogram.
+type OpsLatencyHistogram struct {
+	Buckets []OpsLatencyBucket `json:"buckets"`
+	Window  TimeWindow         `json:"window"`
+}
+
+// OpsLatencyHistogramResponse defines model for OpsLatencyHistogramResponse.
+type OpsLatencyHistogramResponse struct {
+	Data      OpsLatencyHistogram `json:"data"`
+	RequestId RequestId           `json:"request_id"`
+}
+
+// OpsOverview defines model for OpsOverview.
+type OpsOverview struct {
+	ActiveUsers      int        `json:"active_users"`
+	AverageLatencyMs int        `json:"average_latency_ms"`
+	ErrorCount       int        `json:"error_count"`
+	ErrorRate        float32    `json:"error_rate"`
+	GeneratedAt      Timestamp  `json:"generated_at"`
+	LatencyP50Ms     int        `json:"latency_p50_ms"`
+	LatencyP95Ms     int        `json:"latency_p95_ms"`
+	LatencyP99Ms     int        `json:"latency_p99_ms"`
+	RequestCount     int        `json:"request_count"`
+	Rpm              int        `json:"rpm"`
+	SuccessCount     int        `json:"success_count"`
+	Tpm              int        `json:"tpm"`
+	Window           TimeWindow `json:"window"`
+}
+
+// OpsOverviewResponse defines model for OpsOverviewResponse.
+type OpsOverviewResponse struct {
+	Data      OpsOverview `json:"data"`
+	RequestId RequestId   `json:"request_id"`
+}
+
 // OpsSLIType defines model for OpsSLIType.
 type OpsSLIType string
 
@@ -3040,6 +3729,67 @@ type OpsSLOListResponse struct {
 
 // OpsSLOStatus defines model for OpsSLOStatus.
 type OpsSLOStatus string
+
+// OpsSettings defines model for OpsSettings.
+type OpsSettings struct {
+	AlertRetentionDays     int     `json:"alert_retention_days"`
+	AutoRefreshEnabled     bool    `json:"auto_refresh_enabled"`
+	ErrorRateThreshold     float32 `json:"error_rate_threshold"`
+	LatencyP95ThresholdMs  int     `json:"latency_p95_threshold_ms"`
+	RefreshIntervalSeconds int     `json:"refresh_interval_seconds"`
+}
+
+// OpsSettingsResponse defines model for OpsSettingsResponse.
+type OpsSettingsResponse struct {
+	Data      OpsSettings `json:"data"`
+	RequestId RequestId   `json:"request_id"`
+}
+
+// OpsSystemLog defines model for OpsSystemLog.
+type OpsSystemLog struct {
+	CreatedAt Timestamp         `json:"created_at"`
+	Id        Id                `json:"id"`
+	Level     OpsSystemLogLevel `json:"level"`
+	Message   string            `json:"message"`
+	Metadata  *JsonObject       `json:"metadata,omitempty"`
+	Source    string            `json:"source"`
+}
+
+// OpsSystemLogLevel defines model for OpsSystemLog.Level.
+type OpsSystemLogLevel string
+
+// OpsSystemLogListResponse defines model for OpsSystemLogListResponse.
+type OpsSystemLogListResponse struct {
+	Data       []OpsSystemLog `json:"data"`
+	Pagination Pagination     `json:"pagination"`
+	RequestId  RequestId      `json:"request_id"`
+}
+
+// OpsThroughputTrend defines model for OpsThroughputTrend.
+type OpsThroughputTrend struct {
+	Bucket OpsThroughputTrendBucket  `json:"bucket"`
+	Points []OpsThroughputTrendPoint `json:"points"`
+	Window TimeWindow                `json:"window"`
+}
+
+// OpsThroughputTrendBucket defines model for OpsThroughputTrend.Bucket.
+type OpsThroughputTrendBucket string
+
+// OpsThroughputTrendPoint defines model for OpsThroughputTrendPoint.
+type OpsThroughputTrendPoint struct {
+	BucketStart  Timestamp `json:"bucket_start"`
+	Cost         string    `json:"cost"`
+	RequestCount int       `json:"request_count"`
+	Rpm          int       `json:"rpm"`
+	TokenCount   int       `json:"token_count"`
+	Tpm          int       `json:"tpm"`
+}
+
+// OpsThroughputTrendResponse defines model for OpsThroughputTrendResponse.
+type OpsThroughputTrendResponse struct {
+	Data      OpsThroughputTrend `json:"data"`
+	RequestId RequestId          `json:"request_id"`
+}
 
 // Pagination defines model for Pagination.
 type Pagination struct {
@@ -3179,6 +3929,41 @@ type PricingRuleResponse struct {
 	Data      PricingRule `json:"data"`
 	RequestId RequestId   `json:"request_id"`
 }
+
+// PromoCode defines model for PromoCode.
+type PromoCode struct {
+	Code          string            `json:"code"`
+	CreatedAt     Timestamp         `json:"created_at"`
+	Currency      string            `json:"currency"`
+	DiscountType  PromoDiscountType `json:"discount_type"`
+	DiscountValue string            `json:"discount_value"`
+	ExpiresAt     *Timestamp        `json:"expires_at,omitempty"`
+	Id            Id                `json:"id"`
+	MaxUses       int               `json:"max_uses"`
+	StartsAt      *Timestamp        `json:"starts_at,omitempty"`
+	Status        PromoCodeStatus   `json:"status"`
+	UpdatedAt     Timestamp         `json:"updated_at"`
+	UsedCount     int               `json:"used_count"`
+}
+
+// PromoCodeListResponse defines model for PromoCodeListResponse.
+type PromoCodeListResponse struct {
+	Data       []PromoCode `json:"data"`
+	Pagination Pagination  `json:"pagination"`
+	RequestId  RequestId   `json:"request_id"`
+}
+
+// PromoCodeResponse defines model for PromoCodeResponse.
+type PromoCodeResponse struct {
+	Data      PromoCode `json:"data"`
+	RequestId RequestId `json:"request_id"`
+}
+
+// PromoCodeStatus defines model for PromoCodeStatus.
+type PromoCodeStatus string
+
+// PromoDiscountType defines model for PromoDiscountType.
+type PromoDiscountType string
 
 // Provider defines model for Provider.
 type Provider struct {
@@ -3347,6 +4132,55 @@ type RealtimeActiveSlotListResponse struct {
 // RealtimeSlotKind defines model for RealtimeSlotKind.
 type RealtimeSlotKind string
 
+// RedeemCode defines model for RedeemCode.
+type RedeemCode struct {
+	Code           string           `json:"code"`
+	CreatedAt      Timestamp        `json:"created_at"`
+	Currency       string           `json:"currency"`
+	ExpiresAt      *Timestamp       `json:"expires_at,omitempty"`
+	Id             Id               `json:"id"`
+	MaxRedemptions int              `json:"max_redemptions"`
+	RedeemedCount  int              `json:"redeemed_count"`
+	Status         RedeemCodeStatus `json:"status"`
+	Type           RedeemCodeType   `json:"type"`
+	UpdatedAt      Timestamp        `json:"updated_at"`
+	Value          string           `json:"value"`
+}
+
+// RedeemCodeListResponse defines model for RedeemCodeListResponse.
+type RedeemCodeListResponse struct {
+	Data       []RedeemCode `json:"data"`
+	Pagination Pagination   `json:"pagination"`
+	RequestId  RequestId    `json:"request_id"`
+}
+
+// RedeemCodeResponse defines model for RedeemCodeResponse.
+type RedeemCodeResponse struct {
+	Data      RedeemCode `json:"data"`
+	RequestId RequestId  `json:"request_id"`
+}
+
+// RedeemCodeStats defines model for RedeemCodeStats.
+type RedeemCodeStats struct {
+	Active   int `json:"active"`
+	Disabled int `json:"disabled"`
+	Expired  int `json:"expired"`
+	Redeemed int `json:"redeemed"`
+	Total    int `json:"total"`
+}
+
+// RedeemCodeStatsResponse defines model for RedeemCodeStatsResponse.
+type RedeemCodeStatsResponse struct {
+	Data      RedeemCodeStats `json:"data"`
+	RequestId RequestId       `json:"request_id"`
+}
+
+// RedeemCodeStatus defines model for RedeemCodeStatus.
+type RedeemCodeStatus string
+
+// RedeemCodeType defines model for RedeemCodeType.
+type RedeemCodeType string
+
 // RefundPaymentOrderRequest defines model for RefundPaymentOrderRequest.
 type RefundPaymentOrderRequest struct {
 	// Amount Decimal refund amount. Empty or omitted means full refund.
@@ -3445,6 +4279,62 @@ type ResponsesResponse struct {
 // ResponsesResponseObject defines model for ResponsesResponse.Object.
 type ResponsesResponseObject string
 
+// RiskControlConfig defines model for RiskControlConfig.
+type RiskControlConfig struct {
+	BlockedCountries           []string        `json:"blocked_countries"`
+	BlockedIps                 []string        `json:"blocked_ips"`
+	CooldownSeconds            int             `json:"cooldown_seconds"`
+	Enabled                    bool            `json:"enabled"`
+	MaxCostPerDay              string          `json:"max_cost_per_day"`
+	MaxFailedRequestsPerMinute int             `json:"max_failed_requests_per_minute"`
+	Mode                       RiskControlMode `json:"mode"`
+}
+
+// RiskControlConfigResponse defines model for RiskControlConfigResponse.
+type RiskControlConfigResponse struct {
+	Data      RiskControlConfig `json:"data"`
+	RequestId RequestId         `json:"request_id"`
+}
+
+// RiskControlLog defines model for RiskControlLog.
+type RiskControlLog struct {
+	Action    string              `json:"action"`
+	CreatedAt Timestamp           `json:"created_at"`
+	Id        Id                  `json:"id"`
+	Level     RiskControlLogLevel `json:"level"`
+	Metadata  *JsonObject         `json:"metadata,omitempty"`
+	Reason    string              `json:"reason"`
+	Subject   *string             `json:"subject,omitempty"`
+}
+
+// RiskControlLogLevel defines model for RiskControlLog.Level.
+type RiskControlLogLevel string
+
+// RiskControlLogListResponse defines model for RiskControlLogListResponse.
+type RiskControlLogListResponse struct {
+	Data       []RiskControlLog `json:"data"`
+	Pagination Pagination       `json:"pagination"`
+	RequestId  RequestId        `json:"request_id"`
+}
+
+// RiskControlMode defines model for RiskControlMode.
+type RiskControlMode string
+
+// RiskControlStatus defines model for RiskControlStatus.
+type RiskControlStatus struct {
+	ActiveBlocks int             `json:"active_blocks"`
+	Enabled      bool            `json:"enabled"`
+	EvaluatedAt  Timestamp       `json:"evaluated_at"`
+	Mode         RiskControlMode `json:"mode"`
+	RecentEvents int             `json:"recent_events"`
+}
+
+// RiskControlStatusResponse defines model for RiskControlStatusResponse.
+type RiskControlStatusResponse struct {
+	Data      RiskControlStatus `json:"data"`
+	RequestId RequestId         `json:"request_id"`
+}
+
 // RuntimeClass defines model for RuntimeClass.
 type RuntimeClass string
 
@@ -3530,6 +4420,11 @@ type SchedulerStrategyListResponse struct {
 	RequestId  RequestId           `json:"request_id"`
 }
 
+// SecretConfigured defines model for SecretConfigured.
+type SecretConfigured struct {
+	Configured bool `json:"configured"`
+}
+
 // SessionData defines model for SessionData.
 type SessionData struct {
 	// CsrfToken Token to send as X-CSRF-Token for console writes.
@@ -3571,6 +4466,12 @@ type SubscriptionPlanResponse struct {
 
 // SubscriptionPlanStatus defines model for SubscriptionPlanStatus.
 type SubscriptionPlanStatus string
+
+// TimeWindow defines model for TimeWindow.
+type TimeWindow struct {
+	End   Timestamp `json:"end"`
+	Start Timestamp `json:"start"`
+}
 
 // Timestamp defines model for Timestamp.
 type Timestamp = time.Time
@@ -3615,6 +4516,9 @@ type UpdateAdminUserRequest struct {
 	Status   *UserStatus          `json:"status,omitempty"`
 }
 
+// UpdateAnnouncementRequest defines model for UpdateAnnouncementRequest.
+type UpdateAnnouncementRequest = CreateAnnouncementRequest
+
 // UpdateApiKeyRequest defines model for UpdateApiKeyRequest.
 type UpdateApiKeyRequest struct {
 	AllowedModels *[]string     `json:"allowed_models,omitempty"`
@@ -3646,6 +4550,9 @@ type UpdateOpsSLORequest struct {
 	Status     *OpsSLOStatus `json:"status,omitempty"`
 	WindowDays *int          `json:"window_days,omitempty"`
 }
+
+// UpdatePromoCodeRequest defines model for UpdatePromoCodeRequest.
+type UpdatePromoCodeRequest = CreatePromoCodeRequest
 
 // UpdateProviderAccountRequest defines model for UpdateProviderAccountRequest.
 type UpdateProviderAccountRequest struct {
@@ -3827,6 +4734,12 @@ type UserSubscriptionResponse struct {
 // UserSubscriptionStatus defines model for UserSubscriptionStatus.
 type UserSubscriptionStatus string
 
+// Bucket defines model for Bucket.
+type Bucket string
+
+// EndTime defines model for EndTime.
+type EndTime = time.Time
+
 // GeminiModel defines model for GeminiModel.
 type GeminiModel = string
 
@@ -3838,6 +4751,9 @@ type PageSize = int
 
 // SearchQuery defines model for SearchQuery.
 type SearchQuery = string
+
+// StartTime defines model for StartTime.
+type StartTime = time.Time
 
 // Status defines model for Status.
 type Status = string
@@ -3913,6 +4829,13 @@ type ListAdminAccountsParams struct {
 	ProviderId *Id       `form:"provider_id,omitempty" json:"provider_id,omitempty"`
 }
 
+// ListAdminAnnouncementsParams defines parameters for ListAdminAnnouncements.
+type ListAdminAnnouncementsParams struct {
+	Page     *Page               `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *PageSize           `form:"page_size,omitempty" json:"page_size,omitempty"`
+	Status   *AnnouncementStatus `form:"status,omitempty" json:"status,omitempty"`
+}
+
 // ListAdminAuditLogsParams defines parameters for ListAdminAuditLogs.
 type ListAdminAuditLogsParams struct {
 	Page         *Page     `form:"page,omitempty" json:"page,omitempty"`
@@ -3937,12 +4860,26 @@ type ListAdminCapabilitiesParams struct {
 	Status   *Status   `form:"status,omitempty" json:"status,omitempty"`
 }
 
+// GetAdminDashboardSnapshotParams defines parameters for GetAdminDashboardSnapshot.
+type GetAdminDashboardSnapshotParams struct {
+	Start *time.Time `form:"start,omitempty" json:"start,omitempty"`
+	End   *time.Time `form:"end,omitempty" json:"end,omitempty"`
+}
+
 // ListAdminModelsParams defines parameters for ListAdminModels.
 type ListAdminModelsParams struct {
 	Page     *Page        `form:"page,omitempty" json:"page,omitempty"`
 	PageSize *PageSize    `form:"page_size,omitempty" json:"page_size,omitempty"`
 	Status   *Status      `form:"status,omitempty" json:"status,omitempty"`
 	Q        *SearchQuery `form:"q,omitempty" json:"q,omitempty"`
+}
+
+// ListAdminOpsAlertEventsParams defines parameters for ListAdminOpsAlertEvents.
+type ListAdminOpsAlertEventsParams struct {
+	Page     *Page             `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *PageSize         `form:"page_size,omitempty" json:"page_size,omitempty"`
+	Status   *OpsAlertStatus   `form:"status,omitempty" json:"status,omitempty"`
+	Severity *OpsAlertSeverity `form:"severity,omitempty" json:"severity,omitempty"`
 }
 
 // ListAdminOpsAlertsParams defines parameters for ListAdminOpsAlerts.
@@ -3953,12 +4890,54 @@ type ListAdminOpsAlertsParams struct {
 	Severity *OpsAlertSeverity `form:"severity,omitempty" json:"severity,omitempty"`
 }
 
+// GetAdminOpsErrorDistributionParams defines parameters for GetAdminOpsErrorDistribution.
+type GetAdminOpsErrorDistributionParams struct {
+	// Start Inclusive start time for read-model queries.
+	Start *StartTime `form:"start,omitempty" json:"start,omitempty"`
+
+	// End Exclusive end time for read-model queries.
+	End *EndTime `form:"end,omitempty" json:"end,omitempty"`
+}
+
+// GetAdminOpsErrorTrendParams defines parameters for GetAdminOpsErrorTrend.
+type GetAdminOpsErrorTrendParams struct {
+	// Start Inclusive start time for read-model queries.
+	Start *StartTime `form:"start,omitempty" json:"start,omitempty"`
+
+	// End Exclusive end time for read-model queries.
+	End *EndTime `form:"end,omitempty" json:"end,omitempty"`
+
+	// Bucket Time bucket used by trend endpoints.
+	Bucket *GetAdminOpsErrorTrendParamsBucket `form:"bucket,omitempty" json:"bucket,omitempty"`
+}
+
+// GetAdminOpsErrorTrendParamsBucket defines parameters for GetAdminOpsErrorTrend.
+type GetAdminOpsErrorTrendParamsBucket string
+
 // ListAdminOutboxEventsParams defines parameters for ListAdminOutboxEvents.
 type ListAdminOutboxEventsParams struct {
 	Page      *Page     `form:"page,omitempty" json:"page,omitempty"`
 	PageSize  *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
 	Status    *string   `form:"status,omitempty" json:"status,omitempty"`
 	EventType *string   `form:"event_type,omitempty" json:"event_type,omitempty"`
+}
+
+// GetAdminOpsLatencyHistogramParams defines parameters for GetAdminOpsLatencyHistogram.
+type GetAdminOpsLatencyHistogramParams struct {
+	// Start Inclusive start time for read-model queries.
+	Start *StartTime `form:"start,omitempty" json:"start,omitempty"`
+
+	// End Exclusive end time for read-model queries.
+	End *EndTime `form:"end,omitempty" json:"end,omitempty"`
+}
+
+// GetAdminOpsOverviewParams defines parameters for GetAdminOpsOverview.
+type GetAdminOpsOverviewParams struct {
+	// Start Inclusive start time for read-model queries.
+	Start *StartTime `form:"start,omitempty" json:"start,omitempty"`
+
+	// End Exclusive end time for read-model queries.
+	End *EndTime `form:"end,omitempty" json:"end,omitempty"`
 }
 
 // ListAdminOpsRealtimeSlotsParams defines parameters for ListAdminOpsRealtimeSlots.
@@ -3972,6 +4951,28 @@ type ListAdminOpsSLOsParams struct {
 	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
 	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
 }
+
+// ListAdminOpsSystemLogsParams defines parameters for ListAdminOpsSystemLogs.
+type ListAdminOpsSystemLogsParams struct {
+	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+	Level    *string   `form:"level,omitempty" json:"level,omitempty"`
+}
+
+// GetAdminOpsThroughputTrendParams defines parameters for GetAdminOpsThroughputTrend.
+type GetAdminOpsThroughputTrendParams struct {
+	// Start Inclusive start time for read-model queries.
+	Start *StartTime `form:"start,omitempty" json:"start,omitempty"`
+
+	// End Exclusive end time for read-model queries.
+	End *EndTime `form:"end,omitempty" json:"end,omitempty"`
+
+	// Bucket Time bucket used by trend endpoints.
+	Bucket *GetAdminOpsThroughputTrendParamsBucket `form:"bucket,omitempty" json:"bucket,omitempty"`
+}
+
+// GetAdminOpsThroughputTrendParamsBucket defines parameters for GetAdminOpsThroughputTrend.
+type GetAdminOpsThroughputTrendParamsBucket string
 
 // ListAdminPaymentOrdersParams defines parameters for ListAdminPaymentOrders.
 type ListAdminPaymentOrdersParams struct {
@@ -3993,12 +4994,33 @@ type ListAdminPricingRulesParams struct {
 	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
 }
 
+// ListAdminPromoCodesParams defines parameters for ListAdminPromoCodes.
+type ListAdminPromoCodesParams struct {
+	Page     *Page            `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *PageSize        `form:"page_size,omitempty" json:"page_size,omitempty"`
+	Status   *PromoCodeStatus `form:"status,omitempty" json:"status,omitempty"`
+}
+
 // ListAdminProvidersParams defines parameters for ListAdminProviders.
 type ListAdminProvidersParams struct {
 	Page     *Page        `form:"page,omitempty" json:"page,omitempty"`
 	PageSize *PageSize    `form:"page_size,omitempty" json:"page_size,omitempty"`
 	Status   *Status      `form:"status,omitempty" json:"status,omitempty"`
 	Q        *SearchQuery `form:"q,omitempty" json:"q,omitempty"`
+}
+
+// ListAdminRedeemCodesParams defines parameters for ListAdminRedeemCodes.
+type ListAdminRedeemCodesParams struct {
+	Page     *Page             `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *PageSize         `form:"page_size,omitempty" json:"page_size,omitempty"`
+	Status   *RedeemCodeStatus `form:"status,omitempty" json:"status,omitempty"`
+}
+
+// ListAdminRiskControlLogsParams defines parameters for ListAdminRiskControlLogs.
+type ListAdminRiskControlLogsParams struct {
+	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+	Level    *string   `form:"level,omitempty" json:"level,omitempty"`
 }
 
 // ListAdminSchedulerDecisionsParams defines parameters for ListAdminSchedulerDecisions.
@@ -4222,6 +5244,12 @@ type DiscoverAdminAccountModelsJSONRequestBody = DiscoverAccountModelsRequest
 // BindAdminAccountProxyJSONRequestBody defines body for BindAdminAccountProxy for application/json ContentType.
 type BindAdminAccountProxyJSONRequestBody = BindProviderAccountProxyRequest
 
+// CreateAdminAnnouncementJSONRequestBody defines body for CreateAdminAnnouncement for application/json ContentType.
+type CreateAdminAnnouncementJSONRequestBody = CreateAnnouncementRequest
+
+// UpdateAdminAnnouncementJSONRequestBody defines body for UpdateAdminAnnouncement for application/json ContentType.
+type UpdateAdminAnnouncementJSONRequestBody = UpdateAnnouncementRequest
+
 // CreateAdminModelJSONRequestBody defines body for CreateAdminModel for application/json ContentType.
 type CreateAdminModelJSONRequestBody = CreateModelRequest
 
@@ -4233,6 +5261,9 @@ type CreateAdminModelAliasJSONRequestBody = CreateModelAliasRequest
 
 // CreateAdminModelMappingJSONRequestBody defines body for CreateAdminModelMapping for application/json ContentType.
 type CreateAdminModelMappingJSONRequestBody = CreateModelProviderMappingRequest
+
+// UpdateAdminOpsSettingsJSONRequestBody defines body for UpdateAdminOpsSettings for application/json ContentType.
+type UpdateAdminOpsSettingsJSONRequestBody = OpsSettings
 
 // CreateAdminOpsSLOJSONRequestBody defines body for CreateAdminOpsSLO for application/json ContentType.
 type CreateAdminOpsSLOJSONRequestBody = CreateOpsSLORequest
@@ -4249,11 +5280,32 @@ type CreateAdminPaymentProviderJSONRequestBody = CreatePaymentProviderInstanceRe
 // CreateAdminPricingRuleJSONRequestBody defines body for CreateAdminPricingRule for application/json ContentType.
 type CreateAdminPricingRuleJSONRequestBody = CreatePricingRuleRequest
 
+// CreateAdminPromoCodeJSONRequestBody defines body for CreateAdminPromoCode for application/json ContentType.
+type CreateAdminPromoCodeJSONRequestBody = CreatePromoCodeRequest
+
+// UpdateAdminPromoCodeJSONRequestBody defines body for UpdateAdminPromoCode for application/json ContentType.
+type UpdateAdminPromoCodeJSONRequestBody = UpdatePromoCodeRequest
+
 // CreateAdminProviderJSONRequestBody defines body for CreateAdminProvider for application/json ContentType.
 type CreateAdminProviderJSONRequestBody = CreateProviderRequest
 
 // UpdateAdminProviderJSONRequestBody defines body for UpdateAdminProvider for application/json ContentType.
 type UpdateAdminProviderJSONRequestBody = UpdateProviderRequest
+
+// CreateAdminRedeemCodeJSONRequestBody defines body for CreateAdminRedeemCode for application/json ContentType.
+type CreateAdminRedeemCodeJSONRequestBody = CreateRedeemCodeRequest
+
+// BatchDisableAdminRedeemCodesJSONRequestBody defines body for BatchDisableAdminRedeemCodes for application/json ContentType.
+type BatchDisableAdminRedeemCodesJSONRequestBody = BatchDisableRedeemCodesRequest
+
+// BatchGenerateAdminRedeemCodesJSONRequestBody defines body for BatchGenerateAdminRedeemCodes for application/json ContentType.
+type BatchGenerateAdminRedeemCodesJSONRequestBody = BatchGenerateRedeemCodesRequest
+
+// UpdateAdminRiskControlConfigJSONRequestBody defines body for UpdateAdminRiskControlConfig for application/json ContentType.
+type UpdateAdminRiskControlConfigJSONRequestBody = RiskControlConfig
+
+// UpdateAdminSettingsJSONRequestBody defines body for UpdateAdminSettings for application/json ContentType.
+type UpdateAdminSettingsJSONRequestBody = AdminSettings
 
 // CreateAdminSubscriptionPlanJSONRequestBody defines body for CreateAdminSubscriptionPlan for application/json ContentType.
 type CreateAdminSubscriptionPlanJSONRequestBody = CreateSubscriptionPlanRequest
@@ -10248,6 +11300,18 @@ type ServerInterface interface {
 	// Test provider account configuration.
 	// (POST /api/v1/admin/accounts/{id}/test)
 	TestAdminAccount(w http.ResponseWriter, r *http.Request, id Id)
+	// List announcements.
+	// (GET /api/v1/admin/announcements)
+	ListAdminAnnouncements(w http.ResponseWriter, r *http.Request, params ListAdminAnnouncementsParams)
+	// Create an announcement.
+	// (POST /api/v1/admin/announcements)
+	CreateAdminAnnouncement(w http.ResponseWriter, r *http.Request)
+	// Delete an announcement.
+	// (DELETE /api/v1/admin/announcements/{id})
+	DeleteAdminAnnouncement(w http.ResponseWriter, r *http.Request, id Id)
+	// Update an announcement.
+	// (PUT /api/v1/admin/announcements/{id})
+	UpdateAdminAnnouncement(w http.ResponseWriter, r *http.Request, id Id)
 	// List audit logs.
 	// (GET /api/v1/admin/audit-logs)
 	ListAdminAuditLogs(w http.ResponseWriter, r *http.Request, params ListAdminAuditLogsParams)
@@ -10260,6 +11324,9 @@ type ServerInterface interface {
 	// Get admin dashboard statistics.
 	// (GET /api/v1/admin/dashboard)
 	GetAdminDashboard(w http.ResponseWriter, r *http.Request)
+	// Get the admin control-plane dashboard snapshot.
+	// (GET /api/v1/admin/dashboard/snapshot)
+	GetAdminDashboardSnapshot(w http.ResponseWriter, r *http.Request, params GetAdminDashboardSnapshotParams)
 	// List model registry entries.
 	// (GET /api/v1/admin/models)
 	ListAdminModels(w http.ResponseWriter, r *http.Request, params ListAdminModelsParams)
@@ -10276,17 +11343,38 @@ type ServerInterface interface {
 	// (POST /api/v1/admin/models/{id}/mappings)
 	CreateAdminModelMapping(w http.ResponseWriter, r *http.Request, id Id)
 	// List operational alert events.
+	// (GET /api/v1/admin/ops/alert-events)
+	ListAdminOpsAlertEvents(w http.ResponseWriter, r *http.Request, params ListAdminOpsAlertEventsParams)
+	// List operational alert events.
 	// (GET /api/v1/admin/ops/alerts)
 	ListAdminOpsAlerts(w http.ResponseWriter, r *http.Request, params ListAdminOpsAlertsParams)
 	// Acknowledge an operational alert event.
 	// (POST /api/v1/admin/ops/alerts/{id}/ack)
 	AcknowledgeAdminOpsAlert(w http.ResponseWriter, r *http.Request, id Id)
+	// Get current concurrency counters.
+	// (GET /api/v1/admin/ops/concurrency)
+	GetAdminOpsConcurrency(w http.ResponseWriter, r *http.Request)
+	// Get error distribution by class and owner.
+	// (GET /api/v1/admin/ops/error-distribution)
+	GetAdminOpsErrorDistribution(w http.ResponseWriter, r *http.Request, params GetAdminOpsErrorDistributionParams)
+	// Get error trend by time bucket.
+	// (GET /api/v1/admin/ops/error-trend)
+	GetAdminOpsErrorTrend(w http.ResponseWriter, r *http.Request, params GetAdminOpsErrorTrendParams)
 	// List domain event outbox entries.
 	// (GET /api/v1/admin/ops/events/outbox)
 	ListAdminOutboxEvents(w http.ResponseWriter, r *http.Request, params ListAdminOutboxEventsParams)
+	// Get latency histogram buckets.
+	// (GET /api/v1/admin/ops/latency-histogram)
+	GetAdminOpsLatencyHistogram(w http.ResponseWriter, r *http.Request, params GetAdminOpsLatencyHistogramParams)
+	// Get operational golden-signal overview.
+	// (GET /api/v1/admin/ops/overview)
+	GetAdminOpsOverview(w http.ResponseWriter, r *http.Request, params GetAdminOpsOverviewParams)
 	// List active realtime WebSocket slots on this API node.
 	// (GET /api/v1/admin/ops/realtime/slots)
 	ListAdminOpsRealtimeSlots(w http.ResponseWriter, r *http.Request, params ListAdminOpsRealtimeSlotsParams)
+	// Update operational monitoring settings.
+	// (PUT /api/v1/admin/ops/settings)
+	UpdateAdminOpsSettings(w http.ResponseWriter, r *http.Request)
 	// List operational SLO definitions with current evaluation evidence.
 	// (GET /api/v1/admin/ops/slo)
 	ListAdminOpsSLOs(w http.ResponseWriter, r *http.Request, params ListAdminOpsSLOsParams)
@@ -10296,6 +11384,12 @@ type ServerInterface interface {
 	// Update an operational SLO definition.
 	// (PATCH /api/v1/admin/ops/slo/{id})
 	UpdateAdminOpsSLO(w http.ResponseWriter, r *http.Request, id Id)
+	// List sanitized system log events.
+	// (GET /api/v1/admin/ops/system-logs)
+	ListAdminOpsSystemLogs(w http.ResponseWriter, r *http.Request, params ListAdminOpsSystemLogsParams)
+	// Get request and token throughput trend.
+	// (GET /api/v1/admin/ops/throughput-trend)
+	GetAdminOpsThroughputTrend(w http.ResponseWriter, r *http.Request, params GetAdminOpsThroughputTrendParams)
 	// Get admin overview counters.
 	// (GET /api/v1/admin/overview)
 	GetAdminOverview(w http.ResponseWriter, r *http.Request)
@@ -10317,6 +11411,18 @@ type ServerInterface interface {
 	// Create a decimal-safe pricing rule.
 	// (POST /api/v1/admin/pricing-rules)
 	CreateAdminPricingRule(w http.ResponseWriter, r *http.Request)
+	// List promo codes.
+	// (GET /api/v1/admin/promo-codes)
+	ListAdminPromoCodes(w http.ResponseWriter, r *http.Request, params ListAdminPromoCodesParams)
+	// Create a promo code.
+	// (POST /api/v1/admin/promo-codes)
+	CreateAdminPromoCode(w http.ResponseWriter, r *http.Request)
+	// Delete a promo code.
+	// (DELETE /api/v1/admin/promo-codes/{id})
+	DeleteAdminPromoCode(w http.ResponseWriter, r *http.Request, id Id)
+	// Update a promo code.
+	// (PUT /api/v1/admin/promo-codes/{id})
+	UpdateAdminPromoCode(w http.ResponseWriter, r *http.Request, id Id)
 	// List providers.
 	// (GET /api/v1/admin/providers)
 	ListAdminProviders(w http.ResponseWriter, r *http.Request, params ListAdminProvidersParams)
@@ -10329,6 +11435,33 @@ type ServerInterface interface {
 	// Test provider configuration.
 	// (POST /api/v1/admin/providers/{id}/test)
 	TestAdminProvider(w http.ResponseWriter, r *http.Request, id Id)
+	// List redeem codes.
+	// (GET /api/v1/admin/redeem-codes)
+	ListAdminRedeemCodes(w http.ResponseWriter, r *http.Request, params ListAdminRedeemCodesParams)
+	// Create a redeem code.
+	// (POST /api/v1/admin/redeem-codes)
+	CreateAdminRedeemCode(w http.ResponseWriter, r *http.Request)
+	// Batch disable redeem codes.
+	// (POST /api/v1/admin/redeem-codes/batch-disable)
+	BatchDisableAdminRedeemCodes(w http.ResponseWriter, r *http.Request)
+	// Batch generate redeem codes.
+	// (POST /api/v1/admin/redeem-codes/batch-generate)
+	BatchGenerateAdminRedeemCodes(w http.ResponseWriter, r *http.Request)
+	// Get redeem code statistics.
+	// (GET /api/v1/admin/redeem-codes/stats)
+	GetAdminRedeemCodeStats(w http.ResponseWriter, r *http.Request)
+	// Get risk-control configuration.
+	// (GET /api/v1/admin/risk-control/config)
+	GetAdminRiskControlConfig(w http.ResponseWriter, r *http.Request)
+	// Update risk-control configuration.
+	// (PUT /api/v1/admin/risk-control/config)
+	UpdateAdminRiskControlConfig(w http.ResponseWriter, r *http.Request)
+	// List sanitized risk-control events.
+	// (GET /api/v1/admin/risk-control/logs)
+	ListAdminRiskControlLogs(w http.ResponseWriter, r *http.Request, params ListAdminRiskControlLogsParams)
+	// Get risk-control runtime status.
+	// (GET /api/v1/admin/risk-control/status)
+	GetAdminRiskControlStatus(w http.ResponseWriter, r *http.Request)
 	// List scheduler decisions.
 	// (GET /api/v1/admin/scheduler/decisions)
 	ListAdminSchedulerDecisions(w http.ResponseWriter, r *http.Request, params ListAdminSchedulerDecisionsParams)
@@ -10338,6 +11471,12 @@ type ServerInterface interface {
 	// List scheduler strategies.
 	// (GET /api/v1/admin/scheduler/strategies)
 	ListSchedulerStrategies(w http.ResponseWriter, r *http.Request, params ListSchedulerStrategiesParams)
+	// Get typed system settings.
+	// (GET /api/v1/admin/settings)
+	GetAdminSettings(w http.ResponseWriter, r *http.Request)
+	// Update typed system settings.
+	// (PUT /api/v1/admin/settings)
+	UpdateAdminSettings(w http.ResponseWriter, r *http.Request)
 	// List subscription plans.
 	// (GET /api/v1/admin/subscription-plans)
 	ListAdminSubscriptionPlans(w http.ResponseWriter, r *http.Request, params ListAdminSubscriptionPlansParams)
@@ -11627,6 +12766,161 @@ func (siw *ServerInterfaceWrapper) TestAdminAccount(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// ListAdminAnnouncements operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminAnnouncements(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminAnnouncementsParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminAnnouncements(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAdminAnnouncement operation middleware
+func (siw *ServerInterfaceWrapper) CreateAdminAnnouncement(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAdminAnnouncement(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteAdminAnnouncement operation middleware
+func (siw *ServerInterfaceWrapper) DeleteAdminAnnouncement(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteAdminAnnouncement(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateAdminAnnouncement operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAdminAnnouncement(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAdminAnnouncement(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListAdminAuditLogs operation middleware
 func (siw *ServerInterfaceWrapper) ListAdminAuditLogs(w http.ResponseWriter, r *http.Request) {
 
@@ -11881,6 +13175,58 @@ func (siw *ServerInterfaceWrapper) GetAdminDashboard(w http.ResponseWriter, r *h
 	handler.ServeHTTP(w, r)
 }
 
+// GetAdminDashboardSnapshot operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminDashboardSnapshot(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAdminDashboardSnapshotParams
+
+	// ------------- Optional query parameter "start" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "start", r.URL.Query(), &params.Start, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "start"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "start", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "end" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "end", r.URL.Query(), &params.End, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "end"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "end", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminDashboardSnapshot(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListAdminModels operation middleware
 func (siw *ServerInterfaceWrapper) ListAdminModels(w http.ResponseWriter, r *http.Request) {
 
@@ -12083,6 +13429,84 @@ func (siw *ServerInterfaceWrapper) CreateAdminModelMapping(w http.ResponseWriter
 	handler.ServeHTTP(w, r)
 }
 
+// ListAdminOpsAlertEvents operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminOpsAlertEvents(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminOpsAlertEventsParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "severity" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "severity", r.URL.Query(), &params.Severity, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "severity"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "severity", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminOpsAlertEvents(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListAdminOpsAlerts operation middleware
 func (siw *ServerInterfaceWrapper) ListAdminOpsAlerts(w http.ResponseWriter, r *http.Request) {
 
@@ -12195,6 +13619,143 @@ func (siw *ServerInterfaceWrapper) AcknowledgeAdminOpsAlert(w http.ResponseWrite
 	handler.ServeHTTP(w, r)
 }
 
+// GetAdminOpsConcurrency operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminOpsConcurrency(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminOpsConcurrency(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminOpsErrorDistribution operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminOpsErrorDistribution(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAdminOpsErrorDistributionParams
+
+	// ------------- Optional query parameter "start" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "start", r.URL.Query(), &params.Start, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "start"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "start", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "end" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "end", r.URL.Query(), &params.End, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "end"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "end", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminOpsErrorDistribution(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminOpsErrorTrend operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminOpsErrorTrend(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAdminOpsErrorTrendParams
+
+	// ------------- Optional query parameter "start" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "start", r.URL.Query(), &params.Start, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "start"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "start", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "end" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "end", r.URL.Query(), &params.End, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "end"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "end", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "bucket" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "bucket", r.URL.Query(), &params.Bucket, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "bucket"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "bucket", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminOpsErrorTrend(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListAdminOutboxEvents operation middleware
 func (siw *ServerInterfaceWrapper) ListAdminOutboxEvents(w http.ResponseWriter, r *http.Request) {
 
@@ -12273,6 +13834,110 @@ func (siw *ServerInterfaceWrapper) ListAdminOutboxEvents(w http.ResponseWriter, 
 	handler.ServeHTTP(w, r)
 }
 
+// GetAdminOpsLatencyHistogram operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminOpsLatencyHistogram(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAdminOpsLatencyHistogramParams
+
+	// ------------- Optional query parameter "start" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "start", r.URL.Query(), &params.Start, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "start"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "start", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "end" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "end", r.URL.Query(), &params.End, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "end"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "end", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminOpsLatencyHistogram(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminOpsOverview operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminOpsOverview(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAdminOpsOverviewParams
+
+	// ------------- Optional query parameter "start" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "start", r.URL.Query(), &params.Start, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "start"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "start", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "end" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "end", r.URL.Query(), &params.End, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "end"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "end", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminOpsOverview(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListAdminOpsRealtimeSlots operation middleware
 func (siw *ServerInterfaceWrapper) ListAdminOpsRealtimeSlots(w http.ResponseWriter, r *http.Request) {
 
@@ -12316,6 +13981,28 @@ func (siw *ServerInterfaceWrapper) ListAdminOpsRealtimeSlots(w http.ResponseWrit
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListAdminOpsRealtimeSlots(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateAdminOpsSettings operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAdminOpsSettings(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAdminOpsSettings(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -12424,6 +14111,136 @@ func (siw *ServerInterfaceWrapper) UpdateAdminOpsSLO(w http.ResponseWriter, r *h
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateAdminOpsSLO(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAdminOpsSystemLogs operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminOpsSystemLogs(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminOpsSystemLogsParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "level" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "level", r.URL.Query(), &params.Level, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "level"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "level", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminOpsSystemLogs(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminOpsThroughputTrend operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminOpsThroughputTrend(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAdminOpsThroughputTrendParams
+
+	// ------------- Optional query parameter "start" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "start", r.URL.Query(), &params.Start, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "start"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "start", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "end" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "end", r.URL.Query(), &params.End, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "end"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "end", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "bucket" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "bucket", r.URL.Query(), &params.Bucket, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "bucket"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "bucket", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminOpsThroughputTrend(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -12713,6 +14530,161 @@ func (siw *ServerInterfaceWrapper) CreateAdminPricingRule(w http.ResponseWriter,
 	handler.ServeHTTP(w, r)
 }
 
+// ListAdminPromoCodes operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminPromoCodes(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminPromoCodesParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminPromoCodes(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAdminPromoCode operation middleware
+func (siw *ServerInterfaceWrapper) CreateAdminPromoCode(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAdminPromoCode(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteAdminPromoCode operation middleware
+func (siw *ServerInterfaceWrapper) DeleteAdminPromoCode(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteAdminPromoCode(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateAdminPromoCode operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAdminPromoCode(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAdminPromoCode(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListAdminProviders operation middleware
 func (siw *ServerInterfaceWrapper) ListAdminProviders(w http.ResponseWriter, r *http.Request) {
 
@@ -12872,6 +14844,284 @@ func (siw *ServerInterfaceWrapper) TestAdminProvider(w http.ResponseWriter, r *h
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.TestAdminProvider(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAdminRedeemCodes operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminRedeemCodes(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminRedeemCodesParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminRedeemCodes(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAdminRedeemCode operation middleware
+func (siw *ServerInterfaceWrapper) CreateAdminRedeemCode(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAdminRedeemCode(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// BatchDisableAdminRedeemCodes operation middleware
+func (siw *ServerInterfaceWrapper) BatchDisableAdminRedeemCodes(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BatchDisableAdminRedeemCodes(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// BatchGenerateAdminRedeemCodes operation middleware
+func (siw *ServerInterfaceWrapper) BatchGenerateAdminRedeemCodes(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BatchGenerateAdminRedeemCodes(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminRedeemCodeStats operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminRedeemCodeStats(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminRedeemCodeStats(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminRiskControlConfig operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminRiskControlConfig(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminRiskControlConfig(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateAdminRiskControlConfig operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAdminRiskControlConfig(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAdminRiskControlConfig(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAdminRiskControlLogs operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminRiskControlLogs(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminRiskControlLogsParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "level" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "level", r.URL.Query(), &params.Level, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "level"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "level", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminRiskControlLogs(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminRiskControlStatus operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminRiskControlStatus(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminRiskControlStatus(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -13048,6 +15298,48 @@ func (siw *ServerInterfaceWrapper) ListSchedulerStrategies(w http.ResponseWriter
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListSchedulerStrategies(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminSettings operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminSettings(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminSettings(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateAdminSettings operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAdminSettings(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAdminSettings(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -15076,22 +17368,36 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/recover", wrapper.RecoverAdminAccount)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/rpm-status", wrapper.GetAdminAccountRpmStatus)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/test", wrapper.TestAdminAccount)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/announcements", wrapper.ListAdminAnnouncements)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/announcements", wrapper.CreateAdminAnnouncement)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/announcements/{id}", wrapper.DeleteAdminAnnouncement)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/admin/announcements/{id}", wrapper.UpdateAdminAnnouncement)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/audit-logs", wrapper.ListAdminAuditLogs)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/billing-ledger", wrapper.ListAdminBillingLedger)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/capabilities", wrapper.ListAdminCapabilities)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/dashboard", wrapper.GetAdminDashboard)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/dashboard/snapshot", wrapper.GetAdminDashboardSnapshot)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/models", wrapper.ListAdminModels)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/models", wrapper.CreateAdminModel)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/models/{id}", wrapper.UpdateAdminModel)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/models/{id}/aliases", wrapper.CreateAdminModelAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/models/{id}/mappings", wrapper.CreateAdminModelMapping)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/alert-events", wrapper.ListAdminOpsAlertEvents)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/alerts", wrapper.ListAdminOpsAlerts)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/ops/alerts/{id}/ack", wrapper.AcknowledgeAdminOpsAlert)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/concurrency", wrapper.GetAdminOpsConcurrency)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/error-distribution", wrapper.GetAdminOpsErrorDistribution)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/error-trend", wrapper.GetAdminOpsErrorTrend)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/events/outbox", wrapper.ListAdminOutboxEvents)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/latency-histogram", wrapper.GetAdminOpsLatencyHistogram)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/overview", wrapper.GetAdminOpsOverview)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/realtime/slots", wrapper.ListAdminOpsRealtimeSlots)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/admin/ops/settings", wrapper.UpdateAdminOpsSettings)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/slo", wrapper.ListAdminOpsSLOs)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/ops/slo", wrapper.CreateAdminOpsSLO)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/ops/slo/{id}", wrapper.UpdateAdminOpsSLO)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/system-logs", wrapper.ListAdminOpsSystemLogs)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/throughput-trend", wrapper.GetAdminOpsThroughputTrend)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/overview", wrapper.GetAdminOverview)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/payments/orders", wrapper.ListAdminPaymentOrders)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/payments/orders/{id}/refund", wrapper.RefundAdminPaymentOrder)
@@ -15099,13 +17405,28 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/payments/providers", wrapper.CreateAdminPaymentProvider)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/pricing-rules", wrapper.ListAdminPricingRules)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/pricing-rules", wrapper.CreateAdminPricingRule)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/promo-codes", wrapper.ListAdminPromoCodes)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/promo-codes", wrapper.CreateAdminPromoCode)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/promo-codes/{id}", wrapper.DeleteAdminPromoCode)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/admin/promo-codes/{id}", wrapper.UpdateAdminPromoCode)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/providers", wrapper.ListAdminProviders)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/providers", wrapper.CreateAdminProvider)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/providers/{id}", wrapper.UpdateAdminProvider)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/providers/{id}/test", wrapper.TestAdminProvider)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/redeem-codes", wrapper.ListAdminRedeemCodes)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/redeem-codes", wrapper.CreateAdminRedeemCode)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/redeem-codes/batch-disable", wrapper.BatchDisableAdminRedeemCodes)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/redeem-codes/batch-generate", wrapper.BatchGenerateAdminRedeemCodes)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/redeem-codes/stats", wrapper.GetAdminRedeemCodeStats)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/risk-control/config", wrapper.GetAdminRiskControlConfig)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/admin/risk-control/config", wrapper.UpdateAdminRiskControlConfig)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/risk-control/logs", wrapper.ListAdminRiskControlLogs)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/risk-control/status", wrapper.GetAdminRiskControlStatus)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/scheduler/decisions", wrapper.ListAdminSchedulerDecisions)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/scheduler/overview", wrapper.GetAdminSchedulerOverview)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/scheduler/strategies", wrapper.ListSchedulerStrategies)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/settings", wrapper.GetAdminSettings)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/admin/settings", wrapper.UpdateAdminSettings)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/subscription-plans", wrapper.ListAdminSubscriptionPlans)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/subscription-plans", wrapper.CreateAdminSubscriptionPlan)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/usage-logs", wrapper.ListAdminUsageLogs)

@@ -2538,3 +2538,67 @@ Required gates:
 - `make code-quality-check`
 - `make secret-scan`
 - `git diff --check`
+
+## WP-700: Admin Control Plane v1
+
+Objective: deliver SRapi's first complete management control-plane backend for
+the console without copying sub2api implementation structure. The package adds
+typed dashboard, ops monitoring, settings, announcement, redeem-code,
+promo-code, and risk-control APIs that follow SRapi module contracts,
+OpenAPI-first code generation, decimal-safe money rules, and safe audit
+logging.
+
+Read first:
+
+- `docs/ADMIN_CONTROL_PLANE_SPEC.md`
+- `docs/OPENAPI_CONTRACT.md`
+- `docs/OBSERVABILITY_SPEC.md`
+- `docs/SECURITY_MODEL.md`
+- `docs/DATA_MODEL.md`
+- `docs/MODULE_INTERFACE_CONTRACTS.md`
+- `packages/openapi/openapi.yaml`
+- `/home/senran/Desktop/sub2api` for capability analysis only; do not copy code
+  or reproduce its service shape.
+
+Owns:
+
+- OpenAPI contracts for Admin Control Plane v1 route families.
+- Admin dashboard snapshot read model.
+- Ops read-model endpoints for overview, throughput trend, error trend,
+  error distribution, latency histogram, concurrency, system logs, alert
+  events, and ops settings.
+- Settings-backed admin-control module for low-frequency announcements,
+  redeem codes, promo codes, risk-control config/logs, ops settings, and
+  typed system settings.
+- HTTP handlers under existing `runtime_admin_*.go` route families.
+- Safe audit records for all admin writes.
+- Generated Go OpenAPI types and TypeScript SDK.
+- Focused service and HTTP tests.
+
+Definition of Done:
+
+- All requested Admin Control Plane v1 APIs are defined in OpenAPI and have
+  stable operation IDs, tags, security schemes, error envelopes, and generated
+  SDK types.
+- Dashboard snapshot includes API key, account, request, user, token, cost,
+  RPM/TPM, latency, active user, model distribution, token trend, and user usage
+  trend sections.
+- Ops monitoring endpoints are backed by existing usage/account/realtime/alert
+  evidence and do not expose credentials, prompts, API keys, cookies, or raw
+  provider payloads.
+- Announcements, redeem codes, promo codes, risk-control config/logs, ops
+  settings, and typed system settings are managed through module contracts.
+- All write routes require CSRF and record safe audit logs.
+- Financial fields use decimal strings and currency, not float.
+- `specs/STATUS.md` records completion and gates.
+
+Required gates:
+
+- `make openapi-codegen`
+- `make openapi-ts-codegen`
+- `cd apps/api && go test ./...`
+- `make architecture-check`
+- `make code-quality-check`
+- `make secret-scan`
+- `make check`
+- `git diff --check`

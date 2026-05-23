@@ -142,6 +142,7 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 	}
 	if stores != nil {
 		options = append(options,
+			httpserver.WithAdminControlStore(stores.AdminControl),
 			httpserver.WithUserStore(stores.Users),
 			httpserver.WithAPIKeyStore(stores.APIKeys),
 			httpserver.WithProviderStore(stores.Providers),

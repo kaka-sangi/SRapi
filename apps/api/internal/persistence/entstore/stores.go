@@ -5,6 +5,7 @@ import (
 
 	"github.com/srapi/srapi/apps/api/ent"
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
+	admincontrolcontract "github.com/srapi/srapi/apps/api/internal/modules/admin_control/contract"
 	affiliatecontract "github.com/srapi/srapi/apps/api/internal/modules/affiliate/contract"
 	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
 	auditcontract "github.com/srapi/srapi/apps/api/internal/modules/audit/contract"
@@ -19,6 +20,7 @@ import (
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
 	userscontract "github.com/srapi/srapi/apps/api/internal/modules/users/contract"
 	accountstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/accounts"
+	admincontrolstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/admincontrol"
 	affiliatestore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/affiliate"
 	apikeystore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/apikeys"
 	auditstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/audit"
@@ -37,6 +39,7 @@ import (
 var ErrInvalidClient = errors.New("invalid ent store client")
 
 type Stores struct {
+	AdminControl  admincontrolcontract.Store
 	Users         userscontract.Store
 	APIKeys       apikeycontract.Store
 	Affiliate     affiliatecontract.Store
@@ -113,7 +116,12 @@ func New(client *ent.Client) (Stores, error) {
 	if err != nil {
 		return Stores{}, err
 	}
+	adminControl, err := admincontrolstore.New(client)
+	if err != nil {
+		return Stores{}, err
+	}
 	return Stores{
+		AdminControl:  adminControl,
 		Users:         users,
 		APIKeys:       apiKeys,
 		Affiliate:     affiliate,

@@ -93,6 +93,18 @@ func (s *Service) ListByUser(ctx context.Context, userID int) ([]contract.APIKey
 	return out, nil
 }
 
+func (s *Service) List(ctx context.Context) ([]contract.APIKey, error) {
+	keys, err := s.store.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]contract.APIKey, 0, len(keys))
+	for _, key := range keys {
+		out = append(out, withoutHash(key))
+	}
+	return out, nil
+}
+
 func (s *Service) Update(ctx context.Context, req contract.UpdateRequest) (contract.APIKey, error) {
 	if req.UserID <= 0 || req.KeyID <= 0 {
 		return contract.APIKey{}, ErrInvalidInput

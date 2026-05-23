@@ -80,8 +80,17 @@ amount_minor bigint + currency
 - Domain event payload snapshot。
 - Webhook payload snapshot。
 - Metadata。
+- Admin Control Plane v1 的低频 typed settings collections，例如 announcements、redeem codes、promo codes、risk-control config、ops settings 和 system settings。
 
 不应把核心查询字段只放 JSON。
+
+Admin Control Plane v1 可以先用 `settings.value_json` 承载低频管理资源集合，避免在控制台首版中引入过多表。以下能力一旦进入用户高频路径或需要独立约束，应提升为一等 Ent schema 和迁移：
+
+- 用户侧兑换码核销。
+- 优惠码订单应用和使用记录。
+- 公告用户投递与阅读回执。
+- 高吞吐风控事件。
+- 高吞吐系统日志。
 
 能力类 JSON 必须遵守 `CAPABILITY_TAXONOMY_SPEC.md` 的 key、version、status、level 和 metadata schema 规则。
 

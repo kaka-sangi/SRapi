@@ -21,6 +21,7 @@
 | `SECURITY_MODEL.md` | API Key、Cookie、CSRF、凭证、日志、审计和密钥轮换。 |
 | `CONFIGURATION_SPEC.md` | 环境变量、配置优先级、默认值和生产安全约束。 |
 | `OPERATIONS.md` | 迁移、备份、健康检查、发布、数据生命周期和事故处理。 |
+| `ADMIN_CONTROL_PLANE_SPEC.md` | 管理控制面 v1 的 Dashboard、Ops、设置、公告、兑换码、优惠码和风控 API 边界。 |
 
 ## 3. Gateway 与 Provider 文档
 
@@ -85,5 +86,6 @@
 - 改支付必须同步 `PAYMENT_SPEC.md`。
 - 改返利必须同步 `AFFILIATE_REBATE_SPEC.md`。
 - 改可观测、告警、运维后台必须同步 `OBSERVABILITY_SPEC.md`。
+- 改管理控制面 Dashboard、Ops、设置、公告、兑换码、优惠码或风控 API 必须同步 `ADMIN_CONTROL_PLANE_SPEC.md`。
 - 改架构要求、启动 harness 和门禁映射必须同步 `ARCHITECTURE_REQUIREMENTS.md`。
 - 新增任何用户可见文案（控制台、错误信息、营销页）必须先核对 `PRODUCT_TONE.md` 的中英文术语表与语气规则。

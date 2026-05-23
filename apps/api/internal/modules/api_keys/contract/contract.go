@@ -68,6 +68,7 @@ type Store interface {
 	Create(ctx context.Context, input CreateStoredKey) (APIKey, error)
 	Update(ctx context.Context, key APIKey) (APIKey, error)
 	FindByPrefix(ctx context.Context, prefix string) (APIKey, error)
+	List(ctx context.Context) ([]APIKey, error)
 	ListByUser(ctx context.Context, userID int) ([]APIKey, error)
 	TouchLastUsed(ctx context.Context, id int, usedAt time.Time) error
 }

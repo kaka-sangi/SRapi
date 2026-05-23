@@ -9,7 +9,7 @@ Set-StrictMode -Version Latest
 
 $Root = Resolve-Path (Join-Path $PSScriptRoot "..")
 $OpenApi = Join-Path $Root "packages/openapi/openapi.yaml"
-$GoConfig = Join-Path $Root "packages/openapi/oapi-codegen.server.yaml"
+$ApiDir = Join-Path $Root "apps/api"
 $GoOutput = Join-Path $Root "apps/api/internal/openapi/openapi.gen.go"
 $TsOutput = Join-Path $Root "packages/sdk/typescript/src"
 
@@ -88,11 +88,11 @@ try {
     if ($GenerateGo) {
         if ($Check) {
             $TempGo = Join-Path $TempRoot "openapi.gen.go"
-            Invoke-Step "go" @("run", "github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.7.0", "-generate", "types,std-http", "-package", "openapi", "-o", $TempGo, $OpenApi)
+            Invoke-Step "go" @("run", "github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.7.0", "-generate", "types,std-http", "-package", "openapi", "-o", $TempGo, $OpenApi) -WorkingDirectory $ApiDir
             Assert-SameFile -Expected $GoOutput -Actual $TempGo -Message "$GoOutput is out of date; run tools/generate-openapi.ps1"
         }
         else {
-            Invoke-Step "go" @("run", "github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.7.0", "-config", $GoConfig, $OpenApi)
+            Invoke-Step "go" @("run", "github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.7.0", "-generate", "types,std-http", "-package", "openapi", "-o", $GoOutput, $OpenApi) -WorkingDirectory $ApiDir
         }
     }
 

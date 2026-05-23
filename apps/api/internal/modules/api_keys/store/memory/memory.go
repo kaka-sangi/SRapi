@@ -92,6 +92,16 @@ func (s *Store) ListByUser(_ context.Context, userID int) ([]contract.APIKey, er
 	return keys, nil
 }
 
+func (s *Store) List(_ context.Context) ([]contract.APIKey, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	keys := make([]contract.APIKey, 0, len(s.byID))
+	for _, key := range s.byID {
+		keys = append(keys, cloneKey(key))
+	}
+	return keys, nil
+}
+
 func (s *Store) TouchLastUsed(_ context.Context, id int, usedAt time.Time) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

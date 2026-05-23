@@ -60,12 +60,12 @@ openapi-bundle:
 
 openapi-codegen:
 	@mkdir -p $(dir $(OPENAPI_GO_OUTPUT))
-	$(OAPI_CODEGEN) -config $(OPENAPI_GO_CONFIG) $(OPENAPI)
+	cd $(API_DIR) && $(OAPI_CODEGEN) -generate types,std-http -package openapi -o internal/openapi/openapi.gen.go ../../$(OPENAPI)
 
 openapi-codegen-check:
 	@set -e; \
 	tmp="$$(mktemp)"; \
-	$(OAPI_CODEGEN) -generate types,std-http -package openapi -o "$$tmp" $(OPENAPI); \
+	(cd $(API_DIR) && $(OAPI_CODEGEN) -generate types,std-http -package openapi -o "$$tmp" ../../$(OPENAPI)); \
 	cmp -s "$$tmp" "$(OPENAPI_GO_OUTPUT)" || (echo "$(OPENAPI_GO_OUTPUT) is out of date; run make openapi-codegen" >&2; rm -f "$$tmp"; exit 1); \
 	rm -f "$$tmp"
 

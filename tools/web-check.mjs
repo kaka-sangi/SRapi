@@ -21,6 +21,9 @@
  * Exit code is the first non-zero step's exit code.
  */
 import { spawnSync } from "node:child_process";
+import { mkdtempSync } from "node:fs";
+import { rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
@@ -49,6 +52,20 @@ const steps = [
 ];
 
 const isWindows = process.platform === "win32";
+const tempDir = mkdtempSync(path.join(tmpdir(), "srapi-web-check-"));
+const localStorageFile = path.join(tempDir, "vitest-local-storage.json");
+
+const childEnv = {
+  ...process.env,
+  NODE_OPTIONS: [process.env.NODE_OPTIONS, "--disable-warning=DEP0205"].filter(Boolean).join(" "),
+  VITEST_POOL_ID: process.env.VITEST_POOL_ID ?? "1",
+};
+delete childEnv.NO_COLOR;
+delete childEnv.FORCE_COLOR;
+
+const testNodeOptions = [childEnv.NODE_OPTIONS, `--localstorage-file=${localStorageFile}`]
+  .filter(Boolean)
+  .join(" ");
 
 function header(name) {
   console.log("");
@@ -66,7 +83,7 @@ for (const step of steps) {
     cwd: step.cwd ?? webDir,
     stdio: "inherit",
     shell: isWindows,
-    env: { ...process.env, FORCE_COLOR: process.env.FORCE_COLOR ?? "1" },
+    env: step.name === "test" ? { ...childEnv, NODE_OPTIONS: testNodeOptions } : childEnv,
   });
   if (result.status !== 0) {
     firstFailure = result.status ?? 1;
@@ -79,4 +96,5 @@ if (firstFailure === 0) {
   console.log("");
   console.log("==> web-check: all gates passed");
 }
+await rm(tempDir, { force: true, recursive: true });
 process.exit(firstFailure);

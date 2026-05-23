@@ -40,12 +40,22 @@ tags:
     description: Billing ledger administration endpoints.
   - name: AdminSubscriptions
     description: Subscription plan, user subscription, and pricing rule administration endpoints.
+  - name: AdminDashboard
+    description: Administrator dashboard and console snapshot endpoints.
   - name: Payment
     description: Current-user payment methods and payment order endpoints.
   - name: AdminPayments
     description: Payment provider and order administration endpoints.
   - name: AdminOps
     description: Operational event administration endpoints.
+  - name: AdminSettings
+    description: System settings administration endpoints.
+  - name: AdminAnnouncements
+    description: Announcement administration endpoints.
+  - name: AdminPromotions
+    description: Redeem code and promo code administration endpoints.
+  - name: AdminRisk
+    description: Risk-control administration endpoints.
   - name: Gateway
     description: OpenAI and Anthropic compatible gateway endpoints.
 x-srapi-contract-stage: m1-openapi-bootstrap
@@ -717,6 +727,46 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AdminDashboardResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/dashboard/snapshot:
+    get:
+      tags:
+        - AdminDashboard
+      operationId: getAdminDashboardSnapshot
+      summary: Get the admin control-plane dashboard snapshot.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - name: start
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: end
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Admin dashboard snapshot.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminDashboardSnapshotResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -2859,6 +2909,310 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/ops/overview:
+    get:
+      tags:
+        - AdminOps
+      operationId: getAdminOpsOverview
+      summary: Get operational golden-signal overview.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - $ref: "#/components/parameters/StartTime"
+        - $ref: "#/components/parameters/EndTime"
+      responses:
+        "200":
+          description: Operational overview.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsOverviewResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/ops/throughput-trend:
+    get:
+      tags:
+        - AdminOps
+      operationId: getAdminOpsThroughputTrend
+      summary: Get request and token throughput trend.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - $ref: "#/components/parameters/StartTime"
+        - $ref: "#/components/parameters/EndTime"
+        - $ref: "#/components/parameters/Bucket"
+      responses:
+        "200":
+          description: Throughput trend.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsThroughputTrendResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/ops/error-trend:
+    get:
+      tags:
+        - AdminOps
+      operationId: getAdminOpsErrorTrend
+      summary: Get error trend by time bucket.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - $ref: "#/components/parameters/StartTime"
+        - $ref: "#/components/parameters/EndTime"
+        - $ref: "#/components/parameters/Bucket"
+      responses:
+        "200":
+          description: Error trend.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsErrorTrendResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/ops/error-distribution:
+    get:
+      tags:
+        - AdminOps
+      operationId: getAdminOpsErrorDistribution
+      summary: Get error distribution by class and owner.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - $ref: "#/components/parameters/StartTime"
+        - $ref: "#/components/parameters/EndTime"
+      responses:
+        "200":
+          description: Error distribution.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsErrorDistributionResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/ops/latency-histogram:
+    get:
+      tags:
+        - AdminOps
+      operationId: getAdminOpsLatencyHistogram
+      summary: Get latency histogram buckets.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - $ref: "#/components/parameters/StartTime"
+        - $ref: "#/components/parameters/EndTime"
+      responses:
+        "200":
+          description: Latency histogram.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsLatencyHistogramResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/ops/concurrency:
+    get:
+      tags:
+        - AdminOps
+      operationId: getAdminOpsConcurrency
+      summary: Get current concurrency counters.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      responses:
+        "200":
+          description: Concurrency counters.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsConcurrencyResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/ops/system-logs:
+    get:
+      tags:
+        - AdminOps
+      operationId: listAdminOpsSystemLogs
+      summary: List sanitized system log events.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - name: level
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: System log list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsSystemLogListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/ops/alert-events:
+    get:
+      tags:
+        - AdminOps
+      operationId: listAdminOpsAlertEvents
+      summary: List operational alert events.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/OpsAlertStatus"
+        - name: severity
+          in: query
+          schema:
+            $ref: "#/components/schemas/OpsAlertSeverity"
+      responses:
+        "200":
+          description: Alert event list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsAlertListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/ops/settings:
+    put:
+      tags:
+        - AdminOps
+      operationId: updateAdminOpsSettings
+      summary: Update operational monitoring settings.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OpsSettings"
+      responses:
+        "200":
+          description: Ops settings updated.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsSettingsResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/ops/realtime/slots:
     get:
       tags:
@@ -3083,6 +3437,669 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/settings:
+    get:
+      tags:
+        - AdminSettings
+      operationId: getAdminSettings
+      summary: Get typed system settings.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+      responses:
+        "200":
+          description: System settings.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSettingsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+    put:
+      tags:
+        - AdminSettings
+      operationId: updateAdminSettings
+      summary: Update typed system settings.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminSettings"
+      responses:
+        "200":
+          description: System settings updated.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSettingsResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/announcements:
+    get:
+      tags:
+        - AdminAnnouncements
+      operationId: listAdminAnnouncements
+      summary: List announcements.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/AnnouncementStatus"
+      responses:
+        "200":
+          description: Announcement list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnnouncementListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+    post:
+      tags:
+        - AdminAnnouncements
+      operationId: createAdminAnnouncement
+      summary: Create an announcement.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAnnouncementRequest"
+      responses:
+        "201":
+          description: Announcement created.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnnouncementResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/announcements/{id}:
+    put:
+      tags:
+        - AdminAnnouncements
+      operationId: updateAdminAnnouncement
+      summary: Update an announcement.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAnnouncementRequest"
+      responses:
+        "200":
+          description: Announcement updated.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnnouncementResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+    delete:
+      tags:
+        - AdminAnnouncements
+      operationId: deleteAdminAnnouncement
+      summary: Delete an announcement.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Announcement deleted.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/redeem-codes:
+    get:
+      tags:
+        - AdminPromotions
+      operationId: listAdminRedeemCodes
+      summary: List redeem codes.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/RedeemCodeStatus"
+      responses:
+        "200":
+          description: Redeem code list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RedeemCodeListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+    post:
+      tags:
+        - AdminPromotions
+      operationId: createAdminRedeemCode
+      summary: Create a redeem code.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRedeemCodeRequest"
+      responses:
+        "201":
+          description: Redeem code created.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RedeemCodeResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/redeem-codes/batch-generate:
+    post:
+      tags:
+        - AdminPromotions
+      operationId: batchGenerateAdminRedeemCodes
+      summary: Batch generate redeem codes.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchGenerateRedeemCodesRequest"
+      responses:
+        "201":
+          description: Redeem codes generated.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RedeemCodeListResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/redeem-codes/batch-disable:
+    post:
+      tags:
+        - AdminPromotions
+      operationId: batchDisableAdminRedeemCodes
+      summary: Batch disable redeem codes.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchDisableRedeemCodesRequest"
+      responses:
+        "200":
+          description: Redeem codes disabled.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchOperationResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/redeem-codes/stats:
+    get:
+      tags:
+        - AdminPromotions
+      operationId: getAdminRedeemCodeStats
+      summary: Get redeem code statistics.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+      responses:
+        "200":
+          description: Redeem code statistics.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RedeemCodeStatsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/promo-codes:
+    get:
+      tags:
+        - AdminPromotions
+      operationId: listAdminPromoCodes
+      summary: List promo codes.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/PromoCodeStatus"
+      responses:
+        "200":
+          description: Promo code list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PromoCodeListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+    post:
+      tags:
+        - AdminPromotions
+      operationId: createAdminPromoCode
+      summary: Create a promo code.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePromoCodeRequest"
+      responses:
+        "201":
+          description: Promo code created.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PromoCodeResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/promo-codes/{id}:
+    put:
+      tags:
+        - AdminPromotions
+      operationId: updateAdminPromoCode
+      summary: Update a promo code.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePromoCodeRequest"
+      responses:
+        "200":
+          description: Promo code updated.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PromoCodeResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+    delete:
+      tags:
+        - AdminPromotions
+      operationId: deleteAdminPromoCode
+      summary: Delete a promo code.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Promo code deleted.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/risk-control/config:
+    get:
+      tags:
+        - AdminRisk
+      operationId: getAdminRiskControlConfig
+      summary: Get risk-control configuration.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+      responses:
+        "200":
+          description: Risk-control configuration.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RiskControlConfigResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+    put:
+      tags:
+        - AdminRisk
+      operationId: updateAdminRiskControlConfig
+      summary: Update risk-control configuration.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RiskControlConfig"
+      responses:
+        "200":
+          description: Risk-control configuration updated.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RiskControlConfigResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/risk-control/status:
+    get:
+      tags:
+        - AdminRisk
+      operationId: getAdminRiskControlStatus
+      summary: Get risk-control runtime status.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      responses:
+        "200":
+          description: Risk-control status.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RiskControlStatusResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/risk-control/logs:
+    get:
+      tags:
+        - AdminRisk
+      operationId: listAdminRiskControlLogs
+      summary: List sanitized risk-control events.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - name: level
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Risk-control event list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RiskControlLogListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         default:
           $ref: "#/components/responses/StandardError"
 
@@ -4899,6 +5916,30 @@ components:
       schema:
         type: string
         maxLength: 200
+    StartTime:
+      name: start
+      in: query
+      schema:
+        type: string
+        format: date-time
+      description: Inclusive start time for read-model queries.
+    EndTime:
+      name: end
+      in: query
+      schema:
+        type: string
+        format: date-time
+      description: Exclusive end time for read-model queries.
+    Bucket:
+      name: bucket
+      in: query
+      schema:
+        type: string
+        enum:
+          - hour
+          - day
+        default: hour
+      description: Time bucket used by trend endpoints.
     GeminiModel:
       name: model
       in: path
@@ -7573,6 +8614,1481 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/AdminDashboard"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    DeleteResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          type: object
+          required:
+            - deleted
+          properties:
+            deleted:
+              type: boolean
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    BatchOperationResult:
+      type: object
+      required:
+        - requested
+        - succeeded
+        - failed
+      properties:
+        requested:
+          type: integer
+          minimum: 0
+        succeeded:
+          type: integer
+          minimum: 0
+        failed:
+          type: integer
+          minimum: 0
+        failed_ids:
+          type: array
+          items:
+            $ref: "#/components/schemas/Id"
+          default: []
+
+    BatchOperationResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/BatchOperationResult"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    TimeWindow:
+      type: object
+      required:
+        - start
+        - end
+      properties:
+        start:
+          $ref: "#/components/schemas/Timestamp"
+        end:
+          $ref: "#/components/schemas/Timestamp"
+
+    AdminDashboardInventory:
+      type: object
+      required:
+        - total_api_keys
+        - active_api_keys
+        - total_accounts
+        - healthy_accounts
+        - abnormal_accounts
+      properties:
+        total_api_keys:
+          type: integer
+          minimum: 0
+        active_api_keys:
+          type: integer
+          minimum: 0
+        total_accounts:
+          type: integer
+          minimum: 0
+        healthy_accounts:
+          type: integer
+          minimum: 0
+        abnormal_accounts:
+          type: integer
+          minimum: 0
+
+    AdminDashboardTraffic:
+      type: object
+      required:
+        - today_requests
+        - total_requests
+        - success_requests
+        - error_requests
+      properties:
+        today_requests:
+          type: integer
+          minimum: 0
+        total_requests:
+          type: integer
+          minimum: 0
+        success_requests:
+          type: integer
+          minimum: 0
+        error_requests:
+          type: integer
+          minimum: 0
+
+    AdminDashboardUsers:
+      type: object
+      required:
+        - today_new_users
+        - total_users
+        - active_users
+      properties:
+        today_new_users:
+          type: integer
+          minimum: 0
+        total_users:
+          type: integer
+          minimum: 0
+        active_users:
+          type: integer
+          minimum: 0
+
+    AdminDashboardCosts:
+      type: object
+      required:
+        - actual_cost
+        - account_cost
+        - standard_cost
+        - currency
+      properties:
+        actual_cost:
+          type: string
+          pattern: "^-?[0-9]+(\\.[0-9]+)?$"
+        account_cost:
+          type: string
+          pattern: "^-?[0-9]+(\\.[0-9]+)?$"
+        standard_cost:
+          type: string
+          pattern: "^-?[0-9]+(\\.[0-9]+)?$"
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 8
+
+    AdminDashboardTokens:
+      type: object
+      required:
+        - today_tokens
+        - total_tokens
+        - input_tokens
+        - output_tokens
+        - cached_tokens
+        - costs
+      properties:
+        today_tokens:
+          type: integer
+          minimum: 0
+        total_tokens:
+          type: integer
+          minimum: 0
+        input_tokens:
+          type: integer
+          minimum: 0
+        output_tokens:
+          type: integer
+          minimum: 0
+        cached_tokens:
+          type: integer
+          minimum: 0
+        costs:
+          $ref: "#/components/schemas/AdminDashboardCosts"
+
+    AdminDashboardPerformance:
+      type: object
+      required:
+        - current_rpm
+        - current_tpm
+        - peak_rpm
+        - peak_tpm
+        - average_latency_ms
+        - p95_latency_ms
+      properties:
+        current_rpm:
+          type: integer
+          minimum: 0
+        current_tpm:
+          type: integer
+          minimum: 0
+        peak_rpm:
+          type: integer
+          minimum: 0
+        peak_tpm:
+          type: integer
+          minimum: 0
+        average_latency_ms:
+          type: integer
+          minimum: 0
+        p95_latency_ms:
+          type: integer
+          minimum: 0
+
+    DashboardModelDistribution:
+      type: object
+      required:
+        - model
+        - request_count
+        - token_count
+        - cost
+        - currency
+      properties:
+        model:
+          type: string
+        request_count:
+          type: integer
+          minimum: 0
+        token_count:
+          type: integer
+          minimum: 0
+        cost:
+          type: string
+          pattern: "^-?[0-9]+(\\.[0-9]+)?$"
+        currency:
+          type: string
+
+    DashboardTrendPoint:
+      type: object
+      required:
+        - bucket_start
+        - request_count
+        - token_count
+        - cost
+      properties:
+        bucket_start:
+          $ref: "#/components/schemas/Timestamp"
+        request_count:
+          type: integer
+          minimum: 0
+        token_count:
+          type: integer
+          minimum: 0
+        cost:
+          type: string
+          pattern: "^-?[0-9]+(\\.[0-9]+)?$"
+
+    DashboardUserUsageTrend:
+      type: object
+      required:
+        - user_id
+        - request_count
+        - token_count
+        - cost
+      properties:
+        user_id:
+          $ref: "#/components/schemas/Id"
+        email:
+          type: string
+          nullable: true
+        request_count:
+          type: integer
+          minimum: 0
+        token_count:
+          type: integer
+          minimum: 0
+        cost:
+          type: string
+          pattern: "^-?[0-9]+(\\.[0-9]+)?$"
+
+    AdminDashboardSnapshot:
+      type: object
+      required:
+        - window
+        - inventory
+        - traffic
+        - users
+        - tokens
+        - performance
+        - model_distribution
+        - token_trend
+        - user_usage_trend
+        - generated_at
+      properties:
+        window:
+          $ref: "#/components/schemas/TimeWindow"
+        inventory:
+          $ref: "#/components/schemas/AdminDashboardInventory"
+        traffic:
+          $ref: "#/components/schemas/AdminDashboardTraffic"
+        users:
+          $ref: "#/components/schemas/AdminDashboardUsers"
+        tokens:
+          $ref: "#/components/schemas/AdminDashboardTokens"
+        performance:
+          $ref: "#/components/schemas/AdminDashboardPerformance"
+        model_distribution:
+          type: array
+          items:
+            $ref: "#/components/schemas/DashboardModelDistribution"
+        token_trend:
+          type: array
+          items:
+            $ref: "#/components/schemas/DashboardTrendPoint"
+        user_usage_trend:
+          type: array
+          items:
+            $ref: "#/components/schemas/DashboardUserUsageTrend"
+        generated_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    AdminDashboardSnapshotResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/AdminDashboardSnapshot"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    OpsOverview:
+      type: object
+      required:
+        - window
+        - request_count
+        - success_count
+        - error_count
+        - error_rate
+        - latency_p50_ms
+        - latency_p95_ms
+        - latency_p99_ms
+        - average_latency_ms
+        - rpm
+        - tpm
+        - active_users
+        - generated_at
+      properties:
+        window:
+          $ref: "#/components/schemas/TimeWindow"
+        request_count:
+          type: integer
+          minimum: 0
+        success_count:
+          type: integer
+          minimum: 0
+        error_count:
+          type: integer
+          minimum: 0
+        error_rate:
+          type: number
+          minimum: 0
+          maximum: 1
+        latency_p50_ms:
+          type: integer
+          minimum: 0
+        latency_p95_ms:
+          type: integer
+          minimum: 0
+        latency_p99_ms:
+          type: integer
+          minimum: 0
+        average_latency_ms:
+          type: integer
+          minimum: 0
+        rpm:
+          type: integer
+          minimum: 0
+        tpm:
+          type: integer
+          minimum: 0
+        active_users:
+          type: integer
+          minimum: 0
+        generated_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    OpsOverviewResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/OpsOverview"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    OpsThroughputTrendPoint:
+      type: object
+      required:
+        - bucket_start
+        - request_count
+        - token_count
+        - rpm
+        - tpm
+        - cost
+      properties:
+        bucket_start:
+          $ref: "#/components/schemas/Timestamp"
+        request_count:
+          type: integer
+          minimum: 0
+        token_count:
+          type: integer
+          minimum: 0
+        rpm:
+          type: integer
+          minimum: 0
+        tpm:
+          type: integer
+          minimum: 0
+        cost:
+          type: string
+          pattern: "^-?[0-9]+(\\.[0-9]+)?$"
+
+    OpsThroughputTrend:
+      type: object
+      required:
+        - window
+        - bucket
+        - points
+      properties:
+        window:
+          $ref: "#/components/schemas/TimeWindow"
+        bucket:
+          type: string
+          enum:
+            - hour
+            - day
+        points:
+          type: array
+          items:
+            $ref: "#/components/schemas/OpsThroughputTrendPoint"
+
+    OpsThroughputTrendResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/OpsThroughputTrend"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    OpsErrorTrendPoint:
+      type: object
+      required:
+        - bucket_start
+        - request_count
+        - error_count
+        - error_rate
+      properties:
+        bucket_start:
+          $ref: "#/components/schemas/Timestamp"
+        request_count:
+          type: integer
+          minimum: 0
+        error_count:
+          type: integer
+          minimum: 0
+        error_rate:
+          type: number
+          minimum: 0
+          maximum: 1
+
+    OpsErrorTrend:
+      type: object
+      required:
+        - window
+        - bucket
+        - points
+      properties:
+        window:
+          $ref: "#/components/schemas/TimeWindow"
+        bucket:
+          type: string
+          enum:
+            - hour
+            - day
+        points:
+          type: array
+          items:
+            $ref: "#/components/schemas/OpsErrorTrendPoint"
+
+    OpsErrorTrendResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/OpsErrorTrend"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    OpsErrorDistributionItem:
+      type: object
+      required:
+        - error_class
+        - owner
+        - count
+        - share
+      properties:
+        error_class:
+          type: string
+        owner:
+          type: string
+        count:
+          type: integer
+          minimum: 0
+        share:
+          type: number
+          minimum: 0
+          maximum: 1
+
+    OpsErrorDistribution:
+      type: object
+      required:
+        - window
+        - items
+      properties:
+        window:
+          $ref: "#/components/schemas/TimeWindow"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OpsErrorDistributionItem"
+
+    OpsErrorDistributionResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/OpsErrorDistribution"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    OpsLatencyBucket:
+      type: object
+      required:
+        - label
+        - lower_ms
+        - count
+        - share
+      properties:
+        label:
+          type: string
+        lower_ms:
+          type: integer
+          minimum: 0
+        upper_ms:
+          type: integer
+          minimum: 0
+          nullable: true
+        count:
+          type: integer
+          minimum: 0
+        share:
+          type: number
+          minimum: 0
+          maximum: 1
+
+    OpsLatencyHistogram:
+      type: object
+      required:
+        - window
+        - buckets
+      properties:
+        window:
+          $ref: "#/components/schemas/TimeWindow"
+        buckets:
+          type: array
+          items:
+            $ref: "#/components/schemas/OpsLatencyBucket"
+
+    OpsLatencyHistogramResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/OpsLatencyHistogram"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    OpsConcurrency:
+      type: object
+      required:
+        - active_gateway_requests
+        - active_realtime_slots
+        - active_by_api_key
+      properties:
+        active_gateway_requests:
+          type: integer
+          minimum: 0
+        active_realtime_slots:
+          type: integer
+          minimum: 0
+        active_by_api_key:
+          type: object
+          additionalProperties:
+            type: integer
+            minimum: 0
+
+    OpsConcurrencyResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/OpsConcurrency"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    OpsSystemLog:
+      type: object
+      required:
+        - id
+        - level
+        - message
+        - source
+        - created_at
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        level:
+          type: string
+          enum:
+            - debug
+            - info
+            - warn
+            - error
+        message:
+          type: string
+        source:
+          type: string
+        metadata:
+          $ref: "#/components/schemas/JsonObject"
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    OpsSystemLogListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/OpsSystemLog"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    OpsSettings:
+      type: object
+      required:
+        - auto_refresh_enabled
+        - refresh_interval_seconds
+        - error_rate_threshold
+        - latency_p95_threshold_ms
+        - alert_retention_days
+      properties:
+        auto_refresh_enabled:
+          type: boolean
+        refresh_interval_seconds:
+          type: integer
+          minimum: 5
+          maximum: 3600
+        error_rate_threshold:
+          type: number
+          minimum: 0
+          maximum: 1
+        latency_p95_threshold_ms:
+          type: integer
+          minimum: 1
+        alert_retention_days:
+          type: integer
+          minimum: 1
+          maximum: 365
+
+    OpsSettingsResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/OpsSettings"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    SecretConfigured:
+      type: object
+      required:
+        - configured
+      properties:
+        configured:
+          type: boolean
+
+    AdminSettingsGeneral:
+      type: object
+      required:
+        - site_name
+        - logo_url
+        - version_label
+        - custom_menus
+      properties:
+        site_name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        logo_url:
+          type: string
+          maxLength: 2048
+        version_label:
+          type: string
+          maxLength: 80
+        custom_menus:
+          type: array
+          items:
+            $ref: "#/components/schemas/JsonObject"
+
+    AdminSettingsAgreement:
+      type: object
+      required:
+        - user_agreement
+        - privacy_policy
+      properties:
+        user_agreement:
+          type: string
+        privacy_policy:
+          type: string
+
+    AdminSettingsFeatures:
+      type: object
+      required:
+        - enabled_channels
+        - channel_monitoring_enabled
+        - invitation_rebate_enabled
+        - payments_enabled
+      properties:
+        enabled_channels:
+          type: array
+          items:
+            type: string
+        channel_monitoring_enabled:
+          type: boolean
+        invitation_rebate_enabled:
+          type: boolean
+        payments_enabled:
+          type: boolean
+
+    AdminSettingsSecurity:
+      type: object
+      required:
+        - admin_api_key
+        - registration_enabled
+        - oauth_enabled
+        - oauth_providers
+      properties:
+        admin_api_key:
+          $ref: "#/components/schemas/SecretConfigured"
+        registration_enabled:
+          type: boolean
+        oauth_enabled:
+          type: boolean
+        oauth_providers:
+          type: array
+          items:
+            type: string
+
+    AdminSettingsUsers:
+      type: object
+      required:
+        - default_balance
+        - default_group
+        - user_self_delete_enabled
+        - rpm_limit_default
+      properties:
+        default_balance:
+          type: string
+          pattern: "^-?[0-9]+(\\.[0-9]+)?$"
+        default_group:
+          type: string
+        user_self_delete_enabled:
+          type: boolean
+        rpm_limit_default:
+          type: integer
+          minimum: 0
+
+    AdminSettingsGateway:
+      type: object
+      required:
+        - overload_cooldown_seconds
+        - rate_limit_cooldown_seconds
+        - stream_timeout_seconds
+        - request_shaper_enabled
+        - beta_strategy
+      properties:
+        overload_cooldown_seconds:
+          type: integer
+          minimum: 0
+        rate_limit_cooldown_seconds:
+          type: integer
+          minimum: 0
+        stream_timeout_seconds:
+          type: integer
+          minimum: 1
+        request_shaper_enabled:
+          type: boolean
+        beta_strategy:
+          type: string
+
+    AdminSettingsPayment:
+      type: object
+      required:
+        - enabled
+        - providers
+        - subscription_plans_enabled
+      properties:
+        enabled:
+          type: boolean
+        providers:
+          type: array
+          items:
+            type: string
+        subscription_plans_enabled:
+          type: boolean
+
+    AdminSettingsEmail:
+      type: object
+      required:
+        - smtp_configured
+        - templates
+      properties:
+        smtp_configured:
+          type: boolean
+        templates:
+          type: object
+          additionalProperties:
+            type: string
+
+    AdminSettingsBackup:
+      type: object
+      required:
+        - enabled
+        - retention_days
+      properties:
+        enabled:
+          type: boolean
+        last_backup_at:
+          $ref: "#/components/schemas/Timestamp"
+          nullable: true
+        retention_days:
+          type: integer
+          minimum: 1
+
+    AdminSettings:
+      type: object
+      required:
+        - general
+        - agreement
+        - features
+        - security
+        - users
+        - gateway
+        - payment
+        - email
+        - backup
+      properties:
+        general:
+          $ref: "#/components/schemas/AdminSettingsGeneral"
+        agreement:
+          $ref: "#/components/schemas/AdminSettingsAgreement"
+        features:
+          $ref: "#/components/schemas/AdminSettingsFeatures"
+        security:
+          $ref: "#/components/schemas/AdminSettingsSecurity"
+        users:
+          $ref: "#/components/schemas/AdminSettingsUsers"
+        gateway:
+          $ref: "#/components/schemas/AdminSettingsGateway"
+        payment:
+          $ref: "#/components/schemas/AdminSettingsPayment"
+        email:
+          $ref: "#/components/schemas/AdminSettingsEmail"
+        backup:
+          $ref: "#/components/schemas/AdminSettingsBackup"
+
+    AdminSettingsResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/AdminSettings"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    AnnouncementStatus:
+      type: string
+      enum:
+        - draft
+        - published
+        - archived
+
+    AnnouncementSeverity:
+      type: string
+      enum:
+        - info
+        - warning
+        - critical
+
+    AnnouncementAudience:
+      type: string
+      enum:
+        - all
+        - users
+        - admins
+
+    Announcement:
+      type: object
+      required:
+        - id
+        - title
+        - content
+        - status
+        - severity
+        - audience
+        - created_at
+        - updated_at
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        content:
+          type: string
+          minLength: 1
+        status:
+          $ref: "#/components/schemas/AnnouncementStatus"
+        severity:
+          $ref: "#/components/schemas/AnnouncementSeverity"
+        audience:
+          $ref: "#/components/schemas/AnnouncementAudience"
+        starts_at:
+          $ref: "#/components/schemas/Timestamp"
+          nullable: true
+        ends_at:
+          $ref: "#/components/schemas/Timestamp"
+          nullable: true
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+        updated_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    CreateAnnouncementRequest:
+      type: object
+      required:
+        - title
+        - content
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        content:
+          type: string
+          minLength: 1
+        status:
+          $ref: "#/components/schemas/AnnouncementStatus"
+        severity:
+          $ref: "#/components/schemas/AnnouncementSeverity"
+        audience:
+          $ref: "#/components/schemas/AnnouncementAudience"
+        starts_at:
+          $ref: "#/components/schemas/Timestamp"
+          nullable: true
+        ends_at:
+          $ref: "#/components/schemas/Timestamp"
+          nullable: true
+
+    UpdateAnnouncementRequest:
+      allOf:
+        - $ref: "#/components/schemas/CreateAnnouncementRequest"
+
+    AnnouncementResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/Announcement"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    AnnouncementListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Announcement"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    RedeemCodeStatus:
+      type: string
+      enum:
+        - active
+        - redeemed
+        - disabled
+        - expired
+
+    RedeemCodeType:
+      type: string
+      enum:
+        - balance
+        - subscription
+
+    RedeemCode:
+      type: object
+      required:
+        - id
+        - code
+        - type
+        - status
+        - value
+        - currency
+        - max_redemptions
+        - redeemed_count
+        - created_at
+        - updated_at
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        code:
+          type: string
+          minLength: 4
+          maxLength: 80
+        type:
+          $ref: "#/components/schemas/RedeemCodeType"
+        status:
+          $ref: "#/components/schemas/RedeemCodeStatus"
+        value:
+          type: string
+          pattern: "^-?[0-9]+(\\.[0-9]+)?$"
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 8
+        max_redemptions:
+          type: integer
+          minimum: 1
+        redeemed_count:
+          type: integer
+          minimum: 0
+        expires_at:
+          $ref: "#/components/schemas/Timestamp"
+          nullable: true
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+        updated_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    CreateRedeemCodeRequest:
+      type: object
+      required:
+        - code
+        - type
+        - value
+      properties:
+        code:
+          type: string
+          minLength: 4
+          maxLength: 80
+        type:
+          $ref: "#/components/schemas/RedeemCodeType"
+        value:
+          type: string
+          pattern: "^-?[0-9]+(\\.[0-9]+)?$"
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 8
+          default: USD
+        max_redemptions:
+          type: integer
+          minimum: 1
+          default: 1
+        expires_at:
+          $ref: "#/components/schemas/Timestamp"
+          nullable: true
+
+    BatchGenerateRedeemCodesRequest:
+      type: object
+      required:
+        - count
+        - type
+        - value
+      properties:
+        prefix:
+          type: string
+          maxLength: 20
+          default: SR
+        count:
+          type: integer
+          minimum: 1
+          maximum: 1000
+        type:
+          $ref: "#/components/schemas/RedeemCodeType"
+        value:
+          type: string
+          pattern: "^-?[0-9]+(\\.[0-9]+)?$"
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 8
+          default: USD
+        max_redemptions:
+          type: integer
+          minimum: 1
+          default: 1
+        expires_at:
+          $ref: "#/components/schemas/Timestamp"
+          nullable: true
+
+    BatchDisableRedeemCodesRequest:
+      type: object
+      required:
+        - ids
+      properties:
+        ids:
+          type: array
+          minItems: 1
+          maxItems: 1000
+          items:
+            $ref: "#/components/schemas/Id"
+
+    RedeemCodeResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/RedeemCode"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    RedeemCodeListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/RedeemCode"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    RedeemCodeStats:
+      type: object
+      required:
+        - total
+        - active
+        - redeemed
+        - disabled
+        - expired
+      properties:
+        total:
+          type: integer
+          minimum: 0
+        active:
+          type: integer
+          minimum: 0
+        redeemed:
+          type: integer
+          minimum: 0
+        disabled:
+          type: integer
+          minimum: 0
+        expired:
+          type: integer
+          minimum: 0
+
+    RedeemCodeStatsResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/RedeemCodeStats"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    PromoCodeStatus:
+      type: string
+      enum:
+        - active
+        - disabled
+        - expired
+
+    PromoDiscountType:
+      type: string
+      enum:
+        - amount
+        - percent
+
+    PromoCode:
+      type: object
+      required:
+        - id
+        - code
+        - status
+        - discount_type
+        - discount_value
+        - currency
+        - max_uses
+        - used_count
+        - created_at
+        - updated_at
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        code:
+          type: string
+          minLength: 4
+          maxLength: 80
+        status:
+          $ref: "#/components/schemas/PromoCodeStatus"
+        discount_type:
+          $ref: "#/components/schemas/PromoDiscountType"
+        discount_value:
+          type: string
+          pattern: "^-?[0-9]+(\\.[0-9]+)?$"
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 8
+        max_uses:
+          type: integer
+          minimum: 1
+        used_count:
+          type: integer
+          minimum: 0
+        starts_at:
+          $ref: "#/components/schemas/Timestamp"
+          nullable: true
+        expires_at:
+          $ref: "#/components/schemas/Timestamp"
+          nullable: true
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+        updated_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    CreatePromoCodeRequest:
+      type: object
+      required:
+        - code
+        - discount_type
+        - discount_value
+      properties:
+        code:
+          type: string
+          minLength: 4
+          maxLength: 80
+        discount_type:
+          $ref: "#/components/schemas/PromoDiscountType"
+        discount_value:
+          type: string
+          pattern: "^-?[0-9]+(\\.[0-9]+)?$"
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 8
+          default: USD
+        max_uses:
+          type: integer
+          minimum: 1
+          default: 1
+        status:
+          $ref: "#/components/schemas/PromoCodeStatus"
+        starts_at:
+          $ref: "#/components/schemas/Timestamp"
+          nullable: true
+        expires_at:
+          $ref: "#/components/schemas/Timestamp"
+          nullable: true
+
+    UpdatePromoCodeRequest:
+      allOf:
+        - $ref: "#/components/schemas/CreatePromoCodeRequest"
+
+    PromoCodeResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/PromoCode"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    PromoCodeListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/PromoCode"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    RiskControlMode:
+      type: string
+      enum:
+        - monitor
+        - enforce
+
+    RiskControlConfig:
+      type: object
+      required:
+        - enabled
+        - mode
+        - max_failed_requests_per_minute
+        - max_cost_per_day
+        - cooldown_seconds
+        - blocked_countries
+        - blocked_ips
+      properties:
+        enabled:
+          type: boolean
+        mode:
+          $ref: "#/components/schemas/RiskControlMode"
+        max_failed_requests_per_minute:
+          type: integer
+          minimum: 0
+        max_cost_per_day:
+          type: string
+          pattern: "^-?[0-9]+(\\.[0-9]+)?$"
+        cooldown_seconds:
+          type: integer
+          minimum: 0
+        blocked_countries:
+          type: array
+          items:
+            type: string
+        blocked_ips:
+          type: array
+          items:
+            type: string
+
+    RiskControlConfigResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/RiskControlConfig"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    RiskControlStatus:
+      type: object
+      required:
+        - enabled
+        - mode
+        - active_blocks
+        - recent_events
+        - evaluated_at
+      properties:
+        enabled:
+          type: boolean
+        mode:
+          $ref: "#/components/schemas/RiskControlMode"
+        active_blocks:
+          type: integer
+          minimum: 0
+        recent_events:
+          type: integer
+          minimum: 0
+        evaluated_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    RiskControlStatusResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/RiskControlStatus"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    RiskControlLog:
+      type: object
+      required:
+        - id
+        - level
+        - action
+        - reason
+        - created_at
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        level:
+          type: string
+          enum:
+            - info
+            - warn
+            - block
+        action:
+          type: string
+        reason:
+          type: string
+        subject:
+          type: string
+          nullable: true
+        metadata:
+          $ref: "#/components/schemas/JsonObject"
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    RiskControlLogListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/RiskControlLog"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
         request_id:
           $ref: "#/components/schemas/RequestId"
 

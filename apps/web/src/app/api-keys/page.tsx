@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Key, Plus, Copy, Check, AlertCircle, Power, Sparkles } from "lucide-react";
 import DashboardLayout from "@/components/DashboardLayout";
@@ -63,7 +63,11 @@ export default function ApiKeysPage() {
       groupIds: ["group-01"],
     },
   });
-  const selectedModels = form.watch("allowedModels");
+  const selectedModels =
+    useWatch({
+      control: form.control,
+      name: "allowedModels",
+    }) ?? [];
 
   const handleCopy = (text: string, id: string) => {
     navigator.clipboard.writeText(text);

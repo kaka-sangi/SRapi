@@ -92,6 +92,16 @@ func (s *memoryStore) ListByUser(_ context.Context, userID int) ([]contract.APIK
 	return keys, nil
 }
 
+func (s *memoryStore) List(_ context.Context) ([]contract.APIKey, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	keys := make([]contract.APIKey, 0, len(s.byID))
+	for _, key := range s.byID {
+		keys = append(keys, key)
+	}
+	return keys, nil
+}
+
 func (s *memoryStore) TouchLastUsed(_ context.Context, id int, usedAt time.Time) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

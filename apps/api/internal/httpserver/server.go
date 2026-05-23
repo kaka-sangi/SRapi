@@ -15,6 +15,7 @@ import (
 
 	"github.com/srapi/srapi/apps/api/internal/config"
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
+	admincontrolcontract "github.com/srapi/srapi/apps/api/internal/modules/admin_control/contract"
 	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
 	auditcontract "github.com/srapi/srapi/apps/api/internal/modules/audit/contract"
 	billingcontract "github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
@@ -47,6 +48,7 @@ type dependencyPinger interface {
 type Option func(*runtimeOptions)
 
 type runtimeOptions struct {
+	adminControl  admincontrolcontract.Store
 	database      dependencyPinger
 	redis         dependencyPinger
 	users         userscontract.Store
@@ -63,6 +65,12 @@ type runtimeOptions struct {
 	scheduler     schedulercontract.Store
 	subscriptions subscriptioncontract.Store
 	usage         usagecontract.Store
+}
+
+func WithAdminControlStore(store admincontrolcontract.Store) Option {
+	return func(opts *runtimeOptions) {
+		opts.adminControl = store
+	}
 }
 
 func WithDatabasePinger(p dependencyPinger) Option {
@@ -210,6 +218,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("PATCH /api/v1/api-keys/{id}", server.handleUpdateApiKey)
 	mux.HandleFunc("GET /api/v1/admin/overview", server.handleAdminOverview)
 	mux.HandleFunc("GET /api/v1/admin/dashboard", server.handleAdminDashboard)
+	mux.HandleFunc("GET /api/v1/admin/dashboard/snapshot", server.handleAdminDashboardSnapshot)
 	mux.HandleFunc("GET /api/v1/admin/users", server.handleListAdminUsers)
 	mux.HandleFunc("POST /api/v1/admin/users", server.handleCreateAdminUser)
 	mux.HandleFunc("PATCH /api/v1/admin/users/batch", server.handleBatchUpdateAdminUsers)
@@ -269,12 +278,40 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("GET /api/v1/admin/pricing-rules", server.handleListAdminPricingRules)
 	mux.HandleFunc("POST /api/v1/admin/pricing-rules", server.handleCreateAdminPricingRule)
 	mux.HandleFunc("GET /api/v1/admin/ops/events/outbox", server.handleListAdminOutboxEvents)
+	mux.HandleFunc("GET /api/v1/admin/ops/overview", server.handleAdminOpsOverview)
+	mux.HandleFunc("GET /api/v1/admin/ops/throughput-trend", server.handleAdminOpsThroughputTrend)
+	mux.HandleFunc("GET /api/v1/admin/ops/error-trend", server.handleAdminOpsErrorTrend)
+	mux.HandleFunc("GET /api/v1/admin/ops/error-distribution", server.handleAdminOpsErrorDistribution)
+	mux.HandleFunc("GET /api/v1/admin/ops/latency-histogram", server.handleAdminOpsLatencyHistogram)
+	mux.HandleFunc("GET /api/v1/admin/ops/concurrency", server.handleAdminOpsConcurrency)
+	mux.HandleFunc("GET /api/v1/admin/ops/system-logs", server.handleListAdminOpsSystemLogs)
+	mux.HandleFunc("GET /api/v1/admin/ops/alert-events", server.handleListAdminOpsAlerts)
+	mux.HandleFunc("PUT /api/v1/admin/ops/settings", server.handleUpdateAdminOpsSettings)
 	mux.HandleFunc("GET /api/v1/admin/ops/realtime/slots", server.handleListAdminOpsRealtimeSlots)
 	mux.HandleFunc("GET /api/v1/admin/ops/slo", server.handleListAdminOpsSLOs)
 	mux.HandleFunc("POST /api/v1/admin/ops/slo", server.handleCreateAdminOpsSLO)
 	mux.HandleFunc("PATCH /api/v1/admin/ops/slo/{id}", server.handleUpdateAdminOpsSLO)
 	mux.HandleFunc("GET /api/v1/admin/ops/alerts", server.handleListAdminOpsAlerts)
 	mux.HandleFunc("POST /api/v1/admin/ops/alerts/{id}/ack", server.handleAcknowledgeAdminOpsAlert)
+	mux.HandleFunc("GET /api/v1/admin/settings", server.handleGetAdminSettings)
+	mux.HandleFunc("PUT /api/v1/admin/settings", server.handleUpdateAdminSettings)
+	mux.HandleFunc("GET /api/v1/admin/announcements", server.handleListAdminAnnouncements)
+	mux.HandleFunc("POST /api/v1/admin/announcements", server.handleCreateAdminAnnouncement)
+	mux.HandleFunc("PUT /api/v1/admin/announcements/{id}", server.handleUpdateAdminAnnouncement)
+	mux.HandleFunc("DELETE /api/v1/admin/announcements/{id}", server.handleDeleteAdminAnnouncement)
+	mux.HandleFunc("GET /api/v1/admin/redeem-codes", server.handleListAdminRedeemCodes)
+	mux.HandleFunc("POST /api/v1/admin/redeem-codes", server.handleCreateAdminRedeemCode)
+	mux.HandleFunc("POST /api/v1/admin/redeem-codes/batch-generate", server.handleBatchGenerateAdminRedeemCodes)
+	mux.HandleFunc("POST /api/v1/admin/redeem-codes/batch-disable", server.handleBatchDisableAdminRedeemCodes)
+	mux.HandleFunc("GET /api/v1/admin/redeem-codes/stats", server.handleAdminRedeemCodeStats)
+	mux.HandleFunc("GET /api/v1/admin/promo-codes", server.handleListAdminPromoCodes)
+	mux.HandleFunc("POST /api/v1/admin/promo-codes", server.handleCreateAdminPromoCode)
+	mux.HandleFunc("PUT /api/v1/admin/promo-codes/{id}", server.handleUpdateAdminPromoCode)
+	mux.HandleFunc("DELETE /api/v1/admin/promo-codes/{id}", server.handleDeleteAdminPromoCode)
+	mux.HandleFunc("GET /api/v1/admin/risk-control/config", server.handleGetAdminRiskControlConfig)
+	mux.HandleFunc("PUT /api/v1/admin/risk-control/config", server.handleUpdateAdminRiskControlConfig)
+	mux.HandleFunc("GET /api/v1/admin/risk-control/status", server.handleGetAdminRiskControlStatus)
+	mux.HandleFunc("GET /api/v1/admin/risk-control/logs", server.handleListAdminRiskControlLogs)
 	mux.HandleFunc("GET /api/v1/admin/capabilities", server.handleListAdminCapabilities)
 	mux.HandleFunc("GET /api/v1/admin/scheduler/overview", server.handleAdminSchedulerOverview)
 	mux.HandleFunc("GET /api/v1/admin/scheduler/decisions", server.handleListAdminSchedulerDecisions)

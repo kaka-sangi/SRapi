@@ -84,6 +84,11 @@ packages/openapi/
 /api/v1/admin/affiliate
 /api/v1/admin/ops
 /api/v1/admin/settings
+/api/v1/admin/dashboard/snapshot
+/api/v1/admin/announcements
+/api/v1/admin/redeem-codes
+/api/v1/admin/promo-codes
+/api/v1/admin/risk-control
 ```
 
 需要管理员权限。
@@ -218,6 +223,11 @@ components:
 | `/api/v1/admin/ops/slo` | yes | yes | read only | no |
 | `/api/v1/admin/ops/alerts` | yes | yes | read only | no |
 | `/api/v1/admin/settings` | yes | yes | no | no |
+| `/api/v1/admin/dashboard/snapshot` | yes | yes | read only | no |
+| `/api/v1/admin/announcements` | yes | yes | no | no |
+| `/api/v1/admin/redeem-codes` | yes | yes | no | no |
+| `/api/v1/admin/promo-codes` | yes | yes | no | no |
+| `/api/v1/admin/risk-control` | yes | yes | read only | no |
 | `/api/v1/admin/audit-logs` | yes | yes | no | no |
 
 ### 4.7 Ops SLO / Alert APIs

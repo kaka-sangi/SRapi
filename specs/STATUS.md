@@ -69,24 +69,27 @@ last_completed:
 - WP-600: Codex refresh-token-only import and OAuth lifecycle now lets admin create/import/update accept a Codex OAuth `refresh_token` without an initial `access_token`, exchange it through Reverse Proxy Runtime using the Codex CLI OAuth token shape, persist encrypted access-token state, and immediately dispatch Gateway `/v1/responses` to Codex `/responses` with selected-account OAuth identity and no token leakage in control-plane responses.
 - WP-610: Claude Code refresh-token-only import and OAuth lifecycle now lets admin create/import/update accept a Claude Code OAuth `refresh_token` without an initial `access_token`, exchange it through Reverse Proxy Runtime using the Claude Code JSON OAuth token shape, persist encrypted access-token state, and immediately dispatch Gateway `/v1/messages` with selected-account OAuth identity and no credential leakage in control-plane responses.
 - WP-620: Antigravity refresh-token-only import and OAuth lifecycle now lets admin create/import/update accept an Antigravity OAuth `refresh_token` without an initial `access_token`, exchange it through Reverse Proxy Runtime using the Google OAuth form token shape plus configured client secret, persist encrypted access-token state, and immediately dispatch Gateway text requests with selected-account OAuth identity and no credential leakage in control-plane responses.
+- WP-700: Admin Control Plane v1 now defines and implements dashboard snapshot, ops monitoring, typed settings, announcements, redeem codes, promo codes, and risk-control APIs through OpenAPI-first contracts, a module-owned admin_control service/store, safe audit logs for writes, decimal-string financial fields, generated Go/TypeScript SDKs, and HTTP regressions for CSRF/audit coverage.
 
 current:
 
 - package: WP-500+
 - status: pending
-- objective: split and continue the remaining ecosystem and advanced endpoint packages from the roadmap.
+- objective: continue remaining ecosystem and advanced endpoint packages after Admin Control Plane v1.
 
 next_recommended: WP-500+
 
 last_gates:
 
-- `cd apps/api && go test ./internal/modules/accounts/... ./internal/modules/reverse_proxy/... ./internal/modules/provider_adapters/... ./internal/httpserver -run 'Test.*Claude.*Refresh|Test.*Claude.*Import|TestGateway.*Claude' -count=1`: pass
-- `cd apps/api && go test ./internal/modules/accounts/... ./internal/modules/reverse_proxy/... ./internal/modules/provider_adapters/... ./internal/httpserver -run 'Test.*Antigravity.*Refresh|Test.*Antigravity.*Import|TestGateway.*Antigravity' -count=1`: pass
+- `make openapi-lint`: pass
+- `make openapi-codegen`: pass
+- `make openapi-ts-codegen`: pass
+- `cd apps/api && go test ./internal/modules/admin_control/... ./internal/httpserver -run 'Test(AdminControlPlaneV1EndpointsAndAudit|ConsoleWriteRoutesRequireCSRF)'`: pass
 - `cd apps/api && go test ./...`: pass
 - `make architecture-check`: pass
 - `make code-quality-check`: pass
-- `make examples-check`: pass
 - `make secret-scan`: pass
+- `make check`: pass with warning-free OpenAPI/codegen/web-check output
 - `git diff --check`: pass
 
 notes:
@@ -189,6 +192,8 @@ notes:
 - WP-610 added `TestClaudeRefreshUsesJSONTokenRequest`, `TestGatewayClaudeRefreshTokenOnlyCreateCanRequestMessages`, `TestAdminAccountImportClaudeRefreshTokenOnlyExchangesTokenWithoutLeakingCredential`, and `TestGatewayClaudeRefreshTokenOnlyUpdateCanRequestMessages`, proving Claude Code refresh-token-only create/import/update exchanges and persists usable OAuth state before Gateway `/v1/messages` dispatch.
 - WP-620 added `TestAntigravityRefreshUsesClientSecretFormTokenRequest`, `TestAntigravityRefreshRequiresClientSecret`, `TestGatewayAntigravityRefreshTokenOnlyCreateCanRequestChat`, `TestAdminAccountImportAntigravityRefreshTokenOnlyRequiresClientSecret`, and `TestGatewayAntigravityRefreshTokenOnlyUpdateCanRequestChat`, proving Antigravity refresh-token-only create/update requires configured client secret, exchanges via form OAuth, and persists usable OAuth state before Gateway text dispatch.
 - Antigravity refresh-token-only import requires encrypted credential `oauth_client_secret` / `client_secret`; SRapi intentionally does not hard-code the Google OAuth client secret or expose it through account metadata.
+- WP-700 added `docs/ADMIN_CONTROL_PLANE_SPEC.md`, settings-backed admin-control persistence through the existing `settings` table, global API-key inventory listing, dashboard/ops read models from existing usage/account/user/realtime evidence, and `TestAdminControlPlaneV1EndpointsAndAudit` proving new admin writes require CSRF and record audit evidence.
+- WP-700 intentionally stores low-frequency console-managed state as typed settings-backed collections first; high-volume transactional histories such as redeem redemption events can be promoted to dedicated Ent schemas in a later package when the product needs per-redemption concurrency semantics.
 
 ## Work Package Ledger
 
@@ -257,4 +262,5 @@ notes:
 | WP-600 | completed | Codex refresh-token-only import and OAuth lifecycle v1. |
 | WP-610 | completed | Claude Code refresh-token-only import and OAuth lifecycle v1. |
 | WP-620 | completed | Antigravity refresh-token-only import and OAuth lifecycle v1. |
+| WP-700 | completed | Admin Control Plane v1 docs, OpenAPI contracts, module-backed APIs, audit coverage, generated SDKs, and full gates pass. |
 | WP-500+ | pending | Remaining ecosystem and advanced endpoint packages. |

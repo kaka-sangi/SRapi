@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"time"
 
@@ -33,6 +34,24 @@ func auditRecordFromRequest(r *http.Request, actorUserID int, action, resourceTy
 		UserAgent:    r.UserAgent(),
 		TraceID:      requestIDFromContext(r.Context()),
 	}
+}
+
+func adminControlAuditSnapshot(value any) map[string]any {
+	if value == nil {
+		return nil
+	}
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return map[string]any{"value": value}
+	}
+	var out map[string]any
+	if err := json.Unmarshal(encoded, &out); err != nil {
+		return map[string]any{"value": value}
+	}
+	if out == nil {
+		return map[string]any{}
+	}
+	return out
 }
 
 func opsSLOAuditSnapshot(slo operationscontract.SLODefinition) map[string]any {

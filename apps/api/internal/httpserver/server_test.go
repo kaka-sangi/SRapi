@@ -409,6 +409,11 @@ func TestConsoleWriteRoutesRequireCSRF(t *testing.T) {
 		{http.MethodPost, "/api/v1/admin/subscription-plans", `{"name":"blocked-plan","price":"1.00","currency":"USD","validity_days":30}`},
 		{http.MethodPost, "/api/v1/admin/user-subscriptions", `{"user_id":"` + string(loginResp.Data.User.Id) + `","plan_id":"1"}`},
 		{http.MethodPost, "/api/v1/admin/pricing-rules", `{"model_id":"` + string(modelResp.Data.Id) + `","provider_id":"` + string(providerResp.Data.Id) + `","input_price_per_million_tokens":"1","output_price_per_million_tokens":"2","cache_read_price_per_million_tokens":"0","cache_write_price_per_million_tokens":"0","currency":"USD"}`},
+		{http.MethodPut, "/api/v1/admin/settings", `{"general":{"site_name":"SRapi","logo_url":"","version_label":"","custom_menus":[]},"agreement":{"user_agreement":"","privacy_policy":""},"features":{"enabled_channels":[],"channel_monitoring_enabled":true,"invitation_rebate_enabled":false,"payments_enabled":false},"security":{"admin_api_key":{"configured":false},"registration_enabled":true,"oauth_enabled":false,"oauth_providers":[]},"users":{"default_balance":"0","default_group":"default","user_self_delete_enabled":false,"rpm_limit_default":0},"gateway":{"overload_cooldown_seconds":30,"rate_limit_cooldown_seconds":30,"stream_timeout_seconds":600,"request_shaper_enabled":true,"beta_strategy":"allow_configured"},"payment":{"enabled":false,"providers":[],"subscription_plans_enabled":false},"email":{"smtp_configured":false,"templates":{}},"backup":{"enabled":false,"retention_days":30}}`},
+		{http.MethodPost, "/api/v1/admin/announcements", `{"title":"Hello","content":"World"}`},
+		{http.MethodPost, "/api/v1/admin/redeem-codes", `{"code":"CSRF-REDEEM","type":"balance","value":"1.00"}`},
+		{http.MethodPost, "/api/v1/admin/promo-codes", `{"code":"CSRF-PROMO","discount_type":"amount","discount_value":"1.00"}`},
+		{http.MethodPut, "/api/v1/admin/risk-control/config", `{"enabled":true,"mode":"monitor","max_failed_requests_per_minute":10,"max_cost_per_day":"100","cooldown_seconds":60,"blocked_countries":[],"blocked_ips":[]}`},
 		{http.MethodPost, "/api/v1/admin/ops/slo", `{"name":"blocked-slo","objective":99}`},
 		{http.MethodPatch, "/api/v1/admin/ops/slo/1", `{"status":"disabled"}`},
 		{http.MethodPost, "/api/v1/admin/ops/alerts/1/ack", `{}`},
@@ -422,6 +427,118 @@ func TestConsoleWriteRoutesRequireCSRF(t *testing.T) {
 		handler.ServeHTTP(rec, req)
 		if rec.Code != http.StatusForbidden {
 			t.Fatalf("%s %s without csrf: expected 403, got %d body=%s", route.method, route.path, rec.Code, rec.Body.String())
+		}
+	}
+}
+
+func TestAdminControlPlaneV1EndpointsAndAudit(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	_, _ = mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	settingsReq := httptest.NewRequest(http.MethodPut, "/api/v1/admin/settings", strings.NewReader(`{"general":{"site_name":"SRapi Console","logo_url":"","version_label":"v1","custom_menus":[]},"agreement":{"user_agreement":"terms","privacy_policy":"privacy"},"features":{"enabled_channels":["openai-compatible"],"channel_monitoring_enabled":true,"invitation_rebate_enabled":false,"payments_enabled":false},"security":{"admin_api_key":{"configured":false},"registration_enabled":true,"oauth_enabled":false,"oauth_providers":[]},"users":{"default_balance":"0","default_group":"default","user_self_delete_enabled":false,"rpm_limit_default":60},"gateway":{"overload_cooldown_seconds":30,"rate_limit_cooldown_seconds":30,"stream_timeout_seconds":600,"request_shaper_enabled":true,"beta_strategy":"allow_configured"},"payment":{"enabled":false,"providers":[],"subscription_plans_enabled":false},"email":{"smtp_configured":false,"templates":{}},"backup":{"enabled":false,"retention_days":30}}`))
+	settingsReq.Header.Set("Content-Type", "application/json")
+	settingsReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	settingsReq.AddCookie(sessionCookie)
+	settingsRec := httptest.NewRecorder()
+	handler.ServeHTTP(settingsRec, settingsReq)
+	if settingsRec.Code != http.StatusOK {
+		t.Fatalf("expected settings update 200, got %d body=%s", settingsRec.Code, settingsRec.Body.String())
+	}
+
+	announcementReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/announcements", strings.NewReader(`{"title":"Maintenance","content":"Window","status":"published","severity":"info","audience":"all"}`))
+	announcementReq.Header.Set("Content-Type", "application/json")
+	announcementReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	announcementReq.AddCookie(sessionCookie)
+	announcementRec := httptest.NewRecorder()
+	handler.ServeHTTP(announcementRec, announcementReq)
+	if announcementRec.Code != http.StatusCreated {
+		t.Fatalf("expected announcement create 201, got %d body=%s", announcementRec.Code, announcementRec.Body.String())
+	}
+
+	redeemReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/redeem-codes", strings.NewReader(`{"code":"WELCOME10","type":"balance","value":"10.00","currency":"USD"}`))
+	redeemReq.Header.Set("Content-Type", "application/json")
+	redeemReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	redeemReq.AddCookie(sessionCookie)
+	redeemRec := httptest.NewRecorder()
+	handler.ServeHTTP(redeemRec, redeemReq)
+	if redeemRec.Code != http.StatusCreated {
+		t.Fatalf("expected redeem create 201, got %d body=%s", redeemRec.Code, redeemRec.Body.String())
+	}
+
+	batchReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/redeem-codes/batch-generate", strings.NewReader(`{"prefix":"BATCH","count":2,"type":"balance","value":"1.00","currency":"USD"}`))
+	batchReq.Header.Set("Content-Type", "application/json")
+	batchReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	batchReq.AddCookie(sessionCookie)
+	batchRec := httptest.NewRecorder()
+	handler.ServeHTTP(batchRec, batchReq)
+	if batchRec.Code != http.StatusCreated {
+		t.Fatalf("expected redeem batch create 201, got %d body=%s", batchRec.Code, batchRec.Body.String())
+	}
+
+	promoReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/promo-codes", strings.NewReader(`{"code":"PROMO5","discount_type":"amount","discount_value":"5.00","currency":"USD"}`))
+	promoReq.Header.Set("Content-Type", "application/json")
+	promoReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	promoReq.AddCookie(sessionCookie)
+	promoRec := httptest.NewRecorder()
+	handler.ServeHTTP(promoRec, promoReq)
+	if promoRec.Code != http.StatusCreated {
+		t.Fatalf("expected promo create 201, got %d body=%s", promoRec.Code, promoRec.Body.String())
+	}
+
+	riskReq := httptest.NewRequest(http.MethodPut, "/api/v1/admin/risk-control/config", strings.NewReader(`{"enabled":true,"mode":"monitor","max_failed_requests_per_minute":10,"max_cost_per_day":"100.00","cooldown_seconds":60,"blocked_countries":["ZZ"],"blocked_ips":[]}`))
+	riskReq.Header.Set("Content-Type", "application/json")
+	riskReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	riskReq.AddCookie(sessionCookie)
+	riskRec := httptest.NewRecorder()
+	handler.ServeHTTP(riskRec, riskReq)
+	if riskRec.Code != http.StatusOK {
+		t.Fatalf("expected risk config update 200, got %d body=%s", riskRec.Code, riskRec.Body.String())
+	}
+
+	readEndpoints := []string{
+		"/api/v1/admin/dashboard/snapshot",
+		"/api/v1/admin/ops/overview",
+		"/api/v1/admin/ops/throughput-trend",
+		"/api/v1/admin/ops/error-trend",
+		"/api/v1/admin/ops/error-distribution",
+		"/api/v1/admin/ops/latency-histogram",
+		"/api/v1/admin/ops/concurrency",
+		"/api/v1/admin/ops/system-logs",
+		"/api/v1/admin/ops/alert-events",
+		"/api/v1/admin/settings",
+		"/api/v1/admin/announcements",
+		"/api/v1/admin/redeem-codes",
+		"/api/v1/admin/redeem-codes/stats",
+		"/api/v1/admin/promo-codes",
+		"/api/v1/admin/risk-control/config",
+		"/api/v1/admin/risk-control/status",
+		"/api/v1/admin/risk-control/logs",
+	}
+	for _, path := range readEndpoints {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		req.AddCookie(sessionCookie)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected %s 200, got %d body=%s", path, rec.Code, rec.Body.String())
+		}
+	}
+
+	auditReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/audit-logs", nil)
+	auditReq.AddCookie(sessionCookie)
+	auditRec := httptest.NewRecorder()
+	handler.ServeHTTP(auditRec, auditReq)
+	if auditRec.Code != http.StatusOK {
+		t.Fatalf("expected audit logs 200, got %d", auditRec.Code)
+	}
+	var auditResp apiopenapi.AuditLogListResponse
+	if err := json.NewDecoder(auditRec.Body).Decode(&auditResp); err != nil {
+		t.Fatalf("decode audit logs: %v", err)
+	}
+	for _, action := range []string{"admin_settings.update", "announcement.create", "redeem_code.create", "redeem_code.batch_generate", "promo_code.create", "risk_control.update"} {
+		if !auditLogHasAction(auditResp.Data, action) {
+			t.Fatalf("expected audit action %s in %+v", action, auditResp.Data)
 		}
 	}
 }
@@ -619,7 +736,7 @@ func TestAdminSubscriptionPricingControlPlane(t *testing.T) {
 	if err := json.NewDecoder(userSubRec.Body).Decode(&userSubResp); err != nil {
 		t.Fatalf("decode user subscription: %v", err)
 	}
-	if userSubResp.Data.UserId != loginResp.Data.User.Id || userSubResp.Data.PlanId != planResp.Data.Id || userSubResp.Data.Status != apiopenapi.Active {
+	if userSubResp.Data.UserId != loginResp.Data.User.Id || userSubResp.Data.PlanId != planResp.Data.Id || userSubResp.Data.Status != apiopenapi.UserSubscriptionStatusActive {
 		t.Fatalf("unexpected user subscription response: %+v", userSubResp.Data)
 	}
 	if userSubResp.Data.EntitlementsSnapshot["scheduler_strategy"] != "cost_saver" {
