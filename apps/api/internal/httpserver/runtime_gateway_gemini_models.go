@@ -101,6 +101,9 @@ func geminiSupportedGenerationMethods(model modelcontract.Model) []apiopenapi.Ge
 	if modelHasCapability(model, capabilitiescontract.KeyStreaming) {
 		methods = append(methods, apiopenapi.StreamGenerateContent)
 	}
+	if modelHasCapability(model, capabilitiescontract.KeyTokenCounting) {
+		methods = append(methods, apiopenapi.CountTokens)
+	}
 	return methods
 }
 

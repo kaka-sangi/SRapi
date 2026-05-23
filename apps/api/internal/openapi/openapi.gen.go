@@ -2255,6 +2255,27 @@ type GeminiContent struct {
 // GeminiContentRole defines model for GeminiContent.Role.
 type GeminiContentRole string
 
+// GeminiCountTokensRequest defines model for GeminiCountTokensRequest.
+type GeminiCountTokensRequest struct {
+	Contents               *[]GeminiContent              `json:"contents,omitempty"`
+	GenerateContentRequest *GeminiGenerateContentRequest `json:"generateContentRequest,omitempty"`
+	GenerationConfig       *GeminiGenerationConfig       `json:"generationConfig,omitempty"`
+	SafetySettings         *[]JsonObject                 `json:"safetySettings,omitempty"`
+	SystemInstruction      *GeminiContent                `json:"systemInstruction,omitempty"`
+	ToolConfig             *JsonObject                   `json:"toolConfig,omitempty"`
+	Tools                  *[]JsonObject                 `json:"tools,omitempty"`
+	AdditionalProperties   map[string]interface{}        `json:"-"`
+}
+
+// GeminiCountTokensResponse defines model for GeminiCountTokensResponse.
+type GeminiCountTokensResponse struct {
+	CacheTokensDetails      *[]GeminiModalityTokenCount `json:"cacheTokensDetails,omitempty"`
+	CachedContentTokenCount *int                        `json:"cachedContentTokenCount,omitempty"`
+	PromptTokensDetails     *[]GeminiModalityTokenCount `json:"promptTokensDetails,omitempty"`
+	TotalTokens             int                         `json:"totalTokens"`
+	AdditionalProperties    map[string]interface{}      `json:"-"`
+}
+
 // GeminiErrorObject defines model for GeminiErrorObject.
 type GeminiErrorObject struct {
 	Code    int           `json:"code"`
@@ -2297,6 +2318,13 @@ type GeminiGenerationConfig struct {
 	Temperature          *float32               `json:"temperature,omitempty"`
 	TopK                 *int                   `json:"topK,omitempty"`
 	TopP                 *float32               `json:"topP,omitempty"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// GeminiModalityTokenCount defines model for GeminiModalityTokenCount.
+type GeminiModalityTokenCount struct {
+	Modality             string                 `json:"modality"`
+	TokenCount           int                    `json:"tokenCount"`
 	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
@@ -3905,6 +3933,9 @@ type CreateRerankJSONRequestBody = RerankRequest
 // CreateResponseJSONRequestBody defines body for CreateResponse for application/json ContentType.
 type CreateResponseJSONRequestBody = ResponsesRequest
 
+// CountGeminiTokensJSONRequestBody defines body for CountGeminiTokens for application/json ContentType.
+type CountGeminiTokensJSONRequestBody = GeminiCountTokensRequest
+
 // GenerateGeminiContentJSONRequestBody defines body for GenerateGeminiContent for application/json ContentType.
 type GenerateGeminiContentJSONRequestBody = GeminiGenerateContentRequest
 
@@ -5452,6 +5483,275 @@ func (a GeminiContent) MarshalJSON() ([]byte, error) {
 	return json.Marshal(object)
 }
 
+// Getter for additional properties for GeminiCountTokensRequest. Returns the specified
+// element and whether it was found
+func (a GeminiCountTokensRequest) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for GeminiCountTokensRequest
+func (a *GeminiCountTokensRequest) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for GeminiCountTokensRequest to handle AdditionalProperties
+func (a *GeminiCountTokensRequest) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["contents"]; found {
+		err = json.Unmarshal(raw, &a.Contents)
+		if err != nil {
+			return fmt.Errorf("error reading 'contents': %w", err)
+		}
+		delete(object, "contents")
+	}
+
+	if raw, found := object["generateContentRequest"]; found {
+		err = json.Unmarshal(raw, &a.GenerateContentRequest)
+		if err != nil {
+			return fmt.Errorf("error reading 'generateContentRequest': %w", err)
+		}
+		delete(object, "generateContentRequest")
+	}
+
+	if raw, found := object["generationConfig"]; found {
+		err = json.Unmarshal(raw, &a.GenerationConfig)
+		if err != nil {
+			return fmt.Errorf("error reading 'generationConfig': %w", err)
+		}
+		delete(object, "generationConfig")
+	}
+
+	if raw, found := object["safetySettings"]; found {
+		err = json.Unmarshal(raw, &a.SafetySettings)
+		if err != nil {
+			return fmt.Errorf("error reading 'safetySettings': %w", err)
+		}
+		delete(object, "safetySettings")
+	}
+
+	if raw, found := object["systemInstruction"]; found {
+		err = json.Unmarshal(raw, &a.SystemInstruction)
+		if err != nil {
+			return fmt.Errorf("error reading 'systemInstruction': %w", err)
+		}
+		delete(object, "systemInstruction")
+	}
+
+	if raw, found := object["toolConfig"]; found {
+		err = json.Unmarshal(raw, &a.ToolConfig)
+		if err != nil {
+			return fmt.Errorf("error reading 'toolConfig': %w", err)
+		}
+		delete(object, "toolConfig")
+	}
+
+	if raw, found := object["tools"]; found {
+		err = json.Unmarshal(raw, &a.Tools)
+		if err != nil {
+			return fmt.Errorf("error reading 'tools': %w", err)
+		}
+		delete(object, "tools")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for GeminiCountTokensRequest to handle AdditionalProperties
+func (a GeminiCountTokensRequest) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.Contents != nil {
+		object["contents"], err = json.Marshal(a.Contents)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'contents': %w", err)
+		}
+	}
+
+	if a.GenerateContentRequest != nil {
+		object["generateContentRequest"], err = json.Marshal(a.GenerateContentRequest)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'generateContentRequest': %w", err)
+		}
+	}
+
+	if a.GenerationConfig != nil {
+		object["generationConfig"], err = json.Marshal(a.GenerationConfig)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'generationConfig': %w", err)
+		}
+	}
+
+	if a.SafetySettings != nil {
+		object["safetySettings"], err = json.Marshal(a.SafetySettings)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'safetySettings': %w", err)
+		}
+	}
+
+	if a.SystemInstruction != nil {
+		object["systemInstruction"], err = json.Marshal(a.SystemInstruction)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'systemInstruction': %w", err)
+		}
+	}
+
+	if a.ToolConfig != nil {
+		object["toolConfig"], err = json.Marshal(a.ToolConfig)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'toolConfig': %w", err)
+		}
+	}
+
+	if a.Tools != nil {
+		object["tools"], err = json.Marshal(a.Tools)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'tools': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for GeminiCountTokensResponse. Returns the specified
+// element and whether it was found
+func (a GeminiCountTokensResponse) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for GeminiCountTokensResponse
+func (a *GeminiCountTokensResponse) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for GeminiCountTokensResponse to handle AdditionalProperties
+func (a *GeminiCountTokensResponse) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["cacheTokensDetails"]; found {
+		err = json.Unmarshal(raw, &a.CacheTokensDetails)
+		if err != nil {
+			return fmt.Errorf("error reading 'cacheTokensDetails': %w", err)
+		}
+		delete(object, "cacheTokensDetails")
+	}
+
+	if raw, found := object["cachedContentTokenCount"]; found {
+		err = json.Unmarshal(raw, &a.CachedContentTokenCount)
+		if err != nil {
+			return fmt.Errorf("error reading 'cachedContentTokenCount': %w", err)
+		}
+		delete(object, "cachedContentTokenCount")
+	}
+
+	if raw, found := object["promptTokensDetails"]; found {
+		err = json.Unmarshal(raw, &a.PromptTokensDetails)
+		if err != nil {
+			return fmt.Errorf("error reading 'promptTokensDetails': %w", err)
+		}
+		delete(object, "promptTokensDetails")
+	}
+
+	if raw, found := object["totalTokens"]; found {
+		err = json.Unmarshal(raw, &a.TotalTokens)
+		if err != nil {
+			return fmt.Errorf("error reading 'totalTokens': %w", err)
+		}
+		delete(object, "totalTokens")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for GeminiCountTokensResponse to handle AdditionalProperties
+func (a GeminiCountTokensResponse) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.CacheTokensDetails != nil {
+		object["cacheTokensDetails"], err = json.Marshal(a.CacheTokensDetails)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'cacheTokensDetails': %w", err)
+		}
+	}
+
+	if a.CachedContentTokenCount != nil {
+		object["cachedContentTokenCount"], err = json.Marshal(a.CachedContentTokenCount)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'cachedContentTokenCount': %w", err)
+		}
+	}
+
+	if a.PromptTokensDetails != nil {
+		object["promptTokensDetails"], err = json.Marshal(a.PromptTokensDetails)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'promptTokensDetails': %w", err)
+		}
+	}
+
+	object["totalTokens"], err = json.Marshal(a.TotalTokens)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'totalTokens': %w", err)
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
 // Getter for additional properties for GeminiGenerateContentRequest. Returns the specified
 // element and whether it was found
 func (a GeminiGenerateContentRequest) Get(fieldName string) (value interface{}, found bool) {
@@ -5742,6 +6042,85 @@ func (a GeminiGenerationConfig) MarshalJSON() ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error marshaling 'topP': %w", err)
 		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for GeminiModalityTokenCount. Returns the specified
+// element and whether it was found
+func (a GeminiModalityTokenCount) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for GeminiModalityTokenCount
+func (a *GeminiModalityTokenCount) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for GeminiModalityTokenCount to handle AdditionalProperties
+func (a *GeminiModalityTokenCount) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["modality"]; found {
+		err = json.Unmarshal(raw, &a.Modality)
+		if err != nil {
+			return fmt.Errorf("error reading 'modality': %w", err)
+		}
+		delete(object, "modality")
+	}
+
+	if raw, found := object["tokenCount"]; found {
+		err = json.Unmarshal(raw, &a.TokenCount)
+		if err != nil {
+			return fmt.Errorf("error reading 'tokenCount': %w", err)
+		}
+		delete(object, "tokenCount")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for GeminiModalityTokenCount to handle AdditionalProperties
+func (a GeminiModalityTokenCount) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	object["modality"], err = json.Marshal(a.Modality)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'modality': %w", err)
+	}
+
+	object["tokenCount"], err = json.Marshal(a.TokenCount)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'tokenCount': %w", err)
 	}
 
 	for fieldName, field := range a.AdditionalProperties {
@@ -9377,6 +9756,9 @@ type ServerInterface interface {
 	// List Gemini-compatible models available to the gateway API key.
 	// (GET /v1beta/models)
 	ListGeminiModels(w http.ResponseWriter, r *http.Request, params ListGeminiModelsParams)
+	// Count tokens with the Gemini-compatible gateway route.
+	// (POST /v1beta/models/{model}:countTokens)
+	CountGeminiTokens(w http.ResponseWriter, r *http.Request, model GeminiModel)
 	// Generate content with the Gemini-compatible gateway route.
 	// (POST /v1beta/models/{model}:generateContent)
 	GenerateGeminiContent(w http.ResponseWriter, r *http.Request, model GeminiModel)
@@ -12923,6 +13305,38 @@ func (siw *ServerInterfaceWrapper) ListGeminiModels(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// CountGeminiTokens operation middleware
+func (siw *ServerInterfaceWrapper) CountGeminiTokens(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "model" -------------
+	var model GeminiModel
+
+	err = runtime.BindStyledParameterWithOptions("simple", "model", r.PathValue("model"), &model, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "model", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CountGeminiTokens(w, r, model)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GenerateGeminiContent operation middleware
 func (siw *ServerInterfaceWrapper) GenerateGeminiContent(w http.ResponseWriter, r *http.Request) {
 
@@ -13205,6 +13619,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/responses", wrapper.CreateResponse)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/responses/ws", wrapper.ConnectResponsesWebSocket)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1beta/models", wrapper.ListGeminiModels)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1beta/models/{model}:countTokens", wrapper.CountGeminiTokens)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1beta/models/{model}:generateContent", wrapper.GenerateGeminiContent)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1beta/models/{model}:streamGenerateContent", wrapper.StreamGeminiContent)
 

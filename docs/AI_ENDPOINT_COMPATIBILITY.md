@@ -69,6 +69,7 @@ SRapi 必须在 Provider Adapter 层支持 Gemini 原生请求模型：
 ```txt
 models/{model}:generateContent
 models/{model}:streamGenerateContent
+models/{model}:countTokens
 models/{model}:embedContent
 ```
 
@@ -78,11 +79,14 @@ WP-230 起公开 Gemini-native 文本生成路由：
 GET  /v1beta/models
 POST /v1beta/models/{model}:generateContent
 POST /v1beta/models/{model}:streamGenerateContent
+POST /v1beta/models/{model}:countTokens
 ```
 
 这些路由完成客户端侧 Gemini GenerateContent 与 Canonical AI Request / Response 的转换，并复用 Gateway API Key、模型策略、Scheduler、Provider Adapter、usage 和 decision 记录。WP-240 起，目标 Provider 为 `gemini-compatible` / `native-gemini` / `reverse-proxy-gemini-cli` 时，Provider Adapter 会调用 Gemini `generateContent` 或 `streamGenerateContent` 上游。
 
-WP-540 起，`GET /v1beta/models` 返回 Gemini `models.list` 兼容的 `{models,nextPageToken}`，只基于 SRapi model registry 和 Gateway API Key 可见性渲染 active models。响应 model name 使用 `models/{canonical_name}`，并包含 `baseModelId`、`version`、`displayName`、`inputTokenLimit`、`outputTokenLimit` 和 `supportedGenerationMethods`；`pageSize` / `pageToken` 非法时返回 Google-style `INVALID_ARGUMENT`。该目录路由不进入 Scheduler、不读取 Provider Account 凭证、也不做上游模型发现。
+WP-540 起，`GET /v1beta/models` 返回 Gemini `models.list` 兼容的 `{models,nextPageToken}`，只基于 SRapi model registry 和 Gateway API Key 可见性渲染 active models。响应 model name 使用 `models/{canonical_name}`，并包含 `baseModelId`、`version`、`displayName`、`inputTokenLimit`、`outputTokenLimit` 和 `supportedGenerationMethods`；`supportedGenerationMethods` 至少包含 `generateContent`，并按模型能力追加 `streamGenerateContent` 与 `countTokens`。`pageSize` / `pageToken` 非法时返回 Google-style `INVALID_ARGUMENT`。该目录路由不进入 Scheduler、不读取 Provider Account 凭证、也不做上游模型发现。
+
+WP-550 起，`POST /v1beta/models/{model}:countTokens` 接受 Gemini `countTokens` body：可直接提供 `contents`、`systemInstruction`、`generationConfig`、`tools` 等字段，也可提供 `generateContentRequest`。该路由只把请求归一化用于 Gateway policy / entitlement / Scheduler，不构造本地 Provider DTO；Provider Adapter 将原始 Gemini countTokens body 发送到选中上游 `models/{mapped_model}:countTokens`。API-key Gemini 账号按 Gemini auth mode 注入凭证，`runtime_class != api_key` 的 Gemini 反代账号仍通过 Reverse Proxy Runtime 使用选中账号 OAuth/session/client-token 凭证。成功 countTokens 请求记录 Scheduler decision/feedback 和 request evidence，但不进入生成用量，usage tokens 与 cost 记 0。
 
 ### 2.4 OpenRouter 与其他聚合协议
 

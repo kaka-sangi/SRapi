@@ -2164,7 +2164,7 @@ Definition of Done:
 - The response only includes active models visible to the API key and presents names as `models/{canonical_name}`.
 - `pageSize` and `pageToken` query parameters provide deterministic pagination; invalid pagination returns Gemini `INVALID_ARGUMENT`.
 - Gemini model objects include stable SRapi-derived fields: `name`, `baseModelId`, `version`, `displayName`, `inputTokenLimit`, `outputTokenLimit`, and `supportedGenerationMethods`.
-- `supportedGenerationMethods` is derived from SRapi model capabilities and includes at least `generateContent` for text-capable models plus `streamGenerateContent` for streaming-capable models.
+- `supportedGenerationMethods` is derived from SRapi model capabilities and includes at least `generateContent` for text-capable models, plus `streamGenerateContent` for streaming-capable models and `countTokens` for token-counting-capable models.
 - No Scheduler lease is acquired, no Provider Account credential is touched, and no frontend visuals are added.
 
 Required gates:
@@ -2182,12 +2182,62 @@ Required gates:
 - `make secret-scan`
 - `git diff --check`
 
+## WP-550: Gemini Native Count Tokens v1
+
+Objective: implement Gemini-compatible `POST /v1beta/models/{model}:countTokens` so Gemini SDK-style clients can count prompt tokens through SRapi without treating token counting as generation usage or bypassing Provider Account scheduling.
+
+Read first:
+
+- `docs/OPENAPI_CONTRACT.md`
+- `docs/GATEWAY_ROUTE_MATRIX.md`
+- `docs/AI_ENDPOINT_COMPATIBILITY.md`
+- `docs/CAPABILITY_TAXONOMY_SPEC.md`
+- `packages/openapi/openapi.yaml`
+- Gemini official `models.countTokens` REST contract
+- `apps/api/internal/httpserver/runtime_gateway_handlers.go`
+- `apps/api/internal/modules/provider_adapters`
+- `apps/api/internal/modules/gateway`
+
+Owns:
+
+- OpenAPI `POST /v1beta/models/{model}:countTokens` contract and generated Go/TypeScript SDK drift.
+- Gemini countTokens Gateway handler with API key auth, model visibility, entitlement, Scheduler, and Google-style errors.
+- Provider Adapter dispatch to Gemini `models/{mapped_model}:countTokens` for API-key and reverse-proxy Gemini accounts.
+- `token_counting` capability taxonomy and Scheduler filtering for countTokens requests.
+- Route matrix / endpoint compatibility docs and focused adapter + HTTP regressions.
+
+Definition of Done:
+
+- `POST /v1beta/models/{model}:countTokens` is OpenAPI-described, secured with `gatewayBearerAuth`, and returns Google-shaped `GeminiCountTokensResponse`.
+- Requests accept top-level Gemini countTokens fields or `generateContentRequest`.
+- Gateway normalization is only used for policy, entitlement, Scheduler, and evidence; Provider Adapter forwards the original countTokens body to upstream and does not create Gateway-local provider DTOs.
+- Gemini API-key accounts inject credentials according to Gemini auth mode.
+- `runtime_class != api_key` Gemini accounts use Reverse Proxy Runtime with the selected account credentials.
+- Scheduler requires `token_counting.v1`, and models/accounts without that capability are rejected before upstream dispatch.
+- Successful countTokens requests record Scheduler decision/feedback and request evidence, but generation usage tokens and cost remain 0.
+- No frontend visuals are added.
+
+Required gates:
+
+- `make openapi-lint`
+- `make openapi-bundle`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/httpserver -run 'TestGatewayGeminiCountTokens' -count=1`
+- `cd apps/api && go test ./internal/modules/gateway/... ./internal/modules/provider_adapters/... ./internal/httpserver`
+- `cd apps/api && go test ./...`
+- `make architecture-check`
+- `make code-quality-check`
+- `make secret-scan`
+- `git diff --check`
+
 ## WP-500+: Ecosystem And Remaining Advanced Surface
 
 Use `ROADMAP.md` Phase 7 through Phase 8 to split future packages for:
 
 - provider-native realtime protocol adapters and richer slot lifecycle
-- token counting endpoint
+- Anthropic count_tokens endpoint
 - SDK examples and migration guides
 
 Each new package must be added here before implementation starts.

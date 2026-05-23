@@ -25,6 +25,7 @@ const (
 	EndpointRealtime              SourceEndpoint = "/v1/realtime"
 	EndpointGeminiGenerateContent SourceEndpoint = "/v1beta/models/{model}:generateContent"
 	EndpointGeminiStreamContent   SourceEndpoint = "/v1beta/models/{model}:streamGenerateContent"
+	EndpointGeminiCountTokens     SourceEndpoint = "/v1beta/models/{model}:countTokens"
 )
 
 type ContentBlockType string
@@ -253,4 +254,22 @@ type RerankResponse struct {
 	Results               []RerankResult
 	Usage                 Usage
 	CompatibilityWarnings []string
+}
+
+type ModalityTokenCount struct {
+	Modality   string
+	TokenCount int
+	Metadata   map[string]any
+}
+
+type TokenCountResponse struct {
+	RequestID               string
+	Model                   string
+	CanonicalModel          string
+	TotalTokens             int
+	CachedContentTokenCount *int
+	PromptTokensDetails     []ModalityTokenCount
+	CacheTokensDetails      []ModalityTokenCount
+	Metadata                map[string]any
+	CompatibilityWarnings   []string
 }

@@ -109,6 +109,7 @@ audio_transcriptions
 audio_speech
 moderations
 rerank
+token_counting
 ```
 
 `audio_transcriptions` 表示 Provider Account 能处理 `/v1/audio/transcriptions` 兼容端点；`audio_input` 表示模型/Provider 能消费音频输入，`text_output` 表示可产出转写文本。Gateway audio transcription 请求必须要求 `audio_transcriptions.v1`，避免 text-only 或 image-only provider 被误选。
@@ -118,6 +119,8 @@ rerank
 `moderations` 表示 Provider Account 能处理 `/v1/moderations` 兼容端点；`moderation_output` 表示模型/Provider 能产出审核分类结果。Gateway moderation 请求必须要求 `moderations.v1`，避免只具备文本生成能力的候选账号被误选。
 
 `rerank` 表示 Provider Account 能处理 `/v1/rerank` 兼容端点；`rerank_output` 表示模型/Provider 能产出排序评分。Gateway rerank 请求必须要求 `rerank.v1`，避免 generation-only 或 embedding-only provider 被误选。
+
+`token_counting` 表示 Provider Account 能处理原生 token counting 端点，例如 Gemini `models/{model}:countTokens`。Gateway countTokens 请求必须要求 `token_counting.v1`，避免只具备生成能力但没有计数端点的候选账号被误选；计数结果不代表生成用量。
 
 ### 4.3 交互能力
 

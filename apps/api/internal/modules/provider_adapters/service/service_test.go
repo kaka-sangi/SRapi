@@ -1082,6 +1082,50 @@ func TestGeminiCompatibleAdapterAcceptsModelsBaseURL(t *testing.T) {
 	}
 }
 
+func TestGeminiCompatibleAdapterCountsTokensUpstream(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1beta/models/gemini-pro:countTokens" || r.URL.Query().Get("key") != "gemini-secret" {
+			t.Fatalf("unexpected token count upstream request %s?%s", r.URL.Path, r.URL.RawQuery)
+		}
+		var payload struct {
+			Contents []struct {
+				Parts []struct {
+					Text string `json:"text"`
+				} `json:"parts"`
+			} `json:"contents"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode token count payload: %v", err)
+		}
+		if len(payload.Contents) != 1 || payload.Contents[0].Parts[0].Text != "count these tokens" {
+			t.Fatalf("unexpected token count payload: %+v", payload)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"totalTokens":13,"cachedContentTokenCount":2,"promptTokensDetails":[{"modality":"TEXT","tokenCount":11}]}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeTokenCount(context.Background(), contract.TokenCountRequest{
+		RequestID:  "req_gemini_count",
+		Model:      "gemini-local",
+		RawBody:    []byte(`{"contents":[{"role":"user","parts":[{"text":"count these tokens"}]}]}`),
+		Provider:   providercontract.Provider{AdapterType: "native-gemini", Protocol: "gemini-compatible"},
+		Account:    accountcontract.ProviderAccount{ID: 1, Metadata: map[string]any{"base_url": upstream.URL + "/v1beta"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gemini-pro"},
+		Credential: map[string]any{"api_key": "gemini-secret"},
+	})
+	if err != nil {
+		t.Fatalf("count gemini tokens: %v", err)
+	}
+	if resp.TotalTokens != 13 || resp.CachedContentTokenCount == nil || *resp.CachedContentTokenCount != 2 || len(resp.PromptTokensDetails) != 1 || resp.PromptTokensDetails[0].Modality != "TEXT" {
+		t.Fatalf("unexpected token count response: %+v", resp)
+	}
+}
+
 func TestGeminiCompatibleAdapterClassifiesGoogleError(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -1158,6 +1202,48 @@ func TestReverseProxyGeminiAdapterDispatchesThroughRuntime(t *testing.T) {
 	}
 	if len(payload.Contents) != 1 || payload.Contents[0].Parts[0].Text != "hello" {
 		t.Fatalf("unexpected reverse gemini payload: %+v", payload)
+	}
+}
+
+func TestReverseProxyGeminiAdapterCountsTokensThroughRuntime(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body:       []byte(`{"totalTokens":21}`),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeTokenCount(context.Background(), contract.TokenCountRequest{
+		RequestID: "req_reverse_gemini_count",
+		Model:     "gemini-local",
+		RawBody:   []byte(`{"contents":[{"parts":[{"text":"hello"}]}]}`),
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-gemini-cli",
+			Protocol:    "gemini-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("gemini_cli"),
+			Metadata:       map[string]any{"base_url": "https://generativelanguage.googleapis.com/v1beta", "user_agent": "GeminiCLI/1.0"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gemini-pro"},
+		Credential: map[string]any{"cli_client_token": "cli-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke reverse gemini token count: %v", err)
+	}
+	if resp.TotalTokens != 21 {
+		t.Fatalf("unexpected reverse gemini count response: %+v", resp)
+	}
+	if runtime.request.Method != http.MethodPost || runtime.request.URL != "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:countTokens" {
+		t.Fatalf("unexpected reverse gemini count request: %+v", runtime.request)
+	}
+	if runtime.request.Account.RuntimeClass != string(accountcontract.RuntimeClassCliClientToken) || runtime.request.Account.Credential["cli_client_token"] != "cli-token" {
+		t.Fatalf("expected selected-account runtime context, got %+v", runtime.request.Account)
 	}
 }
 

@@ -54,6 +54,7 @@ const (
 	KeyAudioSpeech         = "audio_speech"
 	KeyModerations         = "moderations"
 	KeyRerank              = "rerank"
+	KeyTokenCounting       = "token_counting"
 )
 
 type DefinitionStatus string
@@ -97,6 +98,7 @@ var defaultDefinitions = []Definition{
 	{Key: KeyAudioSpeech, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports audio speech synthesis."},
 	{Key: KeyModerations, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports moderation classification."},
 	{Key: KeyRerank, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports document reranking."},
+	{Key: KeyTokenCounting, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports native token counting."},
 }
 
 var knownKeys = func() map[string]Definition {
@@ -154,6 +156,10 @@ var convenienceKeys = map[string]string{
 	"supports_reranking":            KeyRerank,
 	"rerank":                        KeyRerank,
 	"reranking":                     KeyRerank,
+	"supports_token_counting":       KeyTokenCounting,
+	"supports_count_tokens":         KeyTokenCounting,
+	"count_tokens":                  KeyTokenCounting,
+	"token_counting":                KeyTokenCounting,
 }
 
 func DefaultDefinitions() []Definition {

@@ -61,12 +61,13 @@ last_completed:
 - WP-520: Images edits streaming events now let `/v1/images/edits` and OpenAI-compatible image edit aliases return `text/event-stream` when `stream=true`, synthesize a final `image.generation.result` SSE chunk through the existing Gateway/auth/Scheduler/Provider Adapter/usage path, and keep remote URL / `file_id` rejection unchanged.
 - WP-530: Antigravity project bootstrap now lets `reverse-proxy-antigravity` discovery use selected-account credentials through Reverse Proxy Runtime to call `/v1internal:loadCodeAssist` and, when needed, `/v1internal:onboardUser` before model discovery; preview remains side-effect free and persisted discovery writes resolved project metadata.
 - WP-540: Gemini native models list now exposes `GET /v1beta/models`, authenticates Gateway API keys, filters active SRapi model registry entries by API-key visibility, renders Google-shaped `models.list` responses with pagination and supported generation methods, and does not acquire Scheduler leases or touch Provider Account credentials.
+- WP-550: Gemini native countTokens now exposes `POST /v1beta/models/{model}:countTokens`, advertises `countTokens` in Gemini `models.list` when the SRapi model has `token_counting`, accepts Gemini countTokens body or `generateContentRequest`, schedules only `token_counting` capable Gemini accounts, dispatches upstream `models/{mapped_model}:countTokens` through API-key or Reverse Proxy Runtime credentials, and records Scheduler/request evidence without generation usage or cost.
 
 current:
 
 - package: WP-500+
 - status: pending
-- objective: split the next ecosystem or remaining advanced endpoint package from the roadmap after WP-540.
+- objective: split the next ecosystem or remaining advanced endpoint package from the roadmap after WP-550.
 
 next_recommended: WP-500+
 
@@ -77,8 +78,8 @@ last_gates:
 - `make openapi-codegen-check`: pass
 - `make openapi-ts-codegen-check`: pass
 - `make sdk-ts-typecheck`: pass
-- `cd apps/api && go test ./internal/httpserver -run 'TestGatewayGeminiListModels' -count=1`: pass
-- `cd apps/api && go test ./internal/httpserver ./internal/modules/gateway/...`: pass
+- `cd apps/api && go test ./internal/httpserver -run 'TestGatewayGeminiCountTokens' -count=1`: pass
+- `cd apps/api && go test ./internal/modules/gateway/... ./internal/modules/provider_adapters/... ./internal/httpserver`: pass
 - `cd apps/api && go test ./...`: pass
 - `make architecture-check`: pass
 - `make code-quality-check`: pass
@@ -171,6 +172,8 @@ notes:
 - WP-530 intentionally does not invoke local Antigravity, add Gateway-local DTOs, or implement full Antigravity OAuth onboarding UI/API, credit overage retry policy, or provider-native realtime.
 - WP-540 added `TestGatewayGeminiListModels` and `TestGatewayGeminiListModelsRejectsInvalidPaginationAndDisabledKey`, proving Gemini models.list shape, API-key visibility filtering, pagination, supported generation method derivation, and Google-style errors.
 - WP-540 intentionally does not schedule Provider Accounts, call upstream Gemini model discovery, create usage records for catalog listing, or add frontend visuals.
+- WP-550 added `TestGeminiCompatibleAdapterCountsTokensUpstream`, `TestReverseProxyGeminiAdapterCountsTokensThroughRuntime`, and `TestGatewayGeminiCountTokensSchedulesGeminiCompatibleUpstream`, proving Gemini countTokens API-key dispatch, selected-account reverse-proxy dispatch, Scheduler capability filtering, Google-shaped response rendering, and zero generation usage/cost evidence. The countTokens service logic is split into ownership-specific `gemini_count_tokens.go` files so `code-quality-check` file-size gates stay meaningful.
+- WP-550 intentionally does not implement Anthropic `/v1/messages/count_tokens`, OpenAI tokenizer estimation, provider-native realtime adapters, SDK examples, or frontend visuals.
 
 ## Work Package Ledger
 
@@ -231,4 +234,5 @@ notes:
 | WP-520 | completed | Images edits streaming events v1. |
 | WP-530 | completed | Antigravity project bootstrap for 2api model discovery v1. |
 | WP-540 | completed | Gemini native models list v1. |
+| WP-550 | completed | Gemini native countTokens v1. |
 | WP-500+ | pending | Remaining ecosystem and advanced endpoint packages. |

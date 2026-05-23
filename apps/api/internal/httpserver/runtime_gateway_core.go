@@ -743,6 +743,27 @@ func parseGeminiModelAction(path string) (string, bool, bool) {
 	return model, stream, true
 }
 
+func parseGeminiCountTokens(path string) (string, bool) {
+	raw := strings.TrimPrefix(path, "/v1beta/models/")
+	if raw == path || strings.TrimSpace(raw) == "" || !strings.HasSuffix(raw, ":countTokens") {
+		return "", false
+	}
+	model := strings.TrimSuffix(raw, ":countTokens")
+	model = strings.Trim(model, "/")
+	if model == "" {
+		return "", false
+	}
+	if decoded, err := url.PathUnescape(model); err == nil {
+		model = decoded
+	}
+	model = strings.TrimPrefix(model, "models/")
+	model = strings.TrimSpace(model)
+	if model == "" {
+		return "", false
+	}
+	return model, true
+}
+
 func effectiveCapabilities(model modelcontract.Model, mapping modelcontract.ModelProviderMapping, provider providercontract.Provider, account accountcontract.ProviderAccount) []capabilitiescontract.Descriptor {
 	merged := map[string]capabilitiescontract.Descriptor{}
 	for _, descriptor := range model.Capabilities {
@@ -1028,6 +1049,28 @@ func (rt *runtimeState) invokeProviderText(ctx context.Context, req provideradap
 	return resp, nil
 }
 
+func (rt *runtimeState) invokeProviderTokenCount(ctx context.Context, req provideradaptercontract.TokenCountRequest) (provideradaptercontract.TokenCountResponse, error) {
+	if req.Account.ID <= 0 {
+		return provideradaptercontract.TokenCountResponse{}, provideradaptercontract.ProviderError{Class: "no_available_account", StatusCode: http.StatusServiceUnavailable, Message: "provider account missing"}
+	}
+	credential, err := rt.accounts.DecryptCredential(ctx, req.Account.ID)
+	if err != nil {
+		return provideradaptercontract.TokenCountResponse{}, provideradaptercontract.ProviderError{Class: "credential_error", StatusCode: http.StatusBadGateway, Message: "provider credential unavailable"}
+	}
+	if refreshed, ok, err := rt.refreshReverseProxyCredential(ctx, req.Account, credential); err != nil {
+		return provideradaptercontract.TokenCountResponse{}, provideradaptercontract.ProviderError{Class: "auth_failed", StatusCode: http.StatusBadGateway, Message: "provider credential refresh failed"}
+	} else if ok {
+		credential = refreshed
+	}
+	req.Credential = credential
+	resp, err := rt.adapters.InvokeTokenCount(ctx, req)
+	if err != nil {
+		rt.applyProviderAccountProtection(ctx, req.Account, err)
+		return provideradaptercontract.TokenCountResponse{}, err
+	}
+	return resp, nil
+}
+
 func (rt *runtimeState) invokeProviderEmbeddings(ctx context.Context, req provideradaptercontract.EmbeddingRequest) (provideradaptercontract.EmbeddingResponse, error) {
 	if req.Account.ID <= 0 {
 		return provideradaptercontract.EmbeddingResponse{}, provideradaptercontract.ProviderError{Class: "no_available_account", StatusCode: http.StatusServiceUnavailable, Message: "provider account missing"}
@@ -1224,6 +1267,19 @@ func providerTextRequest(req gatewaycontract.CanonicalRequest, candidate schedul
 		Provider:        candidate.Provider,
 		Account:         candidate.Account,
 		Mapping:         candidate.Mapping,
+	}
+}
+
+func providerTokenCountRequest(req gatewaycontract.CanonicalRequest, rawBody []byte, candidate schedulercontract.Candidate) provideradaptercontract.TokenCountRequest {
+	return provideradaptercontract.TokenCountRequest{
+		RequestID:      req.RequestID,
+		SourceProtocol: string(req.SourceProtocol),
+		SourceEndpoint: req.SourceEndpoint,
+		Model:          req.CanonicalModel,
+		RawBody:        append([]byte(nil), rawBody...),
+		Provider:       candidate.Provider,
+		Account:        candidate.Account,
+		Mapping:        candidate.Mapping,
 	}
 }
 
@@ -1533,6 +1589,31 @@ func reverseProxyAccountFailureStatus(class string) (accountcontract.Status, boo
 	default:
 		return "", false
 	}
+}
+
+func gatewayTokenCountFromProvider(resp provideradaptercontract.TokenCountResponse) gatewaycontract.TokenCountResponse {
+	return gatewaycontract.TokenCountResponse{
+		TotalTokens:             resp.TotalTokens,
+		CachedContentTokenCount: cloneIntPtr(resp.CachedContentTokenCount),
+		PromptTokensDetails:     gatewayModalityTokenCountsFromProvider(resp.PromptTokensDetails),
+		CacheTokensDetails:      gatewayModalityTokenCountsFromProvider(resp.CacheTokensDetails),
+		Metadata:                cloneAnyMap(resp.Metadata),
+	}
+}
+
+func gatewayModalityTokenCountsFromProvider(values []provideradaptercontract.ModalityTokenCount) []gatewaycontract.ModalityTokenCount {
+	if len(values) == 0 {
+		return nil
+	}
+	out := make([]gatewaycontract.ModalityTokenCount, 0, len(values))
+	for _, value := range values {
+		out = append(out, gatewaycontract.ModalityTokenCount{
+			Modality:   value.Modality,
+			TokenCount: value.TokenCount,
+			Metadata:   cloneAnyMap(value.Metadata),
+		})
+	}
+	return out
 }
 
 func gatewayUsageFromProvider(resp provideradaptercontract.TextResponse) gatewaycontract.Usage {

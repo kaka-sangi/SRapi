@@ -31,6 +31,18 @@ type TextRequest struct {
 	Credential      map[string]any
 }
 
+type TokenCountRequest struct {
+	RequestID      string
+	SourceProtocol string
+	SourceEndpoint string
+	Model          string
+	RawBody        []byte
+	Provider       providercontract.Provider
+	Account        accountcontract.ProviderAccount
+	Mapping        modelcontract.ModelProviderMapping
+	Credential     map[string]any
+}
+
 type TextMessage struct {
 	Role    string
 	Content string
@@ -284,6 +296,21 @@ type RerankResponse struct {
 	Model      string
 	StatusCode int
 	Usage      Usage
+}
+
+type TokenCountResponse struct {
+	TotalTokens             int
+	CachedContentTokenCount *int
+	PromptTokensDetails     []ModalityTokenCount
+	CacheTokensDetails      []ModalityTokenCount
+	StatusCode              int
+	Metadata                map[string]any
+}
+
+type ModalityTokenCount struct {
+	Modality   string
+	TokenCount int
+	Metadata   map[string]any
 }
 
 type TextResponse struct {

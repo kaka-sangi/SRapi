@@ -3174,6 +3174,46 @@ paths:
         default:
           $ref: "#/components/responses/GeminiGatewayError"
 
+  /v1beta/models/{model}:countTokens:
+    post:
+      tags:
+        - Gateway
+      operationId: countGeminiTokens
+      summary: Count tokens with the Gemini-compatible gateway route.
+      description: Gemini-compatible countTokens route. SRapi authenticates the gateway API key, applies model visibility and entitlement policy, schedules an eligible provider account, invokes the selected provider adapter using upstream countTokens shape, and renders the upstream token count. Successful count requests record Scheduler and request evidence with zero generation usage/cost.
+      security:
+        - gatewayBearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GeminiModel"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GeminiCountTokensRequest"
+      responses:
+        "200":
+          description: Gemini-compatible countTokens response.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeminiCountTokensResponse"
+        "400":
+          $ref: "#/components/responses/GeminiGatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GeminiGatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GeminiGatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GeminiGatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GeminiGatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GeminiGatewayError"
+
   /v1beta/models:
     get:
       tags:
@@ -8525,6 +8565,32 @@ components:
           $ref: "#/components/schemas/JsonObject"
       additionalProperties: true
 
+    GeminiCountTokensRequest:
+      type: object
+      properties:
+        contents:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/GeminiContent"
+        systemInstruction:
+          $ref: "#/components/schemas/GeminiContent"
+        generationConfig:
+          $ref: "#/components/schemas/GeminiGenerationConfig"
+        safetySettings:
+          type: array
+          items:
+            $ref: "#/components/schemas/JsonObject"
+        tools:
+          type: array
+          items:
+            $ref: "#/components/schemas/JsonObject"
+        toolConfig:
+          $ref: "#/components/schemas/JsonObject"
+        generateContentRequest:
+          $ref: "#/components/schemas/GeminiGenerateContentRequest"
+      additionalProperties: true
+
     GeminiSafetyRating:
       type: object
       properties:
@@ -8571,6 +8637,40 @@ components:
         cachedContentTokenCount:
           type: integer
           minimum: 0
+
+    GeminiModalityTokenCount:
+      type: object
+      required:
+        - modality
+        - tokenCount
+      properties:
+        modality:
+          type: string
+        tokenCount:
+          type: integer
+          minimum: 0
+      additionalProperties: true
+
+    GeminiCountTokensResponse:
+      type: object
+      required:
+        - totalTokens
+      properties:
+        totalTokens:
+          type: integer
+          minimum: 0
+        cachedContentTokenCount:
+          type: integer
+          minimum: 0
+        promptTokensDetails:
+          type: array
+          items:
+            $ref: "#/components/schemas/GeminiModalityTokenCount"
+        cacheTokensDetails:
+          type: array
+          items:
+            $ref: "#/components/schemas/GeminiModalityTokenCount"
+      additionalProperties: true
 
     GeminiGenerateContentResponse:
       type: object

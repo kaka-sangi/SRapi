@@ -1593,6 +1593,17 @@ export type GeminiGenerateContentRequest = {
     [key: string]: unknown;
 };
 
+export type GeminiCountTokensRequest = {
+    contents?: Array<GeminiContent>;
+    systemInstruction?: GeminiContent;
+    generationConfig?: GeminiGenerationConfig;
+    safetySettings?: Array<JsonObject>;
+    tools?: Array<JsonObject>;
+    toolConfig?: JsonObject;
+    generateContentRequest?: GeminiGenerateContentRequest;
+    [key: string]: unknown;
+};
+
 export type GeminiSafetyRating = {
     category?: string;
     probability?: string;
@@ -1613,6 +1624,20 @@ export type GeminiUsageMetadata = {
     candidatesTokenCount?: number;
     totalTokenCount?: number;
     cachedContentTokenCount?: number;
+};
+
+export type GeminiModalityTokenCount = {
+    modality: string;
+    tokenCount: number;
+    [key: string]: unknown;
+};
+
+export type GeminiCountTokensResponse = {
+    totalTokens: number;
+    cachedContentTokenCount?: number;
+    promptTokensDetails?: Array<GeminiModalityTokenCount>;
+    cacheTokensDetails?: Array<GeminiModalityTokenCount>;
+    [key: string]: unknown;
 };
 
 export type GeminiGenerateContentResponse = {
@@ -4957,6 +4982,56 @@ export type StreamGeminiContentResponses = {
 };
 
 export type StreamGeminiContentResponse = StreamGeminiContentResponses[keyof StreamGeminiContentResponses];
+
+export type CountGeminiTokensData = {
+    body: GeminiCountTokensRequest;
+    path: {
+        /**
+         * Gemini model id from the path. SRapi runtime accepts slash-qualified ids when the HTTP router passes them through.
+         */
+        model: string;
+    };
+    query?: never;
+    url: '/v1beta/models/{model}:countTokens';
+};
+
+export type CountGeminiTokensErrors = {
+    /**
+     * Invalid Gemini gateway request.
+     */
+    400: GeminiErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GeminiErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GeminiErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GeminiErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GeminiErrorResponse;
+    /**
+     * Google-style Gemini gateway error.
+     */
+    default: GeminiErrorResponse;
+};
+
+export type CountGeminiTokensError = CountGeminiTokensErrors[keyof CountGeminiTokensErrors];
+
+export type CountGeminiTokensResponses = {
+    /**
+     * Gemini-compatible countTokens response.
+     */
+    200: GeminiCountTokensResponse;
+};
+
+export type CountGeminiTokensResponse = CountGeminiTokensResponses[keyof CountGeminiTokensResponses];
 
 export type ListGeminiModelsData = {
     body?: never;
