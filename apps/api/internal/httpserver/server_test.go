@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -1020,7 +1021,7 @@ func TestAdminAccountModelDiscoveryPersistsAntigravityReverseProxy(t *testing.T)
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
 	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"antigravity-persist-provider","display_name":"Antigravity Persist","adapter_type":"reverse-proxy-antigravity","protocol":"gemini-compatible","status":"active"}`)
-	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"antigravity-persist-account","runtime_class":"ide_plugin_token","credential":{"access_token":"antigravity-persist-token"},"metadata":{"base_url":"`+upstream.URL+`"},"status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"antigravity-persist-account","runtime_class":"ide_plugin_token","credential":{"access_token":"antigravity-persist-token"},"metadata":{"base_url":"`+upstream.URL+`","project_id":"persist-project"},"status":"active"}`)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/"+string(accountResp.Data.Id)+"/discover-models", strings.NewReader(`{"persist":true}`))
 	req.Header.Set("Content-Type", "application/json")
@@ -1056,6 +1057,177 @@ func TestAdminAccountModelDiscoveryPersistsAntigravityReverseProxy(t *testing.T)
 		(*getResp.Data.Metadata)["model_discovery_endpoint"] != upstream.URL+"/v1internal:fetchAvailableModels" ||
 		(*getResp.Data.Metadata)["model_discovery_last_seen_at"] == "" {
 		t.Fatalf("expected persisted antigravity discovery metadata, got %+v", getResp.Data.Metadata)
+	}
+}
+
+func TestAdminAccountModelDiscoveryBootstrapsAntigravityProjectFromLoadCodeAssist(t *testing.T) {
+	type upstreamCall struct {
+		Path          string
+		Authorization string
+		UserAgent     string
+		Project       string
+		IDEType       string
+	}
+	var calls []upstreamCall
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode antigravity bootstrap body: %v", err)
+		}
+		call := upstreamCall{
+			Path:          r.URL.Path,
+			Authorization: r.Header.Get("Authorization"),
+			UserAgent:     r.Header.Get("User-Agent"),
+			Project:       strings.TrimSpace(fmt.Sprint(payload["project"])),
+		}
+		if metadata, ok := payload["metadata"].(map[string]any); ok {
+			call.IDEType = strings.TrimSpace(fmt.Sprint(metadata["ideType"]))
+		}
+		calls = append(calls, call)
+		switch r.URL.Path {
+		case "/v1internal:loadCodeAssist":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"cloudaicompanionProject":{"id":"bootstrap-project"},"currentTier":{"id":"g1-pro-tier"}}`))
+		case "/v1internal:fetchAvailableModels":
+			if call.Project != "bootstrap-project" {
+				t.Fatalf("expected bootstrapped project, got call %+v payload=%+v", call, payload)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"models":{"antigravity-bootstrap-model":{"displayName":"Bootstrap"}}}`))
+		default:
+			t.Fatalf("unexpected antigravity bootstrap path %s", r.URL.Path)
+		}
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"antigravity-bootstrap-load-provider","display_name":"Antigravity Bootstrap Load","adapter_type":"reverse-proxy-antigravity","protocol":"gemini-compatible","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"antigravity-bootstrap-load-account","runtime_class":"desktop_client_token","upstream_client":"antigravity_desktop","credential":{"access_token":"antigravity-bootstrap-token"},"metadata":{"base_url":"`+upstream.URL+`","user_agent":"antigravity/1.23.2 windows/amd64"},"status":"active"}`)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/"+string(accountResp.Data.Id)+"/discover-models", strings.NewReader(`{"limit":10}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Request-ID", "caller-request")
+	req.Header.Set("X-SRapi-Test", "leak")
+	req.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	req.AddCookie(sessionCookie)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected discovery 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if len(calls) != 2 {
+		t.Fatalf("expected loadCodeAssist and discovery calls, got %+v", calls)
+	}
+	if calls[0].Path != "/v1internal:loadCodeAssist" || calls[0].Authorization != "Bearer antigravity-bootstrap-token" || calls[0].UserAgent != "antigravity/1.23.2 windows/amd64" || calls[0].IDEType != "ANTIGRAVITY" {
+		t.Fatalf("unexpected loadCodeAssist call: %+v", calls[0])
+	}
+	if calls[1].Path != "/v1internal:fetchAvailableModels" || calls[1].Project != "bootstrap-project" || calls[1].Authorization != "Bearer antigravity-bootstrap-token" {
+		t.Fatalf("unexpected discovery call: %+v", calls[1])
+	}
+
+	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts/"+string(accountResp.Data.Id), nil)
+	getReq.AddCookie(sessionCookie)
+	getRec := httptest.NewRecorder()
+	handler.ServeHTTP(getRec, getReq)
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("expected account inspect 200, got %d body=%s", getRec.Code, getRec.Body.String())
+	}
+	var getResp apiopenapi.ProviderAccountResponse
+	if err := json.NewDecoder(getRec.Body).Decode(&getResp); err != nil {
+		t.Fatalf("decode account response: %v", err)
+	}
+	if getResp.Data.Metadata != nil && (*getResp.Data.Metadata)["project_id"] == "bootstrap-project" {
+		t.Fatalf("preview discovery should not persist bootstrapped project: %+v", getResp.Data.Metadata)
+	}
+}
+
+func TestAdminAccountModelDiscoveryPersistsAntigravityOnboardedProject(t *testing.T) {
+	type upstreamCall struct {
+		Path          string
+		Authorization string
+		GoogAPIClient string
+		Project       string
+		TierID        string
+	}
+	var calls []upstreamCall
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode antigravity onboard body: %v", err)
+		}
+		call := upstreamCall{
+			Path:          r.URL.Path,
+			Authorization: r.Header.Get("Authorization"),
+			GoogAPIClient: r.Header.Get("X-Goog-Api-Client"),
+			Project:       strings.TrimSpace(fmt.Sprint(payload["project"])),
+			TierID:        strings.TrimSpace(fmt.Sprint(payload["tier_id"])),
+		}
+		calls = append(calls, call)
+		switch r.URL.Path {
+		case "/v1internal:loadCodeAssist":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"allowedTiers":[{"id":"free-tier","isDefault":false},{"id":"g1-pro-tier","isDefault":true}]}`))
+		case "/v1internal:onboardUser":
+			if call.TierID != "g1-pro-tier" || call.GoogAPIClient == "" {
+				t.Fatalf("unexpected onboardUser call: %+v", call)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"done":true,"response":{"cloudaicompanionProject":{"id":"onboarded-project"}}}`))
+		case "/v1internal:fetchAvailableModels":
+			if call.Project != "onboarded-project" {
+				t.Fatalf("expected onboarded project, got call %+v payload=%+v", call, payload)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"models":{"antigravity-onboard-model":{"displayName":"Onboard"}}}`))
+		default:
+			t.Fatalf("unexpected antigravity onboard path %s", r.URL.Path)
+		}
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"antigravity-bootstrap-onboard-provider","display_name":"Antigravity Bootstrap Onboard","adapter_type":"reverse-proxy-antigravity","protocol":"gemini-compatible","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"antigravity-bootstrap-onboard-account","runtime_class":"ide_plugin_token","upstream_client":"antigravity_desktop","credential":{"access_token":"antigravity-onboard-token"},"metadata":{"base_url":"`+upstream.URL+`"},"status":"active"}`)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/"+string(accountResp.Data.Id)+"/discover-models", strings.NewReader(`{"persist":true}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	req.AddCookie(sessionCookie)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected discovery 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if len(calls) != 3 {
+		t.Fatalf("expected loadCodeAssist, onboardUser, and discovery calls, got %+v", calls)
+	}
+	for _, call := range calls {
+		if call.Authorization != "Bearer antigravity-onboard-token" {
+			t.Fatalf("expected selected account token for %+v", call)
+		}
+	}
+
+	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts/"+string(accountResp.Data.Id), nil)
+	getReq.AddCookie(sessionCookie)
+	getRec := httptest.NewRecorder()
+	handler.ServeHTTP(getRec, getReq)
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("expected account inspect 200, got %d body=%s", getRec.Code, getRec.Body.String())
+	}
+	var getResp apiopenapi.ProviderAccountResponse
+	if err := json.NewDecoder(getRec.Body).Decode(&getResp); err != nil {
+		t.Fatalf("decode account response: %v", err)
+	}
+	if getResp.Data.Metadata == nil ||
+		(*getResp.Data.Metadata)["project_id"] != "onboarded-project" ||
+		(*getResp.Data.Metadata)["antigravity_project_id"] != "onboarded-project" ||
+		(*getResp.Data.Metadata)["cloudaicompanion_project"] != "onboarded-project" ||
+		(*getResp.Data.Metadata)["antigravity_project_bootstrapped_at"] == "" ||
+		(*getResp.Data.Metadata)["antigravity_project_bootstrap_endpoint"] != upstream.URL+"/v1internal:onboardUser" ||
+		!jsonObjectContainsString(*getResp.Data.Metadata, "antigravity-onboard-model") {
+		t.Fatalf("expected persisted antigravity project and discovery metadata, got %+v", getResp.Data.Metadata)
 	}
 }
 

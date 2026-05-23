@@ -102,6 +102,12 @@ WP-500 起，Antigravity model discovery 也使用同一 2api 边界：管理员
 `discover-models` 时，SRapi 通过 Reverse Proxy Runtime 用选中账号的 OAuth/desktop/IDE
 credential POST 到 `{base_url}/v1internal:fetchAvailableModels`，解析上游 `models`，并可把
 结果持久化为账号 `supported_models` 供 Provider-neutral Scheduler 过滤。
+WP-530 起，Antigravity discovery 在账号缺少 `project_id`、`antigravity_project_id` 或
+`cloudaicompanion_project` 时，会先通过同一 Reverse Proxy Runtime / selected account
+credential 请求 `{base_url}/v1internal:loadCodeAssist`，必要时请求
+`{base_url}/v1internal:onboardUser`，取得 project 后再请求
+`{base_url}/v1internal:fetchAvailableModels`。预览 discovery 不写回账号 metadata；
+`persist=true` 才持久化解析到的 project 与 `supported_models`。
 WP-360 起，Antigravity 文本 provider alias（例如
 `/api/provider/antigravity/v1/chat/completions` 和
 `/api/provider/antigravity/v1/messages`）只强制 `provider_key=antigravity`；

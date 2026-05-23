@@ -197,6 +197,7 @@ components:
 - `POST /api/v1/admin/accounts/{id}/discover-models` 用于发现 upstream model catalog；默认只返回预览结果，`persist=true` 才写入 `supported_models`、`model_discovery_source` 和 `model_discovery_last_seen_at`。
 - discovery 响应的 `endpoint` 必须是脱敏后的 upstream endpoint；如果实际请求使用 query API key 等凭证形式，凭证不得出现在响应、audit 或日志中。
 - WP-500 起，`reverse-proxy-antigravity` 非 API-key 账号也支持 discovery，source 为 `reverse-proxy-antigravity`，通过 Reverse Proxy Runtime 使用选中账号凭证 POST 到 `{base_url}/v1internal:fetchAvailableModels`。
+- WP-530 起，Antigravity discovery 在账号缺少 project metadata 时会先通过同一 Reverse Proxy Runtime / selected account credential 调用 `{base_url}/v1internal:loadCodeAssist`，必要时调用 `{base_url}/v1internal:onboardUser`，再进行模型发现；`persist=true` 时写回解析到的 project metadata。
 - 该 discovery 结果必须用于后续 Provider Account model 选择，保持 `supported_models` 与现有 Scheduler/Gateway 边界一致。
 
 ### 4.6 RBAC Matrix

@@ -1993,16 +1993,6 @@ Required gates:
 - `make secret-scan`
 - `git diff --check`
 
-## WP-500+: Ecosystem And Remaining Advanced Surface
-
-Use `ROADMAP.md` Phase 7 through Phase 8 to split future packages for:
-
-- provider-native realtime protocol adapters and richer slot lifecycle
-- image edit streaming / JSON reference compatibility
-- SDK examples and migration guides
-
-Each new package must be added here before implementation starts.
-
 ## WP-510: Images Edits JSON References v1
 
 Objective: extend the existing OpenAI-compatible `/v1/images/edits` runtime so JSON callers can provide local image references without bypassing Gateway auth, model policy, Scheduler, Provider Adapter, usage evidence, or the OpenAPI-first contract.
@@ -2052,6 +2042,59 @@ Required gates:
 - `make code-quality-check`
 - `make secret-scan`
 - `git diff --check`
+
+## WP-530: Antigravity Project Bootstrap v1
+
+Objective: let configured Antigravity 2api accounts discover their Cloud Code project through the same selected-account OAuth/desktop/IDE credential path used by the local 2api reference implementations, so operators do not have to hand-fill `project_id` before model discovery.
+
+Read first:
+
+- `docs/2API_REVERSE_PROXY_DEFINITION.md`
+- `docs/REVERSE_PROXY_SPEC.md`
+- `docs/PROVIDER_ADAPTER_SPEC.md`
+- `docs/GATEWAY_ROUTE_MATRIX.md`
+- `/home/senran/Desktop/CLIProxyAPI/internal/auth/antigravity/auth.go`
+- `/home/senran/Desktop/sub2api/backend/internal/pkg/antigravity/client.go`
+- `apps/api/internal/httpserver/model_discovery.go`
+- `apps/api/internal/modules/reverse_proxy`
+- `apps/api/internal/modules/accounts`
+
+Owns:
+
+- Antigravity model discovery bootstrap behavior for accounts missing `project_id`.
+- Reverse Proxy Runtime calls to Antigravity `/v1internal:loadCodeAssist` and `/v1internal:onboardUser`.
+- Account metadata persistence of discovered `project_id` only when the admin discovery request asks to persist results.
+- Focused HTTP regressions proving selected account credentials are used upstream and caller credentials/SRapi headers do not leak.
+- 2api/reverse-proxy docs and status updates.
+
+Definition of Done:
+
+- `reverse-proxy-antigravity` discovery first uses existing `project_id`, `antigravity_project_id`, or `cloudaicompanion_project` metadata when present.
+- If no project metadata exists, discovery posts `loadCodeAssist` through Reverse Proxy Runtime using the selected account credential and Antigravity official-client metadata.
+- If `loadCodeAssist` has no project, discovery posts `onboardUser` through Reverse Proxy Runtime with a tier derived from `allowedTiers`, `currentTier`, or `free-tier`, then uses the returned project.
+- `persist=false` discovery does not mutate account metadata; `persist=true` persists the bootstrapped project plus model discovery metadata.
+- API-key runtime accounts remain rejected for Antigravity 2api discovery.
+- No local Antigravity process is invoked, no Gateway-local Antigravity DTO is introduced, and no frontend visuals are added.
+
+Required gates:
+
+- `cd apps/api && go test ./internal/httpserver -run 'TestAdminAccountModelDiscovery.*Antigravity|TestGatewayAntigravity' -count=1`
+- `cd apps/api && go test ./internal/modules/reverse_proxy/... ./internal/httpserver`
+- `cd apps/api && go test ./...`
+- `make architecture-check`
+- `make code-quality-check`
+- `make secret-scan`
+- `git diff --check`
+
+## WP-500+: Ecosystem And Remaining Advanced Surface
+
+Use `ROADMAP.md` Phase 7 through Phase 8 to split future packages for:
+
+- provider-native realtime protocol adapters and richer slot lifecycle
+- image edit streaming / JSON reference compatibility
+- SDK examples and migration guides
+
+Each new package must be added here before implementation starts.
 
 ## WP-520: Images Edits Streaming Events v1
 

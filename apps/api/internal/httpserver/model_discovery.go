@@ -49,6 +49,12 @@ type modelDiscoveryHTTPRequest struct {
 	ViaReverseProxy bool
 }
 
+type antigravityProjectBootstrap struct {
+	ProjectID    string
+	Bootstrapped bool
+	Endpoint     string
+}
+
 func (rt *runtimeState) discoverAccountModels(ctx context.Context, provider providercontract.Provider, account accountcontract.ProviderAccount, req apiopenapi.DiscoverAccountModelsRequest) (apiopenapi.AccountModelDiscovery, error) {
 	source, ok := modelDiscoverySourceForProvider(provider)
 	if !ok {
@@ -68,7 +74,14 @@ func (rt *runtimeState) discoverAccountModels(ctx context.Context, provider prov
 	if err != nil {
 		return apiopenapi.AccountModelDiscovery{}, errModelDiscoveryAuth
 	}
-	discoveryReq, err := modelDiscoveryRequest(source, provider, account, credential)
+	bootstrap := antigravityProjectBootstrap{}
+	if source == modelDiscoveryAntigravity {
+		bootstrap, err = rt.ensureAntigravityDiscoveryProject(ctx, provider, account, credential)
+		if err != nil {
+			return apiopenapi.AccountModelDiscovery{}, err
+		}
+	}
+	discoveryReq, err := modelDiscoveryRequest(source, provider, account, credential, bootstrap.ProjectID)
 	if err != nil {
 		return apiopenapi.AccountModelDiscovery{}, err
 	}
@@ -95,6 +108,17 @@ func (rt *runtimeState) discoverAccountModels(ctx context.Context, provider prov
 		metadata["model_discovery_source"] = string(source)
 		metadata["model_discovery_endpoint"] = discoveryReq.Endpoint
 		metadata["model_discovery_last_seen_at"] = checkedAt.Format(time.RFC3339)
+		if source == modelDiscoveryAntigravity && bootstrap.ProjectID != "" {
+			metadata["project_id"] = bootstrap.ProjectID
+			metadata["antigravity_project_id"] = bootstrap.ProjectID
+			metadata["cloudaicompanion_project"] = bootstrap.ProjectID
+			if bootstrap.Bootstrapped {
+				metadata["antigravity_project_bootstrapped_at"] = checkedAt.Format(time.RFC3339)
+			}
+			if bootstrap.Endpoint != "" {
+				metadata["antigravity_project_bootstrap_endpoint"] = bootstrap.Endpoint
+			}
+		}
 		if _, err := rt.accounts.Update(ctx, account.ID, accountcontract.UpdateRequest{Metadata: &metadata}); err != nil {
 			return apiopenapi.AccountModelDiscovery{}, err
 		}
@@ -118,7 +142,7 @@ func modelDiscoveryRuntimeSupported(source modelDiscoverySource, account account
 	return account.RuntimeClass == accountcontract.RuntimeClassAPIKey
 }
 
-func modelDiscoveryRequest(source modelDiscoverySource, provider providercontract.Provider, account accountcontract.ProviderAccount, credential map[string]any) (modelDiscoveryHTTPRequest, error) {
+func modelDiscoveryRequest(source modelDiscoverySource, provider providercontract.Provider, account accountcontract.ProviderAccount, credential map[string]any, antigravityProjectID string) (modelDiscoveryHTTPRequest, error) {
 	endpoint := modelDiscoveryEndpoint(source, provider, account)
 	if endpoint == "" {
 		return modelDiscoveryHTTPRequest{}, errModelDiscoveryInvalidInput
@@ -138,7 +162,7 @@ func modelDiscoveryRequest(source modelDiscoverySource, provider providercontrac
 		Headers:    headers,
 	}
 	if source == modelDiscoveryAntigravity {
-		body, err := antigravityModelDiscoveryBody(provider, account, credential)
+		body, err := antigravityModelDiscoveryBody(provider, account, credential, antigravityProjectID)
 		if err != nil {
 			return modelDiscoveryHTTPRequest{}, err
 		}
@@ -316,34 +340,6 @@ func modelDiscoveryHeaders(source modelDiscoverySource, provider providercontrac
 		return nil, errModelDiscoveryInvalidInput
 	}
 	return headers, nil
-}
-
-func antigravityModelDiscoveryBody(provider providercontract.Provider, account accountcontract.ProviderAccount, credential map[string]any) ([]byte, error) {
-	payload := map[string]any{}
-	if projectID := modelDiscoverySetting(provider, account, credential, "project_id", "antigravity_project_id", "cloudaicompanion_project"); projectID != "" {
-		payload["project"] = projectID
-	}
-	raw, err := json.Marshal(payload)
-	if err != nil {
-		return nil, errModelDiscoveryInvalidInput
-	}
-	return raw, nil
-}
-
-func antigravityModelDiscoveryRuntime(account accountcontract.ProviderAccount, credential map[string]any) reverseproxycontract.AccountRuntime {
-	upstreamClient := account.UpstreamClient
-	if upstreamClient == nil || strings.TrimSpace(*upstreamClient) == "" {
-		value := "antigravity_desktop"
-		upstreamClient = &value
-	}
-	return reverseproxycontract.AccountRuntime{
-		AccountID:      account.ID,
-		RuntimeClass:   string(account.RuntimeClass),
-		UpstreamClient: upstreamClient,
-		ProxyID:        account.ProxyID,
-		UserAgent:      mapString(account.Metadata, "user_agent"),
-		Credential:     credential,
-	}
 }
 
 func modelDiscoveryAPIKey(source modelDiscoverySource, credential map[string]any) string {
