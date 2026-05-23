@@ -66,21 +66,23 @@ last_completed:
 - WP-570: AdminOps realtime active slot API now exposes `GET /api/v1/admin/ops/realtime/slots`, returning current-node active slot summaries and endpoint/kind/API-key aggregate counters without raw affinity keys, credentials, prompts, provider frames, local client ingress, or Gateway-local provider DTOs.
 - WP-580: SDK examples and 2api migration guide v1 now provide curl, TypeScript SDK, and Python requests examples for OpenAI/Anthropic/Gemini-compatible Gateway routes plus AdminOps realtime slot listing, document migration from sub2api / CLIProxyAPI / chatgpt2api style deployments into SRapi Provider Account / Scheduler / Reverse Proxy Runtime boundaries, and add `make examples-check`.
 - WP-590: Distributed realtime slot store v1 now adds a realtime Store contract, in-memory and Redis-backed implementations, app/httpserver wiring that uses Redis in release-capable deployments, distributed slot limit/listing tests, and docs for cross-node AdminOps semantics without provider-native DTOs or local client ingress.
+- WP-600: Codex refresh-token-only import and OAuth lifecycle now lets admin create/import/update accept a Codex OAuth `refresh_token` without an initial `access_token`, exchange it through Reverse Proxy Runtime using the Codex CLI OAuth token shape, persist encrypted access-token state, and immediately dispatch Gateway `/v1/responses` to Codex `/responses` with selected-account OAuth identity and no token leakage in control-plane responses.
 
 current:
 
-- package: WP-600
+- package: WP-610
 - status: pending
-- objective: implement sub2api-style Codex refresh-token-only import and real OAuth refresh lifecycle for `reverse-proxy-codex-cli` Provider Accounts.
+- objective: extend refresh-token-only import and OAuth lifecycle support to Claude Code 2api Provider Accounts.
 
-next_recommended: WP-600
+next_recommended: WP-610
 
 last_gates:
 
-- `cd apps/api && go test ./internal/modules/realtime/... ./internal/persistence/redisstore/realtime/... ./internal/app ./internal/httpserver -run 'TestRealtime|TestRedisRealtime|TestRealtimeSlot|TestAdminOpsRealtime' -count=1`: pass
+- `cd apps/api && go test ./internal/modules/accounts/... ./internal/modules/reverse_proxy/... ./internal/modules/provider_adapters/... ./internal/httpserver -run 'Test.*Codex.*Refresh|Test.*Codex.*Import|TestGateway.*Codex' -count=1`: pass
 - `cd apps/api && go test ./...`: pass
 - `make architecture-check`: pass
 - `make code-quality-check`: pass
+- `make examples-check`: pass
 - `make secret-scan`: pass
 - `git diff --check`: pass
 
@@ -179,7 +181,8 @@ notes:
 - WP-580 intentionally does not add frontend visuals, local Codex / Claude Code / Antigravity ingress, Gateway-local provider DTOs, or runnable upstream credential import automation.
 - WP-590 added `TestRedisRealtimeStoreEnforcesDistributedSlotLimits`, `TestRedisRealtimeStoreReleaseFromAnotherInstanceFreesCapacity`, `TestRedisRealtimeStoreExpiresSlotsWithoutLeakingSensitiveData`, and app wiring tests proving Redis-backed realtime slots are used when available, required in release mode, and safe to inspect from AdminOps.
 - WP-590 intentionally does not add provider-native Claude Code / Antigravity realtime adapters, persistent upstream session pools, local Codex / Claude Code / Antigravity ingress, or Codex refresh-token-only import automation.
-- WP-600 is the next explicit package for the user's requested Codex refresh-token-only import flow: accept Codex `refresh_token`, derive/persist encrypted OAuth access state, refresh safely, then request Codex `/responses` through selected Provider Account official-client shape.
+- WP-600 added `TestRuntimeRefreshUsesPerAccountLockAndDoesNotOverwriteOnFailure`, `TestRuntimeRefreshClassifiesInvalidGrantWithoutOverwritingCredential`, `TestGatewayCodexRefreshTokenOnlyCreateCanRequestResponses`, `TestAdminAccountImportCodexRefreshTokenOnlyExchangesTokenWithoutLeakingCredential`, and `TestGatewayCodexRefreshTokenOnlyUpdateCanRequestResponses`, proving Codex refresh-token-only create/import/update exchanges and persists usable OAuth state before Gateway dispatch.
+- WP-600 intentionally does not add local Codex CLI ingress, Gateway-local Codex DTOs, Claude Code refresh-token-only import, or Antigravity refresh-token-only import.
 
 ## Work Package Ledger
 
@@ -245,5 +248,6 @@ notes:
 | WP-570 | completed | AdminOps realtime active slot API v1. |
 | WP-580 | completed | SDK examples and 2api migration guide v1 with examples-check harness. |
 | WP-590 | completed | Distributed Redis-backed realtime slot store v1. |
-| WP-600 | pending | Codex refresh-token-only import and OAuth lifecycle v1. |
+| WP-600 | completed | Codex refresh-token-only import and OAuth lifecycle v1. |
+| WP-610 | pending | Claude Code refresh-token-only import and OAuth lifecycle v1. |
 | WP-500+ | pending | Remaining ecosystem and advanced endpoint packages. |

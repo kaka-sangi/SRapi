@@ -12,6 +12,7 @@ type AccountRuntime struct {
 	UpstreamClient *string
 	ProxyID        *string
 	UserAgent      string
+	Metadata       map[string]any
 	Credential     map[string]any
 }
 

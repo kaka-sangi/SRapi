@@ -164,6 +164,7 @@ func reverseProxyAccountRuntime(account accountcontract.ProviderAccount, credent
 		UpstreamClient: account.UpstreamClient,
 		ProxyID:        account.ProxyID,
 		UserAgent:      mapString(account.Metadata, "user_agent"),
+		Metadata:       account.Metadata,
 		Credential:     credential,
 	}
 }

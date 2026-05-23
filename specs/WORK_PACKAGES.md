@@ -2462,3 +2462,41 @@ Required gates:
 - `make code-quality-check`
 - `make secret-scan`
 - `git diff --check`
+
+## WP-610: Claude Code Refresh Token Import And OAuth Lifecycle v1
+
+Objective: extend the refresh-token-only onboarding pattern from Codex to Claude Code 2api accounts, preserving the same selected Provider Account -> Provider Adapter -> Reverse Proxy Runtime boundary and avoiding local Claude Code client ingress.
+
+Read first:
+
+- `docs/2API_REVERSE_PROXY_DEFINITION.md`
+- `docs/MIGRATION_GUIDE_2API.md`
+- `docs/REVERSE_PROXY_SPEC.md`
+- `apps/api/internal/modules/reverse_proxy/service`
+- `apps/api/internal/modules/provider_adapters/service/claude_code.go`
+- `apps/api/internal/httpserver/runtime_admin_catalog_handlers.go`
+- `/home/senran/Desktop/CLIProxyAPI/internal/auth/claude`
+- `/home/senran/Desktop/sub2api/backend/internal/repository/claude_oauth_service.go`
+
+Owns:
+
+- Claude Code OAuth credential normalization for `runtime_class=oauth_refresh` Provider Accounts.
+- Claude JSON token refresh request support through Reverse Proxy Runtime without leaking provider-specific DTOs into Gateway.
+- Admin create/import/update validation for refresh-token-only Claude Code credentials.
+- Gateway regression proving `/v1/messages` uses selected-account OAuth credentials derived from the imported refresh token.
+
+Definition of Done:
+
+- Admin create/import/update accepts Claude Code `refresh_token` without initial `access_token` and obtains the first access token before the account is usable.
+- Gateway `/v1/messages` using `reverse-proxy-claude-code-cli` dispatches with selected-account OAuth credentials derived from the imported refresh token.
+- Refresh failures do not overwrite previous credentials and do not leak access/refresh tokens in responses, audit, logs, metrics, usage, or Scheduler evidence.
+- No local Claude Code client ingress and no Gateway-local Claude DTO are added.
+
+Required gates:
+
+- `cd apps/api && go test ./internal/modules/accounts/... ./internal/modules/reverse_proxy/... ./internal/modules/provider_adapters/... ./internal/httpserver -run 'Test.*Claude.*Refresh|Test.*Claude.*Import|TestGateway.*Claude' -count=1`
+- `cd apps/api && go test ./...`
+- `make architecture-check`
+- `make code-quality-check`
+- `make secret-scan`
+- `git diff --check`

@@ -22,6 +22,9 @@ import (
 const (
 	maxReverseProxyResponseBytes = 8 << 20
 	statusClientClosedRequest    = 499
+	codexOAuthTokenURL           = "https://auth.openai.com/oauth/token"
+	codexOAuthClientID           = "app_EMoamEEZ73f0CkXaXp7hrann"
+	codexOAuthRefreshScope       = "openid profile email"
 )
 
 type ClientFactory func(account contract.AccountRuntime) (*http.Client, error)
@@ -192,26 +195,83 @@ func (s *Service) RelayWebSocket(ctx context.Context, req contract.WebSocketRela
 }
 
 func (s *Service) Refresh(ctx context.Context, req contract.RefreshRequest) (contract.RefreshResponse, error) {
-	if req.Account.AccountID <= 0 {
+	if req.Account.AccountID > 0 {
+		lock := s.refreshLock(req.Account.AccountID)
+		lock.Lock()
+		defer lock.Unlock()
+	}
+	return s.refreshOAuthCredential(ctx, req)
+}
+
+func (s *Service) refreshOAuthCredential(ctx context.Context, req contract.RefreshRequest) (contract.RefreshResponse, error) {
+	if !supportsOAuthRefresh(req.Account.RuntimeClass) {
 		s.recordRefresh("invalid_request")
 		return contract.RefreshResponse{}, ErrInvalidInput
 	}
-	lock := s.refreshLock(req.Account.AccountID)
-	lock.Lock()
-	defer lock.Unlock()
-
 	refreshToken := credentialString(req.Account.Credential, "refresh_token")
 	if refreshToken == "" {
 		s.recordRefresh("credential_missing")
 		return contract.RefreshResponse{}, contract.RuntimeError{Class: "credential_missing", StatusCode: http.StatusBadRequest, Message: "oauth refresh token missing"}
 	}
-	refreshed := cloneCredential(req.Account.Credential)
-	refreshed["access_token"] = refreshToken
-	now := time.Now().UTC().Format(time.RFC3339)
-	refreshed["refreshed_at"] = now
-	_ = ctx
+	tokenEndpoint, clientID, scope := oauthRefreshSettings(req.Account)
+	if tokenEndpoint == "" || clientID == "" {
+		s.recordRefresh("credential_missing")
+		return contract.RefreshResponse{}, contract.RuntimeError{Class: "credential_missing", StatusCode: http.StatusBadRequest, Message: "oauth refresh configuration missing"}
+	}
+	form := url.Values{
+		"client_id":     {clientID},
+		"grant_type":    {"refresh_token"},
+		"refresh_token": {refreshToken},
+	}
+	if scope != "" {
+		form.Set("scope", scope)
+	}
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, tokenEndpoint, strings.NewReader(form.Encode()))
+	if err != nil {
+		s.recordRefresh("invalid_request")
+		return contract.RefreshResponse{}, err
+	}
+	httpReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	httpReq.Header.Set("Accept", "application/json")
+	if ua := userAgent(req.Account); ua != "" {
+		httpReq.Header.Set("User-Agent", ua)
+	}
+	client, err := s.clientFor(req.Account)
+	if err != nil {
+		s.recordRefresh("network_error")
+		return contract.RefreshResponse{}, err
+	}
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		status := "network_error"
+		statusCode := http.StatusBadGateway
+		message := "oauth refresh request failed"
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			status = "timeout"
+			statusCode = http.StatusGatewayTimeout
+			message = "oauth refresh request timed out"
+		}
+		s.recordRefresh(status)
+		return contract.RefreshResponse{}, contract.RuntimeError{Class: status, StatusCode: statusCode, Message: message}
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxReverseProxyResponseBytes))
+	if err != nil {
+		s.recordRefresh("network_error")
+		return contract.RefreshResponse{}, err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		runtimeErr := classifyOAuthRefreshError(resp.StatusCode, body)
+		s.recordRefresh(runtimeErr.Class)
+		return contract.RefreshResponse{}, runtimeErr
+	}
+	refreshed, refreshedAt, err := mergeOAuthTokenResponse(req.Account.Credential, body)
+	if err != nil {
+		s.recordRefresh("invalid_response")
+		return contract.RefreshResponse{}, err
+	}
 	s.recordRefresh("success")
-	return contract.RefreshResponse{AccountID: req.Account.AccountID, Credential: refreshed, RefreshedAt: now}, nil
+	return contract.RefreshResponse{AccountID: req.Account.AccountID, Credential: refreshed, RefreshedAt: refreshedAt}, nil
 }
 
 type webSocketRelayStats struct {
@@ -367,6 +427,9 @@ func (s *Service) Metrics() contract.MetricsSnapshot {
 
 func (s *Service) clientFor(account contract.AccountRuntime) (*http.Client, error) {
 	if account.AccountID <= 0 {
+		if account.ProxyID != nil && strings.TrimSpace(*account.ProxyID) != "" {
+			return s.factory(account)
+		}
 		return s.defaultClient, nil
 	}
 	s.mu.Lock()
@@ -491,6 +554,9 @@ func userAgent(account contract.AccountRuntime) string {
 		return strings.TrimSpace(account.UserAgent)
 	}
 	if value := credentialString(account.Credential, "user_agent"); value != "" && !strings.HasPrefix(strings.ToLower(value), "srapi/") {
+		return value
+	}
+	if value := credentialString(account.Metadata, "user_agent"); value != "" && !strings.HasPrefix(strings.ToLower(value), "srapi/") {
 		return value
 	}
 	if account.UpstreamClient != nil && strings.TrimSpace(*account.UpstreamClient) != "" {
@@ -679,6 +745,119 @@ func credentialString(values map[string]any, key string) string {
 		return strconv.FormatFloat(value, 'f', -1, 64)
 	default:
 		return strings.TrimSpace(strings.ReplaceAll(fmt.Sprint(value), "\n", " "))
+	}
+}
+
+func accountSetting(account contract.AccountRuntime, keys ...string) string {
+	for _, values := range []map[string]any{account.Credential, account.Metadata} {
+		for _, key := range keys {
+			if value := credentialString(values, key); value != "" {
+				return value
+			}
+		}
+	}
+	return ""
+}
+
+func supportsOAuthRefresh(runtimeClass string) bool {
+	switch strings.ToLower(strings.TrimSpace(runtimeClass)) {
+	case "oauth_refresh", "oauth_device_code":
+		return true
+	default:
+		return false
+	}
+}
+
+func oauthRefreshSettings(account contract.AccountRuntime) (string, string, string) {
+	tokenEndpoint := accountSetting(account, "oauth_token_url", "token_url", "oauth_refresh_url", "refresh_url")
+	if tokenEndpoint == "" && upstreamClientIs(account, "codex_cli") {
+		tokenEndpoint = codexOAuthTokenURL
+	}
+	clientID := accountSetting(account, "oauth_client_id", "client_id")
+	if clientID == "" && upstreamClientIs(account, "codex_cli") {
+		clientID = codexOAuthClientID
+	}
+	scope := accountSetting(account, "oauth_scope", "scope")
+	if scope == "" && upstreamClientIs(account, "codex_cli") {
+		scope = codexOAuthRefreshScope
+	}
+	return tokenEndpoint, clientID, scope
+}
+
+func upstreamClientIs(account contract.AccountRuntime, expected string) bool {
+	if account.UpstreamClient == nil {
+		return false
+	}
+	return strings.EqualFold(strings.TrimSpace(*account.UpstreamClient), expected)
+}
+
+func classifyOAuthRefreshError(statusCode int, body []byte) contract.RuntimeError {
+	message := strings.TrimSpace(extractErrorText(body))
+	if message == "" {
+		message = http.StatusText(statusCode)
+	}
+	lower := strings.ToLower(message)
+	class := "auth_failed"
+	switch {
+	case strings.Contains(lower, "invalid_grant"), strings.Contains(lower, "refresh_token_reused"), strings.Contains(lower, "invalid refresh"):
+		class = "session_invalid"
+	case statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden:
+		class = "auth_failed"
+	case statusCode == http.StatusTooManyRequests:
+		class = "rate_limit"
+	case statusCode == http.StatusRequestTimeout || statusCode == http.StatusGatewayTimeout:
+		class = "timeout"
+	case statusCode >= 500:
+		class = "upstream_error"
+	}
+	return contract.RuntimeError{Class: class, StatusCode: statusCode, Message: message}
+}
+
+func mergeOAuthTokenResponse(existing map[string]any, body []byte) (map[string]any, string, error) {
+	var payload map[string]any
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return nil, "", contract.RuntimeError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "oauth refresh returned invalid json"}
+	}
+	accessToken := credentialString(payload, "access_token")
+	if accessToken == "" {
+		return nil, "", contract.RuntimeError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "oauth refresh response missing access token"}
+	}
+	now := time.Now().UTC()
+	refreshed := cloneCredential(existing)
+	refreshed["access_token"] = accessToken
+	if refreshToken := credentialString(payload, "refresh_token"); refreshToken != "" {
+		refreshed["refresh_token"] = refreshToken
+	}
+	if idToken := credentialString(payload, "id_token"); idToken != "" {
+		refreshed["id_token"] = idToken
+	}
+	if tokenType := credentialString(payload, "token_type"); tokenType != "" {
+		refreshed["token_type"] = tokenType
+	}
+	if expiresIn := tokenExpiresIn(payload["expires_in"]); expiresIn > 0 {
+		refreshed["expires_at"] = now.Add(expiresIn).Format(time.RFC3339)
+	}
+	refreshedAt := now.Format(time.RFC3339)
+	refreshed["refreshed_at"] = refreshedAt
+	return refreshed, refreshedAt, nil
+}
+
+func tokenExpiresIn(value any) time.Duration {
+	switch typed := value.(type) {
+	case json.Number:
+		parsed, _ := typed.Int64()
+		return time.Duration(parsed) * time.Second
+	case int:
+		return time.Duration(typed) * time.Second
+	case int64:
+		return time.Duration(typed) * time.Second
+	case float64:
+		return time.Duration(typed) * time.Second
+	case string:
+		parsed, _ := strconv.ParseInt(strings.TrimSpace(typed), 10, 64)
+		return time.Duration(parsed) * time.Second
+	default:
+		return 0
 	}
 }
 

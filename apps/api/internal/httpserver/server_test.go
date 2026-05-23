@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/textproto"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -5610,11 +5611,24 @@ func TestGatewayAntigravityReverseProxyUsesDesktopRuntimeIdentity(t *testing.T) 
 func TestGatewayReverseProxyOAuthRefreshPersistsCredentialAndAudits(t *testing.T) {
 	var gotAuthorization string
 	var gotPath string
+	var gotRefreshForm url.Values
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotAuthorization = r.Header.Get("Authorization")
-		gotPath = r.URL.Path
-		w.Header().Set("Content-Type", "text/event-stream")
-		_, _ = w.Write([]byte("data: {\"type\":\"conversation.delta\",\"delta\":\"refreshed ok\"}\n\ndata: [DONE]\n\n"))
+		switch r.URL.Path {
+		case "/oauth/token":
+			if err := r.ParseForm(); err != nil {
+				t.Fatalf("parse refresh form: %v", err)
+			}
+			gotRefreshForm = cloneURLValues(r.PostForm)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"access_token":"fresh-access","refresh_token":"fresh-token-rotated","expires_in":3600}`))
+		case "/backend-api/conversation":
+			gotAuthorization = r.Header.Get("Authorization")
+			gotPath = r.URL.Path
+			w.Header().Set("Content-Type", "text/event-stream")
+			_, _ = w.Write([]byte("data: {\"type\":\"conversation.delta\",\"delta\":\"refreshed ok\"}\n\ndata: [DONE]\n\n"))
+		default:
+			t.Fatalf("unexpected upstream path %s", r.URL.Path)
+		}
 	}))
 	defer upstream.Close()
 
@@ -5625,7 +5639,7 @@ func TestGatewayReverseProxyOAuthRefreshPersistsCredentialAndAudits(t *testing.T
 	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"refresh-model","display_name":"Refresh Model","status":"active"}`)
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"refresh-upstream","status":"active"}`)
 
-	accountBody := `{"provider_id":"` + string(providerResp.Data.Id) + `","name":"refresh-account","runtime_class":"oauth_refresh","upstream_client":"chatgpt_web","credential":{"access_token":"expired-token","refresh_token":"fresh-token","expires_at":"2000-01-01T00:00:00Z"},"metadata":{"base_url":"` + upstream.URL + `","user_agent":"ChatGPT/1.0","chatgpt_requirements_token":"requirements-token"},"status":"active"}`
+	accountBody := `{"provider_id":"` + string(providerResp.Data.Id) + `","name":"refresh-account","runtime_class":"oauth_refresh","upstream_client":"chatgpt_web","credential":{"access_token":"expired-token","refresh_token":"fresh-token","expires_at":"2000-01-01T00:00:00Z"},"metadata":{"base_url":"` + upstream.URL + `","oauth_token_url":"` + upstream.URL + `/oauth/token","oauth_client_id":"chatgpt-client","user_agent":"ChatGPT/1.0","chatgpt_requirements_token":"requirements-token"},"status":"active"}`
 	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, accountBody)
 
 	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
@@ -5637,7 +5651,10 @@ func TestGatewayReverseProxyOAuthRefreshPersistsCredentialAndAudits(t *testing.T
 	if chatRec.Code != http.StatusOK {
 		t.Fatalf("expected refreshed gateway success 200, got %d body=%s", chatRec.Code, chatRec.Body.String())
 	}
-	if gotAuthorization != "Bearer fresh-token" {
+	if gotRefreshForm.Get("grant_type") != "refresh_token" || gotRefreshForm.Get("refresh_token") != "fresh-token" || gotRefreshForm.Get("client_id") != "chatgpt-client" {
+		t.Fatalf("unexpected refresh form: %v", gotRefreshForm)
+	}
+	if gotAuthorization != "Bearer fresh-access" {
 		t.Fatalf("expected refreshed bearer token, got %q", gotAuthorization)
 	}
 	if gotPath != "/backend-api/conversation" {

@@ -1,10 +1,12 @@
 package httpserver
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
@@ -13,6 +15,7 @@ import (
 	modelservice "github.com/srapi/srapi/apps/api/internal/modules/models/service"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	providerservice "github.com/srapi/srapi/apps/api/internal/modules/providers/service"
+	reverseproxycontract "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
 
@@ -531,12 +534,19 @@ func (s *Server) handleCreateAdminAccount(w http.ResponseWriter, r *http.Request
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "provider not found", requestID)
 		return
 	}
+	credential := derefMap(body.Credential)
+	metadata := jsonObjectToMap(body.Metadata)
+	credential, err = s.refreshCodexImportCredential(r.Context(), accountcontract.RuntimeClass(body.RuntimeClass), body.UpstreamClient, metadata, body.ProxyId, credential)
+	if err != nil {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "codex oauth refresh failed", requestID)
+		return
+	}
 	account, err := s.runtime.accounts.Create(r.Context(), accountcontract.CreateRequest{
 		ProviderID:     providerID,
 		Name:           body.Name,
 		RuntimeClass:   accountcontract.RuntimeClass(body.RuntimeClass),
-		Credential:     derefMap(body.Credential),
-		Metadata:       jsonObjectToMap(body.Metadata),
+		Credential:     credential,
+		Metadata:       metadata,
 		ProxyID:        body.ProxyId,
 		Status:         toAccountStatusPtr(body.Status),
 		Priority:       body.Priority,
@@ -637,12 +647,19 @@ func (s *Server) handleImportAdminAccounts(w http.ResponseWriter, r *http.Reques
 			importErrors = append(importErrors, fmt.Sprintf("accounts[%d].credential required", idx))
 			continue
 		}
+		metadata := jsonObjectToMap(item.Metadata)
+		credential, err = s.refreshCodexImportCredential(r.Context(), accountcontract.RuntimeClass(item.RuntimeClass), item.UpstreamClient, metadata, item.ProxyId, credential)
+		if err != nil {
+			skipped++
+			importErrors = append(importErrors, fmt.Sprintf("accounts[%d] codex oauth refresh failed", idx))
+			continue
+		}
 		account, err := s.runtime.accounts.Create(r.Context(), accountcontract.CreateRequest{
 			ProviderID:     providerID,
 			Name:           item.Name,
 			RuntimeClass:   accountcontract.RuntimeClass(item.RuntimeClass),
 			Credential:     credential,
-			Metadata:       jsonObjectToMap(item.Metadata),
+			Metadata:       metadata,
 			ProxyID:        item.ProxyId,
 			Status:         toAccountStatusPtr(item.Status),
 			Priority:       item.Priority,
@@ -708,11 +725,34 @@ func (s *Server) handleUpdateAdminAccount(w http.ResponseWriter, r *http.Request
 		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid account update request", requestID)
 		return
 	}
+	credential := optionalCredential(body.Credential)
+	metadata := jsonObjectToMapPtr(body.Metadata)
+	runtimeClass := before.RuntimeClass
+	if body.RuntimeClass != nil {
+		runtimeClass = accountcontract.RuntimeClass(*body.RuntimeClass)
+	}
+	upstreamClient := before.UpstreamClient
+	if body.UpstreamClient != nil {
+		upstreamClient = body.UpstreamClient
+	}
+	proxyID := before.ProxyID
+	if body.ProxyId != nil {
+		proxyID = body.ProxyId
+	}
+	if credential != nil {
+		effectiveMetadata := mergeAccountMetadata(before.Metadata, metadata)
+		refreshed, err := s.refreshCodexImportCredential(r.Context(), runtimeClass, upstreamClient, effectiveMetadata, proxyID, *credential)
+		if err != nil {
+			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "codex oauth refresh failed", requestID)
+			return
+		}
+		credential = &refreshed
+	}
 	account, err := s.runtime.accounts.Update(r.Context(), accountID, accountcontract.UpdateRequest{
 		Name:           body.Name,
 		RuntimeClass:   toAccountRuntimeClassPtr(body.RuntimeClass),
-		Credential:     optionalCredential(body.Credential),
-		Metadata:       jsonObjectToMapPtr(body.Metadata),
+		Credential:     credential,
+		Metadata:       metadata,
 		ProxyID:        optionalNullableString(body.ProxyId),
 		Status:         toAccountStatusPtr(body.Status),
 		Priority:       body.Priority,
@@ -733,6 +773,50 @@ func (s *Server) handleUpdateAdminAccount(w http.ResponseWriter, r *http.Request
 		Data:      s.apiAccount(r.Context(), account),
 		RequestId: requestID,
 	})
+}
+
+func (s *Server) refreshCodexImportCredential(ctx context.Context, runtimeClass accountcontract.RuntimeClass, upstreamClient *string, metadata map[string]any, proxyID *string, credential map[string]any) (map[string]any, error) {
+	if !isCodexRefreshTokenOnlyCredential(runtimeClass, upstreamClient, credential) {
+		return credential, nil
+	}
+	resp, err := s.runtime.reverseProxy.Refresh(ctx, reverseproxycontract.RefreshRequest{
+		Account: reverseproxycontract.AccountRuntime{
+			RuntimeClass:   string(runtimeClass),
+			UpstreamClient: upstreamClient,
+			ProxyID:        proxyID,
+			UserAgent:      mapString(metadata, "user_agent"),
+			Metadata:       metadata,
+			Credential:     credential,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	return resp.Credential, nil
+}
+
+func isCodexRefreshTokenOnlyCredential(runtimeClass accountcontract.RuntimeClass, upstreamClient *string, credential map[string]any) bool {
+	if runtimeClass != accountcontract.RuntimeClassOauthRefresh && runtimeClass != accountcontract.RuntimeClassOauthDeviceCode {
+		return false
+	}
+	if upstreamClient == nil || !strings.EqualFold(strings.TrimSpace(*upstreamClient), "codex_cli") {
+		return false
+	}
+	return mapString(credential, "refresh_token") != "" && mapString(credential, "access_token") == ""
+}
+
+func mergeAccountMetadata(existing map[string]any, incoming *map[string]any) map[string]any {
+	if incoming == nil {
+		return existing
+	}
+	merged := make(map[string]any, len(existing)+len(*incoming))
+	for key, value := range existing {
+		merged[key] = value
+	}
+	for key, value := range *incoming {
+		merged[key] = value
+	}
+	return merged
 }
 
 func (s *Server) handleBindAdminAccountProxy(w http.ResponseWriter, r *http.Request) {

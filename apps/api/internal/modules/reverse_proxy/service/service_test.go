@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -482,6 +483,23 @@ func TestRuntimeClassifiesReverseProxyErrorsAndMetrics(t *testing.T) {
 }
 
 func TestRuntimeRefreshUsesPerAccountLockAndDoesNotOverwriteOnFailure(t *testing.T) {
+	var gotBody string
+	var gotUserAgent string
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/oauth/token" {
+			t.Fatalf("unexpected token endpoint path %s", r.URL.Path)
+		}
+		if r.Method != http.MethodPost {
+			t.Fatalf("unexpected token method %s", r.Method)
+		}
+		gotUserAgent = r.Header.Get("User-Agent")
+		body, _ := io.ReadAll(r.Body)
+		gotBody = string(body)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"access_token":"new-access-token","refresh_token":"rotated-refresh-token","id_token":"id-token","token_type":"Bearer","expires_in":3600}`))
+	}))
+	defer tokenServer.Close()
+
 	svc, err := New(nil)
 	if err != nil {
 		t.Fatalf("create runtime: %v", err)
@@ -493,16 +511,68 @@ func TestRuntimeRefreshUsesPerAccountLockAndDoesNotOverwriteOnFailure(t *testing
 		t.Fatal("expected missing refresh token error")
 	}
 	resp, err := svc.Refresh(context.Background(), contract.RefreshRequest{
-		Account: contract.AccountRuntime{AccountID: 1, RuntimeClass: "oauth_refresh", Credential: map[string]any{"access_token": "old-token", "refresh_token": "refresh-token"}},
+		Account: contract.AccountRuntime{
+			AccountID:      1,
+			RuntimeClass:   "oauth_refresh",
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"oauth_token_url": tokenServer.URL + "/oauth/token", "user_agent": "codex-cli/test"},
+			Credential:     map[string]any{"access_token": "old-token", "refresh_token": "refresh-token"},
+		},
 	})
 	if err != nil {
 		t.Fatalf("refresh with token: %v", err)
 	}
-	if resp.Credential["access_token"] != "refresh-token" || resp.RefreshedAt == "" {
+	if resp.Credential["access_token"] != "new-access-token" ||
+		resp.Credential["refresh_token"] != "rotated-refresh-token" ||
+		resp.Credential["id_token"] != "id-token" ||
+		resp.Credential["token_type"] != "Bearer" ||
+		resp.Credential["expires_at"] == "" ||
+		resp.RefreshedAt == "" {
 		t.Fatalf("unexpected refresh response: %+v", resp)
+	}
+	if !strings.Contains(gotBody, "grant_type=refresh_token") ||
+		!strings.Contains(gotBody, "refresh_token=refresh-token") ||
+		!strings.Contains(gotBody, "client_id="+url.QueryEscape(codexOAuthClientID)) {
+		t.Fatalf("unexpected refresh body %q", gotBody)
+	}
+	if gotUserAgent != "codex-cli/test" {
+		t.Fatalf("expected account user agent, got %q", gotUserAgent)
 	}
 	metrics := svc.Metrics()
 	if metrics.OAuthRefreshTotal["credential_missing"] != 1 || metrics.OAuthRefreshTotal["success"] != 1 {
+		t.Fatalf("unexpected refresh metrics: %+v", metrics)
+	}
+}
+
+func TestRuntimeRefreshClassifiesInvalidGrantWithoutOverwritingCredential(t *testing.T) {
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"error":"invalid_grant","error_description":"refresh_token_reused"}`))
+	}))
+	defer tokenServer.Close()
+
+	svc, err := New(nil)
+	if err != nil {
+		t.Fatalf("create runtime: %v", err)
+	}
+	_, err = svc.Refresh(context.Background(), contract.RefreshRequest{
+		Account: contract.AccountRuntime{
+			AccountID:      2,
+			RuntimeClass:   "oauth_refresh",
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"oauth_token_url": tokenServer.URL},
+			Credential:     map[string]any{"access_token": "old-token", "refresh_token": "bad-refresh-token"},
+		},
+	})
+	var runtimeErr contract.RuntimeError
+	if !errors.As(err, &runtimeErr) {
+		t.Fatalf("expected runtime error, got %T %v", err, err)
+	}
+	if runtimeErr.Class != "session_invalid" {
+		t.Fatalf("expected session_invalid, got %+v", runtimeErr)
+	}
+	metrics := svc.Metrics()
+	if metrics.OAuthRefreshTotal["session_invalid"] != 1 {
 		t.Fatalf("unexpected refresh metrics: %+v", metrics)
 	}
 }
