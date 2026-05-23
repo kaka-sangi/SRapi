@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/config"
+	realtimecontract "github.com/srapi/srapi/apps/api/internal/modules/realtime/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 	"nhooyr.io/websocket"
 )
@@ -455,6 +456,61 @@ func TestGatewayRealtimeWebSocketRelaysOpenAIUpstreamWebSocket(t *testing.T) {
 	usageResp := waitForRealtimeUsageLog(t, handler, sessionCookie, "wp470-realtime-model")
 	if len(usageResp.Data) != 1 || !usageResp.Data[0].Success || usageResp.Data[0].SourceEndpoint != realtimeWebSocketSourceEndpoint {
 		t.Fatalf("unexpected realtime usage record: %+v", usageResp.Data)
+	}
+}
+
+func TestAdminOpsRealtimeSlotsListsActiveSlotsSafely(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	conn := mustDialResponsesWebSocket(t, server.URL+"/v1/responses/ws?session_affinity_key=secret-session&sticky_account_id=42&sticky_strength=hard", apiKey)
+	defer conn.Close(websocket.StatusNormalClosure, "")
+
+	var slotsResp apiopenapi.RealtimeActiveSlotListResponse
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/ops/realtime/slots", nil)
+		req.AddCookie(sessionCookie)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected realtime slot list 200, got %d body=%s", rec.Code, rec.Body.String())
+		}
+		if err := json.NewDecoder(rec.Body).Decode(&slotsResp); err != nil {
+			t.Fatalf("decode realtime slot list: %v", err)
+		}
+		if len(slotsResp.Data) == 1 {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if len(slotsResp.Data) != 1 {
+		t.Fatalf("expected one active realtime slot, got %+v", slotsResp)
+	}
+	slot := slotsResp.Data[0]
+	if slot.Kind != apiopenapi.RealtimeSlotKind(realtimecontract.SlotKindResponsesWebSocket) ||
+		slot.SourceEndpoint != apiopenapi.RealtimeActiveSlotSourceEndpoint(responsesWebSocketSourceEndpoint) ||
+		slot.SessionAffinitySource != "query:sticky_account_id" ||
+		slot.SessionAffinityKeyHash == "" ||
+		strings.Contains(slot.SessionAffinityKeyHash, "secret-session") ||
+		slot.StickyAccountId == nil ||
+		*slot.StickyAccountId != "42" ||
+		slot.StickyStrength != "hard" {
+		t.Fatalf("unexpected sanitized realtime slot: %+v", slot)
+	}
+	if slotsResp.Counters.ActiveSlots != 1 ||
+		slotsResp.Counters.AcquiredTotal != 1 ||
+		slotsResp.Counters.ActiveByEndpoint[responsesWebSocketSourceEndpoint] != 1 ||
+		slotsResp.Counters.ActiveByKind[string(realtimecontract.SlotKindResponsesWebSocket)] != 1 ||
+		len(slotsResp.Counters.ActiveByApiKeyId) != 1 {
+		t.Fatalf("unexpected realtime slot counters: %+v", slotsResp.Counters)
+	}
+	if strings.Contains(mustMarshalString(t, slotsResp), "secret-session") ||
+		strings.Contains(mustMarshalString(t, slotsResp), apiKey) {
+		t.Fatalf("realtime slot response leaked sensitive input: %+v", slotsResp)
 	}
 }
 

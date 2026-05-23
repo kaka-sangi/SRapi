@@ -20,6 +20,7 @@ import (
 	operationsservice "github.com/srapi/srapi/apps/api/internal/modules/operations/service"
 	paymentcontract "github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
+	realtimecontract "github.com/srapi/srapi/apps/api/internal/modules/realtime/contract"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
@@ -551,6 +552,34 @@ func toAPIDomainEventOutbox(event eventscontract.OutboxEvent) apiopenapi.DomainE
 	}
 }
 
+func toAPIRealtimeActiveSlot(slot realtimecontract.Slot) apiopenapi.RealtimeActiveSlot {
+	return apiopenapi.RealtimeActiveSlot{
+		AcquiredAt:             slot.AcquiredAt,
+		ApiKeyId:               apiopenapi.Id(strconv.Itoa(slot.APIKeyID)),
+		Id:                     slot.ID,
+		Kind:                   apiopenapi.RealtimeSlotKind(slot.Kind),
+		RequestId:              apiopenapi.RequestId(slot.RequestID),
+		SessionAffinityKeyHash: slot.SessionAffinityKeyHash,
+		SessionAffinitySource:  slot.SessionAffinitySource,
+		SourceEndpoint:         apiopenapi.RealtimeActiveSlotSourceEndpoint(slot.SourceEndpoint),
+		StickyAccountId:        optionalAPIID(slot.StickyAccountID),
+		StickyStrength:         slot.StickyStrength,
+		UserId:                 apiopenapi.Id(strconv.Itoa(slot.UserID)),
+	}
+}
+
+func toAPIRealtimeActiveSlotCounters(list realtimecontract.ActiveSlotList) apiopenapi.RealtimeActiveSlotCounters {
+	return apiopenapi.RealtimeActiveSlotCounters{
+		AcquiredTotal:    list.Snapshot.AcquiredTotal,
+		ActiveByApiKeyId: intKeyedCounts(list.ActiveByAPIKeyID),
+		ActiveByEndpoint: copyStringCounts(list.Snapshot.ActiveByEndpoint),
+		ActiveByKind:     slotKindCounts(list.ActiveByKind),
+		ActiveSlots:      list.Snapshot.ActiveSlots,
+		RejectedTotal:    list.Snapshot.RejectedTotal,
+		ReleasedTotal:    list.Snapshot.ReleasedTotal,
+	}
+}
+
 func toAPIOpsSLO(item operationscontract.SLOWithEvaluation) apiopenapi.OpsSLO {
 	return apiopenapi.OpsSLO{
 		Definition: toAPIOpsSLODefinition(item.Definition),
@@ -771,6 +800,14 @@ func optionalIDString(value *int) *string {
 		return nil
 	}
 	out := strconv.Itoa(*value)
+	return &out
+}
+
+func optionalAPIID(value *int) *apiopenapi.Id {
+	if value == nil {
+		return nil
+	}
+	out := apiopenapi.Id(strconv.Itoa(*value))
 	return &out
 }
 
@@ -1072,4 +1109,37 @@ func cloneStringPtr(value *string) *string {
 
 func pagination(total int) apiopenapi.Pagination {
 	return apiopenapi.Pagination{Page: 1, PageSize: total, Total: total, HasNext: false}
+}
+
+func copyStringCounts(values map[string]int) map[string]int {
+	if values == nil {
+		return map[string]int{}
+	}
+	out := make(map[string]int, len(values))
+	for key, value := range values {
+		out[key] = value
+	}
+	return out
+}
+
+func slotKindCounts(values map[realtimecontract.SlotKind]int) map[string]int {
+	if values == nil {
+		return map[string]int{}
+	}
+	out := make(map[string]int, len(values))
+	for key, value := range values {
+		out[string(key)] = value
+	}
+	return out
+}
+
+func intKeyedCounts(values map[int]int) map[string]int {
+	if values == nil {
+		return map[string]int{}
+	}
+	out := make(map[string]int, len(values))
+	for key, value := range values {
+		out[strconv.Itoa(key)] = value
+	}
+	return out
 }

@@ -63,12 +63,13 @@ last_completed:
 - WP-540: Gemini native models list now exposes `GET /v1beta/models`, authenticates Gateway API keys, filters active SRapi model registry entries by API-key visibility, renders Google-shaped `models.list` responses with pagination and supported generation methods, and does not acquire Scheduler leases or touch Provider Account credentials.
 - WP-550: Gemini native countTokens now exposes `POST /v1beta/models/{model}:countTokens`, advertises `countTokens` in Gemini `models.list` when the SRapi model has `token_counting`, accepts Gemini countTokens body or `generateContentRequest`, schedules only `token_counting` capable Gemini accounts, dispatches upstream `models/{mapped_model}:countTokens` through API-key or Reverse Proxy Runtime credentials, and records Scheduler/request evidence without generation usage or cost.
 - WP-560: Anthropic Messages count_tokens now exposes `POST /v1/messages/count_tokens` plus anthropic-compatible provider alias, accepts Anthropic count_tokens body shape, schedules only `token_counting` capable accounts, dispatches upstream `/messages/count_tokens` with mapped upstream model for API-key accounts, dispatches Claude Code 2api `/messages/count_tokens?beta=true` through Reverse Proxy Runtime with selected OAuth/CLI credentials, and records Scheduler/request evidence without generation usage or cost.
+- WP-570: AdminOps realtime active slot API now exposes `GET /api/v1/admin/ops/realtime/slots`, returning current-node active slot summaries and endpoint/kind/API-key aggregate counters without raw affinity keys, credentials, prompts, provider frames, local client ingress, or Gateway-local provider DTOs.
 
 current:
 
 - package: WP-500+
 - status: pending
-- objective: split the next ecosystem or remaining advanced endpoint package from the roadmap after WP-560.
+- objective: split the next ecosystem or remaining advanced endpoint package from the roadmap after WP-570.
 
 next_recommended: WP-500+
 
@@ -79,8 +80,7 @@ last_gates:
 - `make openapi-codegen-check`: pass
 - `make openapi-ts-codegen-check`: pass
 - `make sdk-ts-typecheck`: pass
-- `cd apps/api && go test ./internal/httpserver -run 'TestGatewayAnthropicCountTokens' -count=1`: pass
-- `cd apps/api && go test ./internal/modules/gateway/... ./internal/modules/provider_adapters/... ./internal/httpserver`: pass
+- `cd apps/api && go test ./internal/modules/realtime/... ./internal/httpserver -run 'TestRealtime|TestGateway.*Realtime|TestAdminOpsRealtime|TestAcquireReleaseTracksRealtimeSlotLifecycle' -count=1`: pass
 - `cd apps/api && go test ./...`: pass
 - `make architecture-check`: pass
 - `make code-quality-check`: pass
@@ -91,7 +91,7 @@ notes:
 
 - Existing `docs/` remains the architecture and domain source of truth.
 - Future goal runs must read `specs/README.md` first, then continue from `next_recommended`.
-- The repository currently has unrelated dirty worktree entries; Codex must preserve them.
+- Future goal runs must preserve unrelated user worktree changes if present.
 - Frontend visual implementation is intentionally deferred per user instruction.
 - WP-500 keeps discovery responses credential-free while allowing reverse-proxy Antigravity accounts to use selected credentials upstream.
 - WP-080 added `TestGatewayCompatibilityEndpointsTargetSameOpenAICompatibleUpstream`, which records three upstream `/v1/chat/completions` calls using one OpenAI-compatible account and verifies provider/account usage evidence.
@@ -176,6 +176,8 @@ notes:
 - WP-550 added `TestGeminiCompatibleAdapterCountsTokensUpstream`, `TestReverseProxyGeminiAdapterCountsTokensThroughRuntime`, and `TestGatewayGeminiCountTokensSchedulesGeminiCompatibleUpstream`, proving Gemini countTokens API-key dispatch, selected-account reverse-proxy dispatch, Scheduler capability filtering, Google-shaped response rendering, and zero generation usage/cost evidence. The countTokens service logic is split into ownership-specific `gemini_count_tokens.go` files so `code-quality-check` file-size gates stay meaningful.
 - WP-560 added `TestAnthropicCompatibleAdapterCountsTokensUpstream`, `TestReverseProxyClaudeCodeAdapterCountsTokensThroughRuntime`, `TestGatewayAnthropicCountTokensSchedulesAnthropicCompatibleUpstream`, and `TestGatewayAnthropicCountTokensRequiresProviderScopedCapability`, proving Anthropic count_tokens API-key dispatch, Claude Code 2api Reverse Proxy Runtime dispatch, upstream model mapping inside the preserved count_tokens body shape, Scheduler capability filtering, Anthropic-shaped response rendering, and zero generation usage/cost evidence.
 - WP-560 intentionally does not implement OpenAI tokenizer estimation, provider-native realtime adapters, SDK examples, or frontend visuals.
+- WP-570 added `TestAdminOpsRealtimeSlotsListsActiveSlotsSafely` and extended realtime service lifecycle tests, proving `GET /api/v1/admin/ops/realtime/slots` lists active current-node slots and counters while returning only hashed affinity metadata and no API key, credential, prompt, or provider-specific frame content.
+- WP-570 intentionally does not implement distributed Redis-backed slot storage, persistent upstream session pools, provider-native Claude Code / Antigravity realtime protocols, local client ingress, or frontend visuals.
 
 ## Work Package Ledger
 
@@ -238,4 +240,5 @@ notes:
 | WP-540 | completed | Gemini native models list v1. |
 | WP-550 | completed | Gemini native countTokens v1. |
 | WP-560 | completed | Anthropic Messages count_tokens v1 with Claude Code 2api runtime dispatch. |
+| WP-570 | completed | AdminOps realtime active slot API v1. |
 | WP-500+ | pending | Remaining ecosystem and advanced endpoint packages. |

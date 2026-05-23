@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -132,7 +133,43 @@ func (s *Service) Snapshot(_ context.Context) contract.Snapshot {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.snapshotLocked()
+}
 
+func (s *Service) ListActiveSlots(_ context.Context) contract.ActiveSlotList {
+	if s == nil {
+		return contract.ActiveSlotList{
+			Snapshot:         contract.Snapshot{ActiveByEndpoint: map[string]int{}},
+			ActiveByKind:     map[contract.SlotKind]int{},
+			ActiveByAPIKeyID: map[int]int{},
+		}
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	slots := make([]contract.Slot, 0, len(s.active))
+	byKind := map[contract.SlotKind]int{}
+	byAPIKeyID := map[int]int{}
+	for _, slot := range s.active {
+		slots = append(slots, cloneSlot(slot))
+		byKind[slot.Kind]++
+		byAPIKeyID[slot.APIKeyID]++
+	}
+	sort.Slice(slots, func(i, j int) bool {
+		if slots[i].AcquiredAt.Equal(slots[j].AcquiredAt) {
+			return slots[i].ID < slots[j].ID
+		}
+		return slots[i].AcquiredAt.Before(slots[j].AcquiredAt)
+	})
+	return contract.ActiveSlotList{
+		Slots:            slots,
+		Snapshot:         s.snapshotLocked(),
+		ActiveByKind:     byKind,
+		ActiveByAPIKeyID: byAPIKeyID,
+	}
+}
+
+func (s *Service) snapshotLocked() contract.Snapshot {
 	byEndpoint := map[string]int{}
 	for _, slot := range s.active {
 		endpoint := strings.TrimSpace(slot.SourceEndpoint)
@@ -148,6 +185,15 @@ func (s *Service) Snapshot(_ context.Context) contract.Snapshot {
 		RejectedTotal:    s.rejectedTotal,
 		ActiveByEndpoint: byEndpoint,
 	}
+}
+
+func cloneSlot(slot contract.Slot) contract.Slot {
+	slot.StickyAccountID = cloneInt(slot.StickyAccountID)
+	if slot.ReleasedAt != nil {
+		releasedAt := *slot.ReleasedAt
+		slot.ReleasedAt = &releasedAt
+	}
+	return slot
 }
 
 func affinityHash(value string) string {

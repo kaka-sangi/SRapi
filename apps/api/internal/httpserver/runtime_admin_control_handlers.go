@@ -479,6 +479,25 @@ func (s *Server) handleListAdminOutboxEvents(w http.ResponseWriter, r *http.Requ
 	})
 }
 
+func (s *Server) handleListAdminOpsRealtimeSlots(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	if _, err := s.requireAdminSession(r); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	list := s.runtime.realtime.ListActiveSlots(r.Context())
+	data := make([]apiopenapi.RealtimeActiveSlot, 0, len(list.Slots))
+	for _, slot := range list.Slots {
+		data = append(data, toAPIRealtimeActiveSlot(slot))
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.RealtimeActiveSlotListResponse{
+		Counters:   toAPIRealtimeActiveSlotCounters(list),
+		Data:       data,
+		Pagination: pagination(len(data)),
+		RequestId:  requestID,
+	})
+}
+
 func (s *Server) handleListAdminOpsSLOs(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	if _, err := s.requireAdminSession(r); err != nil {

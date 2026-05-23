@@ -243,6 +243,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("GET /api/v1/admin/pricing-rules", server.handleListAdminPricingRules)
 	mux.HandleFunc("POST /api/v1/admin/pricing-rules", server.handleCreateAdminPricingRule)
 	mux.HandleFunc("GET /api/v1/admin/ops/events/outbox", server.handleListAdminOutboxEvents)
+	mux.HandleFunc("GET /api/v1/admin/ops/realtime/slots", server.handleListAdminOpsRealtimeSlots)
 	mux.HandleFunc("GET /api/v1/admin/ops/slo", server.handleListAdminOpsSLOs)
 	mux.HandleFunc("POST /api/v1/admin/ops/slo", server.handleCreateAdminOpsSLO)
 	mux.HandleFunc("PATCH /api/v1/admin/ops/slo/{id}", server.handleUpdateAdminOpsSLO)

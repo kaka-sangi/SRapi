@@ -940,6 +940,54 @@ export type DomainEventOutboxListResponse = {
     request_id: RequestId;
 };
 
+export type RealtimeSlotKind = 'responses_websocket' | 'realtime_websocket';
+
+export type RealtimeActiveSlot = {
+    /**
+     * Ephemeral in-process slot id.
+     */
+    id: string;
+    kind: RealtimeSlotKind;
+    request_id: RequestId;
+    user_id: Id;
+    api_key_id: Id;
+    source_endpoint: '/v1/responses/ws' | '/v1/realtime';
+    /**
+     * Sanitized source label for sticky routing hints.
+     */
+    session_affinity_source: string;
+    /**
+     * SHA-256 hash of the affinity key, or empty when no key was supplied.
+     */
+    session_affinity_key_hash: string;
+    sticky_account_id?: Id;
+    sticky_strength: string;
+    acquired_at: Timestamp;
+};
+
+export type RealtimeActiveSlotCounters = {
+    active_slots: number;
+    acquired_total: number;
+    released_total: number;
+    rejected_total: number;
+    active_by_endpoint: {
+        [key: string]: number;
+    };
+    active_by_kind: {
+        [key: string]: number;
+    };
+    active_by_api_key_id: {
+        [key: string]: number;
+    };
+};
+
+export type RealtimeActiveSlotListResponse = {
+    data: Array<RealtimeActiveSlot>;
+    counters: RealtimeActiveSlotCounters;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
 export type OpsSloStatus = 'active' | 'disabled';
 
 export type OpsSliType = 'availability' | 'latency' | 'freshness' | 'quality';
@@ -3989,6 +4037,42 @@ export type ListAdminOutboxEventsResponses = {
 };
 
 export type ListAdminOutboxEventsResponse = ListAdminOutboxEventsResponses[keyof ListAdminOutboxEventsResponses];
+
+export type ListAdminOpsRealtimeSlotsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        page_size?: number;
+    };
+    url: '/api/v1/admin/ops/realtime/slots';
+};
+
+export type ListAdminOpsRealtimeSlotsErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminOpsRealtimeSlotsError = ListAdminOpsRealtimeSlotsErrors[keyof ListAdminOpsRealtimeSlotsErrors];
+
+export type ListAdminOpsRealtimeSlotsResponses = {
+    /**
+     * Active realtime slot list.
+     */
+    200: RealtimeActiveSlotListResponse;
+};
+
+export type ListAdminOpsRealtimeSlotsResponse = ListAdminOpsRealtimeSlotsResponses[keyof ListAdminOpsRealtimeSlotsResponses];
 
 export type ListAdminOpsSlosData = {
     body?: never;

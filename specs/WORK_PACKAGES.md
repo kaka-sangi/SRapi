@@ -2283,6 +2283,54 @@ Required gates:
 - `make secret-scan`
 - `git diff --check`
 
+## WP-570: Realtime Active Slot Admin API v1
+
+Objective: expose a safe AdminOps read API for current realtime WebSocket slots so operators can inspect active `/v1/responses/ws` and `/v1/realtime` lifecycle state without introducing provider DTOs, local client ingress, or credential-bearing output.
+
+Read first:
+
+- `docs/OPENAPI_CONTRACT.md`
+- `docs/OBSERVABILITY_SPEC.md`
+- `docs/AI_ENDPOINT_COMPATIBILITY.md`
+- `docs/REVERSE_PROXY_SPEC.md`
+- `docs/2API_REVERSE_PROXY_DEFINITION.md`
+- `packages/openapi/openapi.yaml`
+- `apps/api/internal/modules/realtime/contract`
+- `apps/api/internal/modules/realtime/service`
+- `apps/api/internal/httpserver/runtime_gateway_websocket.go`
+- `apps/api/internal/httpserver/runtime_admin_control_handlers.go`
+
+Owns:
+
+- OpenAPI `GET /api/v1/admin/ops/realtime/slots` contract and generated Go/TypeScript SDK drift.
+- Realtime module read contract for current in-process active slots and aggregate counters.
+- AdminOps HTTP handler that returns safe slot summaries under console cookie auth.
+- Docs that define the endpoint as current-node operational state, not a distributed persistent session pool.
+- Focused service and HTTP regressions.
+
+Definition of Done:
+
+- Admins can list active realtime slots with slot id, kind, request id, user id, API key id, source endpoint, acquisition time, sanitized session-affinity metadata, sticky account id, and sticky strength.
+- Response includes aggregate active/acquired/released/rejected counts and active counts by endpoint, slot kind, and API key id.
+- Raw session affinity keys, caller authorization, cookies, upstream credentials, prompt payloads, and provider-specific realtime frames are never returned.
+- The endpoint is read-only, uses `cookieAuth`, and requires no CSRF token.
+- The implementation keeps realtime lifecycle logic inside the realtime module and HTTP rendering inside `internal/httpserver`.
+- No frontend visuals and no local Codex / Claude Code / Antigravity ingress are added.
+
+Required gates:
+
+- `make openapi-lint`
+- `make openapi-bundle`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/modules/realtime/... ./internal/httpserver -run 'TestRealtime|TestGateway.*Realtime|TestAdminOpsRealtime' -count=1`
+- `cd apps/api && go test ./...`
+- `make architecture-check`
+- `make code-quality-check`
+- `make secret-scan`
+- `git diff --check`
+
 ## WP-500+: Ecosystem And Remaining Advanced Surface
 
 Use `ROADMAP.md` Phase 7 through Phase 8 to split future packages for:

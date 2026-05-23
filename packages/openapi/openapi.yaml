@@ -2151,6 +2151,44 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/ops/realtime/slots:
+    get:
+      tags:
+        - AdminOps
+      operationId: listAdminOpsRealtimeSlots
+      summary: List active realtime WebSocket slots on this API node.
+      description: >
+        Returns current in-process realtime slot lifecycle state for operator
+        diagnostics. The response includes sanitized slot metadata and aggregate
+        counters only; it never contains raw session-affinity keys, caller
+        authorization, cookies, upstream credentials, prompt payloads, or
+        provider-specific realtime frames.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: Active realtime slot list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RealtimeActiveSlotListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/ops/slo:
     get:
       tags:
@@ -6909,6 +6947,114 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/DomainEventOutbox"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    RealtimeSlotKind:
+      type: string
+      enum:
+        - responses_websocket
+        - realtime_websocket
+
+    RealtimeActiveSlot:
+      type: object
+      required:
+        - id
+        - kind
+        - request_id
+        - user_id
+        - api_key_id
+        - source_endpoint
+        - session_affinity_source
+        - session_affinity_key_hash
+        - sticky_strength
+        - acquired_at
+      properties:
+        id:
+          type: string
+          description: Ephemeral in-process slot id.
+        kind:
+          $ref: "#/components/schemas/RealtimeSlotKind"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+        user_id:
+          $ref: "#/components/schemas/Id"
+        api_key_id:
+          $ref: "#/components/schemas/Id"
+        source_endpoint:
+          type: string
+          enum:
+            - /v1/responses/ws
+            - /v1/realtime
+        session_affinity_source:
+          type: string
+          description: Sanitized source label for sticky routing hints.
+        session_affinity_key_hash:
+          type: string
+          description: SHA-256 hash of the affinity key, or empty when no key was supplied.
+          pattern: "^(|sha256:[a-f0-9]{64})$"
+        sticky_account_id:
+          $ref: "#/components/schemas/Id"
+        sticky_strength:
+          type: string
+        acquired_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    RealtimeActiveSlotCounters:
+      type: object
+      required:
+        - active_slots
+        - acquired_total
+        - released_total
+        - rejected_total
+        - active_by_endpoint
+        - active_by_kind
+        - active_by_api_key_id
+      properties:
+        active_slots:
+          type: integer
+          minimum: 0
+        acquired_total:
+          type: integer
+          minimum: 0
+        released_total:
+          type: integer
+          minimum: 0
+        rejected_total:
+          type: integer
+          minimum: 0
+        active_by_endpoint:
+          type: object
+          additionalProperties:
+            type: integer
+            minimum: 0
+        active_by_kind:
+          type: object
+          additionalProperties:
+            type: integer
+            minimum: 0
+        active_by_api_key_id:
+          type: object
+          additionalProperties:
+            type: integer
+            minimum: 0
+
+    RealtimeActiveSlotListResponse:
+      type: object
+      required:
+        - data
+        - counters
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/RealtimeActiveSlot"
+        counters:
+          $ref: "#/components/schemas/RealtimeActiveSlotCounters"
         pagination:
           $ref: "#/components/schemas/Pagination"
         request_id:

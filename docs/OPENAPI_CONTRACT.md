@@ -214,6 +214,7 @@ components:
 | `/api/v1/admin/models` | yes | yes | read only | no |
 | `/api/v1/admin/accounts` | yes | yes | read/test only | no |
 | `/api/v1/admin/scheduler` | yes | yes | read/simulate only | no |
+| `/api/v1/admin/ops/realtime/slots` | yes | yes | read only | no |
 | `/api/v1/admin/ops/slo` | yes | yes | read only | no |
 | `/api/v1/admin/ops/alerts` | yes | yes | read only | no |
 | `/api/v1/admin/settings` | yes | yes | no | no |
@@ -228,6 +229,7 @@ components:
 - SLO `objective` 请求可接受 `0.995` 或 `99.5`；响应统一返回比例值。
 - `GET /api/v1/admin/ops/alerts` 支持 `status`、`severity` 过滤。
 - `POST /api/v1/admin/ops/alerts/{id}/ack` 必须使用 CSRF，并且 audit 只记录 ack 摘要，不复制 alert `details`。
+- `GET /api/v1/admin/ops/realtime/slots` 返回当前 API 节点内存中的 active realtime slot 摘要和聚合计数；它不是分布式持久 session pool 查询，且不得返回原始 affinity key、API key、credential、prompt 或 provider-specific frame。
 
 ## 5. 统一响应格式
 
@@ -632,6 +634,7 @@ GET  /api/v1/admin/ops/traffic
 GET  /api/v1/admin/ops/errors
 GET  /api/v1/admin/ops/providers
 GET  /api/v1/admin/ops/scheduler/decisions
+GET  /api/v1/admin/ops/realtime/slots
 GET  /api/v1/admin/ops/alerts
 POST /api/v1/admin/ops/alerts/{id}/ack
 GET  /api/v1/admin/ops/slo

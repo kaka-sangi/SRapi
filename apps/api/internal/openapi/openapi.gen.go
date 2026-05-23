@@ -1166,6 +1166,42 @@ func (e ProviderProtocol) Valid() bool {
 	}
 }
 
+// Defines values for RealtimeActiveSlotSourceEndpoint.
+const (
+	V1realtime    RealtimeActiveSlotSourceEndpoint = "/v1/realtime"
+	V1responsesws RealtimeActiveSlotSourceEndpoint = "/v1/responses/ws"
+)
+
+// Valid indicates whether the value is a known member of the RealtimeActiveSlotSourceEndpoint enum.
+func (e RealtimeActiveSlotSourceEndpoint) Valid() bool {
+	switch e {
+	case V1realtime:
+		return true
+	case V1responsesws:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RealtimeSlotKind.
+const (
+	RealtimeWebsocket  RealtimeSlotKind = "realtime_websocket"
+	ResponsesWebsocket RealtimeSlotKind = "responses_websocket"
+)
+
+// Valid indicates whether the value is a known member of the RealtimeSlotKind enum.
+func (e RealtimeSlotKind) Valid() bool {
+	switch e {
+	case RealtimeWebsocket:
+		return true
+	case ResponsesWebsocket:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ResourceStatus.
 const (
 	ResourceStatusActive   ResourceStatus = "active"
@@ -3121,6 +3157,52 @@ type ProviderResponse struct {
 	RequestId RequestId `json:"request_id"`
 }
 
+// RealtimeActiveSlot defines model for RealtimeActiveSlot.
+type RealtimeActiveSlot struct {
+	AcquiredAt Timestamp `json:"acquired_at"`
+	ApiKeyId   Id        `json:"api_key_id"`
+
+	// Id Ephemeral in-process slot id.
+	Id        string           `json:"id"`
+	Kind      RealtimeSlotKind `json:"kind"`
+	RequestId RequestId        `json:"request_id"`
+
+	// SessionAffinityKeyHash SHA-256 hash of the affinity key, or empty when no key was supplied.
+	SessionAffinityKeyHash string `json:"session_affinity_key_hash"`
+
+	// SessionAffinitySource Sanitized source label for sticky routing hints.
+	SessionAffinitySource string                           `json:"session_affinity_source"`
+	SourceEndpoint        RealtimeActiveSlotSourceEndpoint `json:"source_endpoint"`
+	StickyAccountId       *Id                              `json:"sticky_account_id,omitempty"`
+	StickyStrength        string                           `json:"sticky_strength"`
+	UserId                Id                               `json:"user_id"`
+}
+
+// RealtimeActiveSlotSourceEndpoint defines model for RealtimeActiveSlot.SourceEndpoint.
+type RealtimeActiveSlotSourceEndpoint string
+
+// RealtimeActiveSlotCounters defines model for RealtimeActiveSlotCounters.
+type RealtimeActiveSlotCounters struct {
+	AcquiredTotal    int            `json:"acquired_total"`
+	ActiveByApiKeyId map[string]int `json:"active_by_api_key_id"`
+	ActiveByEndpoint map[string]int `json:"active_by_endpoint"`
+	ActiveByKind     map[string]int `json:"active_by_kind"`
+	ActiveSlots      int            `json:"active_slots"`
+	RejectedTotal    int            `json:"rejected_total"`
+	ReleasedTotal    int            `json:"released_total"`
+}
+
+// RealtimeActiveSlotListResponse defines model for RealtimeActiveSlotListResponse.
+type RealtimeActiveSlotListResponse struct {
+	Counters   RealtimeActiveSlotCounters `json:"counters"`
+	Data       []RealtimeActiveSlot       `json:"data"`
+	Pagination Pagination                 `json:"pagination"`
+	RequestId  RequestId                  `json:"request_id"`
+}
+
+// RealtimeSlotKind defines model for RealtimeSlotKind.
+type RealtimeSlotKind string
+
 // RefundPaymentOrderRequest defines model for RefundPaymentOrderRequest.
 type RefundPaymentOrderRequest struct {
 	// Amount Decimal refund amount. Empty or omitted means full refund.
@@ -3653,6 +3735,12 @@ type ListAdminOutboxEventsParams struct {
 	PageSize  *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
 	Status    *string   `form:"status,omitempty" json:"status,omitempty"`
 	EventType *string   `form:"event_type,omitempty" json:"event_type,omitempty"`
+}
+
+// ListAdminOpsRealtimeSlotsParams defines parameters for ListAdminOpsRealtimeSlots.
+type ListAdminOpsRealtimeSlotsParams struct {
+	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
 }
 
 // ListAdminOpsSLOsParams defines parameters for ListAdminOpsSLOs.
@@ -9906,6 +9994,9 @@ type ServerInterface interface {
 	// List domain event outbox entries.
 	// (GET /api/v1/admin/ops/events/outbox)
 	ListAdminOutboxEvents(w http.ResponseWriter, r *http.Request, params ListAdminOutboxEventsParams)
+	// List active realtime WebSocket slots on this API node.
+	// (GET /api/v1/admin/ops/realtime/slots)
+	ListAdminOpsRealtimeSlots(w http.ResponseWriter, r *http.Request, params ListAdminOpsRealtimeSlotsParams)
 	// List operational SLO definitions with current evaluation evidence.
 	// (GET /api/v1/admin/ops/slo)
 	ListAdminOpsSLOs(w http.ResponseWriter, r *http.Request, params ListAdminOpsSLOsParams)
@@ -11704,6 +11795,58 @@ func (siw *ServerInterfaceWrapper) ListAdminOutboxEvents(w http.ResponseWriter, 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListAdminOutboxEvents(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAdminOpsRealtimeSlots operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminOpsRealtimeSlots(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminOpsRealtimeSlotsParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminOpsRealtimeSlots(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -13917,6 +14060,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/alerts", wrapper.ListAdminOpsAlerts)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/ops/alerts/{id}/ack", wrapper.AcknowledgeAdminOpsAlert)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/events/outbox", wrapper.ListAdminOutboxEvents)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/realtime/slots", wrapper.ListAdminOpsRealtimeSlots)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/slo", wrapper.ListAdminOpsSLOs)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/ops/slo", wrapper.CreateAdminOpsSLO)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/ops/slo/{id}", wrapper.UpdateAdminOpsSLO)

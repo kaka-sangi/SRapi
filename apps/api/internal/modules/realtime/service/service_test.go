@@ -51,6 +51,16 @@ func TestAcquireReleaseTracksRealtimeSlotLifecycle(t *testing.T) {
 	if snapshot.ActiveSlots != 1 || snapshot.AcquiredTotal != 1 || snapshot.ActiveByEndpoint["/v1/responses/ws"] != 1 {
 		t.Fatalf("unexpected active snapshot: %+v", snapshot)
 	}
+	active := svc.ListActiveSlots(context.Background())
+	if len(active.Slots) != 1 ||
+		active.ActiveByKind[contract.SlotKindResponsesWebSocket] != 1 ||
+		active.ActiveByAPIKeyID[3] != 1 ||
+		active.Slots[0].SessionAffinityKeyHash != slot.SessionAffinityKeyHash {
+		t.Fatalf("unexpected active slot list: %+v", active)
+	}
+	if strings.Contains(active.Slots[0].SessionAffinityKeyHash, "conversation-secret") {
+		t.Fatalf("active slot list leaked raw affinity key: %+v", active.Slots[0])
+	}
 
 	released, err := svc.Release(context.Background(), slot.ID)
 	if err != nil {
@@ -62,6 +72,9 @@ func TestAcquireReleaseTracksRealtimeSlotLifecycle(t *testing.T) {
 	snapshot = svc.Snapshot(context.Background())
 	if snapshot.ActiveSlots != 0 || snapshot.AcquiredTotal != 1 || snapshot.ReleasedTotal != 1 {
 		t.Fatalf("unexpected released snapshot: %+v", snapshot)
+	}
+	if active := svc.ListActiveSlots(context.Background()); len(active.Slots) != 0 || active.Snapshot.ActiveSlots != 0 {
+		t.Fatalf("expected empty active slot list after release, got %+v", active)
 	}
 }
 

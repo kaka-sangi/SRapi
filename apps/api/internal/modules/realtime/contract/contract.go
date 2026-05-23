@@ -47,8 +47,16 @@ type Snapshot struct {
 	ActiveByEndpoint map[string]int
 }
 
+type ActiveSlotList struct {
+	Slots            []Slot
+	Snapshot         Snapshot
+	ActiveByKind     map[SlotKind]int
+	ActiveByAPIKeyID map[int]int
+}
+
 type Manager interface {
 	Acquire(ctx context.Context, req AcquireRequest) (Slot, error)
 	Release(ctx context.Context, slotID string) (Slot, error)
 	Snapshot(ctx context.Context) Snapshot
+	ListActiveSlots(ctx context.Context) ActiveSlotList
 }
