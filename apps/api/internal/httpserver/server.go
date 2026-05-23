@@ -253,6 +253,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("GET /api/v1/admin/scheduler/decisions", server.handleListAdminSchedulerDecisions)
 	mux.HandleFunc("GET /api/v1/admin/scheduler/strategies", server.handleListSchedulerStrategies)
 	mux.HandleFunc("GET /v1/models", server.handleListModels)
+	mux.HandleFunc("GET /v1beta/models", server.handleListGeminiModels)
 	mux.HandleFunc("POST /v1/chat/completions", server.handleCreateChatCompletion)
 	mux.HandleFunc("POST /v1/responses", server.handleCreateResponse)
 	mux.HandleFunc("GET /v1/responses/ws", server.handleResponsesWebSocket)

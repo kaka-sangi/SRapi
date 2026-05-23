@@ -75,11 +75,14 @@ models/{model}:embedContent
 WP-230 起公开 Gemini-native 文本生成路由：
 
 ```txt
+GET  /v1beta/models
 POST /v1beta/models/{model}:generateContent
 POST /v1beta/models/{model}:streamGenerateContent
 ```
 
 这些路由完成客户端侧 Gemini GenerateContent 与 Canonical AI Request / Response 的转换，并复用 Gateway API Key、模型策略、Scheduler、Provider Adapter、usage 和 decision 记录。WP-240 起，目标 Provider 为 `gemini-compatible` / `native-gemini` / `reverse-proxy-gemini-cli` 时，Provider Adapter 会调用 Gemini `generateContent` 或 `streamGenerateContent` 上游。
+
+WP-540 起，`GET /v1beta/models` 返回 Gemini `models.list` 兼容的 `{models,nextPageToken}`，只基于 SRapi model registry 和 Gateway API Key 可见性渲染 active models。响应 model name 使用 `models/{canonical_name}`，并包含 `baseModelId`、`version`、`displayName`、`inputTokenLimit`、`outputTokenLimit` 和 `supportedGenerationMethods`；`pageSize` / `pageToken` 非法时返回 Google-style `INVALID_ARGUMENT`。该目录路由不进入 Scheduler、不读取 Provider Account 凭证、也不做上游模型发现。
 
 ### 2.4 OpenRouter 与其他聚合协议
 
@@ -625,7 +628,6 @@ OpenAI-compatible Realtime WebSocket relay
 Phase 2 继续实现：
 
 ```txt
-Gemini native models/list endpoint
 Token counting endpoint
 ```
 

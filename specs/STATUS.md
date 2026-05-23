@@ -60,19 +60,25 @@ last_completed:
 - WP-510: Images edits JSON references now let `/v1/images/edits` and OpenAI-compatible image edit aliases accept application/json local data URL / base64 image references, decode them into the existing canonical image edit path, forward upstream multipart `/images/edits`, and explicitly reject remote URLs and `file_id` references.
 - WP-520: Images edits streaming events now let `/v1/images/edits` and OpenAI-compatible image edit aliases return `text/event-stream` when `stream=true`, synthesize a final `image.generation.result` SSE chunk through the existing Gateway/auth/Scheduler/Provider Adapter/usage path, and keep remote URL / `file_id` rejection unchanged.
 - WP-530: Antigravity project bootstrap now lets `reverse-proxy-antigravity` discovery use selected-account credentials through Reverse Proxy Runtime to call `/v1internal:loadCodeAssist` and, when needed, `/v1internal:onboardUser` before model discovery; preview remains side-effect free and persisted discovery writes resolved project metadata.
+- WP-540: Gemini native models list now exposes `GET /v1beta/models`, authenticates Gateway API keys, filters active SRapi model registry entries by API-key visibility, renders Google-shaped `models.list` responses with pagination and supported generation methods, and does not acquire Scheduler leases or touch Provider Account credentials.
 
 current:
 
 - package: WP-500+
 - status: pending
-- objective: split the next ecosystem or remaining advanced endpoint package from the roadmap after WP-530.
+- objective: split the next ecosystem or remaining advanced endpoint package from the roadmap after WP-540.
 
 next_recommended: WP-500+
 
 last_gates:
 
-- `cd apps/api && go test ./internal/httpserver -run 'TestAdminAccountModelDiscovery.*Antigravity|TestGatewayAntigravity' -count=1`: pass
-- `cd apps/api && go test ./internal/modules/reverse_proxy/... ./internal/httpserver -count=1`: pass
+- `make openapi-lint`: pass
+- `make openapi-bundle`: pass
+- `make openapi-codegen-check`: pass
+- `make openapi-ts-codegen-check`: pass
+- `make sdk-ts-typecheck`: pass
+- `cd apps/api && go test ./internal/httpserver -run 'TestGatewayGeminiListModels' -count=1`: pass
+- `cd apps/api && go test ./internal/httpserver ./internal/modules/gateway/...`: pass
 - `cd apps/api && go test ./...`: pass
 - `make architecture-check`: pass
 - `make code-quality-check`: pass
@@ -163,6 +169,8 @@ notes:
 - WP-490 intentionally does not add multi-image variations, JSON image references, streaming image variation events, or frontend visuals.
 - WP-530 added `TestAdminAccountModelDiscoveryBootstrapsAntigravityProjectFromLoadCodeAssist` and `TestAdminAccountModelDiscoveryPersistsAntigravityOnboardedProject`, proving Antigravity discovery uses selected-account OAuth/desktop/IDE credentials through Reverse Proxy Runtime for `/v1internal:loadCodeAssist`, `/v1internal:onboardUser`, and `/v1internal:fetchAvailableModels`.
 - WP-530 intentionally does not invoke local Antigravity, add Gateway-local DTOs, or implement full Antigravity OAuth onboarding UI/API, credit overage retry policy, or provider-native realtime.
+- WP-540 added `TestGatewayGeminiListModels` and `TestGatewayGeminiListModelsRejectsInvalidPaginationAndDisabledKey`, proving Gemini models.list shape, API-key visibility filtering, pagination, supported generation method derivation, and Google-style errors.
+- WP-540 intentionally does not schedule Provider Accounts, call upstream Gemini model discovery, create usage records for catalog listing, or add frontend visuals.
 
 ## Work Package Ledger
 
@@ -222,4 +230,5 @@ notes:
 | WP-510 | completed | Images edits JSON references v1. |
 | WP-520 | completed | Images edits streaming events v1. |
 | WP-530 | completed | Antigravity project bootstrap for 2api model discovery v1. |
+| WP-540 | completed | Gemini native models list v1. |
 | WP-500+ | pending | Remaining ecosystem and advanced endpoint packages. |

@@ -3174,6 +3174,49 @@ paths:
         default:
           $ref: "#/components/responses/GeminiGatewayError"
 
+  /v1beta/models:
+    get:
+      tags:
+        - Gateway
+      operationId: listGeminiModels
+      summary: List Gemini-compatible models available to the gateway API key.
+      description: Gemini-compatible models.list route. SRapi authenticates the gateway API key, applies model visibility policy, and renders active SRapi registry models in a Google-shaped list response. This endpoint does not schedule a Provider Account or touch provider credentials.
+      security:
+        - gatewayBearerAuth: []
+      parameters:
+        - name: pageSize
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+          description: Maximum number of models to return. Defaults to all visible models when omitted.
+        - name: pageToken
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Opaque pagination token returned by a previous listGeminiModels response.
+      responses:
+        "200":
+          description: Gemini-compatible model list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeminiModelList"
+        "400":
+          $ref: "#/components/responses/GeminiGatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GeminiGatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GeminiGatewayForbidden"
+        default:
+          $ref: "#/components/responses/GeminiGatewayError"
+
   /api/provider/antigravity/v1beta/models/{model}:generateContent:
     post:
       tags:
@@ -8548,3 +8591,56 @@ components:
           type: array
           items:
             type: string
+
+    GeminiModelInfo:
+      type: object
+      required:
+        - name
+        - baseModelId
+        - version
+        - displayName
+        - inputTokenLimit
+        - outputTokenLimit
+        - supportedGenerationMethods
+      properties:
+        name:
+          type: string
+          description: Google-shaped resource name such as `models/gemini-1.5-pro`.
+        baseModelId:
+          type: string
+          description: Base model id without the `models/` prefix.
+        version:
+          type: string
+          description: SRapi model family, quality tier, or `srapi`.
+        displayName:
+          type: string
+        description:
+          type: string
+        inputTokenLimit:
+          type: integer
+          minimum: 0
+        outputTokenLimit:
+          type: integer
+          minimum: 0
+        supportedGenerationMethods:
+          type: array
+          items:
+            type: string
+            enum:
+              - generateContent
+              - streamGenerateContent
+              - countTokens
+          minItems: 1
+      additionalProperties: true
+
+    GeminiModelList:
+      type: object
+      required:
+        - models
+      properties:
+        models:
+          type: array
+          items:
+            $ref: "#/components/schemas/GeminiModelInfo"
+        nextPageToken:
+          type: string

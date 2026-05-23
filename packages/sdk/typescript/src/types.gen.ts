@@ -1623,6 +1623,32 @@ export type GeminiGenerateContentResponse = {
     compatibilityWarnings?: Array<string>;
 };
 
+export type GeminiModelInfo = {
+    /**
+     * Google-shaped resource name such as `models/gemini-1.5-pro`.
+     */
+    name: string;
+    /**
+     * Base model id without the `models/` prefix.
+     */
+    baseModelId: string;
+    /**
+     * SRapi model family, quality tier, or `srapi`.
+     */
+    version: string;
+    displayName: string;
+    description?: string;
+    inputTokenLimit: number;
+    outputTokenLimit: number;
+    supportedGenerationMethods: Array<'generateContent' | 'streamGenerateContent' | 'countTokens'>;
+    [key: string]: unknown;
+};
+
+export type GeminiModelList = {
+    models: Array<GeminiModelInfo>;
+    nextPageToken?: string;
+};
+
 export type CreateProviderAccountRequestWritable = {
     provider_id: Id;
     name: string;
@@ -4931,6 +4957,52 @@ export type StreamGeminiContentResponses = {
 };
 
 export type StreamGeminiContentResponse = StreamGeminiContentResponses[keyof StreamGeminiContentResponses];
+
+export type ListGeminiModelsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Maximum number of models to return. Defaults to all visible models when omitted.
+         */
+        pageSize?: number;
+        /**
+         * Opaque pagination token returned by a previous listGeminiModels response.
+         */
+        pageToken?: string;
+    };
+    url: '/v1beta/models';
+};
+
+export type ListGeminiModelsErrors = {
+    /**
+     * Invalid Gemini gateway request.
+     */
+    400: GeminiErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GeminiErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GeminiErrorResponse;
+    /**
+     * Google-style Gemini gateway error.
+     */
+    default: GeminiErrorResponse;
+};
+
+export type ListGeminiModelsError = ListGeminiModelsErrors[keyof ListGeminiModelsErrors];
+
+export type ListGeminiModelsResponses = {
+    /**
+     * Gemini-compatible model list.
+     */
+    200: GeminiModelList;
+};
+
+export type ListGeminiModelsResponse = ListGeminiModelsResponses[keyof ListGeminiModelsResponses];
 
 export type GenerateAntigravityGeminiContentAliasData = {
     body: GeminiGenerateContentRequest;

@@ -584,6 +584,27 @@ func (e GeminiContentRole) Valid() bool {
 	}
 }
 
+// Defines values for GeminiModelInfoSupportedGenerationMethods.
+const (
+	CountTokens           GeminiModelInfoSupportedGenerationMethods = "countTokens"
+	GenerateContent       GeminiModelInfoSupportedGenerationMethods = "generateContent"
+	StreamGenerateContent GeminiModelInfoSupportedGenerationMethods = "streamGenerateContent"
+)
+
+// Valid indicates whether the value is a known member of the GeminiModelInfoSupportedGenerationMethods enum.
+func (e GeminiModelInfoSupportedGenerationMethods) Valid() bool {
+	switch e {
+	case CountTokens:
+		return true
+	case GenerateContent:
+		return true
+	case StreamGenerateContent:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for HealthDataStatus.
 const (
 	HealthDataStatusDegraded HealthDataStatus = "degraded"
@@ -2279,6 +2300,33 @@ type GeminiGenerationConfig struct {
 	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
+// GeminiModelInfo defines model for GeminiModelInfo.
+type GeminiModelInfo struct {
+	// BaseModelId Base model id without the `models/` prefix.
+	BaseModelId     string  `json:"baseModelId"`
+	Description     *string `json:"description,omitempty"`
+	DisplayName     string  `json:"displayName"`
+	InputTokenLimit int     `json:"inputTokenLimit"`
+
+	// Name Google-shaped resource name such as `models/gemini-1.5-pro`.
+	Name                       string                                      `json:"name"`
+	OutputTokenLimit           int                                         `json:"outputTokenLimit"`
+	SupportedGenerationMethods []GeminiModelInfoSupportedGenerationMethods `json:"supportedGenerationMethods"`
+
+	// Version SRapi model family, quality tier, or `srapi`.
+	Version              string                 `json:"version"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// GeminiModelInfoSupportedGenerationMethods defines model for GeminiModelInfo.SupportedGenerationMethods.
+type GeminiModelInfoSupportedGenerationMethods string
+
+// GeminiModelList defines model for GeminiModelList.
+type GeminiModelList struct {
+	Models        []GeminiModelInfo `json:"models"`
+	NextPageToken *string           `json:"nextPageToken,omitempty"`
+}
+
 // GeminiPart defines model for GeminiPart.
 type GeminiPart struct {
 	FileData             *JsonObject            `json:"file_data,omitempty"`
@@ -3685,6 +3733,15 @@ type ConnectResponsesWebSocketParams struct {
 
 // ConnectResponsesWebSocketParamsStickyStrength defines parameters for ConnectResponsesWebSocket.
 type ConnectResponsesWebSocketParamsStickyStrength string
+
+// ListGeminiModelsParams defines parameters for ListGeminiModels.
+type ListGeminiModelsParams struct {
+	// PageSize Maximum number of models to return. Defaults to all visible models when omitted.
+	PageSize *int `form:"pageSize,omitempty" json:"pageSize,omitempty"`
+
+	// PageToken Opaque pagination token returned by a previous listGeminiModels response.
+	PageToken *string `form:"pageToken,omitempty" json:"pageToken,omitempty"`
+}
 
 // CreateAnthropicCompatibleMessageAliasJSONRequestBody defines body for CreateAnthropicCompatibleMessageAlias for application/json ContentType.
 type CreateAnthropicCompatibleMessageAliasJSONRequestBody = AnthropicMessagesRequest
@@ -5685,6 +5742,167 @@ func (a GeminiGenerationConfig) MarshalJSON() ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error marshaling 'topP': %w", err)
 		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for GeminiModelInfo. Returns the specified
+// element and whether it was found
+func (a GeminiModelInfo) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for GeminiModelInfo
+func (a *GeminiModelInfo) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for GeminiModelInfo to handle AdditionalProperties
+func (a *GeminiModelInfo) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["baseModelId"]; found {
+		err = json.Unmarshal(raw, &a.BaseModelId)
+		if err != nil {
+			return fmt.Errorf("error reading 'baseModelId': %w", err)
+		}
+		delete(object, "baseModelId")
+	}
+
+	if raw, found := object["description"]; found {
+		err = json.Unmarshal(raw, &a.Description)
+		if err != nil {
+			return fmt.Errorf("error reading 'description': %w", err)
+		}
+		delete(object, "description")
+	}
+
+	if raw, found := object["displayName"]; found {
+		err = json.Unmarshal(raw, &a.DisplayName)
+		if err != nil {
+			return fmt.Errorf("error reading 'displayName': %w", err)
+		}
+		delete(object, "displayName")
+	}
+
+	if raw, found := object["inputTokenLimit"]; found {
+		err = json.Unmarshal(raw, &a.InputTokenLimit)
+		if err != nil {
+			return fmt.Errorf("error reading 'inputTokenLimit': %w", err)
+		}
+		delete(object, "inputTokenLimit")
+	}
+
+	if raw, found := object["name"]; found {
+		err = json.Unmarshal(raw, &a.Name)
+		if err != nil {
+			return fmt.Errorf("error reading 'name': %w", err)
+		}
+		delete(object, "name")
+	}
+
+	if raw, found := object["outputTokenLimit"]; found {
+		err = json.Unmarshal(raw, &a.OutputTokenLimit)
+		if err != nil {
+			return fmt.Errorf("error reading 'outputTokenLimit': %w", err)
+		}
+		delete(object, "outputTokenLimit")
+	}
+
+	if raw, found := object["supportedGenerationMethods"]; found {
+		err = json.Unmarshal(raw, &a.SupportedGenerationMethods)
+		if err != nil {
+			return fmt.Errorf("error reading 'supportedGenerationMethods': %w", err)
+		}
+		delete(object, "supportedGenerationMethods")
+	}
+
+	if raw, found := object["version"]; found {
+		err = json.Unmarshal(raw, &a.Version)
+		if err != nil {
+			return fmt.Errorf("error reading 'version': %w", err)
+		}
+		delete(object, "version")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for GeminiModelInfo to handle AdditionalProperties
+func (a GeminiModelInfo) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	object["baseModelId"], err = json.Marshal(a.BaseModelId)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'baseModelId': %w", err)
+	}
+
+	if a.Description != nil {
+		object["description"], err = json.Marshal(a.Description)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'description': %w", err)
+		}
+	}
+
+	object["displayName"], err = json.Marshal(a.DisplayName)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'displayName': %w", err)
+	}
+
+	object["inputTokenLimit"], err = json.Marshal(a.InputTokenLimit)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'inputTokenLimit': %w", err)
+	}
+
+	object["name"], err = json.Marshal(a.Name)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'name': %w", err)
+	}
+
+	object["outputTokenLimit"], err = json.Marshal(a.OutputTokenLimit)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'outputTokenLimit': %w", err)
+	}
+
+	if a.SupportedGenerationMethods != nil {
+		object["supportedGenerationMethods"], err = json.Marshal(a.SupportedGenerationMethods)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'supportedGenerationMethods': %w", err)
+		}
+	}
+
+	object["version"], err = json.Marshal(a.Version)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'version': %w", err)
 	}
 
 	for fieldName, field := range a.AdditionalProperties {
@@ -9156,6 +9374,9 @@ type ServerInterface interface {
 	// Connect to the Responses WebSocket gateway.
 	// (GET /v1/responses/ws)
 	ConnectResponsesWebSocket(w http.ResponseWriter, r *http.Request, params ConnectResponsesWebSocketParams)
+	// List Gemini-compatible models available to the gateway API key.
+	// (GET /v1beta/models)
+	ListGeminiModels(w http.ResponseWriter, r *http.Request, params ListGeminiModelsParams)
 	// Generate content with the Gemini-compatible gateway route.
 	// (POST /v1beta/models/{model}:generateContent)
 	GenerateGeminiContent(w http.ResponseWriter, r *http.Request, model GeminiModel)
@@ -12650,6 +12871,58 @@ func (siw *ServerInterfaceWrapper) ConnectResponsesWebSocket(w http.ResponseWrit
 	handler.ServeHTTP(w, r)
 }
 
+// ListGeminiModels operation middleware
+func (siw *ServerInterfaceWrapper) ListGeminiModels(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListGeminiModelsParams
+
+	// ------------- Optional query parameter "pageSize" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "pageSize", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "pageSize"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "pageSize", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "pageToken" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "pageToken", r.URL.Query(), &params.PageToken, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "pageToken"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "pageToken", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListGeminiModels(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GenerateGeminiContent operation middleware
 func (siw *ServerInterfaceWrapper) GenerateGeminiContent(w http.ResponseWriter, r *http.Request) {
 
@@ -12931,6 +13204,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/rerank", wrapper.CreateRerank)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/responses", wrapper.CreateResponse)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/responses/ws", wrapper.ConnectResponsesWebSocket)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1beta/models", wrapper.ListGeminiModels)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1beta/models/{model}:generateContent", wrapper.GenerateGeminiContent)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1beta/models/{model}:streamGenerateContent", wrapper.StreamGeminiContent)
 

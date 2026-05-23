@@ -2446,6 +2446,100 @@ func TestGatewayGeminiProviderErrorsUseGoogleStyleEnvelope(t *testing.T) {
 	}
 }
 
+func TestGatewayGeminiListModels(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	activeModel := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"gemini-list-visible","display_name":"Gemini List Visible","family":"gemini","context_window":131072,"max_output_tokens":8192,"status":"active","capabilities":[{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	secondModel := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"gemini-list-second","display_name":"Gemini List Second","quality_tier":"flash","context_window":32768,"max_output_tokens":2048,"status":"active"}`)
+	_ = mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"gemini-list-disabled","display_name":"Gemini List Disabled","status":"disabled"}`)
+	keyResp := mustCreateAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"gemini-list-key","scopes":["gateway:invoke"],"allowed_models":["`+string(activeModel.Data.CanonicalName)+`","`+string(secondModel.Data.CanonicalName)+`"]}`)
+
+	firstReq := httptest.NewRequest(http.MethodGet, "/v1beta/models?pageSize=1", nil)
+	firstReq.Header.Set("Authorization", "Bearer "+keyResp.Data.PlaintextKey)
+	firstRec := httptest.NewRecorder()
+	handler.ServeHTTP(firstRec, firstReq)
+	if firstRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 Gemini models first page, got %d body=%s", firstRec.Code, firstRec.Body.String())
+	}
+	var firstResp apiopenapi.GeminiModelList
+	if err := json.NewDecoder(firstRec.Body).Decode(&firstResp); err != nil {
+		t.Fatalf("decode first Gemini models page: %v", err)
+	}
+	if len(firstResp.Models) != 1 || firstResp.Models[0].Name != "models/gemini-list-visible" || firstResp.Models[0].BaseModelId != "gemini-list-visible" || firstResp.Models[0].Version != "gemini" || firstResp.Models[0].InputTokenLimit != 131072 || firstResp.Models[0].OutputTokenLimit != 8192 {
+		t.Fatalf("unexpected first Gemini model page: %+v", firstResp)
+	}
+	if !geminiModelMethodsContain(firstResp.Models[0].SupportedGenerationMethods, apiopenapi.GenerateContent) || !geminiModelMethodsContain(firstResp.Models[0].SupportedGenerationMethods, apiopenapi.StreamGenerateContent) {
+		t.Fatalf("expected generateContent and streamGenerateContent methods, got %+v", firstResp.Models[0].SupportedGenerationMethods)
+	}
+	if firstResp.NextPageToken == nil || *firstResp.NextPageToken != "1" {
+		t.Fatalf("expected next page token 1, got %+v", firstResp.NextPageToken)
+	}
+
+	secondReq := httptest.NewRequest(http.MethodGet, "/v1beta/models?pageToken="+*firstResp.NextPageToken, nil)
+	secondReq.Header.Set("Authorization", "Bearer "+keyResp.Data.PlaintextKey)
+	secondRec := httptest.NewRecorder()
+	handler.ServeHTTP(secondRec, secondReq)
+	if secondRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 Gemini models second page, got %d body=%s", secondRec.Code, secondRec.Body.String())
+	}
+	var secondResp apiopenapi.GeminiModelList
+	if err := json.NewDecoder(secondRec.Body).Decode(&secondResp); err != nil {
+		t.Fatalf("decode second Gemini models page: %v", err)
+	}
+	if len(secondResp.Models) != 1 || secondResp.Models[0].Name != "models/gemini-list-second" || secondResp.Models[0].Version != "flash" || secondResp.NextPageToken != nil {
+		t.Fatalf("unexpected second Gemini model page: %+v", secondResp)
+	}
+	if geminiModelMethodsContain(secondResp.Models[0].SupportedGenerationMethods, apiopenapi.StreamGenerateContent) {
+		t.Fatalf("non-streaming model should not advertise streamGenerateContent: %+v", secondResp.Models[0].SupportedGenerationMethods)
+	}
+}
+
+func TestGatewayGeminiListModelsRejectsInvalidPaginationAndDisabledKey(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	keyResp := mustCreateAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"gemini-list-invalid-key","scopes":["gateway:invoke"]}`)
+
+	invalidReq := httptest.NewRequest(http.MethodGet, "/v1beta/models?pageSize=0", nil)
+	invalidReq.Header.Set("Authorization", "Bearer "+keyResp.Data.PlaintextKey)
+	invalidRec := httptest.NewRecorder()
+	handler.ServeHTTP(invalidRec, invalidReq)
+	if invalidRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected invalid pagination 400, got %d body=%s", invalidRec.Code, invalidRec.Body.String())
+	}
+	var invalidResp apiopenapi.GeminiErrorResponse
+	if err := json.NewDecoder(invalidRec.Body).Decode(&invalidResp); err != nil {
+		t.Fatalf("decode invalid pagination response: %v", err)
+	}
+	if invalidResp.Error.Status != "INVALID_ARGUMENT" {
+		t.Fatalf("expected Gemini INVALID_ARGUMENT, got %+v", invalidResp.Error)
+	}
+
+	patchReq := httptest.NewRequest(http.MethodPatch, "/api/v1/api-keys/"+string(keyResp.Data.ApiKey.Id), strings.NewReader(`{"status":"disabled"}`))
+	patchReq.Header.Set("Content-Type", "application/json")
+	patchReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	patchReq.AddCookie(sessionCookie)
+	patchRec := httptest.NewRecorder()
+	handler.ServeHTTP(patchRec, patchReq)
+	if patchRec.Code != http.StatusOK {
+		t.Fatalf("expected disable key 200, got %d body=%s", patchRec.Code, patchRec.Body.String())
+	}
+
+	disabledReq := httptest.NewRequest(http.MethodGet, "/v1beta/models", nil)
+	disabledReq.Header.Set("Authorization", "Bearer "+keyResp.Data.PlaintextKey)
+	disabledRec := httptest.NewRecorder()
+	handler.ServeHTTP(disabledRec, disabledReq)
+	if disabledRec.Code != http.StatusForbidden {
+		t.Fatalf("expected disabled key 403, got %d body=%s", disabledRec.Code, disabledRec.Body.String())
+	}
+	var disabledResp apiopenapi.GeminiErrorResponse
+	if err := json.NewDecoder(disabledRec.Body).Decode(&disabledResp); err != nil {
+		t.Fatalf("decode disabled key response: %v", err)
+	}
+	if disabledResp.Error.Status != "PERMISSION_DENIED" {
+		t.Fatalf("expected Gemini PERMISSION_DENIED, got %+v", disabledResp.Error)
+	}
+}
+
 func TestGatewayRequestRecordsSchedulerFeedback(t *testing.T) {
 	schedulerStore := schedulermemory.New()
 	handler := New(config.Load(), nil, WithSchedulerStore(schedulerStore))
@@ -5439,7 +5533,13 @@ func mustLoginAdmin(t *testing.T, handler http.Handler) (apiopenapi.LoginRespons
 
 func mustCreateGatewayAPIKey(t *testing.T, handler http.Handler, sessionCookie *http.Cookie, csrfToken string) (apiopenapi.CreateApiKeyResponse, string) {
 	t.Helper()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/api-keys", strings.NewReader(`{"name":"gateway","scopes":["gateway:invoke"]}`))
+	resp := mustCreateAPIKey(t, handler, sessionCookie, csrfToken, `{"name":"gateway","scopes":["gateway:invoke"]}`)
+	return resp, resp.Data.PlaintextKey
+}
+
+func mustCreateAPIKey(t *testing.T, handler http.Handler, sessionCookie *http.Cookie, csrfToken, body string) apiopenapi.CreateApiKeyResponse {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/api-keys", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.AddCookie(sessionCookie)
 	req.Header.Set("X-CSRF-Token", csrfToken)
@@ -5452,7 +5552,16 @@ func mustCreateGatewayAPIKey(t *testing.T, handler http.Handler, sessionCookie *
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode api key response: %v", err)
 	}
-	return resp, resp.Data.PlaintextKey
+	return resp
+}
+
+func geminiModelMethodsContain(methods []apiopenapi.GeminiModelInfoSupportedGenerationMethods, expected apiopenapi.GeminiModelInfoSupportedGenerationMethods) bool {
+	for _, method := range methods {
+		if method == expected {
+			return true
+		}
+	}
+	return false
 }
 
 func mustGatewayRequest(t *testing.T, handler http.Handler, apiKey, method, path, body string) *httptest.ResponseRecorder {

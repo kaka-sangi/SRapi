@@ -2043,59 +2043,6 @@ Required gates:
 - `make secret-scan`
 - `git diff --check`
 
-## WP-530: Antigravity Project Bootstrap v1
-
-Objective: let configured Antigravity 2api accounts discover their Cloud Code project through the same selected-account OAuth/desktop/IDE credential path used by the local 2api reference implementations, so operators do not have to hand-fill `project_id` before model discovery.
-
-Read first:
-
-- `docs/2API_REVERSE_PROXY_DEFINITION.md`
-- `docs/REVERSE_PROXY_SPEC.md`
-- `docs/PROVIDER_ADAPTER_SPEC.md`
-- `docs/GATEWAY_ROUTE_MATRIX.md`
-- `/home/senran/Desktop/CLIProxyAPI/internal/auth/antigravity/auth.go`
-- `/home/senran/Desktop/sub2api/backend/internal/pkg/antigravity/client.go`
-- `apps/api/internal/httpserver/model_discovery.go`
-- `apps/api/internal/modules/reverse_proxy`
-- `apps/api/internal/modules/accounts`
-
-Owns:
-
-- Antigravity model discovery bootstrap behavior for accounts missing `project_id`.
-- Reverse Proxy Runtime calls to Antigravity `/v1internal:loadCodeAssist` and `/v1internal:onboardUser`.
-- Account metadata persistence of discovered `project_id` only when the admin discovery request asks to persist results.
-- Focused HTTP regressions proving selected account credentials are used upstream and caller credentials/SRapi headers do not leak.
-- 2api/reverse-proxy docs and status updates.
-
-Definition of Done:
-
-- `reverse-proxy-antigravity` discovery first uses existing `project_id`, `antigravity_project_id`, or `cloudaicompanion_project` metadata when present.
-- If no project metadata exists, discovery posts `loadCodeAssist` through Reverse Proxy Runtime using the selected account credential and Antigravity official-client metadata.
-- If `loadCodeAssist` has no project, discovery posts `onboardUser` through Reverse Proxy Runtime with a tier derived from `allowedTiers`, `currentTier`, or `free-tier`, then uses the returned project.
-- `persist=false` discovery does not mutate account metadata; `persist=true` persists the bootstrapped project plus model discovery metadata.
-- API-key runtime accounts remain rejected for Antigravity 2api discovery.
-- No local Antigravity process is invoked, no Gateway-local Antigravity DTO is introduced, and no frontend visuals are added.
-
-Required gates:
-
-- `cd apps/api && go test ./internal/httpserver -run 'TestAdminAccountModelDiscovery.*Antigravity|TestGatewayAntigravity' -count=1`
-- `cd apps/api && go test ./internal/modules/reverse_proxy/... ./internal/httpserver`
-- `cd apps/api && go test ./...`
-- `make architecture-check`
-- `make code-quality-check`
-- `make secret-scan`
-- `git diff --check`
-
-## WP-500+: Ecosystem And Remaining Advanced Surface
-
-Use `ROADMAP.md` Phase 7 through Phase 8 to split future packages for:
-
-- provider-native realtime protocol adapters and richer slot lifecycle
-- image edit streaming / JSON reference compatibility
-- SDK examples and migration guides
-
-Each new package must be added here before implementation starts.
-
 ## WP-520: Images Edits Streaming Events v1
 
 Objective: add OpenAI-compatible image edit streaming events to the existing `/v1/images/edits` runtime without introducing a new provider-specific shortcut or bypassing Gateway auth, Scheduler, Provider Adapter, usage evidence, or the current multipart/JSON compatibility behavior.
@@ -2144,3 +2091,103 @@ Required gates:
 - `make code-quality-check`
 - `make secret-scan`
 - `git diff --check`
+
+## WP-530: Antigravity Project Bootstrap v1
+
+Objective: let configured Antigravity 2api accounts discover their Cloud Code project through the same selected-account OAuth/desktop/IDE credential path used by the local 2api reference implementations, so operators do not have to hand-fill `project_id` before model discovery.
+
+Read first:
+
+- `docs/2API_REVERSE_PROXY_DEFINITION.md`
+- `docs/REVERSE_PROXY_SPEC.md`
+- `docs/PROVIDER_ADAPTER_SPEC.md`
+- `docs/GATEWAY_ROUTE_MATRIX.md`
+- `/home/senran/Desktop/CLIProxyAPI/internal/auth/antigravity/auth.go`
+- `/home/senran/Desktop/sub2api/backend/internal/pkg/antigravity/client.go`
+- `apps/api/internal/httpserver/model_discovery.go`
+- `apps/api/internal/modules/reverse_proxy`
+- `apps/api/internal/modules/accounts`
+
+Owns:
+
+- Antigravity model discovery bootstrap behavior for accounts missing `project_id`.
+- Reverse Proxy Runtime calls to Antigravity `/v1internal:loadCodeAssist` and `/v1internal:onboardUser`.
+- Account metadata persistence of discovered `project_id` only when the admin discovery request asks to persist results.
+- Focused HTTP regressions proving selected account credentials are used upstream and caller credentials/SRapi headers do not leak.
+- 2api/reverse-proxy docs and status updates.
+
+Definition of Done:
+
+- `reverse-proxy-antigravity` discovery first uses existing `project_id`, `antigravity_project_id`, or `cloudaicompanion_project` metadata when present.
+- If no project metadata exists, discovery posts `loadCodeAssist` through Reverse Proxy Runtime using the selected account credential and Antigravity official-client metadata.
+- If `loadCodeAssist` has no project, discovery posts `onboardUser` through Reverse Proxy Runtime with a tier derived from `allowedTiers`, `currentTier`, or `free-tier`, then uses the returned project.
+- `persist=false` discovery does not mutate account metadata; `persist=true` persists the bootstrapped project plus model discovery metadata.
+- API-key runtime accounts remain rejected for Antigravity 2api discovery.
+- No local Antigravity process is invoked, no Gateway-local Antigravity DTO is introduced, and no frontend visuals are added.
+
+Required gates:
+
+- `cd apps/api && go test ./internal/httpserver -run 'TestAdminAccountModelDiscovery.*Antigravity|TestGatewayAntigravity' -count=1`
+- `cd apps/api && go test ./internal/modules/reverse_proxy/... ./internal/httpserver`
+- `cd apps/api && go test ./...`
+- `make architecture-check`
+- `make code-quality-check`
+- `make secret-scan`
+- `git diff --check`
+
+## WP-540: Gemini Native Models List v1
+
+Objective: implement Gemini-compatible `GET /v1beta/models` model listing so Gemini SDK-style clients can inspect visible SRapi models through a Google-shaped response without bypassing Gateway API key policy or introducing provider-specific account selection in the handler.
+
+Read first:
+
+- `docs/OPENAPI_CONTRACT.md`
+- `docs/GATEWAY_ROUTE_MATRIX.md`
+- `docs/AI_ENDPOINT_COMPATIBILITY.md`
+- `packages/openapi/openapi.yaml`
+- Gemini official `models.list` REST contract
+- `apps/api/internal/httpserver/runtime_gateway_handlers.go`
+- `apps/api/internal/httpserver/runtime_api_mapping.go`
+- `apps/api/internal/modules/models`
+
+Owns:
+
+- OpenAPI `GET /v1beta/models` contract and generated Go/TypeScript SDK drift.
+- Gemini-native list handler with Gateway API key auth and allowed-model filtering.
+- Google-shaped model list renderer using SRapi model registry metadata.
+- Route matrix / endpoint compatibility docs and focused HTTP regressions.
+
+Definition of Done:
+
+- `GET /v1beta/models` is OpenAPI-described, secured with `gatewayBearerAuth`, and returns `{ "models": [...], "nextPageToken": "..." }`.
+- The handler authenticates Gateway API keys and renders Google-style error objects for invalid, disabled, or expired keys.
+- The response only includes active models visible to the API key and presents names as `models/{canonical_name}`.
+- `pageSize` and `pageToken` query parameters provide deterministic pagination; invalid pagination returns Gemini `INVALID_ARGUMENT`.
+- Gemini model objects include stable SRapi-derived fields: `name`, `baseModelId`, `version`, `displayName`, `inputTokenLimit`, `outputTokenLimit`, and `supportedGenerationMethods`.
+- `supportedGenerationMethods` is derived from SRapi model capabilities and includes at least `generateContent` for text-capable models plus `streamGenerateContent` for streaming-capable models.
+- No Scheduler lease is acquired, no Provider Account credential is touched, and no frontend visuals are added.
+
+Required gates:
+
+- `make openapi-lint`
+- `make openapi-bundle`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/httpserver -run 'TestGatewayGeminiListModels' -count=1`
+- `cd apps/api && go test ./internal/httpserver ./internal/modules/gateway/...`
+- `cd apps/api && go test ./...`
+- `make architecture-check`
+- `make code-quality-check`
+- `make secret-scan`
+- `git diff --check`
+
+## WP-500+: Ecosystem And Remaining Advanced Surface
+
+Use `ROADMAP.md` Phase 7 through Phase 8 to split future packages for:
+
+- provider-native realtime protocol adapters and richer slot lifecycle
+- token counting endpoint
+- SDK examples and migration guides
+
+Each new package must be added here before implementation starts.
