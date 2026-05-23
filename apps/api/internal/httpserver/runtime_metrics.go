@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	realtimecontract "github.com/srapi/srapi/apps/api/internal/modules/realtime/contract"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
 )
@@ -71,7 +72,11 @@ func (rt *runtimeState) metricsLines(ctx context.Context) []string {
 		rt.logger.Warn("failed to collect scheduler lease metrics", "error", leaseErr)
 		lines = append(lines, "srapi_gateway_inflight_requests 0")
 	}
-	realtimeSnapshot := rt.realtime.Snapshot(ctx)
+	realtimeSnapshot, realtimeErr := rt.realtime.Snapshot(ctx)
+	if realtimeErr != nil {
+		rt.logger.Warn("failed to collect realtime slot metrics", "error", realtimeErr)
+		realtimeSnapshot = realtimeEmptySnapshot()
+	}
 	lines = append(lines,
 		fmt.Sprintf("srapi_realtime_active_slots %d", realtimeSnapshot.ActiveSlots),
 		fmt.Sprintf(`srapi_realtime_slots_total{event="acquired"} %d`, realtimeSnapshot.AcquiredTotal),
@@ -105,6 +110,10 @@ func (rt *runtimeState) metricsLines(ctx context.Context) []string {
 	lines = appendZeroValueBaselineMetrics(lines)
 	sortMetricLines(lines)
 	return lines
+}
+
+func realtimeEmptySnapshot() realtimecontract.Snapshot {
+	return realtimecontract.Snapshot{ActiveByEndpoint: map[string]int{}}
 }
 
 func gatewayUsageMetricLines(logs []usagecontract.UsageLog) []string {

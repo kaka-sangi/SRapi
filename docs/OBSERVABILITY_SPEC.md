@@ -110,7 +110,7 @@ srapi_realtime_slots_total{event="acquired|released|rejected"}
 
 Realtime slot 指标只记录连接生命周期和低基数 endpoint 标签，不得包含原始 session affinity key、API key、credential、prompt 或 provider-specific payload。
 
-WP-570 起，`GET /api/v1/admin/ops/realtime/slots` 提供当前 API 节点的 active realtime slot 诊断视图。该接口返回 slot id、kind、request id、user/API key id、source endpoint、acquired time、hash 后的 affinity key、sticky account/strength 以及 endpoint/kind/API key 聚合计数；它不表示分布式持久 session 池，不返回原始 affinity key、API key、credential、prompt 或 provider-specific frame。
+WP-570 起，`GET /api/v1/admin/ops/realtime/slots` 提供 active realtime slot 诊断视图。WP-590 起 Redis 可用时该视图覆盖共享 Redis 的 API 节点；本地降级模式只覆盖当前节点内存。该接口返回 slot id、kind、request id、user/API key id、source endpoint、acquired time、hash 后的 affinity key、sticky account/strength 以及 endpoint/kind/API key 聚合计数；它不表示持久 upstream session 池，不返回原始 affinity key、API key、credential、prompt 或 provider-specific frame。
 
 ## 4. 错误归因
 

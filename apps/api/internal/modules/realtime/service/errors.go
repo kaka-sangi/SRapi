@@ -1,9 +1,9 @@
 package service
 
-import "errors"
+import "github.com/srapi/srapi/apps/api/internal/modules/realtime/contract"
 
 var (
-	ErrInvalidInput  = errors.New("invalid realtime slot input")
-	ErrLimitExceeded = errors.New("realtime slot limit exceeded")
-	ErrSlotNotFound  = errors.New("realtime slot not found")
+	ErrInvalidInput  = contract.ErrInvalidInput
+	ErrLimitExceeded = contract.ErrLimitExceeded
+	ErrSlotNotFound  = contract.ErrSlotNotFound
 )

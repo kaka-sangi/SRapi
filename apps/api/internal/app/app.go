@@ -12,6 +12,7 @@ import (
 	"github.com/srapi/srapi/apps/api/internal/httpserver"
 	"github.com/srapi/srapi/apps/api/internal/persistence/entstore"
 	entschedulerstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/scheduler"
+	redisrealtimestore "github.com/srapi/srapi/apps/api/internal/persistence/redisstore/realtime"
 	redisschedulerstore "github.com/srapi/srapi/apps/api/internal/persistence/redisstore/scheduler"
 	platformdb "github.com/srapi/srapi/apps/api/internal/platform/db"
 	platformredis "github.com/srapi/srapi/apps/api/internal/platform/redis"
@@ -120,6 +121,13 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 		httpserver.WithDatabasePinger(dbClient),
 		httpserver.WithRedisPinger(redisClient),
 	}
+	realtimeStore, err := realtimeSlotStore(context.Background(), cfg, logger, redisClient)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if realtimeStore != nil {
+		options = append(options, httpserver.WithRealtimeStore(realtimeStore))
+	}
 	stores, err := persistentStores(context.Background(), cfg, logger, dbClient, redisClient)
 	if err != nil {
 		return nil, nil, nil, err
@@ -220,6 +228,23 @@ func schedulerLeaseStore(ctx context.Context, cfg config.Config, logger *slog.Lo
 		return nil, nil
 	}
 	return redisschedulerstore.New(redisClient.Raw())
+}
+
+func realtimeSlotStore(ctx context.Context, cfg config.Config, logger *slog.Logger, redisClient *platformredis.Client) (*redisrealtimestore.Store, error) {
+	if redisClient == nil || redisClient.Raw() == nil {
+		return nil, nil
+	}
+	pingCtx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+	err := redisClient.Ping(pingCtx)
+	cancel()
+	if err != nil {
+		if cfg.Server.Mode == "release" {
+			return nil, fmt.Errorf("redis unavailable for realtime slots: %w", err)
+		}
+		logger.Warn("redis unavailable; using in-memory realtime slots", "error", err)
+		return nil, nil
+	}
+	return redisrealtimestore.New(redisClient.Raw())
 }
 
 func domainEventsWorker(stores *entstore.Stores, logger *slog.Logger) (*outboxworker.Worker, error) {

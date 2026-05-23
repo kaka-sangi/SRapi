@@ -25,6 +25,7 @@ import (
 	paymentcontract "github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	providerpreset "github.com/srapi/srapi/apps/api/internal/modules/providers/preset"
+	realtimecontract "github.com/srapi/srapi/apps/api/internal/modules/realtime/contract"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
@@ -58,6 +59,7 @@ type runtimeOptions struct {
 	events        eventscontract.Store
 	operations    operationscontract.Store
 	payments      paymentcontract.Store
+	realtime      realtimecontract.Store
 	scheduler     schedulercontract.Store
 	subscriptions subscriptioncontract.Store
 	usage         usagecontract.Store
@@ -132,6 +134,12 @@ func WithOperationsStore(store operationscontract.Store) Option {
 func WithPaymentStore(store paymentcontract.Store) Option {
 	return func(opts *runtimeOptions) {
 		opts.payments = store
+	}
+}
+
+func WithRealtimeStore(store realtimecontract.Store) Option {
+	return func(opts *runtimeOptions) {
+		opts.realtime = store
 	}
 }
 

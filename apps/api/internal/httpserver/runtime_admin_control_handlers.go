@@ -485,7 +485,11 @@ func (s *Server) handleListAdminOpsRealtimeSlots(w http.ResponseWriter, r *http.
 		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
 		return
 	}
-	list := s.runtime.realtime.ListActiveSlots(r.Context())
+	list, err := s.runtime.realtime.ListActiveSlots(r.Context())
+	if err != nil {
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list realtime slots", requestID)
+		return
+	}
 	data := make([]apiopenapi.RealtimeActiveSlot, 0, len(list.Slots))
 	for _, slot := range list.Slots {
 		data = append(data, toAPIRealtimeActiveSlot(slot))

@@ -37,7 +37,7 @@
 - 用户、API Key、Provider、Model、Account、Usage、Scheduler Decision / Feedback、Audit、Billing Ledger、Domain Events Outbox / Inbox 必须有 Ent-backed store。
 - Domain Events Outbox 必须具备可测试的分发闭环：pending 可被 dispatcher 选择，成功后标记 published，失败后记录 attempt_count、last_error、next_retry_at，到期后允许重试。
 - Domain Events Outbox worker 必须由 `internal/app` 在 persistent Event store 可用时启动；本地降级为内存 runtime 时不得启动持久 outbox worker。
-- Scheduler Lease 属于可重建运行时状态；release 模式必须使用 Redis-backed lease store，本地 Redis 不可用时才允许降级为内存 lease。
+- Scheduler Lease 和 realtime slot lifecycle 属于可重建运行时状态；release 模式必须使用 Redis-backed store，本地 Redis 不可用时才允许降级为内存 lease/slot store。
 - 本地模式允许启动期应用 Ent schema 以支持一键开发；release 模式必须依赖已应用的正式迁移。
 - `apps/api/migrations` 必须保留为版本化迁移目录。
 - PostgreSQL release 迁移必须和 Ent schema 保持一致；修改 `apps/api/ent/schema` 后必须同步更新 `apps/api/migrations/postgres/up`。
@@ -90,6 +90,7 @@ make architecture-check
 - Domain Events Outbox 发布成功、失败重试和到期重试状态迁移。
 - Domain Events Outbox worker 轮询分发、inbox 去重、processed / failed 状态记录和 app 装配规则。
 - Redis-backed Scheduler Lease 原子获取、释放、过期释放并发。
+- Redis-backed realtime slot store 跨实例限额、跨实例释放、过期释放和安全摘要。
 - runtime rebuild 后仍能读回 API Key、Provider、Model、Account、Usage、Scheduler Decision、Billing Ledger、Outbox Event 和 Audit Log。
 - compatible provider preset 注册表。
 - HTTP 启动层基础测试。
@@ -158,6 +159,7 @@ make smoke-gateway
 | Ent-backed repository | `apps/api/internal/persistence/entstore/*`, `apps/api/internal/persistence/entstore/runtime_stores_test.go` |
 | Domain Events Outbox / Inbox 分发 / 重试 | `apps/api/internal/modules/events/service/service_test.go`, `apps/api/internal/workers/outbox/worker_test.go`, `apps/api/internal/persistence/entstore/runtime_stores_test.go` |
 | Redis-backed Scheduler Lease | `apps/api/internal/persistence/redisstore/scheduler`, `apps/api/internal/app/app_test.go` |
+| Redis-backed realtime slots | `apps/api/internal/persistence/redisstore/realtime`, `apps/api/internal/modules/realtime/service`, `apps/api/internal/app/app_test.go` |
 | 运行期数据重启持久化 | `apps/api/internal/httpserver/runtime_persistence_test.go` |
 | release 配置门禁 | `apps/api/internal/config/config_test.go` |
 | logger / crypto 平台层 | `apps/api/internal/platform/logger`, `apps/api/internal/platform/crypto` |

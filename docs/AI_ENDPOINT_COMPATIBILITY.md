@@ -615,7 +615,7 @@ Responses WebSocket transport
 - `session_affinity_key`、`sticky_strength`、`sticky_account_id` query/header 继续作为 Scheduler sticky routing hint；Gateway 不直接选择账号。
 - WP-410 进一步实现 Codex CLI 2api Responses WebSocket upstream relay：当请求显式带 `upstream_ws` 或 `codex_responses_websocket`，且调度出的 `reverse-proxy-codex-cli` 账号 metadata 启用 Codex Responses WebSocket 时，SRapi 通过 Reverse Proxy Runtime 连接 Codex `ws/wss` `/responses`，使用选中账号 OAuth/session/CLI token 凭证、Codex official-client headers，以及包含 mapped upstream model 的 `response.create` 首帧。
 - WP-460 起，`/v1/responses/ws` 在 WebSocket upgrade 前获得 provider-neutral realtime slot，并在连接关闭、上游 relay 完成、客户端断开或 handler error 时释放；slot 只保存 request/user/API key/source endpoint/sticky metadata 和 session affinity hash，不保存原始 affinity key。
-- WP-570 起，`GET /api/v1/admin/ops/realtime/slots` 可查询当前 API 节点的 active realtime slot 摘要和聚合计数；这是运维诊断面，不是分布式持久 session pool，也不引入 provider-specific realtime DTO。
+- WP-570 起，`GET /api/v1/admin/ops/realtime/slots` 可查询 active realtime slot 摘要和聚合计数；WP-590 起 Redis 可用时该视图和 slot 限额跨 API 节点生效，本地降级模式只覆盖当前节点内存。这是运维诊断面，不是持久 upstream session pool，也不引入 provider-specific realtime DTO。
 - 复杂 persistent upstream session reuse、local Codex CLI client ingress，以及 Claude Code / Antigravity provider-native realtime 协议仍是后续包。
 
 WP-470 已实现：

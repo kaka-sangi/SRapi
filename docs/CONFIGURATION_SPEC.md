@@ -94,6 +94,7 @@ Redis 保存：
 - API Key auth cache。
 - rate limit counters。
 - account lease。
+- realtime WebSocket slot lifecycle。
 - sticky session。
 - circuit breaker state。
 - short-term health window。
@@ -158,6 +159,7 @@ GATEWAY_FORCE_CODEX_CLI=false
 
 `GATEWAY_FORCE_CODEX_CLI` 会影响所有 Responses 请求，只能作为部署级兜底开关。
 Realtime slot limit 配置为 `0` 表示不启用该维度限制；生产部署建议按实例容量设置全局和单 API key 上限，防止长连接耗尽 Gateway 资源。
+Redis 可用时 realtime slot lifecycle 使用 Redis-backed store，限额和 AdminOps active slot 视图跨 API 节点生效；local 模式 Redis 不可用时降级为内存 store，release 模式 Redis 不可用必须启动失败。
 
 ## 10. Scheduler
 

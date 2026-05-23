@@ -3,8 +3,11 @@ package app
 import (
 	"io"
 	"log/slog"
+	"net"
+	"strconv"
 	"testing"
 
+	"github.com/alicebob/miniredis/v2"
 	"github.com/srapi/srapi/apps/api/internal/config"
 	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	eventsservice "github.com/srapi/srapi/apps/api/internal/modules/events/service"
@@ -73,6 +76,73 @@ func TestSchedulerLeaseStoreRequiresRedisInRelease(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	if _, err := schedulerLeaseStore(t.Context(), cfg, logger, redisClient); err == nil {
 		t.Fatal("expected release mode to require redis-backed scheduler leases")
+	}
+}
+
+func TestRealtimeSlotStoreUsesRedisWhenAvailable(t *testing.T) {
+	server := miniredis.RunT(t)
+	host, portRaw, err := net.SplitHostPort(server.Addr())
+	if err != nil {
+		t.Fatalf("split miniredis addr: %v", err)
+	}
+	port, err := strconv.Atoi(portRaw)
+	if err != nil {
+		t.Fatalf("parse miniredis port: %v", err)
+	}
+	cfg := config.Load()
+	cfg.Redis.Host = host
+	cfg.Redis.Port = port
+	redisClient, err := platformredis.Open(cfg.Redis)
+	if err != nil {
+		t.Fatalf("open redis client: %v", err)
+	}
+	defer redisClient.Close()
+
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	store, err := realtimeSlotStore(t.Context(), cfg, logger, redisClient)
+	if err != nil {
+		t.Fatalf("expected redis realtime store, got error %v", err)
+	}
+	if store == nil {
+		t.Fatal("expected redis-backed realtime slot store when redis is available")
+	}
+}
+
+func TestRealtimeSlotStoreFallsBackLocallyWhenRedisUnavailable(t *testing.T) {
+	cfg := config.Load()
+	cfg.Server.Mode = "local"
+	cfg.Redis.Host = "127.0.0.1"
+	cfg.Redis.Port = 1
+	redisClient, err := platformredis.Open(cfg.Redis)
+	if err != nil {
+		t.Fatalf("open redis client: %v", err)
+	}
+	defer redisClient.Close()
+
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	store, err := realtimeSlotStore(t.Context(), cfg, logger, redisClient)
+	if err != nil {
+		t.Fatalf("expected local redis realtime fallback without error, got %v", err)
+	}
+	if store != nil {
+		t.Fatalf("expected nil redis realtime store when redis is unavailable in local mode")
+	}
+}
+
+func TestRealtimeSlotStoreRequiresRedisInRelease(t *testing.T) {
+	cfg := config.Load()
+	cfg.Server.Mode = "release"
+	cfg.Redis.Host = "127.0.0.1"
+	cfg.Redis.Port = 1
+	redisClient, err := platformredis.Open(cfg.Redis)
+	if err != nil {
+		t.Fatalf("open redis client: %v", err)
+	}
+	defer redisClient.Close()
+
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	if _, err := realtimeSlotStore(t.Context(), cfg, logger, redisClient); err == nil {
+		t.Fatal("expected release mode to require redis-backed realtime slots")
 	}
 }
 

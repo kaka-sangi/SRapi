@@ -2369,11 +2369,96 @@ Required gates:
 - `make secret-scan`
 - `git diff --check`
 
+## WP-590: Distributed Realtime Slot Store v1
+
+Objective: make realtime WebSocket slot lifecycle enforceable across API nodes by adding an optional Redis-backed realtime slot manager while preserving the Gateway -> realtime contract boundary and keeping provider-native protocol details out of slot state.
+
+Read first:
+
+- `docs/ARCHITECTURE.md`
+- `docs/MODULE_INTERFACE_CONTRACTS.md`
+- `docs/OBSERVABILITY_SPEC.md`
+- `docs/CONFIGURATION_SPEC.md`
+- `docs/REVERSE_PROXY_SPEC.md`
+- `apps/api/internal/modules/realtime/contract`
+- `apps/api/internal/modules/realtime/service`
+- `apps/api/internal/httpserver/runtime_gateway_websocket.go`
+- `apps/api/internal/httpserver/runtime_metrics.go`
+- `apps/api/internal/app/app.go`
+- `apps/api/internal/persistence/redisstore/scheduler`
+
+Owns:
+
+- Realtime module store abstraction so the service can use in-memory state or Redis-backed state without HTTP knowing which one is active.
+- Redis realtime slot store under `apps/api/internal/persistence/redisstore/realtime`.
+- App/httpserver wiring that uses Redis for realtime slots when Redis is reachable, requires it in release mode, and falls back to in-memory state in local mode.
+- Metrics/AdminOps slot listing behavior over the selected realtime manager.
+- Docs/specs status for distributed active slot semantics and remaining non-goals.
+
+Definition of Done:
+
+- Two realtime service instances sharing the Redis store enforce global and per-API-key slot limits together.
+- Releasing a slot from another instance frees capacity and preserves released counters.
+- Expired slots no longer count as active and are marked released/expired without exposing provider-specific frames or credentials.
+- `GET /api/v1/admin/ops/realtime/slots` can read distributed active slots through the same realtime manager contract.
+- Release mode fails startup if Redis-backed realtime slots cannot be initialized; local mode logs fallback and keeps using in-memory slots.
+- No local Codex / Claude Code / Antigravity ingress, no provider-native realtime protocol adapter, and no persistent upstream session pool are added.
+
+Required gates:
+
+- `cd apps/api && go test ./internal/modules/realtime/... ./internal/persistence/redisstore/realtime/... ./internal/app ./internal/httpserver -run 'TestRealtime|TestRedisRealtime|TestRealtimeSlot|TestAdminOpsRealtime' -count=1`
+- `cd apps/api && go test ./...`
+- `make architecture-check`
+- `make code-quality-check`
+- `make secret-scan`
+- `git diff --check`
+
 ## WP-500+: Ecosystem And Remaining Advanced Surface
 
 Use `ROADMAP.md` Phase 7 through Phase 8 to split future packages for:
 
 - provider-native realtime protocol adapters and richer slot lifecycle
-- SDK examples and migration guides
+- Codex / Claude Code / Antigravity OAuth and refresh-token-only account import flows
 
 Each new package must be added here before implementation starts.
+
+## WP-600: Codex Refresh Token Import And OAuth Lifecycle v1
+
+Objective: make Codex 2api account onboarding match the sub2api-style operator flow where an operator can import a Codex OAuth refresh token, SRapi derives and persists the encrypted access-token state needed for official-client upstream requests, and Gateway requests can immediately schedule that Provider Account without local Codex CLI ingress or Gateway-local DTOs.
+
+Read first:
+
+- `docs/2API_REVERSE_PROXY_DEFINITION.md`
+- `docs/MIGRATION_GUIDE_2API.md`
+- `apps/api/internal/modules/accounts/service`
+- `apps/api/internal/modules/reverse_proxy/service`
+- `apps/api/internal/modules/provider_adapters/service/codex.go`
+- `apps/api/internal/httpserver/runtime_admin_catalog_handlers.go`
+- `/home/senran/Desktop/sub2api`
+- `/home/senran/Desktop/CLIProxyAPI`
+- `/home/senran/Desktop/chatgpt2api`
+
+Owns:
+
+- Codex OAuth credential normalization for `runtime_class=oauth_refresh` Provider Accounts.
+- Real refresh-token-to-access-token exchange path through Reverse Proxy Runtime HTTP client boundaries.
+- Import/update validation that accepts refresh-token-only Codex credentials, encrypts the resulting credential, and never returns tokens in API responses/audit.
+- Refresh persistence, failure handling, and Scheduler account health evidence for Codex refresh failures.
+- Tests that prove a refresh-token-only Codex import can request Codex `/responses` through the selected Provider Account official-client shape.
+
+Definition of Done:
+
+- Admin import/create/update accepts a Codex `refresh_token` without an initial `access_token` and obtains the first access token before the account is marked usable.
+- Gateway `/v1/responses` using `reverse-proxy-codex-cli` dispatches to Codex `/responses` with selected-account OAuth credentials derived from the imported refresh token.
+- Expired Codex access tokens refresh with a per-account distributed lock or an equivalent single-writer guard; failures do not overwrite the previous credential.
+- Credential responses, audit records, Scheduler decisions, usage logs, and metrics never expose refresh/access tokens.
+- No local Codex CLI client ingress, no Gateway-local Codex DTO, and no caller header/cookie passthrough are added.
+
+Required gates:
+
+- `cd apps/api && go test ./internal/modules/accounts/... ./internal/modules/reverse_proxy/... ./internal/modules/provider_adapters/... ./internal/httpserver -run 'Test.*Codex.*Refresh|Test.*Codex.*Import|TestGateway.*Codex' -count=1`
+- `cd apps/api && go test ./...`
+- `make architecture-check`
+- `make code-quality-check`
+- `make secret-scan`
+- `git diff --check`

@@ -41,6 +41,7 @@ import (
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	providerservice "github.com/srapi/srapi/apps/api/internal/modules/providers/service"
 	providermemory "github.com/srapi/srapi/apps/api/internal/modules/providers/store/memory"
+	realtimecontract "github.com/srapi/srapi/apps/api/internal/modules/realtime/contract"
 	realtimeservice "github.com/srapi/srapi/apps/api/internal/modules/realtime/service"
 	reverseproxyservice "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/service"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
@@ -98,6 +99,7 @@ type runtimeState struct {
 	modelStore        modelcontract.Store
 	accountStore      accountcontract.Store
 	paymentStore      paymentcontract.Store
+	realtimeStore     realtimecontract.Store
 	schedulerStore    schedulercontract.Store
 	subscriptionStore subscriptioncontract.Store
 	usageStore        usagecontract.Store
@@ -195,10 +197,16 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 	if err != nil {
 		return nil, err
 	}
-	realtimeSvc, err := realtimeservice.New(realtimeservice.Limits{
+	realtimeLimits := realtimeservice.Limits{
 		MaxOpenSlots:       cfg.Gateway.RealtimeMaxOpenSlots,
 		MaxOpenSlotsPerKey: cfg.Gateway.RealtimeMaxOpenSlotsPerKey,
-	}, nil)
+	}
+	var realtimeSvc *realtimeservice.Service
+	if opts.realtime != nil {
+		realtimeSvc, err = realtimeservice.NewWithStore(realtimeLimits, nil, opts.realtime)
+	} else {
+		realtimeSvc, err = realtimeservice.New(realtimeLimits, nil)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -294,6 +302,7 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 		modelStore:        modelStore,
 		accountStore:      accountStore,
 		paymentStore:      paymentStore,
+		realtimeStore:     opts.realtime,
 		schedulerStore:    schedulerStore,
 		subscriptionStore: subscriptionStore,
 		usageStore:        usageStore,

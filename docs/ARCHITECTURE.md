@@ -479,13 +479,14 @@ Domain Events Outbox 在 MVP 阶段使用数据库轮询 dispatcher：`pending` 
 - Rate limit counters。
 - Account concurrency。
 - Lease。
+- Realtime WebSocket slot lifecycle。
 - Circuit breaker state。
 - Sticky binding cache。
 - Cache affinity cache。
 - Short-term health window。
 
 Redis 数据必须可从 PostgreSQL 或运行时反馈重建。
-release 模式下 Scheduler Lease 使用 Redis-backed store；本地开发在 Redis 不可用时可降级为内存 lease，但 `/readyz` 仍应标记 Redis 不可用。
+release 模式下 Scheduler Lease 和 realtime slot lifecycle 使用 Redis-backed store；本地开发在 Redis 不可用时可降级为内存 lease/slot store，但 `/readyz` 仍应标记 Redis 不可用。
 
 ## 10. 错误处理边界
 

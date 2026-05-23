@@ -2,12 +2,10 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
-	"fmt"
-	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/realtime/contract"
@@ -27,36 +25,37 @@ type Limits struct {
 }
 
 type Service struct {
-	mu            sync.Mutex
-	clock         Clock
-	limits        Limits
-	nextID        int
-	active        map[string]contract.Slot
-	activeByKey   map[int]int
-	acquiredTotal int
-	releasedTotal int
-	rejectedTotal int
+	clock  Clock
+	limits Limits
+	store  contract.Store
 }
 
 var _ contract.Manager = (*Service)(nil)
 
 func New(limits Limits, clock Clock) (*Service, error) {
-	if limits.MaxOpenSlots < 0 || limits.MaxOpenSlotsPerKey < 0 {
+	store, err := NewMemoryStore()
+	if err != nil {
+		return nil, err
+	}
+	return NewWithStore(limits, clock, store)
+}
+
+func NewWithStore(limits Limits, clock Clock, store contract.Store) (*Service, error) {
+	if limits.MaxOpenSlots < 0 || limits.MaxOpenSlotsPerKey < 0 || store == nil {
 		return nil, ErrInvalidInput
 	}
 	if clock == nil {
 		clock = SystemClock{}
 	}
 	return &Service{
-		clock:       clock,
-		limits:      limits,
-		active:      map[string]contract.Slot{},
-		activeByKey: map[int]int{},
+		clock:  clock,
+		limits: limits,
+		store:  store,
 	}, nil
 }
 
-func (s *Service) Acquire(_ context.Context, req contract.AcquireRequest) (contract.Slot, error) {
-	if s == nil {
+func (s *Service) Acquire(ctx context.Context, req contract.AcquireRequest) (contract.Slot, error) {
+	if s == nil || s.store == nil {
 		return contract.Slot{}, ErrInvalidInput
 	}
 	kind := req.Kind
@@ -69,134 +68,64 @@ func (s *Service) Acquire(_ context.Context, req contract.AcquireRequest) (contr
 		return contract.Slot{}, ErrInvalidInput
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.limits.MaxOpenSlots > 0 && len(s.active) >= s.limits.MaxOpenSlots {
-		s.rejectedTotal++
-		return contract.Slot{}, ErrLimitExceeded
-	}
-	if s.limits.MaxOpenSlotsPerKey > 0 && s.activeByKey[req.APIKeyID] >= s.limits.MaxOpenSlotsPerKey {
-		s.rejectedTotal++
-		return contract.Slot{}, ErrLimitExceeded
-	}
-
-	s.nextID++
+	now := s.clock.Now()
 	slot := contract.Slot{
-		ID:                     fmt.Sprintf("rtws_%d", s.nextID),
+		ID:                     newSlotID(),
 		Kind:                   kind,
 		RequestID:              requestID,
 		UserID:                 req.UserID,
 		APIKeyID:               req.APIKeyID,
 		SourceEndpoint:         sourceEndpoint,
 		SessionAffinitySource:  strings.TrimSpace(req.SessionAffinitySource),
-		SessionAffinityKeyHash: affinityHash(req.SessionAffinityKey),
-		StickyAccountID:        cloneInt(req.StickyAccountID),
+		SessionAffinityKeyHash: AffinityHash(req.SessionAffinityKey),
+		StickyAccountID:        CloneInt(req.StickyAccountID),
 		StickyStrength:         strings.TrimSpace(req.StickyStrength),
-		AcquiredAt:             s.clock.Now(),
+		AcquiredAt:             now,
 	}
-	s.active[slot.ID] = slot
-	s.activeByKey[slot.APIKeyID]++
-	s.acquiredTotal++
-	return slot, nil
+	return s.store.AcquireSlot(ctx, contract.PreparedSlot{
+		Slot: slot,
+		Limits: contract.SlotLimits{
+			MaxOpenSlots:       s.limits.MaxOpenSlots,
+			MaxOpenSlotsPerKey: s.limits.MaxOpenSlotsPerKey,
+		},
+		ExpireAt: now.Add(slotLeaseTTL),
+	})
 }
 
-func (s *Service) Release(_ context.Context, slotID string) (contract.Slot, error) {
-	if s == nil {
+func (s *Service) Release(ctx context.Context, slotID string) (contract.Slot, error) {
+	if s == nil || s.store == nil {
 		return contract.Slot{}, ErrInvalidInput
 	}
 	slotID = strings.TrimSpace(slotID)
 	if slotID == "" {
 		return contract.Slot{}, ErrInvalidInput
 	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	slot, ok := s.active[slotID]
-	if !ok {
-		return contract.Slot{}, ErrSlotNotFound
-	}
-	delete(s.active, slotID)
-	if s.activeByKey[slot.APIKeyID] > 1 {
-		s.activeByKey[slot.APIKeyID]--
-	} else {
-		delete(s.activeByKey, slot.APIKeyID)
-	}
-	now := s.clock.Now()
-	slot.ReleasedAt = &now
-	s.releasedTotal++
-	return slot, nil
+	return s.store.ReleaseSlot(ctx, slotID, s.clock.Now())
 }
 
-func (s *Service) Snapshot(_ context.Context) contract.Snapshot {
-	if s == nil {
-		return contract.Snapshot{ActiveByEndpoint: map[string]int{}}
+func (s *Service) Snapshot(ctx context.Context) (contract.Snapshot, error) {
+	if s == nil || s.store == nil {
+		return emptySnapshot(), nil
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.snapshotLocked()
+	return s.store.Snapshot(ctx, s.clock.Now())
 }
 
-func (s *Service) ListActiveSlots(_ context.Context) contract.ActiveSlotList {
-	if s == nil {
-		return contract.ActiveSlotList{
-			Snapshot:         contract.Snapshot{ActiveByEndpoint: map[string]int{}},
-			ActiveByKind:     map[contract.SlotKind]int{},
-			ActiveByAPIKeyID: map[int]int{},
-		}
+func (s *Service) ListActiveSlots(ctx context.Context) (contract.ActiveSlotList, error) {
+	if s == nil || s.store == nil {
+		return emptyActiveSlotList(), nil
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	slots := make([]contract.Slot, 0, len(s.active))
-	byKind := map[contract.SlotKind]int{}
-	byAPIKeyID := map[int]int{}
-	for _, slot := range s.active {
-		slots = append(slots, cloneSlot(slot))
-		byKind[slot.Kind]++
-		byAPIKeyID[slot.APIKeyID]++
-	}
-	sort.Slice(slots, func(i, j int) bool {
-		if slots[i].AcquiredAt.Equal(slots[j].AcquiredAt) {
-			return slots[i].ID < slots[j].ID
-		}
-		return slots[i].AcquiredAt.Before(slots[j].AcquiredAt)
-	})
-	return contract.ActiveSlotList{
-		Slots:            slots,
-		Snapshot:         s.snapshotLocked(),
-		ActiveByKind:     byKind,
-		ActiveByAPIKeyID: byAPIKeyID,
-	}
+	return s.store.ListActiveSlots(ctx, s.clock.Now())
 }
 
-func (s *Service) snapshotLocked() contract.Snapshot {
-	byEndpoint := map[string]int{}
-	for _, slot := range s.active {
-		endpoint := strings.TrimSpace(slot.SourceEndpoint)
-		if endpoint == "" {
-			endpoint = "unknown"
-		}
-		byEndpoint[endpoint]++
+func newSlotID() string {
+	var raw [16]byte
+	if _, err := rand.Read(raw[:]); err != nil {
+		return "rtws_" + hex.EncodeToString([]byte(time.Now().UTC().Format(time.RFC3339Nano)))
 	}
-	return contract.Snapshot{
-		ActiveSlots:      len(s.active),
-		AcquiredTotal:    s.acquiredTotal,
-		ReleasedTotal:    s.releasedTotal,
-		RejectedTotal:    s.rejectedTotal,
-		ActiveByEndpoint: byEndpoint,
-	}
+	return "rtws_" + hex.EncodeToString(raw[:])
 }
 
-func cloneSlot(slot contract.Slot) contract.Slot {
-	slot.StickyAccountID = cloneInt(slot.StickyAccountID)
-	if slot.ReleasedAt != nil {
-		releasedAt := *slot.ReleasedAt
-		slot.ReleasedAt = &releasedAt
-	}
-	return slot
-}
-
-func affinityHash(value string) string {
+func AffinityHash(value string) string {
 	value = strings.TrimSpace(value)
 	if value == "" {
 		return ""
@@ -205,10 +134,35 @@ func affinityHash(value string) string {
 	return "sha256:" + hex.EncodeToString(sum[:])
 }
 
-func cloneInt(value *int) *int {
+func CloneSlot(slot contract.Slot) contract.Slot {
+	slot.StickyAccountID = CloneInt(slot.StickyAccountID)
+	if slot.ReleasedAt != nil {
+		releasedAt := *slot.ReleasedAt
+		slot.ReleasedAt = &releasedAt
+	}
+	return slot
+}
+
+func CloneInt(value *int) *int {
 	if value == nil {
 		return nil
 	}
 	cloned := *value
 	return &cloned
+}
+
+func EmptyActiveSlotList() contract.ActiveSlotList {
+	return emptyActiveSlotList()
+}
+
+func emptyActiveSlotList() contract.ActiveSlotList {
+	return contract.ActiveSlotList{
+		Snapshot:         emptySnapshot(),
+		ActiveByKind:     map[contract.SlotKind]int{},
+		ActiveByAPIKeyID: map[int]int{},
+	}
+}
+
+func emptySnapshot() contract.Snapshot {
+	return contract.Snapshot{ActiveByEndpoint: map[string]int{}}
 }

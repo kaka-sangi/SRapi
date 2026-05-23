@@ -47,11 +47,17 @@ func TestAcquireReleaseTracksRealtimeSlotLifecycle(t *testing.T) {
 	if slot.StickyAccountID == nil || *slot.StickyAccountID != stickyAccountID || slot.StickyStrength != "hard" {
 		t.Fatalf("expected sticky metadata on slot, got %+v", slot)
 	}
-	snapshot := svc.Snapshot(context.Background())
+	snapshot, err := svc.Snapshot(context.Background())
+	if err != nil {
+		t.Fatalf("snapshot: %v", err)
+	}
 	if snapshot.ActiveSlots != 1 || snapshot.AcquiredTotal != 1 || snapshot.ActiveByEndpoint["/v1/responses/ws"] != 1 {
 		t.Fatalf("unexpected active snapshot: %+v", snapshot)
 	}
-	active := svc.ListActiveSlots(context.Background())
+	active, err := svc.ListActiveSlots(context.Background())
+	if err != nil {
+		t.Fatalf("list active slots: %v", err)
+	}
 	if len(active.Slots) != 1 ||
 		active.ActiveByKind[contract.SlotKindResponsesWebSocket] != 1 ||
 		active.ActiveByAPIKeyID[3] != 1 ||
@@ -69,11 +75,18 @@ func TestAcquireReleaseTracksRealtimeSlotLifecycle(t *testing.T) {
 	if released.ReleasedAt == nil || !released.ReleasedAt.Equal(clock.now) {
 		t.Fatalf("expected release timestamp, got %+v", released)
 	}
-	snapshot = svc.Snapshot(context.Background())
+	snapshot, err = svc.Snapshot(context.Background())
+	if err != nil {
+		t.Fatalf("snapshot after release: %v", err)
+	}
 	if snapshot.ActiveSlots != 0 || snapshot.AcquiredTotal != 1 || snapshot.ReleasedTotal != 1 {
 		t.Fatalf("unexpected released snapshot: %+v", snapshot)
 	}
-	if active := svc.ListActiveSlots(context.Background()); len(active.Slots) != 0 || active.Snapshot.ActiveSlots != 0 {
+	active, err = svc.ListActiveSlots(context.Background())
+	if err != nil {
+		t.Fatalf("list active slots after release: %v", err)
+	}
+	if len(active.Slots) != 0 || active.Snapshot.ActiveSlots != 0 {
 		t.Fatalf("expected empty active slot list after release, got %+v", active)
 	}
 }
@@ -89,7 +102,10 @@ func TestAcquireRejectsGlobalRealtimeSlotLimit(t *testing.T) {
 	if _, err := svc.Acquire(context.Background(), acquireRequest(2, 11)); !errors.Is(err, ErrLimitExceeded) {
 		t.Fatalf("expected global limit rejection, got %v", err)
 	}
-	snapshot := svc.Snapshot(context.Background())
+	snapshot, err := svc.Snapshot(context.Background())
+	if err != nil {
+		t.Fatalf("snapshot: %v", err)
+	}
 	if snapshot.ActiveSlots != 1 || snapshot.RejectedTotal != 1 {
 		t.Fatalf("unexpected limit snapshot: %+v", snapshot)
 	}
@@ -109,7 +125,10 @@ func TestAcquireRejectsPerAPIKeyRealtimeSlotLimit(t *testing.T) {
 	if _, err := svc.Acquire(context.Background(), acquireRequest(3, 11)); err != nil {
 		t.Fatalf("different api key should acquire: %v", err)
 	}
-	snapshot := svc.Snapshot(context.Background())
+	snapshot, err := svc.Snapshot(context.Background())
+	if err != nil {
+		t.Fatalf("snapshot: %v", err)
+	}
 	if snapshot.ActiveSlots != 2 || snapshot.RejectedTotal != 1 {
 		t.Fatalf("unexpected per-key limit snapshot: %+v", snapshot)
 	}
