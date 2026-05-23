@@ -4,15 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 	"time"
 
-	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
 	apikeyservice "github.com/srapi/srapi/apps/api/internal/modules/api_keys/service"
 	gatewaycontract "github.com/srapi/srapi/apps/api/internal/modules/gateway/contract"
 	gatewayservice "github.com/srapi/srapi/apps/api/internal/modules/gateway/service"
-	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
 
@@ -1023,27 +1020,27 @@ func (s *Server) handleGeminiCountTokens(w http.ResponseWriter, r *http.Request)
 		writeGeminiGatewayAuthError(w, err)
 		return
 	}
-	rawBody, err := io.ReadAll(io.LimitReader(r.Body, 4<<20))
+	rawBody, err := readTokenCountBody(r)
 	if err != nil || len(bytes.TrimSpace(rawBody)) == 0 {
-		s.recordGeminiCountFailure(r, authed, requestID, sourceEndpoint, modelRef, "invalid_request", elapsedMillis(startedAt), nil, gatewayAdmission{})
+		s.recordTokenCountFailure(r, authed, requestID, sourceEndpoint, string(gatewaycontract.ProtocolGeminiCompatible), modelRef, "invalid_request", elapsedMillis(startedAt), nil, gatewayAdmission{})
 		writeGeminiGatewayError(w, http.StatusBadRequest, "INVALID_ARGUMENT", "invalid countTokens request")
 		return
 	}
 	var body apiopenapi.GeminiCountTokensRequest
 	if err := json.Unmarshal(rawBody, &body); err != nil {
-		s.recordGeminiCountFailure(r, authed, requestID, sourceEndpoint, modelRef, "invalid_request", elapsedMillis(startedAt), nil, gatewayAdmission{})
+		s.recordTokenCountFailure(r, authed, requestID, sourceEndpoint, string(gatewaycontract.ProtocolGeminiCompatible), modelRef, "invalid_request", elapsedMillis(startedAt), nil, gatewayAdmission{})
 		writeGeminiGatewayError(w, jsonDecodeStatus(err), "INVALID_ARGUMENT", "invalid countTokens request")
 		return
 	}
 	modelResolution, err := s.runtime.models.ResolveModelReference(r.Context(), modelRef)
 	if err != nil {
-		s.recordGeminiCountFailure(r, authed, requestID, sourceEndpoint, modelRef, "model_not_found", elapsedMillis(startedAt), nil, gatewayAdmission{})
+		s.recordTokenCountFailure(r, authed, requestID, sourceEndpoint, string(gatewaycontract.ProtocolGeminiCompatible), modelRef, "model_not_found", elapsedMillis(startedAt), nil, gatewayAdmission{})
 		writeGeminiGatewayError(w, http.StatusNotFound, "NOT_FOUND", "model not found")
 		return
 	}
 	model := modelResolution.Model
 	if !apiKeyAllowsModelReference(authed.Key.AllowedModels, modelResolution) {
-		s.recordGeminiCountFailure(r, authed, requestID, sourceEndpoint, model.CanonicalName, "model_not_allowed", elapsedMillis(startedAt), nil, gatewayAdmission{})
+		s.recordTokenCountFailure(r, authed, requestID, sourceEndpoint, string(gatewaycontract.ProtocolGeminiCompatible), model.CanonicalName, "model_not_allowed", elapsedMillis(startedAt), nil, gatewayAdmission{})
 		writeGeminiGatewayError(w, http.StatusForbidden, "PERMISSION_DENIED", "model not allowed for this api key")
 		return
 	}
@@ -1055,19 +1052,19 @@ func (s *Server) handleGeminiCountTokens(w http.ResponseWriter, r *http.Request)
 		CanonicalModel: model.CanonicalName,
 	})
 	if err != nil {
-		s.recordGeminiCountFailure(r, authed, requestID, sourceEndpoint, model.CanonicalName, "invalid_request", elapsedMillis(startedAt), nil, gatewayAdmission{})
+		s.recordTokenCountFailure(r, authed, requestID, sourceEndpoint, string(gatewaycontract.ProtocolGeminiCompatible), model.CanonicalName, "invalid_request", elapsedMillis(startedAt), nil, gatewayAdmission{})
 		writeGeminiGatewayError(w, http.StatusBadRequest, "INVALID_ARGUMENT", err.Error())
 		return
 	}
 	admission, err := s.runtime.prepareGatewayAdmission(r.Context(), canonical, modelResolution, model.ID)
 	if err != nil {
-		s.recordGeminiCountFailure(r, authed, canonical.RequestID, canonical.SourceEndpoint, canonical.CanonicalModel, "entitlement_check_failed", elapsedMillis(startedAt), &canonical, admission)
+		s.recordTokenCountFailure(r, authed, canonical.RequestID, canonical.SourceEndpoint, string(canonical.SourceProtocol), canonical.CanonicalModel, "entitlement_check_failed", elapsedMillis(startedAt), &canonical, admission)
 		writeGeminiGatewayError(w, http.StatusInternalServerError, "INTERNAL", "failed to check gateway entitlement")
 		return
 	}
 	if !admission.Entitlement.Allowed {
 		errorClass := gatewayEntitlementErrorClass(admission.Entitlement)
-		s.recordGeminiCountFailure(r, authed, canonical.RequestID, canonical.SourceEndpoint, canonical.CanonicalModel, errorClass, elapsedMillis(startedAt), &canonical, admission)
+		s.recordTokenCountFailure(r, authed, canonical.RequestID, canonical.SourceEndpoint, string(canonical.SourceProtocol), canonical.CanonicalModel, errorClass, elapsedMillis(startedAt), &canonical, admission)
 		writeGeminiGatewayError(w, gatewayEntitlementHTTPStatus(errorClass), geminiStatusForGatewayErrorClass(errorClass, gatewayEntitlementHTTPStatus(errorClass)), gatewayEntitlementMessage(errorClass))
 		return
 	}
@@ -1075,7 +1072,7 @@ func (s *Server) handleGeminiCountTokens(w http.ResponseWriter, r *http.Request)
 	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
 	result, err := s.runtime.scheduleGatewayRequest(r.Context(), scheduleReq, model.ID, forcedProviderKey, authed.Key)
 	if err != nil {
-		s.recordGeminiCountScheduled(r, authed, canonical, result, nil, "no_available_account", http.StatusServiceUnavailable, elapsedMillis(startedAt), admission)
+		s.recordTokenCountScheduled(r, authed, canonical, result, nil, "no_available_account", http.StatusServiceUnavailable, elapsedMillis(startedAt), admission)
 		writeGeminiGatewayError(w, http.StatusServiceUnavailable, "UNAVAILABLE", "no available account")
 		return
 	}
@@ -1083,84 +1080,14 @@ func (s *Server) handleGeminiCountTokens(w http.ResponseWriter, r *http.Request)
 	if err != nil {
 		errorClass, upstreamStatus, _ := providerGatewayError(err)
 		status := providerGatewayHTTPStatus(upstreamStatus)
-		s.recordGeminiCountScheduled(r, authed, canonical, result, &result.Candidate, errorClass, upstreamStatus, elapsedMillis(startedAt), admission)
+		s.recordTokenCountScheduled(r, authed, canonical, result, &result.Candidate, errorClass, upstreamStatus, elapsedMillis(startedAt), admission)
 		writeGeminiGatewayError(w, status, geminiStatusForGatewayErrorClass(errorClass, status), providerGatewayMessage(errorClass))
 		return
 	}
 	tokenCount := gatewayTokenCountFromProvider(providerResp)
 	canonicalResp := s.runtime.gateway.BuildCanonicalTokenCountResponse(canonical, tokenCount.TotalTokens, tokenCount.CachedContentTokenCount, tokenCount.PromptTokensDetails, tokenCount.CacheTokensDetails, tokenCount.Metadata)
-	s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
-		RequestID:             canonical.RequestID,
-		Authed:                authed,
-		DecisionID:            result.Decision.ID,
-		AttemptNo:             result.Decision.AttemptNo,
-		ProviderID:            ptrInt(result.Candidate.Provider.ID),
-		AccountID:             ptrInt(result.Candidate.Account.ID),
-		SourceProtocol:        string(canonical.SourceProtocol),
-		SourceEndpoint:        canonical.SourceEndpoint,
-		TargetProtocol:        result.Candidate.Provider.Protocol,
-		Model:                 canonical.CanonicalModel,
-		Success:               true,
-		StatusCode:            ptrInt(http.StatusOK),
-		LatencyMS:             elapsedMillis(startedAt),
-		UsageEstimated:        false,
-		Pricing:               zeroGatewayPricing(),
-		CompatibilityWarnings: canonicalResp.CompatibilityWarnings,
-	})
+	s.recordTokenCountSuccess(r, authed, canonical, result, canonicalResp, elapsedMillis(startedAt))
 	writeJSONAny(w, http.StatusOK, s.runtime.gateway.RenderGeminiCountTokens(canonicalResp))
-}
-
-func (s *Server) recordGeminiCountFailure(r *http.Request, authed apikeycontract.AuthResult, requestID string, sourceEndpoint string, model string, errorClass string, latencyMS int, canonical *gatewaycontract.CanonicalRequest, admission gatewayAdmission) {
-	rec := gatewayUsageRecord{
-		RequestID:      requestID,
-		Authed:         authed,
-		SourceProtocol: string(gatewaycontract.ProtocolGeminiCompatible),
-		SourceEndpoint: sourceEndpoint,
-		Model:          fallbackModelName(model),
-		Success:        false,
-		ErrorClass:     ptrStringValue(errorClass),
-		LatencyMS:      latencyMS,
-		UsageEstimated: true,
-		Pricing:        admission.Pricing,
-	}
-	if canonical != nil {
-		rec.SourceProtocol = string(canonical.SourceProtocol)
-		rec.SourceEndpoint = canonical.SourceEndpoint
-		rec.Model = canonical.CanonicalModel
-		rec.InputTokens = admission.EstimatedUsage.InputTokens
-		rec.OutputTokens = admission.EstimatedUsage.OutputTokens
-		rec.CachedTokens = admission.EstimatedUsage.CachedTokens
-		rec.CompatibilityWarnings = canonical.CompatibilityWarnings
-	}
-	s.runtime.recordGatewayUsage(r.Context(), rec)
-}
-
-func (s *Server) recordGeminiCountScheduled(r *http.Request, authed apikeycontract.AuthResult, canonical gatewaycontract.CanonicalRequest, result schedulercontract.ScheduleResult, candidate *schedulercontract.Candidate, errorClass string, statusCode int, latencyMS int, admission gatewayAdmission) {
-	rec := gatewayUsageRecord{
-		RequestID:             canonical.RequestID,
-		Authed:                authed,
-		DecisionID:            result.Decision.ID,
-		AttemptNo:             result.Decision.AttemptNo,
-		SourceProtocol:        string(canonical.SourceProtocol),
-		SourceEndpoint:        canonical.SourceEndpoint,
-		Model:                 canonical.CanonicalModel,
-		Success:               false,
-		ErrorClass:            ptrStringValue(errorClass),
-		StatusCode:            ptrInt(statusCode),
-		LatencyMS:             latencyMS,
-		InputTokens:           admission.EstimatedUsage.InputTokens,
-		OutputTokens:          admission.EstimatedUsage.OutputTokens,
-		CachedTokens:          admission.EstimatedUsage.CachedTokens,
-		UsageEstimated:        true,
-		Pricing:               admission.Pricing,
-		CompatibilityWarnings: canonical.CompatibilityWarnings,
-	}
-	if candidate != nil {
-		rec.ProviderID = ptrInt(candidate.Provider.ID)
-		rec.AccountID = ptrInt(candidate.Account.ID)
-		rec.TargetProtocol = candidate.Provider.Protocol
-	}
-	s.runtime.recordGatewayUsage(r.Context(), rec)
 }
 
 func zeroGatewayPricing() gatewayPricingEvidence {

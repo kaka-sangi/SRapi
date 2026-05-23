@@ -125,6 +125,7 @@ WP-420 Claude Code 2api boundary:
 
 - `reverse-proxy-claude-code-cli` dispatches Anthropic Messages-shaped text requests through Reverse Proxy Runtime, not through direct API-key HTTP.
 - The upstream endpoint is `{base_url}/messages?beta=true`; account metadata should store `base_url` at the `/v1` prefix.
+- Count token requests dispatch to `{base_url}/messages/count_tokens?beta=true`, keep the Anthropic count_tokens body shape with the mapped upstream `model`, and add Claude Code count-token beta/header/body conventions before Reverse Proxy Runtime sends the selected account identity.
 - Adapter-owned official-client shape includes Claude Code `Anthropic-Beta`, `Anthropic-Version`, `X-App`, `X-Stainless-*`, `X-Claude-Code-Session-Id`, `x-client-request-id`, stream/non-stream `Accept`, and Claude Code system/billing blocks.
 - Runtime-owned transport still injects the selected account credential as OAuth/CLI bearer and strips caller/SRapi headers; adapter must not forward caller `Authorization` or add `x-api-key`.
 - `runtime_class = api_key` is rejected for this adapter because Claude Code 2api means official-client OAuth/session/client-token simulation, not Anthropic API-key mode.

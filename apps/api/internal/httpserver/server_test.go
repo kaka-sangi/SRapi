@@ -2471,6 +2471,139 @@ func TestGatewayGeminiCountTokensSchedulesGeminiCompatibleUpstream(t *testing.T)
 	}
 }
 
+func TestGatewayAnthropicCountTokensSchedulesAnthropicCompatibleUpstream(t *testing.T) {
+	type anthropicCountCall struct {
+		Path    string
+		APIKey  string
+		Version string
+		Model   string
+		System  string
+		Message string
+	}
+	var (
+		mu    sync.Mutex
+		calls []anthropicCountCall
+	)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload struct {
+			Model    string `json:"model"`
+			System   string `json:"system"`
+			Messages []struct {
+				Role    string `json:"role"`
+				Content string `json:"content"`
+			} `json:"messages"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode Anthropic count request: %v", err)
+		}
+		message := ""
+		if len(payload.Messages) > 0 {
+			message = payload.Messages[0].Content
+		}
+		mu.Lock()
+		calls = append(calls, anthropicCountCall{
+			Path:    r.URL.Path,
+			APIKey:  r.Header.Get("x-api-key"),
+			Version: r.Header.Get("anthropic-version"),
+			Model:   payload.Model,
+			System:  payload.System,
+			Message: message,
+		})
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"input_tokens":23,"cache_creation_input_tokens":2}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"anthropic-count-provider","display_name":"Anthropic Count Provider","adapter_type":"anthropic-compatible","protocol":"anthropic-compatible","status":"active","capabilities":{"token_counting":true}}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"anthropic-count-model","display_name":"Anthropic Count Model","status":"active","capabilities":[{"key":"token_counting","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"claude-count-upstream","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"anthropic-count-account","runtime_class":"api_key","credential":{"api_key":"anthropic-count-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	body := `{"model":"anthropic-count-model","system":"count only","messages":[{"role":"user","content":"count this anthropic prompt"}]}`
+	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/messages/count_tokens", body)
+	var resp apiopenapi.AnthropicCountTokensResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode Anthropic count response: %v", err)
+	}
+	if resp.InputTokens != 23 || resp.AdditionalProperties["cache_creation_input_tokens"] == nil {
+		t.Fatalf("unexpected Anthropic count response: %+v", resp)
+	}
+
+	mu.Lock()
+	gotCalls := append([]anthropicCountCall(nil), calls...)
+	mu.Unlock()
+	if len(gotCalls) != 1 {
+		t.Fatalf("expected one Anthropic count call, got %+v", gotCalls)
+	}
+	call := gotCalls[0]
+	if call.Path != "/v1/messages/count_tokens" || call.APIKey != "anthropic-count-secret" || call.Version != "2023-06-01" || call.Model != "claude-count-upstream" {
+		t.Fatalf("unexpected Anthropic count call: %+v", call)
+	}
+	if call.System != "count only" || call.Message != "count this anthropic prompt" {
+		t.Fatalf("expected count_tokens body shape preserved with mapped model, got %+v", call)
+	}
+
+	usageReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/usage-logs?model=anthropic-count-model", nil)
+	usageReq.AddCookie(sessionCookie)
+	usageRec := httptest.NewRecorder()
+	handler.ServeHTTP(usageRec, usageReq)
+	if usageRec.Code != http.StatusOK {
+		t.Fatalf("expected usage logs 200, got %d body=%s", usageRec.Code, usageRec.Body.String())
+	}
+	var usageResp apiopenapi.UsageLogListResponse
+	if err := json.NewDecoder(usageRec.Body).Decode(&usageResp); err != nil {
+		t.Fatalf("decode usage logs: %v", err)
+	}
+	if len(usageResp.Data) != 1 {
+		t.Fatalf("expected one usage record, got %+v", usageResp.Data)
+	}
+	usage := usageResp.Data[0]
+	if !usage.Success || usage.TotalTokens != 0 || usage.Cost != "0.00000000" || usage.SourceEndpoint != "/v1/messages/count_tokens" || usage.TargetProtocol == nil || *usage.TargetProtocol != "anthropic-compatible" {
+		t.Fatalf("unexpected Anthropic count usage record: %+v", usage)
+	}
+	if usage.ProviderId == nil || *usage.ProviderId != providerResp.Data.Id || usage.AccountId == nil || *usage.AccountId != accountResp.Data.Id || usage.Model != modelResp.Data.CanonicalName {
+		t.Fatalf("expected provider/account/model evidence, got %+v", usage)
+	}
+}
+
+func TestGatewayAnthropicCountTokensRequiresProviderScopedCapability(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"anthropic-count-missing-cap-provider","display_name":"Anthropic Missing Count Capability","adapter_type":"anthropic-compatible","protocol":"anthropic-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"anthropic-count-missing-cap-model","display_name":"Anthropic Missing Count Capability Model","status":"active","capabilities":[{"key":"token_counting","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"claude-count-upstream","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"anthropic-count-missing-cap-account","runtime_class":"api_key","credential":{"api_key":"anthropic-count-secret"},"metadata":{"base_url":"https://api.anthropic.com/v1"},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/messages/count_tokens", strings.NewReader(`{"model":"anthropic-count-missing-cap-model","messages":[{"role":"user","content":"count"}]}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected no available account when provider lacks token_counting, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=anthropic-count-missing-cap-model", nil)
+	decisionsReq.AddCookie(sessionCookie)
+	decisionsRec := httptest.NewRecorder()
+	handler.ServeHTTP(decisionsRec, decisionsReq)
+	if decisionsRec.Code != http.StatusOK {
+		t.Fatalf("expected scheduler decisions 200, got %d body=%s", decisionsRec.Code, decisionsRec.Body.String())
+	}
+	var decisionsResp apiopenapi.SchedulerDecisionListResponse
+	if err := json.NewDecoder(decisionsRec.Body).Decode(&decisionsResp); err != nil {
+		t.Fatalf("decode scheduler decisions: %v", err)
+	}
+	if len(decisionsResp.Data) != 1 || decisionsResp.Data[0].SelectedAccountId != nil || !rejectionReasonsContain(decisionsResp.Data[0].RejectReasons, "capability_mismatch") {
+		t.Fatalf("expected capability_mismatch decision, got %+v", decisionsResp.Data)
+	}
+}
+
 func TestGatewayGeminiStreamGenerateContentEmitsGeminiSSE(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
@@ -5922,7 +6055,7 @@ func mustCreateGeminiGatewayTarget(t *testing.T, handler http.Handler, sessionCo
 
 func mustCreateNativeGeminiGatewayTarget(t *testing.T, handler http.Handler, sessionCookie *http.Cookie, csrfToken, upstreamURL string) (apiopenapi.ProviderResponse, apiopenapi.ModelResponse, apiopenapi.ProviderAccountResponse) {
 	t.Helper()
-	providerResp := mustCreateProvider(t, handler, sessionCookie, csrfToken, `{"name":"native-gemini-route-provider","display_name":"Native Gemini Route Provider","adapter_type":"gemini-compatible","protocol":"gemini-compatible","status":"active"}`)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, csrfToken, `{"name":"native-gemini-route-provider","display_name":"Native Gemini Route Provider","adapter_type":"gemini-compatible","protocol":"gemini-compatible","status":"active","capabilities":{"token_counting":true}}`)
 	modelResp := mustCreateModel(t, handler, sessionCookie, csrfToken, `{"canonical_name":"native-gemini-route-model","display_name":"Native Gemini Route Model","status":"active","capabilities":[{"key":"streaming","level":"required","status":"stable","version":"v1"},{"key":"token_counting","level":"required","status":"stable","version":"v1"}]}`)
 	mustCreateMapping(t, handler, sessionCookie, csrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"gemini-native-upstream","status":"active"}`)
 	accountResp := mustCreateAccount(t, handler, sessionCookie, csrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"native-gemini-route-account","runtime_class":"api_key","credential":{"api_key":"native-gemini-secret"},"metadata":{"base_url":"`+upstreamURL+`/v1beta"},"status":"active"}`)
@@ -6050,6 +6183,15 @@ func jsonObjectContainsString(value apiopenapi.JsonObject, target string) bool {
 					return true
 				}
 			}
+		}
+	}
+	return false
+}
+
+func rejectionReasonsContain(value apiopenapi.JsonObject, target string) bool {
+	for _, item := range value {
+		if item == target {
+			return true
 		}
 	}
 	return false

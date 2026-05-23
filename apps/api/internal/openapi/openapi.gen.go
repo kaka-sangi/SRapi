@@ -1593,6 +1593,34 @@ type AnthropicContentBlock struct {
 // AnthropicContentBlockType defines model for AnthropicContentBlock.Type.
 type AnthropicContentBlockType string
 
+// AnthropicCountTokensRequest defines model for AnthropicCountTokensRequest.
+type AnthropicCountTokensRequest struct {
+	Messages             []AnthropicMessage                  `json:"messages"`
+	Model                string                              `json:"model"`
+	System               *AnthropicCountTokensRequest_System `json:"system,omitempty"`
+	Thinking             *JsonObject                         `json:"thinking,omitempty"`
+	ToolChoice           *JsonObject                         `json:"tool_choice,omitempty"`
+	Tools                *[]JsonObject                       `json:"tools,omitempty"`
+	AdditionalProperties map[string]interface{}              `json:"-"`
+}
+
+// AnthropicCountTokensRequestSystem0 defines model for .
+type AnthropicCountTokensRequestSystem0 = string
+
+// AnthropicCountTokensRequestSystem1 defines model for .
+type AnthropicCountTokensRequestSystem1 = []AnthropicContentBlock
+
+// AnthropicCountTokensRequest_System defines model for AnthropicCountTokensRequest.System.
+type AnthropicCountTokensRequest_System struct {
+	union json.RawMessage
+}
+
+// AnthropicCountTokensResponse defines model for AnthropicCountTokensResponse.
+type AnthropicCountTokensResponse struct {
+	InputTokens          int                    `json:"input_tokens"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
 // AnthropicMessage defines model for AnthropicMessage.
 type AnthropicMessage struct {
 	Content AnthropicMessage_Content `json:"content"`
@@ -3774,6 +3802,9 @@ type ListGeminiModelsParams struct {
 // CreateAnthropicCompatibleMessageAliasJSONRequestBody defines body for CreateAnthropicCompatibleMessageAlias for application/json ContentType.
 type CreateAnthropicCompatibleMessageAliasJSONRequestBody = AnthropicMessagesRequest
 
+// CountAnthropicCompatibleMessageTokensAliasJSONRequestBody defines body for CountAnthropicCompatibleMessageTokensAlias for application/json ContentType.
+type CountAnthropicCompatibleMessageTokensAliasJSONRequestBody = AnthropicCountTokensRequest
+
 // CreateAntigravityChatCompletionAliasJSONRequestBody defines body for CreateAntigravityChatCompletionAlias for application/json ContentType.
 type CreateAntigravityChatCompletionAliasJSONRequestBody = ChatCompletionRequest
 
@@ -3924,6 +3955,9 @@ type CreateImageVariationMultipartRequestBody = ImageVariationRequest
 // CreateMessageJSONRequestBody defines body for CreateMessage for application/json ContentType.
 type CreateMessageJSONRequestBody = AnthropicMessagesRequest
 
+// CountAnthropicMessageTokensJSONRequestBody defines body for CountAnthropicMessageTokens for application/json ContentType.
+type CountAnthropicMessageTokensJSONRequestBody = AnthropicCountTokensRequest
+
 // CreateModerationJSONRequestBody defines body for CreateModeration for application/json ContentType.
 type CreateModerationJSONRequestBody = ModerationRequest
 
@@ -4012,6 +4046,213 @@ func (a AnthropicContentBlock) MarshalJSON() ([]byte, error) {
 	object["type"], err = json.Marshal(a.Type)
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling 'type': %w", err)
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for AnthropicCountTokensRequest. Returns the specified
+// element and whether it was found
+func (a AnthropicCountTokensRequest) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for AnthropicCountTokensRequest
+func (a *AnthropicCountTokensRequest) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for AnthropicCountTokensRequest to handle AdditionalProperties
+func (a *AnthropicCountTokensRequest) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["messages"]; found {
+		err = json.Unmarshal(raw, &a.Messages)
+		if err != nil {
+			return fmt.Errorf("error reading 'messages': %w", err)
+		}
+		delete(object, "messages")
+	}
+
+	if raw, found := object["model"]; found {
+		err = json.Unmarshal(raw, &a.Model)
+		if err != nil {
+			return fmt.Errorf("error reading 'model': %w", err)
+		}
+		delete(object, "model")
+	}
+
+	if raw, found := object["system"]; found {
+		err = json.Unmarshal(raw, &a.System)
+		if err != nil {
+			return fmt.Errorf("error reading 'system': %w", err)
+		}
+		delete(object, "system")
+	}
+
+	if raw, found := object["thinking"]; found {
+		err = json.Unmarshal(raw, &a.Thinking)
+		if err != nil {
+			return fmt.Errorf("error reading 'thinking': %w", err)
+		}
+		delete(object, "thinking")
+	}
+
+	if raw, found := object["tool_choice"]; found {
+		err = json.Unmarshal(raw, &a.ToolChoice)
+		if err != nil {
+			return fmt.Errorf("error reading 'tool_choice': %w", err)
+		}
+		delete(object, "tool_choice")
+	}
+
+	if raw, found := object["tools"]; found {
+		err = json.Unmarshal(raw, &a.Tools)
+		if err != nil {
+			return fmt.Errorf("error reading 'tools': %w", err)
+		}
+		delete(object, "tools")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for AnthropicCountTokensRequest to handle AdditionalProperties
+func (a AnthropicCountTokensRequest) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.Messages != nil {
+		object["messages"], err = json.Marshal(a.Messages)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'messages': %w", err)
+		}
+	}
+
+	object["model"], err = json.Marshal(a.Model)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'model': %w", err)
+	}
+
+	if a.System != nil {
+		object["system"], err = json.Marshal(a.System)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'system': %w", err)
+		}
+	}
+
+	if a.Thinking != nil {
+		object["thinking"], err = json.Marshal(a.Thinking)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'thinking': %w", err)
+		}
+	}
+
+	if a.ToolChoice != nil {
+		object["tool_choice"], err = json.Marshal(a.ToolChoice)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'tool_choice': %w", err)
+		}
+	}
+
+	if a.Tools != nil {
+		object["tools"], err = json.Marshal(a.Tools)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'tools': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for AnthropicCountTokensResponse. Returns the specified
+// element and whether it was found
+func (a AnthropicCountTokensResponse) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for AnthropicCountTokensResponse
+func (a *AnthropicCountTokensResponse) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for AnthropicCountTokensResponse to handle AdditionalProperties
+func (a *AnthropicCountTokensResponse) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["input_tokens"]; found {
+		err = json.Unmarshal(raw, &a.InputTokens)
+		if err != nil {
+			return fmt.Errorf("error reading 'input_tokens': %w", err)
+		}
+		delete(object, "input_tokens")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for AnthropicCountTokensResponse to handle AdditionalProperties
+func (a AnthropicCountTokensResponse) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	object["input_tokens"], err = json.Marshal(a.InputTokens)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'input_tokens': %w", err)
 	}
 
 	for fieldName, field := range a.AdditionalProperties {
@@ -8716,6 +8957,68 @@ func (a ToolDefinition) MarshalJSON() ([]byte, error) {
 	return json.Marshal(object)
 }
 
+// AsAnthropicCountTokensRequestSystem0 returns the union data inside the AnthropicCountTokensRequest_System as a AnthropicCountTokensRequestSystem0
+func (t AnthropicCountTokensRequest_System) AsAnthropicCountTokensRequestSystem0() (AnthropicCountTokensRequestSystem0, error) {
+	var body AnthropicCountTokensRequestSystem0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromAnthropicCountTokensRequestSystem0 overwrites any union data inside the AnthropicCountTokensRequest_System as the provided AnthropicCountTokensRequestSystem0
+func (t *AnthropicCountTokensRequest_System) FromAnthropicCountTokensRequestSystem0(v AnthropicCountTokensRequestSystem0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeAnthropicCountTokensRequestSystem0 performs a merge with any union data inside the AnthropicCountTokensRequest_System, using the provided AnthropicCountTokensRequestSystem0
+func (t *AnthropicCountTokensRequest_System) MergeAnthropicCountTokensRequestSystem0(v AnthropicCountTokensRequestSystem0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsAnthropicCountTokensRequestSystem1 returns the union data inside the AnthropicCountTokensRequest_System as a AnthropicCountTokensRequestSystem1
+func (t AnthropicCountTokensRequest_System) AsAnthropicCountTokensRequestSystem1() (AnthropicCountTokensRequestSystem1, error) {
+	var body AnthropicCountTokensRequestSystem1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromAnthropicCountTokensRequestSystem1 overwrites any union data inside the AnthropicCountTokensRequest_System as the provided AnthropicCountTokensRequestSystem1
+func (t *AnthropicCountTokensRequest_System) FromAnthropicCountTokensRequestSystem1(v AnthropicCountTokensRequestSystem1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeAnthropicCountTokensRequestSystem1 performs a merge with any union data inside the AnthropicCountTokensRequest_System, using the provided AnthropicCountTokensRequestSystem1
+func (t *AnthropicCountTokensRequest_System) MergeAnthropicCountTokensRequestSystem1(v AnthropicCountTokensRequestSystem1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t AnthropicCountTokensRequest_System) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *AnthropicCountTokensRequest_System) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsAnthropicMessageContent0 returns the union data inside the AnthropicMessage_Content as a AnthropicMessageContent0
 func (t AnthropicMessage_Content) AsAnthropicMessageContent0() (AnthropicMessageContent0, error) {
 	var body AnthropicMessageContent0
@@ -9465,6 +9768,9 @@ type ServerInterface interface {
 	// Create an Anthropic Messages-compatible message with anthropic-compatible provider context.
 	// (POST /api/provider/anthropic-compatible/v1/messages)
 	CreateAnthropicCompatibleMessageAlias(w http.ResponseWriter, r *http.Request)
+	// Count Anthropic Messages-compatible input tokens with anthropic-compatible provider context.
+	// (POST /api/provider/anthropic-compatible/v1/messages/count_tokens)
+	CountAnthropicCompatibleMessageTokensAlias(w http.ResponseWriter, r *http.Request)
 	// Create an OpenAI-compatible chat completion with Antigravity provider context.
 	// (POST /api/provider/antigravity/v1/chat/completions)
 	CreateAntigravityChatCompletionAlias(w http.ResponseWriter, r *http.Request)
@@ -9735,6 +10041,9 @@ type ServerInterface interface {
 	// Create an Anthropic Messages-compatible message.
 	// (POST /v1/messages)
 	CreateMessage(w http.ResponseWriter, r *http.Request)
+	// Count input tokens with the Anthropic Messages-compatible gateway route.
+	// (POST /v1/messages/count_tokens)
+	CountAnthropicMessageTokens(w http.ResponseWriter, r *http.Request)
 	// List models available to the gateway API key.
 	// (GET /v1/models)
 	ListModels(w http.ResponseWriter, r *http.Request)
@@ -9787,6 +10096,26 @@ func (siw *ServerInterfaceWrapper) CreateAnthropicCompatibleMessageAlias(w http.
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateAnthropicCompatibleMessageAlias(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CountAnthropicCompatibleMessageTokensAlias operation middleware
+func (siw *ServerInterfaceWrapper) CountAnthropicCompatibleMessageTokensAlias(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CountAnthropicCompatibleMessageTokensAlias(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -12996,6 +13325,26 @@ func (siw *ServerInterfaceWrapper) CreateMessage(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
+// CountAnthropicMessageTokens operation middleware
+func (siw *ServerInterfaceWrapper) CountAnthropicMessageTokens(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CountAnthropicMessageTokens(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListModels operation middleware
 func (siw *ServerInterfaceWrapper) ListModels(w http.ResponseWriter, r *http.Request) {
 
@@ -13522,6 +13871,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	}
 
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/anthropic-compatible/v1/messages", wrapper.CreateAnthropicCompatibleMessageAlias)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/anthropic-compatible/v1/messages/count_tokens", wrapper.CountAnthropicCompatibleMessageTokensAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/antigravity/v1/chat/completions", wrapper.CreateAntigravityChatCompletionAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/antigravity/v1/messages", wrapper.CreateAntigravityMessageAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/antigravity/v1beta/models/{model}:generateContent", wrapper.GenerateAntigravityGeminiContentAlias)
@@ -13612,6 +13962,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/images/generations", wrapper.CreateImageGeneration)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/images/variations", wrapper.CreateImageVariation)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/messages", wrapper.CreateMessage)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/messages/count_tokens", wrapper.CountAnthropicMessageTokens)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/models", wrapper.ListModels)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/moderations", wrapper.CreateModeration)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/realtime", wrapper.ConnectRealtimeWebSocket)

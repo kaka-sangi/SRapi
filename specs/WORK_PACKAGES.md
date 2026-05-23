@@ -2232,12 +2232,62 @@ Required gates:
 - `make secret-scan`
 - `git diff --check`
 
+## WP-560: Anthropic Messages Count Tokens v1
+
+Objective: implement Anthropic-compatible `POST /v1/messages/count_tokens` so Anthropic SDK-style clients can count prompt tokens through SRapi without treating token counting as generation usage or bypassing Provider Account scheduling.
+
+Read first:
+
+- `docs/OPENAPI_CONTRACT.md`
+- `docs/GATEWAY_ROUTE_MATRIX.md`
+- `docs/AI_ENDPOINT_COMPATIBILITY.md`
+- `docs/CAPABILITY_TAXONOMY_SPEC.md`
+- `docs/2API_REVERSE_PROXY_DEFINITION.md`
+- `packages/openapi/openapi.yaml`
+- Anthropic official Messages Count Tokens API contract
+- `apps/api/internal/httpserver/runtime_gateway_handlers.go`
+- `apps/api/internal/modules/provider_adapters`
+- `apps/api/internal/modules/gateway`
+
+Owns:
+
+- OpenAPI `POST /v1/messages/count_tokens` contract and generated Go/TypeScript SDK drift.
+- Anthropic count_tokens Gateway handler with API key auth, model visibility, entitlement, Scheduler, and Anthropic-style errors.
+- Provider Adapter dispatch to Anthropic `/messages/count_tokens` for API-key and reverse-proxy Anthropic accounts.
+- `token_counting` capability taxonomy usage and Scheduler filtering for Anthropic count_tokens requests.
+- Route matrix / endpoint compatibility docs and focused adapter + HTTP regressions.
+
+Definition of Done:
+
+- `POST /v1/messages/count_tokens` is OpenAPI-described, secured with `gatewayBearerAuth`, and returns Anthropic-shaped `{ "input_tokens": N }`.
+- Requests accept Anthropic Messages-style count body with `model`, `messages`, `system`, `tools`, `tool_choice`, `thinking`, and compatible additional properties.
+- Gateway normalization is only used for policy, entitlement, Scheduler, and evidence; Provider Adapter preserves the Anthropic count_tokens body shape, replaces only `model` with the mapped upstream model, and does not create Gateway-local provider DTOs.
+- Anthropic API-key accounts inject credentials according to Anthropic auth mode.
+- `runtime_class != api_key` Anthropic accounts use Reverse Proxy Runtime with the selected account credentials.
+- Scheduler requires `token_counting.v1`, and models/accounts without that capability are rejected before upstream dispatch.
+- Successful count_tokens requests record Scheduler decision/feedback and request evidence, but generation usage tokens and cost remain 0.
+- No frontend visuals are added.
+
+Required gates:
+
+- `make openapi-lint`
+- `make openapi-bundle`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/httpserver -run 'TestGatewayAnthropicCountTokens' -count=1`
+- `cd apps/api && go test ./internal/modules/gateway/... ./internal/modules/provider_adapters/... ./internal/httpserver`
+- `cd apps/api && go test ./...`
+- `make architecture-check`
+- `make code-quality-check`
+- `make secret-scan`
+- `git diff --check`
+
 ## WP-500+: Ecosystem And Remaining Advanced Surface
 
 Use `ROADMAP.md` Phase 7 through Phase 8 to split future packages for:
 
 - provider-native realtime protocol adapters and richer slot lifecycle
-- Anthropic count_tokens endpoint
 - SDK examples and migration guides
 
 Each new package must be added here before implementation starts.

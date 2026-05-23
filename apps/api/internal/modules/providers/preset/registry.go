@@ -171,6 +171,7 @@ func anthropicCapabilities() map[string]bool {
 	return map[string]bool{
 		capabilitiescontract.KeyMessages:         true,
 		capabilitiescontract.KeyStreaming:        true,
+		capabilitiescontract.KeyTokenCounting:    true,
 		capabilitiescontract.KeyToolCalling:      true,
 		capabilitiescontract.KeyStructuredOutput: true,
 		capabilitiescontract.KeyVisionInput:      true,

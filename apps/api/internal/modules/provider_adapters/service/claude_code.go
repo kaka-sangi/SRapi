@@ -21,7 +21,15 @@ func isClaudeCodeReverseProxy(req contract.TextRequest) bool {
 	return strings.EqualFold(strings.TrimSpace(req.Provider.AdapterType), "reverse-proxy-claude-code-cli")
 }
 
+func isClaudeCodeTokenCountReverseProxy(req contract.TokenCountRequest) bool {
+	return strings.EqualFold(strings.TrimSpace(req.Provider.AdapterType), "reverse-proxy-claude-code-cli")
+}
+
 func claudeCodeReverseProxyRuntimeIsAPIKey(req contract.TextRequest) bool {
+	return strings.EqualFold(strings.TrimSpace(string(req.Account.RuntimeClass)), "api_key")
+}
+
+func claudeCodeTokenCountReverseProxyRuntimeIsAPIKey(req contract.TokenCountRequest) bool {
 	return strings.EqualFold(strings.TrimSpace(string(req.Account.RuntimeClass)), "api_key")
 }
 
@@ -29,6 +37,31 @@ func claudeCodeMessagesEndpoint(baseURL string) string {
 	endpoint := strings.TrimRight(strings.TrimSpace(baseURL), "/")
 	if !strings.HasSuffix(strings.TrimRight(endpoint, "/"), "/messages") {
 		endpoint += "/messages"
+	}
+	parsed, err := url.Parse(endpoint)
+	if err != nil {
+		separator := "?"
+		if strings.Contains(endpoint, "?") {
+			separator = "&"
+		}
+		return endpoint + separator + "beta=true"
+	}
+	query := parsed.Query()
+	if query.Get("beta") == "" {
+		query.Set("beta", "true")
+	}
+	parsed.RawQuery = query.Encode()
+	return parsed.String()
+}
+
+func claudeCodeCountTokensEndpoint(baseURL string) string {
+	endpoint := strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	switch {
+	case strings.HasSuffix(endpoint, "/messages/count_tokens"):
+	case strings.HasSuffix(endpoint, "/messages"):
+		endpoint = strings.TrimSuffix(endpoint, "/messages") + "/messages/count_tokens"
+	default:
+		endpoint += "/messages/count_tokens"
 	}
 	parsed, err := url.Parse(endpoint)
 	if err != nil {
@@ -56,6 +89,9 @@ func claudeCodeMessagesHeaders(req contract.TextRequest) http.Header {
 	} else {
 		beta = mergeCommaList(beta, "claude-code-20250219", "oauth-2025-04-20", "interleaved-thinking-2025-05-14")
 	}
+	if req.SourceEndpoint == "/v1/messages/count_tokens" {
+		beta = mergeCommaList(beta, "token-counting-2024-11-01")
+	}
 	headers.Set("Anthropic-Beta", beta)
 	headers.Set("Anthropic-Version", defaultRequestSetting(req, "2023-06-01", "anthropic_version", "anthropic-version"))
 	headers.Set("X-App", defaultRequestSetting(req, "cli", "x_app", "x-app"))
@@ -78,6 +114,13 @@ func claudeCodeMessagesHeaders(req contract.TextRequest) http.Header {
 	return headers
 }
 
+func claudeCodeTokenCountHeaders(req contract.TokenCountRequest) http.Header {
+	textReq := tokenCountTextRequest(req)
+	textReq.SourceEndpoint = "/v1/messages/count_tokens"
+	textReq.Stream = false
+	return claudeCodeMessagesHeaders(textReq)
+}
+
 func claudeCodeMessagesPayload(req contract.TextRequest, raw []byte) ([]byte, error) {
 	var payload map[string]any
 	if err := json.Unmarshal(raw, &payload); err != nil {
@@ -88,6 +131,23 @@ func claudeCodeMessagesPayload(req contract.TextRequest, raw []byte) ([]byte, er
 	}
 	payload["system"] = claudeCodeSystemBlocks(req, raw, payload["system"])
 	return json.Marshal(payload)
+}
+
+func claudeCodeTokenCountPayload(req contract.TokenCountRequest, raw []byte) ([]byte, error) {
+	return claudeCodeMessagesPayload(tokenCountTextRequest(req), raw)
+}
+
+func tokenCountTextRequest(req contract.TokenCountRequest) contract.TextRequest {
+	return contract.TextRequest{
+		RequestID:      req.RequestID,
+		SourceProtocol: req.SourceProtocol,
+		SourceEndpoint: req.SourceEndpoint,
+		Model:          req.Model,
+		Provider:       req.Provider,
+		Account:        req.Account,
+		Mapping:        req.Mapping,
+		Credential:     req.Credential,
+	}
 }
 
 func claudeCodeSystemBlocks(req contract.TextRequest, raw []byte, original any) []map[string]any {

@@ -1126,6 +1126,56 @@ func TestGeminiCompatibleAdapterCountsTokensUpstream(t *testing.T) {
 	}
 }
 
+func TestAnthropicCompatibleAdapterCountsTokensUpstream(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/messages/count_tokens" {
+			t.Fatalf("unexpected token count upstream path %s", r.URL.Path)
+		}
+		if got := r.Header.Get("x-api-key"); got != "anthropic-secret" {
+			t.Fatalf("unexpected x-api-key %q", got)
+		}
+		if got := r.Header.Get("anthropic-version"); got != "2023-06-01" {
+			t.Fatalf("unexpected anthropic-version %q", got)
+		}
+		var payload struct {
+			Model    string `json:"model"`
+			Messages []struct {
+				Role    string `json:"role"`
+				Content string `json:"content"`
+			} `json:"messages"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode Anthropic count payload: %v", err)
+		}
+		if payload.Model != "claude-upstream" || len(payload.Messages) != 1 || payload.Messages[0].Content != "count anthropic tokens" {
+			t.Fatalf("unexpected Anthropic count payload: %+v", payload)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"input_tokens":17,"cache_creation_input_tokens":1}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeTokenCount(context.Background(), contract.TokenCountRequest{
+		RequestID:  "req_anthropic_count",
+		Model:      "claude-local",
+		RawBody:    []byte(`{"model":"claude-local","messages":[{"role":"user","content":"count anthropic tokens"}]}`),
+		Provider:   providercontract.Provider{AdapterType: "anthropic-compatible", Protocol: "anthropic-compatible"},
+		Account:    accountcontract.ProviderAccount{ID: 2, Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "claude-upstream"},
+		Credential: map[string]any{"api_key": "anthropic-secret"},
+	})
+	if err != nil {
+		t.Fatalf("count Anthropic tokens: %v", err)
+	}
+	if resp.TotalTokens != 17 || resp.Metadata["cache_creation_input_tokens"] == nil {
+		t.Fatalf("unexpected Anthropic count response: %+v", resp)
+	}
+}
+
 func TestGeminiCompatibleAdapterClassifiesGoogleError(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -1241,6 +1291,83 @@ func TestReverseProxyGeminiAdapterCountsTokensThroughRuntime(t *testing.T) {
 	}
 	if runtime.request.Method != http.MethodPost || runtime.request.URL != "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:countTokens" {
 		t.Fatalf("unexpected reverse gemini count request: %+v", runtime.request)
+	}
+	if runtime.request.Account.RuntimeClass != string(accountcontract.RuntimeClassCliClientToken) || runtime.request.Account.Credential["cli_client_token"] != "cli-token" {
+		t.Fatalf("expected selected-account runtime context, got %+v", runtime.request.Account)
+	}
+}
+
+func TestReverseProxyClaudeCodeAdapterCountsTokensThroughRuntime(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body:       []byte(`{"input_tokens":29}`),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeTokenCount(context.Background(), contract.TokenCountRequest{
+		RequestID: "req_reverse_claude_count",
+		Model:     "claude-local",
+		RawBody:   []byte(`{"model":"claude-local","messages":[{"role":"user","content":"hello"}]}`),
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-claude-code-cli",
+			Protocol:    "anthropic-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             12,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("claude_code_cli"),
+			Metadata: map[string]any{
+				"base_url":                 "https://upstream.example/v1",
+				"user_agent":               "Claude-Code/1.0",
+				"claude_code_session_id":   "session-123",
+				"claude_client_request_id": "client-req-123",
+				"claude_code_version":      "2.1.63",
+				"claude_code_build":        "abc123",
+			},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "claude-upstream"},
+		Credential: map[string]any{"cli_client_token": "cli-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke reverse Claude Code token count: %v", err)
+	}
+	if resp.TotalTokens != 29 {
+		t.Fatalf("unexpected Claude Code count response: %+v", resp)
+	}
+	if runtime.request.Method != http.MethodPost || runtime.request.URL != "https://upstream.example/v1/messages/count_tokens?beta=true" {
+		t.Fatalf("unexpected Claude Code count request: %+v", runtime.request)
+	}
+	if headerValue(runtime.request.Headers, "Anthropic-Version") != "2023-06-01" ||
+		!strings.Contains(headerValue(runtime.request.Headers, "Anthropic-Beta"), "claude-code-20250219") ||
+		!strings.Contains(headerValue(runtime.request.Headers, "Anthropic-Beta"), "token-counting-2024-11-01") ||
+		headerValue(runtime.request.Headers, "X-Claude-Code-Session-Id") != "session-123" ||
+		headerValue(runtime.request.Headers, "x-client-request-id") != "client-req-123" ||
+		headerValue(runtime.request.Headers, "Accept") != "application/json" {
+		t.Fatalf("unexpected Claude Code count headers: %+v", runtime.request.Headers)
+	}
+	if runtime.request.Headers.Get("x-api-key") != "" || runtime.request.Headers.Get("Authorization") != "" {
+		t.Fatalf("adapter must leave auth injection to runtime, got %+v", runtime.request.Headers)
+	}
+	var payload struct {
+		System []struct {
+			Text string `json:"text"`
+		} `json:"system"`
+		Model    string `json:"model"`
+		Messages []struct {
+			Content string `json:"content"`
+		} `json:"messages"`
+	}
+	if err := json.Unmarshal(runtime.request.Body, &payload); err != nil {
+		t.Fatalf("decode Claude Code count payload: %v", err)
+	}
+	if payload.Model != "claude-upstream" || len(payload.Messages) != 1 || payload.Messages[0].Content != "hello" || len(payload.System) < 2 ||
+		!strings.HasPrefix(payload.System[0].Text, "x-anthropic-billing-header: cc_version=2.1.63.abc123;") ||
+		payload.System[1].Text != "You are Claude Code, Anthropic's official CLI for Claude." {
+		t.Fatalf("unexpected Claude Code count payload: %+v", payload)
 	}
 	if runtime.request.Account.RuntimeClass != string(accountcontract.RuntimeClassCliClientToken) || runtime.request.Account.Credential["cli_client_token"] != "cli-token" {
 		t.Fatalf("expected selected-account runtime context, got %+v", runtime.request.Account)

@@ -1538,6 +1538,21 @@ export type AnthropicMessagesRequest = {
     [key: string]: unknown;
 };
 
+export type AnthropicCountTokensRequest = {
+    model: string;
+    system?: string | Array<AnthropicContentBlock>;
+    messages: Array<AnthropicMessage>;
+    tools?: Array<JsonObject>;
+    tool_choice?: JsonObject;
+    thinking?: JsonObject;
+    [key: string]: unknown;
+};
+
+export type AnthropicCountTokensResponse = {
+    input_tokens: number;
+    [key: string]: unknown;
+};
+
 export type AnthropicUsage = {
     input_tokens?: number;
     output_tokens?: number;
@@ -4613,6 +4628,51 @@ export type CreateMessageResponses = {
 
 export type CreateMessageResponse = CreateMessageResponses[keyof CreateMessageResponses];
 
+export type CountAnthropicMessageTokensData = {
+    body: AnthropicCountTokensRequest;
+    path?: never;
+    query?: never;
+    url: '/v1/messages/count_tokens';
+};
+
+export type CountAnthropicMessageTokensErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CountAnthropicMessageTokensError = CountAnthropicMessageTokensErrors[keyof CountAnthropicMessageTokensErrors];
+
+export type CountAnthropicMessageTokensResponses = {
+    /**
+     * Anthropic-compatible count_tokens response.
+     */
+    200: AnthropicCountTokensResponse;
+};
+
+export type CountAnthropicMessageTokensResponse = CountAnthropicMessageTokensResponses[keyof CountAnthropicMessageTokensResponses];
+
 export type CreateEmbeddingData = {
     body: EmbeddingRequest;
     path?: never;
@@ -5898,3 +5958,48 @@ export type CreateAnthropicCompatibleMessageAliasResponses = {
 };
 
 export type CreateAnthropicCompatibleMessageAliasResponse = CreateAnthropicCompatibleMessageAliasResponses[keyof CreateAnthropicCompatibleMessageAliasResponses];
+
+export type CountAnthropicCompatibleMessageTokensAliasData = {
+    body: AnthropicCountTokensRequest;
+    path?: never;
+    query?: never;
+    url: '/api/provider/anthropic-compatible/v1/messages/count_tokens';
+};
+
+export type CountAnthropicCompatibleMessageTokensAliasErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CountAnthropicCompatibleMessageTokensAliasError = CountAnthropicCompatibleMessageTokensAliasErrors[keyof CountAnthropicCompatibleMessageTokensAliasErrors];
+
+export type CountAnthropicCompatibleMessageTokensAliasResponses = {
+    /**
+     * Anthropic-compatible count_tokens response.
+     */
+    200: AnthropicCountTokensResponse;
+};
+
+export type CountAnthropicCompatibleMessageTokensAliasResponse = CountAnthropicCompatibleMessageTokensAliasResponses[keyof CountAnthropicCompatibleMessageTokensAliasResponses];

@@ -51,16 +51,18 @@ SRapi 必须优先支持：
 
 ```txt
 POST /v1/messages
+POST /v1/messages/count_tokens
 ```
 
 后续扩展：
 
 ```txt
-POST /v1/messages/count_tokens
 GET  /v1/models
 ```
 
 统一命名为 `anthropic-compatible`，不使用 `claude-compatible`。
+
+WP-560 起，`POST /v1/messages/count_tokens` 接受 Anthropic Messages-style count body，包括 `model`、`messages`、`system`、`tools`、`tool_choice`、`thinking` 和兼容扩展字段。Gateway normalization 只用于 policy / entitlement / Scheduler / evidence，不在 Gateway service 构造 Provider-local DTO；Provider Adapter 保留 Anthropic count_tokens body shape，只把 `model` 替换成调度后 mapping 的 upstream model，再调用选中上游 `/messages/count_tokens`。API-key Anthropic 账号按 Anthropic auth mode 注入凭证；`runtime_class != api_key` 的 Claude Code / Anthropic 反代账号通过 Reverse Proxy Runtime 使用选中账号 OAuth/session/CLI credential，并构造 Claude Code count_tokens official-client path/header/body。成功 count_tokens 请求记录 Scheduler decision/feedback 和 request evidence，但不进入生成用量，usage tokens 与 cost 记 0。
 
 ### 2.3 Gemini-compatible
 

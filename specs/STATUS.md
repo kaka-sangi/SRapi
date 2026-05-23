@@ -62,12 +62,13 @@ last_completed:
 - WP-530: Antigravity project bootstrap now lets `reverse-proxy-antigravity` discovery use selected-account credentials through Reverse Proxy Runtime to call `/v1internal:loadCodeAssist` and, when needed, `/v1internal:onboardUser` before model discovery; preview remains side-effect free and persisted discovery writes resolved project metadata.
 - WP-540: Gemini native models list now exposes `GET /v1beta/models`, authenticates Gateway API keys, filters active SRapi model registry entries by API-key visibility, renders Google-shaped `models.list` responses with pagination and supported generation methods, and does not acquire Scheduler leases or touch Provider Account credentials.
 - WP-550: Gemini native countTokens now exposes `POST /v1beta/models/{model}:countTokens`, advertises `countTokens` in Gemini `models.list` when the SRapi model has `token_counting`, accepts Gemini countTokens body or `generateContentRequest`, schedules only `token_counting` capable Gemini accounts, dispatches upstream `models/{mapped_model}:countTokens` through API-key or Reverse Proxy Runtime credentials, and records Scheduler/request evidence without generation usage or cost.
+- WP-560: Anthropic Messages count_tokens now exposes `POST /v1/messages/count_tokens` plus anthropic-compatible provider alias, accepts Anthropic count_tokens body shape, schedules only `token_counting` capable accounts, dispatches upstream `/messages/count_tokens` with mapped upstream model for API-key accounts, dispatches Claude Code 2api `/messages/count_tokens?beta=true` through Reverse Proxy Runtime with selected OAuth/CLI credentials, and records Scheduler/request evidence without generation usage or cost.
 
 current:
 
 - package: WP-500+
 - status: pending
-- objective: split the next ecosystem or remaining advanced endpoint package from the roadmap after WP-550.
+- objective: split the next ecosystem or remaining advanced endpoint package from the roadmap after WP-560.
 
 next_recommended: WP-500+
 
@@ -78,7 +79,7 @@ last_gates:
 - `make openapi-codegen-check`: pass
 - `make openapi-ts-codegen-check`: pass
 - `make sdk-ts-typecheck`: pass
-- `cd apps/api && go test ./internal/httpserver -run 'TestGatewayGeminiCountTokens' -count=1`: pass
+- `cd apps/api && go test ./internal/httpserver -run 'TestGatewayAnthropicCountTokens' -count=1`: pass
 - `cd apps/api && go test ./internal/modules/gateway/... ./internal/modules/provider_adapters/... ./internal/httpserver`: pass
 - `cd apps/api && go test ./...`: pass
 - `make architecture-check`: pass
@@ -173,7 +174,8 @@ notes:
 - WP-540 added `TestGatewayGeminiListModels` and `TestGatewayGeminiListModelsRejectsInvalidPaginationAndDisabledKey`, proving Gemini models.list shape, API-key visibility filtering, pagination, supported generation method derivation, and Google-style errors.
 - WP-540 intentionally does not schedule Provider Accounts, call upstream Gemini model discovery, create usage records for catalog listing, or add frontend visuals.
 - WP-550 added `TestGeminiCompatibleAdapterCountsTokensUpstream`, `TestReverseProxyGeminiAdapterCountsTokensThroughRuntime`, and `TestGatewayGeminiCountTokensSchedulesGeminiCompatibleUpstream`, proving Gemini countTokens API-key dispatch, selected-account reverse-proxy dispatch, Scheduler capability filtering, Google-shaped response rendering, and zero generation usage/cost evidence. The countTokens service logic is split into ownership-specific `gemini_count_tokens.go` files so `code-quality-check` file-size gates stay meaningful.
-- WP-550 intentionally does not implement Anthropic `/v1/messages/count_tokens`, OpenAI tokenizer estimation, provider-native realtime adapters, SDK examples, or frontend visuals.
+- WP-560 added `TestAnthropicCompatibleAdapterCountsTokensUpstream`, `TestReverseProxyClaudeCodeAdapterCountsTokensThroughRuntime`, `TestGatewayAnthropicCountTokensSchedulesAnthropicCompatibleUpstream`, and `TestGatewayAnthropicCountTokensRequiresProviderScopedCapability`, proving Anthropic count_tokens API-key dispatch, Claude Code 2api Reverse Proxy Runtime dispatch, upstream model mapping inside the preserved count_tokens body shape, Scheduler capability filtering, Anthropic-shaped response rendering, and zero generation usage/cost evidence.
+- WP-560 intentionally does not implement OpenAI tokenizer estimation, provider-native realtime adapters, SDK examples, or frontend visuals.
 
 ## Work Package Ledger
 
@@ -235,4 +237,5 @@ notes:
 | WP-530 | completed | Antigravity project bootstrap for 2api model discovery v1. |
 | WP-540 | completed | Gemini native models list v1. |
 | WP-550 | completed | Gemini native countTokens v1. |
+| WP-560 | completed | Anthropic Messages count_tokens v1 with Claude Code 2api runtime dispatch. |
 | WP-500+ | pending | Remaining ecosystem and advanced endpoint packages. |

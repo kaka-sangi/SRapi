@@ -120,7 +120,7 @@ token_counting
 
 `rerank` 表示 Provider Account 能处理 `/v1/rerank` 兼容端点；`rerank_output` 表示模型/Provider 能产出排序评分。Gateway rerank 请求必须要求 `rerank.v1`，避免 generation-only 或 embedding-only provider 被误选。
 
-`token_counting` 表示 Provider Account 能处理原生 token counting 端点，例如 Gemini `models/{model}:countTokens`。Gateway countTokens 请求必须要求 `token_counting.v1`，避免只具备生成能力但没有计数端点的候选账号被误选；计数结果不代表生成用量。
+`token_counting` 表示 Provider Account 能处理原生 token counting 端点，例如 Gemini `models/{model}:countTokens` 或 Anthropic `/v1/messages/count_tokens`。Gateway countTokens / count_tokens 请求必须要求 `token_counting.v1`，避免只具备生成能力但没有计数端点的候选账号被误选；计数结果不代表生成用量。
 
 ### 4.3 交互能力
 
