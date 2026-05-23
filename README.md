@@ -80,6 +80,7 @@ SRapi/
 | [支付系统规格](docs/PAYMENT_SPEC.md) | 支付渠道、多实例、订单状态机、Webhook、退款和幂等 | 商业化开发必读 |
 | [邀请返利规格](docs/AFFILIATE_REBATE_SPEC.md) | 邀请关系、返利账本、退款补偿、转余额和风控 | 商业化开发必读 |
 | [前端设计系统与视觉规范](docs/FRONTEND_DESIGN_SYSTEM.md) | 控制台视觉、组件、动效和响应式约束 | 前端开发必读 |
+| [产品基调与文案规范](docs/PRODUCT_TONE.md) | 产品定位、中英文语气规则、术语替换表（v0.1.0 起统一基调） | 任何 UI / 文档撰写必读 |
 
 ## 推荐技术方向
 
@@ -155,6 +156,24 @@ make ent-generate
 
 ```bash
 make api-run
+```
+
+启动前端开发服务器：
+
+```bash
+make web-dev
+```
+
+前端质量门（typecheck / lint / 单测 + a11y / build）：
+
+```bash
+make web-check
+```
+
+前端 e2e（Playwright + Chromium + axe-core 全页 a11y）：
+
+```bash
+make web-check-e2e
 ```
 
 启动 PostgreSQL、Redis 和 API：

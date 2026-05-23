@@ -1,39 +1,24 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { 
-  FileCode, 
-  CheckCircle, 
-  XCircle, 
+import React, { useState } from 'react';
+import {
+  FileCode,
+  CheckCircle,
+  XCircle,
   AlertTriangle,
-  Play
+  Play,
 } from 'lucide-react';
 import DashboardLayout from '../../components/DashboardLayout';
-import { apiService } from '../../lib/api';
-import { MockProviderAccount } from '../../lib/mockData';
+import { useProviderAccounts } from '@/hooks/queries';
 import { useLanguage } from '../../context/LanguageContext';
 
 export default function ProviderAccountsPage() {
   const { language, t } = useLanguage();
-  const [accounts, setAccounts] = useState<MockProviderAccount[]>([]);
-  const [loading, setLoading] = useState(true);
+  const accountsQuery = useProviderAccounts();
+  const accounts = accountsQuery.data ?? [];
+  const loading = accountsQuery.isLoading;
   const [testingId, setTestingId] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<{ id: string; success: boolean; latency: number } | null>(null);
-
-  useEffect(() => {
-    async function loadAccounts() {
-      setLoading(true);
-      try {
-        const fetchedAccounts = await apiService.listProviderAccounts();
-        setAccounts(fetchedAccounts);
-      } catch (err) {
-        console.error('Failed to load provider accounts', err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadAccounts();
-  }, []);
 
   const handleTestAccount = async (id: string) => {
     setTestingId(id);
@@ -59,15 +44,15 @@ export default function ProviderAccountsPage() {
     }, 1200);
   };
 
-  // Localized literals
-  const textUpstreamAccounts = language === 'en' ? 'Upstream Provider Accounts' : '上游大模型服务商账户';
-  const textUpstreamDesc = language === 'en' 
-    ? 'Register secure, write-only credentials and proxy endpoints scoped for upstream LLM foundation providers.' 
-    : '配置并注册用于安全调用上游 LLM 基础大模型提供商的只写凭证与代理路由端点。';
-  const textVerifyBtn = language === 'en' ? 'Verify Link' : '校验链路';
-  const textVerifying = language === 'en' ? 'Verifying...' : '正在校验...';
-  const textAdapter = language === 'en' ? 'adapter' : '适配器';
-  const textNone = language === 'en' ? 'None' : '无限制';
+  // SRapi v0.1.0 product tone, see docs/PRODUCT_TONE.md.
+  const textUpstreamAccounts = language === 'en' ? 'Provider accounts' : '上游账号';
+  const textUpstreamDesc = language === 'en'
+    ? 'Connected upstream accounts the scheduler can route to. Credentials stay encrypted and write-only.'
+    : 'SRapi 可调度的上游账号。凭据始终加密且只写存储。';
+  const textVerifyBtn = language === 'en' ? 'Test connection' : '测试连接';
+  const textVerifying = language === 'en' ? 'Testing...' : '测试中...';
+  const textAdapter = language === 'en' ? 'provider' : '服务商';
+  const textNone = language === 'en' ? 'All' : '全部';
 
   return (
     <DashboardLayout allowedRole="admin">
@@ -124,7 +109,11 @@ export default function ProviderAccountsPage() {
                           ? 'border-yellow-500/20 text-yellow-600 bg-yellow-500/5'
                           : 'border-srapi-error/20 text-srapi-error bg-srapi-error/5'
                       }`}>
-                        {acc.status === 'active' ? (language === 'en' ? 'ACTIVE' : '启用') : acc.status === 'limited' ? (language === 'en' ? 'LIMITED' : '流量受限') : (language === 'en' ? 'DISABLED' : '暂停')}
+                        {acc.status === 'active'
+                          ? (language === 'en' ? 'Active' : '启用')
+                          : acc.status === 'limited'
+                          ? (language === 'en' ? 'Rate limited' : '被限速')
+                          : (language === 'en' ? 'Disabled' : '已停用')}
                       </span>
                     </div>
 
@@ -202,7 +191,7 @@ export default function ProviderAccountsPage() {
                         {testResult.success ? (
                           <>
                             <CheckCircle size={12} />
-                            {language === 'en' ? `Verified (${testResult.latency}ms)` : `校验成功 (${testResult.latency}ms)`}
+                            {language === 'en' ? `OK (${testResult.latency}ms)` : `正常 (${testResult.latency}ms)`}
                           </>
                         ) : (
                           <>

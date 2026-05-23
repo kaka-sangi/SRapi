@@ -1,16 +1,15 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { 
-  Settings, 
-  GitBranch, 
-  Activity, 
+import React, { useEffect, useState } from 'react';
+import {
+  Settings,
+  GitBranch,
+  Activity,
   Cpu,
-  Play
+  Play,
 } from 'lucide-react';
 import DashboardLayout from '../../components/DashboardLayout';
-import { apiService } from '../../lib/api';
-import { MockSlo } from '../../lib/mockData';
+import { useOverviewStats, useSlos } from '@/hooks/queries';
 import { useLanguage } from '../../context/LanguageContext';
 
 interface SimStep {
@@ -18,22 +17,15 @@ interface SimStep {
   highlight: boolean;
 }
 
-interface OverviewStats {
-  providers: number;
-  models: number;
-  accounts: number;
-  usage_logs: number;
-  decisions: number;
-}
-
 export default function AdminDashboard() {
   const { language } = useLanguage();
-  
-  const [stats, setStats] = useState<OverviewStats | null>(null);
-  const [slos, setSlos] = useState<MockSlo[]>([]);
-  const [loading, setLoading] = useState(true);
+  const statsQuery = useOverviewStats();
+  const slosQuery = useSlos();
+  const stats = statsQuery.data ?? null;
+  const slos = slosQuery.data ?? [];
+  const loading = statsQuery.isLoading || slosQuery.isLoading;
 
-  // Simulation state
+  // Simulation state stays local — it's a UI-only walkthrough animation.
   const [simModel, setSimModel] = useState('claude-3-7-sonnet');
   const [simStrategy, setSimStrategy] = useState('BAL');
   const [isSimulating, setIsSimulating] = useState(false);
@@ -43,24 +35,6 @@ export default function AdminDashboard() {
   const [typedLines, setTypedLines] = useState<string[]>([]);
   const [currentLineText, setCurrentLineText] = useState('');
   const [showPlaceholder, setShowPlaceholder] = useState(true);
-
-  useEffect(() => {
-    async function loadAdminData() {
-      try {
-        const [fetchedStats, fetchedSlos] = await Promise.all([
-          apiService.getOverviewStats(),
-          apiService.listSlos()
-        ]);
-        setStats(fetchedStats);
-        setSlos(fetchedSlos);
-      } catch (err) {
-        console.error('Failed to fetch admin stats', err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadAdminData();
-  }, []);
 
   // Execution algorithm for streaming dispatcher typewriter
   const runSimulation = () => {
@@ -73,60 +47,61 @@ export default function AdminDashboard() {
 
     const reqId = `req_${Math.random().toString(36).substring(2, 10)}`;
 
+    // SRapi v0.1.0: simulator log lines follow docs/PRODUCT_TONE.md §6.7.
     let steps: SimStep[] = [];
     if (simStrategy === 'BAL') {
       steps = [
-        { text: language === 'en' 
-            ? `[1/5] [INFO] Request classified: ID=${reqId} | Model=${simModel} | Priority=NORMAL` 
-            : `[1/5] [系统] 请求已分类识别: ID=${reqId} | 目标模型=${simModel} | 优先级=普通`, highlight: false },
-        { text: language === 'en' 
-            ? `[2/5] [SCHEDULER] Capability check passed. Allowed groups resolved.` 
-            : `[2/5] [调度器] 租户权限校验通过。映射关联账户组解析完成。`, highlight: false },
-        { text: language === 'en' 
-            ? `[3/5] [EVALUATE] Evaluated 3 potential candidates...` 
-            : `[3/5] [评估核对] 网关已对 3 个潜在候选上游执行健康建模...`, highlight: false },
-        { text: language === 'en' 
-            ? `[4/5] [FILTER] Rejected candidate [openai-pro-02] Reason: COOLDOWN_UNTIL_EXPIRED` 
-            : `[4/5] [熔断过滤] 剔除候选上游 [openai-pro-02] 原因：冷却熔断期 (COOLDOWN) 未结束`, highlight: false },
-        { text: language === 'en' 
-            ? `[5/5] [RESOLVED] Selected: [claude-sonnet-01] | Net Score: 0.94\n  - Health:  1.00 (W: 0.3) -> 0.300\n  - Quota:   0.85 (W: 0.2) -> 0.170\n  - Cache:   0.90 (W: 0.1) -> 0.090 [Affinity Hit]\n  - Sticky:  1.00 (W: 0.1) -> 0.100 [Session Bound]\n  - Cost:    0.92 (W: 0.1) -> 0.092`
-            : `[5/5] [最优仲裁] 选中上游：[claude-sonnet-01] | 净评分：0.94\n  - 健康系数:  1.00 (权重: 0.3) -> 0.300\n  - 配额余量:  0.85 (权重: 0.2) -> 0.170\n  - 缓存亲和:  0.90 (权重: 0.1) -> 0.090 [Affinity 命中]\n  - 粘性连接:  1.00 (权重: 0.1) -> 0.100 [会话绑定]\n  - 价格指数:  0.92 (权重: 0.1) -> 0.092`, highlight: true }
+        { text: language === 'en'
+            ? `[1/5] request    id=${reqId} model=${simModel}`
+            : `[1/5] 请求受理  id=${reqId} 模型=${simModel}`, highlight: false },
+        { text: language === 'en'
+            ? `[2/5] scheduler  capability ok, account groups resolved`
+            : `[2/5] 调度器    能力匹配通过，账号组已解析`, highlight: false },
+        { text: language === 'en'
+            ? `[3/5] candidates 3 accounts to score`
+            : `[3/5] 候选      待评分账号 3 个`, highlight: false },
+        { text: language === 'en'
+            ? `[4/5] excluded   openai-pro-02 cooldown not expired`
+            : `[4/5] 已排除    openai-pro-02仅冷却未结束`, highlight: false },
+        { text: language === 'en'
+            ? `[5/5] selected   claude-sonnet-01  score=0.94\n      - health 1.00 (w 0.3) -> 0.300\n      - quota  0.85 (w 0.2) -> 0.170\n      - cache  0.90 (w 0.1) -> 0.090\n      - sticky 1.00 (w 0.1) -> 0.100\n      - cost   0.92 (w 0.1) -> 0.092`
+            : `[5/5] 已选中    claude-sonnet-01  评分=0.94\n      - 健康 1.00 (权 0.3) -> 0.300\n      - 配额 0.85 (权 0.2) -> 0.170\n      - 缓存 0.90 (权 0.1) -> 0.090\n      - 粘性 1.00 (权 0.1) -> 0.100\n      - 成本 0.92 (权 0.1) -> 0.092`, highlight: true }
       ];
     } else if (simStrategy === 'COST') {
       steps = [
         { text: language === 'en'
-            ? `[1/5] [INFO] Request classified: ID=${reqId} | Model=${simModel} | Priority=LOW_TIER`
-            : `[1/5] [系统] 请求已分类识别: ID=${reqId} | 目标模型=${simModel} | 优先级=低成本`, highlight: false },
+            ? `[1/5] request    id=${reqId} model=${simModel} priority=cost`
+            : `[1/5] 请求受理  id=${reqId} 模型=${simModel} 优先级=低成本`, highlight: false },
         { text: language === 'en'
-            ? `[2/5] [SCHEDULER] Policy filter loaded: COST_SAVER_STRICT.`
-            : `[2/5] [调度器] 过滤策略已载入：严格成本节约优先 (COST_SAVER_STRICT)。`, highlight: false },
+            ? `[2/5] scheduler  policy=cost-saver-strict`
+            : `[2/5] 调度器    策略=严格低成本`, highlight: false },
         { text: language === 'en'
-            ? `[3/5] [EVALUATE] Scanning cost margins for 2 accounts...`
-            : `[3/5] [评估核对] 网关已对 2 个低廉候选上游执行比价建模...`, highlight: false },
+            ? `[3/5] candidates 2 accounts to score`
+            : `[3/5] 候选      待评分账号 2 个`, highlight: false },
         { text: language === 'en'
-            ? `[4/5] [COST] Preferred cheapest channel: third-party-cheap`
-            : `[4/5] [价格过滤] 优选最廉价分发通道：third-party-cheap`, highlight: false },
+            ? `[4/5] cost       cheapest match: third-party-cheap`
+            : `[4/5] 成本      价格最低：third-party-cheap`, highlight: false },
         { text: language === 'en'
-            ? `[5/5] [RESOLVED] Selected: [third-party-cheap] | Net Score: 0.98\n  - Cost:    1.00 (W: 0.3) -> 0.300 [Price Best]\n  - Health:  0.85 (W: 0.15) -> 0.127\n  - Quota:   0.90 (W: 0.2) -> 0.180\n  - Cache:   0.00 (W: 0.15) -> 0.000`
-            : `[5/5] [最优仲裁] 选中上游：[third-party-cheap] | 净评分：0.98\n  - 价格指数:  1.00 (权重: 0.3) -> 0.300 [价格最优]\n  - 健康系数:  0.85 (权重: 0.15) -> 0.127\n  - 配额余量:  0.90 (权重: 0.2) -> 0.180\n  - 缓存亲和:  0.00 (权重: 0.15) -> 0.000`, highlight: true }
+            ? `[5/5] selected   third-party-cheap  score=0.98\n      - cost   1.00 (w 0.3)  -> 0.300\n      - health 0.85 (w 0.15) -> 0.127\n      - quota  0.90 (w 0.2)  -> 0.180\n      - cache  0.00 (w 0.15) -> 0.000`
+            : `[5/5] 已选中    third-party-cheap  评分=0.98\n      - 成本 1.00 (权 0.3)  -> 0.300\n      - 健康 0.85 (权 0.15) -> 0.127\n      - 配额 0.90 (权 0.2)  -> 0.180\n      - 缓存 0.00 (权 0.15) -> 0.000`, highlight: true }
       ];
     } else {
       steps = [
         { text: language === 'en'
-            ? `[1/5] [INFO] Request classified: ID=${reqId} | Model=${simModel} | Priority=HIGH_PRO`
-            : `[1/5] [系统] 请求已分类识别: ID=${reqId} | 目标模型=${simModel} | 优先级=高级尊享`, highlight: false },
+            ? `[1/5] request    id=${reqId} model=${simModel} priority=quality`
+            : `[1/5] 请求受理  id=${reqId} 模型=${simModel} 优先级=高品质`, highlight: false },
         { text: language === 'en'
-            ? `[2/5] [SCHEDULER] Priority lease requested. Hard-sticky lock enabled.`
-            : `[2/5] [调度器] 检测到高品质租约请求。已启用强粘性锁。`, highlight: false },
+            ? `[2/5] scheduler  policy=quality-first, sticky lock on`
+            : `[2/5] 调度器    策略=品质优先，粘性锁已开`, highlight: false },
         { text: language === 'en'
-            ? `[3/5] [EVALUATE] Scanning metrics for 3 active accounts...`
-            : `[3/5] [评估核对] 对 3 个活动上游执行品质与高可用 SLA 比对...`, highlight: false },
+            ? `[3/5] candidates 3 accounts to score`
+            : `[3/5] 候选      待评分账号 3 个`, highlight: false },
         { text: language === 'en'
-            ? `[4/5] [HEALTH] Target account [claude-sonnet-01] verified at 100% success rate.`
-            : `[4/5] [健康检测] 目标账号 [claude-sonnet-01] 通过了 100% 成功率高水位校验。`, highlight: false },
+            ? `[4/5] health     claude-sonnet-01 success_rate=100%`
+            : `[4/5] 健康      claude-sonnet-01 成功率=100%`, highlight: false },
         { text: language === 'en'
-            ? `[5/5] [RESOLVED] Selected: [claude-sonnet-01] | Net Score: 0.97\n  - Health:  1.00 (W: 0.4) -> 0.400 [Flawless Snapshot]\n  - Latency: 0.95 (W: 0.2) -> 0.190\n  - Quota:   0.85 (W: 0.15) -> 0.127\n  - Sticky:  1.00 (W: 0.1) -> 0.100`
-            : `[5/5] [最优仲裁] 选中上游：[claude-sonnet-01] | 净评分：0.97\n  - 健康系数:  1.00 (权重: 0.4) -> 0.400 [SLA 无瑕疵]\n  - 延迟指标:  0.95 (权重: 0.2) -> 0.190\n  - 配额余量:  0.85 (权重: 0.15) -> 0.127\n  - 粘性锁定:  1.00 (权重: 0.1) -> 0.100`, highlight: true }
+            ? `[5/5] selected   claude-sonnet-01  score=0.97\n      - health  1.00 (w 0.4)  -> 0.400\n      - latency 0.95 (w 0.2)  -> 0.190\n      - quota   0.85 (w 0.15) -> 0.127\n      - sticky  1.00 (w 0.1)  -> 0.100`
+            : `[5/5] 已选中    claude-sonnet-01  评分=0.97\n      - 健康 1.00 (权 0.4)  -> 0.400\n      - 延迟 0.95 (权 0.2)  -> 0.190\n      - 配额 0.85 (权 0.15) -> 0.127\n      - 粘性 1.00 (权 0.1)  -> 0.100`, highlight: true }
       ];
     }
 
@@ -173,43 +148,47 @@ export default function AdminDashboard() {
     return () => clearInterval(interval);
   }, [activeStepIdx, simSteps]);
 
-  // Localized texts
-  const textDecrypting = language === 'en' ? 'Decrypting control plane telemetry...' : '正在解密控制平面度量指标...';
-  const textEpochPerformance = language === 'en' ? 'Current Epoch Performance' : '当前周期运行表现';
-  const textAdapterRegistry = language === 'en' ? 'Adapter Registry' : '适配器注册数';
-  const textConnectedPlatforms = language === 'en' ? 'CONNECTED PLATFORMS' : '已连接平台';
-  const textLiveCredentials = language === 'en' ? 'Live Credentials' : '活动服务商凭证数';
-  const textActiveAccountEntries = language === 'en' ? 'ACTIVE ACCOUNT ENTRIES' : '个活动提供商账户';
-  const textSchedulerLeases = language === 'en' ? 'Scheduler Leases' : '调度决策数';
-  const textEvaluationTelemetries = language === 'en' ? 'EVALUATION TELEMETRIES' : '条决策遥测日志';
-  const textGatewayLogs = language === 'en' ? 'Gateway Logs' : '网关流量日志数';
-  const textAuditedTransactionSlots = language === 'en' ? 'AUDITED TRANSACTION SLOTS' : '个已审计交易插槽';
-  
-  const textSloTitle = language === 'en' ? 'Service Level Objective (SLO) Health' : '服务等级目标 (SLO) 健康度';
-  const textComplianceRate = language === 'en' ? 'Compliance rate' : '合规率';
-  const textMinThreshold = language === 'en' ? 'Min Threshold' : '最低目标值';
-  const textScaleCap = language === 'en' ? 'Scale Cap: 100%' : '刻度上限: 100%';
-  
-  const textOperatorCli = language === 'en' ? 'Operator CLI Diagnostic Reference' : '操作员 CLI 诊断参考说明';
-  const textDiagnosticInterface = language === 'en' ? 'Diagnostic Command Interface' : '诊断命令行接口';
-  const textCliDesc = language === 'en' ? 'Execute deep configuration and health audits directly inside the container terminal.' : '直接在容器终端内执行深入的配置与健康审计。';
-  const textCliCmd1 = language === 'en' ? '1. EXPORT UPSTREAM HEALTH CRITERIA' : '1. 导出上游健康检查标准';
-  const textCliCmd2 = language === 'en' ? '2. CONFIGURE ANTHROPIC UPSTREAM ACCOUNT' : '2. 配置上游服务商账户';
-  
-  const textScribeTitle = language === 'en' ? 'Dispatcher Scribe & Simulator' : '智能调度记录仪与模拟器';
-  const textConfigureSim = language === 'en' ? 'Configure Dispatch Simulation' : '配置分发模拟选项';
-  const textSimDesc = language === 'en' ? 'Trigger mock gateway query requests. The monitoring output will trace candidate evaluations and optimal routing decisions in real-time.' : '手动触发网关模拟查询请求，观察日志追溯评分计算与最优路由调度决策。';
-  const textModelScope = language === 'en' ? 'Model Request Scope' : '请求目标大模型范围';
-  const textStrategy = language === 'en' ? 'Scheduler Strategy' : '调度程序优先级算法';
-  
-  const textBal = language === 'en' ? 'Balanced (Weight Latency/Cost)' : '平衡策略 (均衡延迟与成本)';
-  const textCost = language === 'en' ? 'Cost Saver (Strict Price Margin)' : '成本省钱模式 (严格低价优先)';
-  const textQuality = language === 'en' ? 'Quality First (100% SLA Pool)' : '质量第一 (100% SLA 连接池)';
-  const textExecuteDispatch = language === 'en' ? 'Execute Dispatch Pipeline' : '启动路由调度分发';
-  
-  const textTraceLog = language === 'en' ? 'Dispatch Trace Log' : '调度引擎追踪日志';
-  const textLiveEpoch = language === 'en' ? 'Epoch Index: Live' : '当前索引: 实时监控';
-  const textAwaiting = language === 'en' ? 'Awaiting routing instructions...' : '等待注入调度路由决策指令...';
+  // SRapi v0.1.0 product tone, see docs/PRODUCT_TONE.md.
+  const textDecrypting = language === 'en' ? 'Loading...' : '加载中...';
+  const textEpochPerformance = language === 'en' ? 'Live metrics' : '实时指标';
+  const textAdapterRegistry = language === 'en' ? 'Providers' : '服务商';
+  const textConnectedPlatforms = language === 'en' ? 'CONNECTED' : '已接入';
+  const textLiveCredentials = language === 'en' ? 'Provider accounts' : '上游账号';
+  const textActiveAccountEntries = language === 'en' ? 'ACTIVE' : '活动';
+  const textSchedulerLeases = language === 'en' ? 'Scheduler decisions' : '调度决策';
+  const textEvaluationTelemetries = language === 'en' ? 'RECORDED' : '条记录';
+  const textGatewayLogs = language === 'en' ? 'Requests' : '请求';
+  const textAuditedTransactionSlots = language === 'en' ? 'LOGGED' : '条日志';
+
+  const textSloTitle = language === 'en' ? 'SLO health' : 'SLO 健康度';
+  const textComplianceRate = language === 'en' ? 'attainment' : '达成率';
+  const textMinThreshold = language === 'en' ? 'Target' : '目标';
+  const textScaleCap = language === 'en' ? '100% scale' : '100% 刻度';
+
+  const textOperatorCli = language === 'en' ? 'CLI quick reference' : 'CLI 快速参考';
+  const textDiagnosticInterface = language === 'en' ? 'Common admin commands' : '常用管理命令';
+  const textCliDesc = language === 'en'
+    ? 'Run these inside the SRapi container or your local checkout. They never touch credentials.'
+    : '在 SRapi 容器或本地仓库中运行，不会接触凭据。';
+  const textCliCmd1 = language === 'en' ? '1. WHO AM I (CURRENT ADMIN SESSION)' : '1. 查看当前管理者会话';
+  const textCliCmd2 = language === 'en' ? '2. CONFIGURE A NEW PROVIDER ACCOUNT' : '2. 配置一个上游账号';
+
+  const textScribeTitle = language === 'en' ? 'Routing simulator' : '调度模拟器';
+  const textConfigureSim = language === 'en' ? 'Simulator' : '模拟器';
+  const textSimDesc = language === 'en'
+    ? 'Send a mock request and watch the scheduler pick a provider account in real time.'
+    : '发出一个模拟请求，看调度器如何选中上游账号。';
+  const textModelScope = language === 'en' ? 'Model' : '模型';
+  const textStrategy = language === 'en' ? 'Strategy' : '策略';
+
+  const textBal = language === 'en' ? 'Balanced (latency / cost)' : '平衡（延迟 / 成本）';
+  const textCost = language === 'en' ? 'Cost saver (cheapest first)' : '成本优先（低价优先）';
+  const textQuality = language === 'en' ? 'Quality first (best SLA)' : '品质优先（最佳 SLA）';
+  const textExecuteDispatch = language === 'en' ? 'Run simulation' : '运行模拟';
+
+  const textTraceLog = language === 'en' ? 'Trace log' : '调度日志';
+  const textLiveEpoch = language === 'en' ? 'Live' : '实时';
+  const textAwaiting = language === 'en' ? 'Click "Run simulation" to start.' : '点击 "运行模拟" 开始。';
 
   return (
     <DashboardLayout allowedRole="admin">
@@ -298,7 +277,7 @@ export default function AdminDashboard() {
                           ? 'border-green-500/20 text-green-700 dark:text-green-500 bg-green-500/10' 
                           : 'border-srapi-primary/20 text-srapi-primary bg-srapi-primary/5'
                       }`}>
-                        {slo.status === 'healthy' ? (language === 'en' ? 'HEALTHY' : '健康良好') : (language === 'en' ? 'DEGRADED' : '降级预警')}
+                        {slo.status === 'healthy' ? (language === 'en' ? 'HEALTHY' : '健康') : (language === 'en' ? 'AT RISK' : '预警')}
                       </span>
                     </div>
 
@@ -335,14 +314,14 @@ export default function AdminDashboard() {
                   <div className="space-y-1.5">
                     <span className="text-srapi-text-secondary block font-bold tracking-wider">{textCliCmd1}</span>
                     <pre className="p-3 bg-srapi-card-muted border border-srapi-border rounded-xl text-srapi-text-primary overflow-x-auto select-all">
-                      node tools/srapi-admin.mjs whoami --json
+node tools/srapi-admin.mjs whoami --json
                     </pre>
                   </div>
-                  
+
                   <div className="space-y-1.5">
                     <span className="text-srapi-text-secondary block font-bold tracking-wider">{textCliCmd2}</span>
                     <pre className="p-3 bg-srapi-card-muted border border-srapi-border rounded-xl text-srapi-text-primary overflow-x-auto select-all">
-                      node tools/srapi-admin.mjs configure-openai-account --model gpt-4o-mini --upstream-model gpt-4o-mini
+node tools/srapi-admin.mjs configure-openai-account --model gpt-4o-mini --upstream-model gpt-4o-mini
                     </pre>
                   </div>
                 </div>

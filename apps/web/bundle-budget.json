@@ -1,0 +1,17 @@
+{
+  "comment": "SRapi v0.1.0 frontend bundle size budgets. Sizes are in bytes (uncompressed). Brotli/gzip on the wire is much smaller. Run via `node tools/bundle-budget.mjs` after `next build`; web-check.mjs invokes it automatically. Adjust caps only with deliberate review — they are calibrated against the v0.1.0 baseline + room for organic growth.",
+  "groups": {
+    "all-js-chunks": {
+      "description": "Sum of every JS chunk Next.js emits. Catches dependency-bloat regressions across the whole app.",
+      "files": ["chunks/**/*.js"],
+      "metric": "total",
+      "max_bytes": 2200000
+    },
+    "largest-chunk": {
+      "description": "Single largest emitted chunk. Catches accidental imports of huge libs into one route. Adjust only after profiling.",
+      "files": ["chunks/**/*.js"],
+      "metric": "largest",
+      "max_bytes": 500000
+    }
+  }
+}

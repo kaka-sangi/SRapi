@@ -1,37 +1,20 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { ChevronRight, Copy, Check } from 'lucide-react';
 import DashboardLayout from '../../components/DashboardLayout';
-import { apiService } from '../../lib/api';
-import { MockApiKey, MockUsageLog } from '../../lib/mockData';
+import { useApiKeys, useUsageLogs } from '@/hooks/queries';
 import { useLanguage } from '../../context/LanguageContext';
 
 export default function UserDashboard() {
   const { language } = useLanguage();
-  
-  const [keys, setKeys] = useState<MockApiKey[]>([]);
-  const [recentLogs, setRecentLogs] = useState<MockUsageLog[]>([]);
-  const [loading, setLoading] = useState(true);
+  const apiKeysQuery = useApiKeys();
+  const usageQuery = useUsageLogs();
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function loadDashboardData() {
-      try {
-        const [fetchedKeys, fetchedLogs] = await Promise.all([
-          apiService.listApiKeys(),
-          apiService.listUsageLogs()
-        ]);
-        setKeys(fetchedKeys.slice(0, 3));
-        setRecentLogs(fetchedLogs.slice(0, 5));
-      } catch (err) {
-        console.error('Failed to load dashboard logs', err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadDashboardData();
-  }, []);
+  const loading = apiKeysQuery.isLoading || usageQuery.isLoading;
+  const keys = (apiKeysQuery.data ?? []).slice(0, 3);
+  const recentLogs = (usageQuery.data ?? []).slice(0, 5);
 
   const handleCopyPrefix = (prefix: string, id: string) => {
     navigator.clipboard.writeText(prefix);
@@ -39,39 +22,39 @@ export default function UserDashboard() {
     setTimeout(() => setCopiedId(null), 1500);
   };
 
-  const activeKeysCount = keys.filter(k => k.status === 'active').length;
+  const activeKeysCount = keys.filter((k) => k.status === 'active').length;
   const totalCost = recentLogs.reduce((acc, log) => acc + log.cost, 0);
 
-  // Localized literals
-  const textEpochPerformance = language === 'en' ? 'Current Epoch Performance' : '当前周期运行表现';
-  const textAvailableYield = language === 'en' ? 'Available Account Yield' : '可用账户余额';
-  const textUsdCredits = language === 'en' ? 'USD CREDITS' : '美元余额';
-  const textAccountUsage = language === 'en' ? 'Account usage' : '账户已消耗';
-  const textCap = language === 'en' ? 'Cap' : '额度上限';
-  const textActiveChannels = language === 'en' ? 'Active Channels' : '活动代理通道';
-  const textCredentials = language === 'en' ? 'Credentials' : '项认证凭证';
-  const textRoutingStatus = language === 'en' ? 'Routing status:' : '路由分发状态:';
-  const textOperational = language === 'en' ? '● OPERATIONAL' : '● 正在运行';
-  const textEpochCost = language === 'en' ? 'Epoch Cost Accumulation' : '当前周期累计费用';
-  const textRoutedDebits = language === 'en' ? 'Routed Debits' : '路由消耗金额';
-  const textSlaAvailability = language === 'en' ? 'SLA availability:' : 'SLA 可用率:';
-  const textAuthorizedChannels = language === 'en' ? 'Authorized Channels' : '授权分发通道';
-  const textConfigureKeys = language === 'en' ? 'Configure Keys' : '配置通道密钥';
+  // SRapi v0.1.0 product tone, see docs/PRODUCT_TONE.md.
+  const textEpochPerformance = language === 'en' ? 'This period' : '本周期';
+  const textAvailableYield = language === 'en' ? 'Available balance' : '可用余额';
+  const textUsdCredits = language === 'en' ? 'USD' : '美元';
+  const textAccountUsage = language === 'en' ? 'Used' : '已用';
+  const textCap = language === 'en' ? 'Cap' : '上限';
+  const textActiveChannels = language === 'en' ? 'Active API keys' : '启用中的密钥';
+  const textCredentials = language === 'en' ? 'keys' : '个';
+  const textRoutingStatus = language === 'en' ? 'Gateway:' : '网关：';
+  const textOperational = language === 'en' ? '● Online' : '● 在线';
+  const textEpochCost = language === 'en' ? 'Spend this period' : '本周期花费';
+  const textRoutedDebits = language === 'en' ? 'spent' : '已花费';
+  const textSlaAvailability = language === 'en' ? 'Uptime:' : '可用率：';
+  const textAuthorizedChannels = language === 'en' ? 'Your API keys' : '你的 API 密钥';
+  const textConfigureKeys = language === 'en' ? 'Manage keys' : '管理密钥';
   const textActive = language === 'en' ? '● Active' : '● 启用';
-  const textSuspended = language === 'en' ? '■ Suspended' : '■ 禁用';
+  const textSuspended = language === 'en' ? '■ Disabled' : '■ 已停用';
   const textApiKey = language === 'en' ? 'API KEY' : 'API 密钥';
-  const textAllowedModels = language === 'en' ? 'ALLOWED MODELS' : '允许的目标模型';
-  const textCreatedDate = language === 'en' ? 'CREATED DATE' : '创建日期';
-  const textRecentTransactions = language === 'en' ? 'Recent Ingress Transactions' : '近期网关入口交易明细';
-  const textInspectLogs = language === 'en' ? 'Inspect Logs' : '审计流量日志';
-  const textTimestamp = language === 'en' ? 'Timestamp' : '时间戳';
-  const textTransactionId = language === 'en' ? 'Transaction ID' : '交易请求 ID';
-  const textSelectedModel = language === 'en' ? 'Selected Model' : '分发大模型';
-  const textSourcePath = language === 'en' ? 'Source Path' : '来源端点';
-  const textReroutedTokens = language === 'en' ? 'Rerouted Tokens' : '重定向 Token 数';
-  const textYieldCost = language === 'en' ? 'Yield Cost' : '消耗花费';
+  const textAllowedModels = language === 'en' ? 'ALLOWED MODELS' : '可用模型';
+  const textCreatedDate = language === 'en' ? 'CREATED' : '创建时间';
+  const textRecentTransactions = language === 'en' ? 'Recent requests' : '最近的请求';
+  const textInspectLogs = language === 'en' ? 'View all' : '查看全部';
+  const textTimestamp = language === 'en' ? 'Time' : '时间';
+  const textTransactionId = language === 'en' ? 'Request ID' : '请求 ID';
+  const textSelectedModel = language === 'en' ? 'Model' : '模型';
+  const textSourcePath = language === 'en' ? 'Endpoint' : '接入点';
+  const textReroutedTokens = language === 'en' ? 'Tokens' : 'Token';
+  const textYieldCost = language === 'en' ? 'Cost' : '花费';
   const textStatus = language === 'en' ? 'Status' : '状态';
-  const textSynthesizing = language === 'en' ? 'Synthesizing developer metrics...' : '正在合成开发者度量指标数据...';
+  const textSynthesizing = language === 'en' ? 'Loading...' : '加载中...';
 
   return (
     <DashboardLayout allowedRole="user">
@@ -245,7 +228,7 @@ export default function UserDashboard() {
                               ? 'text-green-700 dark:text-green-500 bg-green-500/10 border-green-500/20' 
                               : 'text-srapi-error bg-srapi-error/5 border-srapi-error/20'
                           }`}>
-                            {log.success ? '200 OK' : '500 ERR'}
+                            {log.success ? (language === 'en' ? 'Success' : '成功') : (language === 'en' ? 'Failed' : '失败')}
                           </span>
                         </td>
                       </tr>

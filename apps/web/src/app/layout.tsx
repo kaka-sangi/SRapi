@@ -1,7 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Lora, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import { LanguageProvider } from "../context/LanguageContext";
+import { AppProviders } from "@/providers";
+import { WebVitalsReporter } from "@/components/layout/web-vitals-reporter";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -22,8 +23,25 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SRapi Console — AI Gateway Management Portal",
-  description: "Self-hosted AI API gateway and intelligence routing control panel, styled with Claude + ChatGPT design systems.",
+  title: {
+    default: "SRapi — Self-hosted AI gateway",
+    template: "%s · SRapi",
+  },
+  description:
+    "One endpoint, every provider, your accounts, your control. Route OpenAI, Anthropic, Gemini and CLI / web-session accounts through a single OpenAI-compatible API with built-in scheduling, quotas and audit logs.",
+  applicationName: "SRapi",
+  authors: [{ name: "SRapi" }],
+  formatDetection: { telephone: false, email: false, address: false },
+  robots: { index: false, follow: false },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#F9F6F0" },
+    { media: "(prefers-color-scheme: dark)", color: "#111110" },
+  ],
 };
 
 export default function RootLayout({
@@ -35,11 +53,13 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${inter.variable} ${lora.variable} ${jetbrainsMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col font-sans bg-srapi-bg text-srapi-text-primary transition-colors duration-300">
-        <LanguageProvider>
+        <AppProviders>
+          <WebVitalsReporter />
           {children}
-        </LanguageProvider>
+        </AppProviders>
       </body>
     </html>
   );

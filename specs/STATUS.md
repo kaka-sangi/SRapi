@@ -91,7 +91,7 @@ notes:
 - Existing `docs/` remains the architecture and domain source of truth.
 - Future goal runs must read `specs/README.md` first, then continue from `next_recommended`.
 - Future goal runs must preserve unrelated user worktree changes if present.
-- Frontend visual implementation is intentionally deferred per user instruction.
+- Frontend visual implementation deferral was lifted by WP-160a: tone, component library, data layer, harness, e2e, bundle budget all landed under `apps/web` and `tools/`. `make web-check` is part of `make check`. New tone source: `docs/PRODUCT_TONE.md`. New architecture source: `docs/FRONTEND_ARCHITECTURE.md`. Future frontend goal runs must respect both, plus `docs/FRONTEND_DESIGN_SYSTEM.md`.
 - WP-500 keeps discovery responses credential-free while allowing reverse-proxy Antigravity accounts to use selected credentials upstream.
 - WP-080 added `TestGatewayCompatibilityEndpointsTargetSameOpenAICompatibleUpstream`, which records three upstream `/v1/chat/completions` calls using one OpenAI-compatible account and verifies provider/account usage evidence.
 - `make smoke-gateway` passed against a temporary local API on `127.0.0.1:18080`; the temporary process was stopped after the run.

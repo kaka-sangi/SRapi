@@ -29,6 +29,7 @@ import {
   MockSlo,
   SmokeChecklist
 } from './mockData';
+import { setSessionPresenceCookie, clearSessionPresenceCookie } from './session-cookie';
 
 export interface ApiRuntimeStatus {
   mode: 'live' | 'demo';
@@ -247,6 +248,10 @@ function storeSession(user: MockUser, csrfToken?: string) {
   } else {
     localStorage.removeItem(CSRF_STORAGE_KEY);
   }
+  // Mirror a presence flag into a cookie so `middleware.ts` can do
+  // server-side redirects without a flash of unauthenticated content. The
+  // cookie carries no credentials.
+  setSessionPresenceCookie(user.role);
 }
 
 function clearSession() {
@@ -256,6 +261,7 @@ function clearSession() {
 
   localStorage.removeItem(USER_STORAGE_KEY);
   localStorage.removeItem(CSRF_STORAGE_KEY);
+  clearSessionPresenceCookie();
 }
 
 function isPublicHTTPSURL(url?: string) {

@@ -1,341 +1,375 @@
-'use client';
+"use client";
 
-import React, { useCallback, useState, useEffect } from 'react';
-import { 
-  Key, 
-  Plus, 
-  Copy, 
-  Check, 
-  AlertCircle, 
-  Power, 
-  Sparkles,
-  X
-} from 'lucide-react';
-import DashboardLayout from '../../components/DashboardLayout';
-import { apiService } from '../../lib/api';
-import { MockApiKey } from '../../lib/mockData';
-import { useLanguage } from '../../context/LanguageContext';
+import * as React from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Key, Plus, Copy, Check, AlertCircle, Power, Sparkles } from "lucide-react";
+import DashboardLayout from "@/components/DashboardLayout";
+import { useApiKeys, useCreateApiKey, useToggleApiKey } from "@/hooks/queries";
+import { useLanguage } from "@/context/LanguageContext";
+import {
+  Badge,
+  Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Input,
+  Label,
+  Spinner,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui";
+import { cn } from "@/lib/cn";
+import {
+  createApiKeySchema,
+  parseGroupIdsCsv,
+  type CreateApiKeyValues,
+} from "@/lib/schemas/api-key";
+import type { MockApiKey } from "@/lib/mockData";
+
+const DEFAULT_MODELS: readonly string[] = [
+  "gpt-4o-mini",
+  "claude-3-5-sonnet",
+  "gemini-1.5-pro",
+  "gemini-1.5-flash",
+];
 
 export default function ApiKeysPage() {
   const { language, t } = useLanguage();
-  const [keys, setKeys] = useState<MockApiKey[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-  
-  // Creation Form State
-  const [name, setName] = useState('');
-  const [selectedModels, setSelectedModels] = useState<string[]>(['gpt-4o-mini']);
-  const [groupIds, setGroupIds] = useState('group-01');
-  const [isCreating, setIsCreating] = useState(false);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  
-  // Single-display key result
-  const [generatedKey, setGeneratedKey] = useState<MockApiKey | null>(null);
-  const [copiedPlaintext, setCopiedPlaintext] = useState(false);
+  const apiKeysQuery = useApiKeys();
+  const createMutation = useCreateApiKey();
+  const toggleMutation = useToggleApiKey();
+  const keys = apiKeysQuery.data ?? [];
+  const loading = apiKeysQuery.isLoading;
 
-  const loadKeys = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await apiService.listApiKeys();
-      setKeys(data);
-    } catch (err) {
-      console.error('Failed to load API keys', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const [copiedId, setCopiedId] = React.useState<string | null>(null);
+  const [showCreateModal, setShowCreateModal] = React.useState(false);
+  const [generatedKey, setGeneratedKey] = React.useState<MockApiKey | null>(null);
+  const [copiedPlaintext, setCopiedPlaintext] = React.useState(false);
+  const [groupsCsv, setGroupsCsv] = React.useState("group-01");
 
-  useEffect(() => {
-    queueMicrotask(loadKeys);
-  }, [loadKeys]);
+  const form = useForm<CreateApiKeyValues>({
+    resolver: zodResolver(createApiKeySchema),
+    defaultValues: {
+      name: "",
+      allowedModels: ["gpt-4o-mini"],
+      groupIds: ["group-01"],
+    },
+  });
+  const selectedModels = form.watch("allowedModels");
 
   const handleCopy = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 1500);
+    window.setTimeout(() => setCopiedId(null), 1500);
   };
 
   const handleCopyPlaintext = (text: string) => {
     navigator.clipboard.writeText(text);
     setCopiedPlaintext(true);
-    setTimeout(() => setCopiedPlaintext(false), 1500);
+    window.setTimeout(() => setCopiedPlaintext(false), 1500);
   };
 
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name) return;
-    
-    setIsCreating(true);
-    try {
-      const newKey = await apiService.createApiKey(
-        name,
-        selectedModels,
-        groupIds.split(',').map(g => g.trim()).filter(Boolean)
-      );
-      setGeneratedKey(newKey);
-      setName('');
-      setSelectedModels(['gpt-4o-mini']);
-      setGroupIds('group-01');
-      setShowCreateModal(false);
-      await loadKeys();
-    } catch (err) {
-      console.error('Failed to create key', err);
-    } finally {
-      setIsCreating(false);
-    }
-  };
+  const onSubmit = form.handleSubmit(async (values) => {
+    const newKey = await createMutation.mutateAsync({
+      name: values.name,
+      allowedModels: values.allowedModels,
+      groupIds: values.groupIds,
+    });
+    setGeneratedKey(newKey);
+    form.reset({ name: "", allowedModels: ["gpt-4o-mini"], groupIds: ["group-01"] });
+    setGroupsCsv("group-01");
+    setShowCreateModal(false);
+  });
 
-  const handleToggleStatus = async (id: string, currentStatus: 'active' | 'disabled') => {
-    try {
-      const updated = await apiService.toggleApiKeyStatus(id, currentStatus);
-      if (updated) {
-        setKeys(prev => prev.map(k => k.id === id ? { ...k, status: updated.status } : k));
-      }
-    } catch (err) {
-      console.error('Failed to toggle status', err);
-    }
+  const handleToggleStatus = async (id: string, currentStatus: "active" | "disabled") => {
+    await toggleMutation.mutateAsync({ id, currentStatus });
   };
 
   const handleModelToggle = (model: string) => {
-    setSelectedModels(prev => 
-      prev.includes(model) 
-        ? prev.filter(m => m !== model) 
-        : [...prev, model]
-    );
+    const current = form.getValues("allowedModels");
+    const next = current.includes(model)
+      ? current.filter((m) => m !== model)
+      : [...current, model];
+    form.setValue("allowedModels", next, { shouldValidate: true, shouldDirty: true });
   };
 
-  // Localized string values
-  const textAccessCredentials = language === 'en' ? 'Access Control Credentials' : '访问控制安全凭证';
-  const textAccessDesc = language === 'en' 
-    ? 'Generate secure, scoped tokens to authenticate your client applications with the SRapi scheduling engine.' 
-    : '生成作用域安全令牌，以授权您的客户端应用程序调用 SRapi 自适应调度分发网关。';
-  const textActiveUpper = language === 'en' ? 'ACTIVE' : '启用';
-  const textDisabledUpper = language === 'en' ? 'DISABLED' : '已撤销';
+  // SRapi v0.1.0 product tone, see docs/PRODUCT_TONE.md.
+  const textHeading = language === "en" ? "API keys" : "API 密钥";
+  const textHeadingDesc =
+    language === "en"
+      ? "Issue scoped API keys for your apps. SRapi only stores an HMAC hash, so the secret is shown once at creation."
+      : "为应用颁发带作用域的 API 密钥。SRapi 只保存 HMAC 哈希，明文仅在创建时显示一次。";
+  const textActiveBadge = language === "en" ? "Active" : "启用";
+  const textDisabledBadge = language === "en" ? "Disabled" : "已停用";
+  const placeholderName = language === "en" ? "e.g. production-web" : "例如：production-web";
 
   return (
     <DashboardLayout>
       <div className="space-y-8 animate-bloom">
-        
-        {/* Top Operational Header (rounded-2xl) */}
-        <div className="bg-srapi-card border border-srapi-border rounded-2xl p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-6 tactile-card">
+        {/* Top operational header */}
+        <div className="tactile-card flex flex-col justify-between gap-6 rounded-2xl border border-srapi-border bg-srapi-card p-6 sm:flex-row sm:items-center">
           <div className="space-y-1">
-            <h3 className="font-serif font-medium text-lg tracking-tight">{textAccessCredentials}</h3>
-            <p className="text-xs text-srapi-text-secondary leading-relaxed">{textAccessDesc}</p>
+            <h3 className="font-serif text-lg font-medium tracking-tight">{textHeading}</h3>
+            <p className="text-xs leading-relaxed text-srapi-text-secondary">{textHeadingDesc}</p>
           </div>
-          <button
+          <Button
             onClick={() => {
               setGeneratedKey(null);
               setShowCreateModal(true);
             }}
-            className="px-5 py-3.5 bg-srapi-text-primary text-srapi-bg dark:bg-srapi-text-primary dark:text-srapi-bg hover:bg-transparent hover:text-srapi-text-primary dark:hover:bg-transparent dark:hover:text-srapi-text-primary border border-srapi-text-primary text-xs font-mono tracking-wider uppercase rounded-full transition-all active:scale-[0.96] font-bold flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
+            size="md"
           >
-            <Plus size={14} />
-            {t('generateKey')}
-          </button>
+            <Plus size={14} aria-hidden="true" />
+            {t("generateKey")}
+          </Button>
         </div>
 
-        {/* Secure Plaintext Single-Show Container (rounded-2xl) */}
-        {generatedKey && generatedKey.plaintextKey && (
-          <div className="p-6 border border-srapi-primary/30 bg-srapi-primary/5 rounded-2xl space-y-4 animate-bloom relative">
+        {/* One-time plaintext display */}
+        {generatedKey && generatedKey.plaintextKey ? (
+          <div className="space-y-4 rounded-2xl border border-srapi-primary/30 bg-srapi-primary/5 p-6 animate-bloom">
             <div className="flex items-start gap-3.5">
-              <AlertCircle className="text-srapi-primary mt-0.5 flex-shrink-0" size={18} />
+              <AlertCircle
+                size={18}
+                aria-hidden="true"
+                className="mt-0.5 shrink-0 text-srapi-primary"
+              />
               <div className="space-y-1">
-                <h4 className="text-xs font-extrabold text-srapi-primary font-mono uppercase tracking-wider">{t('secretKeyGenerated')}</h4>
-                <p className="text-xs text-srapi-text-secondary leading-relaxed font-sans">
-                  {t('keyWarning')}
+                <h4 className="font-mono text-xs font-extrabold uppercase tracking-wider text-srapi-primary">
+                  {t("secretKeyGenerated")}
+                </h4>
+                <p className="text-xs leading-relaxed text-srapi-text-secondary">
+                  {t("keyWarning")}
                 </p>
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-              <code className="flex-grow p-3.5 bg-srapi-card border border-srapi-border rounded-xl text-xs font-mono font-bold text-srapi-text-primary overflow-x-auto select-all block">
+            <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+              <code className="block flex-grow select-all overflow-x-auto rounded-xl border border-srapi-border bg-srapi-card p-3.5 font-mono text-xs font-bold text-srapi-text-primary">
                 {generatedKey.plaintextKey}
               </code>
-              <button
+              <Button
+                variant="accent"
                 onClick={() => handleCopyPlaintext(generatedKey.plaintextKey!)}
-                className="px-5 py-3.5 bg-srapi-primary hover:bg-srapi-primary-hover text-white rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 font-mono text-xs font-bold shrink-0"
               >
-                {copiedPlaintext ? <Check size={14} /> : <Copy size={14} />}
-                {copiedPlaintext ? t('copiedClipboard') : t('copyPlaintext')}
-              </button>
+                {copiedPlaintext ? (
+                  <Check size={14} aria-hidden="true" />
+                ) : (
+                  <Copy size={14} aria-hidden="true" />
+                )}
+                {copiedPlaintext ? t("copiedClipboard") : t("copyPlaintext")}
+              </Button>
             </div>
           </div>
-        )}
+        ) : null}
 
-        {/* API Keys Table (rounded-3xl card with tactile feel) */}
-        <div className="bg-srapi-card border border-srapi-border rounded-3xl p-6 space-y-5 tactile-card">
-          <h4 className="font-serif text-lg italic text-srapi-text-primary">{t('activeChannels')}</h4>
+        {/* Keys table */}
+        <div className="tactile-card space-y-5 rounded-3xl border border-srapi-border bg-srapi-card p-6">
+          <h4 className="font-serif text-lg italic text-srapi-text-primary">
+            {t("activeChannels")}
+          </h4>
 
           {loading ? (
-            <div className="py-12 text-center font-mono">
-              <div className="w-6 h-6 border-t-2 border-srapi-primary rounded-full animate-spin mx-auto mb-3"></div>
-              <p className="text-xs text-srapi-text-secondary">{t('queryRegistry')}</p>
+            <div className="py-12 text-center">
+              <Spinner size={24} label={t("queryRegistry")} />
             </div>
           ) : keys.length === 0 ? (
-            <div className="py-16 border border-dashed border-srapi-border rounded-2xl text-center space-y-3.5">
-              <Key className="mx-auto text-srapi-text-secondary opacity-40" size={28} />
-              <p className="text-xs font-bold text-srapi-text-primary font-serif">{t('noKeys')}</p>
-              <p className="text-[10px] text-srapi-text-secondary font-mono">{t('noKeysDesc')}</p>
+            <div className="space-y-3.5 rounded-2xl border border-dashed border-srapi-border py-16 text-center">
+              <Key
+                size={28}
+                aria-hidden="true"
+                className="mx-auto text-srapi-text-secondary opacity-40"
+              />
+              <p className="font-serif text-xs font-bold text-srapi-text-primary">{t("noKeys")}</p>
+              <p className="font-mono text-xs text-srapi-text-secondary">{t("noKeysDesc")}</p>
             </div>
           ) : (
-            <div className="overflow-x-auto scrollbar-none border border-srapi-border rounded-2xl shadow-[0_4px_20px_rgba(25,25,25,0.015)] dark:shadow-none bg-srapi-card">
-              <table className="w-full text-left border-collapse text-xs min-w-[700px]">
-                <thead>
-                  <tr className="bg-srapi-card-muted/65 border-b border-srapi-border font-mono text-srapi-text-secondary text-[10px] uppercase tracking-wider">
-                    <th className="py-4 px-6 font-medium">{t('keyName')}</th>
-                    <th className="py-4 px-6 font-medium">{t('prefix')}</th>
-                    <th className="py-4 px-6 font-medium">{t('allowedModels')}</th>
-                    <th className="py-4 px-6 font-medium">{t('status')}</th>
-                    <th className="py-4 px-6 font-medium">{t('created')}</th>
-                    <th className="py-4 px-6 font-medium text-right">{t('actions')}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-srapi-border font-mono text-[11px]">
-                  {keys.map((k) => (
-                    <tr key={k.id} className="hover:bg-srapi-card-muted/20 transition-colors">
-                      <td className="py-4.5 px-6 whitespace-nowrap font-sans font-bold text-srapi-text-primary">
-                        {k.name}
-                      </td>
-                      <td className="py-4.5 px-6 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <code className="bg-srapi-card-muted px-2 py-0.5 border border-srapi-border rounded text-srapi-text-secondary text-[10px]">
-                            {k.prefix}
-                          </code>
-                          <button
-                            onClick={() => handleCopy(k.prefix, k.id)}
-                            className="p-1 hover:bg-srapi-card-muted rounded border border-transparent hover:border-srapi-border transition-all text-srapi-text-secondary hover:text-srapi-text-primary cursor-pointer"
-                          >
-                            {copiedId === k.id ? <Check size={12} className="text-green-700" /> : <Copy size={12} />}
-                          </button>
-                        </div>
-                      </td>
-                      <td className="py-4.5 px-6">
-                        <div className="flex flex-wrap gap-1 max-w-[240px]">
-                          {k.allowed_models.map(m => (
-                            <span key={m} className="px-1.5 py-0.5 bg-srapi-card-muted border border-srapi-border rounded text-[9px] font-bold text-srapi-text-secondary">
-                              {m}
-                            </span>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="py-4.5 px-6 whitespace-nowrap">
-                        <span className={`text-[10px] font-bold border px-2.5 py-0.5 rounded-full ${
-                          k.status === 'active' 
-                            ? 'border-green-500/20 text-green-700 dark:text-green-500 bg-green-500/10' 
-                            : 'border-srapi-border text-srapi-text-secondary bg-srapi-card-muted'
-                        }`}>
-                          {k.status === 'active' ? textActiveUpper : textDisabledUpper}
-                        </span>
-                      </td>
-                      <td className="py-4.5 px-6 whitespace-nowrap text-srapi-text-secondary">
-                        {new Date(k.created_at).toLocaleDateString()} {new Date(k.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </td>
-                      <td className="py-4.5 px-6 text-right whitespace-nowrap">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t("keyName")}</TableHead>
+                  <TableHead>{t("prefix")}</TableHead>
+                  <TableHead>{t("allowedModels")}</TableHead>
+                  <TableHead>{t("status")}</TableHead>
+                  <TableHead>{t("created")}</TableHead>
+                  <TableHead className="text-right">{t("actions")}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {keys.map((k) => (
+                  <TableRow key={k.id}>
+                    <TableCell className="font-sans font-bold text-srapi-text-primary">
+                      {k.name}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <code className="rounded border border-srapi-border bg-srapi-card-muted px-2 py-0.5 text-xs text-srapi-text-secondary">
+                          {k.prefix}
+                        </code>
                         <button
-                          onClick={() => handleToggleStatus(k.id, k.status)}
-                          className={`px-3 py-1.5 border rounded-lg transition-all cursor-pointer font-sans text-xs font-medium inline-flex items-center justify-center gap-1.5 ${
-                            k.status === 'active'
-                              ? 'border-srapi-error/25 hover:bg-srapi-error/5 text-srapi-error'
-                              : 'border-green-500/20 hover:bg-green-500/5 text-green-700'
-                          }`}
+                          type="button"
+                          onClick={() => handleCopy(k.prefix, k.id)}
+                          aria-label={`Copy prefix for ${k.name}`}
+                          className="rounded border border-transparent p-1 text-srapi-text-secondary transition-all hover:border-srapi-border hover:bg-srapi-card-muted hover:text-srapi-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-srapi-primary"
                         >
-                          <Power size={11} />
-                          {k.status === 'active' ? t('revoke') : t('activate')}
+                          {copiedId === k.id ? (
+                            <Check size={12} aria-hidden="true" className="text-green-700" />
+                          ) : (
+                            <Copy size={12} aria-hidden="true" />
+                          )}
                         </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex max-w-[260px] flex-wrap gap-1">
+                        {k.allowed_models.map((m) => (
+                          <Badge key={m} size="sm">
+                            {m}
+                          </Badge>
+                        ))}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={k.status === "active" ? "success" : "neutral"}>
+                        {k.status === "active" ? textActiveBadge : textDisabledBadge}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-srapi-text-secondary">
+                      {new Date(k.created_at).toLocaleDateString()}{" "}
+                      {new Date(k.created_at).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        size="sm"
+                        variant={k.status === "active" ? "danger" : "outline"}
+                        onClick={() => handleToggleStatus(k.id, k.status)}
+                        disabled={toggleMutation.isPending}
+                      >
+                        <Power size={11} aria-hidden="true" />
+                        {k.status === "active" ? t("revoke") : t("activate")}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </div>
 
-        {/* Creation Dialog Modal (Large soft rounded-3xl with paper background) */}
-        {showCreateModal && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black/45 z-50 p-4 backdrop-blur-sm">
-            <div className="bg-srapi-card border border-srapi-border rounded-3xl p-8 max-w-md w-full paper-grain space-y-6 shadow-2xl relative">
-              <button 
-                onClick={() => setShowCreateModal(false)}
-                className="absolute top-4 right-4 p-1.5 border border-srapi-border hover:bg-srapi-card-muted rounded-full cursor-pointer"
-              >
-                <X size={14} />
-              </button>
+        {/* Create dialog */}
+        <Dialog
+          open={showCreateModal}
+          onOpenChange={(open) => {
+            setShowCreateModal(open);
+            if (!open) form.clearErrors();
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{t("deployTitle")}</DialogTitle>
+              <DialogDescription>{t("deployDesc")}</DialogDescription>
+            </DialogHeader>
 
-              <div className="space-y-1">
-                <h4 className="font-serif font-medium text-lg tracking-tight text-srapi-text-primary">{t('deployTitle')}</h4>
-                <p className="text-xs text-srapi-text-secondary font-sans leading-relaxed">{t('deployDesc')}</p>
+            <form onSubmit={onSubmit} className="space-y-5">
+              <div className="space-y-1.5">
+                <Label htmlFor="api-key-name">{t("keyNickname")}</Label>
+                <Input
+                  id="api-key-name"
+                  placeholder={placeholderName}
+                  aria-invalid={!!form.formState.errors.name}
+                  aria-describedby={
+                    form.formState.errors.name ? "api-key-name-error" : undefined
+                  }
+                  {...form.register("name")}
+                />
+                {form.formState.errors.name ? (
+                  <p
+                    id="api-key-name-error"
+                    role="alert"
+                    className="text-xs text-srapi-error"
+                  >
+                    {form.formState.errors.name.message}
+                  </p>
+                ) : null}
               </div>
 
-              <form onSubmit={handleCreate} className="space-y-5">
-                <div className="space-y-1.5 text-xs">
-                  <label className="font-mono uppercase text-[9px] font-bold text-srapi-text-secondary">{t('keyNickname')}</label>
-                  <input
-                    type="text"
-                    required
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. Production Ingress Gateway"
-                    className="w-full px-3.5 py-3 border border-srapi-border bg-srapi-bg text-srapi-text-primary rounded-xl text-xs outline-none focus:border-srapi-primary font-sans"
-                  />
+              <div className="space-y-2">
+                <Label>{t("allowedTargetModels")}</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {DEFAULT_MODELS.map((m) => {
+                    const isSelected = selectedModels.includes(m);
+                    return (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => handleModelToggle(m)}
+                        aria-pressed={isSelected}
+                        className={cn(
+                          "flex items-center justify-between rounded-lg border p-2.5 font-mono text-xs transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-srapi-primary",
+                          isSelected
+                            ? "border-srapi-primary bg-srapi-primary/5 font-bold text-srapi-primary"
+                            : "border-srapi-border bg-srapi-bg text-srapi-text-secondary hover:bg-srapi-card-muted",
+                        )}
+                      >
+                        {m}
+                        {isSelected ? <Sparkles size={10} aria-hidden="true" /> : null}
+                      </button>
+                    );
+                  })}
                 </div>
+                {form.formState.errors.allowedModels ? (
+                  <p role="alert" className="text-xs text-srapi-error">
+                    {form.formState.errors.allowedModels.message}
+                  </p>
+                ) : null}
+              </div>
 
-                <div className="space-y-2 text-xs">
-                  <label className="font-mono uppercase text-[9px] font-bold text-srapi-text-secondary">{t('allowedTargetModels')}</label>
-                  <div className="grid grid-cols-2 gap-2 mt-1">
-                    {['gpt-4o-mini', 'claude-3-5-sonnet', 'gemini-1.5-pro', 'gemini-1.5-flash'].map(m => {
-                      const isSelected = selectedModels.includes(m);
-                      return (
-                        <button
-                          type="button"
-                          key={m}
-                          onClick={() => handleModelToggle(m)}
-                          className={`p-2.5 border text-left font-mono rounded-lg transition-all text-[10px] flex items-center justify-between cursor-pointer ${
-                            isSelected 
-                              ? 'border-srapi-primary bg-srapi-primary/5 text-srapi-primary font-bold' 
-                              : 'border-srapi-border bg-srapi-bg text-srapi-text-secondary'
-                          }`}
-                        >
-                          {m}
-                          {isSelected && <Sparkles size={10} />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="api-key-groups">{t("scopeGroupsCsv")}</Label>
+                <Input
+                  id="api-key-groups"
+                  placeholder="group-01, group-02"
+                  value={groupsCsv}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setGroupsCsv(next);
+                    form.setValue("groupIds", parseGroupIdsCsv(next), {
+                      shouldValidate: true,
+                    });
+                  }}
+                />
+                {form.formState.errors.groupIds ? (
+                  <p role="alert" className="text-xs text-srapi-error">
+                    {form.formState.errors.groupIds.message}
+                  </p>
+                ) : null}
+              </div>
 
-                <div className="space-y-1.5 text-xs">
-                  <label className="font-mono uppercase text-[9px] font-bold text-srapi-text-secondary">{t('scopeGroupsCsv')}</label>
-                  <input
-                    type="text"
-                    value={groupIds}
-                    onChange={(e) => setGroupIds(e.target.value)}
-                    placeholder="group-01, group-02"
-                    className="w-full px-3.5 py-3 border border-srapi-border bg-srapi-bg text-srapi-text-primary rounded-xl text-xs outline-none focus:border-srapi-primary font-mono"
-                  />
-                </div>
-
-                <div className="flex gap-4 pt-3 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setShowCreateModal(false)}
-                    className="flex-1 py-3.5 border border-srapi-border bg-srapi-card-muted hover:bg-srapi-card-muted/80 rounded-full text-xs font-bold font-mono active:scale-[0.97] cursor-pointer"
-                  >
-                    {t('cancel')}
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isCreating}
-                    className="flex-1 py-3.5 bg-srapi-text-primary text-srapi-bg dark:bg-srapi-text-primary dark:text-srapi-bg hover:bg-neutral-800 rounded-full text-xs font-bold font-mono active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    {isCreating ? t('deploying') : t('deployChannel')}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setShowCreateModal(false)}
+                >
+                  {t("cancel")}
+                </Button>
+                <Button type="submit" disabled={createMutation.isPending}>
+                  {createMutation.isPending ? t("deploying") : t("deployChannel")}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );

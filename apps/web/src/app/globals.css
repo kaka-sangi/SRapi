@@ -1,6 +1,18 @@
 @import "tailwindcss";
 
+/*
+ * SRapi v0.1.0 design tokens.
+ *
+ * Theme tokens are exposed as CSS variables and surfaced through Tailwind
+ * via the @theme block. Page code should never hardcode hex values, font
+ * stacks, or one-off pixel sizes — pull from the tokens here.
+ *
+ * Typography scale floor is `--text-xs` (12px). The legacy 9–10px sizes
+ * present in the v0.1.0 frontend predate WCAG-AA discipline and are being
+ * migrated. Add new copy at >= 12px.
+ */
 @theme {
+  /* Color tokens (resolved per .light/.dark via CSS variables below) */
   --color-srapi-bg: var(--srapi-bg);
   --color-srapi-card: var(--srapi-card);
   --color-srapi-card-muted: var(--srapi-card-muted);
@@ -11,10 +23,33 @@
   --color-srapi-primary-hover: var(--srapi-primary-hover);
   --color-srapi-success: var(--srapi-success);
   --color-srapi-error: var(--srapi-error);
-  
+
+  /* Font families */
   --font-serif: var(--font-lora), Georgia, serif;
   --font-sans: var(--font-inter), sans-serif;
   --font-mono: var(--font-jetbrains-mono), monospace;
+
+  /* Typography scale (12 / 13 / 14 / 16 / 18 / 24 / 30 / 36px) */
+  --text-2xs: 0.6875rem; /* 11px — reserved for 'caps' labels only */
+  --text-xs: 0.75rem;    /* 12px — body floor for non-decorative text */
+  --text-sm: 0.8125rem;  /* 13px */
+  --text-base: 0.875rem; /* 14px */
+  --text-md: 1rem;       /* 16px */
+  --text-lg: 1.125rem;   /* 18px */
+  --text-xl: 1.5rem;     /* 24px */
+  --text-2xl: 1.875rem;  /* 30px */
+  --text-3xl: 2.25rem;   /* 36px */
+
+  /* Radius scale */
+  --radius-xs: 0.25rem;
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+  --radius-pill: 9999px;
+
+  /* Motion */
+  --ease-bloom: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 :root {
@@ -143,6 +178,36 @@ body {
 .animate-bloom {
   opacity: 0;
   animation: editorialBloom 700ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Stagger delay helpers: keep CSS-driven so first paint never sticks at
+ * opacity:0 if JS is slow or fails. The `animate-bloom-soft` variant is a
+ * shorter, lower-displacement bloom for the auth form card. */
+.animate-bloom.delay-100 { animation-delay: 80ms; }
+.animate-bloom.delay-200 { animation-delay: 160ms; }
+.animate-bloom.delay-300 { animation-delay: 240ms; }
+
+@keyframes editorialBloomSoft {
+  from { opacity: 0; transform: scale(0.985); }
+  to { opacity: 1; transform: scale(1); }
+}
+.animate-bloom-soft {
+  opacity: 0;
+  animation: editorialBloomSoft 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Respect user preference: skip the bloom entirely so motion-sensitive
+ * users see content instantly. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-bloom,
+  .animate-bloom-soft,
+  .animate-bloom.delay-100,
+  .animate-bloom.delay-200,
+  .animate-bloom.delay-300 {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
 }
 
 /* Custom Scrollbar for side-scrolling tables on mobile */

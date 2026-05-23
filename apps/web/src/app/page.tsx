@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
 import { Shield, Key, ArrowRight } from 'lucide-react';
 import { apiService, ApiRuntimeStatus } from '../lib/api';
 import { useLanguage } from '../context/LanguageContext';
@@ -114,7 +113,7 @@ export default function Home() {
             SRapi.
           </a>
           <span className="text-[10px] font-mono tracking-wider uppercase text-srapi-text-secondary px-2 py-0.5 border border-srapi-border rounded-full">
-            v0.1 Core Studio
+            v0.1.0
           </span>
           <span className={`text-[10px] font-mono tracking-wider uppercase px-2 py-0.5 border rounded-full ${
             isDemoRuntime
@@ -125,79 +124,66 @@ export default function Home() {
           </span>
         </div>
 
-        {/* Pitch content */}
+        {/* Pitch content. CSS-driven bloom keeps first paint visible even
+            if JS is slow or fails. */}
         <div className="my-auto py-16 md:py-0 space-y-8 max-w-lg">
-          <motion.div
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="space-y-4"
-          >
+          <div className="space-y-4 animate-bloom">
             <div className="text-[10px] font-mono tracking-widest uppercase text-srapi-primary font-bold">
-              SPECIFICATION PORTAL
+              {language === 'en' ? 'SELF-HOSTED AI GATEWAY' : '自托管 AI 网关'}
             </div>
             <h2 className="font-serif text-3xl md:text-5xl font-normal text-srapi-text-primary leading-[1.15] tracking-tight">
-              {language === 'en' ? 'Adaptive dispatch, built for the resilient API gateway.' : '自适应调度分发，为高韧性 API 网关而生。'}
+              {language === 'en'
+                ? 'One endpoint, every provider, your accounts, your control.'
+                : '一个入口，接入所有服务商，账号自管，调度可控。'}
             </h2>
-          </motion.div>
-          
-          <motion.p 
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.15 }}
-            className="text-xs md:text-sm text-srapi-text-secondary leading-relaxed font-sans"
-          >
-            {language === 'en' 
-              ? 'SRapi balances real-time client traffic demand with active upstream model quotas. Designed as an academic, low-latency LLM router, the kernel scores individual accounts based on dynamic SLA health, queue weights, and cost indices.' 
-              : 'SRapi 能够完美平衡实时客户端流量需求与活动上游大模型配额。作为一个学术化、低延迟的 LLM 路由器，内核基于动态 SLA 健康度、队列权重和成本指数为各个账户进行动态评分。'}
-          </motion.p>
+          </div>
 
-          {/* Quick specs grid */}
-          <motion.div 
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.3 }}
-            className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2"
-          >
+          <p className="text-xs md:text-sm text-srapi-text-secondary leading-relaxed font-sans animate-bloom delay-100">
+            {language === 'en'
+              ? 'SRapi routes OpenAI, Anthropic, Gemini and CLI / web-session accounts through one OpenAI-compatible endpoint. Bring your own provider accounts, set quotas and rate limits, and the built-in scheduler picks the best account for every request.'
+              : 'SRapi 把 OpenAI、Anthropic、Gemini 以及 CLI / 反代账号统一在一个 OpenAI 兼容的接口之后。你接入自己的上游账号，设置配额与限速，内置调度器为每一笔请求挑选最合适的账号。'}
+          </p>
+
+          {/* Highlights */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2 animate-bloom delay-200">
             <div className="p-5 border border-srapi-border bg-srapi-card rounded-2xl tactile-card space-y-2">
-              <Shield size={16} className="text-srapi-primary" />
+              <Shield size={16} className="text-srapi-primary" aria-hidden="true" />
               <div className="text-xs font-bold text-srapi-text-primary font-serif">
-                {language === 'en' ? 'Zero-Trust Mappings' : '零信任映射规程'}
+                {language === 'en' ? 'Your accounts stay yours' : '账号始终在你手里'}
               </div>
               <div className="text-[10px] text-srapi-text-secondary font-mono leading-relaxed">
-                {language === 'en' 
-                  ? 'Secure credentials vault with write-only authentication tokens and cookie hygiene.' 
-                  : '安全的凭证保险库，配备只写认证令牌与严格的 Cookie 安全保护。'}
+                {language === 'en'
+                  ? 'Self-hosted. Provider credentials are encrypted at rest and never returned by the admin API.'
+                  : '自托管部署。上游凭据落库前加密，管理 API 永不回显明文。'}
               </div>
             </div>
-            
+
             <div className="p-5 border border-srapi-border bg-srapi-card rounded-2xl tactile-card space-y-2">
-              <Key size={16} className="text-srapi-primary" />
+              <Key size={16} className="text-srapi-primary" aria-hidden="true" />
               <div className="text-xs font-bold text-srapi-text-primary font-serif">
-                {language === 'en' ? 'Optimal Routing Core' : '最优调度内核'}
+                {language === 'en' ? 'Smart, transparent routing' : '调度可解释、可观测'}
               </div>
               <div className="text-[10px] text-srapi-text-secondary font-mono leading-relaxed">
-                {language === 'en' 
-                  ? 'Real-time candidate weighting filters. Prevent upstreams from hitting concurrency rate-limits.' 
-                  : '实时候选者权重过滤机制，防止上游连接触发并发速率限制阀值。'}
+                {language === 'en'
+                  ? 'The scheduler weighs health, quota, cost and session affinity, and shows you exactly why each account was picked.'
+                  : '调度器同时考虑健康度、配额、成本与会话亲和，并清晰呈现每一次为什么选中这个上游。'}
               </div>
             </div>
-          </motion.div>
+          </div>
         </div>
 
         {/* Footer */}
         <div className="text-[10px] font-mono text-srapi-text-secondary">
-          © 2026 SRapi dispatch team. Academic Self-hosted Console.
+          {language === 'en'
+            ? '© 2026 SRapi · Self-hosted AI gateway · v0.1.0'
+            : '© 2026 SRapi · 自托管 AI 网关 · v0.1.0'}
         </div>
       </div>
 
       {/* Right Column: Physical Login Credentials Sheet */}
       <div className="flex-1 flex items-center justify-center p-6 md:p-16">
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.98 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.4 }}
-          className="w-full max-w-md bg-srapi-card border border-srapi-border rounded-3xl p-8 md:p-10 space-y-8 shadow-[0_8px_30px_rgba(25,25,25,0.015)] dark:shadow-none tactile-card"
+        <div
+          className="w-full max-w-md bg-srapi-card border border-srapi-border rounded-3xl p-8 md:p-10 space-y-8 shadow-[0_8px_30px_rgba(25,25,25,0.015)] dark:shadow-none tactile-card animate-bloom-soft"
         >
           <div className="space-y-2">
             <h3 className="font-serif font-normal text-2xl tracking-tight text-srapi-text-primary">{t('verifyOperator')}</h3>
@@ -234,8 +220,10 @@ export default function Home() {
               </label>
               <input
                 id="password"
+                name="password"
                 type="password"
                 required
+                autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••••••"
@@ -276,7 +264,7 @@ export default function Home() {
               </button>
             </div>
           </div>
-        </motion.div>
+        </div>
       </div>
 
     </div>

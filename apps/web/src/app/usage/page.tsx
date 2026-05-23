@@ -1,45 +1,31 @@
 'use client';
 
-import React, { useMemo, useState, useEffect } from 'react';
-import { 
-  Activity, 
-  Search, 
-  Filter, 
-  TrendingUp, 
-  TrendingDown, 
+import React, { useMemo, useState } from 'react';
+import {
+  Activity,
+  Search,
+  Filter,
+  TrendingUp,
+  TrendingDown,
   AlertTriangle,
-  Calculator
+  Calculator,
 } from 'lucide-react';
 import DashboardLayout from '../../components/DashboardLayout';
 import { apiService } from '../../lib/api';
-import { MockUsageLog } from '../../lib/mockData';
+import { useUsageLogs } from '@/hooks/queries';
 import { useLanguage } from '../../context/LanguageContext';
 
 export default function UsagePage() {
   const { language, t } = useLanguage();
-  const [logs, setLogs] = useState<MockUsageLog[]>([]);
-  const [loading, setLoading] = useState(true);
+  const logsQuery = useUsageLogs();
+  const logs = useMemo(() => logsQuery.data ?? [], [logsQuery.data]);
+  const loading = logsQuery.isLoading;
   const [user] = useState(() => apiService.getCurrentUser());
 
   // Filters State
   const [selectedModel, setSelectedModel] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
-
-  useEffect(() => {
-    async function loadLogs() {
-      setLoading(true);
-      try {
-        const fetchedLogs = await apiService.listUsageLogs();
-        setLogs(fetchedLogs);
-      } catch (err) {
-        console.error('Failed to load usage logs', err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadLogs();
-  }, []);
 
   const filteredLogs = useMemo(() => {
     let result = logs;
@@ -75,8 +61,8 @@ export default function UsagePage() {
   const totalTokens = filteredLogs.reduce((acc, log) => acc + log.total_tokens, 0);
   const totalCost = filteredLogs.reduce((acc, log) => acc + log.cost, 0);
 
-  // Localized values
-  const textSuccessRateUpper = language === 'en' ? 'SUCCESS RATE' : '请求成功率';
+  // SRapi v0.1.0 product tone, see docs/PRODUCT_TONE.md.
+  const textSuccessRateUpper = language === 'en' ? 'SUCCESS RATE' : '成功率';
 
   return (
     <DashboardLayout>
@@ -250,7 +236,7 @@ export default function UsagePage() {
                             ? 'border-green-500/20 text-green-700 dark:text-green-500 bg-green-500/10' 
                             : 'border-srapi-error/20 text-srapi-error bg-srapi-error/5'
                         }`}>
-                          {log.success ? '200 OK' : '500 ERROR'}
+                          {log.success ? (language === 'en' ? 'Success' : '成功') : (language === 'en' ? 'Failed' : '失败')}
                         </span>
                       </td>
                       <td className="py-4.5 px-6 text-right whitespace-nowrap font-medium text-srapi-text-primary">

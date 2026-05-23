@@ -1,5 +1,7 @@
 # SRapi 前端设计系统与视觉工程规范
 
+> 本文件只规定**视觉**。文案语气与中英文术语表统一在 [`docs/PRODUCT_TONE.md`](./PRODUCT_TONE.md)。任何 UI 改动同时遵守这两份规范。
+
 ## 1. 设计哲学 (Academic Editorial & Cards)
 
 SRapi 的视觉风格定义为 **“学术期刊/社论感 (Anthropic Claude)” 与 “结构化沉浸式流 (ChatGPT)” 的融合**。它不是一个充斥着渐变蓝色、荧光发光、或炫目呼吸灯的流水线 AI 模板网站，而是一个充满墨香、高可读性、带有浓厚“学院派 (Calm & Intellectual)”质感的技术控制台。

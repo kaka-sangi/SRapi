@@ -12,7 +12,7 @@ ENT ?= go run entgo.io/ent/cmd/ent@v0.14.6
 EXAMPLES_CHECK ?= node tools/examples-check.mjs
 API_DIR ?= apps/api
 
-.PHONY: help bootstrap-env openapi-lint openapi-bundle openapi-codegen openapi-codegen-check openapi-ts-codegen openapi-ts-codegen-check sdk-ts-typecheck ent-generate ent-generate-check migration-check api-test api-run dev-up dev-down dev-logs smoke-health smoke-gateway smoke-release backup-postgres restore-postgres examples-check secret-scan architecture-check code-quality-check diff-check check
+.PHONY: help bootstrap-env openapi-lint openapi-bundle openapi-codegen openapi-codegen-check openapi-ts-codegen openapi-ts-codegen-check sdk-ts-typecheck ent-generate ent-generate-check migration-check api-test api-run dev-up dev-down dev-logs smoke-health smoke-gateway smoke-release backup-postgres restore-postgres examples-check secret-scan architecture-check code-quality-check diff-check web-install web-check web-check-e2e web-dev check
 
 help:
 	@printf '%s\n' \
@@ -42,6 +42,10 @@ help:
 		'  make code-quality-check  Run repository code-quality harness tests' \
 		'  make diff-check     Check staged and unstaged diff whitespace' \
 		'  make secret-scan     Scan source files for committed secrets' \
+		'  make web-install    Install apps/web npm dependencies' \
+		'  make web-check      Run frontend typecheck, lint, unit tests, build, bundle budget' \
+		'  make web-check-e2e  Run frontend Playwright e2e harness' \
+		'  make web-dev        Start the frontend dev server (next dev)' \
 		'  make check           Run current contract and API checks'
 
 bootstrap-env:
@@ -159,4 +163,16 @@ secret-scan:
 examples-check:
 	$(EXAMPLES_CHECK)
 
-check: diff-check openapi-lint openapi-bundle openapi-codegen-check openapi-ts-codegen-check sdk-ts-typecheck ent-generate-check migration-check architecture-check code-quality-check examples-check api-test secret-scan
+web-install:
+	cd apps/web && npm install --no-fund --no-audit
+
+web-check:
+	node tools/web-check.mjs
+
+web-check-e2e:
+	node tools/web-check-e2e.mjs
+
+web-dev:
+	cd apps/web && npm run dev
+
+check: diff-check openapi-lint openapi-bundle openapi-codegen-check openapi-ts-codegen-check sdk-ts-typecheck ent-generate-check migration-check architecture-check code-quality-check examples-check api-test secret-scan web-check

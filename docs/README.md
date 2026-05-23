@@ -57,6 +57,8 @@
 | 文档 | 作用 |
 | --- | --- |
 | `FRONTEND_DESIGN_SYSTEM.md` | 控制台视觉、组件、动效和响应式约束。 |
+| `FRONTEND_ARCHITECTURE.md` | apps/web 工程结构、模块边界、数据流、鉴权链路、质量门、性能预算。 |
+| `PRODUCT_TONE.md` | 产品定位、中英文语气规则、术语替换表（v0.1.0 起统一基调）。 |
 
 ## 7. Codex 执行规格
 
@@ -84,3 +86,4 @@
 - 改返利必须同步 `AFFILIATE_REBATE_SPEC.md`。
 - 改可观测、告警、运维后台必须同步 `OBSERVABILITY_SPEC.md`。
 - 改架构要求、启动 harness 和门禁映射必须同步 `ARCHITECTURE_REQUIREMENTS.md`。
+- 新增任何用户可见文案（控制台、错误信息、营销页）必须先核对 `PRODUCT_TONE.md` 的中英文术语表与语气规则。
