@@ -12,7 +12,7 @@ ENT ?= go run entgo.io/ent/cmd/ent@v0.14.6
 EXAMPLES_CHECK ?= node tools/examples-check.mjs
 API_DIR ?= apps/api
 
-.PHONY: help bootstrap-env openapi-lint openapi-bundle openapi-codegen openapi-codegen-check openapi-ts-codegen openapi-ts-codegen-check sdk-ts-typecheck ent-generate ent-generate-check migration-check api-test api-run dev-up dev-down dev-logs smoke-health smoke-gateway smoke-release backup-postgres restore-postgres examples-check secret-scan architecture-check code-quality-check check
+.PHONY: help bootstrap-env openapi-lint openapi-bundle openapi-codegen openapi-codegen-check openapi-ts-codegen openapi-ts-codegen-check sdk-ts-typecheck ent-generate ent-generate-check migration-check api-test api-run dev-up dev-down dev-logs smoke-health smoke-gateway smoke-release backup-postgres restore-postgres examples-check secret-scan architecture-check code-quality-check diff-check check
 
 help:
 	@printf '%s\n' \
@@ -39,7 +39,8 @@ help:
 		'  make restore-postgres BACKUP_FILE=...  Restore a PostgreSQL custom-format backup' \
 		'  make examples-check  Validate public examples and 2api migration guide' \
 		'  make architecture-check  Run architecture and startup harness tests' \
-		'  make code-quality-check  Run gofmt, go vet, and size harness tests' \
+		'  make code-quality-check  Run repository code-quality harness tests' \
+		'  make diff-check     Check staged and unstaged diff whitespace' \
 		'  make secret-scan     Scan source files for committed secrets' \
 		'  make check           Run current contract and API checks'
 
@@ -103,6 +104,9 @@ architecture-check:
 code-quality-check:
 	cd $(API_DIR) && go test ./internal/codequality
 
+diff-check:
+	git diff --check
+
 dev-up: bootstrap-env
 	@test -n "$(COMPOSE)" || (echo 'Docker Compose is required: install the docker compose plugin or docker-compose.' >&2; exit 127)
 	$(COMPOSE) --env-file .env -f deploy/docker-compose.yml up --build
@@ -155,4 +159,4 @@ secret-scan:
 examples-check:
 	$(EXAMPLES_CHECK)
 
-check: openapi-lint openapi-bundle openapi-codegen-check openapi-ts-codegen-check sdk-ts-typecheck ent-generate-check migration-check code-quality-check examples-check api-test secret-scan
+check: diff-check openapi-lint openapi-bundle openapi-codegen-check openapi-ts-codegen-check sdk-ts-typecheck ent-generate-check migration-check architecture-check code-quality-check examples-check api-test secret-scan

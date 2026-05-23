@@ -135,7 +135,7 @@ span.mono-metric {
 ```css
 /* 温润纸张模式 (Light) */
 .tactile-card {
-    box-shadow: 
+    box-shadow:
         0 1px 2px rgba(25, 25, 25, 0.02),               /* 超软微阴影 */
         0 4px 20px -2px rgba(25, 25, 25, 0.015),          /* 远端重力渐衰 */
         inset 0 1px 0 0 rgba(255, 255, 255, 0.7);        /* 1px 物理防漫反射内高光，营造物理厚度 */
@@ -143,7 +143,7 @@ span.mono-metric {
 
 /* 深邃墨水模式 (Dark) */
 .dark .tactile-card {
-    box-shadow: 
+    box-shadow:
         0 1px 2px rgba(0, 0, 0, 0.2),
         0 4px 20px -2px rgba(0, 0, 0, 0.15),
         inset 0 1px 0 0 rgba(255, 255, 255, 0.04);       /* 暗夜微高光 */

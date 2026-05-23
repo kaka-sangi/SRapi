@@ -2,6 +2,19 @@
 
 ## 1. Universal Gates
 
+Code quality means the requested behavior is correct and the repository remains easy to understand, modify, test, debug, and extend. A change should improve or preserve code health over time; passing tests is necessary but not sufficient.
+
+Review every implementation change against these standards:
+
+- Correctness: normal inputs, invalid inputs, edge cases, and error paths behave predictably.
+- Readability: names and structure explain intent without requiring hidden context.
+- Maintainability: ownership boundaries are clear, coupling stays low, and business logic is not scattered.
+- Simplicity: use the smallest boring design that solves the current need; no speculative abstractions.
+- Testability: core logic, side effects, and error paths can be verified in focused tests.
+- Locality: inputs, rules, state changes, errors, and outputs are discoverable without excessive file hopping.
+- Stable evolution: changes are small, reversible, and protected by behavior checks.
+- Consistency: error handling, dependency injection, API shapes, tests, and layout follow existing project patterns.
+
 Run for every implementation package unless explicitly skipped with a reason in `specs/STATUS.md`:
 
 ```bash
@@ -90,14 +103,25 @@ It covers:
 
 - `gofmt -l` drift across Go files.
 - `go vet ./...`.
-- Production Go file-size thresholds, excluding generated Ent/OpenAPI code.
-- Production Go function-size thresholds, excluding tests and generated Ent/OpenAPI code.
+- `git diff --check` whitespace drift.
+- `make check` must include architecture, code-quality, API test, generated drift, migration, and secret-scan gates.
+- Secret scanning must cover generated OpenAPI/SDK artifacts and lockfiles.
+- Production Go file-size thresholds, excluding generated Ent/OpenAPI/SDK code.
+- Production Go function-size thresholds, excluding tests and generated Ent/OpenAPI/SDK code.
+- Repository text hygiene for tracked source/docs/config files.
+- Node and shell script syntax checks.
+- Dockerfile and Compose baseline container hygiene.
+- Production Go code must not add speculative markers such as `TODO`, `FIXME`, `HACK`, or `XXX`.
+- Production Go `panic`/`recover` usage is restricted to documented bootstrap escape hatches.
 
 Rules:
 
 - Treat failures as harness findings, not as optional style advice.
-- If a threshold is hit by new code, split by ownership or extract helpers before merging.
+- If a threshold is hit by new code, split by ownership, extract cohesive private functions, or move behavior behind an existing boundary before merging.
 - Threshold changes must be documented in `docs/ARCHITECTURE_REQUIREMENTS.md` and justified in `specs/STATUS.md`.
+- Do not add a new abstraction, framework, helper, or global registry unless at least two real call sites need it now.
+- New exported APIs must be documented; complex private logic needs a short comment explaining why, not what.
+- Errors must be explicit and actionable; do not silently swallow failures.
 
 ## 5. Gateway Gates
 

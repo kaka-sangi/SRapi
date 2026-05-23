@@ -113,7 +113,7 @@ make migration-check
 make check
 ```
 
-它继续作为完整质量门禁，覆盖 OpenAPI、SDK、Ent、migration check、code-quality-check、Go test 和 secret scan。
+它继续作为完整质量门禁，覆盖 diff check、OpenAPI、SDK、Ent、migration check、architecture-check、code-quality-check、Go test 和 secret scan。
 
 ### 3.4 代码质量门禁
 
@@ -125,8 +125,16 @@ make code-quality-check
 
 - Go 文件 `gofmt` 漂移。
 - `go vet ./...`。
-- 非生成生产 Go 文件最大 2200 行。
-- 非生成生产 Go 函数最大 220 行。
+- `git diff --check`。
+- `make check` 必须包含架构、代码质量、API test、生成物漂移、migration 和 secret scan 门禁。
+- secret scan 必须覆盖生成的 OpenAPI/SDK artifacts 和 lockfile。
+- 非生成生产 Go 文件最大 2180 行。
+- 非生成生产 Go 函数最大 210 行。
+- 仓库文本文件必须是 UTF-8、以换行结尾、无尾随空白。
+- Node / shell 脚本必须能通过语法检查。
+- Dockerfile / Compose 必须满足基础容器卫生：镜像 tag 显式，运行镜像非 root。
+- 生产 Go 代码不得新增 `TODO`、`FIXME`、`HACK`、`XXX` 这类投机标记。
+- 生产 Go 代码不得在已记录的启动装配逃生口之外使用 `panic` / `recover`。
 
 `code-quality-check` 和 `architecture-check` 分工不同：前者卡住代码形态和静态质量，后者卡住模块边界、启动装配、persistence/worker/HTTP ownership 等架构不变量。生成代码不进入 size 阈值，但仍必须通过对应 codegen drift check。
 

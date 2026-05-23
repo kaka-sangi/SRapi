@@ -2,6 +2,7 @@ package codequality_test
 
 import (
 	"bytes"
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -12,16 +13,18 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 const (
-	maxProductionGoFileLines = 2200
-	maxProductionFuncLines   = 220
+	maxProductionGoFileLines = 2180
+	maxProductionFuncLines   = 210
 )
 
 var generatedPathFragments = []string{
 	string(filepath.Separator) + "ent" + string(filepath.Separator),
 	string(filepath.Separator) + "internal" + string(filepath.Separator) + "openapi" + string(filepath.Separator),
+	string(filepath.Separator) + "packages" + string(filepath.Separator) + "sdk" + string(filepath.Separator) + "typescript" + string(filepath.Separator) + "src" + string(filepath.Separator),
 }
 
 func TestGoFilesAreGofmtFormatted(t *testing.T) {
@@ -47,6 +50,70 @@ func TestGoVetPasses(t *testing.T) {
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("go vet ./... failed: %v\n%s", err, out)
+	}
+}
+
+func TestGitDiffCheckPasses(t *testing.T) {
+	root := repoRoot(t)
+	cmd := exec.Command("git", "diff", "--check")
+	cmd.Dir = root
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git diff --check failed: %v\n%s", err, out)
+	}
+}
+
+func TestMakeCheckRunsMandatoryQualityGates(t *testing.T) {
+	root := repoRoot(t)
+	raw, err := os.ReadFile(filepath.Join(root, "Makefile"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	dependencies := makeTargetDependencies(string(raw), "check")
+	required := []string{
+		"diff-check",
+		"architecture-check",
+		"code-quality-check",
+		"api-test",
+		"secret-scan",
+		"openapi-codegen-check",
+		"openapi-ts-codegen-check",
+		"ent-generate-check",
+		"migration-check",
+	}
+	var missing []string
+	for _, target := range required {
+		if !dependencies[target] {
+			missing = append(missing, target)
+		}
+	}
+	if len(missing) > 0 {
+		t.Fatalf("make check is missing mandatory quality gates: %s", strings.Join(missing, ", "))
+	}
+}
+
+func TestSecretScanCoversGeneratedContractsAndLockfiles(t *testing.T) {
+	root := repoRoot(t)
+	raw, err := os.ReadFile(filepath.Join(root, ".secretlintignore"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	scannedPaths := []string{
+		"package-lock.json",
+		"build/openapi/openapi.bundle.yaml",
+		"apps/api/internal/openapi/openapi.gen.go",
+		"packages/sdk/typescript/src/index.ts",
+	}
+	var violations []string
+	for _, pattern := range secretlintIgnorePatterns(string(raw)) {
+		for _, path := range scannedPaths {
+			if ignorePatternCovers(pattern, path) {
+				violations = append(violations, pattern+" hides "+path)
+			}
+		}
+	}
+	if len(violations) > 0 {
+		t.Fatalf("secret scan must cover generated contracts and lockfiles:\n%s", strings.Join(violations, "\n"))
 	}
 }
 
@@ -94,6 +161,106 @@ func TestProductionFunctionsStaySmallEnough(t *testing.T) {
 	}
 }
 
+func TestRepositoryTextFilesAreClean(t *testing.T) {
+	root := repoRoot(t)
+	files := repoFiles(t, root)
+	var violations []string
+	for _, rel := range files {
+		if !isTextHygieneFile(rel) || isGeneratedPath(filepath.Join(root, rel)) {
+			continue
+		}
+		raw, err := os.ReadFile(filepath.Join(root, rel))
+		if err != nil {
+			t.Fatal(err)
+		}
+		violations = append(violations, textHygieneViolations(rel, raw)...)
+	}
+	if len(violations) > 0 {
+		t.Fatalf("text hygiene violations:\n%s", strings.Join(violations, "\n"))
+	}
+}
+
+func TestNodeScriptsParse(t *testing.T) {
+	root := repoRoot(t)
+	for _, rel := range repoFiles(t, root) {
+		if filepath.Ext(rel) != ".mjs" && filepath.Ext(rel) != ".js" {
+			continue
+		}
+		runCommand(t, root, "node", "--check", rel)
+	}
+}
+
+func TestShellScriptsParse(t *testing.T) {
+	root := repoRoot(t)
+	for _, rel := range repoFiles(t, root) {
+		if filepath.Ext(rel) != ".sh" {
+			continue
+		}
+		runCommand(t, root, "bash", "-n", rel)
+	}
+}
+
+func TestContainerFilesUsePinnedNonRootDefaults(t *testing.T) {
+	root := repoRoot(t)
+	var violations []string
+	for _, rel := range repoFiles(t, root) {
+		switch filepath.Base(rel) {
+		case "Dockerfile":
+			violations = append(violations, dockerfileViolations(t, root, rel)...)
+		}
+		if isComposeFile(rel) {
+			violations = append(violations, composeImageViolations(t, root, rel)...)
+		}
+	}
+	if len(violations) > 0 {
+		t.Fatalf("container configuration violations:\n%s", strings.Join(violations, "\n"))
+	}
+}
+
+func TestProductionCodeHasNoSpeculativeMarkers(t *testing.T) {
+	root := repoRoot(t)
+	files := goFiles(t, root, productionOnly)
+	markers := []string{"TODO", "FIXME", "HACK", "XXX"}
+	var violations []string
+	for _, path := range files {
+		lines := fileLines(t, path)
+		for i, line := range lines {
+			for _, marker := range markers {
+				if strings.Contains(line, marker) {
+					violations = append(violations, relativePath(root, path)+":"+strconv.Itoa(i+1)+": remove speculative marker "+marker)
+				}
+			}
+		}
+	}
+	if len(violations) > 0 {
+		t.Fatalf("production code marker violations:\n%s", strings.Join(violations, "\n"))
+	}
+}
+
+func TestProductionGoAvoidsPanicAndRecoverOutsideBootstrap(t *testing.T) {
+	root := repoRoot(t)
+	files := goFiles(t, root, productionOnly)
+	allowed := map[string][]string{
+		"apps/api/internal/app/app.go":           {"recover()"},
+		"apps/api/internal/httpserver/server.go": {"panic(err)"},
+	}
+	var violations []string
+	for _, path := range files {
+		rel := relativePath(root, path)
+		lines := fileLines(t, path)
+		for i, line := range lines {
+			for _, call := range []string{"panic(", "recover("} {
+				if strings.Contains(line, call) && !allowedEscapeHatch(allowed[rel], line) {
+					violations = append(violations, rel+":"+strconv.Itoa(i+1)+": "+call+" must stay out of production code outside documented bootstrap escape hatches")
+				}
+			}
+		}
+	}
+	if len(violations) > 0 {
+		t.Fatalf("panic/recover violations:\n%s", strings.Join(violations, "\n"))
+	}
+}
+
 type fileMode int
 
 const (
@@ -135,6 +302,24 @@ func goFiles(t *testing.T, root string, mode fileMode) []string {
 	return files
 }
 
+func repoFiles(t *testing.T, root string) []string {
+	t.Helper()
+	cmd := exec.Command("git", "ls-files", "--cached", "--others", "--exclude-standard")
+	cmd.Dir = root
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("list repository files: %v", err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	var files []string
+	for _, line := range lines {
+		if line != "" {
+			files = append(files, filepath.Clean(line))
+		}
+	}
+	return files
+}
+
 func isGeneratedPath(path string) bool {
 	clean := filepath.Clean(path)
 	for _, fragment := range generatedPathFragments {
@@ -143,6 +328,43 @@ func isGeneratedPath(path string) bool {
 		}
 	}
 	return false
+}
+
+func isTextHygieneFile(path string) bool {
+	switch filepath.Base(path) {
+	case "Makefile", "Dockerfile", ".secretlintignore":
+		return true
+	}
+	switch filepath.Ext(path) {
+	case ".go", ".md", ".yaml", ".yml", ".json", ".mjs", ".js", ".ts", ".sh", ".ps1", ".html":
+		return true
+	default:
+		return false
+	}
+}
+
+func textHygieneViolations(path string, raw []byte) []string {
+	if len(raw) == 0 {
+		return nil
+	}
+	var violations []string
+	if !utf8.Valid(raw) {
+		violations = append(violations, path+": file must be valid UTF-8")
+	}
+	if raw[len(raw)-1] != '\n' {
+		violations = append(violations, path+": file must end with a newline")
+	}
+	lines := bytes.Split(raw, []byte{'\n'})
+	for i, line := range lines {
+		if i == len(lines)-1 && len(line) == 0 {
+			continue
+		}
+		line = bytes.TrimSuffix(line, []byte{'\r'})
+		if bytes.HasSuffix(line, []byte{' '}) || bytes.HasSuffix(line, []byte{'\t'}) {
+			violations = append(violations, path+":"+strconv.Itoa(i+1)+": trailing whitespace")
+		}
+	}
+	return violations
 }
 
 func repoRoot(t *testing.T) string {
@@ -174,10 +396,114 @@ func lineCount(t *testing.T, path string) int {
 	return lines
 }
 
+func fileLines(t *testing.T, path string) []string {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return strings.Split(string(raw), "\n")
+}
+
 func relativePath(root, path string) string {
 	rel, err := filepath.Rel(root, path)
 	if err != nil {
 		return path
 	}
 	return rel
+}
+
+func makeTargetDependencies(content, target string) map[string]bool {
+	dependencies := map[string]bool{}
+	prefix := target + ":"
+	for _, line := range strings.Split(content, "\n") {
+		if !strings.HasPrefix(line, prefix) {
+			continue
+		}
+		for _, field := range strings.Fields(strings.TrimPrefix(line, prefix)) {
+			dependencies[field] = true
+		}
+		return dependencies
+	}
+	return dependencies
+}
+
+func secretlintIgnorePatterns(content string) []string {
+	var patterns []string
+	for _, line := range strings.Split(content, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		patterns = append(patterns, line)
+	}
+	return patterns
+}
+
+func ignorePatternCovers(pattern, path string) bool {
+	pattern = strings.TrimSuffix(filepath.ToSlash(pattern), "/")
+	pattern = strings.TrimSuffix(pattern, "/**")
+	path = filepath.ToSlash(path)
+	return pattern == path || strings.HasPrefix(path, pattern+"/")
+}
+
+func runCommand(t *testing.T, root string, name string, args ...string) {
+	t.Helper()
+	cmd := exec.Command(name, args...)
+	cmd.Dir = root
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("%s %s failed: %v\n%s", name, strings.Join(args, " "), err, out)
+	}
+}
+
+func dockerfileViolations(t *testing.T, root, rel string) []string {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join(root, rel))
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := string(raw)
+	var violations []string
+	if strings.Contains(content, ":latest") {
+		violations = append(violations, rel+": image tags must be pinned; do not use latest")
+	}
+	if !strings.Contains(content, "USER nonroot") {
+		violations = append(violations, rel+": runtime image must declare a non-root user")
+	}
+	return violations
+}
+
+func composeImageViolations(t *testing.T, root, rel string) []string {
+	t.Helper()
+	lines := fileLines(t, filepath.Join(root, rel))
+	var violations []string
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(trimmed, "image:") {
+			continue
+		}
+		image := strings.TrimSpace(strings.TrimPrefix(trimmed, "image:"))
+		if image == "" || strings.Contains(image, "${") {
+			continue
+		}
+		if !strings.Contains(image, ":") || strings.HasSuffix(image, ":latest") {
+			violations = append(violations, fmt.Sprintf("%s:%d: image must use an explicit non-latest tag", rel, i+1))
+		}
+	}
+	return violations
+}
+
+func isComposeFile(path string) bool {
+	base := filepath.Base(path)
+	return base == "docker-compose.yml" || base == "docker-compose.yaml" || strings.Contains(base, "compose.")
+}
+
+func allowedEscapeHatch(allowed []string, line string) bool {
+	for _, snippet := range allowed {
+		if strings.Contains(line, snippet) {
+			return true
+		}
+	}
+	return false
 }
