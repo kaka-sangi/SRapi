@@ -63,6 +63,8 @@ SRapi/
 | [AI 端点兼容与转换规范](docs/AI_ENDPOINT_COMPATIBILITY.md) | Chat Completions、Responses、Messages、Gemini 等端点互转与 Canonical AI IR | 是 |
 | [数据模型设计](docs/DATA_MODEL.md) | PostgreSQL 表、索引、一致性和加密字段 | 是 |
 | [安全模型](docs/SECURITY_MODEL.md) | API Key、Cookie、CSRF、Provider 凭证、日志和审计要求 | 是 |
+| [SDK 与 HTTP 示例](examples/README.md) | curl、TypeScript SDK 和 Python requests 的安全本地调用示例 | 集成开发必读 |
+| [2api 迁移指南](docs/MIGRATION_GUIDE_2API.md) | sub2api / CLIProxyAPI / chatgpt2api 风格部署迁移到 SRapi 的账号、模型和反代边界映射 | 反代迁移必读 |
 | [调度内核专项设计](docs/SCHEDULING_KERNEL_DESIGN.md) | 调度内核总体设计和长期演进模型 | 是 |
 | [Scheduler v1 实现级规格](docs/SCHEDULER_V1_SPEC.md) | MVP 调度过滤、打分、Lease、Decision 和 Feedback 规则 | 是 |
 | [Scheduler 策略扩展规范](docs/SCHEDULER_STRATEGY_EXTENSION_SPEC.md) | 策略注册、版本、灰度、dry-run、shadow decision 和回滚规则 | 是 |
@@ -117,7 +119,7 @@ make bootstrap-env
 make check
 ```
 
-当前 `make check` 覆盖 OpenAPI lint / bundle、Go OpenAPI codegen drift check、TypeScript SDK codegen drift check、TypeScript typecheck、Ent generate check、migration check、Go tests 和 secret scan。
+当前 `make check` 覆盖 OpenAPI lint / bundle、Go OpenAPI codegen drift check、TypeScript SDK codegen drift check、TypeScript typecheck、Ent generate check、migration check、Go code quality、examples check、Go tests 和 secret scan。
 
 架构门禁可单独运行：
 

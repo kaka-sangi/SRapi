@@ -9,9 +9,10 @@ OPENAPI_TS ?= npx --yes @hey-api/openapi-ts@0.97.2
 TSC ?= npx --yes -p typescript@5.9.3 tsc
 SECRETLINT ?= npx --yes -p secretlint@13.0.2 -p @secretlint/secretlint-rule-preset-recommend@13.0.2 secretlint
 ENT ?= go run entgo.io/ent/cmd/ent@v0.14.6
+EXAMPLES_CHECK ?= node tools/examples-check.mjs
 API_DIR ?= apps/api
 
-.PHONY: help bootstrap-env openapi-lint openapi-bundle openapi-codegen openapi-codegen-check openapi-ts-codegen openapi-ts-codegen-check sdk-ts-typecheck ent-generate ent-generate-check migration-check api-test api-run dev-up dev-down dev-logs smoke-health smoke-gateway smoke-release backup-postgres restore-postgres secret-scan architecture-check code-quality-check check
+.PHONY: help bootstrap-env openapi-lint openapi-bundle openapi-codegen openapi-codegen-check openapi-ts-codegen openapi-ts-codegen-check sdk-ts-typecheck ent-generate ent-generate-check migration-check api-test api-run dev-up dev-down dev-logs smoke-health smoke-gateway smoke-release backup-postgres restore-postgres examples-check secret-scan architecture-check code-quality-check check
 
 help:
 	@printf '%s\n' \
@@ -36,6 +37,7 @@ help:
 		'  make smoke-release   Validate health, readiness, metrics, and gateway smoke on localhost' \
 		'  make backup-postgres BACKUP_FILE=...   Create a PostgreSQL custom-format backup' \
 		'  make restore-postgres BACKUP_FILE=...  Restore a PostgreSQL custom-format backup' \
+		'  make examples-check  Validate public examples and 2api migration guide' \
 		'  make architecture-check  Run architecture and startup harness tests' \
 		'  make code-quality-check  Run gofmt, go vet, and size harness tests' \
 		'  make secret-scan     Scan source files for committed secrets' \
@@ -150,4 +152,7 @@ restore-postgres:
 secret-scan:
 	$(SECRETLINT) "**/*"
 
-check: openapi-lint openapi-bundle openapi-codegen-check openapi-ts-codegen-check sdk-ts-typecheck ent-generate-check migration-check code-quality-check api-test secret-scan
+examples-check:
+	$(EXAMPLES_CHECK)
+
+check: openapi-lint openapi-bundle openapi-codegen-check openapi-ts-codegen-check sdk-ts-typecheck ent-generate-check migration-check code-quality-check examples-check api-test secret-scan

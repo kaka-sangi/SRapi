@@ -32,6 +32,7 @@
 | `COMPATIBLE_PROVIDER_REGISTRY_SPEC.md` | OpenAI-compatible / Anthropic-compatible preset、默认 base URL、auth mode、模型目录和 route alias。 |
 | `CAPABILITY_TAXONOMY_SPEC.md` | Request / Model / Provider / Endpoint capability 命名、版本、降级和匹配规则。 |
 | `2API_REVERSE_PROXY_DEFINITION.md` | SRapi 中“反代/2api”的权威定义：SRapi 模拟官方客户端请求上游，而不是本地 CLI 作为下游入口。 |
+| `MIGRATION_GUIDE_2API.md` | 从 sub2api / CLIProxyAPI / chatgpt2api 风格部署迁移到 SRapi Provider Account / Scheduler / Reverse Proxy Runtime 的指南。 |
 | `REVERSE_PROXY_SPEC.md` | 2api 反代、TLS / HTTP/2 / Header 指纹、cookie / OAuth 凭证和反封号策略。 |
 
 ## 4. Scheduler 文档

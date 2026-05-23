@@ -195,7 +195,23 @@ Browser verification is required for substantial UI work:
 - no horizontal page overflow except contained data tables
 - generated SDK is used for API calls
 
-## 10. Documentation Gates
+## 10. Examples And Migration Guide Gates
+
+Required when changing `examples/`, public SDK usage docs, or 2api migration guidance:
+
+```bash
+make examples-check
+```
+
+It covers:
+
+- Public examples mention required Gateway and AdminOps routes.
+- Public examples use `SRAPI_BASE_URL`, `SRAPI_API_KEY`, and optional admin session/CSRF environment variables.
+- The TypeScript example typechecks against the generated SDK.
+- The 2api migration guide preserves the selected Provider Account OAuth/session/desktop/CLI/IDE credential boundary and rejects local Codex / Claude Code / Antigravity ingress plus Gateway-local DTOs.
+- Examples do not contain real-secret placeholders.
+
+## 11. Documentation Gates
 
 Required whenever implementation changes behavior:
 
@@ -210,7 +226,7 @@ Required whenever implementation changes behavior:
 - Payment change -> update `docs/PAYMENT_SPEC.md`.
 - Observability change -> update `docs/OBSERVABILITY_SPEC.md`.
 
-## 11. Definition Of Done
+## 12. Definition Of Done
 
 A package is done when:
 

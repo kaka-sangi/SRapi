@@ -2331,6 +2331,44 @@ Required gates:
 - `make secret-scan`
 - `git diff --check`
 
+## WP-580: SDK Examples And 2api Migration Guides v1
+
+Objective: add the first public integration examples and migration guides so operators and client developers can use SRapi's generated SDK, OpenAI/Anthropic/Gemini-compatible Gateway routes, and 2api account concepts without relying on frontend visuals or reverse-engineering tests.
+
+Read first:
+
+- `README.md`
+- `docs/OPENAPI_CONTRACT.md`
+- `docs/GATEWAY_ROUTE_MATRIX.md`
+- `docs/2API_REVERSE_PROXY_DEFINITION.md`
+- `specs/FINAL_STATE.md`
+- `specs/QUALITY_GATES.md`
+- `packages/sdk/typescript/src`
+- `tools/smoke-local.mjs`
+
+Owns:
+
+- `examples/` developer-facing examples for curl, TypeScript SDK, and Python requests.
+- `docs/MIGRATION_GUIDE_2API.md` for sub2api / CLIProxyAPI / chatgpt2api style deployment migration.
+- README and docs index links to the examples and migration guide.
+- A lightweight examples quality harness that checks examples for route drift, required environment variables, and forbidden real-secret placeholders.
+- Specs status and work package ledger updates.
+
+Definition of Done:
+
+- Examples show safe local usage with `SRAPI_BASE_URL`, `SRAPI_API_KEY`, and optional admin cookie/CSRF variables, never real tokens.
+- Examples cover at least `/v1/models`, `/v1/chat/completions`, `/v1/responses`, `/v1/messages`, Gemini `models.list` / `countTokens`, Anthropic `count_tokens`, and AdminOps realtime slot listing.
+- Migration guide explicitly preserves SRapi's 2api definition: selected Provider Account OAuth/session/desktop/CLI/IDE credential to real upstream, not local Codex / Claude Code / Antigravity ingress and not Gateway-local provider DTOs.
+- The examples-check harness is runnable with `make examples-check` and is included in package gates.
+- No frontend visuals are added.
+
+Required gates:
+
+- `make examples-check`
+- `make code-quality-check`
+- `make secret-scan`
+- `git diff --check`
+
 ## WP-500+: Ecosystem And Remaining Advanced Surface
 
 Use `ROADMAP.md` Phase 7 through Phase 8 to split future packages for:

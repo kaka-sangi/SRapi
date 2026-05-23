@@ -7,6 +7,7 @@
     "openapi:bundle": "redocly bundle packages/openapi/openapi.yaml --output build/openapi/openapi.bundle.yaml",
     "openapi:ts": "openapi-ts -i packages/openapi/openapi.yaml -o packages/sdk/typescript/src -c @hey-api/client-fetch -p @hey-api/typescript @hey-api/sdk --no-log-file",
     "sdk:tsc": "tsc -p packages/sdk/typescript/tsconfig.json --noEmit",
+    "examples:check": "node tools/examples-check.mjs",
     "secret:scan": "secretlint \"**/*\""
   },
   "devDependencies": {

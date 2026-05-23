@@ -64,25 +64,19 @@ last_completed:
 - WP-550: Gemini native countTokens now exposes `POST /v1beta/models/{model}:countTokens`, advertises `countTokens` in Gemini `models.list` when the SRapi model has `token_counting`, accepts Gemini countTokens body or `generateContentRequest`, schedules only `token_counting` capable Gemini accounts, dispatches upstream `models/{mapped_model}:countTokens` through API-key or Reverse Proxy Runtime credentials, and records Scheduler/request evidence without generation usage or cost.
 - WP-560: Anthropic Messages count_tokens now exposes `POST /v1/messages/count_tokens` plus anthropic-compatible provider alias, accepts Anthropic count_tokens body shape, schedules only `token_counting` capable accounts, dispatches upstream `/messages/count_tokens` with mapped upstream model for API-key accounts, dispatches Claude Code 2api `/messages/count_tokens?beta=true` through Reverse Proxy Runtime with selected OAuth/CLI credentials, and records Scheduler/request evidence without generation usage or cost.
 - WP-570: AdminOps realtime active slot API now exposes `GET /api/v1/admin/ops/realtime/slots`, returning current-node active slot summaries and endpoint/kind/API-key aggregate counters without raw affinity keys, credentials, prompts, provider frames, local client ingress, or Gateway-local provider DTOs.
+- WP-580: SDK examples and 2api migration guide v1 now provide curl, TypeScript SDK, and Python requests examples for OpenAI/Anthropic/Gemini-compatible Gateway routes plus AdminOps realtime slot listing, document migration from sub2api / CLIProxyAPI / chatgpt2api style deployments into SRapi Provider Account / Scheduler / Reverse Proxy Runtime boundaries, and add `make examples-check`.
 
 current:
 
 - package: WP-500+
 - status: pending
-- objective: split the next ecosystem or remaining advanced endpoint package from the roadmap after WP-570.
+- objective: split the next ecosystem or remaining advanced endpoint package from the roadmap after WP-580.
 
 next_recommended: WP-500+
 
 last_gates:
 
-- `make openapi-lint`: pass
-- `make openapi-bundle`: pass
-- `make openapi-codegen-check`: pass
-- `make openapi-ts-codegen-check`: pass
-- `make sdk-ts-typecheck`: pass
-- `cd apps/api && go test ./internal/modules/realtime/... ./internal/httpserver -run 'TestRealtime|TestGateway.*Realtime|TestAdminOpsRealtime|TestAcquireReleaseTracksRealtimeSlotLifecycle' -count=1`: pass
-- `cd apps/api && go test ./...`: pass
-- `make architecture-check`: pass
+- `make examples-check`: pass
 - `make code-quality-check`: pass
 - `make secret-scan`: pass
 - `git diff --check`: pass
@@ -178,6 +172,8 @@ notes:
 - WP-560 intentionally does not implement OpenAI tokenizer estimation, provider-native realtime adapters, SDK examples, or frontend visuals.
 - WP-570 added `TestAdminOpsRealtimeSlotsListsActiveSlotsSafely` and extended realtime service lifecycle tests, proving `GET /api/v1/admin/ops/realtime/slots` lists active current-node slots and counters while returning only hashed affinity metadata and no API key, credential, prompt, or provider-specific frame content.
 - WP-570 intentionally does not implement distributed Redis-backed slot storage, persistent upstream session pools, provider-native Claude Code / Antigravity realtime protocols, local client ingress, or frontend visuals.
+- WP-580 added `examples/README.md`, curl / TypeScript / Python examples, `docs/MIGRATION_GUIDE_2API.md`, and `tools/examples-check.mjs`; the harness checks required routes, env vars, TypeScript SDK compile compatibility, 2api boundary phrases, README/docs links, and secret-like placeholders.
+- WP-580 intentionally does not add frontend visuals, local Codex / Claude Code / Antigravity ingress, Gateway-local provider DTOs, or runnable upstream credential import automation.
 
 ## Work Package Ledger
 
@@ -241,4 +237,5 @@ notes:
 | WP-550 | completed | Gemini native countTokens v1. |
 | WP-560 | completed | Anthropic Messages count_tokens v1 with Claude Code 2api runtime dispatch. |
 | WP-570 | completed | AdminOps realtime active slot API v1. |
+| WP-580 | completed | SDK examples and 2api migration guide v1 with examples-check harness. |
 | WP-500+ | pending | Remaining ecosystem and advanced endpoint packages. |
