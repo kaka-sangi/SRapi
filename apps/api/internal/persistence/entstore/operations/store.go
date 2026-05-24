@@ -269,6 +269,7 @@ func (s *Store) ListUsageLogs(ctx context.Context) ([]usagecontract.UsageLog, er
 			ErrorClass:            cloneString(row.ErrorClass),
 			Cost:                  row.Cost,
 			Currency:              row.Currency,
+			ChargedAt:             cloneTime(row.ChargedAt),
 			CompatibilityWarnings: cloneStrings(row.CompatibilityWarningsJSON),
 			CreatedAt:             row.CreatedAt,
 		})
@@ -523,6 +524,14 @@ func cloneString(value *string) *string {
 	return &cloned
 }
 
+func cloneTime(value *time.Time) *time.Time {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
+}
+
 func cloneStrings(values []string) []string {
 	if values == nil {
 		return nil
@@ -530,12 +539,4 @@ func cloneStrings(values []string) []string {
 	out := make([]string, len(values))
 	copy(out, values)
 	return out
-}
-
-func cloneTime(value *time.Time) *time.Time {
-	if value == nil {
-		return nil
-	}
-	cloned := *value
-	return &cloned
 }

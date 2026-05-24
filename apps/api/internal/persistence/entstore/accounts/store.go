@@ -13,6 +13,7 @@ import (
 	entaccounthealthsnapshot "github.com/srapi/srapi/apps/api/ent/accounthealthsnapshot"
 	entaccountquotasnapshot "github.com/srapi/srapi/apps/api/ent/accountquotasnapshot"
 	entaccount "github.com/srapi/srapi/apps/api/ent/provideraccount"
+	entproxy "github.com/srapi/srapi/apps/api/ent/proxy"
 	"github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 )
 
@@ -118,6 +119,65 @@ func (s *Store) ListGroupIDsByAccount(ctx context.Context, accountID int) ([]int
 	out := make([]int, 0, len(rows))
 	for _, row := range rows {
 		out = append(out, row.AccountGroupID)
+	}
+	return out, nil
+}
+
+func (s *Store) CreateProxy(ctx context.Context, input contract.CreateStoredProxy) (contract.ProxyDefinition, error) {
+	created, err := s.client.Proxy.Create().
+		SetName(input.Name).
+		SetType(string(input.Type)).
+		SetURLCiphertext([]byte(input.URLCiphertext)).
+		SetURLVersion(credentialVersionToInt(input.URLVersion)).
+		SetStatus(string(input.Status)).
+		SetMetadataJSON(cloneMap(input.Metadata)).
+		Save(ctx)
+	if err != nil {
+		return contract.ProxyDefinition{}, err
+	}
+	return toProxy(created), nil
+}
+
+func (s *Store) UpdateProxy(ctx context.Context, proxy contract.ProxyDefinition) (contract.ProxyDefinition, error) {
+	update := s.client.Proxy.UpdateOneID(proxy.ID).
+		Where(entproxy.DeletedAtIsNil()).
+		SetName(proxy.Name).
+		SetType(string(proxy.Type)).
+		SetURLCiphertext([]byte(proxy.URLCiphertext)).
+		SetURLVersion(credentialVersionToInt(proxy.URLVersion)).
+		SetStatus(string(proxy.Status)).
+		SetMetadataJSON(cloneMap(proxy.Metadata))
+	if !proxy.UpdatedAt.IsZero() {
+		update.SetUpdatedAt(proxy.UpdatedAt)
+	}
+	updated, err := update.Save(ctx)
+	if err != nil {
+		return contract.ProxyDefinition{}, err
+	}
+	return toProxy(updated), nil
+}
+
+func (s *Store) FindProxyByID(ctx context.Context, id int) (contract.ProxyDefinition, error) {
+	found, err := s.client.Proxy.Query().
+		Where(entproxy.IDEQ(id), entproxy.DeletedAtIsNil()).
+		Only(ctx)
+	if err != nil {
+		return contract.ProxyDefinition{}, err
+	}
+	return toProxy(found), nil
+}
+
+func (s *Store) ListProxies(ctx context.Context) ([]contract.ProxyDefinition, error) {
+	rows, err := s.client.Proxy.Query().
+		Where(entproxy.DeletedAtIsNil()).
+		Order(entproxy.ByID()).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]contract.ProxyDefinition, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toProxy(row))
 	}
 	return out, nil
 }
@@ -331,6 +391,21 @@ func toAccount(row *ent.ProviderAccount) contract.ProviderAccount {
 		CreatedAt:            row.CreatedAt,
 		UpdatedAt:            row.UpdatedAt,
 		DeletedAt:            cloneTime(row.DeletedAt),
+	}
+}
+
+func toProxy(row *ent.Proxy) contract.ProxyDefinition {
+	return contract.ProxyDefinition{
+		ID:            row.ID,
+		Name:          row.Name,
+		Type:          contract.ProxyType(row.Type),
+		URLCiphertext: string(row.URLCiphertext),
+		URLVersion:    credentialVersionToString(row.URLVersion),
+		Status:        contract.ProxyStatus(row.Status),
+		Metadata:      cloneMap(row.MetadataJSON),
+		CreatedAt:     row.CreatedAt,
+		UpdatedAt:     row.UpdatedAt,
+		DeletedAt:     cloneTime(row.DeletedAt),
 	}
 }
 

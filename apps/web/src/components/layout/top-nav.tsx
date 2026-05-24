@@ -6,13 +6,13 @@ import { LogOut, Server } from "lucide-react";
 import { Badge } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { apiService, type ApiRuntimeStatus } from "@/lib/api";
+import { ADMIN_HOME_ROUTE, homeRouteForRole } from "@/lib/routes";
 import { useLanguage } from "@/context/LanguageContext";
 import { LanguageToggle } from "./language-toggle";
 import { ThemeToggle } from "./theme-toggle";
-import { RoleSwitcher } from "./role-switcher";
 
 interface TopNavProps {
-  user: { role: "admin" | "user"; authMode?: "live" | "demo" };
+  user: { role: "admin" | "user" };
   runtimeStatus: ApiRuntimeStatus | null;
 }
 
@@ -23,7 +23,7 @@ const userNavigation = [
 ] as const;
 
 const adminNavigation = [
-  { key: "navOverview", href: "/admin" },
+  { key: "navOverview", href: ADMIN_HOME_ROUTE },
   { key: "navProviderAccounts", href: "/provider-accounts" },
   { key: "navSchedulerDecisions", href: "/scheduler-decisions" },
   { key: "navUsageLogs", href: "/usage" },
@@ -33,7 +33,8 @@ export function TopNav({ user, runtimeStatus }: TopNavProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { t } = useLanguage();
-  const isDemoRuntime = user.authMode === "demo" || runtimeStatus?.mode === "demo";
+  const isOfflineRuntime = runtimeStatus && !runtimeStatus.connected;
+  const runtimeLabel = isOfflineRuntime ? t("apiOffline") : t("liveApi");
 
   const handleLogout = async () => {
     await apiService.logout();
@@ -47,7 +48,7 @@ export function TopNav({ user, runtimeStatus }: TopNavProps) {
       <div className="mx-auto flex h-20 max-w-6xl items-center justify-between px-6 md:px-8">
         <div className="flex items-center gap-4">
           <a
-            href={user.role === "admin" ? "/admin" : "/dashboard"}
+            href={homeRouteForRole(user.role)}
             className="font-serif text-xl font-medium italic tracking-tight text-srapi-primary"
           >
             SRapi.
@@ -57,13 +58,13 @@ export function TopNav({ user, runtimeStatus }: TopNavProps) {
             title={runtimeStatus?.apiBaseUrl ?? ""}
             className={cn(
               "hidden items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-mono text-[11px] font-bold uppercase tracking-wider md:inline-flex",
-              isDemoRuntime
-                ? "border-srapi-primary/30 bg-srapi-primary/5 text-srapi-primary"
+              isOfflineRuntime
+                  ? "border-srapi-error/30 bg-srapi-error/5 text-srapi-error"
                 : "border-srapi-success/30 bg-srapi-success/5 text-srapi-success",
             )}
           >
             <Server size={11} aria-hidden="true" />
-            {isDemoRuntime ? t("demoData") : t("liveApi")}
+            {runtimeLabel}
           </span>
         </div>
 
@@ -89,7 +90,6 @@ export function TopNav({ user, runtimeStatus }: TopNavProps) {
 
           <div className="flex items-center gap-4 border-l border-srapi-border pl-4 md:gap-6 md:pl-6">
             <LanguageToggle />
-            <RoleSwitcher currentRole={user.role} authMode={user.authMode} />
             <ThemeToggle />
             <button
               type="button"

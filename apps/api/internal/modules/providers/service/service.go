@@ -135,6 +135,14 @@ func (s *Service) FindByID(ctx context.Context, id int) (contract.Provider, erro
 	return s.store.FindByID(ctx, id)
 }
 
+func (s *Service) FindByName(ctx context.Context, name string) (contract.Provider, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return contract.Provider{}, ErrInvalidInput
+	}
+	return s.store.FindByName(ctx, name)
+}
+
 func cloneMap(value map[string]any) map[string]any {
 	if value == nil {
 		return nil

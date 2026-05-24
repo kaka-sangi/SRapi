@@ -4,6 +4,8 @@ import (
 	"testing"
 	"time"
 
+	eventsservice "github.com/srapi/srapi/apps/api/internal/modules/events/service"
+	eventsmemory "github.com/srapi/srapi/apps/api/internal/modules/events/store/memory"
 	"github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	"github.com/srapi/srapi/apps/api/internal/modules/subscriptions/service"
 	subscriptionmemory "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/store/memory"
@@ -254,6 +256,93 @@ func TestCreateUserSubscriptionIsIdempotentBySource(t *testing.T) {
 	}
 	if len(subscriptions) != 1 {
 		t.Fatalf("expected one subscription after duplicate source, got %+v", subscriptions)
+	}
+}
+
+func TestExpireActiveUserSubscriptionsMarksExpiredAndEnqueuesEvent(t *testing.T) {
+	store := subscriptionmemory.New()
+	eventsStore := eventsmemory.New()
+	eventsSvc, err := eventsservice.New(eventsStore, fixedClock{now: time.Date(2026, 5, 22, 12, 5, 0, 0, time.UTC)})
+	if err != nil {
+		t.Fatalf("new events service: %v", err)
+	}
+	svc, err := service.NewWithDependencies(store, service.Dependencies{Events: eventsSvc}, fixedClock{now: time.Date(2026, 5, 22, 12, 0, 0, 0, time.UTC)})
+	if err != nil {
+		t.Fatalf("new subscription service: %v", err)
+	}
+	plan, err := svc.CreatePlan(t.Context(), contract.CreatePlanRequest{
+		Name:         "pro",
+		Price:        "9.99",
+		Currency:     "USD",
+		ValidityDays: 30,
+		Entitlements: map[string]any{"allowed_models": []any{"pro-model"}},
+	})
+	if err != nil {
+		t.Fatalf("create plan: %v", err)
+	}
+	now := time.Date(2026, 5, 22, 12, 5, 0, 0, time.UTC)
+	expiredStart := now.Add(-2 * time.Hour)
+	expiredAt := now.Add(-time.Minute)
+	expiredSub, err := svc.CreateUserSubscription(t.Context(), contract.CreateSubscriptionRequest{
+		UserID:    1,
+		PlanID:    plan.ID,
+		StartsAt:  &expiredStart,
+		ExpiresAt: &expiredAt,
+	})
+	if err != nil {
+		t.Fatalf("create expired candidate subscription: %v", err)
+	}
+	futureStart := now.Add(-time.Hour)
+	futureExpiry := now.Add(time.Hour)
+	futureSub, err := svc.CreateUserSubscription(t.Context(), contract.CreateSubscriptionRequest{
+		UserID:    1,
+		PlanID:    plan.ID,
+		StartsAt:  &futureStart,
+		ExpiresAt: &futureExpiry,
+	})
+	if err != nil {
+		t.Fatalf("create future subscription: %v", err)
+	}
+
+	result, err := svc.ExpireActiveUserSubscriptions(t.Context(), now)
+	if err != nil {
+		t.Fatalf("expire active subscriptions: %v", err)
+	}
+	if result.Selected != 1 || result.Expired != 1 {
+		t.Fatalf("unexpected expiration result: %+v", result)
+	}
+	subscriptions, err := svc.ListUserSubscriptionsByUser(t.Context(), 1)
+	if err != nil {
+		t.Fatalf("list subscriptions: %v", err)
+	}
+	statuses := map[int]contract.SubscriptionStatus{}
+	for _, subscription := range subscriptions {
+		statuses[subscription.ID] = subscription.Status
+	}
+	if statuses[expiredSub.ID] != contract.SubscriptionStatusExpired || statuses[futureSub.ID] != contract.SubscriptionStatusActive {
+		t.Fatalf("unexpected subscription statuses: %+v", statuses)
+	}
+	outbox, err := eventsSvc.ListOutbox(t.Context())
+	if err != nil {
+		t.Fatalf("list outbox: %v", err)
+	}
+	if len(outbox) != 1 || outbox[0].EventType != "SubscriptionExpired" || outbox[0].ProducerModule != "subscriptions" {
+		t.Fatalf("expected subscription expiration event, got %+v", outbox)
+	}
+
+	second, err := svc.ExpireActiveUserSubscriptions(t.Context(), now.Add(time.Minute))
+	if err != nil {
+		t.Fatalf("expire active subscriptions again: %v", err)
+	}
+	if second.Expired != 0 {
+		t.Fatalf("expiration should be idempotent on second run, got %+v", second)
+	}
+	outbox, err = eventsSvc.ListOutbox(t.Context())
+	if err != nil {
+		t.Fatalf("list outbox again: %v", err)
+	}
+	if len(outbox) != 1 {
+		t.Fatalf("expected one expiration event after second run, got %+v", outbox)
 	}
 }
 

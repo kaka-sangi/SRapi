@@ -15,6 +15,9 @@ import (
 	admincontrolcontract "github.com/srapi/srapi/apps/api/internal/modules/admin_control/contract"
 	admincontrolservice "github.com/srapi/srapi/apps/api/internal/modules/admin_control/service"
 	admincontrolmemory "github.com/srapi/srapi/apps/api/internal/modules/admin_control/store/memory"
+	affiliatecontract "github.com/srapi/srapi/apps/api/internal/modules/affiliate/contract"
+	affiliateservice "github.com/srapi/srapi/apps/api/internal/modules/affiliate/service"
+	affiliatememory "github.com/srapi/srapi/apps/api/internal/modules/affiliate/store/memory"
 	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
 	apikeyservice "github.com/srapi/srapi/apps/api/internal/modules/api_keys/service"
 	apikeymemory "github.com/srapi/srapi/apps/api/internal/modules/api_keys/store/memory"
@@ -79,6 +82,7 @@ type runtimeState struct {
 	audit             *auditservice.Service
 	billing           *billingservice.Service
 	events            *eventsservice.Service
+	affiliate         *affiliateservice.Service
 	gateway           *gatewayservice.Service
 	providers         *providerservice.Service
 	models            *modelservice.Service
@@ -98,6 +102,7 @@ type runtimeState struct {
 	auditStore        auditcontract.Store
 	billingStore      billingcontract.Store
 	eventsStore       eventscontract.Store
+	affiliateStore    affiliatecontract.Store
 	operationsStore   operationscontract.Store
 	providerStore     providercontract.Store
 	modelStore        modelcontract.Store
@@ -166,6 +171,18 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 		eventsStore = eventsmemory.New()
 	}
 	eventsSvc, err := eventsservice.New(eventsStore, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	affiliateStore := opts.affiliate
+	if affiliateStore == nil {
+		affiliateStore = affiliatememory.New()
+	}
+	affiliateSvc, err := affiliateservice.New(affiliateStore, affiliateservice.Dependencies{
+		Audit:  auditSvc,
+		Events: eventsSvc,
+	}, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -243,39 +260,12 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 		return nil, err
 	}
 
-	subscriptionStore := opts.subscriptions
-	if subscriptionStore == nil {
-		subscriptionStore = subscriptionmemory.New()
-	}
-	subscriptionSvc, err := subscriptionservice.New(subscriptionStore, nil)
+	subscriptionStore, subscriptionSvc, paymentStore, paymentsSvc, err := newCommerceRuntime(cfg, opts, billingSvc, auditSvc, eventsSvc)
 	if err != nil {
 		return nil, err
 	}
 
-	paymentStore := opts.payments
-	if paymentStore == nil {
-		paymentStore = paymentmemory.New()
-	}
-	paymentsSvc, err := paymentservice.New(paymentStore, cfg.Security.MasterKey, paymentservice.Dependencies{
-		Billing:       billingSvc,
-		Subscriptions: subscriptionSvc,
-		Audit:         auditSvc,
-		Events:        eventsSvc,
-	}, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	usageStore := opts.usage
-	if usageStore == nil {
-		usageStore = usagememory.New()
-	}
-	usageSvc, err := usageservice.New(usageStore, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	operationsStore, operationsSvc, err := newOperationsRuntime(opts.operations, usageStore)
+	usageStore, usageSvc, operationsStore, operationsSvc, err := newUsageRuntime(opts)
 	if err != nil {
 		return nil, err
 	}
@@ -287,6 +277,7 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 		auditSvc:          auditSvc,
 		billingSvc:        billingSvc,
 		eventsSvc:         eventsSvc,
+		affiliateSvc:      affiliateSvc,
 		gatewaySvc:        gatewaySvc,
 		providersSvc:      providersSvc,
 		modelsSvc:         modelsSvc,
@@ -306,6 +297,7 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 		auditStore:        auditStore,
 		billingStore:      billingStore,
 		eventsStore:       eventsStore,
+		affiliateStore:    affiliateStore,
 		operationsStore:   operationsStore,
 		providerStore:     providerStore,
 		modelStore:        modelStore,
@@ -325,6 +317,57 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 	return rt, nil
 }
 
+func newCommerceRuntime(
+	cfg config.Config,
+	opts runtimeOptions,
+	billingSvc *billingservice.Service,
+	auditSvc *auditservice.Service,
+	eventsSvc *eventsservice.Service,
+) (subscriptioncontract.Store, *subscriptionservice.Service, paymentcontract.Store, *paymentservice.Service, error) {
+	subscriptionStore := opts.subscriptions
+	if subscriptionStore == nil {
+		subscriptionStore = subscriptionmemory.New()
+	}
+	subscriptionSvc, err := subscriptionservice.New(subscriptionStore, nil)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
+	paymentStore := opts.payments
+	if paymentStore == nil {
+		paymentStore = paymentmemory.New()
+	}
+	paymentsSvc, err := paymentservice.New(paymentStore, cfg.Security.MasterKey, paymentservice.Dependencies{
+		Billing:       billingSvc,
+		Subscriptions: subscriptionSvc,
+		Audit:         auditSvc,
+		Events:        eventsSvc,
+	}, nil)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
+	return subscriptionStore, subscriptionSvc, paymentStore, paymentsSvc, nil
+}
+
+func newUsageRuntime(opts runtimeOptions) (usagecontract.Store, *usageservice.Service, operationscontract.Store, *operationsservice.Service, error) {
+	usageStore := opts.usage
+	if usageStore == nil {
+		usageStore = usagememory.New()
+	}
+	usageSvc, err := usageservice.New(usageStore, nil)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
+	operationsStore, operationsSvc, err := newOperationsRuntime(opts.operations, usageStore)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
+	return usageStore, usageSvc, operationsStore, operationsSvc, nil
+}
+
 type runtimeAssembly struct {
 	usersSvc          *usersservice.Service
 	authSvc           *authservice.Service
@@ -332,6 +375,7 @@ type runtimeAssembly struct {
 	auditSvc          *auditservice.Service
 	billingSvc        *billingservice.Service
 	eventsSvc         *eventsservice.Service
+	affiliateSvc      *affiliateservice.Service
 	gatewaySvc        *gatewayservice.Service
 	providersSvc      *providerservice.Service
 	modelsSvc         *modelservice.Service
@@ -351,6 +395,7 @@ type runtimeAssembly struct {
 	auditStore        auditcontract.Store
 	billingStore      billingcontract.Store
 	eventsStore       eventscontract.Store
+	affiliateStore    affiliatecontract.Store
 	operationsStore   operationscontract.Store
 	providerStore     providercontract.Store
 	modelStore        modelcontract.Store
@@ -372,6 +417,7 @@ func assembleRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOp
 		audit:             assembly.auditSvc,
 		billing:           assembly.billingSvc,
 		events:            assembly.eventsSvc,
+		affiliate:         assembly.affiliateSvc,
 		gateway:           assembly.gatewaySvc,
 		providers:         assembly.providersSvc,
 		models:            assembly.modelsSvc,
@@ -391,6 +437,7 @@ func assembleRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOp
 		auditStore:        assembly.auditStore,
 		billingStore:      assembly.billingStore,
 		eventsStore:       assembly.eventsStore,
+		affiliateStore:    assembly.affiliateStore,
 		operationsStore:   assembly.operationsStore,
 		providerStore:     assembly.providerStore,
 		modelStore:        assembly.modelStore,

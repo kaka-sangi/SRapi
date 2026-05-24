@@ -11,12 +11,13 @@ interface PageHeaderProps {
   title: string;
   description: string;
   user: { name: string; balance?: string };
+  showSmoke?: boolean;
 }
 
-export function PageHeader({ category, title, description, user }: PageHeaderProps) {
+export function PageHeader({ category, title, description, user, showSmoke = false }: PageHeaderProps) {
   const { t } = useLanguage();
-  const { data: smokeStatus } = useSmokeStatus();
-  const [showSmoke, setShowSmoke] = React.useState(false);
+  const { data: smokeStatus } = useSmokeStatus(undefined, { enabled: showSmoke });
+  const [isSmokeDrawerOpen, setIsSmokeDrawerOpen] = React.useState(false);
 
   return (
     <>
@@ -49,7 +50,7 @@ export function PageHeader({ category, title, description, user }: PageHeaderPro
           {smokeStatus ? (
             <button
               type="button"
-              onClick={() => setShowSmoke(true)}
+              onClick={() => setIsSmokeDrawerOpen(true)}
               className={cn(
                 "quiet-badge cursor-pointer rounded-full transition-all hover:bg-srapi-card-muted",
                 smokeStatus.v0_1_smoke_evidence_complete
@@ -75,8 +76,8 @@ export function PageHeader({ category, title, description, user }: PageHeaderPro
 
       {smokeStatus ? (
         <SmokeDrawer
-          open={showSmoke}
-          onClose={() => setShowSmoke(false)}
+          open={isSmokeDrawerOpen}
+          onClose={() => setIsSmokeDrawerOpen(false)}
           status={smokeStatus}
         />
       ) : null}

@@ -115,6 +115,54 @@ func TestStoreListsAccountGroupMemberships(t *testing.T) {
 	}
 }
 
+func TestStoreCreatesUpdatesAndListsProxies(t *testing.T) {
+	client := enttest.Open(t, dialect.SQLite, sqliteDSN(t))
+	defer client.Close()
+
+	store, err := New(client)
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+
+	ctx := context.Background()
+	created, err := store.CreateProxy(ctx, contract.CreateStoredProxy{
+		Name:          "proxy-us-east",
+		Type:          contract.ProxyTypeHTTPS,
+		URLCiphertext: "ciphertext",
+		URLVersion:    "v1",
+		Status:        contract.ProxyStatusActive,
+		Metadata:      map[string]any{"region": "us-east"},
+	})
+	if err != nil {
+		t.Fatalf("create proxy: %v", err)
+	}
+	if created.URLCiphertext != "ciphertext" || created.URLVersion != "v1" || created.Metadata["region"] != "us-east" {
+		t.Fatalf("unexpected proxy: %+v", created)
+	}
+
+	loaded, err := store.FindProxyByID(ctx, created.ID)
+	if err != nil {
+		t.Fatalf("find proxy: %v", err)
+	}
+	loaded.Name = "proxy-us-east-2"
+	loaded.Status = contract.ProxyStatusDisabled
+	updated, err := store.UpdateProxy(ctx, loaded)
+	if err != nil {
+		t.Fatalf("update proxy: %v", err)
+	}
+	if updated.Name != "proxy-us-east-2" || updated.Status != contract.ProxyStatusDisabled {
+		t.Fatalf("unexpected updated proxy: %+v", updated)
+	}
+
+	items, err := store.ListProxies(ctx)
+	if err != nil {
+		t.Fatalf("list proxies: %v", err)
+	}
+	if len(items) != 1 || items[0].ID != created.ID {
+		t.Fatalf("unexpected proxies list: %+v", items)
+	}
+}
+
 func sqliteDSN(t *testing.T) string {
 	t.Helper()
 	return "file:" + filepath.Join(t.TempDir(), "accounts.db") + "?_fk=1"

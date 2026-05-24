@@ -12,6 +12,8 @@ import (
 	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	eventsservice "github.com/srapi/srapi/apps/api/internal/modules/events/service"
 	eventsmemory "github.com/srapi/srapi/apps/api/internal/modules/events/store/memory"
+	paymentmemory "github.com/srapi/srapi/apps/api/internal/modules/payments/store/memory"
+	subscriptionmemory "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/store/memory"
 	"github.com/srapi/srapi/apps/api/internal/persistence/entstore"
 	platformredis "github.com/srapi/srapi/apps/api/internal/platform/redis"
 )
@@ -201,5 +203,41 @@ func TestRetentionWorkerRequiresPersistentOperationsStore(t *testing.T) {
 	}
 	if worker, err := retentionCleanupWorker(config.Load(), &entstore.Stores{}, logger); err != nil || worker != nil {
 		t.Fatalf("expected nil worker without operations store, worker=%v err=%v", worker, err)
+	}
+}
+
+func TestPaymentOrderExpirerWorkerRequiresPersistentPaymentStore(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	if worker, err := paymentOrderExpirerWorker(config.Load(), nil, logger); err != nil || worker != nil {
+		t.Fatalf("expected nil worker without persistent stores, worker=%v err=%v", worker, err)
+	}
+	if worker, err := paymentOrderExpirerWorker(config.Load(), &entstore.Stores{}, logger); err != nil || worker != nil {
+		t.Fatalf("expected nil worker without payment store, worker=%v err=%v", worker, err)
+	}
+
+	worker, err := paymentOrderExpirerWorker(config.Load(), &entstore.Stores{Payments: paymentmemory.New()}, logger)
+	if err != nil {
+		t.Fatalf("create payment order expirer worker: %v", err)
+	}
+	if worker == nil {
+		t.Fatal("expected worker for persistent payment store")
+	}
+}
+
+func TestSubscriptionExpirerWorkerRequiresPersistentSubscriptionStore(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	if worker, err := subscriptionExpirerWorker(nil, logger); err != nil || worker != nil {
+		t.Fatalf("expected nil worker without persistent stores, worker=%v err=%v", worker, err)
+	}
+	if worker, err := subscriptionExpirerWorker(&entstore.Stores{}, logger); err != nil || worker != nil {
+		t.Fatalf("expected nil worker without subscription store, worker=%v err=%v", worker, err)
+	}
+
+	worker, err := subscriptionExpirerWorker(&entstore.Stores{Subscriptions: subscriptionmemory.New()}, logger)
+	if err != nil {
+		t.Fatalf("create subscription expirer worker: %v", err)
+	}
+	if worker == nil {
+		t.Fatal("expected worker for persistent subscription store")
 	}
 }

@@ -9,6 +9,7 @@ DROP TABLE IF EXISTS "scheduler_strategies";
 DROP TABLE IF EXISTS "scheduler_feedbacks";
 DROP TABLE IF EXISTS "scheduler_decisions";
 DROP TABLE IF EXISTS "roles";
+DROP TABLE IF EXISTS "proxies";
 DROP TABLE IF EXISTS "provider_accounts";
 DROP TABLE IF EXISTS "providers";
 DROP TABLE IF EXISTS "pricing_rules";

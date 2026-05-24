@@ -521,7 +521,7 @@ export type BulkPricingRuleImportResponse = {
 
 export type ProviderProtocol = 'openai-compatible' | 'anthropic-compatible' | 'gemini-compatible' | 'rerank-compatible';
 
-export type ProviderAdapterType = 'openai-compatible' | 'anthropic-compatible' | 'gemini-compatible' | 'rerank-compatible' | 'native-openai' | 'native-anthropic' | 'native-gemini' | 'openrouter' | 'reverse-proxy-chatgpt-web' | 'reverse-proxy-codex-cli' | 'reverse-proxy-claude-web' | 'reverse-proxy-claude-code-cli' | 'reverse-proxy-gemini-cli' | 'reverse-proxy-antigravity' | 'custom';
+export type ProviderAdapterType = 'openai-compatible' | 'generic-reverse-proxy' | 'anthropic-compatible' | 'gemini-compatible' | 'rerank-compatible' | 'native-openai' | 'native-anthropic' | 'native-gemini' | 'openrouter' | 'reverse-proxy-chatgpt-web' | 'reverse-proxy-codex-cli' | 'reverse-proxy-claude-web' | 'reverse-proxy-claude-code-cli' | 'reverse-proxy-gemini-cli' | 'reverse-proxy-antigravity' | 'custom';
 
 export type Provider = {
     id: Id;
@@ -778,9 +778,52 @@ export type UpdateProviderAccountRequest = {
 
 export type BindProviderAccountProxyRequest = {
     /**
-     * Set to null or an empty string to clear proxy binding.
+     * Proxy definition id. Set to null or an empty string to clear proxy binding. Existing raw proxy URLs remain accepted for backward-compatible imports.
      */
     proxy_id: string | null;
+};
+
+export type ProxyDefinitionType = 'http' | 'https' | 'socks5';
+
+export type ProxyDefinitionStatus = 'active' | 'disabled';
+
+export type ProxyDefinition = {
+    id: Id;
+    name: string;
+    type: ProxyDefinitionType;
+    status: ProxyDefinitionStatus;
+    /**
+     * True when an encrypted proxy URL is stored. Raw URLs are never returned.
+     */
+    url_configured: boolean;
+    metadata?: JsonObject;
+    created_at: Timestamp;
+    updated_at: Timestamp;
+};
+
+export type CreateProxyDefinitionRequest = {
+    name: string;
+    type: ProxyDefinitionType;
+    status?: ProxyDefinitionStatus;
+    metadata?: JsonObject;
+};
+
+export type UpdateProxyDefinitionRequest = {
+    name?: string;
+    type?: ProxyDefinitionType;
+    status?: ProxyDefinitionStatus;
+    metadata?: JsonObject;
+};
+
+export type ProxyDefinitionResponse = {
+    data: ProxyDefinition;
+    request_id: RequestId;
+};
+
+export type ProxyDefinitionListResponse = {
+    data: Array<ProxyDefinition>;
+    pagination: Pagination;
+    request_id: RequestId;
 };
 
 export type ProviderAccountExportItem = {
@@ -1632,6 +1675,52 @@ export type BillingLedgerListResponse = {
     request_id: RequestId;
 };
 
+export type AffiliateRelationshipStatus = 'active' | 'disabled';
+
+export type AffiliateLedgerEntryType = 'accrue' | 'settle' | 'transfer_to_balance' | 'withdraw' | 'refund_compensation' | 'manual_adjustment';
+
+export type AffiliateLedgerEntryStatus = 'pending' | 'settled' | 'canceled' | 'compensated';
+
+export type AffiliateInviteRecord = {
+    id: Id;
+    inviter_user_id: Id;
+    invitee_user_id: Id;
+    invite_code_id: Id;
+    status: AffiliateRelationshipStatus;
+    created_at: Timestamp;
+    updated_at: Timestamp;
+    first_paid_at?: string | null;
+};
+
+export type AffiliateInviteRecordListResponse = {
+    data: Array<AffiliateInviteRecord>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type AffiliateLedgerEntry = {
+    id: Id;
+    user_id: Id;
+    related_user_id: Id;
+    payment_order_id?: Id;
+    subscription_id?: Id;
+    type: AffiliateLedgerEntryType;
+    amount: string;
+    currency: string;
+    status: AffiliateLedgerEntryStatus;
+    reference_id: string;
+    metadata: JsonObject;
+    created_at: Timestamp;
+    updated_at: Timestamp;
+    settled_at?: string | null;
+};
+
+export type AffiliateLedgerEntryListResponse = {
+    data: Array<AffiliateLedgerEntry>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
 export type DomainEventOutbox = {
     id: Id;
     event_id: string;
@@ -1843,7 +1932,7 @@ export type SchedulerDecision = {
     source_endpoint: string;
     target_protocol: string;
     model: string;
-    strategy: 'balanced' | 'cost_saver';
+    strategy: 'balanced' | 'cost_saver' | 'latency_first' | 'quota_protect' | 'sticky_first' | 'cache_affinity_first' | 'premium_quality';
     strategy_version: string;
     strategy_config_hash: string;
     selected_provider_id?: string | null;
@@ -1885,7 +1974,7 @@ export type SchedulerOverviewResponse = {
 
 export type SchedulerStrategy = {
     id: Id;
-    name: 'balanced' | 'cost_saver' | 'quality_first' | 'cache_affinity' | 'low_latency';
+    name: 'balanced' | 'cost_saver' | 'latency_first' | 'quota_protect' | 'sticky_first' | 'cache_affinity_first' | 'premium_quality';
     version: string;
     status: 'active' | 'draft' | 'deprecated';
     config_hash: string;
@@ -2488,6 +2577,28 @@ export type UpdateProviderAccountRequestWritable = {
     status?: ProviderAccountStatus;
     priority?: number;
     weight?: number;
+    metadata?: JsonObject;
+};
+
+export type CreateProxyDefinitionRequestWritable = {
+    name: string;
+    type: ProxyDefinitionType;
+    /**
+     * Proxy URL with credentials if needed. Stored encrypted and never returned.
+     */
+    url: string;
+    status?: ProxyDefinitionStatus;
+    metadata?: JsonObject;
+};
+
+export type UpdateProxyDefinitionRequestWritable = {
+    name?: string;
+    type?: ProxyDefinitionType;
+    /**
+     * Replacement proxy URL. Omit to keep the existing encrypted URL.
+     */
+    url?: string;
+    status?: ProxyDefinitionStatus;
     metadata?: JsonObject;
 };
 
@@ -3159,6 +3270,39 @@ export type CreateAdminProviderResponses = {
 };
 
 export type CreateAdminProviderResponse = CreateAdminProviderResponses[keyof CreateAdminProviderResponses];
+
+export type InstallAdminProviderPresetsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/providers/preset/install';
+};
+
+export type InstallAdminProviderPresetsErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type InstallAdminProviderPresetsError = InstallAdminProviderPresetsErrors[keyof InstallAdminProviderPresetsErrors];
+
+export type InstallAdminProviderPresetsResponses = {
+    /**
+     * Provider preset install result.
+     */
+    200: BatchOperationResponse;
+};
+
+export type InstallAdminProviderPresetsResponse = InstallAdminProviderPresetsResponses[keyof InstallAdminProviderPresetsResponses];
 
 export type UpdateAdminProviderData = {
     body: UpdateProviderRequest;
@@ -4299,6 +4443,123 @@ export type BindAdminAccountProxyResponses = {
 
 export type BindAdminAccountProxyResponse = BindAdminAccountProxyResponses[keyof BindAdminAccountProxyResponses];
 
+export type ListAdminProxiesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        page_size?: number;
+        status?: ProxyDefinitionStatus;
+    };
+    url: '/api/v1/admin/proxies';
+};
+
+export type ListAdminProxiesErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminProxiesError = ListAdminProxiesErrors[keyof ListAdminProxiesErrors];
+
+export type ListAdminProxiesResponses = {
+    /**
+     * Proxy definition list.
+     */
+    200: ProxyDefinitionListResponse;
+};
+
+export type ListAdminProxiesResponse = ListAdminProxiesResponses[keyof ListAdminProxiesResponses];
+
+export type CreateAdminProxyData = {
+    body: CreateProxyDefinitionRequestWritable;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/proxies';
+};
+
+export type CreateAdminProxyErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type CreateAdminProxyError = CreateAdminProxyErrors[keyof CreateAdminProxyErrors];
+
+export type CreateAdminProxyResponses = {
+    /**
+     * Proxy definition created.
+     */
+    201: ProxyDefinitionResponse;
+};
+
+export type CreateAdminProxyResponse = CreateAdminProxyResponses[keyof CreateAdminProxyResponses];
+
+export type UpdateAdminProxyData = {
+    body: UpdateProxyDefinitionRequestWritable;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/proxies/{id}';
+};
+
+export type UpdateAdminProxyErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UpdateAdminProxyError = UpdateAdminProxyErrors[keyof UpdateAdminProxyErrors];
+
+export type UpdateAdminProxyResponses = {
+    /**
+     * Proxy definition updated.
+     */
+    200: ProxyDefinitionResponse;
+};
+
+export type UpdateAdminProxyResponse = UpdateAdminProxyResponses[keyof UpdateAdminProxyResponses];
+
 export type TestAdminAccountData = {
     body?: never;
     path: {
@@ -5156,6 +5417,116 @@ export type ListAdminBillingLedgerResponses = {
 };
 
 export type ListAdminBillingLedgerResponse = ListAdminBillingLedgerResponses[keyof ListAdminBillingLedgerResponses];
+
+export type ListAdminAffiliateInvitesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        page_size?: number;
+    };
+    url: '/api/v1/admin/affiliates/invites';
+};
+
+export type ListAdminAffiliateInvitesErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminAffiliateInvitesError = ListAdminAffiliateInvitesErrors[keyof ListAdminAffiliateInvitesErrors];
+
+export type ListAdminAffiliateInvitesResponses = {
+    /**
+     * Affiliate invite relationship list.
+     */
+    200: AffiliateInviteRecordListResponse;
+};
+
+export type ListAdminAffiliateInvitesResponse = ListAdminAffiliateInvitesResponses[keyof ListAdminAffiliateInvitesResponses];
+
+export type ListAdminAffiliateRebatesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        page_size?: number;
+        user_id?: Id;
+    };
+    url: '/api/v1/admin/affiliates/rebates';
+};
+
+export type ListAdminAffiliateRebatesErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminAffiliateRebatesError = ListAdminAffiliateRebatesErrors[keyof ListAdminAffiliateRebatesErrors];
+
+export type ListAdminAffiliateRebatesResponses = {
+    /**
+     * Affiliate rebate ledger list.
+     */
+    200: AffiliateLedgerEntryListResponse;
+};
+
+export type ListAdminAffiliateRebatesResponse = ListAdminAffiliateRebatesResponses[keyof ListAdminAffiliateRebatesResponses];
+
+export type ListAdminAffiliateTransfersData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        page_size?: number;
+        user_id?: Id;
+    };
+    url: '/api/v1/admin/affiliates/transfers';
+};
+
+export type ListAdminAffiliateTransfersErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminAffiliateTransfersError = ListAdminAffiliateTransfersErrors[keyof ListAdminAffiliateTransfersErrors];
+
+export type ListAdminAffiliateTransfersResponses = {
+    /**
+     * Affiliate transfer ledger list.
+     */
+    200: AffiliateLedgerEntryListResponse;
+};
+
+export type ListAdminAffiliateTransfersResponse = ListAdminAffiliateTransfersResponses[keyof ListAdminAffiliateTransfersResponses];
 
 export type ListAdminPaymentProvidersData = {
     body?: never;

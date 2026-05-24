@@ -71,6 +71,7 @@ func (s *Service) Record(ctx context.Context, req contract.RecordRequest) (contr
 		ErrorClass:            req.ErrorClass,
 		Cost:                  cost,
 		Currency:              currency,
+		ChargedAt:             req.ChargedAt,
 		CompatibilityWarnings: cloneStrings(req.CompatibilityWarnings),
 		CreatedAt:             s.clock.Now(),
 	})

@@ -3,16 +3,19 @@
 import React, { useState } from 'react';
 import { ChevronRight, Copy, Check } from 'lucide-react';
 import DashboardLayout from '../../components/DashboardLayout';
-import { useApiKeys, useUsageLogs } from '@/hooks/queries';
+import { useApiKeys, useLiveCurrentUser, useUsageLogs } from '@/hooks/queries';
 import { useLanguage } from '../../context/LanguageContext';
+import { PageQueryError, PageQueryLoading } from '@/components/layout/page-query-state';
 
 export default function UserDashboard() {
   const { language } = useLanguage();
+  const currentUserQuery = useLiveCurrentUser();
   const apiKeysQuery = useApiKeys();
   const usageQuery = useUsageLogs();
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const loading = apiKeysQuery.isLoading || usageQuery.isLoading;
+  const loading = currentUserQuery.isLoading || apiKeysQuery.isLoading || usageQuery.isLoading;
+  const user = currentUserQuery.data;
   const keys = (apiKeysQuery.data ?? []).slice(0, 3);
   const recentLogs = (usageQuery.data ?? []).slice(0, 5);
 
@@ -24,20 +27,32 @@ export default function UserDashboard() {
 
   const activeKeysCount = keys.filter((k) => k.status === 'active').length;
   const totalCost = recentLogs.reduce((acc, log) => acc + log.cost, 0);
+  const successfulRequests = recentLogs.filter((log) => log.success).length;
+  const successRate = recentLogs.length > 0 ? (successfulRequests / recentLogs.length) * 100 : null;
+  const totalTokens = recentLogs.reduce((acc, log) => acc + log.total_tokens, 0);
+  const balance = user ? Number.parseFloat(user.balance) : 0;
+  const formattedBalance = Number.isFinite(balance)
+    ? new Intl.NumberFormat(language === 'en' ? 'en-US' : 'zh-CN', {
+        style: 'currency',
+        currency: user?.currency || 'USD',
+        maximumFractionDigits: 4,
+      }).format(balance)
+    : `${user?.balance ?? '0'} ${user?.currency ?? 'USD'}`;
 
   // SRapi v0.1.0 product tone, see docs/PRODUCT_TONE.md.
   const textEpochPerformance = language === 'en' ? 'This period' : '本周期';
   const textAvailableYield = language === 'en' ? 'Available balance' : '可用余额';
   const textUsdCredits = language === 'en' ? 'USD' : '美元';
   const textAccountUsage = language === 'en' ? 'Used' : '已用';
-  const textCap = language === 'en' ? 'Cap' : '上限';
+  const textRpmLimit = language === 'en' ? 'RPM limit' : 'RPM 限制';
   const textActiveChannels = language === 'en' ? 'Active API keys' : '启用中的密钥';
   const textCredentials = language === 'en' ? 'keys' : '个';
   const textRoutingStatus = language === 'en' ? 'Gateway:' : '网关：';
-  const textOperational = language === 'en' ? '● Online' : '● 在线';
+  const textOperational = language === 'en' ? 'Live API' : '实时 API';
   const textEpochCost = language === 'en' ? 'Spend this period' : '本周期花费';
   const textRoutedDebits = language === 'en' ? 'spent' : '已花费';
-  const textSlaAvailability = language === 'en' ? 'Uptime:' : '可用率：';
+  const textSuccessRate = language === 'en' ? 'Success rate:' : '成功率：';
+  const textNotProvided = language === 'en' ? 'Not provided' : '未提供';
   const textAuthorizedChannels = language === 'en' ? 'Your API keys' : '你的 API 密钥';
   const textConfigureKeys = language === 'en' ? 'Manage keys' : '管理密钥';
   const textActive = language === 'en' ? '● Active' : '● 启用';
@@ -59,10 +74,16 @@ export default function UserDashboard() {
   return (
     <DashboardLayout allowedRole="user">
       {loading ? (
-        <div className="py-12 text-center font-mono">
-          <div className="w-6 h-6 border-t-2 border-srapi-primary rounded-full animate-spin mx-auto mb-3"></div>
-          <p className="text-xs text-srapi-text-secondary">{textSynthesizing}</p>
-        </div>
+        <PageQueryLoading label={textSynthesizing} />
+      ) : currentUserQuery.isError || apiKeysQuery.isError || usageQuery.isError ? (
+        <PageQueryError
+          error={currentUserQuery.error || apiKeysQuery.error || usageQuery.error}
+          onRetry={() => {
+            void currentUserQuery.refetch();
+            void apiKeysQuery.refetch();
+            void usageQuery.refetch();
+          }}
+        />
       ) : (
         <div className="space-y-12">
           
@@ -76,19 +97,18 @@ export default function UserDashboard() {
                 <div>
                   <div className="text-[10px] font-mono tracking-wider uppercase text-srapi-text-secondary mb-2">{textAvailableYield}</div>
                   <div className="flex items-baseline space-x-2">
-                    <span className="font-serif text-3xl font-medium tracking-tight text-srapi-primary">$42.50</span>
-                    <span className="text-[9px] font-mono text-srapi-text-secondary uppercase">{textUsdCredits}</span>
+                    <span className="font-serif text-3xl font-medium tracking-tight text-srapi-primary">{formattedBalance}</span>
+                    <span className="text-[9px] font-mono text-srapi-text-secondary uppercase">{user?.currency || textUsdCredits}</span>
                   </div>
                 </div>
                 
-                {/* 1px letterpress Dial indicating Quota Remainder */}
                 <div className="w-full">
                   <div className="relative w-full bg-srapi-border h-[1px]">
-                    <div className="absolute h-3 w-[1px] bg-srapi-primary -top-1" style={{ left: '42.5%' }}></div>
+                    <div className="absolute h-3 w-[1px] bg-srapi-primary -top-1" style={{ left: '0%' }}></div>
                   </div>
                   <div className="flex justify-between items-center mt-2.5 text-[9px] font-mono text-srapi-text-secondary">
-                    <span>{textAccountUsage}: 42.5%</span>
-                    <span>{textCap}: $100.0</span>
+                    <span>{textAccountUsage}: {totalTokens.toLocaleString()} tokens</span>
+                    <span>{textRpmLimit}: {user?.rpm_limit ?? textNotProvided}</span>
                   </div>
                 </div>
               </div>
@@ -118,8 +138,10 @@ export default function UserDashboard() {
                   </div>
                 </div>
                 <div className="text-[10px] font-mono text-srapi-text-secondary border-t border-srapi-border/40 pt-2.5 flex items-center justify-between">
-                  <span>{textSlaAvailability}</span>
-                  <span className="text-green-700 dark:text-green-500 font-bold">99.98%</span>
+                  <span>{textSuccessRate}</span>
+                  <span className="text-green-700 dark:text-green-500 font-bold">
+                    {successRate === null ? textNotProvided : `${successRate.toFixed(1)}%`}
+                  </span>
                 </div>
               </div>
 

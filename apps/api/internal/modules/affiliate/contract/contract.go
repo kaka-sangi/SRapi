@@ -196,6 +196,7 @@ type Store interface {
 	FindInviteCodeByCode(ctx context.Context, code string) (InviteCode, error)
 	CreateRelationship(ctx context.Context, input InviteRelationship) (InviteRelationship, error)
 	FindRelationshipByInvitee(ctx context.Context, inviteeUserID int) (InviteRelationship, error)
+	ListRelationships(ctx context.Context) ([]InviteRelationship, error)
 	MarkRelationshipFirstPaid(ctx context.Context, id int, firstPaidAt time.Time) (InviteRelationship, error)
 	CreateRule(ctx context.Context, input AffiliateRule) (AffiliateRule, error)
 	GetEffectiveRule(ctx context.Context, trigger TriggerType, currency string, at time.Time) (AffiliateRule, error)

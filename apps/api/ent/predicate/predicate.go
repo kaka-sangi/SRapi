@@ -87,6 +87,9 @@ type Provider func(*sql.Selector)
 // ProviderAccount is the predicate function for provideraccount builders.
 type ProviderAccount func(*sql.Selector)
 
+// Proxy is the predicate function for proxy builders.
+type Proxy func(*sql.Selector)
+
 // Role is the predicate function for role builders.
 type Role func(*sql.Selector)
 

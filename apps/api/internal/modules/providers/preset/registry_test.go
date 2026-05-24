@@ -23,12 +23,15 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 		"grok",
 		"groq",
 		"kimi",
+		"mistral",
 		"moonshot",
 		"moonshot-anthropic",
 		"openai",
 		"openai-compatible",
 		"openrouter",
+		"qwen",
 		"rerank-compatible",
+		"together",
 		"zai",
 		"zai-anthropic",
 		"zhipu",
@@ -126,6 +129,22 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	}
 	if !containsAccountType(groqPreset.AccountTypeAllowlist, AccountTypeAPIKey) || !containsAuthMode(groqPreset.AuthModes, AuthModeBearer) {
 		t.Fatalf("expected groq preset to include bearer api_key support")
+	}
+
+	togetherPreset, ok := registry.Lookup("together")
+	if !ok {
+		t.Fatalf("missing together preset")
+	}
+	if togetherPreset.DefaultBaseURL != "https://api.together.xyz/v1" {
+		t.Fatalf("unexpected together base url: %s", togetherPreset.DefaultBaseURL)
+	}
+
+	qwenPreset, ok := registry.Lookup("qwen")
+	if !ok {
+		t.Fatalf("missing qwen preset")
+	}
+	if !qwenPreset.MatchesPath("/api/provider/tongyi/v1/chat/completions") {
+		t.Fatalf("expected tongyi route alias to map to qwen preset")
 	}
 
 	rerankPreset, ok := registry.Lookup("rerank-compatible")

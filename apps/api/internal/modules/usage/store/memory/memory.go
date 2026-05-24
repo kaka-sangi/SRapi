@@ -61,6 +61,10 @@ func (s *Store) ListByUser(_ context.Context, userID int) ([]contract.UsageLog, 
 
 func cloneLog(value contract.UsageLog) contract.UsageLog {
 	value.CompatibilityWarnings = cloneStrings(value.CompatibilityWarnings)
+	if value.ChargedAt != nil {
+		cloned := *value.ChargedAt
+		value.ChargedAt = &cloned
+	}
 	return value
 }
 

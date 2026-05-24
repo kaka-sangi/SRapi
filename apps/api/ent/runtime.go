@@ -32,6 +32,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/pricingrule"
 	"github.com/srapi/srapi/apps/api/ent/provider"
 	"github.com/srapi/srapi/apps/api/ent/provideraccount"
+	"github.com/srapi/srapi/apps/api/ent/proxy"
 	"github.com/srapi/srapi/apps/api/ent/role"
 	"github.com/srapi/srapi/apps/api/ent/schedulerdecision"
 	"github.com/srapi/srapi/apps/api/ent/schedulerfeedback"
@@ -936,6 +937,37 @@ func init() {
 	provideraccountDescRiskLevel := provideraccountFields[11].Descriptor()
 	// provideraccount.DefaultRiskLevel holds the default value on creation for the risk_level field.
 	provideraccount.DefaultRiskLevel = provideraccountDescRiskLevel.Default.(string)
+	proxyMixin := schema.Proxy{}.Mixin()
+	proxyMixinFields0 := proxyMixin[0].Fields()
+	_ = proxyMixinFields0
+	proxyFields := schema.Proxy{}.Fields()
+	_ = proxyFields
+	// proxyDescCreatedAt is the schema descriptor for created_at field.
+	proxyDescCreatedAt := proxyMixinFields0[0].Descriptor()
+	// proxy.DefaultCreatedAt holds the default value on creation for the created_at field.
+	proxy.DefaultCreatedAt = proxyDescCreatedAt.Default.(func() time.Time)
+	// proxyDescUpdatedAt is the schema descriptor for updated_at field.
+	proxyDescUpdatedAt := proxyMixinFields0[1].Descriptor()
+	// proxy.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	proxy.DefaultUpdatedAt = proxyDescUpdatedAt.Default.(func() time.Time)
+	// proxy.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	proxy.UpdateDefaultUpdatedAt = proxyDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// proxyDescName is the schema descriptor for name field.
+	proxyDescName := proxyFields[0].Descriptor()
+	// proxy.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	proxy.NameValidator = proxyDescName.Validators[0].(func(string) error)
+	// proxyDescType is the schema descriptor for type field.
+	proxyDescType := proxyFields[1].Descriptor()
+	// proxy.TypeValidator is a validator for the "type" field. It is called by the builders before save.
+	proxy.TypeValidator = proxyDescType.Validators[0].(func(string) error)
+	// proxyDescURLVersion is the schema descriptor for url_version field.
+	proxyDescURLVersion := proxyFields[3].Descriptor()
+	// proxy.DefaultURLVersion holds the default value on creation for the url_version field.
+	proxy.DefaultURLVersion = proxyDescURLVersion.Default.(int)
+	// proxyDescStatus is the schema descriptor for status field.
+	proxyDescStatus := proxyFields[4].Descriptor()
+	// proxy.DefaultStatus holds the default value on creation for the status field.
+	proxy.DefaultStatus = proxyDescStatus.Default.(string)
 	roleMixin := schema.Role{}.Mixin()
 	roleMixinFields0 := roleMixin[0].Fields()
 	_ = roleMixinFields0

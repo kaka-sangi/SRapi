@@ -164,6 +164,12 @@ type PricingResult struct {
 	PricingRuleID *int
 }
 
+// ExpireSubscriptionsResult reports the outcome of a subscription expiration pass.
+type ExpireSubscriptionsResult struct {
+	Selected int
+	Expired  int
+}
+
 type Store interface {
 	CreatePlan(ctx context.Context, input CreateStoredPlan) (SubscriptionPlan, error)
 	FindPlanByID(ctx context.Context, id int) (SubscriptionPlan, error)
@@ -173,6 +179,8 @@ type Store interface {
 	ListUserSubscriptions(ctx context.Context) ([]UserSubscription, error)
 	ListUserSubscriptionsByUser(ctx context.Context, userID int) ([]UserSubscription, error)
 	ListActiveUserSubscriptions(ctx context.Context, userID int, at time.Time) ([]UserSubscription, error)
+	ListExpiredActiveUserSubscriptions(ctx context.Context, now time.Time) ([]UserSubscription, error)
+	ExpireUserSubscription(ctx context.Context, id int, now time.Time) (UserSubscription, bool, error)
 	CreatePricingRule(ctx context.Context, input PricingRule) (PricingRule, error)
 	ListPricingRules(ctx context.Context) ([]PricingRule, error)
 }

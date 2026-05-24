@@ -70,14 +70,13 @@ apps/web/
 │  │  └─ zh.ts
 │  │
 │  └─ lib/
-│     ├─ api.ts                 # apiService 门面：SDK + demo 回退
+│     ├─ api.ts                 # apiService 门面：只走真实 SDK/API
 │     ├─ cn.ts                  # tailwind-merge + clsx
-│     ├─ mockData.ts            # 演示数据
 │     ├─ query-keys.ts          # 集中式 query 键
 │     ├─ schemas/               # zod schemas（client + 未来 Server Action 共用）
 │     │   └─ api-key.ts         # createApiKeySchema + parseGroupIdsCsv
 │     ├─ session-cookie.ts      # 给 proxy.ts 使用的非凭据存在标记
-│     └─ telemetry.ts           # web-vitals + Sentry hook stub
+│     └─ telemetry.ts           # web-vitals + redacted exception collector
 │
 ├─ tests/
 │  ├─ unit/                     # Vitest 单测 + axe 单测
@@ -99,8 +98,6 @@ Page (Client Component)
    │  useXxx (TanStack Query)
    ▼
 hooks/queries.ts   ──> apiService (lib/api.ts) ──> packages/sdk (生成自 OpenAPI)
-                                  │
-                                  └─ 演示模式回退 ──> lib/mockData.ts
 
 Page (Login)
    │  apiService.login → setSessionPresenceCookie
@@ -110,6 +107,7 @@ AuthGate (client)      ──> 兜底守卫 + 注入 user / runtimeStatus 到子
 ```
 
 - 所有页面通过 `@/hooks/queries` 拿数据，hooks 内部调 `apiService.*`，apiService 内部走 `packages/sdk`。**禁止**在页面里手写 `useEffect+fetch` 或 `useState+setLoading`。
+- 前端主体不提供演示业务数据回退；后端不可用或接口失败时显示明确错误态/空态。
 - 凭据从未进入前端：`packages/sdk` 用浏览器 cookie + CSRF，`session-cookie.ts` 只写一个非敏感的 "presence" 标记给 proxy 用。
 - AuthGate 的当前用户由 `useSyncExternalStore(localStorage)` 派生；缓存由 raw JSON 字符串校验，避免 React error #185。同 tab 内 `apiService.login/logout` 触发 `srapi:user-change` 事件即时刷新。
 
@@ -128,15 +126,16 @@ AuthGate (client)      ──> 兜底守卫 + 注入 user / runtimeStatus 到子
 
 1. `npm run typecheck` — `tsc --noEmit`
 2. `npm run lint` — eslint（next + 严格规则）
-3. `npm run test` — vitest run（单测 + axe 单测，目前 33 例）
+3. `npm run test` — vitest run（单测 + axe 单测，目前 98 例）
 4. `npm run build` — `next build`（同时验证 CSP 头）
 5. `node tools/bundle-budget.mjs` — 读 `apps/web/bundle-budget.json` 校验 chunk 大小
 
 `make web-check-e2e` 单独跑（成本高）：
 
-1. `next build`
-2. 安装 Playwright Chromium（可通过 `SRAPI_WEB_E2E_SKIP_INSTALL=1` 跳过）
-3. `playwright test`（含 `@axe-core/playwright` 全页 a11y）
+1. API preflight：检查 `SRAPI_WEB_E2E_API_URL`（默认 `http://127.0.0.1:8080`）的 `/livez` 与 `/readyz`；该目标同时传给 `SRAPI_API_PROXY_TARGET`，浏览器默认继续通过 Next 同源代理访问后端。只有在目标 API 已配置浏览器 CORS/cookie 凭据时，才用 `SRAPI_WEB_E2E_DIRECT_BROWSER_API=1` 让 SDK 直连 API。
+2. `next build`
+3. 安装 Playwright Chromium（可通过 `SRAPI_WEB_E2E_SKIP_INSTALL=1` 跳过；OS 依赖用 `npm run test:e2e:install-deps` 显式安装）
+4. `playwright test`（含 `@axe-core/playwright` 全页 a11y）
 
 `make check` 已把 `web-check` 加在最后一步，前后端任意一侧出问题都拦截。
 
@@ -151,6 +150,8 @@ AuthGate (client)      ──> 兜底守卫 + 注入 user / runtimeStatus 到子
 | 单个最大 chunk | ≤ 500 KB（`bundle-budget.json/largest-chunk`） | 同上 |
 | 首屏 JS | bundle analyzer 看图 | `npm run analyze` |
 | 主路由 RSC | 静态预渲染优先 | `next build` 输出表 |
+
+`NEXT_PUBLIC_SRAPI_TELEMETRY_URL` 同时接收 Core Web Vitals 与前端异常摘要。生产 CSP 会把该 URL 的 origin 加入 `connect-src`，但不会放开通配域。异常上报只包含低基数字段、当前页面、错误名称/消息/栈摘要和脱敏后的上下文；不得上传 API key、Authorization、Cookie、CSRF、session、provider credential、prompt、messages 或请求体。
 
 ## 7. 安全
 
@@ -174,7 +175,7 @@ AuthGate (client)      ──> 兜底守卫 + 注入 user / runtimeStatus 到子
 
 ## 10. 演进路线
 
-- **WP-160a**（已完成）：P0–P3 + 前端 harness，组件库、TanStack Query 全量接入、AuthGate 修复 React #185、6 页全部走 hooks、API key 表单走 react-hook-form + zod、bundle 预算守门。33 单测 + 6 e2e 通过。
+- **WP-160a**（已完成）：P0–P3 + 前端 harness，组件库、TanStack Query 全量接入、AuthGate 修复 React #185、6 页全部走 hooks、API key 表单走 react-hook-form + zod、bundle 预算守门。98 单测 + 5 e2e 通过。
 - **WP-160b**：把 `LanguageContext` 替换成 `next-intl`，启用 ICU plural、按路由代码分割。
 - **WP-160c**：把 admin 总览、用量页改成 RSC + Server Action（form action 用现成的 `@/lib/schemas/api-key.ts` 直接复用）。
 - **WP-160d**：Storybook + Chromatic 视觉回归（如果团队真的需要设计评审产物）。

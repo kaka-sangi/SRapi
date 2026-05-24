@@ -171,6 +171,9 @@ func TestRepositoryTextFilesAreClean(t *testing.T) {
 		}
 		raw, err := os.ReadFile(filepath.Join(root, rel))
 		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
 			t.Fatal(err)
 		}
 		violations = append(violations, textHygieneViolations(rel, raw)...)
@@ -188,6 +191,21 @@ func TestNodeScriptsParse(t *testing.T) {
 		}
 		runCommand(t, root, "node", "--check", rel)
 	}
+}
+
+func TestNodeUnitTestsPass(t *testing.T) {
+	root := repoRoot(t)
+	var files []string
+	for _, rel := range repoFiles(t, root) {
+		if strings.HasSuffix(rel, ".test.mjs") {
+			files = append(files, rel)
+		}
+	}
+	if len(files) == 0 {
+		return
+	}
+	args := append([]string{"--test"}, files...)
+	runCommand(t, root, "node", args...)
 }
 
 func TestShellScriptsParse(t *testing.T) {
@@ -258,6 +276,32 @@ func TestProductionGoAvoidsPanicAndRecoverOutsideBootstrap(t *testing.T) {
 	}
 	if len(violations) > 0 {
 		t.Fatalf("panic/recover violations:\n%s", strings.Join(violations, "\n"))
+	}
+}
+
+func TestProductionGoHasNoPlaceholderNotImplementedHandlers(t *testing.T) {
+	root := repoRoot(t)
+	files := goFiles(t, root, productionOnly)
+	disallowed := []string{
+		"http.StatusNotImplemented",
+		"StatusNotImplemented",
+		`"not_implemented"`,
+		`"not implemented yet"`,
+	}
+	var violations []string
+	for _, path := range files {
+		rel := relativePath(root, path)
+		lines := fileLines(t, path)
+		for i, line := range lines {
+			for _, marker := range disallowed {
+				if strings.Contains(line, marker) {
+					violations = append(violations, rel+":"+strconv.Itoa(i+1)+": remove placeholder not-implemented response "+marker)
+				}
+			}
+		}
+	}
+	if len(violations) > 0 {
+		t.Fatalf("not-implemented placeholder violations:\n%s", strings.Join(violations, "\n"))
 	}
 }
 

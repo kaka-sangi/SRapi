@@ -172,7 +172,7 @@ func TestInjectedPersistentStoresSurviveRuntimeRebuild(t *testing.T) {
 			t.Fatalf("decode billing ledger: %v", err)
 		}
 		return len(resp.Data)
-	}, 1)
+	}, 0)
 	assertListCount(t, restarted, restartedSessionCookie, "/api/v1/admin/ops/events/outbox?event_type=GatewayRequestCompleted", func(payload []byte) int {
 		var resp apiopenapi.DomainEventOutboxListResponse
 		if err := json.Unmarshal(payload, &resp); err != nil {

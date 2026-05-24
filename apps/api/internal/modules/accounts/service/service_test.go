@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -48,6 +49,80 @@ func TestCreateRejectsMissingCredential(t *testing.T) {
 	})
 	if !errors.Is(err, ErrCredentialMissing) {
 		t.Fatalf("expected ErrCredentialMissing, got %v", err)
+	}
+}
+
+func TestProxyRegistryEncryptsURLAndResolvesRuntimeURL(t *testing.T) {
+	store := accountmemory.New()
+	svc, err := New(store, "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	ctx := context.Background()
+
+	proxy, err := svc.CreateProxy(ctx, contract.CreateProxyRequest{
+		Name:     "us-east-egress",
+		Type:     contract.ProxyTypeHTTPS,
+		URL:      "https://proxy-user:proxy-pass@example.invalid:8443",
+		Metadata: map[string]any{"region": "us-east"},
+	})
+	if err != nil {
+		t.Fatalf("create proxy: %v", err)
+	}
+	if proxy.URLCiphertext == "" || strings.Contains(proxy.URLCiphertext, "proxy-pass") {
+		t.Fatalf("proxy url was not encrypted: %+v", proxy)
+	}
+	if proxy.URLVersion != "v1" || proxy.Metadata["region"] != "us-east" {
+		t.Fatalf("unexpected proxy metadata: %+v", proxy)
+	}
+
+	id := strconv.Itoa(proxy.ID)
+	account, err := svc.Create(ctx, contract.CreateRequest{
+		ProviderID:   1,
+		Name:         "proxied",
+		RuntimeClass: contract.RuntimeClassAPIKey,
+		Credential:   map[string]any{"api_key": "secret-value"},
+	})
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+	bound, err := svc.BindProxy(ctx, account.ID, &id)
+	if err != nil {
+		t.Fatalf("bind proxy: %v", err)
+	}
+	if bound.ProxyID == nil || *bound.ProxyID != id {
+		t.Fatalf("unexpected proxy binding: %+v", bound)
+	}
+
+	runtimeURL, err := svc.ResolveProxyURL(ctx, bound.ProxyID)
+	if err != nil {
+		t.Fatalf("resolve proxy url: %v", err)
+	}
+	if runtimeURL == nil || *runtimeURL != "https://proxy-user:proxy-pass@example.invalid:8443" {
+		t.Fatalf("unexpected runtime proxy url: %v", runtimeURL)
+	}
+
+	disabled := contract.ProxyStatusDisabled
+	if _, err := svc.UpdateProxy(ctx, proxy.ID, contract.UpdateProxyRequest{Status: &disabled}); err != nil {
+		t.Fatalf("disable proxy: %v", err)
+	}
+	if _, err := svc.ResolveProxyURL(ctx, &id); !errors.Is(err, ErrProxyUnavailable) {
+		t.Fatalf("expected unavailable proxy resolution, got %v", err)
+	}
+}
+
+func TestProxyRegistryRejectsMismatchedScheme(t *testing.T) {
+	svc, err := New(accountmemory.New(), "0123456789abcdef0123456789abcdef", nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	_, err = svc.CreateProxy(context.Background(), contract.CreateProxyRequest{
+		Name: "bad-proxy",
+		Type: contract.ProxyTypeSOCKS5,
+		URL:  "https://example.invalid:8443",
+	})
+	if !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected invalid input, got %v", err)
 	}
 }
 

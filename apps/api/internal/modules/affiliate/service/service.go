@@ -350,6 +350,10 @@ func (s *Service) ListLedgers(ctx context.Context) ([]contract.AffiliateLedger, 
 	return s.store.ListLedgers(ctx)
 }
 
+func (s *Service) ListRelationships(ctx context.Context) ([]contract.InviteRelationship, error) {
+	return s.store.ListRelationships(ctx)
+}
+
 func (s *Service) recordAudit(ctx context.Context, action string, resourceType string, resourceID string, before map[string]any, after map[string]any) {
 	if s.deps.Audit == nil {
 		return

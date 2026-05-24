@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -110,6 +111,113 @@ func (s *Service) ListGroupIDsByAccount(ctx context.Context, accountID int) ([]i
 		return nil, ErrInvalidInput
 	}
 	return s.store.ListGroupIDsByAccount(ctx, accountID)
+}
+
+func (s *Service) CreateProxy(ctx context.Context, req contract.CreateProxyRequest) (contract.ProxyDefinition, error) {
+	name := strings.TrimSpace(req.Name)
+	proxyType := req.Type
+	rawURL := strings.TrimSpace(req.URL)
+	if name == "" || rawURL == "" || !validProxyType(proxyType) {
+		return contract.ProxyDefinition{}, ErrInvalidInput
+	}
+	if err := validateProxyURL(proxyType, rawURL); err != nil {
+		return contract.ProxyDefinition{}, err
+	}
+	ciphertext, err := s.encryptCredential(map[string]any{"url": rawURL})
+	if err != nil {
+		return contract.ProxyDefinition{}, err
+	}
+	status := contract.ProxyStatusActive
+	if req.Status != nil {
+		if !validProxyStatus(*req.Status) {
+			return contract.ProxyDefinition{}, ErrInvalidInput
+		}
+		status = *req.Status
+	}
+	return s.store.CreateProxy(ctx, contract.CreateStoredProxy{
+		Name:          name,
+		Type:          proxyType,
+		URLCiphertext: ciphertext,
+		URLVersion:    credentialVersionV1,
+		Status:        status,
+		Metadata:      cloneMap(req.Metadata),
+	})
+}
+
+func (s *Service) UpdateProxy(ctx context.Context, id int, req contract.UpdateProxyRequest) (contract.ProxyDefinition, error) {
+	if id <= 0 {
+		return contract.ProxyDefinition{}, ErrInvalidInput
+	}
+	proxy, err := s.store.FindProxyByID(ctx, id)
+	if err != nil {
+		return contract.ProxyDefinition{}, err
+	}
+	if req.Name != nil {
+		name := strings.TrimSpace(*req.Name)
+		if name == "" {
+			return contract.ProxyDefinition{}, ErrInvalidInput
+		}
+		proxy.Name = name
+	}
+	if req.Type != nil {
+		if !validProxyType(*req.Type) {
+			return contract.ProxyDefinition{}, ErrInvalidInput
+		}
+		proxy.Type = *req.Type
+	}
+	if req.URL != nil {
+		rawURL := strings.TrimSpace(*req.URL)
+		if rawURL == "" {
+			return contract.ProxyDefinition{}, ErrInvalidInput
+		}
+		if err := validateProxyURL(proxy.Type, rawURL); err != nil {
+			return contract.ProxyDefinition{}, err
+		}
+		ciphertext, err := s.encryptCredential(map[string]any{"url": rawURL})
+		if err != nil {
+			return contract.ProxyDefinition{}, err
+		}
+		proxy.URLCiphertext = ciphertext
+		proxy.URLVersion = credentialVersionV1
+	} else if req.Type != nil && proxy.URLCiphertext != "" {
+		rawURL, err := s.decryptProxyURL(proxy)
+		if err != nil {
+			return contract.ProxyDefinition{}, err
+		}
+		if err := validateProxyURL(proxy.Type, rawURL); err != nil {
+			return contract.ProxyDefinition{}, err
+		}
+	}
+	if req.Status != nil {
+		if !validProxyStatus(*req.Status) {
+			return contract.ProxyDefinition{}, ErrInvalidInput
+		}
+		proxy.Status = *req.Status
+	}
+	if req.Metadata != nil {
+		proxy.Metadata = cloneMap(*req.Metadata)
+	}
+	proxy.UpdatedAt = s.clock.Now()
+	return s.store.UpdateProxy(ctx, proxy)
+}
+
+func (s *Service) FindProxyByID(ctx context.Context, id int) (contract.ProxyDefinition, error) {
+	if id <= 0 {
+		return contract.ProxyDefinition{}, ErrInvalidInput
+	}
+	return s.store.FindProxyByID(ctx, id)
+}
+
+func (s *Service) ListProxies(ctx context.Context) ([]contract.ProxyDefinition, error) {
+	proxies, err := s.store.ListProxies(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]contract.ProxyDefinition, 0, len(proxies))
+	for _, proxy := range proxies {
+		out = append(out, proxy)
+	}
+	return out, nil
 }
 
 func (s *Service) CreateGroup(ctx context.Context, req contract.CreateGroupRequest) (contract.AccountGroup, error) {
@@ -410,6 +518,41 @@ func (s *Service) BindProxy(ctx context.Context, id int, proxyID *string) (contr
 	return s.Update(ctx, id, contract.UpdateRequest{ProxyID: &normalized})
 }
 
+func (s *Service) ResolveProxyURL(ctx context.Context, proxyID *string) (*string, error) {
+	if proxyID == nil {
+		return nil, nil
+	}
+	trimmed := strings.TrimSpace(*proxyID)
+	if trimmed == "" {
+		return nil, nil
+	}
+	if strings.Contains(trimmed, "://") {
+		if _, err := url.ParseRequestURI(trimmed); err != nil {
+			return nil, ErrInvalidInput
+		}
+		return &trimmed, nil
+	}
+	id, err := strconv.Atoi(trimmed)
+	if err != nil || id <= 0 {
+		return nil, ErrInvalidInput
+	}
+	proxy, err := s.store.FindProxyByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if proxy.Status != contract.ProxyStatusActive || proxy.URLCiphertext == "" {
+		return nil, ErrProxyUnavailable
+	}
+	rawURL, err := s.decryptProxyURL(proxy)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateProxyURL(proxy.Type, rawURL); err != nil {
+		return nil, err
+	}
+	return &rawURL, nil
+}
+
 func (s *Service) Recover(ctx context.Context, id int) (contract.ProviderAccount, error) {
 	if id <= 0 {
 		return contract.ProviderAccount{}, ErrInvalidInput
@@ -558,6 +701,47 @@ func (s *Service) decryptCredential(ciphertext string) (map[string]any, error) {
 		return nil, err
 	}
 	return payload, nil
+}
+
+func (s *Service) decryptProxyURL(proxy contract.ProxyDefinition) (string, error) {
+	payload, err := s.decryptCredential(proxy.URLCiphertext)
+	if err != nil {
+		return "", err
+	}
+	rawURL, ok := payload["url"].(string)
+	if !ok || strings.TrimSpace(rawURL) == "" {
+		return "", ErrInvalidInput
+	}
+	return strings.TrimSpace(rawURL), nil
+}
+
+func validProxyType(proxyType contract.ProxyType) bool {
+	switch proxyType {
+	case contract.ProxyTypeHTTP, contract.ProxyTypeHTTPS, contract.ProxyTypeSOCKS5:
+		return true
+	default:
+		return false
+	}
+}
+
+func validProxyStatus(status contract.ProxyStatus) bool {
+	switch status {
+	case contract.ProxyStatusActive, contract.ProxyStatusDisabled:
+		return true
+	default:
+		return false
+	}
+}
+
+func validateProxyURL(proxyType contract.ProxyType, rawURL string) error {
+	parsed, err := url.ParseRequestURI(strings.TrimSpace(rawURL))
+	if err != nil || parsed.Host == "" {
+		return ErrInvalidInput
+	}
+	if contract.ProxyType(strings.ToLower(parsed.Scheme)) != proxyType {
+		return ErrInvalidInput
+	}
+	return nil
 }
 
 func validGroupStatus(status contract.GroupStatus) bool {

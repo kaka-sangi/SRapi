@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	"github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 )
 
@@ -25,19 +26,32 @@ type SystemClock struct{}
 
 func (SystemClock) Now() time.Time { return time.Now().UTC() }
 
+type EventEnqueuer interface {
+	Enqueue(ctx context.Context, req eventscontract.EnqueueRequest) (eventscontract.OutboxEvent, error)
+}
+
+type Dependencies struct {
+	Events EventEnqueuer
+}
+
 type Service struct {
 	store contract.Store
+	deps  Dependencies
 	clock Clock
 }
 
 func New(store contract.Store, clock Clock) (*Service, error) {
+	return NewWithDependencies(store, Dependencies{}, clock)
+}
+
+func NewWithDependencies(store contract.Store, deps Dependencies, clock Clock) (*Service, error) {
 	if store == nil {
 		return nil, ErrInvalidInput
 	}
 	if clock == nil {
 		clock = SystemClock{}
 	}
-	return &Service{store: store, clock: clock}, nil
+	return &Service{store: store, deps: deps, clock: clock}, nil
 }
 
 func (s *Service) CreatePlan(ctx context.Context, req contract.CreatePlanRequest) (contract.SubscriptionPlan, error) {
@@ -140,6 +154,30 @@ func (s *Service) ListUserSubscriptionsByUser(ctx context.Context, userID int) (
 		return nil, ErrInvalidInput
 	}
 	return s.store.ListUserSubscriptionsByUser(ctx, userID)
+}
+
+func (s *Service) ExpireActiveUserSubscriptions(ctx context.Context, now time.Time) (contract.ExpireSubscriptionsResult, error) {
+	if now.IsZero() {
+		now = s.clock.Now()
+	}
+	now = now.UTC()
+	subscriptions, err := s.store.ListExpiredActiveUserSubscriptions(ctx, now)
+	if err != nil {
+		return contract.ExpireSubscriptionsResult{}, err
+	}
+	result := contract.ExpireSubscriptionsResult{Selected: len(subscriptions)}
+	for _, subscription := range subscriptions {
+		updated, expired, err := s.store.ExpireUserSubscription(ctx, subscription.ID, now)
+		if err != nil {
+			return result, err
+		}
+		if !expired {
+			continue
+		}
+		s.enqueueSubscriptionExpired(ctx, updated, now)
+		result.Expired++
+	}
+	return result, nil
 }
 
 func (s *Service) CreatePricingRule(ctx context.Context, req contract.CreatePricingRuleRequest) (contract.PricingRule, error) {
@@ -270,6 +308,25 @@ func (s *Service) EstimatePrice(ctx context.Context, req contract.PricingRequest
 	}
 	ruleID := rule.ID
 	return priceFromRule(rule, req, &ruleID), nil
+}
+
+func (s *Service) enqueueSubscriptionExpired(ctx context.Context, subscription contract.UserSubscription, expiredAt time.Time) {
+	if s.deps.Events == nil {
+		return
+	}
+	_, _ = s.deps.Events.Enqueue(ctx, eventscontract.EnqueueRequest{
+		EventType:      "SubscriptionExpired",
+		ProducerModule: "subscriptions",
+		AggregateType:  "user_subscription",
+		AggregateID:    strconv.Itoa(subscription.ID),
+		IdempotencyKey: "subscription_expired:" + strconv.Itoa(subscription.ID),
+		Payload: map[string]any{
+			"subscription_id": subscription.ID,
+			"user_id":         subscription.UserID,
+			"plan_id":         subscription.PlanID,
+			"expired_at":      expiredAt.Format(time.RFC3339Nano),
+		},
+	})
 }
 
 func mergeEntitlements(subscriptions []contract.UserSubscription) map[string]any {

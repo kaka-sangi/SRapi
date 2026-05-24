@@ -83,6 +83,78 @@ func (e AdminTestResultStatus) Valid() bool {
 	}
 }
 
+// Defines values for AffiliateLedgerEntryStatus.
+const (
+	AffiliateLedgerEntryStatusCanceled    AffiliateLedgerEntryStatus = "canceled"
+	AffiliateLedgerEntryStatusCompensated AffiliateLedgerEntryStatus = "compensated"
+	AffiliateLedgerEntryStatusPending     AffiliateLedgerEntryStatus = "pending"
+	AffiliateLedgerEntryStatusSettled     AffiliateLedgerEntryStatus = "settled"
+)
+
+// Valid indicates whether the value is a known member of the AffiliateLedgerEntryStatus enum.
+func (e AffiliateLedgerEntryStatus) Valid() bool {
+	switch e {
+	case AffiliateLedgerEntryStatusCanceled:
+		return true
+	case AffiliateLedgerEntryStatusCompensated:
+		return true
+	case AffiliateLedgerEntryStatusPending:
+		return true
+	case AffiliateLedgerEntryStatusSettled:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AffiliateLedgerEntryType.
+const (
+	Accrue             AffiliateLedgerEntryType = "accrue"
+	ManualAdjustment   AffiliateLedgerEntryType = "manual_adjustment"
+	RefundCompensation AffiliateLedgerEntryType = "refund_compensation"
+	Settle             AffiliateLedgerEntryType = "settle"
+	TransferToBalance  AffiliateLedgerEntryType = "transfer_to_balance"
+	Withdraw           AffiliateLedgerEntryType = "withdraw"
+)
+
+// Valid indicates whether the value is a known member of the AffiliateLedgerEntryType enum.
+func (e AffiliateLedgerEntryType) Valid() bool {
+	switch e {
+	case Accrue:
+		return true
+	case ManualAdjustment:
+		return true
+	case RefundCompensation:
+		return true
+	case Settle:
+		return true
+	case TransferToBalance:
+		return true
+	case Withdraw:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AffiliateRelationshipStatus.
+const (
+	AffiliateRelationshipStatusActive   AffiliateRelationshipStatus = "active"
+	AffiliateRelationshipStatusDisabled AffiliateRelationshipStatus = "disabled"
+)
+
+// Valid indicates whether the value is a known member of the AffiliateRelationshipStatus enum.
+func (e AffiliateRelationshipStatus) Valid() bool {
+	switch e {
+	case AffiliateRelationshipStatusActive:
+		return true
+	case AffiliateRelationshipStatusDisabled:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for AnnouncementAudience.
 const (
 	Admins AnnouncementAudience = "admins"
@@ -1252,6 +1324,7 @@ const (
 	ProviderAdapterTypeAnthropicCompatible       ProviderAdapterType = "anthropic-compatible"
 	ProviderAdapterTypeCustom                    ProviderAdapterType = "custom"
 	ProviderAdapterTypeGeminiCompatible          ProviderAdapterType = "gemini-compatible"
+	ProviderAdapterTypeGenericReverseProxy       ProviderAdapterType = "generic-reverse-proxy"
 	ProviderAdapterTypeNativeAnthropic           ProviderAdapterType = "native-anthropic"
 	ProviderAdapterTypeNativeGemini              ProviderAdapterType = "native-gemini"
 	ProviderAdapterTypeNativeOpenai              ProviderAdapterType = "native-openai"
@@ -1274,6 +1347,8 @@ func (e ProviderAdapterType) Valid() bool {
 	case ProviderAdapterTypeCustom:
 		return true
 	case ProviderAdapterTypeGeminiCompatible:
+		return true
+	case ProviderAdapterTypeGenericReverseProxy:
 		return true
 	case ProviderAdapterTypeNativeAnthropic:
 		return true
@@ -1322,6 +1397,45 @@ func (e ProviderProtocol) Valid() bool {
 	case OpenaiCompatible:
 		return true
 	case RerankCompatible:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ProxyDefinitionStatus.
+const (
+	ProxyDefinitionStatusActive   ProxyDefinitionStatus = "active"
+	ProxyDefinitionStatusDisabled ProxyDefinitionStatus = "disabled"
+)
+
+// Valid indicates whether the value is a known member of the ProxyDefinitionStatus enum.
+func (e ProxyDefinitionStatus) Valid() bool {
+	switch e {
+	case ProxyDefinitionStatusActive:
+		return true
+	case ProxyDefinitionStatusDisabled:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ProxyDefinitionType.
+const (
+	Http   ProxyDefinitionType = "http"
+	Https  ProxyDefinitionType = "https"
+	Socks5 ProxyDefinitionType = "socks5"
+)
+
+// Valid indicates whether the value is a known member of the ProxyDefinitionType enum.
+func (e ProxyDefinitionType) Valid() bool {
+	switch e {
+	case Http:
+		return true
+	case Https:
+		return true
+	case Socks5:
 		return true
 	default:
 		return false
@@ -1525,8 +1639,13 @@ func (e RuntimeClass) Valid() bool {
 
 // Defines values for SchedulerDecisionStrategy.
 const (
-	SchedulerDecisionStrategyBalanced  SchedulerDecisionStrategy = "balanced"
-	SchedulerDecisionStrategyCostSaver SchedulerDecisionStrategy = "cost_saver"
+	SchedulerDecisionStrategyBalanced           SchedulerDecisionStrategy = "balanced"
+	SchedulerDecisionStrategyCacheAffinityFirst SchedulerDecisionStrategy = "cache_affinity_first"
+	SchedulerDecisionStrategyCostSaver          SchedulerDecisionStrategy = "cost_saver"
+	SchedulerDecisionStrategyLatencyFirst       SchedulerDecisionStrategy = "latency_first"
+	SchedulerDecisionStrategyPremiumQuality     SchedulerDecisionStrategy = "premium_quality"
+	SchedulerDecisionStrategyQuotaProtect       SchedulerDecisionStrategy = "quota_protect"
+	SchedulerDecisionStrategyStickyFirst        SchedulerDecisionStrategy = "sticky_first"
 )
 
 // Valid indicates whether the value is a known member of the SchedulerDecisionStrategy enum.
@@ -1534,7 +1653,17 @@ func (e SchedulerDecisionStrategy) Valid() bool {
 	switch e {
 	case SchedulerDecisionStrategyBalanced:
 		return true
+	case SchedulerDecisionStrategyCacheAffinityFirst:
+		return true
 	case SchedulerDecisionStrategyCostSaver:
+		return true
+	case SchedulerDecisionStrategyLatencyFirst:
+		return true
+	case SchedulerDecisionStrategyPremiumQuality:
+		return true
+	case SchedulerDecisionStrategyQuotaProtect:
+		return true
+	case SchedulerDecisionStrategyStickyFirst:
 		return true
 	default:
 		return false
@@ -1543,11 +1672,13 @@ func (e SchedulerDecisionStrategy) Valid() bool {
 
 // Defines values for SchedulerStrategyName.
 const (
-	SchedulerStrategyNameBalanced      SchedulerStrategyName = "balanced"
-	SchedulerStrategyNameCacheAffinity SchedulerStrategyName = "cache_affinity"
-	SchedulerStrategyNameCostSaver     SchedulerStrategyName = "cost_saver"
-	SchedulerStrategyNameLowLatency    SchedulerStrategyName = "low_latency"
-	SchedulerStrategyNameQualityFirst  SchedulerStrategyName = "quality_first"
+	SchedulerStrategyNameBalanced           SchedulerStrategyName = "balanced"
+	SchedulerStrategyNameCacheAffinityFirst SchedulerStrategyName = "cache_affinity_first"
+	SchedulerStrategyNameCostSaver          SchedulerStrategyName = "cost_saver"
+	SchedulerStrategyNameLatencyFirst       SchedulerStrategyName = "latency_first"
+	SchedulerStrategyNamePremiumQuality     SchedulerStrategyName = "premium_quality"
+	SchedulerStrategyNameQuotaProtect       SchedulerStrategyName = "quota_protect"
+	SchedulerStrategyNameStickyFirst        SchedulerStrategyName = "sticky_first"
 )
 
 // Valid indicates whether the value is a known member of the SchedulerStrategyName enum.
@@ -1555,13 +1686,17 @@ func (e SchedulerStrategyName) Valid() bool {
 	switch e {
 	case SchedulerStrategyNameBalanced:
 		return true
-	case SchedulerStrategyNameCacheAffinity:
+	case SchedulerStrategyNameCacheAffinityFirst:
 		return true
 	case SchedulerStrategyNameCostSaver:
 		return true
-	case SchedulerStrategyNameLowLatency:
+	case SchedulerStrategyNameLatencyFirst:
 		return true
-	case SchedulerStrategyNameQualityFirst:
+	case SchedulerStrategyNamePremiumQuality:
+		return true
+	case SchedulerStrategyNameQuotaProtect:
+		return true
+	case SchedulerStrategyNameStickyFirst:
 		return true
 	default:
 		return false
@@ -1702,22 +1837,22 @@ func (e UserStatus) Valid() bool {
 
 // Defines values for UserSubscriptionStatus.
 const (
-	UserSubscriptionStatusActive    UserSubscriptionStatus = "active"
-	UserSubscriptionStatusCancelled UserSubscriptionStatus = "cancelled"
-	UserSubscriptionStatusExpired   UserSubscriptionStatus = "expired"
-	UserSubscriptionStatusSuspended UserSubscriptionStatus = "suspended"
+	Active    UserSubscriptionStatus = "active"
+	Cancelled UserSubscriptionStatus = "cancelled"
+	Expired   UserSubscriptionStatus = "expired"
+	Suspended UserSubscriptionStatus = "suspended"
 )
 
 // Valid indicates whether the value is a known member of the UserSubscriptionStatus enum.
 func (e UserSubscriptionStatus) Valid() bool {
 	switch e {
-	case UserSubscriptionStatusActive:
+	case Active:
 		return true
-	case UserSubscriptionStatusCancelled:
+	case Cancelled:
 		return true
-	case UserSubscriptionStatusExpired:
+	case Expired:
 		return true
-	case UserSubscriptionStatusSuspended:
+	case Suspended:
 		return true
 	default:
 		return false
@@ -2166,6 +2301,59 @@ type AdminTestResultResponse struct {
 	RequestId RequestId       `json:"request_id"`
 }
 
+// AffiliateInviteRecord defines model for AffiliateInviteRecord.
+type AffiliateInviteRecord struct {
+	CreatedAt     Timestamp                   `json:"created_at"`
+	FirstPaidAt   *time.Time                  `json:"first_paid_at,omitempty"`
+	Id            Id                          `json:"id"`
+	InviteCodeId  Id                          `json:"invite_code_id"`
+	InviteeUserId Id                          `json:"invitee_user_id"`
+	InviterUserId Id                          `json:"inviter_user_id"`
+	Status        AffiliateRelationshipStatus `json:"status"`
+	UpdatedAt     Timestamp                   `json:"updated_at"`
+}
+
+// AffiliateInviteRecordListResponse defines model for AffiliateInviteRecordListResponse.
+type AffiliateInviteRecordListResponse struct {
+	Data       []AffiliateInviteRecord `json:"data"`
+	Pagination Pagination              `json:"pagination"`
+	RequestId  RequestId               `json:"request_id"`
+}
+
+// AffiliateLedgerEntry defines model for AffiliateLedgerEntry.
+type AffiliateLedgerEntry struct {
+	Amount         string                     `json:"amount"`
+	CreatedAt      Timestamp                  `json:"created_at"`
+	Currency       string                     `json:"currency"`
+	Id             Id                         `json:"id"`
+	Metadata       JsonObject                 `json:"metadata"`
+	PaymentOrderId *Id                        `json:"payment_order_id,omitempty"`
+	ReferenceId    string                     `json:"reference_id"`
+	RelatedUserId  Id                         `json:"related_user_id"`
+	SettledAt      *time.Time                 `json:"settled_at,omitempty"`
+	Status         AffiliateLedgerEntryStatus `json:"status"`
+	SubscriptionId *Id                        `json:"subscription_id,omitempty"`
+	Type           AffiliateLedgerEntryType   `json:"type"`
+	UpdatedAt      Timestamp                  `json:"updated_at"`
+	UserId         Id                         `json:"user_id"`
+}
+
+// AffiliateLedgerEntryListResponse defines model for AffiliateLedgerEntryListResponse.
+type AffiliateLedgerEntryListResponse struct {
+	Data       []AffiliateLedgerEntry `json:"data"`
+	Pagination Pagination             `json:"pagination"`
+	RequestId  RequestId              `json:"request_id"`
+}
+
+// AffiliateLedgerEntryStatus defines model for AffiliateLedgerEntryStatus.
+type AffiliateLedgerEntryStatus string
+
+// AffiliateLedgerEntryType defines model for AffiliateLedgerEntryType.
+type AffiliateLedgerEntryType string
+
+// AffiliateRelationshipStatus defines model for AffiliateRelationshipStatus.
+type AffiliateRelationshipStatus string
+
 // Announcement defines model for Announcement.
 type Announcement struct {
 	Audience  AnnouncementAudience `json:"audience"`
@@ -2538,7 +2726,7 @@ type BillingLedgerListResponse struct {
 
 // BindProviderAccountProxyRequest defines model for BindProviderAccountProxyRequest.
 type BindProviderAccountProxyRequest struct {
-	// ProxyId Set to null or an empty string to clear proxy binding.
+	// ProxyId Proxy definition id. Set to null or an empty string to clear proxy binding. Existing raw proxy URLs remain accepted for backward-compatible imports.
 	ProxyId *string `json:"proxy_id"`
 }
 
@@ -2858,6 +3046,17 @@ type CreateProviderRequest struct {
 	Name         string              `json:"name"`
 	Protocol     ProviderProtocol    `json:"protocol"`
 	Status       *ResourceStatus     `json:"status,omitempty"`
+}
+
+// CreateProxyDefinitionRequest defines model for CreateProxyDefinitionRequest.
+type CreateProxyDefinitionRequest struct {
+	Metadata *JsonObject            `json:"metadata,omitempty"`
+	Name     string                 `json:"name"`
+	Status   *ProxyDefinitionStatus `json:"status,omitempty"`
+	Type     ProxyDefinitionType    `json:"type"`
+
+	// Url Proxy URL with credentials if needed. Stored encrypted and never returned.
+	Url *string `json:"url,omitempty"`
 }
 
 // CreateRedeemCodeRequest defines model for CreateRedeemCodeRequest.
@@ -4114,6 +4313,39 @@ type ProviderResponse struct {
 	RequestId RequestId `json:"request_id"`
 }
 
+// ProxyDefinition defines model for ProxyDefinition.
+type ProxyDefinition struct {
+	CreatedAt Timestamp             `json:"created_at"`
+	Id        Id                    `json:"id"`
+	Metadata  *JsonObject           `json:"metadata,omitempty"`
+	Name      string                `json:"name"`
+	Status    ProxyDefinitionStatus `json:"status"`
+	Type      ProxyDefinitionType   `json:"type"`
+	UpdatedAt Timestamp             `json:"updated_at"`
+
+	// UrlConfigured True when an encrypted proxy URL is stored. Raw URLs are never returned.
+	UrlConfigured bool `json:"url_configured"`
+}
+
+// ProxyDefinitionListResponse defines model for ProxyDefinitionListResponse.
+type ProxyDefinitionListResponse struct {
+	Data       []ProxyDefinition `json:"data"`
+	Pagination Pagination        `json:"pagination"`
+	RequestId  RequestId         `json:"request_id"`
+}
+
+// ProxyDefinitionResponse defines model for ProxyDefinitionResponse.
+type ProxyDefinitionResponse struct {
+	Data      ProxyDefinition `json:"data"`
+	RequestId RequestId       `json:"request_id"`
+}
+
+// ProxyDefinitionStatus defines model for ProxyDefinitionStatus.
+type ProxyDefinitionStatus string
+
+// ProxyDefinitionType defines model for ProxyDefinitionType.
+type ProxyDefinitionType string
+
 // RealtimeActiveSlot defines model for RealtimeActiveSlot.
 type RealtimeActiveSlot struct {
 	AcquiredAt Timestamp `json:"acquired_at"`
@@ -4606,6 +4838,17 @@ type UpdateProviderRequest struct {
 	Status       *ResourceStatus      `json:"status,omitempty"`
 }
 
+// UpdateProxyDefinitionRequest defines model for UpdateProxyDefinitionRequest.
+type UpdateProxyDefinitionRequest struct {
+	Metadata *JsonObject            `json:"metadata,omitempty"`
+	Name     *string                `json:"name,omitempty"`
+	Status   *ProxyDefinitionStatus `json:"status,omitempty"`
+	Type     *ProxyDefinitionType   `json:"type,omitempty"`
+
+	// Url Replacement proxy URL. Omit to keep the existing encrypted URL.
+	Url *string `json:"url,omitempty"`
+}
+
 // UpdateUserBalanceRequest defines model for UpdateUserBalanceRequest.
 type UpdateUserBalanceRequest struct {
 	// Amount Decimal string amount.
@@ -4871,6 +5114,26 @@ type ListAdminAccountsParams struct {
 	ProviderId *Id       `form:"provider_id,omitempty" json:"provider_id,omitempty"`
 }
 
+// ListAdminAffiliateInvitesParams defines parameters for ListAdminAffiliateInvites.
+type ListAdminAffiliateInvitesParams struct {
+	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
+
+// ListAdminAffiliateRebatesParams defines parameters for ListAdminAffiliateRebates.
+type ListAdminAffiliateRebatesParams struct {
+	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+	UserId   *Id       `form:"user_id,omitempty" json:"user_id,omitempty"`
+}
+
+// ListAdminAffiliateTransfersParams defines parameters for ListAdminAffiliateTransfers.
+type ListAdminAffiliateTransfersParams struct {
+	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+	UserId   *Id       `form:"user_id,omitempty" json:"user_id,omitempty"`
+}
+
 // ListAdminAnnouncementsParams defines parameters for ListAdminAnnouncements.
 type ListAdminAnnouncementsParams struct {
 	Page     *Page               `form:"page,omitempty" json:"page,omitempty"`
@@ -5063,6 +5326,13 @@ type ListAdminProvidersParams struct {
 	PageSize *PageSize    `form:"page_size,omitempty" json:"page_size,omitempty"`
 	Status   *Status      `form:"status,omitempty" json:"status,omitempty"`
 	Q        *SearchQuery `form:"q,omitempty" json:"q,omitempty"`
+}
+
+// ListAdminProxiesParams defines parameters for ListAdminProxies.
+type ListAdminProxiesParams struct {
+	Page     *Page                  `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *PageSize              `form:"page_size,omitempty" json:"page_size,omitempty"`
+	Status   *ProxyDefinitionStatus `form:"status,omitempty" json:"status,omitempty"`
 }
 
 // ListAdminRedeemCodesParams defines parameters for ListAdminRedeemCodes.
@@ -5350,6 +5620,12 @@ type CreateAdminProviderJSONRequestBody = CreateProviderRequest
 
 // UpdateAdminProviderJSONRequestBody defines body for UpdateAdminProvider for application/json ContentType.
 type UpdateAdminProviderJSONRequestBody = UpdateProviderRequest
+
+// CreateAdminProxyJSONRequestBody defines body for CreateAdminProxy for application/json ContentType.
+type CreateAdminProxyJSONRequestBody = CreateProxyDefinitionRequest
+
+// UpdateAdminProxyJSONRequestBody defines body for UpdateAdminProxy for application/json ContentType.
+type UpdateAdminProxyJSONRequestBody = UpdateProxyDefinitionRequest
 
 // CreateAdminRedeemCodeJSONRequestBody defines body for CreateAdminRedeemCode for application/json ContentType.
 type CreateAdminRedeemCodeJSONRequestBody = CreateRedeemCodeRequest
@@ -11421,6 +11697,15 @@ type ServerInterface interface {
 	// Test provider account configuration.
 	// (POST /api/v1/admin/accounts/{id}/test)
 	TestAdminAccount(w http.ResponseWriter, r *http.Request, id Id)
+	// List affiliate invite relationships.
+	// (GET /api/v1/admin/affiliates/invites)
+	ListAdminAffiliateInvites(w http.ResponseWriter, r *http.Request, params ListAdminAffiliateInvitesParams)
+	// List affiliate rebate ledger entries.
+	// (GET /api/v1/admin/affiliates/rebates)
+	ListAdminAffiliateRebates(w http.ResponseWriter, r *http.Request, params ListAdminAffiliateRebatesParams)
+	// List affiliate transfer ledger entries.
+	// (GET /api/v1/admin/affiliates/transfers)
+	ListAdminAffiliateTransfers(w http.ResponseWriter, r *http.Request, params ListAdminAffiliateTransfersParams)
 	// List announcements.
 	// (GET /api/v1/admin/announcements)
 	ListAdminAnnouncements(w http.ResponseWriter, r *http.Request, params ListAdminAnnouncementsParams)
@@ -11553,12 +11838,24 @@ type ServerInterface interface {
 	// Create a provider.
 	// (POST /api/v1/admin/providers)
 	CreateAdminProvider(w http.ResponseWriter, r *http.Request)
+	// Install compatible provider presets.
+	// (POST /api/v1/admin/providers/preset/install)
+	InstallAdminProviderPresets(w http.ResponseWriter, r *http.Request)
 	// Update a provider.
 	// (PATCH /api/v1/admin/providers/{id})
 	UpdateAdminProvider(w http.ResponseWriter, r *http.Request, id Id)
 	// Test provider configuration.
 	// (POST /api/v1/admin/providers/{id}/test)
 	TestAdminProvider(w http.ResponseWriter, r *http.Request, id Id)
+	// List encrypted egress proxy definitions.
+	// (GET /api/v1/admin/proxies)
+	ListAdminProxies(w http.ResponseWriter, r *http.Request, params ListAdminProxiesParams)
+	// Create an encrypted egress proxy definition.
+	// (POST /api/v1/admin/proxies)
+	CreateAdminProxy(w http.ResponseWriter, r *http.Request)
+	// Update an encrypted egress proxy definition.
+	// (PATCH /api/v1/admin/proxies/{id})
+	UpdateAdminProxy(w http.ResponseWriter, r *http.Request, id Id)
 	// List redeem codes.
 	// (GET /api/v1/admin/redeem-codes)
 	ListAdminRedeemCodes(w http.ResponseWriter, r *http.Request, params ListAdminRedeemCodesParams)
@@ -12884,6 +13181,188 @@ func (siw *ServerInterfaceWrapper) TestAdminAccount(w http.ResponseWriter, r *ht
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.TestAdminAccount(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAdminAffiliateInvites operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminAffiliateInvites(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminAffiliateInvitesParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminAffiliateInvites(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAdminAffiliateRebates operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminAffiliateRebates(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminAffiliateRebatesParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "user_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "user_id", r.URL.Query(), &params.UserId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "user_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminAffiliateRebates(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAdminAffiliateTransfers operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminAffiliateTransfers(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminAffiliateTransfersParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "user_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "user_id", r.URL.Query(), &params.UserId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "user_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminAffiliateTransfers(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -14953,6 +15432,28 @@ func (siw *ServerInterfaceWrapper) CreateAdminProvider(w http.ResponseWriter, r 
 	handler.ServeHTTP(w, r)
 }
 
+// InstallAdminProviderPresets operation middleware
+func (siw *ServerInterfaceWrapper) InstallAdminProviderPresets(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.InstallAdminProviderPresets(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // UpdateAdminProvider operation middleware
 func (siw *ServerInterfaceWrapper) UpdateAdminProvider(w http.ResponseWriter, r *http.Request) {
 
@@ -15012,6 +15513,127 @@ func (siw *ServerInterfaceWrapper) TestAdminProvider(w http.ResponseWriter, r *h
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.TestAdminProvider(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAdminProxies operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminProxies(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminProxiesParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminProxies(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAdminProxy operation middleware
+func (siw *ServerInterfaceWrapper) CreateAdminProxy(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAdminProxy(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateAdminProxy operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAdminProxy(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAdminProxy(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -17556,6 +18178,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/recover", wrapper.RecoverAdminAccount)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/rpm-status", wrapper.GetAdminAccountRpmStatus)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/test", wrapper.TestAdminAccount)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/affiliates/invites", wrapper.ListAdminAffiliateInvites)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/affiliates/rebates", wrapper.ListAdminAffiliateRebates)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/affiliates/transfers", wrapper.ListAdminAffiliateTransfers)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/announcements", wrapper.ListAdminAnnouncements)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/announcements", wrapper.CreateAdminAnnouncement)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/announcements/{id}", wrapper.DeleteAdminAnnouncement)
@@ -17600,8 +18225,12 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/admin/promo-codes/{id}", wrapper.UpdateAdminPromoCode)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/providers", wrapper.ListAdminProviders)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/providers", wrapper.CreateAdminProvider)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/providers/preset/install", wrapper.InstallAdminProviderPresets)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/providers/{id}", wrapper.UpdateAdminProvider)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/providers/{id}/test", wrapper.TestAdminProvider)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/proxies", wrapper.ListAdminProxies)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/proxies", wrapper.CreateAdminProxy)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/proxies/{id}", wrapper.UpdateAdminProxy)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/redeem-codes", wrapper.ListAdminRedeemCodes)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/redeem-codes", wrapper.CreateAdminRedeemCode)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/redeem-codes/batch-disable", wrapper.BatchDisableAdminRedeemCodes)

@@ -14,6 +14,7 @@ import (
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
 	modelservice "github.com/srapi/srapi/apps/api/internal/modules/models/service"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
+	providerpreset "github.com/srapi/srapi/apps/api/internal/modules/providers/preset"
 	providerservice "github.com/srapi/srapi/apps/api/internal/modules/providers/service"
 	reverseproxycontract "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
@@ -173,6 +174,59 @@ func (s *Server) handleCreateAdminProvider(w http.ResponseWriter, r *http.Reques
 	})
 }
 
+func (s *Server) handleInstallAdminProviderPresets(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+
+	status := providercontract.StatusDisabled
+	presets := providerpreset.Default().List()
+	result := apiopenapi.BatchOperationResult{
+		Requested: len(presets),
+	}
+	installedNames := []string{}
+	for _, preset := range presets {
+		if _, err := s.runtime.providers.FindByName(r.Context(), preset.ProviderKey); err == nil {
+			continue
+		}
+		provider, err := s.runtime.providers.Create(r.Context(), providerPresetCreateRequest(preset, status))
+		if err != nil {
+			if errors.Is(err, providerservice.ErrProviderExists) {
+				continue
+			}
+			result.Failed++
+			failedIDs := []apiopenapi.Id{apiopenapi.Id(preset.ProviderKey)}
+			if result.FailedIds != nil {
+				failedIDs = append(*result.FailedIds, failedIDs...)
+			}
+			result.FailedIds = &failedIDs
+			s.logger.Warn("failed to install provider preset", "provider_key", preset.ProviderKey, "error", err)
+			continue
+		}
+		result.Succeeded++
+		installedNames = append(installedNames, provider.Name)
+	}
+	skipped := result.Requested - result.Succeeded - result.Failed
+
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "provider_preset.install", "provider", "bulk", nil, map[string]any{
+		"installed_count": result.Succeeded,
+		"skipped_count":   skipped,
+		"failed_count":    result.Failed,
+		"installed_names": installedNames,
+	}))
+	writeJSONAny(w, http.StatusOK, apiopenapi.BatchOperationResponse{
+		Data:      result,
+		RequestId: requestID,
+	})
+}
+
 func (s *Server) handleUpdateAdminProvider(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	session, err := s.requireAdminSession(r)
@@ -221,6 +275,88 @@ func (s *Server) handleUpdateAdminProvider(w http.ResponseWriter, r *http.Reques
 		Data:      toAPIProvider(provider),
 		RequestId: requestID,
 	})
+}
+
+func providerPresetCreateRequest(preset providerpreset.Preset, status providercontract.Status) providercontract.CreateRequest {
+	return providercontract.CreateRequest{
+		Name:         preset.ProviderKey,
+		DisplayName:  preset.DisplayName,
+		AdapterType:  presetAdapterType(preset),
+		Protocol:     presetProtocol(preset),
+		Status:       &status,
+		Capabilities: presetCapabilityMap(preset),
+		ConfigSchema: presetConfigSchema(preset),
+	}
+}
+
+func presetAdapterType(preset providerpreset.Preset) string {
+	switch preset.PlatformFamily {
+	case providerpreset.PlatformFamilyAnthropicCompatible:
+		return "anthropic-compatible"
+	case providerpreset.PlatformFamilyReverseProxyAntigravity:
+		return "reverse-proxy-antigravity"
+	case providerpreset.PlatformFamilyRerankCompatible:
+		return "rerank-compatible"
+	default:
+		return "openai-compatible"
+	}
+}
+
+func presetProtocol(preset providerpreset.Preset) string {
+	switch preset.PlatformFamily {
+	case providerpreset.PlatformFamilyAnthropicCompatible:
+		return "anthropic-compatible"
+	case providerpreset.PlatformFamilyRerankCompatible:
+		return "rerank-compatible"
+	default:
+		return "openai-compatible"
+	}
+}
+
+func presetCapabilityMap(preset providerpreset.Preset) map[string]any {
+	out := make(map[string]any, len(preset.Capabilities))
+	for key, value := range preset.Capabilities {
+		out[key] = value
+	}
+	return out
+}
+
+func presetConfigSchema(preset providerpreset.Preset) map[string]any {
+	return map[string]any{
+		"provider_key":           preset.ProviderKey,
+		"platform_family":        string(preset.PlatformFamily),
+		"default_base_url":       preset.DefaultBaseURL,
+		"route_aliases":          stringSliceAny(preset.RouteAliases),
+		"gemini_route_aliases":   stringSliceAny(preset.GeminiRouteAliases),
+		"auth_modes":             authModesAny(preset.AuthModes),
+		"model_catalog_owner":    preset.ModelCatalogOwner,
+		"account_type_allowlist": accountTypesAny(preset.AccountTypeAllowlist),
+		"installed_from":         "provider_preset",
+	}
+}
+
+func stringSliceAny(values []string) []any {
+	out := make([]any, 0, len(values))
+	for _, value := range values {
+		out = append(out, value)
+	}
+	return out
+}
+
+func authModesAny(values []providerpreset.AuthMode) []any {
+	out := make([]any, 0, len(values))
+	for _, value := range values {
+		out = append(out, string(value))
+	}
+	return out
+}
+
+func accountTypesAny(values []providerpreset.AccountType) []any {
+	out := make([]any, 0, len(values))
+	for _, value := range values {
+		out = append(out, string(value))
+	}
+	return out
 }
 
 func (s *Server) handleTestAdminProvider(w http.ResponseWriter, r *http.Request) {

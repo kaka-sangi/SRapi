@@ -18,7 +18,6 @@ import {
   DialogTitle,
   Input,
   Label,
-  Spinner,
   Table,
   TableBody,
   TableCell,
@@ -26,13 +25,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui";
+import { PageQueryError, PageQueryLoading } from "@/components/layout/page-query-state";
 import { cn } from "@/lib/cn";
 import {
   createApiKeySchema,
   parseGroupIdsCsv,
   type CreateApiKeyValues,
 } from "@/lib/schemas/api-key";
-import type { MockApiKey } from "@/lib/mockData";
+import type { ApiKeySummary } from "@/lib/srapi-types";
 
 const DEFAULT_MODELS: readonly string[] = [
   "gpt-4o-mini",
@@ -51,7 +51,7 @@ export default function ApiKeysPage() {
 
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = React.useState(false);
-  const [generatedKey, setGeneratedKey] = React.useState<MockApiKey | null>(null);
+  const [generatedKey, setGeneratedKey] = React.useState<ApiKeySummary | null>(null);
   const [copiedPlaintext, setCopiedPlaintext] = React.useState(false);
   const [groupsCsv, setGroupsCsv] = React.useState("group-01");
 
@@ -175,15 +175,19 @@ export default function ApiKeysPage() {
         ) : null}
 
         {/* Keys table */}
+        {toggleMutation.isError ? (
+          <PageQueryError error={toggleMutation.error} title="API key status update failed" />
+        ) : null}
+
         <div className="tactile-card space-y-5 rounded-3xl border border-srapi-border bg-srapi-card p-6">
           <h4 className="font-serif text-lg italic text-srapi-text-primary">
             {t("activeChannels")}
           </h4>
 
           {loading ? (
-            <div className="py-12 text-center">
-              <Spinner size={24} label={t("queryRegistry")} />
-            </div>
+            <PageQueryLoading label={t("queryRegistry")} />
+          ) : apiKeysQuery.isError ? (
+            <PageQueryError error={apiKeysQuery.error} onRetry={() => void apiKeysQuery.refetch()} />
           ) : keys.length === 0 ? (
             <div className="space-y-3.5 rounded-2xl border border-dashed border-srapi-border py-16 text-center">
               <Key
@@ -285,6 +289,9 @@ export default function ApiKeysPage() {
             </DialogHeader>
 
             <form onSubmit={onSubmit} className="space-y-5">
+              {createMutation.isError ? (
+                <PageQueryError error={createMutation.error} title="API key creation failed" />
+              ) : null}
               <div className="space-y-1.5">
                 <Label htmlFor="api-key-name">{t("keyNickname")}</Label>
                 <Input

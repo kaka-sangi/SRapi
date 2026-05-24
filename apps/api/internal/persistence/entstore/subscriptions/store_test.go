@@ -87,6 +87,35 @@ func TestStorePersistsPlansSubscriptionsAndPricingRules(t *testing.T) {
 	if len(active) != 1 || active[0].ID != subscription.ID || active[0].EntitlementsSnapshot["allowed_models"] == nil {
 		t.Fatalf("expected only active subscription with snapshot, got %+v", active)
 	}
+	expiredActive, err := store.ListExpiredActiveUserSubscriptions(ctx, now)
+	if err != nil {
+		t.Fatalf("list expired active subscriptions: %v", err)
+	}
+	if len(expiredActive) != 0 {
+		t.Fatalf("expected no active subscriptions expired before now, got %+v", expiredActive)
+	}
+	future := now.Add(time.Hour + time.Minute)
+	expiredActive, err = store.ListExpiredActiveUserSubscriptions(ctx, future)
+	if err != nil {
+		t.Fatalf("list future expired active subscriptions: %v", err)
+	}
+	if len(expiredActive) != 1 || expiredActive[0].ID != subscription.ID {
+		t.Fatalf("expected active subscription to be expired in future scan, got %+v", expiredActive)
+	}
+	expired, changed, err := store.ExpireUserSubscription(ctx, subscription.ID, future)
+	if err != nil {
+		t.Fatalf("expire user subscription: %v", err)
+	}
+	if !changed || expired.Status != contract.SubscriptionStatusExpired {
+		t.Fatalf("expected subscription to expire, changed=%v subscription=%+v", changed, expired)
+	}
+	_, changed, err = store.ExpireUserSubscription(ctx, subscription.ID, future.Add(time.Minute))
+	if err != nil {
+		t.Fatalf("expire user subscription again: %v", err)
+	}
+	if changed {
+		t.Fatal("expected second expiration to be a no-op")
+	}
 
 	from := now.Add(-time.Hour)
 	to := now.Add(time.Hour)

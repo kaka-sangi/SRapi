@@ -38,6 +38,9 @@ func (s *Service) InvokeText(ctx context.Context, req contract.TextRequest) (con
 		return contract.TextResponse{}, ErrInvalidInput
 	}
 	if baseURL := upstreamBaseURL(req); baseURL != "" {
+		if isGenericReverseProxy(req) {
+			return s.invokeGenericReverseProxyText(ctx, req, baseURL)
+		}
 		if isCodexReverseProxy(req) {
 			return s.invokeReverseProxyCodexResponses(ctx, req, baseURL)
 		}
@@ -94,6 +97,9 @@ func (s *Service) InvokeEmbeddings(ctx context.Context, req contract.EmbeddingRe
 		return contract.EmbeddingResponse{}, ErrInvalidInput
 	}
 	if baseURL := upstreamBaseURLEmbeddings(req); baseURL != "" {
+		if isGenericReverseProxyEmbeddings(req) {
+			return s.invokeGenericReverseProxyEmbeddings(ctx, req, baseURL)
+		}
 		if isReverseProxyEmbeddingRuntime(req) {
 			return s.invokeReverseProxyOpenAICompatibleEmbeddings(ctx, req, baseURL)
 		}

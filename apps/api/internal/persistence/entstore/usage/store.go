@@ -3,6 +3,7 @@ package usage
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/srapi/srapi/apps/api/ent"
 	entusagelog "github.com/srapi/srapi/apps/api/ent/usagelog"
@@ -43,6 +44,7 @@ func (s *Store) Create(ctx context.Context, input contract.UsageLog) (contract.U
 		SetNillableErrorClass(input.ErrorClass).
 		SetCost(input.Cost).
 		SetCurrency(input.Currency).
+		SetNillableChargedAt(input.ChargedAt).
 		SetCompatibilityWarningsJSON(cloneStrings(input.CompatibilityWarnings))
 	if !input.CreatedAt.IsZero() {
 		create.SetCreatedAt(input.CreatedAt).SetUpdatedAt(input.CreatedAt)
@@ -105,6 +107,7 @@ func toUsageLog(row *ent.UsageLog) contract.UsageLog {
 		ErrorClass:            cloneString(row.ErrorClass),
 		Cost:                  row.Cost,
 		Currency:              row.Currency,
+		ChargedAt:             cloneTime(row.ChargedAt),
 		CompatibilityWarnings: cloneStrings(row.CompatibilityWarningsJSON),
 		CreatedAt:             row.CreatedAt,
 	}
@@ -119,6 +122,14 @@ func cloneInt(value *int) *int {
 }
 
 func cloneString(value *string) *string {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
+}
+
+func cloneTime(value *time.Time) *time.Time {
 	if value == nil {
 		return nil
 	}

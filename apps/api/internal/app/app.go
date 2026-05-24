@@ -16,8 +16,11 @@ import (
 	redisschedulerstore "github.com/srapi/srapi/apps/api/internal/persistence/redisstore/scheduler"
 	platformdb "github.com/srapi/srapi/apps/api/internal/platform/db"
 	platformredis "github.com/srapi/srapi/apps/api/internal/platform/redis"
+	balancechargerworker "github.com/srapi/srapi/apps/api/internal/workers/balance_charger"
+	orderexpirerworker "github.com/srapi/srapi/apps/api/internal/workers/order_expirer"
 	outboxworker "github.com/srapi/srapi/apps/api/internal/workers/outbox"
 	retentionworker "github.com/srapi/srapi/apps/api/internal/workers/retention"
+	subscriptionexpirerworker "github.com/srapi/srapi/apps/api/internal/workers/subscription_expirer"
 )
 
 const defaultReadHeaderTimeout = 10 * time.Second
@@ -30,6 +33,9 @@ type App struct {
 	redis     *platformredis.Client
 	outbox    *outboxworker.Worker
 	retention *retentionworker.Worker
+	expirer   *orderexpirerworker.Worker
+	subExpiry *subscriptionexpirerworker.Worker
+	balance   *balancechargerworker.Worker
 }
 
 func New(cfg config.Config, logger *slog.Logger) (*App, error) {
@@ -47,7 +53,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		return nil, err
 	}
 
-	handler, outbox, retention, err := newHandler(cfg, logger, dbClient, redisClient)
+	handler, outbox, retention, expirer, subExpiry, balance, err := newHandler(cfg, logger, dbClient, redisClient)
 	if err != nil {
 		_ = dbClient.Close()
 		_ = redisClient.Close()
@@ -67,6 +73,9 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		redis:     redisClient,
 		outbox:    outbox,
 		retention: retention,
+		expirer:   expirer,
+		subExpiry: subExpiry,
+		balance:   balance,
 	}, nil
 }
 
@@ -111,7 +120,7 @@ func Healthcheck(ctx context.Context, cfg config.Config) error {
 	return httpserver.Healthcheck(ctx, cfg.HealthcheckAddress())
 }
 
-func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Client, redisClient *platformredis.Client) (http.Handler, *outboxworker.Worker, *retentionworker.Worker, error) {
+func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Client, redisClient *platformredis.Client) (http.Handler, *outboxworker.Worker, *retentionworker.Worker, *orderexpirerworker.Worker, *subscriptionexpirerworker.Worker, *balancechargerworker.Worker, error) {
 	var (
 		handler http.Handler
 		err     error
@@ -123,22 +132,34 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 	}
 	realtimeStore, err := realtimeSlotStore(context.Background(), cfg, logger, redisClient)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, err
 	}
 	if realtimeStore != nil {
 		options = append(options, httpserver.WithRealtimeStore(realtimeStore))
 	}
 	stores, err := persistentStores(context.Background(), cfg, logger, dbClient, redisClient)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, err
 	}
 	outbox, err := domainEventsWorker(stores, logger)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, err
 	}
 	retention, err := retentionCleanupWorker(cfg, stores, logger)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, err
+	}
+	expirer, err := paymentOrderExpirerWorker(cfg, stores, logger)
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, err
+	}
+	subExpiry, err := subscriptionExpirerWorker(stores, logger)
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, err
+	}
+	balance, err := balanceChargerWorker(stores, logger)
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, err
 	}
 	if stores != nil {
 		options = append(options,
@@ -151,6 +172,7 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 			httpserver.WithAuditStore(stores.Audit),
 			httpserver.WithBillingStore(stores.Billing),
 			httpserver.WithEventStore(stores.Events),
+			httpserver.WithAffiliateStore(stores.Affiliate),
 			httpserver.WithOperationsStore(stores.Operations),
 			httpserver.WithPaymentStore(stores.Payments),
 			httpserver.WithSchedulerStore(stores.Scheduler),
@@ -168,7 +190,7 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 		handler = httpserver.New(cfg, logger, options...)
 	}()
 
-	return handler, outbox, retention, err
+	return handler, outbox, retention, expirer, subExpiry, balance, err
 }
 
 func persistentStores(ctx context.Context, cfg config.Config, logger *slog.Logger, dbClient *platformdb.Client, redisClient *platformredis.Client) (*entstore.Stores, error) {
@@ -272,6 +294,34 @@ func retentionCleanupWorker(cfg config.Config, stores *entstore.Stores, logger *
 	})
 }
 
+func paymentOrderExpirerWorker(cfg config.Config, stores *entstore.Stores, logger *slog.Logger) (*orderexpirerworker.Worker, error) {
+	if stores == nil || stores.Payments == nil {
+		return nil, nil
+	}
+	return orderexpirerworker.New(stores.Payments, cfg.Security.MasterKey, orderexpirerworker.Dependencies{}, logger, orderexpirerworker.Config{
+		Audit: stores.Audit,
+	})
+}
+
+func subscriptionExpirerWorker(stores *entstore.Stores, logger *slog.Logger) (*subscriptionexpirerworker.Worker, error) {
+	if stores == nil || stores.Subscriptions == nil {
+		return nil, nil
+	}
+	return subscriptionexpirerworker.New(stores.Subscriptions, subscriptionexpirerworker.Dependencies{}, logger, subscriptionexpirerworker.Config{
+		Events: stores.Events,
+	})
+}
+
+func balanceChargerWorker(stores *entstore.Stores, logger *slog.Logger) (*balancechargerworker.Worker, error) {
+	if stores == nil || stores.UsageCharges == nil {
+		return nil, nil
+	}
+	return balancechargerworker.New(stores.UsageCharges, logger, balancechargerworker.Config{
+		Users: stores.Users,
+		Audit: stores.Audit,
+	})
+}
+
 func (a *App) startWorkers() {
 	if a == nil {
 		return
@@ -281,6 +331,15 @@ func (a *App) startWorkers() {
 	}
 	if a.retention != nil {
 		a.retention.Start(context.Background())
+	}
+	if a.expirer != nil {
+		a.expirer.Start(context.Background())
+	}
+	if a.subExpiry != nil {
+		a.subExpiry.Start(context.Background())
+	}
+	if a.balance != nil {
+		a.balance.Start(context.Background())
 	}
 }
 
@@ -294,6 +353,15 @@ func (a *App) stopWorkers(ctx context.Context) error {
 	}
 	if a.retention != nil {
 		errs = append(errs, a.retention.Shutdown(ctx))
+	}
+	if a.expirer != nil {
+		errs = append(errs, a.expirer.Shutdown(ctx))
+	}
+	if a.subExpiry != nil {
+		errs = append(errs, a.subExpiry.Shutdown(ctx))
+	}
+	if a.balance != nil {
+		errs = append(errs, a.balance.Shutdown(ctx))
 	}
 	return errors.Join(errs...)
 }

@@ -160,6 +160,12 @@ type RefundRequest struct {
 	Reason      string
 }
 
+// ExpireOrdersResult reports the outcome of a pending-order expiration pass.
+type ExpireOrdersResult struct {
+	Selected int
+	Expired  int
+}
+
 type Store interface {
 	CreateProviderInstance(ctx context.Context, input CreateStoredProviderInstance) (PaymentProviderInstance, error)
 	ListProviderInstances(ctx context.Context) ([]PaymentProviderInstance, error)
@@ -169,7 +175,9 @@ type Store interface {
 	FindOrderByID(ctx context.Context, id int) (PaymentOrder, error)
 	FindOrderByOrderNo(ctx context.Context, orderNo string) (PaymentOrder, error)
 	ListOrders(ctx context.Context) ([]PaymentOrder, error)
+	ListExpiredPendingOrders(ctx context.Context, now time.Time) ([]PaymentOrder, error)
 	ListOrdersByUser(ctx context.Context, userID int) ([]PaymentOrder, error)
+	ExpireOrder(ctx context.Context, orderID int, now time.Time) (PaymentOrder, bool, error)
 	CreateAuditLog(ctx context.Context, input PaymentAuditLog) (PaymentAuditLog, bool, error)
 	ListAuditLogsByOrder(ctx context.Context, orderID int) ([]PaymentAuditLog, error)
 }

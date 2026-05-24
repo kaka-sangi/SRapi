@@ -145,11 +145,11 @@ SRapi 不是一个堆满酷炫词汇的 AI SaaS 落地页，而是一个**自托
 | Adaptive Dispatch Interface & Architectural Control | Gateway overview | 网关总览 |
 | Real-Time Decision Registry & Fallback Evidence | Live scheduling decisions | 实时调度决策 |
 | Dynamic Scheduling Diagnostics | Scheduler decisions | 调度决策 |
-| Dispatcher Scribe & Simulator | Routing simulator | 调度模拟器 |
-| Configure Dispatch Simulation | Simulator | 模拟器 |
-| Execute Dispatch Pipeline | Run simulation | 运行模拟 |
-| Initiate / Pause Live Simulation Feed | Live / Paused | 实时刷新中 / 已暂停 |
-| Awaiting routing instructions... | Click "Run simulation" to start. | 点击 "运行模拟" 开始。 |
+| Dispatcher Scribe & Simulator | Routing decisions | 调度决策 |
+| Configure Dispatch Simulation | Decision filters | 决策筛选 |
+| Execute Dispatch Pipeline | Refresh decisions | 刷新调度决策 |
+| Initiate / Pause Live Simulation Feed | Live data / Paused | 实时数据 / 已暂停 |
+| Awaiting routing instructions... | Send real traffic to record decisions. | 发出真实请求以记录调度决策。 |
 | Dispatch Trace Log | Trace log | 调度日志 |
 | Epoch Index: Live | Live | 实时 |
 | Lease Candidates Scores | Candidate scores | 候选评分 |
@@ -165,7 +165,7 @@ SRapi 不是一个堆满酷炫词汇的 AI SaaS 落地页，而是一个**自托
 | --- | --- | --- |
 | Specification Portal | SRapi | SRapi |
 | v0.1 Core Studio | v0.1.0 | v0.1.0 |
-| Live API / Demo Data | Live / Demo | 实时数据 / 演示数据 |
+| Live API / Demo Data | Live / API offline | 实时数据 / API 离线 |
 | Smoke Evidence: Complete / not complete | Self-check: passing / not passing | 自检：通过 / 未通过 |
 | Constraints Matrix | Checks | 检查项 |
 | Healthy Traffic Registry | Real traffic recorded | 已记录真实流量 |
@@ -174,9 +174,9 @@ SRapi 不是一个堆满酷炫词汇的 AI SaaS 落地页，而是一个**自托
 | Synthesizing developer metrics... / Decrypting control plane telemetry... | Loading... | 加载中... |
 | Operator CLI Diagnostic Reference | CLI quick reference | CLI 快速参考 |
 
-### 6.7 调度模拟器输出
+### 6.7 调度决策输出
 
-模拟器输出的每一行不再使用 `[INFO]` `[SCHEDULER]` `[EVALUATE]` `[FILTER]` `[RESOLVED]` 这种工业控制器风格的全大写标签；改为可读的单词或一致的小写 tag：
+调度决策输出的每一行不再使用 `[INFO]` `[SCHEDULER]` `[EVALUATE]` `[FILTER]` `[RESOLVED]` 这种工业控制器风格的全大写标签；改为可读的单词或一致的小写 tag：
 
 ```text
 [1/5] request received  id=req_xxx model=claude-3-7-sonnet

@@ -1,11 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   GitBranch,
   Terminal as TermIcon,
-  Play,
-  Pause,
+  RefreshCw,
   ChevronDown,
   ChevronUp,
   AlertCircle,
@@ -15,89 +14,15 @@ import {
 } from 'lucide-react';
 import DashboardLayout from '../../components/DashboardLayout';
 import { useSchedulerDecisions } from '@/hooks/queries';
-import { MockSchedulerDecision } from '../../lib/mockData';
 import { useLanguage } from '../../context/LanguageContext';
+import { PageQueryError, PageQueryLoading } from '@/components/layout/page-query-state';
 
 export default function SchedulerDecisionsPage() {
   const { language, t } = useLanguage();
   const decisionsQuery = useSchedulerDecisions();
   const loading = decisionsQuery.isLoading;
   const [expandedId, setExpandedId] = useState<string | null>(null);
-
-  // Live simulation feed.
-  // - The query data is the historical seed (read-only).
-  // - `simulatedExtras` is the in-memory list of mock decisions appended by
-  //   the local simulator; the visible feed is `[...simulatedExtras, ...query]`
-  //   capped at 15 entries. This keeps state writes out of effects.
-  const [isSimulating, setIsSimulating] = useState(true);
-  const [simulatedExtras, setSimulatedExtras] = useState<MockSchedulerDecision[]>([]);
-  const simulatedCountRef = useRef(0);
-
-  const simulatedDecisions = React.useMemo(() => {
-    const seed = decisionsQuery.data ?? [];
-    return [...simulatedExtras, ...seed].slice(0, 15);
-  }, [simulatedExtras, decisionsQuery.data]);
-
-  // Real-time decision flow simulation
-  useEffect(() => {
-    if (!isSimulating || loading) return;
-
-    const interval = setInterval(() => {
-      simulatedCountRef.current += 1;
-      const count = simulatedCountRef.current;
-      
-      const newMock: MockSchedulerDecision = {
-        created_at: new Date().toISOString(),
-        request_id: `req_simulated_${count}_${Math.floor(Math.random()*10000)}`,
-        model: Math.random() > 0.4 ? 'gpt-4o-mini' : 'claude-3-5-sonnet',
-        source_endpoint: Math.random() > 0.5 ? '/v1/chat/completions' : '/v1/messages',
-        candidate_count: 2,
-        selected_account_id: Math.random() > 0.5 ? 'acc-01' : 'acc-02',
-        selected_account_name: Math.random() > 0.5 ? 'OpenAI Main Pool #1' : 'Anthropic Corporate Pool',
-        rejected_count: 1,
-        rejected_reasons: [
-          {
-            account: 'acc-03 (Gemini Public)',
-            reason: language === 'en'
-              ? 'Latency above SLA threshold (>300ms)'
-              : '延迟高于 SLA 阈值（>300ms）'
-          }
-        ],
-        scores: [
-          { 
-            account: 'OpenAI Pool #1', 
-            score: parseFloat((0.85 + Math.random()*0.14).toFixed(2)), 
-            latency: parseFloat((0.8 + Math.random()*0.19).toFixed(2)), 
-            cost: parseFloat((0.85 + Math.random()*0.1).toFixed(2)), 
-            quota: parseFloat((0.9 + Math.random()*0.09).toFixed(2)) 
-          },
-          { 
-            account: 'Anthropic Corp', 
-            score: parseFloat((0.82 + Math.random()*0.16).toFixed(2)), 
-            latency: parseFloat((0.8 + Math.random()*0.18).toFixed(2)), 
-            cost: parseFloat((0.9 + Math.random()*0.08).toFixed(2)), 
-            quota: parseFloat((0.85 + Math.random()*0.14).toFixed(2)) 
-          }
-        ],
-        warnings: [],
-        logs: language === 'en' ? [
-          `scheduler  request received for tenant tenant-sim-${count}`,
-          `scheduler  capability matrix resolved`,
-          `scheduler  scoring candidates with policy=balanced`,
-          `scheduler  decision lease-sim-${count} dispatched`
-        ] : [
-          `调度器  受理租户 tenant-sim-${count} 的请求`,
-          `调度器  能力矩阵解析完成`,
-          `调度器  使用策略=平衡进行评分`,
-          `调度器  决策 lease-sim-${count} 已分发`
-        ]
-      };
-
-      setSimulatedExtras((prev) => [newMock, ...prev].slice(0, 14));
-    }, 4500);
-
-    return () => clearInterval(interval);
-  }, [isSimulating, loading, language]);
+  const decisions = decisionsQuery.data ?? [];
 
   const toggleExpand = (id: string) => {
     setExpandedId(prev => prev === id ? null : id);
@@ -122,27 +47,34 @@ export default function SchedulerDecisionsPage() {
           </div>
 
           <button
-            onClick={() => setIsSimulating(!isSimulating)}
-            className={`px-5 py-3.5 border rounded-full text-xs font-mono font-bold tracking-wider uppercase transition-all active:scale-[0.96] flex items-center gap-2 cursor-pointer ${
-              isSimulating 
-                ? 'border-green-500/20 text-green-700 bg-green-500/10 hover:bg-green-500/20' 
-                : 'border-srapi-border text-srapi-text-secondary hover:bg-srapi-card-muted'
-            }`}
+            onClick={() => void decisionsQuery.refetch()}
+            className="px-5 py-3.5 border border-srapi-border rounded-full text-xs font-mono font-bold tracking-wider uppercase transition-all active:scale-[0.96] flex items-center gap-2 cursor-pointer text-srapi-text-secondary hover:bg-srapi-card-muted"
           >
-            {isSimulating ? <Play size={12} className="animate-pulse" /> : <Pause size={12} />}
-            {isSimulating ? t('streaming') : t('paused')}
+            <RefreshCw size={12} />
+            {language === 'en' ? 'Refresh' : '刷新'}
           </button>
         </div>
 
         {/* Decisions Feed Logs */}
         {loading ? (
-          <div className="py-12 text-center font-mono">
-            <div className="w-6 h-6 border-t-2 border-srapi-primary rounded-full animate-spin mx-auto mb-3"></div>
-            <p className="text-xs text-srapi-text-secondary">{t('accessingLogs')}</p>
+          <PageQueryLoading label={t('accessingLogs')} />
+        ) : decisionsQuery.isError ? (
+          <PageQueryError error={decisionsQuery.error} onRetry={() => void decisionsQuery.refetch()} />
+        ) : decisions.length === 0 ? (
+          <div className="py-16 border border-dashed border-srapi-border rounded-2xl text-center space-y-3.5">
+            <GitBranch className="mx-auto text-srapi-text-secondary opacity-40" size={28} />
+            <p className="text-xs font-bold text-srapi-text-primary font-serif">
+              {language === 'en' ? 'No scheduler decisions yet' : '暂无调度决策'}
+            </p>
+            <p className="text-[10px] text-srapi-text-secondary font-mono">
+              {language === 'en'
+                ? 'Send a gateway request to record real scheduler evidence.'
+                : '发出网关请求后，这里会显示真实调度证据。'}
+            </p>
           </div>
         ) : (
           <div className="space-y-6">
-            {simulatedDecisions.map((dec) => {
+            {decisions.map((dec) => {
               const isExpanded = expandedId === dec.request_id;
               
               return (

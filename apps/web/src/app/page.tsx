@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Shield, Key, ArrowRight } from 'lucide-react';
 import { apiService, ApiRuntimeStatus } from '../lib/api';
 import { useLanguage } from '../context/LanguageContext';
+import { homeRouteForRole } from '@/lib/routes';
 
 export default function Home() {
   const router = useRouter();
@@ -21,7 +22,7 @@ export default function Home() {
     // Check if already authenticated
     const currentUser = apiService.getCurrentUser();
     if (currentUser) {
-      router.push(currentUser.role === 'admin' ? '/admin' : '/dashboard');
+      router.push(homeRouteForRole(currentUser.role));
     }
 
     const savedTheme = localStorage.getItem('srapi_theme');
@@ -63,10 +64,7 @@ export default function Home() {
 
     try {
       const user = await apiService.login(email, password);
-      // Wait a moment for transition animation
-      setTimeout(() => {
-        router.push(user.role === 'admin' ? '/admin' : '/dashboard');
-      }, 500);
+      router.push(homeRouteForRole(user.role));
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : t('authRejected'));
     } finally {
@@ -74,12 +72,7 @@ export default function Home() {
     }
   };
 
-  const loadDemoUser = async (role: 'admin' | 'user') => {
-    setEmail(role === 'admin' ? 'admin@srapi.local' : 'developer@srapi.local');
-    setPassword('password123');
-  };
-
-  const isDemoRuntime = runtimeStatus?.mode !== 'live';
+  const isApiOffline = runtimeStatus && !runtimeStatus.connected;
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-srapi-bg text-srapi-text-primary font-sans antialiased transition-colors duration-300 paper-grain relative">
@@ -116,11 +109,11 @@ export default function Home() {
             v0.1.0
           </span>
           <span className={`text-[10px] font-mono tracking-wider uppercase px-2 py-0.5 border rounded-full ${
-            isDemoRuntime
-              ? 'border-srapi-primary/30 text-srapi-primary bg-srapi-primary/5'
+            isApiOffline
+              ? 'border-srapi-error/30 text-srapi-error bg-srapi-error/5'
               : 'border-srapi-success/30 text-srapi-success bg-srapi-success/5'
           }`}>
-            {isDemoRuntime ? t('demoData') : t('liveApi')}
+            {isApiOffline ? t('apiOffline') : t('liveApi')}
           </span>
         </div>
 
@@ -192,7 +185,7 @@ export default function Home() {
             </p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-5">
+          <form method="post" onSubmit={handleLogin} className="space-y-5">
             {error && (
               <div className="p-4 border border-srapi-error/20 bg-srapi-error/5 text-srapi-error rounded-2xl text-[10px] font-mono">
                 {error}
@@ -205,8 +198,10 @@ export default function Home() {
               </label>
               <input
                 id="email"
+                name="email"
                 type="email"
                 required
+                autoComplete="username"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="operator@srapi.local"
@@ -234,36 +229,13 @@ export default function Home() {
             <button
               id="login-submit"
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || runtimeStatus === null}
               className="w-full bg-[#191919] hover:bg-neutral-800 dark:bg-[#F1EFEA] dark:hover:bg-white text-white dark:text-[#111110] text-xs font-mono tracking-widest uppercase py-4 rounded-full transition-all active:scale-[0.96] mt-4 font-bold border border-neutral-800 dark:border-white shadow-md disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
             >
-              {isLoading ? t('decrypting') : t('authenticate')}
+              {isLoading || runtimeStatus === null ? t('decrypting') : t('authenticate')}
               <ArrowRight size={14} />
             </button>
           </form>
-
-          {/* Quick-Access Test Accounts for local testing */}
-          <div className="pt-6 border-t border-srapi-border space-y-4">
-            <span className="text-[9px] uppercase font-mono tracking-wider text-srapi-text-secondary font-bold block">
-              {t('quickTest')}
-            </span>
-            <div className="flex gap-4">
-              <button
-                type="button"
-                onClick={() => loadDemoUser('admin')}
-                className="flex-1 py-3 px-4 border border-srapi-border bg-srapi-card-muted/50 hover:bg-srapi-card-muted text-[10px] font-bold text-srapi-text-primary rounded-xl transition-all cursor-pointer font-mono text-center block hover:border-srapi-primary/40 active:scale-[0.97]"
-              >
-                ● {t('adminAccount')}
-              </button>
-              <button
-                type="button"
-                onClick={() => loadDemoUser('user')}
-                className="flex-1 py-3 px-4 border border-srapi-border bg-srapi-card-muted/50 hover:bg-srapi-card-muted text-[10px] font-bold text-srapi-text-primary rounded-xl transition-all cursor-pointer font-mono text-center block hover:border-srapi-primary/40 active:scale-[0.97]"
-              >
-                ■ {t('devAccount')}
-              </button>
-            </div>
-          </div>
         </div>
       </div>
 

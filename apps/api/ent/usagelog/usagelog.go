@@ -55,6 +55,8 @@ const (
 	FieldCost = "cost"
 	// FieldCurrency holds the string denoting the currency field in the database.
 	FieldCurrency = "currency"
+	// FieldChargedAt holds the string denoting the charged_at field in the database.
+	FieldChargedAt = "charged_at"
 	// FieldCompatibilityWarningsJSON holds the string denoting the compatibility_warnings_json field in the database.
 	FieldCompatibilityWarningsJSON = "compatibility_warnings_json"
 	// Table holds the table name of the usagelog in the database.
@@ -85,6 +87,7 @@ var Columns = []string{
 	FieldErrorClass,
 	FieldCost,
 	FieldCurrency,
+	FieldChargedAt,
 	FieldCompatibilityWarningsJSON,
 }
 
@@ -246,4 +249,9 @@ func ByCost(opts ...sql.OrderTermOption) OrderOption {
 // ByCurrency orders the results by the currency field.
 func ByCurrency(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCurrency, opts...).ToFunc()
+}
+
+// ByChargedAt orders the results by the charged_at field.
+func ByChargedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldChargedAt, opts...).ToFunc()
 }

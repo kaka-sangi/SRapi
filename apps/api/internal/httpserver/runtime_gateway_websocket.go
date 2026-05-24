@@ -590,6 +590,9 @@ func (rt *runtimeState) prepareProviderRealtime(ctx context.Context, req provide
 	if req.Account.ID <= 0 {
 		return providerRealtimeSession{}, nil, provideradaptercontract.ProviderError{Class: "no_available_account", StatusCode: http.StatusServiceUnavailable, Message: "provider account missing"}
 	}
+	if err := rt.materializeProviderProxy(ctx, &req.Account); err != nil {
+		return providerRealtimeSession{}, nil, err
+	}
 	credential, err := rt.accounts.DecryptCredential(ctx, req.Account.ID)
 	if err != nil {
 		return providerRealtimeSession{}, nil, provideradaptercontract.ProviderError{Class: "credential_error", StatusCode: http.StatusBadGateway, Message: "provider credential unavailable"}

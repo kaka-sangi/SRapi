@@ -752,7 +752,7 @@ func TestAdminSubscriptionPricingControlPlane(t *testing.T) {
 	if err := json.NewDecoder(userSubRec.Body).Decode(&userSubResp); err != nil {
 		t.Fatalf("decode user subscription: %v", err)
 	}
-	if userSubResp.Data.UserId != loginResp.Data.User.Id || userSubResp.Data.PlanId != planResp.Data.Id || userSubResp.Data.Status != apiopenapi.UserSubscriptionStatusActive {
+	if userSubResp.Data.UserId != loginResp.Data.User.Id || userSubResp.Data.PlanId != planResp.Data.Id || userSubResp.Data.Status != apiopenapi.Active {
 		t.Fatalf("unexpected user subscription response: %+v", userSubResp.Data)
 	}
 	if userSubResp.Data.EntitlementsSnapshot["scheduler_strategy"] != "cost_saver" {
@@ -1729,8 +1729,8 @@ func TestAdminCatalogFlow(t *testing.T) {
 	if err := json.NewDecoder(strategiesRec.Body).Decode(&strategiesResp); err != nil {
 		t.Fatalf("decode strategies response: %v", err)
 	}
-	if len(strategiesResp.Data) != 2 {
-		t.Fatalf("expected 2 strategies, got %d", len(strategiesResp.Data))
+	if len(strategiesResp.Data) != 7 {
+		t.Fatalf("expected 7 strategies, got %d", len(strategiesResp.Data))
 	}
 	for _, strategy := range strategiesResp.Data {
 		if strategy.Version == "" || !strings.HasPrefix(strategy.ConfigHash, "sha256:") || len(strategy.Config) == 0 {
@@ -2101,16 +2101,8 @@ func TestAdminCatalogFlow(t *testing.T) {
 	if err := json.NewDecoder(billingRec.Body).Decode(&billingResp); err != nil {
 		t.Fatalf("decode billing ledger: %v", err)
 	}
-	if len(billingResp.Data) < len(usageResp.Data) {
-		t.Fatalf("expected billing ledger for usage logs, got %d ledger entries for %d usage logs", len(billingResp.Data), len(usageResp.Data))
-	}
-	for _, entry := range billingResp.Data {
-		if entry.Type != apiopenapi.UsageCharge || entry.ReferenceType != "usage_log" || entry.UserId == "" {
-			t.Fatalf("unexpected billing ledger entry: %+v", entry)
-		}
-		if entry.Metadata["request_id"] == nil || entry.Metadata["total_tokens"] == nil {
-			t.Fatalf("expected billing metadata to reference usage, got %+v", entry.Metadata)
-		}
+	if len(billingResp.Data) != 0 {
+		t.Fatalf("expected usage charges to wait for balance worker, got %+v", billingResp.Data)
 	}
 
 	outboxReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/ops/events/outbox?event_type=GatewayRequestCompleted", nil)
@@ -2427,6 +2419,82 @@ func TestGatewayInvokesOpenAICompatibleProviderAdapter(t *testing.T) {
 	}
 	if len(usageResp.Data) != 1 || usageResp.Data[0].UsageEstimated || usageResp.Data[0].TotalTokens != 12 {
 		t.Fatalf("expected parsed upstream usage, got %+v", usageResp.Data)
+	}
+}
+
+func TestGatewayUsageLogPersistsPricingRuleCost(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/chat/completions" {
+			t.Fatalf("unexpected upstream path %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"priced adapter response"}}],"usage":{"prompt_tokens":5,"completion_tokens":7,"total_tokens":12}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"priced-openai","display_name":"Priced OpenAI","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"priced-model","display_name":"Priced Model","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"priced-upstream","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"priced-account","runtime_class":"api_key","credential":{"api_key":"upstream-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
+
+	pricingReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/pricing-rules", strings.NewReader(`{"model_id":"`+string(modelResp.Data.Id)+`","provider_id":"`+string(providerResp.Data.Id)+`","input_price_per_million_tokens":"1000","output_price_per_million_tokens":"2000","cache_read_price_per_million_tokens":"0","cache_write_price_per_million_tokens":"0","currency":"USD"}`))
+	pricingReq.Header.Set("Content-Type", "application/json")
+	pricingReq.AddCookie(sessionCookie)
+	pricingReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	pricingRec := httptest.NewRecorder()
+	handler.ServeHTTP(pricingRec, pricingReq)
+	if pricingRec.Code != http.StatusCreated {
+		t.Fatalf("expected pricing rule create 201, got %d body=%s", pricingRec.Code, pricingRec.Body.String())
+	}
+	var pricingResp apiopenapi.PricingRuleResponse
+	if err := json.NewDecoder(pricingRec.Body).Decode(&pricingResp); err != nil {
+		t.Fatalf("decode pricing rule: %v", err)
+	}
+
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/chat/completions", `{"model":"priced-model","messages":[{"role":"user","content":"call priced upstream"}]}`)
+
+	usageReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/usage-logs?model=priced-model", nil)
+	usageReq.AddCookie(sessionCookie)
+	usageRec := httptest.NewRecorder()
+	handler.ServeHTTP(usageRec, usageReq)
+	if usageRec.Code != http.StatusOK {
+		t.Fatalf("expected usage logs 200, got %d body=%s", usageRec.Code, usageRec.Body.String())
+	}
+	var usageResp apiopenapi.UsageLogListResponse
+	if err := json.NewDecoder(usageRec.Body).Decode(&usageResp); err != nil {
+		t.Fatalf("decode usage logs: %v", err)
+	}
+	if len(usageResp.Data) != 1 {
+		t.Fatalf("expected one usage log, got %+v", usageResp.Data)
+	}
+	usage := usageResp.Data[0]
+	if usage.Cost != "0.01900000" || usage.Currency != "USD" || usage.TotalTokens != 12 {
+		t.Fatalf("expected priced usage cost, got %+v", usage)
+	}
+
+	billingReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/billing-ledger?reference_type=usage_log", nil)
+	billingReq.AddCookie(sessionCookie)
+	billingRec := httptest.NewRecorder()
+	handler.ServeHTTP(billingRec, billingReq)
+	if billingRec.Code != http.StatusOK {
+		t.Fatalf("expected billing ledger 200, got %d body=%s", billingRec.Code, billingRec.Body.String())
+	}
+	var billingResp apiopenapi.BillingLedgerListResponse
+	if err := json.NewDecoder(billingRec.Body).Decode(&billingResp); err != nil {
+		t.Fatalf("decode billing ledger: %v", err)
+	}
+	pricingRuleID, err := strconv.Atoi(string(pricingResp.Data.Id))
+	if err != nil {
+		t.Fatalf("parse pricing rule id: %v", err)
+	}
+	if len(billingResp.Data) != 0 {
+		t.Fatalf("expected usage charges to wait for balance worker, got %+v", billingResp.Data)
+	}
+	if pricingRuleID <= 0 {
+		t.Fatalf("expected pricing rule id, got %d", pricingRuleID)
 	}
 }
 
@@ -3222,6 +3290,56 @@ func TestGatewayProviderAliasUsesPresetProviderKey(t *testing.T) {
 	}
 	if decision.SourceEndpoint != "/api/provider/deepseek/v1/chat/completions" {
 		t.Fatalf("expected deepseek alias source endpoint, got %q", decision.SourceEndpoint)
+	}
+}
+
+func TestAdminInstallProviderPresetsIsIdempotent(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+
+	first := mustInstallProviderPresets(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	if first.Data.Succeeded == 0 {
+		t.Fatalf("expected provider presets to install missing providers, got %+v", first.Data)
+	}
+	if first.Data.Failed != 0 {
+		t.Fatalf("expected provider preset install without failures, got %+v", first.Data)
+	}
+
+	providersReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/providers", nil)
+	providersReq.AddCookie(sessionCookie)
+	providersRec := httptest.NewRecorder()
+	handler.ServeHTTP(providersRec, providersReq)
+	if providersRec.Code != http.StatusOK {
+		t.Fatalf("expected provider list 200, got %d body=%s", providersRec.Code, providersRec.Body.String())
+	}
+	var providersResp apiopenapi.ProviderListResponse
+	if err := json.NewDecoder(providersRec.Body).Decode(&providersResp); err != nil {
+		t.Fatalf("decode provider list: %v", err)
+	}
+	providersByName := map[string]apiopenapi.Provider{}
+	for _, provider := range providersResp.Data {
+		providersByName[provider.Name] = provider
+	}
+	for _, name := range []string{"deepseek", "kimi", "qwen", "zhipu", "grok", "mistral", "groq", "together"} {
+		provider, ok := providersByName[name]
+		if !ok {
+			t.Fatalf("expected installed provider preset %s in %+v", name, providersByName)
+		}
+		if provider.Status != apiopenapi.ResourceStatusDisabled {
+			t.Fatalf("expected installed provider %s to default disabled, got %s", name, provider.Status)
+		}
+	}
+	deepseekSchema := providersByName["deepseek"].ConfigSchema
+	if deepseekSchema == nil || (*deepseekSchema)["default_base_url"] != "https://api.deepseek.com" {
+		t.Fatalf("expected deepseek preset default base url, got %+v", deepseekSchema)
+	}
+
+	second := mustInstallProviderPresets(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	if second.Data.Succeeded != 0 || second.Data.Failed != 0 {
+		t.Fatalf("expected second install to be idempotent, got %+v", second.Data)
+	}
+	if second.Data.Requested != first.Data.Requested {
+		t.Fatalf("expected stable preset count, first=%+v second=%+v", first.Data, second.Data)
 	}
 }
 
@@ -6182,6 +6300,23 @@ func mustFindProviderByName(t *testing.T, handler http.Handler, sessionCookie *h
 	}
 	t.Fatalf("provider %s not found in %+v", name, resp.Data)
 	return apiopenapi.Provider{}
+}
+
+func mustInstallProviderPresets(t *testing.T, handler http.Handler, sessionCookie *http.Cookie, csrfToken string) apiopenapi.BatchOperationResponse {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/providers/preset/install", nil)
+	req.AddCookie(sessionCookie)
+	req.Header.Set("X-CSRF-Token", csrfToken)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected provider preset install 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var resp apiopenapi.BatchOperationResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode provider preset install response: %v", err)
+	}
+	return resp
 }
 
 func mustCreateModel(t *testing.T, handler http.Handler, sessionCookie *http.Cookie, csrfToken, body string) apiopenapi.ModelResponse {

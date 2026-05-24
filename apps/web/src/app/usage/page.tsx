@@ -14,6 +14,7 @@ import DashboardLayout from '../../components/DashboardLayout';
 import { apiService } from '../../lib/api';
 import { useUsageLogs } from '@/hooks/queries';
 import { useLanguage } from '../../context/LanguageContext';
+import { PageQueryError, PageQueryLoading } from '@/components/layout/page-query-state';
 
 export default function UsagePage() {
   const { language, t } = useLanguage();
@@ -189,10 +190,9 @@ export default function UsagePage() {
           </div>
 
           {loading ? (
-            <div className="py-12 text-center font-mono">
-              <div className="w-6 h-6 border-t-2 border-srapi-primary rounded-full animate-spin mx-auto mb-3"></div>
-              <p className="text-xs text-srapi-text-secondary">{t('fetchingEvidence')}</p>
-            </div>
+            <PageQueryLoading label={t('fetchingEvidence')} />
+          ) : logsQuery.isError ? (
+            <PageQueryError error={logsQuery.error} onRetry={() => void logsQuery.refetch()} />
           ) : filteredLogs.length === 0 ? (
             <div className="py-16 border border-dashed border-srapi-border rounded-2xl text-center space-y-3.5">
               <AlertTriangle className="mx-auto text-srapi-text-secondary opacity-40" size={28} />

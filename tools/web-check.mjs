@@ -12,6 +12,7 @@
  *   2. lint        -> eslint
  *   3. unit tests  -> vitest run (includes axe-core unit smoke)
  *   4. build       -> next build (production output, also exercises CSP headers)
+ *   5. budget      -> emitted JS bundle-size budget
  *
  * Playwright e2e is intentionally NOT run here. e2e needs a live server and
  * Chromium download; `make web-check-e2e` runs that separately.

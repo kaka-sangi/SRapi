@@ -41,6 +41,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/pricingrule"
 	"github.com/srapi/srapi/apps/api/ent/provider"
 	"github.com/srapi/srapi/apps/api/ent/provideraccount"
+	"github.com/srapi/srapi/apps/api/ent/proxy"
 	"github.com/srapi/srapi/apps/api/ent/role"
 	"github.com/srapi/srapi/apps/api/ent/schedulerdecision"
 	"github.com/srapi/srapi/apps/api/ent/schedulerfeedback"
@@ -112,6 +113,8 @@ type Client struct {
 	Provider *ProviderClient
 	// ProviderAccount is the client for interacting with the ProviderAccount builders.
 	ProviderAccount *ProviderAccountClient
+	// Proxy is the client for interacting with the Proxy builders.
+	Proxy *ProxyClient
 	// Role is the client for interacting with the Role builders.
 	Role *RoleClient
 	// SchedulerDecision is the client for interacting with the SchedulerDecision builders.
@@ -170,6 +173,7 @@ func (c *Client) init() {
 	c.PricingRule = NewPricingRuleClient(c.config)
 	c.Provider = NewProviderClient(c.config)
 	c.ProviderAccount = NewProviderAccountClient(c.config)
+	c.Proxy = NewProxyClient(c.config)
 	c.Role = NewRoleClient(c.config)
 	c.SchedulerDecision = NewSchedulerDecisionClient(c.config)
 	c.SchedulerFeedback = NewSchedulerFeedbackClient(c.config)
@@ -299,6 +303,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		PricingRule:             NewPricingRuleClient(cfg),
 		Provider:                NewProviderClient(cfg),
 		ProviderAccount:         NewProviderAccountClient(cfg),
+		Proxy:                   NewProxyClient(cfg),
 		Role:                    NewRoleClient(cfg),
 		SchedulerDecision:       NewSchedulerDecisionClient(cfg),
 		SchedulerFeedback:       NewSchedulerFeedbackClient(cfg),
@@ -355,6 +360,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		PricingRule:             NewPricingRuleClient(cfg),
 		Provider:                NewProviderClient(cfg),
 		ProviderAccount:         NewProviderAccountClient(cfg),
+		Proxy:                   NewProxyClient(cfg),
 		Role:                    NewRoleClient(cfg),
 		SchedulerDecision:       NewSchedulerDecisionClient(cfg),
 		SchedulerFeedback:       NewSchedulerFeedbackClient(cfg),
@@ -401,7 +407,7 @@ func (c *Client) Use(hooks ...Hook) {
 		c.InviteRelationship, c.ModelAlias, c.ModelProviderMapping, c.ModelRegistry,
 		c.ObsAlertEvent, c.ObsSLODefinition, c.PaymentAuditLog, c.PaymentOrder,
 		c.PaymentProviderInstance, c.PricingRule, c.Provider, c.ProviderAccount,
-		c.Role, c.SchedulerDecision, c.SchedulerFeedback, c.SchedulerStrategy,
+		c.Proxy, c.Role, c.SchedulerDecision, c.SchedulerFeedback, c.SchedulerStrategy,
 		c.Setting, c.SubscriptionPlan, c.UsageLog, c.User, c.UserRole,
 		c.UserSubscription,
 	} {
@@ -420,7 +426,7 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.InviteRelationship, c.ModelAlias, c.ModelProviderMapping, c.ModelRegistry,
 		c.ObsAlertEvent, c.ObsSLODefinition, c.PaymentAuditLog, c.PaymentOrder,
 		c.PaymentProviderInstance, c.PricingRule, c.Provider, c.ProviderAccount,
-		c.Role, c.SchedulerDecision, c.SchedulerFeedback, c.SchedulerStrategy,
+		c.Proxy, c.Role, c.SchedulerDecision, c.SchedulerFeedback, c.SchedulerStrategy,
 		c.Setting, c.SubscriptionPlan, c.UsageLog, c.User, c.UserRole,
 		c.UserSubscription,
 	} {
@@ -485,6 +491,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Provider.mutate(ctx, m)
 	case *ProviderAccountMutation:
 		return c.ProviderAccount.mutate(ctx, m)
+	case *ProxyMutation:
+		return c.Proxy.mutate(ctx, m)
 	case *RoleMutation:
 		return c.Role.mutate(ctx, m)
 	case *SchedulerDecisionMutation:
@@ -4101,6 +4109,139 @@ func (c *ProviderAccountClient) mutate(ctx context.Context, m *ProviderAccountMu
 	}
 }
 
+// ProxyClient is a client for the Proxy schema.
+type ProxyClient struct {
+	config
+}
+
+// NewProxyClient returns a client for the Proxy from the given config.
+func NewProxyClient(c config) *ProxyClient {
+	return &ProxyClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `proxy.Hooks(f(g(h())))`.
+func (c *ProxyClient) Use(hooks ...Hook) {
+	c.hooks.Proxy = append(c.hooks.Proxy, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `proxy.Intercept(f(g(h())))`.
+func (c *ProxyClient) Intercept(interceptors ...Interceptor) {
+	c.inters.Proxy = append(c.inters.Proxy, interceptors...)
+}
+
+// Create returns a builder for creating a Proxy entity.
+func (c *ProxyClient) Create() *ProxyCreate {
+	mutation := newProxyMutation(c.config, OpCreate)
+	return &ProxyCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of Proxy entities.
+func (c *ProxyClient) CreateBulk(builders ...*ProxyCreate) *ProxyCreateBulk {
+	return &ProxyCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ProxyClient) MapCreateBulk(slice any, setFunc func(*ProxyCreate, int)) *ProxyCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ProxyCreateBulk{err: fmt.Errorf("calling to ProxyClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ProxyCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ProxyCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for Proxy.
+func (c *ProxyClient) Update() *ProxyUpdate {
+	mutation := newProxyMutation(c.config, OpUpdate)
+	return &ProxyUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ProxyClient) UpdateOne(_m *Proxy) *ProxyUpdateOne {
+	mutation := newProxyMutation(c.config, OpUpdateOne, withProxy(_m))
+	return &ProxyUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ProxyClient) UpdateOneID(id int) *ProxyUpdateOne {
+	mutation := newProxyMutation(c.config, OpUpdateOne, withProxyID(id))
+	return &ProxyUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for Proxy.
+func (c *ProxyClient) Delete() *ProxyDelete {
+	mutation := newProxyMutation(c.config, OpDelete)
+	return &ProxyDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ProxyClient) DeleteOne(_m *Proxy) *ProxyDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ProxyClient) DeleteOneID(id int) *ProxyDeleteOne {
+	builder := c.Delete().Where(proxy.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ProxyDeleteOne{builder}
+}
+
+// Query returns a query builder for Proxy.
+func (c *ProxyClient) Query() *ProxyQuery {
+	return &ProxyQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeProxy},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a Proxy entity by its id.
+func (c *ProxyClient) Get(ctx context.Context, id int) (*Proxy, error) {
+	return c.Query().Where(proxy.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ProxyClient) GetX(ctx context.Context, id int) *Proxy {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ProxyClient) Hooks() []Hook {
+	return c.hooks.Proxy
+}
+
+// Interceptors returns the client interceptors.
+func (c *ProxyClient) Interceptors() []Interceptor {
+	return c.inters.Proxy
+}
+
+func (c *ProxyClient) mutate(ctx context.Context, m *ProxyMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ProxyCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ProxyUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ProxyUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ProxyDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown Proxy mutation op: %q", m.Op())
+	}
+}
+
 // RoleClient is a client for the Role schema.
 type RoleClient struct {
 	config
@@ -5439,7 +5580,7 @@ type (
 		CapabilityDefinition, DomainEventsInbox, DomainEventsOutbox, IdempotencyRecord,
 		InviteCode, InviteRelationship, ModelAlias, ModelProviderMapping,
 		ModelRegistry, ObsAlertEvent, ObsSLODefinition, PaymentAuditLog, PaymentOrder,
-		PaymentProviderInstance, PricingRule, Provider, ProviderAccount, Role,
+		PaymentProviderInstance, PricingRule, Provider, ProviderAccount, Proxy, Role,
 		SchedulerDecision, SchedulerFeedback, SchedulerStrategy, Setting,
 		SubscriptionPlan, UsageLog, User, UserRole, UserSubscription []ent.Hook
 	}
@@ -5449,7 +5590,7 @@ type (
 		CapabilityDefinition, DomainEventsInbox, DomainEventsOutbox, IdempotencyRecord,
 		InviteCode, InviteRelationship, ModelAlias, ModelProviderMapping,
 		ModelRegistry, ObsAlertEvent, ObsSLODefinition, PaymentAuditLog, PaymentOrder,
-		PaymentProviderInstance, PricingRule, Provider, ProviderAccount, Role,
+		PaymentProviderInstance, PricingRule, Provider, ProviderAccount, Proxy, Role,
 		SchedulerDecision, SchedulerFeedback, SchedulerStrategy, Setting,
 		SubscriptionPlan, UsageLog, User, UserRole, UserSubscription []ent.Interceptor
 	}

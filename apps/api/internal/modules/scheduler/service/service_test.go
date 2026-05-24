@@ -103,6 +103,36 @@ func TestBalancedStrategyPrefersHealthyCandidate(t *testing.T) {
 	}
 }
 
+func TestScheduleReturnsRankedAvailableCandidates(t *testing.T) {
+	svc := newService(t)
+	req := baseRequest()
+	req.Candidates = []contract.Candidate{
+		candidate(1, withHealth(0.40), withQuotaRemaining(0.90), withCapabilities(capabilitiescontract.KeyStreaming)),
+		candidate(2, withCircuitOpen(), withCapabilities(capabilitiescontract.KeyStreaming)),
+		candidate(3, withHealth(0.95), withQuotaRemaining(0.90), withCapabilities(capabilitiescontract.KeyStreaming)),
+		candidate(4, withHealth(0.75), withQuotaRemaining(0.90), withCapabilities(capabilitiescontract.KeyStreaming)),
+	}
+
+	result, err := svc.Schedule(context.Background(), req)
+	if err != nil {
+		t.Fatalf("schedule: %v", err)
+	}
+	if result.Candidate.Account.ID != 3 {
+		t.Fatalf("expected selected candidate 3, got %+v", result.Candidate.Account)
+	}
+	if len(result.Candidates) != 3 {
+		t.Fatalf("expected three ranked candidates after filtering, got %+v", result.Candidates)
+	}
+	got := []int{result.Candidates[0].Account.ID, result.Candidates[1].Account.ID, result.Candidates[2].Account.ID}
+	want := []int{3, 4, 1}
+	for idx := range want {
+		if got[idx] != want[idx] {
+			t.Fatalf("expected ranked candidate order %v, got %v", want, got)
+		}
+	}
+	assertRejectReason(t, result.Decision.RejectReasons, 2, "circuit_open")
+}
+
 func TestFreeTierRejectsProtectedLowQuotaAccount(t *testing.T) {
 	svc := newService(t)
 	req := baseRequest()
@@ -252,6 +282,137 @@ func TestCostSaverPrefersLowerRelativeCost(t *testing.T) {
 	}
 	if !strings.HasPrefix(result.Decision.StrategyConfigHash, "sha256:") {
 		t.Fatalf("expected strategy config hash snapshot, got %+v", result.Decision)
+	}
+}
+
+func TestLatencyFirstPrefersLowerP95Latency(t *testing.T) {
+	svc := newService(t)
+	req := baseRequest()
+	req.Strategy = contract.StrategyLatencyFirst
+	req.Candidates = []contract.Candidate{
+		candidate(1, withHealth(0.95), withQuotaRemaining(0.90), withLatencyP95MS(8000), withCapabilities(capabilitiescontract.KeyStreaming)),
+		candidate(2, withHealth(0.85), withQuotaRemaining(0.90), withLatencyP95MS(1000), withCapabilities(capabilitiescontract.KeyStreaming)),
+	}
+
+	result, err := svc.Schedule(context.Background(), req)
+	if err != nil {
+		t.Fatalf("schedule: %v", err)
+	}
+	if result.Candidate.Account.ID != 2 {
+		t.Fatalf("expected lower-latency account 2 selected, got %d", result.Candidate.Account.ID)
+	}
+	if result.Decision.Strategy != contract.StrategyLatencyFirst {
+		t.Fatalf("expected latency_first strategy snapshot, got %+v", result.Decision)
+	}
+}
+
+func TestQuotaProtectPrefersMoreRemainingQuota(t *testing.T) {
+	svc := newService(t)
+	req := baseRequest()
+	req.Strategy = contract.StrategyQuotaProtect
+	req.Candidates = []contract.Candidate{
+		candidate(1, withHealth(0.95), withQuotaRemaining(0.10), withCapabilities(capabilitiescontract.KeyStreaming)),
+		candidate(2, withHealth(0.85), withQuotaRemaining(0.90), withCapabilities(capabilitiescontract.KeyStreaming)),
+	}
+
+	result, err := svc.Schedule(context.Background(), req)
+	if err != nil {
+		t.Fatalf("schedule: %v", err)
+	}
+	if result.Candidate.Account.ID != 2 {
+		t.Fatalf("expected quota-rich account 2 selected, got %d", result.Candidate.Account.ID)
+	}
+}
+
+func TestStickyFirstPrioritizesStickyCandidate(t *testing.T) {
+	svc := newService(t)
+	req := baseRequest()
+	stickyAccountID := 1
+	req.Strategy = contract.StrategyStickyFirst
+	req.StickyAccountID = &stickyAccountID
+	req.StickyStrength = contract.StickyStrengthSoft
+	req.Candidates = []contract.Candidate{
+		candidate(1, withHealth(0.80), withQuotaRemaining(0.90), withCapabilities(capabilitiescontract.KeyStreaming)),
+		candidate(2, withHealth(0.92), withQuotaRemaining(0.90), withCapabilities(capabilitiescontract.KeyStreaming)),
+	}
+
+	result, err := svc.Schedule(context.Background(), req)
+	if err != nil {
+		t.Fatalf("schedule: %v", err)
+	}
+	if result.Candidate.Account.ID != 1 {
+		t.Fatalf("expected sticky account 1 selected, got %d", result.Candidate.Account.ID)
+	}
+	if !result.Decision.StickyHit {
+		t.Fatalf("expected sticky hit in decision, got %+v", result.Decision)
+	}
+}
+
+func TestPremiumQualityPrefersHealthOverCost(t *testing.T) {
+	svc := newService(t)
+	req := baseRequest()
+	req.Strategy = contract.StrategyPremiumQuality
+	req.Candidates = []contract.Candidate{
+		candidate(1, withHealth(0.95), withQuotaRemaining(0.90), withRelativeCost("0.9"), withCapabilities(capabilitiescontract.KeyStreaming)),
+		candidate(2, withHealth(0.60), withQuotaRemaining(0.90), withRelativeCost("0.1"), withCapabilities(capabilitiescontract.KeyStreaming)),
+	}
+
+	result, err := svc.Schedule(context.Background(), req)
+	if err != nil {
+		t.Fatalf("schedule: %v", err)
+	}
+	if result.Candidate.Account.ID != 1 {
+		t.Fatalf("expected premium quality to select healthier account 1, got %d", result.Candidate.Account.ID)
+	}
+}
+
+func TestCacheAffinityFirstPrefersHealthyCachedCandidate(t *testing.T) {
+	svc := newService(t)
+	req := baseRequest()
+	req.Strategy = contract.StrategyCacheAffinityFirst
+	req.EstimatedInputTokens = 80000
+	req.EstimatedOutputTokens = 1000
+	req.Candidates = []contract.Candidate{
+		candidate(1, withHealth(0.88), withQuotaRemaining(0.90), withCacheScore("0.90"), withCapabilities(capabilitiescontract.KeyStreaming)),
+		candidate(2, withHealth(0.95), withQuotaRemaining(0.90), withCapabilities(capabilitiescontract.KeyStreaming)),
+	}
+
+	result, err := svc.Schedule(context.Background(), req)
+	if err != nil {
+		t.Fatalf("schedule: %v", err)
+	}
+	if result.Candidate.Account.ID != 1 {
+		t.Fatalf("expected cache-affinity account 1 selected, got %d", result.Candidate.Account.ID)
+	}
+	if !result.Decision.CacheAffinityHit {
+		t.Fatalf("expected cache affinity hit in decision, got %+v", result.Decision)
+	}
+	if cache := decisionScore(t, result.Decision.Scores, 1)["cache_score"].(float64); cache <= 0 {
+		t.Fatalf("expected positive cache score, got %+v", result.Decision.Scores)
+	}
+}
+
+func TestCacheAffinityDoesNotOverridePoorHealth(t *testing.T) {
+	svc := newService(t)
+	req := baseRequest()
+	req.Strategy = contract.StrategyCacheAffinityFirst
+	req.Candidates = []contract.Candidate{
+		candidate(1, withHealth(0.30), withQuotaRemaining(0.90), withCacheScore("1.00"), withCapabilities(capabilitiescontract.KeyStreaming)),
+		candidate(2, withHealth(0.95), withQuotaRemaining(0.90), withCapabilities(capabilitiescontract.KeyStreaming)),
+	}
+
+	result, err := svc.Schedule(context.Background(), req)
+	if err != nil {
+		t.Fatalf("schedule: %v", err)
+	}
+	if result.Candidate.Account.ID != 2 {
+		t.Fatalf("expected healthy account 2 selected, got %d", result.Candidate.Account.ID)
+	}
+	if result.Decision.CacheAffinityHit {
+		t.Fatalf("did not expect cache affinity hit for selected uncached account, got %+v", result.Decision)
+	}
+	if cache := decisionScore(t, result.Decision.Scores, 1)["cache_score"].(float64); cache != 0 {
+		t.Fatalf("expected poor-health cache score to be suppressed, got %+v", result.Decision.Scores)
 	}
 }
 
@@ -468,12 +629,27 @@ func TestUserBalanceInsufficientCreatesDecisionWithoutLease(t *testing.T) {
 func TestStrategyRegistryListsSeededStrategies(t *testing.T) {
 	svc := newService(t)
 	strategies := svc.ListStrategies()
-	if len(strategies) != 2 {
-		t.Fatalf("expected 2 seeded strategies, got %d", len(strategies))
+	if len(strategies) != 7 {
+		t.Fatalf("expected 7 seeded strategies, got %d", len(strategies))
 	}
+	seen := map[contract.StrategyName]bool{}
 	for _, strategy := range strategies {
 		if strategy.Version == "" || strategy.Status != "active" || !strings.HasPrefix(strategy.ConfigHash, "sha256:") || len(strategy.Weights) == 0 || len(strategy.Config) == 0 {
 			t.Fatalf("unexpected strategy descriptor: %+v", strategy)
+		}
+		seen[strategy.Name] = true
+	}
+	for _, name := range []contract.StrategyName{
+		contract.StrategyBalanced,
+		contract.StrategyCostSaver,
+		contract.StrategyLatencyFirst,
+		contract.StrategyQuotaProtect,
+		contract.StrategyStickyFirst,
+		contract.StrategyCacheAffinityFirst,
+		contract.StrategyPremiumQuality,
+	} {
+		if !seen[name] {
+			t.Fatalf("expected seeded strategy %s in %+v", name, strategies)
 		}
 	}
 }
@@ -740,6 +916,10 @@ func withQuotaRemaining(value float64) candidateOption {
 	return func(candidate *contract.Candidate) { candidate.RuntimeState.QuotaRemainingRatio = &value }
 }
 
+func withLatencyP95MS(value int) candidateOption {
+	return func(candidate *contract.Candidate) { candidate.RuntimeState.LatencyP95MS = &value }
+}
+
 func withProtectedAccount() candidateOption {
 	return func(candidate *contract.Candidate) {
 		if candidate.Account.Metadata == nil {
@@ -782,6 +962,12 @@ func withCapabilities(keys ...string) candidateOption {
 func withRelativeCost(value string) candidateOption {
 	return func(candidate *contract.Candidate) {
 		candidate.Mapping.PricingOverride["relative_cost"] = value
+	}
+}
+
+func withCacheScore(value string) candidateOption {
+	return func(candidate *contract.Candidate) {
+		candidate.Mapping.PricingOverride["cache_score"] = value
 	}
 }
 

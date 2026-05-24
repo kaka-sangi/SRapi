@@ -10,6 +10,7 @@ import (
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
+	affiliatecontract "github.com/srapi/srapi/apps/api/internal/modules/affiliate/contract"
 	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
 	auditcontract "github.com/srapi/srapi/apps/api/internal/modules/audit/contract"
 	billingcontract "github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
@@ -278,6 +279,19 @@ func toAPIAccount(account accountcontract.ProviderAccount) apiopenapi.ProviderAc
 	}
 }
 
+func toAPIProxyDefinition(proxy accountcontract.ProxyDefinition) apiopenapi.ProxyDefinition {
+	return apiopenapi.ProxyDefinition{
+		CreatedAt:     proxy.CreatedAt,
+		Id:            apiopenapi.Id(strconv.Itoa(proxy.ID)),
+		Metadata:      mapToJsonObjectPtr(proxy.Metadata),
+		Name:          proxy.Name,
+		Status:        apiopenapi.ProxyDefinitionStatus(proxy.Status),
+		Type:          apiopenapi.ProxyDefinitionType(proxy.Type),
+		UpdatedAt:     proxy.UpdatedAt,
+		UrlConfigured: proxy.URLCiphertext != "",
+	}
+}
+
 func (s *Server) apiAccount(ctx context.Context, account accountcontract.ProviderAccount) apiopenapi.ProviderAccount {
 	out := toAPIAccount(account)
 	groupIDs, err := s.runtime.accounts.ListGroupIDsByAccount(ctx, account.ID)
@@ -471,6 +485,38 @@ func toAPIBillingLedgerEntry(entry billingcontract.LedgerEntry) apiopenapi.Billi
 		ReferenceType: entry.ReferenceType,
 		Type:          apiopenapi.BillingLedgerEntryType(entry.Type),
 		UserId:        apiopenapi.Id(strconv.Itoa(entry.UserID)),
+	}
+}
+
+func toAPIAffiliateInviteRecord(item affiliatecontract.InviteRelationship) apiopenapi.AffiliateInviteRecord {
+	return apiopenapi.AffiliateInviteRecord{
+		CreatedAt:     item.CreatedAt,
+		FirstPaidAt:   cloneTimePtr(item.FirstPaidAt),
+		Id:            apiopenapi.Id(strconv.Itoa(item.ID)),
+		InviteCodeId:  apiopenapi.Id(strconv.Itoa(item.InviteCodeID)),
+		InviteeUserId: apiopenapi.Id(strconv.Itoa(item.InviteeUserID)),
+		InviterUserId: apiopenapi.Id(strconv.Itoa(item.InviterUserID)),
+		Status:        apiopenapi.AffiliateRelationshipStatus(item.Status),
+		UpdatedAt:     item.UpdatedAt,
+	}
+}
+
+func toAPIAffiliateLedgerEntry(item affiliatecontract.AffiliateLedger) apiopenapi.AffiliateLedgerEntry {
+	return apiopenapi.AffiliateLedgerEntry{
+		Amount:         item.Amount,
+		CreatedAt:      item.CreatedAt,
+		Currency:       item.Currency,
+		Id:             apiopenapi.Id(strconv.Itoa(item.ID)),
+		Metadata:       jsonObject(item.Metadata),
+		PaymentOrderId: optionalAPIID(item.PaymentOrderID),
+		ReferenceId:    item.ReferenceID,
+		RelatedUserId:  apiopenapi.Id(strconv.Itoa(item.RelatedUserID)),
+		SettledAt:      cloneTimePtr(item.SettledAt),
+		Status:         apiopenapi.AffiliateLedgerEntryStatus(item.Status),
+		SubscriptionId: optionalAPIID(item.SubscriptionID),
+		Type:           apiopenapi.AffiliateLedgerEntryType(item.Type),
+		UpdatedAt:      item.UpdatedAt,
+		UserId:         apiopenapi.Id(strconv.Itoa(item.UserID)),
 	}
 }
 
@@ -900,6 +946,14 @@ func derefMap(value *map[string]interface{}) map[string]any {
 	return out
 }
 
+func optionalMap(value *map[string]interface{}) *map[string]any {
+	if value == nil {
+		return nil
+	}
+	out := derefMap(value)
+	return &out
+}
+
 func optionalCredential(value *map[string]interface{}) *map[string]any {
 	if value == nil {
 		return nil
@@ -930,6 +984,22 @@ func toAccountStatusPtr(value *apiopenapi.ProviderAccountStatus) *accountcontrac
 	}
 	status := accountcontract.Status(*value)
 	return &status
+}
+
+func toProxyStatusPtr(value *apiopenapi.ProxyDefinitionStatus) *accountcontract.ProxyStatus {
+	if value == nil {
+		return nil
+	}
+	status := accountcontract.ProxyStatus(*value)
+	return &status
+}
+
+func toProxyTypePtr(value *apiopenapi.ProxyDefinitionType) *accountcontract.ProxyType {
+	if value == nil {
+		return nil
+	}
+	proxyType := accountcontract.ProxyType(*value)
+	return &proxyType
 }
 
 func toUserStatusPtr(value *apiopenapi.UserStatus) *userscontract.Status {

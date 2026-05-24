@@ -26,6 +26,7 @@ type UsageLog struct {
 	ErrorClass            *string
 	Cost                  string
 	Currency              string
+	ChargedAt             *time.Time
 	CompatibilityWarnings []string
 	CreatedAt             time.Time
 }
@@ -49,6 +50,7 @@ type RecordRequest struct {
 	ErrorClass            *string
 	Cost                  string
 	Currency              string
+	ChargedAt             *time.Time
 	CompatibilityWarnings []string
 }
 

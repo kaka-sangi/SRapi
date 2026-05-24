@@ -14,12 +14,15 @@ import (
 type Store struct {
 	mu                  sync.Mutex
 	nextID              int
+	nextProxyID         int
 	nextGroupID         int
 	nextGroupMemberID   int
 	nextHealthID        int
 	nextQuotaID         int
 	byID                map[int]contract.ProviderAccount
 	byName              map[string]int
+	proxiesByID         map[int]contract.ProxyDefinition
+	proxiesByName       map[string]int
 	groupsByID          map[int]contract.AccountGroup
 	groupsByName        map[string]int
 	groupMembersByID    map[int]contract.AccountGroupMember
@@ -30,12 +33,15 @@ type Store struct {
 func New() *Store {
 	return &Store{
 		nextID:              1,
+		nextProxyID:         1,
 		nextGroupID:         1,
 		nextGroupMemberID:   1,
 		nextHealthID:        1,
 		nextQuotaID:         1,
 		byID:                map[int]contract.ProviderAccount{},
 		byName:              map[string]int{},
+		proxiesByID:         map[int]contract.ProxyDefinition{},
+		proxiesByName:       map[string]int{},
 		groupsByID:          map[int]contract.AccountGroup{},
 		groupsByName:        map[string]int{},
 		groupMembersByID:    map[int]contract.AccountGroupMember{},
@@ -117,6 +123,71 @@ func (s *Store) ListGroupIDsByAccount(_ context.Context, accountID int) ([]int, 
 		}
 	}
 	sort.Ints(out)
+	return out, nil
+}
+
+func (s *Store) CreateProxy(_ context.Context, input contract.CreateStoredProxy) (contract.ProxyDefinition, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, exists := s.proxiesByName[strings.ToLower(input.Name)]; exists {
+		return contract.ProxyDefinition{}, errors.New("proxy already exists")
+	}
+	now := time.Now().UTC()
+	proxy := contract.ProxyDefinition{
+		ID:            s.nextProxyID,
+		Name:          input.Name,
+		Type:          input.Type,
+		URLCiphertext: input.URLCiphertext,
+		URLVersion:    input.URLVersion,
+		Status:        input.Status,
+		Metadata:      cloneMap(input.Metadata),
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}
+	s.proxiesByID[proxy.ID] = proxy
+	s.proxiesByName[strings.ToLower(proxy.Name)] = proxy.ID
+	s.nextProxyID++
+	return cloneProxy(proxy), nil
+}
+
+func (s *Store) UpdateProxy(_ context.Context, proxy contract.ProxyDefinition) (contract.ProxyDefinition, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.proxiesByID[proxy.ID]; !ok {
+		return contract.ProxyDefinition{}, errors.New("proxy not found")
+	}
+	for id, existing := range s.proxiesByID {
+		if id != proxy.ID && strings.EqualFold(existing.Name, proxy.Name) {
+			return contract.ProxyDefinition{}, errors.New("proxy already exists")
+		}
+	}
+	stored := cloneProxy(proxy)
+	s.proxiesByID[stored.ID] = stored
+	s.proxiesByName[strings.ToLower(stored.Name)] = stored.ID
+	return cloneProxy(stored), nil
+}
+
+func (s *Store) FindProxyByID(_ context.Context, id int) (contract.ProxyDefinition, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	proxy, ok := s.proxiesByID[id]
+	if !ok || proxy.DeletedAt != nil {
+		return contract.ProxyDefinition{}, errors.New("proxy not found")
+	}
+	return cloneProxy(proxy), nil
+}
+
+func (s *Store) ListProxies(_ context.Context) ([]contract.ProxyDefinition, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]contract.ProxyDefinition, 0, len(s.proxiesByID))
+	for _, proxy := range s.proxiesByID {
+		if proxy.DeletedAt != nil {
+			continue
+		}
+		out = append(out, cloneProxy(proxy))
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
 	return out, nil
 }
 
@@ -325,6 +396,15 @@ func (s *Store) ListQuotaSnapshotsByAccount(_ context.Context, accountID int, li
 
 func cloneAccount(value contract.ProviderAccount) contract.ProviderAccount {
 	value.Metadata = cloneMap(value.Metadata)
+	return value
+}
+
+func cloneProxy(value contract.ProxyDefinition) contract.ProxyDefinition {
+	value.Metadata = cloneMap(value.Metadata)
+	if value.DeletedAt != nil {
+		cloned := *value.DeletedAt
+		value.DeletedAt = &cloned
+	}
 	return value
 }
 

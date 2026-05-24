@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { apiService, type ApiRuntimeStatus } from "@/lib/api";
 import { useRuntimeStatus } from "@/hooks/queries";
 import { Spinner } from "@/components/ui";
+import { homeRouteForRole } from "@/lib/routes";
 
 type Role = "admin" | "user";
 type CurrentUser = ReturnType<typeof apiService.getCurrentUser>;
@@ -111,7 +112,7 @@ export function AuthGate({ allowedRole, children, loadingLabel = "Loading..." }:
       return;
     }
     if (wrongRole && user) {
-      router.replace(user.role === "admin" ? "/admin" : "/dashboard");
+      router.replace(homeRouteForRole(user.role));
     }
   }, [mounted, missingUser, wrongRole, user, router]);
 

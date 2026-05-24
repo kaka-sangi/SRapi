@@ -780,9 +780,17 @@ func promoCodeRequestFromAPI(in apiopenapi.CreatePromoCodeRequest) admincontrol.
 }
 
 func toAPIRiskControlConfig(in admincontrol.RiskControlConfig) apiopenapi.RiskControlConfig {
+	blockedCountries := append([]string(nil), in.BlockedCountries...)
+	if blockedCountries == nil {
+		blockedCountries = []string{}
+	}
+	blockedIPs := append([]string(nil), in.BlockedIPs...)
+	if blockedIPs == nil {
+		blockedIPs = []string{}
+	}
 	return apiopenapi.RiskControlConfig{
-		BlockedCountries:           append([]string(nil), in.BlockedCountries...),
-		BlockedIps:                 append([]string(nil), in.BlockedIPs...),
+		BlockedCountries:           blockedCountries,
+		BlockedIps:                 blockedIPs,
 		CooldownSeconds:            in.CooldownSeconds,
 		Enabled:                    in.Enabled,
 		MaxCostPerDay:              in.MaxCostPerDay,

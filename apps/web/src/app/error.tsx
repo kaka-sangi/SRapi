@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Button, Card, CardDescription, CardTitle } from "@/components/ui";
+import { captureException } from "@/lib/telemetry";
 
 export default function RootError({
   error,
@@ -11,6 +12,10 @@ export default function RootError({
   reset: () => void;
 }) {
   React.useEffect(() => {
+    captureException(error, {
+      boundary: "route",
+      digest: error.digest ?? null,
+    });
     if (process.env.NODE_ENV !== "production") {
       console.error("[srapi] route error", error);
     }

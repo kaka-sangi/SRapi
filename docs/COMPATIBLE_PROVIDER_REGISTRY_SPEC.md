@@ -22,6 +22,11 @@ Provider preset 的目标是减少硬编码分叉：
 | `model_catalog_owner` | 模型目录来源。 |
 | `account_type_allowlist` | 允许的账号类型。 |
 
+`generic-reverse-proxy` 是配置驱动的 OpenAI-compatible adapter。它读取 provider 或 account metadata 中的
+`base_url`、`auth_header_template`、`body_mapping_rules` 和 `response_path_rules`，用于没有专用 adapter
+但仍能用 OpenAI-compatible 请求/响应形态接入的上游。`runtime_class=api_key` 走普通 HTTP client；
+其他 runtime class 走 Reverse Proxy Runtime。
+
 ## 3. OpenAI-compatible preset
 
 第一阶段建议内置：
@@ -36,8 +41,11 @@ Provider preset 的目标是减少硬编码分叉：
 | `grok` | xAI Grok OpenAI-compatible | MVP preset |
 | `moonshot` | Moonshot / Kimi | MVP preset |
 | `kimi` | Kimi route alias preset | MVP preset |
+| `mistral` | Mistral OpenAI-compatible | MVP preset |
 | `openrouter` | OpenRouter | MVP preset |
 | `anyrouter` | AnyRouter | MVP preset |
+| `qwen` | 通义千问 / DashScope OpenAI-compatible | MVP preset |
+| `together` | Together AI OpenAI-compatible | MVP preset |
 | `zhipu` | GLM / Zhipu | MVP preset |
 | `zai` | Z.AI / GLM | MVP preset |
 

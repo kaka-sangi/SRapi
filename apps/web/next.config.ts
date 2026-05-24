@@ -22,17 +22,39 @@ const securityHeaders = [
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
 ];
 
-const prodCSP = [
+export function telemetryConnectOrigin(rawUrl = process.env.NEXT_PUBLIC_SRAPI_TELEMETRY_URL ?? "") {
+  const value = rawUrl.trim();
+  if (!value || value.startsWith("/")) return null;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+    return url.origin;
+  } catch {
+    return null;
+  }
+}
+
+export function buildProdCSP(telemetryUrl = process.env.NEXT_PUBLIC_SRAPI_TELEMETRY_URL ?? "") {
+  const connectSrc = ["'self'"];
+  const telemetryOrigin = telemetryConnectOrigin(telemetryUrl);
+  if (telemetryOrigin) {
+    connectSrc.push(telemetryOrigin);
+  }
+
+  return [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline'",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
-  "connect-src 'self'",
+    `connect-src ${connectSrc.join(" ")}`,
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",
-].join("; ");
+  ].join("; ");
+}
+
+const prodCSP = buildProdCSP();
 
 const baseConfig: NextConfig = {
   turbopack: {

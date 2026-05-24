@@ -164,6 +164,25 @@ func (s *Store) ListOrders(ctx context.Context) ([]contract.PaymentOrder, error)
 	return out, nil
 }
 
+func (s *Store) ListExpiredPendingOrders(ctx context.Context, now time.Time) ([]contract.PaymentOrder, error) {
+	rows, err := s.client.PaymentOrder.Query().
+		Where(
+			entpaymentorder.StatusEQ(string(contract.OrderStatusPending)),
+			entpaymentorder.ExpiresAtNotNil(),
+			entpaymentorder.ExpiresAtLT(now.UTC()),
+		).
+		Order(entpaymentorder.ByID()).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]contract.PaymentOrder, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toOrder(row))
+	}
+	return out, nil
+}
+
 func (s *Store) ListOrdersByUser(ctx context.Context, userID int) ([]contract.PaymentOrder, error) {
 	rows, err := s.client.PaymentOrder.Query().
 		Where(entpaymentorder.UserIDEQ(userID)).
@@ -177,6 +196,31 @@ func (s *Store) ListOrdersByUser(ctx context.Context, userID int) ([]contract.Pa
 		out = append(out, toOrder(row))
 	}
 	return out, nil
+}
+
+func (s *Store) ExpireOrder(ctx context.Context, orderID int, now time.Time) (contract.PaymentOrder, bool, error) {
+	now = now.UTC()
+	updated, err := s.client.PaymentOrder.UpdateOneID(orderID).
+		Where(
+			entpaymentorder.StatusEQ(string(contract.OrderStatusPending)),
+			entpaymentorder.ExpiresAtNotNil(),
+			entpaymentorder.ExpiresAtLT(now),
+		).
+		SetStatus(string(contract.OrderStatusExpired)).
+		SetClosedAt(now).
+		SetUpdatedAt(now).
+		Save(ctx)
+	if err == nil {
+		return toOrder(updated), true, nil
+	}
+	if !ent.IsNotFound(err) {
+		return contract.PaymentOrder{}, false, err
+	}
+	order, findErr := s.FindOrderByID(ctx, orderID)
+	if findErr != nil {
+		return contract.PaymentOrder{}, false, findErr
+	}
+	return order, false, nil
 }
 
 func (s *Store) CreateAuditLog(ctx context.Context, input contract.PaymentAuditLog) (contract.PaymentAuditLog, bool, error) {

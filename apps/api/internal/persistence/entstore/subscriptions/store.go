@@ -98,6 +98,9 @@ func (s *Store) FindUserSubscriptionBySource(ctx context.Context, sourceType str
 		Order(entusersubscription.ByID()).
 		First(ctx)
 	if err != nil {
+		if ent.IsNotFound(err) {
+			return contract.UserSubscription{}, contract.ErrNotFound
+		}
 		return contract.UserSubscription{}, err
 	}
 	return toSubscription(found), nil
@@ -150,6 +153,49 @@ func (s *Store) ListActiveUserSubscriptions(ctx context.Context, userID int, at 
 		out = append(out, toSubscription(row))
 	}
 	return out, nil
+}
+
+func (s *Store) ListExpiredActiveUserSubscriptions(ctx context.Context, now time.Time) ([]contract.UserSubscription, error) {
+	rows, err := s.client.UserSubscription.Query().
+		Where(
+			entusersubscription.StatusEQ(string(contract.SubscriptionStatusActive)),
+			entusersubscription.ExpiresAtLT(now.UTC()),
+		).
+		Order(entusersubscription.ByID()).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]contract.UserSubscription, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toSubscription(row))
+	}
+	return out, nil
+}
+
+func (s *Store) ExpireUserSubscription(ctx context.Context, id int, now time.Time) (contract.UserSubscription, bool, error) {
+	now = now.UTC()
+	updated, err := s.client.UserSubscription.UpdateOneID(id).
+		Where(
+			entusersubscription.StatusEQ(string(contract.SubscriptionStatusActive)),
+			entusersubscription.ExpiresAtLT(now),
+		).
+		SetStatus(string(contract.SubscriptionStatusExpired)).
+		SetUpdatedAt(now).
+		Save(ctx)
+	if err == nil {
+		return toSubscription(updated), true, nil
+	}
+	if !ent.IsNotFound(err) {
+		return contract.UserSubscription{}, false, err
+	}
+	subscriptions, findErr := s.client.UserSubscription.Query().
+		Where(entusersubscription.IDEQ(id)).
+		Only(ctx)
+	if findErr != nil {
+		return contract.UserSubscription{}, false, findErr
+	}
+	return toSubscription(subscriptions), false, nil
 }
 
 func (s *Store) CreatePricingRule(ctx context.Context, input contract.PricingRule) (contract.PricingRule, error) {

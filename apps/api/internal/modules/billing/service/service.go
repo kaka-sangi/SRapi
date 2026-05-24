@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,8 +20,9 @@ type SystemClock struct{}
 func (SystemClock) Now() time.Time { return time.Now().UTC() }
 
 type Service struct {
-	store contract.Store
-	clock Clock
+	store        contract.Store
+	usageCharges contract.UsageChargeStore
+	clock        Clock
 }
 
 func New(store contract.Store, clock Clock) (*Service, error) {
@@ -32,7 +35,20 @@ func New(store contract.Store, clock Clock) (*Service, error) {
 	return &Service{store: store, clock: clock}, nil
 }
 
+func NewUsageCharger(store contract.UsageChargeStore, clock Clock) (*Service, error) {
+	if store == nil {
+		return nil, ErrInvalidInput
+	}
+	if clock == nil {
+		clock = SystemClock{}
+	}
+	return &Service{usageCharges: store, clock: clock}, nil
+}
+
 func (s *Service) Record(ctx context.Context, req contract.RecordRequest) (contract.LedgerEntry, error) {
+	if s == nil || s.store == nil {
+		return contract.LedgerEntry{}, ErrInvalidInput
+	}
 	if req.UserID <= 0 || strings.TrimSpace(string(req.Type)) == "" {
 		return contract.LedgerEntry{}, ErrInvalidInput
 	}
@@ -56,7 +72,90 @@ func (s *Service) Record(ctx context.Context, req contract.RecordRequest) (contr
 }
 
 func (s *Service) List(ctx context.Context) ([]contract.LedgerEntry, error) {
+	if s == nil || s.store == nil {
+		return nil, ErrInvalidInput
+	}
 	return s.store.List(ctx)
+}
+
+func (s *Service) ChargePendingUsage(ctx context.Context, req contract.ChargePendingUsageRequest) (contract.ChargePendingUsageResult, error) {
+	if s == nil || s.usageCharges == nil {
+		return contract.ChargePendingUsageResult{}, ErrInvalidInput
+	}
+	limit := req.Limit
+	if limit <= 0 {
+		limit = 500
+	}
+	chargedAt := req.ChargedAt
+	if chargedAt.IsZero() {
+		chargedAt = s.clock.Now()
+	}
+	pending, err := s.usageCharges.ListPendingUsageCharges(ctx, limit)
+	if err != nil {
+		return contract.ChargePendingUsageResult{}, err
+	}
+	result := contract.ChargePendingUsageResult{Selected: len(pending)}
+	if len(pending) == 0 {
+		return result, nil
+	}
+	sort.Slice(pending, func(i, j int) bool {
+		if pending[i].UserID != pending[j].UserID {
+			return pending[i].UserID < pending[j].UserID
+		}
+		if pending[i].Currency != pending[j].Currency {
+			return pending[i].Currency < pending[j].Currency
+		}
+		return pending[i].UsageLogID < pending[j].UsageLogID
+	})
+	for start := 0; start < len(pending); {
+		end := start + 1
+		for end < len(pending) && pending[end].UserID == pending[start].UserID && pending[end].Currency == pending[start].Currency {
+			end++
+		}
+		usageLogIDs := make([]int, 0, end-start)
+		for _, item := range pending[start:end] {
+			usageLogIDs = append(usageLogIDs, item.UsageLogID)
+		}
+		chargeResult, err := s.ChargeUsage(ctx, contract.ChargeUsageRequest{
+			UserID:        pending[start].UserID,
+			Currency:      pending[start].Currency,
+			UsageLogIDs:   usageLogIDs,
+			ChargedAt:     chargedAt,
+			ReferenceType: "usage_log_batch",
+			ReferenceID:   usageChargeReferenceID(usageLogIDs),
+		})
+		if err != nil {
+			return result, err
+		}
+		if chargeResult.LedgerEntry.ID > 0 {
+			result.Batches = append(result.Batches, chargeResult)
+			result.Charged += len(chargeResult.ChargedUsageLogIDs)
+		}
+		start = end
+	}
+	return result, nil
+}
+
+func (s *Service) ChargeUsage(ctx context.Context, req contract.ChargeUsageRequest) (contract.ChargeUsageResult, error) {
+	if s == nil || s.usageCharges == nil {
+		return contract.ChargeUsageResult{}, ErrInvalidInput
+	}
+	if req.UserID <= 0 || len(req.UsageLogIDs) == 0 {
+		return contract.ChargeUsageResult{}, ErrInvalidInput
+	}
+	if strings.TrimSpace(req.Currency) == "" {
+		req.Currency = "USD"
+	}
+	if strings.TrimSpace(req.ReferenceType) == "" {
+		req.ReferenceType = "usage_log_batch"
+	}
+	if strings.TrimSpace(req.ReferenceID) == "" {
+		req.ReferenceID = usageChargeReferenceID(req.UsageLogIDs)
+	}
+	if req.ChargedAt.IsZero() {
+		req.ChargedAt = s.clock.Now()
+	}
+	return s.usageCharges.ChargeUsage(ctx, req)
 }
 
 func defaultMoney(value string) string {
@@ -80,4 +179,14 @@ func cloneMap(value map[string]any) map[string]any {
 		return map[string]any{}
 	}
 	return cloned
+}
+
+func usageChargeReferenceID(ids []int) string {
+	if len(ids) == 0 {
+		return ""
+	}
+	if len(ids) == 1 {
+		return strconv.Itoa(ids[0])
+	}
+	return strconv.Itoa(ids[0]) + "-" + strconv.Itoa(ids[len(ids)-1])
 }

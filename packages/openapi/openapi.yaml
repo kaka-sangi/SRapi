@@ -28,6 +28,8 @@ tags:
     description: Model registry administration endpoints.
   - name: AdminAccounts
     description: Provider account administration endpoints.
+  - name: AdminProxies
+    description: Encrypted egress proxy registry and account bindings.
   - name: AdminAccountGroups
     description: Provider account pool and group administration endpoints.
   - name: AdminCapabilities
@@ -38,6 +40,8 @@ tags:
     description: Audit log administration endpoints.
   - name: AdminBilling
     description: Billing ledger administration endpoints.
+  - name: AdminAffiliates
+    description: Affiliate invite, rebate, and transfer administration endpoints.
   - name: AdminSubscriptions
     description: Subscription plan, user subscription, and pricing rule administration endpoints.
   - name: AdminDashboard
@@ -611,6 +615,36 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "409":
           $ref: "#/components/responses/Conflict"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/providers/preset/install:
+    post:
+      tags:
+        - AdminProviders
+      operationId: installAdminProviderPresets
+      summary: Install compatible provider presets.
+      description: Creates missing compatible provider definitions from the built-in preset registry. Existing providers are skipped and new providers are disabled by default.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      responses:
+        "200":
+          description: Provider preset install result.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchOperationResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         default:
           $ref: "#/components/responses/StandardError"
 
@@ -1709,6 +1743,121 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/proxies:
+    get:
+      tags:
+        - AdminProxies
+      operationId: listAdminProxies
+      summary: List encrypted egress proxy definitions.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/ProxyDefinitionStatus"
+      responses:
+        "200":
+          description: Proxy definition list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProxyDefinitionListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+    post:
+      tags:
+        - AdminProxies
+      operationId: createAdminProxy
+      summary: Create an encrypted egress proxy definition.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProxyDefinitionRequest"
+      responses:
+        "201":
+          description: Proxy definition created.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProxyDefinitionResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/proxies/{id}:
+    patch:
+      tags:
+        - AdminProxies
+      operationId: updateAdminProxy
+      summary: Update an encrypted egress proxy definition.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProxyDefinitionRequest"
+      responses:
+        "200":
+          description: Proxy definition updated.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProxyDefinitionResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/accounts/{id}/test:
     post:
       tags:
@@ -2533,6 +2682,107 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/BillingLedgerListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/affiliates/invites:
+    get:
+      tags:
+        - AdminAffiliates
+      operationId: listAdminAffiliateInvites
+      summary: List affiliate invite relationships.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: Affiliate invite relationship list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AffiliateInviteRecordListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/affiliates/rebates:
+    get:
+      tags:
+        - AdminAffiliates
+      operationId: listAdminAffiliateRebates
+      summary: List affiliate rebate ledger entries.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - name: user_id
+          in: query
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Affiliate rebate ledger list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AffiliateLedgerEntryListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/affiliates/transfers:
+    get:
+      tags:
+        - AdminAffiliates
+      operationId: listAdminAffiliateTransfers
+      summary: List affiliate transfer ledger entries.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - name: user_id
+          in: query
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Affiliate transfer ledger list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AffiliateLedgerEntryListResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -7597,6 +7847,7 @@ components:
       type: string
       enum:
         - openai-compatible
+        - generic-reverse-proxy
         - anthropic-compatible
         - gemini-compatible
         - rerank-compatible
@@ -8312,7 +8563,117 @@ components:
         proxy_id:
           type: string
           nullable: true
-          description: Set to null or an empty string to clear proxy binding.
+          description: Proxy definition id. Set to null or an empty string to clear proxy binding. Existing raw proxy URLs remain accepted for backward-compatible imports.
+
+    ProxyDefinitionType:
+      type: string
+      enum:
+        - http
+        - https
+        - socks5
+
+    ProxyDefinitionStatus:
+      type: string
+      enum:
+        - active
+        - disabled
+
+    ProxyDefinition:
+      type: object
+      required:
+        - id
+        - name
+        - type
+        - status
+        - url_configured
+        - created_at
+        - updated_at
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        name:
+          type: string
+        type:
+          $ref: "#/components/schemas/ProxyDefinitionType"
+        status:
+          $ref: "#/components/schemas/ProxyDefinitionStatus"
+        url_configured:
+          type: boolean
+          description: True when an encrypted proxy URL is stored. Raw URLs are never returned.
+        metadata:
+          $ref: "#/components/schemas/JsonObject"
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+        updated_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    CreateProxyDefinitionRequest:
+      type: object
+      required:
+        - name
+        - type
+        - url
+      properties:
+        name:
+          type: string
+          minLength: 1
+        type:
+          $ref: "#/components/schemas/ProxyDefinitionType"
+        url:
+          type: string
+          format: uri
+          writeOnly: true
+          description: Proxy URL with credentials if needed. Stored encrypted and never returned.
+        status:
+          $ref: "#/components/schemas/ProxyDefinitionStatus"
+        metadata:
+          $ref: "#/components/schemas/JsonObject"
+
+    UpdateProxyDefinitionRequest:
+      type: object
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 1
+        type:
+          $ref: "#/components/schemas/ProxyDefinitionType"
+        url:
+          type: string
+          format: uri
+          writeOnly: true
+          description: Replacement proxy URL. Omit to keep the existing encrypted URL.
+        status:
+          $ref: "#/components/schemas/ProxyDefinitionStatus"
+        metadata:
+          $ref: "#/components/schemas/JsonObject"
+
+    ProxyDefinitionResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/ProxyDefinition"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    ProxyDefinitionListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProxyDefinition"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
 
     ProviderAccountExportItem:
       type: object
@@ -10716,6 +11077,140 @@ components:
         request_id:
           $ref: "#/components/schemas/RequestId"
 
+    AffiliateRelationshipStatus:
+      type: string
+      enum:
+        - active
+        - disabled
+
+    AffiliateLedgerEntryType:
+      type: string
+      enum:
+        - accrue
+        - settle
+        - transfer_to_balance
+        - withdraw
+        - refund_compensation
+        - manual_adjustment
+
+    AffiliateLedgerEntryStatus:
+      type: string
+      enum:
+        - pending
+        - settled
+        - canceled
+        - compensated
+
+    AffiliateInviteRecord:
+      type: object
+      required:
+        - id
+        - inviter_user_id
+        - invitee_user_id
+        - invite_code_id
+        - status
+        - created_at
+        - updated_at
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        inviter_user_id:
+          $ref: "#/components/schemas/Id"
+        invitee_user_id:
+          $ref: "#/components/schemas/Id"
+        invite_code_id:
+          $ref: "#/components/schemas/Id"
+        status:
+          $ref: "#/components/schemas/AffiliateRelationshipStatus"
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+        updated_at:
+          $ref: "#/components/schemas/Timestamp"
+        first_paid_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    AffiliateInviteRecordListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AffiliateInviteRecord"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    AffiliateLedgerEntry:
+      type: object
+      required:
+        - id
+        - user_id
+        - related_user_id
+        - type
+        - amount
+        - currency
+        - status
+        - reference_id
+        - metadata
+        - created_at
+        - updated_at
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        user_id:
+          $ref: "#/components/schemas/Id"
+        related_user_id:
+          $ref: "#/components/schemas/Id"
+        payment_order_id:
+          $ref: "#/components/schemas/Id"
+          nullable: true
+        subscription_id:
+          $ref: "#/components/schemas/Id"
+          nullable: true
+        type:
+          $ref: "#/components/schemas/AffiliateLedgerEntryType"
+        amount:
+          type: string
+        currency:
+          type: string
+        status:
+          $ref: "#/components/schemas/AffiliateLedgerEntryStatus"
+        reference_id:
+          type: string
+        metadata:
+          $ref: "#/components/schemas/JsonObject"
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+        updated_at:
+          $ref: "#/components/schemas/Timestamp"
+        settled_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    AffiliateLedgerEntryListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AffiliateLedgerEntry"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
     DomainEventOutbox:
       type: object
       required:
@@ -11301,6 +11796,11 @@ components:
           enum:
             - balanced
             - cost_saver
+            - latency_first
+            - quota_protect
+            - sticky_first
+            - cache_affinity_first
+            - premium_quality
         strategy_version:
           type: string
         strategy_config_hash:
@@ -11421,9 +11921,11 @@ components:
           enum:
             - balanced
             - cost_saver
-            - quality_first
-            - cache_affinity
-            - low_latency
+            - latency_first
+            - quota_protect
+            - sticky_first
+            - cache_affinity_first
+            - premium_quality
         version:
           type: string
           example: v1

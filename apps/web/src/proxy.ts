@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_PRESENT_COOKIE, SESSION_ROLE_COOKIE } from "@/lib/session-cookie";
+import { ADMIN_HOME_ROUTE, USER_HOME_ROUTE } from "@/lib/routes";
 
 /**
  * SRapi v0.1.0 edge proxy (formerly Next.js middleware).
@@ -47,12 +48,12 @@ export function proxy(request: NextRequest) {
   const role = request.cookies.get(SESSION_ROLE_COOKIE)?.value;
   if (role === "admin" && matchPath(pathname, USER_ONLY_PATHS)) {
     const url = request.nextUrl.clone();
-    url.pathname = "/admin";
+    url.pathname = ADMIN_HOME_ROUTE;
     return NextResponse.redirect(url);
   }
   if (role !== "admin" && matchPath(pathname, ADMIN_ONLY_PATHS)) {
     const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
+    url.pathname = USER_HOME_ROUTE;
     return NextResponse.redirect(url);
   }
 

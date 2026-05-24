@@ -16,6 +16,7 @@ import (
 	"github.com/srapi/srapi/apps/api/internal/config"
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	admincontrolcontract "github.com/srapi/srapi/apps/api/internal/modules/admin_control/contract"
+	affiliatecontract "github.com/srapi/srapi/apps/api/internal/modules/affiliate/contract"
 	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
 	auditcontract "github.com/srapi/srapi/apps/api/internal/modules/audit/contract"
 	billingcontract "github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
@@ -59,6 +60,7 @@ type runtimeOptions struct {
 	audit         auditcontract.Store
 	billing       billingcontract.Store
 	events        eventscontract.Store
+	affiliate     affiliatecontract.Store
 	operations    operationscontract.Store
 	payments      paymentcontract.Store
 	realtime      realtimecontract.Store
@@ -130,6 +132,12 @@ func WithBillingStore(store billingcontract.Store) Option {
 func WithEventStore(store eventscontract.Store) Option {
 	return func(opts *runtimeOptions) {
 		opts.events = store
+	}
+}
+
+func WithAffiliateStore(store affiliatecontract.Store) Option {
+	return func(opts *runtimeOptions) {
+		opts.affiliate = store
 	}
 }
 
@@ -232,6 +240,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("POST /api/v1/admin/users/{id}/enable", server.handleEnableAdminUser)
 	mux.HandleFunc("GET /api/v1/admin/providers", server.handleListAdminProviders)
 	mux.HandleFunc("POST /api/v1/admin/providers", server.handleCreateAdminProvider)
+	mux.HandleFunc("POST /api/v1/admin/providers/preset/install", server.handleInstallAdminProviderPresets)
 	mux.HandleFunc("PATCH /api/v1/admin/providers/{id}", server.handleUpdateAdminProvider)
 	mux.HandleFunc("POST /api/v1/admin/providers/{id}/test", server.handleTestAdminProvider)
 	mux.HandleFunc("GET /api/v1/admin/models", server.handleListAdminModels)
@@ -247,6 +256,9 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("GET /api/v1/admin/accounts/{id}", server.handleGetAdminAccount)
 	mux.HandleFunc("PATCH /api/v1/admin/accounts/{id}", server.handleUpdateAdminAccount)
 	mux.HandleFunc("PATCH /api/v1/admin/accounts/{id}/proxy", server.handleBindAdminAccountProxy)
+	mux.HandleFunc("GET /api/v1/admin/proxies", server.handleListAdminProxies)
+	mux.HandleFunc("POST /api/v1/admin/proxies", server.handleCreateAdminProxy)
+	mux.HandleFunc("PATCH /api/v1/admin/proxies/{id}", server.handleUpdateAdminProxy)
 	mux.HandleFunc("POST /api/v1/admin/accounts/{id}/test", server.handleTestAdminAccount)
 	mux.HandleFunc("POST /api/v1/admin/accounts/{id}/discover-models", server.handleDiscoverAdminAccountModels)
 	mux.HandleFunc("POST /api/v1/admin/accounts/{id}/disable", server.handleDisableAdminAccount)
@@ -268,6 +280,9 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("GET /api/v1/admin/usage/export", server.handleAdminUsageExport)
 	mux.HandleFunc("GET /api/v1/admin/audit-logs", server.handleListAdminAuditLogs)
 	mux.HandleFunc("GET /api/v1/admin/billing-ledger", server.handleListAdminBillingLedger)
+	mux.HandleFunc("GET /api/v1/admin/affiliates/invites", server.handleListAdminAffiliateInvites)
+	mux.HandleFunc("GET /api/v1/admin/affiliates/rebates", server.handleListAdminAffiliateRebates)
+	mux.HandleFunc("GET /api/v1/admin/affiliates/transfers", server.handleListAdminAffiliateTransfers)
 	mux.HandleFunc("GET /api/v1/admin/payments/providers", server.handleListAdminPaymentProviders)
 	mux.HandleFunc("POST /api/v1/admin/payments/providers", server.handleCreateAdminPaymentProvider)
 	mux.HandleFunc("GET /api/v1/admin/payments/orders", server.handleListAdminPaymentOrders)

@@ -39,6 +39,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/pricingrule"
 	"github.com/srapi/srapi/apps/api/ent/provider"
 	"github.com/srapi/srapi/apps/api/ent/provideraccount"
+	"github.com/srapi/srapi/apps/api/ent/proxy"
 	"github.com/srapi/srapi/apps/api/ent/role"
 	"github.com/srapi/srapi/apps/api/ent/schedulerdecision"
 	"github.com/srapi/srapi/apps/api/ent/schedulerfeedback"
@@ -136,6 +137,7 @@ func checkColumn(t, c string) error {
 			pricingrule.Table:             pricingrule.ValidColumn,
 			provider.Table:                provider.ValidColumn,
 			provideraccount.Table:         provideraccount.ValidColumn,
+			proxy.Table:                   proxy.ValidColumn,
 			role.Table:                    role.ValidColumn,
 			schedulerdecision.Table:       schedulerdecision.ValidColumn,
 			schedulerfeedback.Table:       schedulerfeedback.ValidColumn,

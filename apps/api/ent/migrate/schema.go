@@ -996,6 +996,42 @@ var (
 			},
 		},
 	}
+	// ProxiesColumns holds the columns for the "proxies" table.
+	ProxiesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "deleted_at", Type: field.TypeTime, Nullable: true},
+		{Name: "name", Type: field.TypeString},
+		{Name: "type", Type: field.TypeString},
+		{Name: "url_ciphertext", Type: field.TypeBytes, Nullable: true},
+		{Name: "url_version", Type: field.TypeInt, Default: 1},
+		{Name: "status", Type: field.TypeString, Default: "active"},
+		{Name: "metadata_json", Type: field.TypeJSON, Nullable: true},
+	}
+	// ProxiesTable holds the schema information for the "proxies" table.
+	ProxiesTable = &schema.Table{
+		Name:       "proxies",
+		Columns:    ProxiesColumns,
+		PrimaryKey: []*schema.Column{ProxiesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "proxy_name",
+				Unique:  true,
+				Columns: []*schema.Column{ProxiesColumns[4]},
+			},
+			{
+				Name:    "proxy_status",
+				Unique:  false,
+				Columns: []*schema.Column{ProxiesColumns[8]},
+			},
+			{
+				Name:    "proxy_type_status",
+				Unique:  false,
+				Columns: []*schema.Column{ProxiesColumns[5], ProxiesColumns[8]},
+			},
+		},
+	}
 	// RolesColumns holds the columns for the "roles" table.
 	RolesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -1256,6 +1292,7 @@ var (
 		{Name: "error_class", Type: field.TypeString, Nullable: true},
 		{Name: "cost", Type: field.TypeString, Default: "0.00000000"},
 		{Name: "currency", Type: field.TypeString, Default: "USD"},
+		{Name: "charged_at", Type: field.TypeTime, Nullable: true},
 		{Name: "compatibility_warnings_json", Type: field.TypeJSON, Nullable: true},
 	}
 	// UsageLogsTable holds the schema information for the "usage_logs" table.
@@ -1273,6 +1310,11 @@ var (
 				Name:    "usagelog_user_id_created_at",
 				Unique:  false,
 				Columns: []*schema.Column{UsageLogsColumns[4], UsageLogsColumns[1]},
+			},
+			{
+				Name:    "usagelog_charged_at",
+				Unique:  false,
+				Columns: []*schema.Column{UsageLogsColumns[22]},
 			},
 			{
 				Name:    "usagelog_api_key_id_created_at",
@@ -1427,6 +1469,7 @@ var (
 		PricingRulesTable,
 		ProvidersTable,
 		ProviderAccountsTable,
+		ProxiesTable,
 		RolesTable,
 		SchedulerDecisionsTable,
 		SchedulerFeedbacksTable,

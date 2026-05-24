@@ -4,7 +4,7 @@ const PORT = Number(process.env.SRAPI_WEB_E2E_PORT ?? 3100);
 const BASE_URL = process.env.SRAPI_WEB_E2E_BASE_URL ?? `http://127.0.0.1:${PORT}`;
 
 // SRapi v0.1.0 frontend e2e harness.
-// Default run uses Chromium against the demo runtime (no real backend required).
+// Default run uses Chromium against a live local SRapi API on 127.0.0.1:8080.
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: false,
@@ -31,8 +31,5 @@ export default defineConfig({
         url: BASE_URL,
         reuseExistingServer: !process.env.CI,
         timeout: 60_000,
-        env: {
-          NEXT_PUBLIC_SRAPI_DEMO_MODE: "true",
-        },
       },
 });

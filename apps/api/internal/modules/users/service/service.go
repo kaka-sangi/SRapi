@@ -53,19 +53,15 @@ type ListRequest struct {
 	Query  string
 }
 
-type BalanceOperation string
+type BalanceOperation = contract.BalanceOperation
 
 const (
-	BalanceOperationSet       BalanceOperation = "set"
-	BalanceOperationIncrement BalanceOperation = "increment"
-	BalanceOperationDecrement BalanceOperation = "decrement"
+	BalanceOperationSet       = contract.BalanceOperationSet
+	BalanceOperationIncrement = contract.BalanceOperationIncrement
+	BalanceOperationDecrement = contract.BalanceOperationDecrement
 )
 
-type BalanceUpdateRequest struct {
-	Operation BalanceOperation
-	Amount    string
-	Currency  string
-}
+type BalanceUpdateRequest = contract.BalanceUpdateRequest
 
 type BatchUpdateRequest struct {
 	UserIDs  []int

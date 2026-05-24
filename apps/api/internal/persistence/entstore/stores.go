@@ -48,6 +48,7 @@ type Stores struct {
 	Accounts      accountcontract.Store
 	Audit         auditcontract.Store
 	Billing       billingcontract.Store
+	UsageCharges  billingcontract.UsageChargeStore
 	Events        eventscontract.Store
 	Operations    operationscontract.Store
 	Payments      paymentcontract.Store
@@ -130,6 +131,7 @@ func New(client *ent.Client) (Stores, error) {
 		Accounts:      accounts,
 		Audit:         audit,
 		Billing:       billing,
+		UsageCharges:  billing,
 		Events:        events,
 		Operations:    operations,
 		Payments:      payments,

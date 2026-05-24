@@ -1,5 +1,8 @@
 "use client";
 
+import * as React from "react";
+import { captureException } from "@/lib/telemetry";
+
 export default function GlobalError({
   error,
   reset,
@@ -7,6 +10,13 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  React.useEffect(() => {
+    captureException(error, {
+      boundary: "global",
+      digest: error.digest ?? null,
+    });
+  }, [error]);
+
   return (
     <html lang="en">
       <body

@@ -53,7 +53,7 @@ if (typeof window !== "undefined" && !window.localStorage) {
   });
 }
 
-if (typeof window !== "undefined" && !globalThis.localStorage) {
+if (typeof window !== "undefined") {
   Object.defineProperty(globalThis, "localStorage", {
     configurable: true,
     value: window.localStorage,

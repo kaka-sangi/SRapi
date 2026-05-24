@@ -36,6 +36,21 @@ const (
 	GroupStatusDisabled GroupStatus = "disabled"
 )
 
+type ProxyType string
+
+const (
+	ProxyTypeHTTP   ProxyType = "http"
+	ProxyTypeHTTPS  ProxyType = "https"
+	ProxyTypeSOCKS5 ProxyType = "socks5"
+)
+
+type ProxyStatus string
+
+const (
+	ProxyStatusActive   ProxyStatus = "active"
+	ProxyStatusDisabled ProxyStatus = "disabled"
+)
+
 type ProviderAccount struct {
 	ID                   int
 	ProviderID           int
@@ -53,6 +68,19 @@ type ProviderAccount struct {
 	CreatedAt            time.Time
 	UpdatedAt            time.Time
 	DeletedAt            *time.Time
+}
+
+type ProxyDefinition struct {
+	ID            int
+	Name          string
+	Type          ProxyType
+	URLCiphertext string
+	URLVersion    string
+	Status        ProxyStatus
+	Metadata      map[string]any
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+	DeletedAt     *time.Time
 }
 
 type AccountGroup struct {
@@ -171,6 +199,22 @@ type UpdateGroupRequest struct {
 	Status        *GroupStatus
 }
 
+type CreateProxyRequest struct {
+	Name     string
+	Type     ProxyType
+	URL      string
+	Status   *ProxyStatus
+	Metadata map[string]any
+}
+
+type UpdateProxyRequest struct {
+	Name     *string
+	Type     *ProxyType
+	URL      *string
+	Status   *ProxyStatus
+	Metadata *map[string]any
+}
+
 type CreateStoredAccount struct {
 	ProviderID           int
 	Name                 string
@@ -183,6 +227,15 @@ type CreateStoredAccount struct {
 	Priority             int
 	Weight               float32
 	UpstreamClient       *string
+}
+
+type CreateStoredProxy struct {
+	Name          string
+	Type          ProxyType
+	URLCiphertext string
+	URLVersion    string
+	Status        ProxyStatus
+	Metadata      map[string]any
 }
 
 type CreateStoredAccountGroup struct {
@@ -199,6 +252,10 @@ type Store interface {
 	Update(ctx context.Context, account ProviderAccount) (ProviderAccount, error)
 	FindByID(ctx context.Context, id int) (ProviderAccount, error)
 	List(ctx context.Context) ([]ProviderAccount, error)
+	CreateProxy(ctx context.Context, input CreateStoredProxy) (ProxyDefinition, error)
+	UpdateProxy(ctx context.Context, proxy ProxyDefinition) (ProxyDefinition, error)
+	FindProxyByID(ctx context.Context, id int) (ProxyDefinition, error)
+	ListProxies(ctx context.Context) ([]ProxyDefinition, error)
 	CreateGroup(ctx context.Context, input CreateStoredAccountGroup) (AccountGroup, error)
 	UpdateGroup(ctx context.Context, group AccountGroup) (AccountGroup, error)
 	FindGroupByID(ctx context.Context, id int) (AccountGroup, error)

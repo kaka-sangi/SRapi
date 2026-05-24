@@ -80,6 +80,7 @@ func TestEntSchemaAppliesToEmptyDatabase(t *testing.T) {
 		"pricing_rules",
 		"provider_accounts",
 		"providers",
+		"proxies",
 		"roles",
 		"scheduler_decisions",
 		"scheduler_feedbacks",

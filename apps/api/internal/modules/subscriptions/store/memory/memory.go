@@ -161,6 +161,38 @@ func (s *Store) ListActiveUserSubscriptions(_ context.Context, userID int, at ti
 	return out, nil
 }
 
+func (s *Store) ListExpiredActiveUserSubscriptions(_ context.Context, now time.Time) ([]contract.UserSubscription, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now = now.UTC()
+	out := make([]contract.UserSubscription, 0)
+	for _, subscription := range s.subscriptions {
+		if subscription.Status != contract.SubscriptionStatusActive || !subscription.ExpiresAt.Before(now) {
+			continue
+		}
+		out = append(out, cloneSubscription(subscription))
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out, nil
+}
+
+func (s *Store) ExpireUserSubscription(_ context.Context, id int, now time.Time) (contract.UserSubscription, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	subscription, ok := s.subscriptions[id]
+	if !ok {
+		return contract.UserSubscription{}, false, errors.New("user subscription not found")
+	}
+	now = now.UTC()
+	if subscription.Status != contract.SubscriptionStatusActive || !subscription.ExpiresAt.Before(now) {
+		return cloneSubscription(subscription), false, nil
+	}
+	subscription.Status = contract.SubscriptionStatusExpired
+	subscription.UpdatedAt = now
+	s.subscriptions[subscription.ID] = subscription
+	return cloneSubscription(subscription), true, nil
+}
+
 func (s *Store) CreatePricingRule(_ context.Context, input contract.PricingRule) (contract.PricingRule, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

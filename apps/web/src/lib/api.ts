@@ -3,10 +3,13 @@ import { client } from '../../../../packages/sdk/typescript/src/client.gen';
 import {
   login as sdkLogin,
   logout as sdkLogout,
+  getCurrentUser as sdkGetCurrentUser,
+  getCurrentUserUsage as sdkGetCurrentUserUsage,
   listApiKeys as sdkListApiKeys,
   createApiKey as sdkCreateApiKey,
   updateApiKey as sdkUpdateApiKey,
   listAdminAccounts as sdkListAdminAccounts,
+  testAdminAccount as sdkTestAdminAccount,
   getAdminOverview as sdkGetAdminOverview,
   listAdminUsageLogs as sdkListAdminUsageLogs,
   listAdminSchedulerDecisions as sdkListAdminSchedulerDecisions,
@@ -14,28 +17,22 @@ import {
 } from '../../../../packages/sdk/typescript/src/index';
 import type { JsonObject } from '../../../../packages/sdk/typescript/src/types.gen';
 import {
-  mockUsers,
-  initialApiKeys,
-  mockProviderAccounts,
-  mockUsageLogs,
-  mockSchedulerDecisions,
-  mockSlos,
-  mockSmokeStatus,
-  MockUser,
-  MockApiKey,
-  MockProviderAccount,
-  MockUsageLog,
-  MockSchedulerDecision,
-  MockSlo,
-  SmokeChecklist
-} from './mockData';
+  offlineSmokeStatus,
+  type ApiKeySummary,
+  type CurrentUser,
+  type ProviderAccountSummary,
+  type SchedulerDecisionSummary,
+  type SloSummary,
+  type SmokeChecklist,
+  type UsageLogSummary,
+} from './srapi-types';
+import type { AdminTestResult } from '../../../../packages/sdk/typescript/src/types.gen';
 import { setSessionPresenceCookie, clearSessionPresenceCookie } from './session-cookie';
 
 export interface ApiRuntimeStatus {
-  mode: 'live' | 'demo';
+  mode: 'live' | 'offline';
   connected: boolean;
   apiBaseUrl: string;
-  demoModeForced: boolean;
   checkedAt: string;
 }
 
@@ -44,12 +41,16 @@ const HEALTH_TIMEOUT_MS = 2500;
 const USER_STORAGE_KEY = 'srapi_user';
 const CSRF_STORAGE_KEY = 'srapi_csrf_token';
 
-const sessionCreatedKeys: MockApiKey[] = [];
-
 type LiveUser = {
+  id?: string;
   email?: string;
   name?: string;
   roles?: string[];
+  balance?: string;
+  currency?: string;
+  rpm_limit?: number | null;
+  last_login_at?: string | null;
+  created_at?: string;
 };
 
 type LiveApiKey = {
@@ -69,7 +70,7 @@ type LiveProviderAccount = {
   provider?: {
     display_name?: string;
   };
-  runtime_class: MockProviderAccount['runtime_class'];
+  runtime_class: ProviderAccountSummary['runtime_class'];
   status: string;
   metadata?: JsonObject;
   supported_models?: string[];
@@ -109,7 +110,7 @@ type LiveSchedulerDecision = {
   logs?: string[];
 };
 
-type LiveSlo = Partial<MockSlo> & {
+type LiveSlo = Partial<SloSummary> & {
   definition?: {
     id?: string;
     name?: string;
@@ -130,10 +131,6 @@ type LiveModel = {
 
 function configuredApiBaseUrl(): string {
   return (process.env.NEXT_PUBLIC_SRAPI_BASE_URL || '').replace(/\/+$/, '');
-}
-
-function demoModeForced(): boolean {
-  return process.env.NEXT_PUBLIC_SRAPI_DEMO_MODE === 'true';
 }
 
 function buildApiUrl(path: string): string {
@@ -215,29 +212,24 @@ async function fetchApiJSON<T>(path: string, init: RequestInit = {}): Promise<T>
   return response.json() as Promise<T>;
 }
 
-function mapLiveUser(user: LiveUser, fallbackEmail: string, authMode: MockUser['authMode']): MockUser {
+function mapLiveUser(user: LiveUser, fallbackEmail: string): CurrentUser {
   const roles = Array.isArray(user?.roles) ? user.roles : [];
   const hasAdminRole = roles.includes('admin') || roles.includes('owner') || roles.includes('operator');
 
   return {
+    id: user?.id,
     email: user?.email || fallbackEmail,
     name: user?.name || 'User',
     role: hasAdminRole ? 'admin' : 'user',
-    balance: '100.00',
-    currency: 'USD',
-    authMode
+    balance: user?.balance || '0.00000000',
+    currency: user?.currency || 'USD',
+    rpm_limit: user?.rpm_limit ?? null,
+    last_login_at: user?.last_login_at ?? null,
+    created_at: user?.created_at
   };
 }
 
-function mockLogin(email: string): MockUser {
-  const role = email.includes('admin') ? 'admin' : 'user';
-  return {
-    ...mockUsers[role],
-    authMode: 'demo'
-  };
-}
-
-function storeSession(user: MockUser, csrfToken?: string) {
+function storeSession(user: CurrentUser, csrfToken?: string) {
   if (typeof window === 'undefined') {
     return;
   }
@@ -315,60 +307,46 @@ export const apiService = {
 
   async getRuntimeStatus(): Promise<ApiRuntimeStatus> {
     const connected = await this.isBackendConnected();
-    const currentUser = this.getCurrentUser();
-    const mode = connected && currentUser?.authMode !== 'demo' && !demoModeForced() ? 'live' : 'demo';
 
     return {
-      mode,
+      mode: connected ? 'live' : 'offline',
       connected,
       apiBaseUrl: apiBaseUrlLabel(),
-      demoModeForced: demoModeForced(),
       checkedAt: new Date().toISOString()
     };
   },
 
   async shouldUseLiveAPI(): Promise<boolean> {
-    if (demoModeForced()) {
-      return false;
-    }
-
-    const currentUser = this.getCurrentUser();
-    if (currentUser?.authMode === 'demo') {
-      return false;
-    }
-
     return this.isBackendConnected();
   },
 
-  async login(email: string, password: string): Promise<MockUser> {
+  async login(email: string, password: string): Promise<CurrentUser> {
     configureSDKClient();
 
     const connected = await this.isBackendConnected();
-    if (connected && !demoModeForced()) {
-      const response = await sdkLogin({
-        body: { email, password },
-        throwOnError: true
-      });
-      const session = response.data?.data;
-      if (!session?.user) {
-        throw new Error('Authentication rejected. Verify email and password.');
-      }
-
-      const mappedUser = mapLiveUser(session.user, email, 'live');
-      storeSession(mappedUser, session.csrf_token);
-      return mappedUser;
+    if (!connected) {
+      throw new Error('SRapi API is offline. Start the backend and try again.');
     }
 
-    const user = mockLogin(email);
-    storeSession(user);
-    return user;
+    const response = await sdkLogin({
+      body: { email, password },
+      throwOnError: true
+    });
+    const session = response.data?.data;
+    if (!session?.user) {
+      throw new Error('Authentication rejected. Verify email and password.');
+    }
+
+    const mappedUser = mapLiveUser(session.user, email);
+    storeSession(mappedUser, session.csrf_token);
+    return mappedUser;
   },
 
   async logout(): Promise<void> {
     configureSDKClient();
 
     const currentUser = this.getCurrentUser();
-    if (currentUser?.authMode === 'live' && await this.isBackendConnected()) {
+    if (currentUser && await this.isBackendConnected()) {
       try {
         await sdkLogout({ throwOnError: true });
       } catch (err) {
@@ -379,7 +357,7 @@ export const apiService = {
     clearSession();
   },
 
-  getCurrentUser(): MockUser | null {
+  getCurrentUser(): CurrentUser | null {
     if (typeof window === 'undefined') {
       return null;
     }
@@ -390,263 +368,195 @@ export const apiService = {
     }
 
     try {
-      const user = JSON.parse(stored) as MockUser;
-      return {
-        ...user,
-        authMode: user.authMode || 'demo'
-      };
+      return JSON.parse(stored) as CurrentUser;
     } catch {
       return null;
     }
   },
 
-  async listApiKeys(): Promise<MockApiKey[]> {
-    if (await this.shouldUseLiveAPI()) {
-      try {
-        const response = await sdkListApiKeys();
-        if (response.data) {
-          const liveKeys = (response.data.data || []) as LiveApiKey[];
-          const mapped: MockApiKey[] = liveKeys.map((key) => ({
-            id: key.id,
-            name: key.name,
-            prefix: key.prefix,
-            status: (key.status === 'active' ? 'active' : 'disabled') as 'active' | 'disabled',
-            created_at: key.created_at,
-            allowed_models: key.allowed_models || [],
-            group_ids: key.group_ids || []
-          }));
-          return [...sessionCreatedKeys.filter(sk => !mapped.some(m => m.id === sk.id)), ...mapped];
-        }
-      } catch (err) {
-        console.warn('Failed to fetch real API keys, using demo data', err);
-      }
+  async getLiveCurrentUser(): Promise<CurrentUser> {
+    configureSDKClient();
+    const response = await sdkGetCurrentUser({ throwOnError: true });
+    const user = response.data?.data;
+    if (!user) {
+      throw new Error('Current user response was empty.');
     }
 
-    return [...sessionCreatedKeys, ...initialApiKeys];
+    const mappedUser = mapLiveUser(user, user.email);
+    storeSession(mappedUser, getStoredCSRFToken());
+    return mappedUser;
   },
 
-  async createApiKey(name: string, allowedModels: string[], groupIds: string[]): Promise<MockApiKey> {
-    if (await this.shouldUseLiveAPI()) {
-      try {
-        const response = await sdkCreateApiKey({
-          body: {
-            name,
-            allowed_models: allowedModels,
-            group_ids: groupIds,
-            scopes: ['gateway:invoke']
-          }
-        });
-        if (response.data?.data) {
-          const key = response.data.data.api_key;
-          const plaintext = response.data.data.plaintext_key;
-          const newKey: MockApiKey = {
-            id: key.id,
-            name: key.name,
-            prefix: key.prefix,
-            plaintextKey: plaintext,
-            status: key.status === 'active' ? 'active' : 'disabled',
-            created_at: key.created_at || new Date().toISOString(),
-            allowed_models: key.allowed_models || allowedModels,
-            group_ids: key.group_ids || groupIds
-          };
-          sessionCreatedKeys.unshift(newKey);
-          return newKey;
-        }
-      } catch (err) {
-        console.warn('Failed to create real API key, using demo creation', err);
-      }
+  async listApiKeys(): Promise<ApiKeySummary[]> {
+    const response = await sdkListApiKeys({ throwOnError: true });
+    if (response.data) {
+      const liveKeys = (response.data.data || []) as LiveApiKey[];
+      return liveKeys.map((key) => ({
+        id: key.id,
+        name: key.name,
+        prefix: key.prefix,
+        status: (key.status === 'active' ? 'active' : 'disabled') as 'active' | 'disabled',
+        created_at: key.created_at,
+        allowed_models: key.allowed_models || [],
+        group_ids: key.group_ids || []
+      }));
     }
-
-    const mockId = `key-${Math.floor(Math.random() * 1000)}`;
-    const randomHex = Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
-    const newMockKey: MockApiKey = {
-      id: mockId,
-      name,
-      prefix: `sk-srapi-${mockId}...`,
-      plaintextKey: `sk-srapi-${mockId}-${randomHex}`,
-      status: 'active',
-      created_at: new Date().toISOString(),
-      allowed_models: allowedModels.length > 0 ? allowedModels : ['gpt-4o-mini'],
-      group_ids: groupIds.length > 0 ? groupIds : ['group-01']
-    };
-    sessionCreatedKeys.unshift(newMockKey);
-    return newMockKey;
+    return [];
   },
 
-  async toggleApiKeyStatus(id: string, currentStatus: 'active' | 'disabled'): Promise<MockApiKey | null> {
+  async createApiKey(name: string, allowedModels: string[], groupIds: string[]): Promise<ApiKeySummary> {
+    const response = await sdkCreateApiKey({
+      body: {
+        name,
+        allowed_models: allowedModels,
+        group_ids: groupIds,
+        scopes: ['gateway:invoke']
+      },
+      throwOnError: true
+    });
+    if (response.data?.data) {
+      const key = response.data.data.api_key;
+      const plaintext = response.data.data.plaintext_key;
+      return {
+        id: key.id,
+        name: key.name,
+        prefix: key.prefix,
+        plaintextKey: plaintext,
+        status: key.status === 'active' ? 'active' : 'disabled',
+        created_at: key.created_at || new Date().toISOString(),
+        allowed_models: key.allowed_models || allowedModels,
+        group_ids: key.group_ids || groupIds
+      };
+    }
+    throw new Error('API key creation returned an empty response.');
+  },
+
+  async toggleApiKeyStatus(id: string, currentStatus: 'active' | 'disabled'): Promise<ApiKeySummary | null> {
     const nextStatus = currentStatus === 'active' ? 'disabled' : 'active';
 
-    if (await this.shouldUseLiveAPI()) {
-      try {
-        const response = await sdkUpdateApiKey({
-          path: { id },
-          body: { status: nextStatus }
-        });
-        if (response.data?.data) {
-          const key = response.data.data;
-          return {
-            id: key.id,
-            name: key.name,
-            prefix: key.prefix,
-            status: (key.status === 'active' ? 'active' : 'disabled') as 'active' | 'disabled',
-            created_at: key.created_at,
-            allowed_models: key.allowed_models || [],
-            group_ids: key.group_ids || []
-          };
-        }
-      } catch (err) {
-        console.warn('Failed to toggle real key status, updating demo data', err);
-      }
+    const response = await sdkUpdateApiKey({
+      path: { id },
+      body: { status: nextStatus },
+      throwOnError: true
+    });
+    if (response.data?.data) {
+      const key = response.data.data;
+      return {
+        id: key.id,
+        name: key.name,
+        prefix: key.prefix,
+        status: (key.status === 'active' ? 'active' : 'disabled') as 'active' | 'disabled',
+        created_at: key.created_at,
+        allowed_models: key.allowed_models || [],
+        group_ids: key.group_ids || []
+      };
     }
-
-    const sessionKey = sessionCreatedKeys.find(k => k.id === id);
-    if (sessionKey) {
-      sessionKey.status = nextStatus;
-      return sessionKey;
-    }
-
-    const initialKey = initialApiKeys.find(k => k.id === id);
-    if (initialKey) {
-      initialKey.status = nextStatus;
-      return initialKey;
-    }
-
-    return null;
+    throw new Error('API key update returned an empty response.');
   },
 
-  async listProviderAccounts(): Promise<MockProviderAccount[]> {
-    if (await this.shouldUseLiveAPI()) {
-      try {
-        const response = await sdkListAdminAccounts();
-        if (response.data) {
-          return ((response.data.data || []) as LiveProviderAccount[]).map((account) => ({
-            id: account.id,
-            name: account.name,
-            provider_id: account.provider_id,
-            provider_name: account.provider?.display_name || account.provider_id,
-            runtime_class: account.runtime_class,
-            status: account.status as 'active' | 'limited' | 'disabled',
-            base_url: typeof account.metadata?.base_url === 'string' ? account.metadata.base_url : 'https://api.openai.com/v1',
-            supported_models: account.supported_models || [],
-            latency: account.health_snapshot?.latency_ms || 150,
-            quota_percentage: account.quota_snapshot?.remaining_percentage || 80
-          }));
-        }
-      } catch (err) {
-        console.warn('Failed to fetch real accounts, using demo data', err);
-      }
+  async listProviderAccounts(): Promise<ProviderAccountSummary[]> {
+    const response = await sdkListAdminAccounts({ throwOnError: true });
+    if (response.data) {
+      return ((response.data.data || []) as LiveProviderAccount[]).map((account) => ({
+        id: account.id,
+        name: account.name,
+        provider_id: account.provider_id,
+        provider_name: account.provider?.display_name || account.provider_id,
+        runtime_class: account.runtime_class,
+        status: account.status as 'active' | 'limited' | 'disabled',
+        base_url: typeof account.metadata?.base_url === 'string' ? account.metadata.base_url : 'not configured',
+        supported_models: account.supported_models || [],
+        latency: account.health_snapshot?.latency_ms || 0,
+        quota_percentage: account.quota_snapshot?.remaining_percentage || 0
+      }));
     }
-
-    return mockProviderAccounts;
+    return [];
   },
 
-  async listUsageLogs(): Promise<MockUsageLog[]> {
-    if (await this.shouldUseLiveAPI()) {
-      try {
-        const response = await sdkListAdminUsageLogs();
-        if (response.data) {
-          return ((response.data.data || []) as LiveUsageLog[]).map((log) => ({
-            created_at: log.created_at,
-            request_id: log.request_id,
-            model: log.model,
-            source_endpoint: log.source_endpoint,
-            success: log.success,
-            total_tokens: log.total_tokens || 0,
-            cost: typeof log.cost === 'number' ? log.cost : parseFloat(log.cost || '0'),
-            currency: log.currency || 'USD'
-          }));
-        }
-      } catch (err) {
-        console.warn('Failed to fetch real usage logs, using demo data', err);
-      }
+  async testProviderAccount(id: string): Promise<AdminTestResult> {
+    const response = await sdkTestAdminAccount({
+      path: { id },
+      throwOnError: true,
+    });
+    if (response.data?.data) {
+      return response.data.data;
     }
-
-    return mockUsageLogs;
+    throw new Error('Provider account test returned an empty response.');
   },
 
-  async listSchedulerDecisions(): Promise<MockSchedulerDecision[]> {
-    if (await this.shouldUseLiveAPI()) {
-      try {
-        const response = await sdkListAdminSchedulerDecisions();
-        if (response.data) {
-          return ((response.data.data || []) as LiveSchedulerDecision[]).map((decision) => ({
-            created_at: decision.created_at,
-            request_id: decision.request_id,
-            model: decision.model,
-            source_endpoint: decision.source_endpoint,
-            candidate_count: decision.candidate_count || 1,
-            selected_account_id: decision.selected_account_id || '',
-            selected_account_name: decision.selected_account?.name || 'Upstream Account',
-            rejected_count: decision.rejected_count || 0,
-            rejected_reasons: Array.isArray(decision.rejected_reasons) ? decision.rejected_reasons : [],
-            scores: Array.isArray(decision.scores) ? decision.scores : [],
-            warnings: decision.warnings || [],
-            logs: decision.logs || []
-          }));
-        }
-      } catch (err) {
-        console.warn('Failed to fetch real scheduler decisions, using demo data', err);
-      }
+  async listUsageLogs(): Promise<UsageLogSummary[]> {
+    const response = await sdkGetCurrentUserUsage({ throwOnError: true });
+    if (response.data) {
+      return ((response.data.data || []) as LiveUsageLog[]).map((log) => ({
+        created_at: log.created_at,
+        request_id: log.request_id,
+        model: log.model,
+        source_endpoint: log.source_endpoint,
+        success: log.success,
+        total_tokens: log.total_tokens || 0,
+        cost: typeof log.cost === 'number' ? log.cost : parseFloat(log.cost || '0'),
+        currency: log.currency || 'USD'
+      }));
     }
-
-    return mockSchedulerDecisions;
+    return [];
   },
 
-  async listSlos(): Promise<MockSlo[]> {
-    if (await this.shouldUseLiveAPI()) {
-      try {
-        const response = await sdkListAdminOpsSlos();
-        if (response.data) {
-          return ((response.data.data || []) as LiveSlo[]).map((slo) => {
-            const definition = slo.definition;
-            const objective = slo.objective ?? definition?.objective ?? slo.evaluation?.objective ?? 0.99;
-            const errorRate = slo.evaluation?.error_rate ?? 0;
-
-            return {
-              id: slo.id || definition?.id || 'slo',
-              name: slo.name || definition?.name || 'Gateway SLO',
-              sli_type: slo.sli_type || definition?.sli_type || 'availability',
-              objective: objective > 1 ? objective : objective * 100,
-              window: slo.window || (definition?.window_days ? `${definition.window_days}-day` : '30-day'),
-              availability: slo.availability ?? Math.max(0, (1 - errorRate) * 100),
-              status: (slo.status || definition?.status || 'healthy') as 'healthy' | 'burning' | 'breached'
-            };
-          });
-        }
-      } catch (err) {
-        console.warn('Failed to fetch real SLOs, using demo data', err);
-      }
+  async listSchedulerDecisions(): Promise<SchedulerDecisionSummary[]> {
+    const response = await sdkListAdminSchedulerDecisions({ throwOnError: true });
+    if (response.data) {
+      return ((response.data.data || []) as LiveSchedulerDecision[]).map((decision) => ({
+        created_at: decision.created_at,
+        request_id: decision.request_id,
+        model: decision.model,
+        source_endpoint: decision.source_endpoint,
+        candidate_count: decision.candidate_count || 1,
+        selected_account_id: decision.selected_account_id || '',
+        selected_account_name: decision.selected_account?.name || 'Upstream Account',
+        rejected_count: decision.rejected_count || 0,
+        rejected_reasons: Array.isArray(decision.rejected_reasons) ? decision.rejected_reasons : [],
+        scores: Array.isArray(decision.scores) ? decision.scores : [],
+        warnings: decision.warnings || [],
+        logs: decision.logs || []
+      }));
     }
+    return [];
+  },
 
-    return mockSlos;
+  async listSlos(): Promise<SloSummary[]> {
+    const response = await sdkListAdminOpsSlos({ throwOnError: true });
+    if (response.data) {
+      return ((response.data.data || []) as LiveSlo[]).map((slo) => {
+        const definition = slo.definition;
+        const objective = slo.objective ?? definition?.objective ?? slo.evaluation?.objective ?? 0.99;
+        const errorRate = slo.evaluation?.error_rate ?? 0;
+
+        return {
+          id: slo.id || definition?.id || 'slo',
+          name: slo.name || definition?.name || 'Gateway SLO',
+          sli_type: slo.sli_type || definition?.sli_type || 'availability',
+          objective: objective > 1 ? objective : objective * 100,
+          window: slo.window || (definition?.window_days ? `${definition.window_days}-day` : '30-day'),
+          availability: slo.availability ?? Math.max(0, (1 - errorRate) * 100),
+          status: (slo.status || definition?.status || 'healthy') as 'healthy' | 'burning' | 'breached'
+        };
+      });
+    }
+    return [];
   },
 
   async getOverviewStats(): Promise<{ providers: number; models: number; accounts: number; usage_logs: number; decisions: number }> {
-    if (await this.shouldUseLiveAPI()) {
-      try {
-        const response = await sdkGetAdminOverview();
-        if (response.data) {
-          const data = response.data.data;
-          return {
-            providers: data.provider_count || 0,
-            models: data.model_count || 0,
-            accounts: data.account_count || 0,
-            usage_logs: data.usage_log_count || 0,
-            decisions: data.scheduler_decision_count || 0
-          };
-        }
-      } catch (err) {
-        console.warn('Failed to get real overview, using demo data', err);
-      }
+    const response = await sdkGetAdminOverview({ throwOnError: true });
+    if (response.data) {
+      const data = response.data.data;
+      return {
+        providers: data.provider_count || 0,
+        models: data.model_count || 0,
+        accounts: data.account_count || 0,
+        usage_logs: data.usage_log_count || 0,
+        decisions: data.scheduler_decision_count || 0
+      };
     }
-
-    return {
-      providers: 4,
-      models: 8,
-      accounts: mockProviderAccounts.length,
-      usage_logs: 182,
-      decisions: 154
-    };
+    throw new Error('Admin overview returned an empty response.');
   },
 
   async getSmokeStatus(model: string = 'gpt-4o-mini'): Promise<SmokeChecklist> {
@@ -683,6 +593,9 @@ export const apiService = {
         const missingRealDecisions = coreEndpoints.filter(endpoint => !realDecisionEndpoints.has(endpoint));
         const models = modelsRes.data || [];
         const modelExists = models.some((item) => item.canonical_name === model);
+        const gatewaySmokeComplete = modelExists
+          && activeAccounts.length > 0
+          && missingUsage.length === 0;
 
         return {
           base_url: apiBaseUrlLabel(),
@@ -694,18 +607,17 @@ export const apiService = {
           real_upstream_scheduler_decision_endpoints: Array.from(realDecisionEndpoints) as string[],
           missing_usage_endpoints: missingUsage,
           missing_real_upstream_scheduler_decision_endpoints: missingRealDecisions,
-          v0_1_smoke_evidence_complete: modelExists
-            && realUpstreamAccounts.length > 0
-            && missingUsage.length === 0
-            && missingRealDecisions.length === 0
+          v0_1_smoke_evidence_complete: gatewaySmokeComplete
         };
-      } catch (err) {
-        console.warn('Failed to compile live smoke status, returning demo status', err);
+      } catch {
+        // The self-check drawer already renders an explicit incomplete/offline
+        // state. Avoid noisy console warnings when a route transition aborts
+        // these background requests.
       }
     }
 
     return {
-      ...mockSmokeStatus,
+      ...offlineSmokeStatus,
       base_url: apiBaseUrlLabel()
     };
   }

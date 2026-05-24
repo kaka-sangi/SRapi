@@ -175,6 +175,9 @@ func modelDiscoveryRequest(source modelDiscoverySource, provider providercontrac
 
 func (rt *runtimeState) executeModelDiscoveryRequest(ctx context.Context, account accountcontract.ProviderAccount, credential map[string]any, req modelDiscoveryHTTPRequest) ([]byte, error) {
 	if req.ViaReverseProxy {
+		if err := rt.materializeProviderProxy(ctx, &account); err != nil {
+			return nil, errModelDiscoveryUpstream
+		}
 		resp, err := rt.reverseProxy.Do(ctx, reverseproxycontract.Request{
 			Account: antigravityModelDiscoveryRuntime(account, credential),
 			Method:  req.Method,

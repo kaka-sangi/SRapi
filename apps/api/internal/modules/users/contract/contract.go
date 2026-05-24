@@ -22,6 +22,20 @@ const (
 	RoleUser     Role = "user"
 )
 
+type BalanceOperation string
+
+const (
+	BalanceOperationSet       BalanceOperation = "set"
+	BalanceOperationIncrement BalanceOperation = "increment"
+	BalanceOperationDecrement BalanceOperation = "decrement"
+)
+
+type BalanceUpdateRequest struct {
+	Operation BalanceOperation
+	Amount    string
+	Currency  string
+}
+
 type User struct {
 	ID          int
 	Email       string

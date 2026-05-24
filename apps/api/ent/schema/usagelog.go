@@ -35,6 +35,7 @@ func (UsageLog) Fields() []ent.Field {
 		field.String("error_class").Optional().Nillable(),
 		field.String("cost").Default("0.00000000"),
 		field.String("currency").Default("USD"),
+		field.Time("charged_at").Optional().Nillable(),
 		field.JSON("compatibility_warnings_json", []string{}).Optional(),
 	}
 }
@@ -43,6 +44,7 @@ func (UsageLog) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("request_id").Unique(),
 		index.Fields("user_id", "created_at"),
+		index.Fields("charged_at"),
 		index.Fields("api_key_id", "created_at"),
 		index.Fields("account_id", "created_at"),
 		index.Fields("source_endpoint", "created_at"),

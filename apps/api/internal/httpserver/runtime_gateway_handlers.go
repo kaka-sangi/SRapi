@@ -1093,7 +1093,3 @@ func (s *Server) handleGeminiCountTokens(w http.ResponseWriter, r *http.Request)
 func zeroGatewayPricing() gatewayPricingEvidence {
 	return gatewayPricingEvidence{Amount: "0.00000000", Currency: "USD", PricingSource: "token_count_no_charge", PricingEstimated: false}
 }
-
-func (s *Server) handleNotImplemented(w http.ResponseWriter, r *http.Request) {
-	writeGatewayError(w, http.StatusNotImplemented, apiopenapi.InternalError, "endpoint not implemented yet", "not_implemented")
-}

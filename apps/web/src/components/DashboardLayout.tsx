@@ -13,7 +13,7 @@ interface DashboardLayoutProps {
  *
  * The original 480-line DashboardLayout has been split into focused
  * components under `@/components/layout` (AppShell, AuthGate, TopNav,
- * PageHeader, SmokeDrawer, ThemeToggle, LanguageToggle, RoleSwitcher).
+ * PageHeader, SmokeDrawer, ThemeToggle, LanguageToggle).
  * Pages keep importing from this path while migration completes; new code
  * should import `AppShell` directly.
  */

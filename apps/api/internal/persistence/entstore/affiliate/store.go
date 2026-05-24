@@ -103,6 +103,20 @@ func (s *Store) FindRelationshipByInvitee(ctx context.Context, inviteeUserID int
 	return toRelationship(row), nil
 }
 
+func (s *Store) ListRelationships(ctx context.Context) ([]contract.InviteRelationship, error) {
+	rows, err := s.client.InviteRelationship.Query().
+		Order(entinviterelationship.ByID()).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]contract.InviteRelationship, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toRelationship(row))
+	}
+	return out, nil
+}
+
 func (s *Store) MarkRelationshipFirstPaid(ctx context.Context, id int, firstPaidAt time.Time) (contract.InviteRelationship, error) {
 	row, err := s.client.InviteRelationship.UpdateOneID(id).
 		Where(entinviterelationship.FirstPaidAtIsNil()).

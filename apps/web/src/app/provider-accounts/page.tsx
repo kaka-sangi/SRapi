@@ -11,6 +11,9 @@ import {
 import DashboardLayout from '../../components/DashboardLayout';
 import { useProviderAccounts } from '@/hooks/queries';
 import { useLanguage } from '../../context/LanguageContext';
+import { apiService } from '@/lib/api';
+import { PageQueryError, PageQueryLoading } from '@/components/layout/page-query-state';
+import type { AdminTestResult } from '../../../../../packages/sdk/typescript/src/types.gen';
 
 export default function ProviderAccountsPage() {
   const { language, t } = useLanguage();
@@ -18,30 +21,25 @@ export default function ProviderAccountsPage() {
   const accounts = accountsQuery.data ?? [];
   const loading = accountsQuery.isLoading;
   const [testingId, setTestingId] = useState<string | null>(null);
-  const [testResult, setTestResult] = useState<{ id: string; success: boolean; latency: number } | null>(null);
+  const [testResult, setTestResult] = useState<{ id: string; result: AdminTestResult } | null>(null);
+  const [testError, setTestError] = useState<unknown>(null);
 
   const handleTestAccount = async (id: string) => {
     setTestingId(id);
     setTestResult(null);
-    
-    // Simulate API lease connection test latency
-    setTimeout(() => {
-      const targetAcc = accounts.find(a => a.id === id);
-      const isFailed = targetAcc?.status === 'disabled';
-      const responseLatency = targetAcc ? Math.round(targetAcc.latency * 0.9 + Math.random() * 20) : 120;
-      
+    setTestError(null);
+
+    try {
+      const result = await apiService.testProviderAccount(id);
       setTestResult({
         id,
-        success: !isFailed,
-        latency: responseLatency
+        result,
       });
+    } catch (error) {
+      setTestError(error);
+    } finally {
       setTestingId(null);
-      
-      // Clear result after 4 seconds
-      setTimeout(() => {
-        setTestResult(null);
-      }, 4000);
-    }, 1200);
+    }
   };
 
   // SRapi v0.1.0 product tone, see docs/PRODUCT_TONE.md.
@@ -77,11 +75,14 @@ export default function ProviderAccountsPage() {
         </div>
 
         {/* Upstreams Grid */}
+        {testError ? (
+          <PageQueryError error={testError} title="Provider account test failed" />
+        ) : null}
+
         {loading ? (
-          <div className="py-12 text-center font-mono">
-            <div className="w-6 h-6 border-t-2 border-srapi-primary rounded-full animate-spin mx-auto mb-3"></div>
-            <p className="text-xs text-srapi-text-secondary">{t('resolvingAccounts')}</p>
-          </div>
+          <PageQueryLoading label={t('resolvingAccounts')} />
+        ) : accountsQuery.isError ? (
+          <PageQueryError error={accountsQuery.error} onRetry={() => void accountsQuery.refetch()} />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
             {accounts.map((acc) => {
@@ -186,17 +187,19 @@ export default function ProviderAccountsPage() {
 
                     {hasResult && (
                       <div className={`text-[10px] font-mono flex items-center gap-1 ${
-                        testResult.success ? 'text-green-700 dark:text-green-500 animate-pulse' : 'text-srapi-primary'
+                        testResult.result.ok ? 'text-green-700 dark:text-green-500 animate-pulse' : 'text-srapi-primary'
                       }`}>
-                        {testResult.success ? (
+                        {testResult.result.ok ? (
                           <>
                             <CheckCircle size={12} />
-                            {language === 'en' ? `OK (${testResult.latency}ms)` : `正常 (${testResult.latency}ms)`}
+                            {language === 'en'
+                              ? `OK (${testResult.result.latency_ms ?? 0}ms)`
+                              : `正常 (${testResult.result.latency_ms ?? 0}ms)`}
                           </>
                         ) : (
                           <>
                             <XCircle size={12} />
-                            {t('rejected')}
+                            {testResult.result.message || t('rejected')}
                           </>
                         )}
                       </div>

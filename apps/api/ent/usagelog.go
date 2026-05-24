@@ -60,6 +60,8 @@ type UsageLog struct {
 	Cost string `json:"cost,omitempty"`
 	// Currency holds the value of the "currency" field.
 	Currency string `json:"currency,omitempty"`
+	// ChargedAt holds the value of the "charged_at" field.
+	ChargedAt *time.Time `json:"charged_at,omitempty"`
 	// CompatibilityWarningsJSON holds the value of the "compatibility_warnings_json" field.
 	CompatibilityWarningsJSON []string `json:"compatibility_warnings_json,omitempty"`
 	selectValues              sql.SelectValues
@@ -78,7 +80,7 @@ func (*UsageLog) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullInt64)
 		case usagelog.FieldRequestID, usagelog.FieldSourceProtocol, usagelog.FieldSourceEndpoint, usagelog.FieldTargetProtocol, usagelog.FieldModel, usagelog.FieldErrorClass, usagelog.FieldCost, usagelog.FieldCurrency:
 			values[i] = new(sql.NullString)
-		case usagelog.FieldCreatedAt, usagelog.FieldUpdatedAt:
+		case usagelog.FieldCreatedAt, usagelog.FieldUpdatedAt, usagelog.FieldChargedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -230,6 +232,13 @@ func (_m *UsageLog) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.Currency = value.String
 			}
+		case usagelog.FieldChargedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field charged_at", values[i])
+			} else if value.Valid {
+				_m.ChargedAt = new(time.Time)
+				*_m.ChargedAt = value.Time
+			}
 		case usagelog.FieldCompatibilityWarningsJSON:
 			if value, ok := values[i].(*[]byte); !ok {
 				return fmt.Errorf("unexpected type %T for field compatibility_warnings_json", values[i])
@@ -342,6 +351,11 @@ func (_m *UsageLog) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("currency=")
 	builder.WriteString(_m.Currency)
+	builder.WriteString(", ")
+	if v := _m.ChargedAt; v != nil {
+		builder.WriteString("charged_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
 	builder.WriteString(", ")
 	builder.WriteString("compatibility_warnings_json=")
 	builder.WriteString(fmt.Sprintf("%v", _m.CompatibilityWarningsJSON))

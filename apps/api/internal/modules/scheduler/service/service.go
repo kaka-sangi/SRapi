@@ -57,6 +57,56 @@ func NewStrategyRegistry() *StrategyRegistry {
 			"sticky":   0.05,
 			"priority": 0.00,
 		}),
+		newStrategyDescriptor(contract.StrategyLatencyFirst, "v1", "Low-latency scheduler strategy.", map[string]float64{
+			"latency":  0.35,
+			"health":   0.25,
+			"quota":    0.15,
+			"sticky":   0.10,
+			"cost":     0.05,
+			"cache":    0.05,
+			"fairness": 0.05,
+			"priority": 0.00,
+		}),
+		newStrategyDescriptor(contract.StrategyQuotaProtect, "v1", "Quota-protection scheduler strategy.", map[string]float64{
+			"quota":    0.35,
+			"health":   0.25,
+			"cost":     0.15,
+			"latency":  0.10,
+			"fairness": 0.05,
+			"sticky":   0.05,
+			"cache":    0.05,
+			"priority": 0.00,
+		}),
+		newStrategyDescriptor(contract.StrategyStickyFirst, "v1", "Sticky-affinity scheduler strategy.", map[string]float64{
+			"sticky":   0.35,
+			"health":   0.25,
+			"quota":    0.15,
+			"latency":  0.10,
+			"cost":     0.05,
+			"cache":    0.05,
+			"fairness": 0.05,
+			"priority": 0.00,
+		}),
+		newStrategyDescriptor(contract.StrategyCacheAffinityFirst, "v1", "Cache-affinity scheduler strategy.", map[string]float64{
+			"cache":    0.30,
+			"cost":     0.20,
+			"health":   0.20,
+			"quota":    0.15,
+			"latency":  0.05,
+			"sticky":   0.05,
+			"fairness": 0.05,
+			"priority": 0.00,
+		}),
+		newStrategyDescriptor(contract.StrategyPremiumQuality, "v1", "Premium-quality scheduler strategy.", map[string]float64{
+			"health":   0.35,
+			"latency":  0.20,
+			"quota":    0.15,
+			"sticky":   0.10,
+			"cost":     0.05,
+			"cache":    0.05,
+			"fairness": 0.05,
+			"priority": 0.05,
+		}),
 	} {
 		descriptors[descriptor.Name] = descriptor
 	}
@@ -212,6 +262,7 @@ func (s *Service) Schedule(ctx context.Context, req contract.ScheduleRequest) (c
 		}
 		return scores[i].Score.Final > scores[j].Score.Final
 	})
+	candidatesByRank := rankedCandidates(scores)
 	selected := scores[0].Candidate
 	scorePayload := map[string]any{}
 	for _, score := range scores {
@@ -231,7 +282,7 @@ func (s *Service) Schedule(ctx context.Context, req contract.ScheduleRequest) (c
 		_, _ = s.store.UpdateLeaseStatus(ctx, requestID, contract.LeaseStatusReleased)
 		return contract.ScheduleResult{}, err
 	}
-	return contract.ScheduleResult{Decision: decision, Candidate: selected, Lease: lease}, nil
+	return contract.ScheduleResult{Decision: decision, Candidate: selected, Candidates: candidatesByRank, Lease: lease}, nil
 }
 
 func normalizeScheduleCapabilities(req *contract.ScheduleRequest) error {
@@ -373,6 +424,7 @@ func (s *Service) buildDecision(req contract.ScheduleRequest, strategy contract.
 		decision.SelectedProviderID = &providerID
 		decision.SelectedAccountID = &accountID
 		decision.StickyHit = stickyScore(*selected, req) > 0
+		decision.CacheAffinityHit = cacheScore(*selected, req, healthScore(*selected)) > 0
 	}
 	return decision
 }
@@ -455,6 +507,14 @@ type candidateScore struct {
 	Score     scoreBreakdown
 }
 
+func rankedCandidates(scores []candidateScore) []contract.Candidate {
+	out := make([]contract.Candidate, 0, len(scores))
+	for _, score := range scores {
+		out = append(out, score.Candidate)
+	}
+	return out
+}
+
 type scoreBreakdown struct {
 	AccountID         int     `json:"account_id"`
 	Final             float64 `json:"final_score"`
@@ -475,7 +535,7 @@ func scoreCandidate(candidate contract.Candidate, req contract.ScheduleRequest, 
 	quota := quotaScore(candidate)
 	latency := latencyScore(candidate)
 	sticky := stickyScore(candidate, req)
-	cache := 0.0
+	cache := cacheScore(candidate, req, health)
 	cost := costScore(candidate)
 	fairness := normalizeWeight(candidate.Account.Weight)
 	riskPenalty := riskPenalty(candidate)
@@ -662,6 +722,29 @@ func stickyScore(candidate contract.Candidate, req contract.ScheduleRequest) flo
 	}
 }
 
+func cacheScore(candidate contract.Candidate, req contract.ScheduleRequest, health float64) float64 {
+	if health < 0.40 {
+		return 0
+	}
+	valueMaps := []map[string]any{candidate.Mapping.PricingOverride, candidate.Account.Metadata, candidate.Provider.Capabilities, candidate.Provider.ConfigSchema}
+	if score, ok := firstScoreValue(valueMaps, "cache_score", "cache_affinity_score", "cache_hit_rate", "prompt_cache_hit_rate", "cache_saving_ratio"); ok {
+		return score
+	}
+	if saving, savingOK := firstPositiveFloat(valueMaps, "estimated_cache_saving", "cache_saving_estimate"); savingOK {
+		if total, totalOK := firstPositiveFloat(valueMaps, "estimated_total_cost", "estimated_cost", "total_cost"); totalOK {
+			return clamp01(saving / total)
+		}
+	}
+	if cachedTokens, ok := firstPositiveFloat([]map[string]any{candidate.Mapping.PricingOverride, candidate.Account.Metadata}, "cached_token_estimate", "estimated_cached_tokens"); ok {
+		totalTokens := float64(req.EstimatedInputTokens + req.EstimatedOutputTokens)
+		if totalTokens <= 0 {
+			totalTokens = cachedTokens
+		}
+		return clamp01(cachedTokens / (totalTokens + cachedTokens))
+	}
+	return 0
+}
+
 func quotaProtected(candidate contract.Candidate, req contract.ScheduleRequest) bool {
 	if !freeTier(req.UserTier) || !protectedAccount(candidate) || candidate.RuntimeState.QuotaRemainingRatio == nil {
 		return false
@@ -729,21 +812,64 @@ func saturationPenalty(candidate contract.Candidate) float64 {
 
 func costScore(candidate contract.Candidate) float64 {
 	if value, ok := candidate.Mapping.PricingOverride["relative_cost"]; ok {
-		switch v := value.(type) {
-		case float64:
-			return clamp01(1 - v)
-		case float32:
-			return clamp01(1 - float64(v))
-		case int:
-			return clamp01(1 - float64(v))
-		case string:
-			parsed, err := strconv.ParseFloat(strings.TrimSpace(v), 64)
-			if err == nil {
-				return clamp01(1 - parsed)
-			}
+		if parsed, ok := floatValue(value); ok {
+			return clamp01(1 - parsed)
 		}
 	}
 	return 0.6
+}
+
+func firstScoreValue(values []map[string]any, keys ...string) (float64, bool) {
+	value, ok := firstPositiveFloat(values, keys...)
+	if !ok {
+		return 0, false
+	}
+	return clamp01(value), true
+}
+
+func firstPositiveFloat(values []map[string]any, keys ...string) (float64, bool) {
+	for _, metadata := range values {
+		for _, key := range keys {
+			value, ok := metadataValue(metadata, key)
+			if !ok {
+				continue
+			}
+			parsed, ok := floatValue(value)
+			if ok && parsed > 0 {
+				return parsed, true
+			}
+		}
+	}
+	return 0, false
+}
+
+func metadataValue(metadata map[string]any, key string) (any, bool) {
+	if metadata == nil {
+		return nil, false
+	}
+	value, ok := metadata[key]
+	return value, ok
+}
+
+func floatValue(value any) (float64, bool) {
+	switch typed := value.(type) {
+	case float64:
+		return typed, true
+	case float32:
+		return float64(typed), true
+	case int:
+		return float64(typed), true
+	case int64:
+		return float64(typed), true
+	case json.Number:
+		parsed, err := typed.Float64()
+		return parsed, err == nil
+	case string:
+		parsed, err := strconv.ParseFloat(strings.TrimSpace(typed), 64)
+		return parsed, err == nil
+	default:
+		return 0, false
+	}
 }
 
 func riskPenalty(candidate contract.Candidate) float64 {

@@ -32,6 +32,7 @@ export function AppShell({ children, allowedRole }: AppShellProps) {
               title={meta.title}
               description={meta.desc}
               user={{ name: user.name, balance: user.balance }}
+              showSmoke={user.role === "admin"}
             />
             <div className="animate-bloom delay-200">{children}</div>
           </main>

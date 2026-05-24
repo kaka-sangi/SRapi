@@ -159,6 +159,11 @@ func Currency(v string) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldCurrency, v))
 }
 
+// ChargedAt applies equality check predicate on the "charged_at" field. It's identical to ChargedAtEQ.
+func ChargedAt(v time.Time) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldChargedAt, v))
+}
+
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.
 func CreatedAtEQ(v time.Time) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldCreatedAt, v))
@@ -1167,6 +1172,56 @@ func CurrencyEqualFold(v string) predicate.UsageLog {
 // CurrencyContainsFold applies the ContainsFold predicate on the "currency" field.
 func CurrencyContainsFold(v string) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldContainsFold(FieldCurrency, v))
+}
+
+// ChargedAtEQ applies the EQ predicate on the "charged_at" field.
+func ChargedAtEQ(v time.Time) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldChargedAt, v))
+}
+
+// ChargedAtNEQ applies the NEQ predicate on the "charged_at" field.
+func ChargedAtNEQ(v time.Time) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNEQ(FieldChargedAt, v))
+}
+
+// ChargedAtIn applies the In predicate on the "charged_at" field.
+func ChargedAtIn(vs ...time.Time) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldIn(FieldChargedAt, vs...))
+}
+
+// ChargedAtNotIn applies the NotIn predicate on the "charged_at" field.
+func ChargedAtNotIn(vs ...time.Time) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNotIn(FieldChargedAt, vs...))
+}
+
+// ChargedAtGT applies the GT predicate on the "charged_at" field.
+func ChargedAtGT(v time.Time) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGT(FieldChargedAt, v))
+}
+
+// ChargedAtGTE applies the GTE predicate on the "charged_at" field.
+func ChargedAtGTE(v time.Time) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGTE(FieldChargedAt, v))
+}
+
+// ChargedAtLT applies the LT predicate on the "charged_at" field.
+func ChargedAtLT(v time.Time) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLT(FieldChargedAt, v))
+}
+
+// ChargedAtLTE applies the LTE predicate on the "charged_at" field.
+func ChargedAtLTE(v time.Time) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLTE(FieldChargedAt, v))
+}
+
+// ChargedAtIsNil applies the IsNil predicate on the "charged_at" field.
+func ChargedAtIsNil() predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldIsNull(FieldChargedAt))
+}
+
+// ChargedAtNotNil applies the NotNil predicate on the "charged_at" field.
+func ChargedAtNotNil() predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNotNull(FieldChargedAt))
 }
 
 // CompatibilityWarningsJSONIsNil applies the IsNil predicate on the "compatibility_warnings_json" field.

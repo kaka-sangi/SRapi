@@ -13,8 +13,13 @@ import (
 type StrategyName string
 
 const (
-	StrategyBalanced  StrategyName = "balanced"
-	StrategyCostSaver StrategyName = "cost_saver"
+	StrategyBalanced           StrategyName = "balanced"
+	StrategyCostSaver          StrategyName = "cost_saver"
+	StrategyLatencyFirst       StrategyName = "latency_first"
+	StrategyQuotaProtect       StrategyName = "quota_protect"
+	StrategyStickyFirst        StrategyName = "sticky_first"
+	StrategyCacheAffinityFirst StrategyName = "cache_affinity_first"
+	StrategyPremiumQuality     StrategyName = "premium_quality"
 )
 
 type UserTier string
@@ -142,9 +147,10 @@ type Decision struct {
 }
 
 type ScheduleResult struct {
-	Decision  Decision
-	Candidate Candidate
-	Lease     Lease
+	Decision   Decision
+	Candidate  Candidate
+	Candidates []Candidate
+	Lease      Lease
 }
 
 type Lease struct {

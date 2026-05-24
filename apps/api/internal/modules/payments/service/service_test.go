@@ -308,6 +308,89 @@ func TestPaymentOrderStatusMachineRejectsIllegalTransitions(t *testing.T) {
 	}
 }
 
+func TestExpirePendingOrdersMarksExpiredOrdersAndWritesAudit(t *testing.T) {
+	h := newHarness(t)
+	_, err := h.payments.CreateProviderInstance(t.Context(), contract.CreateProviderInstanceRequest{
+		Provider:         "manual",
+		Name:             "manual-credit",
+		Config:           map[string]any{"webhook_secret": "manual-secret"},
+		SupportedMethods: []string{"manual"},
+	})
+	if err != nil {
+		t.Fatalf("create provider instance: %v", err)
+	}
+	expiredOrder, err := h.payments.CreateOrder(t.Context(), contract.CreateOrderRequest{
+		UserID:      7,
+		Method:      "manual",
+		Amount:      "5.00",
+		Currency:    "USD",
+		ProductType: contract.ProductTypeBalanceCredit,
+	})
+	if err != nil {
+		t.Fatalf("create expired candidate order: %v", err)
+	}
+	futureOrder, err := h.payments.CreateOrder(t.Context(), contract.CreateOrderRequest{
+		UserID:      7,
+		Method:      "manual",
+		Amount:      "8.00",
+		Currency:    "USD",
+		ProductType: contract.ProductTypeBalanceCredit,
+	})
+	if err != nil {
+		t.Fatalf("create future order: %v", err)
+	}
+	now := time.Date(2026, 5, 22, 12, 5, 0, 0, time.UTC)
+	past := now.Add(-time.Minute)
+	expiredOrder.ExpiresAt = &past
+	if _, err := h.store.UpdateOrder(t.Context(), expiredOrder); err != nil {
+		t.Fatalf("backdate order expiry: %v", err)
+	}
+
+	result, err := h.payments.ExpirePendingOrders(t.Context(), now)
+	if err != nil {
+		t.Fatalf("expire pending orders: %v", err)
+	}
+	if result.Selected != 1 || result.Expired != 1 {
+		t.Fatalf("unexpected expiration result: %+v", result)
+	}
+	updatedExpired, err := h.payments.FindOrderByID(t.Context(), expiredOrder.ID)
+	if err != nil {
+		t.Fatalf("find expired order: %v", err)
+	}
+	if updatedExpired.Status != contract.OrderStatusExpired || updatedExpired.ClosedAt == nil || !updatedExpired.ClosedAt.Equal(now) {
+		t.Fatalf("expected expired order closed at worker time, got %+v", updatedExpired)
+	}
+	updatedFuture, err := h.payments.FindOrderByID(t.Context(), futureOrder.ID)
+	if err != nil {
+		t.Fatalf("find future order: %v", err)
+	}
+	if updatedFuture.Status != contract.OrderStatusPending {
+		t.Fatalf("future order should remain pending, got %+v", updatedFuture)
+	}
+	audits, err := h.store.ListAuditLogsByOrder(t.Context(), expiredOrder.ID)
+	if err != nil {
+		t.Fatalf("list payment audit logs: %v", err)
+	}
+	if len(audits) != 1 || audits[0].EventType != "order.expired" || !audits[0].SignatureValid {
+		t.Fatalf("expected signed expiration audit log, got %+v", audits)
+	}
+
+	second, err := h.payments.ExpirePendingOrders(t.Context(), now.Add(time.Minute))
+	if err != nil {
+		t.Fatalf("expire pending orders again: %v", err)
+	}
+	if second.Expired != 0 {
+		t.Fatalf("expiration should be idempotent on second run, got %+v", second)
+	}
+	audits, err = h.store.ListAuditLogsByOrder(t.Context(), expiredOrder.ID)
+	if err != nil {
+		t.Fatalf("list payment audit logs again: %v", err)
+	}
+	if len(audits) != 1 {
+		t.Fatalf("expected one expiration audit log after second run, got %+v", audits)
+	}
+}
+
 type harness struct {
 	store         *paymentmemory.Store
 	payments      *Service

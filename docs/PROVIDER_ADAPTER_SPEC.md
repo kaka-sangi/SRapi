@@ -44,6 +44,7 @@ Provider Adapter 不负责：
 
 ```txt
 openai-compatible
+generic-reverse-proxy
 anthropic-compatible
 gemini-compatible
 native-openai
@@ -103,6 +104,7 @@ native-openai 或 openrouter
 
 ```txt
 openai-compatible       -> /chat/completions
+generic-reverse-proxy   -> metadata-defined OpenAI-compatible chat / embeddings path, optional body / response path mapping
 anthropic-compatible    -> /messages
 gemini-compatible       -> /models/{model}:generateContent 或 :streamGenerateContent
 native-gemini           -> /models/{model}:generateContent 或 :streamGenerateContent

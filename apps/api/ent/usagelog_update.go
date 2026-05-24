@@ -382,6 +382,26 @@ func (_u *UsageLogUpdate) SetNillableCurrency(v *string) *UsageLogUpdate {
 	return _u
 }
 
+// SetChargedAt sets the "charged_at" field.
+func (_u *UsageLogUpdate) SetChargedAt(v time.Time) *UsageLogUpdate {
+	_u.mutation.SetChargedAt(v)
+	return _u
+}
+
+// SetNillableChargedAt sets the "charged_at" field if the given value is not nil.
+func (_u *UsageLogUpdate) SetNillableChargedAt(v *time.Time) *UsageLogUpdate {
+	if v != nil {
+		_u.SetChargedAt(*v)
+	}
+	return _u
+}
+
+// ClearChargedAt clears the value of the "charged_at" field.
+func (_u *UsageLogUpdate) ClearChargedAt() *UsageLogUpdate {
+	_u.mutation.ClearChargedAt()
+	return _u
+}
+
 // SetCompatibilityWarningsJSON sets the "compatibility_warnings_json" field.
 func (_u *UsageLogUpdate) SetCompatibilityWarningsJSON(v []string) *UsageLogUpdate {
 	_u.mutation.SetCompatibilityWarningsJSON(v)
@@ -558,6 +578,12 @@ func (_u *UsageLogUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.Currency(); ok {
 		_spec.SetField(usagelog.FieldCurrency, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.ChargedAt(); ok {
+		_spec.SetField(usagelog.FieldChargedAt, field.TypeTime, value)
+	}
+	if _u.mutation.ChargedAtCleared() {
+		_spec.ClearField(usagelog.FieldChargedAt, field.TypeTime)
 	}
 	if value, ok := _u.mutation.CompatibilityWarningsJSON(); ok {
 		_spec.SetField(usagelog.FieldCompatibilityWarningsJSON, field.TypeJSON, value)
@@ -943,6 +969,26 @@ func (_u *UsageLogUpdateOne) SetNillableCurrency(v *string) *UsageLogUpdateOne {
 	return _u
 }
 
+// SetChargedAt sets the "charged_at" field.
+func (_u *UsageLogUpdateOne) SetChargedAt(v time.Time) *UsageLogUpdateOne {
+	_u.mutation.SetChargedAt(v)
+	return _u
+}
+
+// SetNillableChargedAt sets the "charged_at" field if the given value is not nil.
+func (_u *UsageLogUpdateOne) SetNillableChargedAt(v *time.Time) *UsageLogUpdateOne {
+	if v != nil {
+		_u.SetChargedAt(*v)
+	}
+	return _u
+}
+
+// ClearChargedAt clears the value of the "charged_at" field.
+func (_u *UsageLogUpdateOne) ClearChargedAt() *UsageLogUpdateOne {
+	_u.mutation.ClearChargedAt()
+	return _u
+}
+
 // SetCompatibilityWarningsJSON sets the "compatibility_warnings_json" field.
 func (_u *UsageLogUpdateOne) SetCompatibilityWarningsJSON(v []string) *UsageLogUpdateOne {
 	_u.mutation.SetCompatibilityWarningsJSON(v)
@@ -1149,6 +1195,12 @@ func (_u *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, err 
 	}
 	if value, ok := _u.mutation.Currency(); ok {
 		_spec.SetField(usagelog.FieldCurrency, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.ChargedAt(); ok {
+		_spec.SetField(usagelog.FieldChargedAt, field.TypeTime, value)
+	}
+	if _u.mutation.ChargedAtCleared() {
+		_spec.ClearField(usagelog.FieldChargedAt, field.TypeTime)
 	}
 	if value, ok := _u.mutation.CompatibilityWarningsJSON(); ok {
 		_spec.SetField(usagelog.FieldCompatibilityWarningsJSON, field.TypeJSON, value)

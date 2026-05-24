@@ -454,6 +454,7 @@ id
 name
 type
 url_ciphertext
+url_version
 status
 metadata_json
 created_at
@@ -468,6 +469,19 @@ http
 https
 socks5
 ```
+
+索引：
+
+```txt
+unique(name)
+index(status)
+index(type, status)
+```
+
+规则：
+
+- `url_ciphertext` 存储加密后的代理 URL，API 响应只暴露 `url_configured`。
+- `url_version` 记录代理 URL 密文字段的 key/aad 版本，便于后续密钥轮换。
 
 ## 10. 调度相关
 

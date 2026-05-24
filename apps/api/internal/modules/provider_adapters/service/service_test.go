@@ -770,6 +770,178 @@ func TestOpenAICompatibleAdapterEstimatesStreamUsageWhenMissing(t *testing.T) {
 	}
 }
 
+func TestGenericReverseProxyAdapterInvokesConfiguredChatUpstream(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v2/chat" {
+			t.Fatalf("unexpected generic upstream path %s", r.URL.Path)
+		}
+		if got := r.Header.Get("X-Api-Key"); got != "generic-secret" {
+			t.Fatalf("unexpected generic auth header %q", got)
+		}
+		var payload struct {
+			UpstreamModel string `json:"upstream_model"`
+			PromptItems   []struct {
+				Content string `json:"content"`
+			} `json:"prompt_items"`
+			Route string `json:"route"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode generic chat request: %v", err)
+		}
+		if payload.UpstreamModel != "generic-upstream" || len(payload.PromptItems) != 1 || payload.PromptItems[0].Content != "hello generic" || payload.Route != "test" {
+			t.Fatalf("unexpected generic chat payload: %+v", payload)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"output":{"text":"generic says hi"},"metering":{"input_tokens":6,"output_tokens":7,"cached_tokens":2}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeText(context.Background(), contract.TextRequest{
+		RequestID: "req_generic_chat",
+		Model:     "generic-local",
+		Prompt:    "hello generic",
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "generic-reverse-proxy",
+			Protocol:    "openai-compatible",
+			ConfigSchema: map[string]any{
+				"base_url":             upstream.URL,
+				"chat_path":            "/v2/chat",
+				"auth_header_template": "X-Api-Key: {{api_key}}",
+				"body_mapping_rules": map[string]any{
+					"model_field":    "upstream_model",
+					"messages_field": "prompt_items",
+					"extra":          map[string]any{"route": "test"},
+				},
+				"response_path_rules": map[string]any{
+					"text_path":  "output.text",
+					"usage_path": "metering",
+				},
+			},
+		},
+		Account:    accountcontract.ProviderAccount{ID: 1, RuntimeClass: accountcontract.RuntimeClassAPIKey},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "generic-upstream"},
+		Credential: map[string]any{"api_key": "generic-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke generic chat upstream: %v", err)
+	}
+	if resp.Text != "generic says hi" || resp.Usage.Estimated || resp.Usage.InputTokens != 6 || resp.Usage.OutputTokens != 7 || resp.Usage.CachedTokens != 2 {
+		t.Fatalf("unexpected generic chat response: %+v", resp)
+	}
+}
+
+func TestGenericReverseProxyAdapterStreamsConfiguredChatUpstream(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/chat/completions" {
+			t.Fatalf("unexpected generic stream path %s", r.URL.Path)
+		}
+		var payload struct {
+			Model         string `json:"model"`
+			Stream        bool   `json:"stream"`
+			StreamOptions *struct {
+				IncludeUsage bool `json:"include_usage"`
+			} `json:"stream_options"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode generic stream request: %v", err)
+		}
+		if payload.Model != "stream-upstream" || !payload.Stream || payload.StreamOptions == nil || !payload.StreamOptions.IncludeUsage {
+			t.Fatalf("unexpected generic stream payload: %+v", payload)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"generic\"}}]}\n\n"))
+		_, _ = w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\" stream\"}}]}\n\n"))
+		_, _ = w.Write([]byte("data: {\"choices\":[],\"usage\":{\"prompt_tokens\":4,\"completion_tokens\":5}}\n\n"))
+		_, _ = w.Write([]byte("data: [DONE]\n\n"))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeText(context.Background(), contract.TextRequest{
+		RequestID: "req_generic_stream",
+		Model:     "generic-local",
+		Prompt:    "hello stream",
+		Stream:    true,
+		Provider: providercontract.Provider{
+			AdapterType:  "generic-reverse-proxy",
+			Protocol:     "openai-compatible",
+			ConfigSchema: map[string]any{"base_url": upstream.URL + "/v1"},
+		},
+		Account:    accountcontract.ProviderAccount{ID: 1, RuntimeClass: accountcontract.RuntimeClassAPIKey},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "stream-upstream"},
+		Credential: map[string]any{"api_key": "generic-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke generic stream upstream: %v", err)
+	}
+	if resp.Text != "generic stream" || resp.Usage.Estimated || resp.Usage.InputTokens != 4 || resp.Usage.OutputTokens != 5 {
+		t.Fatalf("unexpected generic stream response: %+v", resp)
+	}
+}
+
+func TestGenericReverseProxyAdapterInvokesEmbeddingsUpstream(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v2/embeddings" {
+			t.Fatalf("unexpected generic embeddings path %s", r.URL.Path)
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer embedding-secret" {
+			t.Fatalf("unexpected generic embeddings auth %q", got)
+		}
+		var payload struct {
+			Model string   `json:"model"`
+			Texts []string `json:"texts"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode generic embeddings request: %v", err)
+		}
+		if payload.Model != "embedding-upstream" || len(payload.Texts) != 2 || payload.Texts[0] != "first" || payload.Texts[1] != "second" {
+			t.Fatalf("unexpected generic embeddings payload: %+v", payload)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"embedding":[0.1,0.2],"index":0},{"embedding":[0.3,0.4],"index":1}],"model":"embedding-upstream","usage":{"prompt_tokens":8,"total_tokens":8}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeEmbeddings(context.Background(), contract.EmbeddingRequest{
+		RequestID: "req_generic_embeddings",
+		Model:     "embedding-local",
+		Input:     []string{"first", "second"},
+		Provider: providercontract.Provider{
+			AdapterType: "generic-reverse-proxy",
+			Protocol:    "openai-compatible",
+			ConfigSchema: map[string]any{
+				"base_url":             upstream.URL,
+				"embeddings_path":      "/v2/embeddings",
+				"auth_header_template": "Authorization: Bearer {{api_key}}",
+				"embeddings_body_mapping_rules": map[string]any{
+					"input_field": "texts",
+				},
+			},
+		},
+		Account:    accountcontract.ProviderAccount{ID: 1, RuntimeClass: accountcontract.RuntimeClassAPIKey},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "embedding-upstream"},
+		Credential: map[string]any{"api_key": "embedding-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke generic embeddings upstream: %v", err)
+	}
+	if resp.Model != "embedding-upstream" || len(resp.Data) != 2 || len(resp.Data[0].Vector) != 2 || resp.Usage.InputTokens != 8 || resp.Usage.Estimated {
+		t.Fatalf("unexpected generic embeddings response: %+v", resp)
+	}
+}
+
 func TestOpenAICompatibleAdapterClassifiesInterruptedStream(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
@@ -2796,6 +2968,70 @@ func TestReverseProxyAdapterStreamsThroughRuntime(t *testing.T) {
 	}
 	if resp.Text != "runtime stream" || resp.Usage.Estimated || resp.Usage.InputTokens != 4 || resp.Usage.OutputTokens != 5 {
 		t.Fatalf("unexpected reverse proxy stream response: %+v", resp)
+	}
+}
+
+func TestGenericReverseProxyAdapterDispatchesCustomRuntimeThroughRuntime(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body:       []byte(`{"result":{"message":"runtime generic response"},"usage":{"prompt_tokens":2,"completion_tokens":3}}`),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeText(context.Background(), contract.TextRequest{
+		RequestID: "req_generic_runtime",
+		Model:     "generic-local",
+		Prompt:    "hello runtime",
+		Provider: providercontract.Provider{
+			AdapterType: "generic-reverse-proxy",
+			Protocol:    "openai-compatible",
+			ConfigSchema: map[string]any{
+				"base_url":             "https://generic.example/api",
+				"chat_path":            "/chat",
+				"auth_header_template": "X-Generic-Token: {{access_token}}",
+				"response_path_rules":  map[string]any{"text_path": "result.message"},
+			},
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:           9,
+			RuntimeClass: accountcontract.RuntimeClassCustomReverseProxy,
+			ProxyID:      ptrString("http://proxy.example:8080"),
+			Metadata:     map[string]any{"user_agent": "GenericClient/1.0"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "runtime-upstream"},
+		Credential: map[string]any{"access_token": "runtime-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke generic runtime adapter: %v", err)
+	}
+	if resp.Text != "runtime generic response" || resp.Usage.InputTokens != 2 || resp.Usage.OutputTokens != 3 {
+		t.Fatalf("unexpected generic runtime response: %+v", resp)
+	}
+	if runtime.request.Method != http.MethodPost || runtime.request.URL != "https://generic.example/api/chat" {
+		t.Fatalf("unexpected generic runtime request: %+v", runtime.request)
+	}
+	if runtime.request.Headers.Get("X-Generic-Token") != "runtime-token" || runtime.request.Headers.Get("Authorization") != "" {
+		t.Fatalf("unexpected generic runtime headers: %+v", runtime.request.Headers)
+	}
+	if runtime.request.Account.RuntimeClass != string(accountcontract.RuntimeClassCustomReverseProxy) ||
+		runtime.request.Account.ProxyID == nil ||
+		*runtime.request.Account.ProxyID != "http://proxy.example:8080" ||
+		runtime.request.Account.UserAgent != "GenericClient/1.0" ||
+		runtime.request.Account.Credential["access_token"] != "runtime-token" {
+		t.Fatalf("expected custom reverse proxy runtime context, got %+v", runtime.request.Account)
+	}
+	var payload struct {
+		Model string `json:"model"`
+	}
+	if err := json.Unmarshal(runtime.request.Body, &payload); err != nil {
+		t.Fatalf("decode generic runtime payload: %v", err)
+	}
+	if payload.Model != "runtime-upstream" {
+		t.Fatalf("unexpected generic runtime payload: %+v", payload)
 	}
 }
 

@@ -1,14 +1,13 @@
 /**
  * SRapi v0.1.0 client-side session cookie shim.
  *
- * The control panel keeps user state in `localStorage` (so demo mode works
- * without a backend), but Next.js `proxy.ts` runs on the edge and only sees
- * cookies. This module mirrors a tiny presence flag into a non-HTTP-only
- * cookie so the proxy can do server-side redirects without a flash of
- * unauthenticated content.
+ * The control panel keeps a minimal user shell in `localStorage`, but Next.js
+ * `proxy.ts` runs on the edge and only sees cookies. This module mirrors a
+ * tiny presence flag into a non-HTTP-only cookie so the proxy can do
+ * server-side redirects without a flash of unauthenticated content.
  *
  * The cookie carries no credentials. Real auth still depends on the backend's
- * `srapi_session` cookie in live mode; this shim only signals "the browser
+ * `srapi_session` cookie; this shim only signals "the browser
  * believes it has a session" so the server can route accordingly.
  *
  * Setting / clearing also dispatches a `srapi:user-change` event so

@@ -114,6 +114,17 @@ func (s *Store) FindRelationshipByInvitee(_ context.Context, inviteeUserID int) 
 	return cloneRelationship(s.relationships[id]), nil
 }
 
+func (s *Store) ListRelationships(_ context.Context) ([]contract.InviteRelationship, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]contract.InviteRelationship, 0, len(s.relationships))
+	for _, row := range s.relationships {
+		out = append(out, cloneRelationship(row))
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out, nil
+}
+
 func (s *Store) MarkRelationshipFirstPaid(_ context.Context, id int, firstPaidAt time.Time) (contract.InviteRelationship, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

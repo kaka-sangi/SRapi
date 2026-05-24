@@ -155,6 +155,17 @@ func accountAuditSnapshot(account accountcontract.ProviderAccount) map[string]an
 	}
 }
 
+func proxyAuditSnapshot(proxy accountcontract.ProxyDefinition) map[string]any {
+	return map[string]any{
+		"name":           proxy.Name,
+		"type":           proxy.Type,
+		"status":         proxy.Status,
+		"url_configured": proxy.URLCiphertext != "",
+		"url_version":    proxy.URLVersion,
+		"metadata":       cloneAnyMap(proxy.Metadata),
+	}
+}
+
 func accountGroupAuditSnapshot(group accountcontract.AccountGroup) map[string]any {
 	return map[string]any{
 		"name":           group.Name,

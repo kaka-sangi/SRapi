@@ -162,6 +162,21 @@ func (s *Store) ListOrders(_ context.Context) ([]contract.PaymentOrder, error) {
 	return out, nil
 }
 
+func (s *Store) ListExpiredPendingOrders(_ context.Context, now time.Time) ([]contract.PaymentOrder, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now = now.UTC()
+	out := make([]contract.PaymentOrder, 0)
+	for _, order := range s.orders {
+		if order.Status != contract.OrderStatusPending || order.ExpiresAt == nil || !order.ExpiresAt.Before(now) {
+			continue
+		}
+		out = append(out, cloneOrder(order))
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out, nil
+}
+
 func (s *Store) ListOrdersByUser(_ context.Context, userID int) ([]contract.PaymentOrder, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -173,6 +188,24 @@ func (s *Store) ListOrdersByUser(_ context.Context, userID int) ([]contract.Paym
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
 	return out, nil
+}
+
+func (s *Store) ExpireOrder(_ context.Context, orderID int, now time.Time) (contract.PaymentOrder, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	order, ok := s.orders[orderID]
+	if !ok {
+		return contract.PaymentOrder{}, false, contract.ErrNotFound
+	}
+	now = now.UTC()
+	if order.Status != contract.OrderStatusPending || order.ExpiresAt == nil || !order.ExpiresAt.Before(now) {
+		return cloneOrder(order), false, nil
+	}
+	order.Status = contract.OrderStatusExpired
+	order.ClosedAt = &now
+	order.UpdatedAt = now
+	s.orders[order.ID] = order
+	return cloneOrder(order), true, nil
 }
 
 func (s *Store) CreateAuditLog(_ context.Context, input contract.PaymentAuditLog) (contract.PaymentAuditLog, bool, error) {

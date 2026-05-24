@@ -103,6 +103,9 @@ func (rt *runtimeState) executeAntigravityBootstrapRequest(ctx context.Context, 
 	if !validModelDiscoveryEndpoint(endpoint) {
 		return nil, errModelDiscoveryInvalidInput
 	}
+	if err := rt.materializeProviderProxy(ctx, &account); err != nil {
+		return nil, errModelDiscoveryUpstream
+	}
 	headers := http.Header{
 		"Accept":       {"*/*"},
 		"Content-Type": {"application/json"},

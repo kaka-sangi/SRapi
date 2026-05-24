@@ -290,6 +290,20 @@ func (_c *UsageLogCreate) SetNillableCurrency(v *string) *UsageLogCreate {
 	return _c
 }
 
+// SetChargedAt sets the "charged_at" field.
+func (_c *UsageLogCreate) SetChargedAt(v time.Time) *UsageLogCreate {
+	_c.mutation.SetChargedAt(v)
+	return _c
+}
+
+// SetNillableChargedAt sets the "charged_at" field if the given value is not nil.
+func (_c *UsageLogCreate) SetNillableChargedAt(v *time.Time) *UsageLogCreate {
+	if v != nil {
+		_c.SetChargedAt(*v)
+	}
+	return _c
+}
+
 // SetCompatibilityWarningsJSON sets the "compatibility_warnings_json" field.
 func (_c *UsageLogCreate) SetCompatibilityWarningsJSON(v []string) *UsageLogCreate {
 	_c.mutation.SetCompatibilityWarningsJSON(v)
@@ -563,6 +577,10 @@ func (_c *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Currency(); ok {
 		_spec.SetField(usagelog.FieldCurrency, field.TypeString, value)
 		_node.Currency = value
+	}
+	if value, ok := _c.mutation.ChargedAt(); ok {
+		_spec.SetField(usagelog.FieldChargedAt, field.TypeTime, value)
+		_node.ChargedAt = &value
 	}
 	if value, ok := _c.mutation.CompatibilityWarningsJSON(); ok {
 		_spec.SetField(usagelog.FieldCompatibilityWarningsJSON, field.TypeJSON, value)

@@ -249,6 +249,50 @@ func (s *Service) CancelOrder(ctx context.Context, userID int, orderID int) (con
 	return s.store.UpdateOrder(ctx, order)
 }
 
+func (s *Service) ExpirePendingOrders(ctx context.Context, now time.Time) (contract.ExpireOrdersResult, error) {
+	if now.IsZero() {
+		now = s.clock.Now()
+	}
+	now = now.UTC()
+	orders, err := s.store.ListExpiredPendingOrders(ctx, now)
+	if err != nil {
+		return contract.ExpireOrdersResult{}, err
+	}
+	result := contract.ExpireOrdersResult{Selected: len(orders)}
+	for _, order := range orders {
+		before := order
+		if err := validateTransition(order.Status, contract.OrderStatusExpired); err != nil {
+			return result, err
+		}
+		updated, expired, err := s.store.ExpireOrder(ctx, order.ID, now)
+		if err != nil {
+			return result, err
+		}
+		if !expired {
+			continue
+		}
+		_, _, err = s.store.CreateAuditLog(ctx, contract.PaymentAuditLog{
+			OrderID:            updated.ID,
+			ProviderInstanceID: updated.ProviderInstanceID,
+			EventType:          "order.expired",
+			IdempotencyKey:     "order_expired:" + updated.OrderNo,
+			Payload: map[string]any{
+				"order_id":   updated.ID,
+				"order_no":   updated.OrderNo,
+				"expired_at": now.Format(time.RFC3339Nano),
+			},
+			SignatureValid: true,
+			CreatedAt:      now,
+		})
+		if err != nil {
+			return result, err
+		}
+		s.recordAudit(ctx, nil, "payment_order.expire", "payment_order", strconv.Itoa(updated.ID), paymentOrderAuditSnapshot(before), paymentOrderAuditSnapshot(updated))
+		result.Expired++
+	}
+	return result, nil
+}
+
 func (s *Service) HandleWebhook(ctx context.Context, req contract.WebhookRequest) (contract.WebhookResult, error) {
 	provider := strings.TrimSpace(req.Provider)
 	normalized, err := s.normalizeWebhook(ctx, provider, req)
