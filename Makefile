@@ -9,10 +9,12 @@ OPENAPI_TS ?= npx --yes @hey-api/openapi-ts@0.97.2
 TSC ?= npx --yes -p typescript@5.9.3 tsc
 SECRETLINT ?= npx --yes -p secretlint@13.0.2 -p @secretlint/secretlint-rule-preset-recommend@13.0.2 secretlint
 ENT ?= go run entgo.io/ent/cmd/ent@v0.14.6
+ATLAS ?= npx --yes @ariga/atlas@1.2.0
 EXAMPLES_CHECK ?= node tools/examples-check.mjs
 API_DIR ?= apps/api
+MIGRATION_NAME ?=
 
-.PHONY: help bootstrap-env openapi-lint openapi-bundle openapi-codegen openapi-codegen-check openapi-ts-codegen openapi-ts-codegen-check sdk-ts-typecheck ent-generate ent-generate-check migration-check api-test api-run dev-up dev-down dev-logs smoke-health smoke-gateway smoke-release backup-postgres restore-postgres examples-check secret-scan architecture-check code-quality-check diff-check web-install web-check web-check-e2e web-dev check
+.PHONY: help bootstrap-env openapi-lint openapi-bundle openapi-codegen openapi-codegen-check openapi-ts-codegen openapi-ts-codegen-check sdk-ts-typecheck ent-generate ent-generate-check migration-diff migration-hash migration-check api-test api-run dev-up dev-down dev-logs smoke-health smoke-gateway smoke-release backup-postgres restore-postgres examples-check secret-scan architecture-check code-quality-check diff-check web-install web-check web-check-e2e web-dev check
 
 help:
 	@printf '%s\n' \
@@ -27,6 +29,8 @@ help:
 		'  make sdk-ts-typecheck Typecheck generated TypeScript SDK' \
 		'  make ent-generate    Generate Ent client from schema' \
 		'  make ent-generate-check Check Ent generated code is current' \
+		'  make migration-diff MIGRATION_NAME=... Generate a PostgreSQL migration from Ent schema' \
+		'  make migration-hash  Refresh Atlas migration integrity hash for PostgreSQL up migrations' \
 		'  make migration-check Check versioned PostgreSQL migrations against Ent schema' \
 		'  make api-test        Run Go API tests' \
 		'  make api-run         Run the API locally with go run' \
@@ -93,8 +97,37 @@ ent-generate-check:
 	diff -qr "$$tmp/ent.before" "$(API_DIR)/ent" >/dev/null || (echo 'Ent generated code changed; run make ent-generate' >&2; rm -rf "$$tmp"; exit 1); \
 	rm -rf "$$tmp"
 
+migration-diff:
+	@test -n "$(MIGRATION_NAME)" || (echo 'MIGRATION_NAME is required, for example: make migration-diff MIGRATION_NAME=000002_auth_sessions' >&2; exit 2)
+	@name="$(MIGRATION_NAME)"; \
+	printf '%s' "$$name" | grep -Eq '^[0-9]{6}_[a-z0-9_]+$$' || (echo 'MIGRATION_NAME must look like 000002_auth_sessions' >&2; exit 2); \
+	number="$${name%%_*}"; \
+	test "$$number" != "000001" || (echo '000001 is reserved for the initial schema; use 000002 or later' >&2; exit 2)
+	@set -e; \
+	before="$$(mktemp)"; \
+	after="$$(mktemp)"; \
+	find "$(API_DIR)/migrations/postgres/up" -maxdepth 1 -type f -name '*.sql' -printf '%f\n' | sort > "$$before"; \
+	(cd $(API_DIR) && $(ATLAS) migrate diff "$(MIGRATION_NAME)" --env local); \
+	find "$(API_DIR)/migrations/postgres/up" -maxdepth 1 -type f -name '*.sql' -printf '%f\n' | sort > "$$after"; \
+	new="$$(comm -13 "$$before" "$$after" | sed '/^$$/d')"; \
+	rm -f "$$before" "$$after"; \
+	count="$$(printf '%s\n' "$$new" | sed '/^$$/d' | wc -l | tr -d ' ')"; \
+	test "$$count" -le 1 || (echo "Atlas generated multiple migration files; review apps/api/migrations/postgres/up manually" >&2; exit 1); \
+	if test "$$count" -eq 0; then \
+		printf '%s\n' 'No migration generated; Ent schema already matches the up migration directory.'; \
+		exit 0; \
+	fi; \
+	if test "$$new" != "$(MIGRATION_NAME).sql"; then \
+		mv "$(API_DIR)/migrations/postgres/up/$$new" "$(API_DIR)/migrations/postgres/up/$(MIGRATION_NAME).sql"; \
+	fi; \
+	$(MAKE) migration-hash; \
+	printf '%s\n' 'Review the generated up migration and add the matching apps/api/migrations/postgres/down/$(MIGRATION_NAME).sql before commit.'
+
+migration-hash:
+	cd $(API_DIR) && $(ATLAS) migrate hash --dir file://migrations/postgres/up
+
 migration-check:
-	cd $(API_DIR) && go test ./internal/platform/db -run 'Test(EntSchemaAppliesToEmptyDatabase|PostgresInitialMigrationMatchesEntSchema|PostgresInitialDownMigrationCoversAllTables)'
+	cd $(API_DIR) && go test ./internal/platform/db -run 'Test(EntSchemaAppliesToEmptyDatabase|PostgresInitialMigrationMatchesEntSchema|PostgresInitialDownMigrationCoversAllTables|PostgresIncrementalMigrationsArePairedAndContiguous)'
 
 api-test:
 	cd $(API_DIR) && go test ./...

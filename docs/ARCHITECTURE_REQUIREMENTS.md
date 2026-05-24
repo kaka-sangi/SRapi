@@ -40,8 +40,9 @@
 - Scheduler Lease 和 realtime slot lifecycle 属于可重建运行时状态；release 模式必须使用 Redis-backed store，本地 Redis 不可用时才允许降级为内存 lease/slot store。
 - 本地模式允许启动期应用 Ent schema 以支持一键开发；release 模式必须依赖已应用的正式迁移。
 - `apps/api/migrations` 必须保留为版本化迁移目录。
-- PostgreSQL release 迁移必须和 Ent schema 保持一致；修改 `apps/api/ent/schema` 后必须同步更新 `apps/api/migrations/postgres/up`。
+- PostgreSQL release 迁移必须和 Ent schema 保持一致；修改 `apps/api/ent/schema` 后必须先运行 `make ent-generate`，再运行 `make migration-diff MIGRATION_NAME=00000N_subject` 生成下一条 up migration。
 - 每个 release 迁移必须提供 down migration；初始迁移的 down migration 必须覆盖当前 Ent table list。
+- `apps/api/atlas.hcl` 是 Ent -> Atlas -> PostgreSQL migration diff 的项目配置；`make migration-diff` 和 `make migration-hash` 必须保留显式 pin 的 Atlas CLI。
 
 ### 2.4 启动与配置
 
@@ -106,6 +107,7 @@ make migration-check
 - Ent schema 可应用到空库。
 - `apps/api/migrations/postgres/up/000001_initial_schema.sql` 与 Ent 生成的 PostgreSQL DDL 无漂移。
 - `apps/api/migrations/postgres/down/000001_initial_schema.sql` 覆盖当前 Ent table list。
+- `apps/api/migrations/postgres/up` 和 `apps/api/migrations/postgres/down` 文件成对，编号连续，新增迁移从 `000002_*` 开始。
 
 ### 3.3 全量门禁
 
@@ -163,7 +165,7 @@ make smoke-gateway
 | app worker 生命周期 | `apps/api/internal/app/app_test.go`, `apps/api/internal/workers/outbox/worker_test.go` |
 | platform db / redis | `apps/api/internal/platform/db`, `apps/api/internal/platform/redis` |
 | 空库迁移可应用 | `make migration-check`, `apps/api/internal/platform/db/migration_test.go` |
-| release 版本化迁移无漂移 | `make migration-check`, `apps/api/internal/platform/db/migration_test.go`, `apps/api/migrations/postgres` |
+| release 版本化迁移无漂移 | `make migration-check`, `apps/api/internal/platform/db/migration_test.go`, `apps/api/atlas.hcl`, `apps/api/migrations/postgres` |
 | Ent-backed repository | `apps/api/internal/persistence/entstore/*`, `apps/api/internal/persistence/entstore/runtime_stores_test.go` |
 | Domain Events Outbox / Inbox 分发 / 重试 | `apps/api/internal/modules/events/service/service_test.go`, `apps/api/internal/workers/outbox/worker_test.go`, `apps/api/internal/persistence/entstore/runtime_stores_test.go` |
 | Redis-backed Scheduler Lease | `apps/api/internal/persistence/redisstore/scheduler`, `apps/api/internal/app/app_test.go` |

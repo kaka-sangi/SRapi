@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -126,6 +127,20 @@ func TestPostgresInitialDownMigrationCoversAllTables(t *testing.T) {
 	}
 }
 
+func TestPostgresIncrementalMigrationsArePairedAndContiguous(t *testing.T) {
+	up := migrationFiles(t, "../../../migrations/postgres/up")
+	down := migrationFiles(t, "../../../migrations/postgres/down")
+	if !reflect.DeepEqual(up.names, down.names) {
+		t.Fatalf("postgres up/down migrations must be paired by filename:\nup:   %v\ndown: %v", up.names, down.names)
+	}
+	for i, number := range up.numbers {
+		want := i + 1
+		if number != want {
+			t.Fatalf("postgres migration numbering must be contiguous from 000001: got %06d at position %d, want %06d", number, i, want)
+		}
+	}
+}
+
 func postgresInitialDDL(ctx context.Context) (string, error) {
 	ddl, err := entschema.DDL(ctx, entschema.DDLArgs{
 		Dialect: dialect.Postgres,
@@ -136,6 +151,60 @@ func postgresInitialDDL(ctx context.Context) (string, error) {
 		return "", err
 	}
 	return normalizeSQL(ddl), nil
+}
+
+type migrationFileList struct {
+	names   []string
+	numbers []int
+}
+
+func migrationFiles(t *testing.T, dir string) migrationFileList {
+	t.Helper()
+	entries, err := os.ReadDir(filepath.Clean(dir))
+	if err != nil {
+		t.Fatalf("read migration dir %s: %v", dir, err)
+	}
+	var out migrationFileList
+	seen := map[int]string{}
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".sql" {
+			continue
+		}
+		number, ok := migrationNumber(entry.Name())
+		if !ok {
+			t.Fatalf("migration %s must be named 000001_subject.sql", entry.Name())
+		}
+		if existing, ok := seen[number]; ok {
+			t.Fatalf("migration number %06d is used by both %s and %s", number, existing, entry.Name())
+		}
+		seen[number] = entry.Name()
+		out.names = append(out.names, entry.Name())
+		out.numbers = append(out.numbers, number)
+	}
+	sort.Strings(out.names)
+	sort.Ints(out.numbers)
+	if len(out.names) == 0 {
+		t.Fatalf("no SQL migrations found in %s", dir)
+	}
+	return out
+}
+
+func migrationNumber(name string) (int, bool) {
+	prefix, subject, ok := strings.Cut(strings.TrimSuffix(name, ".sql"), "_")
+	if !ok || len(prefix) != 6 || subject == "" {
+		return 0, false
+	}
+	number, err := strconv.Atoi(prefix)
+	if err != nil || number <= 0 {
+		return 0, false
+	}
+	for _, r := range subject {
+		if r == '_' || r >= 'a' && r <= 'z' || r >= '0' && r <= '9' {
+			continue
+		}
+		return 0, false
+	}
+	return number, true
 }
 
 func normalizeSQL(value string) string {

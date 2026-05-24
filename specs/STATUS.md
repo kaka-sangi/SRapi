@@ -70,14 +70,15 @@ last_completed:
 - WP-610: Claude Code refresh-token-only import and OAuth lifecycle now lets admin create/import/update accept a Claude Code OAuth `refresh_token` without an initial `access_token`, exchange it through Reverse Proxy Runtime using the Claude Code JSON OAuth token shape, persist encrypted access-token state, and immediately dispatch Gateway `/v1/messages` with selected-account OAuth identity and no credential leakage in control-plane responses.
 - WP-620: Antigravity refresh-token-only import and OAuth lifecycle now lets admin create/import/update accept an Antigravity OAuth `refresh_token` without an initial `access_token`, exchange it through Reverse Proxy Runtime using the Google OAuth form token shape plus configured client secret, persist encrypted access-token state, and immediately dispatch Gateway text requests with selected-account OAuth identity and no credential leakage in control-plane responses.
 - WP-700: Admin Control Plane v1 now defines and implements dashboard snapshot, ops monitoring, typed settings, announcements, redeem codes, promo codes, and risk-control APIs through OpenAPI-first contracts, a module-owned admin_control service/store, safe audit logs for writes, decimal-string financial fields, generated Go/TypeScript SDKs, and HTTP regressions for CSRF/audit coverage.
+- WP-710: Incremental migration workflow now adds `apps/api/atlas.hcl`, pinned Atlas `migration-diff` / `migration-hash` Makefile targets, `atlas.sum`, up/down pairing plus contiguous numbering checks in `make migration-check`, and updated migration architecture docs so future Ent schema changes generate `000002+` migrations instead of expanding the initial schema.
 
 current:
 
-- package: WP-500+
+- package: WP-710+
 - status: pending
-- objective: continue remaining ecosystem and advanced endpoint packages after Admin Control Plane v1.
+- objective: continue P1 commercial hardening after incremental migration workflow foundation.
 
-next_recommended: WP-500+
+next_recommended: A1.1 AuthSession persistence or A2.1 Redis rate limiting
 
 last_gates:
 

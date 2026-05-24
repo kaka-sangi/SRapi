@@ -92,6 +92,48 @@ func TestMakeCheckRunsMandatoryQualityGates(t *testing.T) {
 	}
 }
 
+func TestMigrationWorkflowTargetsArePinned(t *testing.T) {
+	root := repoRoot(t)
+	raw, err := os.ReadFile(filepath.Join(root, "Makefile"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := string(raw)
+	required := []string{
+		"ATLAS ?= npx --yes @ariga/atlas@1.2.0",
+		"migration-diff:",
+		"migration-hash:",
+		"grep -Eq '^[0-9]{6}_[a-z0-9_]+$$'",
+		"$(ATLAS) migrate diff \"$(MIGRATION_NAME)\" --env local",
+		"mv \"$(API_DIR)/migrations/postgres/up/$$new\" \"$(API_DIR)/migrations/postgres/up/$(MIGRATION_NAME).sql\"",
+		"$(ATLAS) migrate hash --dir file://migrations/postgres/up",
+	}
+	var missing []string
+	for _, needle := range required {
+		if !strings.Contains(content, needle) {
+			missing = append(missing, needle)
+		}
+	}
+	if len(missing) > 0 {
+		t.Fatalf("migration workflow Makefile entries missing or unpinned:\n%s", strings.Join(missing, "\n"))
+	}
+
+	atlas, err := os.ReadFile(filepath.Join(root, "apps", "api", "atlas.hcl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	atlasContent := string(atlas)
+	for _, needle := range []string{
+		`src = "ent://ent/schema"`,
+		`dev = "docker://postgres/16/dev?search_path=public"`,
+		`dir = "file://migrations/postgres/up"`,
+	} {
+		if !strings.Contains(atlasContent, needle) {
+			t.Fatalf("apps/api/atlas.hcl missing %q", needle)
+		}
+	}
+}
+
 func TestSecretScanCoversGeneratedContractsAndLockfiles(t *testing.T) {
 	root := repoRoot(t)
 	raw, err := os.ReadFile(filepath.Join(root, ".secretlintignore"))
@@ -380,7 +422,7 @@ func isTextHygieneFile(path string) bool {
 		return true
 	}
 	switch filepath.Ext(path) {
-	case ".go", ".md", ".yaml", ".yml", ".json", ".mjs", ".js", ".ts", ".sh", ".ps1", ".html":
+	case ".go", ".hcl", ".md", ".yaml", ".yml", ".json", ".mjs", ".js", ".ts", ".sh", ".ps1", ".html":
 		return true
 	default:
 		return false
