@@ -2,8 +2,11 @@ package contract
 
 import (
 	"context"
+	"errors"
 	"time"
 )
+
+var ErrNotFound = errors.New("subscription resource not found")
 
 type PlanStatus string
 
@@ -166,6 +169,7 @@ type Store interface {
 	FindPlanByID(ctx context.Context, id int) (SubscriptionPlan, error)
 	ListPlans(ctx context.Context) ([]SubscriptionPlan, error)
 	CreateUserSubscription(ctx context.Context, input CreateStoredSubscription) (UserSubscription, error)
+	FindUserSubscriptionBySource(ctx context.Context, sourceType string, sourceID string) (UserSubscription, error)
 	ListUserSubscriptions(ctx context.Context) ([]UserSubscription, error)
 	ListUserSubscriptionsByUser(ctx context.Context, userID int) ([]UserSubscription, error)
 	ListActiveUserSubscriptions(ctx context.Context, userID int, at time.Time) ([]UserSubscription, error)

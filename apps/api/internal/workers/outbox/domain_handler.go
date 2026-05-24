@@ -12,10 +12,12 @@ import (
 	auditservice "github.com/srapi/srapi/apps/api/internal/modules/audit/service"
 	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	eventsservice "github.com/srapi/srapi/apps/api/internal/modules/events/service"
+	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
+	subscriptionservice "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/service"
 )
 
 func defaultEventHandler(events *eventsservice.Service, cfg Config) (eventsservice.OutboxHandler, error) {
-	if cfg.AffiliateStore == nil {
+	if cfg.AffiliateStore == nil && cfg.SubscriptionStore == nil {
 		return eventsservice.OutboxHandlerFunc(func(context.Context, eventscontract.OutboxEvent) error {
 			return nil
 		}), nil
@@ -28,35 +30,71 @@ func defaultEventHandler(events *eventsservice.Service, cfg Config) (eventsservi
 			return nil, err
 		}
 	}
-	deps := affiliateservice.Dependencies{Events: events}
-	if audit != nil {
-		deps.Audit = audit
+	var affiliate *affiliateservice.Service
+	if cfg.AffiliateStore != nil {
+		deps := affiliateservice.Dependencies{Events: events}
+		if audit != nil {
+			deps.Audit = audit
+		}
+		var err error
+		affiliate, err = affiliateservice.New(cfg.AffiliateStore, deps, nil)
+		if err != nil {
+			return nil, err
+		}
 	}
-	affiliate, err := affiliateservice.New(cfg.AffiliateStore, deps, nil)
-	if err != nil {
-		return nil, err
+	var subscriptions *subscriptionservice.Service
+	if cfg.SubscriptionStore != nil {
+		var err error
+		subscriptions, err = subscriptionservice.New(cfg.SubscriptionStore, nil)
+		if err != nil {
+			return nil, err
+		}
 	}
-	return domainEventHandler{affiliate: affiliate}, nil
+	return domainEventHandler{affiliate: affiliate, subscriptions: subscriptions}, nil
 }
 
 type domainEventHandler struct {
-	affiliate *affiliateservice.Service
+	affiliate     *affiliateservice.Service
+	subscriptions *subscriptionservice.Service
 }
 
 func (h domainEventHandler) HandleOutboxEvent(ctx context.Context, event eventscontract.OutboxEvent) error {
-	if h.affiliate == nil {
-		return nil
-	}
 	switch event.EventType {
 	case "PaymentOrderPaid":
+		if err := h.activateSubscription(ctx, event); err != nil {
+			return err
+		}
+		if h.affiliate == nil {
+			return nil
+		}
 		_, err := h.affiliate.AccrueRebate(ctx, affiliateAccrualFromEvent(event))
 		return err
 	case "PaymentOrderRefunded":
+		if h.affiliate == nil {
+			return nil
+		}
 		_, err := h.affiliate.CompensateRefund(ctx, affiliateCompensationFromEvent(event))
 		return err
 	default:
 		return nil
 	}
+}
+
+func (h domainEventHandler) activateSubscription(ctx context.Context, event eventscontract.OutboxEvent) error {
+	if h.subscriptions == nil || payloadString(event.Payload, "product_type") != "subscription_plan" {
+		return nil
+	}
+	planID := payloadInt(event.Payload, "product_id")
+	if planID <= 0 {
+		return subscriptionservice.ErrInvalidInput
+	}
+	_, err := h.subscriptions.CreateUserSubscription(ctx, subscriptioncontract.CreateSubscriptionRequest{
+		UserID:     payloadInt(event.Payload, "user_id"),
+		PlanID:     planID,
+		SourceType: "payment_order",
+		SourceID:   payloadString(event.Payload, "order_no"),
+	})
+	return err
 }
 
 func affiliateAccrualFromEvent(event eventscontract.OutboxEvent) affiliatecontract.AccrueRebateRequest {

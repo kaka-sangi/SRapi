@@ -81,9 +81,26 @@ func (s *Store) CreateUserSubscription(ctx context.Context, input contract.Creat
 		SetSourceID(input.SourceID).
 		Save(ctx)
 	if err != nil {
+		if ent.IsNotFound(err) {
+			return contract.UserSubscription{}, contract.ErrNotFound
+		}
 		return contract.UserSubscription{}, err
 	}
 	return toSubscription(created), nil
+}
+
+func (s *Store) FindUserSubscriptionBySource(ctx context.Context, sourceType string, sourceID string) (contract.UserSubscription, error) {
+	found, err := s.client.UserSubscription.Query().
+		Where(
+			entusersubscription.SourceTypeEQ(sourceType),
+			entusersubscription.SourceIDEQ(sourceID),
+		).
+		Order(entusersubscription.ByID()).
+		First(ctx)
+	if err != nil {
+		return contract.UserSubscription{}, err
+	}
+	return toSubscription(found), nil
 }
 
 func (s *Store) ListUserSubscriptions(ctx context.Context) ([]contract.UserSubscription, error) {

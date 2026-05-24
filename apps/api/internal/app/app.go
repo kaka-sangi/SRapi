@@ -253,8 +253,9 @@ func domainEventsWorker(stores *entstore.Stores, logger *slog.Logger) (*outboxwo
 		return nil, nil
 	}
 	return outboxworker.New(stores.Events, logger, outboxworker.Config{
-		AffiliateStore: stores.Affiliate,
-		AuditStore:     stores.Audit,
+		AffiliateStore:    stores.Affiliate,
+		AuditStore:        stores.Audit,
+		SubscriptionStore: stores.Subscriptions,
 	})
 }
 

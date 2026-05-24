@@ -11,6 +11,7 @@ import (
 	auditcontract "github.com/srapi/srapi/apps/api/internal/modules/audit/contract"
 	"github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	"github.com/srapi/srapi/apps/api/internal/modules/events/service"
+	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 )
 
 const (
@@ -22,14 +23,15 @@ const (
 )
 
 type Config struct {
-	Interval       time.Duration
-	Limit          int
-	RetryBackoff   time.Duration
-	ConsumerName   string
-	EventHandler   service.OutboxHandler
-	DispatchClock  service.Clock
-	AffiliateStore affiliatecontract.Store
-	AuditStore     auditcontract.Store
+	Interval          time.Duration
+	Limit             int
+	RetryBackoff      time.Duration
+	ConsumerName      string
+	EventHandler      service.OutboxHandler
+	DispatchClock     service.Clock
+	AffiliateStore    affiliatecontract.Store
+	AuditStore        auditcontract.Store
+	SubscriptionStore subscriptioncontract.Store
 }
 
 type Worker struct {

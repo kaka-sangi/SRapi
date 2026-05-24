@@ -14,6 +14,9 @@ import (
 	"github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	eventsservice "github.com/srapi/srapi/apps/api/internal/modules/events/service"
 	eventsmemory "github.com/srapi/srapi/apps/api/internal/modules/events/store/memory"
+	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
+	subscriptionservice "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/service"
+	subscriptionmemory "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/store/memory"
 	"github.com/srapi/srapi/apps/api/internal/workers/outbox"
 )
 
@@ -245,6 +248,87 @@ func TestWorkerDispatchesPaymentEventsToAffiliate(t *testing.T) {
 	}
 	if len(outboxRows) != 2 || outboxRows[0].EventType != "PaymentOrderPaid" || outboxRows[0].Status != contract.OutboxStatusPublished || outboxRows[1].EventType != "AffiliateRebateAccrued" {
 		t.Fatalf("expected payment published and affiliate accrued pending, got %+v", outboxRows)
+	}
+}
+
+func TestWorkerDispatchesPaymentPaidToSubscription(t *testing.T) {
+	store := eventsmemory.New()
+	clock := &fixedClock{now: time.Date(2026, 5, 22, 12, 0, 0, 0, time.UTC)}
+	events, err := eventsservice.New(store, clock)
+	if err != nil {
+		t.Fatalf("new events service: %v", err)
+	}
+	subscriptionStore := subscriptionmemory.New()
+	subscriptions, err := subscriptionservice.New(subscriptionStore, clock)
+	if err != nil {
+		t.Fatalf("new subscription service: %v", err)
+	}
+	plan, err := subscriptions.CreatePlan(t.Context(), subscriptioncontract.CreatePlanRequest{
+		Name:         "commercial-pro",
+		Price:        "19.99",
+		Currency:     "USD",
+		ValidityDays: 30,
+		Entitlements: map[string]any{"allowed_models": []any{"commercial-model"}},
+	})
+	if err != nil {
+		t.Fatalf("create plan: %v", err)
+	}
+	if _, err := events.Enqueue(t.Context(), contract.EnqueueRequest{
+		EventType:      "PaymentOrderPaid",
+		ProducerModule: "payments",
+		AggregateType:  "payment_order",
+		AggregateID:    "pay_sub_1",
+		IdempotencyKey: "payment_paid:pay_sub_1",
+		Payload: map[string]any{
+			"order_id":     1,
+			"order_no":     "pay_sub_1",
+			"user_id":      20,
+			"amount":       "19.99000000",
+			"currency":     "USD",
+			"product_type": "subscription_plan",
+			"product_id":   plan.ID,
+			"paid_at":      clock.now.Format(time.RFC3339Nano),
+		},
+	}); err != nil {
+		t.Fatalf("enqueue payment event: %v", err)
+	}
+
+	worker, err := outbox.New(store, discardLogger(), outbox.Config{
+		ConsumerName:      "subscription-consumer",
+		DispatchClock:     clock,
+		SubscriptionStore: subscriptionStore,
+	})
+	if err != nil {
+		t.Fatalf("new worker: %v", err)
+	}
+	result, err := worker.RunOnce(t.Context())
+	if err != nil {
+		t.Fatalf("run worker once: %v", err)
+	}
+	if result.Selected != 1 || result.Published != 1 || result.Failed != 0 {
+		t.Fatalf("unexpected dispatch result: %+v", result)
+	}
+	userSubscriptions, err := subscriptions.ListUserSubscriptionsByUser(t.Context(), 20)
+	if err != nil {
+		t.Fatalf("list subscriptions: %v", err)
+	}
+	if len(userSubscriptions) != 1 || userSubscriptions[0].PlanID != plan.ID || userSubscriptions[0].SourceID != "pay_sub_1" {
+		t.Fatalf("expected subscription activated from payment event, got %+v", userSubscriptions)
+	}
+
+	duplicate, err := worker.RunOnce(t.Context())
+	if err != nil {
+		t.Fatalf("run worker once again: %v", err)
+	}
+	if duplicate.Selected != 0 {
+		t.Fatalf("published outbox event should not be redispatched, got %+v", duplicate)
+	}
+	userSubscriptions, err = subscriptions.ListUserSubscriptionsByUser(t.Context(), 20)
+	if err != nil {
+		t.Fatalf("list subscriptions after duplicate run: %v", err)
+	}
+	if len(userSubscriptions) != 1 {
+		t.Fatalf("expected subscription activation to stay idempotent, got %+v", userSubscriptions)
 	}
 }
 

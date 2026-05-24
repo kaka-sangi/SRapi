@@ -212,6 +212,51 @@ func TestValidatePricingRuleDoesNotPersist(t *testing.T) {
 	}
 }
 
+func TestCreateUserSubscriptionIsIdempotentBySource(t *testing.T) {
+	clock := fixedClock{now: time.Date(2026, 5, 22, 12, 0, 0, 0, time.UTC)}
+	svc, err := service.New(subscriptionmemory.New(), clock)
+	if err != nil {
+		t.Fatalf("new subscription service: %v", err)
+	}
+	plan, err := svc.CreatePlan(t.Context(), contract.CreatePlanRequest{
+		Name:         "pro",
+		Price:        "9.99",
+		Currency:     "USD",
+		ValidityDays: 30,
+	})
+	if err != nil {
+		t.Fatalf("create plan: %v", err)
+	}
+	first, err := svc.CreateUserSubscription(t.Context(), contract.CreateSubscriptionRequest{
+		UserID:     1,
+		PlanID:     plan.ID,
+		SourceType: "payment_order",
+		SourceID:   "pay_1",
+	})
+	if err != nil {
+		t.Fatalf("create subscription: %v", err)
+	}
+	duplicate, err := svc.CreateUserSubscription(t.Context(), contract.CreateSubscriptionRequest{
+		UserID:     1,
+		PlanID:     plan.ID,
+		SourceType: "payment_order",
+		SourceID:   "pay_1",
+	})
+	if err != nil {
+		t.Fatalf("create duplicate subscription: %v", err)
+	}
+	if duplicate.ID != first.ID {
+		t.Fatalf("expected duplicate source to return existing subscription, first=%+v duplicate=%+v", first, duplicate)
+	}
+	subscriptions, err := svc.ListUserSubscriptionsByUser(t.Context(), 1)
+	if err != nil {
+		t.Fatalf("list user subscriptions: %v", err)
+	}
+	if len(subscriptions) != 1 {
+		t.Fatalf("expected one subscription after duplicate source, got %+v", subscriptions)
+	}
+}
+
 type fixedClock struct {
 	now time.Time
 }

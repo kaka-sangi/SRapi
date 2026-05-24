@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -85,6 +86,17 @@ func (s *Service) CreateUserSubscription(ctx context.Context, req contract.Creat
 	if req.UserID <= 0 || req.PlanID <= 0 {
 		return contract.UserSubscription{}, ErrInvalidInput
 	}
+	sourceType := strings.TrimSpace(req.SourceType)
+	sourceID := strings.TrimSpace(req.SourceID)
+	if sourceType != "" && sourceID != "" {
+		existing, err := s.store.FindUserSubscriptionBySource(ctx, sourceType, sourceID)
+		if err == nil {
+			return existing, nil
+		}
+		if !errors.Is(err, contract.ErrNotFound) {
+			return contract.UserSubscription{}, err
+		}
+	}
 	plan, err := s.store.FindPlanByID(ctx, req.PlanID)
 	if err != nil {
 		return contract.UserSubscription{}, err
@@ -114,8 +126,8 @@ func (s *Service) CreateUserSubscription(ctx context.Context, req contract.Creat
 		StartsAt:             startsAt,
 		ExpiresAt:            expiresAt,
 		EntitlementsSnapshot: cloneMap(plan.Entitlements),
-		SourceType:           strings.TrimSpace(req.SourceType),
-		SourceID:             strings.TrimSpace(req.SourceID),
+		SourceType:           sourceType,
+		SourceID:             sourceID,
 	})
 }
 

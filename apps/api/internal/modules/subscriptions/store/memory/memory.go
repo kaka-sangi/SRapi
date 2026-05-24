@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -104,6 +105,19 @@ func (s *Store) CreateUserSubscription(_ context.Context, input contract.CreateS
 	s.subscriptions[subscription.ID] = subscription
 	s.nextSubID++
 	return cloneSubscription(subscription), nil
+}
+
+func (s *Store) FindUserSubscriptionBySource(_ context.Context, sourceType string, sourceID string) (contract.UserSubscription, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	sourceType = strings.TrimSpace(sourceType)
+	sourceID = strings.TrimSpace(sourceID)
+	for _, subscription := range s.subscriptions {
+		if subscription.SourceType == sourceType && subscription.SourceID == sourceID {
+			return cloneSubscription(subscription), nil
+		}
+	}
+	return contract.UserSubscription{}, contract.ErrNotFound
 }
 
 func (s *Store) ListUserSubscriptions(_ context.Context) ([]contract.UserSubscription, error) {
