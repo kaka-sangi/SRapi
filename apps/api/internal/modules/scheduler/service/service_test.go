@@ -133,6 +133,43 @@ func TestScheduleReturnsRankedAvailableCandidates(t *testing.T) {
 	assertRejectReason(t, result.Decision.RejectReasons, 2, "circuit_open")
 }
 
+func TestParetoFrontierExcludesDominatedCandidateBeforeWeightedSelection(t *testing.T) {
+	svc := newService(t)
+	req := baseRequest()
+	req.Candidates = []contract.Candidate{
+		candidate(1, withHealth(0.70), withQuotaRemaining(0.50), withLatencyP95MS(2000), withRelativeCost("0.1"), withQualityScore("0.90"), withCapabilities(capabilitiescontract.KeyStreaming)),
+		candidate(2, withHealth(0.70), withQuotaRemaining(0.50), withLatencyP95MS(1000), withRelativeCost("0.9"), withQualityScore("0.60"), withCapabilities(capabilitiescontract.KeyStreaming)),
+		candidate(3, withHealth(1.00), withQuotaRemaining(1.00), withLatencyP95MS(2000), withRelativeCost("0.2"), withQualityScore("0.40"), withCapabilities(capabilitiescontract.KeyStreaming)),
+	}
+
+	result, err := svc.Schedule(context.Background(), req)
+	if err != nil {
+		t.Fatalf("schedule: %v", err)
+	}
+	if result.Candidate.Account.ID != 1 {
+		t.Fatalf("expected Pareto frontier candidate 1 selected, got %d", result.Candidate.Account.ID)
+	}
+	if len(result.Candidates) != 3 {
+		t.Fatalf("expected all available candidates returned by rank, got %+v", result.Candidates)
+	}
+	gotRank := []int{result.Candidates[0].Account.ID, result.Candidates[1].Account.ID, result.Candidates[2].Account.ID}
+	wantRank := []int{1, 2, 3}
+	for idx := range wantRank {
+		if gotRank[idx] != wantRank[idx] {
+			t.Fatalf("expected Pareto frontier candidates before dominated candidate %v, got %v", wantRank, gotRank)
+		}
+	}
+	frontierIDs := paretoFrontierIDs(t, result.Decision.Scores)
+	if len(frontierIDs) != 2 || frontierIDs[0] != 1 || frontierIDs[1] != 2 {
+		t.Fatalf("expected accounts 1 and 2 in Pareto frontier, got %v", frontierIDs)
+	}
+	account1 := decisionScore(t, result.Decision.Scores, 1)
+	account3 := decisionScore(t, result.Decision.Scores, 3)
+	if account3["final_score"].(float64) <= account1["final_score"].(float64) {
+		t.Fatalf("test setup expected dominated account 3 to have higher weighted score than selected account 1: a1=%+v a3=%+v", account1, account3)
+	}
+}
+
 func TestFreeTierRejectsProtectedLowQuotaAccount(t *testing.T) {
 	svc := newService(t)
 	req := baseRequest()
@@ -971,6 +1008,12 @@ func withCacheScore(value string) candidateOption {
 	}
 }
 
+func withQualityScore(value string) candidateOption {
+	return func(candidate *contract.Candidate) {
+		candidate.Mapping.PricingOverride["quality_score"] = value
+	}
+}
+
 func assertRejectReason(t *testing.T, reasons map[string]any, accountID int, expected string) {
 	t.Helper()
 	got, ok := reasons["account_"+strconv.Itoa(accountID)]
@@ -993,4 +1036,32 @@ func decisionScore(t *testing.T, scores map[string]any, accountID int) map[strin
 		t.Fatalf("expected score map for account %d, got %T %+v", accountID, raw, raw)
 	}
 	return score
+}
+
+func paretoFrontierIDs(t *testing.T, scores map[string]any) []int {
+	t.Helper()
+	rawPareto, ok := scores["pareto"]
+	if !ok {
+		t.Fatalf("missing Pareto evidence in %+v", scores)
+	}
+	pareto, ok := rawPareto.(map[string]any)
+	if !ok {
+		t.Fatalf("expected Pareto evidence map, got %T %+v", rawPareto, rawPareto)
+	}
+	rawIDs, ok := pareto["frontier_account_ids"].([]any)
+	if !ok {
+		t.Fatalf("expected Pareto frontier account IDs, got %+v", pareto)
+	}
+	out := make([]int, 0, len(rawIDs))
+	for _, rawID := range rawIDs {
+		switch typed := rawID.(type) {
+		case float64:
+			out = append(out, int(typed))
+		case int:
+			out = append(out, typed)
+		default:
+			t.Fatalf("unexpected Pareto frontier account ID type %T in %+v", rawID, rawIDs)
+		}
+	}
+	return out
 }

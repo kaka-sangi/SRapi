@@ -256,18 +256,19 @@ func (s *Service) Schedule(ctx context.Context, req contract.ScheduleRequest) (c
 		return contract.ScheduleResult{Decision: decision}, ErrNoAvailableAccount
 	}
 
-	sort.SliceStable(scores, func(i, j int) bool {
-		if scores[i].Score.Final == scores[j].Score.Final {
-			return scores[i].Candidate.Account.ID < scores[j].Candidate.Account.ID
-		}
-		return scores[i].Score.Final > scores[j].Score.Final
-	})
-	candidatesByRank := rankedCandidates(scores)
-	selected := scores[0].Candidate
 	scorePayload := map[string]any{}
 	for _, score := range scores {
 		scorePayload[accountKey(score.Candidate.Account.ID)] = score.Score
 	}
+	frontier := paretoFrontier(scores)
+	sortCandidateScores(frontier)
+	sortCandidateScores(scores)
+	scorePayload["pareto"] = map[string]any{
+		"objective":            "cost_latency_quality",
+		"frontier_account_ids": paretoFrontierAccountIDs(frontier),
+	}
+	selected := frontier[0].Candidate
+	candidatesByRank := rankedCandidates(frontier, scores)
 	lease, err := s.acquireLease(ctx, req, 1, selected)
 	if err != nil {
 		rejectReasons[accountKey(selected.Account.ID)] = "concurrency_full"
@@ -507,9 +508,26 @@ type candidateScore struct {
 	Score     scoreBreakdown
 }
 
-func rankedCandidates(scores []candidateScore) []contract.Candidate {
+func sortCandidateScores(scores []candidateScore) {
+	sort.SliceStable(scores, func(i, j int) bool {
+		if scores[i].Score.Final == scores[j].Score.Final {
+			return scores[i].Candidate.Account.ID < scores[j].Candidate.Account.ID
+		}
+		return scores[i].Score.Final > scores[j].Score.Final
+	})
+}
+
+func rankedCandidates(frontier []candidateScore, scores []candidateScore) []contract.Candidate {
 	out := make([]contract.Candidate, 0, len(scores))
+	seen := map[int]bool{}
+	for _, score := range frontier {
+		out = append(out, score.Candidate)
+		seen[score.Candidate.Account.ID] = true
+	}
 	for _, score := range scores {
+		if seen[score.Candidate.Account.ID] {
+			continue
+		}
 		out = append(out, score.Candidate)
 	}
 	return out
@@ -521,6 +539,7 @@ type scoreBreakdown struct {
 	Health            float64 `json:"health_score"`
 	Quota             float64 `json:"quota_score"`
 	Latency           float64 `json:"latency_score"`
+	Quality           float64 `json:"quality_score"`
 	Sticky            float64 `json:"sticky_score"`
 	Cache             float64 `json:"cache_score"`
 	Cost              float64 `json:"cost_score"`
@@ -534,19 +553,21 @@ func scoreCandidate(candidate contract.Candidate, req contract.ScheduleRequest, 
 	health := healthScore(candidate)
 	quota := quotaScore(candidate)
 	latency := latencyScore(candidate)
+	quality := qualityScore(candidate)
 	sticky := stickyScore(candidate, req)
 	cache := cacheScore(candidate, req, health)
 	cost := costScore(candidate)
 	fairness := normalizeWeight(candidate.Account.Weight)
 	riskPenalty := riskPenalty(candidate)
 	saturationPenalty := saturationPenalty(candidate)
-	final := health*weights["health"] + quota*weights["quota"] + latency*weights["latency"] + sticky*weights["sticky"] + cache*weights["cache"] + cost*weights["cost"] + fairness*weights["fairness"] - riskPenalty - saturationPenalty
+	final := health*weights["health"] + quota*weights["quota"] + latency*weights["latency"] + sticky*weights["sticky"] + cache*weights["cache"] + cost*weights["cost"] + fairness*weights["fairness"] + quality*weights["priority"] - riskPenalty - saturationPenalty
 	return scoreBreakdown{
 		AccountID:         candidate.Account.ID,
 		Final:             final,
 		Health:            health,
 		Quota:             quota,
 		Latency:           latency,
+		Quality:           quality,
 		Sticky:            sticky,
 		Cache:             cache,
 		Cost:              cost,
@@ -706,6 +727,42 @@ func latencyScore(candidate contract.Candidate) float64 {
 		return 0.60
 	}
 	return clamp01(1 - float64(*candidate.RuntimeState.LatencyP95MS)/10000)
+}
+
+func qualityScore(candidate contract.Candidate) float64 {
+	valueMaps := []map[string]any{candidate.Mapping.PricingOverride, candidate.Account.Metadata, candidate.Provider.Capabilities, candidate.Provider.ConfigSchema}
+	if score, ok := firstScoreValue(valueMaps, "quality_score", "quality_eval_score", "online_eval_score", "judge_score"); ok {
+		return score
+	}
+	if tier, ok := firstQualityTier(valueMaps); ok {
+		switch tier {
+		case "premium", "high", "gold":
+			return 0.90
+		case "standard", "medium", "silver":
+			return 0.60
+		case "basic", "low", "bronze":
+			return 0.35
+		default:
+			return 0.50
+		}
+	}
+	return 0.50
+}
+
+func firstQualityTier(values []map[string]any) (string, bool) {
+	for _, metadata := range values {
+		for _, key := range []string{"quality_tier", "quality"} {
+			value, ok := metadataValue(metadata, key)
+			if !ok {
+				continue
+			}
+			parsed := strings.ToLower(strings.TrimSpace(fmt.Sprint(value)))
+			if parsed != "" {
+				return parsed, true
+			}
+		}
+	}
+	return "", false
 }
 
 func stickyScore(candidate contract.Candidate, req contract.ScheduleRequest) float64 {
