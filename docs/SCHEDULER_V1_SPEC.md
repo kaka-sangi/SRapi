@@ -403,6 +403,7 @@ target_protocol
 model
 strategy
 strategy_version
+fallback_from_decision_id
 selected_provider_id
 selected_account_id
 candidate_count
@@ -422,6 +423,7 @@ created_at
 
 - 第一次调度 `attempt_no = 1`。
 - fallback 后必须使用同一 `request_id` 和递增 `attempt_no`。
+- fallback attempt 必须保存 `fallback_from_decision_id`，指向触发 fallback 的上一条 decision。
 - 数据库唯一约束应为 `unique(request_id, attempt_no)`。
 - `strategy_weights_json` 必须保存当次决策使用的权重快照。
 

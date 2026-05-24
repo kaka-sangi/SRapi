@@ -660,6 +660,7 @@ target_protocol
 model
 strategy
 strategy_version
+fallback_from_decision_id
 selected_provider_id
 selected_account_id
 candidate_count

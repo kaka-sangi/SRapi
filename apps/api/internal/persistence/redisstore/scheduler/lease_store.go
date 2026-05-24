@@ -42,6 +42,9 @@ func (s *Store) AcquireLease(ctx context.Context, input contract.Lease, maxConcu
 	if input.ID == "" || input.RequestID == "" || input.AccountID <= 0 {
 		return contract.Lease{}, ErrInvalidLease
 	}
+	if input.AttemptNo <= 0 {
+		input.AttemptNo = 1
+	}
 	now := time.Now().UTC()
 	lease := input
 	lease.Status = contract.LeaseStatusPending
@@ -63,7 +66,7 @@ func (s *Store) AcquireLease(ctx context.Context, input contract.Lease, maxConcu
 		s.leaseKey(lease.ID),
 		s.accountLeasesKey(lease.AccountID),
 		s.accountConcurrencyKey(lease.AccountID),
-		s.requestKey(lease.RequestID),
+		s.requestKey(lease.RequestID, lease.AttemptNo),
 	},
 		now.UnixNano(),
 		lease.ID,
@@ -75,6 +78,7 @@ func (s *Store) AcquireLease(ctx context.Context, input contract.Lease, maxConcu
 		lease.UpdatedAt.UnixNano(),
 		leaseKeyPrefix,
 		retentionMS,
+		lease.AttemptNo,
 	).Slice()
 	if err != nil {
 		return contract.Lease{}, err
@@ -90,13 +94,16 @@ func (s *Store) AcquireLease(ctx context.Context, input contract.Lease, maxConcu
 	}
 }
 
-func (s *Store) UpdateLeaseStatus(ctx context.Context, requestID string, status contract.LeaseStatus) (contract.Lease, error) {
+func (s *Store) UpdateLeaseStatus(ctx context.Context, requestID string, attemptNo int, status contract.LeaseStatus) (contract.Lease, error) {
 	if requestID == "" {
 		return contract.Lease{}, ErrLeaseNotFound
 	}
+	if attemptNo <= 0 {
+		attemptNo = 1
+	}
 	now := time.Now().UTC()
 	result, err := updateLeaseScript.Run(ctx, s.client, []string{
-		s.requestKey(requestID),
+		s.requestKey(requestID, attemptNo),
 		"",
 		"",
 	},
@@ -187,8 +194,11 @@ func (s *Store) leaseKey(id string) string {
 	return leaseKeyPrefix + id
 }
 
-func (s *Store) requestKey(requestID string) string {
-	return requestKeyPrefix + requestID
+func (s *Store) requestKey(requestID string, attemptNo int) string {
+	if attemptNo <= 0 {
+		attemptNo = 1
+	}
+	return requestKeyPrefix + requestID + ":" + strconv.Itoa(attemptNo)
 }
 
 func (s *Store) accountLeasesKey(accountID int) string {
@@ -235,6 +245,7 @@ func leaseFromHash(row map[string]string) contract.Lease {
 	return contract.Lease{
 		ID:        row["id"],
 		RequestID: row["request_id"],
+		AttemptNo: parseInt(row["attempt_no"]),
 		AccountID: parseInt(row["account_id"]),
 		Status:    contract.LeaseStatus(row["status"]),
 		ExpiresAt: parseUnixNano(row["expires_at_unix_nano"]),
@@ -267,6 +278,7 @@ local created_at = ARGV[7]
 local updated_at = ARGV[8]
 local lease_prefix = ARGV[9]
 local retention_ms = tonumber(ARGV[10])
+local attempt_no = ARGV[11]
 
 local expired = redis.call("ZRANGEBYSCORE", KEYS[2], "-inf", now)
 for _, expired_lease_id in ipairs(expired) do
@@ -296,6 +308,7 @@ end
 redis.call("HSET", KEYS[1],
 	"id", lease_id,
 	"request_id", request_id,
+	"attempt_no", attempt_no,
 	"account_id", account_id,
 	"status", "pending",
 	"expires_at_unix_nano", expires_at,

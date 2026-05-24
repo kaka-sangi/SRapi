@@ -1079,27 +1079,27 @@ func init() {
 	// schedulerdecision.DefaultStrategyConfigHash holds the default value on creation for the strategy_config_hash field.
 	schedulerdecision.DefaultStrategyConfigHash = schedulerdecisionDescStrategyConfigHash.Default.(string)
 	// schedulerdecisionDescCandidateCount is the schema descriptor for candidate_count field.
-	schedulerdecisionDescCandidateCount := schedulerdecisionFields[13].Descriptor()
+	schedulerdecisionDescCandidateCount := schedulerdecisionFields[14].Descriptor()
 	// schedulerdecision.DefaultCandidateCount holds the default value on creation for the candidate_count field.
 	schedulerdecision.DefaultCandidateCount = schedulerdecisionDescCandidateCount.Default.(int)
 	// schedulerdecisionDescRejectedCount is the schema descriptor for rejected_count field.
-	schedulerdecisionDescRejectedCount := schedulerdecisionFields[14].Descriptor()
+	schedulerdecisionDescRejectedCount := schedulerdecisionFields[15].Descriptor()
 	// schedulerdecision.DefaultRejectedCount holds the default value on creation for the rejected_count field.
 	schedulerdecision.DefaultRejectedCount = schedulerdecisionDescRejectedCount.Default.(int)
 	// schedulerdecisionDescStickyHit is the schema descriptor for sticky_hit field.
-	schedulerdecisionDescStickyHit := schedulerdecisionFields[19].Descriptor()
+	schedulerdecisionDescStickyHit := schedulerdecisionFields[20].Descriptor()
 	// schedulerdecision.DefaultStickyHit holds the default value on creation for the sticky_hit field.
 	schedulerdecision.DefaultStickyHit = schedulerdecisionDescStickyHit.Default.(bool)
 	// schedulerdecisionDescCacheAffinityHit is the schema descriptor for cache_affinity_hit field.
-	schedulerdecisionDescCacheAffinityHit := schedulerdecisionFields[20].Descriptor()
+	schedulerdecisionDescCacheAffinityHit := schedulerdecisionFields[21].Descriptor()
 	// schedulerdecision.DefaultCacheAffinityHit holds the default value on creation for the cache_affinity_hit field.
 	schedulerdecision.DefaultCacheAffinityHit = schedulerdecisionDescCacheAffinityHit.Default.(bool)
 	// schedulerdecisionDescEstimatedCost is the schema descriptor for estimated_cost field.
-	schedulerdecisionDescEstimatedCost := schedulerdecisionFields[21].Descriptor()
+	schedulerdecisionDescEstimatedCost := schedulerdecisionFields[22].Descriptor()
 	// schedulerdecision.DefaultEstimatedCost holds the default value on creation for the estimated_cost field.
 	schedulerdecision.DefaultEstimatedCost = schedulerdecisionDescEstimatedCost.Default.(string)
 	// schedulerdecisionDescCurrency is the schema descriptor for currency field.
-	schedulerdecisionDescCurrency := schedulerdecisionFields[22].Descriptor()
+	schedulerdecisionDescCurrency := schedulerdecisionFields[23].Descriptor()
 	// schedulerdecision.DefaultCurrency holds the default value on creation for the currency field.
 	schedulerdecision.DefaultCurrency = schedulerdecisionDescCurrency.Default.(string)
 	schedulerfeedbackMixin := schema.SchedulerFeedback{}.Mixin()

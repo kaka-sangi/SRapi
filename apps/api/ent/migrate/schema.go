@@ -1108,6 +1108,7 @@ var (
 		{Name: "strategy", Type: field.TypeString, Default: "balanced"},
 		{Name: "strategy_version", Type: field.TypeString, Default: "v1"},
 		{Name: "strategy_config_hash", Type: field.TypeString, Default: ""},
+		{Name: "fallback_from_decision_id", Type: field.TypeInt, Nullable: true},
 		{Name: "selected_provider_id", Type: field.TypeInt, Nullable: true},
 		{Name: "selected_account_id", Type: field.TypeInt, Nullable: true},
 		{Name: "candidate_count", Type: field.TypeInt, Default: 0},
@@ -1145,7 +1146,7 @@ var (
 			{
 				Name:    "schedulerdecision_selected_account_id_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{SchedulerDecisionsColumns[15], SchedulerDecisionsColumns[1]},
+				Columns: []*schema.Column{SchedulerDecisionsColumns[16], SchedulerDecisionsColumns[1]},
 			},
 			{
 				Name:    "schedulerdecision_strategy_created_at",

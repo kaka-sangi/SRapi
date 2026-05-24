@@ -178,6 +178,20 @@ func (_c *SchedulerDecisionCreate) SetNillableStrategyConfigHash(v *string) *Sch
 	return _c
 }
 
+// SetFallbackFromDecisionID sets the "fallback_from_decision_id" field.
+func (_c *SchedulerDecisionCreate) SetFallbackFromDecisionID(v int) *SchedulerDecisionCreate {
+	_c.mutation.SetFallbackFromDecisionID(v)
+	return _c
+}
+
+// SetNillableFallbackFromDecisionID sets the "fallback_from_decision_id" field if the given value is not nil.
+func (_c *SchedulerDecisionCreate) SetNillableFallbackFromDecisionID(v *int) *SchedulerDecisionCreate {
+	if v != nil {
+		_c.SetFallbackFromDecisionID(*v)
+	}
+	return _c
+}
+
 // SetSelectedProviderID sets the "selected_provider_id" field.
 func (_c *SchedulerDecisionCreate) SetSelectedProviderID(v int) *SchedulerDecisionCreate {
 	_c.mutation.SetSelectedProviderID(v)
@@ -556,6 +570,10 @@ func (_c *SchedulerDecisionCreate) createSpec() (*SchedulerDecision, *sqlgraph.C
 	if value, ok := _c.mutation.StrategyConfigHash(); ok {
 		_spec.SetField(schedulerdecision.FieldStrategyConfigHash, field.TypeString, value)
 		_node.StrategyConfigHash = value
+	}
+	if value, ok := _c.mutation.FallbackFromDecisionID(); ok {
+		_spec.SetField(schedulerdecision.FieldFallbackFromDecisionID, field.TypeInt, value)
+		_node.FallbackFromDecisionID = &value
 	}
 	if value, ok := _c.mutation.SelectedProviderID(); ok {
 		_spec.SetField(schedulerdecision.FieldSelectedProviderID, field.TypeInt, value)

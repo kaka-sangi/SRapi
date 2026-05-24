@@ -1937,6 +1937,7 @@ export type SchedulerDecision = {
     strategy: 'balanced' | 'cost_saver' | 'latency_first' | 'quota_protect' | 'sticky_first' | 'cache_affinity_first' | 'premium_quality';
     strategy_version: string;
     strategy_config_hash: string;
+    fallback_from_decision_id?: string | null;
     selected_provider_id?: string | null;
     selected_account_id?: string | null;
     candidate_count: number;

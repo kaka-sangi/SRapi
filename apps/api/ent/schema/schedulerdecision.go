@@ -27,6 +27,7 @@ func (SchedulerDecision) Fields() []ent.Field {
 		field.String("strategy").Default("balanced"),
 		field.String("strategy_version").Default("v1"),
 		field.String("strategy_config_hash").Default(""),
+		field.Int("fallback_from_decision_id").Optional().Nillable(),
 		field.Int("selected_provider_id").Optional().Nillable(),
 		field.Int("selected_account_id").Optional().Nillable(),
 		field.Int("candidate_count").Default(0),

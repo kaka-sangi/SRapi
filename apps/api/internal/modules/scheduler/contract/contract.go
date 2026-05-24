@@ -70,6 +70,8 @@ type Candidate struct {
 
 type ScheduleRequest struct {
 	RequestID               string
+	AttemptNo               int
+	FallbackFromDecisionID  *int
 	UserID                  int
 	APIKeyID                int
 	SourceProtocol          string
@@ -97,6 +99,7 @@ type ScheduleRequest struct {
 	Warnings                []string
 	RequestCapabilities     []capabilitiescontract.Descriptor
 	Candidates              []Candidate
+	ExcludedAccountIDs      []int
 	LeaseTTL                time.Duration
 }
 
@@ -119,31 +122,32 @@ type RuntimeLimits struct {
 }
 
 type Decision struct {
-	ID                    int
-	RequestID             string
-	AttemptNo             int
-	UserID                int
-	APIKeyID              int
-	SourceProtocol        string
-	SourceEndpoint        string
-	TargetProtocol        string
-	Model                 string
-	Strategy              StrategyName
-	StrategyVersion       string
-	StrategyConfigHash    string
-	SelectedProviderID    *int
-	SelectedAccountID     *int
-	CandidateCount        int
-	RejectedCount         int
-	Scores                map[string]any
-	RejectReasons         map[string]any
-	StrategyWeights       map[string]any
-	CompatibilityWarnings []string
-	StickyHit             bool
-	CacheAffinityHit      bool
-	EstimatedCost         string
-	Currency              string
-	CreatedAt             time.Time
+	ID                     int
+	RequestID              string
+	AttemptNo              int
+	UserID                 int
+	APIKeyID               int
+	SourceProtocol         string
+	SourceEndpoint         string
+	TargetProtocol         string
+	Model                  string
+	Strategy               StrategyName
+	StrategyVersion        string
+	StrategyConfigHash     string
+	FallbackFromDecisionID *int
+	SelectedProviderID     *int
+	SelectedAccountID      *int
+	CandidateCount         int
+	RejectedCount          int
+	Scores                 map[string]any
+	RejectReasons          map[string]any
+	StrategyWeights        map[string]any
+	CompatibilityWarnings  []string
+	StickyHit              bool
+	CacheAffinityHit       bool
+	EstimatedCost          string
+	Currency               string
+	CreatedAt              time.Time
 }
 
 type ScheduleResult struct {
@@ -156,6 +160,7 @@ type ScheduleResult struct {
 type Lease struct {
 	ID        string
 	RequestID string
+	AttemptNo int
 	AccountID int
 	Status    LeaseStatus
 	ExpiresAt time.Time
@@ -207,6 +212,6 @@ type Store interface {
 	CreateFeedback(ctx context.Context, input Feedback) (Feedback, error)
 	ListFeedbacks(ctx context.Context) ([]Feedback, error)
 	AcquireLease(ctx context.Context, input Lease, maxConcurrency *int) (Lease, error)
-	UpdateLeaseStatus(ctx context.Context, requestID string, status LeaseStatus) (Lease, error)
+	UpdateLeaseStatus(ctx context.Context, requestID string, attemptNo int, status LeaseStatus) (Lease, error)
 	ListLeases(ctx context.Context) ([]Lease, error)
 }

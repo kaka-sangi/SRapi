@@ -4602,31 +4602,32 @@ type RuntimeClass string
 
 // SchedulerDecision defines model for SchedulerDecision.
 type SchedulerDecision struct {
-	ApiKeyId              Id                        `json:"api_key_id"`
-	AttemptNo             int                       `json:"attempt_no"`
-	CacheAffinityHit      bool                      `json:"cache_affinity_hit"`
-	CandidateCount        int                       `json:"candidate_count"`
-	CompatibilityWarnings []string                  `json:"compatibility_warnings"`
-	CreatedAt             Timestamp                 `json:"created_at"`
-	Currency              string                    `json:"currency"`
-	EstimatedCost         string                    `json:"estimated_cost"`
-	Id                    Id                        `json:"id"`
-	Model                 string                    `json:"model"`
-	RejectReasons         JsonObject                `json:"reject_reasons"`
-	RejectedCount         int                       `json:"rejected_count"`
-	RequestId             RequestId                 `json:"request_id"`
-	Scores                JsonObject                `json:"scores"`
-	SelectedAccountId     *string                   `json:"selected_account_id,omitempty"`
-	SelectedProviderId    *string                   `json:"selected_provider_id,omitempty"`
-	SourceEndpoint        string                    `json:"source_endpoint"`
-	SourceProtocol        string                    `json:"source_protocol"`
-	StickyHit             bool                      `json:"sticky_hit"`
-	Strategy              SchedulerDecisionStrategy `json:"strategy"`
-	StrategyConfigHash    string                    `json:"strategy_config_hash"`
-	StrategyVersion       string                    `json:"strategy_version"`
-	StrategyWeights       JsonObject                `json:"strategy_weights"`
-	TargetProtocol        string                    `json:"target_protocol"`
-	UserId                Id                        `json:"user_id"`
+	ApiKeyId               Id                        `json:"api_key_id"`
+	AttemptNo              int                       `json:"attempt_no"`
+	CacheAffinityHit       bool                      `json:"cache_affinity_hit"`
+	CandidateCount         int                       `json:"candidate_count"`
+	CompatibilityWarnings  []string                  `json:"compatibility_warnings"`
+	CreatedAt              Timestamp                 `json:"created_at"`
+	Currency               string                    `json:"currency"`
+	EstimatedCost          string                    `json:"estimated_cost"`
+	FallbackFromDecisionId *string                   `json:"fallback_from_decision_id,omitempty"`
+	Id                     Id                        `json:"id"`
+	Model                  string                    `json:"model"`
+	RejectReasons          JsonObject                `json:"reject_reasons"`
+	RejectedCount          int                       `json:"rejected_count"`
+	RequestId              RequestId                 `json:"request_id"`
+	Scores                 JsonObject                `json:"scores"`
+	SelectedAccountId      *string                   `json:"selected_account_id,omitempty"`
+	SelectedProviderId     *string                   `json:"selected_provider_id,omitempty"`
+	SourceEndpoint         string                    `json:"source_endpoint"`
+	SourceProtocol         string                    `json:"source_protocol"`
+	StickyHit              bool                      `json:"sticky_hit"`
+	Strategy               SchedulerDecisionStrategy `json:"strategy"`
+	StrategyConfigHash     string                    `json:"strategy_config_hash"`
+	StrategyVersion        string                    `json:"strategy_version"`
+	StrategyWeights        JsonObject                `json:"strategy_weights"`
+	TargetProtocol         string                    `json:"target_protocol"`
+	UserId                 Id                        `json:"user_id"`
 }
 
 // SchedulerDecisionStrategy defines model for SchedulerDecision.Strategy.

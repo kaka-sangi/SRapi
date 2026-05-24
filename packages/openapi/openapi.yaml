@@ -11813,6 +11813,9 @@ components:
           type: string
         strategy_config_hash:
           type: string
+        fallback_from_decision_id:
+          type: string
+          nullable: true
         selected_provider_id:
           type: string
           nullable: true

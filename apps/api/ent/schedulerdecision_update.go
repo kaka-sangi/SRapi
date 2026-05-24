@@ -210,6 +210,33 @@ func (_u *SchedulerDecisionUpdate) SetNillableStrategyConfigHash(v *string) *Sch
 	return _u
 }
 
+// SetFallbackFromDecisionID sets the "fallback_from_decision_id" field.
+func (_u *SchedulerDecisionUpdate) SetFallbackFromDecisionID(v int) *SchedulerDecisionUpdate {
+	_u.mutation.ResetFallbackFromDecisionID()
+	_u.mutation.SetFallbackFromDecisionID(v)
+	return _u
+}
+
+// SetNillableFallbackFromDecisionID sets the "fallback_from_decision_id" field if the given value is not nil.
+func (_u *SchedulerDecisionUpdate) SetNillableFallbackFromDecisionID(v *int) *SchedulerDecisionUpdate {
+	if v != nil {
+		_u.SetFallbackFromDecisionID(*v)
+	}
+	return _u
+}
+
+// AddFallbackFromDecisionID adds value to the "fallback_from_decision_id" field.
+func (_u *SchedulerDecisionUpdate) AddFallbackFromDecisionID(v int) *SchedulerDecisionUpdate {
+	_u.mutation.AddFallbackFromDecisionID(v)
+	return _u
+}
+
+// ClearFallbackFromDecisionID clears the value of the "fallback_from_decision_id" field.
+func (_u *SchedulerDecisionUpdate) ClearFallbackFromDecisionID() *SchedulerDecisionUpdate {
+	_u.mutation.ClearFallbackFromDecisionID()
+	return _u
+}
+
 // SetSelectedProviderID sets the "selected_provider_id" field.
 func (_u *SchedulerDecisionUpdate) SetSelectedProviderID(v int) *SchedulerDecisionUpdate {
 	_u.mutation.ResetSelectedProviderID()
@@ -524,6 +551,15 @@ func (_u *SchedulerDecisionUpdate) sqlSave(ctx context.Context) (_node int, err 
 	if value, ok := _u.mutation.StrategyConfigHash(); ok {
 		_spec.SetField(schedulerdecision.FieldStrategyConfigHash, field.TypeString, value)
 	}
+	if value, ok := _u.mutation.FallbackFromDecisionID(); ok {
+		_spec.SetField(schedulerdecision.FieldFallbackFromDecisionID, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedFallbackFromDecisionID(); ok {
+		_spec.AddField(schedulerdecision.FieldFallbackFromDecisionID, field.TypeInt, value)
+	}
+	if _u.mutation.FallbackFromDecisionIDCleared() {
+		_spec.ClearField(schedulerdecision.FieldFallbackFromDecisionID, field.TypeInt)
+	}
 	if value, ok := _u.mutation.SelectedProviderID(); ok {
 		_spec.SetField(schedulerdecision.FieldSelectedProviderID, field.TypeInt, value)
 	}
@@ -793,6 +829,33 @@ func (_u *SchedulerDecisionUpdateOne) SetNillableStrategyConfigHash(v *string) *
 	if v != nil {
 		_u.SetStrategyConfigHash(*v)
 	}
+	return _u
+}
+
+// SetFallbackFromDecisionID sets the "fallback_from_decision_id" field.
+func (_u *SchedulerDecisionUpdateOne) SetFallbackFromDecisionID(v int) *SchedulerDecisionUpdateOne {
+	_u.mutation.ResetFallbackFromDecisionID()
+	_u.mutation.SetFallbackFromDecisionID(v)
+	return _u
+}
+
+// SetNillableFallbackFromDecisionID sets the "fallback_from_decision_id" field if the given value is not nil.
+func (_u *SchedulerDecisionUpdateOne) SetNillableFallbackFromDecisionID(v *int) *SchedulerDecisionUpdateOne {
+	if v != nil {
+		_u.SetFallbackFromDecisionID(*v)
+	}
+	return _u
+}
+
+// AddFallbackFromDecisionID adds value to the "fallback_from_decision_id" field.
+func (_u *SchedulerDecisionUpdateOne) AddFallbackFromDecisionID(v int) *SchedulerDecisionUpdateOne {
+	_u.mutation.AddFallbackFromDecisionID(v)
+	return _u
+}
+
+// ClearFallbackFromDecisionID clears the value of the "fallback_from_decision_id" field.
+func (_u *SchedulerDecisionUpdateOne) ClearFallbackFromDecisionID() *SchedulerDecisionUpdateOne {
+	_u.mutation.ClearFallbackFromDecisionID()
 	return _u
 }
 
@@ -1139,6 +1202,15 @@ func (_u *SchedulerDecisionUpdateOne) sqlSave(ctx context.Context) (_node *Sched
 	}
 	if value, ok := _u.mutation.StrategyConfigHash(); ok {
 		_spec.SetField(schedulerdecision.FieldStrategyConfigHash, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.FallbackFromDecisionID(); ok {
+		_spec.SetField(schedulerdecision.FieldFallbackFromDecisionID, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedFallbackFromDecisionID(); ok {
+		_spec.AddField(schedulerdecision.FieldFallbackFromDecisionID, field.TypeInt, value)
+	}
+	if _u.mutation.FallbackFromDecisionIDCleared() {
+		_spec.ClearField(schedulerdecision.FieldFallbackFromDecisionID, field.TypeInt)
 	}
 	if value, ok := _u.mutation.SelectedProviderID(); ok {
 		_spec.SetField(schedulerdecision.FieldSelectedProviderID, field.TypeInt, value)

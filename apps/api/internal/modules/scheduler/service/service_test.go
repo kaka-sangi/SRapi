@@ -820,6 +820,65 @@ func TestLeaseExpiresAndFreesConcurrency(t *testing.T) {
 	}
 }
 
+func TestFallbackAttemptRecordsDecisionChainAndAttemptScopedLease(t *testing.T) {
+	svc := newService(t)
+	req := baseRequest()
+	req.Candidates = []contract.Candidate{
+		candidate(1, withMaxConcurrency(2), withHealth(0.95), withCapabilities(capabilitiescontract.KeyStreaming)),
+		candidate(2, withMaxConcurrency(2), withHealth(0.90), withCapabilities(capabilitiescontract.KeyStreaming)),
+	}
+	first, err := svc.Schedule(context.Background(), req)
+	if err != nil {
+		t.Fatalf("first schedule: %v", err)
+	}
+	if first.Decision.AttemptNo != 1 || first.Lease.AttemptNo != 1 {
+		t.Fatalf("expected first attempt=1, got decision=%+v lease=%+v", first.Decision, first.Lease)
+	}
+
+	secondReq := req
+	secondReq.AttemptNo = 2
+	secondReq.FallbackFromDecisionID = &first.Decision.ID
+	secondReq.ExcludedAccountIDs = []int{first.Candidate.Account.ID}
+	second, err := svc.Schedule(context.Background(), secondReq)
+	if err != nil {
+		t.Fatalf("fallback schedule: %v", err)
+	}
+	if second.Decision.AttemptNo != 2 || second.Lease.AttemptNo != 2 {
+		t.Fatalf("expected fallback attempt=2, got decision=%+v lease=%+v", second.Decision, second.Lease)
+	}
+	if second.Decision.FallbackFromDecisionID == nil || *second.Decision.FallbackFromDecisionID != first.Decision.ID {
+		t.Fatalf("expected fallback_from_decision_id=%d, got %+v", first.Decision.ID, second.Decision)
+	}
+	if second.Candidate.Account.ID == first.Candidate.Account.ID {
+		t.Fatalf("expected excluded first account to be skipped, got %+v", second.Candidate.Account)
+	}
+	assertRejectReason(t, second.Decision.RejectReasons, first.Candidate.Account.ID, "fallback_excluded")
+
+	_, err = svc.RecordFeedback(context.Background(), contract.RecordFeedbackRequest{
+		RequestID:  first.Decision.RequestID,
+		DecisionID: first.Decision.ID,
+		AttemptNo:  first.Decision.AttemptNo,
+		AccountID:  first.Candidate.Account.ID,
+		ProviderID: first.Candidate.Provider.ID,
+		Model:      first.Decision.Model,
+		Success:    false,
+	})
+	if err != nil {
+		t.Fatalf("record first feedback: %v", err)
+	}
+	leases, err := svc.ListLeases(context.Background())
+	if err != nil {
+		t.Fatalf("list leases: %v", err)
+	}
+	statusByAttempt := map[int]contract.LeaseStatus{}
+	for _, lease := range leases {
+		statusByAttempt[lease.AttemptNo] = lease.Status
+	}
+	if statusByAttempt[1] != contract.LeaseStatusFailed || statusByAttempt[2] != contract.LeaseStatusPending {
+		t.Fatalf("expected feedback to update only attempt 1, got %+v", leases)
+	}
+}
+
 func TestScheduleRejectsUnknownCapabilityKeys(t *testing.T) {
 	svc := newService(t)
 	req := baseRequest()

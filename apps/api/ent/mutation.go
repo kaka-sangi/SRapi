@@ -28230,6 +28230,8 @@ type SchedulerDecisionMutation struct {
 	strategy                          *string
 	strategy_version                  *string
 	strategy_config_hash              *string
+	fallback_from_decision_id         *int
+	addfallback_from_decision_id      *int
 	selected_provider_id              *int
 	addselected_provider_id           *int
 	selected_account_id               *int
@@ -28879,6 +28881,76 @@ func (m *SchedulerDecisionMutation) ResetStrategyConfigHash() {
 	m.strategy_config_hash = nil
 }
 
+// SetFallbackFromDecisionID sets the "fallback_from_decision_id" field.
+func (m *SchedulerDecisionMutation) SetFallbackFromDecisionID(i int) {
+	m.fallback_from_decision_id = &i
+	m.addfallback_from_decision_id = nil
+}
+
+// FallbackFromDecisionID returns the value of the "fallback_from_decision_id" field in the mutation.
+func (m *SchedulerDecisionMutation) FallbackFromDecisionID() (r int, exists bool) {
+	v := m.fallback_from_decision_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFallbackFromDecisionID returns the old "fallback_from_decision_id" field's value of the SchedulerDecision entity.
+// If the SchedulerDecision object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SchedulerDecisionMutation) OldFallbackFromDecisionID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFallbackFromDecisionID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFallbackFromDecisionID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFallbackFromDecisionID: %w", err)
+	}
+	return oldValue.FallbackFromDecisionID, nil
+}
+
+// AddFallbackFromDecisionID adds i to the "fallback_from_decision_id" field.
+func (m *SchedulerDecisionMutation) AddFallbackFromDecisionID(i int) {
+	if m.addfallback_from_decision_id != nil {
+		*m.addfallback_from_decision_id += i
+	} else {
+		m.addfallback_from_decision_id = &i
+	}
+}
+
+// AddedFallbackFromDecisionID returns the value that was added to the "fallback_from_decision_id" field in this mutation.
+func (m *SchedulerDecisionMutation) AddedFallbackFromDecisionID() (r int, exists bool) {
+	v := m.addfallback_from_decision_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearFallbackFromDecisionID clears the value of the "fallback_from_decision_id" field.
+func (m *SchedulerDecisionMutation) ClearFallbackFromDecisionID() {
+	m.fallback_from_decision_id = nil
+	m.addfallback_from_decision_id = nil
+	m.clearedFields[schedulerdecision.FieldFallbackFromDecisionID] = struct{}{}
+}
+
+// FallbackFromDecisionIDCleared returns if the "fallback_from_decision_id" field was cleared in this mutation.
+func (m *SchedulerDecisionMutation) FallbackFromDecisionIDCleared() bool {
+	_, ok := m.clearedFields[schedulerdecision.FieldFallbackFromDecisionID]
+	return ok
+}
+
+// ResetFallbackFromDecisionID resets all changes to the "fallback_from_decision_id" field.
+func (m *SchedulerDecisionMutation) ResetFallbackFromDecisionID() {
+	m.fallback_from_decision_id = nil
+	m.addfallback_from_decision_id = nil
+	delete(m.clearedFields, schedulerdecision.FieldFallbackFromDecisionID)
+}
+
 // SetSelectedProviderID sets the "selected_provider_id" field.
 func (m *SchedulerDecisionMutation) SetSelectedProviderID(i int) {
 	m.selected_provider_id = &i
@@ -29521,7 +29593,7 @@ func (m *SchedulerDecisionMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *SchedulerDecisionMutation) Fields() []string {
-	fields := make([]string, 0, 25)
+	fields := make([]string, 0, 26)
 	if m.created_at != nil {
 		fields = append(fields, schedulerdecision.FieldCreatedAt)
 	}
@@ -29560,6 +29632,9 @@ func (m *SchedulerDecisionMutation) Fields() []string {
 	}
 	if m.strategy_config_hash != nil {
 		fields = append(fields, schedulerdecision.FieldStrategyConfigHash)
+	}
+	if m.fallback_from_decision_id != nil {
+		fields = append(fields, schedulerdecision.FieldFallbackFromDecisionID)
 	}
 	if m.selected_provider_id != nil {
 		fields = append(fields, schedulerdecision.FieldSelectedProviderID)
@@ -29631,6 +29706,8 @@ func (m *SchedulerDecisionMutation) Field(name string) (ent.Value, bool) {
 		return m.StrategyVersion()
 	case schedulerdecision.FieldStrategyConfigHash:
 		return m.StrategyConfigHash()
+	case schedulerdecision.FieldFallbackFromDecisionID:
+		return m.FallbackFromDecisionID()
 	case schedulerdecision.FieldSelectedProviderID:
 		return m.SelectedProviderID()
 	case schedulerdecision.FieldSelectedAccountID:
@@ -29690,6 +29767,8 @@ func (m *SchedulerDecisionMutation) OldField(ctx context.Context, name string) (
 		return m.OldStrategyVersion(ctx)
 	case schedulerdecision.FieldStrategyConfigHash:
 		return m.OldStrategyConfigHash(ctx)
+	case schedulerdecision.FieldFallbackFromDecisionID:
+		return m.OldFallbackFromDecisionID(ctx)
 	case schedulerdecision.FieldSelectedProviderID:
 		return m.OldSelectedProviderID(ctx)
 	case schedulerdecision.FieldSelectedAccountID:
@@ -29814,6 +29893,13 @@ func (m *SchedulerDecisionMutation) SetField(name string, value ent.Value) error
 		}
 		m.SetStrategyConfigHash(v)
 		return nil
+	case schedulerdecision.FieldFallbackFromDecisionID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFallbackFromDecisionID(v)
+		return nil
 	case schedulerdecision.FieldSelectedProviderID:
 		v, ok := value.(int)
 		if !ok {
@@ -29915,6 +30001,9 @@ func (m *SchedulerDecisionMutation) AddedFields() []string {
 	if m.addapi_key_id != nil {
 		fields = append(fields, schedulerdecision.FieldAPIKeyID)
 	}
+	if m.addfallback_from_decision_id != nil {
+		fields = append(fields, schedulerdecision.FieldFallbackFromDecisionID)
+	}
 	if m.addselected_provider_id != nil {
 		fields = append(fields, schedulerdecision.FieldSelectedProviderID)
 	}
@@ -29941,6 +30030,8 @@ func (m *SchedulerDecisionMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedUserID()
 	case schedulerdecision.FieldAPIKeyID:
 		return m.AddedAPIKeyID()
+	case schedulerdecision.FieldFallbackFromDecisionID:
+		return m.AddedFallbackFromDecisionID()
 	case schedulerdecision.FieldSelectedProviderID:
 		return m.AddedSelectedProviderID()
 	case schedulerdecision.FieldSelectedAccountID:
@@ -29979,6 +30070,13 @@ func (m *SchedulerDecisionMutation) AddField(name string, value ent.Value) error
 		}
 		m.AddAPIKeyID(v)
 		return nil
+	case schedulerdecision.FieldFallbackFromDecisionID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddFallbackFromDecisionID(v)
+		return nil
 	case schedulerdecision.FieldSelectedProviderID:
 		v, ok := value.(int)
 		if !ok {
@@ -30015,6 +30113,9 @@ func (m *SchedulerDecisionMutation) AddField(name string, value ent.Value) error
 // mutation.
 func (m *SchedulerDecisionMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(schedulerdecision.FieldFallbackFromDecisionID) {
+		fields = append(fields, schedulerdecision.FieldFallbackFromDecisionID)
+	}
 	if m.FieldCleared(schedulerdecision.FieldSelectedProviderID) {
 		fields = append(fields, schedulerdecision.FieldSelectedProviderID)
 	}
@@ -30047,6 +30148,9 @@ func (m *SchedulerDecisionMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *SchedulerDecisionMutation) ClearField(name string) error {
 	switch name {
+	case schedulerdecision.FieldFallbackFromDecisionID:
+		m.ClearFallbackFromDecisionID()
+		return nil
 	case schedulerdecision.FieldSelectedProviderID:
 		m.ClearSelectedProviderID()
 		return nil
@@ -30111,6 +30215,9 @@ func (m *SchedulerDecisionMutation) ResetField(name string) error {
 		return nil
 	case schedulerdecision.FieldStrategyConfigHash:
 		m.ResetStrategyConfigHash()
+		return nil
+	case schedulerdecision.FieldFallbackFromDecisionID:
+		m.ResetFallbackFromDecisionID()
 		return nil
 	case schedulerdecision.FieldSelectedProviderID:
 		m.ResetSelectedProviderID()

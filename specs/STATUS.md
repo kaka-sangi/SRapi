@@ -74,22 +74,30 @@ last_completed:
 - A1.1: AuthSession persistence now adds hashed `auth_sessions` Ent/PostgreSQL storage, `entstore/auth`, HTTP/app runtime injection, old-cookie runtime rebuild coverage, and migration/docs alignment so console sessions survive API restart without storing session or CSRF token plaintext.
 - A2.1: Gateway API key/user RPM and API key TPM limits now use Redis-backed atomic counters through `internal/platform/ratelimit`, app/httpserver injection, admission-stage enforcement before Scheduler dispatch, 429 + `Retry-After` Gateway errors, and HTTP/unit regressions proving repeated calls are throttled without partial counter updates.
 - A2.2: Scheduler account-level quota evidence now has an end-to-end Gateway path: successful account usage updates `rpm_used` / `tpm_used` runtime metadata from the recent usage window, scheduler candidates read those counters with existing `rpm_limit` / `tpm_limit` / `max_concurrency` metadata, and HTTP + scheduler regressions prove `rpm_limit_exceeded`, `tpm_limit_exceeded`, and `concurrency_full` reject reasons are recorded.
+- A4.1: Scheduler failover foundations now return ranked candidate lists, persist `fallback_from_decision_id` on scheduler decisions, expose the field through admin OpenAPI/SDK responses, and update memory/Redis leases by `(request_id, attempt_no)` so fallback attempts do not overwrite each other.
 - K1.5: Scheduler ranking now applies a Cost/Latency/Quality Pareto frontier before final weighted selection, records `pareto.frontier_account_ids` in decision score evidence, keeps all available candidates in failover rank order, and uses explicit `quality_score` / `quality_tier` metadata as the quality objective.
 
 current:
 
-- package: K1+
+- package: A4.2
 - status: pending
-- objective: continue Pareto routing and online evaluation after K1.5 frontier selection.
+- objective: add the Gateway retry loop that consumes ranked scheduler candidates and records failover attempts.
 
-next_recommended: K1.4 quality evaluation module and worker to feed explicit scheduler quality scores.
+next_recommended: A4.2 gateway handler retry loop, including retryable error classification, attempt feedback, and failover metrics.
 
 last_gates:
 
-- `cd apps/api && go test ./internal/modules/scheduler/... ./internal/persistence/entstore/scheduler/... ./internal/persistence/redisstore/scheduler/...`: pass
+- `cd apps/api && go test ./internal/modules/scheduler/...`: pass
+- `cd apps/api && go test ./internal/persistence/redisstore/scheduler`: pass
+- `cd apps/api && go test ./internal/persistence/entstore/...`: pass
+- `make openapi-lint`: pass
+- `make openapi-codegen-check`: pass
+- `make openapi-ts-codegen-check`: pass
+- `make sdk-ts-typecheck`: pass
+- `make ent-generate-check`: pass
+- `make migration-check`: pass
 - `make architecture-check`: pass
-- `make code-quality-check`: pass
-- `git diff --check`: pass
+- `cd apps/api && go test ./...`: pass
 
 notes:
 

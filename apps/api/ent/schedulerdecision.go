@@ -44,6 +44,8 @@ type SchedulerDecision struct {
 	StrategyVersion string `json:"strategy_version,omitempty"`
 	// StrategyConfigHash holds the value of the "strategy_config_hash" field.
 	StrategyConfigHash string `json:"strategy_config_hash,omitempty"`
+	// FallbackFromDecisionID holds the value of the "fallback_from_decision_id" field.
+	FallbackFromDecisionID *int `json:"fallback_from_decision_id,omitempty"`
 	// SelectedProviderID holds the value of the "selected_provider_id" field.
 	SelectedProviderID *int `json:"selected_provider_id,omitempty"`
 	// SelectedAccountID holds the value of the "selected_account_id" field.
@@ -80,7 +82,7 @@ func (*SchedulerDecision) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case schedulerdecision.FieldStickyHit, schedulerdecision.FieldCacheAffinityHit:
 			values[i] = new(sql.NullBool)
-		case schedulerdecision.FieldID, schedulerdecision.FieldAttemptNo, schedulerdecision.FieldUserID, schedulerdecision.FieldAPIKeyID, schedulerdecision.FieldSelectedProviderID, schedulerdecision.FieldSelectedAccountID, schedulerdecision.FieldCandidateCount, schedulerdecision.FieldRejectedCount:
+		case schedulerdecision.FieldID, schedulerdecision.FieldAttemptNo, schedulerdecision.FieldUserID, schedulerdecision.FieldAPIKeyID, schedulerdecision.FieldFallbackFromDecisionID, schedulerdecision.FieldSelectedProviderID, schedulerdecision.FieldSelectedAccountID, schedulerdecision.FieldCandidateCount, schedulerdecision.FieldRejectedCount:
 			values[i] = new(sql.NullInt64)
 		case schedulerdecision.FieldRequestID, schedulerdecision.FieldSourceProtocol, schedulerdecision.FieldSourceEndpoint, schedulerdecision.FieldTargetProtocol, schedulerdecision.FieldModel, schedulerdecision.FieldStrategy, schedulerdecision.FieldStrategyVersion, schedulerdecision.FieldStrategyConfigHash, schedulerdecision.FieldEstimatedCost, schedulerdecision.FieldCurrency:
 			values[i] = new(sql.NullString)
@@ -184,6 +186,13 @@ func (_m *SchedulerDecision) assignValues(columns []string, values []any) error 
 				return fmt.Errorf("unexpected type %T for field strategy_config_hash", values[i])
 			} else if value.Valid {
 				_m.StrategyConfigHash = value.String
+			}
+		case schedulerdecision.FieldFallbackFromDecisionID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field fallback_from_decision_id", values[i])
+			} else if value.Valid {
+				_m.FallbackFromDecisionID = new(int)
+				*_m.FallbackFromDecisionID = int(value.Int64)
 			}
 		case schedulerdecision.FieldSelectedProviderID:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -341,6 +350,11 @@ func (_m *SchedulerDecision) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("strategy_config_hash=")
 	builder.WriteString(_m.StrategyConfigHash)
+	builder.WriteString(", ")
+	if v := _m.FallbackFromDecisionID; v != nil {
+		builder.WriteString("fallback_from_decision_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	if v := _m.SelectedProviderID; v != nil {
 		builder.WriteString("selected_provider_id=")

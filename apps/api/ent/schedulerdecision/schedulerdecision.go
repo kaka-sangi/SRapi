@@ -39,6 +39,8 @@ const (
 	FieldStrategyVersion = "strategy_version"
 	// FieldStrategyConfigHash holds the string denoting the strategy_config_hash field in the database.
 	FieldStrategyConfigHash = "strategy_config_hash"
+	// FieldFallbackFromDecisionID holds the string denoting the fallback_from_decision_id field in the database.
+	FieldFallbackFromDecisionID = "fallback_from_decision_id"
 	// FieldSelectedProviderID holds the string denoting the selected_provider_id field in the database.
 	FieldSelectedProviderID = "selected_provider_id"
 	// FieldSelectedAccountID holds the string denoting the selected_account_id field in the database.
@@ -83,6 +85,7 @@ var Columns = []string{
 	FieldStrategy,
 	FieldStrategyVersion,
 	FieldStrategyConfigHash,
+	FieldFallbackFromDecisionID,
 	FieldSelectedProviderID,
 	FieldSelectedAccountID,
 	FieldCandidateCount,
@@ -217,6 +220,11 @@ func ByStrategyVersion(opts ...sql.OrderTermOption) OrderOption {
 // ByStrategyConfigHash orders the results by the strategy_config_hash field.
 func ByStrategyConfigHash(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldStrategyConfigHash, opts...).ToFunc()
+}
+
+// ByFallbackFromDecisionID orders the results by the fallback_from_decision_id field.
+func ByFallbackFromDecisionID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldFallbackFromDecisionID, opts...).ToFunc()
 }
 
 // BySelectedProviderID orders the results by the selected_provider_id field.

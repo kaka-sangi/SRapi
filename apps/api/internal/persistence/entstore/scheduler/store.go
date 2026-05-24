@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
 
@@ -30,7 +31,7 @@ func New(client *ent.Client) (*Store, error) {
 
 type LeaseStore interface {
 	AcquireLease(ctx context.Context, input contract.Lease, maxConcurrency *int) (contract.Lease, error)
-	UpdateLeaseStatus(ctx context.Context, requestID string, status contract.LeaseStatus) (contract.Lease, error)
+	UpdateLeaseStatus(ctx context.Context, requestID string, attemptNo int, status contract.LeaseStatus) (contract.Lease, error)
 	ListLeases(ctx context.Context) ([]contract.Lease, error)
 }
 
@@ -59,6 +60,7 @@ func (s *Store) CreateDecision(ctx context.Context, input contract.Decision) (co
 		SetStrategy(string(input.Strategy)).
 		SetStrategyVersion(input.StrategyVersion).
 		SetStrategyConfigHash(input.StrategyConfigHash).
+		SetNillableFallbackFromDecisionID(input.FallbackFromDecisionID).
 		SetNillableSelectedProviderID(input.SelectedProviderID).
 		SetNillableSelectedAccountID(input.SelectedAccountID).
 		SetCandidateCount(input.CandidateCount).
@@ -147,6 +149,9 @@ func (s *Store) AcquireLease(ctx context.Context, input contract.Lease, maxConcu
 	if input.ID == "" || input.RequestID == "" || input.AccountID <= 0 {
 		return contract.Lease{}, errors.New("invalid lease")
 	}
+	if input.AttemptNo <= 0 {
+		input.AttemptNo = 1
+	}
 	if maxConcurrency != nil && *maxConcurrency >= 0 && s.pendingConcurrency(input.AccountID) >= *maxConcurrency {
 		return contract.Lease{}, errors.New("concurrency full")
 	}
@@ -162,18 +167,18 @@ func (s *Store) AcquireLease(ctx context.Context, input contract.Lease, maxConcu
 		lease.ExpiresAt = now.Add(30 * time.Second)
 	}
 	s.leases[lease.ID] = lease
-	s.leaseByRequest[lease.RequestID] = lease.ID
+	s.leaseByRequest[leaseRequestKey(lease.RequestID, lease.AttemptNo)] = lease.ID
 	return lease, nil
 }
 
-func (s *Store) UpdateLeaseStatus(ctx context.Context, requestID string, status contract.LeaseStatus) (contract.Lease, error) {
+func (s *Store) UpdateLeaseStatus(ctx context.Context, requestID string, attemptNo int, status contract.LeaseStatus) (contract.Lease, error) {
 	if s.leaseStore != nil {
-		return s.leaseStore.UpdateLeaseStatus(ctx, requestID, status)
+		return s.leaseStore.UpdateLeaseStatus(ctx, requestID, attemptNo, status)
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.expireLeases(time.Now().UTC())
-	leaseID, ok := s.leaseByRequest[requestID]
+	leaseID, ok := s.leaseByRequest[leaseRequestKey(requestID, attemptNo)]
 	if !ok {
 		return contract.Lease{}, errors.New("lease not found")
 	}
@@ -224,33 +229,41 @@ func (s *Store) expireLeases(now time.Time) {
 	}
 }
 
+func leaseRequestKey(requestID string, attemptNo int) string {
+	if attemptNo <= 0 {
+		attemptNo = 1
+	}
+	return requestID + ":" + strconv.Itoa(attemptNo)
+}
+
 func toDecision(row *ent.SchedulerDecision) contract.Decision {
 	return contract.Decision{
-		ID:                    row.ID,
-		RequestID:             row.RequestID,
-		AttemptNo:             row.AttemptNo,
-		UserID:                row.UserID,
-		APIKeyID:              row.APIKeyID,
-		SourceProtocol:        row.SourceProtocol,
-		SourceEndpoint:        row.SourceEndpoint,
-		TargetProtocol:        row.TargetProtocol,
-		Model:                 row.Model,
-		Strategy:              contract.StrategyName(row.Strategy),
-		StrategyVersion:       row.StrategyVersion,
-		StrategyConfigHash:    row.StrategyConfigHash,
-		SelectedProviderID:    cloneInt(row.SelectedProviderID),
-		SelectedAccountID:     cloneInt(row.SelectedAccountID),
-		CandidateCount:        row.CandidateCount,
-		RejectedCount:         row.RejectedCount,
-		Scores:                cloneMap(row.ScoresJSON),
-		RejectReasons:         cloneMap(row.RejectReasonsJSON),
-		StrategyWeights:       cloneMap(row.StrategyWeightsJSON),
-		CompatibilityWarnings: cloneStrings(row.CompatibilityWarningsJSON),
-		StickyHit:             row.StickyHit,
-		CacheAffinityHit:      row.CacheAffinityHit,
-		EstimatedCost:         row.EstimatedCost,
-		Currency:              row.Currency,
-		CreatedAt:             row.CreatedAt,
+		ID:                     row.ID,
+		RequestID:              row.RequestID,
+		AttemptNo:              row.AttemptNo,
+		UserID:                 row.UserID,
+		APIKeyID:               row.APIKeyID,
+		SourceProtocol:         row.SourceProtocol,
+		SourceEndpoint:         row.SourceEndpoint,
+		TargetProtocol:         row.TargetProtocol,
+		Model:                  row.Model,
+		Strategy:               contract.StrategyName(row.Strategy),
+		StrategyVersion:        row.StrategyVersion,
+		StrategyConfigHash:     row.StrategyConfigHash,
+		FallbackFromDecisionID: cloneInt(row.FallbackFromDecisionID),
+		SelectedProviderID:     cloneInt(row.SelectedProviderID),
+		SelectedAccountID:      cloneInt(row.SelectedAccountID),
+		CandidateCount:         row.CandidateCount,
+		RejectedCount:          row.RejectedCount,
+		Scores:                 cloneMap(row.ScoresJSON),
+		RejectReasons:          cloneMap(row.RejectReasonsJSON),
+		StrategyWeights:        cloneMap(row.StrategyWeightsJSON),
+		CompatibilityWarnings:  cloneStrings(row.CompatibilityWarningsJSON),
+		StickyHit:              row.StickyHit,
+		CacheAffinityHit:       row.CacheAffinityHit,
+		EstimatedCost:          row.EstimatedCost,
+		Currency:               row.Currency,
+		CreatedAt:              row.CreatedAt,
 	}
 }
 

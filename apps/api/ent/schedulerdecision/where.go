@@ -119,6 +119,11 @@ func StrategyConfigHash(v string) predicate.SchedulerDecision {
 	return predicate.SchedulerDecision(sql.FieldEQ(FieldStrategyConfigHash, v))
 }
 
+// FallbackFromDecisionID applies equality check predicate on the "fallback_from_decision_id" field. It's identical to FallbackFromDecisionIDEQ.
+func FallbackFromDecisionID(v int) predicate.SchedulerDecision {
+	return predicate.SchedulerDecision(sql.FieldEQ(FieldFallbackFromDecisionID, v))
+}
+
 // SelectedProviderID applies equality check predicate on the "selected_provider_id" field. It's identical to SelectedProviderIDEQ.
 func SelectedProviderID(v int) predicate.SchedulerDecision {
 	return predicate.SchedulerDecision(sql.FieldEQ(FieldSelectedProviderID, v))
@@ -877,6 +882,56 @@ func StrategyConfigHashEqualFold(v string) predicate.SchedulerDecision {
 // StrategyConfigHashContainsFold applies the ContainsFold predicate on the "strategy_config_hash" field.
 func StrategyConfigHashContainsFold(v string) predicate.SchedulerDecision {
 	return predicate.SchedulerDecision(sql.FieldContainsFold(FieldStrategyConfigHash, v))
+}
+
+// FallbackFromDecisionIDEQ applies the EQ predicate on the "fallback_from_decision_id" field.
+func FallbackFromDecisionIDEQ(v int) predicate.SchedulerDecision {
+	return predicate.SchedulerDecision(sql.FieldEQ(FieldFallbackFromDecisionID, v))
+}
+
+// FallbackFromDecisionIDNEQ applies the NEQ predicate on the "fallback_from_decision_id" field.
+func FallbackFromDecisionIDNEQ(v int) predicate.SchedulerDecision {
+	return predicate.SchedulerDecision(sql.FieldNEQ(FieldFallbackFromDecisionID, v))
+}
+
+// FallbackFromDecisionIDIn applies the In predicate on the "fallback_from_decision_id" field.
+func FallbackFromDecisionIDIn(vs ...int) predicate.SchedulerDecision {
+	return predicate.SchedulerDecision(sql.FieldIn(FieldFallbackFromDecisionID, vs...))
+}
+
+// FallbackFromDecisionIDNotIn applies the NotIn predicate on the "fallback_from_decision_id" field.
+func FallbackFromDecisionIDNotIn(vs ...int) predicate.SchedulerDecision {
+	return predicate.SchedulerDecision(sql.FieldNotIn(FieldFallbackFromDecisionID, vs...))
+}
+
+// FallbackFromDecisionIDGT applies the GT predicate on the "fallback_from_decision_id" field.
+func FallbackFromDecisionIDGT(v int) predicate.SchedulerDecision {
+	return predicate.SchedulerDecision(sql.FieldGT(FieldFallbackFromDecisionID, v))
+}
+
+// FallbackFromDecisionIDGTE applies the GTE predicate on the "fallback_from_decision_id" field.
+func FallbackFromDecisionIDGTE(v int) predicate.SchedulerDecision {
+	return predicate.SchedulerDecision(sql.FieldGTE(FieldFallbackFromDecisionID, v))
+}
+
+// FallbackFromDecisionIDLT applies the LT predicate on the "fallback_from_decision_id" field.
+func FallbackFromDecisionIDLT(v int) predicate.SchedulerDecision {
+	return predicate.SchedulerDecision(sql.FieldLT(FieldFallbackFromDecisionID, v))
+}
+
+// FallbackFromDecisionIDLTE applies the LTE predicate on the "fallback_from_decision_id" field.
+func FallbackFromDecisionIDLTE(v int) predicate.SchedulerDecision {
+	return predicate.SchedulerDecision(sql.FieldLTE(FieldFallbackFromDecisionID, v))
+}
+
+// FallbackFromDecisionIDIsNil applies the IsNil predicate on the "fallback_from_decision_id" field.
+func FallbackFromDecisionIDIsNil() predicate.SchedulerDecision {
+	return predicate.SchedulerDecision(sql.FieldIsNull(FieldFallbackFromDecisionID))
+}
+
+// FallbackFromDecisionIDNotNil applies the NotNil predicate on the "fallback_from_decision_id" field.
+func FallbackFromDecisionIDNotNil() predicate.SchedulerDecision {
+	return predicate.SchedulerDecision(sql.FieldNotNull(FieldFallbackFromDecisionID))
 }
 
 // SelectedProviderIDEQ applies the EQ predicate on the "selected_provider_id" field.

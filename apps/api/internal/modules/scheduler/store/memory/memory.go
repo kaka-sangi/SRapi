@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
 
@@ -91,6 +92,9 @@ func (s *Store) AcquireLease(_ context.Context, input contract.Lease, maxConcurr
 	if input.ID == "" || input.RequestID == "" || input.AccountID <= 0 {
 		return contract.Lease{}, errors.New("invalid lease")
 	}
+	if input.AttemptNo <= 0 {
+		input.AttemptNo = 1
+	}
 	if maxConcurrency != nil && *maxConcurrency >= 0 && s.pendingConcurrency(input.AccountID) >= *maxConcurrency {
 		return contract.Lease{}, errors.New("concurrency full")
 	}
@@ -106,15 +110,15 @@ func (s *Store) AcquireLease(_ context.Context, input contract.Lease, maxConcurr
 		lease.ExpiresAt = now.Add(30 * time.Second)
 	}
 	s.leases[lease.ID] = lease
-	s.leaseByRequest[lease.RequestID] = lease.ID
+	s.leaseByRequest[leaseRequestKey(lease.RequestID, lease.AttemptNo)] = lease.ID
 	return cloneLease(lease), nil
 }
 
-func (s *Store) UpdateLeaseStatus(_ context.Context, requestID string, status contract.LeaseStatus) (contract.Lease, error) {
+func (s *Store) UpdateLeaseStatus(_ context.Context, requestID string, attemptNo int, status contract.LeaseStatus) (contract.Lease, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.expireLeases(time.Now().UTC())
-	leaseID, ok := s.leaseByRequest[requestID]
+	leaseID, ok := s.leaseByRequest[leaseRequestKey(requestID, attemptNo)]
 	if !ok {
 		return contract.Lease{}, errors.New("lease not found")
 	}
@@ -160,6 +164,13 @@ func (s *Store) expireLeases(now time.Time) {
 			s.leases[id] = lease
 		}
 	}
+}
+
+func leaseRequestKey(requestID string, attemptNo int) string {
+	if attemptNo <= 0 {
+		attemptNo = 1
+	}
+	return requestID + ":" + strconv.Itoa(attemptNo)
 }
 
 func cloneDecision(value contract.Decision) contract.Decision {

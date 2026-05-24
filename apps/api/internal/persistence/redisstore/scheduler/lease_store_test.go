@@ -21,6 +21,7 @@ func TestRedisLeaseStorePreventsConcurrentSchedulingAndReleases(t *testing.T) {
 	first, err := store.AcquireLease(ctx, contract.Lease{
 		ID:        "lease_req_1_1_10",
 		RequestID: "req_1",
+		AttemptNo: 1,
 		AccountID: 10,
 		ExpiresAt: time.Now().UTC().Add(time.Minute),
 	}, &maxConcurrency)
@@ -34,6 +35,7 @@ func TestRedisLeaseStorePreventsConcurrentSchedulingAndReleases(t *testing.T) {
 	_, err = store.AcquireLease(ctx, contract.Lease{
 		ID:        "lease_req_2_1_10",
 		RequestID: "req_2",
+		AttemptNo: 1,
 		AccountID: 10,
 		ExpiresAt: time.Now().UTC().Add(time.Minute),
 	}, &maxConcurrency)
@@ -41,7 +43,7 @@ func TestRedisLeaseStorePreventsConcurrentSchedulingAndReleases(t *testing.T) {
 		t.Fatalf("expected concurrency full, got %v", err)
 	}
 
-	committed, err := store.UpdateLeaseStatus(ctx, "req_1", contract.LeaseStatusCommitted)
+	committed, err := store.UpdateLeaseStatus(ctx, "req_1", 1, contract.LeaseStatusCommitted)
 	if err != nil {
 		t.Fatalf("commit first lease: %v", err)
 	}
@@ -52,6 +54,7 @@ func TestRedisLeaseStorePreventsConcurrentSchedulingAndReleases(t *testing.T) {
 	third, err := store.AcquireLease(ctx, contract.Lease{
 		ID:        "lease_req_3_1_10",
 		RequestID: "req_3",
+		AttemptNo: 1,
 		AccountID: 10,
 		ExpiresAt: time.Now().UTC().Add(time.Minute),
 	}, &maxConcurrency)
@@ -79,6 +82,7 @@ func TestRedisLeaseStoreAllowsOnlyOneConcurrentAcquire(t *testing.T) {
 			_, err := store.AcquireLease(ctx, contract.Lease{
 				ID:        "lease_req_concurrent_" + string(rune('a'+idx)),
 				RequestID: "req_concurrent_" + string(rune('a'+idx)),
+				AttemptNo: 1,
 				AccountID: 10,
 				ExpiresAt: time.Now().UTC().Add(time.Minute),
 			}, &maxConcurrency)
@@ -127,6 +131,7 @@ func TestRedisLeaseStoreExpiresAndFreesConcurrency(t *testing.T) {
 	first, err := store.AcquireLease(ctx, contract.Lease{
 		ID:        "lease_req_expired_1_10",
 		RequestID: "req_expired",
+		AttemptNo: 1,
 		AccountID: 10,
 		ExpiresAt: time.Now().UTC().Add(5 * time.Millisecond),
 	}, &maxConcurrency)
@@ -138,6 +143,7 @@ func TestRedisLeaseStoreExpiresAndFreesConcurrency(t *testing.T) {
 	second, err := store.AcquireLease(ctx, contract.Lease{
 		ID:        "lease_req_after_expiry_1_10",
 		RequestID: "req_after_expiry",
+		AttemptNo: 1,
 		AccountID: 10,
 		ExpiresAt: time.Now().UTC().Add(time.Minute),
 	}, &maxConcurrency)
@@ -172,6 +178,7 @@ func TestRedisLeaseStoreFeedbackAfterExpiryDoesNotLeakConcurrency(t *testing.T) 
 	_, err := store.AcquireLease(ctx, contract.Lease{
 		ID:        "lease_req_feedback_expired_1_10",
 		RequestID: "req_feedback_expired",
+		AttemptNo: 1,
 		AccountID: 10,
 		ExpiresAt: time.Now().UTC().Add(5 * time.Millisecond),
 	}, &maxConcurrency)
@@ -180,7 +187,7 @@ func TestRedisLeaseStoreFeedbackAfterExpiryDoesNotLeakConcurrency(t *testing.T) 
 	}
 	time.Sleep(20 * time.Millisecond)
 
-	updated, err := store.UpdateLeaseStatus(ctx, "req_feedback_expired", contract.LeaseStatusCommitted)
+	updated, err := store.UpdateLeaseStatus(ctx, "req_feedback_expired", 1, contract.LeaseStatusCommitted)
 	if err != nil {
 		t.Fatalf("update expired lease status: %v", err)
 	}
@@ -191,11 +198,51 @@ func TestRedisLeaseStoreFeedbackAfterExpiryDoesNotLeakConcurrency(t *testing.T) 
 	_, err = store.AcquireLease(ctx, contract.Lease{
 		ID:        "lease_req_after_feedback_expiry_1_10",
 		RequestID: "req_after_feedback_expiry",
+		AttemptNo: 1,
 		AccountID: 10,
 		ExpiresAt: time.Now().UTC().Add(time.Minute),
 	}, &maxConcurrency)
 	if err != nil {
 		t.Fatalf("expected expired feedback path to free concurrency: %v", err)
+	}
+}
+
+func TestRedisLeaseStoreUpdatesAttemptScopedLease(t *testing.T) {
+	store, closeClient := newTestStore(t)
+	defer closeClient()
+
+	ctx := context.Background()
+	maxConcurrency := 2
+	for attempt := 1; attempt <= 2; attempt++ {
+		_, err := store.AcquireLease(ctx, contract.Lease{
+			ID:        "lease_req_attempt_" + string(rune('0'+attempt)) + "_10",
+			RequestID: "req_attempt",
+			AttemptNo: attempt,
+			AccountID: 10,
+			ExpiresAt: time.Now().UTC().Add(time.Minute),
+		}, &maxConcurrency)
+		if err != nil {
+			t.Fatalf("acquire attempt %d lease: %v", attempt, err)
+		}
+	}
+
+	committed, err := store.UpdateLeaseStatus(ctx, "req_attempt", 1, contract.LeaseStatusCommitted)
+	if err != nil {
+		t.Fatalf("commit attempt 1 lease: %v", err)
+	}
+	if committed.AttemptNo != 1 || committed.Status != contract.LeaseStatusCommitted {
+		t.Fatalf("expected attempt 1 committed, got %+v", committed)
+	}
+	leases, err := store.ListLeases(ctx)
+	if err != nil {
+		t.Fatalf("list leases: %v", err)
+	}
+	statusByAttempt := map[int]contract.LeaseStatus{}
+	for _, lease := range leases {
+		statusByAttempt[lease.AttemptNo] = lease.Status
+	}
+	if statusByAttempt[1] != contract.LeaseStatusCommitted || statusByAttempt[2] != contract.LeaseStatusPending {
+		t.Fatalf("expected only attempt 1 released, got %+v", leases)
 	}
 }
 

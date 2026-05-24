@@ -533,6 +533,7 @@ target_protocol
 model
 strategy
 strategy_version
+fallback_from_decision_id
 selected_provider_id
 selected_account_id
 candidate_count
@@ -561,6 +562,7 @@ index(strategy, created_at)
 规则：
 
 - 同一 Gateway 请求如果发生 fallback，必须使用同一个 `request_id` 和递增 `attempt_no`。
+- fallback attempt 必须通过 `fallback_from_decision_id` 指向上一条 `scheduler_decisions.id`，形成可审计链路。
 - 每个 attempt 必须保留当时的 `strategy_version` 与 `strategy_weights_json`。
 - 历史 decision 不得因策略权重变更而被重写。
 

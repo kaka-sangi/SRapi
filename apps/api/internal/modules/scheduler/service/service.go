@@ -225,6 +225,7 @@ func (s *Service) Schedule(ctx context.Context, req contract.ScheduleRequest) (c
 	if err != nil {
 		return contract.ScheduleResult{}, err
 	}
+	attemptNo := scheduleAttemptNo(req.AttemptNo)
 	if req.UserBalanceInsufficient {
 		rejectReasons := rejectAllCandidates(req.Candidates, "user_balance_insufficient")
 		decision, err := s.store.CreateDecision(ctx, s.buildDecision(req, strategy, nil, len(req.Candidates), len(rejectReasons), nil, rejectReasons))
@@ -269,7 +270,7 @@ func (s *Service) Schedule(ctx context.Context, req contract.ScheduleRequest) (c
 	}
 	selected := frontier[0].Candidate
 	candidatesByRank := rankedCandidates(frontier, scores)
-	lease, err := s.acquireLease(ctx, req, 1, selected)
+	lease, err := s.acquireLease(ctx, req, attemptNo, selected)
 	if err != nil {
 		rejectReasons[accountKey(selected.Account.ID)] = "concurrency_full"
 		decision, decisionErr := s.store.CreateDecision(ctx, s.buildDecision(req, strategy, nil, len(req.Candidates), len(rejectReasons), scorePayload, rejectReasons))
@@ -280,7 +281,7 @@ func (s *Service) Schedule(ctx context.Context, req contract.ScheduleRequest) (c
 	}
 	decision, err := s.store.CreateDecision(ctx, s.buildDecision(req, strategy, &selected, len(req.Candidates), len(rejectReasons), scorePayload, rejectReasons))
 	if err != nil {
-		_, _ = s.store.UpdateLeaseStatus(ctx, requestID, contract.LeaseStatusReleased)
+		_, _ = s.store.UpdateLeaseStatus(ctx, requestID, attemptNo, contract.LeaseStatusReleased)
 		return contract.ScheduleResult{}, err
 	}
 	return contract.ScheduleResult{Decision: decision, Candidate: selected, Candidates: candidatesByRank, Lease: lease}, nil
@@ -343,7 +344,7 @@ func (s *Service) RecordFeedback(ctx context.Context, req contract.RecordFeedbac
 	if !req.Success {
 		status = contract.LeaseStatusFailed
 	}
-	if _, err := s.store.UpdateLeaseStatus(ctx, strings.TrimSpace(req.RequestID), status); err != nil {
+	if _, err := s.store.UpdateLeaseStatus(ctx, strings.TrimSpace(req.RequestID), req.AttemptNo, status); err != nil {
 		return feedback, nil
 	}
 	return feedback, nil
@@ -370,6 +371,7 @@ func (s *Service) acquireLease(ctx context.Context, req contract.ScheduleRequest
 	return s.store.AcquireLease(ctx, contract.Lease{
 		ID:        fmt.Sprintf("lease_%s_%d_%d", strings.TrimSpace(req.RequestID), attemptNo, selected.Account.ID),
 		RequestID: strings.TrimSpace(req.RequestID),
+		AttemptNo: attemptNo,
 		AccountID: selected.Account.ID,
 		Status:    contract.LeaseStatusPending,
 		ExpiresAt: now.Add(ttl),
@@ -396,26 +398,27 @@ func (s *Service) buildDecision(req contract.ScheduleRequest, strategy contract.
 		currency = "USD"
 	}
 	decision := contract.Decision{
-		RequestID:             strings.TrimSpace(req.RequestID),
-		AttemptNo:             1,
-		UserID:                req.UserID,
-		APIKeyID:              req.APIKeyID,
-		SourceProtocol:        sourceProtocol,
-		SourceEndpoint:        strings.TrimSpace(req.SourceEndpoint),
-		TargetProtocol:        targetProtocol,
-		Model:                 strings.TrimSpace(req.Model),
-		Strategy:              strategy.Name,
-		StrategyVersion:       strategy.Version,
-		StrategyConfigHash:    strategy.ConfigHash,
-		CandidateCount:        candidateCount,
-		RejectedCount:         rejectedCount,
-		Scores:                scores,
-		RejectReasons:         rejectReasons,
-		StrategyWeights:       strategyWeightsPayload(strategy),
-		CompatibilityWarnings: cloneStrings(req.Warnings),
-		EstimatedCost:         estimatedCost,
-		Currency:              currency,
-		CreatedAt:             s.clock.Now(),
+		RequestID:              strings.TrimSpace(req.RequestID),
+		AttemptNo:              scheduleAttemptNo(req.AttemptNo),
+		UserID:                 req.UserID,
+		APIKeyID:               req.APIKeyID,
+		SourceProtocol:         sourceProtocol,
+		SourceEndpoint:         strings.TrimSpace(req.SourceEndpoint),
+		TargetProtocol:         targetProtocol,
+		Model:                  strings.TrimSpace(req.Model),
+		Strategy:               strategy.Name,
+		StrategyVersion:        strategy.Version,
+		StrategyConfigHash:     strategy.ConfigHash,
+		FallbackFromDecisionID: cloneIntPtr(req.FallbackFromDecisionID),
+		CandidateCount:         candidateCount,
+		RejectedCount:          rejectedCount,
+		Scores:                 scores,
+		RejectReasons:          rejectReasons,
+		StrategyWeights:        strategyWeightsPayload(strategy),
+		CompatibilityWarnings:  cloneStrings(req.Warnings),
+		EstimatedCost:          estimatedCost,
+		Currency:               currency,
+		CreatedAt:              s.clock.Now(),
 	}
 	attachRoutingHints(&decision, req)
 	attachPricingEvidence(&decision, req)
@@ -578,6 +581,9 @@ func scoreCandidate(candidate contract.Candidate, req contract.ScheduleRequest, 
 }
 
 func rejectReason(candidate contract.Candidate, req contract.ScheduleRequest) string {
+	if excludedAccount(candidate.Account.ID, req.ExcludedAccountIDs) {
+		return "fallback_excluded"
+	}
 	if req.StickyStrength == contract.StickyStrengthHard {
 		if req.StickyAccountID == nil {
 			return "hard_sticky_missing"
@@ -943,6 +949,15 @@ func riskPenalty(candidate contract.Candidate) float64 {
 	}
 }
 
+func excludedAccount(accountID int, excluded []int) bool {
+	for _, excludedID := range excluded {
+		if accountID == excludedID {
+			return true
+		}
+	}
+	return false
+}
+
 func clamp01(value float64) float64 {
 	if value < 0 {
 		return 0
@@ -983,4 +998,19 @@ func cloneStrings(values []string) []string {
 	cloned := make([]string, len(values))
 	copy(cloned, values)
 	return cloned
+}
+
+func scheduleAttemptNo(value int) int {
+	if value <= 0 {
+		return 1
+	}
+	return value
+}
+
+func cloneIntPtr(value *int) *int {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
 }
