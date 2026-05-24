@@ -626,6 +626,7 @@ GET  /api/v1/admin/user-subscriptions
 POST /api/v1/admin/user-subscriptions
 GET  /api/v1/admin/pricing-rules
 POST /api/v1/admin/pricing-rules
+POST /api/v1/admin/pricing-rules:bulk
 ```
 
 订阅与定价控制面必须满足：

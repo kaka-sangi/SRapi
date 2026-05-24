@@ -125,6 +125,20 @@ export type UpdateUserBalanceRequest = {
     note?: string;
 };
 
+export type UserBalance = {
+    user_id: Id;
+    /**
+     * Decimal string balance.
+     */
+    balance: string;
+    currency: string;
+};
+
+export type UserBalanceResponse = {
+    data: UserBalance;
+    request_id: RequestId;
+};
+
 export type UpdateUserRpmLimitRequest = {
     rpm_limit: number | null;
 };
@@ -478,6 +492,30 @@ export type PricingRuleResponse = {
 export type PricingRuleListResponse = {
     data: Array<PricingRule>;
     pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type BulkPricingRuleImportRequest = {
+    dry_run?: boolean;
+    items: Array<CreatePricingRuleRequest>;
+};
+
+export type BulkPricingRuleImportError = {
+    index: number;
+    message: string;
+};
+
+export type BulkPricingRuleImportResult = {
+    dry_run: boolean;
+    requested: number;
+    validated: number;
+    created: number;
+    errors: Array<BulkPricingRuleImportError>;
+    rules: Array<PricingRule>;
+};
+
+export type BulkPricingRuleImportResponse = {
+    data: BulkPricingRuleImportResult;
     request_id: RequestId;
 };
 
@@ -2625,6 +2663,35 @@ export type GetCurrentUserResponses = {
 };
 
 export type GetCurrentUserResponse = GetCurrentUserResponses[keyof GetCurrentUserResponses];
+
+export type GetCurrentUserBalanceData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/me/balance';
+};
+
+export type GetCurrentUserBalanceErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetCurrentUserBalanceError = GetCurrentUserBalanceErrors[keyof GetCurrentUserBalanceErrors];
+
+export type GetCurrentUserBalanceResponses = {
+    /**
+     * Current user balance.
+     */
+    200: UserBalanceResponse;
+};
+
+export type GetCurrentUserBalanceResponse = GetCurrentUserBalanceResponses[keyof GetCurrentUserBalanceResponses];
 
 export type GetCurrentUserUsageData = {
     body?: never;
@@ -5463,6 +5530,48 @@ export type CreateAdminPricingRuleResponses = {
 };
 
 export type CreateAdminPricingRuleResponse = CreateAdminPricingRuleResponses[keyof CreateAdminPricingRuleResponses];
+
+export type BulkImportAdminPricingRulesData = {
+    body: BulkPricingRuleImportRequest | Array<CreatePricingRuleRequest>;
+    path?: never;
+    query?: {
+        /**
+         * Dry-run mode for naked JSON array and CSV imports. Object JSON requests should prefer body.dry_run.
+         */
+        dry_run?: boolean;
+    };
+    url: '/api/v1/admin/pricing-rules:bulk';
+};
+
+export type BulkImportAdminPricingRulesErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type BulkImportAdminPricingRulesError = BulkImportAdminPricingRulesErrors[keyof BulkImportAdminPricingRulesErrors];
+
+export type BulkImportAdminPricingRulesResponses = {
+    /**
+     * Pricing rules validated or imported.
+     */
+    200: BulkPricingRuleImportResponse;
+};
+
+export type BulkImportAdminPricingRulesResponse = BulkImportAdminPricingRulesResponses[keyof BulkImportAdminPricingRulesResponses];
 
 export type ListAdminOutboxEventsData = {
     body?: never;

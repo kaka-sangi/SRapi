@@ -100,6 +100,28 @@ func (s *Server) handleCurrentUser(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (s *Server) handleCurrentUserBalance(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireConsoleSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusUnauthorized, apiopenapi.UNAUTHORIZED, "unauthorized", requestID)
+		return
+	}
+	user, err := s.runtime.users.FindByID(r.Context(), session.User.ID)
+	if err != nil {
+		writeUserServiceError(w, err, requestID)
+		return
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.UserBalanceResponse{
+		Data: apiopenapi.UserBalance{
+			UserId:   apiopenapi.Id(strconv.Itoa(user.ID)),
+			Balance:  user.Balance,
+			Currency: user.Currency,
+		},
+		RequestId: requestID,
+	})
+}
+
 func (s *Server) handleCurrentUserUsage(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	session, err := s.requireConsoleSession(r)

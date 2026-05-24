@@ -1,6 +1,12 @@
 package httpserver
 
 import (
+	"bytes"
+	"context"
+	"encoding/csv"
+	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -11,6 +17,8 @@ import (
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
+
+const maxBulkPricingRuleImportItems = 500
 
 func (s *Server) handleListAdminUsageLogs(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
@@ -414,37 +422,12 @@ func (s *Server) handleCreateAdminPricingRule(w http.ResponseWriter, r *http.Req
 		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid pricing rule request", requestID)
 		return
 	}
-	modelID, err := strconv.Atoi(string(body.ModelId))
-	if err != nil || modelID <= 0 {
-		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid model id", requestID)
+	pricingReq, message := s.pricingRuleRequestFromAPI(r.Context(), body)
+	if message != "" {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, message, requestID)
 		return
 	}
-	providerID, err := strconv.Atoi(string(body.ProviderId))
-	if err != nil || providerID < 0 {
-		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid provider id", requestID)
-		return
-	}
-	if _, err := s.runtime.models.FindByID(r.Context(), modelID); err != nil {
-		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "model not found", requestID)
-		return
-	}
-	if providerID > 0 {
-		if _, err := s.runtime.providers.FindByID(r.Context(), providerID); err != nil {
-			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "provider not found", requestID)
-			return
-		}
-	}
-	rule, err := s.runtime.subscriptions.CreatePricingRule(r.Context(), subscriptioncontract.CreatePricingRuleRequest{
-		ModelID:                         modelID,
-		ProviderID:                      providerID,
-		InputPricePerMillionTokens:      body.InputPricePerMillionTokens,
-		OutputPricePerMillionTokens:     body.OutputPricePerMillionTokens,
-		CacheReadPricePerMillionTokens:  body.CacheReadPricePerMillionTokens,
-		CacheWritePricePerMillionTokens: body.CacheWritePricePerMillionTokens,
-		Currency:                        body.Currency,
-		EffectiveFrom:                   body.EffectiveFrom,
-		EffectiveTo:                     body.EffectiveTo,
-	})
+	rule, err := s.runtime.subscriptions.CreatePricingRule(r.Context(), pricingReq)
 	if err != nil {
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid pricing rule request", requestID)
 		return
@@ -454,6 +437,229 @@ func (s *Server) handleCreateAdminPricingRule(w http.ResponseWriter, r *http.Req
 		Data:      toAPIPricingRule(rule),
 		RequestId: requestID,
 	})
+}
+
+func (s *Server) handleBulkImportAdminPricingRules(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	body, err := s.decodeBulkPricingRuleImport(w, r)
+	if err != nil {
+		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid pricing rule import request", requestID)
+		return
+	}
+	if len(body.Items) == 0 || len(body.Items) > maxBulkPricingRuleImportItems {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "pricing rule import requires 1 to 500 items", requestID)
+		return
+	}
+	dryRun := body.DryRun != nil && *body.DryRun
+	errorsOut := make([]apiopenapi.BulkPricingRuleImportError, 0)
+	rules := make([]apiopenapi.PricingRule, 0, len(body.Items))
+	validated := 0
+	created := 0
+	for idx, item := range body.Items {
+		pricingReq, message := s.pricingRuleRequestFromAPI(r.Context(), item)
+		if message == "" {
+			if err := s.runtime.subscriptions.ValidatePricingRule(pricingReq); err != nil {
+				message = "invalid pricing rule request"
+			}
+		}
+		if message != "" {
+			errorsOut = append(errorsOut, apiopenapi.BulkPricingRuleImportError{Index: idx, Message: message})
+			continue
+		}
+		validated++
+		if dryRun {
+			continue
+		}
+		rule, err := s.runtime.subscriptions.CreatePricingRule(r.Context(), pricingReq)
+		if err != nil {
+			errorsOut = append(errorsOut, apiopenapi.BulkPricingRuleImportError{Index: idx, Message: "invalid pricing rule request"})
+			continue
+		}
+		created++
+		rules = append(rules, toAPIPricingRule(rule))
+	}
+	if created > 0 {
+		s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "pricing_rule.bulk_import", "pricing_rule", "bulk", nil, map[string]any{
+			"requested": len(body.Items),
+			"validated": validated,
+			"created":   created,
+			"errors":    len(errorsOut),
+			"dry_run":   dryRun,
+		}))
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.BulkPricingRuleImportResponse{
+		Data: apiopenapi.BulkPricingRuleImportResult{
+			Created:   created,
+			DryRun:    dryRun,
+			Errors:    errorsOut,
+			Requested: len(body.Items),
+			Rules:     rules,
+			Validated: validated,
+		},
+		RequestId: requestID,
+	})
+}
+
+func (s *Server) decodeBulkPricingRuleImport(w http.ResponseWriter, r *http.Request) (apiopenapi.BulkPricingRuleImportRequest, error) {
+	limited := http.MaxBytesReader(w, r.Body, s.cfg.Gateway.MaxBodySize)
+	dryRun, err := parseBoolQuery(r.URL.Query().Get("dry_run"))
+	if err != nil {
+		return apiopenapi.BulkPricingRuleImportRequest{}, err
+	}
+	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(r.Header.Get("Content-Type"))), "text/csv") {
+		return decodeCSVPricingRuleImport(limited, dryRun)
+	}
+	payload, err := io.ReadAll(limited)
+	if err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			return apiopenapi.BulkPricingRuleImportRequest{}, errRequestTooLarge
+		}
+		return apiopenapi.BulkPricingRuleImportRequest{}, err
+	}
+	var body apiopenapi.BulkPricingRuleImportRequest
+	if err := decodeStrictJSON(payload, &body); err == nil {
+		if body.DryRun == nil {
+			body.DryRun = dryRun
+		}
+		return body, nil
+	}
+	var items []apiopenapi.CreatePricingRuleRequest
+	if err := decodeStrictJSON(payload, &items); err != nil {
+		return apiopenapi.BulkPricingRuleImportRequest{}, err
+	}
+	return apiopenapi.BulkPricingRuleImportRequest{
+		DryRun: dryRun,
+		Items:  items,
+	}, nil
+}
+
+func decodeStrictJSON(payload []byte, dst any) error {
+	decoder := json.NewDecoder(bytes.NewReader(payload))
+	decoder.DisallowUnknownFields()
+	return decoder.Decode(dst)
+}
+
+func (s *Server) pricingRuleRequestFromAPI(ctx context.Context, body apiopenapi.CreatePricingRuleRequest) (subscriptioncontract.CreatePricingRuleRequest, string) {
+	modelID, err := strconv.Atoi(string(body.ModelId))
+	if err != nil || modelID <= 0 {
+		return subscriptioncontract.CreatePricingRuleRequest{}, "invalid model id"
+	}
+	providerID, err := strconv.Atoi(string(body.ProviderId))
+	if err != nil || providerID < 0 {
+		return subscriptioncontract.CreatePricingRuleRequest{}, "invalid provider id"
+	}
+	if _, err := s.runtime.models.FindByID(ctx, modelID); err != nil {
+		return subscriptioncontract.CreatePricingRuleRequest{}, "model not found"
+	}
+	if providerID > 0 {
+		if _, err := s.runtime.providers.FindByID(ctx, providerID); err != nil {
+			return subscriptioncontract.CreatePricingRuleRequest{}, "provider not found"
+		}
+	}
+	return subscriptioncontract.CreatePricingRuleRequest{
+		ModelID:                         modelID,
+		ProviderID:                      providerID,
+		InputPricePerMillionTokens:      body.InputPricePerMillionTokens,
+		OutputPricePerMillionTokens:     body.OutputPricePerMillionTokens,
+		CacheReadPricePerMillionTokens:  body.CacheReadPricePerMillionTokens,
+		CacheWritePricePerMillionTokens: body.CacheWritePricePerMillionTokens,
+		Currency:                        body.Currency,
+		EffectiveFrom:                   body.EffectiveFrom,
+		EffectiveTo:                     body.EffectiveTo,
+	}, ""
+}
+
+func decodeCSVPricingRuleImport(body io.Reader, dryRun *bool) (apiopenapi.BulkPricingRuleImportRequest, error) {
+	reader := csv.NewReader(body)
+	reader.TrimLeadingSpace = true
+	header, err := reader.Read()
+	if err != nil {
+		return apiopenapi.BulkPricingRuleImportRequest{}, err
+	}
+	columns := make(map[string]int, len(header))
+	for idx, column := range header {
+		columns[strings.ToLower(strings.TrimSpace(column))] = idx
+	}
+	items := make([]apiopenapi.CreatePricingRuleRequest, 0)
+	for {
+		record, err := reader.Read()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return apiopenapi.BulkPricingRuleImportRequest{}, err
+		}
+		item, err := pricingRuleFromCSVRecord(columns, record)
+		if err != nil {
+			return apiopenapi.BulkPricingRuleImportRequest{}, err
+		}
+		items = append(items, item)
+	}
+	return apiopenapi.BulkPricingRuleImportRequest{DryRun: dryRun, Items: items}, nil
+}
+
+func pricingRuleFromCSVRecord(columns map[string]int, record []string) (apiopenapi.CreatePricingRuleRequest, error) {
+	effectiveFrom, err := csvOptionalTime(columns, record, "effective_from")
+	if err != nil {
+		return apiopenapi.CreatePricingRuleRequest{}, err
+	}
+	effectiveTo, err := csvOptionalTime(columns, record, "effective_to")
+	if err != nil {
+		return apiopenapi.CreatePricingRuleRequest{}, err
+	}
+	return apiopenapi.CreatePricingRuleRequest{
+		ModelId:                         apiopenapi.Id(csvValue(columns, record, "model_id")),
+		ProviderId:                      apiopenapi.Id(csvValue(columns, record, "provider_id")),
+		InputPricePerMillionTokens:      csvValue(columns, record, "input_price_per_million_tokens"),
+		OutputPricePerMillionTokens:     csvValue(columns, record, "output_price_per_million_tokens"),
+		CacheReadPricePerMillionTokens:  csvValue(columns, record, "cache_read_price_per_million_tokens"),
+		CacheWritePricePerMillionTokens: csvValue(columns, record, "cache_write_price_per_million_tokens"),
+		Currency:                        csvValue(columns, record, "currency"),
+		EffectiveFrom:                   effectiveFrom,
+		EffectiveTo:                     effectiveTo,
+	}, nil
+}
+
+func csvValue(columns map[string]int, record []string, name string) string {
+	idx, ok := columns[name]
+	if !ok || idx < 0 || idx >= len(record) {
+		return ""
+	}
+	return strings.TrimSpace(record[idx])
+}
+
+func csvOptionalTime(columns map[string]int, record []string, name string) (*time.Time, error) {
+	value := csvValue(columns, record, name)
+	if value == "" {
+		return nil, nil
+	}
+	parsed, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return nil, err
+	}
+	return &parsed, nil
+}
+
+func parseBoolQuery(value string) (*bool, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil, nil
+	}
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return nil, err
+	}
+	return &parsed, nil
 }
 
 func (s *Server) handleListAdminOutboxEvents(w http.ResponseWriter, r *http.Request) {

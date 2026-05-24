@@ -2542,6 +2542,34 @@ type BindProviderAccountProxyRequest struct {
 	ProxyId *string `json:"proxy_id"`
 }
 
+// BulkPricingRuleImportError defines model for BulkPricingRuleImportError.
+type BulkPricingRuleImportError struct {
+	Index   int    `json:"index"`
+	Message string `json:"message"`
+}
+
+// BulkPricingRuleImportRequest defines model for BulkPricingRuleImportRequest.
+type BulkPricingRuleImportRequest struct {
+	DryRun *bool                      `json:"dry_run,omitempty"`
+	Items  []CreatePricingRuleRequest `json:"items"`
+}
+
+// BulkPricingRuleImportResponse defines model for BulkPricingRuleImportResponse.
+type BulkPricingRuleImportResponse struct {
+	Data      BulkPricingRuleImportResult `json:"data"`
+	RequestId RequestId                   `json:"request_id"`
+}
+
+// BulkPricingRuleImportResult defines model for BulkPricingRuleImportResult.
+type BulkPricingRuleImportResult struct {
+	Created   int                          `json:"created"`
+	DryRun    bool                         `json:"dry_run"`
+	Errors    []BulkPricingRuleImportError `json:"errors"`
+	Requested int                          `json:"requested"`
+	Rules     []PricingRule                `json:"rules"`
+	Validated int                          `json:"validated"`
+}
+
 // CapabilityDefinition defines model for CapabilityDefinition.
 type CapabilityDefinition struct {
 	Category       string                     `json:"category"`
@@ -4684,6 +4712,20 @@ type User struct {
 	Status      UserStatus          `json:"status"`
 }
 
+// UserBalance defines model for UserBalance.
+type UserBalance struct {
+	// Balance Decimal string balance.
+	Balance  string `json:"balance"`
+	Currency string `json:"currency"`
+	UserId   Id     `json:"user_id"`
+}
+
+// UserBalanceResponse defines model for UserBalanceResponse.
+type UserBalanceResponse struct {
+	Data      UserBalance `json:"data"`
+	RequestId RequestId   `json:"request_id"`
+}
+
 // UserListResponse defines model for UserListResponse.
 type UserListResponse struct {
 	Data       []User     `json:"data"`
@@ -4994,6 +5036,20 @@ type ListAdminPricingRulesParams struct {
 	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
 }
 
+// BulkImportAdminPricingRulesJSONBody defines parameters for BulkImportAdminPricingRules.
+type BulkImportAdminPricingRulesJSONBody struct {
+	union json.RawMessage
+}
+
+// BulkImportAdminPricingRulesParams defines parameters for BulkImportAdminPricingRules.
+type BulkImportAdminPricingRulesParams struct {
+	// DryRun Dry-run mode for naked JSON array and CSV imports. Object JSON requests should prefer body.dry_run.
+	DryRun *bool `form:"dry_run,omitempty" json:"dry_run,omitempty"`
+}
+
+// BulkImportAdminPricingRulesJSONBody1 defines parameters for BulkImportAdminPricingRules.
+type BulkImportAdminPricingRulesJSONBody1 = []CreatePricingRuleRequest
+
 // ListAdminPromoCodesParams defines parameters for ListAdminPromoCodes.
 type ListAdminPromoCodesParams struct {
 	Page     *Page            `form:"page,omitempty" json:"page,omitempty"`
@@ -5279,6 +5335,9 @@ type CreateAdminPaymentProviderJSONRequestBody = CreatePaymentProviderInstanceRe
 
 // CreateAdminPricingRuleJSONRequestBody defines body for CreateAdminPricingRule for application/json ContentType.
 type CreateAdminPricingRuleJSONRequestBody = CreatePricingRuleRequest
+
+// BulkImportAdminPricingRulesJSONRequestBody defines body for BulkImportAdminPricingRules for application/json ContentType.
+type BulkImportAdminPricingRulesJSONRequestBody BulkImportAdminPricingRulesJSONBody
 
 // CreateAdminPromoCodeJSONRequestBody defines body for CreateAdminPromoCode for application/json ContentType.
 type CreateAdminPromoCodeJSONRequestBody = CreatePromoCodeRequest
@@ -11178,6 +11237,68 @@ func (t *ResponsesRequest_Input) UnmarshalJSON(b []byte) error {
 	return err
 }
 
+// AsBulkPricingRuleImportRequest returns the union data inside the BulkImportAdminPricingRulesJSONBody as a BulkPricingRuleImportRequest
+func (t BulkImportAdminPricingRulesJSONBody) AsBulkPricingRuleImportRequest() (BulkPricingRuleImportRequest, error) {
+	var body BulkPricingRuleImportRequest
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromBulkPricingRuleImportRequest overwrites any union data inside the BulkImportAdminPricingRulesJSONBody as the provided BulkPricingRuleImportRequest
+func (t *BulkImportAdminPricingRulesJSONBody) FromBulkPricingRuleImportRequest(v BulkPricingRuleImportRequest) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeBulkPricingRuleImportRequest performs a merge with any union data inside the BulkImportAdminPricingRulesJSONBody, using the provided BulkPricingRuleImportRequest
+func (t *BulkImportAdminPricingRulesJSONBody) MergeBulkPricingRuleImportRequest(v BulkPricingRuleImportRequest) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsBulkImportAdminPricingRulesJSONBody1 returns the union data inside the BulkImportAdminPricingRulesJSONBody as a BulkImportAdminPricingRulesJSONBody1
+func (t BulkImportAdminPricingRulesJSONBody) AsBulkImportAdminPricingRulesJSONBody1() (BulkImportAdminPricingRulesJSONBody1, error) {
+	var body BulkImportAdminPricingRulesJSONBody1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromBulkImportAdminPricingRulesJSONBody1 overwrites any union data inside the BulkImportAdminPricingRulesJSONBody as the provided BulkImportAdminPricingRulesJSONBody1
+func (t *BulkImportAdminPricingRulesJSONBody) FromBulkImportAdminPricingRulesJSONBody1(v BulkImportAdminPricingRulesJSONBody1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeBulkImportAdminPricingRulesJSONBody1 performs a merge with any union data inside the BulkImportAdminPricingRulesJSONBody, using the provided BulkImportAdminPricingRulesJSONBody1
+func (t *BulkImportAdminPricingRulesJSONBody) MergeBulkImportAdminPricingRulesJSONBody1(v BulkImportAdminPricingRulesJSONBody1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t BulkImportAdminPricingRulesJSONBody) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *BulkImportAdminPricingRulesJSONBody) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// Create an Anthropic Messages-compatible message with anthropic-compatible provider context.
@@ -11411,6 +11532,9 @@ type ServerInterface interface {
 	// Create a decimal-safe pricing rule.
 	// (POST /api/v1/admin/pricing-rules)
 	CreateAdminPricingRule(w http.ResponseWriter, r *http.Request)
+	// Bulk import decimal-safe pricing rules.
+	// (POST /api/v1/admin/pricing-rules:bulk)
+	BulkImportAdminPricingRules(w http.ResponseWriter, r *http.Request, params BulkImportAdminPricingRulesParams)
 	// List promo codes.
 	// (GET /api/v1/admin/promo-codes)
 	ListAdminPromoCodes(w http.ResponseWriter, r *http.Request, params ListAdminPromoCodesParams)
@@ -11552,6 +11676,9 @@ type ServerInterface interface {
 	// Get current console user.
 	// (GET /api/v1/me)
 	GetCurrentUser(w http.ResponseWriter, r *http.Request)
+	// Get current user balance.
+	// (GET /api/v1/me/balance)
+	GetCurrentUserBalance(w http.ResponseWriter, r *http.Request)
 	// List subscriptions for the current console user.
 	// (GET /api/v1/me/subscriptions)
 	GetCurrentUserSubscriptions(w http.ResponseWriter, r *http.Request, params GetCurrentUserSubscriptionsParams)
@@ -14530,6 +14657,47 @@ func (siw *ServerInterfaceWrapper) CreateAdminPricingRule(w http.ResponseWriter,
 	handler.ServeHTTP(w, r)
 }
 
+// BulkImportAdminPricingRules operation middleware
+func (siw *ServerInterfaceWrapper) BulkImportAdminPricingRules(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params BulkImportAdminPricingRulesParams
+
+	// ------------- Optional query parameter "dry_run" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "dry_run", r.URL.Query(), &params.DryRun, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "dry_run"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dry_run", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BulkImportAdminPricingRules(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListAdminPromoCodes operation middleware
 func (siw *ServerInterfaceWrapper) ListAdminPromoCodes(w http.ResponseWriter, r *http.Request) {
 
@@ -16333,6 +16501,26 @@ func (siw *ServerInterfaceWrapper) GetCurrentUser(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// GetCurrentUserBalance operation middleware
+func (siw *ServerInterfaceWrapper) GetCurrentUserBalance(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetCurrentUserBalance(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetCurrentUserSubscriptions operation middleware
 func (siw *ServerInterfaceWrapper) GetCurrentUserSubscriptions(w http.ResponseWriter, r *http.Request) {
 
@@ -17405,6 +17593,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/payments/providers", wrapper.CreateAdminPaymentProvider)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/pricing-rules", wrapper.ListAdminPricingRules)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/pricing-rules", wrapper.CreateAdminPricingRule)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/pricing-rules:bulk", wrapper.BulkImportAdminPricingRules)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/promo-codes", wrapper.ListAdminPromoCodes)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/promo-codes", wrapper.CreateAdminPromoCode)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/promo-codes/{id}", wrapper.DeleteAdminPromoCode)
@@ -17452,6 +17641,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/auth/logout", wrapper.Logout)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/health", wrapper.GetHealth)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me", wrapper.GetCurrentUser)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/balance", wrapper.GetCurrentUserBalance)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/subscriptions", wrapper.GetCurrentUserSubscriptions)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/usage", wrapper.GetCurrentUserUsage)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/payment/methods", wrapper.ListPaymentMethods)

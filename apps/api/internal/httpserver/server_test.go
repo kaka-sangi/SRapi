@@ -225,6 +225,21 @@ func TestAuthAndGatewayFlow(t *testing.T) {
 		t.Fatalf("expected admin email, got %s", meResp.Data.Email)
 	}
 
+	balanceReq := httptest.NewRequest(http.MethodGet, "/api/v1/me/balance", nil)
+	balanceReq.AddCookie(sessionCookie)
+	balanceRec := httptest.NewRecorder()
+	handler.ServeHTTP(balanceRec, balanceReq)
+	if balanceRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 balance, got %d body=%s", balanceRec.Code, balanceRec.Body.String())
+	}
+	var balanceResp apiopenapi.UserBalanceResponse
+	if err := json.NewDecoder(balanceRec.Body).Decode(&balanceResp); err != nil {
+		t.Fatalf("decode balance response: %v", err)
+	}
+	if balanceResp.Data.UserId != meResp.Data.Id || balanceResp.Data.Balance != meResp.Data.Balance || balanceResp.Data.Currency != meResp.Data.Currency {
+		t.Fatalf("expected current user balance snapshot, got %+v for user %+v", balanceResp.Data, meResp.Data)
+	}
+
 	createBody := `{"name":"default","scopes":["gateway:invoke"]}`
 	createReq := httptest.NewRequest(http.MethodPost, "/api/v1/api-keys", strings.NewReader(createBody))
 	createReq.Header.Set("Content-Type", "application/json")
@@ -409,6 +424,7 @@ func TestConsoleWriteRoutesRequireCSRF(t *testing.T) {
 		{http.MethodPost, "/api/v1/admin/subscription-plans", `{"name":"blocked-plan","price":"1.00","currency":"USD","validity_days":30}`},
 		{http.MethodPost, "/api/v1/admin/user-subscriptions", `{"user_id":"` + string(loginResp.Data.User.Id) + `","plan_id":"1"}`},
 		{http.MethodPost, "/api/v1/admin/pricing-rules", `{"model_id":"` + string(modelResp.Data.Id) + `","provider_id":"` + string(providerResp.Data.Id) + `","input_price_per_million_tokens":"1","output_price_per_million_tokens":"2","cache_read_price_per_million_tokens":"0","cache_write_price_per_million_tokens":"0","currency":"USD"}`},
+		{http.MethodPost, "/api/v1/admin/pricing-rules:bulk", `{"items":[{"model_id":"` + string(modelResp.Data.Id) + `","provider_id":"` + string(providerResp.Data.Id) + `","input_price_per_million_tokens":"1","output_price_per_million_tokens":"2","cache_read_price_per_million_tokens":"0","cache_write_price_per_million_tokens":"0","currency":"USD"}]}`},
 		{http.MethodPut, "/api/v1/admin/settings", `{"general":{"site_name":"SRapi","logo_url":"","version_label":"","custom_menus":[]},"agreement":{"user_agreement":"","privacy_policy":""},"features":{"enabled_channels":[],"channel_monitoring_enabled":true,"invitation_rebate_enabled":false,"payments_enabled":false},"security":{"admin_api_key":{"configured":false},"registration_enabled":true,"oauth_enabled":false,"oauth_providers":[]},"users":{"default_balance":"0","default_group":"default","user_self_delete_enabled":false,"rpm_limit_default":0},"gateway":{"overload_cooldown_seconds":30,"rate_limit_cooldown_seconds":30,"stream_timeout_seconds":600,"request_shaper_enabled":true,"beta_strategy":"allow_configured"},"payment":{"enabled":false,"providers":[],"subscription_plans_enabled":false},"email":{"smtp_configured":false,"templates":{}},"backup":{"enabled":false,"retention_days":30}}`},
 		{http.MethodPost, "/api/v1/admin/announcements", `{"title":"Hello","content":"World"}`},
 		{http.MethodPost, "/api/v1/admin/redeem-codes", `{"code":"CSRF-REDEEM","type":"balance","value":"1.00"}`},
@@ -760,6 +776,43 @@ func TestAdminSubscriptionPricingControlPlane(t *testing.T) {
 		t.Fatalf("expected normalized decimal pricing rule, got %+v", pricingResp.Data)
 	}
 
+	bulkDryRunReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/pricing-rules:bulk", strings.NewReader(`{"dry_run":true,"items":[{"model_id":"`+string(modelResp.Data.Id)+`","provider_id":"`+string(providerResp.Data.Id)+`","input_price_per_million_tokens":"3","output_price_per_million_tokens":"4","cache_read_price_per_million_tokens":"0","cache_write_price_per_million_tokens":"0","currency":"usd"},{"model_id":"bad","provider_id":"`+string(providerResp.Data.Id)+`","input_price_per_million_tokens":"3","output_price_per_million_tokens":"4","cache_read_price_per_million_tokens":"0","cache_write_price_per_million_tokens":"0","currency":"usd"}]}`))
+	bulkDryRunReq.Header.Set("Content-Type", "application/json")
+	bulkDryRunReq.AddCookie(sessionCookie)
+	bulkDryRunReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	bulkDryRunRec := httptest.NewRecorder()
+	handler.ServeHTTP(bulkDryRunRec, bulkDryRunReq)
+	if bulkDryRunRec.Code != http.StatusOK {
+		t.Fatalf("expected pricing rule bulk dry-run 200, got %d body=%s", bulkDryRunRec.Code, bulkDryRunRec.Body.String())
+	}
+	var bulkDryRunResp apiopenapi.BulkPricingRuleImportResponse
+	if err := json.NewDecoder(bulkDryRunRec.Body).Decode(&bulkDryRunResp); err != nil {
+		t.Fatalf("decode pricing rule bulk dry-run: %v", err)
+	}
+	if !bulkDryRunResp.Data.DryRun || bulkDryRunResp.Data.Requested != 2 || bulkDryRunResp.Data.Validated != 1 || bulkDryRunResp.Data.Created != 0 || len(bulkDryRunResp.Data.Rules) != 0 || len(bulkDryRunResp.Data.Errors) != 1 {
+		t.Fatalf("unexpected pricing rule bulk dry-run response: %+v", bulkDryRunResp.Data)
+	}
+
+	bulkReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/pricing-rules:bulk", strings.NewReader(`[{"model_id":"`+string(modelResp.Data.Id)+`","provider_id":"`+string(providerResp.Data.Id)+`","input_price_per_million_tokens":"3","output_price_per_million_tokens":"4","cache_read_price_per_million_tokens":"0","cache_write_price_per_million_tokens":"0","currency":"usd"}]`))
+	bulkReq.Header.Set("Content-Type", "application/json")
+	bulkReq.AddCookie(sessionCookie)
+	bulkReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	bulkRec := httptest.NewRecorder()
+	handler.ServeHTTP(bulkRec, bulkReq)
+	if bulkRec.Code != http.StatusOK {
+		t.Fatalf("expected pricing rule bulk import 200, got %d body=%s", bulkRec.Code, bulkRec.Body.String())
+	}
+	var bulkResp apiopenapi.BulkPricingRuleImportResponse
+	if err := json.NewDecoder(bulkRec.Body).Decode(&bulkResp); err != nil {
+		t.Fatalf("decode pricing rule bulk import: %v", err)
+	}
+	if bulkResp.Data.DryRun || bulkResp.Data.Requested != 1 || bulkResp.Data.Validated != 1 || bulkResp.Data.Created != 1 || len(bulkResp.Data.Errors) != 0 || len(bulkResp.Data.Rules) != 1 {
+		t.Fatalf("unexpected pricing rule bulk import response: %+v", bulkResp.Data)
+	}
+	if bulkResp.Data.Rules[0].InputPricePerMillionTokens != "3.00000000" || bulkResp.Data.Rules[0].Currency != "USD" {
+		t.Fatalf("expected normalized bulk pricing rule, got %+v", bulkResp.Data.Rules[0])
+	}
+
 	plansReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/subscription-plans", nil)
 	plansReq.AddCookie(sessionCookie)
 	plansRec := httptest.NewRecorder()
@@ -816,7 +869,7 @@ func TestAdminSubscriptionPricingControlPlane(t *testing.T) {
 	if err := json.NewDecoder(rulesRec.Body).Decode(&rulesResp); err != nil {
 		t.Fatalf("decode pricing rule list: %v", err)
 	}
-	if len(rulesResp.Data) != 1 || rulesResp.Data[0].Id != pricingResp.Data.Id {
+	if len(rulesResp.Data) != 2 || !pricingRuleListHasID(rulesResp.Data, pricingResp.Data.Id) || !pricingRuleListHasID(rulesResp.Data, bulkResp.Data.Rules[0].Id) {
 		t.Fatalf("unexpected pricing rule list: %+v", rulesResp.Data)
 	}
 
@@ -831,10 +884,53 @@ func TestAdminSubscriptionPricingControlPlane(t *testing.T) {
 	if err := json.NewDecoder(auditRec.Body).Decode(&auditResp); err != nil {
 		t.Fatalf("decode audit logs: %v", err)
 	}
-	for _, action := range []string{"subscription_plan.create", "user_subscription.create", "pricing_rule.create"} {
+	for _, action := range []string{"subscription_plan.create", "user_subscription.create", "pricing_rule.create", "pricing_rule.bulk_import"} {
 		if !auditLogHasAction(auditResp.Data, action) {
 			t.Fatalf("expected audit action %s in %+v", action, auditResp.Data)
 		}
+	}
+}
+
+func TestBulkImportAdminPricingRulesAcceptsCSV(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"pricing-csv-provider","display_name":"Pricing CSV Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	modelIDs := make([]apiopenapi.Id, 0, 50)
+	for idx := 0; idx < 50; idx++ {
+		modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, fmt.Sprintf(`{"canonical_name":"pricing-csv-model-%02d","display_name":"Pricing CSV Model %02d","status":"active"}`, idx, idx))
+		modelIDs = append(modelIDs, modelResp.Data.Id)
+	}
+
+	var csvBody strings.Builder
+	csvBody.WriteString("model_id,provider_id,input_price_per_million_tokens,output_price_per_million_tokens,cache_read_price_per_million_tokens,cache_write_price_per_million_tokens,currency,effective_from,effective_to\n")
+	for idx, modelID := range modelIDs {
+		csvBody.WriteString(fmt.Sprintf("%s,%s,1.%02d,2.%02d,0,0,usd,,\n", modelID, providerResp.Data.Id, idx, idx))
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/pricing-rules:bulk", strings.NewReader(csvBody.String()))
+	req.Header.Set("Content-Type", "text/csv")
+	req.AddCookie(sessionCookie)
+	req.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected pricing rule csv import 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var resp apiopenapi.BulkPricingRuleImportResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode pricing rule csv import: %v", err)
+	}
+	if resp.Data.Requested != 50 || resp.Data.Validated != 50 || resp.Data.Created != 50 || len(resp.Data.Errors) != 0 || len(resp.Data.Rules) != 50 {
+		t.Fatalf("unexpected pricing rule csv import response: %+v", resp.Data)
+	}
+
+	badQueryReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/pricing-rules:bulk?dry_run=maybe", strings.NewReader("[]"))
+	badQueryReq.Header.Set("Content-Type", "application/json")
+	badQueryReq.AddCookie(sessionCookie)
+	badQueryReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	badQueryRec := httptest.NewRecorder()
+	handler.ServeHTTP(badQueryRec, badQueryReq)
+	if badQueryRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected invalid dry_run query to return 400, got %d body=%s", badQueryRec.Code, badQueryRec.Body.String())
 	}
 }
 
@@ -6245,6 +6341,15 @@ func assertAdminListContains(t *testing.T, handler http.Handler, sessionCookie *
 func auditLogHasAction(items []apiopenapi.AuditLog, action string) bool {
 	for _, item := range items {
 		if item.Action == action {
+			return true
+		}
+	}
+	return false
+}
+
+func pricingRuleListHasID(items []apiopenapi.PricingRule, id apiopenapi.Id) bool {
+	for _, item := range items {
+		if item.Id == id {
 			return true
 		}
 	}

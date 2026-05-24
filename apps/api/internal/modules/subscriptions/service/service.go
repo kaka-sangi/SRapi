@@ -131,6 +131,20 @@ func (s *Service) ListUserSubscriptionsByUser(ctx context.Context, userID int) (
 }
 
 func (s *Service) CreatePricingRule(ctx context.Context, req contract.CreatePricingRuleRequest) (contract.PricingRule, error) {
+	rule, err := pricingRuleFromRequest(req)
+	if err != nil {
+		return contract.PricingRule{}, err
+	}
+	return s.store.CreatePricingRule(ctx, rule)
+}
+
+// ValidatePricingRule validates a pricing-rule request without persisting it.
+func (s *Service) ValidatePricingRule(req contract.CreatePricingRuleRequest) error {
+	_, err := pricingRuleFromRequest(req)
+	return err
+}
+
+func pricingRuleFromRequest(req contract.CreatePricingRuleRequest) (contract.PricingRule, error) {
 	if req.ModelID <= 0 || req.ProviderID < 0 {
 		return contract.PricingRule{}, ErrInvalidInput
 	}
@@ -153,7 +167,7 @@ func (s *Service) CreatePricingRule(ctx context.Context, req contract.CreatePric
 	if req.EffectiveFrom != nil && req.EffectiveTo != nil && !req.EffectiveTo.After(*req.EffectiveFrom) {
 		return contract.PricingRule{}, ErrInvalidInput
 	}
-	return s.store.CreatePricingRule(ctx, contract.PricingRule{
+	return contract.PricingRule{
 		ModelID:                         req.ModelID,
 		ProviderID:                      req.ProviderID,
 		InputPricePerMillionTokens:      input,
@@ -163,7 +177,7 @@ func (s *Service) CreatePricingRule(ctx context.Context, req contract.CreatePric
 		Currency:                        normalizeCurrency(req.Currency),
 		EffectiveFrom:                   cloneTime(req.EffectiveFrom),
 		EffectiveTo:                     cloneTime(req.EffectiveTo),
-	})
+	}, nil
 }
 
 func (s *Service) ListPricingRules(ctx context.Context) ([]contract.PricingRule, error) {

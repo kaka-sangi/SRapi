@@ -175,6 +175,43 @@ func TestEstimatePriceUsesDecimalSafeProviderSpecificRulesAndOverrides(t *testin
 	}
 }
 
+func TestValidatePricingRuleDoesNotPersist(t *testing.T) {
+	svc, err := service.New(subscriptionmemory.New(), nil)
+	if err != nil {
+		t.Fatalf("new subscription service: %v", err)
+	}
+
+	if err := svc.ValidatePricingRule(contract.CreatePricingRuleRequest{
+		ModelID:                         1,
+		ProviderID:                      0,
+		InputPricePerMillionTokens:      "1.25",
+		OutputPricePerMillionTokens:     "2.50",
+		CacheReadPricePerMillionTokens:  "0",
+		CacheWritePricePerMillionTokens: "0",
+		Currency:                        "usd",
+	}); err != nil {
+		t.Fatalf("validate pricing rule: %v", err)
+	}
+	rules, err := svc.ListPricingRules(t.Context())
+	if err != nil {
+		t.Fatalf("list pricing rules: %v", err)
+	}
+	if len(rules) != 0 {
+		t.Fatalf("validation should not persist pricing rules, got %+v", rules)
+	}
+	if err := svc.ValidatePricingRule(contract.CreatePricingRuleRequest{
+		ModelID:                         1,
+		ProviderID:                      0,
+		InputPricePerMillionTokens:      "not-money",
+		OutputPricePerMillionTokens:     "2.50",
+		CacheReadPricePerMillionTokens:  "0",
+		CacheWritePricePerMillionTokens: "0",
+		Currency:                        "usd",
+	}); err == nil {
+		t.Fatal("expected invalid pricing rule to be rejected")
+	}
+}
+
 type fixedClock struct {
 	now time.Time
 }
