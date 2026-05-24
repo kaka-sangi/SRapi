@@ -14,6 +14,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/apikey"
 	"github.com/srapi/srapi/apps/api/ent/apikeygroup"
 	"github.com/srapi/srapi/apps/api/ent/auditlog"
+	"github.com/srapi/srapi/apps/api/ent/authsession"
 	"github.com/srapi/srapi/apps/api/ent/billingledger"
 	"github.com/srapi/srapi/apps/api/ent/capabilitydefinition"
 	"github.com/srapi/srapi/apps/api/ent/domaineventsinbox"
@@ -311,6 +312,41 @@ func init() {
 	auditlogDescTraceID := auditlogFields[8].Descriptor()
 	// auditlog.DefaultTraceID holds the default value on creation for the trace_id field.
 	auditlog.DefaultTraceID = auditlogDescTraceID.Default.(string)
+	authsessionMixin := schema.AuthSession{}.Mixin()
+	authsessionMixinFields0 := authsessionMixin[0].Fields()
+	_ = authsessionMixinFields0
+	authsessionFields := schema.AuthSession{}.Fields()
+	_ = authsessionFields
+	// authsessionDescCreatedAt is the schema descriptor for created_at field.
+	authsessionDescCreatedAt := authsessionMixinFields0[0].Descriptor()
+	// authsession.DefaultCreatedAt holds the default value on creation for the created_at field.
+	authsession.DefaultCreatedAt = authsessionDescCreatedAt.Default.(func() time.Time)
+	// authsessionDescUpdatedAt is the schema descriptor for updated_at field.
+	authsessionDescUpdatedAt := authsessionMixinFields0[1].Descriptor()
+	// authsession.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	authsession.DefaultUpdatedAt = authsessionDescUpdatedAt.Default.(func() time.Time)
+	// authsession.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	authsession.UpdateDefaultUpdatedAt = authsessionDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// authsessionDescSessionIDHash is the schema descriptor for session_id_hash field.
+	authsessionDescSessionIDHash := authsessionFields[0].Descriptor()
+	// authsession.SessionIDHashValidator is a validator for the "session_id_hash" field. It is called by the builders before save.
+	authsession.SessionIDHashValidator = authsessionDescSessionIDHash.Validators[0].(func(string) error)
+	// authsessionDescCsrfTokenHash is the schema descriptor for csrf_token_hash field.
+	authsessionDescCsrfTokenHash := authsessionFields[1].Descriptor()
+	// authsession.CsrfTokenHashValidator is a validator for the "csrf_token_hash" field. It is called by the builders before save.
+	authsession.CsrfTokenHashValidator = authsessionDescCsrfTokenHash.Validators[0].(func(string) error)
+	// authsessionDescIP is the schema descriptor for ip field.
+	authsessionDescIP := authsessionFields[5].Descriptor()
+	// authsession.DefaultIP holds the default value on creation for the ip field.
+	authsession.DefaultIP = authsessionDescIP.Default.(string)
+	// authsessionDescUserAgent is the schema descriptor for user_agent field.
+	authsessionDescUserAgent := authsessionFields[6].Descriptor()
+	// authsession.DefaultUserAgent holds the default value on creation for the user_agent field.
+	authsession.DefaultUserAgent = authsessionDescUserAgent.Default.(string)
+	// authsessionDescStatus is the schema descriptor for status field.
+	authsessionDescStatus := authsessionFields[7].Descriptor()
+	// authsession.DefaultStatus holds the default value on creation for the status field.
+	authsession.DefaultStatus = authsessionDescStatus.Default.(string)
 	billingledgerMixin := schema.BillingLedger{}.Mixin()
 	billingledgerMixinFields0 := billingledgerMixin[0].Fields()
 	_ = billingledgerMixinFields0

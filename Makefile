@@ -127,7 +127,7 @@ migration-hash:
 	cd $(API_DIR) && $(ATLAS) migrate hash --dir file://migrations/postgres/up
 
 migration-check:
-	cd $(API_DIR) && go test ./internal/platform/db -run 'Test(EntSchemaAppliesToEmptyDatabase|PostgresInitialMigrationMatchesEntSchema|PostgresInitialDownMigrationCoversAllTables|PostgresIncrementalMigrationsArePairedAndContiguous)'
+	cd $(API_DIR) && go test ./internal/platform/db -run 'Test(EntSchemaAppliesToEmptyDatabase|PostgresVersionedUpMigrationsMatchEntSchema|PostgresInitialDownMigrationCoversInitialTables|PostgresDownMigrationsCoverCreatedTables|PostgresIncrementalMigrationsArePairedAndContiguous)'
 
 api-test:
 	cd $(API_DIR) && go test ./...

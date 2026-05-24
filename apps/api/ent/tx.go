@@ -30,6 +30,8 @@ type Tx struct {
 	AffiliateRule *AffiliateRuleClient
 	// AuditLog is the client for interacting with the AuditLog builders.
 	AuditLog *AuditLogClient
+	// AuthSession is the client for interacting with the AuthSession builders.
+	AuthSession *AuthSessionClient
 	// BillingLedger is the client for interacting with the BillingLedger builders.
 	BillingLedger *BillingLedgerClient
 	// CapabilityDefinition is the client for interacting with the CapabilityDefinition builders.
@@ -228,6 +230,7 @@ func (tx *Tx) init() {
 	tx.AffiliateLedger = NewAffiliateLedgerClient(tx.config)
 	tx.AffiliateRule = NewAffiliateRuleClient(tx.config)
 	tx.AuditLog = NewAuditLogClient(tx.config)
+	tx.AuthSession = NewAuthSessionClient(tx.config)
 	tx.BillingLedger = NewBillingLedgerClient(tx.config)
 	tx.CapabilityDefinition = NewCapabilityDefinitionClient(tx.config)
 	tx.DomainEventsInbox = NewDomainEventsInboxClient(tx.config)

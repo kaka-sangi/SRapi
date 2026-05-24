@@ -36,6 +36,7 @@ func TestInjectedPersistentStoresSurviveRuntimeRebuild(t *testing.T) {
 		WithModelStore(stores.Models),
 		WithAccountStore(stores.Accounts),
 		WithAuditStore(stores.Audit),
+		WithAuthSessionStore(stores.AuthSessions),
 		WithBillingStore(stores.Billing),
 		WithEventStore(stores.Events),
 		WithSchedulerStore(stores.Scheduler),
@@ -69,6 +70,7 @@ func TestInjectedPersistentStoresSurviveRuntimeRebuild(t *testing.T) {
 		WithModelStore(stores.Models),
 		WithAccountStore(stores.Accounts),
 		WithAuditStore(stores.Audit),
+		WithAuthSessionStore(stores.AuthSessions),
 		WithBillingStore(stores.Billing),
 		WithEventStore(stores.Events),
 		WithSchedulerStore(stores.Scheduler),
@@ -91,6 +93,18 @@ func TestInjectedPersistentStoresSurviveRuntimeRebuild(t *testing.T) {
 	}
 	if len(listResp.Data) != 1 {
 		t.Fatalf("expected one persisted api key, got %d", len(listResp.Data))
+	}
+
+	currentReq := httptest.NewRequest(http.MethodGet, "/api/v1/me", nil)
+	currentReq.AddCookie(sessionCookie)
+	currentRec := httptest.NewRecorder()
+	restarted.ServeHTTP(currentRec, currentReq)
+	if currentRec.Code != http.StatusOK {
+		t.Fatalf("expected persisted session cookie to authenticate after restart, got %d body=%s", currentRec.Code, currentRec.Body.String())
+	}
+	persistedSessionKey := mustCreateAPIKey(t, restarted, sessionCookie, loginResp.Data.CsrfToken, `{"name":"persisted-session","scopes":["gateway:invoke"]}`)
+	if persistedSessionKey.Data.PlaintextKey == "" {
+		t.Fatal("expected persisted session csrf token to authorize writes after restart")
 	}
 
 	modelsReq := httptest.NewRequest(http.MethodGet, "/v1/models", nil)

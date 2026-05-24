@@ -9,6 +9,7 @@ import (
 	affiliatecontract "github.com/srapi/srapi/apps/api/internal/modules/affiliate/contract"
 	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
 	auditcontract "github.com/srapi/srapi/apps/api/internal/modules/audit/contract"
+	authcontract "github.com/srapi/srapi/apps/api/internal/modules/auth/contract"
 	billingcontract "github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
 	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
@@ -24,6 +25,7 @@ import (
 	affiliatestore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/affiliate"
 	apikeystore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/apikeys"
 	auditstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/audit"
+	authstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/auth"
 	billingstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/billing"
 	eventsstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/events"
 	modelstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/models"
@@ -47,6 +49,7 @@ type Stores struct {
 	Models        modelcontract.Store
 	Accounts      accountcontract.Store
 	Audit         auditcontract.Store
+	AuthSessions  authcontract.Store
 	Billing       billingcontract.Store
 	UsageCharges  billingcontract.UsageChargeStore
 	Events        eventscontract.Store
@@ -86,6 +89,10 @@ func New(client *ent.Client) (Stores, error) {
 		return Stores{}, err
 	}
 	audit, err := auditstore.New(client)
+	if err != nil {
+		return Stores{}, err
+	}
+	authSessions, err := authstore.New(client)
 	if err != nil {
 		return Stores{}, err
 	}
@@ -130,6 +137,7 @@ func New(client *ent.Client) (Stores, error) {
 		Models:        models,
 		Accounts:      accounts,
 		Audit:         audit,
+		AuthSessions:  authSessions,
 		Billing:       billing,
 		UsageCharges:  billing,
 		Events:        events,

@@ -24,6 +24,7 @@ import (
 	auditcontract "github.com/srapi/srapi/apps/api/internal/modules/audit/contract"
 	auditservice "github.com/srapi/srapi/apps/api/internal/modules/audit/service"
 	auditmemory "github.com/srapi/srapi/apps/api/internal/modules/audit/store/memory"
+	authcontract "github.com/srapi/srapi/apps/api/internal/modules/auth/contract"
 	authservice "github.com/srapi/srapi/apps/api/internal/modules/auth/service"
 	authmemory "github.com/srapi/srapi/apps/api/internal/modules/auth/store/memory"
 	billingcontract "github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
@@ -97,7 +98,7 @@ type runtimeState struct {
 	operations        *operationsservice.Service
 	usage             *usageservice.Service
 	userStore         userscontract.Store
-	sessionStore      *authmemory.Store
+	sessionStore      authcontract.Store
 	apiKeyStore       apikeycontract.Store
 	auditStore        auditcontract.Store
 	billingStore      billingcontract.Store
@@ -133,7 +134,10 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 		return nil, err
 	}
 
-	sessionStore := authmemory.New()
+	sessionStore := opts.authSessions
+	if sessionStore == nil {
+		sessionStore = authmemory.New()
+	}
 	authSvc, err := authservice.New(usersSvc, sessionStore, 0, nil)
 	if err != nil {
 		return nil, err
@@ -390,7 +394,7 @@ type runtimeAssembly struct {
 	operationsSvc     *operationsservice.Service
 	usageSvc          *usageservice.Service
 	userStore         userscontract.Store
-	sessionStore      *authmemory.Store
+	sessionStore      authcontract.Store
 	apiKeyStore       apikeycontract.Store
 	auditStore        auditcontract.Store
 	billingStore      billingcontract.Store

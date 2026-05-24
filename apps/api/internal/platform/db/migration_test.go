@@ -3,10 +3,10 @@ package db_test
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -63,6 +63,7 @@ func TestEntSchemaAppliesToEmptyDatabase(t *testing.T) {
 		"api_key_groups",
 		"api_keys",
 		"audit_logs",
+		"auth_sessions",
 		"billing_ledgers",
 		"capability_definitions",
 		"domain_events_inboxes",
@@ -98,32 +99,39 @@ func TestEntSchemaAppliesToEmptyDatabase(t *testing.T) {
 	}
 }
 
-func TestPostgresInitialMigrationMatchesEntSchema(t *testing.T) {
-	got, err := os.ReadFile(filepath.Clean("../../../migrations/postgres/up/000001_initial_schema.sql"))
-	if err != nil {
-		t.Fatalf("read postgres initial migration: %v", err)
-	}
+func TestPostgresVersionedUpMigrationsMatchEntSchema(t *testing.T) {
+	got := postgresUpMigrationsDDL(t)
 	want, err := postgresInitialDDL(t.Context())
 	if err != nil {
 		t.Fatalf("generate postgres ddl from Ent schema: %v", err)
 	}
-	if normalizeSQL(string(got)) != want {
-		t.Fatal("postgres initial migration drifted from Ent schema; regenerate apps/api/migrations/postgres/up/000001_initial_schema.sql")
+	gotStatements := sqlStatements(got)
+	wantStatements := sqlStatements(want)
+	if !reflect.DeepEqual(gotStatements, wantStatements) {
+		t.Fatalf("postgres versioned up migrations drifted from Ent schema:\nmissing from migrations: %v\nextra in migrations: %v", missingStrings(wantStatements, gotStatements), missingStrings(gotStatements, wantStatements))
 	}
 }
 
-func TestPostgresInitialDownMigrationCoversAllTables(t *testing.T) {
-	got, err := os.ReadFile(filepath.Clean("../../../migrations/postgres/down/000001_initial_schema.sql"))
-	if err != nil {
-		t.Fatalf("read postgres initial down migration: %v", err)
+func TestPostgresInitialDownMigrationCoversInitialTables(t *testing.T) {
+	up := readMigrationFile(t, "../../../migrations/postgres/up/000001_initial_schema.sql")
+	down := readMigrationFile(t, "../../../migrations/postgres/down/000001_initial_schema.sql")
+	want := createdTables(up)
+	got := droppedTables(down)
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("postgres initial down migration does not cover initial tables:\nwant: %v\ngot:  %v", want, got)
 	}
-	var want strings.Builder
-	want.WriteString("-- Drop initial SRapi MVP schema.\n")
-	for i := len(migrate.Tables) - 1; i >= 0; i-- {
-		fmt.Fprintf(&want, "DROP TABLE IF EXISTS %q;\n", migrate.Tables[i].Name)
-	}
-	if normalizeSQL(string(got)) != normalizeSQL(want.String()) {
-		t.Fatal("postgres initial down migration does not match Ent table list")
+}
+
+func TestPostgresDownMigrationsCoverCreatedTables(t *testing.T) {
+	up := migrationFiles(t, "../../../migrations/postgres/up")
+	for _, name := range up.names {
+		upSQL := readMigrationFile(t, filepath.Join("../../../migrations/postgres/up", name))
+		downSQL := readMigrationFile(t, filepath.Join("../../../migrations/postgres/down", name))
+		created := createdTables(upSQL)
+		dropped := droppedTables(downSQL)
+		if !reflect.DeepEqual(dropped, created) {
+			t.Fatalf("postgres down migration %s does not cover created tables:\ncreated: %v\ndropped: %v", name, created, dropped)
+		}
 	}
 }
 
@@ -151,6 +159,26 @@ func postgresInitialDDL(ctx context.Context) (string, error) {
 		return "", err
 	}
 	return normalizeSQL(ddl), nil
+}
+
+func postgresUpMigrationsDDL(t *testing.T) string {
+	t.Helper()
+	up := migrationFiles(t, "../../../migrations/postgres/up")
+	var builder strings.Builder
+	for _, name := range up.names {
+		builder.WriteString(readMigrationFile(t, filepath.Join("../../../migrations/postgres/up", name)))
+		builder.WriteString("\n")
+	}
+	return builder.String()
+}
+
+func readMigrationFile(t *testing.T, path string) string {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Clean(path))
+	if err != nil {
+		t.Fatalf("read migration %s: %v", path, err)
+	}
+	return string(raw)
 }
 
 type migrationFileList struct {
@@ -213,4 +241,65 @@ func normalizeSQL(value string) string {
 		lines[i] = strings.TrimRight(line, " \t")
 	}
 	return strings.Join(lines, "\n") + "\n"
+}
+
+func sqlStatements(value string) []string {
+	value = stripSQLComments(value)
+	parts := strings.Split(value, ";")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		statement := strings.Join(strings.Fields(part), " ")
+		if statement == "" {
+			continue
+		}
+		out = append(out, statement)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func stripSQLComments(value string) string {
+	lines := strings.Split(value, "\n")
+	out := make([]string, 0, len(lines))
+	for _, line := range lines {
+		if strings.HasPrefix(strings.TrimSpace(line), "--") {
+			continue
+		}
+		out = append(out, line)
+	}
+	return strings.Join(out, "\n")
+}
+
+func createdTables(sql string) []string {
+	return quotedIdentifierMatches(sql, regexp.MustCompile(`(?i)CREATE\s+TABLE\s+"([^"]+)"`))
+}
+
+func droppedTables(sql string) []string {
+	return quotedIdentifierMatches(sql, regexp.MustCompile(`(?i)DROP\s+TABLE\s+IF\s+EXISTS\s+"([^"]+)"`))
+}
+
+func quotedIdentifierMatches(sql string, pattern *regexp.Regexp) []string {
+	matches := pattern.FindAllStringSubmatch(sql, -1)
+	out := make([]string, 0, len(matches))
+	for _, match := range matches {
+		if len(match) == 2 {
+			out = append(out, match[1])
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+func missingStrings(want []string, got []string) []string {
+	gotSet := make(map[string]struct{}, len(got))
+	for _, value := range got {
+		gotSet[value] = struct{}{}
+	}
+	var missing []string
+	for _, value := range want {
+		if _, ok := gotSet[value]; !ok {
+			missing = append(missing, value)
+		}
+	}
+	return missing
 }

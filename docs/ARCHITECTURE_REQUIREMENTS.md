@@ -92,7 +92,7 @@ make architecture-check
 - Domain Events Outbox worker 轮询分发、inbox 去重、processed / failed 状态记录和 app 装配规则。
 - Redis-backed Scheduler Lease 原子获取、释放、过期释放并发。
 - Redis-backed realtime slot store 跨实例限额、跨实例释放、过期释放和安全摘要。
-- runtime rebuild 后仍能读回 API Key、Provider、Model、Account、Usage、Scheduler Decision、Billing Ledger、Outbox Event 和 Audit Log。
+- runtime rebuild 后仍能读回 Auth Session、API Key、Provider、Model、Account、Usage、Scheduler Decision、Billing Ledger、Outbox Event 和 Audit Log。
 - compatible provider preset 注册表。
 - HTTP 启动层基础测试。
 
@@ -105,8 +105,8 @@ make migration-check
 它当前覆盖：
 
 - Ent schema 可应用到空库。
-- `apps/api/migrations/postgres/up/000001_initial_schema.sql` 与 Ent 生成的 PostgreSQL DDL 无漂移。
-- `apps/api/migrations/postgres/down/000001_initial_schema.sql` 覆盖当前 Ent table list。
+- `apps/api/migrations/postgres/up` 的所有版本化迁移合并后与 Ent 生成的 PostgreSQL DDL 无漂移。
+- 每个 `apps/api/migrations/postgres/down` 文件覆盖同名 up migration 创建的 table。
 - `apps/api/migrations/postgres/up` 和 `apps/api/migrations/postgres/down` 文件成对，编号连续，新增迁移从 `000002_*` 开始。
 
 ### 3.3 全量门禁

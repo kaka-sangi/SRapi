@@ -21,6 +21,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/apikey"
 	"github.com/srapi/srapi/apps/api/ent/apikeygroup"
 	"github.com/srapi/srapi/apps/api/ent/auditlog"
+	"github.com/srapi/srapi/apps/api/ent/authsession"
 	"github.com/srapi/srapi/apps/api/ent/billingledger"
 	"github.com/srapi/srapi/apps/api/ent/capabilitydefinition"
 	"github.com/srapi/srapi/apps/api/ent/domaineventsinbox"
@@ -119,6 +120,7 @@ func checkColumn(t, c string) error {
 			affiliateledger.Table:         affiliateledger.ValidColumn,
 			affiliaterule.Table:           affiliaterule.ValidColumn,
 			auditlog.Table:                auditlog.ValidColumn,
+			authsession.Table:             authsession.ValidColumn,
 			billingledger.Table:           billingledger.ValidColumn,
 			capabilitydefinition.Table:    capabilitydefinition.ValidColumn,
 			domaineventsinbox.Table:       domaineventsinbox.ValidColumn,

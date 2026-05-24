@@ -19,6 +19,7 @@ import (
 	affiliatecontract "github.com/srapi/srapi/apps/api/internal/modules/affiliate/contract"
 	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
 	auditcontract "github.com/srapi/srapi/apps/api/internal/modules/audit/contract"
+	authcontract "github.com/srapi/srapi/apps/api/internal/modules/auth/contract"
 	billingcontract "github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
 	capabilitiescontract "github.com/srapi/srapi/apps/api/internal/modules/capabilities/contract"
 	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
@@ -58,6 +59,7 @@ type runtimeOptions struct {
 	models        modelcontract.Store
 	accounts      accountcontract.Store
 	audit         auditcontract.Store
+	authSessions  authcontract.Store
 	billing       billingcontract.Store
 	events        eventscontract.Store
 	affiliate     affiliatecontract.Store
@@ -120,6 +122,12 @@ func WithAccountStore(store accountcontract.Store) Option {
 func WithAuditStore(store auditcontract.Store) Option {
 	return func(opts *runtimeOptions) {
 		opts.audit = store
+	}
+}
+
+func WithAuthSessionStore(store authcontract.Store) Option {
+	return func(opts *runtimeOptions) {
+		opts.authSessions = store
 	}
 }
 

@@ -23,6 +23,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/apikey"
 	"github.com/srapi/srapi/apps/api/ent/apikeygroup"
 	"github.com/srapi/srapi/apps/api/ent/auditlog"
+	"github.com/srapi/srapi/apps/api/ent/authsession"
 	"github.com/srapi/srapi/apps/api/ent/billingledger"
 	"github.com/srapi/srapi/apps/api/ent/capabilitydefinition"
 	"github.com/srapi/srapi/apps/api/ent/domaineventsinbox"
@@ -77,6 +78,8 @@ type Client struct {
 	AffiliateRule *AffiliateRuleClient
 	// AuditLog is the client for interacting with the AuditLog builders.
 	AuditLog *AuditLogClient
+	// AuthSession is the client for interacting with the AuthSession builders.
+	AuthSession *AuthSessionClient
 	// BillingLedger is the client for interacting with the BillingLedger builders.
 	BillingLedger *BillingLedgerClient
 	// CapabilityDefinition is the client for interacting with the CapabilityDefinition builders.
@@ -155,6 +158,7 @@ func (c *Client) init() {
 	c.AffiliateLedger = NewAffiliateLedgerClient(c.config)
 	c.AffiliateRule = NewAffiliateRuleClient(c.config)
 	c.AuditLog = NewAuditLogClient(c.config)
+	c.AuthSession = NewAuthSessionClient(c.config)
 	c.BillingLedger = NewBillingLedgerClient(c.config)
 	c.CapabilityDefinition = NewCapabilityDefinitionClient(c.config)
 	c.DomainEventsInbox = NewDomainEventsInboxClient(c.config)
@@ -285,6 +289,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		AffiliateLedger:         NewAffiliateLedgerClient(cfg),
 		AffiliateRule:           NewAffiliateRuleClient(cfg),
 		AuditLog:                NewAuditLogClient(cfg),
+		AuthSession:             NewAuthSessionClient(cfg),
 		BillingLedger:           NewBillingLedgerClient(cfg),
 		CapabilityDefinition:    NewCapabilityDefinitionClient(cfg),
 		DomainEventsInbox:       NewDomainEventsInboxClient(cfg),
@@ -342,6 +347,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		AffiliateLedger:         NewAffiliateLedgerClient(cfg),
 		AffiliateRule:           NewAffiliateRuleClient(cfg),
 		AuditLog:                NewAuditLogClient(cfg),
+		AuthSession:             NewAuthSessionClient(cfg),
 		BillingLedger:           NewBillingLedgerClient(cfg),
 		CapabilityDefinition:    NewCapabilityDefinitionClient(cfg),
 		DomainEventsInbox:       NewDomainEventsInboxClient(cfg),
@@ -402,14 +408,14 @@ func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
 		c.APIKey, c.APIKeyGroup, c.AccountGroup, c.AccountGroupMember,
 		c.AccountHealthSnapshot, c.AccountQuotaSnapshot, c.AffiliateLedger,
-		c.AffiliateRule, c.AuditLog, c.BillingLedger, c.CapabilityDefinition,
-		c.DomainEventsInbox, c.DomainEventsOutbox, c.IdempotencyRecord, c.InviteCode,
-		c.InviteRelationship, c.ModelAlias, c.ModelProviderMapping, c.ModelRegistry,
-		c.ObsAlertEvent, c.ObsSLODefinition, c.PaymentAuditLog, c.PaymentOrder,
-		c.PaymentProviderInstance, c.PricingRule, c.Provider, c.ProviderAccount,
-		c.Proxy, c.Role, c.SchedulerDecision, c.SchedulerFeedback, c.SchedulerStrategy,
-		c.Setting, c.SubscriptionPlan, c.UsageLog, c.User, c.UserRole,
-		c.UserSubscription,
+		c.AffiliateRule, c.AuditLog, c.AuthSession, c.BillingLedger,
+		c.CapabilityDefinition, c.DomainEventsInbox, c.DomainEventsOutbox,
+		c.IdempotencyRecord, c.InviteCode, c.InviteRelationship, c.ModelAlias,
+		c.ModelProviderMapping, c.ModelRegistry, c.ObsAlertEvent, c.ObsSLODefinition,
+		c.PaymentAuditLog, c.PaymentOrder, c.PaymentProviderInstance, c.PricingRule,
+		c.Provider, c.ProviderAccount, c.Proxy, c.Role, c.SchedulerDecision,
+		c.SchedulerFeedback, c.SchedulerStrategy, c.Setting, c.SubscriptionPlan,
+		c.UsageLog, c.User, c.UserRole, c.UserSubscription,
 	} {
 		n.Use(hooks...)
 	}
@@ -421,14 +427,14 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
 		c.APIKey, c.APIKeyGroup, c.AccountGroup, c.AccountGroupMember,
 		c.AccountHealthSnapshot, c.AccountQuotaSnapshot, c.AffiliateLedger,
-		c.AffiliateRule, c.AuditLog, c.BillingLedger, c.CapabilityDefinition,
-		c.DomainEventsInbox, c.DomainEventsOutbox, c.IdempotencyRecord, c.InviteCode,
-		c.InviteRelationship, c.ModelAlias, c.ModelProviderMapping, c.ModelRegistry,
-		c.ObsAlertEvent, c.ObsSLODefinition, c.PaymentAuditLog, c.PaymentOrder,
-		c.PaymentProviderInstance, c.PricingRule, c.Provider, c.ProviderAccount,
-		c.Proxy, c.Role, c.SchedulerDecision, c.SchedulerFeedback, c.SchedulerStrategy,
-		c.Setting, c.SubscriptionPlan, c.UsageLog, c.User, c.UserRole,
-		c.UserSubscription,
+		c.AffiliateRule, c.AuditLog, c.AuthSession, c.BillingLedger,
+		c.CapabilityDefinition, c.DomainEventsInbox, c.DomainEventsOutbox,
+		c.IdempotencyRecord, c.InviteCode, c.InviteRelationship, c.ModelAlias,
+		c.ModelProviderMapping, c.ModelRegistry, c.ObsAlertEvent, c.ObsSLODefinition,
+		c.PaymentAuditLog, c.PaymentOrder, c.PaymentProviderInstance, c.PricingRule,
+		c.Provider, c.ProviderAccount, c.Proxy, c.Role, c.SchedulerDecision,
+		c.SchedulerFeedback, c.SchedulerStrategy, c.Setting, c.SubscriptionPlan,
+		c.UsageLog, c.User, c.UserRole, c.UserSubscription,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -455,6 +461,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.AffiliateRule.mutate(ctx, m)
 	case *AuditLogMutation:
 		return c.AuditLog.mutate(ctx, m)
+	case *AuthSessionMutation:
+		return c.AuthSession.mutate(ctx, m)
 	case *BillingLedgerMutation:
 		return c.BillingLedger.mutate(ctx, m)
 	case *CapabilityDefinitionMutation:
@@ -1712,6 +1720,139 @@ func (c *AuditLogClient) mutate(ctx context.Context, m *AuditLogMutation) (Value
 		return (&AuditLogDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown AuditLog mutation op: %q", m.Op())
+	}
+}
+
+// AuthSessionClient is a client for the AuthSession schema.
+type AuthSessionClient struct {
+	config
+}
+
+// NewAuthSessionClient returns a client for the AuthSession from the given config.
+func NewAuthSessionClient(c config) *AuthSessionClient {
+	return &AuthSessionClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `authsession.Hooks(f(g(h())))`.
+func (c *AuthSessionClient) Use(hooks ...Hook) {
+	c.hooks.AuthSession = append(c.hooks.AuthSession, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `authsession.Intercept(f(g(h())))`.
+func (c *AuthSessionClient) Intercept(interceptors ...Interceptor) {
+	c.inters.AuthSession = append(c.inters.AuthSession, interceptors...)
+}
+
+// Create returns a builder for creating a AuthSession entity.
+func (c *AuthSessionClient) Create() *AuthSessionCreate {
+	mutation := newAuthSessionMutation(c.config, OpCreate)
+	return &AuthSessionCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of AuthSession entities.
+func (c *AuthSessionClient) CreateBulk(builders ...*AuthSessionCreate) *AuthSessionCreateBulk {
+	return &AuthSessionCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *AuthSessionClient) MapCreateBulk(slice any, setFunc func(*AuthSessionCreate, int)) *AuthSessionCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &AuthSessionCreateBulk{err: fmt.Errorf("calling to AuthSessionClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*AuthSessionCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &AuthSessionCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for AuthSession.
+func (c *AuthSessionClient) Update() *AuthSessionUpdate {
+	mutation := newAuthSessionMutation(c.config, OpUpdate)
+	return &AuthSessionUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *AuthSessionClient) UpdateOne(_m *AuthSession) *AuthSessionUpdateOne {
+	mutation := newAuthSessionMutation(c.config, OpUpdateOne, withAuthSession(_m))
+	return &AuthSessionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *AuthSessionClient) UpdateOneID(id int) *AuthSessionUpdateOne {
+	mutation := newAuthSessionMutation(c.config, OpUpdateOne, withAuthSessionID(id))
+	return &AuthSessionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for AuthSession.
+func (c *AuthSessionClient) Delete() *AuthSessionDelete {
+	mutation := newAuthSessionMutation(c.config, OpDelete)
+	return &AuthSessionDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *AuthSessionClient) DeleteOne(_m *AuthSession) *AuthSessionDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *AuthSessionClient) DeleteOneID(id int) *AuthSessionDeleteOne {
+	builder := c.Delete().Where(authsession.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &AuthSessionDeleteOne{builder}
+}
+
+// Query returns a query builder for AuthSession.
+func (c *AuthSessionClient) Query() *AuthSessionQuery {
+	return &AuthSessionQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeAuthSession},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a AuthSession entity by its id.
+func (c *AuthSessionClient) Get(ctx context.Context, id int) (*AuthSession, error) {
+	return c.Query().Where(authsession.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *AuthSessionClient) GetX(ctx context.Context, id int) *AuthSession {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *AuthSessionClient) Hooks() []Hook {
+	return c.hooks.AuthSession
+}
+
+// Interceptors returns the client interceptors.
+func (c *AuthSessionClient) Interceptors() []Interceptor {
+	return c.inters.AuthSession
+}
+
+func (c *AuthSessionClient) mutate(ctx context.Context, m *AuthSessionMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&AuthSessionCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&AuthSessionUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&AuthSessionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&AuthSessionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown AuthSession mutation op: %q", m.Op())
 	}
 }
 
@@ -5576,22 +5717,24 @@ func (c *UserSubscriptionClient) mutate(ctx context.Context, m *UserSubscription
 type (
 	hooks struct {
 		APIKey, APIKeyGroup, AccountGroup, AccountGroupMember, AccountHealthSnapshot,
-		AccountQuotaSnapshot, AffiliateLedger, AffiliateRule, AuditLog, BillingLedger,
-		CapabilityDefinition, DomainEventsInbox, DomainEventsOutbox, IdempotencyRecord,
-		InviteCode, InviteRelationship, ModelAlias, ModelProviderMapping,
-		ModelRegistry, ObsAlertEvent, ObsSLODefinition, PaymentAuditLog, PaymentOrder,
-		PaymentProviderInstance, PricingRule, Provider, ProviderAccount, Proxy, Role,
-		SchedulerDecision, SchedulerFeedback, SchedulerStrategy, Setting,
-		SubscriptionPlan, UsageLog, User, UserRole, UserSubscription []ent.Hook
+		AccountQuotaSnapshot, AffiliateLedger, AffiliateRule, AuditLog, AuthSession,
+		BillingLedger, CapabilityDefinition, DomainEventsInbox, DomainEventsOutbox,
+		IdempotencyRecord, InviteCode, InviteRelationship, ModelAlias,
+		ModelProviderMapping, ModelRegistry, ObsAlertEvent, ObsSLODefinition,
+		PaymentAuditLog, PaymentOrder, PaymentProviderInstance, PricingRule, Provider,
+		ProviderAccount, Proxy, Role, SchedulerDecision, SchedulerFeedback,
+		SchedulerStrategy, Setting, SubscriptionPlan, UsageLog, User, UserRole,
+		UserSubscription []ent.Hook
 	}
 	inters struct {
 		APIKey, APIKeyGroup, AccountGroup, AccountGroupMember, AccountHealthSnapshot,
-		AccountQuotaSnapshot, AffiliateLedger, AffiliateRule, AuditLog, BillingLedger,
-		CapabilityDefinition, DomainEventsInbox, DomainEventsOutbox, IdempotencyRecord,
-		InviteCode, InviteRelationship, ModelAlias, ModelProviderMapping,
-		ModelRegistry, ObsAlertEvent, ObsSLODefinition, PaymentAuditLog, PaymentOrder,
-		PaymentProviderInstance, PricingRule, Provider, ProviderAccount, Proxy, Role,
-		SchedulerDecision, SchedulerFeedback, SchedulerStrategy, Setting,
-		SubscriptionPlan, UsageLog, User, UserRole, UserSubscription []ent.Interceptor
+		AccountQuotaSnapshot, AffiliateLedger, AffiliateRule, AuditLog, AuthSession,
+		BillingLedger, CapabilityDefinition, DomainEventsInbox, DomainEventsOutbox,
+		IdempotencyRecord, InviteCode, InviteRelationship, ModelAlias,
+		ModelProviderMapping, ModelRegistry, ObsAlertEvent, ObsSLODefinition,
+		PaymentAuditLog, PaymentOrder, PaymentProviderInstance, PricingRule, Provider,
+		ProviderAccount, Proxy, Role, SchedulerDecision, SchedulerFeedback,
+		SchedulerStrategy, Setting, SubscriptionPlan, UsageLog, User, UserRole,
+		UserSubscription []ent.Interceptor
 	}
 )

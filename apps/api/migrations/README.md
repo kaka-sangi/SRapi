@@ -36,7 +36,7 @@ make migration-check
 ```
 
 `make migration-check` applies the Ent schema to an empty database, checks the
-expected MVP tables, verifies `000001_initial_schema.sql` has not drifted from
-the current Ent schema while SRapi is still pre-release, verifies the initial
-down migration covers the current Ent table list, and checks that every
-PostgreSQL up migration has a matching down migration with contiguous numbering.
+expected tables, verifies the combined PostgreSQL up migration set matches the
+current Ent schema, verifies every down migration drops the tables created by
+its matching up migration, and checks that every PostgreSQL up migration has a
+matching down migration with contiguous numbering.

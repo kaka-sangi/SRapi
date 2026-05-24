@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"strings"
 	"time"
@@ -138,7 +139,15 @@ func (s *Service) Logout(ctx context.Context, sessionID string) error {
 
 func ValidateCSRF(session authcontract.Session, token string) error {
 	token = strings.TrimSpace(token)
-	if token == "" || !hmac.Equal([]byte(session.CSRFToken), []byte(token)) {
+	if token == "" {
+		return ErrCSRFTokenInvalid
+	}
+	expected := strings.TrimSpace(session.CSRFToken)
+	if strings.HasPrefix(expected, "sha256:") {
+		sum := sha256.Sum256([]byte(token))
+		token = "sha256:" + hex.EncodeToString(sum[:])
+	}
+	if !hmac.Equal([]byte(expected), []byte(token)) {
 		return ErrCSRFTokenInvalid
 	}
 	return nil

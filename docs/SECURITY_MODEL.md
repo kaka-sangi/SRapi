@@ -56,6 +56,7 @@ Session 要求：
 - Access session 必须有过期时间。
 - Refresh session 如果引入，必须支持 rotation。
 - 登出必须使当前 session 失效。
+- Session ID 持久化时只能保存 hash，不得保存 Cookie 原文。
 - 高风险操作可以要求二次确认或重新认证。
 
 CSRF 要求：
@@ -76,6 +77,7 @@ Synchronizer Token Pattern
 - 前端通过 `/api/v1/auth/csrf` 或 session bootstrap 响应获取 token。
 - 所有控制台写操作通过 `X-CSRF-Token` 发送 token。
 - 服务端必须校验 token 与当前 session 绑定。
+- CSRF token 持久化时只能保存 hash，登录响应只返回本次新建 token 的明文值。
 
 可选方案：
 

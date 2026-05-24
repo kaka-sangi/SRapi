@@ -170,6 +170,7 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 			httpserver.WithModelStore(stores.Models),
 			httpserver.WithAccountStore(stores.Accounts),
 			httpserver.WithAuditStore(stores.Audit),
+			httpserver.WithAuthSessionStore(stores.AuthSessions),
 			httpserver.WithBillingStore(stores.Billing),
 			httpserver.WithEventStore(stores.Events),
 			httpserver.WithAffiliateStore(stores.Affiliate),
