@@ -42,3 +42,38 @@ end
 
 return {"ok", tostring(max_limit), tostring(max_used)}
 `)
+
+var acquireConcurrencyScript = redis.NewScript(`
+local name = ARGV[1]
+local limit = tonumber(ARGV[2])
+local now_ms = tonumber(ARGV[3])
+local ttl_ms = tonumber(ARGV[4])
+local token = ARGV[5]
+local expire_at = now_ms + ttl_ms
+
+redis.call("ZREMRANGEBYSCORE", KEYS[1], "-inf", now_ms)
+local used = tonumber(redis.call("ZCARD", KEYS[1]))
+if used >= limit then
+	local oldest = redis.call("ZRANGE", KEYS[1], 0, 0, "WITHSCORES")
+	local retry_ms = ttl_ms
+	if oldest[2] ~= nil then
+		retry_ms = tonumber(oldest[2]) - now_ms
+		if retry_ms < 1 then
+			retry_ms = 1
+		end
+	end
+	return {"limited", name, tostring(limit), tostring(used), "1", tostring(retry_ms)}
+end
+
+redis.call("ZADD", KEYS[1], expire_at, token)
+redis.call("PEXPIRE", KEYS[1], ttl_ms)
+return {"ok", name, tostring(limit), tostring(used + 1)}
+`)
+
+var releaseConcurrencyScript = redis.NewScript(`
+redis.call("ZREM", KEYS[1], ARGV[1])
+if redis.call("ZCARD", KEYS[1]) == 0 then
+	redis.call("DEL", KEYS[1])
+end
+return {"ok"}
+`)

@@ -17,31 +17,33 @@ const (
 )
 
 type APIKey struct {
-	ID            int
-	UserID        int
-	Name          string
-	Prefix        string
-	Hash          string
-	Status        Status
-	Scopes        []string
-	AllowedModels []string
-	GroupIDs      []int
-	RPMLimit      *int
-	TPMLimit      *int
-	ExpiresAt     *time.Time
-	LastUsedAt    *time.Time
-	CreatedAt     time.Time
+	ID               int
+	UserID           int
+	Name             string
+	Prefix           string
+	Hash             string
+	Status           Status
+	Scopes           []string
+	AllowedModels    []string
+	GroupIDs         []int
+	RPMLimit         *int
+	TPMLimit         *int
+	ConcurrencyLimit *int
+	ExpiresAt        *time.Time
+	LastUsedAt       *time.Time
+	CreatedAt        time.Time
 }
 
 type CreateRequest struct {
-	UserID        int
-	Name          string
-	Scopes        []string
-	AllowedModels []string
-	GroupIDs      []int
-	RPMLimit      *int
-	TPMLimit      *int
-	ExpiresAt     *time.Time
+	UserID           int
+	Name             string
+	Scopes           []string
+	AllowedModels    []string
+	GroupIDs         []int
+	RPMLimit         *int
+	TPMLimit         *int
+	ConcurrencyLimit *int
+	ExpiresAt        *time.Time
 }
 
 type UpdateRequest struct {
@@ -74,15 +76,16 @@ type Store interface {
 }
 
 type CreateStoredKey struct {
-	UserID        int
-	Name          string
-	Prefix        string
-	Hash          string
-	Status        Status
-	Scopes        []string
-	AllowedModels []string
-	GroupIDs      []int
-	RPMLimit      *int
-	TPMLimit      *int
-	ExpiresAt     *time.Time
+	UserID           int
+	Name             string
+	Prefix           string
+	Hash             string
+	Status           Status
+	Scopes           []string
+	AllowedModels    []string
+	GroupIDs         []int
+	RPMLimit         *int
+	TPMLimit         *int
+	ConcurrencyLimit *int
+	ExpiresAt        *time.Time
 }

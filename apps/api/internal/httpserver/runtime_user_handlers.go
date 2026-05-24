@@ -418,14 +418,15 @@ func (s *Server) handleCreateApiKey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result, err := s.runtime.apiKeys.Create(r.Context(), apikeycontract.CreateRequest{
-		UserID:        session.User.ID,
-		Name:          body.Name,
-		Scopes:        derefStrings(body.Scopes),
-		AllowedModels: derefStrings(body.AllowedModels),
-		GroupIDs:      groupIDs,
-		RPMLimit:      body.RpmLimit,
-		TPMLimit:      body.TpmLimit,
-		ExpiresAt:     body.ExpiresAt,
+		UserID:           session.User.ID,
+		Name:             body.Name,
+		Scopes:           derefStrings(body.Scopes),
+		AllowedModels:    derefStrings(body.AllowedModels),
+		GroupIDs:         groupIDs,
+		RPMLimit:         body.RpmLimit,
+		TPMLimit:         body.TpmLimit,
+		ConcurrencyLimit: body.ConcurrencyLimit,
+		ExpiresAt:        body.ExpiresAt,
 	})
 	if err != nil {
 		switch {

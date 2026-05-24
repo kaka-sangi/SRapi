@@ -23,6 +23,7 @@ var (
 		{Name: "allowed_models_json", Type: field.TypeJSON, Nullable: true},
 		{Name: "rpm_limit", Type: field.TypeInt, Nullable: true},
 		{Name: "tpm_limit", Type: field.TypeInt, Nullable: true},
+		{Name: "concurrency_limit", Type: field.TypeInt, Nullable: true},
 		{Name: "expires_at", Type: field.TypeTime, Nullable: true},
 		{Name: "last_used_at", Type: field.TypeTime, Nullable: true},
 	}
@@ -45,7 +46,7 @@ var (
 			{
 				Name:    "apikey_expires_at",
 				Unique:  false,
-				Columns: []*schema.Column{APIKeysColumns[13]},
+				Columns: []*schema.Column{APIKeysColumns[14]},
 			},
 		},
 	}

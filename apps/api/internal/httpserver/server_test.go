@@ -227,6 +227,103 @@ func TestGatewayEnforcesAPIKeyRPMLimit(t *testing.T) {
 	}
 }
 
+func TestGatewayEnforcesAPIKeyConcurrencyLimit(t *testing.T) {
+	redisServer := miniredis.RunT(t)
+	redisClient := redis.NewClient(&redis.Options{Addr: redisServer.Addr()})
+	defer redisClient.Close()
+	limiter, err := ratelimit.New(redisClient)
+	if err != nil {
+		t.Fatalf("new rate limiter: %v", err)
+	}
+
+	upstreamStarted := make(chan struct{})
+	releaseUpstream := make(chan struct{})
+	var startOnce sync.Once
+	var releaseOnce sync.Once
+	defer releaseOnce.Do(func() { close(releaseUpstream) })
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/chat/completions" {
+			t.Fatalf("unexpected upstream path %s", r.URL.Path)
+		}
+		startOnce.Do(func() {
+			close(upstreamStarted)
+			<-releaseUpstream
+		})
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"concurrency ok"}}],"usage":{"prompt_tokens":3,"completion_tokens":2,"total_tokens":5}}`))
+	}))
+	defer upstream.Close()
+
+	cfg := config.Load()
+	cfg.Gateway.RequestTimeout = time.Minute
+	handler := New(cfg, nil, WithRateLimiter(limiter))
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"api-key-concurrency-provider","display_name":"API Key Concurrency","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"api-key-concurrency-model","display_name":"API Key Concurrency Model","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"api-key-concurrency-upstream","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"api-key-concurrency-account","runtime_class":"api_key","credential":{"api_key":"upstream-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
+	keyResp := mustCreateAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"limited-concurrency","scopes":["gateway:invoke"],"concurrency_limit":1}`)
+	if keyResp.Data.ApiKey.ConcurrencyLimit == nil || *keyResp.Data.ApiKey.ConcurrencyLimit != 1 {
+		t.Fatalf("expected API key concurrency_limit 1, got %+v", keyResp.Data.ApiKey.ConcurrencyLimit)
+	}
+	apiKey := keyResp.Data.PlaintextKey
+
+	firstDone := make(chan *httptest.ResponseRecorder, 1)
+	go func() {
+		req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"api-key-concurrency-model","messages":[{"role":"user","content":"first"}]}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		firstDone <- rec
+	}()
+
+	select {
+	case <-upstreamStarted:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for first gateway request to reach upstream")
+	}
+
+	secondReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"api-key-concurrency-model","messages":[{"role":"user","content":"second"}]}`))
+	secondReq.Header.Set("Content-Type", "application/json")
+	secondReq.Header.Set("Authorization", "Bearer "+apiKey)
+	secondRec := httptest.NewRecorder()
+	handler.ServeHTTP(secondRec, secondReq)
+	if secondRec.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected concurrent gateway request 429, got %d body=%s", secondRec.Code, secondRec.Body.String())
+	}
+	if secondRec.Header().Get("Retry-After") == "" {
+		t.Fatal("expected Retry-After header on concurrency limited gateway request")
+	}
+	var errResp apiopenapi.GatewayErrorResponse
+	if err := json.NewDecoder(secondRec.Body).Decode(&errResp); err != nil {
+		t.Fatalf("decode concurrency limit error response: %v", err)
+	}
+	if errResp.Error.Code == nil || *errResp.Error.Code != "concurrency_limit_exceeded" || errResp.Error.Type != apiopenapi.RateLimitError {
+		t.Fatalf("unexpected concurrency limit error response: %+v", errResp)
+	}
+
+	releaseOnce.Do(func() { close(releaseUpstream) })
+	var firstRec *httptest.ResponseRecorder
+	select {
+	case firstRec = <-firstDone:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for first gateway request to finish")
+	}
+	if firstRec.Code != http.StatusOK {
+		t.Fatalf("expected first gateway request 200, got %d body=%s", firstRec.Code, firstRec.Body.String())
+	}
+
+	thirdReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"api-key-concurrency-model","messages":[{"role":"user","content":"third"}]}`))
+	thirdReq.Header.Set("Content-Type", "application/json")
+	thirdReq.Header.Set("Authorization", "Bearer "+apiKey)
+	thirdRec := httptest.NewRecorder()
+	handler.ServeHTTP(thirdRec, thirdReq)
+	if thirdRec.Code != http.StatusOK {
+		t.Fatalf("expected released concurrency slot to allow third request 200, got %d body=%s", thirdRec.Code, thirdRec.Body.String())
+	}
+}
+
 func TestGatewayGeminiRateLimitUsesGoogleEnvelopeAndRetryAfter(t *testing.T) {
 	redisServer := miniredis.RunT(t)
 	redisClient := redis.NewClient(&redis.Options{Addr: redisServer.Addr()})

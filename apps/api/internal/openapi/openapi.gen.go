@@ -2503,13 +2503,14 @@ type AnthropicUsage struct {
 
 // ApiKey defines model for ApiKey.
 type ApiKey struct {
-	AllowedModels []string   `json:"allowed_models"`
-	CreatedAt     Timestamp  `json:"created_at"`
-	ExpiresAt     *time.Time `json:"expires_at,omitempty"`
-	GroupIds      []Id       `json:"group_ids"`
-	Id            Id         `json:"id"`
-	LastUsedAt    *time.Time `json:"last_used_at,omitempty"`
-	Name          string     `json:"name"`
+	AllowedModels    []string   `json:"allowed_models"`
+	ConcurrencyLimit *int       `json:"concurrency_limit,omitempty"`
+	CreatedAt        Timestamp  `json:"created_at"`
+	ExpiresAt        *time.Time `json:"expires_at,omitempty"`
+	GroupIds         []Id       `json:"group_ids"`
+	Id               Id         `json:"id"`
+	LastUsedAt       *time.Time `json:"last_used_at,omitempty"`
+	Name             string     `json:"name"`
 
 	// Prefix Public key prefix for lookup, never sufficient for authentication.
 	Prefix   string       `json:"prefix"`
@@ -2917,13 +2918,14 @@ type CreateAnnouncementRequest struct {
 
 // CreateApiKeyRequest defines model for CreateApiKeyRequest.
 type CreateApiKeyRequest struct {
-	AllowedModels *[]string  `json:"allowed_models,omitempty"`
-	ExpiresAt     *time.Time `json:"expires_at,omitempty"`
-	GroupIds      *[]Id      `json:"group_ids,omitempty"`
-	Name          string     `json:"name"`
-	RpmLimit      *int       `json:"rpm_limit,omitempty"`
-	Scopes        *[]string  `json:"scopes,omitempty"`
-	TpmLimit      *int       `json:"tpm_limit,omitempty"`
+	AllowedModels    *[]string  `json:"allowed_models,omitempty"`
+	ConcurrencyLimit *int       `json:"concurrency_limit,omitempty"`
+	ExpiresAt        *time.Time `json:"expires_at,omitempty"`
+	GroupIds         *[]Id      `json:"group_ids,omitempty"`
+	Name             string     `json:"name"`
+	RpmLimit         *int       `json:"rpm_limit,omitempty"`
+	Scopes           *[]string  `json:"scopes,omitempty"`
+	TpmLimit         *int       `json:"tpm_limit,omitempty"`
 }
 
 // CreateApiKeyResponse defines model for CreateApiKeyResponse.

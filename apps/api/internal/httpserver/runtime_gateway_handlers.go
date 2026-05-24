@@ -3,11 +3,9 @@ package httpserver
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"time"
 
-	apikeyservice "github.com/srapi/srapi/apps/api/internal/modules/api_keys/service"
 	gatewaycontract "github.com/srapi/srapi/apps/api/internal/modules/gateway/contract"
 	gatewayservice "github.com/srapi/srapi/apps/api/internal/modules/gateway/service"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
@@ -17,14 +15,7 @@ func (s *Server) handleListModels(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	authed, err := s.requireGatewayKey(r)
 	if err != nil {
-		switch {
-		case errors.Is(err, apikeyservice.ErrInvalidKey), errors.Is(err, apikeyservice.ErrInvalidInput):
-			writeGatewayError(w, http.StatusUnauthorized, apiopenapi.AuthenticationError, "invalid API key", "invalid_api_key")
-		case errors.Is(err, apikeyservice.ErrKeyDisabled), errors.Is(err, apikeyservice.ErrKeyExpired):
-			writeGatewayError(w, http.StatusForbidden, apiopenapi.PermissionError, "API key disabled or expired", "api_key_disabled")
-		default:
-			writeGatewayError(w, http.StatusInternalServerError, apiopenapi.InternalError, "failed to authenticate API key", "internal_error")
-		}
+		writeGatewayAuthError(w, err, requestID)
 		return
 	}
 

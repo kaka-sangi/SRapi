@@ -40,6 +40,7 @@ func (s *Store) Create(ctx context.Context, input contract.CreateStoredKey) (con
 		SetAllowedModelsJSON(cloneStrings(input.AllowedModels)).
 		SetNillableRpmLimit(input.RPMLimit).
 		SetNillableTpmLimit(input.TPMLimit).
+		SetNillableConcurrencyLimit(input.ConcurrencyLimit).
 		SetNillableExpiresAt(input.ExpiresAt).
 		Save(ctx)
 	if err != nil {
@@ -174,20 +175,21 @@ func (s *Store) toAPIKey(ctx context.Context, key *ent.APIKey) (contract.APIKey,
 		return contract.APIKey{}, err
 	}
 	return contract.APIKey{
-		ID:            key.ID,
-		UserID:        key.UserID,
-		Name:          key.Name,
-		Prefix:        key.Prefix,
-		Hash:          key.Hash,
-		Status:        contract.Status(key.Status),
-		Scopes:        cloneStrings(key.ScopesJSON),
-		AllowedModels: cloneStrings(key.AllowedModelsJSON),
-		GroupIDs:      groupIDs,
-		RPMLimit:      key.RpmLimit,
-		TPMLimit:      key.TpmLimit,
-		ExpiresAt:     key.ExpiresAt,
-		LastUsedAt:    key.LastUsedAt,
-		CreatedAt:     key.CreatedAt,
+		ID:               key.ID,
+		UserID:           key.UserID,
+		Name:             key.Name,
+		Prefix:           key.Prefix,
+		Hash:             key.Hash,
+		Status:           contract.Status(key.Status),
+		Scopes:           cloneStrings(key.ScopesJSON),
+		AllowedModels:    cloneStrings(key.AllowedModelsJSON),
+		GroupIDs:         groupIDs,
+		RPMLimit:         key.RpmLimit,
+		TPMLimit:         key.TpmLimit,
+		ConcurrencyLimit: key.ConcurrencyLimit,
+		ExpiresAt:        key.ExpiresAt,
+		LastUsedAt:       key.LastUsedAt,
+		CreatedAt:        key.CreatedAt,
 	}, nil
 }
 

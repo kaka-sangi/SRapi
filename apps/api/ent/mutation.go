@@ -126,6 +126,8 @@ type APIKeyMutation struct {
 	addrpm_limit              *int
 	tpm_limit                 *int
 	addtpm_limit              *int
+	concurrency_limit         *int
+	addconcurrency_limit      *int
 	expires_at                *time.Time
 	last_used_at              *time.Time
 	clearedFields             map[string]struct{}
@@ -823,6 +825,76 @@ func (m *APIKeyMutation) ResetTpmLimit() {
 	delete(m.clearedFields, apikey.FieldTpmLimit)
 }
 
+// SetConcurrencyLimit sets the "concurrency_limit" field.
+func (m *APIKeyMutation) SetConcurrencyLimit(i int) {
+	m.concurrency_limit = &i
+	m.addconcurrency_limit = nil
+}
+
+// ConcurrencyLimit returns the value of the "concurrency_limit" field in the mutation.
+func (m *APIKeyMutation) ConcurrencyLimit() (r int, exists bool) {
+	v := m.concurrency_limit
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldConcurrencyLimit returns the old "concurrency_limit" field's value of the APIKey entity.
+// If the APIKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *APIKeyMutation) OldConcurrencyLimit(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldConcurrencyLimit is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldConcurrencyLimit requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldConcurrencyLimit: %w", err)
+	}
+	return oldValue.ConcurrencyLimit, nil
+}
+
+// AddConcurrencyLimit adds i to the "concurrency_limit" field.
+func (m *APIKeyMutation) AddConcurrencyLimit(i int) {
+	if m.addconcurrency_limit != nil {
+		*m.addconcurrency_limit += i
+	} else {
+		m.addconcurrency_limit = &i
+	}
+}
+
+// AddedConcurrencyLimit returns the value that was added to the "concurrency_limit" field in this mutation.
+func (m *APIKeyMutation) AddedConcurrencyLimit() (r int, exists bool) {
+	v := m.addconcurrency_limit
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearConcurrencyLimit clears the value of the "concurrency_limit" field.
+func (m *APIKeyMutation) ClearConcurrencyLimit() {
+	m.concurrency_limit = nil
+	m.addconcurrency_limit = nil
+	m.clearedFields[apikey.FieldConcurrencyLimit] = struct{}{}
+}
+
+// ConcurrencyLimitCleared returns if the "concurrency_limit" field was cleared in this mutation.
+func (m *APIKeyMutation) ConcurrencyLimitCleared() bool {
+	_, ok := m.clearedFields[apikey.FieldConcurrencyLimit]
+	return ok
+}
+
+// ResetConcurrencyLimit resets all changes to the "concurrency_limit" field.
+func (m *APIKeyMutation) ResetConcurrencyLimit() {
+	m.concurrency_limit = nil
+	m.addconcurrency_limit = nil
+	delete(m.clearedFields, apikey.FieldConcurrencyLimit)
+}
+
 // SetExpiresAt sets the "expires_at" field.
 func (m *APIKeyMutation) SetExpiresAt(t time.Time) {
 	m.expires_at = &t
@@ -955,7 +1027,7 @@ func (m *APIKeyMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *APIKeyMutation) Fields() []string {
-	fields := make([]string, 0, 14)
+	fields := make([]string, 0, 15)
 	if m.created_at != nil {
 		fields = append(fields, apikey.FieldCreatedAt)
 	}
@@ -991,6 +1063,9 @@ func (m *APIKeyMutation) Fields() []string {
 	}
 	if m.tpm_limit != nil {
 		fields = append(fields, apikey.FieldTpmLimit)
+	}
+	if m.concurrency_limit != nil {
+		fields = append(fields, apikey.FieldConcurrencyLimit)
 	}
 	if m.expires_at != nil {
 		fields = append(fields, apikey.FieldExpiresAt)
@@ -1030,6 +1105,8 @@ func (m *APIKeyMutation) Field(name string) (ent.Value, bool) {
 		return m.RpmLimit()
 	case apikey.FieldTpmLimit:
 		return m.TpmLimit()
+	case apikey.FieldConcurrencyLimit:
+		return m.ConcurrencyLimit()
 	case apikey.FieldExpiresAt:
 		return m.ExpiresAt()
 	case apikey.FieldLastUsedAt:
@@ -1067,6 +1144,8 @@ func (m *APIKeyMutation) OldField(ctx context.Context, name string) (ent.Value, 
 		return m.OldRpmLimit(ctx)
 	case apikey.FieldTpmLimit:
 		return m.OldTpmLimit(ctx)
+	case apikey.FieldConcurrencyLimit:
+		return m.OldConcurrencyLimit(ctx)
 	case apikey.FieldExpiresAt:
 		return m.OldExpiresAt(ctx)
 	case apikey.FieldLastUsedAt:
@@ -1164,6 +1243,13 @@ func (m *APIKeyMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetTpmLimit(v)
 		return nil
+	case apikey.FieldConcurrencyLimit:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetConcurrencyLimit(v)
+		return nil
 	case apikey.FieldExpiresAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -1195,6 +1281,9 @@ func (m *APIKeyMutation) AddedFields() []string {
 	if m.addtpm_limit != nil {
 		fields = append(fields, apikey.FieldTpmLimit)
 	}
+	if m.addconcurrency_limit != nil {
+		fields = append(fields, apikey.FieldConcurrencyLimit)
+	}
 	return fields
 }
 
@@ -1209,6 +1298,8 @@ func (m *APIKeyMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedRpmLimit()
 	case apikey.FieldTpmLimit:
 		return m.AddedTpmLimit()
+	case apikey.FieldConcurrencyLimit:
+		return m.AddedConcurrencyLimit()
 	}
 	return nil, false
 }
@@ -1239,6 +1330,13 @@ func (m *APIKeyMutation) AddField(name string, value ent.Value) error {
 		}
 		m.AddTpmLimit(v)
 		return nil
+	case apikey.FieldConcurrencyLimit:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddConcurrencyLimit(v)
+		return nil
 	}
 	return fmt.Errorf("unknown APIKey numeric field %s", name)
 }
@@ -1261,6 +1359,9 @@ func (m *APIKeyMutation) ClearedFields() []string {
 	}
 	if m.FieldCleared(apikey.FieldTpmLimit) {
 		fields = append(fields, apikey.FieldTpmLimit)
+	}
+	if m.FieldCleared(apikey.FieldConcurrencyLimit) {
+		fields = append(fields, apikey.FieldConcurrencyLimit)
 	}
 	if m.FieldCleared(apikey.FieldExpiresAt) {
 		fields = append(fields, apikey.FieldExpiresAt)
@@ -1296,6 +1397,9 @@ func (m *APIKeyMutation) ClearField(name string) error {
 		return nil
 	case apikey.FieldTpmLimit:
 		m.ClearTpmLimit()
+		return nil
+	case apikey.FieldConcurrencyLimit:
+		m.ClearConcurrencyLimit()
 		return nil
 	case apikey.FieldExpiresAt:
 		m.ClearExpiresAt()
@@ -1346,6 +1450,9 @@ func (m *APIKeyMutation) ResetField(name string) error {
 		return nil
 	case apikey.FieldTpmLimit:
 		m.ResetTpmLimit()
+		return nil
+	case apikey.FieldConcurrencyLimit:
+		m.ResetConcurrencyLimit()
 		return nil
 	case apikey.FieldExpiresAt:
 		m.ResetExpiresAt()

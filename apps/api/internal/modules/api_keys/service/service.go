@@ -59,17 +59,18 @@ func (s *Service) Create(ctx context.Context, req contract.CreateRequest) (contr
 	hash := s.HashPlaintext(plaintext)
 
 	stored, err := s.store.Create(ctx, contract.CreateStoredKey{
-		UserID:        req.UserID,
-		Name:          strings.TrimSpace(req.Name),
-		Prefix:        prefix,
-		Hash:          hash,
-		Status:        contract.StatusActive,
-		Scopes:        withDefaultScopes(req.Scopes),
-		AllowedModels: cloneStrings(req.AllowedModels),
-		GroupIDs:      cloneInts(req.GroupIDs),
-		RPMLimit:      cloneIntPointer(req.RPMLimit),
-		TPMLimit:      cloneIntPointer(req.TPMLimit),
-		ExpiresAt:     cloneTimePointer(req.ExpiresAt),
+		UserID:           req.UserID,
+		Name:             strings.TrimSpace(req.Name),
+		Prefix:           prefix,
+		Hash:             hash,
+		Status:           contract.StatusActive,
+		Scopes:           withDefaultScopes(req.Scopes),
+		AllowedModels:    cloneStrings(req.AllowedModels),
+		GroupIDs:         cloneInts(req.GroupIDs),
+		RPMLimit:         cloneIntPointer(req.RPMLimit),
+		TPMLimit:         cloneIntPointer(req.TPMLimit),
+		ConcurrencyLimit: cloneIntPointer(req.ConcurrencyLimit),
+		ExpiresAt:        cloneTimePointer(req.ExpiresAt),
 	})
 	if err != nil {
 		return contract.CreatedKey{}, err

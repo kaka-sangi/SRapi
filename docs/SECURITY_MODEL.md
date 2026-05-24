@@ -168,6 +168,7 @@ scopes_json
 allowed_models_json
 rpm_limit
 tpm_limit
+concurrency_limit
 expires_at
 last_used_at
 ```

@@ -105,8 +105,8 @@ func TestPostgresVersionedUpMigrationsMatchEntSchema(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate postgres ddl from Ent schema: %v", err)
 	}
-	gotStatements := sqlStatements(got)
-	wantStatements := sqlStatements(want)
+	gotStatements := postgresSchemaFingerprint(got)
+	wantStatements := postgresSchemaFingerprint(want)
 	if !reflect.DeepEqual(gotStatements, wantStatements) {
 		t.Fatalf("postgres versioned up migrations drifted from Ent schema:\nmissing from migrations: %v\nextra in migrations: %v", missingStrings(wantStatements, gotStatements), missingStrings(gotStatements, wantStatements))
 	}
@@ -255,6 +255,92 @@ func sqlStatements(value string) []string {
 		out = append(out, statement)
 	}
 	sort.Strings(out)
+	return out
+}
+
+func postgresSchemaFingerprint(value string) []string {
+	statements := sqlStatements(value)
+	tables := map[string][]string{}
+	var other []string
+	for _, statement := range statements {
+		if table, elements, ok := parseCreateTableStatement(statement); ok {
+			tables[table] = append(tables[table], elements...)
+			continue
+		}
+		if table, column, ok := parseAlterTableAddColumnStatement(statement); ok {
+			tables[table] = append(tables[table], column)
+			continue
+		}
+		other = append(other, statement)
+	}
+	out := make([]string, 0, len(other)+len(tables))
+	for table, elements := range tables {
+		for i, element := range elements {
+			elements[i] = strings.Join(strings.Fields(element), " ")
+		}
+		sort.Strings(elements)
+		out = append(out, `CREATE TABLE "`+table+`" (`+strings.Join(elements, ", ")+`)`)
+	}
+	out = append(out, other...)
+	sort.Strings(out)
+	return out
+}
+
+func parseCreateTableStatement(statement string) (string, []string, bool) {
+	match := regexp.MustCompile(`(?i)^CREATE TABLE "([^"]+)" \((.*)\)$`).FindStringSubmatch(statement)
+	if len(match) != 3 {
+		return "", nil, false
+	}
+	return match[1], splitSQLList(match[2]), true
+}
+
+func parseAlterTableAddColumnStatement(statement string) (string, string, bool) {
+	match := regexp.MustCompile(`(?i)^ALTER TABLE "([^"]+)" ADD COLUMN (.*)$`).FindStringSubmatch(statement)
+	if len(match) != 3 {
+		return "", "", false
+	}
+	return match[1], match[2], true
+}
+
+func splitSQLList(value string) []string {
+	var out []string
+	start := 0
+	depth := 0
+	inDoubleQuote := false
+	inSingleQuote := false
+	for i, r := range value {
+		switch {
+		case inSingleQuote:
+			if r == '\'' {
+				inSingleQuote = false
+			}
+		case inDoubleQuote:
+			if r == '"' {
+				inDoubleQuote = false
+			}
+		default:
+			switch r {
+			case '\'':
+				inSingleQuote = true
+			case '"':
+				inDoubleQuote = true
+			case '(':
+				depth++
+			case ')':
+				if depth > 0 {
+					depth--
+				}
+			case ',':
+				if depth == 0 {
+					out = append(out, strings.TrimSpace(value[start:i]))
+					start = i + 1
+				}
+			}
+		}
+	}
+	if tail := strings.TrimSpace(value[start:]); tail != "" {
+		out = append(out, tail)
+	}
 	return out
 }
 

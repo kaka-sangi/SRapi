@@ -28,19 +28,20 @@ func (s *Store) Create(_ context.Context, input contract.CreateStoredKey) (contr
 	defer s.mu.Unlock()
 	now := time.Now().UTC()
 	key := contract.APIKey{
-		ID:            s.nextID,
-		UserID:        input.UserID,
-		Name:          input.Name,
-		Prefix:        input.Prefix,
-		Hash:          input.Hash,
-		Status:        input.Status,
-		Scopes:        append([]string(nil), input.Scopes...),
-		AllowedModels: append([]string(nil), input.AllowedModels...),
-		GroupIDs:      append([]int(nil), input.GroupIDs...),
-		RPMLimit:      input.RPMLimit,
-		TPMLimit:      input.TPMLimit,
-		ExpiresAt:     input.ExpiresAt,
-		CreatedAt:     now,
+		ID:               s.nextID,
+		UserID:           input.UserID,
+		Name:             input.Name,
+		Prefix:           input.Prefix,
+		Hash:             input.Hash,
+		Status:           input.Status,
+		Scopes:           append([]string(nil), input.Scopes...),
+		AllowedModels:    append([]string(nil), input.AllowedModels...),
+		GroupIDs:         append([]int(nil), input.GroupIDs...),
+		RPMLimit:         cloneIntPointer(input.RPMLimit),
+		TPMLimit:         cloneIntPointer(input.TPMLimit),
+		ConcurrencyLimit: cloneIntPointer(input.ConcurrencyLimit),
+		ExpiresAt:        cloneTimePointer(input.ExpiresAt),
+		CreatedAt:        now,
 	}
 	s.nextID++
 	s.byID[key.ID] = key
@@ -61,6 +62,7 @@ func (s *Store) Update(_ context.Context, key contract.APIKey) (contract.APIKey,
 	key.CreatedAt = stored.CreatedAt
 	key.RPMLimit = cloneIntPointer(stored.RPMLimit)
 	key.TPMLimit = cloneIntPointer(stored.TPMLimit)
+	key.ConcurrencyLimit = cloneIntPointer(stored.ConcurrencyLimit)
 	key.ExpiresAt = cloneTimePointer(stored.ExpiresAt)
 	key.LastUsedAt = cloneTimePointer(stored.LastUsedAt)
 	key.Scopes = append([]string(nil), key.Scopes...)
@@ -120,6 +122,7 @@ func cloneKey(key contract.APIKey) contract.APIKey {
 	key.GroupIDs = append([]int(nil), key.GroupIDs...)
 	key.RPMLimit = cloneIntPointer(key.RPMLimit)
 	key.TPMLimit = cloneIntPointer(key.TPMLimit)
+	key.ConcurrencyLimit = cloneIntPointer(key.ConcurrencyLimit)
 	key.ExpiresAt = cloneTimePointer(key.ExpiresAt)
 	key.LastUsedAt = cloneTimePointer(key.LastUsedAt)
 	return key

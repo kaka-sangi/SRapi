@@ -6,7 +6,9 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	admincontrol "github.com/srapi/srapi/apps/api/internal/modules/admin_control/contract"
@@ -20,7 +22,64 @@ import (
 	paymentservice "github.com/srapi/srapi/apps/api/internal/modules/payments/service"
 	userscontract "github.com/srapi/srapi/apps/api/internal/modules/users/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
+	"github.com/srapi/srapi/apps/api/internal/platform/ratelimit"
 )
+
+var errGatewayConcurrencyLimited = errors.New("gateway concurrency limit exceeded")
+
+type gatewayConcurrencyLimitError struct {
+	decision ratelimit.Decision
+}
+
+func (e gatewayConcurrencyLimitError) Error() string {
+	return errGatewayConcurrencyLimited.Error()
+}
+
+func (e gatewayConcurrencyLimitError) Unwrap() error {
+	return errGatewayConcurrencyLimited
+}
+
+type gatewayConcurrencyState struct {
+	mu       sync.Mutex
+	apiKeyID int
+	acquired bool
+	lease    ratelimit.ConcurrencyLease
+	released bool
+}
+
+func (s *gatewayConcurrencyState) hasLeaseFor(apiKeyID int) bool {
+	if s == nil {
+		return false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.acquired && !s.released && s.apiKeyID == apiKeyID
+}
+
+func (s *gatewayConcurrencyState) storeLease(apiKeyID int, lease ratelimit.ConcurrencyLease) {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.apiKeyID = apiKeyID
+	s.lease = lease
+	s.acquired = true
+	s.released = false
+}
+
+func (s *gatewayConcurrencyState) releaseLease() (ratelimit.ConcurrencyLease, bool) {
+	if s == nil {
+		return ratelimit.ConcurrencyLease{}, false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.acquired || s.released {
+		return ratelimit.ConcurrencyLease{}, false
+	}
+	s.released = true
+	return s.lease, true
+}
 
 func sanitizedExportMetadata(value map[string]any) map[string]any {
 	if value == nil {
@@ -214,7 +273,42 @@ func (s *Server) requireGatewayKey(r *http.Request) (apikeycontract.AuthResult, 
 	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
 		return apikeycontract.AuthResult{}, apikeyservice.ErrInvalidKey
 	}
-	return s.runtime.apiKeys.Authenticate(r.Context(), parts[1])
+	authed, err := s.runtime.apiKeys.Authenticate(r.Context(), parts[1])
+	if err != nil {
+		return apikeycontract.AuthResult{}, err
+	}
+	if err := s.acquireGatewayConcurrency(r.Context(), authed.Key); err != nil {
+		return apikeycontract.AuthResult{}, err
+	}
+	return authed, nil
+}
+
+func (s *Server) acquireGatewayConcurrency(ctx context.Context, key apikeycontract.APIKey) error {
+	if s.runtime == nil || s.runtime.rateLimiter == nil {
+		return nil
+	}
+	limit := positiveLimit(key.ConcurrencyLimit)
+	if limit <= 0 {
+		return nil
+	}
+	state, _ := ctx.Value(gatewayConcurrencyContextKey{}).(*gatewayConcurrencyState)
+	if state == nil || state.hasLeaseFor(key.ID) {
+		return nil
+	}
+	lease, decision, err := s.runtime.rateLimiter.AcquireConcurrency(ctx, ratelimit.ConcurrencyCheck{
+		Name:  "concurrency",
+		Key:   "apikey:" + strconv.Itoa(key.ID) + ":concurrency",
+		Limit: limit,
+		TTL:   s.cfg.Gateway.RequestTimeout,
+	}, time.Now().UTC())
+	if err != nil {
+		return err
+	}
+	if !decision.Allowed {
+		return gatewayConcurrencyLimitError{decision: decision}
+	}
+	state.storeLease(key.ID, lease)
+	return nil
 }
 
 func (s *Server) apiKeyByUser(ctx context.Context, userID, keyID int) (apikeycontract.APIKey, error) {
@@ -285,7 +379,11 @@ func writeGatewayError(w http.ResponseWriter, status int, typ apiopenapi.Gateway
 }
 
 func writeGatewayAuthError(w http.ResponseWriter, err error, requestID string) {
+	var concurrencyErr gatewayConcurrencyLimitError
 	switch {
+	case errors.As(err, &concurrencyErr):
+		setRetryAfterFromDecision(w, concurrencyErr.decision)
+		writeGatewayError(w, http.StatusTooManyRequests, apiopenapi.RateLimitError, "API key concurrency limit exceeded", "concurrency_limit_exceeded")
 	case errors.Is(err, apikeyservice.ErrInvalidKey), errors.Is(err, apikeyservice.ErrInvalidInput):
 		writeGatewayError(w, http.StatusUnauthorized, apiopenapi.AuthenticationError, "invalid API key", "invalid_api_key")
 	case errors.Is(err, apikeyservice.ErrKeyDisabled), errors.Is(err, apikeyservice.ErrKeyExpired):
@@ -313,8 +411,23 @@ func setDefaultRetryAfter(w http.ResponseWriter, status int) {
 	}
 }
 
+func setRetryAfterFromDecision(w http.ResponseWriter, decision ratelimit.Decision) {
+	if decision.RetryAfter <= 0 {
+		return
+	}
+	seconds := int((decision.RetryAfter + time.Second - time.Nanosecond) / time.Second)
+	if seconds < 1 {
+		seconds = 1
+	}
+	w.Header().Set("Retry-After", strconv.Itoa(seconds))
+}
+
 func writeGeminiGatewayAuthError(w http.ResponseWriter, err error) {
+	var concurrencyErr gatewayConcurrencyLimitError
 	switch {
+	case errors.As(err, &concurrencyErr):
+		setRetryAfterFromDecision(w, concurrencyErr.decision)
+		writeGeminiGatewayError(w, http.StatusTooManyRequests, "RESOURCE_EXHAUSTED", "API key concurrency limit exceeded")
 	case errors.Is(err, apikeyservice.ErrInvalidKey), errors.Is(err, apikeyservice.ErrInvalidInput):
 		writeGeminiGatewayError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "invalid API key")
 	case errors.Is(err, apikeyservice.ErrKeyDisabled), errors.Is(err, apikeyservice.ErrKeyExpired):
@@ -328,7 +441,7 @@ func geminiStatusForGatewayErrorClass(errorClass string, status int) string {
 	switch errorClass {
 	case "invalid_request":
 		return "INVALID_ARGUMENT"
-	case "rate_limit", "rate_limit_exceeded", "rpm_limit_exceeded", "tpm_limit_exceeded", "monthly_token_quota_exceeded", "monthly_cost_quota_exceeded":
+	case "rate_limit", "rate_limit_exceeded", "rpm_limit_exceeded", "tpm_limit_exceeded", "concurrency_limit_exceeded", "monthly_token_quota_exceeded", "monthly_cost_quota_exceeded":
 		return "RESOURCE_EXHAUSTED"
 	case "auth_failed", "auth_error", "permission_denied", "credential_error", "entitlement_model_not_allowed", "entitlement_denied":
 		return "PERMISSION_DENIED"

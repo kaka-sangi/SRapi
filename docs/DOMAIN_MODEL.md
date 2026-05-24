@@ -136,6 +136,7 @@ scopes
 allowed_models
 rpm_limit
 tpm_limit
+concurrency_limit
 expires_at
 last_used_at
 created_at

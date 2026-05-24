@@ -193,18 +193,19 @@ func toAPIKey(key apikeycontract.APIKey) apiopenapi.ApiKey {
 		groupIDs = append(groupIDs, apiopenapi.Id(strconv.Itoa(id)))
 	}
 	return apiopenapi.ApiKey{
-		AllowedModels: append([]string(nil), key.AllowedModels...),
-		CreatedAt:     key.CreatedAt,
-		ExpiresAt:     key.ExpiresAt,
-		GroupIds:      groupIDs,
-		Id:            apiopenapi.Id(strconv.Itoa(key.ID)),
-		LastUsedAt:    key.LastUsedAt,
-		Name:          key.Name,
-		Prefix:        key.Prefix,
-		RpmLimit:      key.RPMLimit,
-		Scopes:        append([]string(nil), key.Scopes...),
-		Status:        apiopenapi.ApiKeyStatus(key.Status),
-		TpmLimit:      key.TPMLimit,
+		AllowedModels:    append([]string(nil), key.AllowedModels...),
+		CreatedAt:        key.CreatedAt,
+		ExpiresAt:        key.ExpiresAt,
+		GroupIds:         groupIDs,
+		Id:               apiopenapi.Id(strconv.Itoa(key.ID)),
+		LastUsedAt:       key.LastUsedAt,
+		Name:             key.Name,
+		Prefix:           key.Prefix,
+		ConcurrencyLimit: key.ConcurrencyLimit,
+		RpmLimit:         key.RPMLimit,
+		Scopes:           append([]string(nil), key.Scopes...),
+		Status:           apiopenapi.ApiKeyStatus(key.Status),
+		TpmLimit:         key.TPMLimit,
 	}
 }
 

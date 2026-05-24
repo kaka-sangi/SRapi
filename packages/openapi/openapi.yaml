@@ -7008,6 +7008,10 @@ components:
           type: integer
           nullable: true
           minimum: 0
+        concurrency_limit:
+          type: integer
+          nullable: true
+          minimum: 0
         expires_at:
           type: string
           format: date-time
@@ -7049,6 +7053,10 @@ components:
           nullable: true
           minimum: 0
         tpm_limit:
+          type: integer
+          nullable: true
+          minimum: 0
+        concurrency_limit:
           type: integer
           nullable: true
           minimum: 0

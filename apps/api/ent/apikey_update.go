@@ -222,6 +222,33 @@ func (_u *APIKeyUpdate) ClearTpmLimit() *APIKeyUpdate {
 	return _u
 }
 
+// SetConcurrencyLimit sets the "concurrency_limit" field.
+func (_u *APIKeyUpdate) SetConcurrencyLimit(v int) *APIKeyUpdate {
+	_u.mutation.ResetConcurrencyLimit()
+	_u.mutation.SetConcurrencyLimit(v)
+	return _u
+}
+
+// SetNillableConcurrencyLimit sets the "concurrency_limit" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableConcurrencyLimit(v *int) *APIKeyUpdate {
+	if v != nil {
+		_u.SetConcurrencyLimit(*v)
+	}
+	return _u
+}
+
+// AddConcurrencyLimit adds value to the "concurrency_limit" field.
+func (_u *APIKeyUpdate) AddConcurrencyLimit(v int) *APIKeyUpdate {
+	_u.mutation.AddConcurrencyLimit(v)
+	return _u
+}
+
+// ClearConcurrencyLimit clears the value of the "concurrency_limit" field.
+func (_u *APIKeyUpdate) ClearConcurrencyLimit() *APIKeyUpdate {
+	_u.mutation.ClearConcurrencyLimit()
+	return _u
+}
+
 // SetExpiresAt sets the "expires_at" field.
 func (_u *APIKeyUpdate) SetExpiresAt(v time.Time) *APIKeyUpdate {
 	_u.mutation.SetExpiresAt(v)
@@ -396,6 +423,15 @@ func (_u *APIKeyUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.TpmLimitCleared() {
 		_spec.ClearField(apikey.FieldTpmLimit, field.TypeInt)
+	}
+	if value, ok := _u.mutation.ConcurrencyLimit(); ok {
+		_spec.SetField(apikey.FieldConcurrencyLimit, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedConcurrencyLimit(); ok {
+		_spec.AddField(apikey.FieldConcurrencyLimit, field.TypeInt, value)
+	}
+	if _u.mutation.ConcurrencyLimitCleared() {
+		_spec.ClearField(apikey.FieldConcurrencyLimit, field.TypeInt)
 	}
 	if value, ok := _u.mutation.ExpiresAt(); ok {
 		_spec.SetField(apikey.FieldExpiresAt, field.TypeTime, value)
@@ -622,6 +658,33 @@ func (_u *APIKeyUpdateOne) ClearTpmLimit() *APIKeyUpdateOne {
 	return _u
 }
 
+// SetConcurrencyLimit sets the "concurrency_limit" field.
+func (_u *APIKeyUpdateOne) SetConcurrencyLimit(v int) *APIKeyUpdateOne {
+	_u.mutation.ResetConcurrencyLimit()
+	_u.mutation.SetConcurrencyLimit(v)
+	return _u
+}
+
+// SetNillableConcurrencyLimit sets the "concurrency_limit" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableConcurrencyLimit(v *int) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetConcurrencyLimit(*v)
+	}
+	return _u
+}
+
+// AddConcurrencyLimit adds value to the "concurrency_limit" field.
+func (_u *APIKeyUpdateOne) AddConcurrencyLimit(v int) *APIKeyUpdateOne {
+	_u.mutation.AddConcurrencyLimit(v)
+	return _u
+}
+
+// ClearConcurrencyLimit clears the value of the "concurrency_limit" field.
+func (_u *APIKeyUpdateOne) ClearConcurrencyLimit() *APIKeyUpdateOne {
+	_u.mutation.ClearConcurrencyLimit()
+	return _u
+}
+
 // SetExpiresAt sets the "expires_at" field.
 func (_u *APIKeyUpdateOne) SetExpiresAt(v time.Time) *APIKeyUpdateOne {
 	_u.mutation.SetExpiresAt(v)
@@ -826,6 +889,15 @@ func (_u *APIKeyUpdateOne) sqlSave(ctx context.Context) (_node *APIKey, err erro
 	}
 	if _u.mutation.TpmLimitCleared() {
 		_spec.ClearField(apikey.FieldTpmLimit, field.TypeInt)
+	}
+	if value, ok := _u.mutation.ConcurrencyLimit(); ok {
+		_spec.SetField(apikey.FieldConcurrencyLimit, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedConcurrencyLimit(); ok {
+		_spec.AddField(apikey.FieldConcurrencyLimit, field.TypeInt, value)
+	}
+	if _u.mutation.ConcurrencyLimitCleared() {
+		_spec.ClearField(apikey.FieldConcurrencyLimit, field.TypeInt)
 	}
 	if value, ok := _u.mutation.ExpiresAt(); ok {
 		_spec.SetField(apikey.FieldExpiresAt, field.TypeTime, value)

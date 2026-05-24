@@ -42,6 +42,8 @@ type APIKey struct {
 	RpmLimit *int `json:"rpm_limit,omitempty"`
 	// TpmLimit holds the value of the "tpm_limit" field.
 	TpmLimit *int `json:"tpm_limit,omitempty"`
+	// ConcurrencyLimit holds the value of the "concurrency_limit" field.
+	ConcurrencyLimit *int `json:"concurrency_limit,omitempty"`
 	// ExpiresAt holds the value of the "expires_at" field.
 	ExpiresAt *time.Time `json:"expires_at,omitempty"`
 	// LastUsedAt holds the value of the "last_used_at" field.
@@ -56,7 +58,7 @@ func (*APIKey) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case apikey.FieldScopesJSON, apikey.FieldAllowedModelsJSON:
 			values[i] = new([]byte)
-		case apikey.FieldID, apikey.FieldUserID, apikey.FieldRpmLimit, apikey.FieldTpmLimit:
+		case apikey.FieldID, apikey.FieldUserID, apikey.FieldRpmLimit, apikey.FieldTpmLimit, apikey.FieldConcurrencyLimit:
 			values[i] = new(sql.NullInt64)
 		case apikey.FieldName, apikey.FieldPrefix, apikey.FieldHash, apikey.FieldStatus:
 			values[i] = new(sql.NullString)
@@ -162,6 +164,13 @@ func (_m *APIKey) assignValues(columns []string, values []any) error {
 				_m.TpmLimit = new(int)
 				*_m.TpmLimit = int(value.Int64)
 			}
+		case apikey.FieldConcurrencyLimit:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field concurrency_limit", values[i])
+			} else if value.Valid {
+				_m.ConcurrencyLimit = new(int)
+				*_m.ConcurrencyLimit = int(value.Int64)
+			}
 		case apikey.FieldExpiresAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field expires_at", values[i])
@@ -250,6 +259,11 @@ func (_m *APIKey) String() string {
 	builder.WriteString(", ")
 	if v := _m.TpmLimit; v != nil {
 		builder.WriteString("tpm_limit=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.ConcurrencyLimit; v != nil {
+		builder.WriteString("concurrency_limit=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")

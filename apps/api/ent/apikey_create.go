@@ -140,6 +140,20 @@ func (_c *APIKeyCreate) SetNillableTpmLimit(v *int) *APIKeyCreate {
 	return _c
 }
 
+// SetConcurrencyLimit sets the "concurrency_limit" field.
+func (_c *APIKeyCreate) SetConcurrencyLimit(v int) *APIKeyCreate {
+	_c.mutation.SetConcurrencyLimit(v)
+	return _c
+}
+
+// SetNillableConcurrencyLimit sets the "concurrency_limit" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableConcurrencyLimit(v *int) *APIKeyCreate {
+	if v != nil {
+		_c.SetConcurrencyLimit(*v)
+	}
+	return _c
+}
+
 // SetExpiresAt sets the "expires_at" field.
 func (_c *APIKeyCreate) SetExpiresAt(v time.Time) *APIKeyCreate {
 	_c.mutation.SetExpiresAt(v)
@@ -323,6 +337,10 @@ func (_c *APIKeyCreate) createSpec() (*APIKey, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.TpmLimit(); ok {
 		_spec.SetField(apikey.FieldTpmLimit, field.TypeInt, value)
 		_node.TpmLimit = &value
+	}
+	if value, ok := _c.mutation.ConcurrencyLimit(); ok {
+		_spec.SetField(apikey.FieldConcurrencyLimit, field.TypeInt, value)
+		_node.ConcurrencyLimit = &value
 	}
 	if value, ok := _c.mutation.ExpiresAt(); ok {
 		_spec.SetField(apikey.FieldExpiresAt, field.TypeTime, value)

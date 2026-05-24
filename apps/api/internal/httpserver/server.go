@@ -377,7 +377,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("POST /v1beta/models/", server.handleGeminiModelAction)
 	server.registerGatewayProviderAliases(mux)
 
-	return requestIDMiddleware(mux)
+	return requestIDMiddleware(server.gatewayConcurrencyMiddleware(mux))
 }
 
 func (s *Server) handleLive(w http.ResponseWriter, r *http.Request) {
@@ -457,6 +457,30 @@ func requestIDMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+func (s *Server) gatewayConcurrencyMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		state := &gatewayConcurrencyState{}
+		ctx := context.WithValue(r.Context(), gatewayConcurrencyContextKey{}, state)
+		defer s.releaseGatewayConcurrency(state)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func (s *Server) releaseGatewayConcurrency(state *gatewayConcurrencyState) {
+	if state == nil || s.runtime == nil || s.runtime.rateLimiter == nil {
+		return
+	}
+	lease, ok := state.releaseLease()
+	if !ok {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := s.runtime.rateLimiter.ReleaseConcurrency(ctx, lease); err != nil {
+		s.logger.Warn("failed to release gateway concurrency slot", "error", err, "lease_key", lease.Key)
+	}
+}
+
 func writeJSON(w http.ResponseWriter, status int, body envelope) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -472,6 +496,8 @@ func requestIDFromContext(ctx context.Context) string {
 	}
 	return requestID
 }
+
+type gatewayConcurrencyContextKey struct{}
 
 type gatewayRouteContextKey struct{}
 

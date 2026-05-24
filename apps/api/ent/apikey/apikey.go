@@ -37,6 +37,8 @@ const (
 	FieldRpmLimit = "rpm_limit"
 	// FieldTpmLimit holds the string denoting the tpm_limit field in the database.
 	FieldTpmLimit = "tpm_limit"
+	// FieldConcurrencyLimit holds the string denoting the concurrency_limit field in the database.
+	FieldConcurrencyLimit = "concurrency_limit"
 	// FieldExpiresAt holds the string denoting the expires_at field in the database.
 	FieldExpiresAt = "expires_at"
 	// FieldLastUsedAt holds the string denoting the last_used_at field in the database.
@@ -60,6 +62,7 @@ var Columns = []string{
 	FieldAllowedModelsJSON,
 	FieldRpmLimit,
 	FieldTpmLimit,
+	FieldConcurrencyLimit,
 	FieldExpiresAt,
 	FieldLastUsedAt,
 }
@@ -145,6 +148,11 @@ func ByRpmLimit(opts ...sql.OrderTermOption) OrderOption {
 // ByTpmLimit orders the results by the tpm_limit field.
 func ByTpmLimit(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldTpmLimit, opts...).ToFunc()
+}
+
+// ByConcurrencyLimit orders the results by the concurrency_limit field.
+func ByConcurrencyLimit(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldConcurrencyLimit, opts...).ToFunc()
 }
 
 // ByExpiresAt orders the results by the expires_at field.

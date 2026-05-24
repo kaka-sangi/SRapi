@@ -25,6 +25,7 @@ func (APIKey) Fields() []ent.Field {
 		field.JSON("allowed_models_json", []string{}).Optional(),
 		field.Int("rpm_limit").Optional().Nillable(),
 		field.Int("tpm_limit").Optional().Nillable(),
+		field.Int("concurrency_limit").Optional().Nillable(),
 		field.Time("expires_at").Optional().Nillable(),
 		field.Time("last_used_at").Optional().Nillable(),
 	}

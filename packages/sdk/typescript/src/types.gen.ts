@@ -208,6 +208,7 @@ export type ApiKey = {
     group_ids: Array<Id>;
     rpm_limit?: number | null;
     tpm_limit?: number | null;
+    concurrency_limit?: number | null;
     expires_at?: string | null;
     last_used_at?: string | null;
     created_at: Timestamp;
@@ -220,6 +221,7 @@ export type CreateApiKeyRequest = {
     group_ids?: Array<Id>;
     rpm_limit?: number | null;
     tpm_limit?: number | null;
+    concurrency_limit?: number | null;
     expires_at?: string | null;
 };
 
