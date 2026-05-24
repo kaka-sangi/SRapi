@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
@@ -31,12 +32,24 @@ type Service struct {
 }
 
 type StrategyRegistry struct {
+	mu          sync.RWMutex
 	descriptors map[contract.StrategyName]contract.StrategyDescriptor
 }
 
 func NewStrategyRegistry() *StrategyRegistry {
+	return &StrategyRegistry{descriptors: seededStrategyDescriptorMap()}
+}
+
+func seededStrategyDescriptorMap() map[contract.StrategyName]contract.StrategyDescriptor {
 	descriptors := map[contract.StrategyName]contract.StrategyDescriptor{}
-	for _, descriptor := range []contract.StrategyDescriptor{
+	for _, descriptor := range seededStrategyDescriptors() {
+		descriptors[descriptor.Name] = descriptor
+	}
+	return descriptors
+}
+
+func seededStrategyDescriptors() []contract.StrategyDescriptor {
+	return []contract.StrategyDescriptor{
 		newStrategyDescriptor(contract.StrategyBalanced, "v1", "Balanced default scheduler strategy.", map[string]float64{
 			"health":   0.30,
 			"quota":    0.20,
@@ -107,16 +120,15 @@ func NewStrategyRegistry() *StrategyRegistry {
 			"fairness": 0.05,
 			"priority": 0.05,
 		}),
-	} {
-		descriptors[descriptor.Name] = descriptor
 	}
-	return &StrategyRegistry{descriptors: descriptors}
 }
 
 func (r *StrategyRegistry) Resolve(name contract.StrategyName) (contract.StrategyDescriptor, error) {
 	if name == "" {
 		name = contract.StrategyBalanced
 	}
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	descriptor, ok := r.descriptors[name]
 	if !ok || descriptor.Status != "active" {
 		return contract.StrategyDescriptor{}, ErrInvalidInput
@@ -125,6 +137,8 @@ func (r *StrategyRegistry) Resolve(name contract.StrategyName) (contract.Strateg
 }
 
 func (r *StrategyRegistry) List() []contract.StrategyDescriptor {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	out := make([]contract.StrategyDescriptor, 0, len(r.descriptors))
 	for _, descriptor := range r.descriptors {
 		out = append(out, cloneStrategyDescriptor(descriptor))
@@ -219,6 +233,9 @@ func (s *Service) Schedule(ctx context.Context, req contract.ScheduleRequest) (c
 	}
 	if err := normalizeScheduleCapabilities(&req); err != nil {
 		return contract.ScheduleResult{}, ErrInvalidInput
+	}
+	if err := s.RefreshStrategies(ctx); err != nil {
+		return contract.ScheduleResult{}, err
 	}
 
 	strategy, err := s.registry.Resolve(req.Strategy)
@@ -354,8 +371,11 @@ func (s *Service) ListFeedbacks(ctx context.Context) ([]contract.Feedback, error
 	return s.store.ListFeedbacks(ctx)
 }
 
-func (s *Service) ListStrategies() []contract.StrategyDescriptor {
-	return s.registry.List()
+func (s *Service) ListStrategies(ctx context.Context) ([]contract.StrategyDescriptor, error) {
+	if err := s.RefreshStrategies(ctx); err != nil {
+		return nil, err
+	}
+	return s.registry.List(), nil
 }
 
 func (s *Service) ListLeases(ctx context.Context) ([]contract.Lease, error) {

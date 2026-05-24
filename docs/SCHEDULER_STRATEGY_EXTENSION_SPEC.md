@@ -378,6 +378,12 @@ index(name, status)
 
 也可在 MVP 先用配置文件 seed，但 decision 中必须记录策略版本和权重快照。
 
+K1.2 起运行时已经读取 `status=active`、`scope_type=global` 且 `scope_id IS NULL` 的
+`scheduler_strategies` 行，并在每次调度和管理员策略列表读取前刷新到
+`StrategyRegistry`。同名多 active 版本按 `activated_at`、`updated_at` / `created_at`、
+`id` 选择最新行；内置 seed 仍作为本地 / memory store fallback。API key、model、provider
+等 scoped override、灰度和 shadow decision 仍属于 K1.6+ 范围。
+
 ## 17. Admin API
 
 OpenAPI 中必须预留：

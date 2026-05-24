@@ -12,6 +12,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent"
 	entschedulerdecision "github.com/srapi/srapi/apps/api/ent/schedulerdecision"
 	entschedulerfeedback "github.com/srapi/srapi/apps/api/ent/schedulerfeedback"
+	entschedulerstrategy "github.com/srapi/srapi/apps/api/ent/schedulerstrategy"
 	"github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 )
 
@@ -136,6 +137,69 @@ func (s *Store) ListFeedbacks(ctx context.Context) ([]contract.Feedback, error) 
 		out = append(out, toFeedback(row))
 	}
 	return out, nil
+}
+
+func (s *Store) ListActiveStrategies(ctx context.Context) ([]contract.StrategyDescriptor, error) {
+	rows, err := s.client.SchedulerStrategy.Query().
+		Where(
+			entschedulerstrategy.StatusEQ("active"),
+			entschedulerstrategy.ScopeTypeEQ("global"),
+			entschedulerstrategy.ScopeIDIsNil(),
+		).
+		Order(entschedulerstrategy.ByName(), entschedulerstrategy.ByID()).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	latestByName := map[contract.StrategyName]*ent.SchedulerStrategy{}
+	for _, row := range rows {
+		name := contract.StrategyName(row.Name)
+		current := latestByName[name]
+		if current == nil || strategyRowNewer(row, current) {
+			latestByName[name] = row
+		}
+	}
+	names := make([]string, 0, len(latestByName))
+	for name := range latestByName {
+		names = append(names, string(name))
+	}
+	sort.Strings(names)
+	out := make([]contract.StrategyDescriptor, 0, len(names))
+	for _, name := range names {
+		row := latestByName[contract.StrategyName(name)]
+		out = append(out, contract.StrategyDescriptor{
+			ID:          row.ID,
+			Name:        contract.StrategyName(row.Name),
+			Version:     row.Version,
+			Status:      row.Status,
+			ConfigHash:  row.ConfigHash,
+			Config:      cloneMap(row.ConfigJSON),
+			Description: row.Description,
+		})
+	}
+	return out, nil
+}
+
+func strategyRowNewer(left, right *ent.SchedulerStrategy) bool {
+	leftTime := strategyRowEffectiveAt(left)
+	rightTime := strategyRowEffectiveAt(right)
+	if !leftTime.Equal(rightTime) {
+		return leftTime.After(rightTime)
+	}
+	return left.ID > right.ID
+}
+
+func strategyRowEffectiveAt(row *ent.SchedulerStrategy) time.Time {
+	if row == nil {
+		return time.Time{}
+	}
+	if row.ActivatedAt != nil {
+		return *row.ActivatedAt
+	}
+	if !row.UpdatedAt.IsZero() {
+		return row.UpdatedAt
+	}
+	return row.CreatedAt
 }
 
 func (s *Store) AcquireLease(ctx context.Context, input contract.Lease, maxConcurrency *int) (contract.Lease, error) {

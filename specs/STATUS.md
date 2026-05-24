@@ -79,25 +79,25 @@ last_completed:
 - A5.1: Generic reverse-proxy adapter now accepts `generic-reverse-proxy` providers, reads provider/account metadata for `base_url`, custom auth headers, chat/embedding paths, body mapping, response text/usage paths, supports API-key HTTP client and custom reverse-proxy runtime dispatch, handles OpenAI-compatible streaming/embeddings, and has adapter plus Gateway regressions proving configured upstreams work end to end.
 - A5.2: Provider preset install now covers DeepSeek/Kimi/通义(qwen)/智谱(zhipu)/Grok/Mistral/Groq/Together, keeps new providers disabled by default, records preset metadata into provider config, exposes preset key/platform/default base URL in provider test diagnostics, and has representative DeepSeek/Qwen/Together install + enable + `/admin/providers/{id}/test` coverage. Together's OpenAI-compatible base URL was updated to `https://api.together.ai/v1` per current official docs.
 - C3.3: Gateway content safety now adds `internal/modules/content_safety`, redacts email/phone/SSN/national ID/credit-card text across CanonicalRequest prompt, messages, embeddings, image/audio/speech, moderation, and rerank fields before provider dispatch, records safe audit finding summaries without raw PII, and persists compatibility warnings on usage evidence.
+- K1.2: Scheduler strategy loading now refreshes active global `scheduler_strategies` rows before scheduling and admin strategy listing, normalizes persisted weight config into runtime strategy descriptors, records updated version/hash/weights snapshots on decisions, and keeps seeded strategies as the memory/local fallback.
 - K1.5: Scheduler ranking now applies a Cost/Latency/Quality Pareto frontier before final weighted selection, records `pareto.frontier_account_ids` in decision score evidence, keeps all available candidates in failover rank order, and uses explicit `quality_score` / `quality_tier` metadata as the quality objective.
 
 current:
 
-- package: K1.2
+- package: K1.6
 - status: pending
-- objective: load active SchedulerStrategy rows from PostgreSQL into the runtime StrategyRegistry so strategy config changes can take effect without recompiling.
+- objective: implement Scheduler strategy simulator dry-run/shadow decisions without creating leases or mutating real routing state.
 
-next_recommended: K1.2 strategy_loader（DB → runtime），then K1.6 strategy_simulator（dry-run + shadow）.
+next_recommended: K1.6 strategy_simulator（dry-run + shadow）.
 
 last_gates:
 
-- `cd apps/api && go test ./internal/modules/providers/preset ./internal/httpserver -run 'TestDefaultRegistrySeedsCompatiblePresets|TestAdminInstallProviderPresetsIsIdempotent' -count=1`: pass
-- `cd apps/api && go test ./internal/httpserver -run 'TestAdminProviderOperationsAndDiagnostics|TestAdminInstallProviderPresetsIsIdempotent|TestGatewayProviderAliasUsesPresetProviderKey' -count=1`: pass
-- `cd apps/api && go test ./internal/modules/providers/... ./internal/modules/provider_adapters/... -count=1`: pass
+- `cd apps/api && go test ./internal/modules/scheduler/... ./internal/persistence/entstore/scheduler ./internal/httpserver -run 'TestServiceRefreshesActiveStrategyBeforeSchedule|TestStrategyRegistryListsSeededStrategies|TestStoreListsActiveGlobalStrategies|TestAdminSchedulerStrategiesReflectActivePersistentStrategy|TestAdminProviderOperationsAndDiagnostics' -count=1`: pass
 - `cd apps/api && go test ./...`: pass
-- `git diff --check`: pass
-- `make code-quality-check`: pass
 - `make architecture-check`: pass
+- `make code-quality-check`: pass
+- `make secret-scan`: pass
+- `git diff --check`: pass
 
 notes:
 

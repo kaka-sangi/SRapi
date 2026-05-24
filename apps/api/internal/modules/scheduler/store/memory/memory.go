@@ -84,6 +84,10 @@ func (s *Store) ListFeedbacks(_ context.Context) ([]contract.Feedback, error) {
 	return out, nil
 }
 
+func (s *Store) ListActiveStrategies(_ context.Context) ([]contract.StrategyDescriptor, error) {
+	return nil, nil
+}
+
 func (s *Store) AcquireLease(_ context.Context, input contract.Lease, maxConcurrency *int) (contract.Lease, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -934,11 +934,19 @@ func (s *Server) handleListSchedulerStrategies(w http.ResponseWriter, r *http.Re
 		return
 	}
 	now := time.Now().UTC()
-	strategies := s.runtime.scheduler.ListStrategies()
+	strategies, err := s.runtime.scheduler.ListStrategies(r.Context())
+	if err != nil {
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list scheduler strategies", requestID)
+		return
+	}
 	data := make([]apiopenapi.SchedulerStrategy, 0, len(strategies))
 	for index, strategy := range strategies {
+		id := strategy.ID
+		if id <= 0 {
+			id = index + 1
+		}
 		data = append(data, apiopenapi.SchedulerStrategy{
-			Id:          apiopenapi.Id(strconv.Itoa(index + 1)),
+			Id:          apiopenapi.Id(strconv.Itoa(id)),
 			Name:        apiopenapi.SchedulerStrategyName(strategy.Name),
 			Version:     strategy.Version,
 			Status:      apiopenapi.SchedulerStrategyStatus(strategy.Status),

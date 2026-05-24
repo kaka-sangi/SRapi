@@ -50,6 +50,7 @@ const (
 )
 
 type StrategyDescriptor struct {
+	ID          int
 	Name        StrategyName
 	Version     string
 	Status      string
@@ -211,6 +212,7 @@ type Store interface {
 	ListDecisions(ctx context.Context) ([]Decision, error)
 	CreateFeedback(ctx context.Context, input Feedback) (Feedback, error)
 	ListFeedbacks(ctx context.Context) ([]Feedback, error)
+	ListActiveStrategies(ctx context.Context) ([]StrategyDescriptor, error)
 	AcquireLease(ctx context.Context, input Lease, maxConcurrency *int) (Lease, error)
 	UpdateLeaseStatus(ctx context.Context, requestID string, attemptNo int, status LeaseStatus) (Lease, error)
 	ListLeases(ctx context.Context) ([]Lease, error)

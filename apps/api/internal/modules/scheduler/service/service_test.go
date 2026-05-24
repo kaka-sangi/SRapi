@@ -665,7 +665,10 @@ func TestUserBalanceInsufficientCreatesDecisionWithoutLease(t *testing.T) {
 
 func TestStrategyRegistryListsSeededStrategies(t *testing.T) {
 	svc := newService(t)
-	strategies := svc.ListStrategies()
+	strategies, err := svc.ListStrategies(context.Background())
+	if err != nil {
+		t.Fatalf("list strategies: %v", err)
+	}
 	if len(strategies) != 7 {
 		t.Fatalf("expected 7 seeded strategies, got %d", len(strategies))
 	}
@@ -688,6 +691,56 @@ func TestStrategyRegistryListsSeededStrategies(t *testing.T) {
 		if !seen[name] {
 			t.Fatalf("expected seeded strategy %s in %+v", name, strategies)
 		}
+	}
+}
+
+func TestServiceRefreshesActiveStrategyBeforeSchedule(t *testing.T) {
+	store := &dynamicStrategyStore{Store: schedulermemory.New()}
+	svc, err := service.New(store, nil)
+	if err != nil {
+		t.Fatalf("create scheduler service: %v", err)
+	}
+
+	req := baseRequest()
+	req.Candidates = []contract.Candidate{
+		candidate(1, withHealth(0.95), withRelativeCost("0.9"), withCapabilities(capabilitiescontract.KeyStreaming)),
+		candidate(2, withHealth(0.60), withRelativeCost("0.1"), withCapabilities(capabilitiescontract.KeyStreaming)),
+	}
+	first, err := svc.Schedule(context.Background(), req)
+	if err != nil {
+		t.Fatalf("schedule with seeded strategy: %v", err)
+	}
+	if first.Candidate.Account.ID != 1 {
+		t.Fatalf("expected seeded balanced strategy to select healthier account 1, got %d", first.Candidate.Account.ID)
+	}
+
+	store.strategies = []contract.StrategyDescriptor{
+		{
+			ID:      42,
+			Name:    contract.StrategyBalanced,
+			Version: "v2",
+			Status:  "active",
+			Config: map[string]any{
+				"weights": map[string]any{
+					"cost_weight": 1.0,
+				},
+			},
+			Description: "DB-loaded balanced override",
+		},
+	}
+	req.RequestID = "req_scheduler_strategy_refresh"
+	second, err := svc.Schedule(context.Background(), req)
+	if err != nil {
+		t.Fatalf("schedule with DB-loaded strategy: %v", err)
+	}
+	if second.Candidate.Account.ID != 2 {
+		t.Fatalf("expected DB-loaded balanced strategy to select lower-cost account 2, got %d", second.Candidate.Account.ID)
+	}
+	if second.Decision.StrategyVersion != "v2" || !strings.HasPrefix(second.Decision.StrategyConfigHash, "sha256:") {
+		t.Fatalf("expected DB-loaded strategy snapshot, got %+v", second.Decision)
+	}
+	if second.Decision.StrategyWeights["cost"] != 1.0 {
+		t.Fatalf("expected cost-only strategy weights, got %+v", second.Decision.StrategyWeights)
 	}
 }
 
@@ -911,6 +964,15 @@ func newService(t *testing.T) *service.Service {
 		t.Fatalf("create scheduler service: %v", err)
 	}
 	return svc
+}
+
+type dynamicStrategyStore struct {
+	*schedulermemory.Store
+	strategies []contract.StrategyDescriptor
+}
+
+func (s *dynamicStrategyStore) ListActiveStrategies(_ context.Context) ([]contract.StrategyDescriptor, error) {
+	return append([]contract.StrategyDescriptor(nil), s.strategies...), nil
 }
 
 func baseRequest() contract.ScheduleRequest {
