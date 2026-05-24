@@ -269,6 +269,7 @@ func writeStandardError(w http.ResponseWriter, status int, code apiopenapi.Error
 }
 
 func writeGatewayError(w http.ResponseWriter, status int, typ apiopenapi.GatewayErrorObjectType, message, code string) {
+	setDefaultRetryAfter(w, status)
 	var codePtr *string
 	if code != "" {
 		codePtr = &code
@@ -296,6 +297,7 @@ func writeGatewayAuthError(w http.ResponseWriter, err error, requestID string) {
 }
 
 func writeGeminiGatewayError(w http.ResponseWriter, status int, rpcStatus, message string) {
+	setDefaultRetryAfter(w, status)
 	writeJSONAny(w, status, apiopenapi.GeminiErrorResponse{
 		Error: apiopenapi.GeminiErrorObject{
 			Code:    status,
@@ -303,6 +305,12 @@ func writeGeminiGatewayError(w http.ResponseWriter, status int, rpcStatus, messa
 			Status:  strings.TrimSpace(rpcStatus),
 		},
 	})
+}
+
+func setDefaultRetryAfter(w http.ResponseWriter, status int) {
+	if status == http.StatusTooManyRequests && strings.TrimSpace(w.Header().Get("Retry-After")) == "" {
+		w.Header().Set("Retry-After", "60")
+	}
 }
 
 func writeGeminiGatewayAuthError(w http.ResponseWriter, err error) {
@@ -320,7 +328,7 @@ func geminiStatusForGatewayErrorClass(errorClass string, status int) string {
 	switch errorClass {
 	case "invalid_request":
 		return "INVALID_ARGUMENT"
-	case "rate_limit", "monthly_token_quota_exceeded", "monthly_cost_quota_exceeded":
+	case "rate_limit", "rate_limit_exceeded", "rpm_limit_exceeded", "tpm_limit_exceeded", "monthly_token_quota_exceeded", "monthly_cost_quota_exceeded":
 		return "RESOURCE_EXHAUSTED"
 	case "auth_failed", "auth_error", "permission_denied", "credential_error", "entitlement_model_not_allowed", "entitlement_denied":
 		return "PERMISSION_DENIED"

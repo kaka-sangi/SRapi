@@ -92,7 +92,7 @@ REDIS_ENABLE_TLS=false
 Redis 保存：
 
 - API Key auth cache。
-- rate limit counters。
+- Gateway API key/user RPM 和 API key TPM rate limit counters；Redis 不可用时 release mode 必须启动失败，非 release mode 会禁用 Gateway rate limit。
 - account lease。
 - realtime WebSocket slot lifecycle。
 - sticky session。

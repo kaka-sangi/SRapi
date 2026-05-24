@@ -18,6 +18,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alicebob/miniredis/v2"
+	"github.com/redis/go-redis/v9"
 	"github.com/srapi/srapi/apps/api/internal/config"
 	auditcontract "github.com/srapi/srapi/apps/api/internal/modules/audit/contract"
 	auditmemory "github.com/srapi/srapi/apps/api/internal/modules/audit/store/memory"
@@ -30,6 +32,7 @@ import (
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
 	usagememory "github.com/srapi/srapi/apps/api/internal/modules/usage/store/memory"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
+	"github.com/srapi/srapi/apps/api/internal/platform/ratelimit"
 )
 
 type upstreamMessage struct {
@@ -178,6 +181,100 @@ func TestMetricsExposeBaselineSRapiSignals(t *testing.T) {
 	}
 	if !strings.Contains(body, `srapi_usage_tokens_total{model="gpt-4o-mini",provider_protocol="openai-compatible",token_kind="input"}`) {
 		t.Fatalf("expected usage token metric, got:\n%s", body)
+	}
+}
+
+func TestGatewayEnforcesAPIKeyRPMLimit(t *testing.T) {
+	redisServer := miniredis.RunT(t)
+	redisClient := redis.NewClient(&redis.Options{Addr: redisServer.Addr()})
+	defer redisClient.Close()
+	limiter, err := ratelimit.New(redisClient)
+	if err != nil {
+		t.Fatalf("new rate limiter: %v", err)
+	}
+
+	handler := New(config.Load(), nil, WithRateLimiter(limiter))
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	keyResp := mustCreateAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"limited-gateway","scopes":["gateway:invoke"],"rpm_limit":1}`)
+	apiKey := keyResp.Data.PlaintextKey
+
+	firstReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"gpt-4o-mini","messages":[{"role":"user","content":"first limited request"}]}`))
+	firstReq.Header.Set("Content-Type", "application/json")
+	firstReq.Header.Set("Authorization", "Bearer "+apiKey)
+	firstRec := httptest.NewRecorder()
+	handler.ServeHTTP(firstRec, firstReq)
+	if firstRec.Code != http.StatusOK {
+		t.Fatalf("expected first gateway request 200, got %d body=%s", firstRec.Code, firstRec.Body.String())
+	}
+
+	secondReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"gpt-4o-mini","messages":[{"role":"user","content":"second limited request"}]}`))
+	secondReq.Header.Set("Content-Type", "application/json")
+	secondReq.Header.Set("Authorization", "Bearer "+apiKey)
+	secondRec := httptest.NewRecorder()
+	handler.ServeHTTP(secondRec, secondReq)
+	if secondRec.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected second gateway request 429, got %d body=%s", secondRec.Code, secondRec.Body.String())
+	}
+	if secondRec.Header().Get("Retry-After") == "" {
+		t.Fatal("expected Retry-After header on rate limited gateway request")
+	}
+	var errResp apiopenapi.GatewayErrorResponse
+	if err := json.NewDecoder(secondRec.Body).Decode(&errResp); err != nil {
+		t.Fatalf("decode rate limit error response: %v", err)
+	}
+	if errResp.Error.Code == nil || *errResp.Error.Code != "rpm_limit_exceeded" || errResp.Error.Type != apiopenapi.RateLimitError {
+		t.Fatalf("unexpected rate limit error response: %+v", errResp)
+	}
+}
+
+func TestGatewayGeminiRateLimitUsesGoogleEnvelopeAndRetryAfter(t *testing.T) {
+	redisServer := miniredis.RunT(t)
+	redisClient := redis.NewClient(&redis.Options{Addr: redisServer.Addr()})
+	defer redisClient.Close()
+	limiter, err := ratelimit.New(redisClient)
+	if err != nil {
+		t.Fatalf("new rate limiter: %v", err)
+	}
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"gemini ok"}}],"usage":{"prompt_tokens":4,"completion_tokens":2,"total_tokens":6}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil, WithRateLimiter(limiter))
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	mustCreateGeminiGatewayTarget(t, handler, sessionCookie, loginResp.Data.CsrfToken, upstream.URL, false)
+	keyResp := mustCreateAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"limited-gemini","scopes":["gateway:invoke"],"rpm_limit":1}`)
+	apiKey := keyResp.Data.PlaintextKey
+	body := `{"contents":[{"role":"user","parts":[{"text":"gemini limited prompt"}]}]}`
+
+	firstReq := httptest.NewRequest(http.MethodPost, "/v1beta/models/gemini-route-model:generateContent", strings.NewReader(body))
+	firstReq.Header.Set("Content-Type", "application/json")
+	firstReq.Header.Set("Authorization", "Bearer "+apiKey)
+	firstRec := httptest.NewRecorder()
+	handler.ServeHTTP(firstRec, firstReq)
+	if firstRec.Code != http.StatusOK {
+		t.Fatalf("expected first gemini gateway request 200, got %d body=%s", firstRec.Code, firstRec.Body.String())
+	}
+
+	secondReq := httptest.NewRequest(http.MethodPost, "/v1beta/models/gemini-route-model:generateContent", strings.NewReader(body))
+	secondReq.Header.Set("Content-Type", "application/json")
+	secondReq.Header.Set("Authorization", "Bearer "+apiKey)
+	secondRec := httptest.NewRecorder()
+	handler.ServeHTTP(secondRec, secondReq)
+	if secondRec.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected second gemini gateway request 429, got %d body=%s", secondRec.Code, secondRec.Body.String())
+	}
+	if secondRec.Header().Get("Retry-After") == "" {
+		t.Fatal("expected Retry-After header on rate limited gemini request")
+	}
+	var errResp apiopenapi.GeminiErrorResponse
+	if err := json.NewDecoder(secondRec.Body).Decode(&errResp); err != nil {
+		t.Fatalf("decode gemini rate limit error response: %v", err)
+	}
+	if errResp.Error.Code != http.StatusTooManyRequests || errResp.Error.Status != "RESOURCE_EXHAUSTED" {
+		t.Fatalf("unexpected gemini rate limit error response: %+v", errResp)
 	}
 }
 

@@ -26,6 +26,7 @@ import (
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
+	"github.com/srapi/srapi/apps/api/internal/platform/ratelimit"
 )
 
 type gatewayUsageRecord struct {
@@ -55,6 +56,7 @@ type gatewayAdmission struct {
 	EstimatedUsage gatewaycontract.Usage
 	Pricing        gatewayPricingEvidence
 	Entitlement    subscriptioncontract.EntitlementDecision
+	RateLimit      ratelimit.Decision
 }
 
 type gatewayPricingEvidence struct {
@@ -121,7 +123,84 @@ func (rt *runtimeState) prepareGatewayAdmission(ctx context.Context, canonical g
 	if err != nil {
 		return gatewayAdmission{}, err
 	}
-	return gatewayAdmission{EstimatedUsage: estimatedUsage, Pricing: pricing, Entitlement: entitlement}, nil
+	admission := gatewayAdmission{EstimatedUsage: estimatedUsage, Pricing: pricing, Entitlement: entitlement}
+	if !entitlement.Allowed {
+		return admission, nil
+	}
+	rateLimit, err := rt.checkGatewayRateLimit(ctx, canonical, estimatedUsage)
+	if err != nil {
+		return gatewayAdmission{}, err
+	}
+	admission.RateLimit = rateLimit
+	if !rateLimit.Allowed {
+		admission.Entitlement.Allowed = false
+		admission.Entitlement.Reason = gatewayRateLimitReason(rateLimit.Name)
+	}
+	return admission, nil
+}
+
+func (rt *runtimeState) checkGatewayRateLimit(ctx context.Context, canonical gatewaycontract.CanonicalRequest, usage gatewaycontract.Usage) (ratelimit.Decision, error) {
+	if rt.rateLimiter == nil || canonical.UserID <= 0 || canonical.APIKeyID <= 0 {
+		return ratelimit.Decision{Allowed: true}, nil
+	}
+	apiKey, err := rt.apiKeyByID(ctx, canonical.UserID, canonical.APIKeyID)
+	if err != nil {
+		return ratelimit.Decision{}, err
+	}
+	user, err := rt.users.FindByID(ctx, canonical.UserID)
+	if err != nil {
+		return ratelimit.Decision{}, err
+	}
+
+	checks := make([]ratelimit.Check, 0, 3)
+	if limit := positiveLimit(apiKey.RPMLimit); limit > 0 {
+		checks = append(checks, ratelimit.Check{
+			Name:   "rpm",
+			Key:    fmt.Sprintf("apikey:%d:rpm", apiKey.ID),
+			Limit:  limit,
+			Cost:   1,
+			Window: time.Minute,
+		})
+	}
+	if limit := positiveLimit(user.RPMLimit); limit > 0 {
+		checks = append(checks, ratelimit.Check{
+			Name:   "rpm",
+			Key:    fmt.Sprintf("user:%d:rpm", user.ID),
+			Limit:  limit,
+			Cost:   1,
+			Window: time.Minute,
+		})
+	}
+	if limit := positiveLimit(apiKey.TPMLimit); limit > 0 {
+		checks = append(checks, ratelimit.Check{
+			Name:   "tpm",
+			Key:    fmt.Sprintf("apikey:%d:tpm", apiKey.ID),
+			Limit:  limit,
+			Cost:   max(1, usage.InputTokens+usage.OutputTokens+usage.CachedTokens),
+			Window: time.Minute,
+		})
+	}
+	return rt.rateLimiter.Allow(ctx, checks, time.Now().UTC())
+}
+
+func (rt *runtimeState) apiKeyByID(ctx context.Context, userID int, apiKeyID int) (apikeycontract.APIKey, error) {
+	keys, err := rt.apiKeys.ListByUser(ctx, userID)
+	if err != nil {
+		return apikeycontract.APIKey{}, err
+	}
+	for _, key := range keys {
+		if key.ID == apiKeyID {
+			return key, nil
+		}
+	}
+	return apikeycontract.APIKey{}, apikeycontract.ErrKeyNotFound
+}
+
+func positiveLimit(value *int) int {
+	if value == nil || *value <= 0 {
+		return 0
+	}
+	return *value
 }
 
 func (rt *runtimeState) applyGatewayAdmission(req *schedulercontract.ScheduleRequest, admission gatewayAdmission) {
@@ -223,6 +302,12 @@ func gatewayEntitlementErrorClass(decision subscriptioncontract.EntitlementDecis
 		return "monthly_token_quota_exceeded"
 	case "monthly_cost_quota_exceeded":
 		return "monthly_cost_quota_exceeded"
+	case "rpm_limit_exceeded":
+		return "rpm_limit_exceeded"
+	case "tpm_limit_exceeded":
+		return "tpm_limit_exceeded"
+	case "rate_limit_exceeded":
+		return "rate_limit_exceeded"
 	default:
 		return "entitlement_denied"
 	}
@@ -230,7 +315,7 @@ func gatewayEntitlementErrorClass(decision subscriptioncontract.EntitlementDecis
 
 func gatewayEntitlementHTTPStatus(errorClass string) int {
 	switch errorClass {
-	case "monthly_token_quota_exceeded", "monthly_cost_quota_exceeded":
+	case "monthly_token_quota_exceeded", "monthly_cost_quota_exceeded", "rpm_limit_exceeded", "tpm_limit_exceeded", "rate_limit_exceeded":
 		return http.StatusTooManyRequests
 	default:
 		return http.StatusForbidden
@@ -239,7 +324,7 @@ func gatewayEntitlementHTTPStatus(errorClass string) int {
 
 func gatewayEntitlementErrorType(errorClass string) apiopenapi.GatewayErrorObjectType {
 	switch errorClass {
-	case "monthly_token_quota_exceeded", "monthly_cost_quota_exceeded":
+	case "monthly_token_quota_exceeded", "monthly_cost_quota_exceeded", "rpm_limit_exceeded", "tpm_limit_exceeded", "rate_limit_exceeded":
 		return apiopenapi.RateLimitError
 	default:
 		return apiopenapi.PermissionError
@@ -254,8 +339,25 @@ func gatewayEntitlementMessage(errorClass string) string {
 		return "monthly token quota exceeded"
 	case "monthly_cost_quota_exceeded":
 		return "monthly cost quota exceeded"
+	case "rpm_limit_exceeded":
+		return "API key RPM limit exceeded"
+	case "tpm_limit_exceeded":
+		return "API key TPM limit exceeded"
+	case "rate_limit_exceeded":
+		return "API key rate limit exceeded"
 	default:
 		return "request not allowed by subscription entitlement"
+	}
+}
+
+func gatewayRateLimitReason(name string) string {
+	switch strings.TrimSpace(name) {
+	case "rpm":
+		return "rpm_limit_exceeded"
+	case "tpm":
+		return "tpm_limit_exceeded"
+	default:
+		return "rate_limit_exceeded"
 	}
 }
 

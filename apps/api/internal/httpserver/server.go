@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/srapi/srapi/apps/api/internal/config"
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	admincontrolcontract "github.com/srapi/srapi/apps/api/internal/modules/admin_control/contract"
@@ -33,6 +34,7 @@ import (
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
 	userscontract "github.com/srapi/srapi/apps/api/internal/modules/users/contract"
+	"github.com/srapi/srapi/apps/api/internal/platform/ratelimit"
 )
 
 const requestIDHeader = "X-Request-ID"
@@ -66,6 +68,7 @@ type runtimeOptions struct {
 	operations    operationscontract.Store
 	payments      paymentcontract.Store
 	realtime      realtimecontract.Store
+	rateLimiter   *ratelimit.Limiter
 	scheduler     schedulercontract.Store
 	subscriptions subscriptioncontract.Store
 	usage         usagecontract.Store
@@ -165,6 +168,20 @@ func WithRealtimeStore(store realtimecontract.Store) Option {
 	return func(opts *runtimeOptions) {
 		opts.realtime = store
 	}
+}
+
+func WithRateLimiter(limiter *ratelimit.Limiter) Option {
+	return func(opts *runtimeOptions) {
+		opts.rateLimiter = limiter
+	}
+}
+
+func WithRateLimitRedis(client *redis.Client) Option {
+	limiter, err := ratelimit.New(client)
+	if err != nil {
+		return func(*runtimeOptions) {}
+	}
+	return WithRateLimiter(limiter)
 }
 
 func WithSchedulerStore(store schedulercontract.Store) Option {

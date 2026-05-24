@@ -137,6 +137,13 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 	if realtimeStore != nil {
 		options = append(options, httpserver.WithRealtimeStore(realtimeStore))
 	}
+	rateLimiterOption, err := gatewayRateLimiterOption(context.Background(), cfg, logger, redisClient)
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, err
+	}
+	if rateLimiterOption != nil {
+		options = append(options, rateLimiterOption)
+	}
 	stores, err := persistentStores(context.Background(), cfg, logger, dbClient, redisClient)
 	if err != nil {
 		return nil, nil, nil, nil, nil, nil, err
@@ -269,6 +276,23 @@ func realtimeSlotStore(ctx context.Context, cfg config.Config, logger *slog.Logg
 		return nil, nil
 	}
 	return redisrealtimestore.New(redisClient.Raw())
+}
+
+func gatewayRateLimiterOption(ctx context.Context, cfg config.Config, logger *slog.Logger, redisClient *platformredis.Client) (httpserver.Option, error) {
+	if redisClient == nil || redisClient.Raw() == nil {
+		return nil, nil
+	}
+	pingCtx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+	err := redisClient.Ping(pingCtx)
+	cancel()
+	if err != nil {
+		if cfg.Server.Mode == "release" {
+			return nil, fmt.Errorf("redis unavailable for gateway rate limits: %w", err)
+		}
+		logger.Warn("redis unavailable; gateway rate limits disabled", "error", err)
+		return nil, nil
+	}
+	return httpserver.WithRateLimitRedis(redisClient.Raw()), nil
 }
 
 func domainEventsWorker(stores *entstore.Stores, logger *slog.Logger) (*outboxworker.Worker, error) {

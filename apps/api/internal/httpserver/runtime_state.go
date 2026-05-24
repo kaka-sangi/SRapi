@@ -64,6 +64,7 @@ import (
 	usersservice "github.com/srapi/srapi/apps/api/internal/modules/users/service"
 	usermemory "github.com/srapi/srapi/apps/api/internal/modules/users/store/memory"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
+	"github.com/srapi/srapi/apps/api/internal/platform/ratelimit"
 )
 
 const (
@@ -111,6 +112,7 @@ type runtimeState struct {
 	adminControlStore admincontrolcontract.Store
 	paymentStore      paymentcontract.Store
 	realtimeStore     realtimecontract.Store
+	rateLimiter       *ratelimit.Limiter
 	schedulerStore    schedulercontract.Store
 	subscriptionStore subscriptioncontract.Store
 	usageStore        usagecontract.Store
@@ -449,6 +451,7 @@ func assembleRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOp
 		adminControlStore: assembly.adminControlStore,
 		paymentStore:      assembly.paymentStore,
 		realtimeStore:     opts.realtime,
+		rateLimiter:       opts.rateLimiter,
 		schedulerStore:    assembly.schedulerStore,
 		subscriptionStore: assembly.subscriptionStore,
 		usageStore:        assembly.usageStore,

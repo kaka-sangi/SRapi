@@ -227,7 +227,8 @@ func (s *Server) handleRealtimeWebSocket(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if !admission.Entitlement.Allowed {
-		writeGatewayError(w, http.StatusForbidden, apiopenapi.PermissionError, gatewayEntitlementMessage(gatewayEntitlementErrorClass(admission.Entitlement)), gatewayEntitlementErrorClass(admission.Entitlement))
+		errorClass := gatewayEntitlementErrorClass(admission.Entitlement)
+		writeGatewayError(w, gatewayEntitlementHTTPStatus(errorClass), gatewayEntitlementErrorType(errorClass), gatewayEntitlementMessage(errorClass), errorClass)
 		return
 	}
 	scheduleReq := gatewayScheduleRequest(r, canonical, modelResolution)
