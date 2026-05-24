@@ -16,10 +16,12 @@ import (
 	eventsservice "github.com/srapi/srapi/apps/api/internal/modules/events/service"
 	eventsmemory "github.com/srapi/srapi/apps/api/internal/modules/events/store/memory"
 	"github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
+	stripeprovider "github.com/srapi/srapi/apps/api/internal/modules/payments/providers/stripe"
 	paymentmemory "github.com/srapi/srapi/apps/api/internal/modules/payments/store/memory"
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	subscriptionservice "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/service"
 	subscriptionmemory "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/store/memory"
+	"github.com/stripe/stripe-go/v78/webhook"
 )
 
 const testMasterKey = "payment_master_key_32_bytes_minimum_value"
@@ -175,6 +177,91 @@ func TestPaymentWebhookRejectsInvalidSignatureFailClosed(t *testing.T) {
 	assertCounts(t, h, 0, 0, 0, 1)
 }
 
+func TestStripeOrderCreatesCheckoutSessionMetadata(t *testing.T) {
+	h := newHarness(t)
+	h.stripe.session = stripeprovider.CheckoutSession{ID: "cs_test_123", URL: "https://checkout.stripe.test/session/cs_test_123"}
+	provider, err := h.payments.CreateProviderInstance(t.Context(), contract.CreateProviderInstanceRequest{
+		Provider:         "stripe",
+		Name:             "stripe-primary",
+		Config:           map[string]any{"secret_key": "stripe_test_api_key", "webhook_secret": "stripe_test_webhook_secret", "success_url": "https://app.example/success", "cancel_url": "https://app.example/cancel"},
+		SupportedMethods: []string{"card"},
+		Limits:           map[string]any{"currency": "USD"},
+	})
+	if err != nil {
+		t.Fatalf("create stripe provider: %v", err)
+	}
+	order, err := h.payments.CreateOrder(t.Context(), contract.CreateOrderRequest{
+		UserID:      1,
+		Method:      "card",
+		Amount:      "12.34",
+		Currency:    "USD",
+		ProductType: contract.ProductTypeBalanceCredit,
+	})
+	if err != nil {
+		t.Fatalf("create stripe order: %v", err)
+	}
+	if order.ProviderInstanceID != provider.ID {
+		t.Fatalf("expected stripe provider instance %d, got %+v", provider.ID, order)
+	}
+	if order.Metadata["stripe_checkout_session_id"] != "cs_test_123" || order.Metadata["stripe_checkout_url"] != h.stripe.session.URL {
+		t.Fatalf("expected checkout metadata, got %+v", order.Metadata)
+	}
+	if h.stripe.last.APIKey != "stripe_test_api_key" || h.stripe.last.Amount != 1234 || h.stripe.last.Currency != "usd" || h.stripe.last.OrderNo != order.OrderNo {
+		t.Fatalf("unexpected stripe checkout request: %+v", h.stripe.last)
+	}
+	if h.stripe.last.Metadata["order_no"] != order.OrderNo || h.stripe.last.Metadata["user_id"] != "1" {
+		t.Fatalf("expected order metadata in stripe checkout request, got %+v", h.stripe.last.Metadata)
+	}
+}
+
+func TestStripeWebhookFulfillsCheckoutSession(t *testing.T) {
+	h := newHarness(t)
+	h.stripe.session = stripeprovider.CheckoutSession{ID: "cs_test_order", URL: "https://checkout.stripe.test/session/cs_test_order"}
+	if _, err := h.payments.CreateProviderInstance(t.Context(), contract.CreateProviderInstanceRequest{
+		Provider:         "stripe",
+		Name:             "stripe-primary",
+		Config:           map[string]any{"secret_key": "stripe_test_api_key", "webhook_secret": "stripe_test_webhook_secret", "success_url": "https://app.example/success", "cancel_url": "https://app.example/cancel"},
+		SupportedMethods: []string{"card"},
+		Limits:           map[string]any{"currency": "USD"},
+	}); err != nil {
+		t.Fatalf("create stripe provider: %v", err)
+	}
+	order, err := h.payments.CreateOrder(t.Context(), contract.CreateOrderRequest{
+		UserID:      1,
+		Method:      "card",
+		Amount:      "12.34",
+		Currency:    "USD",
+		ProductType: contract.ProductTypeBalanceCredit,
+	})
+	if err != nil {
+		t.Fatalf("create stripe order: %v", err)
+	}
+	payload := []byte(`{"id":"evt_test_paid","type":"checkout.session.completed","data":{"object":{"id":"cs_test_order","object":"checkout.session","client_reference_id":"` + order.OrderNo + `","amount_total":1234,"currency":"usd","metadata":{"order_no":"` + order.OrderNo + `"}}}}`)
+	signed := webhook.GenerateTestSignedPayload(&webhook.UnsignedPayload{
+		Payload:   payload,
+		Secret:    "stripe_test_webhook_secret",
+		Timestamp: time.Now(),
+	})
+	result, err := h.payments.HandleWebhook(t.Context(), contract.WebhookRequest{
+		Provider: "stripe",
+		Headers:  map[string]string{"Stripe-Signature": signed.Header},
+		Payload:  map[string]any{"raw_body": string(payload)},
+	})
+	if err != nil {
+		t.Fatalf("handle stripe webhook: %v", err)
+	}
+	if !result.Handled || result.Order.Status != contract.OrderStatusFulfilled || stringValue(result.Order.ProviderTransactionID) != "cs_test_order" {
+		t.Fatalf("expected fulfilled stripe order, got %+v", result)
+	}
+	ledger, err := h.billing.List(t.Context())
+	if err != nil {
+		t.Fatalf("list billing ledger: %v", err)
+	}
+	if len(ledger) != 1 || ledger[0].Type != billingcontract.LedgerTypePaymentCredit || ledger[0].ReferenceID != order.OrderNo {
+		t.Fatalf("expected payment credit ledger, got %+v", ledger)
+	}
+}
+
 func TestPaymentOrderStatusMachineRejectsIllegalTransitions(t *testing.T) {
 	h := newHarness(t)
 	_, err := h.payments.CreateProviderInstance(t.Context(), contract.CreateProviderInstanceRequest{
@@ -228,6 +315,7 @@ type harness struct {
 	subscriptions *subscriptionservice.Service
 	audit         *auditservice.Service
 	events        *eventsservice.Service
+	stripe        *fakeStripeCheckout
 }
 
 func newHarness(t *testing.T) harness {
@@ -249,16 +337,18 @@ func newHarness(t *testing.T) harness {
 	if err != nil {
 		t.Fatalf("new events service: %v", err)
 	}
+	stripeFake := &fakeStripeCheckout{}
 	paymentsSvc, err := New(store, testMasterKey, Dependencies{
 		Billing:       billingSvc,
 		Subscriptions: subSvc,
 		Audit:         auditSvc,
 		Events:        eventsSvc,
+		Stripe:        stripeFake,
 	}, fixedClock{now: time.Date(2026, 5, 22, 12, 0, 0, 0, time.UTC)})
 	if err != nil {
 		t.Fatalf("new payment service: %v", err)
 	}
-	return harness{store: store, payments: paymentsSvc, billing: billingSvc, subscriptions: subSvc, audit: auditSvc, events: eventsSvc}
+	return harness{store: store, payments: paymentsSvc, billing: billingSvc, subscriptions: subSvc, audit: auditSvc, events: eventsSvc, stripe: stripeFake}
 }
 
 func assertCounts(t *testing.T, h harness, wantLedger int, wantSubs int, wantOutbox int, wantAudit int) {
@@ -312,4 +402,18 @@ type fixedClock struct {
 
 func (c fixedClock) Now() time.Time {
 	return c.now
+}
+
+type fakeStripeCheckout struct {
+	last    stripeprovider.CheckoutSessionRequest
+	session stripeprovider.CheckoutSession
+	err     error
+}
+
+func (f *fakeStripeCheckout) CreateCheckoutSession(req stripeprovider.CheckoutSessionRequest) (stripeprovider.CheckoutSession, error) {
+	f.last = req
+	if f.err != nil {
+		return stripeprovider.CheckoutSession{}, f.err
+	}
+	return f.session, nil
 }

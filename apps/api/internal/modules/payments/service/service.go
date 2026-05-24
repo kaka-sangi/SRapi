@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -21,6 +22,7 @@ import (
 	billingcontract "github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
 	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	"github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
+	stripeprovider "github.com/srapi/srapi/apps/api/internal/modules/payments/providers/stripe"
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	platformcrypto "github.com/srapi/srapi/apps/api/internal/platform/crypto"
 )
@@ -61,6 +63,7 @@ type Dependencies struct {
 	Subscriptions SubscriptionActivator
 	Audit         AuditRecorder
 	Events        EventEnqueuer
+	Stripe        stripeprovider.CheckoutCreator
 }
 
 type Service struct {
@@ -80,6 +83,9 @@ func New(store contract.Store, masterKey string, deps Dependencies, clock Clock)
 	}
 	if clock == nil {
 		clock = SystemClock{}
+	}
+	if deps.Stripe == nil {
+		deps.Stripe = stripeprovider.New()
 	}
 	return &Service{store: store, masterKey: derivedKey, deps: deps, clock: clock}, nil
 }
@@ -179,7 +185,7 @@ func (s *Service) CreateOrder(ctx context.Context, req contract.CreateOrderReque
 		return contract.PaymentOrder{}, ErrInvalidInput
 	}
 	orderNo := newOrderNo()
-	return s.store.CreateOrder(ctx, contract.CreateStoredOrder{
+	order, err := s.store.CreateOrder(ctx, contract.CreateStoredOrder{
 		UserID:             req.UserID,
 		OrderNo:            orderNo,
 		ProviderInstanceID: instance.ID,
@@ -198,6 +204,10 @@ func (s *Service) CreateOrder(ctx context.Context, req contract.CreateOrderReque
 		ExpiresAt: &expiresAt,
 		Metadata:  cloneMap(req.Metadata),
 	})
+	if err != nil {
+		return contract.PaymentOrder{}, err
+	}
+	return s.attachProviderCheckout(ctx, order, instance)
 }
 
 func (s *Service) ListOrders(ctx context.Context) ([]contract.PaymentOrder, error) {
@@ -241,10 +251,14 @@ func (s *Service) CancelOrder(ctx context.Context, userID int, orderID int) (con
 
 func (s *Service) HandleWebhook(ctx context.Context, req contract.WebhookRequest) (contract.WebhookResult, error) {
 	provider := strings.TrimSpace(req.Provider)
-	orderNo := payloadString(req.Payload, "order_no")
-	transactionID := payloadString(req.Payload, "transaction_id", "trade_no", "provider_transaction_id")
-	status := normalizeProviderStatus(payloadString(req.Payload, "status", "trade_status"))
-	idempotencyKey := payloadString(req.Payload, "idempotency_key", "event_id")
+	normalized, err := s.normalizeWebhook(ctx, provider, req)
+	if err != nil {
+		return contract.WebhookResult{}, err
+	}
+	orderNo := normalized.OrderNo
+	transactionID := normalized.TransactionID
+	status := normalized.Status
+	idempotencyKey := normalized.IdempotencyKey
 	if provider == "" || orderNo == "" || status == "" {
 		return contract.WebhookResult{}, ErrInvalidInput
 	}
@@ -262,17 +276,23 @@ func (s *Service) HandleWebhook(ctx context.Context, req contract.WebhookRequest
 	if instance.Provider != provider {
 		return contract.WebhookResult{}, ErrOrderMismatch
 	}
+	if normalized.ProviderInstanceID > 0 && normalized.ProviderInstanceID != instance.ID {
+		return contract.WebhookResult{}, ErrOrderMismatch
+	}
 	config, err := s.decryptConfig(instance, instance.ConfigCiphertext)
 	if err != nil {
 		return contract.WebhookResult{}, err
 	}
-	signatureValid := verifyWebhookSignature(config, req.Headers, req.Payload)
+	signatureValid := normalized.SignatureValid
+	if !signatureValid {
+		signatureValid = verifyWebhookSignature(config, req.Headers, req.Payload)
+	}
 	auditLog, created, err := s.store.CreateAuditLog(ctx, contract.PaymentAuditLog{
 		OrderID:            order.ID,
 		ProviderInstanceID: instance.ID,
 		EventType:          "webhook." + status,
 		IdempotencyKey:     idempotencyKey,
-		Payload:            sanitizePayload(req.Payload),
+		Payload:            sanitizePayload(normalized.Payload),
 		SignatureValid:     signatureValid,
 		CreatedAt:          s.clock.Now(),
 	})
@@ -292,7 +312,7 @@ func (s *Service) HandleWebhook(ctx context.Context, req contract.WebhookRequest
 	if !signatureValid {
 		return contract.WebhookResult{}, ErrSignatureInvalid
 	}
-	if err := verifyWebhookOrder(order, req.Payload); err != nil {
+	if err := verifyWebhookOrder(order, normalized.Payload); err != nil {
 		return contract.WebhookResult{}, err
 	}
 	if status != "paid" {
@@ -306,6 +326,91 @@ func (s *Service) HandleWebhook(ctx context.Context, req contract.WebhookRequest
 		return contract.WebhookResult{}, err
 	}
 	return contract.WebhookResult{Order: fulfilled, Handled: true}, nil
+}
+
+func (s *Service) attachProviderCheckout(ctx context.Context, order contract.PaymentOrder, instance contract.PaymentProviderInstance) (contract.PaymentOrder, error) {
+	if instance.Provider != "stripe" {
+		return order, nil
+	}
+	config, err := s.decryptConfig(instance, instance.ConfigCiphertext)
+	if err != nil {
+		return contract.PaymentOrder{}, err
+	}
+	secretKey := payloadString(config, "secret_key", "api_key")
+	if secretKey == "" {
+		return contract.PaymentOrder{}, ErrInvalidInput
+	}
+	successURL := checkoutURL(config, "success_url", order.OrderNo)
+	cancelURL := checkoutURL(config, "cancel_url", order.OrderNo)
+	if successURL == "" || cancelURL == "" {
+		return contract.PaymentOrder{}, ErrInvalidInput
+	}
+	amountMinor, ok := stripeMinorAmount(order.Amount, order.Currency)
+	if !ok {
+		return contract.PaymentOrder{}, ErrInvalidInput
+	}
+	session, err := s.deps.Stripe.CreateCheckoutSession(stripeprovider.CheckoutSessionRequest{
+		APIKey:     secretKey,
+		OrderNo:    order.OrderNo,
+		Amount:     amountMinor,
+		Currency:   strings.ToLower(order.Currency),
+		SuccessURL: successURL,
+		CancelURL:  cancelURL,
+		Metadata: map[string]string{
+			"order_no":     order.OrderNo,
+			"user_id":      strconv.Itoa(order.UserID),
+			"product_type": string(order.ProductType),
+			"product_id":   order.ProductID,
+		},
+	})
+	if err != nil {
+		return contract.PaymentOrder{}, err
+	}
+	order.Metadata = cloneMap(order.Metadata)
+	order.Metadata["stripe_checkout_session_id"] = session.ID
+	order.Metadata["stripe_checkout_url"] = session.URL
+	order.UpdatedAt = s.clock.Now()
+	return s.store.UpdateOrder(ctx, order)
+}
+
+func checkoutURL(config map[string]any, key string, orderNo string) string {
+	raw := payloadString(config, key)
+	if raw == "" {
+		return ""
+	}
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return ""
+	}
+	query := parsed.Query()
+	if query.Get("order_no") == "" {
+		query.Set("order_no", orderNo)
+	}
+	parsed.RawQuery = query.Encode()
+	return parsed.String()
+}
+
+type normalizedWebhook struct {
+	OrderNo            string
+	TransactionID      string
+	Status             string
+	IdempotencyKey     string
+	Payload            map[string]any
+	SignatureValid     bool
+	ProviderInstanceID int
+}
+
+func (s *Service) normalizeWebhook(ctx context.Context, provider string, req contract.WebhookRequest) (normalizedWebhook, error) {
+	if provider == "stripe" {
+		return s.normalizeStripeWebhook(ctx, req)
+	}
+	return normalizedWebhook{
+		OrderNo:        payloadString(req.Payload, "order_no"),
+		TransactionID:  payloadString(req.Payload, "transaction_id", "trade_no", "provider_transaction_id"),
+		Status:         normalizeProviderStatus(payloadString(req.Payload, "status", "trade_status")),
+		IdempotencyKey: payloadString(req.Payload, "idempotency_key", "event_id"),
+		Payload:        req.Payload,
+	}, nil
 }
 
 func (s *Service) RequestRefund(ctx context.Context, req contract.RefundRequest) (contract.PaymentOrder, error) {

@@ -1,7 +1,9 @@
 package httpserver
 
 import (
+	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"sort"
 	"strconv"
@@ -307,9 +309,22 @@ func (s *Server) handlePaymentWebhook(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	provider := strings.TrimSpace(r.PathValue("provider"))
 	var body apiopenapi.PaymentWebhookRequest
-	if err := s.decodeJSONBody(w, r, &body); err != nil {
-		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid payment webhook request", requestID)
-		return
+	if provider == "stripe" {
+		raw, err := io.ReadAll(http.MaxBytesReader(w, r.Body, s.cfg.Gateway.MaxBodySize))
+		if err != nil {
+			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid payment webhook request", requestID)
+			return
+		}
+		if err := json.Unmarshal(raw, &body); err != nil {
+			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid payment webhook request", requestID)
+			return
+		}
+		body["raw_body"] = string(raw)
+	} else {
+		if err := s.decodeJSONBody(w, r, &body); err != nil {
+			writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid payment webhook request", requestID)
+			return
+		}
 	}
 	result, err := s.runtime.payments.HandleWebhook(r.Context(), paymentcontract.WebhookRequest{
 		Provider: provider,

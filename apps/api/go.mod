@@ -9,6 +9,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.44
 	github.com/oapi-codegen/runtime v1.4.1
 	github.com/redis/go-redis/v9 v9.19.0
+	github.com/stripe/stripe-go/v78 v78.12.0
 	golang.org/x/crypto v0.51.0
 	nhooyr.io/websocket v1.8.17
 )
