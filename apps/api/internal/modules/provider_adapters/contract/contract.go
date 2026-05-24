@@ -319,6 +319,22 @@ type TextResponse struct {
 	Usage      Usage
 }
 
+// ProbeRequest contains the provider, account, and credential used for a health probe.
+type ProbeRequest struct {
+	Provider   providercontract.Provider
+	Account    accountcontract.ProviderAccount
+	Credential map[string]any
+}
+
+// ProbeResponse captures a provider adapter health probe outcome.
+type ProbeResponse struct {
+	OK         bool
+	ErrorClass string
+	StatusCode int
+	LatencyMS  int
+	Metadata   map[string]any
+}
+
 type RealtimeRequest struct {
 	RequestID      string
 	SourceProtocol string
@@ -356,6 +372,11 @@ func (e ProviderError) Error() string {
 
 type TextAdapter interface {
 	InvokeText(ctx context.Context, req TextRequest) (TextResponse, error)
+}
+
+// ProbeAdapter checks whether a provider account can reach its upstream.
+type ProbeAdapter interface {
+	ProbeAccount(ctx context.Context, req ProbeRequest) (ProbeResponse, error)
 }
 
 type RealtimeAdapter interface {

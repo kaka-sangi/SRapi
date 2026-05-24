@@ -17,13 +17,14 @@ const (
 )
 
 type Config struct {
-	Server    ServerConfig
-	Database  DependencyConfig
-	Redis     DependencyConfig
-	Gateway   GatewayConfig
-	Security  SecurityConfig
-	Bootstrap BootstrapConfig
-	Retention RetentionConfig
+	Server      ServerConfig
+	Database    DependencyConfig
+	Redis       DependencyConfig
+	Gateway     GatewayConfig
+	Security    SecurityConfig
+	Bootstrap   BootstrapConfig
+	Retention   RetentionConfig
+	HealthProbe HealthProbeConfig
 }
 
 type ServerConfig struct {
@@ -69,6 +70,17 @@ type RetentionConfig struct {
 	SchedulerFeedbacksDays     int
 	AuditLogsDays              int
 	AccountHealthSnapshotsDays int
+}
+
+// HealthProbeConfig controls the account health probe worker.
+type HealthProbeConfig struct {
+	Interval               time.Duration
+	Timeout                time.Duration
+	MaxConcurrent          int
+	FailureThreshold       int
+	ErrorRateThreshold     float32
+	MinSamplesForErrorRate int
+	Cooldown               time.Duration
 }
 
 func Load() Config {
@@ -118,6 +130,15 @@ func Load() Config {
 			AuditLogsDays:              getIntEnv("DATA_RETENTION_AUDIT_LOGS_DAYS", 365),
 			AccountHealthSnapshotsDays: getIntEnv("DATA_RETENTION_ACCOUNT_HEALTH_SNAPSHOTS_DAYS", 90),
 		},
+		HealthProbe: HealthProbeConfig{
+			Interval:               time.Duration(getIntEnv("ACCOUNT_HEALTH_PROBE_INTERVAL_SECONDS", 300)) * time.Second,
+			Timeout:                time.Duration(getIntEnv("ACCOUNT_HEALTH_PROBE_TIMEOUT_SECONDS", 10)) * time.Second,
+			MaxConcurrent:          getIntEnv("ACCOUNT_HEALTH_PROBE_MAX_CONCURRENT", 8),
+			FailureThreshold:       getIntEnv("ACCOUNT_HEALTH_PROBE_FAILURE_THRESHOLD", 3),
+			ErrorRateThreshold:     float32(getIntEnv("ACCOUNT_HEALTH_PROBE_ERROR_RATE_THRESHOLD_PERCENT", 50)) / 100,
+			MinSamplesForErrorRate: getIntEnv("ACCOUNT_HEALTH_PROBE_MIN_SAMPLES_FOR_ERROR_RATE", 3),
+			Cooldown:               time.Duration(getIntEnv("ACCOUNT_HEALTH_PROBE_COOLDOWN_SECONDS", 300)) * time.Second,
+		},
 	}
 }
 
@@ -165,6 +186,27 @@ func (c Config) Validate() error {
 	}
 	if c.Retention.AccountHealthSnapshotsDays < 0 {
 		return fmt.Errorf("DATA_RETENTION_ACCOUNT_HEALTH_SNAPSHOTS_DAYS must be zero or positive")
+	}
+	if c.HealthProbe.Interval <= 0 {
+		return fmt.Errorf("ACCOUNT_HEALTH_PROBE_INTERVAL_SECONDS must be positive")
+	}
+	if c.HealthProbe.Timeout <= 0 {
+		return fmt.Errorf("ACCOUNT_HEALTH_PROBE_TIMEOUT_SECONDS must be positive")
+	}
+	if c.HealthProbe.MaxConcurrent <= 0 {
+		return fmt.Errorf("ACCOUNT_HEALTH_PROBE_MAX_CONCURRENT must be positive")
+	}
+	if c.HealthProbe.FailureThreshold <= 0 {
+		return fmt.Errorf("ACCOUNT_HEALTH_PROBE_FAILURE_THRESHOLD must be positive")
+	}
+	if c.HealthProbe.ErrorRateThreshold <= 0 || c.HealthProbe.ErrorRateThreshold > 1 {
+		return fmt.Errorf("ACCOUNT_HEALTH_PROBE_ERROR_RATE_THRESHOLD_PERCENT must be greater than 0 and at most 100")
+	}
+	if c.HealthProbe.MinSamplesForErrorRate <= 0 {
+		return fmt.Errorf("ACCOUNT_HEALTH_PROBE_MIN_SAMPLES_FOR_ERROR_RATE must be positive")
+	}
+	if c.HealthProbe.Cooldown <= 0 {
+		return fmt.Errorf("ACCOUNT_HEALTH_PROBE_COOLDOWN_SECONDS must be positive")
 	}
 	if c.Server.Mode == "release" {
 		if weakSecret(c.Security.JWTSecret) {

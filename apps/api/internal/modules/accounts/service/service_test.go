@@ -238,6 +238,134 @@ func TestAccountOperationsManageGroupsProxyRecoveryAndSnapshots(t *testing.T) {
 	}
 }
 
+func TestProbeAccountOpensCircuitAfterConsecutiveFailures(t *testing.T) {
+	store := accountmemory.New()
+	now := time.Date(2026, 5, 25, 10, 0, 0, 0, time.UTC)
+	svc, err := New(store, "0123456789abcdef0123456789abcdef", fixedClock{now: now})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	ctx := context.Background()
+	account, err := svc.Create(ctx, contract.CreateRequest{
+		ProviderID:   11,
+		Name:         "probe-main",
+		RuntimeClass: contract.RuntimeClassAPIKey,
+		Credential:   map[string]any{"api_key": "secret-value"},
+	})
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+	for i := 0; i < 2; i++ {
+		if _, err := svc.RecordHealthSnapshot(ctx, contract.AccountHealthSnapshot{
+			AccountID:    account.ID,
+			ProviderID:   account.ProviderID,
+			Status:       "unhealthy",
+			SuccessRate:  0,
+			ErrorRate:    1,
+			LatencyP50MS: 150 + i,
+			LatencyP95MS: 300 + i,
+			TimeoutCount: 1,
+			CircuitState: "open",
+			SnapshotAt:   now.Add(time.Duration(-2+i) * time.Minute),
+		}); err != nil {
+			t.Fatalf("record history: %v", err)
+		}
+	}
+
+	snapshot, updated, err := svc.ProbeAccount(ctx, account.ID, fakeAccountProber{
+		result: contract.AccountProbeResult{
+			OK:         false,
+			ErrorClass: "timeout",
+			StatusCode: 504,
+			LatencyMS:  100,
+			CheckedAt:  now,
+			Metadata:   map[string]any{"endpoint": "https://provider.test/v1/models"},
+		},
+	}, contract.AccountProbePolicy{
+		HistoryLimit:           3,
+		FailureThreshold:       3,
+		ErrorRateThreshold:     0.5,
+		MinSamplesForErrorRate: 3,
+		Cooldown:               2 * time.Minute,
+	})
+	if err != nil {
+		t.Fatalf("probe account: %v", err)
+	}
+	if snapshot.Status != "unhealthy" || snapshot.CircuitState != "open" || snapshot.CooldownUntil == nil {
+		t.Fatalf("expected unhealthy open circuit snapshot, got %+v", snapshot)
+	}
+	if !snapshot.CooldownUntil.Equal(now.Add(2 * time.Minute)) {
+		t.Fatalf("unexpected cooldown_until: %v", snapshot.CooldownUntil)
+	}
+	if snapshot.SuccessRate != 0 || snapshot.ErrorRate != 1 || snapshot.TimeoutCount != 3 {
+		t.Fatalf("unexpected aggregate probe metrics: %+v", snapshot)
+	}
+	if updated.Metadata["cooldown_active"] != true ||
+		updated.Metadata["circuit_open"] != true ||
+		updated.Metadata["cooldown_reason"] != "timeout" ||
+		updated.Metadata["last_error_class"] != "timeout" ||
+		updated.Metadata["consecutive_probe_failures"] != 3 {
+		t.Fatalf("expected protective metadata, got %+v", updated.Metadata)
+	}
+	if updated.Metadata["last_probe_endpoint"] != "https://provider.test/v1/models" {
+		t.Fatalf("expected probe metadata to be persisted, got %+v", updated.Metadata)
+	}
+	if updated.Metadata["last_health_snapshot_id"] != snapshot.ID {
+		t.Fatalf("expected latest snapshot id in metadata, got %+v", updated.Metadata)
+	}
+}
+
+func TestProbeAccountSuccessfulProbeClearsProtectionMetadata(t *testing.T) {
+	store := accountmemory.New()
+	now := time.Date(2026, 5, 25, 10, 5, 0, 0, time.UTC)
+	svc, err := New(store, "0123456789abcdef0123456789abcdef", fixedClock{now: now})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	ctx := context.Background()
+	account, err := svc.Create(ctx, contract.CreateRequest{
+		ProviderID:   12,
+		Name:         "probe-recovered",
+		RuntimeClass: contract.RuntimeClassAPIKey,
+		Credential:   map[string]any{"api_key": "secret-value"},
+		Metadata: map[string]any{
+			"cooldown_active":    true,
+			"cooldown_reason":    "timeout",
+			"cooldown_until":     now.Add(time.Minute).Format(time.RFC3339),
+			"circuit_open":       true,
+			"last_error_class":   "timeout",
+			"last_error_message": "timeout",
+		},
+	})
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+
+	snapshot, updated, err := svc.ProbeAccount(ctx, account.ID, fakeAccountProber{
+		result: contract.AccountProbeResult{
+			OK:         true,
+			StatusCode: 200,
+			LatencyMS:  42,
+			CheckedAt:  now,
+		},
+		wantCredential: "secret-value",
+	}, contract.AccountProbePolicy{})
+	if err != nil {
+		t.Fatalf("probe account: %v", err)
+	}
+	if snapshot.Status != "healthy" || snapshot.CircuitState != "closed" || snapshot.CooldownUntil != nil {
+		t.Fatalf("expected healthy closed circuit snapshot, got %+v", snapshot)
+	}
+	for _, key := range []string{"cooldown_active", "cooldown_reason", "cooldown_until", "circuit_open", "last_error_class", "last_error_message"} {
+		if _, ok := updated.Metadata[key]; ok {
+			t.Fatalf("expected %s to be cleared from metadata: %+v", key, updated.Metadata)
+		}
+	}
+	if updated.Metadata["last_probe_ok"] != true || updated.Metadata["health_state"] != "healthy" || updated.Metadata["health_score"] != float32(1) {
+		t.Fatalf("expected healthy probe metadata, got %+v", updated.Metadata)
+	}
+}
+
 func TestAdminAccountLifecycleHelpers(t *testing.T) {
 	svc, err := New(accountmemory.New(), "0123456789abcdef0123456789abcdef", nil)
 	if err != nil {
@@ -304,4 +432,22 @@ func TestAdminAccountLifecycleHelpers(t *testing.T) {
 	if len(result.Errors) != 0 || len(result.Updated) != 1 || result.Updated[0].Status != status {
 		t.Fatalf("unexpected batch status result: %+v", result)
 	}
+}
+
+type fixedClock struct {
+	now time.Time
+}
+
+func (c fixedClock) Now() time.Time { return c.now }
+
+type fakeAccountProber struct {
+	result         contract.AccountProbeResult
+	wantCredential string
+}
+
+func (p fakeAccountProber) ProbeAccount(_ context.Context, _ contract.ProviderAccount, credential map[string]any) (contract.AccountProbeResult, error) {
+	if p.wantCredential != "" && credential["api_key"] != p.wantCredential {
+		return contract.AccountProbeResult{}, errors.New("unexpected credential")
+	}
+	return p.result, nil
 }

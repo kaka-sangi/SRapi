@@ -162,6 +162,55 @@ func TestRetentionDefaultsOverridesAndValidation(t *testing.T) {
 	}
 }
 
+func TestHealthProbeDefaultsOverridesAndValidation(t *testing.T) {
+	t.Setenv("ACCOUNT_HEALTH_PROBE_INTERVAL_SECONDS", "")
+	t.Setenv("ACCOUNT_HEALTH_PROBE_TIMEOUT_SECONDS", "")
+	t.Setenv("ACCOUNT_HEALTH_PROBE_MAX_CONCURRENT", "")
+	t.Setenv("ACCOUNT_HEALTH_PROBE_FAILURE_THRESHOLD", "")
+	t.Setenv("ACCOUNT_HEALTH_PROBE_ERROR_RATE_THRESHOLD_PERCENT", "")
+	t.Setenv("ACCOUNT_HEALTH_PROBE_MIN_SAMPLES_FOR_ERROR_RATE", "")
+	t.Setenv("ACCOUNT_HEALTH_PROBE_COOLDOWN_SECONDS", "")
+	cfg := Load()
+	if cfg.HealthProbe.Interval != 5*time.Minute ||
+		cfg.HealthProbe.Timeout != 10*time.Second ||
+		cfg.HealthProbe.MaxConcurrent != 8 ||
+		cfg.HealthProbe.FailureThreshold != 3 ||
+		cfg.HealthProbe.ErrorRateThreshold != 0.5 ||
+		cfg.HealthProbe.MinSamplesForErrorRate != 3 ||
+		cfg.HealthProbe.Cooldown != 5*time.Minute {
+		t.Fatalf("unexpected health probe defaults: %+v", cfg.HealthProbe)
+	}
+
+	t.Setenv("ACCOUNT_HEALTH_PROBE_INTERVAL_SECONDS", "60")
+	t.Setenv("ACCOUNT_HEALTH_PROBE_TIMEOUT_SECONDS", "3")
+	t.Setenv("ACCOUNT_HEALTH_PROBE_MAX_CONCURRENT", "4")
+	t.Setenv("ACCOUNT_HEALTH_PROBE_FAILURE_THRESHOLD", "2")
+	t.Setenv("ACCOUNT_HEALTH_PROBE_ERROR_RATE_THRESHOLD_PERCENT", "75")
+	t.Setenv("ACCOUNT_HEALTH_PROBE_MIN_SAMPLES_FOR_ERROR_RATE", "5")
+	t.Setenv("ACCOUNT_HEALTH_PROBE_COOLDOWN_SECONDS", "120")
+	cfg = Load()
+	if cfg.HealthProbe.Interval != time.Minute ||
+		cfg.HealthProbe.Timeout != 3*time.Second ||
+		cfg.HealthProbe.MaxConcurrent != 4 ||
+		cfg.HealthProbe.FailureThreshold != 2 ||
+		cfg.HealthProbe.ErrorRateThreshold != 0.75 ||
+		cfg.HealthProbe.MinSamplesForErrorRate != 5 ||
+		cfg.HealthProbe.Cooldown != 2*time.Minute {
+		t.Fatalf("unexpected health probe overrides: %+v", cfg.HealthProbe)
+	}
+
+	cfg.HealthProbe.MaxConcurrent = 0
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "ACCOUNT_HEALTH_PROBE_MAX_CONCURRENT") {
+		t.Fatalf("expected health probe validation failure, got %v", err)
+	}
+
+	cfg = Load()
+	cfg.HealthProbe.ErrorRateThreshold = 0
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "ACCOUNT_HEALTH_PROBE_ERROR_RATE_THRESHOLD_PERCENT") {
+		t.Fatalf("expected health probe error rate validation failure, got %v", err)
+	}
+}
+
 func validReleaseConfig() Config {
 	cfg := Load()
 	cfg.Server.Mode = "release"

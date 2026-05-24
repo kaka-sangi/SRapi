@@ -119,6 +119,30 @@ type AccountHealthSnapshot struct {
 	SnapshotAt     time.Time
 }
 
+// AccountProbeResult captures one active upstream health probe result.
+type AccountProbeResult struct {
+	OK         bool
+	ErrorClass string
+	StatusCode int
+	LatencyMS  int
+	CheckedAt  time.Time
+	Metadata   map[string]any
+}
+
+// AccountProbePolicy controls how probe results are folded into health state.
+type AccountProbePolicy struct {
+	HistoryLimit           int
+	FailureThreshold       int
+	ErrorRateThreshold     float32
+	MinSamplesForErrorRate int
+	Cooldown               time.Duration
+}
+
+// AccountProber performs the provider-specific account health check.
+type AccountProber interface {
+	ProbeAccount(ctx context.Context, account ProviderAccount, credential map[string]any) (AccountProbeResult, error)
+}
+
 type AccountQuotaSnapshot struct {
 	ID             int
 	AccountID      int

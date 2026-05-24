@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -598,6 +599,47 @@ func (s *Service) RecordHealthSnapshot(ctx context.Context, snapshot contract.Ac
 	return s.store.RecordHealthSnapshot(ctx, snapshot)
 }
 
+// ProbeAccount probes one provider account and persists the resulting health state.
+func (s *Service) ProbeAccount(ctx context.Context, id int, prober contract.AccountProber, policy contract.AccountProbePolicy) (contract.AccountHealthSnapshot, contract.ProviderAccount, error) {
+	if id <= 0 || prober == nil {
+		return contract.AccountHealthSnapshot{}, contract.ProviderAccount{}, ErrInvalidInput
+	}
+	account, err := s.store.FindByID(ctx, id)
+	if err != nil {
+		return contract.AccountHealthSnapshot{}, contract.ProviderAccount{}, err
+	}
+	credential, err := s.decryptCredential(account.CredentialCiphertext)
+	if err != nil {
+		return contract.AccountHealthSnapshot{}, contract.ProviderAccount{}, err
+	}
+	policy = normalizeProbePolicy(policy)
+	result, err := prober.ProbeAccount(ctx, account, credential)
+	if err != nil {
+		return contract.AccountHealthSnapshot{}, contract.ProviderAccount{}, err
+	}
+	if err := ctx.Err(); err != nil {
+		return contract.AccountHealthSnapshot{}, contract.ProviderAccount{}, err
+	}
+	if result.CheckedAt.IsZero() {
+		result.CheckedAt = s.clock.Now()
+	}
+	history, err := s.store.ListHealthSnapshotsByAccount(ctx, account.ID, policy.HistoryLimit)
+	if err != nil {
+		return contract.AccountHealthSnapshot{}, contract.ProviderAccount{}, err
+	}
+	snapshot, update := probeHealthState(account, result, history, policy)
+	recorded, err := s.RecordHealthSnapshot(ctx, snapshot)
+	if err != nil {
+		return contract.AccountHealthSnapshot{}, contract.ProviderAccount{}, err
+	}
+	update.Metadata["last_health_snapshot_id"] = recorded.ID
+	updated, err := s.store.Update(ctx, update)
+	if err != nil {
+		return contract.AccountHealthSnapshot{}, contract.ProviderAccount{}, err
+	}
+	return recorded, updated, nil
+}
+
 func (s *Service) LatestHealthSnapshotByAccount(ctx context.Context, accountID int) (contract.AccountHealthSnapshot, error) {
 	if accountID <= 0 {
 		return contract.AccountHealthSnapshot{}, ErrInvalidInput
@@ -770,6 +812,205 @@ func clampRatio(value float32) float32 {
 		return 1
 	}
 	return value
+}
+
+func normalizeProbePolicy(policy contract.AccountProbePolicy) contract.AccountProbePolicy {
+	if policy.HistoryLimit <= 0 {
+		policy.HistoryLimit = 5
+	}
+	if policy.FailureThreshold <= 0 {
+		policy.FailureThreshold = 3
+	}
+	if policy.ErrorRateThreshold <= 0 {
+		policy.ErrorRateThreshold = 0.5
+	}
+	if policy.MinSamplesForErrorRate <= 0 {
+		policy.MinSamplesForErrorRate = 3
+	}
+	if policy.Cooldown <= 0 {
+		policy.Cooldown = 5 * time.Minute
+	}
+	return policy
+}
+
+func probeHealthState(account contract.ProviderAccount, result contract.AccountProbeResult, history []contract.AccountHealthSnapshot, policy contract.AccountProbePolicy) (contract.AccountHealthSnapshot, contract.ProviderAccount) {
+	samples := probeSamples(result, history, policy.HistoryLimit)
+	successes := 0
+	failures := 0
+	latencies := make([]int, 0, len(samples))
+	for _, sample := range samples {
+		if sample.success {
+			successes++
+		} else {
+			failures++
+		}
+		if sample.latencyMS > 0 {
+			latencies = append(latencies, sample.latencyMS)
+		}
+	}
+	total := successes + failures
+	successRate := float32(0)
+	errorRate := float32(0)
+	if total > 0 {
+		successRate = float32(successes) / float32(total)
+		errorRate = float32(failures) / float32(total)
+	}
+	consecutiveFailures := consecutiveProbeFailures(samples)
+	unhealthy := consecutiveFailures >= policy.FailureThreshold ||
+		(total >= policy.MinSamplesForErrorRate && errorRate > policy.ErrorRateThreshold)
+
+	status := "healthy"
+	circuitState := "closed"
+	var cooldownUntil *time.Time
+	if unhealthy {
+		status = "unhealthy"
+		circuitState = "open"
+		until := result.CheckedAt.Add(policy.Cooldown)
+		cooldownUntil = &until
+	} else if !result.OK {
+		status = "degraded"
+		circuitState = "half_open"
+	}
+
+	snapshot := contract.AccountHealthSnapshot{
+		AccountID:      account.ID,
+		ProviderID:     account.ProviderID,
+		Status:         status,
+		SuccessRate:    clampRatio(successRate),
+		ErrorRate:      clampRatio(errorRate),
+		LatencyP50MS:   percentileLatency(latencies, 0.50),
+		LatencyP95MS:   percentileLatency(latencies, 0.95),
+		RateLimitCount: probeErrorCount(samples, "rate_limit"),
+		TimeoutCount:   probeErrorCount(samples, "timeout"),
+		CooldownUntil:  cooldownUntil,
+		CircuitState:   circuitState,
+		SnapshotAt:     result.CheckedAt,
+	}
+
+	updated := account
+	metadata := cloneMap(account.Metadata)
+	if metadata == nil {
+		metadata = map[string]any{}
+	}
+	metadata["health_score"] = snapshot.SuccessRate
+	metadata["health_state"] = status
+	metadata["last_probe_at"] = result.CheckedAt.Format(time.RFC3339)
+	metadata["last_probe_ok"] = result.OK
+	metadata["last_probe_latency_ms"] = result.LatencyMS
+	metadata["last_probe_status_code"] = result.StatusCode
+	metadata["consecutive_probe_failures"] = consecutiveFailures
+	for key, value := range result.Metadata {
+		if strings.TrimSpace(key) == "" || value == nil {
+			continue
+		}
+		metadata["last_probe_"+key] = value
+	}
+	errorClass := strings.TrimSpace(result.ErrorClass)
+	if errorClass == "" {
+		errorClass = "probe_failed"
+	}
+	if unhealthy {
+		metadata["cooldown_active"] = true
+		metadata["cooldown_reason"] = errorClass
+		metadata["cooldown_until"] = cooldownUntil.Format(time.RFC3339)
+		metadata["circuit_open"] = true
+		if !result.OK {
+			metadata["last_error_class"] = errorClass
+			metadata["last_error_message"] = errorClass
+		}
+	} else if result.OK {
+		delete(metadata, "cooldown_active")
+		delete(metadata, "cooldown_reason")
+		delete(metadata, "cooldown_until")
+		delete(metadata, "circuit_open")
+		delete(metadata, "last_error_class")
+		delete(metadata, "last_error_message")
+	} else {
+		metadata["last_error_class"] = errorClass
+		metadata["last_error_message"] = errorClass
+		delete(metadata, "cooldown_active")
+		delete(metadata, "cooldown_reason")
+		delete(metadata, "cooldown_until")
+		delete(metadata, "circuit_open")
+	}
+	updated.Metadata = metadata
+	updated.UpdatedAt = result.CheckedAt
+	return snapshot, updated
+}
+
+type probeSample struct {
+	success    bool
+	latencyMS  int
+	errorClass string
+}
+
+func probeSamples(result contract.AccountProbeResult, history []contract.AccountHealthSnapshot, limit int) []probeSample {
+	samples := make([]probeSample, 0, len(history)+1)
+	samples = append(samples, probeSample{
+		success:    result.OK,
+		latencyMS:  result.LatencyMS,
+		errorClass: strings.TrimSpace(result.ErrorClass),
+	})
+	for _, snapshot := range history {
+		samples = append(samples, probeSample{
+			success:    snapshot.SuccessRate >= 0.5 && !strings.EqualFold(snapshot.CircuitState, "open"),
+			latencyMS:  snapshot.LatencyP50MS,
+			errorClass: snapshotStatusErrorClass(snapshot),
+		})
+		if len(samples) >= limit {
+			break
+		}
+	}
+	return samples
+}
+
+func consecutiveProbeFailures(samples []probeSample) int {
+	count := 0
+	for _, sample := range samples {
+		if sample.success {
+			break
+		}
+		count++
+	}
+	return count
+}
+
+func probeErrorCount(samples []probeSample, errorClass string) int {
+	count := 0
+	for _, sample := range samples {
+		if strings.EqualFold(sample.errorClass, errorClass) {
+			count++
+		}
+	}
+	return count
+}
+
+func percentileLatency(values []int, percentile float64) int {
+	if len(values) == 0 {
+		return 0
+	}
+	sort.Ints(values)
+	idx := int(float64(len(values))*percentile+0.999999) - 1
+	if idx < 0 {
+		idx = 0
+	}
+	if idx >= len(values) {
+		idx = len(values) - 1
+	}
+	return values[idx]
+}
+
+func snapshotStatusErrorClass(snapshot contract.AccountHealthSnapshot) string {
+	if snapshot.TimeoutCount > 0 {
+		return "timeout"
+	}
+	if snapshot.RateLimitCount > 0 {
+		return "rate_limit"
+	}
+	if !strings.EqualFold(snapshot.Status, "healthy") {
+		return strings.TrimSpace(snapshot.Status)
+	}
+	return ""
 }
 
 func metadataOptionalInt(metadata map[string]any, keys ...string) *int {
