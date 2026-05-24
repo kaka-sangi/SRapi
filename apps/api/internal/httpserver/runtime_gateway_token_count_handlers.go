@@ -60,7 +60,7 @@ func (s *Server) handleAnthropicCountTokens(w http.ResponseWriter, r *http.Reque
 		writeGatewayError(w, http.StatusBadRequest, apiopenapi.InvalidRequestError, err.Error(), "invalid_request")
 		return
 	}
-	admission, err := s.runtime.prepareGatewayAdmission(r.Context(), canonical, modelResolution, model.ID)
+	admission, err := s.runtime.prepareGatewayAdmission(r.Context(), &canonical, modelResolution, model.ID)
 	if err != nil {
 		s.recordTokenCountFailure(r, authed, canonical.RequestID, canonical.SourceEndpoint, string(canonical.SourceProtocol), canonical.CanonicalModel, "entitlement_check_failed", elapsedMillis(startedAt), &canonical, admission)
 		writeGatewayError(w, http.StatusInternalServerError, apiopenapi.InternalError, "failed to check gateway entitlement", "entitlement_check_failed")

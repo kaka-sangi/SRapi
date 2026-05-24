@@ -319,17 +319,7 @@ func TestGatewayResponsesWebSocketRelaysCodexUpstreamWebSocket(t *testing.T) {
 		t.Fatalf("expected codex websocket scheduler evidence, got %+v", decision)
 	}
 
-	usageReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/usage-logs?model=wp410-codex-ws-model", nil)
-	usageReq.AddCookie(sessionCookie)
-	usageRec := httptest.NewRecorder()
-	handler.ServeHTTP(usageRec, usageReq)
-	if usageRec.Code != http.StatusOK {
-		t.Fatalf("expected usage logs 200, got %d body=%s", usageRec.Code, usageRec.Body.String())
-	}
-	var usageResp apiopenapi.UsageLogListResponse
-	if err := json.NewDecoder(usageRec.Body).Decode(&usageResp); err != nil {
-		t.Fatalf("decode usage logs: %v", err)
-	}
+	usageResp := waitForRealtimeUsageLog(t, handler, sessionCookie, "wp410-codex-ws-model")
 	if len(usageResp.Data) != 1 ||
 		!usageResp.Data[0].Success ||
 		usageResp.Data[0].SourceEndpoint != responsesWebSocketSourceEndpoint ||

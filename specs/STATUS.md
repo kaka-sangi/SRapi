@@ -76,30 +76,26 @@ last_completed:
 - A2.2: Scheduler account-level quota evidence now has an end-to-end Gateway path: successful account usage updates `rpm_used` / `tpm_used` runtime metadata from the recent usage window, scheduler candidates read those counters with existing `rpm_limit` / `tpm_limit` / `max_concurrency` metadata, and HTTP + scheduler regressions prove `rpm_limit_exceeded`, `tpm_limit_exceeded`, and `concurrency_full` reject reasons are recorded.
 - A4.1: Scheduler failover foundations now return ranked candidate lists, persist `fallback_from_decision_id` on scheduler decisions, expose the field through admin OpenAPI/SDK responses, and update memory/Redis leases by `(request_id, attempt_no)` so fallback attempts do not overwrite each other.
 - A4.2: Gateway text, Responses, Messages, Embeddings, and Gemini GenerateContent handlers now consume ranked scheduler candidates with a retry loop for retryable provider errors, persist one `usage_logs` evidence row per `(request_id, attempt_no)`, link fallback scheduler decisions through `fallback_from_decision_id`, record `fallback_excluded` evidence, and expose `srapi_gateway_failover_total`.
+- A5.1: Generic reverse-proxy adapter now accepts `generic-reverse-proxy` providers, reads provider/account metadata for `base_url`, custom auth headers, chat/embedding paths, body mapping, response text/usage paths, supports API-key HTTP client and custom reverse-proxy runtime dispatch, handles OpenAI-compatible streaming/embeddings, and has adapter plus Gateway regressions proving configured upstreams work end to end.
+- C3.3: Gateway content safety now adds `internal/modules/content_safety`, redacts email/phone/SSN/national ID/credit-card text across CanonicalRequest prompt, messages, embeddings, image/audio/speech, moderation, and rerank fields before provider dispatch, records safe audit finding summaries without raw PII, and persists compatibility warnings on usage evidence.
 - K1.5: Scheduler ranking now applies a Cost/Latency/Quality Pareto frontier before final weighted selection, records `pareto.frontier_account_ids` in decision score evidence, keeps all available candidates in failover rank order, and uses explicit `quality_score` / `quality_tier` metadata as the quality objective.
 
 current:
 
-- package: A5.1
+- package: A5.2
 - status: pending
-- objective: add a generic reverse-proxy adapter for configurable OpenAI-compatible upstreams.
+- objective: add provider presets for DeepSeek/Kimi/通义/智谱/Grok/Mistral/Groq/Together.
 
-next_recommended: A5.1 generic reverse-proxy adapter, then A5.2 provider presets for DeepSeek/Kimi/通义/智谱/Grok/Mistral/Groq/Together.
+next_recommended: A5.2 provider presets for DeepSeek/Kimi/通义/智谱/Grok/Mistral/Groq/Together, then complete `/admin/providers/{id}/test` coverage for representative installed presets.
 
 last_gates:
 
-- `cd apps/api && go test ./internal/modules/scheduler/...`: pass
-- `cd apps/api && go test ./internal/persistence/redisstore/scheduler`: pass
-- `cd apps/api && go test ./internal/persistence/entstore/...`: pass
-- `make openapi-lint`: pass
-- `make openapi-codegen-check`: pass
-- `make openapi-ts-codegen-check`: pass
-- `make sdk-ts-typecheck`: pass
-- `make ent-generate-check`: pass
-- `make migration-check`: pass
+- `cd apps/api && go test ./internal/modules/content_safety/...`: pass
+- `cd apps/api && go test ./internal/httpserver -run 'TestGatewayRealtimeWebSocketRelaysOpenAIUpstreamWebSocket|TestGatewayResponsesWebSocketRelaysCodexUpstreamWebSocket|TestGatewayContentSafetyRedactsPIIAndRecordsEvidence' -count=1 -v`: pass
+- `git diff --check`: pass
+- `make code-quality-check`: pass
 - `make architecture-check`: pass
 - `cd apps/api && go test ./...`: pass
-- `make check`: pass
 
 notes:
 

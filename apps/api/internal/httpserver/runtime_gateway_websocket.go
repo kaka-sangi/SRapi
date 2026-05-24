@@ -221,7 +221,7 @@ func (s *Server) handleRealtimeWebSocket(w http.ResponseWriter, r *http.Request)
 		APIKeyID:       authed.Key.ID,
 		CanonicalModel: modelResolution.Model.CanonicalName,
 	})
-	admission, err := s.runtime.prepareGatewayAdmission(r.Context(), canonical, modelResolution, modelResolution.Model.ID)
+	admission, err := s.runtime.prepareGatewayAdmission(r.Context(), &canonical, modelResolution, modelResolution.Model.ID)
 	if err != nil {
 		writeGatewayError(w, http.StatusBadRequest, apiopenapi.InvalidRequestError, err.Error(), "invalid_request")
 		return
@@ -307,6 +307,7 @@ func (s *Server) relayRealtimeWebSocket(ctx context.Context, conn *websocket.Con
 
 	var relayResult *responsesWebSocketRelayResult
 	relayDoneCh := relayDone
+	forwardedUpstreamMessage := false
 	for {
 		select {
 		case msg, ok := <-upstreamToClient:
@@ -332,9 +333,13 @@ func (s *Server) relayRealtimeWebSocket(ctx context.Context, conn *websocket.Con
 				cancelRelay()
 				return false, "client_closed", statusClientClosedRequest
 			}
+			forwardedUpstreamMessage = true
 		case err := <-clientDone:
 			cancelRelay()
 			if err != nil {
+				if forwardedUpstreamMessage {
+					return true, "", http.StatusOK
+				}
 				return false, "client_closed", statusClientClosedRequest
 			}
 			if relayDoneCh != nil {
@@ -436,7 +441,7 @@ func (s *Server) relayCodexResponsesWebSocket(r *http.Request, conn *websocket.C
 		APIKeyID:       authed.Key.ID,
 		CanonicalModel: model.CanonicalName,
 	})
-	admission, err := s.runtime.prepareGatewayAdmission(r.Context(), canonical, modelResolution, model.ID)
+	admission, err := s.runtime.prepareGatewayAdmission(r.Context(), &canonical, modelResolution, model.ID)
 	if err != nil {
 		return false, err
 	}

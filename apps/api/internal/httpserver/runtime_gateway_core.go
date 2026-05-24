@@ -17,6 +17,7 @@ import (
 	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
 	auditcontract "github.com/srapi/srapi/apps/api/internal/modules/audit/contract"
 	capabilitiescontract "github.com/srapi/srapi/apps/api/internal/modules/capabilities/contract"
+	contentsafetycontract "github.com/srapi/srapi/apps/api/internal/modules/content_safety/contract"
 	gatewaycontract "github.com/srapi/srapi/apps/api/internal/modules/gateway/contract"
 	gatewayservice "github.com/srapi/srapi/apps/api/internal/modules/gateway/service"
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
@@ -98,8 +99,22 @@ func (rt *runtimeState) scheduleGatewayRequest(ctx context.Context, req schedule
 	return rt.scheduler.Schedule(ctx, req)
 }
 
-func (rt *runtimeState) prepareGatewayAdmission(ctx context.Context, canonical gatewaycontract.CanonicalRequest, resolution modelcontract.ModelResolution, modelID int) (gatewayAdmission, error) {
-	estimatedUsage := estimateGatewayRequestUsage(canonical)
+func (rt *runtimeState) prepareGatewayAdmission(ctx context.Context, canonical *gatewaycontract.CanonicalRequest, resolution modelcontract.ModelResolution, modelID int) (gatewayAdmission, error) {
+	return rt.prepareGatewayAdmissionWithOptions(ctx, canonical, resolution, modelID, true)
+}
+
+func (rt *runtimeState) prepareGatewayAdmissionWithoutContentSafety(ctx context.Context, canonical *gatewaycontract.CanonicalRequest, resolution modelcontract.ModelResolution, modelID int) (gatewayAdmission, error) {
+	return rt.prepareGatewayAdmissionWithOptions(ctx, canonical, resolution, modelID, false)
+}
+
+func (rt *runtimeState) prepareGatewayAdmissionWithOptions(ctx context.Context, canonical *gatewaycontract.CanonicalRequest, resolution modelcontract.ModelResolution, modelID int, applyContentSafety bool) (gatewayAdmission, error) {
+	if canonical == nil {
+		return gatewayAdmission{}, errors.New("canonical gateway request is nil")
+	}
+	if applyContentSafety {
+		*canonical = rt.applyGatewayContentSafety(ctx, *canonical)
+	}
+	estimatedUsage := estimateGatewayRequestUsage(*canonical)
 	pricing := rt.gatewayPricing(ctx, subscriptioncontract.PricingRequest{
 		ModelID:      modelID,
 		ProviderID:   0,
@@ -113,7 +128,7 @@ func (rt *runtimeState) prepareGatewayAdmission(ctx context.Context, canonical g
 	}
 	entitlement, err := rt.subscriptions.CheckEntitlement(ctx, subscriptioncontract.EntitlementCheckRequest{
 		UserID:             canonical.UserID,
-		ModelReferences:    gatewayModelReferences(canonical, resolution),
+		ModelReferences:    gatewayModelReferences(*canonical, resolution),
 		EstimatedTokens:    estimatedUsage.InputTokens + estimatedUsage.OutputTokens + estimatedUsage.CachedTokens,
 		EstimatedCost:      pricing.Amount,
 		TokensUsedInPeriod: tokensUsed,
@@ -127,7 +142,7 @@ func (rt *runtimeState) prepareGatewayAdmission(ctx context.Context, canonical g
 	if !entitlement.Allowed {
 		return admission, nil
 	}
-	rateLimit, err := rt.checkGatewayRateLimit(ctx, canonical, estimatedUsage)
+	rateLimit, err := rt.checkGatewayRateLimit(ctx, *canonical, estimatedUsage)
 	if err != nil {
 		return gatewayAdmission{}, err
 	}
@@ -137,6 +152,45 @@ func (rt *runtimeState) prepareGatewayAdmission(ctx context.Context, canonical g
 		admission.Entitlement.Reason = gatewayRateLimitReason(rateLimit.Name)
 	}
 	return admission, nil
+}
+
+func (rt *runtimeState) applyGatewayContentSafety(ctx context.Context, canonical gatewaycontract.CanonicalRequest) gatewaycontract.CanonicalRequest {
+	if rt.contentSafety == nil {
+		return canonical
+	}
+	updated, result := rt.contentSafety.Apply(canonical)
+	if len(result.Findings) == 0 {
+		return updated
+	}
+	rt.recordAudit(ctx, auditcontract.RecordRequest{
+		ActorUserID:  ptrInt(canonical.UserID),
+		Action:       "gateway.content_safety",
+		ResourceType: "gateway_request",
+		ResourceID:   canonical.RequestID,
+		After: map[string]any{
+			"request_id":      canonical.RequestID,
+			"source_endpoint": canonical.SourceEndpoint,
+			"model":           canonical.CanonicalModel,
+			"changed":         result.Changed,
+			"warnings":        nonNilStrings(result.Warnings),
+			"findings":        contentSafetyFindingsAudit(result.Findings),
+		},
+		TraceID: requestIDFromContext(ctx),
+	})
+	return updated
+}
+
+func contentSafetyFindingsAudit(findings []contentsafetycontract.Finding) []map[string]any {
+	out := make([]map[string]any, 0, len(findings))
+	for _, finding := range findings {
+		out = append(out, map[string]any{
+			"kind":     string(finding.Kind),
+			"severity": string(finding.Severity),
+			"count":    finding.Count,
+			"redacted": finding.Redacted,
+		})
+	}
+	return out
 }
 
 func (rt *runtimeState) checkGatewayRateLimit(ctx context.Context, canonical gatewaycontract.CanonicalRequest, usage gatewaycontract.Usage) (ratelimit.Decision, error) {

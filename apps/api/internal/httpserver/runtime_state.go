@@ -31,6 +31,7 @@ import (
 	billingservice "github.com/srapi/srapi/apps/api/internal/modules/billing/service"
 	billingmemory "github.com/srapi/srapi/apps/api/internal/modules/billing/store/memory"
 	capabilitiescontract "github.com/srapi/srapi/apps/api/internal/modules/capabilities/contract"
+	contentsafetyservice "github.com/srapi/srapi/apps/api/internal/modules/content_safety/service"
 	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	eventsservice "github.com/srapi/srapi/apps/api/internal/modules/events/service"
 	eventsmemory "github.com/srapi/srapi/apps/api/internal/modules/events/store/memory"
@@ -85,6 +86,7 @@ type runtimeState struct {
 	billing           *billingservice.Service
 	events            *eventsservice.Service
 	affiliate         *affiliateservice.Service
+	contentSafety     *contentsafetyservice.Service
 	gateway           *gatewayservice.Service
 	providers         *providerservice.Service
 	models            *modelservice.Service
@@ -193,6 +195,11 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 		return nil, err
 	}
 
+	contentSafetySvc, err := contentsafetyservice.New()
+	if err != nil {
+		return nil, err
+	}
+
 	gatewaySvc, err := gatewayservice.New()
 	if err != nil {
 		return nil, err
@@ -284,6 +291,7 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 		billingSvc:        billingSvc,
 		eventsSvc:         eventsSvc,
 		affiliateSvc:      affiliateSvc,
+		contentSafetySvc:  contentSafetySvc,
 		gatewaySvc:        gatewaySvc,
 		providersSvc:      providersSvc,
 		modelsSvc:         modelsSvc,
@@ -382,6 +390,7 @@ type runtimeAssembly struct {
 	billingSvc        *billingservice.Service
 	eventsSvc         *eventsservice.Service
 	affiliateSvc      *affiliateservice.Service
+	contentSafetySvc  *contentsafetyservice.Service
 	gatewaySvc        *gatewayservice.Service
 	providersSvc      *providerservice.Service
 	modelsSvc         *modelservice.Service
@@ -424,6 +433,7 @@ func assembleRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOp
 		billing:           assembly.billingSvc,
 		events:            assembly.eventsSvc,
 		affiliate:         assembly.affiliateSvc,
+		contentSafety:     assembly.contentSafetySvc,
 		gateway:           assembly.gatewaySvc,
 		providers:         assembly.providersSvc,
 		models:            assembly.modelsSvc,

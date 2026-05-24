@@ -98,7 +98,7 @@ func (s *Server) handleCreateChatCompletion(w http.ResponseWriter, r *http.Reque
 		APIKeyID:       authed.Key.ID,
 		CanonicalModel: model.CanonicalName,
 	})
-	admission, err := s.runtime.prepareGatewayAdmission(r.Context(), canonical, modelResolution, model.ID)
+	admission, err := s.runtime.prepareGatewayAdmission(r.Context(), &canonical, modelResolution, model.ID)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:             canonical.RequestID,
@@ -248,7 +248,7 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 		APIKeyID:       authed.Key.ID,
 		CanonicalModel: model.CanonicalName,
 	})
-	admission, err := s.runtime.prepareGatewayAdmission(r.Context(), canonical, modelResolution, model.ID)
+	admission, err := s.runtime.prepareGatewayAdmission(r.Context(), &canonical, modelResolution, model.ID)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:             canonical.RequestID,
@@ -399,7 +399,7 @@ func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
 		APIKeyID:       authed.Key.ID,
 		CanonicalModel: model.CanonicalName,
 	})
-	admission, err := s.runtime.prepareGatewayAdmission(r.Context(), canonical, modelResolution, model.ID)
+	admission, err := s.runtime.prepareGatewayAdmission(r.Context(), &canonical, modelResolution, model.ID)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:             canonical.RequestID,
@@ -565,7 +565,7 @@ func (s *Server) handleCreateEmbedding(w http.ResponseWriter, r *http.Request) {
 		writeGatewayError(w, http.StatusBadRequest, apiopenapi.InvalidRequestError, err.Error(), "invalid_request")
 		return
 	}
-	admission, err := s.runtime.prepareGatewayAdmission(r.Context(), canonical, modelResolution, model.ID)
+	admission, err := s.runtime.prepareGatewayAdmission(r.Context(), &canonical, modelResolution, model.ID)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:             canonical.RequestID,
@@ -720,7 +720,7 @@ func (s *Server) handleGeminiModelAction(w http.ResponseWriter, r *http.Request)
 		APIKeyID:       authed.Key.ID,
 		CanonicalModel: model.CanonicalName,
 	})
-	admission, err := s.runtime.prepareGatewayAdmission(r.Context(), canonical, modelResolution, model.ID)
+	admission, err := s.runtime.prepareGatewayAdmission(r.Context(), &canonical, modelResolution, model.ID)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:             canonical.RequestID,
@@ -857,7 +857,7 @@ func (s *Server) handleGeminiCountTokens(w http.ResponseWriter, r *http.Request)
 		writeGeminiGatewayError(w, http.StatusBadRequest, "INVALID_ARGUMENT", err.Error())
 		return
 	}
-	admission, err := s.runtime.prepareGatewayAdmission(r.Context(), canonical, modelResolution, model.ID)
+	admission, err := s.runtime.prepareGatewayAdmission(r.Context(), &canonical, modelResolution, model.ID)
 	if err != nil {
 		s.recordTokenCountFailure(r, authed, canonical.RequestID, canonical.SourceEndpoint, string(canonical.SourceProtocol), canonical.CanonicalModel, "entitlement_check_failed", elapsedMillis(startedAt), &canonical, admission)
 		writeGeminiGatewayError(w, http.StatusInternalServerError, "INTERNAL", "failed to check gateway entitlement")

@@ -361,6 +361,7 @@ Gateway 必须执行：
 - RPM/TPM 限制。
 - 用户余额或 entitlement 检查。
 - 请求体大小限制。
+- CanonicalRequest 文本字段的基础 PII 脱敏与 prompt-injection 命中记录。
 - 上游超时限制。
 - Provider 错误脱敏。
 
@@ -370,6 +371,21 @@ OpenAI-compatible 错误响应不得泄漏：
 - 内部账号 id 以外的敏感配置。
 - 数据库错误细节。
 - 堆栈信息。
+
+### 8.1 Content Safety 起步边界
+
+Gateway admission 在 CanonicalRequest 生成后、Scheduler 和 Provider Adapter 之前执行 `content_safety` 扫描。当前策略是轻量级输入清洗与证据记录：
+
+- 邮箱、手机号、SSN、身份证/国民 ID、信用卡文本会被替换为固定 redaction marker。
+- `ignore previous instructions`、`developer mode`、`reveal/print/show your system prompt` 等 prompt-injection 关键词会产生 warning。
+- 命中后写入 `gateway.content_safety` audit log，只记录 finding kind、severity、count、redacted，不记录原始 prompt 或 PII。
+- usage log 的 `compatibility_warnings` 会保留 `content_safety_pii_redacted` / `content_safety_prompt_injection_detected`，用于后续运营分析和策略升级。
+
+限制：
+
+- 这是起步层，不等价于完整 LLM guardrail。
+- 当前不会阻断请求；后续 block/mask/warn 策略必须显式配置并写入 audit。
+- 图片、音频二进制内容、文件内部隐藏文本和间接 prompt injection 仍需专用 detector 或上游安全能力处理。
 
 ## 9. Provider Adapter 安全
 

@@ -94,7 +94,7 @@ func (s *Server) handleCreateAudioTranscription(w http.ResponseWriter, r *http.R
 		return
 	}
 	canonical.AudioContentType = contentType
-	admission, err := s.runtime.prepareGatewayAdmission(r.Context(), canonical, modelResolution, model.ID)
+	admission, err := s.runtime.prepareGatewayAdmission(r.Context(), &canonical, modelResolution, model.ID)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:             canonical.RequestID,
@@ -406,7 +406,7 @@ func (s *Server) handleCreateAudioSpeech(w http.ResponseWriter, r *http.Request)
 		writeGatewayError(w, http.StatusBadRequest, apiopenapi.InvalidRequestError, err.Error(), "invalid_request")
 		return
 	}
-	admission, err := s.runtime.prepareGatewayAdmission(r.Context(), canonical, modelResolution, model.ID)
+	admission, err := s.runtime.prepareGatewayAdmission(r.Context(), &canonical, modelResolution, model.ID)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:             canonical.RequestID,

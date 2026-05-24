@@ -2617,6 +2617,76 @@ func TestGatewayInvokesOpenAICompatibleProviderAdapter(t *testing.T) {
 	}
 }
 
+func TestGatewayInvokesGenericReverseProxyProviderAdapter(t *testing.T) {
+	var upstreamCalls int
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamCalls++
+		if r.URL.Path != "/v2/chat" {
+			t.Fatalf("unexpected generic upstream path %s", r.URL.Path)
+		}
+		if got := r.Header.Get("X-Api-Key"); got != "generic-secret" {
+			t.Fatalf("unexpected generic upstream auth %q", got)
+		}
+		if got := r.Header.Get("Authorization"); got != "" {
+			t.Fatalf("generic adapter must not send default authorization header, got %q", got)
+		}
+		var payload struct {
+			UpstreamModel string `json:"upstream_model"`
+			PromptItems   []struct {
+				Content string `json:"content"`
+			} `json:"prompt_items"`
+			Route string `json:"route"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode generic upstream request: %v", err)
+		}
+		if payload.UpstreamModel != "generic-upstream" || len(payload.PromptItems) != 1 || payload.PromptItems[0].Content != "call generic upstream" || payload.Route != "gateway-test" {
+			t.Fatalf("unexpected generic upstream payload: %+v", payload)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"output":{"text":"generic gateway response"},"metering":{"input_tokens":6,"output_tokens":7,"cached_tokens":2}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"generic-http-provider","display_name":"Generic HTTP Provider","adapter_type":"generic-reverse-proxy","protocol":"openai-compatible","status":"active","config_schema":{"base_url":"`+upstream.URL+`","chat_path":"/v2/chat","auth_header_template":"X-Api-Key: {{api_key}}","body_mapping_rules":{"model_field":"upstream_model","messages_field":"prompt_items","extra":{"route":"gateway-test"}},"response_path_rules":{"text_path":"output.text","usage_path":"metering"}}}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"generic-http-model","display_name":"Generic HTTP Model","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"generic-upstream","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"generic-http-account","runtime_class":"api_key","credential":{"api_key":"generic-secret"},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/chat/completions", `{"model":"generic-http-model","messages":[{"role":"user","content":"call generic upstream"}]}`)
+	if upstreamCalls != 1 {
+		t.Fatalf("expected one generic upstream call, got %d", upstreamCalls)
+	}
+	var chatResp apiopenapi.ChatCompletionResponse
+	if err := json.NewDecoder(rec.Body).Decode(&chatResp); err != nil {
+		t.Fatalf("decode generic chat response: %v", err)
+	}
+	if text := decodeChatMessageText(t, chatResp.Choices[0].Message.Content); text != "generic gateway response" {
+		t.Fatalf("expected generic response text, got %q", text)
+	}
+
+	usageReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/usage-logs?model=generic-http-model", nil)
+	usageReq.AddCookie(sessionCookie)
+	usageRec := httptest.NewRecorder()
+	handler.ServeHTTP(usageRec, usageReq)
+	if usageRec.Code != http.StatusOK {
+		t.Fatalf("expected usage logs 200, got %d body=%s", usageRec.Code, usageRec.Body.String())
+	}
+	var usageResp apiopenapi.UsageLogListResponse
+	if err := json.NewDecoder(usageRec.Body).Decode(&usageResp); err != nil {
+		t.Fatalf("decode generic usage logs: %v", err)
+	}
+	if len(usageResp.Data) != 1 || usageResp.Data[0].UsageEstimated || usageResp.Data[0].InputTokens != 6 || usageResp.Data[0].OutputTokens != 7 || usageResp.Data[0].CachedTokens != 2 || usageResp.Data[0].TotalTokens != 15 {
+		t.Fatalf("expected parsed generic usage, got %+v", usageResp.Data)
+	}
+	if usageResp.Data[0].TargetProtocol == nil || *usageResp.Data[0].TargetProtocol != "openai-compatible" {
+		t.Fatalf("expected generic provider to preserve target protocol evidence, got %+v", usageResp.Data[0])
+	}
+}
+
 func TestGatewayUsageLogPersistsPricingRuleCost(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/chat/completions" {
