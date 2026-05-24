@@ -735,6 +735,7 @@ index(reset_at)
 ```txt
 id
 request_id
+attempt_no
 user_id
 api_key_id
 provider_id
@@ -760,13 +761,18 @@ created_at
 索引：
 
 ```txt
-unique(request_id)
+unique(request_id, attempt_no)
 index(user_id, created_at)
 index(api_key_id, created_at)
 index(account_id, created_at)
 index(source_endpoint, created_at)
 index(model, created_at)
 ```
+
+规则：
+
+- 同一 Gateway 请求如果发生 fallback，必须为每次 provider attempt 记录一条 `usage_logs`。
+- 所有 attempt 共用同一个 `request_id`，并递增 `attempt_no`，便于和 `scheduler_decisions` / `scheduler_feedbacks` 串联。
 
 ### 11.2 billing_ledger
 

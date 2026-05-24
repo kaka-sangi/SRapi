@@ -262,6 +262,12 @@ func postgresSchemaFingerprint(value string) []string {
 	statements := sqlStatements(value)
 	tables := map[string][]string{}
 	var other []string
+	droppedIndexes := map[string]struct{}{}
+	for _, statement := range statements {
+		if name, ok := parseDropIndexStatement(statement); ok {
+			droppedIndexes[name] = struct{}{}
+		}
+	}
 	for _, statement := range statements {
 		if table, elements, ok := parseCreateTableStatement(statement); ok {
 			tables[table] = append(tables[table], elements...)
@@ -270,6 +276,14 @@ func postgresSchemaFingerprint(value string) []string {
 		if table, column, ok := parseAlterTableAddColumnStatement(statement); ok {
 			tables[table] = append(tables[table], column)
 			continue
+		}
+		if _, ok := parseDropIndexStatement(statement); ok {
+			continue
+		}
+		if name, ok := parseCreateIndexStatement(statement); ok {
+			if _, dropped := droppedIndexes[name]; dropped {
+				continue
+			}
 		}
 		other = append(other, statement)
 	}
@@ -300,6 +314,22 @@ func parseAlterTableAddColumnStatement(statement string) (string, string, bool) 
 		return "", "", false
 	}
 	return match[1], match[2], true
+}
+
+func parseCreateIndexStatement(statement string) (string, bool) {
+	match := regexp.MustCompile(`(?i)^CREATE (?:UNIQUE )?INDEX "([^"]+)" ON `).FindStringSubmatch(statement)
+	if len(match) != 2 {
+		return "", false
+	}
+	return match[1], true
+}
+
+func parseDropIndexStatement(statement string) (string, bool) {
+	match := regexp.MustCompile(`(?i)^DROP INDEX "([^"]+)"$`).FindStringSubmatch(statement)
+	if len(match) != 2 {
+		return "", false
+	}
+	return match[1], true
 }
 
 func splitSQLList(value string) []string {

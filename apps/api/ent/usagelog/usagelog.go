@@ -19,6 +19,8 @@ const (
 	FieldUpdatedAt = "updated_at"
 	// FieldRequestID holds the string denoting the request_id field in the database.
 	FieldRequestID = "request_id"
+	// FieldAttemptNo holds the string denoting the attempt_no field in the database.
+	FieldAttemptNo = "attempt_no"
 	// FieldUserID holds the string denoting the user_id field in the database.
 	FieldUserID = "user_id"
 	// FieldAPIKeyID holds the string denoting the api_key_id field in the database.
@@ -69,6 +71,7 @@ var Columns = []string{
 	FieldCreatedAt,
 	FieldUpdatedAt,
 	FieldRequestID,
+	FieldAttemptNo,
 	FieldUserID,
 	FieldAPIKeyID,
 	FieldProviderID,
@@ -110,6 +113,8 @@ var (
 	UpdateDefaultUpdatedAt func() time.Time
 	// RequestIDValidator is a validator for the "request_id" field. It is called by the builders before save.
 	RequestIDValidator func(string) error
+	// DefaultAttemptNo holds the default value on creation for the "attempt_no" field.
+	DefaultAttemptNo int
 	// DefaultSourceProtocol holds the default value on creation for the "source_protocol" field.
 	DefaultSourceProtocol string
 	// DefaultSourceEndpoint holds the default value on creation for the "source_endpoint" field.
@@ -159,6 +164,11 @@ func ByUpdatedAt(opts ...sql.OrderTermOption) OrderOption {
 // ByRequestID orders the results by the request_id field.
 func ByRequestID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldRequestID, opts...).ToFunc()
+}
+
+// ByAttemptNo orders the results by the attempt_no field.
+func ByAttemptNo(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAttemptNo, opts...).ToFunc()
 }
 
 // ByUserID orders the results by the user_id field.

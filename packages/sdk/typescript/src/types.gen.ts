@@ -1609,6 +1609,7 @@ export type AccountQuotaListResponse = {
 export type UsageLog = {
     id: Id;
     request_id: RequestId;
+    attempt_no: number;
     user_id: Id;
     api_key_id: Id;
     provider_id?: string | null;

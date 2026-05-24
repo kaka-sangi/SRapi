@@ -54,6 +54,20 @@ func (_c *UsageLogCreate) SetRequestID(v string) *UsageLogCreate {
 	return _c
 }
 
+// SetAttemptNo sets the "attempt_no" field.
+func (_c *UsageLogCreate) SetAttemptNo(v int) *UsageLogCreate {
+	_c.mutation.SetAttemptNo(v)
+	return _c
+}
+
+// SetNillableAttemptNo sets the "attempt_no" field if the given value is not nil.
+func (_c *UsageLogCreate) SetNillableAttemptNo(v *int) *UsageLogCreate {
+	if v != nil {
+		_c.SetAttemptNo(*v)
+	}
+	return _c
+}
+
 // SetUserID sets the "user_id" field.
 func (_c *UsageLogCreate) SetUserID(v int) *UsageLogCreate {
 	_c.mutation.SetUserID(v)
@@ -353,6 +367,10 @@ func (_c *UsageLogCreate) defaults() {
 		v := usagelog.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
 	}
+	if _, ok := _c.mutation.AttemptNo(); !ok {
+		v := usagelog.DefaultAttemptNo
+		_c.mutation.SetAttemptNo(v)
+	}
 	if _, ok := _c.mutation.SourceProtocol(); !ok {
 		v := usagelog.DefaultSourceProtocol
 		_c.mutation.SetSourceProtocol(v)
@@ -422,6 +440,9 @@ func (_c *UsageLogCreate) check() error {
 		if err := usagelog.RequestIDValidator(v); err != nil {
 			return &ValidationError{Name: "request_id", err: fmt.Errorf(`ent: validator failed for field "UsageLog.request_id": %w`, err)}
 		}
+	}
+	if _, ok := _c.mutation.AttemptNo(); !ok {
+		return &ValidationError{Name: "attempt_no", err: errors.New(`ent: missing required field "UsageLog.attempt_no"`)}
 	}
 	if _, ok := _c.mutation.UserID(); !ok {
 		return &ValidationError{Name: "user_id", err: errors.New(`ent: missing required field "UsageLog.user_id"`)}
@@ -505,6 +526,10 @@ func (_c *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.RequestID(); ok {
 		_spec.SetField(usagelog.FieldRequestID, field.TypeString, value)
 		_node.RequestID = value
+	}
+	if value, ok := _c.mutation.AttemptNo(); ok {
+		_spec.SetField(usagelog.FieldAttemptNo, field.TypeInt, value)
+		_node.AttemptNo = value
 	}
 	if value, ok := _c.mutation.UserID(); ok {
 		_spec.SetField(usagelog.FieldUserID, field.TypeInt, value)

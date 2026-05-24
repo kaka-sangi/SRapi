@@ -1285,56 +1285,60 @@ func init() {
 	usagelogDescRequestID := usagelogFields[0].Descriptor()
 	// usagelog.RequestIDValidator is a validator for the "request_id" field. It is called by the builders before save.
 	usagelog.RequestIDValidator = usagelogDescRequestID.Validators[0].(func(string) error)
+	// usagelogDescAttemptNo is the schema descriptor for attempt_no field.
+	usagelogDescAttemptNo := usagelogFields[1].Descriptor()
+	// usagelog.DefaultAttemptNo holds the default value on creation for the attempt_no field.
+	usagelog.DefaultAttemptNo = usagelogDescAttemptNo.Default.(int)
 	// usagelogDescSourceProtocol is the schema descriptor for source_protocol field.
-	usagelogDescSourceProtocol := usagelogFields[5].Descriptor()
+	usagelogDescSourceProtocol := usagelogFields[6].Descriptor()
 	// usagelog.DefaultSourceProtocol holds the default value on creation for the source_protocol field.
 	usagelog.DefaultSourceProtocol = usagelogDescSourceProtocol.Default.(string)
 	// usagelogDescSourceEndpoint is the schema descriptor for source_endpoint field.
-	usagelogDescSourceEndpoint := usagelogFields[6].Descriptor()
+	usagelogDescSourceEndpoint := usagelogFields[7].Descriptor()
 	// usagelog.DefaultSourceEndpoint holds the default value on creation for the source_endpoint field.
 	usagelog.DefaultSourceEndpoint = usagelogDescSourceEndpoint.Default.(string)
 	// usagelogDescTargetProtocol is the schema descriptor for target_protocol field.
-	usagelogDescTargetProtocol := usagelogFields[7].Descriptor()
+	usagelogDescTargetProtocol := usagelogFields[8].Descriptor()
 	// usagelog.DefaultTargetProtocol holds the default value on creation for the target_protocol field.
 	usagelog.DefaultTargetProtocol = usagelogDescTargetProtocol.Default.(string)
 	// usagelogDescModel is the schema descriptor for model field.
-	usagelogDescModel := usagelogFields[8].Descriptor()
+	usagelogDescModel := usagelogFields[9].Descriptor()
 	// usagelog.DefaultModel holds the default value on creation for the model field.
 	usagelog.DefaultModel = usagelogDescModel.Default.(string)
 	// usagelogDescInputTokens is the schema descriptor for input_tokens field.
-	usagelogDescInputTokens := usagelogFields[9].Descriptor()
+	usagelogDescInputTokens := usagelogFields[10].Descriptor()
 	// usagelog.DefaultInputTokens holds the default value on creation for the input_tokens field.
 	usagelog.DefaultInputTokens = usagelogDescInputTokens.Default.(int)
 	// usagelogDescOutputTokens is the schema descriptor for output_tokens field.
-	usagelogDescOutputTokens := usagelogFields[10].Descriptor()
+	usagelogDescOutputTokens := usagelogFields[11].Descriptor()
 	// usagelog.DefaultOutputTokens holds the default value on creation for the output_tokens field.
 	usagelog.DefaultOutputTokens = usagelogDescOutputTokens.Default.(int)
 	// usagelogDescCachedTokens is the schema descriptor for cached_tokens field.
-	usagelogDescCachedTokens := usagelogFields[11].Descriptor()
+	usagelogDescCachedTokens := usagelogFields[12].Descriptor()
 	// usagelog.DefaultCachedTokens holds the default value on creation for the cached_tokens field.
 	usagelog.DefaultCachedTokens = usagelogDescCachedTokens.Default.(int)
 	// usagelogDescTotalTokens is the schema descriptor for total_tokens field.
-	usagelogDescTotalTokens := usagelogFields[12].Descriptor()
+	usagelogDescTotalTokens := usagelogFields[13].Descriptor()
 	// usagelog.DefaultTotalTokens holds the default value on creation for the total_tokens field.
 	usagelog.DefaultTotalTokens = usagelogDescTotalTokens.Default.(int)
 	// usagelogDescUsageEstimated is the schema descriptor for usage_estimated field.
-	usagelogDescUsageEstimated := usagelogFields[13].Descriptor()
+	usagelogDescUsageEstimated := usagelogFields[14].Descriptor()
 	// usagelog.DefaultUsageEstimated holds the default value on creation for the usage_estimated field.
 	usagelog.DefaultUsageEstimated = usagelogDescUsageEstimated.Default.(bool)
 	// usagelogDescLatencyMs is the schema descriptor for latency_ms field.
-	usagelogDescLatencyMs := usagelogFields[14].Descriptor()
+	usagelogDescLatencyMs := usagelogFields[15].Descriptor()
 	// usagelog.DefaultLatencyMs holds the default value on creation for the latency_ms field.
 	usagelog.DefaultLatencyMs = usagelogDescLatencyMs.Default.(int)
 	// usagelogDescSuccess is the schema descriptor for success field.
-	usagelogDescSuccess := usagelogFields[15].Descriptor()
+	usagelogDescSuccess := usagelogFields[16].Descriptor()
 	// usagelog.DefaultSuccess holds the default value on creation for the success field.
 	usagelog.DefaultSuccess = usagelogDescSuccess.Default.(bool)
 	// usagelogDescCost is the schema descriptor for cost field.
-	usagelogDescCost := usagelogFields[17].Descriptor()
+	usagelogDescCost := usagelogFields[18].Descriptor()
 	// usagelog.DefaultCost holds the default value on creation for the cost field.
 	usagelog.DefaultCost = usagelogDescCost.Default.(string)
 	// usagelogDescCurrency is the schema descriptor for currency field.
-	usagelogDescCurrency := usagelogFields[18].Descriptor()
+	usagelogDescCurrency := usagelogFields[19].Descriptor()
 	// usagelog.DefaultCurrency holds the default value on creation for the currency field.
 	usagelog.DefaultCurrency = usagelogDescCurrency.Default.(string)
 	userMixin := schema.User{}.Mixin()

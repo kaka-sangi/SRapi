@@ -22,6 +22,7 @@ func (rt *runtimeState) recordGatewayUsage(ctx context.Context, rec gatewayUsage
 	rt.warnDefaultZeroGatewayPricing(rec, model, pricing)
 	usageLog, usageErr := rt.usage.Record(ctx, usagecontract.RecordRequest{
 		RequestID:             rec.RequestID,
+		AttemptNo:             rec.AttemptNo,
 		UserID:                rec.Authed.UserID,
 		APIKeyID:              rec.Authed.Key.ID,
 		ProviderID:            rec.ProviderID,
@@ -211,6 +212,7 @@ func (rt *runtimeState) enqueueGatewayUsageEvent(ctx context.Context, log usagec
 	payload := map[string]any{
 		"usage_log_id":           log.ID,
 		"request_id":             log.RequestID,
+		"attempt_no":             log.AttemptNo,
 		"user_id":                log.UserID,
 		"api_key_id":             log.APIKeyID,
 		"source_protocol":        log.SourceProtocol,
@@ -238,7 +240,7 @@ func (rt *runtimeState) enqueueGatewayUsageEvent(ctx context.Context, log usagec
 		AggregateID:    strconv.Itoa(log.ID),
 		CorrelationID:  log.RequestID,
 		CausationID:    log.RequestID,
-		IdempotencyKey: log.RequestID,
+		IdempotencyKey: gatewayUsageEventIdempotencyKey(log.RequestID, log.AttemptNo),
 		Payload:        payload,
 		Metadata: map[string]any{
 			"source_protocol": log.SourceProtocol,
@@ -253,6 +255,7 @@ func (rt *runtimeState) enqueueGatewayUsageEvent(ctx context.Context, log usagec
 func (rt *runtimeState) enqueueGatewayUsageFailureEvent(ctx context.Context, rec gatewayUsageRecord, model string) {
 	payload := map[string]any{
 		"request_id":             rec.RequestID,
+		"attempt_no":             rec.AttemptNo,
 		"user_id":                rec.Authed.UserID,
 		"api_key_id":             rec.Authed.Key.ID,
 		"source_protocol":        rec.SourceProtocol,
@@ -280,7 +283,7 @@ func (rt *runtimeState) enqueueGatewayUsageFailureEvent(ctx context.Context, rec
 		AggregateID:    rec.RequestID,
 		CorrelationID:  rec.RequestID,
 		CausationID:    rec.RequestID,
-		IdempotencyKey: rec.RequestID,
+		IdempotencyKey: gatewayUsageEventIdempotencyKey(rec.RequestID, rec.AttemptNo),
 		Payload:        payload,
 		Metadata: map[string]any{
 			"source_protocol": rec.SourceProtocol,
@@ -290,4 +293,11 @@ func (rt *runtimeState) enqueueGatewayUsageFailureEvent(ctx context.Context, rec
 	if err != nil {
 		rt.logger.Warn("failed to enqueue gateway usage failure event", "error", err, "request_id", rec.RequestID)
 	}
+}
+
+func gatewayUsageEventIdempotencyKey(requestID string, attemptNo int) string {
+	if attemptNo <= 0 {
+		attemptNo = 1
+	}
+	return requestID + ":attempt:" + strconv.Itoa(attemptNo)
 }

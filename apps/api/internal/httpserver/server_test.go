@@ -167,6 +167,7 @@ func TestMetricsExposeBaselineSRapiSignals(t *testing.T) {
 		"srapi_gateway_request_duration_seconds_sum",
 		"srapi_gateway_inflight_requests",
 		"srapi_gateway_errors_total",
+		"srapi_gateway_failover_total",
 		"srapi_scheduler_decisions_total",
 		"srapi_provider_errors_total",
 		"srapi_usage_tokens_total",
@@ -3443,6 +3444,137 @@ func TestGatewayProviderAliasForcesProviderContext(t *testing.T) {
 	}
 	if len(usageResp.Data) != 1 || usageResp.Data[0].SourceEndpoint != "/api/provider/openai-compatible/v1/chat/completions" {
 		t.Fatalf("expected alias source endpoint in usage log, got %+v", usageResp.Data)
+	}
+}
+
+func TestGatewayChatCompletionFailoverRecordsAttemptEvidence(t *testing.T) {
+	var (
+		mu             sync.Mutex
+		primaryCalls   int
+		secondaryCalls int
+	)
+	primaryUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/chat/completions" {
+			t.Fatalf("unexpected primary upstream path %s", r.URL.Path)
+		}
+		mu.Lock()
+		primaryCalls++
+		mu.Unlock()
+		if got := r.Header.Get("Authorization"); got != "Bearer failover-primary-secret" {
+			t.Fatalf("expected primary upstream auth, got %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = w.Write([]byte(`{"error":{"message":"primary unavailable","type":"server_error"}}`))
+	}))
+	defer primaryUpstream.Close()
+
+	secondaryUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/chat/completions" {
+			t.Fatalf("unexpected secondary upstream path %s", r.URL.Path)
+		}
+		mu.Lock()
+		secondaryCalls++
+		mu.Unlock()
+		if got := r.Header.Get("Authorization"); got != "Bearer failover-secondary-secret" {
+			t.Fatalf("expected secondary upstream auth, got %q", got)
+		}
+		var payload struct {
+			Model string `json:"model"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode secondary upstream request: %v", err)
+		}
+		if payload.Model != "failover-secondary-upstream" {
+			t.Fatalf("expected fallback upstream model, got %q", payload.Model)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"failover ok"}}],"usage":{"prompt_tokens":7,"completion_tokens":3,"total_tokens":10}}`))
+	}))
+	defer secondaryUpstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"failover-attempt-model","display_name":"Failover Attempt Model","status":"active"}`)
+	primaryProvider := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"failover-primary-provider","display_name":"Failover Primary","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	secondaryProvider := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"failover-secondary-provider","display_name":"Failover Secondary","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(primaryProvider.Data.Id)+`","upstream_model_name":"failover-primary-upstream","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(secondaryProvider.Data.Id)+`","upstream_model_name":"failover-secondary-upstream","status":"active"}`)
+	primaryAccount := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(primaryProvider.Data.Id)+`","name":"failover-primary-account","runtime_class":"api_key","credential":{"api_key":"failover-primary-secret"},"metadata":{"base_url":"`+primaryUpstream.URL+`/v1","health_score":0.99,"latency_p95_ms":50,"quality_score":0.99},"status":"active"}`)
+	secondaryAccount := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(secondaryProvider.Data.Id)+`","name":"failover-secondary-account","runtime_class":"api_key","credential":{"api_key":"failover-secondary-secret"},"metadata":{"base_url":"`+secondaryUpstream.URL+`/v1","health_score":0.80,"latency_p95_ms":1000,"quality_score":0.50},"status":"active"}`)
+
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/chat/completions", `{"model":"failover-attempt-model","messages":[{"role":"user","content":"exercise failover"}]}`)
+	var chatResp apiopenapi.ChatCompletionResponse
+	if err := json.NewDecoder(rec.Body).Decode(&chatResp); err != nil {
+		t.Fatalf("decode failover chat response: %v", err)
+	}
+	if len(chatResp.Choices) != 1 || decodeChatMessageText(t, chatResp.Choices[0].Message.Content) != "failover ok" {
+		t.Fatalf("expected fallback response, got %+v", chatResp)
+	}
+
+	mu.Lock()
+	gotPrimaryCalls := primaryCalls
+	gotSecondaryCalls := secondaryCalls
+	mu.Unlock()
+	if gotPrimaryCalls != 1 || gotSecondaryCalls != 1 {
+		t.Fatalf("expected one call to each upstream, got primary=%d secondary=%d", gotPrimaryCalls, gotSecondaryCalls)
+	}
+
+	usageReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/usage-logs?model=failover-attempt-model", nil)
+	usageReq.AddCookie(sessionCookie)
+	usageRec := httptest.NewRecorder()
+	handler.ServeHTTP(usageRec, usageReq)
+	if usageRec.Code != http.StatusOK {
+		t.Fatalf("expected usage logs 200, got %d body=%s", usageRec.Code, usageRec.Body.String())
+	}
+	var usageResp apiopenapi.UsageLogListResponse
+	if err := json.NewDecoder(usageRec.Body).Decode(&usageResp); err != nil {
+		t.Fatalf("decode usage logs: %v", err)
+	}
+	if len(usageResp.Data) != 2 {
+		t.Fatalf("expected failed and successful usage attempts, got %+v", usageResp.Data)
+	}
+	firstUsage := usageResp.Data[0]
+	secondUsage := usageResp.Data[1]
+	if firstUsage.AttemptNo != 1 || firstUsage.Success || firstUsage.ProviderId == nil || *firstUsage.ProviderId != string(primaryProvider.Data.Id) || firstUsage.AccountId == nil || *firstUsage.AccountId != string(primaryAccount.Data.Id) || firstUsage.ErrorClass == nil {
+		t.Fatalf("unexpected first usage attempt: %+v", firstUsage)
+	}
+	if secondUsage.AttemptNo != 2 || !secondUsage.Success || secondUsage.ProviderId == nil || *secondUsage.ProviderId != string(secondaryProvider.Data.Id) || secondUsage.AccountId == nil || *secondUsage.AccountId != string(secondaryAccount.Data.Id) || secondUsage.TotalTokens != 10 {
+		t.Fatalf("unexpected second usage attempt: %+v", secondUsage)
+	}
+	if firstUsage.RequestId != secondUsage.RequestId {
+		t.Fatalf("expected attempts to share request id, got %q and %q", firstUsage.RequestId, secondUsage.RequestId)
+	}
+
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?request_id="+string(firstUsage.RequestId), nil)
+	decisionsReq.AddCookie(sessionCookie)
+	decisionsRec := httptest.NewRecorder()
+	handler.ServeHTTP(decisionsRec, decisionsReq)
+	if decisionsRec.Code != http.StatusOK {
+		t.Fatalf("expected decisions 200, got %d body=%s", decisionsRec.Code, decisionsRec.Body.String())
+	}
+	var decisionsResp apiopenapi.SchedulerDecisionListResponse
+	if err := json.NewDecoder(decisionsRec.Body).Decode(&decisionsResp); err != nil {
+		t.Fatalf("decode scheduler decisions: %v", err)
+	}
+	if len(decisionsResp.Data) != 2 {
+		t.Fatalf("expected two scheduler decisions, got %+v", decisionsResp.Data)
+	}
+	firstDecision := decisionsResp.Data[0]
+	secondDecision := decisionsResp.Data[1]
+	if firstDecision.AttemptNo != 1 || firstDecision.SelectedAccountId == nil || *firstDecision.SelectedAccountId != string(primaryAccount.Data.Id) || firstDecision.FallbackFromDecisionId != nil {
+		t.Fatalf("unexpected first decision: %+v", firstDecision)
+	}
+	if secondDecision.AttemptNo != 2 || secondDecision.SelectedAccountId == nil || *secondDecision.SelectedAccountId != string(secondaryAccount.Data.Id) || secondDecision.FallbackFromDecisionId == nil || *secondDecision.FallbackFromDecisionId != string(firstDecision.Id) {
+		t.Fatalf("unexpected fallback decision: first=%+v second=%+v", firstDecision, secondDecision)
+	}
+	if got := secondDecision.RejectReasons["account_"+string(primaryAccount.Data.Id)]; got != "fallback_excluded" {
+		t.Fatalf("expected fallback exclusion evidence for primary account, got %+v", secondDecision.RejectReasons)
+	}
+	metrics := metricsBody(t, handler)
+	if !strings.Contains(metrics, `srapi_gateway_failover_total{endpoint_family="chat_completions",model="failover-attempt-model",provider_protocol="openai-compatible",result="success"} 1`) {
+		t.Fatalf("expected failover metric, got:\n%s", metrics)
 	}
 }
 

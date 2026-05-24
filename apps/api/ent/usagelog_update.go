@@ -49,6 +49,27 @@ func (_u *UsageLogUpdate) SetNillableRequestID(v *string) *UsageLogUpdate {
 	return _u
 }
 
+// SetAttemptNo sets the "attempt_no" field.
+func (_u *UsageLogUpdate) SetAttemptNo(v int) *UsageLogUpdate {
+	_u.mutation.ResetAttemptNo()
+	_u.mutation.SetAttemptNo(v)
+	return _u
+}
+
+// SetNillableAttemptNo sets the "attempt_no" field if the given value is not nil.
+func (_u *UsageLogUpdate) SetNillableAttemptNo(v *int) *UsageLogUpdate {
+	if v != nil {
+		_u.SetAttemptNo(*v)
+	}
+	return _u
+}
+
+// AddAttemptNo adds value to the "attempt_no" field.
+func (_u *UsageLogUpdate) AddAttemptNo(v int) *UsageLogUpdate {
+	_u.mutation.AddAttemptNo(v)
+	return _u
+}
+
 // SetUserID sets the "user_id" field.
 func (_u *UsageLogUpdate) SetUserID(v int) *UsageLogUpdate {
 	_u.mutation.ResetUserID()
@@ -489,6 +510,12 @@ func (_u *UsageLogUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.RequestID(); ok {
 		_spec.SetField(usagelog.FieldRequestID, field.TypeString, value)
 	}
+	if value, ok := _u.mutation.AttemptNo(); ok {
+		_spec.SetField(usagelog.FieldAttemptNo, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedAttemptNo(); ok {
+		_spec.AddField(usagelog.FieldAttemptNo, field.TypeInt, value)
+	}
 	if value, ok := _u.mutation.UserID(); ok {
 		_spec.SetField(usagelog.FieldUserID, field.TypeInt, value)
 	}
@@ -633,6 +660,27 @@ func (_u *UsageLogUpdateOne) SetNillableRequestID(v *string) *UsageLogUpdateOne 
 	if v != nil {
 		_u.SetRequestID(*v)
 	}
+	return _u
+}
+
+// SetAttemptNo sets the "attempt_no" field.
+func (_u *UsageLogUpdateOne) SetAttemptNo(v int) *UsageLogUpdateOne {
+	_u.mutation.ResetAttemptNo()
+	_u.mutation.SetAttemptNo(v)
+	return _u
+}
+
+// SetNillableAttemptNo sets the "attempt_no" field if the given value is not nil.
+func (_u *UsageLogUpdateOne) SetNillableAttemptNo(v *int) *UsageLogUpdateOne {
+	if v != nil {
+		_u.SetAttemptNo(*v)
+	}
+	return _u
+}
+
+// AddAttemptNo adds value to the "attempt_no" field.
+func (_u *UsageLogUpdateOne) AddAttemptNo(v int) *UsageLogUpdateOne {
+	_u.mutation.AddAttemptNo(v)
 	return _u
 }
 
@@ -1105,6 +1153,12 @@ func (_u *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, err 
 	}
 	if value, ok := _u.mutation.RequestID(); ok {
 		_spec.SetField(usagelog.FieldRequestID, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.AttemptNo(); ok {
+		_spec.SetField(usagelog.FieldAttemptNo, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedAttemptNo(); ok {
+		_spec.AddField(usagelog.FieldAttemptNo, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.UserID(); ok {
 		_spec.SetField(usagelog.FieldUserID, field.TypeInt, value)

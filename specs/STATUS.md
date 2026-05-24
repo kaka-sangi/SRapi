@@ -75,15 +75,16 @@ last_completed:
 - A2.1: Gateway API key/user RPM and API key TPM limits now use Redis-backed atomic counters through `internal/platform/ratelimit`, app/httpserver injection, admission-stage enforcement before Scheduler dispatch, 429 + `Retry-After` Gateway errors, and HTTP/unit regressions proving repeated calls are throttled without partial counter updates.
 - A2.2: Scheduler account-level quota evidence now has an end-to-end Gateway path: successful account usage updates `rpm_used` / `tpm_used` runtime metadata from the recent usage window, scheduler candidates read those counters with existing `rpm_limit` / `tpm_limit` / `max_concurrency` metadata, and HTTP + scheduler regressions prove `rpm_limit_exceeded`, `tpm_limit_exceeded`, and `concurrency_full` reject reasons are recorded.
 - A4.1: Scheduler failover foundations now return ranked candidate lists, persist `fallback_from_decision_id` on scheduler decisions, expose the field through admin OpenAPI/SDK responses, and update memory/Redis leases by `(request_id, attempt_no)` so fallback attempts do not overwrite each other.
+- A4.2: Gateway text, Responses, Messages, Embeddings, and Gemini GenerateContent handlers now consume ranked scheduler candidates with a retry loop for retryable provider errors, persist one `usage_logs` evidence row per `(request_id, attempt_no)`, link fallback scheduler decisions through `fallback_from_decision_id`, record `fallback_excluded` evidence, and expose `srapi_gateway_failover_total`.
 - K1.5: Scheduler ranking now applies a Cost/Latency/Quality Pareto frontier before final weighted selection, records `pareto.frontier_account_ids` in decision score evidence, keeps all available candidates in failover rank order, and uses explicit `quality_score` / `quality_tier` metadata as the quality objective.
 
 current:
 
-- package: A4.2
+- package: A5.1
 - status: pending
-- objective: add the Gateway retry loop that consumes ranked scheduler candidates and records failover attempts.
+- objective: add a generic reverse-proxy adapter for configurable OpenAI-compatible upstreams.
 
-next_recommended: A4.2 gateway handler retry loop, including retryable error classification, attempt feedback, and failover metrics.
+next_recommended: A5.1 generic reverse-proxy adapter, then A5.2 provider presets for DeepSeek/Kimi/通义/智谱/Grok/Mistral/Groq/Together.
 
 last_gates:
 
@@ -98,6 +99,7 @@ last_gates:
 - `make migration-check`: pass
 - `make architecture-check`: pass
 - `cd apps/api && go test ./...`: pass
+- `make check`: pass
 
 notes:
 

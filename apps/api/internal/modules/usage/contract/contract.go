@@ -8,6 +8,7 @@ import (
 type UsageLog struct {
 	ID                    int
 	RequestID             string
+	AttemptNo             int
 	UserID                int
 	APIKeyID              int
 	ProviderID            *int
@@ -33,6 +34,7 @@ type UsageLog struct {
 
 type RecordRequest struct {
 	RequestID             string
+	AttemptNo             int
 	UserID                int
 	APIKeyID              int
 	ProviderID            *int

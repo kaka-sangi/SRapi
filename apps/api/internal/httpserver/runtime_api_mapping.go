@@ -395,6 +395,7 @@ func toAPIUsageLog(log usagecontract.UsageLog) apiopenapi.UsageLog {
 	return apiopenapi.UsageLog{
 		AccountId:             optionalIDString(log.AccountID),
 		ApiKeyId:              apiopenapi.Id(strconv.Itoa(log.APIKeyID)),
+		AttemptNo:             log.AttemptNo,
 		CachedTokens:          log.CachedTokens,
 		CompatibilityWarnings: nonNilStrings(log.CompatibilityWarnings),
 		Cost:                  log.Cost,

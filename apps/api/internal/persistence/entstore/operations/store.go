@@ -251,6 +251,7 @@ func (s *Store) ListUsageLogs(ctx context.Context) ([]usagecontract.UsageLog, er
 		out = append(out, usagecontract.UsageLog{
 			ID:                    row.ID,
 			RequestID:             row.RequestID,
+			AttemptNo:             row.AttemptNo,
 			UserID:                row.UserID,
 			APIKeyID:              row.APIKeyID,
 			ProviderID:            cloneInt(row.ProviderID),

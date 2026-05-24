@@ -1314,6 +1314,7 @@ var (
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "request_id", Type: field.TypeString},
+		{Name: "attempt_no", Type: field.TypeInt, Default: 1},
 		{Name: "user_id", Type: field.TypeInt},
 		{Name: "api_key_id", Type: field.TypeInt},
 		{Name: "provider_id", Type: field.TypeInt, Nullable: true},
@@ -1342,39 +1343,39 @@ var (
 		PrimaryKey: []*schema.Column{UsageLogsColumns[0]},
 		Indexes: []*schema.Index{
 			{
-				Name:    "usagelog_request_id",
+				Name:    "usagelog_request_id_attempt_no",
 				Unique:  true,
-				Columns: []*schema.Column{UsageLogsColumns[3]},
+				Columns: []*schema.Column{UsageLogsColumns[3], UsageLogsColumns[4]},
 			},
 			{
 				Name:    "usagelog_user_id_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[4], UsageLogsColumns[1]},
+				Columns: []*schema.Column{UsageLogsColumns[5], UsageLogsColumns[1]},
 			},
 			{
 				Name:    "usagelog_charged_at",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[22]},
+				Columns: []*schema.Column{UsageLogsColumns[23]},
 			},
 			{
 				Name:    "usagelog_api_key_id_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[5], UsageLogsColumns[1]},
+				Columns: []*schema.Column{UsageLogsColumns[6], UsageLogsColumns[1]},
 			},
 			{
 				Name:    "usagelog_account_id_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[7], UsageLogsColumns[1]},
+				Columns: []*schema.Column{UsageLogsColumns[8], UsageLogsColumns[1]},
 			},
 			{
 				Name:    "usagelog_source_endpoint_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[9], UsageLogsColumns[1]},
+				Columns: []*schema.Column{UsageLogsColumns[10], UsageLogsColumns[1]},
 			},
 			{
 				Name:    "usagelog_model_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[11], UsageLogsColumns[1]},
+				Columns: []*schema.Column{UsageLogsColumns[12], UsageLogsColumns[1]},
 			},
 		},
 	}

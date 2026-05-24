@@ -4914,6 +4914,7 @@ type UsageExportResponse struct {
 type UsageLog struct {
 	AccountId             *string   `json:"account_id,omitempty"`
 	ApiKeyId              Id        `json:"api_key_id"`
+	AttemptNo             int       `json:"attempt_no"`
 	CachedTokens          int       `json:"cached_tokens"`
 	CompatibilityWarnings []string  `json:"compatibility_warnings"`
 	Cost                  string    `json:"cost"`

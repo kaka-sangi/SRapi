@@ -17,6 +17,7 @@ func (UsageLog) Mixin() []ent.Mixin {
 func (UsageLog) Fields() []ent.Field {
 	return []ent.Field{
 		field.String("request_id").NotEmpty(),
+		field.Int("attempt_no").Default(1),
 		field.Int("user_id"),
 		field.Int("api_key_id"),
 		field.Int("provider_id").Optional().Nillable(),
@@ -42,7 +43,7 @@ func (UsageLog) Fields() []ent.Field {
 
 func (UsageLog) Indexes() []ent.Index {
 	return []ent.Index{
-		index.Fields("request_id").Unique(),
+		index.Fields("request_id", "attempt_no").Unique(),
 		index.Fields("user_id", "created_at"),
 		index.Fields("charged_at"),
 		index.Fields("api_key_id", "created_at"),

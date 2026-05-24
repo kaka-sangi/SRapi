@@ -45,6 +45,7 @@ type RecordRequest struct {
 type PendingUsageCharge struct {
 	UsageLogID int
 	RequestID  string
+	AttemptNo  int
 	UserID     int
 	Cost       string
 	Currency   string

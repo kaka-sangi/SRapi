@@ -35,6 +35,8 @@ func (rt *runtimeState) metricsLines(ctx context.Context) []string {
 		"# TYPE srapi_realtime_slots_total counter",
 		"# HELP srapi_gateway_errors_total Gateway request errors recorded by error class.",
 		"# TYPE srapi_gateway_errors_total counter",
+		"# HELP srapi_gateway_failover_total Gateway fallback attempts by endpoint family, model, provider protocol, and result.",
+		"# TYPE srapi_gateway_failover_total counter",
 		"# HELP srapi_scheduler_decisions_total Scheduler decisions by strategy and outcome.",
 		"# TYPE srapi_scheduler_decisions_total counter",
 		"# HELP srapi_provider_errors_total Provider-facing errors recorded by protocol and error class.",
@@ -52,6 +54,7 @@ func (rt *runtimeState) metricsLines(ctx context.Context) []string {
 	usageLogs, usageErr := rt.usage.List(ctx)
 	if usageErr == nil {
 		lines = append(lines, gatewayUsageMetricLines(usageLogs)...)
+		lines = append(lines, gatewayFailoverMetricLines(usageLogs)...)
 		lines = append(lines, providerErrorMetricLines(usageLogs)...)
 		lines = append(lines, usageTokenMetricLines(usageLogs)...)
 	} else {
@@ -178,6 +181,31 @@ func schedulerDecisionMetricLines(decisions []schedulercontract.Decision) []stri
 	for _, key := range sortedIntKeys(counts) {
 		parts := strings.Split(key, "\xff")
 		lines = append(lines, fmt.Sprintf("srapi_scheduler_decisions_total{strategy=%q,outcome=%q,reason=%q} %d", parts[0], parts[1], parts[2], counts[key]))
+	}
+	return lines
+}
+
+func gatewayFailoverMetricLines(logs []usagecontract.UsageLog) []string {
+	counts := map[string]int{}
+	for _, log := range logs {
+		if log.AttemptNo <= 1 {
+			continue
+		}
+		result := "success"
+		if !log.Success {
+			result = "error"
+		}
+		counts[strings.Join([]string{
+			endpointFamily(log.SourceEndpoint),
+			metricLabelValue(log.Model, "unknown"),
+			metricLabelValue(log.TargetProtocol, "unknown"),
+			result,
+		}, "\xff")]++
+	}
+	lines := make([]string, 0, len(counts))
+	for _, key := range sortedIntKeys(counts) {
+		parts := strings.Split(key, "\xff")
+		lines = append(lines, fmt.Sprintf("srapi_gateway_failover_total{endpoint_family=%q,model=%q,provider_protocol=%q,result=%q} %d", parts[0], parts[1], parts[2], parts[3], counts[key]))
 	}
 	return lines
 }
@@ -317,6 +345,7 @@ func appendZeroValueBaselineMetrics(lines []string) []string {
 		`srapi_realtime_active_slots 0`,
 		`srapi_realtime_slots_total{event="acquired"} 0`,
 		`srapi_gateway_errors_total{error_class="unknown"} 0`,
+		`srapi_gateway_failover_total{endpoint_family="unknown",model="unknown",provider_protocol="unknown",result="success"} 0`,
 		`srapi_scheduler_decisions_total{strategy="unknown",outcome="selected",reason="selected"} 0`,
 		`srapi_provider_errors_total{provider_protocol="unknown",error_class="unknown"} 0`,
 		`srapi_usage_tokens_total{model="unknown",provider_protocol="unknown",token_kind="input"} 0`,

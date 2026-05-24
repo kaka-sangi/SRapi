@@ -27,6 +27,9 @@ func (s *Store) Create(_ context.Context, input contract.UsageLog) (contract.Usa
 	defer s.mu.Unlock()
 	log := cloneLog(input)
 	log.ID = s.nextID
+	if log.AttemptNo <= 0 {
+		log.AttemptNo = 1
+	}
 	if log.CreatedAt.IsZero() {
 		log.CreatedAt = time.Now().UTC()
 	}

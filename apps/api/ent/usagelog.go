@@ -24,6 +24,8 @@ type UsageLog struct {
 	UpdatedAt time.Time `json:"updated_at,omitempty"`
 	// RequestID holds the value of the "request_id" field.
 	RequestID string `json:"request_id,omitempty"`
+	// AttemptNo holds the value of the "attempt_no" field.
+	AttemptNo int `json:"attempt_no,omitempty"`
 	// UserID holds the value of the "user_id" field.
 	UserID int `json:"user_id,omitempty"`
 	// APIKeyID holds the value of the "api_key_id" field.
@@ -76,7 +78,7 @@ func (*UsageLog) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case usagelog.FieldUsageEstimated, usagelog.FieldSuccess:
 			values[i] = new(sql.NullBool)
-		case usagelog.FieldID, usagelog.FieldUserID, usagelog.FieldAPIKeyID, usagelog.FieldProviderID, usagelog.FieldAccountID, usagelog.FieldInputTokens, usagelog.FieldOutputTokens, usagelog.FieldCachedTokens, usagelog.FieldTotalTokens, usagelog.FieldLatencyMs:
+		case usagelog.FieldID, usagelog.FieldAttemptNo, usagelog.FieldUserID, usagelog.FieldAPIKeyID, usagelog.FieldProviderID, usagelog.FieldAccountID, usagelog.FieldInputTokens, usagelog.FieldOutputTokens, usagelog.FieldCachedTokens, usagelog.FieldTotalTokens, usagelog.FieldLatencyMs:
 			values[i] = new(sql.NullInt64)
 		case usagelog.FieldRequestID, usagelog.FieldSourceProtocol, usagelog.FieldSourceEndpoint, usagelog.FieldTargetProtocol, usagelog.FieldModel, usagelog.FieldErrorClass, usagelog.FieldCost, usagelog.FieldCurrency:
 			values[i] = new(sql.NullString)
@@ -120,6 +122,12 @@ func (_m *UsageLog) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field request_id", values[i])
 			} else if value.Valid {
 				_m.RequestID = value.String
+			}
+		case usagelog.FieldAttemptNo:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field attempt_no", values[i])
+			} else if value.Valid {
+				_m.AttemptNo = int(value.Int64)
 			}
 		case usagelog.FieldUserID:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -291,6 +299,9 @@ func (_m *UsageLog) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("request_id=")
 	builder.WriteString(_m.RequestID)
+	builder.WriteString(", ")
+	builder.WriteString("attempt_no=")
+	builder.WriteString(fmt.Sprintf("%v", _m.AttemptNo))
 	builder.WriteString(", ")
 	builder.WriteString("user_id=")
 	builder.WriteString(fmt.Sprintf("%v", _m.UserID))

@@ -51,8 +51,13 @@ func (s *Service) Record(ctx context.Context, req contract.RecordRequest) (contr
 		sourceProtocol = "openai-compatible"
 	}
 	totalTokens := req.InputTokens + req.OutputTokens + req.CachedTokens
+	attemptNo := req.AttemptNo
+	if attemptNo <= 0 {
+		attemptNo = 1
+	}
 	return s.store.Create(ctx, contract.UsageLog{
 		RequestID:             strings.TrimSpace(req.RequestID),
+		AttemptNo:             attemptNo,
 		UserID:                req.UserID,
 		APIKeyID:              req.APIKeyID,
 		ProviderID:            req.ProviderID,

@@ -69,6 +69,11 @@ func RequestID(v string) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldRequestID, v))
 }
 
+// AttemptNo applies equality check predicate on the "attempt_no" field. It's identical to AttemptNoEQ.
+func AttemptNo(v int) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldAttemptNo, v))
+}
+
 // UserID applies equality check predicate on the "user_id" field. It's identical to UserIDEQ.
 func UserID(v int) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldUserID, v))
@@ -307,6 +312,46 @@ func RequestIDEqualFold(v string) predicate.UsageLog {
 // RequestIDContainsFold applies the ContainsFold predicate on the "request_id" field.
 func RequestIDContainsFold(v string) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldContainsFold(FieldRequestID, v))
+}
+
+// AttemptNoEQ applies the EQ predicate on the "attempt_no" field.
+func AttemptNoEQ(v int) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldAttemptNo, v))
+}
+
+// AttemptNoNEQ applies the NEQ predicate on the "attempt_no" field.
+func AttemptNoNEQ(v int) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNEQ(FieldAttemptNo, v))
+}
+
+// AttemptNoIn applies the In predicate on the "attempt_no" field.
+func AttemptNoIn(vs ...int) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldIn(FieldAttemptNo, vs...))
+}
+
+// AttemptNoNotIn applies the NotIn predicate on the "attempt_no" field.
+func AttemptNoNotIn(vs ...int) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNotIn(FieldAttemptNo, vs...))
+}
+
+// AttemptNoGT applies the GT predicate on the "attempt_no" field.
+func AttemptNoGT(v int) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGT(FieldAttemptNo, v))
+}
+
+// AttemptNoGTE applies the GTE predicate on the "attempt_no" field.
+func AttemptNoGTE(v int) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGTE(FieldAttemptNo, v))
+}
+
+// AttemptNoLT applies the LT predicate on the "attempt_no" field.
+func AttemptNoLT(v int) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLT(FieldAttemptNo, v))
+}
+
+// AttemptNoLTE applies the LTE predicate on the "attempt_no" field.
+func AttemptNoLTE(v int) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLTE(FieldAttemptNo, v))
 }
 
 // UserIDEQ applies the EQ predicate on the "user_id" field.

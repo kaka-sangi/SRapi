@@ -34822,6 +34822,8 @@ type UsageLogMutation struct {
 	created_at                        *time.Time
 	updated_at                        *time.Time
 	request_id                        *string
+	attempt_no                        *int
+	addattempt_no                     *int
 	user_id                           *int
 	adduser_id                        *int
 	api_key_id                        *int
@@ -35062,6 +35064,62 @@ func (m *UsageLogMutation) OldRequestID(ctx context.Context) (v string, err erro
 // ResetRequestID resets all changes to the "request_id" field.
 func (m *UsageLogMutation) ResetRequestID() {
 	m.request_id = nil
+}
+
+// SetAttemptNo sets the "attempt_no" field.
+func (m *UsageLogMutation) SetAttemptNo(i int) {
+	m.attempt_no = &i
+	m.addattempt_no = nil
+}
+
+// AttemptNo returns the value of the "attempt_no" field in the mutation.
+func (m *UsageLogMutation) AttemptNo() (r int, exists bool) {
+	v := m.attempt_no
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAttemptNo returns the old "attempt_no" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldAttemptNo(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAttemptNo is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAttemptNo requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAttemptNo: %w", err)
+	}
+	return oldValue.AttemptNo, nil
+}
+
+// AddAttemptNo adds i to the "attempt_no" field.
+func (m *UsageLogMutation) AddAttemptNo(i int) {
+	if m.addattempt_no != nil {
+		*m.addattempt_no += i
+	} else {
+		m.addattempt_no = &i
+	}
+}
+
+// AddedAttemptNo returns the value that was added to the "attempt_no" field in this mutation.
+func (m *UsageLogMutation) AddedAttemptNo() (r int, exists bool) {
+	v := m.addattempt_no
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetAttemptNo resets all changes to the "attempt_no" field.
+func (m *UsageLogMutation) ResetAttemptNo() {
+	m.attempt_no = nil
+	m.addattempt_no = nil
 }
 
 // SetUserID sets the "user_id" field.
@@ -36081,7 +36139,7 @@ func (m *UsageLogMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UsageLogMutation) Fields() []string {
-	fields := make([]string, 0, 23)
+	fields := make([]string, 0, 24)
 	if m.created_at != nil {
 		fields = append(fields, usagelog.FieldCreatedAt)
 	}
@@ -36090,6 +36148,9 @@ func (m *UsageLogMutation) Fields() []string {
 	}
 	if m.request_id != nil {
 		fields = append(fields, usagelog.FieldRequestID)
+	}
+	if m.attempt_no != nil {
+		fields = append(fields, usagelog.FieldAttemptNo)
 	}
 	if m.user_id != nil {
 		fields = append(fields, usagelog.FieldUserID)
@@ -36165,6 +36226,8 @@ func (m *UsageLogMutation) Field(name string) (ent.Value, bool) {
 		return m.UpdatedAt()
 	case usagelog.FieldRequestID:
 		return m.RequestID()
+	case usagelog.FieldAttemptNo:
+		return m.AttemptNo()
 	case usagelog.FieldUserID:
 		return m.UserID()
 	case usagelog.FieldAPIKeyID:
@@ -36220,6 +36283,8 @@ func (m *UsageLogMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldUpdatedAt(ctx)
 	case usagelog.FieldRequestID:
 		return m.OldRequestID(ctx)
+	case usagelog.FieldAttemptNo:
+		return m.OldAttemptNo(ctx)
 	case usagelog.FieldUserID:
 		return m.OldUserID(ctx)
 	case usagelog.FieldAPIKeyID:
@@ -36289,6 +36354,13 @@ func (m *UsageLogMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetRequestID(v)
+		return nil
+	case usagelog.FieldAttemptNo:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAttemptNo(v)
 		return nil
 	case usagelog.FieldUserID:
 		v, ok := value.(int)
@@ -36438,6 +36510,9 @@ func (m *UsageLogMutation) SetField(name string, value ent.Value) error {
 // this mutation.
 func (m *UsageLogMutation) AddedFields() []string {
 	var fields []string
+	if m.addattempt_no != nil {
+		fields = append(fields, usagelog.FieldAttemptNo)
+	}
 	if m.adduser_id != nil {
 		fields = append(fields, usagelog.FieldUserID)
 	}
@@ -36473,6 +36548,8 @@ func (m *UsageLogMutation) AddedFields() []string {
 // was not set, or was not defined in the schema.
 func (m *UsageLogMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
+	case usagelog.FieldAttemptNo:
+		return m.AddedAttemptNo()
 	case usagelog.FieldUserID:
 		return m.AddedUserID()
 	case usagelog.FieldAPIKeyID:
@@ -36500,6 +36577,13 @@ func (m *UsageLogMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *UsageLogMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case usagelog.FieldAttemptNo:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddAttemptNo(v)
+		return nil
 	case usagelog.FieldUserID:
 		v, ok := value.(int)
 		if !ok {
@@ -36631,6 +36715,9 @@ func (m *UsageLogMutation) ResetField(name string) error {
 		return nil
 	case usagelog.FieldRequestID:
 		m.ResetRequestID()
+		return nil
+	case usagelog.FieldAttemptNo:
+		m.ResetAttemptNo()
 		return nil
 	case usagelog.FieldUserID:
 		m.ResetUserID()

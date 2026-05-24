@@ -10882,6 +10882,7 @@ components:
       required:
         - id
         - request_id
+        - attempt_no
         - user_id
         - api_key_id
         - source_protocol
@@ -10903,6 +10904,9 @@ components:
           $ref: "#/components/schemas/Id"
         request_id:
           $ref: "#/components/schemas/RequestId"
+        attempt_no:
+          type: integer
+          minimum: 1
         user_id:
           $ref: "#/components/schemas/Id"
         api_key_id:

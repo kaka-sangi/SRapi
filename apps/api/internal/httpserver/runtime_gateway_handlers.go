@@ -139,57 +139,19 @@ func (s *Server) handleCreateChatCompletion(w http.ResponseWriter, r *http.Reque
 	}
 	scheduleReq := gatewayScheduleRequest(r, canonical, modelResolution)
 	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
-	result, err := s.runtime.scheduleGatewayRequest(r.Context(), scheduleReq, model.ID, forcedProviderKey, authed.Key)
-	if err != nil {
-		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
-			RequestID:             canonical.RequestID,
-			Authed:                authed,
-			DecisionID:            result.Decision.ID,
-			AttemptNo:             result.Decision.AttemptNo,
-			SourceProtocol:        string(canonical.SourceProtocol),
-			SourceEndpoint:        canonical.SourceEndpoint,
-			Model:                 canonical.CanonicalModel,
-			Success:               false,
-			ErrorClass:            ptrStringValue("no_available_account"),
-			LatencyMS:             elapsedMillis(startedAt),
-			InputTokens:           admission.EstimatedUsage.InputTokens,
-			OutputTokens:          admission.EstimatedUsage.OutputTokens,
-			CachedTokens:          admission.EstimatedUsage.CachedTokens,
-			UsageEstimated:        true,
-			Pricing:               admission.Pricing,
-			CompatibilityWarnings: canonical.CompatibilityWarnings,
-		})
-		writeGatewayError(w, http.StatusServiceUnavailable, apiopenapi.ServiceUnavailableError, "no available account", "no_available_account")
-		return
-	}
-	providerResp, err := s.runtime.invokeProviderText(r.Context(), providerTextRequest(canonical, result.Candidate))
-	if err != nil {
-		errorClass, upstreamStatus, errorType := providerGatewayError(err)
-		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
-			RequestID:             canonical.RequestID,
-			Authed:                authed,
-			DecisionID:            result.Decision.ID,
-			AttemptNo:             result.Decision.AttemptNo,
-			ProviderID:            ptrInt(result.Candidate.Provider.ID),
-			AccountID:             ptrInt(result.Candidate.Account.ID),
-			SourceProtocol:        string(canonical.SourceProtocol),
-			SourceEndpoint:        canonical.SourceEndpoint,
-			TargetProtocol:        result.Candidate.Provider.Protocol,
-			Model:                 canonical.CanonicalModel,
-			Success:               false,
-			ErrorClass:            ptrStringValue(errorClass),
-			StatusCode:            ptrInt(upstreamStatus),
-			LatencyMS:             elapsedMillis(startedAt),
-			InputTokens:           admission.EstimatedUsage.InputTokens,
-			OutputTokens:          admission.EstimatedUsage.OutputTokens,
-			CachedTokens:          admission.EstimatedUsage.CachedTokens,
-			UsageEstimated:        true,
-			Pricing:               admission.Pricing,
-			CompatibilityWarnings: canonical.CompatibilityWarnings,
-		})
+	failover := s.invokeProviderTextWithFailover(r.Context(), r, authed, canonical, scheduleReq, model.ID, forcedProviderKey, admission, startedAt)
+	result := failover.ScheduleResult
+	if failover.Err != nil {
+		if !failover.FailureRecorded {
+			s.recordGatewayNoAvailableAccount(r, authed, canonical, result, admission, startedAt)
+			writeGatewayError(w, http.StatusServiceUnavailable, apiopenapi.ServiceUnavailableError, "no available account", "no_available_account")
+			return
+		}
+		errorClass, upstreamStatus, errorType := providerGatewayError(failover.Err)
 		writeGatewayError(w, providerGatewayHTTPStatus(upstreamStatus), errorType, providerGatewayMessage(errorClass), errorClass)
 		return
 	}
+	providerResp := failover.Response
 	usage := gatewayUsageFromProvider(providerResp)
 	canonicalResp := s.runtime.gateway.BuildCanonicalTextResponse(canonical, providerResp.Text, usage)
 	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequest(model.ID, result.Candidate, canonicalResp.Usage), canonicalResp.Usage.Estimated)
@@ -327,57 +289,19 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 	}
 	scheduleReq := gatewayScheduleRequest(r, canonical, modelResolution)
 	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
-	result, err := s.runtime.scheduleGatewayRequest(r.Context(), scheduleReq, model.ID, forcedProviderKey, authed.Key)
-	if err != nil {
-		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
-			RequestID:             canonical.RequestID,
-			Authed:                authed,
-			DecisionID:            result.Decision.ID,
-			AttemptNo:             result.Decision.AttemptNo,
-			SourceProtocol:        string(canonical.SourceProtocol),
-			SourceEndpoint:        canonical.SourceEndpoint,
-			Model:                 canonical.CanonicalModel,
-			Success:               false,
-			ErrorClass:            ptrStringValue("no_available_account"),
-			LatencyMS:             elapsedMillis(startedAt),
-			InputTokens:           admission.EstimatedUsage.InputTokens,
-			OutputTokens:          admission.EstimatedUsage.OutputTokens,
-			CachedTokens:          admission.EstimatedUsage.CachedTokens,
-			UsageEstimated:        true,
-			Pricing:               admission.Pricing,
-			CompatibilityWarnings: canonical.CompatibilityWarnings,
-		})
-		writeGatewayError(w, http.StatusServiceUnavailable, apiopenapi.ServiceUnavailableError, "no available account", "no_available_account")
-		return
-	}
-	providerResp, err := s.runtime.invokeProviderText(r.Context(), providerTextRequest(canonical, result.Candidate))
-	if err != nil {
-		errorClass, upstreamStatus, errorType := providerGatewayError(err)
-		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
-			RequestID:             canonical.RequestID,
-			Authed:                authed,
-			DecisionID:            result.Decision.ID,
-			AttemptNo:             result.Decision.AttemptNo,
-			ProviderID:            ptrInt(result.Candidate.Provider.ID),
-			AccountID:             ptrInt(result.Candidate.Account.ID),
-			SourceProtocol:        string(canonical.SourceProtocol),
-			SourceEndpoint:        canonical.SourceEndpoint,
-			TargetProtocol:        result.Candidate.Provider.Protocol,
-			Model:                 canonical.CanonicalModel,
-			Success:               false,
-			ErrorClass:            ptrStringValue(errorClass),
-			StatusCode:            ptrInt(upstreamStatus),
-			LatencyMS:             elapsedMillis(startedAt),
-			InputTokens:           admission.EstimatedUsage.InputTokens,
-			OutputTokens:          admission.EstimatedUsage.OutputTokens,
-			CachedTokens:          admission.EstimatedUsage.CachedTokens,
-			UsageEstimated:        true,
-			Pricing:               admission.Pricing,
-			CompatibilityWarnings: canonical.CompatibilityWarnings,
-		})
+	failover := s.invokeProviderTextWithFailover(r.Context(), r, authed, canonical, scheduleReq, model.ID, forcedProviderKey, admission, startedAt)
+	result := failover.ScheduleResult
+	if failover.Err != nil {
+		if !failover.FailureRecorded {
+			s.recordGatewayNoAvailableAccount(r, authed, canonical, result, admission, startedAt)
+			writeGatewayError(w, http.StatusServiceUnavailable, apiopenapi.ServiceUnavailableError, "no available account", "no_available_account")
+			return
+		}
+		errorClass, upstreamStatus, errorType := providerGatewayError(failover.Err)
 		writeGatewayError(w, providerGatewayHTTPStatus(upstreamStatus), errorType, providerGatewayMessage(errorClass), errorClass)
 		return
 	}
+	providerResp := failover.Response
 	usage := gatewayUsageFromProvider(providerResp)
 	canonicalResp := s.runtime.gateway.BuildCanonicalTextResponse(canonical, providerResp.Text, usage)
 	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequest(model.ID, result.Candidate, canonicalResp.Usage), canonicalResp.Usage.Estimated)
@@ -516,57 +440,19 @@ func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	scheduleReq := gatewayScheduleRequest(r, canonical, modelResolution)
 	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
-	result, err := s.runtime.scheduleGatewayRequest(r.Context(), scheduleReq, model.ID, forcedProviderKey, authed.Key)
-	if err != nil {
-		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
-			RequestID:             canonical.RequestID,
-			Authed:                authed,
-			DecisionID:            result.Decision.ID,
-			AttemptNo:             result.Decision.AttemptNo,
-			SourceProtocol:        string(canonical.SourceProtocol),
-			SourceEndpoint:        canonical.SourceEndpoint,
-			Model:                 canonical.CanonicalModel,
-			Success:               false,
-			ErrorClass:            ptrStringValue("no_available_account"),
-			LatencyMS:             elapsedMillis(startedAt),
-			InputTokens:           admission.EstimatedUsage.InputTokens,
-			OutputTokens:          admission.EstimatedUsage.OutputTokens,
-			CachedTokens:          admission.EstimatedUsage.CachedTokens,
-			UsageEstimated:        true,
-			Pricing:               admission.Pricing,
-			CompatibilityWarnings: canonical.CompatibilityWarnings,
-		})
-		writeGatewayError(w, http.StatusServiceUnavailable, apiopenapi.ServiceUnavailableError, "no available account", "no_available_account")
-		return
-	}
-	providerResp, err := s.runtime.invokeProviderText(r.Context(), providerTextRequest(canonical, result.Candidate))
-	if err != nil {
-		errorClass, upstreamStatus, errorType := providerGatewayError(err)
-		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
-			RequestID:             canonical.RequestID,
-			Authed:                authed,
-			DecisionID:            result.Decision.ID,
-			AttemptNo:             result.Decision.AttemptNo,
-			ProviderID:            ptrInt(result.Candidate.Provider.ID),
-			AccountID:             ptrInt(result.Candidate.Account.ID),
-			SourceProtocol:        string(canonical.SourceProtocol),
-			SourceEndpoint:        canonical.SourceEndpoint,
-			TargetProtocol:        result.Candidate.Provider.Protocol,
-			Model:                 canonical.CanonicalModel,
-			Success:               false,
-			ErrorClass:            ptrStringValue(errorClass),
-			StatusCode:            ptrInt(upstreamStatus),
-			LatencyMS:             elapsedMillis(startedAt),
-			InputTokens:           admission.EstimatedUsage.InputTokens,
-			OutputTokens:          admission.EstimatedUsage.OutputTokens,
-			CachedTokens:          admission.EstimatedUsage.CachedTokens,
-			UsageEstimated:        true,
-			Pricing:               admission.Pricing,
-			CompatibilityWarnings: canonical.CompatibilityWarnings,
-		})
+	failover := s.invokeProviderTextWithFailover(r.Context(), r, authed, canonical, scheduleReq, model.ID, forcedProviderKey, admission, startedAt)
+	result := failover.ScheduleResult
+	if failover.Err != nil {
+		if !failover.FailureRecorded {
+			s.recordGatewayNoAvailableAccount(r, authed, canonical, result, admission, startedAt)
+			writeGatewayError(w, http.StatusServiceUnavailable, apiopenapi.ServiceUnavailableError, "no available account", "no_available_account")
+			return
+		}
+		errorClass, upstreamStatus, errorType := providerGatewayError(failover.Err)
 		writeGatewayError(w, providerGatewayHTTPStatus(upstreamStatus), errorType, providerGatewayMessage(errorClass), errorClass)
 		return
 	}
+	providerResp := failover.Response
 	usage := gatewayUsageFromProvider(providerResp)
 	canonicalResp := s.runtime.gateway.BuildCanonicalTextResponse(canonical, providerResp.Text, usage)
 	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequest(model.ID, result.Candidate, canonicalResp.Usage), canonicalResp.Usage.Estimated)
@@ -720,57 +606,19 @@ func (s *Server) handleCreateEmbedding(w http.ResponseWriter, r *http.Request) {
 	}
 	scheduleReq := gatewayScheduleRequest(r, canonical, modelResolution)
 	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
-	result, err := s.runtime.scheduleGatewayRequest(r.Context(), scheduleReq, model.ID, forcedProviderKey, authed.Key)
-	if err != nil {
-		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
-			RequestID:             canonical.RequestID,
-			Authed:                authed,
-			DecisionID:            result.Decision.ID,
-			AttemptNo:             result.Decision.AttemptNo,
-			SourceProtocol:        string(canonical.SourceProtocol),
-			SourceEndpoint:        canonical.SourceEndpoint,
-			Model:                 canonical.CanonicalModel,
-			Success:               false,
-			ErrorClass:            ptrStringValue("no_available_account"),
-			LatencyMS:             elapsedMillis(startedAt),
-			InputTokens:           admission.EstimatedUsage.InputTokens,
-			OutputTokens:          admission.EstimatedUsage.OutputTokens,
-			CachedTokens:          admission.EstimatedUsage.CachedTokens,
-			UsageEstimated:        true,
-			Pricing:               admission.Pricing,
-			CompatibilityWarnings: canonical.CompatibilityWarnings,
-		})
-		writeGatewayError(w, http.StatusServiceUnavailable, apiopenapi.ServiceUnavailableError, "no available account", "no_available_account")
-		return
-	}
-	providerResp, err := s.runtime.invokeProviderEmbeddings(r.Context(), providerEmbeddingRequest(canonical, result.Candidate))
-	if err != nil {
-		errorClass, upstreamStatus, errorType := providerGatewayError(err)
-		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
-			RequestID:             canonical.RequestID,
-			Authed:                authed,
-			DecisionID:            result.Decision.ID,
-			AttemptNo:             result.Decision.AttemptNo,
-			ProviderID:            ptrInt(result.Candidate.Provider.ID),
-			AccountID:             ptrInt(result.Candidate.Account.ID),
-			SourceProtocol:        string(canonical.SourceProtocol),
-			SourceEndpoint:        canonical.SourceEndpoint,
-			TargetProtocol:        result.Candidate.Provider.Protocol,
-			Model:                 canonical.CanonicalModel,
-			Success:               false,
-			ErrorClass:            ptrStringValue(errorClass),
-			StatusCode:            ptrInt(upstreamStatus),
-			LatencyMS:             elapsedMillis(startedAt),
-			InputTokens:           admission.EstimatedUsage.InputTokens,
-			OutputTokens:          admission.EstimatedUsage.OutputTokens,
-			CachedTokens:          admission.EstimatedUsage.CachedTokens,
-			UsageEstimated:        true,
-			Pricing:               admission.Pricing,
-			CompatibilityWarnings: canonical.CompatibilityWarnings,
-		})
+	failover := s.invokeProviderEmbeddingsWithFailover(r.Context(), r, authed, canonical, scheduleReq, model.ID, forcedProviderKey, admission, startedAt)
+	result := failover.ScheduleResult
+	if failover.Err != nil {
+		if !failover.FailureRecorded {
+			s.recordGatewayNoAvailableAccount(r, authed, canonical, result, admission, startedAt)
+			writeGatewayError(w, http.StatusServiceUnavailable, apiopenapi.ServiceUnavailableError, "no available account", "no_available_account")
+			return
+		}
+		errorClass, upstreamStatus, errorType := providerGatewayError(failover.Err)
 		writeGatewayError(w, providerGatewayHTTPStatus(upstreamStatus), errorType, providerGatewayMessage(errorClass), errorClass)
 		return
 	}
+	providerResp := failover.Response
 	usage := gatewayUsageFromEmbeddingProvider(providerResp)
 	canonicalResp := s.runtime.gateway.BuildCanonicalEmbeddingResponse(canonical, gatewayEmbeddingsFromProvider(providerResp), usage)
 	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequest(model.ID, result.Candidate, canonicalResp.Usage), canonicalResp.Usage.Estimated)
@@ -913,58 +761,20 @@ func (s *Server) handleGeminiModelAction(w http.ResponseWriter, r *http.Request)
 	}
 	scheduleReq := gatewayScheduleRequest(r, canonical, modelResolution)
 	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
-	result, err := s.runtime.scheduleGatewayRequest(r.Context(), scheduleReq, model.ID, forcedProviderKey, authed.Key)
-	if err != nil {
-		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
-			RequestID:             canonical.RequestID,
-			Authed:                authed,
-			DecisionID:            result.Decision.ID,
-			AttemptNo:             result.Decision.AttemptNo,
-			SourceProtocol:        string(canonical.SourceProtocol),
-			SourceEndpoint:        canonical.SourceEndpoint,
-			Model:                 canonical.CanonicalModel,
-			Success:               false,
-			ErrorClass:            ptrStringValue("no_available_account"),
-			LatencyMS:             elapsedMillis(startedAt),
-			InputTokens:           admission.EstimatedUsage.InputTokens,
-			OutputTokens:          admission.EstimatedUsage.OutputTokens,
-			CachedTokens:          admission.EstimatedUsage.CachedTokens,
-			UsageEstimated:        true,
-			Pricing:               admission.Pricing,
-			CompatibilityWarnings: canonical.CompatibilityWarnings,
-		})
-		writeGeminiGatewayError(w, http.StatusServiceUnavailable, "UNAVAILABLE", "no available account")
-		return
-	}
-	providerResp, err := s.runtime.invokeProviderText(r.Context(), providerTextRequest(canonical, result.Candidate))
-	if err != nil {
-		errorClass, upstreamStatus, _ := providerGatewayError(err)
+	failover := s.invokeProviderTextWithFailover(r.Context(), r, authed, canonical, scheduleReq, model.ID, forcedProviderKey, admission, startedAt)
+	result := failover.ScheduleResult
+	if failover.Err != nil {
+		if !failover.FailureRecorded {
+			s.recordGatewayNoAvailableAccount(r, authed, canonical, result, admission, startedAt)
+			writeGeminiGatewayError(w, http.StatusServiceUnavailable, "UNAVAILABLE", "no available account")
+			return
+		}
+		errorClass, upstreamStatus, _ := providerGatewayError(failover.Err)
 		status := providerGatewayHTTPStatus(upstreamStatus)
-		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
-			RequestID:             canonical.RequestID,
-			Authed:                authed,
-			DecisionID:            result.Decision.ID,
-			AttemptNo:             result.Decision.AttemptNo,
-			ProviderID:            ptrInt(result.Candidate.Provider.ID),
-			AccountID:             ptrInt(result.Candidate.Account.ID),
-			SourceProtocol:        string(canonical.SourceProtocol),
-			SourceEndpoint:        canonical.SourceEndpoint,
-			TargetProtocol:        result.Candidate.Provider.Protocol,
-			Model:                 canonical.CanonicalModel,
-			Success:               false,
-			ErrorClass:            ptrStringValue(errorClass),
-			StatusCode:            ptrInt(upstreamStatus),
-			LatencyMS:             elapsedMillis(startedAt),
-			InputTokens:           admission.EstimatedUsage.InputTokens,
-			OutputTokens:          admission.EstimatedUsage.OutputTokens,
-			CachedTokens:          admission.EstimatedUsage.CachedTokens,
-			UsageEstimated:        true,
-			Pricing:               admission.Pricing,
-			CompatibilityWarnings: canonical.CompatibilityWarnings,
-		})
 		writeGeminiGatewayError(w, status, geminiStatusForGatewayErrorClass(errorClass, status), providerGatewayMessage(errorClass))
 		return
 	}
+	providerResp := failover.Response
 	usage := gatewayUsageFromProvider(providerResp)
 	canonicalResp := s.runtime.gateway.BuildCanonicalTextResponse(canonical, providerResp.Text, usage)
 	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequest(model.ID, result.Candidate, canonicalResp.Usage), canonicalResp.Usage.Estimated)

@@ -26,6 +26,7 @@ func New(client *ent.Client) (*Store, error) {
 func (s *Store) Create(ctx context.Context, input contract.UsageLog) (contract.UsageLog, error) {
 	create := s.client.UsageLog.Create().
 		SetRequestID(input.RequestID).
+		SetAttemptNo(input.AttemptNo).
 		SetUserID(input.UserID).
 		SetAPIKeyID(input.APIKeyID).
 		SetNillableProviderID(input.ProviderID).
@@ -89,6 +90,7 @@ func toUsageLog(row *ent.UsageLog) contract.UsageLog {
 	return contract.UsageLog{
 		ID:                    row.ID,
 		RequestID:             row.RequestID,
+		AttemptNo:             row.AttemptNo,
 		UserID:                row.UserID,
 		APIKeyID:              row.APIKeyID,
 		ProviderID:            cloneInt(row.ProviderID),

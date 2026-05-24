@@ -89,6 +89,7 @@ func (s *Store) ListPendingUsageCharges(ctx context.Context, limit int) ([]contr
 		out = append(out, contract.PendingUsageCharge{
 			UsageLogID: row.ID,
 			RequestID:  row.RequestID,
+			AttemptNo:  row.AttemptNo,
 			UserID:     row.UserID,
 			Cost:       row.Cost,
 			Currency:   row.Currency,

@@ -75,6 +75,14 @@ provider_failover_rate
 provider_error_rate
 ```
 
+当前 Gateway failover 计数由 `/metrics` 暴露为：
+
+```txt
+srapi_gateway_failover_total{endpoint_family, model, provider_protocol, result}
+```
+
+该指标只使用低基数 route/model/protocol/result 标签，不得加入 API key、account id、user id、request id、prompt 或 credential。
+
 ### 3.4 经济指标
 
 ```txt
