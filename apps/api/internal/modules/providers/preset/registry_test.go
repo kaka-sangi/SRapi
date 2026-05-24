@@ -135,7 +135,7 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	if !ok {
 		t.Fatalf("missing together preset")
 	}
-	if togetherPreset.DefaultBaseURL != "https://api.together.xyz/v1" {
+	if togetherPreset.DefaultBaseURL != "https://api.together.ai/v1" {
 		t.Fatalf("unexpected together base url: %s", togetherPreset.DefaultBaseURL)
 	}
 

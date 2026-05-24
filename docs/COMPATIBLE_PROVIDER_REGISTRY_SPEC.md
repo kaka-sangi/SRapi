@@ -45,7 +45,7 @@ Provider preset 的目标是减少硬编码分叉：
 | `openrouter` | OpenRouter | MVP preset |
 | `anyrouter` | AnyRouter | MVP preset |
 | `qwen` | 通义千问 / DashScope OpenAI-compatible | MVP preset |
-| `together` | Together AI OpenAI-compatible | MVP preset |
+| `together` | Together AI OpenAI-compatible (`https://api.together.ai/v1`) | MVP preset |
 | `zhipu` | GLM / Zhipu | MVP preset |
 | `zai` | Z.AI / GLM | MVP preset |
 
@@ -165,12 +165,15 @@ deepseek-anthropic
 grok
 groq
 kimi
+mistral
 moonshot
 moonshot-anthropic
 openai
 openai-compatible
 openrouter
+qwen
 rerank-compatible
+together
 zai
 zai-anthropic
 zhipu

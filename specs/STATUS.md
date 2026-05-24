@@ -77,31 +77,34 @@ last_completed:
 - A4.1: Scheduler failover foundations now return ranked candidate lists, persist `fallback_from_decision_id` on scheduler decisions, expose the field through admin OpenAPI/SDK responses, and update memory/Redis leases by `(request_id, attempt_no)` so fallback attempts do not overwrite each other.
 - A4.2: Gateway text, Responses, Messages, Embeddings, and Gemini GenerateContent handlers now consume ranked scheduler candidates with a retry loop for retryable provider errors, persist one `usage_logs` evidence row per `(request_id, attempt_no)`, link fallback scheduler decisions through `fallback_from_decision_id`, record `fallback_excluded` evidence, and expose `srapi_gateway_failover_total`.
 - A5.1: Generic reverse-proxy adapter now accepts `generic-reverse-proxy` providers, reads provider/account metadata for `base_url`, custom auth headers, chat/embedding paths, body mapping, response text/usage paths, supports API-key HTTP client and custom reverse-proxy runtime dispatch, handles OpenAI-compatible streaming/embeddings, and has adapter plus Gateway regressions proving configured upstreams work end to end.
+- A5.2: Provider preset install now covers DeepSeek/Kimi/通义(qwen)/智谱(zhipu)/Grok/Mistral/Groq/Together, keeps new providers disabled by default, records preset metadata into provider config, exposes preset key/platform/default base URL in provider test diagnostics, and has representative DeepSeek/Qwen/Together install + enable + `/admin/providers/{id}/test` coverage. Together's OpenAI-compatible base URL was updated to `https://api.together.ai/v1` per current official docs.
 - C3.3: Gateway content safety now adds `internal/modules/content_safety`, redacts email/phone/SSN/national ID/credit-card text across CanonicalRequest prompt, messages, embeddings, image/audio/speech, moderation, and rerank fields before provider dispatch, records safe audit finding summaries without raw PII, and persists compatibility warnings on usage evidence.
 - K1.5: Scheduler ranking now applies a Cost/Latency/Quality Pareto frontier before final weighted selection, records `pareto.frontier_account_ids` in decision score evidence, keeps all available candidates in failover rank order, and uses explicit `quality_score` / `quality_tier` metadata as the quality objective.
 
 current:
 
-- package: A5.2
+- package: K1.2
 - status: pending
-- objective: add provider presets for DeepSeek/Kimi/通义/智谱/Grok/Mistral/Groq/Together.
+- objective: load active SchedulerStrategy rows from PostgreSQL into the runtime StrategyRegistry so strategy config changes can take effect without recompiling.
 
-next_recommended: A5.2 provider presets for DeepSeek/Kimi/通义/智谱/Grok/Mistral/Groq/Together, then complete `/admin/providers/{id}/test` coverage for representative installed presets.
+next_recommended: K1.2 strategy_loader（DB → runtime），then K1.6 strategy_simulator（dry-run + shadow）.
 
 last_gates:
 
-- `cd apps/api && go test ./internal/modules/content_safety/...`: pass
-- `cd apps/api && go test ./internal/httpserver -run 'TestGatewayRealtimeWebSocketRelaysOpenAIUpstreamWebSocket|TestGatewayResponsesWebSocketRelaysCodexUpstreamWebSocket|TestGatewayContentSafetyRedactsPIIAndRecordsEvidence' -count=1 -v`: pass
+- `cd apps/api && go test ./internal/modules/providers/preset ./internal/httpserver -run 'TestDefaultRegistrySeedsCompatiblePresets|TestAdminInstallProviderPresetsIsIdempotent' -count=1`: pass
+- `cd apps/api && go test ./internal/httpserver -run 'TestAdminProviderOperationsAndDiagnostics|TestAdminInstallProviderPresetsIsIdempotent|TestGatewayProviderAliasUsesPresetProviderKey' -count=1`: pass
+- `cd apps/api && go test ./internal/modules/providers/... ./internal/modules/provider_adapters/... -count=1`: pass
+- `cd apps/api && go test ./...`: pass
 - `git diff --check`: pass
 - `make code-quality-check`: pass
 - `make architecture-check`: pass
-- `cd apps/api && go test ./...`: pass
 
 notes:
 
 - Existing `docs/` remains the architecture and domain source of truth.
 - Future goal runs must read `specs/README.md` first, then continue from `next_recommended`.
 - Future goal runs must preserve unrelated user worktree changes if present.
+- A5.2 now has code/test/docs evidence in the provider preset registry, admin provider install API, admin provider test diagnostics, and `docs/COMPATIBLE_PROVIDER_REGISTRY_SPEC.md`; no real upstream credential is required for the representative test coverage.
 - Frontend visual implementation deferral was lifted by WP-160a: tone, component library, data layer, harness, e2e, bundle budget all landed under `apps/web` and `tools/`. `make web-check` is part of `make check`. New tone source: `docs/PRODUCT_TONE.md`. New architecture source: `docs/FRONTEND_ARCHITECTURE.md`. Future frontend goal runs must respect both, plus `docs/FRONTEND_DESIGN_SYSTEM.md`.
 - WP-500 keeps discovery responses credential-free while allowing reverse-proxy Antigravity accounts to use selected credentials upstream.
 - WP-080 added `TestGatewayCompatibilityEndpointsTargetSameOpenAICompatibleUpstream`, which records three upstream `/v1/chat/completions` calls using one OpenAI-compatible account and verifies provider/account usage evidence.

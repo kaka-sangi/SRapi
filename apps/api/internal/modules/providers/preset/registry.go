@@ -89,7 +89,7 @@ func Default() *Registry {
 		openAIPreset("openrouter", "OpenRouter", "https://openrouter.ai/api/v1", providerAliases("openrouter")),
 		openAIPreset("qwen", "通义千问", "https://dashscope.aliyuncs.com/compatible-mode/v1", append(providerAliases("qwen"), providerAliases("tongyi")...)),
 		rerankPreset("rerank-compatible", "Rerank Compatible", "https://api.cohere.com/v2", []string{"/api/provider/rerank-compatible", "/api/provider/rerank-compatible/v1"}),
-		openAIPreset("together", "Together AI", "https://api.together.xyz/v1", providerAliases("together")),
+		openAIPreset("together", "Together AI", "https://api.together.ai/v1", providerAliases("together")),
 		openAIPreset("zai", "Z.AI", "https://api.z.ai/api/paas/v4", providerAliases("zai")),
 		openAIPreset("zhipu", "Zhipu", "https://open.bigmodel.cn/api/paas/v4", providerAliases("zhipu")),
 	)

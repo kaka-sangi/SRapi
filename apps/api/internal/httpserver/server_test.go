@@ -3729,6 +3729,35 @@ func TestAdminInstallProviderPresetsIsIdempotent(t *testing.T) {
 	if deepseekSchema == nil || (*deepseekSchema)["default_base_url"] != "https://api.deepseek.com" {
 		t.Fatalf("expected deepseek preset default base url, got %+v", deepseekSchema)
 	}
+	togetherSchema := providersByName["together"].ConfigSchema
+	if togetherSchema == nil || (*togetherSchema)["default_base_url"] != "https://api.together.ai/v1" {
+		t.Fatalf("expected together preset default base url, got %+v", togetherSchema)
+	}
+
+	for _, preset := range []struct {
+		name           string
+		defaultBaseURL string
+	}{
+		{name: "deepseek", defaultBaseURL: "https://api.deepseek.com"},
+		{name: "qwen", defaultBaseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1"},
+		{name: "together", defaultBaseURL: "https://api.together.ai/v1"},
+	} {
+		provider := providersByName[preset.name]
+		mustUpdateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(provider.Id), `{"status":"active"}`)
+		mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(provider.Id)+`","name":"`+preset.name+`-preset-test-account","runtime_class":"api_key","credential":{"api_key":"`+preset.name+`-secret"},"status":"active"}`)
+
+		testResp := mustTestProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(provider.Id))
+		if !testResp.Data.Ok || testResp.Data.ProviderId == nil || *testResp.Data.ProviderId != provider.Id {
+			t.Fatalf("expected provider preset %s to test ok, got %+v", preset.name, testResp.Data)
+		}
+		if testResp.Data.Checks == nil {
+			t.Fatalf("expected provider preset %s test checks", preset.name)
+		}
+		checks := *testResp.Data.Checks
+		if checks["provider_key"] != preset.name || checks["default_base_url"] != preset.defaultBaseURL || checks["platform_family"] != "openai_compatible" {
+			t.Fatalf("unexpected provider preset %s test checks: %+v", preset.name, checks)
+		}
+	}
 
 	second := mustInstallProviderPresets(t, handler, sessionCookie, loginResp.Data.CsrfToken)
 	if second.Data.Succeeded != 0 || second.Data.Failed != 0 {
@@ -6746,6 +6775,41 @@ func mustCreateProvider(t *testing.T, handler http.Handler, sessionCookie *http.
 	var resp apiopenapi.ProviderResponse
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode provider response: %v", err)
+	}
+	return resp
+}
+
+func mustUpdateProvider(t *testing.T, handler http.Handler, sessionCookie *http.Cookie, csrfToken, providerID, body string) apiopenapi.ProviderResponse {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/providers/"+providerID, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(sessionCookie)
+	req.Header.Set("X-CSRF-Token", csrfToken)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected provider update 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var resp apiopenapi.ProviderResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode provider update response: %v", err)
+	}
+	return resp
+}
+
+func mustTestProvider(t *testing.T, handler http.Handler, sessionCookie *http.Cookie, csrfToken, providerID string) apiopenapi.AdminTestResultResponse {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/providers/"+providerID+"/test", nil)
+	req.AddCookie(sessionCookie)
+	req.Header.Set("X-CSRF-Token", csrfToken)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected provider test 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var resp apiopenapi.AdminTestResultResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode provider test response: %v", err)
 	}
 	return resp
 }

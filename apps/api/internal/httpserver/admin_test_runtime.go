@@ -41,12 +41,15 @@ func (rt *runtimeState) testProvider(ctx context.Context, provider providercontr
 		message = "provider has no active accounts"
 	}
 	return adminTestResult(ok, message, startedAt, apiopenapi.Id(strconv.Itoa(provider.ID)), nil, map[string]any{
-		"provider_exists": true,
-		"provider_active": provider.Status == providercontract.StatusActive,
-		"account_count":   total,
-		"active_accounts": active,
-		"adapter_type":    provider.AdapterType,
-		"protocol":        provider.Protocol,
+		"provider_exists":  true,
+		"provider_active":  provider.Status == providercontract.StatusActive,
+		"account_count":    total,
+		"active_accounts":  active,
+		"adapter_type":     provider.AdapterType,
+		"protocol":         provider.Protocol,
+		"provider_key":     mapString(provider.ConfigSchema, "provider_key"),
+		"platform_family":  mapString(provider.ConfigSchema, "platform_family"),
+		"default_base_url": mapString(provider.ConfigSchema, "default_base_url"),
 	})
 }
 
