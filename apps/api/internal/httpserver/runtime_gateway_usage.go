@@ -128,14 +128,53 @@ func (rt *runtimeState) recordGatewayAccountSnapshots(ctx context.Context, rec g
 		return
 	}
 	now := time.Now().UTC()
-	health := buildAccountHealthSnapshot(account, usageLogsForAccount(usageLogs, account.ID), now)
+	accountLogs := usageLogsForAccount(usageLogs, account.ID)
+	if err := rt.updateAccountRuntimeQuotaMetadata(ctx, account, accountLogs, now); err != nil {
+		rt.logger.Warn("failed to update account runtime quota metadata", "error", err, "account_id", account.ID)
+	}
+	health := buildAccountHealthSnapshot(account, accountLogs, now)
 	if _, err := rt.accounts.RecordHealthSnapshot(ctx, accountHealthSnapshotFromAPI(health)); err != nil {
 		rt.logger.Warn("failed to record account health snapshot", "error", err, "account_id", account.ID)
 	}
-	quota := buildAccountQuotaSnapshot(account, usageLogsForAccount(usageLogs, account.ID), now)
+	quota := buildAccountQuotaSnapshot(account, accountLogs, now)
 	if _, err := rt.accounts.RecordQuotaSnapshot(ctx, accountQuotaSnapshotFromAPI(quota)); err != nil {
 		rt.logger.Warn("failed to record account quota snapshot", "error", err, "account_id", account.ID)
 	}
+}
+
+func (rt *runtimeState) updateAccountRuntimeQuotaMetadata(ctx context.Context, account accountcontract.ProviderAccount, logs []usagecontract.UsageLog, now time.Time) error {
+	window := accountRuntimeQuotaWindow(account.Metadata)
+	windowStart := now.Add(-window)
+	rpmUsed := 0
+	tpmUsed := 0
+	for _, log := range logs {
+		if log.CreatedAt.Before(windowStart) {
+			continue
+		}
+		rpmUsed++
+		tpmUsed += log.TotalTokens
+	}
+
+	metadata := cloneMetadata(account.Metadata)
+	windowSeconds := int(window / time.Second)
+	resetAt := now.Add(window).Format(time.RFC3339)
+	metadata["rpm_used"] = rpmUsed
+	metadata["tpm_used"] = tpmUsed
+	metadata["rpm_window_seconds"] = windowSeconds
+	metadata["tpm_window_seconds"] = windowSeconds
+	metadata["rpm_reset_at"] = resetAt
+	metadata["tpm_reset_at"] = resetAt
+	metadata["runtime_quota_updated_at"] = now.Format(time.RFC3339)
+	_, err := rt.accounts.Update(ctx, account.ID, accountcontract.UpdateRequest{Metadata: &metadata})
+	return err
+}
+
+func accountRuntimeQuotaWindow(metadata map[string]any) time.Duration {
+	seconds := metadataInt(metadata, "runtime_quota_window_seconds", "quota_window_seconds", "rpm_window_seconds", "tpm_window_seconds", "window_seconds")
+	if seconds <= 0 {
+		seconds = 60
+	}
+	return time.Duration(seconds) * time.Second
 }
 
 func (rt *runtimeState) recordAccountTestHealthSnapshot(ctx context.Context, account accountcontract.ProviderAccount, result apiopenapi.AdminTestResult) {

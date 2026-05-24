@@ -5499,6 +5499,80 @@ func TestGatewaySchedulerRejectsSaturatedAccount(t *testing.T) {
 	}
 }
 
+func TestGatewayUpdatesAccountRuntimeQuotaMetadataForScheduler(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/chat/completions" {
+			t.Fatalf("unexpected upstream path %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"quota ok"}}],"usage":{"prompt_tokens":3,"completion_tokens":2,"total_tokens":5}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"account-runtime-quota-provider","display_name":"Account Runtime Quota","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"account-runtime-quota-model","display_name":"Account Runtime Quota Model","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"account-runtime-quota-upstream","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"account-runtime-quota-account","runtime_class":"api_key","credential":{"api_key":"upstream-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1","rpm_limit":1},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	firstReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"account-runtime-quota-model","messages":[{"role":"user","content":"first quota request"}]}`))
+	firstReq.Header.Set("Content-Type", "application/json")
+	firstReq.Header.Set("Authorization", "Bearer "+apiKey)
+	firstRec := httptest.NewRecorder()
+	handler.ServeHTTP(firstRec, firstReq)
+	if firstRec.Code != http.StatusOK {
+		t.Fatalf("expected first gateway request 200, got %d body=%s", firstRec.Code, firstRec.Body.String())
+	}
+
+	accountsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts", nil)
+	accountsReq.AddCookie(sessionCookie)
+	accountsRec := httptest.NewRecorder()
+	handler.ServeHTTP(accountsRec, accountsReq)
+	if accountsRec.Code != http.StatusOK {
+		t.Fatalf("expected accounts list 200, got %d body=%s", accountsRec.Code, accountsRec.Body.String())
+	}
+	var accountsResp apiopenapi.ProviderAccountListResponse
+	if err := json.NewDecoder(accountsRec.Body).Decode(&accountsResp); err != nil {
+		t.Fatalf("decode accounts: %v", err)
+	}
+	account := findProviderAccountByID(accountsResp.Data, accountResp.Data.Id)
+	if account == nil || account.Metadata == nil {
+		t.Fatalf("expected updated account metadata, got %+v", account)
+	}
+	if got := intFromJSONValue((*account.Metadata)["rpm_used"]); got != 1 {
+		t.Fatalf("expected account rpm_used metadata 1, got %v in %+v", got, account.Metadata)
+	}
+	if got := intFromJSONValue((*account.Metadata)["tpm_used"]); got != 5 {
+		t.Fatalf("expected account tpm_used metadata 5, got %v in %+v", got, account.Metadata)
+	}
+
+	secondReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"account-runtime-quota-model","messages":[{"role":"user","content":"second quota request"}]}`))
+	secondReq.Header.Set("Content-Type", "application/json")
+	secondReq.Header.Set("Authorization", "Bearer "+apiKey)
+	secondRec := httptest.NewRecorder()
+	handler.ServeHTTP(secondRec, secondReq)
+	if secondRec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected account runtime quota rejection 503, got %d body=%s", secondRec.Code, secondRec.Body.String())
+	}
+
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=account-runtime-quota-model", nil)
+	decisionsReq.AddCookie(sessionCookie)
+	decisionsRec := httptest.NewRecorder()
+	handler.ServeHTTP(decisionsRec, decisionsReq)
+	if decisionsRec.Code != http.StatusOK {
+		t.Fatalf("expected decisions 200, got %d body=%s", decisionsRec.Code, decisionsRec.Body.String())
+	}
+	var decisionsResp apiopenapi.SchedulerDecisionListResponse
+	if err := json.NewDecoder(decisionsRec.Body).Decode(&decisionsResp); err != nil {
+		t.Fatalf("decode decisions: %v", err)
+	}
+	if len(decisionsResp.Data) != 2 || !jsonObjectContainsString(decisionsResp.Data[1].RejectReasons, "rpm_limit_exceeded") {
+		t.Fatalf("expected second decision rpm_limit_exceeded, got %+v", decisionsResp.Data)
+	}
+}
+
 func TestGatewayVisionRequestUsesCapabilityTaxonomy(t *testing.T) {
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
@@ -6657,6 +6731,28 @@ func jsonObjectContainsString(value apiopenapi.JsonObject, target string) bool {
 		}
 	}
 	return false
+}
+
+func intFromJSONValue(value any) int {
+	switch value := value.(type) {
+	case int:
+		return value
+	case int64:
+		return int(value)
+	case float64:
+		return int(value)
+	case json.Number:
+		parsed, err := value.Int64()
+		if err == nil {
+			return int(parsed)
+		}
+	case string:
+		parsed, err := strconv.Atoi(strings.TrimSpace(value))
+		if err == nil {
+			return parsed
+		}
+	}
+	return 0
 }
 
 func rejectionReasonsContain(value apiopenapi.JsonObject, target string) bool {

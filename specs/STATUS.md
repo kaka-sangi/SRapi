@@ -73,14 +73,15 @@ last_completed:
 - WP-710: Incremental migration workflow now adds `apps/api/atlas.hcl`, pinned Atlas `migration-diff` / `migration-hash` Makefile targets, `atlas.sum`, up/down pairing plus contiguous numbering checks in `make migration-check`, and updated migration architecture docs so future Ent schema changes generate `000002+` migrations instead of expanding the initial schema.
 - A1.1: AuthSession persistence now adds hashed `auth_sessions` Ent/PostgreSQL storage, `entstore/auth`, HTTP/app runtime injection, old-cookie runtime rebuild coverage, and migration/docs alignment so console sessions survive API restart without storing session or CSRF token plaintext.
 - A2.1: Gateway API key/user RPM and API key TPM limits now use Redis-backed atomic counters through `internal/platform/ratelimit`, app/httpserver injection, admission-stage enforcement before Scheduler dispatch, 429 + `Retry-After` Gateway errors, and HTTP/unit regressions proving repeated calls are throttled without partial counter updates.
+- A2.2: Scheduler account-level quota evidence now has an end-to-end Gateway path: successful account usage updates `rpm_used` / `tpm_used` runtime metadata from the recent usage window, scheduler candidates read those counters with existing `rpm_limit` / `tpm_limit` / `max_concurrency` metadata, and HTTP + scheduler regressions prove `rpm_limit_exceeded`, `tpm_limit_exceeded`, and `concurrency_full` reject reasons are recorded.
 
 current:
 
 - package: A2+
 - status: pending
-- objective: continue P1 gateway stability after Redis RPM/TPM enforcement.
+- objective: continue P1 gateway stability after account-level scheduler quota evidence.
 
-next_recommended: A2.2 gateway concurrency limits and scheduler/account-level quota evidence
+next_recommended: A2.3 gateway concurrency Redis ZSet and rate-limit p99 benchmark
 
 last_gates:
 
