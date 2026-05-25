@@ -9,6 +9,7 @@ import (
 	"github.com/srapi/srapi/apps/api/internal/modules/audit/contract"
 	billingcontract "github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
 	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
+	qualitycontract "github.com/srapi/srapi/apps/api/internal/modules/quality_eval/contract"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
 	"github.com/srapi/srapi/apps/api/internal/persistence/entstore"
@@ -126,6 +127,46 @@ func TestRuntimeStoresPersistRecords(t *testing.T) {
 	}
 	if len(feedbacks) != 1 || feedbacks[0].StatusCode == nil || *feedbacks[0].StatusCode != statusCode {
 		t.Fatalf("expected persisted scheduler feedback, got %+v", feedbacks)
+	}
+	if _, created, err := stores.QualityEval.CreateSample(ctx, qualitycontract.Sample{
+		FeedbackID:              feedbacks[0].ID,
+		RequestID:               "req_runtime_store",
+		DecisionID:              decision.ID,
+		AttemptNo:               1,
+		AccountID:               accountID,
+		ProviderID:              providerID,
+		Model:                   "persist-model",
+		SourceEndpoint:          "/v1/chat/completions",
+		SampleRequestHash:       "sha256:runtime",
+		SamplePayloadCiphertext: "v1:nonce:ciphertext",
+		PayloadVersion:          "v1",
+		CapturedAt:              now,
+	}); err != nil || !created {
+		t.Fatalf("create quality eval sample: created=%v err=%v", created, err)
+	}
+	if _, created, err := stores.QualityEval.CreateEvaluation(ctx, qualitycontract.Evaluation{
+		FeedbackID:        feedbacks[0].ID,
+		RequestID:         "req_runtime_store",
+		DecisionID:        decision.ID,
+		AttemptNo:         1,
+		AccountID:         accountID,
+		ProviderID:        providerID,
+		Model:             "persist-model",
+		SourceEndpoint:    "/v1/chat/completions",
+		SampleRequestHash: "sha256:runtime",
+		JudgeModel:        "fake-judge",
+		Score:             0.8,
+		Rubric:            map[string]any{"correctness": 4},
+		JudgedAt:          now,
+	}); err != nil || !created {
+		t.Fatalf("create quality evaluation: created=%v err=%v", created, err)
+	}
+	quality, err := stores.QualityEval.AggregateScore(ctx, accountID, "persist-model", now.Add(-time.Hour))
+	if err != nil {
+		t.Fatalf("aggregate quality score: %v", err)
+	}
+	if quality.SampleCount != 1 || quality.Score != 0.8 {
+		t.Fatalf("expected persisted quality aggregate, got %+v", quality)
 	}
 
 	_, err = stores.Audit.Create(ctx, contract.Log{

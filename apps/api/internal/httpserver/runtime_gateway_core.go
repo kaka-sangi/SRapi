@@ -51,6 +51,9 @@ type gatewayUsageRecord struct {
 	UsageEstimated        bool
 	Pricing               gatewayPricingEvidence
 	CompatibilityWarnings []string
+	QualityPrompt         string
+	QualityOutput         string
+	FeedbackID            int
 }
 
 type gatewayAdmission struct {
@@ -95,6 +98,7 @@ func (rt *runtimeState) scheduleGatewayRequest(ctx context.Context, req schedule
 	if req.StickyAccountID == nil && strings.TrimSpace(req.SessionAffinityKey) != "" {
 		req.StickyAccountID = stickyAccountIDFromCandidates(candidates, req.SessionAffinityKey)
 	}
+	candidates = rt.applyGatewayQualityScores(ctx, candidates, req.Model)
 	req.Candidates = candidates
 	rt.applyGatewayStrategyRollout(ctx, &req, apiKey)
 	return rt.scheduler.Schedule(ctx, req)

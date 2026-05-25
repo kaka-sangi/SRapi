@@ -210,6 +210,8 @@ score =
 
 最终选择先在 Cost / Latency / Quality 三目标上筛出 Pareto 前沿，再在前沿内按策略加权分排序。缺少明确输入的目标不得参与 Pareto 支配判断，避免把默认分数当成真实运行信号。前沿之外的候选仍保留在候选排序证据中，供故障转移和审计使用。
 
+Quality 维度的在线真实输入由 QualityEval 提供：Gateway 根据最近 30 天 `(account_id, model)` 的 `quality_evaluations.score` 平均值向候选注入 `quality_score`、`quality_eval_score`、`quality_eval_samples` 和 `quality_tier`。没有评估样本的候选不注入质量信号，避免默认分数影响 Pareto。
+
 ### 4.6 LeaseManager
 
 选中账号后创建短期租约。
@@ -698,7 +700,13 @@ currency
 created_at
 ```
 
-### 15.3 sticky_sessions
+### 15.3 quality_eval_samples / quality_evaluations
+
+`quality_eval_samples` 是默认关闭的加密样本边界，仅在 `QUALITY_EVAL_ENABLED=true` 且文本 Gateway 请求成功写入 feedback 后创建。payload 为 content-safety 后的脱敏 prompt/output 摘要，并使用 `SRAPI_MASTER_KEY` 派生密钥加密。
+
+`quality_evaluations` 保存 LLM-as-judge 结果：`decision_id`、`sample_request_hash`、`judge_model`、`score`、`rubric_json`、`judged_at`。worker 默认每小时按 hash 稳定抽样 1%，调用 `gpt-4o-mini` 兼容 judge，Scheduler 只聚合最近 30 天 account+model 平均分。
+
+### 15.4 sticky_sessions
 
 ```txt
 id

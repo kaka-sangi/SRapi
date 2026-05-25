@@ -20,6 +20,7 @@ import (
 	healthprobeworker "github.com/srapi/srapi/apps/api/internal/workers/health_probe"
 	orderexpirerworker "github.com/srapi/srapi/apps/api/internal/workers/order_expirer"
 	outboxworker "github.com/srapi/srapi/apps/api/internal/workers/outbox"
+	qualityevalworker "github.com/srapi/srapi/apps/api/internal/workers/quality_eval"
 	retentionworker "github.com/srapi/srapi/apps/api/internal/workers/retention"
 	subscriptionexpirerworker "github.com/srapi/srapi/apps/api/internal/workers/subscription_expirer"
 )
@@ -38,6 +39,7 @@ type App struct {
 	subExpiry *subscriptionexpirerworker.Worker
 	balance   *balancechargerworker.Worker
 	health    *healthprobeworker.Worker
+	quality   *qualityevalworker.Worker
 }
 
 func New(cfg config.Config, logger *slog.Logger) (*App, error) {
@@ -55,7 +57,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		return nil, err
 	}
 
-	handler, outbox, retention, expirer, subExpiry, balance, health, err := newHandler(cfg, logger, dbClient, redisClient)
+	handler, outbox, retention, expirer, subExpiry, balance, health, quality, err := newHandler(cfg, logger, dbClient, redisClient)
 	if err != nil {
 		_ = dbClient.Close()
 		_ = redisClient.Close()
@@ -79,6 +81,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		subExpiry: subExpiry,
 		balance:   balance,
 		health:    health,
+		quality:   quality,
 	}, nil
 }
 
@@ -123,7 +126,7 @@ func Healthcheck(ctx context.Context, cfg config.Config) error {
 	return httpserver.Healthcheck(ctx, cfg.HealthcheckAddress())
 }
 
-func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Client, redisClient *platformredis.Client) (http.Handler, *outboxworker.Worker, *retentionworker.Worker, *orderexpirerworker.Worker, *subscriptionexpirerworker.Worker, *balancechargerworker.Worker, *healthprobeworker.Worker, error) {
+func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Client, redisClient *platformredis.Client) (http.Handler, *outboxworker.Worker, *retentionworker.Worker, *orderexpirerworker.Worker, *subscriptionexpirerworker.Worker, *balancechargerworker.Worker, *healthprobeworker.Worker, *qualityevalworker.Worker, error) {
 	var (
 		handler http.Handler
 		err     error
@@ -137,45 +140,49 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 	}
 	realtimeStore, err := realtimeSlotStore(context.Background(), cfg, logger, redisClient)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	if realtimeStore != nil {
 		options = append(options, httpserver.WithRealtimeStore(realtimeStore))
 	}
 	rateLimiterOption, err := gatewayRateLimiterOption(context.Background(), cfg, logger, redisClient)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	if rateLimiterOption != nil {
 		options = append(options, rateLimiterOption)
 	}
 	stores, err := persistentStores(context.Background(), cfg, logger, dbClient, redisClient)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	outbox, err := domainEventsWorker(stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	retention, err := retentionCleanupWorker(cfg, stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	expirer, err := paymentOrderExpirerWorker(cfg, stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	subExpiry, err := subscriptionExpirerWorker(stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	balance, err := balanceChargerWorker(stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	health, err := accountHealthProbeWorker(cfg, stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, err
+	}
+	quality, err := qualityEvalWorker(cfg, stores, logger)
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	if stores != nil {
 		options = append(options,
@@ -192,6 +199,7 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 			httpserver.WithAffiliateStore(stores.Affiliate),
 			httpserver.WithOperationsStore(stores.Operations),
 			httpserver.WithPaymentStore(stores.Payments),
+			httpserver.WithQualityEvalStore(stores.QualityEval),
 			httpserver.WithSchedulerStore(stores.Scheduler),
 			httpserver.WithSubscriptionStore(stores.Subscriptions),
 			httpserver.WithUsageStore(stores.Usage),
@@ -207,7 +215,7 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 		handler = httpserver.New(cfg, logger, options...)
 	}()
 
-	return handler, outbox, retention, expirer, subExpiry, balance, health, err
+	return handler, outbox, retention, expirer, subExpiry, balance, health, quality, err
 }
 
 func persistentStores(ctx context.Context, cfg config.Config, logger *slog.Logger, dbClient *platformdb.Client, redisClient *platformredis.Client) (*entstore.Stores, error) {
@@ -372,6 +380,23 @@ func accountHealthProbeWorker(cfg config.Config, stores *entstore.Stores, logger
 	})
 }
 
+func qualityEvalWorker(cfg config.Config, stores *entstore.Stores, logger *slog.Logger) (*qualityevalworker.Worker, error) {
+	if stores == nil || stores.QualityEval == nil || !cfg.QualityEval.Enabled {
+		return nil, nil
+	}
+	return qualityevalworker.New(stores.QualityEval, logger, qualityevalworker.Config{
+		Interval:      cfg.QualityEval.Interval,
+		Timeout:       cfg.QualityEval.Timeout,
+		BatchLimit:    cfg.QualityEval.BatchLimit,
+		SamplePercent: cfg.QualityEval.SamplePercent,
+		MasterKey:     cfg.Security.MasterKey,
+		OpenAIAPIKey:  cfg.QualityEval.OpenAIAPIKey,
+		OpenAIBaseURL: cfg.QualityEval.OpenAIBaseURL,
+		JudgeModel:    cfg.QualityEval.JudgeModel,
+		JudgeTimeout:  cfg.QualityEval.JudgeTimeout,
+	})
+}
+
 func (a *App) startWorkers() {
 	if a == nil {
 		return
@@ -393,6 +418,9 @@ func (a *App) startWorkers() {
 	}
 	if a.health != nil {
 		a.health.Start(context.Background())
+	}
+	if a.quality != nil {
+		a.quality.Start(context.Background())
 	}
 }
 
@@ -418,6 +446,9 @@ func (a *App) stopWorkers(ctx context.Context) error {
 	}
 	if a.health != nil {
 		errs = append(errs, a.health.Shutdown(ctx))
+	}
+	if a.quality != nil {
+		errs = append(errs, a.quality.Shutdown(ctx))
 	}
 	return errors.Join(errs...)
 }

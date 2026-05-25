@@ -221,6 +221,7 @@ func TestAppBootstrapOnlyImportsBootstrapPackages(t *testing.T) {
 		"github.com/srapi/srapi/apps/api/internal/workers/health_probe":             true,
 		"github.com/srapi/srapi/apps/api/internal/workers/order_expirer":            true,
 		"github.com/srapi/srapi/apps/api/internal/workers/outbox":                   true,
+		"github.com/srapi/srapi/apps/api/internal/workers/quality_eval":             true,
 		"github.com/srapi/srapi/apps/api/internal/workers/retention":                true,
 		"github.com/srapi/srapi/apps/api/internal/workers/balance_charger":          true,
 		"github.com/srapi/srapi/apps/api/internal/workers/subscription_expirer":     true,

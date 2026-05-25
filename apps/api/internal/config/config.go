@@ -28,6 +28,7 @@ type Config struct {
 	Bootstrap   BootstrapConfig
 	Retention   RetentionConfig
 	HealthProbe HealthProbeConfig
+	QualityEval QualityEvalConfig
 }
 
 type ServerConfig struct {
@@ -90,6 +91,19 @@ type HealthProbeConfig struct {
 	Cooldown               time.Duration
 }
 
+// QualityEvalConfig controls the LLM-as-judge quality evaluation worker.
+type QualityEvalConfig struct {
+	Enabled       bool
+	Interval      time.Duration
+	Timeout       time.Duration
+	BatchLimit    int
+	SamplePercent float64
+	OpenAIAPIKey  string
+	OpenAIBaseURL string
+	JudgeModel    string
+	JudgeTimeout  time.Duration
+}
+
 func Load() Config {
 	return Config{
 		Server: ServerConfig{
@@ -148,6 +162,17 @@ func Load() Config {
 			ErrorRateThreshold:     float32(getIntEnv("ACCOUNT_HEALTH_PROBE_ERROR_RATE_THRESHOLD_PERCENT", 50)) / 100,
 			MinSamplesForErrorRate: getIntEnv("ACCOUNT_HEALTH_PROBE_MIN_SAMPLES_FOR_ERROR_RATE", 3),
 			Cooldown:               time.Duration(getIntEnv("ACCOUNT_HEALTH_PROBE_COOLDOWN_SECONDS", 300)) * time.Second,
+		},
+		QualityEval: QualityEvalConfig{
+			Enabled:       getBoolEnv("QUALITY_EVAL_ENABLED", false),
+			Interval:      time.Duration(getIntEnv("QUALITY_EVAL_INTERVAL_SECONDS", 3600)) * time.Second,
+			Timeout:       time.Duration(getIntEnv("QUALITY_EVAL_TIMEOUT_SECONDS", 30)) * time.Second,
+			BatchLimit:    getIntEnv("QUALITY_EVAL_BATCH_LIMIT", 100),
+			SamplePercent: getFloatEnv("QUALITY_EVAL_SAMPLE_PERCENT", 1),
+			OpenAIAPIKey:  getEnv("QUALITY_EVAL_OPENAI_API_KEY", ""),
+			OpenAIBaseURL: getEnv("QUALITY_EVAL_OPENAI_BASE_URL", ""),
+			JudgeModel:    getEnv("QUALITY_EVAL_JUDGE_MODEL", "gpt-4o-mini"),
+			JudgeTimeout:  time.Duration(getIntEnv("QUALITY_EVAL_JUDGE_TIMEOUT_SECONDS", 20)) * time.Second,
 		},
 	}
 }
@@ -223,6 +248,24 @@ func (c Config) Validate() error {
 	if c.HealthProbe.Cooldown <= 0 {
 		return fmt.Errorf("ACCOUNT_HEALTH_PROBE_COOLDOWN_SECONDS must be positive")
 	}
+	if c.QualityEval.Interval <= 0 {
+		return fmt.Errorf("QUALITY_EVAL_INTERVAL_SECONDS must be positive")
+	}
+	if c.QualityEval.Timeout <= 0 {
+		return fmt.Errorf("QUALITY_EVAL_TIMEOUT_SECONDS must be positive")
+	}
+	if c.QualityEval.BatchLimit <= 0 {
+		return fmt.Errorf("QUALITY_EVAL_BATCH_LIMIT must be positive")
+	}
+	if c.QualityEval.SamplePercent <= 0 || c.QualityEval.SamplePercent > 100 {
+		return fmt.Errorf("QUALITY_EVAL_SAMPLE_PERCENT must be greater than 0 and at most 100")
+	}
+	if c.QualityEval.JudgeTimeout <= 0 {
+		return fmt.Errorf("QUALITY_EVAL_JUDGE_TIMEOUT_SECONDS must be positive")
+	}
+	if c.QualityEval.Enabled && strings.TrimSpace(c.QualityEval.OpenAIAPIKey) == "" {
+		return fmt.Errorf("QUALITY_EVAL_OPENAI_API_KEY must be set when QUALITY_EVAL_ENABLED=true")
+	}
 	if c.Server.Mode == "release" {
 		if c.StorageBackend() == StorageBackendMemory {
 			return fmt.Errorf("STORAGE_BACKEND=memory is not allowed in release mode")
@@ -280,6 +323,30 @@ func getIntEnv(key string, fallback int) int {
 		return fallback
 	}
 	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
+}
+
+func getFloatEnv(key string, fallback float64) float64 {
+	value, ok := os.LookupEnv(key)
+	if !ok || value == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		return fallback
+	}
+	return parsed
+}
+
+func getBoolEnv(key string, fallback bool) bool {
+	value, ok := os.LookupEnv(key)
+	if !ok || value == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseBool(value)
 	if err != nil {
 		return fallback
 	}

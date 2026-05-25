@@ -186,6 +186,8 @@ score =
 
 最终排序先在 Cost / Latency / Quality 三目标上筛出 Pareto 前沿，再在前沿内按策略加权分排序。只有双方都有明确输入的目标才参与 Pareto 支配判断，避免默认分数淘汰候选。前沿之外的候选仍保留在候选排序和决策证据中，用于故障转移与审计。
 
+Quality 目标的真实在线输入来自 QualityEval：Gateway 构建 Scheduler candidates 时按最近 30 天 `(account_id, model)` 的 `quality_evaluations.score` 平均值写入 `quality_score` / `quality_eval_score`，并根据平均分派生 `quality_tier`。没有评估样本的候选不注入质量分，Scheduler 不得把默认值当成 Pareto 质量输入。
+
 ### 7.1 Health Score
 
 ```txt
@@ -467,6 +469,15 @@ created_at
 ```
 
 错误分类必须与 Provider Adapter 规范一致。
+
+## 13. QualityEval 反馈闭环
+
+QualityEval worker 对已完成的成功 `scheduler_feedbacks` 做在线抽样评估：
+
+- Gateway 在 `QUALITY_EVAL_ENABLED=true` 时为文本请求捕获加密 `quality_eval_samples`，样本只包含 content-safety 后的脱敏 prompt/output 摘要。
+- worker 默认每小时按 `sample_request_hash` 稳定抽样 1%，调用 OpenAI-compatible judge model（默认 `gpt-4o-mini`），要求返回 JSON rubric。
+- `quality_evaluations` 记录 `decision_id`、`sample_request_hash`、`judge_model`、归一化 `score`、`rubric_json` 和 `judged_at`。
+- Scheduler candidate enrichment 按 account+model 聚合最近 30 天平均分，写入候选质量信号并进入 score/Pareto 证据。
 
 ## 13. 重试与 Fallback
 

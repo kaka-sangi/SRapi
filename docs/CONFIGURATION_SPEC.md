@@ -181,7 +181,28 @@ GATEWAY_SCHEDULING_FULL_REBUILD_INTERVAL_SECONDS=300
 
 Scheduler snapshot / outbox 配置必须能防止缓存失效时全量打爆数据库。
 
-## 11. Reverse Proxy Runtime
+## 11. QualityEval
+
+```txt
+QUALITY_EVAL_ENABLED=false
+QUALITY_EVAL_INTERVAL_SECONDS=3600
+QUALITY_EVAL_TIMEOUT_SECONDS=30
+QUALITY_EVAL_BATCH_LIMIT=100
+QUALITY_EVAL_SAMPLE_PERCENT=1
+QUALITY_EVAL_JUDGE_MODEL=gpt-4o-mini
+QUALITY_EVAL_JUDGE_TIMEOUT_SECONDS=20
+QUALITY_EVAL_OPENAI_BASE_URL=https://api.openai.com/v1
+QUALITY_EVAL_OPENAI_API_KEY=
+```
+
+规则：
+
+- 默认关闭；启用时必须设置 `QUALITY_EVAL_OPENAI_API_KEY`，否则启动配置校验失败。
+- 仅持久化 PostgreSQL store 会由 `internal/app` 启动 `quality_eval` worker。内存模式可用于测试 HTTP 捕获和服务逻辑，不作为生产评估闭环。
+- worker 默认每小时从未评估的 `quality_eval_samples` 中按 `sample_request_hash` 稳定抽样 1%，单批最多 100 条，单条 judge 调用 30 秒总超时、20 秒上游 HTTP 超时。
+- 样本捕获只保存 content-safety 之后的脱敏文本摘要，并以 `SRAPI_MASTER_KEY` 派生密钥加密；禁用时不新增样本，但已有 `quality_evaluations` 仍可继续作为 Scheduler quality 分数输入。
+
+## 12. Reverse Proxy Runtime
 
 ```txt
 REVERSE_PROXY_DEFAULT_CONNECT_TIMEOUT_SECONDS=30
@@ -194,7 +215,7 @@ REVERSE_PROXY_EGRESS_PROFILE_STRICT=false
 
 高级 TLS / HTTP/2 指纹配置以 `REVERSE_PROXY_SPEC.md` 为准。
 
-## 12. Observability
+## 13. Observability
 
 ```txt
 OPS_ENABLED=true
@@ -225,7 +246,7 @@ ACCOUNT_HEALTH_PROBE_COOLDOWN_SECONDS=300
 
 账号健康探测 worker 默认每 5 分钟探测一次活跃 API-key provider account，单个探测 10 秒超时，并发上限为 8。连续 3 次失败或最小样本数内错误率超过 50% 时写入 unhealthy 快照和 cooldown metadata，scheduler 会基于 `cooldown_active` / `circuit_open` 避开该账号。
 
-## 13. Payment
+## 14. Payment
 
 ```txt
 PAYMENT_ENABLED=false
@@ -236,7 +257,7 @@ PAYMENT_DAILY_AMOUNT_LIMIT=
 
 支付服务商密钥不得通过 env 明文长期管理，优先使用后台加密 settings 或 secret manager。
 
-## 14. Security / URL Allowlist
+## 15. Security / URL Allowlist
 
 ```txt
 SECURITY_URL_ALLOWLIST_ENABLED=false
@@ -249,7 +270,7 @@ SECURITY_URL_ALLOWLIST_CRS_HOSTS=
 
 所有自定义 upstream、pricing、CRS URL 必须经过 SSRF 防护。
 
-## 15. OAuth Client Credentials
+## 16. OAuth Client Credentials
 
 ```txt
 GEMINI_CLI_OAUTH_CLIENT_ID=
@@ -262,7 +283,7 @@ ANTIGRAVITY_OAUTH_CLIENT_SECRET=
 
 SRapi 不得在代码仓库中内置第三方 OAuth client_secret。
 
-## 16. Update / External Fetch
+## 17. Update / External Fetch
 
 ```txt
 UPDATE_PROXY_URL=
@@ -272,7 +293,7 @@ PRICING_UPDATE_PROXY_URL=
 
 外部 fetch 必须遵守 URL allowlist / SSRF 规则。
 
-## 17. 配置变更审计
+## 18. 配置变更审计
 
 以下配置变更必须写 audit log：
 
@@ -284,7 +305,7 @@ PRICING_UPDATE_PROXY_URL=
 - Reverse Proxy Egress Profile。
 - Observability notification channel。
 
-## 18. MVP 最小要求
+## 19. MVP 最小要求
 
 MVP 至少提供：
 

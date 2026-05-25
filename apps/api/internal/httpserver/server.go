@@ -29,6 +29,7 @@ import (
 	paymentcontract "github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	providerpreset "github.com/srapi/srapi/apps/api/internal/modules/providers/preset"
+	qualitycontract "github.com/srapi/srapi/apps/api/internal/modules/quality_eval/contract"
 	realtimecontract "github.com/srapi/srapi/apps/api/internal/modules/realtime/contract"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
@@ -67,6 +68,7 @@ type runtimeOptions struct {
 	affiliate     affiliatecontract.Store
 	operations    operationscontract.Store
 	payments      paymentcontract.Store
+	qualityEval   qualitycontract.Store
 	realtime      realtimecontract.Store
 	rateLimiter   *ratelimit.Limiter
 	scheduler     schedulercontract.Store
@@ -161,6 +163,12 @@ func WithOperationsStore(store operationscontract.Store) Option {
 func WithPaymentStore(store paymentcontract.Store) Option {
 	return func(opts *runtimeOptions) {
 		opts.payments = store
+	}
+}
+
+func WithQualityEvalStore(store qualitycontract.Store) Option {
+	return func(opts *runtimeOptions) {
+		opts.qualityEval = store
 	}
 }
 

@@ -357,6 +357,30 @@ func (f ProxyFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ProxyMutation", m)
 }
 
+// The QualityEvalSampleFunc type is an adapter to allow the use of ordinary
+// function as QualityEvalSample mutator.
+type QualityEvalSampleFunc func(context.Context, *ent.QualityEvalSampleMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f QualityEvalSampleFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.QualityEvalSampleMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.QualityEvalSampleMutation", m)
+}
+
+// The QualityEvaluationFunc type is an adapter to allow the use of ordinary
+// function as QualityEvaluation mutator.
+type QualityEvaluationFunc func(context.Context, *ent.QualityEvaluationMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f QualityEvaluationFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.QualityEvaluationMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.QualityEvaluationMutation", m)
+}
+
 // The RoleFunc type is an adapter to allow the use of ordinary
 // function as Role mutator.
 type RoleFunc func(context.Context, *ent.RoleMutation) (ent.Value, error)

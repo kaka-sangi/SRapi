@@ -41,6 +41,8 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/provider"
 	"github.com/srapi/srapi/apps/api/ent/provideraccount"
 	"github.com/srapi/srapi/apps/api/ent/proxy"
+	"github.com/srapi/srapi/apps/api/ent/qualityevalsample"
+	"github.com/srapi/srapi/apps/api/ent/qualityevaluation"
 	"github.com/srapi/srapi/apps/api/ent/role"
 	"github.com/srapi/srapi/apps/api/ent/schedulerdecision"
 	"github.com/srapi/srapi/apps/api/ent/schedulerfeedback"
@@ -92,6 +94,8 @@ const (
 	TypeProvider                 = "Provider"
 	TypeProviderAccount          = "ProviderAccount"
 	TypeProxy                    = "Proxy"
+	TypeQualityEvalSample        = "QualityEvalSample"
+	TypeQualityEvaluation        = "QualityEvaluation"
 	TypeRole                     = "Role"
 	TypeSchedulerDecision        = "SchedulerDecision"
 	TypeSchedulerFeedback        = "SchedulerFeedback"
@@ -27720,6 +27724,2507 @@ func (m *ProxyMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *ProxyMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown Proxy edge %s", name)
+}
+
+// QualityEvalSampleMutation represents an operation that mutates the QualityEvalSample nodes in the graph.
+type QualityEvalSampleMutation struct {
+	config
+	op                        Op
+	typ                       string
+	id                        *int
+	created_at                *time.Time
+	updated_at                *time.Time
+	feedback_id               *int
+	addfeedback_id            *int
+	request_id                *string
+	decision_id               *int
+	adddecision_id            *int
+	attempt_no                *int
+	addattempt_no             *int
+	account_id                *int
+	addaccount_id             *int
+	provider_id               *int
+	addprovider_id            *int
+	model                     *string
+	source_endpoint           *string
+	sample_request_hash       *string
+	sample_payload_ciphertext *[]byte
+	payload_version           *string
+	captured_at               *time.Time
+	clearedFields             map[string]struct{}
+	done                      bool
+	oldValue                  func(context.Context) (*QualityEvalSample, error)
+	predicates                []predicate.QualityEvalSample
+}
+
+var _ ent.Mutation = (*QualityEvalSampleMutation)(nil)
+
+// qualityevalsampleOption allows management of the mutation configuration using functional options.
+type qualityevalsampleOption func(*QualityEvalSampleMutation)
+
+// newQualityEvalSampleMutation creates new mutation for the QualityEvalSample entity.
+func newQualityEvalSampleMutation(c config, op Op, opts ...qualityevalsampleOption) *QualityEvalSampleMutation {
+	m := &QualityEvalSampleMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeQualityEvalSample,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withQualityEvalSampleID sets the ID field of the mutation.
+func withQualityEvalSampleID(id int) qualityevalsampleOption {
+	return func(m *QualityEvalSampleMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *QualityEvalSample
+		)
+		m.oldValue = func(ctx context.Context) (*QualityEvalSample, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().QualityEvalSample.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withQualityEvalSample sets the old QualityEvalSample of the mutation.
+func withQualityEvalSample(node *QualityEvalSample) qualityevalsampleOption {
+	return func(m *QualityEvalSampleMutation) {
+		m.oldValue = func(context.Context) (*QualityEvalSample, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m QualityEvalSampleMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m QualityEvalSampleMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *QualityEvalSampleMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *QualityEvalSampleMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().QualityEvalSample.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *QualityEvalSampleMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *QualityEvalSampleMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the QualityEvalSample entity.
+// If the QualityEvalSample object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityEvalSampleMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *QualityEvalSampleMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *QualityEvalSampleMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *QualityEvalSampleMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the QualityEvalSample entity.
+// If the QualityEvalSample object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityEvalSampleMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *QualityEvalSampleMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetFeedbackID sets the "feedback_id" field.
+func (m *QualityEvalSampleMutation) SetFeedbackID(i int) {
+	m.feedback_id = &i
+	m.addfeedback_id = nil
+}
+
+// FeedbackID returns the value of the "feedback_id" field in the mutation.
+func (m *QualityEvalSampleMutation) FeedbackID() (r int, exists bool) {
+	v := m.feedback_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFeedbackID returns the old "feedback_id" field's value of the QualityEvalSample entity.
+// If the QualityEvalSample object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityEvalSampleMutation) OldFeedbackID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFeedbackID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFeedbackID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFeedbackID: %w", err)
+	}
+	return oldValue.FeedbackID, nil
+}
+
+// AddFeedbackID adds i to the "feedback_id" field.
+func (m *QualityEvalSampleMutation) AddFeedbackID(i int) {
+	if m.addfeedback_id != nil {
+		*m.addfeedback_id += i
+	} else {
+		m.addfeedback_id = &i
+	}
+}
+
+// AddedFeedbackID returns the value that was added to the "feedback_id" field in this mutation.
+func (m *QualityEvalSampleMutation) AddedFeedbackID() (r int, exists bool) {
+	v := m.addfeedback_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetFeedbackID resets all changes to the "feedback_id" field.
+func (m *QualityEvalSampleMutation) ResetFeedbackID() {
+	m.feedback_id = nil
+	m.addfeedback_id = nil
+}
+
+// SetRequestID sets the "request_id" field.
+func (m *QualityEvalSampleMutation) SetRequestID(s string) {
+	m.request_id = &s
+}
+
+// RequestID returns the value of the "request_id" field in the mutation.
+func (m *QualityEvalSampleMutation) RequestID() (r string, exists bool) {
+	v := m.request_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRequestID returns the old "request_id" field's value of the QualityEvalSample entity.
+// If the QualityEvalSample object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityEvalSampleMutation) OldRequestID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRequestID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRequestID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRequestID: %w", err)
+	}
+	return oldValue.RequestID, nil
+}
+
+// ResetRequestID resets all changes to the "request_id" field.
+func (m *QualityEvalSampleMutation) ResetRequestID() {
+	m.request_id = nil
+}
+
+// SetDecisionID sets the "decision_id" field.
+func (m *QualityEvalSampleMutation) SetDecisionID(i int) {
+	m.decision_id = &i
+	m.adddecision_id = nil
+}
+
+// DecisionID returns the value of the "decision_id" field in the mutation.
+func (m *QualityEvalSampleMutation) DecisionID() (r int, exists bool) {
+	v := m.decision_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDecisionID returns the old "decision_id" field's value of the QualityEvalSample entity.
+// If the QualityEvalSample object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityEvalSampleMutation) OldDecisionID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDecisionID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDecisionID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDecisionID: %w", err)
+	}
+	return oldValue.DecisionID, nil
+}
+
+// AddDecisionID adds i to the "decision_id" field.
+func (m *QualityEvalSampleMutation) AddDecisionID(i int) {
+	if m.adddecision_id != nil {
+		*m.adddecision_id += i
+	} else {
+		m.adddecision_id = &i
+	}
+}
+
+// AddedDecisionID returns the value that was added to the "decision_id" field in this mutation.
+func (m *QualityEvalSampleMutation) AddedDecisionID() (r int, exists bool) {
+	v := m.adddecision_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetDecisionID resets all changes to the "decision_id" field.
+func (m *QualityEvalSampleMutation) ResetDecisionID() {
+	m.decision_id = nil
+	m.adddecision_id = nil
+}
+
+// SetAttemptNo sets the "attempt_no" field.
+func (m *QualityEvalSampleMutation) SetAttemptNo(i int) {
+	m.attempt_no = &i
+	m.addattempt_no = nil
+}
+
+// AttemptNo returns the value of the "attempt_no" field in the mutation.
+func (m *QualityEvalSampleMutation) AttemptNo() (r int, exists bool) {
+	v := m.attempt_no
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAttemptNo returns the old "attempt_no" field's value of the QualityEvalSample entity.
+// If the QualityEvalSample object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityEvalSampleMutation) OldAttemptNo(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAttemptNo is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAttemptNo requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAttemptNo: %w", err)
+	}
+	return oldValue.AttemptNo, nil
+}
+
+// AddAttemptNo adds i to the "attempt_no" field.
+func (m *QualityEvalSampleMutation) AddAttemptNo(i int) {
+	if m.addattempt_no != nil {
+		*m.addattempt_no += i
+	} else {
+		m.addattempt_no = &i
+	}
+}
+
+// AddedAttemptNo returns the value that was added to the "attempt_no" field in this mutation.
+func (m *QualityEvalSampleMutation) AddedAttemptNo() (r int, exists bool) {
+	v := m.addattempt_no
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetAttemptNo resets all changes to the "attempt_no" field.
+func (m *QualityEvalSampleMutation) ResetAttemptNo() {
+	m.attempt_no = nil
+	m.addattempt_no = nil
+}
+
+// SetAccountID sets the "account_id" field.
+func (m *QualityEvalSampleMutation) SetAccountID(i int) {
+	m.account_id = &i
+	m.addaccount_id = nil
+}
+
+// AccountID returns the value of the "account_id" field in the mutation.
+func (m *QualityEvalSampleMutation) AccountID() (r int, exists bool) {
+	v := m.account_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAccountID returns the old "account_id" field's value of the QualityEvalSample entity.
+// If the QualityEvalSample object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityEvalSampleMutation) OldAccountID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAccountID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAccountID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAccountID: %w", err)
+	}
+	return oldValue.AccountID, nil
+}
+
+// AddAccountID adds i to the "account_id" field.
+func (m *QualityEvalSampleMutation) AddAccountID(i int) {
+	if m.addaccount_id != nil {
+		*m.addaccount_id += i
+	} else {
+		m.addaccount_id = &i
+	}
+}
+
+// AddedAccountID returns the value that was added to the "account_id" field in this mutation.
+func (m *QualityEvalSampleMutation) AddedAccountID() (r int, exists bool) {
+	v := m.addaccount_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetAccountID resets all changes to the "account_id" field.
+func (m *QualityEvalSampleMutation) ResetAccountID() {
+	m.account_id = nil
+	m.addaccount_id = nil
+}
+
+// SetProviderID sets the "provider_id" field.
+func (m *QualityEvalSampleMutation) SetProviderID(i int) {
+	m.provider_id = &i
+	m.addprovider_id = nil
+}
+
+// ProviderID returns the value of the "provider_id" field in the mutation.
+func (m *QualityEvalSampleMutation) ProviderID() (r int, exists bool) {
+	v := m.provider_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProviderID returns the old "provider_id" field's value of the QualityEvalSample entity.
+// If the QualityEvalSample object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityEvalSampleMutation) OldProviderID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProviderID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProviderID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProviderID: %w", err)
+	}
+	return oldValue.ProviderID, nil
+}
+
+// AddProviderID adds i to the "provider_id" field.
+func (m *QualityEvalSampleMutation) AddProviderID(i int) {
+	if m.addprovider_id != nil {
+		*m.addprovider_id += i
+	} else {
+		m.addprovider_id = &i
+	}
+}
+
+// AddedProviderID returns the value that was added to the "provider_id" field in this mutation.
+func (m *QualityEvalSampleMutation) AddedProviderID() (r int, exists bool) {
+	v := m.addprovider_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetProviderID resets all changes to the "provider_id" field.
+func (m *QualityEvalSampleMutation) ResetProviderID() {
+	m.provider_id = nil
+	m.addprovider_id = nil
+}
+
+// SetModel sets the "model" field.
+func (m *QualityEvalSampleMutation) SetModel(s string) {
+	m.model = &s
+}
+
+// Model returns the value of the "model" field in the mutation.
+func (m *QualityEvalSampleMutation) Model() (r string, exists bool) {
+	v := m.model
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldModel returns the old "model" field's value of the QualityEvalSample entity.
+// If the QualityEvalSample object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityEvalSampleMutation) OldModel(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldModel is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldModel requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldModel: %w", err)
+	}
+	return oldValue.Model, nil
+}
+
+// ResetModel resets all changes to the "model" field.
+func (m *QualityEvalSampleMutation) ResetModel() {
+	m.model = nil
+}
+
+// SetSourceEndpoint sets the "source_endpoint" field.
+func (m *QualityEvalSampleMutation) SetSourceEndpoint(s string) {
+	m.source_endpoint = &s
+}
+
+// SourceEndpoint returns the value of the "source_endpoint" field in the mutation.
+func (m *QualityEvalSampleMutation) SourceEndpoint() (r string, exists bool) {
+	v := m.source_endpoint
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSourceEndpoint returns the old "source_endpoint" field's value of the QualityEvalSample entity.
+// If the QualityEvalSample object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityEvalSampleMutation) OldSourceEndpoint(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSourceEndpoint is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSourceEndpoint requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSourceEndpoint: %w", err)
+	}
+	return oldValue.SourceEndpoint, nil
+}
+
+// ResetSourceEndpoint resets all changes to the "source_endpoint" field.
+func (m *QualityEvalSampleMutation) ResetSourceEndpoint() {
+	m.source_endpoint = nil
+}
+
+// SetSampleRequestHash sets the "sample_request_hash" field.
+func (m *QualityEvalSampleMutation) SetSampleRequestHash(s string) {
+	m.sample_request_hash = &s
+}
+
+// SampleRequestHash returns the value of the "sample_request_hash" field in the mutation.
+func (m *QualityEvalSampleMutation) SampleRequestHash() (r string, exists bool) {
+	v := m.sample_request_hash
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSampleRequestHash returns the old "sample_request_hash" field's value of the QualityEvalSample entity.
+// If the QualityEvalSample object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityEvalSampleMutation) OldSampleRequestHash(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSampleRequestHash is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSampleRequestHash requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSampleRequestHash: %w", err)
+	}
+	return oldValue.SampleRequestHash, nil
+}
+
+// ResetSampleRequestHash resets all changes to the "sample_request_hash" field.
+func (m *QualityEvalSampleMutation) ResetSampleRequestHash() {
+	m.sample_request_hash = nil
+}
+
+// SetSamplePayloadCiphertext sets the "sample_payload_ciphertext" field.
+func (m *QualityEvalSampleMutation) SetSamplePayloadCiphertext(b []byte) {
+	m.sample_payload_ciphertext = &b
+}
+
+// SamplePayloadCiphertext returns the value of the "sample_payload_ciphertext" field in the mutation.
+func (m *QualityEvalSampleMutation) SamplePayloadCiphertext() (r []byte, exists bool) {
+	v := m.sample_payload_ciphertext
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSamplePayloadCiphertext returns the old "sample_payload_ciphertext" field's value of the QualityEvalSample entity.
+// If the QualityEvalSample object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityEvalSampleMutation) OldSamplePayloadCiphertext(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSamplePayloadCiphertext is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSamplePayloadCiphertext requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSamplePayloadCiphertext: %w", err)
+	}
+	return oldValue.SamplePayloadCiphertext, nil
+}
+
+// ResetSamplePayloadCiphertext resets all changes to the "sample_payload_ciphertext" field.
+func (m *QualityEvalSampleMutation) ResetSamplePayloadCiphertext() {
+	m.sample_payload_ciphertext = nil
+}
+
+// SetPayloadVersion sets the "payload_version" field.
+func (m *QualityEvalSampleMutation) SetPayloadVersion(s string) {
+	m.payload_version = &s
+}
+
+// PayloadVersion returns the value of the "payload_version" field in the mutation.
+func (m *QualityEvalSampleMutation) PayloadVersion() (r string, exists bool) {
+	v := m.payload_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPayloadVersion returns the old "payload_version" field's value of the QualityEvalSample entity.
+// If the QualityEvalSample object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityEvalSampleMutation) OldPayloadVersion(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPayloadVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPayloadVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPayloadVersion: %w", err)
+	}
+	return oldValue.PayloadVersion, nil
+}
+
+// ResetPayloadVersion resets all changes to the "payload_version" field.
+func (m *QualityEvalSampleMutation) ResetPayloadVersion() {
+	m.payload_version = nil
+}
+
+// SetCapturedAt sets the "captured_at" field.
+func (m *QualityEvalSampleMutation) SetCapturedAt(t time.Time) {
+	m.captured_at = &t
+}
+
+// CapturedAt returns the value of the "captured_at" field in the mutation.
+func (m *QualityEvalSampleMutation) CapturedAt() (r time.Time, exists bool) {
+	v := m.captured_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCapturedAt returns the old "captured_at" field's value of the QualityEvalSample entity.
+// If the QualityEvalSample object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityEvalSampleMutation) OldCapturedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCapturedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCapturedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCapturedAt: %w", err)
+	}
+	return oldValue.CapturedAt, nil
+}
+
+// ResetCapturedAt resets all changes to the "captured_at" field.
+func (m *QualityEvalSampleMutation) ResetCapturedAt() {
+	m.captured_at = nil
+}
+
+// Where appends a list predicates to the QualityEvalSampleMutation builder.
+func (m *QualityEvalSampleMutation) Where(ps ...predicate.QualityEvalSample) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the QualityEvalSampleMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *QualityEvalSampleMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.QualityEvalSample, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *QualityEvalSampleMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *QualityEvalSampleMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (QualityEvalSample).
+func (m *QualityEvalSampleMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *QualityEvalSampleMutation) Fields() []string {
+	fields := make([]string, 0, 14)
+	if m.created_at != nil {
+		fields = append(fields, qualityevalsample.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, qualityevalsample.FieldUpdatedAt)
+	}
+	if m.feedback_id != nil {
+		fields = append(fields, qualityevalsample.FieldFeedbackID)
+	}
+	if m.request_id != nil {
+		fields = append(fields, qualityevalsample.FieldRequestID)
+	}
+	if m.decision_id != nil {
+		fields = append(fields, qualityevalsample.FieldDecisionID)
+	}
+	if m.attempt_no != nil {
+		fields = append(fields, qualityevalsample.FieldAttemptNo)
+	}
+	if m.account_id != nil {
+		fields = append(fields, qualityevalsample.FieldAccountID)
+	}
+	if m.provider_id != nil {
+		fields = append(fields, qualityevalsample.FieldProviderID)
+	}
+	if m.model != nil {
+		fields = append(fields, qualityevalsample.FieldModel)
+	}
+	if m.source_endpoint != nil {
+		fields = append(fields, qualityevalsample.FieldSourceEndpoint)
+	}
+	if m.sample_request_hash != nil {
+		fields = append(fields, qualityevalsample.FieldSampleRequestHash)
+	}
+	if m.sample_payload_ciphertext != nil {
+		fields = append(fields, qualityevalsample.FieldSamplePayloadCiphertext)
+	}
+	if m.payload_version != nil {
+		fields = append(fields, qualityevalsample.FieldPayloadVersion)
+	}
+	if m.captured_at != nil {
+		fields = append(fields, qualityevalsample.FieldCapturedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *QualityEvalSampleMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case qualityevalsample.FieldCreatedAt:
+		return m.CreatedAt()
+	case qualityevalsample.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case qualityevalsample.FieldFeedbackID:
+		return m.FeedbackID()
+	case qualityevalsample.FieldRequestID:
+		return m.RequestID()
+	case qualityevalsample.FieldDecisionID:
+		return m.DecisionID()
+	case qualityevalsample.FieldAttemptNo:
+		return m.AttemptNo()
+	case qualityevalsample.FieldAccountID:
+		return m.AccountID()
+	case qualityevalsample.FieldProviderID:
+		return m.ProviderID()
+	case qualityevalsample.FieldModel:
+		return m.Model()
+	case qualityevalsample.FieldSourceEndpoint:
+		return m.SourceEndpoint()
+	case qualityevalsample.FieldSampleRequestHash:
+		return m.SampleRequestHash()
+	case qualityevalsample.FieldSamplePayloadCiphertext:
+		return m.SamplePayloadCiphertext()
+	case qualityevalsample.FieldPayloadVersion:
+		return m.PayloadVersion()
+	case qualityevalsample.FieldCapturedAt:
+		return m.CapturedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *QualityEvalSampleMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case qualityevalsample.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case qualityevalsample.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case qualityevalsample.FieldFeedbackID:
+		return m.OldFeedbackID(ctx)
+	case qualityevalsample.FieldRequestID:
+		return m.OldRequestID(ctx)
+	case qualityevalsample.FieldDecisionID:
+		return m.OldDecisionID(ctx)
+	case qualityevalsample.FieldAttemptNo:
+		return m.OldAttemptNo(ctx)
+	case qualityevalsample.FieldAccountID:
+		return m.OldAccountID(ctx)
+	case qualityevalsample.FieldProviderID:
+		return m.OldProviderID(ctx)
+	case qualityevalsample.FieldModel:
+		return m.OldModel(ctx)
+	case qualityevalsample.FieldSourceEndpoint:
+		return m.OldSourceEndpoint(ctx)
+	case qualityevalsample.FieldSampleRequestHash:
+		return m.OldSampleRequestHash(ctx)
+	case qualityevalsample.FieldSamplePayloadCiphertext:
+		return m.OldSamplePayloadCiphertext(ctx)
+	case qualityevalsample.FieldPayloadVersion:
+		return m.OldPayloadVersion(ctx)
+	case qualityevalsample.FieldCapturedAt:
+		return m.OldCapturedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown QualityEvalSample field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *QualityEvalSampleMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case qualityevalsample.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case qualityevalsample.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case qualityevalsample.FieldFeedbackID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFeedbackID(v)
+		return nil
+	case qualityevalsample.FieldRequestID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRequestID(v)
+		return nil
+	case qualityevalsample.FieldDecisionID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDecisionID(v)
+		return nil
+	case qualityevalsample.FieldAttemptNo:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAttemptNo(v)
+		return nil
+	case qualityevalsample.FieldAccountID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAccountID(v)
+		return nil
+	case qualityevalsample.FieldProviderID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProviderID(v)
+		return nil
+	case qualityevalsample.FieldModel:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetModel(v)
+		return nil
+	case qualityevalsample.FieldSourceEndpoint:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSourceEndpoint(v)
+		return nil
+	case qualityevalsample.FieldSampleRequestHash:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSampleRequestHash(v)
+		return nil
+	case qualityevalsample.FieldSamplePayloadCiphertext:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSamplePayloadCiphertext(v)
+		return nil
+	case qualityevalsample.FieldPayloadVersion:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPayloadVersion(v)
+		return nil
+	case qualityevalsample.FieldCapturedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCapturedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown QualityEvalSample field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *QualityEvalSampleMutation) AddedFields() []string {
+	var fields []string
+	if m.addfeedback_id != nil {
+		fields = append(fields, qualityevalsample.FieldFeedbackID)
+	}
+	if m.adddecision_id != nil {
+		fields = append(fields, qualityevalsample.FieldDecisionID)
+	}
+	if m.addattempt_no != nil {
+		fields = append(fields, qualityevalsample.FieldAttemptNo)
+	}
+	if m.addaccount_id != nil {
+		fields = append(fields, qualityevalsample.FieldAccountID)
+	}
+	if m.addprovider_id != nil {
+		fields = append(fields, qualityevalsample.FieldProviderID)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *QualityEvalSampleMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case qualityevalsample.FieldFeedbackID:
+		return m.AddedFeedbackID()
+	case qualityevalsample.FieldDecisionID:
+		return m.AddedDecisionID()
+	case qualityevalsample.FieldAttemptNo:
+		return m.AddedAttemptNo()
+	case qualityevalsample.FieldAccountID:
+		return m.AddedAccountID()
+	case qualityevalsample.FieldProviderID:
+		return m.AddedProviderID()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *QualityEvalSampleMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case qualityevalsample.FieldFeedbackID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddFeedbackID(v)
+		return nil
+	case qualityevalsample.FieldDecisionID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddDecisionID(v)
+		return nil
+	case qualityevalsample.FieldAttemptNo:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddAttemptNo(v)
+		return nil
+	case qualityevalsample.FieldAccountID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddAccountID(v)
+		return nil
+	case qualityevalsample.FieldProviderID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddProviderID(v)
+		return nil
+	}
+	return fmt.Errorf("unknown QualityEvalSample numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *QualityEvalSampleMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *QualityEvalSampleMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *QualityEvalSampleMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown QualityEvalSample nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *QualityEvalSampleMutation) ResetField(name string) error {
+	switch name {
+	case qualityevalsample.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case qualityevalsample.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case qualityevalsample.FieldFeedbackID:
+		m.ResetFeedbackID()
+		return nil
+	case qualityevalsample.FieldRequestID:
+		m.ResetRequestID()
+		return nil
+	case qualityevalsample.FieldDecisionID:
+		m.ResetDecisionID()
+		return nil
+	case qualityevalsample.FieldAttemptNo:
+		m.ResetAttemptNo()
+		return nil
+	case qualityevalsample.FieldAccountID:
+		m.ResetAccountID()
+		return nil
+	case qualityevalsample.FieldProviderID:
+		m.ResetProviderID()
+		return nil
+	case qualityevalsample.FieldModel:
+		m.ResetModel()
+		return nil
+	case qualityevalsample.FieldSourceEndpoint:
+		m.ResetSourceEndpoint()
+		return nil
+	case qualityevalsample.FieldSampleRequestHash:
+		m.ResetSampleRequestHash()
+		return nil
+	case qualityevalsample.FieldSamplePayloadCiphertext:
+		m.ResetSamplePayloadCiphertext()
+		return nil
+	case qualityevalsample.FieldPayloadVersion:
+		m.ResetPayloadVersion()
+		return nil
+	case qualityevalsample.FieldCapturedAt:
+		m.ResetCapturedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown QualityEvalSample field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *QualityEvalSampleMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *QualityEvalSampleMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *QualityEvalSampleMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *QualityEvalSampleMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *QualityEvalSampleMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *QualityEvalSampleMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *QualityEvalSampleMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown QualityEvalSample unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *QualityEvalSampleMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown QualityEvalSample edge %s", name)
+}
+
+// QualityEvaluationMutation represents an operation that mutates the QualityEvaluation nodes in the graph.
+type QualityEvaluationMutation struct {
+	config
+	op                  Op
+	typ                 string
+	id                  *int
+	created_at          *time.Time
+	updated_at          *time.Time
+	feedback_id         *int
+	addfeedback_id      *int
+	request_id          *string
+	decision_id         *int
+	adddecision_id      *int
+	attempt_no          *int
+	addattempt_no       *int
+	account_id          *int
+	addaccount_id       *int
+	provider_id         *int
+	addprovider_id      *int
+	model               *string
+	source_endpoint     *string
+	sample_request_hash *string
+	judge_model         *string
+	score               *float64
+	addscore            *float64
+	rubric_json         *map[string]interface{}
+	judged_at           *time.Time
+	clearedFields       map[string]struct{}
+	done                bool
+	oldValue            func(context.Context) (*QualityEvaluation, error)
+	predicates          []predicate.QualityEvaluation
+}
+
+var _ ent.Mutation = (*QualityEvaluationMutation)(nil)
+
+// qualityevaluationOption allows management of the mutation configuration using functional options.
+type qualityevaluationOption func(*QualityEvaluationMutation)
+
+// newQualityEvaluationMutation creates new mutation for the QualityEvaluation entity.
+func newQualityEvaluationMutation(c config, op Op, opts ...qualityevaluationOption) *QualityEvaluationMutation {
+	m := &QualityEvaluationMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeQualityEvaluation,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withQualityEvaluationID sets the ID field of the mutation.
+func withQualityEvaluationID(id int) qualityevaluationOption {
+	return func(m *QualityEvaluationMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *QualityEvaluation
+		)
+		m.oldValue = func(ctx context.Context) (*QualityEvaluation, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().QualityEvaluation.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withQualityEvaluation sets the old QualityEvaluation of the mutation.
+func withQualityEvaluation(node *QualityEvaluation) qualityevaluationOption {
+	return func(m *QualityEvaluationMutation) {
+		m.oldValue = func(context.Context) (*QualityEvaluation, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m QualityEvaluationMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m QualityEvaluationMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *QualityEvaluationMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *QualityEvaluationMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().QualityEvaluation.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *QualityEvaluationMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *QualityEvaluationMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the QualityEvaluation entity.
+// If the QualityEvaluation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityEvaluationMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *QualityEvaluationMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *QualityEvaluationMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *QualityEvaluationMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the QualityEvaluation entity.
+// If the QualityEvaluation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityEvaluationMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *QualityEvaluationMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetFeedbackID sets the "feedback_id" field.
+func (m *QualityEvaluationMutation) SetFeedbackID(i int) {
+	m.feedback_id = &i
+	m.addfeedback_id = nil
+}
+
+// FeedbackID returns the value of the "feedback_id" field in the mutation.
+func (m *QualityEvaluationMutation) FeedbackID() (r int, exists bool) {
+	v := m.feedback_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFeedbackID returns the old "feedback_id" field's value of the QualityEvaluation entity.
+// If the QualityEvaluation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityEvaluationMutation) OldFeedbackID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFeedbackID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFeedbackID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFeedbackID: %w", err)
+	}
+	return oldValue.FeedbackID, nil
+}
+
+// AddFeedbackID adds i to the "feedback_id" field.
+func (m *QualityEvaluationMutation) AddFeedbackID(i int) {
+	if m.addfeedback_id != nil {
+		*m.addfeedback_id += i
+	} else {
+		m.addfeedback_id = &i
+	}
+}
+
+// AddedFeedbackID returns the value that was added to the "feedback_id" field in this mutation.
+func (m *QualityEvaluationMutation) AddedFeedbackID() (r int, exists bool) {
+	v := m.addfeedback_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetFeedbackID resets all changes to the "feedback_id" field.
+func (m *QualityEvaluationMutation) ResetFeedbackID() {
+	m.feedback_id = nil
+	m.addfeedback_id = nil
+}
+
+// SetRequestID sets the "request_id" field.
+func (m *QualityEvaluationMutation) SetRequestID(s string) {
+	m.request_id = &s
+}
+
+// RequestID returns the value of the "request_id" field in the mutation.
+func (m *QualityEvaluationMutation) RequestID() (r string, exists bool) {
+	v := m.request_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRequestID returns the old "request_id" field's value of the QualityEvaluation entity.
+// If the QualityEvaluation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityEvaluationMutation) OldRequestID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRequestID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRequestID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRequestID: %w", err)
+	}
+	return oldValue.RequestID, nil
+}
+
+// ResetRequestID resets all changes to the "request_id" field.
+func (m *QualityEvaluationMutation) ResetRequestID() {
+	m.request_id = nil
+}
+
+// SetDecisionID sets the "decision_id" field.
+func (m *QualityEvaluationMutation) SetDecisionID(i int) {
+	m.decision_id = &i
+	m.adddecision_id = nil
+}
+
+// DecisionID returns the value of the "decision_id" field in the mutation.
+func (m *QualityEvaluationMutation) DecisionID() (r int, exists bool) {
+	v := m.decision_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDecisionID returns the old "decision_id" field's value of the QualityEvaluation entity.
+// If the QualityEvaluation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityEvaluationMutation) OldDecisionID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDecisionID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDecisionID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDecisionID: %w", err)
+	}
+	return oldValue.DecisionID, nil
+}
+
+// AddDecisionID adds i to the "decision_id" field.
+func (m *QualityEvaluationMutation) AddDecisionID(i int) {
+	if m.adddecision_id != nil {
+		*m.adddecision_id += i
+	} else {
+		m.adddecision_id = &i
+	}
+}
+
+// AddedDecisionID returns the value that was added to the "decision_id" field in this mutation.
+func (m *QualityEvaluationMutation) AddedDecisionID() (r int, exists bool) {
+	v := m.adddecision_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetDecisionID resets all changes to the "decision_id" field.
+func (m *QualityEvaluationMutation) ResetDecisionID() {
+	m.decision_id = nil
+	m.adddecision_id = nil
+}
+
+// SetAttemptNo sets the "attempt_no" field.
+func (m *QualityEvaluationMutation) SetAttemptNo(i int) {
+	m.attempt_no = &i
+	m.addattempt_no = nil
+}
+
+// AttemptNo returns the value of the "attempt_no" field in the mutation.
+func (m *QualityEvaluationMutation) AttemptNo() (r int, exists bool) {
+	v := m.attempt_no
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAttemptNo returns the old "attempt_no" field's value of the QualityEvaluation entity.
+// If the QualityEvaluation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityEvaluationMutation) OldAttemptNo(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAttemptNo is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAttemptNo requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAttemptNo: %w", err)
+	}
+	return oldValue.AttemptNo, nil
+}
+
+// AddAttemptNo adds i to the "attempt_no" field.
+func (m *QualityEvaluationMutation) AddAttemptNo(i int) {
+	if m.addattempt_no != nil {
+		*m.addattempt_no += i
+	} else {
+		m.addattempt_no = &i
+	}
+}
+
+// AddedAttemptNo returns the value that was added to the "attempt_no" field in this mutation.
+func (m *QualityEvaluationMutation) AddedAttemptNo() (r int, exists bool) {
+	v := m.addattempt_no
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetAttemptNo resets all changes to the "attempt_no" field.
+func (m *QualityEvaluationMutation) ResetAttemptNo() {
+	m.attempt_no = nil
+	m.addattempt_no = nil
+}
+
+// SetAccountID sets the "account_id" field.
+func (m *QualityEvaluationMutation) SetAccountID(i int) {
+	m.account_id = &i
+	m.addaccount_id = nil
+}
+
+// AccountID returns the value of the "account_id" field in the mutation.
+func (m *QualityEvaluationMutation) AccountID() (r int, exists bool) {
+	v := m.account_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAccountID returns the old "account_id" field's value of the QualityEvaluation entity.
+// If the QualityEvaluation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityEvaluationMutation) OldAccountID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAccountID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAccountID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAccountID: %w", err)
+	}
+	return oldValue.AccountID, nil
+}
+
+// AddAccountID adds i to the "account_id" field.
+func (m *QualityEvaluationMutation) AddAccountID(i int) {
+	if m.addaccount_id != nil {
+		*m.addaccount_id += i
+	} else {
+		m.addaccount_id = &i
+	}
+}
+
+// AddedAccountID returns the value that was added to the "account_id" field in this mutation.
+func (m *QualityEvaluationMutation) AddedAccountID() (r int, exists bool) {
+	v := m.addaccount_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetAccountID resets all changes to the "account_id" field.
+func (m *QualityEvaluationMutation) ResetAccountID() {
+	m.account_id = nil
+	m.addaccount_id = nil
+}
+
+// SetProviderID sets the "provider_id" field.
+func (m *QualityEvaluationMutation) SetProviderID(i int) {
+	m.provider_id = &i
+	m.addprovider_id = nil
+}
+
+// ProviderID returns the value of the "provider_id" field in the mutation.
+func (m *QualityEvaluationMutation) ProviderID() (r int, exists bool) {
+	v := m.provider_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProviderID returns the old "provider_id" field's value of the QualityEvaluation entity.
+// If the QualityEvaluation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityEvaluationMutation) OldProviderID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProviderID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProviderID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProviderID: %w", err)
+	}
+	return oldValue.ProviderID, nil
+}
+
+// AddProviderID adds i to the "provider_id" field.
+func (m *QualityEvaluationMutation) AddProviderID(i int) {
+	if m.addprovider_id != nil {
+		*m.addprovider_id += i
+	} else {
+		m.addprovider_id = &i
+	}
+}
+
+// AddedProviderID returns the value that was added to the "provider_id" field in this mutation.
+func (m *QualityEvaluationMutation) AddedProviderID() (r int, exists bool) {
+	v := m.addprovider_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetProviderID resets all changes to the "provider_id" field.
+func (m *QualityEvaluationMutation) ResetProviderID() {
+	m.provider_id = nil
+	m.addprovider_id = nil
+}
+
+// SetModel sets the "model" field.
+func (m *QualityEvaluationMutation) SetModel(s string) {
+	m.model = &s
+}
+
+// Model returns the value of the "model" field in the mutation.
+func (m *QualityEvaluationMutation) Model() (r string, exists bool) {
+	v := m.model
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldModel returns the old "model" field's value of the QualityEvaluation entity.
+// If the QualityEvaluation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityEvaluationMutation) OldModel(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldModel is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldModel requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldModel: %w", err)
+	}
+	return oldValue.Model, nil
+}
+
+// ResetModel resets all changes to the "model" field.
+func (m *QualityEvaluationMutation) ResetModel() {
+	m.model = nil
+}
+
+// SetSourceEndpoint sets the "source_endpoint" field.
+func (m *QualityEvaluationMutation) SetSourceEndpoint(s string) {
+	m.source_endpoint = &s
+}
+
+// SourceEndpoint returns the value of the "source_endpoint" field in the mutation.
+func (m *QualityEvaluationMutation) SourceEndpoint() (r string, exists bool) {
+	v := m.source_endpoint
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSourceEndpoint returns the old "source_endpoint" field's value of the QualityEvaluation entity.
+// If the QualityEvaluation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityEvaluationMutation) OldSourceEndpoint(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSourceEndpoint is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSourceEndpoint requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSourceEndpoint: %w", err)
+	}
+	return oldValue.SourceEndpoint, nil
+}
+
+// ResetSourceEndpoint resets all changes to the "source_endpoint" field.
+func (m *QualityEvaluationMutation) ResetSourceEndpoint() {
+	m.source_endpoint = nil
+}
+
+// SetSampleRequestHash sets the "sample_request_hash" field.
+func (m *QualityEvaluationMutation) SetSampleRequestHash(s string) {
+	m.sample_request_hash = &s
+}
+
+// SampleRequestHash returns the value of the "sample_request_hash" field in the mutation.
+func (m *QualityEvaluationMutation) SampleRequestHash() (r string, exists bool) {
+	v := m.sample_request_hash
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSampleRequestHash returns the old "sample_request_hash" field's value of the QualityEvaluation entity.
+// If the QualityEvaluation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityEvaluationMutation) OldSampleRequestHash(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSampleRequestHash is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSampleRequestHash requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSampleRequestHash: %w", err)
+	}
+	return oldValue.SampleRequestHash, nil
+}
+
+// ResetSampleRequestHash resets all changes to the "sample_request_hash" field.
+func (m *QualityEvaluationMutation) ResetSampleRequestHash() {
+	m.sample_request_hash = nil
+}
+
+// SetJudgeModel sets the "judge_model" field.
+func (m *QualityEvaluationMutation) SetJudgeModel(s string) {
+	m.judge_model = &s
+}
+
+// JudgeModel returns the value of the "judge_model" field in the mutation.
+func (m *QualityEvaluationMutation) JudgeModel() (r string, exists bool) {
+	v := m.judge_model
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldJudgeModel returns the old "judge_model" field's value of the QualityEvaluation entity.
+// If the QualityEvaluation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityEvaluationMutation) OldJudgeModel(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldJudgeModel is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldJudgeModel requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldJudgeModel: %w", err)
+	}
+	return oldValue.JudgeModel, nil
+}
+
+// ResetJudgeModel resets all changes to the "judge_model" field.
+func (m *QualityEvaluationMutation) ResetJudgeModel() {
+	m.judge_model = nil
+}
+
+// SetScore sets the "score" field.
+func (m *QualityEvaluationMutation) SetScore(f float64) {
+	m.score = &f
+	m.addscore = nil
+}
+
+// Score returns the value of the "score" field in the mutation.
+func (m *QualityEvaluationMutation) Score() (r float64, exists bool) {
+	v := m.score
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldScore returns the old "score" field's value of the QualityEvaluation entity.
+// If the QualityEvaluation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityEvaluationMutation) OldScore(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldScore is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldScore requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldScore: %w", err)
+	}
+	return oldValue.Score, nil
+}
+
+// AddScore adds f to the "score" field.
+func (m *QualityEvaluationMutation) AddScore(f float64) {
+	if m.addscore != nil {
+		*m.addscore += f
+	} else {
+		m.addscore = &f
+	}
+}
+
+// AddedScore returns the value that was added to the "score" field in this mutation.
+func (m *QualityEvaluationMutation) AddedScore() (r float64, exists bool) {
+	v := m.addscore
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetScore resets all changes to the "score" field.
+func (m *QualityEvaluationMutation) ResetScore() {
+	m.score = nil
+	m.addscore = nil
+}
+
+// SetRubricJSON sets the "rubric_json" field.
+func (m *QualityEvaluationMutation) SetRubricJSON(value map[string]interface{}) {
+	m.rubric_json = &value
+}
+
+// RubricJSON returns the value of the "rubric_json" field in the mutation.
+func (m *QualityEvaluationMutation) RubricJSON() (r map[string]interface{}, exists bool) {
+	v := m.rubric_json
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRubricJSON returns the old "rubric_json" field's value of the QualityEvaluation entity.
+// If the QualityEvaluation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityEvaluationMutation) OldRubricJSON(ctx context.Context) (v map[string]interface{}, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRubricJSON is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRubricJSON requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRubricJSON: %w", err)
+	}
+	return oldValue.RubricJSON, nil
+}
+
+// ClearRubricJSON clears the value of the "rubric_json" field.
+func (m *QualityEvaluationMutation) ClearRubricJSON() {
+	m.rubric_json = nil
+	m.clearedFields[qualityevaluation.FieldRubricJSON] = struct{}{}
+}
+
+// RubricJSONCleared returns if the "rubric_json" field was cleared in this mutation.
+func (m *QualityEvaluationMutation) RubricJSONCleared() bool {
+	_, ok := m.clearedFields[qualityevaluation.FieldRubricJSON]
+	return ok
+}
+
+// ResetRubricJSON resets all changes to the "rubric_json" field.
+func (m *QualityEvaluationMutation) ResetRubricJSON() {
+	m.rubric_json = nil
+	delete(m.clearedFields, qualityevaluation.FieldRubricJSON)
+}
+
+// SetJudgedAt sets the "judged_at" field.
+func (m *QualityEvaluationMutation) SetJudgedAt(t time.Time) {
+	m.judged_at = &t
+}
+
+// JudgedAt returns the value of the "judged_at" field in the mutation.
+func (m *QualityEvaluationMutation) JudgedAt() (r time.Time, exists bool) {
+	v := m.judged_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldJudgedAt returns the old "judged_at" field's value of the QualityEvaluation entity.
+// If the QualityEvaluation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityEvaluationMutation) OldJudgedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldJudgedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldJudgedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldJudgedAt: %w", err)
+	}
+	return oldValue.JudgedAt, nil
+}
+
+// ResetJudgedAt resets all changes to the "judged_at" field.
+func (m *QualityEvaluationMutation) ResetJudgedAt() {
+	m.judged_at = nil
+}
+
+// Where appends a list predicates to the QualityEvaluationMutation builder.
+func (m *QualityEvaluationMutation) Where(ps ...predicate.QualityEvaluation) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the QualityEvaluationMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *QualityEvaluationMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.QualityEvaluation, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *QualityEvaluationMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *QualityEvaluationMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (QualityEvaluation).
+func (m *QualityEvaluationMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *QualityEvaluationMutation) Fields() []string {
+	fields := make([]string, 0, 15)
+	if m.created_at != nil {
+		fields = append(fields, qualityevaluation.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, qualityevaluation.FieldUpdatedAt)
+	}
+	if m.feedback_id != nil {
+		fields = append(fields, qualityevaluation.FieldFeedbackID)
+	}
+	if m.request_id != nil {
+		fields = append(fields, qualityevaluation.FieldRequestID)
+	}
+	if m.decision_id != nil {
+		fields = append(fields, qualityevaluation.FieldDecisionID)
+	}
+	if m.attempt_no != nil {
+		fields = append(fields, qualityevaluation.FieldAttemptNo)
+	}
+	if m.account_id != nil {
+		fields = append(fields, qualityevaluation.FieldAccountID)
+	}
+	if m.provider_id != nil {
+		fields = append(fields, qualityevaluation.FieldProviderID)
+	}
+	if m.model != nil {
+		fields = append(fields, qualityevaluation.FieldModel)
+	}
+	if m.source_endpoint != nil {
+		fields = append(fields, qualityevaluation.FieldSourceEndpoint)
+	}
+	if m.sample_request_hash != nil {
+		fields = append(fields, qualityevaluation.FieldSampleRequestHash)
+	}
+	if m.judge_model != nil {
+		fields = append(fields, qualityevaluation.FieldJudgeModel)
+	}
+	if m.score != nil {
+		fields = append(fields, qualityevaluation.FieldScore)
+	}
+	if m.rubric_json != nil {
+		fields = append(fields, qualityevaluation.FieldRubricJSON)
+	}
+	if m.judged_at != nil {
+		fields = append(fields, qualityevaluation.FieldJudgedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *QualityEvaluationMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case qualityevaluation.FieldCreatedAt:
+		return m.CreatedAt()
+	case qualityevaluation.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case qualityevaluation.FieldFeedbackID:
+		return m.FeedbackID()
+	case qualityevaluation.FieldRequestID:
+		return m.RequestID()
+	case qualityevaluation.FieldDecisionID:
+		return m.DecisionID()
+	case qualityevaluation.FieldAttemptNo:
+		return m.AttemptNo()
+	case qualityevaluation.FieldAccountID:
+		return m.AccountID()
+	case qualityevaluation.FieldProviderID:
+		return m.ProviderID()
+	case qualityevaluation.FieldModel:
+		return m.Model()
+	case qualityevaluation.FieldSourceEndpoint:
+		return m.SourceEndpoint()
+	case qualityevaluation.FieldSampleRequestHash:
+		return m.SampleRequestHash()
+	case qualityevaluation.FieldJudgeModel:
+		return m.JudgeModel()
+	case qualityevaluation.FieldScore:
+		return m.Score()
+	case qualityevaluation.FieldRubricJSON:
+		return m.RubricJSON()
+	case qualityevaluation.FieldJudgedAt:
+		return m.JudgedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *QualityEvaluationMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case qualityevaluation.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case qualityevaluation.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case qualityevaluation.FieldFeedbackID:
+		return m.OldFeedbackID(ctx)
+	case qualityevaluation.FieldRequestID:
+		return m.OldRequestID(ctx)
+	case qualityevaluation.FieldDecisionID:
+		return m.OldDecisionID(ctx)
+	case qualityevaluation.FieldAttemptNo:
+		return m.OldAttemptNo(ctx)
+	case qualityevaluation.FieldAccountID:
+		return m.OldAccountID(ctx)
+	case qualityevaluation.FieldProviderID:
+		return m.OldProviderID(ctx)
+	case qualityevaluation.FieldModel:
+		return m.OldModel(ctx)
+	case qualityevaluation.FieldSourceEndpoint:
+		return m.OldSourceEndpoint(ctx)
+	case qualityevaluation.FieldSampleRequestHash:
+		return m.OldSampleRequestHash(ctx)
+	case qualityevaluation.FieldJudgeModel:
+		return m.OldJudgeModel(ctx)
+	case qualityevaluation.FieldScore:
+		return m.OldScore(ctx)
+	case qualityevaluation.FieldRubricJSON:
+		return m.OldRubricJSON(ctx)
+	case qualityevaluation.FieldJudgedAt:
+		return m.OldJudgedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown QualityEvaluation field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *QualityEvaluationMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case qualityevaluation.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case qualityevaluation.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case qualityevaluation.FieldFeedbackID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFeedbackID(v)
+		return nil
+	case qualityevaluation.FieldRequestID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRequestID(v)
+		return nil
+	case qualityevaluation.FieldDecisionID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDecisionID(v)
+		return nil
+	case qualityevaluation.FieldAttemptNo:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAttemptNo(v)
+		return nil
+	case qualityevaluation.FieldAccountID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAccountID(v)
+		return nil
+	case qualityevaluation.FieldProviderID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProviderID(v)
+		return nil
+	case qualityevaluation.FieldModel:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetModel(v)
+		return nil
+	case qualityevaluation.FieldSourceEndpoint:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSourceEndpoint(v)
+		return nil
+	case qualityevaluation.FieldSampleRequestHash:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSampleRequestHash(v)
+		return nil
+	case qualityevaluation.FieldJudgeModel:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetJudgeModel(v)
+		return nil
+	case qualityevaluation.FieldScore:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetScore(v)
+		return nil
+	case qualityevaluation.FieldRubricJSON:
+		v, ok := value.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRubricJSON(v)
+		return nil
+	case qualityevaluation.FieldJudgedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetJudgedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown QualityEvaluation field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *QualityEvaluationMutation) AddedFields() []string {
+	var fields []string
+	if m.addfeedback_id != nil {
+		fields = append(fields, qualityevaluation.FieldFeedbackID)
+	}
+	if m.adddecision_id != nil {
+		fields = append(fields, qualityevaluation.FieldDecisionID)
+	}
+	if m.addattempt_no != nil {
+		fields = append(fields, qualityevaluation.FieldAttemptNo)
+	}
+	if m.addaccount_id != nil {
+		fields = append(fields, qualityevaluation.FieldAccountID)
+	}
+	if m.addprovider_id != nil {
+		fields = append(fields, qualityevaluation.FieldProviderID)
+	}
+	if m.addscore != nil {
+		fields = append(fields, qualityevaluation.FieldScore)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *QualityEvaluationMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case qualityevaluation.FieldFeedbackID:
+		return m.AddedFeedbackID()
+	case qualityevaluation.FieldDecisionID:
+		return m.AddedDecisionID()
+	case qualityevaluation.FieldAttemptNo:
+		return m.AddedAttemptNo()
+	case qualityevaluation.FieldAccountID:
+		return m.AddedAccountID()
+	case qualityevaluation.FieldProviderID:
+		return m.AddedProviderID()
+	case qualityevaluation.FieldScore:
+		return m.AddedScore()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *QualityEvaluationMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case qualityevaluation.FieldFeedbackID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddFeedbackID(v)
+		return nil
+	case qualityevaluation.FieldDecisionID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddDecisionID(v)
+		return nil
+	case qualityevaluation.FieldAttemptNo:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddAttemptNo(v)
+		return nil
+	case qualityevaluation.FieldAccountID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddAccountID(v)
+		return nil
+	case qualityevaluation.FieldProviderID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddProviderID(v)
+		return nil
+	case qualityevaluation.FieldScore:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddScore(v)
+		return nil
+	}
+	return fmt.Errorf("unknown QualityEvaluation numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *QualityEvaluationMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(qualityevaluation.FieldRubricJSON) {
+		fields = append(fields, qualityevaluation.FieldRubricJSON)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *QualityEvaluationMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *QualityEvaluationMutation) ClearField(name string) error {
+	switch name {
+	case qualityevaluation.FieldRubricJSON:
+		m.ClearRubricJSON()
+		return nil
+	}
+	return fmt.Errorf("unknown QualityEvaluation nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *QualityEvaluationMutation) ResetField(name string) error {
+	switch name {
+	case qualityevaluation.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case qualityevaluation.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case qualityevaluation.FieldFeedbackID:
+		m.ResetFeedbackID()
+		return nil
+	case qualityevaluation.FieldRequestID:
+		m.ResetRequestID()
+		return nil
+	case qualityevaluation.FieldDecisionID:
+		m.ResetDecisionID()
+		return nil
+	case qualityevaluation.FieldAttemptNo:
+		m.ResetAttemptNo()
+		return nil
+	case qualityevaluation.FieldAccountID:
+		m.ResetAccountID()
+		return nil
+	case qualityevaluation.FieldProviderID:
+		m.ResetProviderID()
+		return nil
+	case qualityevaluation.FieldModel:
+		m.ResetModel()
+		return nil
+	case qualityevaluation.FieldSourceEndpoint:
+		m.ResetSourceEndpoint()
+		return nil
+	case qualityevaluation.FieldSampleRequestHash:
+		m.ResetSampleRequestHash()
+		return nil
+	case qualityevaluation.FieldJudgeModel:
+		m.ResetJudgeModel()
+		return nil
+	case qualityevaluation.FieldScore:
+		m.ResetScore()
+		return nil
+	case qualityevaluation.FieldRubricJSON:
+		m.ResetRubricJSON()
+		return nil
+	case qualityevaluation.FieldJudgedAt:
+		m.ResetJudgedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown QualityEvaluation field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *QualityEvaluationMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *QualityEvaluationMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *QualityEvaluationMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *QualityEvaluationMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *QualityEvaluationMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *QualityEvaluationMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *QualityEvaluationMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown QualityEvaluation unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *QualityEvaluationMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown QualityEvaluation edge %s", name)
 }
 
 // RoleMutation represents an operation that mutates the Role nodes in the graph.

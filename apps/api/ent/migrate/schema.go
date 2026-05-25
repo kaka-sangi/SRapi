@@ -1071,6 +1071,109 @@ var (
 			},
 		},
 	}
+	// QualityEvalSamplesColumns holds the columns for the "quality_eval_samples" table.
+	QualityEvalSamplesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "feedback_id", Type: field.TypeInt},
+		{Name: "request_id", Type: field.TypeString},
+		{Name: "decision_id", Type: field.TypeInt},
+		{Name: "attempt_no", Type: field.TypeInt, Default: 1},
+		{Name: "account_id", Type: field.TypeInt},
+		{Name: "provider_id", Type: field.TypeInt},
+		{Name: "model", Type: field.TypeString, Default: ""},
+		{Name: "source_endpoint", Type: field.TypeString, Default: ""},
+		{Name: "sample_request_hash", Type: field.TypeString},
+		{Name: "sample_payload_ciphertext", Type: field.TypeBytes},
+		{Name: "payload_version", Type: field.TypeString, Default: "v1"},
+		{Name: "captured_at", Type: field.TypeTime},
+	}
+	// QualityEvalSamplesTable holds the schema information for the "quality_eval_samples" table.
+	QualityEvalSamplesTable = &schema.Table{
+		Name:       "quality_eval_samples",
+		Columns:    QualityEvalSamplesColumns,
+		PrimaryKey: []*schema.Column{QualityEvalSamplesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "qualityevalsample_feedback_id",
+				Unique:  true,
+				Columns: []*schema.Column{QualityEvalSamplesColumns[3]},
+			},
+			{
+				Name:    "qualityevalsample_decision_id",
+				Unique:  false,
+				Columns: []*schema.Column{QualityEvalSamplesColumns[5]},
+			},
+			{
+				Name:    "qualityevalsample_request_id_attempt_no",
+				Unique:  false,
+				Columns: []*schema.Column{QualityEvalSamplesColumns[4], QualityEvalSamplesColumns[6]},
+			},
+			{
+				Name:    "qualityevalsample_account_id_model_captured_at",
+				Unique:  false,
+				Columns: []*schema.Column{QualityEvalSamplesColumns[7], QualityEvalSamplesColumns[9], QualityEvalSamplesColumns[14]},
+			},
+			{
+				Name:    "qualityevalsample_sample_request_hash",
+				Unique:  false,
+				Columns: []*schema.Column{QualityEvalSamplesColumns[11]},
+			},
+		},
+	}
+	// QualityEvaluationsColumns holds the columns for the "quality_evaluations" table.
+	QualityEvaluationsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "feedback_id", Type: field.TypeInt},
+		{Name: "request_id", Type: field.TypeString},
+		{Name: "decision_id", Type: field.TypeInt},
+		{Name: "attempt_no", Type: field.TypeInt, Default: 1},
+		{Name: "account_id", Type: field.TypeInt},
+		{Name: "provider_id", Type: field.TypeInt},
+		{Name: "model", Type: field.TypeString, Default: ""},
+		{Name: "source_endpoint", Type: field.TypeString, Default: ""},
+		{Name: "sample_request_hash", Type: field.TypeString},
+		{Name: "judge_model", Type: field.TypeString, Default: ""},
+		{Name: "score", Type: field.TypeFloat64, Default: 0},
+		{Name: "rubric_json", Type: field.TypeJSON, Nullable: true},
+		{Name: "judged_at", Type: field.TypeTime},
+	}
+	// QualityEvaluationsTable holds the schema information for the "quality_evaluations" table.
+	QualityEvaluationsTable = &schema.Table{
+		Name:       "quality_evaluations",
+		Columns:    QualityEvaluationsColumns,
+		PrimaryKey: []*schema.Column{QualityEvaluationsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "qualityevaluation_feedback_id",
+				Unique:  true,
+				Columns: []*schema.Column{QualityEvaluationsColumns[3]},
+			},
+			{
+				Name:    "qualityevaluation_decision_id",
+				Unique:  false,
+				Columns: []*schema.Column{QualityEvaluationsColumns[5]},
+			},
+			{
+				Name:    "qualityevaluation_account_id_model_judged_at",
+				Unique:  false,
+				Columns: []*schema.Column{QualityEvaluationsColumns[7], QualityEvaluationsColumns[9], QualityEvaluationsColumns[15]},
+			},
+			{
+				Name:    "qualityevaluation_judge_model_judged_at",
+				Unique:  false,
+				Columns: []*schema.Column{QualityEvaluationsColumns[12], QualityEvaluationsColumns[15]},
+			},
+			{
+				Name:    "qualityevaluation_sample_request_hash",
+				Unique:  false,
+				Columns: []*schema.Column{QualityEvaluationsColumns[11]},
+			},
+		},
+	}
 	// RolesColumns holds the columns for the "roles" table.
 	RolesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -1560,6 +1663,8 @@ var (
 		ProvidersTable,
 		ProviderAccountsTable,
 		ProxiesTable,
+		QualityEvalSamplesTable,
+		QualityEvaluationsTable,
 		RolesTable,
 		SchedulerDecisionsTable,
 		SchedulerFeedbacksTable,

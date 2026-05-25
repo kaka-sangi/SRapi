@@ -16,6 +16,7 @@ import (
 	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
 	paymentcontract "github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
+	qualitycontract "github.com/srapi/srapi/apps/api/internal/modules/quality_eval/contract"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
@@ -32,6 +33,7 @@ import (
 	operationsstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/operations"
 	paymentstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/payments"
 	providerstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/providers"
+	qualitystore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/qualityeval"
 	schedulerstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/scheduler"
 	subscriptionstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/subscriptions"
 	usagestore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/usage"
@@ -55,6 +57,7 @@ type Stores struct {
 	Events        eventscontract.Store
 	Operations    operationscontract.Store
 	Payments      paymentcontract.Store
+	QualityEval   qualitycontract.Store
 	Scheduler     schedulercontract.Store
 	Subscriptions subscriptioncontract.Store
 	Usage         usagecontract.Store
@@ -116,6 +119,10 @@ func New(client *ent.Client) (Stores, error) {
 	if err != nil {
 		return Stores{}, err
 	}
+	qualityEval, err := qualitystore.New(client)
+	if err != nil {
+		return Stores{}, err
+	}
 	subscriptions, err := subscriptionstore.New(client)
 	if err != nil {
 		return Stores{}, err
@@ -143,6 +150,7 @@ func New(client *ent.Client) (Stores, error) {
 		Events:        events,
 		Operations:    operations,
 		Payments:      payments,
+		QualityEval:   qualityEval,
 		Scheduler:     scheduler,
 		Subscriptions: subscriptions,
 		Usage:         usage,

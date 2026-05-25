@@ -352,6 +352,14 @@ PII raw value
 - 必须有保留时间。
 - 必须写入 audit log。
 
+QualityEval 是默认关闭的特殊在线评估路径：
+
+- 只有 `QUALITY_EVAL_ENABLED=true` 且配置了 judge API key 时才捕获样本并启动 worker。
+- 样本只能来自成功完成并写入 `scheduler_feedbacks` 的文本 Gateway 请求，且捕获发生在 Gateway content-safety 脱敏之后。
+- `quality_eval_samples.sample_payload_ciphertext` 只保存截断后的脱敏 prompt/output 摘要，必须用 `SRAPI_MASTER_KEY` 派生密钥 AES-GCM 加密；`quality_evaluations` 只保存 score、rubric、judge model 和不可逆 hash。
+- LLM judge 调用会把脱敏样本发送给配置的 OpenAI-compatible Chat Completions endpoint；生产启用前必须按数据处理要求确认该外部评估端点。
+- Usage、audit、scheduler decision、scheduler snapshot 仍不得保存原始 prompt/messages/tool arguments。
+
 ## 8. Gateway 安全
 
 Gateway 必须执行：

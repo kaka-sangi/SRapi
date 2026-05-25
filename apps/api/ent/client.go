@@ -43,6 +43,8 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/provider"
 	"github.com/srapi/srapi/apps/api/ent/provideraccount"
 	"github.com/srapi/srapi/apps/api/ent/proxy"
+	"github.com/srapi/srapi/apps/api/ent/qualityevalsample"
+	"github.com/srapi/srapi/apps/api/ent/qualityevaluation"
 	"github.com/srapi/srapi/apps/api/ent/role"
 	"github.com/srapi/srapi/apps/api/ent/schedulerdecision"
 	"github.com/srapi/srapi/apps/api/ent/schedulerfeedback"
@@ -119,6 +121,10 @@ type Client struct {
 	ProviderAccount *ProviderAccountClient
 	// Proxy is the client for interacting with the Proxy builders.
 	Proxy *ProxyClient
+	// QualityEvalSample is the client for interacting with the QualityEvalSample builders.
+	QualityEvalSample *QualityEvalSampleClient
+	// QualityEvaluation is the client for interacting with the QualityEvaluation builders.
+	QualityEvaluation *QualityEvaluationClient
 	// Role is the client for interacting with the Role builders.
 	Role *RoleClient
 	// SchedulerDecision is the client for interacting with the SchedulerDecision builders.
@@ -181,6 +187,8 @@ func (c *Client) init() {
 	c.Provider = NewProviderClient(c.config)
 	c.ProviderAccount = NewProviderAccountClient(c.config)
 	c.Proxy = NewProxyClient(c.config)
+	c.QualityEvalSample = NewQualityEvalSampleClient(c.config)
+	c.QualityEvaluation = NewQualityEvaluationClient(c.config)
 	c.Role = NewRoleClient(c.config)
 	c.SchedulerDecision = NewSchedulerDecisionClient(c.config)
 	c.SchedulerFeedback = NewSchedulerFeedbackClient(c.config)
@@ -313,6 +321,8 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		Provider:                 NewProviderClient(cfg),
 		ProviderAccount:          NewProviderAccountClient(cfg),
 		Proxy:                    NewProxyClient(cfg),
+		QualityEvalSample:        NewQualityEvalSampleClient(cfg),
+		QualityEvaluation:        NewQualityEvaluationClient(cfg),
 		Role:                     NewRoleClient(cfg),
 		SchedulerDecision:        NewSchedulerDecisionClient(cfg),
 		SchedulerFeedback:        NewSchedulerFeedbackClient(cfg),
@@ -372,6 +382,8 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		Provider:                 NewProviderClient(cfg),
 		ProviderAccount:          NewProviderAccountClient(cfg),
 		Proxy:                    NewProxyClient(cfg),
+		QualityEvalSample:        NewQualityEvalSampleClient(cfg),
+		QualityEvaluation:        NewQualityEvaluationClient(cfg),
 		Role:                     NewRoleClient(cfg),
 		SchedulerDecision:        NewSchedulerDecisionClient(cfg),
 		SchedulerFeedback:        NewSchedulerFeedbackClient(cfg),
@@ -419,10 +431,10 @@ func (c *Client) Use(hooks ...Hook) {
 		c.IdempotencyRecord, c.InviteCode, c.InviteRelationship, c.ModelAlias,
 		c.ModelProviderMapping, c.ModelRegistry, c.ObsAlertEvent, c.ObsSLODefinition,
 		c.PaymentAuditLog, c.PaymentOrder, c.PaymentProviderInstance, c.PricingRule,
-		c.Provider, c.ProviderAccount, c.Proxy, c.Role, c.SchedulerDecision,
-		c.SchedulerFeedback, c.SchedulerRequestSnapshot, c.SchedulerStrategy,
-		c.Setting, c.SubscriptionPlan, c.UsageLog, c.User, c.UserRole,
-		c.UserSubscription,
+		c.Provider, c.ProviderAccount, c.Proxy, c.QualityEvalSample,
+		c.QualityEvaluation, c.Role, c.SchedulerDecision, c.SchedulerFeedback,
+		c.SchedulerRequestSnapshot, c.SchedulerStrategy, c.Setting, c.SubscriptionPlan,
+		c.UsageLog, c.User, c.UserRole, c.UserSubscription,
 	} {
 		n.Use(hooks...)
 	}
@@ -439,10 +451,10 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.IdempotencyRecord, c.InviteCode, c.InviteRelationship, c.ModelAlias,
 		c.ModelProviderMapping, c.ModelRegistry, c.ObsAlertEvent, c.ObsSLODefinition,
 		c.PaymentAuditLog, c.PaymentOrder, c.PaymentProviderInstance, c.PricingRule,
-		c.Provider, c.ProviderAccount, c.Proxy, c.Role, c.SchedulerDecision,
-		c.SchedulerFeedback, c.SchedulerRequestSnapshot, c.SchedulerStrategy,
-		c.Setting, c.SubscriptionPlan, c.UsageLog, c.User, c.UserRole,
-		c.UserSubscription,
+		c.Provider, c.ProviderAccount, c.Proxy, c.QualityEvalSample,
+		c.QualityEvaluation, c.Role, c.SchedulerDecision, c.SchedulerFeedback,
+		c.SchedulerRequestSnapshot, c.SchedulerStrategy, c.Setting, c.SubscriptionPlan,
+		c.UsageLog, c.User, c.UserRole, c.UserSubscription,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -509,6 +521,10 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.ProviderAccount.mutate(ctx, m)
 	case *ProxyMutation:
 		return c.Proxy.mutate(ctx, m)
+	case *QualityEvalSampleMutation:
+		return c.QualityEvalSample.mutate(ctx, m)
+	case *QualityEvaluationMutation:
+		return c.QualityEvaluation.mutate(ctx, m)
 	case *RoleMutation:
 		return c.Role.mutate(ctx, m)
 	case *SchedulerDecisionMutation:
@@ -4393,6 +4409,272 @@ func (c *ProxyClient) mutate(ctx context.Context, m *ProxyMutation) (Value, erro
 	}
 }
 
+// QualityEvalSampleClient is a client for the QualityEvalSample schema.
+type QualityEvalSampleClient struct {
+	config
+}
+
+// NewQualityEvalSampleClient returns a client for the QualityEvalSample from the given config.
+func NewQualityEvalSampleClient(c config) *QualityEvalSampleClient {
+	return &QualityEvalSampleClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `qualityevalsample.Hooks(f(g(h())))`.
+func (c *QualityEvalSampleClient) Use(hooks ...Hook) {
+	c.hooks.QualityEvalSample = append(c.hooks.QualityEvalSample, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `qualityevalsample.Intercept(f(g(h())))`.
+func (c *QualityEvalSampleClient) Intercept(interceptors ...Interceptor) {
+	c.inters.QualityEvalSample = append(c.inters.QualityEvalSample, interceptors...)
+}
+
+// Create returns a builder for creating a QualityEvalSample entity.
+func (c *QualityEvalSampleClient) Create() *QualityEvalSampleCreate {
+	mutation := newQualityEvalSampleMutation(c.config, OpCreate)
+	return &QualityEvalSampleCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of QualityEvalSample entities.
+func (c *QualityEvalSampleClient) CreateBulk(builders ...*QualityEvalSampleCreate) *QualityEvalSampleCreateBulk {
+	return &QualityEvalSampleCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *QualityEvalSampleClient) MapCreateBulk(slice any, setFunc func(*QualityEvalSampleCreate, int)) *QualityEvalSampleCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &QualityEvalSampleCreateBulk{err: fmt.Errorf("calling to QualityEvalSampleClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*QualityEvalSampleCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &QualityEvalSampleCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for QualityEvalSample.
+func (c *QualityEvalSampleClient) Update() *QualityEvalSampleUpdate {
+	mutation := newQualityEvalSampleMutation(c.config, OpUpdate)
+	return &QualityEvalSampleUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *QualityEvalSampleClient) UpdateOne(_m *QualityEvalSample) *QualityEvalSampleUpdateOne {
+	mutation := newQualityEvalSampleMutation(c.config, OpUpdateOne, withQualityEvalSample(_m))
+	return &QualityEvalSampleUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *QualityEvalSampleClient) UpdateOneID(id int) *QualityEvalSampleUpdateOne {
+	mutation := newQualityEvalSampleMutation(c.config, OpUpdateOne, withQualityEvalSampleID(id))
+	return &QualityEvalSampleUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for QualityEvalSample.
+func (c *QualityEvalSampleClient) Delete() *QualityEvalSampleDelete {
+	mutation := newQualityEvalSampleMutation(c.config, OpDelete)
+	return &QualityEvalSampleDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *QualityEvalSampleClient) DeleteOne(_m *QualityEvalSample) *QualityEvalSampleDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *QualityEvalSampleClient) DeleteOneID(id int) *QualityEvalSampleDeleteOne {
+	builder := c.Delete().Where(qualityevalsample.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &QualityEvalSampleDeleteOne{builder}
+}
+
+// Query returns a query builder for QualityEvalSample.
+func (c *QualityEvalSampleClient) Query() *QualityEvalSampleQuery {
+	return &QualityEvalSampleQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeQualityEvalSample},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a QualityEvalSample entity by its id.
+func (c *QualityEvalSampleClient) Get(ctx context.Context, id int) (*QualityEvalSample, error) {
+	return c.Query().Where(qualityevalsample.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *QualityEvalSampleClient) GetX(ctx context.Context, id int) *QualityEvalSample {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *QualityEvalSampleClient) Hooks() []Hook {
+	return c.hooks.QualityEvalSample
+}
+
+// Interceptors returns the client interceptors.
+func (c *QualityEvalSampleClient) Interceptors() []Interceptor {
+	return c.inters.QualityEvalSample
+}
+
+func (c *QualityEvalSampleClient) mutate(ctx context.Context, m *QualityEvalSampleMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&QualityEvalSampleCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&QualityEvalSampleUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&QualityEvalSampleUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&QualityEvalSampleDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown QualityEvalSample mutation op: %q", m.Op())
+	}
+}
+
+// QualityEvaluationClient is a client for the QualityEvaluation schema.
+type QualityEvaluationClient struct {
+	config
+}
+
+// NewQualityEvaluationClient returns a client for the QualityEvaluation from the given config.
+func NewQualityEvaluationClient(c config) *QualityEvaluationClient {
+	return &QualityEvaluationClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `qualityevaluation.Hooks(f(g(h())))`.
+func (c *QualityEvaluationClient) Use(hooks ...Hook) {
+	c.hooks.QualityEvaluation = append(c.hooks.QualityEvaluation, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `qualityevaluation.Intercept(f(g(h())))`.
+func (c *QualityEvaluationClient) Intercept(interceptors ...Interceptor) {
+	c.inters.QualityEvaluation = append(c.inters.QualityEvaluation, interceptors...)
+}
+
+// Create returns a builder for creating a QualityEvaluation entity.
+func (c *QualityEvaluationClient) Create() *QualityEvaluationCreate {
+	mutation := newQualityEvaluationMutation(c.config, OpCreate)
+	return &QualityEvaluationCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of QualityEvaluation entities.
+func (c *QualityEvaluationClient) CreateBulk(builders ...*QualityEvaluationCreate) *QualityEvaluationCreateBulk {
+	return &QualityEvaluationCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *QualityEvaluationClient) MapCreateBulk(slice any, setFunc func(*QualityEvaluationCreate, int)) *QualityEvaluationCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &QualityEvaluationCreateBulk{err: fmt.Errorf("calling to QualityEvaluationClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*QualityEvaluationCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &QualityEvaluationCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for QualityEvaluation.
+func (c *QualityEvaluationClient) Update() *QualityEvaluationUpdate {
+	mutation := newQualityEvaluationMutation(c.config, OpUpdate)
+	return &QualityEvaluationUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *QualityEvaluationClient) UpdateOne(_m *QualityEvaluation) *QualityEvaluationUpdateOne {
+	mutation := newQualityEvaluationMutation(c.config, OpUpdateOne, withQualityEvaluation(_m))
+	return &QualityEvaluationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *QualityEvaluationClient) UpdateOneID(id int) *QualityEvaluationUpdateOne {
+	mutation := newQualityEvaluationMutation(c.config, OpUpdateOne, withQualityEvaluationID(id))
+	return &QualityEvaluationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for QualityEvaluation.
+func (c *QualityEvaluationClient) Delete() *QualityEvaluationDelete {
+	mutation := newQualityEvaluationMutation(c.config, OpDelete)
+	return &QualityEvaluationDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *QualityEvaluationClient) DeleteOne(_m *QualityEvaluation) *QualityEvaluationDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *QualityEvaluationClient) DeleteOneID(id int) *QualityEvaluationDeleteOne {
+	builder := c.Delete().Where(qualityevaluation.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &QualityEvaluationDeleteOne{builder}
+}
+
+// Query returns a query builder for QualityEvaluation.
+func (c *QualityEvaluationClient) Query() *QualityEvaluationQuery {
+	return &QualityEvaluationQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeQualityEvaluation},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a QualityEvaluation entity by its id.
+func (c *QualityEvaluationClient) Get(ctx context.Context, id int) (*QualityEvaluation, error) {
+	return c.Query().Where(qualityevaluation.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *QualityEvaluationClient) GetX(ctx context.Context, id int) *QualityEvaluation {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *QualityEvaluationClient) Hooks() []Hook {
+	return c.hooks.QualityEvaluation
+}
+
+// Interceptors returns the client interceptors.
+func (c *QualityEvaluationClient) Interceptors() []Interceptor {
+	return c.inters.QualityEvaluation
+}
+
+func (c *QualityEvaluationClient) mutate(ctx context.Context, m *QualityEvaluationMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&QualityEvaluationCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&QualityEvaluationUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&QualityEvaluationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&QualityEvaluationDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown QualityEvaluation mutation op: %q", m.Op())
+	}
+}
+
 // RoleClient is a client for the Role schema.
 type RoleClient struct {
 	config
@@ -5865,9 +6147,10 @@ type (
 		IdempotencyRecord, InviteCode, InviteRelationship, ModelAlias,
 		ModelProviderMapping, ModelRegistry, ObsAlertEvent, ObsSLODefinition,
 		PaymentAuditLog, PaymentOrder, PaymentProviderInstance, PricingRule, Provider,
-		ProviderAccount, Proxy, Role, SchedulerDecision, SchedulerFeedback,
-		SchedulerRequestSnapshot, SchedulerStrategy, Setting, SubscriptionPlan,
-		UsageLog, User, UserRole, UserSubscription []ent.Hook
+		ProviderAccount, Proxy, QualityEvalSample, QualityEvaluation, Role,
+		SchedulerDecision, SchedulerFeedback, SchedulerRequestSnapshot,
+		SchedulerStrategy, Setting, SubscriptionPlan, UsageLog, User, UserRole,
+		UserSubscription []ent.Hook
 	}
 	inters struct {
 		APIKey, APIKeyGroup, AccountGroup, AccountGroupMember, AccountHealthSnapshot,
@@ -5876,8 +6159,9 @@ type (
 		IdempotencyRecord, InviteCode, InviteRelationship, ModelAlias,
 		ModelProviderMapping, ModelRegistry, ObsAlertEvent, ObsSLODefinition,
 		PaymentAuditLog, PaymentOrder, PaymentProviderInstance, PricingRule, Provider,
-		ProviderAccount, Proxy, Role, SchedulerDecision, SchedulerFeedback,
-		SchedulerRequestSnapshot, SchedulerStrategy, Setting, SubscriptionPlan,
-		UsageLog, User, UserRole, UserSubscription []ent.Interceptor
+		ProviderAccount, Proxy, QualityEvalSample, QualityEvaluation, Role,
+		SchedulerDecision, SchedulerFeedback, SchedulerRequestSnapshot,
+		SchedulerStrategy, Setting, SubscriptionPlan, UsageLog, User, UserRole,
+		UserSubscription []ent.Interceptor
 	}
 )

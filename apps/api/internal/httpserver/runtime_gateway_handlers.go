@@ -175,6 +175,8 @@ func (s *Server) handleCreateChatCompletion(w http.ResponseWriter, r *http.Reque
 		UsageEstimated:        canonicalResp.Usage.Estimated,
 		Pricing:               pricing,
 		CompatibilityWarnings: canonicalResp.CompatibilityWarnings,
+		QualityPrompt:         gatewayTextForQuality(canonical),
+		QualityOutput:         canonicalResp.Message,
 	})
 	if canonical.Stream {
 		writeSSEJSON(w, s.runtime.gateway.RenderChatStreamChunk(canonicalResp))
@@ -325,6 +327,8 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 		UsageEstimated:        canonicalResp.Usage.Estimated,
 		Pricing:               pricing,
 		CompatibilityWarnings: canonicalResp.CompatibilityWarnings,
+		QualityPrompt:         gatewayTextForQuality(canonical),
+		QualityOutput:         canonicalResp.Message,
 	})
 	response := s.runtime.gateway.RenderResponses(canonicalResp)
 	if canonical.Stream {
@@ -476,6 +480,8 @@ func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
 		UsageEstimated:        canonicalResp.Usage.Estimated,
 		Pricing:               pricing,
 		CompatibilityWarnings: canonicalResp.CompatibilityWarnings,
+		QualityPrompt:         gatewayTextForQuality(canonical),
+		QualityOutput:         canonicalResp.Message,
 	})
 	response := s.runtime.gateway.RenderAnthropicMessages(canonicalResp)
 	if canonical.Stream {
@@ -798,6 +804,8 @@ func (s *Server) handleGeminiModelAction(w http.ResponseWriter, r *http.Request)
 		UsageEstimated:        canonicalResp.Usage.Estimated,
 		Pricing:               pricing,
 		CompatibilityWarnings: canonicalResp.CompatibilityWarnings,
+		QualityPrompt:         gatewayTextForQuality(canonical),
+		QualityOutput:         canonicalResp.Message,
 	})
 	if canonical.Stream {
 		writeSSEEvents(w, s.runtime.gateway.RenderGeminiGenerateContentStreamEvents(canonicalResp))

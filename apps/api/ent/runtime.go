@@ -34,6 +34,8 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/provider"
 	"github.com/srapi/srapi/apps/api/ent/provideraccount"
 	"github.com/srapi/srapi/apps/api/ent/proxy"
+	"github.com/srapi/srapi/apps/api/ent/qualityevalsample"
+	"github.com/srapi/srapi/apps/api/ent/qualityevaluation"
 	"github.com/srapi/srapi/apps/api/ent/role"
 	"github.com/srapi/srapi/apps/api/ent/schedulerdecision"
 	"github.com/srapi/srapi/apps/api/ent/schedulerfeedback"
@@ -1005,6 +1007,88 @@ func init() {
 	proxyDescStatus := proxyFields[4].Descriptor()
 	// proxy.DefaultStatus holds the default value on creation for the status field.
 	proxy.DefaultStatus = proxyDescStatus.Default.(string)
+	qualityevalsampleMixin := schema.QualityEvalSample{}.Mixin()
+	qualityevalsampleMixinFields0 := qualityevalsampleMixin[0].Fields()
+	_ = qualityevalsampleMixinFields0
+	qualityevalsampleFields := schema.QualityEvalSample{}.Fields()
+	_ = qualityevalsampleFields
+	// qualityevalsampleDescCreatedAt is the schema descriptor for created_at field.
+	qualityevalsampleDescCreatedAt := qualityevalsampleMixinFields0[0].Descriptor()
+	// qualityevalsample.DefaultCreatedAt holds the default value on creation for the created_at field.
+	qualityevalsample.DefaultCreatedAt = qualityevalsampleDescCreatedAt.Default.(func() time.Time)
+	// qualityevalsampleDescUpdatedAt is the schema descriptor for updated_at field.
+	qualityevalsampleDescUpdatedAt := qualityevalsampleMixinFields0[1].Descriptor()
+	// qualityevalsample.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	qualityevalsample.DefaultUpdatedAt = qualityevalsampleDescUpdatedAt.Default.(func() time.Time)
+	// qualityevalsample.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	qualityevalsample.UpdateDefaultUpdatedAt = qualityevalsampleDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// qualityevalsampleDescRequestID is the schema descriptor for request_id field.
+	qualityevalsampleDescRequestID := qualityevalsampleFields[1].Descriptor()
+	// qualityevalsample.RequestIDValidator is a validator for the "request_id" field. It is called by the builders before save.
+	qualityevalsample.RequestIDValidator = qualityevalsampleDescRequestID.Validators[0].(func(string) error)
+	// qualityevalsampleDescAttemptNo is the schema descriptor for attempt_no field.
+	qualityevalsampleDescAttemptNo := qualityevalsampleFields[3].Descriptor()
+	// qualityevalsample.DefaultAttemptNo holds the default value on creation for the attempt_no field.
+	qualityevalsample.DefaultAttemptNo = qualityevalsampleDescAttemptNo.Default.(int)
+	// qualityevalsampleDescModel is the schema descriptor for model field.
+	qualityevalsampleDescModel := qualityevalsampleFields[6].Descriptor()
+	// qualityevalsample.DefaultModel holds the default value on creation for the model field.
+	qualityevalsample.DefaultModel = qualityevalsampleDescModel.Default.(string)
+	// qualityevalsampleDescSourceEndpoint is the schema descriptor for source_endpoint field.
+	qualityevalsampleDescSourceEndpoint := qualityevalsampleFields[7].Descriptor()
+	// qualityevalsample.DefaultSourceEndpoint holds the default value on creation for the source_endpoint field.
+	qualityevalsample.DefaultSourceEndpoint = qualityevalsampleDescSourceEndpoint.Default.(string)
+	// qualityevalsampleDescSampleRequestHash is the schema descriptor for sample_request_hash field.
+	qualityevalsampleDescSampleRequestHash := qualityevalsampleFields[8].Descriptor()
+	// qualityevalsample.SampleRequestHashValidator is a validator for the "sample_request_hash" field. It is called by the builders before save.
+	qualityevalsample.SampleRequestHashValidator = qualityevalsampleDescSampleRequestHash.Validators[0].(func(string) error)
+	// qualityevalsampleDescPayloadVersion is the schema descriptor for payload_version field.
+	qualityevalsampleDescPayloadVersion := qualityevalsampleFields[10].Descriptor()
+	// qualityevalsample.DefaultPayloadVersion holds the default value on creation for the payload_version field.
+	qualityevalsample.DefaultPayloadVersion = qualityevalsampleDescPayloadVersion.Default.(string)
+	qualityevaluationMixin := schema.QualityEvaluation{}.Mixin()
+	qualityevaluationMixinFields0 := qualityevaluationMixin[0].Fields()
+	_ = qualityevaluationMixinFields0
+	qualityevaluationFields := schema.QualityEvaluation{}.Fields()
+	_ = qualityevaluationFields
+	// qualityevaluationDescCreatedAt is the schema descriptor for created_at field.
+	qualityevaluationDescCreatedAt := qualityevaluationMixinFields0[0].Descriptor()
+	// qualityevaluation.DefaultCreatedAt holds the default value on creation for the created_at field.
+	qualityevaluation.DefaultCreatedAt = qualityevaluationDescCreatedAt.Default.(func() time.Time)
+	// qualityevaluationDescUpdatedAt is the schema descriptor for updated_at field.
+	qualityevaluationDescUpdatedAt := qualityevaluationMixinFields0[1].Descriptor()
+	// qualityevaluation.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	qualityevaluation.DefaultUpdatedAt = qualityevaluationDescUpdatedAt.Default.(func() time.Time)
+	// qualityevaluation.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	qualityevaluation.UpdateDefaultUpdatedAt = qualityevaluationDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// qualityevaluationDescRequestID is the schema descriptor for request_id field.
+	qualityevaluationDescRequestID := qualityevaluationFields[1].Descriptor()
+	// qualityevaluation.RequestIDValidator is a validator for the "request_id" field. It is called by the builders before save.
+	qualityevaluation.RequestIDValidator = qualityevaluationDescRequestID.Validators[0].(func(string) error)
+	// qualityevaluationDescAttemptNo is the schema descriptor for attempt_no field.
+	qualityevaluationDescAttemptNo := qualityevaluationFields[3].Descriptor()
+	// qualityevaluation.DefaultAttemptNo holds the default value on creation for the attempt_no field.
+	qualityevaluation.DefaultAttemptNo = qualityevaluationDescAttemptNo.Default.(int)
+	// qualityevaluationDescModel is the schema descriptor for model field.
+	qualityevaluationDescModel := qualityevaluationFields[6].Descriptor()
+	// qualityevaluation.DefaultModel holds the default value on creation for the model field.
+	qualityevaluation.DefaultModel = qualityevaluationDescModel.Default.(string)
+	// qualityevaluationDescSourceEndpoint is the schema descriptor for source_endpoint field.
+	qualityevaluationDescSourceEndpoint := qualityevaluationFields[7].Descriptor()
+	// qualityevaluation.DefaultSourceEndpoint holds the default value on creation for the source_endpoint field.
+	qualityevaluation.DefaultSourceEndpoint = qualityevaluationDescSourceEndpoint.Default.(string)
+	// qualityevaluationDescSampleRequestHash is the schema descriptor for sample_request_hash field.
+	qualityevaluationDescSampleRequestHash := qualityevaluationFields[8].Descriptor()
+	// qualityevaluation.SampleRequestHashValidator is a validator for the "sample_request_hash" field. It is called by the builders before save.
+	qualityevaluation.SampleRequestHashValidator = qualityevaluationDescSampleRequestHash.Validators[0].(func(string) error)
+	// qualityevaluationDescJudgeModel is the schema descriptor for judge_model field.
+	qualityevaluationDescJudgeModel := qualityevaluationFields[9].Descriptor()
+	// qualityevaluation.DefaultJudgeModel holds the default value on creation for the judge_model field.
+	qualityevaluation.DefaultJudgeModel = qualityevaluationDescJudgeModel.Default.(string)
+	// qualityevaluationDescScore is the schema descriptor for score field.
+	qualityevaluationDescScore := qualityevaluationFields[10].Descriptor()
+	// qualityevaluation.DefaultScore holds the default value on creation for the score field.
+	qualityevaluation.DefaultScore = qualityevaluationDescScore.Default.(float64)
 	roleMixin := schema.Role{}.Mixin()
 	roleMixinFields0 := roleMixin[0].Fields()
 	_ = roleMixinFields0

@@ -8,8 +8,11 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/config"
+	qualitycontract "github.com/srapi/srapi/apps/api/internal/modules/quality_eval/contract"
+	qualitymemory "github.com/srapi/srapi/apps/api/internal/modules/quality_eval/store/memory"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
 
@@ -95,6 +98,107 @@ func TestGatewaySchedulerScoresUseAccountRuntimeMetadata(t *testing.T) {
 	assertNumberNear(t, score["health_score"], 0.9)
 	assertNumberNear(t, score["quota_score"], 0.7)
 	assertNumberNear(t, score["latency_score"], 0.75)
+}
+
+func TestGatewaySchedulerScoresUseQualityEvaluationAggregate(t *testing.T) {
+	qualityStore := qualitymemory.New()
+	upstream := openAIChatCompletionTestServer(t)
+	handler := New(config.Load(), nil, WithQualityEvalStore(qualityStore))
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	providerA := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"quality-a-provider","display_name":"Quality A","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	providerB := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"quality-b-provider","display_name":"Quality B","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"quality-route-model","display_name":"Quality Route Model","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerA.Data.Id)+`","upstream_model_name":"quality-a-upstream","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerB.Data.Id)+`","upstream_model_name":"quality-b-upstream","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerA.Data.Id)+`","name":"quality-a-account","runtime_class":"api_key","credential":{"api_key":"a-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1","health_score":0.6},"status":"active"}`)
+	accountB := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerB.Data.Id)+`","name":"quality-b-account","runtime_class":"api_key","credential":{"api_key":"b-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1","health_score":0.6},"status":"active"}`)
+
+	accountID, err := strconv.Atoi(string(accountB.Data.Id))
+	if err != nil {
+		t.Fatalf("parse account id: %v", err)
+	}
+	providerID, err := strconv.Atoi(string(providerB.Data.Id))
+	if err != nil {
+		t.Fatalf("parse provider id: %v", err)
+	}
+	if _, _, err := qualityStore.CreateEvaluation(t.Context(), qualitycontract.Evaluation{
+		FeedbackID:        100,
+		RequestID:         "req_quality_seed",
+		DecisionID:        200,
+		AttemptNo:         1,
+		AccountID:         accountID,
+		ProviderID:        providerID,
+		Model:             "quality-route-model",
+		SourceEndpoint:    "/v1/chat/completions",
+		SampleRequestHash: "sha256:0001",
+		JudgeModel:        "fake-judge",
+		Score:             0.95,
+		Rubric:            map[string]any{"correctness": 5},
+		JudgedAt:          time.Now().UTC(),
+	}); err != nil {
+		t.Fatalf("seed quality evaluation: %v", err)
+	}
+
+	mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/chat/completions", `{"model":"quality-route-model","messages":[{"role":"user","content":"quality route"}]}`)
+
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=quality-route-model", nil)
+	decisionsReq.AddCookie(sessionCookie)
+	decisionsRec := httptest.NewRecorder()
+	handler.ServeHTTP(decisionsRec, decisionsReq)
+	if decisionsRec.Code != http.StatusOK {
+		t.Fatalf("expected scheduler decisions 200, got %d body=%s", decisionsRec.Code, decisionsRec.Body.String())
+	}
+	var decisionsResp apiopenapi.SchedulerDecisionListResponse
+	if err := json.NewDecoder(decisionsRec.Body).Decode(&decisionsResp); err != nil {
+		t.Fatalf("decode scheduler decisions: %v", err)
+	}
+	if len(decisionsResp.Data) != 1 {
+		t.Fatalf("expected one quality-route-model decision, got %d", len(decisionsResp.Data))
+	}
+	score := schedulerDecisionScore(t, decisionsResp.Data[0].Scores, accountID)
+	assertNumberNear(t, score["quality_score"], 0.95)
+}
+
+func TestGatewayCapturesQualitySampleWhenEnabled(t *testing.T) {
+	qualityStore := qualitymemory.New()
+	upstream := openAIChatCompletionTestServer(t)
+	cfg := config.Load()
+	cfg.QualityEval.Enabled = true
+	cfg.QualityEval.OpenAIAPIKey = "not-used-by-http-runtime"
+	handler := New(cfg, nil, WithQualityEvalStore(qualityStore))
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"quality-capture-provider","display_name":"Quality Capture","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"quality-capture-model","display_name":"Quality Capture Model","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"quality-capture-upstream","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"quality-capture-account","runtime_class":"api_key","credential":{"api_key":"capture-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
+
+	mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/chat/completions", `{"model":"quality-capture-model","messages":[{"role":"user","content":"quality capture prompt"}]}`)
+
+	samples, err := qualityStore.ListPendingSamples(t.Context(), qualitycontract.PendingSampleFilter{SamplePercent: 100, Limit: 10, Now: time.Now().UTC()})
+	if err != nil {
+		t.Fatalf("list pending quality samples: %v", err)
+	}
+	if len(samples) != 1 {
+		t.Fatalf("expected one pending quality sample, got %+v", samples)
+	}
+	if samples[0].SamplePayloadCiphertext == "" || strings.Contains(samples[0].SamplePayloadCiphertext, "quality capture prompt") {
+		t.Fatalf("expected encrypted quality sample payload, got %+v", samples[0])
+	}
+}
+
+func openAIChatCompletionTestServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/chat/completions" {
+			t.Fatalf("unexpected upstream path %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"chatcmpl-test","object":"chat.completion","model":"quality-upstream","choices":[{"index":0,"message":{"role":"assistant","content":"quality ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`))
+	}))
+	t.Cleanup(server.Close)
+	return server
 }
 
 func schedulerDecisionScore(t *testing.T, scores apiopenapi.JsonObject, accountID int) map[string]any {

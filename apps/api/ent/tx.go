@@ -70,6 +70,10 @@ type Tx struct {
 	ProviderAccount *ProviderAccountClient
 	// Proxy is the client for interacting with the Proxy builders.
 	Proxy *ProxyClient
+	// QualityEvalSample is the client for interacting with the QualityEvalSample builders.
+	QualityEvalSample *QualityEvalSampleClient
+	// QualityEvaluation is the client for interacting with the QualityEvaluation builders.
+	QualityEvaluation *QualityEvaluationClient
 	// Role is the client for interacting with the Role builders.
 	Role *RoleClient
 	// SchedulerDecision is the client for interacting with the SchedulerDecision builders.
@@ -252,6 +256,8 @@ func (tx *Tx) init() {
 	tx.Provider = NewProviderClient(tx.config)
 	tx.ProviderAccount = NewProviderAccountClient(tx.config)
 	tx.Proxy = NewProxyClient(tx.config)
+	tx.QualityEvalSample = NewQualityEvalSampleClient(tx.config)
+	tx.QualityEvaluation = NewQualityEvaluationClient(tx.config)
 	tx.Role = NewRoleClient(tx.config)
 	tx.SchedulerDecision = NewSchedulerDecisionClient(tx.config)
 	tx.SchedulerFeedback = NewSchedulerFeedbackClient(tx.config)

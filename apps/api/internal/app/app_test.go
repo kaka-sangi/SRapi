@@ -13,6 +13,7 @@ import (
 	eventsservice "github.com/srapi/srapi/apps/api/internal/modules/events/service"
 	eventsmemory "github.com/srapi/srapi/apps/api/internal/modules/events/store/memory"
 	paymentmemory "github.com/srapi/srapi/apps/api/internal/modules/payments/store/memory"
+	qualitymemory "github.com/srapi/srapi/apps/api/internal/modules/quality_eval/store/memory"
 	subscriptionmemory "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/store/memory"
 	"github.com/srapi/srapi/apps/api/internal/persistence/entstore"
 	platformdb "github.com/srapi/srapi/apps/api/internal/platform/db"
@@ -226,6 +227,31 @@ func TestDomainEventsWorkerDispatchesPersistentOutbox(t *testing.T) {
 	}
 	if len(inbox) != 1 || inbox[0].EventID != enqueued.EventID {
 		t.Fatalf("expected outbox worker to record inbox, got %+v", inbox)
+	}
+}
+
+func TestQualityEvalWorkerRequiresEnabledPersistentStoreAndJudgeConfig(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	cfg := config.Load()
+	if worker, err := qualityEvalWorker(cfg, nil, logger); err != nil || worker != nil {
+		t.Fatalf("expected nil worker without persistent stores, worker=%v err=%v", worker, err)
+	}
+	if worker, err := qualityEvalWorker(cfg, &entstore.Stores{QualityEval: qualitymemory.New()}, logger); err != nil || worker != nil {
+		t.Fatalf("expected nil worker when quality eval is disabled, worker=%v err=%v", worker, err)
+	}
+
+	cfg.QualityEval.Enabled = true
+	if worker, err := qualityEvalWorker(cfg, &entstore.Stores{QualityEval: qualitymemory.New()}, logger); err == nil || worker != nil {
+		t.Fatalf("expected enabled worker to require judge config, worker=%v err=%v", worker, err)
+	}
+
+	cfg.QualityEval.OpenAIAPIKey = "judge-key"
+	worker, err := qualityEvalWorker(cfg, &entstore.Stores{QualityEval: qualitymemory.New()}, logger)
+	if err != nil {
+		t.Fatalf("create quality eval worker: %v", err)
+	}
+	if worker == nil {
+		t.Fatal("expected enabled quality eval worker")
 	}
 }
 

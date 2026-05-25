@@ -670,7 +670,86 @@ index(selected_account_id, created_at)
 - `candidate_snapshot_json` 只能保存调度重算需要的 provider/account/mapping/runtime/capability 字段，不得保存账号凭证、cookie、OAuth token、API key、密码或 credential ciphertext。
 - 历史 replay 只能声称覆盖有 snapshot 的 decision；旧的 decision-only 行只能用于报表统计。
 
-### 10.5 sticky_sessions
+### 10.5 quality_eval_samples
+
+用于在 `QUALITY_EVAL_ENABLED=true` 时保存可供 LLM-as-judge 评估的加密样本。样本来自已完成且成功写入 `scheduler_feedbacks` 的 Gateway 文本请求，保存的是经过 Gateway content-safety 处理后的规范化 prompt/output 摘要，不是原始请求体。
+
+```txt
+id
+feedback_id
+request_id
+decision_id
+attempt_no
+account_id
+provider_id
+model
+source_endpoint
+sample_request_hash
+sample_payload_ciphertext
+payload_version
+captured_at
+created_at
+updated_at
+```
+
+索引：
+
+```txt
+unique(feedback_id)
+index(decision_id)
+index(request_id, attempt_no)
+index(account_id, model, captured_at)
+index(sample_request_hash)
+```
+
+规则：
+
+- `sample_payload_ciphertext` 必须使用 `SRAPI_MASTER_KEY` 派生密钥进行 AES-GCM 加密，当前 `payload_version = v1`。
+- `sample_request_hash` 是基于请求侧脱敏文本、request_id、attempt_no 和 model 的不可逆 SHA-256，用于稳定 1% 抽样；它不得包含明文 prompt 或输出。
+- 每条 feedback 最多创建一条 sample，重复捕获必须幂等返回既有记录。
+- 当前捕获范围是文本型 Gateway 成功响应：OpenAI Chat Completions、OpenAI Responses、Anthropic Messages、Gemini GenerateContent。二进制/音频/图片/流式内部事件不进入本表。
+
+### 10.6 quality_evaluations
+
+保存 QualityEval worker 对样本的 LLM-as-judge 结果，并作为 Scheduler account+model 质量聚合的输入。
+
+```txt
+id
+feedback_id
+request_id
+decision_id
+attempt_no
+account_id
+provider_id
+model
+source_endpoint
+sample_request_hash
+judge_model
+score
+rubric_json
+judged_at
+created_at
+updated_at
+```
+
+索引：
+
+```txt
+unique(feedback_id)
+index(decision_id)
+index(account_id, model, judged_at)
+index(judge_model, judged_at)
+index(sample_request_hash)
+```
+
+规则：
+
+- `score` 归一化到 `0.0 - 1.0`；`rubric_json` 当前包含 `correctness`、`coherence`、`safety` 三项 0-5 分和短 rationale。
+- worker 默认每小时从未评估 sample 中按 `sample_request_hash` 稳定抽样 1%，调用 `gpt-4o-mini` 兼容的 Chat Completions JSON mode 评判模型。
+- Gateway 调度时按最近 30 天的 `(account_id, model)` 平均 `score` 注入候选 `quality_score`、`quality_eval_score`、`quality_tier` 和样本数，供 Scheduler score/Pareto 使用。
+- 本表不保存明文 prompt、输出、账号凭证、API key、cookie 或 OAuth token。
+
+### 10.7 sticky_sessions
 
 ```txt
 id
@@ -696,7 +775,7 @@ index(account_id)
 index(expires_at)
 ```
 
-### 10.6 cache_affinity_records
+### 10.8 cache_affinity_records
 
 ```txt
 id
@@ -720,7 +799,7 @@ index(prompt_prefix_hash)
 index(last_hit_time)
 ```
 
-### 10.7 account_health_snapshots
+### 10.9 account_health_snapshots
 
 ```txt
 id
@@ -746,7 +825,7 @@ index(provider_id, snapshot_at)
 index(status)
 ```
 
-### 10.8 account_quota_snapshots
+### 10.10 account_quota_snapshots
 
 ```txt
 id
@@ -1292,6 +1371,8 @@ usage_logs
 scheduler_decisions
 scheduler_request_snapshots
 scheduler_feedbacks
+quality_eval_samples
+quality_evaluations
 audit_logs
 account_health_snapshots
 account_quota_snapshots
@@ -1338,6 +1419,7 @@ provider_accounts.device_fingerprint_ciphertext
 proxies.url_ciphertext
 payment_provider_instances.config_ciphertext
 settings.value_ciphertext when is_secret = true
+quality_eval_samples.sample_payload_ciphertext
 ```
 
 加密建议：
@@ -1368,6 +1450,8 @@ scheduler_decisions
 scheduler_feedbacks
 scheduler_request_snapshots
 scheduler_strategies
+quality_eval_samples
+quality_evaluations
 billing_ledger
 account_health_snapshots
 account_quota_snapshots

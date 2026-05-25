@@ -50,6 +50,9 @@ import (
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	providerservice "github.com/srapi/srapi/apps/api/internal/modules/providers/service"
 	providermemory "github.com/srapi/srapi/apps/api/internal/modules/providers/store/memory"
+	qualitycontract "github.com/srapi/srapi/apps/api/internal/modules/quality_eval/contract"
+	qualityservice "github.com/srapi/srapi/apps/api/internal/modules/quality_eval/service"
+	qualitymemory "github.com/srapi/srapi/apps/api/internal/modules/quality_eval/store/memory"
 	realtimecontract "github.com/srapi/srapi/apps/api/internal/modules/realtime/contract"
 	realtimeservice "github.com/srapi/srapi/apps/api/internal/modules/realtime/service"
 	reverseproxyservice "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/service"
@@ -96,6 +99,7 @@ type runtimeState struct {
 	reverseProxy      *reverseproxyservice.Service
 	accounts          *accountservice.Service
 	adminControl      *admincontrolservice.Service
+	qualityEval       *qualityservice.Service
 	scheduler         *schedulerservice.Service
 	subscriptions     *subscriptionservice.Service
 	payments          *paymentservice.Service
@@ -114,6 +118,7 @@ type runtimeState struct {
 	accountStore      accountcontract.Store
 	adminControlStore admincontrolcontract.Store
 	paymentStore      paymentcontract.Store
+	qualityEvalStore  qualitycontract.Store
 	realtimeStore     realtimecontract.Store
 	rateLimiter       *ratelimit.Limiter
 	schedulerStore    schedulercontract.Store
@@ -221,6 +226,18 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 		return nil, err
 	}
 
+	qualityEvalStore := opts.qualityEval
+	if qualityEvalStore == nil {
+		if !allowMemoryStores {
+			return nil, missingRuntimeStoreError("quality eval")
+		}
+		qualityEvalStore = qualitymemory.New()
+	}
+	qualityEvalSvc, err := qualityservice.New(qualityEvalStore, cfg.Security.MasterKey, nil)
+	if err != nil {
+		return nil, err
+	}
+
 	schedulerStore := opts.scheduler
 	if schedulerStore == nil {
 		if !allowMemoryStores {
@@ -260,6 +277,7 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 		reverseProxySvc:   reverseProxySvc,
 		accountsSvc:       accountsSvc,
 		adminControlSvc:   adminControlSvc,
+		qualityEvalSvc:    qualityEvalSvc,
 		schedulerSvc:      schedulerSvc,
 		subscriptionSvc:   subscriptionSvc,
 		paymentsSvc:       paymentsSvc,
@@ -278,6 +296,7 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 		accountStore:      accountStore,
 		adminControlStore: adminControlStore,
 		paymentStore:      paymentStore,
+		qualityEvalStore:  qualityEvalStore,
 		schedulerStore:    schedulerStore,
 		subscriptionStore: subscriptionStore,
 		usageStore:        usageStore,
@@ -492,6 +511,7 @@ type runtimeAssembly struct {
 	reverseProxySvc   *reverseproxyservice.Service
 	accountsSvc       *accountservice.Service
 	adminControlSvc   *admincontrolservice.Service
+	qualityEvalSvc    *qualityservice.Service
 	schedulerSvc      *schedulerservice.Service
 	subscriptionSvc   *subscriptionservice.Service
 	paymentsSvc       *paymentservice.Service
@@ -510,6 +530,7 @@ type runtimeAssembly struct {
 	accountStore      accountcontract.Store
 	adminControlStore admincontrolcontract.Store
 	paymentStore      paymentcontract.Store
+	qualityEvalStore  qualitycontract.Store
 	schedulerStore    schedulercontract.Store
 	subscriptionStore subscriptioncontract.Store
 	usageStore        usagecontract.Store
@@ -535,6 +556,7 @@ func assembleRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOp
 		reverseProxy:      assembly.reverseProxySvc,
 		accounts:          assembly.accountsSvc,
 		adminControl:      assembly.adminControlSvc,
+		qualityEval:       assembly.qualityEvalSvc,
 		scheduler:         assembly.schedulerSvc,
 		subscriptions:     assembly.subscriptionSvc,
 		payments:          assembly.paymentsSvc,
@@ -553,6 +575,7 @@ func assembleRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOp
 		accountStore:      assembly.accountStore,
 		adminControlStore: assembly.adminControlStore,
 		paymentStore:      assembly.paymentStore,
+		qualityEvalStore:  assembly.qualityEvalStore,
 		realtimeStore:     opts.realtime,
 		rateLimiter:       opts.rateLimiter,
 		schedulerStore:    assembly.schedulerStore,

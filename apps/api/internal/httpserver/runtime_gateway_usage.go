@@ -51,7 +51,7 @@ func (rt *runtimeState) recordGatewayUsage(ctx context.Context, rec gatewayUsage
 	if rec.DecisionID <= 0 || rec.AccountID == nil || rec.ProviderID == nil {
 		return
 	}
-	_, feedbackErr := rt.scheduler.RecordFeedback(ctx, schedulercontract.RecordFeedbackRequest{
+	feedback, feedbackErr := rt.scheduler.RecordFeedback(ctx, schedulercontract.RecordFeedbackRequest{
 		RequestID:    rec.RequestID,
 		DecisionID:   rec.DecisionID,
 		AttemptNo:    rec.AttemptNo,
@@ -70,6 +70,9 @@ func (rt *runtimeState) recordGatewayUsage(ctx context.Context, rec gatewayUsage
 	})
 	if feedbackErr != nil {
 		rt.logger.Warn("failed to record scheduler feedback", "error", feedbackErr, "request_id", rec.RequestID)
+	} else if rec.QualityPrompt != "" && rec.QualityOutput != "" {
+		rec.FeedbackID = feedback.ID
+		rt.captureGatewayQualitySample(ctx, rec, rec.QualityPrompt, rec.QualityOutput)
 	}
 	if !rec.Success && rec.ErrorClass != nil && *rec.ErrorClass == "rate_limit" {
 		rt.applyProviderRateLimitCooldown(ctx, *rec.AccountID)

@@ -1,7 +1,8 @@
-h1:y3GXBuhWJiyZRTknwBidB2qNCehjWNZftMinNC30rzA=
+h1:gcBpyQxmgPdQ5TQZx/QGrWHoLTdIv6NsMzxhSAMib08=
 000001_initial_schema.sql h1:cyZ0pax3l7J4onSmEmgqPwpoJYXPXuJYXeTAGUOEHs4=
 000002_auth_sessions.sql h1:zJ6uEWQDpw4sa3JpABmlbbFR2Sy3JCceNl4UnBtcX9c=
 000003_api_key_concurrency_limit.sql h1:j/8OE2iF7+LUa5XCsyYSC4dvN1Vh2cihbc41rySg4OQ=
 000004_scheduler_decision_fallback_field.sql h1:Mi1lqs0QJAdhE6TeUH4HhyVOOCOs7oTPtL9NhJpByQw=
 000005_usage_log_attempts.sql h1:YBvDjVFhEHKLDtaUjJ9dxhphyB6G3r5g2ZWkKC/Z9RI=
 000006_scheduler_request_snapshots.sql h1:vjstgyOejuxHHyM8QG7CsKNFIKl3IZopqr3/+tVwaLU=
+000007_quality_evaluations.sql h1:iL+VZhYmvU1hUe/FoO3Ws8DjaMm2noZ1d1T0k8VJCC0=

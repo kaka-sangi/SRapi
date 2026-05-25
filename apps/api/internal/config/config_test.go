@@ -236,6 +236,63 @@ func TestHealthProbeDefaultsOverridesAndValidation(t *testing.T) {
 	}
 }
 
+func TestQualityEvalDefaultsOverridesAndValidation(t *testing.T) {
+	t.Setenv("QUALITY_EVAL_ENABLED", "")
+	t.Setenv("QUALITY_EVAL_INTERVAL_SECONDS", "")
+	t.Setenv("QUALITY_EVAL_TIMEOUT_SECONDS", "")
+	t.Setenv("QUALITY_EVAL_BATCH_LIMIT", "")
+	t.Setenv("QUALITY_EVAL_SAMPLE_PERCENT", "")
+	t.Setenv("QUALITY_EVAL_OPENAI_API_KEY", "")
+	t.Setenv("QUALITY_EVAL_OPENAI_BASE_URL", "")
+	t.Setenv("QUALITY_EVAL_JUDGE_MODEL", "")
+	t.Setenv("QUALITY_EVAL_JUDGE_TIMEOUT_SECONDS", "")
+	cfg := Load()
+	if cfg.QualityEval.Enabled ||
+		cfg.QualityEval.Interval != time.Hour ||
+		cfg.QualityEval.Timeout != 30*time.Second ||
+		cfg.QualityEval.BatchLimit != 100 ||
+		cfg.QualityEval.SamplePercent != 1 ||
+		cfg.QualityEval.JudgeModel != "gpt-4o-mini" ||
+		cfg.QualityEval.JudgeTimeout != 20*time.Second {
+		t.Fatalf("unexpected quality eval defaults: %+v", cfg.QualityEval)
+	}
+
+	t.Setenv("QUALITY_EVAL_ENABLED", "true")
+	t.Setenv("QUALITY_EVAL_INTERVAL_SECONDS", "1800")
+	t.Setenv("QUALITY_EVAL_TIMEOUT_SECONDS", "15")
+	t.Setenv("QUALITY_EVAL_BATCH_LIMIT", "25")
+	t.Setenv("QUALITY_EVAL_SAMPLE_PERCENT", "2.5")
+	t.Setenv("QUALITY_EVAL_OPENAI_API_KEY", "judge-key")
+	t.Setenv("QUALITY_EVAL_OPENAI_BASE_URL", "https://judge.example/v1")
+	t.Setenv("QUALITY_EVAL_JUDGE_MODEL", "gpt-4o-mini")
+	t.Setenv("QUALITY_EVAL_JUDGE_TIMEOUT_SECONDS", "9")
+	cfg = Load()
+	if !cfg.QualityEval.Enabled ||
+		cfg.QualityEval.Interval != 30*time.Minute ||
+		cfg.QualityEval.Timeout != 15*time.Second ||
+		cfg.QualityEval.BatchLimit != 25 ||
+		cfg.QualityEval.SamplePercent != 2.5 ||
+		cfg.QualityEval.OpenAIAPIKey != "judge-key" ||
+		cfg.QualityEval.OpenAIBaseURL != "https://judge.example/v1" ||
+		cfg.QualityEval.JudgeTimeout != 9*time.Second {
+		t.Fatalf("unexpected quality eval overrides: %+v", cfg.QualityEval)
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("expected enabled quality eval config to validate, got %v", err)
+	}
+
+	cfg.QualityEval.OpenAIAPIKey = ""
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "QUALITY_EVAL_OPENAI_API_KEY") {
+		t.Fatalf("expected missing quality judge key validation failure, got %v", err)
+	}
+
+	cfg = Load()
+	cfg.QualityEval.SamplePercent = 101
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "QUALITY_EVAL_SAMPLE_PERCENT") {
+		t.Fatalf("expected quality sample percent validation failure, got %v", err)
+	}
+}
+
 func validReleaseConfig() Config {
 	cfg := Load()
 	cfg.Server.Mode = "release"
