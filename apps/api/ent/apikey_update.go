@@ -76,6 +76,33 @@ func (_u *APIKeyUpdate) AddUserID(v int) *APIKeyUpdate {
 	return _u
 }
 
+// SetWorkspaceID sets the "workspace_id" field.
+func (_u *APIKeyUpdate) SetWorkspaceID(v int) *APIKeyUpdate {
+	_u.mutation.ResetWorkspaceID()
+	_u.mutation.SetWorkspaceID(v)
+	return _u
+}
+
+// SetNillableWorkspaceID sets the "workspace_id" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableWorkspaceID(v *int) *APIKeyUpdate {
+	if v != nil {
+		_u.SetWorkspaceID(*v)
+	}
+	return _u
+}
+
+// AddWorkspaceID adds value to the "workspace_id" field.
+func (_u *APIKeyUpdate) AddWorkspaceID(v int) *APIKeyUpdate {
+	_u.mutation.AddWorkspaceID(v)
+	return _u
+}
+
+// ClearWorkspaceID clears the value of the "workspace_id" field.
+func (_u *APIKeyUpdate) ClearWorkspaceID() *APIKeyUpdate {
+	_u.mutation.ClearWorkspaceID()
+	return _u
+}
+
 // SetName sets the "name" field.
 func (_u *APIKeyUpdate) SetName(v string) *APIKeyUpdate {
 	_u.mutation.SetName(v)
@@ -372,6 +399,15 @@ func (_u *APIKeyUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.AddedUserID(); ok {
 		_spec.AddField(apikey.FieldUserID, field.TypeInt, value)
 	}
+	if value, ok := _u.mutation.WorkspaceID(); ok {
+		_spec.SetField(apikey.FieldWorkspaceID, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedWorkspaceID(); ok {
+		_spec.AddField(apikey.FieldWorkspaceID, field.TypeInt, value)
+	}
+	if _u.mutation.WorkspaceIDCleared() {
+		_spec.ClearField(apikey.FieldWorkspaceID, field.TypeInt)
+	}
 	if value, ok := _u.mutation.Name(); ok {
 		_spec.SetField(apikey.FieldName, field.TypeString, value)
 	}
@@ -509,6 +545,33 @@ func (_u *APIKeyUpdateOne) SetNillableUserID(v *int) *APIKeyUpdateOne {
 // AddUserID adds value to the "user_id" field.
 func (_u *APIKeyUpdateOne) AddUserID(v int) *APIKeyUpdateOne {
 	_u.mutation.AddUserID(v)
+	return _u
+}
+
+// SetWorkspaceID sets the "workspace_id" field.
+func (_u *APIKeyUpdateOne) SetWorkspaceID(v int) *APIKeyUpdateOne {
+	_u.mutation.ResetWorkspaceID()
+	_u.mutation.SetWorkspaceID(v)
+	return _u
+}
+
+// SetNillableWorkspaceID sets the "workspace_id" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableWorkspaceID(v *int) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetWorkspaceID(*v)
+	}
+	return _u
+}
+
+// AddWorkspaceID adds value to the "workspace_id" field.
+func (_u *APIKeyUpdateOne) AddWorkspaceID(v int) *APIKeyUpdateOne {
+	_u.mutation.AddWorkspaceID(v)
+	return _u
+}
+
+// ClearWorkspaceID clears the value of the "workspace_id" field.
+func (_u *APIKeyUpdateOne) ClearWorkspaceID() *APIKeyUpdateOne {
+	_u.mutation.ClearWorkspaceID()
 	return _u
 }
 
@@ -837,6 +900,15 @@ func (_u *APIKeyUpdateOne) sqlSave(ctx context.Context) (_node *APIKey, err erro
 	}
 	if value, ok := _u.mutation.AddedUserID(); ok {
 		_spec.AddField(apikey.FieldUserID, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.WorkspaceID(); ok {
+		_spec.SetField(apikey.FieldWorkspaceID, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedWorkspaceID(); ok {
+		_spec.AddField(apikey.FieldWorkspaceID, field.TypeInt, value)
+	}
+	if _u.mutation.WorkspaceIDCleared() {
+		_spec.ClearField(apikey.FieldWorkspaceID, field.TypeInt)
 	}
 	if value, ok := _u.mutation.Name(); ok {
 		_spec.SetField(apikey.FieldName, field.TypeString, value)

@@ -21,6 +21,7 @@ func (User) Fields() []ent.Field {
 		field.String("name").Default(""),
 		field.String("password_hash").Sensitive(),
 		field.String("status").Default("active"),
+		field.Int("workspace_id").Optional().Nillable(),
 		field.String("balance").Default("0.00000000"),
 		field.String("currency").Default("USD"),
 		field.Int("rpm_limit").Optional().Nillable(),
@@ -31,6 +32,7 @@ func (User) Fields() []ent.Field {
 func (User) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("email").Unique(),
+		index.Fields("workspace_id"),
 		index.Fields("status"),
 		index.Fields("created_at"),
 	}

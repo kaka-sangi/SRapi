@@ -17,6 +17,7 @@ Provider Adapter 使用该账号调用上游 AI Provider。
 
 ```txt
 User
+  ├── Workspace
   ├── API Key
   ├── Subscription
   ├── Balance / Ledger
@@ -60,6 +61,7 @@ email
 name
 role
 status
+workspace_id
 balance
 created_at
 updated_at
@@ -73,7 +75,33 @@ suspended
 deleted
 ```
 
-## 4. Role
+新用户默认归属一个个人 Workspace。当前不暴露 Workspace 管理 API；持久化层会在创建用户时为未指定 `workspace_id` 的用户创建 `personal-<user_id>` Workspace 并写回用户。
+
+## 4. Workspace
+
+Workspace 是当前多租户边界，用于把用户、API Key 和后续权限/安全策略聚合到同一租户作用域。第一阶段只支持个人 Workspace，不建 Organization/Team。
+
+关键属性：
+
+```txt
+id
+name
+slug
+owner_user_id
+type
+status
+metadata
+created_at
+updated_at
+```
+
+规则：
+
+- `type=personal` 表示个人工作区。
+- `users.workspace_id` 和 `api_keys.workspace_id` 为 nullable，便于增量迁移和导入数据；新建用户默认会有个人 Workspace。
+- API Key 创建时如果未指定 Workspace，会继承 owner user 的 Workspace。
+
+## 5. Role
 
 角色用于控制后台权限。
 
@@ -88,7 +116,7 @@ user
 
 角色只控制控制台和管理 API 权限，不直接控制模型访问。模型访问由 API Key、Subscription、Entitlement 和 User Group 共同决定。
 
-## 5. User Group
+## 6. User Group
 
 用户组用于绑定策略、价格、权限和调度偏好。
 
@@ -112,7 +140,7 @@ account_group_scope
 status
 ```
 
-## 6. API Key
+## 7. API Key
 
 API Key 是用户调用 Gateway 的凭证。
 
@@ -122,12 +150,14 @@ API Key 是用户调用 Gateway 的凭证。
 - 数据库只保存哈希。
 - 使用 key prefix 做快速定位。
 - 可以绑定权限、模型范围、限流和过期时间。
+- 默认继承 owner user 的 Workspace，后续 Workspace 级策略可按该字段过滤。
 
 关键属性：
 
 ```txt
 id
 user_id
+workspace_id
 name
 prefix
 hash
@@ -151,7 +181,7 @@ expired
 revoked
 ```
 
-## 7. Provider
+## 8. Provider
 
 Provider 表示一个 AI 服务商或协议类型。
 
@@ -191,7 +221,7 @@ created_at
 updated_at
 ```
 
-## 8. Provider Adapter
+## 9. Provider Adapter
 
 Provider Adapter 是对某个 Provider 协议的代码实现。
 
@@ -207,7 +237,7 @@ Provider Adapter 是对某个 Provider 协议的代码实现。
 
 Provider Adapter 不保存业务数据。
 
-## 9. Provider Account
+## 10. Provider Account
 
 Provider Account 是可被调度使用的上游账号或上游凭证。
 
@@ -262,7 +292,7 @@ dead
 
 Provider Account 是 Scheduler 的主要候选对象。
 
-## 10. Account Group
+## 11. Account Group
 
 Account Group 是账号池分组。
 
@@ -284,7 +314,7 @@ strategy_hint
 status
 ```
 
-## 11. Model Registry
+## 12. Model Registry
 
 Model Registry 是 SRapi 内部的模型目录。
 
@@ -309,7 +339,7 @@ quality_tier
 status
 ```
 
-## 12. Model Alias
+## 13. Model Alias
 
 Model Alias 用于兼容不同客户端或商业命名。
 
@@ -327,7 +357,7 @@ fast-chat -> internal selected low-latency model
 - 一个 fallback model list。
 - 一个 strategy-driven virtual model。
 
-## 13. Model Capability
+## 14. Model Capability
 
 描述模型能力。
 
@@ -362,7 +392,7 @@ metadata_json
 
 Gateway 负责从客户端请求提取 RequestCapability；Scheduler 只能使用 RequestCapability 与 EffectiveCapability 做候选过滤；Provider Adapter 负责声明 ProviderCapability。
 
-## 14. Provider Model Mapping
+## 15. Provider Model Mapping
 
 Provider Model Mapping 表示某个 Provider 如何调用某个内部模型。
 
@@ -385,7 +415,7 @@ status
 - 某个 Provider 可覆盖价格和能力。
 - `capability_override` 必须遵守 `CAPABILITY_TAXONOMY_SPEC.md`，并参与 EffectiveCapability 计算。
 
-## 15. Pricing Rule
+## 16. Pricing Rule
 
 Pricing Rule 描述模型或 Provider 的价格。
 
@@ -405,7 +435,7 @@ effective_from
 effective_to
 ```
 
-## 16. Subscription Plan
+## 17. Subscription Plan
 
 Subscription Plan 是可售卖套餐。
 
@@ -426,7 +456,7 @@ sort_order
 status
 ```
 
-## 17. User Subscription
+## 18. User Subscription
 
 User Subscription 是用户实际拥有的订阅。
 
@@ -453,7 +483,7 @@ cancelled
 suspended
 ```
 
-## 18. Entitlement
+## 19. Entitlement
 
 Entitlement 是用户权益。
 
@@ -483,7 +513,7 @@ Entitlement 可以来自：
 API Key override > User override > Subscription > User Group > System default
 ```
 
-## 19. Quota
+## 20. Quota
 
 Quota 表示额度或限制。
 
@@ -505,7 +535,7 @@ Quota 有两类：
 - 用户侧 quota：决定用户是否能发起请求。
 - 账号侧 quota：决定某个账号是否能被调度。
 
-## 20. Gateway Request
+## 21. Gateway Request
 
 Gateway Request 是客户端发来的模型调用请求。
 
@@ -526,7 +556,7 @@ metadata
 idempotency_key
 ```
 
-## 21. Request Profile
+## 22. Request Profile
 
 Request Profile 是 Gateway 请求进入 Scheduler 前的标准化画像。
 
@@ -552,7 +582,7 @@ priority
 strategy_hint
 ```
 
-## 21.1 Client Endpoint Adapter
+## 22.1 Client Endpoint Adapter
 
 Client Endpoint Adapter 负责把不同客户端协议转换为 Canonical AI Request，并把 Canonical AI Response 渲染回源端点格式。
 
@@ -577,7 +607,7 @@ batch
 realtime
 ```
 
-## 21.2 Canonical AI Request
+## 22.2 Canonical AI Request
 
 Canonical AI Request 是 SRapi 内部所有 AI 调用的统一请求模型。
 
@@ -589,7 +619,7 @@ Canonical AI Request 是 SRapi 内部所有 AI 调用的统一请求模型。
 
 关键属性以 `AI_ENDPOINT_COMPATIBILITY.md` 为准。
 
-## 21.3 Canonical AI Response
+## 22.3 Canonical AI Response
 
 Canonical AI Response 是 Provider Adapter 输出到 Gateway 的统一响应模型。
 
@@ -604,7 +634,7 @@ Gemini GenerateContent response
 
 无法无损转换时必须携带 compatibility warning 或返回明确错误。
 
-## 22. Scheduler Decision
+## 23. Scheduler Decision
 
 Scheduler Decision 是一次调度选择的结果和解释。
 
@@ -629,7 +659,7 @@ estimated_cost
 
 它必须可审计、可观察、可用于调试。
 
-## 23. Lease
+## 24. Lease
 
 Lease 是调度选中账号后的短期资源预占。
 
@@ -657,7 +687,7 @@ expired
 failed
 ```
 
-## 24. Sticky Session
+## 25. Sticky Session
 
 Sticky Session 是会话粘度绑定。
 
@@ -691,7 +721,7 @@ cache_only
 none
 ```
 
-## 25. Cache Affinity Record
+## 26. Cache Affinity Record
 
 Cache Affinity Record 表示某个 prompt prefix 或上下文在某个 Provider Account 上可能有缓存收益。
 
@@ -708,7 +738,7 @@ last_hit_time
 ttl_seconds
 ```
 
-## 26. Usage Log
+## 27. Usage Log
 
 Usage Log 是请求级用量记录。
 
@@ -732,7 +762,7 @@ created_at
 
 Usage Log 是报表和计费的数据基础，但真实扣费应以 Billing Ledger 为准。
 
-## 27. Billing Ledger
+## 28. Billing Ledger
 
 Billing Ledger 是账务流水。
 
@@ -767,7 +797,7 @@ adjustment
 compensation
 ```
 
-## 28. Payment Order
+## 29. Payment Order
 
 Payment Order 是支付订单。
 
@@ -799,7 +829,7 @@ refunded
 partially_refunded
 ```
 
-## 29. Audit Log
+## 30. Audit Log
 
 Audit Log 是管理员和系统关键动作日志。
 
@@ -813,7 +843,7 @@ Audit Log 是管理员和系统关键动作日志。
 - User-Agent。
 - Trace ID。
 
-## 30. Reverse Proxy Runtime
+## 31. Reverse Proxy Runtime
 
 Reverse Proxy Runtime 是 Provider Adapter 之下的反代执行层。
 
@@ -827,7 +857,7 @@ Reverse Proxy Runtime 是 Provider Adapter 之下的反代执行层。
 
 详见 `REVERSE_PROXY_SPEC.md`。
 
-## 31. Egress Profile
+## 32. Egress Profile
 
 Egress Profile 是反代请求的指纹模板。
 
@@ -858,7 +888,7 @@ last_validated_at
 
 Egress Profile 必须可在管理后台版本化更新。升级 Profile 不得改写旧的 decision 与 usage 记录。
 
-## 32. Cookie Jar
+## 33. Cookie Jar
 
 Cookie Jar 是每账号独立的 cookie 集合。
 
@@ -879,7 +909,7 @@ expires_hint_at
 - 不得跨账号共享。
 - 必须遵守上游 `Set-Cookie` 的 Domain、Path、Secure、HttpOnly、SameSite、Expires。
 
-## 33. Device Fingerprint
+## 34. Device Fingerprint
 
 Device Fingerprint 描述某账号在反代请求中持续呈现的设备特征。
 
@@ -906,7 +936,7 @@ last_used_at
 - 仅 `runtime_class` 为 `web_session_cookie` / `desktop_client_token` / `ide_plugin_token` / `cli_client_token` 时必填。
 - 同账号同请求必须使用同一 Device Fingerprint，不得在请求间随机切换。
 
-## 34. 概念边界总结
+## 35. 概念边界总结
 
 - Provider 是服务商或协议类型。
 - Provider Adapter 是 Provider 的代码实现。

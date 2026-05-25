@@ -33,6 +33,8 @@ type User struct {
 	PasswordHash string `json:"-"`
 	// Status holds the value of the "status" field.
 	Status string `json:"status,omitempty"`
+	// WorkspaceID holds the value of the "workspace_id" field.
+	WorkspaceID *int `json:"workspace_id,omitempty"`
 	// Balance holds the value of the "balance" field.
 	Balance string `json:"balance,omitempty"`
 	// Currency holds the value of the "currency" field.
@@ -49,7 +51,7 @@ func (*User) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case user.FieldID, user.FieldRpmLimit:
+		case user.FieldID, user.FieldWorkspaceID, user.FieldRpmLimit:
 			values[i] = new(sql.NullInt64)
 		case user.FieldEmail, user.FieldName, user.FieldPasswordHash, user.FieldStatus, user.FieldBalance, user.FieldCurrency:
 			values[i] = new(sql.NullString)
@@ -125,6 +127,13 @@ func (_m *User) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field status", values[i])
 			} else if value.Valid {
 				_m.Status = value.String
+			}
+		case user.FieldWorkspaceID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field workspace_id", values[i])
+			} else if value.Valid {
+				_m.WorkspaceID = new(int)
+				*_m.WorkspaceID = int(value.Int64)
 			}
 		case user.FieldBalance:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -214,6 +223,11 @@ func (_m *User) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(_m.Status)
+	builder.WriteString(", ")
+	if v := _m.WorkspaceID; v != nil {
+		builder.WriteString("workspace_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	builder.WriteString("balance=")
 	builder.WriteString(_m.Balance)

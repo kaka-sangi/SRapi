@@ -48,6 +48,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/user"
 	"github.com/srapi/srapi/apps/api/ent/userrole"
 	"github.com/srapi/srapi/apps/api/ent/usersubscription"
+	"github.com/srapi/srapi/apps/api/ent/workspace"
 )
 
 // The init function reads all schema descriptors with runtime code
@@ -70,15 +71,15 @@ func init() {
 	// apikey.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	apikey.UpdateDefaultUpdatedAt = apikeyDescUpdatedAt.UpdateDefault.(func() time.Time)
 	// apikeyDescName is the schema descriptor for name field.
-	apikeyDescName := apikeyFields[1].Descriptor()
+	apikeyDescName := apikeyFields[2].Descriptor()
 	// apikey.NameValidator is a validator for the "name" field. It is called by the builders before save.
 	apikey.NameValidator = apikeyDescName.Validators[0].(func(string) error)
 	// apikeyDescPrefix is the schema descriptor for prefix field.
-	apikeyDescPrefix := apikeyFields[2].Descriptor()
+	apikeyDescPrefix := apikeyFields[3].Descriptor()
 	// apikey.PrefixValidator is a validator for the "prefix" field. It is called by the builders before save.
 	apikey.PrefixValidator = apikeyDescPrefix.Validators[0].(func(string) error)
 	// apikeyDescStatus is the schema descriptor for status field.
-	apikeyDescStatus := apikeyFields[4].Descriptor()
+	apikeyDescStatus := apikeyFields[5].Descriptor()
 	// apikey.DefaultStatus holds the default value on creation for the status field.
 	apikey.DefaultStatus = apikeyDescStatus.Default.(string)
 	apikeygroupMixin := schema.APIKeyGroup{}.Mixin()
@@ -1489,11 +1490,11 @@ func init() {
 	// user.DefaultStatus holds the default value on creation for the status field.
 	user.DefaultStatus = userDescStatus.Default.(string)
 	// userDescBalance is the schema descriptor for balance field.
-	userDescBalance := userFields[5].Descriptor()
+	userDescBalance := userFields[6].Descriptor()
 	// user.DefaultBalance holds the default value on creation for the balance field.
 	user.DefaultBalance = userDescBalance.Default.(string)
 	// userDescCurrency is the schema descriptor for currency field.
-	userDescCurrency := userFields[6].Descriptor()
+	userDescCurrency := userFields[7].Descriptor()
 	// user.DefaultCurrency holds the default value on creation for the currency field.
 	user.DefaultCurrency = userDescCurrency.Default.(string)
 	userroleMixin := schema.UserRole{}.Mixin()
@@ -1538,4 +1539,35 @@ func init() {
 	usersubscriptionDescSourceID := usersubscriptionFields[7].Descriptor()
 	// usersubscription.DefaultSourceID holds the default value on creation for the source_id field.
 	usersubscription.DefaultSourceID = usersubscriptionDescSourceID.Default.(string)
+	workspaceMixin := schema.Workspace{}.Mixin()
+	workspaceMixinFields0 := workspaceMixin[0].Fields()
+	_ = workspaceMixinFields0
+	workspaceFields := schema.Workspace{}.Fields()
+	_ = workspaceFields
+	// workspaceDescCreatedAt is the schema descriptor for created_at field.
+	workspaceDescCreatedAt := workspaceMixinFields0[0].Descriptor()
+	// workspace.DefaultCreatedAt holds the default value on creation for the created_at field.
+	workspace.DefaultCreatedAt = workspaceDescCreatedAt.Default.(func() time.Time)
+	// workspaceDescUpdatedAt is the schema descriptor for updated_at field.
+	workspaceDescUpdatedAt := workspaceMixinFields0[1].Descriptor()
+	// workspace.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	workspace.DefaultUpdatedAt = workspaceDescUpdatedAt.Default.(func() time.Time)
+	// workspace.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	workspace.UpdateDefaultUpdatedAt = workspaceDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// workspaceDescName is the schema descriptor for name field.
+	workspaceDescName := workspaceFields[0].Descriptor()
+	// workspace.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	workspace.NameValidator = workspaceDescName.Validators[0].(func(string) error)
+	// workspaceDescSlug is the schema descriptor for slug field.
+	workspaceDescSlug := workspaceFields[1].Descriptor()
+	// workspace.SlugValidator is a validator for the "slug" field. It is called by the builders before save.
+	workspace.SlugValidator = workspaceDescSlug.Validators[0].(func(string) error)
+	// workspaceDescType is the schema descriptor for type field.
+	workspaceDescType := workspaceFields[3].Descriptor()
+	// workspace.DefaultType holds the default value on creation for the type field.
+	workspace.DefaultType = workspaceDescType.Default.(string)
+	// workspaceDescStatus is the schema descriptor for status field.
+	workspaceDescStatus := workspaceFields[4].Descriptor()
+	// workspace.DefaultStatus holds the default value on creation for the status field.
+	workspace.DefaultStatus = workspaceDescStatus.Default.(string)
 }

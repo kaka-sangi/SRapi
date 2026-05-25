@@ -130,6 +130,33 @@ func (_u *UserUpdate) SetNillableStatus(v *string) *UserUpdate {
 	return _u
 }
 
+// SetWorkspaceID sets the "workspace_id" field.
+func (_u *UserUpdate) SetWorkspaceID(v int) *UserUpdate {
+	_u.mutation.ResetWorkspaceID()
+	_u.mutation.SetWorkspaceID(v)
+	return _u
+}
+
+// SetNillableWorkspaceID sets the "workspace_id" field if the given value is not nil.
+func (_u *UserUpdate) SetNillableWorkspaceID(v *int) *UserUpdate {
+	if v != nil {
+		_u.SetWorkspaceID(*v)
+	}
+	return _u
+}
+
+// AddWorkspaceID adds value to the "workspace_id" field.
+func (_u *UserUpdate) AddWorkspaceID(v int) *UserUpdate {
+	_u.mutation.AddWorkspaceID(v)
+	return _u
+}
+
+// ClearWorkspaceID clears the value of the "workspace_id" field.
+func (_u *UserUpdate) ClearWorkspaceID() *UserUpdate {
+	_u.mutation.ClearWorkspaceID()
+	return _u
+}
+
 // SetBalance sets the "balance" field.
 func (_u *UserUpdate) SetBalance(v string) *UserUpdate {
 	_u.mutation.SetBalance(v)
@@ -295,6 +322,15 @@ func (_u *UserUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(user.FieldStatus, field.TypeString, value)
 	}
+	if value, ok := _u.mutation.WorkspaceID(); ok {
+		_spec.SetField(user.FieldWorkspaceID, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedWorkspaceID(); ok {
+		_spec.AddField(user.FieldWorkspaceID, field.TypeInt, value)
+	}
+	if _u.mutation.WorkspaceIDCleared() {
+		_spec.ClearField(user.FieldWorkspaceID, field.TypeInt)
+	}
 	if value, ok := _u.mutation.Balance(); ok {
 		_spec.SetField(user.FieldBalance, field.TypeString, value)
 	}
@@ -435,6 +471,33 @@ func (_u *UserUpdateOne) SetNillableStatus(v *string) *UserUpdateOne {
 	if v != nil {
 		_u.SetStatus(*v)
 	}
+	return _u
+}
+
+// SetWorkspaceID sets the "workspace_id" field.
+func (_u *UserUpdateOne) SetWorkspaceID(v int) *UserUpdateOne {
+	_u.mutation.ResetWorkspaceID()
+	_u.mutation.SetWorkspaceID(v)
+	return _u
+}
+
+// SetNillableWorkspaceID sets the "workspace_id" field if the given value is not nil.
+func (_u *UserUpdateOne) SetNillableWorkspaceID(v *int) *UserUpdateOne {
+	if v != nil {
+		_u.SetWorkspaceID(*v)
+	}
+	return _u
+}
+
+// AddWorkspaceID adds value to the "workspace_id" field.
+func (_u *UserUpdateOne) AddWorkspaceID(v int) *UserUpdateOne {
+	_u.mutation.AddWorkspaceID(v)
+	return _u
+}
+
+// ClearWorkspaceID clears the value of the "workspace_id" field.
+func (_u *UserUpdateOne) ClearWorkspaceID() *UserUpdateOne {
+	_u.mutation.ClearWorkspaceID()
 	return _u
 }
 
@@ -632,6 +695,15 @@ func (_u *UserUpdateOne) sqlSave(ctx context.Context) (_node *User, err error) {
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(user.FieldStatus, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.WorkspaceID(); ok {
+		_spec.SetField(user.FieldWorkspaceID, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedWorkspaceID(); ok {
+		_spec.AddField(user.FieldWorkspaceID, field.TypeInt, value)
+	}
+	if _u.mutation.WorkspaceIDCleared() {
+		_spec.ClearField(user.FieldWorkspaceID, field.TypeInt)
 	}
 	if value, ok := _u.mutation.Balance(); ok {
 		_spec.SetField(user.FieldBalance, field.TypeString, value)

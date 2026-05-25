@@ -19,6 +19,7 @@ const (
 type APIKey struct {
 	ID               int
 	UserID           int
+	WorkspaceID      *int
 	Name             string
 	Prefix           string
 	Hash             string
@@ -36,6 +37,7 @@ type APIKey struct {
 
 type CreateRequest struct {
 	UserID           int
+	WorkspaceID      *int
 	Name             string
 	Scopes           []string
 	AllowedModels    []string
@@ -77,6 +79,7 @@ type Store interface {
 
 type CreateStoredKey struct {
 	UserID           int
+	WorkspaceID      *int
 	Name             string
 	Prefix           string
 	Hash             string

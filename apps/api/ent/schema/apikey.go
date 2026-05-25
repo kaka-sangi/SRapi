@@ -17,6 +17,7 @@ func (APIKey) Mixin() []ent.Mixin {
 func (APIKey) Fields() []ent.Field {
 	return []ent.Field{
 		field.Int("user_id"),
+		field.Int("workspace_id").Optional().Nillable(),
 		field.String("name").NotEmpty(),
 		field.String("prefix").NotEmpty(),
 		field.String("hash").Sensitive(),
@@ -34,6 +35,7 @@ func (APIKey) Fields() []ent.Field {
 func (APIKey) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("prefix").Unique(),
+		index.Fields("workspace_id", "status"),
 		index.Fields("user_id", "status"),
 		index.Fields("expires_at"),
 	}

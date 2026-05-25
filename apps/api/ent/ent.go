@@ -54,6 +54,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/user"
 	"github.com/srapi/srapi/apps/api/ent/userrole"
 	"github.com/srapi/srapi/apps/api/ent/usersubscription"
+	"github.com/srapi/srapi/apps/api/ent/workspace"
 )
 
 // ent aliases to avoid import conflicts in user's code.
@@ -156,6 +157,7 @@ func checkColumn(t, c string) error {
 			user.Table:                     user.ValidColumn,
 			userrole.Table:                 userrole.ValidColumn,
 			usersubscription.Table:         usersubscription.ValidColumn,
+			workspace.Table:                workspace.ValidColumn,
 		})
 	})
 	return columnCheck(t, c)

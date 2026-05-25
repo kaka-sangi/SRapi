@@ -26,6 +26,8 @@ type APIKey struct {
 	DeletedAt *time.Time `json:"deleted_at,omitempty"`
 	// UserID holds the value of the "user_id" field.
 	UserID int `json:"user_id,omitempty"`
+	// WorkspaceID holds the value of the "workspace_id" field.
+	WorkspaceID *int `json:"workspace_id,omitempty"`
 	// Name holds the value of the "name" field.
 	Name string `json:"name,omitempty"`
 	// Prefix holds the value of the "prefix" field.
@@ -58,7 +60,7 @@ func (*APIKey) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case apikey.FieldScopesJSON, apikey.FieldAllowedModelsJSON:
 			values[i] = new([]byte)
-		case apikey.FieldID, apikey.FieldUserID, apikey.FieldRpmLimit, apikey.FieldTpmLimit, apikey.FieldConcurrencyLimit:
+		case apikey.FieldID, apikey.FieldUserID, apikey.FieldWorkspaceID, apikey.FieldRpmLimit, apikey.FieldTpmLimit, apikey.FieldConcurrencyLimit:
 			values[i] = new(sql.NullInt64)
 		case apikey.FieldName, apikey.FieldPrefix, apikey.FieldHash, apikey.FieldStatus:
 			values[i] = new(sql.NullString)
@@ -109,6 +111,13 @@ func (_m *APIKey) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field user_id", values[i])
 			} else if value.Valid {
 				_m.UserID = int(value.Int64)
+			}
+		case apikey.FieldWorkspaceID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field workspace_id", values[i])
+			} else if value.Valid {
+				_m.WorkspaceID = new(int)
+				*_m.WorkspaceID = int(value.Int64)
 			}
 		case apikey.FieldName:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -234,6 +243,11 @@ func (_m *APIKey) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("user_id=")
 	builder.WriteString(fmt.Sprintf("%v", _m.UserID))
+	builder.WriteString(", ")
+	if v := _m.WorkspaceID; v != nil {
+		builder.WriteString("workspace_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	builder.WriteString("name=")
 	builder.WriteString(_m.Name)

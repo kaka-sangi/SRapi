@@ -88,26 +88,26 @@ last_completed:
 - K1.6.4: Scoped real-traffic Scheduler strategy rollout now lets admin settings enable a shadow Scheduler strategy for real Gateway requests with a stable rollout percentage, optional canonical model / alias scope, and optional API key prefix hash scope. Gateway computes sanitized rollout inputs, Scheduler applies the provider-neutral split before resolving the active strategy, and decisions/snapshots persist only hash/bucket/percent/selection evidence without raw API keys, rollout keys, prompts, cookies, or credentials.
 - K1.7: Admin strategy comparison UI now exposes `/admin/ops/strategy`, uses the generated TypeScript SDK through `adminApi` and `useAdminSchedulerReplay`, calls `POST /api/v1/admin/scheduler/replay`, renders strategy/time/model/request replay controls, summary cards, Recharts current-vs-shadow score curves, winner distributions, and per-snapshot replay evidence, and is included in admin smoke targets.
 - K1.4: QualityEval now adds encrypted `quality_eval_samples`, persisted `quality_evaluations`, contract/service/memory/Ent stores, an hourly worker, and OpenAI-compatible Chat Completions JSON-mode judge support. Gateway captures content-safety-sanitized text samples only when `QUALITY_EVAL_ENABLED=true`, worker samples 1% by stable hash and records correctness/coherence/safety rubric, and Scheduler candidates receive recent account+model aggregate `quality_score` / `quality_tier` evidence.
+- C3.1: Workspace persistence now adds `workspaces`, nullable `users.workspace_id`, nullable `api_keys.workspace_id`, `000008_workspaces_and_user_workspace_id` up/down migrations, User store personal workspace creation, API Key workspace inheritance, and docs/spec migration parity.
 
 current:
 
 - package: next critical-path backend package
-- status: K1.4 implemented; production smoke pending real judge credential/environment
-- objective: continue the critical path after QualityEval without letting docs/specs drift.
+- status: C3.1 implemented; production QualityEval smoke still pending real judge credential/environment
+- objective: continue the critical path after Workspace tenant scope without letting docs/specs drift.
 
-next_recommended: Continue with the next pending backend package from `specs/silly-stirring-turtle.md`, prioritizing C3.1 workspace/user workspace persistence or B1.2 usage performance indexing unless the user redirects.
+next_recommended: Continue with the next pending backend package from `specs/silly-stirring-turtle.md`, prioritizing C3.2 Role permissions and Entitlement persistence or B1.2 usage performance indexing unless the user redirects.
 
 last_gates:
 
-- `cd apps/api && go test ./internal/modules/scheduler/... ./internal/persistence/entstore/scheduler ./internal/platform/db`: pass
 - `make ent-generate-check`: pass
 - `make migration-check`: pass
+- `cd apps/api && go test ./internal/persistence/entstore/users ./internal/persistence/entstore/apikeys ./internal/modules/users/... ./internal/modules/api_keys/...`: pass
 - `cd apps/api && go test ./...`: pass
 - `make architecture-check`: pass
 - `make code-quality-check`: pass
-- `make secret-scan`: pass
-- `make diff-check`: pass
 - `git diff --check`: pass
+- `make check`: pass
 
 notes:
 
@@ -282,5 +282,6 @@ notes:
 | WP-610 | completed | Claude Code refresh-token-only import and OAuth lifecycle v1. |
 | WP-620 | completed | Antigravity refresh-token-only import and OAuth lifecycle v1. |
 | WP-700 | completed | Admin Control Plane v1 docs, OpenAPI contracts, module-backed APIs, audit coverage, generated SDKs, and full gates pass. |
-| WP-710 | completed | K1.4 QualityEval module, encrypted samples, worker, judge client, migration, Scheduler quality aggregation, and docs/spec governance. |
+| WP-720 | completed | K1.4 QualityEval module, encrypted samples, worker, judge client, migration, Scheduler quality aggregation, and docs/spec governance. |
+| WP-730 | completed | C3.1 Workspace schema, nullable User/APIKey workspace scope, personal workspace defaults, API Key inheritance, incremental migration, and docs/spec governance. |
 | WP-500+ | pending | Remaining ecosystem and advanced endpoint packages. |

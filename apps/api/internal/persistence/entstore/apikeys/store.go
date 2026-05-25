@@ -3,11 +3,13 @@ package apikeys
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/srapi/srapi/apps/api/ent"
 	entapikey "github.com/srapi/srapi/apps/api/ent/apikey"
 	entapikeygroup "github.com/srapi/srapi/apps/api/ent/apikeygroup"
+	entuser "github.com/srapi/srapi/apps/api/ent/user"
 	"github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
 )
 
@@ -29,9 +31,15 @@ func (s *Store) Create(ctx context.Context, input contract.CreateStoredKey) (con
 	if err != nil {
 		return contract.APIKey{}, err
 	}
+	workspaceID, err := workspaceIDForKey(ctx, tx, input)
+	if err != nil {
+		_ = tx.Rollback()
+		return contract.APIKey{}, err
+	}
 
 	created, err := tx.APIKey.Create().
 		SetUserID(input.UserID).
+		SetNillableWorkspaceID(workspaceID).
 		SetName(input.Name).
 		SetPrefix(input.Prefix).
 		SetHash(input.Hash).
@@ -177,6 +185,7 @@ func (s *Store) toAPIKey(ctx context.Context, key *ent.APIKey) (contract.APIKey,
 	return contract.APIKey{
 		ID:               key.ID,
 		UserID:           key.UserID,
+		WorkspaceID:      cloneIntPointer(key.WorkspaceID),
 		Name:             key.Name,
 		Prefix:           key.Prefix,
 		Hash:             key.Hash,
@@ -208,6 +217,22 @@ func (s *Store) groupIDs(ctx context.Context, apiKeyID int) ([]int, error) {
 	return out, nil
 }
 
+func workspaceIDForKey(ctx context.Context, tx *ent.Tx, input contract.CreateStoredKey) (*int, error) {
+	if input.WorkspaceID != nil {
+		return cloneIntPointer(input.WorkspaceID), nil
+	}
+	owner, err := tx.User.Query().
+		Where(entuser.IDEQ(input.UserID), entuser.DeletedAtIsNil()).
+		Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, fmt.Errorf("api key owner user %d not found", input.UserID)
+		}
+		return nil, err
+	}
+	return cloneIntPointer(owner.WorkspaceID), nil
+}
+
 func cloneStrings(values []string) []string {
 	if values == nil {
 		return nil
@@ -228,4 +253,12 @@ func uniqueInts(values []int) []int {
 		out = append(out, value)
 	}
 	return out
+}
+
+func cloneIntPointer(value *int) *int {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
 }

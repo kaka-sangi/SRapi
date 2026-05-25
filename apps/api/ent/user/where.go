@@ -94,6 +94,11 @@ func Status(v string) predicate.User {
 	return predicate.User(sql.FieldEQ(FieldStatus, v))
 }
 
+// WorkspaceID applies equality check predicate on the "workspace_id" field. It's identical to WorkspaceIDEQ.
+func WorkspaceID(v int) predicate.User {
+	return predicate.User(sql.FieldEQ(FieldWorkspaceID, v))
+}
+
 // Balance applies equality check predicate on the "balance" field. It's identical to BalanceEQ.
 func Balance(v string) predicate.User {
 	return predicate.User(sql.FieldEQ(FieldBalance, v))
@@ -552,6 +557,56 @@ func StatusEqualFold(v string) predicate.User {
 // StatusContainsFold applies the ContainsFold predicate on the "status" field.
 func StatusContainsFold(v string) predicate.User {
 	return predicate.User(sql.FieldContainsFold(FieldStatus, v))
+}
+
+// WorkspaceIDEQ applies the EQ predicate on the "workspace_id" field.
+func WorkspaceIDEQ(v int) predicate.User {
+	return predicate.User(sql.FieldEQ(FieldWorkspaceID, v))
+}
+
+// WorkspaceIDNEQ applies the NEQ predicate on the "workspace_id" field.
+func WorkspaceIDNEQ(v int) predicate.User {
+	return predicate.User(sql.FieldNEQ(FieldWorkspaceID, v))
+}
+
+// WorkspaceIDIn applies the In predicate on the "workspace_id" field.
+func WorkspaceIDIn(vs ...int) predicate.User {
+	return predicate.User(sql.FieldIn(FieldWorkspaceID, vs...))
+}
+
+// WorkspaceIDNotIn applies the NotIn predicate on the "workspace_id" field.
+func WorkspaceIDNotIn(vs ...int) predicate.User {
+	return predicate.User(sql.FieldNotIn(FieldWorkspaceID, vs...))
+}
+
+// WorkspaceIDGT applies the GT predicate on the "workspace_id" field.
+func WorkspaceIDGT(v int) predicate.User {
+	return predicate.User(sql.FieldGT(FieldWorkspaceID, v))
+}
+
+// WorkspaceIDGTE applies the GTE predicate on the "workspace_id" field.
+func WorkspaceIDGTE(v int) predicate.User {
+	return predicate.User(sql.FieldGTE(FieldWorkspaceID, v))
+}
+
+// WorkspaceIDLT applies the LT predicate on the "workspace_id" field.
+func WorkspaceIDLT(v int) predicate.User {
+	return predicate.User(sql.FieldLT(FieldWorkspaceID, v))
+}
+
+// WorkspaceIDLTE applies the LTE predicate on the "workspace_id" field.
+func WorkspaceIDLTE(v int) predicate.User {
+	return predicate.User(sql.FieldLTE(FieldWorkspaceID, v))
+}
+
+// WorkspaceIDIsNil applies the IsNil predicate on the "workspace_id" field.
+func WorkspaceIDIsNil() predicate.User {
+	return predicate.User(sql.FieldIsNull(FieldWorkspaceID))
+}
+
+// WorkspaceIDNotNil applies the NotNil predicate on the "workspace_id" field.
+func WorkspaceIDNotNil() predicate.User {
+	return predicate.User(sql.FieldNotNull(FieldWorkspaceID))
 }
 
 // BalanceEQ applies the EQ predicate on the "balance" field.

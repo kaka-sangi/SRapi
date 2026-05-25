@@ -60,6 +60,7 @@ func (s *Service) Create(ctx context.Context, req contract.CreateRequest) (contr
 
 	stored, err := s.store.Create(ctx, contract.CreateStoredKey{
 		UserID:           req.UserID,
+		WorkspaceID:      cloneIntPointer(req.WorkspaceID),
 		Name:             strings.TrimSpace(req.Name),
 		Prefix:           prefix,
 		Hash:             hash,

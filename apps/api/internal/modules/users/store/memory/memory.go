@@ -37,15 +37,16 @@ func (s *Store) Create(_ context.Context, input contract.CreateStoredUser) (cont
 	now := time.Now().UTC()
 	user := contract.StoredUser{
 		User: contract.User{
-			ID:        s.nextID,
-			Email:     email,
-			Name:      input.Name,
-			Status:    input.Status,
-			Roles:     append([]contract.Role(nil), input.Roles...),
-			Balance:   input.Balance,
-			Currency:  input.Currency,
-			RPMLimit:  cloneInt(input.RPMLimit),
-			CreatedAt: now,
+			ID:          s.nextID,
+			Email:       email,
+			Name:        input.Name,
+			Status:      input.Status,
+			WorkspaceID: cloneInt(input.WorkspaceID),
+			Roles:       append([]contract.Role(nil), input.Roles...),
+			Balance:     input.Balance,
+			Currency:    input.Currency,
+			RPMLimit:    cloneInt(input.RPMLimit),
+			CreatedAt:   now,
 		},
 		PasswordHash:    input.PasswordHash,
 		EmailVerifiedAt: input.EmailVerifiedAt,
@@ -136,6 +137,9 @@ func (s *Store) Update(_ context.Context, id int, input contract.UpdateStoredUse
 	if input.Status != nil {
 		user.Status = *input.Status
 	}
+	if input.WorkspaceID != nil {
+		user.WorkspaceID = cloneInt(*input.WorkspaceID)
+	}
 	if input.Roles != nil {
 		user.Roles = append([]contract.Role(nil), (*input.Roles)...)
 	}
@@ -166,6 +170,7 @@ func (s *Store) UpdateLastLogin(_ context.Context, id int, at time.Time) error {
 
 func cloneUser(user contract.StoredUser) contract.StoredUser {
 	user.Roles = append([]contract.Role(nil), user.Roles...)
+	user.WorkspaceID = cloneInt(user.WorkspaceID)
 	user.RPMLimit = cloneInt(user.RPMLimit)
 	if user.LastLoginAt != nil {
 		lastLoginAt := *user.LastLoginAt

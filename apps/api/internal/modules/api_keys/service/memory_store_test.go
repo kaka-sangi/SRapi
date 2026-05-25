@@ -30,6 +30,7 @@ func (s *memoryStore) Create(_ context.Context, input contract.CreateStoredKey) 
 	key := contract.APIKey{
 		ID:            s.nextID,
 		UserID:        input.UserID,
+		WorkspaceID:   cloneInt(input.WorkspaceID),
 		Name:          input.Name,
 		Prefix:        input.Prefix,
 		Hash:          input.Hash,
@@ -56,6 +57,7 @@ func (s *memoryStore) Update(_ context.Context, key contract.APIKey) (contract.A
 		return contract.APIKey{}, contract.ErrKeyNotFound
 	}
 	key.UserID = stored.UserID
+	key.WorkspaceID = cloneInt(stored.WorkspaceID)
 	key.Prefix = stored.Prefix
 	key.Hash = stored.Hash
 	key.CreatedAt = stored.CreatedAt
@@ -129,4 +131,12 @@ type fixedClock struct {
 
 func (c fixedClock) Now() time.Time {
 	return c.now
+}
+
+func cloneInt(value *int) *int {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
 }

@@ -56,6 +56,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/user"
 	"github.com/srapi/srapi/apps/api/ent/userrole"
 	"github.com/srapi/srapi/apps/api/ent/usersubscription"
+	"github.com/srapi/srapi/apps/api/ent/workspace"
 )
 
 // Client is the client that holds all ent builders.
@@ -147,6 +148,8 @@ type Client struct {
 	UserRole *UserRoleClient
 	// UserSubscription is the client for interacting with the UserSubscription builders.
 	UserSubscription *UserSubscriptionClient
+	// Workspace is the client for interacting with the Workspace builders.
+	Workspace *WorkspaceClient
 }
 
 // NewClient creates a new client configured with the given options.
@@ -200,6 +203,7 @@ func (c *Client) init() {
 	c.User = NewUserClient(c.config)
 	c.UserRole = NewUserRoleClient(c.config)
 	c.UserSubscription = NewUserSubscriptionClient(c.config)
+	c.Workspace = NewWorkspaceClient(c.config)
 }
 
 type (
@@ -334,6 +338,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		User:                     NewUserClient(cfg),
 		UserRole:                 NewUserRoleClient(cfg),
 		UserSubscription:         NewUserSubscriptionClient(cfg),
+		Workspace:                NewWorkspaceClient(cfg),
 	}, nil
 }
 
@@ -395,6 +400,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		User:                     NewUserClient(cfg),
 		UserRole:                 NewUserRoleClient(cfg),
 		UserSubscription:         NewUserSubscriptionClient(cfg),
+		Workspace:                NewWorkspaceClient(cfg),
 	}, nil
 }
 
@@ -434,7 +440,7 @@ func (c *Client) Use(hooks ...Hook) {
 		c.Provider, c.ProviderAccount, c.Proxy, c.QualityEvalSample,
 		c.QualityEvaluation, c.Role, c.SchedulerDecision, c.SchedulerFeedback,
 		c.SchedulerRequestSnapshot, c.SchedulerStrategy, c.Setting, c.SubscriptionPlan,
-		c.UsageLog, c.User, c.UserRole, c.UserSubscription,
+		c.UsageLog, c.User, c.UserRole, c.UserSubscription, c.Workspace,
 	} {
 		n.Use(hooks...)
 	}
@@ -454,7 +460,7 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.Provider, c.ProviderAccount, c.Proxy, c.QualityEvalSample,
 		c.QualityEvaluation, c.Role, c.SchedulerDecision, c.SchedulerFeedback,
 		c.SchedulerRequestSnapshot, c.SchedulerStrategy, c.Setting, c.SubscriptionPlan,
-		c.UsageLog, c.User, c.UserRole, c.UserSubscription,
+		c.UsageLog, c.User, c.UserRole, c.UserSubscription, c.Workspace,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -547,6 +553,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.UserRole.mutate(ctx, m)
 	case *UserSubscriptionMutation:
 		return c.UserSubscription.mutate(ctx, m)
+	case *WorkspaceMutation:
+		return c.Workspace.mutate(ctx, m)
 	default:
 		return nil, fmt.Errorf("ent: unknown mutation type %T", m)
 	}
@@ -6138,6 +6146,139 @@ func (c *UserSubscriptionClient) mutate(ctx context.Context, m *UserSubscription
 	}
 }
 
+// WorkspaceClient is a client for the Workspace schema.
+type WorkspaceClient struct {
+	config
+}
+
+// NewWorkspaceClient returns a client for the Workspace from the given config.
+func NewWorkspaceClient(c config) *WorkspaceClient {
+	return &WorkspaceClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `workspace.Hooks(f(g(h())))`.
+func (c *WorkspaceClient) Use(hooks ...Hook) {
+	c.hooks.Workspace = append(c.hooks.Workspace, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `workspace.Intercept(f(g(h())))`.
+func (c *WorkspaceClient) Intercept(interceptors ...Interceptor) {
+	c.inters.Workspace = append(c.inters.Workspace, interceptors...)
+}
+
+// Create returns a builder for creating a Workspace entity.
+func (c *WorkspaceClient) Create() *WorkspaceCreate {
+	mutation := newWorkspaceMutation(c.config, OpCreate)
+	return &WorkspaceCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of Workspace entities.
+func (c *WorkspaceClient) CreateBulk(builders ...*WorkspaceCreate) *WorkspaceCreateBulk {
+	return &WorkspaceCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *WorkspaceClient) MapCreateBulk(slice any, setFunc func(*WorkspaceCreate, int)) *WorkspaceCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &WorkspaceCreateBulk{err: fmt.Errorf("calling to WorkspaceClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*WorkspaceCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &WorkspaceCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for Workspace.
+func (c *WorkspaceClient) Update() *WorkspaceUpdate {
+	mutation := newWorkspaceMutation(c.config, OpUpdate)
+	return &WorkspaceUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *WorkspaceClient) UpdateOne(_m *Workspace) *WorkspaceUpdateOne {
+	mutation := newWorkspaceMutation(c.config, OpUpdateOne, withWorkspace(_m))
+	return &WorkspaceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *WorkspaceClient) UpdateOneID(id int) *WorkspaceUpdateOne {
+	mutation := newWorkspaceMutation(c.config, OpUpdateOne, withWorkspaceID(id))
+	return &WorkspaceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for Workspace.
+func (c *WorkspaceClient) Delete() *WorkspaceDelete {
+	mutation := newWorkspaceMutation(c.config, OpDelete)
+	return &WorkspaceDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *WorkspaceClient) DeleteOne(_m *Workspace) *WorkspaceDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *WorkspaceClient) DeleteOneID(id int) *WorkspaceDeleteOne {
+	builder := c.Delete().Where(workspace.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &WorkspaceDeleteOne{builder}
+}
+
+// Query returns a query builder for Workspace.
+func (c *WorkspaceClient) Query() *WorkspaceQuery {
+	return &WorkspaceQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeWorkspace},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a Workspace entity by its id.
+func (c *WorkspaceClient) Get(ctx context.Context, id int) (*Workspace, error) {
+	return c.Query().Where(workspace.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *WorkspaceClient) GetX(ctx context.Context, id int) *Workspace {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *WorkspaceClient) Hooks() []Hook {
+	return c.hooks.Workspace
+}
+
+// Interceptors returns the client interceptors.
+func (c *WorkspaceClient) Interceptors() []Interceptor {
+	return c.inters.Workspace
+}
+
+func (c *WorkspaceClient) mutate(ctx context.Context, m *WorkspaceMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&WorkspaceCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&WorkspaceUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&WorkspaceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&WorkspaceDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown Workspace mutation op: %q", m.Op())
+	}
+}
+
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
@@ -6150,7 +6291,7 @@ type (
 		ProviderAccount, Proxy, QualityEvalSample, QualityEvaluation, Role,
 		SchedulerDecision, SchedulerFeedback, SchedulerRequestSnapshot,
 		SchedulerStrategy, Setting, SubscriptionPlan, UsageLog, User, UserRole,
-		UserSubscription []ent.Hook
+		UserSubscription, Workspace []ent.Hook
 	}
 	inters struct {
 		APIKey, APIKeyGroup, AccountGroup, AccountGroupMember, AccountHealthSnapshot,
@@ -6162,6 +6303,6 @@ type (
 		ProviderAccount, Proxy, QualityEvalSample, QualityEvaluation, Role,
 		SchedulerDecision, SchedulerFeedback, SchedulerRequestSnapshot,
 		SchedulerStrategy, Setting, SubscriptionPlan, UsageLog, User, UserRole,
-		UserSubscription []ent.Interceptor
+		UserSubscription, Workspace []ent.Interceptor
 	}
 )

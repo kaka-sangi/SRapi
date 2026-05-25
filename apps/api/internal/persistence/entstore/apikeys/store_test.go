@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect"
+	"github.com/srapi/srapi/apps/api/ent"
 	"github.com/srapi/srapi/apps/api/ent/enttest"
 	"github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
 
@@ -23,8 +24,9 @@ func TestStoreCreatesAndLoadsAPIKey(t *testing.T) {
 	}
 
 	ctx := context.Background()
+	userID, workspaceID := createUserWithWorkspace(t, ctx, client, "primary")
 	created, err := store.Create(ctx, contract.CreateStoredKey{
-		UserID:        42,
+		UserID:        userID,
 		Name:          "default",
 		Prefix:        "sk_abcdef",
 		Hash:          "hmac-sha256:hash",
@@ -42,13 +44,19 @@ func TestStoreCreatesAndLoadsAPIKey(t *testing.T) {
 	if len(created.GroupIDs) != 2 || created.GroupIDs[0] != 2 || created.GroupIDs[1] != 1 {
 		t.Fatalf("unexpected group ids: %v", created.GroupIDs)
 	}
+	if created.WorkspaceID == nil || *created.WorkspaceID != workspaceID {
+		t.Fatalf("expected inherited workspace %d, got %v", workspaceID, created.WorkspaceID)
+	}
 
 	found, err := store.FindByPrefix(ctx, "sk_abcdef")
 	if err != nil {
 		t.Fatalf("find by prefix: %v", err)
 	}
-	if found.ID != created.ID || found.UserID != 42 || found.Scopes[0] != "gateway:invoke" {
+	if found.ID != created.ID || found.UserID != userID || found.Scopes[0] != "gateway:invoke" {
 		t.Fatalf("unexpected api key: %+v", found)
+	}
+	if found.WorkspaceID == nil || *found.WorkspaceID != workspaceID {
+		t.Fatalf("expected loaded workspace %d, got %v", workspaceID, found.WorkspaceID)
 	}
 
 	usedAt := time.Now().UTC().Truncate(time.Second)
@@ -74,17 +82,19 @@ func TestStoreListByUser(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	if _, err := store.Create(ctx, newKey(1, "sk_first")); err != nil {
+	userID, _ := createUserWithWorkspace(t, ctx, client, "user-one")
+	otherUserID, _ := createUserWithWorkspace(t, ctx, client, "user-two")
+	if _, err := store.Create(ctx, newKey(userID, "sk_first")); err != nil {
 		t.Fatalf("create first key: %v", err)
 	}
-	if _, err := store.Create(ctx, newKey(2, "sk_other")); err != nil {
+	if _, err := store.Create(ctx, newKey(otherUserID, "sk_other")); err != nil {
 		t.Fatalf("create other key: %v", err)
 	}
-	if _, err := store.Create(ctx, newKey(1, "sk_second")); err != nil {
+	if _, err := store.Create(ctx, newKey(userID, "sk_second")); err != nil {
 		t.Fatalf("create second key: %v", err)
 	}
 
-	keys, err := store.ListByUser(ctx, 1)
+	keys, err := store.ListByUser(ctx, userID)
 	if err != nil {
 		t.Fatalf("list by user: %v", err)
 	}
@@ -92,7 +102,7 @@ func TestStoreListByUser(t *testing.T) {
 		t.Fatalf("expected 2 keys, got %d", len(keys))
 	}
 	for _, key := range keys {
-		if key.UserID != 1 {
+		if key.UserID != userID {
 			t.Fatalf("unexpected user id in key: %+v", key)
 		}
 	}
@@ -108,8 +118,9 @@ func TestStoreUpdateAPIKeyPreservesSecretMaterialAndReplacesGroups(t *testing.T)
 	}
 
 	ctx := context.Background()
+	userID, workspaceID := createUserWithWorkspace(t, ctx, client, "update")
 	created, err := store.Create(ctx, contract.CreateStoredKey{
-		UserID:        42,
+		UserID:        userID,
 		Name:          "default",
 		Prefix:        "sk_update",
 		Hash:          "hmac-sha256:original",
@@ -120,6 +131,9 @@ func TestStoreUpdateAPIKeyPreservesSecretMaterialAndReplacesGroups(t *testing.T)
 	})
 	if err != nil {
 		t.Fatalf("create api key: %v", err)
+	}
+	if created.WorkspaceID == nil || *created.WorkspaceID != workspaceID {
+		t.Fatalf("expected inherited workspace %d, got %v", workspaceID, created.WorkspaceID)
 	}
 
 	created.Name = "renamed"
@@ -138,6 +152,9 @@ func TestStoreUpdateAPIKeyPreservesSecretMaterialAndReplacesGroups(t *testing.T)
 	if updated.Prefix != "sk_update" || updated.Hash != "hmac-sha256:original" {
 		t.Fatalf("update must preserve prefix and hash, got prefix=%s hash=%s", updated.Prefix, updated.Hash)
 	}
+	if updated.WorkspaceID == nil || *updated.WorkspaceID != workspaceID {
+		t.Fatalf("update must preserve workspace %d, got %v", workspaceID, updated.WorkspaceID)
+	}
 	if len(updated.GroupIDs) != 2 || updated.GroupIDs[0] != 3 || updated.GroupIDs[1] != 4 {
 		t.Fatalf("expected replaced unique group ids [3 4], got %v", updated.GroupIDs)
 	}
@@ -149,6 +166,30 @@ func TestStoreUpdateAPIKeyPreservesSecretMaterialAndReplacesGroups(t *testing.T)
 	if found.Hash != "hmac-sha256:original" || found.Name != "renamed" {
 		t.Fatalf("unexpected persisted api key: %+v", found)
 	}
+}
+
+func createUserWithWorkspace(t *testing.T, ctx context.Context, client *ent.Client, slug string) (int, int) {
+	t.Helper()
+	workspace, err := client.Workspace.Create().
+		SetName(slug + " workspace").
+		SetSlug(slug).
+		SetStatus("active").
+		SetType("personal").
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create workspace: %v", err)
+	}
+	user, err := client.User.Create().
+		SetEmail(slug + "@srapi.local").
+		SetName(slug).
+		SetPasswordHash("hash").
+		SetStatus("active").
+		SetWorkspaceID(workspace.ID).
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	return user.ID, workspace.ID
 }
 
 func newKey(userID int, prefix string) contract.CreateStoredKey {

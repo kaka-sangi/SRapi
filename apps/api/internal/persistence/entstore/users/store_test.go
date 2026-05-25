@@ -3,11 +3,13 @@ package users
 import (
 	"context"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
 	"entgo.io/ent/dialect"
 	"github.com/srapi/srapi/apps/api/ent/enttest"
+	entworkspace "github.com/srapi/srapi/apps/api/ent/workspace"
 	"github.com/srapi/srapi/apps/api/internal/modules/users/contract"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -43,6 +45,19 @@ func TestStoreCreatesAndLoadsUserWithRoles(t *testing.T) {
 	}
 	if created.Balance != "0.00000000" || created.Currency != "USD" {
 		t.Fatalf("unexpected balance: %s %s", created.Balance, created.Currency)
+	}
+	if created.WorkspaceID == nil {
+		t.Fatalf("expected personal workspace id, got nil")
+	}
+	workspace, err := client.Workspace.Query().Where(entworkspace.IDEQ(*created.WorkspaceID)).Only(ctx)
+	if err != nil {
+		t.Fatalf("load personal workspace: %v", err)
+	}
+	if workspace.Slug != "personal-"+strconv.Itoa(created.ID) || workspace.Type != "personal" || workspace.Status != "active" {
+		t.Fatalf("unexpected personal workspace: %+v", workspace)
+	}
+	if workspace.OwnerUserID == nil || *workspace.OwnerUserID != created.ID {
+		t.Fatalf("expected owner user %d, got %v", created.ID, workspace.OwnerUserID)
 	}
 
 	loaded, err := store.FindByEmail(ctx, "ADMIN@srapi.local")

@@ -15,6 +15,7 @@ var (
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "deleted_at", Type: field.TypeTime, Nullable: true},
 		{Name: "user_id", Type: field.TypeInt},
+		{Name: "workspace_id", Type: field.TypeInt, Nullable: true},
 		{Name: "name", Type: field.TypeString},
 		{Name: "prefix", Type: field.TypeString},
 		{Name: "hash", Type: field.TypeString},
@@ -36,17 +37,22 @@ var (
 			{
 				Name:    "apikey_prefix",
 				Unique:  true,
-				Columns: []*schema.Column{APIKeysColumns[6]},
+				Columns: []*schema.Column{APIKeysColumns[7]},
+			},
+			{
+				Name:    "apikey_workspace_id_status",
+				Unique:  false,
+				Columns: []*schema.Column{APIKeysColumns[5], APIKeysColumns[9]},
 			},
 			{
 				Name:    "apikey_user_id_status",
 				Unique:  false,
-				Columns: []*schema.Column{APIKeysColumns[4], APIKeysColumns[8]},
+				Columns: []*schema.Column{APIKeysColumns[4], APIKeysColumns[9]},
 			},
 			{
 				Name:    "apikey_expires_at",
 				Unique:  false,
-				Columns: []*schema.Column{APIKeysColumns[14]},
+				Columns: []*schema.Column{APIKeysColumns[15]},
 			},
 		},
 	}
@@ -1541,6 +1547,7 @@ var (
 		{Name: "name", Type: field.TypeString, Default: ""},
 		{Name: "password_hash", Type: field.TypeString},
 		{Name: "status", Type: field.TypeString, Default: "active"},
+		{Name: "workspace_id", Type: field.TypeInt, Nullable: true},
 		{Name: "balance", Type: field.TypeString, Default: "0.00000000"},
 		{Name: "currency", Type: field.TypeString, Default: "USD"},
 		{Name: "rpm_limit", Type: field.TypeInt, Nullable: true},
@@ -1556,6 +1563,11 @@ var (
 				Name:    "user_email",
 				Unique:  true,
 				Columns: []*schema.Column{UsersColumns[4]},
+			},
+			{
+				Name:    "user_workspace_id",
+				Unique:  false,
+				Columns: []*schema.Column{UsersColumns[9]},
 			},
 			{
 				Name:    "user_status",
@@ -1632,6 +1644,42 @@ var (
 			},
 		},
 	}
+	// WorkspacesColumns holds the columns for the "workspaces" table.
+	WorkspacesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "deleted_at", Type: field.TypeTime, Nullable: true},
+		{Name: "name", Type: field.TypeString},
+		{Name: "slug", Type: field.TypeString},
+		{Name: "owner_user_id", Type: field.TypeInt, Nullable: true},
+		{Name: "type", Type: field.TypeString, Default: "personal"},
+		{Name: "status", Type: field.TypeString, Default: "active"},
+		{Name: "metadata_json", Type: field.TypeJSON, Nullable: true},
+	}
+	// WorkspacesTable holds the schema information for the "workspaces" table.
+	WorkspacesTable = &schema.Table{
+		Name:       "workspaces",
+		Columns:    WorkspacesColumns,
+		PrimaryKey: []*schema.Column{WorkspacesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "workspace_slug",
+				Unique:  true,
+				Columns: []*schema.Column{WorkspacesColumns[5]},
+			},
+			{
+				Name:    "workspace_owner_user_id_status",
+				Unique:  false,
+				Columns: []*schema.Column{WorkspacesColumns[6], WorkspacesColumns[8]},
+			},
+			{
+				Name:    "workspace_status",
+				Unique:  false,
+				Columns: []*schema.Column{WorkspacesColumns[8]},
+			},
+		},
+	}
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
 		APIKeysTable,
@@ -1676,6 +1724,7 @@ var (
 		UsersTable,
 		UserRolesTable,
 		UserSubscriptionsTable,
+		WorkspacesTable,
 	}
 )
 

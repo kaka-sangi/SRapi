@@ -29,6 +29,8 @@ const (
 	FieldPasswordHash = "password_hash"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
+	// FieldWorkspaceID holds the string denoting the workspace_id field in the database.
+	FieldWorkspaceID = "workspace_id"
 	// FieldBalance holds the string denoting the balance field in the database.
 	FieldBalance = "balance"
 	// FieldCurrency holds the string denoting the currency field in the database.
@@ -52,6 +54,7 @@ var Columns = []string{
 	FieldName,
 	FieldPasswordHash,
 	FieldStatus,
+	FieldWorkspaceID,
 	FieldBalance,
 	FieldCurrency,
 	FieldRpmLimit,
@@ -133,6 +136,11 @@ func ByPasswordHash(opts ...sql.OrderTermOption) OrderOption {
 // ByStatus orders the results by the status field.
 func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldStatus, opts...).ToFunc()
+}
+
+// ByWorkspaceID orders the results by the workspace_id field.
+func ByWorkspaceID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldWorkspaceID, opts...).ToFunc()
 }
 
 // ByBalance orders the results by the balance field.

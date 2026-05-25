@@ -41,6 +41,7 @@ type User struct {
 	Email       string
 	Name        string
 	Status      Status
+	WorkspaceID *int
 	Roles       []Role
 	Balance     string
 	Currency    string
@@ -60,6 +61,7 @@ type CreateStoredUser struct {
 	Name            string
 	PasswordHash    string
 	Status          Status
+	WorkspaceID     *int
 	Roles           []Role
 	EmailVerifiedAt *time.Time
 	Balance         string
@@ -72,6 +74,7 @@ type UpdateStoredUser struct {
 	Name         *string
 	PasswordHash *string
 	Status       *Status
+	WorkspaceID  **int
 	Roles        *[]Role
 	Balance      *string
 	Currency     *string

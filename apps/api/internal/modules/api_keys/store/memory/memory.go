@@ -30,6 +30,7 @@ func (s *Store) Create(_ context.Context, input contract.CreateStoredKey) (contr
 	key := contract.APIKey{
 		ID:               s.nextID,
 		UserID:           input.UserID,
+		WorkspaceID:      cloneIntPointer(input.WorkspaceID),
 		Name:             input.Name,
 		Prefix:           input.Prefix,
 		Hash:             input.Hash,
@@ -57,6 +58,7 @@ func (s *Store) Update(_ context.Context, key contract.APIKey) (contract.APIKey,
 		return contract.APIKey{}, contract.ErrKeyNotFound
 	}
 	key.UserID = stored.UserID
+	key.WorkspaceID = cloneIntPointer(stored.WorkspaceID)
 	key.Prefix = stored.Prefix
 	key.Hash = stored.Hash
 	key.CreatedAt = stored.CreatedAt
@@ -120,6 +122,7 @@ func cloneKey(key contract.APIKey) contract.APIKey {
 	key.Scopes = append([]string(nil), key.Scopes...)
 	key.AllowedModels = append([]string(nil), key.AllowedModels...)
 	key.GroupIDs = append([]int(nil), key.GroupIDs...)
+	key.WorkspaceID = cloneIntPointer(key.WorkspaceID)
 	key.RPMLimit = cloneIntPointer(key.RPMLimit)
 	key.TPMLimit = cloneIntPointer(key.TPMLimit)
 	key.ConcurrencyLimit = cloneIntPointer(key.ConcurrencyLimit)

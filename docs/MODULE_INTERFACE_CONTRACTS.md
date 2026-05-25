@@ -170,7 +170,7 @@ ApiKeyPolicyReader.GetGatewayPolicy
 ApiKeyGroupReader.ListBoundGroups
 ```
 
-Gateway 只能通过这些 contract 鉴权，不得直接查询 `api_keys` 表。
+Gateway 只能通过这些 contract 鉴权，不得直接查询 `api_keys` 表。API Key contract DTO 可以携带 nullable `workspace_id` 作为租户作用域；未显式指定时由持久化 store 从 owner user 继承，服务层和 HTTP 层不直接查询 Workspace 表。
 
 ### 6.3 Models
 

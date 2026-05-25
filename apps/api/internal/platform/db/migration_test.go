@@ -96,6 +96,7 @@ func TestEntSchemaAppliesToEmptyDatabase(t *testing.T) {
 		"user_roles",
 		"user_subscriptions",
 		"users",
+		"workspaces",
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("unexpected tables:\nwant: %v\ngot:  %v", want, got)
@@ -287,6 +288,10 @@ func postgresSchemaFingerprint(value string) []string {
 			if _, dropped := droppedIndexes[name]; dropped {
 				continue
 			}
+			statement = canonicalCreateIndexStatement(statement)
+		}
+		if isDataMigrationStatement(statement) {
+			continue
 		}
 		other = append(other, statement)
 	}
@@ -304,7 +309,7 @@ func postgresSchemaFingerprint(value string) []string {
 }
 
 func parseCreateTableStatement(statement string) (string, []string, bool) {
-	match := regexp.MustCompile(`(?i)^CREATE TABLE "([^"]+)" \((.*)\)$`).FindStringSubmatch(statement)
+	match := regexp.MustCompile(`(?i)^CREATE TABLE (?:IF NOT EXISTS )?"([^"]+)" \((.*)\)$`).FindStringSubmatch(statement)
 	if len(match) != 3 {
 		return "", nil, false
 	}
@@ -312,7 +317,7 @@ func parseCreateTableStatement(statement string) (string, []string, bool) {
 }
 
 func parseAlterTableAddColumnStatement(statement string) (string, string, bool) {
-	match := regexp.MustCompile(`(?i)^ALTER TABLE "([^"]+)" ADD COLUMN (.*)$`).FindStringSubmatch(statement)
+	match := regexp.MustCompile(`(?i)^ALTER TABLE "([^"]+)" ADD COLUMN (?:IF NOT EXISTS )?(.*)$`).FindStringSubmatch(statement)
 	if len(match) != 3 {
 		return "", "", false
 	}
@@ -320,11 +325,15 @@ func parseAlterTableAddColumnStatement(statement string) (string, string, bool) 
 }
 
 func parseCreateIndexStatement(statement string) (string, bool) {
-	match := regexp.MustCompile(`(?i)^CREATE (?:UNIQUE )?INDEX "([^"]+)" ON `).FindStringSubmatch(statement)
+	match := regexp.MustCompile(`(?i)^CREATE (?:UNIQUE )?INDEX (?:IF NOT EXISTS )?"([^"]+)" ON `).FindStringSubmatch(statement)
 	if len(match) != 2 {
 		return "", false
 	}
 	return match[1], true
+}
+
+func canonicalCreateIndexStatement(statement string) string {
+	return regexp.MustCompile(`(?i)^(CREATE (?:UNIQUE )?INDEX) IF NOT EXISTS `).ReplaceAllString(statement, `$1 `)
 }
 
 func parseDropIndexStatement(statement string) (string, bool) {
@@ -333,6 +342,11 @@ func parseDropIndexStatement(statement string) (string, bool) {
 		return "", false
 	}
 	return match[1], true
+}
+
+func isDataMigrationStatement(statement string) bool {
+	upper := strings.ToUpper(statement)
+	return strings.HasPrefix(upper, "INSERT INTO ") || strings.HasPrefix(upper, "UPDATE ")
 }
 
 func splitSQLList(value string) []string {
@@ -390,7 +404,7 @@ func stripSQLComments(value string) string {
 }
 
 func createdTables(sql string) []string {
-	return quotedIdentifierMatches(sql, regexp.MustCompile(`(?i)CREATE\s+TABLE\s+"([^"]+)"`))
+	return quotedIdentifierMatches(sql, regexp.MustCompile(`(?i)CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?"([^"]+)"`))
 }
 
 func droppedTables(sql string) []string {

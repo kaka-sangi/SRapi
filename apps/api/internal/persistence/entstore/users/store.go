@@ -3,6 +3,7 @@ package users
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -40,6 +41,7 @@ func (s *Store) Create(ctx context.Context, input contract.CreateStoredUser) (co
 		SetName(strings.TrimSpace(input.Name)).
 		SetPasswordHash(input.PasswordHash).
 		SetStatus(string(input.Status)).
+		SetNillableWorkspaceID(input.WorkspaceID).
 		SetNillableEmailVerifiedAt(input.EmailVerifiedAt).
 		SetBalance(input.Balance).
 		SetCurrency(input.Currency).
@@ -48,6 +50,28 @@ func (s *Store) Create(ctx context.Context, input contract.CreateStoredUser) (co
 	if err != nil {
 		_ = tx.Rollback()
 		return contract.StoredUser{}, err
+	}
+
+	if created.WorkspaceID == nil {
+		workspace, err := tx.Workspace.Create().
+			SetName(personalWorkspaceName(input.Name)).
+			SetSlug(fmt.Sprintf("personal-%d", created.ID)).
+			SetOwnerUserID(created.ID).
+			SetType("personal").
+			SetStatus("active").
+			Save(ctx)
+		if err != nil {
+			_ = tx.Rollback()
+			return contract.StoredUser{}, err
+		}
+		created, err = tx.User.UpdateOneID(created.ID).
+			Where(entuser.DeletedAtIsNil()).
+			SetWorkspaceID(workspace.ID).
+			Save(ctx)
+		if err != nil {
+			_ = tx.Rollback()
+			return contract.StoredUser{}, err
+		}
 	}
 
 	for _, roleName := range normalizeRoles(input.Roles) {
@@ -161,6 +185,13 @@ func (s *Store) Update(ctx context.Context, id int, input contract.UpdateStoredU
 			update.SetRpmLimit(**input.RPMLimit)
 		}
 	}
+	if input.WorkspaceID != nil {
+		if *input.WorkspaceID == nil {
+			update.ClearWorkspaceID()
+		} else {
+			update.SetWorkspaceID(**input.WorkspaceID)
+		}
+	}
 	updated, err := update.Save(ctx)
 	if err != nil {
 		_ = tx.Rollback()
@@ -208,6 +239,7 @@ func (s *Store) toStoredUser(ctx context.Context, user *ent.User) (contract.Stor
 			Email:       user.Email,
 			Name:        user.Name,
 			Status:      contract.Status(user.Status),
+			WorkspaceID: cloneInt(user.WorkspaceID),
 			Roles:       roles,
 			Balance:     user.Balance,
 			Currency:    user.Currency,
@@ -283,6 +315,14 @@ func normalizeRoles(roles []contract.Role) []contract.Role {
 		out = append(out, role)
 	}
 	return out
+}
+
+func personalWorkspaceName(name string) string {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return "Personal Workspace"
+	}
+	return name + " Workspace"
 }
 
 func cloneInt(value *int) *int {
