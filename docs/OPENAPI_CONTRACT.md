@@ -82,7 +82,7 @@ packages/openapi/
 /api/v1/admin/user-subscriptions
 /api/v1/admin/pricing-rules
 /api/v1/admin/payments
-/api/v1/admin/affiliate
+/api/v1/admin/affiliates
 /api/v1/admin/ops
 /api/v1/admin/settings
 /api/v1/admin/dashboard/snapshot
@@ -707,11 +707,12 @@ POST /api/v1/admin/payments/orders/{id}/refund
 GET  /api/v1/me/affiliate
 GET  /api/v1/me/affiliate/ledger
 POST /api/v1/me/affiliate/transfer-to-balance
-GET  /api/v1/admin/affiliate/rules
-POST /api/v1/admin/affiliate/rules
-PATCH /api/v1/admin/affiliate/rules/{id}
-GET  /api/v1/admin/affiliate/ledger
+GET  /api/v1/admin/affiliates/invites
+GET  /api/v1/admin/affiliates/rebates
+GET  /api/v1/admin/affiliates/transfers
 ```
+
+用户侧 affiliate 转余额接口是账务写接口，必须同时使用 `cookieAuth`、`csrfHeader` 和 `Idempotency-Key` header。响应返回本次 affiliate ledger、billing ledger id、余额变更前后值和是否实际应用，重复 idempotency key 必须保持无副作用。
 
 ## 17. AI 端点兼容边界
 

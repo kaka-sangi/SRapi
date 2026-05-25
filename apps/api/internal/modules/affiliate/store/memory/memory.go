@@ -280,6 +280,19 @@ func (s *Store) ListLedgers(_ context.Context) ([]contract.AffiliateLedger, erro
 	return out, nil
 }
 
+func (s *Store) ListLedgersByUser(_ context.Context, userID int) ([]contract.AffiliateLedger, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]contract.AffiliateLedger, 0)
+	for _, row := range s.ledgers {
+		if row.UserID == userID {
+			out = append(out, cloneLedger(row))
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out, nil
+}
+
 func (s *Store) availableAffiliateBalance(userID int, currency string) *big.Rat {
 	total := new(big.Rat)
 	for _, row := range s.ledgers {

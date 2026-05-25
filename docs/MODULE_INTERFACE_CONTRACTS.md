@@ -306,6 +306,8 @@ PaymentWebhookCommand.HandleWebhook
 
 ```txt
 AffiliateRuleReader.GetEffectiveRule
+AffiliateLedgerReader.ListLedgersByUser
+AffiliateSummaryReader.GetSummary
 AffiliateCommand.AccrueRebate
 AffiliateCommand.CompensateRefund
 AffiliateBalanceCommand.TransferToBalance

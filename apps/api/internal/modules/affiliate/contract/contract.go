@@ -115,6 +115,24 @@ type AffiliateLedger struct {
 	SettledAt      *time.Time
 }
 
+// AffiliateCurrencySummary is the current affiliate balance view for one currency.
+type AffiliateCurrencySummary struct {
+	Currency                   string
+	AvailableBalance           string
+	AccruedAmount              string
+	RefundCompensatedAmount    string
+	TransferredToBalanceAmount string
+	SettledAmount              string
+	WithdrawnAmount            string
+	ManualAdjustmentAmount     string
+}
+
+// AffiliateSummary is the current user's affiliate balance summary across currencies.
+type AffiliateSummary struct {
+	UserID   int
+	Balances []AffiliateCurrencySummary
+}
+
 type CreateInviteCodeRequest struct {
 	UserID    int
 	Code      string
@@ -203,5 +221,6 @@ type Store interface {
 	AppendLedger(ctx context.Context, input AffiliateLedger) (AffiliateLedger, bool, error)
 	TransferToBalance(ctx context.Context, input TransferToBalanceInput) (TransferToBalanceResult, bool, error)
 	ListLedgers(ctx context.Context) ([]AffiliateLedger, error)
+	ListLedgersByUser(ctx context.Context, userID int) ([]AffiliateLedger, error)
 	ListLedgersByPaymentOrder(ctx context.Context, paymentOrderID int) ([]AffiliateLedger, error)
 }

@@ -2333,6 +2333,20 @@ type AdminTestResultResponse struct {
 	RequestId RequestId       `json:"request_id"`
 }
 
+// AffiliateCurrencySummary defines model for AffiliateCurrencySummary.
+type AffiliateCurrencySummary struct {
+	AccruedAmount string `json:"accrued_amount"`
+
+	// AvailableBalance Decimal string affiliate balance available for transfer.
+	AvailableBalance           string `json:"available_balance"`
+	Currency                   string `json:"currency"`
+	ManualAdjustmentAmount     string `json:"manual_adjustment_amount"`
+	RefundCompensatedAmount    string `json:"refund_compensated_amount"`
+	SettledAmount              string `json:"settled_amount"`
+	TransferredToBalanceAmount string `json:"transferred_to_balance_amount"`
+	WithdrawnAmount            string `json:"withdrawn_amount"`
+}
+
 // AffiliateInviteRecord defines model for AffiliateInviteRecord.
 type AffiliateInviteRecord struct {
 	CreatedAt     Timestamp                   `json:"created_at"`
@@ -2385,6 +2399,41 @@ type AffiliateLedgerEntryType string
 
 // AffiliateRelationshipStatus defines model for AffiliateRelationshipStatus.
 type AffiliateRelationshipStatus string
+
+// AffiliateSummary defines model for AffiliateSummary.
+type AffiliateSummary struct {
+	Balances []AffiliateCurrencySummary `json:"balances"`
+	UserId   Id                         `json:"user_id"`
+}
+
+// AffiliateSummaryResponse defines model for AffiliateSummaryResponse.
+type AffiliateSummaryResponse struct {
+	Data      AffiliateSummary `json:"data"`
+	RequestId RequestId        `json:"request_id"`
+}
+
+// AffiliateTransferToBalanceRequest defines model for AffiliateTransferToBalanceRequest.
+type AffiliateTransferToBalanceRequest struct {
+	// Amount Decimal string amount to move from affiliate balance into gateway balance.
+	Amount   string  `json:"amount"`
+	Currency *string `json:"currency,omitempty"`
+}
+
+// AffiliateTransferToBalanceResponse defines model for AffiliateTransferToBalanceResponse.
+type AffiliateTransferToBalanceResponse struct {
+	Data      AffiliateTransferToBalanceResult `json:"data"`
+	RequestId RequestId                        `json:"request_id"`
+}
+
+// AffiliateTransferToBalanceResult defines model for AffiliateTransferToBalanceResult.
+type AffiliateTransferToBalanceResult struct {
+	AffiliateLedger AffiliateLedgerEntry `json:"affiliate_ledger"`
+	Applied         bool                 `json:"applied"`
+	BalanceAfter    string               `json:"balance_after"`
+	BalanceBefore   string               `json:"balance_before"`
+	BillingLedgerId Id                   `json:"billing_ledger_id"`
+	Reason          *string              `json:"reason,omitempty"`
+}
 
 // Announcement defines model for Announcement.
 type Announcement struct {
@@ -5335,6 +5384,9 @@ type EndTime = time.Time
 // GeminiModel defines model for GeminiModel.
 type GeminiModel = string
 
+// IdempotencyKey defines model for IdempotencyKey.
+type IdempotencyKey = string
+
 // Page defines model for Page.
 type Page = int
 
@@ -5733,6 +5785,18 @@ type ListApiKeysParams struct {
 	Status   *Status   `form:"status,omitempty" json:"status,omitempty"`
 }
 
+// ListCurrentUserAffiliateLedgerParams defines parameters for ListCurrentUserAffiliateLedger.
+type ListCurrentUserAffiliateLedgerParams struct {
+	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
+
+// TransferCurrentUserAffiliateToBalanceParams defines parameters for TransferCurrentUserAffiliateToBalance.
+type TransferCurrentUserAffiliateToBalanceParams struct {
+	// IdempotencyKey Idempotency key for financial write operations.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
 // GetCurrentUserSubscriptionsParams defines parameters for GetCurrentUserSubscriptions.
 type GetCurrentUserSubscriptionsParams struct {
 	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
@@ -5990,6 +6054,9 @@ type UpdateApiKeyJSONRequestBody = UpdateApiKeyRequest
 
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = LoginRequest
+
+// TransferCurrentUserAffiliateToBalanceJSONRequestBody defines body for TransferCurrentUserAffiliateToBalance for application/json ContentType.
+type TransferCurrentUserAffiliateToBalanceJSONRequestBody = AffiliateTransferToBalanceRequest
 
 // CreatePaymentOrderJSONRequestBody defines body for CreatePaymentOrder for application/json ContentType.
 type CreatePaymentOrderJSONRequestBody = CreatePaymentOrderRequest
@@ -12310,6 +12377,15 @@ type ServerInterface interface {
 	// Get current console user.
 	// (GET /api/v1/me)
 	GetCurrentUser(w http.ResponseWriter, r *http.Request)
+	// Get current user affiliate summary.
+	// (GET /api/v1/me/affiliate)
+	GetCurrentUserAffiliate(w http.ResponseWriter, r *http.Request)
+	// List affiliate ledger entries for the current user.
+	// (GET /api/v1/me/affiliate/ledger)
+	ListCurrentUserAffiliateLedger(w http.ResponseWriter, r *http.Request, params ListCurrentUserAffiliateLedgerParams)
+	// Transfer current user affiliate balance into gateway balance.
+	// (POST /api/v1/me/affiliate/transfer-to-balance)
+	TransferCurrentUserAffiliateToBalance(w http.ResponseWriter, r *http.Request, params TransferCurrentUserAffiliateToBalanceParams)
 	// Get current user balance.
 	// (GET /api/v1/me/balance)
 	GetCurrentUserBalance(w http.ResponseWriter, r *http.Request)
@@ -17614,6 +17690,131 @@ func (siw *ServerInterfaceWrapper) GetCurrentUser(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// GetCurrentUserAffiliate operation middleware
+func (siw *ServerInterfaceWrapper) GetCurrentUserAffiliate(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetCurrentUserAffiliate(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListCurrentUserAffiliateLedger operation middleware
+func (siw *ServerInterfaceWrapper) ListCurrentUserAffiliateLedger(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListCurrentUserAffiliateLedgerParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListCurrentUserAffiliateLedger(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// TransferCurrentUserAffiliateToBalance operation middleware
+func (siw *ServerInterfaceWrapper) TransferCurrentUserAffiliateToBalance(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params TransferCurrentUserAffiliateToBalanceParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.TransferCurrentUserAffiliateToBalance(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetCurrentUserBalance operation middleware
 func (siw *ServerInterfaceWrapper) GetCurrentUserBalance(w http.ResponseWriter, r *http.Request) {
 
@@ -18767,6 +18968,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/auth/logout", wrapper.Logout)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/health", wrapper.GetHealth)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me", wrapper.GetCurrentUser)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/affiliate", wrapper.GetCurrentUserAffiliate)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/affiliate/ledger", wrapper.ListCurrentUserAffiliateLedger)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/me/affiliate/transfer-to-balance", wrapper.TransferCurrentUserAffiliateToBalance)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/balance", wrapper.GetCurrentUserBalance)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/subscriptions", wrapper.GetCurrentUserSubscriptions)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/usage", wrapper.GetCurrentUserUsage)

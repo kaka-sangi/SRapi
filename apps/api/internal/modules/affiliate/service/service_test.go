@@ -232,6 +232,56 @@ func TestTransferToBalanceWritesLedgerAndAuditIdempotently(t *testing.T) {
 	}
 }
 
+func TestAffiliateSummaryGroupsLedgerAmountsByCurrency(t *testing.T) {
+	h := newHarness(t)
+	seedInviteAndRule(t, h)
+	if _, err := h.affiliate.AccrueRebate(t.Context(), contract.AccrueRebateRequest{
+		OrderID:       404,
+		OrderNo:       "pay_404",
+		InviteeUserID: 20,
+		Amount:        "100.00",
+		Currency:      "USD",
+		PaidAt:        h.clock.now,
+	}); err != nil {
+		t.Fatalf("accrue rebate: %v", err)
+	}
+	if _, err := h.affiliate.CompensateRefund(t.Context(), contract.CompensateRefundRequest{
+		OrderID:      404,
+		RefundID:     "refund_404",
+		UserID:       20,
+		RefundAmount: "40.00",
+		Currency:     "USD",
+		RefundedAt:   h.clock.now.Add(time.Hour),
+	}); err != nil {
+		t.Fatalf("compensate refund: %v", err)
+	}
+	if _, err := h.affiliate.TransferToBalance(t.Context(), contract.TransferToBalanceRequest{
+		UserID:         10,
+		Amount:         "3.00",
+		Currency:       "USD",
+		IdempotencyKey: "transfer_404",
+		RequestedAt:    h.clock.now.Add(2 * time.Hour),
+	}); err != nil {
+		t.Fatalf("transfer to balance: %v", err)
+	}
+
+	summary, err := h.affiliate.GetSummary(t.Context(), 10)
+	if err != nil {
+		t.Fatalf("get summary: %v", err)
+	}
+	if summary.UserID != 10 || len(summary.Balances) != 1 {
+		t.Fatalf("unexpected summary shape: %+v", summary)
+	}
+	balance := summary.Balances[0]
+	if balance.Currency != "USD" ||
+		balance.AvailableBalance != "3.00000000" ||
+		balance.AccruedAmount != "10.00000000" ||
+		balance.RefundCompensatedAmount != "4.00000000" ||
+		balance.TransferredToBalanceAmount != "3.00000000" {
+		t.Fatalf("unexpected summary balance: %+v", balance)
+	}
+}
+
 type harness struct {
 	store     *affiliatememory.Store
 	affiliate *Service

@@ -353,6 +353,21 @@ func (s *Store) ListLedgers(ctx context.Context) ([]contract.AffiliateLedger, er
 	return out, nil
 }
 
+func (s *Store) ListLedgersByUser(ctx context.Context, userID int) ([]contract.AffiliateLedger, error) {
+	rows, err := s.client.AffiliateLedger.Query().
+		Where(entaffiliateledger.UserIDEQ(userID)).
+		Order(entaffiliateledger.ByID()).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]contract.AffiliateLedger, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toLedger(row))
+	}
+	return out, nil
+}
+
 func (s *Store) ListLedgersByPaymentOrder(ctx context.Context, paymentOrderID int) ([]contract.AffiliateLedger, error) {
 	rows, err := s.client.AffiliateLedger.Query().
 		Where(entaffiliateledger.PaymentOrderIDEQ(paymentOrderID)).

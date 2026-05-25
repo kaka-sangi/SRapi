@@ -1777,6 +1777,52 @@ export type AffiliateLedgerEntryListResponse = {
     request_id: RequestId;
 };
 
+export type AffiliateCurrencySummary = {
+    currency: string;
+    /**
+     * Decimal string affiliate balance available for transfer.
+     */
+    available_balance: string;
+    accrued_amount: string;
+    refund_compensated_amount: string;
+    transferred_to_balance_amount: string;
+    settled_amount: string;
+    withdrawn_amount: string;
+    manual_adjustment_amount: string;
+};
+
+export type AffiliateSummary = {
+    user_id: Id;
+    balances: Array<AffiliateCurrencySummary>;
+};
+
+export type AffiliateSummaryResponse = {
+    data: AffiliateSummary;
+    request_id: RequestId;
+};
+
+export type AffiliateTransferToBalanceRequest = {
+    /**
+     * Decimal string amount to move from affiliate balance into gateway balance.
+     */
+    amount: string;
+    currency?: string;
+};
+
+export type AffiliateTransferToBalanceResult = {
+    applied: boolean;
+    reason?: string;
+    affiliate_ledger: AffiliateLedgerEntry;
+    billing_ledger_id: Id;
+    balance_before: string;
+    balance_after: string;
+};
+
+export type AffiliateTransferToBalanceResponse = {
+    data: AffiliateTransferToBalanceResult;
+    request_id: RequestId;
+};
+
 export type DomainEventOutbox = {
     id: Id;
     event_id: string;
@@ -2948,6 +2994,11 @@ export type Page = number;
 
 export type PageSize = number;
 
+/**
+ * Idempotency key for financial write operations.
+ */
+export type IdempotencyKey = string;
+
 export type Status = string;
 
 export type SearchQuery = string;
@@ -3120,6 +3171,114 @@ export type GetCurrentUserBalanceResponses = {
 };
 
 export type GetCurrentUserBalanceResponse = GetCurrentUserBalanceResponses[keyof GetCurrentUserBalanceResponses];
+
+export type GetCurrentUserAffiliateData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/me/affiliate';
+};
+
+export type GetCurrentUserAffiliateErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetCurrentUserAffiliateError = GetCurrentUserAffiliateErrors[keyof GetCurrentUserAffiliateErrors];
+
+export type GetCurrentUserAffiliateResponses = {
+    /**
+     * Current user affiliate balances grouped by currency.
+     */
+    200: AffiliateSummaryResponse;
+};
+
+export type GetCurrentUserAffiliateResponse = GetCurrentUserAffiliateResponses[keyof GetCurrentUserAffiliateResponses];
+
+export type ListCurrentUserAffiliateLedgerData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        page_size?: number;
+    };
+    url: '/api/v1/me/affiliate/ledger';
+};
+
+export type ListCurrentUserAffiliateLedgerErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListCurrentUserAffiliateLedgerError = ListCurrentUserAffiliateLedgerErrors[keyof ListCurrentUserAffiliateLedgerErrors];
+
+export type ListCurrentUserAffiliateLedgerResponses = {
+    /**
+     * Current user affiliate ledger entries.
+     */
+    200: AffiliateLedgerEntryListResponse;
+};
+
+export type ListCurrentUserAffiliateLedgerResponse = ListCurrentUserAffiliateLedgerResponses[keyof ListCurrentUserAffiliateLedgerResponses];
+
+export type TransferCurrentUserAffiliateToBalanceData = {
+    body: AffiliateTransferToBalanceRequest;
+    headers: {
+        /**
+         * Idempotency key for financial write operations.
+         */
+        'Idempotency-Key': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/me/affiliate/transfer-to-balance';
+};
+
+export type TransferCurrentUserAffiliateToBalanceErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource conflict.
+     */
+    409: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type TransferCurrentUserAffiliateToBalanceError = TransferCurrentUserAffiliateToBalanceErrors[keyof TransferCurrentUserAffiliateToBalanceErrors];
+
+export type TransferCurrentUserAffiliateToBalanceResponses = {
+    /**
+     * Affiliate balance transfer result.
+     */
+    200: AffiliateTransferToBalanceResponse;
+};
+
+export type TransferCurrentUserAffiliateToBalanceResponse = TransferCurrentUserAffiliateToBalanceResponses[keyof TransferCurrentUserAffiliateToBalanceResponses];
 
 export type GetCurrentUserUsageData = {
     body?: never;

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	affiliatecontract "github.com/srapi/srapi/apps/api/internal/modules/affiliate/contract"
 	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
 	apikeyservice "github.com/srapi/srapi/apps/api/internal/modules/api_keys/service"
 	paymentcontract "github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
@@ -120,6 +121,84 @@ func (s *Server) handleCurrentUserBalance(w http.ResponseWriter, r *http.Request
 			Balance:  user.Balance,
 			Currency: user.Currency,
 		},
+		RequestId: requestID,
+	})
+}
+
+func (s *Server) handleCurrentUserAffiliate(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireConsoleSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusUnauthorized, apiopenapi.UNAUTHORIZED, "unauthorized", requestID)
+		return
+	}
+	summary, err := s.runtime.affiliate.GetSummary(r.Context(), session.User.ID)
+	if err != nil {
+		writeAffiliateServiceError(w, err, requestID)
+		return
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.AffiliateSummaryResponse{
+		Data:      toAPIAffiliateSummary(summary),
+		RequestId: requestID,
+	})
+}
+
+func (s *Server) handleCurrentUserAffiliateLedger(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireConsoleSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusUnauthorized, apiopenapi.UNAUTHORIZED, "unauthorized", requestID)
+		return
+	}
+	items, err := s.runtime.affiliate.ListLedgersByUser(r.Context(), session.User.ID)
+	if err != nil {
+		writeAffiliateServiceError(w, err, requestID)
+		return
+	}
+	data := make([]apiopenapi.AffiliateLedgerEntry, 0, len(items))
+	for _, item := range items {
+		data = append(data, toAPIAffiliateLedgerEntry(item))
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.AffiliateLedgerEntryListResponse{
+		Data:       data,
+		Pagination: pagination(len(data)),
+		RequestId:  requestID,
+	})
+}
+
+func (s *Server) handleCurrentUserAffiliateTransferToBalance(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireConsoleSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusUnauthorized, apiopenapi.UNAUTHORIZED, "unauthorized", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	idempotencyKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
+	if idempotencyKey == "" {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "idempotency key is required", requestID)
+		return
+	}
+	var body apiopenapi.AffiliateTransferToBalanceRequest
+	if err := s.decodeJSONBody(w, r, &body); err != nil {
+		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid affiliate transfer request", requestID)
+		return
+	}
+	result, err := s.runtime.affiliate.TransferToBalance(r.Context(), affiliatecontract.TransferToBalanceRequest{
+		UserID:         session.User.ID,
+		Amount:         body.Amount,
+		Currency:       optionalStringValue(body.Currency),
+		IdempotencyKey: idempotencyKey,
+	})
+	if err != nil {
+		writeAffiliateServiceError(w, err, requestID)
+		return
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.AffiliateTransferToBalanceResponse{
+		Data:      toAPIAffiliateTransferToBalanceResult(result),
 		RequestId: requestID,
 	})
 }

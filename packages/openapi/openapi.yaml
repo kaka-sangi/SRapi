@@ -209,6 +209,93 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/me/affiliate:
+    get:
+      tags:
+        - CurrentUser
+      operationId: getCurrentUserAffiliate
+      summary: Get current user affiliate summary.
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Current user affiliate balances grouped by currency.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AffiliateSummaryResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/me/affiliate/ledger:
+    get:
+      tags:
+        - CurrentUser
+      operationId: listCurrentUserAffiliateLedger
+      summary: List affiliate ledger entries for the current user.
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: Current user affiliate ledger entries.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AffiliateLedgerEntryListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/me/affiliate/transfer-to-balance:
+    post:
+      tags:
+        - CurrentUser
+      operationId: transferCurrentUserAffiliateToBalance
+      summary: Transfer current user affiliate balance into gateway balance.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AffiliateTransferToBalanceRequest"
+      responses:
+        "200":
+          description: Affiliate balance transfer result.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AffiliateTransferToBalanceResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/me/usage:
     get:
       tags:
@@ -6462,6 +6549,15 @@ components:
         minimum: 1
         maximum: 100
         default: 20
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 200
+      description: Idempotency key for financial write operations.
     Status:
       name: status
       in: query
@@ -11559,6 +11655,105 @@ components:
             $ref: "#/components/schemas/AffiliateLedgerEntry"
         pagination:
           $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    AffiliateCurrencySummary:
+      type: object
+      required:
+        - currency
+        - available_balance
+        - accrued_amount
+        - refund_compensated_amount
+        - transferred_to_balance_amount
+        - settled_amount
+        - withdrawn_amount
+        - manual_adjustment_amount
+      properties:
+        currency:
+          type: string
+        available_balance:
+          type: string
+          description: Decimal string affiliate balance available for transfer.
+        accrued_amount:
+          type: string
+        refund_compensated_amount:
+          type: string
+        transferred_to_balance_amount:
+          type: string
+        settled_amount:
+          type: string
+        withdrawn_amount:
+          type: string
+        manual_adjustment_amount:
+          type: string
+
+    AffiliateSummary:
+      type: object
+      required:
+        - user_id
+        - balances
+      properties:
+        user_id:
+          $ref: "#/components/schemas/Id"
+        balances:
+          type: array
+          items:
+            $ref: "#/components/schemas/AffiliateCurrencySummary"
+
+    AffiliateSummaryResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/AffiliateSummary"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    AffiliateTransferToBalanceRequest:
+      type: object
+      required:
+        - amount
+      properties:
+        amount:
+          type: string
+          description: Decimal string amount to move from affiliate balance into gateway balance.
+        currency:
+          type: string
+          default: USD
+
+    AffiliateTransferToBalanceResult:
+      type: object
+      required:
+        - applied
+        - affiliate_ledger
+        - billing_ledger_id
+        - balance_before
+        - balance_after
+      properties:
+        applied:
+          type: boolean
+        reason:
+          type: string
+        affiliate_ledger:
+          $ref: "#/components/schemas/AffiliateLedgerEntry"
+        billing_ledger_id:
+          $ref: "#/components/schemas/Id"
+        balance_before:
+          type: string
+        balance_after:
+          type: string
+
+    AffiliateTransferToBalanceResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/AffiliateTransferToBalanceResult"
         request_id:
           $ref: "#/components/schemas/RequestId"
 

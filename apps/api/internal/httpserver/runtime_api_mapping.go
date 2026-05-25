@@ -533,6 +533,37 @@ func toAPIAffiliateLedgerEntry(item affiliatecontract.AffiliateLedger) apiopenap
 	}
 }
 
+func toAPIAffiliateSummary(summary affiliatecontract.AffiliateSummary) apiopenapi.AffiliateSummary {
+	balances := make([]apiopenapi.AffiliateCurrencySummary, 0, len(summary.Balances))
+	for _, balance := range summary.Balances {
+		balances = append(balances, apiopenapi.AffiliateCurrencySummary{
+			AccruedAmount:              balance.AccruedAmount,
+			AvailableBalance:           balance.AvailableBalance,
+			Currency:                   balance.Currency,
+			ManualAdjustmentAmount:     balance.ManualAdjustmentAmount,
+			RefundCompensatedAmount:    balance.RefundCompensatedAmount,
+			SettledAmount:              balance.SettledAmount,
+			TransferredToBalanceAmount: balance.TransferredToBalanceAmount,
+			WithdrawnAmount:            balance.WithdrawnAmount,
+		})
+	}
+	return apiopenapi.AffiliateSummary{
+		Balances: balances,
+		UserId:   apiopenapi.Id(strconv.Itoa(summary.UserID)),
+	}
+}
+
+func toAPIAffiliateTransferToBalanceResult(result affiliatecontract.TransferToBalanceResult) apiopenapi.AffiliateTransferToBalanceResult {
+	return apiopenapi.AffiliateTransferToBalanceResult{
+		AffiliateLedger: toAPIAffiliateLedgerEntry(result.AffiliateLedger),
+		Applied:         result.Applied,
+		BalanceAfter:    result.BalanceAfter,
+		BalanceBefore:   result.BalanceBefore,
+		BillingLedgerId: apiopenapi.Id(strconv.Itoa(result.BillingLedgerID)),
+		Reason:          optionalString(result.Reason),
+	}
+}
+
 func toAPIPaymentMethod(method paymentcontract.PaymentMethod) apiopenapi.PaymentMethod {
 	return apiopenapi.PaymentMethod{
 		Metadata:           jsonObject(method.Metadata),

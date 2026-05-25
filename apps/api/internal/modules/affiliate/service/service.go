@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"math/big"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -350,6 +351,30 @@ func (s *Service) ListLedgers(ctx context.Context) ([]contract.AffiliateLedger, 
 	return s.store.ListLedgers(ctx)
 }
 
+// ListLedgersByUser returns affiliate ledger entries owned by one user.
+func (s *Service) ListLedgersByUser(ctx context.Context, userID int) ([]contract.AffiliateLedger, error) {
+	if userID <= 0 {
+		return nil, ErrInvalidInput
+	}
+	return s.store.ListLedgersByUser(ctx, userID)
+}
+
+// GetSummary returns the user's affiliate balances grouped by currency.
+func (s *Service) GetSummary(ctx context.Context, userID int) (contract.AffiliateSummary, error) {
+	if userID <= 0 {
+		return contract.AffiliateSummary{}, ErrInvalidInput
+	}
+	ledgers, err := s.store.ListLedgersByUser(ctx, userID)
+	if err != nil {
+		return contract.AffiliateSummary{}, err
+	}
+	summary := contract.AffiliateSummary{
+		UserID:   userID,
+		Balances: affiliateCurrencySummaries(ledgers),
+	}
+	return summary, nil
+}
+
 func (s *Service) ListRelationships(ctx context.Context) ([]contract.InviteRelationship, error) {
 	return s.store.ListRelationships(ctx)
 }
@@ -532,6 +557,83 @@ func validRuleStatus(status contract.RuleStatus) bool {
 	default:
 		return false
 	}
+}
+
+type affiliateCurrencyAccumulator struct {
+	available            *big.Rat
+	accrued              *big.Rat
+	refundCompensated    *big.Rat
+	transferredToBalance *big.Rat
+	settled              *big.Rat
+	withdrawn            *big.Rat
+	manualAdjustment     *big.Rat
+}
+
+func newAffiliateCurrencyAccumulator() affiliateCurrencyAccumulator {
+	return affiliateCurrencyAccumulator{
+		available:            new(big.Rat),
+		accrued:              new(big.Rat),
+		refundCompensated:    new(big.Rat),
+		transferredToBalance: new(big.Rat),
+		settled:              new(big.Rat),
+		withdrawn:            new(big.Rat),
+		manualAdjustment:     new(big.Rat),
+	}
+}
+
+func affiliateCurrencySummaries(ledgers []contract.AffiliateLedger) []contract.AffiliateCurrencySummary {
+	accumulators := map[string]affiliateCurrencyAccumulator{}
+	for _, ledger := range ledgers {
+		if ledger.Status == contract.LedgerStatusCanceled {
+			continue
+		}
+		amount, ok := decimalRat(ledger.Amount)
+		if !ok {
+			continue
+		}
+		currency := normalizeCurrency(ledger.Currency)
+		accumulator, ok := accumulators[currency]
+		if !ok {
+			accumulator = newAffiliateCurrencyAccumulator()
+		}
+		accumulator.available.Add(accumulator.available, amount)
+		absoluteAmount := absRat(amount)
+		switch ledger.Type {
+		case contract.LedgerTypeAccrue:
+			accumulator.accrued.Add(accumulator.accrued, amount)
+		case contract.LedgerTypeRefundCompensation:
+			accumulator.refundCompensated.Add(accumulator.refundCompensated, absoluteAmount)
+		case contract.LedgerTypeTransferToBalance:
+			accumulator.transferredToBalance.Add(accumulator.transferredToBalance, absoluteAmount)
+		case contract.LedgerTypeSettle:
+			accumulator.settled.Add(accumulator.settled, absoluteAmount)
+		case contract.LedgerTypeWithdraw:
+			accumulator.withdrawn.Add(accumulator.withdrawn, absoluteAmount)
+		case contract.LedgerTypeManualAdjustment:
+			accumulator.manualAdjustment.Add(accumulator.manualAdjustment, amount)
+		}
+		accumulators[currency] = accumulator
+	}
+	currencies := make([]string, 0, len(accumulators))
+	for currency := range accumulators {
+		currencies = append(currencies, currency)
+	}
+	sort.Strings(currencies)
+	out := make([]contract.AffiliateCurrencySummary, 0, len(currencies))
+	for _, currency := range currencies {
+		accumulator := accumulators[currency]
+		out = append(out, contract.AffiliateCurrencySummary{
+			Currency:                   currency,
+			AvailableBalance:           formatRatFixed(accumulator.available, 8),
+			AccruedAmount:              formatRatFixed(accumulator.accrued, 8),
+			RefundCompensatedAmount:    formatRatFixed(accumulator.refundCompensated, 8),
+			TransferredToBalanceAmount: formatRatFixed(accumulator.transferredToBalance, 8),
+			SettledAmount:              formatRatFixed(accumulator.settled, 8),
+			WithdrawnAmount:            formatRatFixed(accumulator.withdrawn, 8),
+			ManualAdjustmentAmount:     formatRatFixed(accumulator.manualAdjustment, 8),
+		})
+	}
+	return out
 }
 
 func errorsIsNotFound(err error) bool {

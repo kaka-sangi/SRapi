@@ -12,6 +12,8 @@ import (
 	"time"
 
 	admincontrol "github.com/srapi/srapi/apps/api/internal/modules/admin_control/contract"
+	affiliatecontract "github.com/srapi/srapi/apps/api/internal/modules/affiliate/contract"
+	affiliateservice "github.com/srapi/srapi/apps/api/internal/modules/affiliate/service"
 	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
 	apikeyservice "github.com/srapi/srapi/apps/api/internal/modules/api_keys/service"
 	authcontract "github.com/srapi/srapi/apps/api/internal/modules/auth/contract"
@@ -517,6 +519,21 @@ func writePaymentServiceError(w http.ResponseWriter, err error, requestID string
 		writeStandardError(w, http.StatusConflict, apiopenapi.RESOURCECONFLICT, "payment resource conflict", requestID)
 	default:
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "payment service error", requestID)
+	}
+}
+
+func writeAffiliateServiceError(w http.ResponseWriter, err error, requestID string) {
+	switch {
+	case errors.Is(err, affiliateservice.ErrInvalidInput):
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid affiliate request", requestID)
+	case errors.Is(err, affiliatecontract.ErrInsufficientBalance):
+		writeStandardError(w, http.StatusConflict, apiopenapi.RESOURCECONFLICT, "affiliate balance insufficient", requestID)
+	case errors.Is(err, affiliatecontract.ErrNotFound):
+		writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "affiliate resource not found", requestID)
+	case errors.Is(err, affiliatecontract.ErrConflict):
+		writeStandardError(w, http.StatusConflict, apiopenapi.RESOURCECONFLICT, "affiliate resource conflict", requestID)
+	default:
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "affiliate service error", requestID)
 	}
 }
 

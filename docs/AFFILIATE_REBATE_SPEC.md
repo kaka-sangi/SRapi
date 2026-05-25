@@ -187,7 +187,7 @@ users.balance update
 
 Phase 2 可只做基础规则；Phase 3 引入风险评分。
 
-## 9. OpenAPI 草案
+## 9. OpenAPI
 
 用户侧：
 
@@ -197,15 +197,14 @@ GET  /api/v1/me/affiliate/ledger
 POST /api/v1/me/affiliate/transfer-to-balance
 ```
 
+`POST /api/v1/me/affiliate/transfer-to-balance` 必须使用控制台 session、CSRF header 和 `Idempotency-Key` header。服务端按幂等 key 生成转余额 reference，重复请求返回同一 affiliate ledger 结果且不会重复写 billing ledger 或重复增加 user balance。
+
 管理侧：
 
 ```txt
-GET   /api/v1/admin/affiliate/rules
-POST  /api/v1/admin/affiliate/rules
-PATCH /api/v1/admin/affiliate/rules/{id}
-GET   /api/v1/admin/affiliate/relationships
-GET   /api/v1/admin/affiliate/ledger
-POST  /api/v1/admin/affiliate/ledger/manual-adjustment
+GET   /api/v1/admin/affiliates/invites
+GET   /api/v1/admin/affiliates/rebates
+GET   /api/v1/admin/affiliates/transfers
 ```
 
 ## 10. 数据一致性
