@@ -24,8 +24,14 @@ OTEL_OVERHEAD_SAMPLES ?= 2000
 OTEL_OVERHEAD_WARMUP ?= 200
 OTEL_OVERHEAD_BUDGET_MS ?= 5
 OTEL_OVERHEAD_TIMEOUT ?= 60s
+JAEGER_IMAGE ?= jaegertracing/all-in-one:1.76.0
+JAEGER_CONTAINER ?= srapi-jaeger-smoke
+JAEGER_OTLP_PORT ?= 4317
+JAEGER_QUERY_PORT ?= 16686
+JAEGER_QUERY_TIMEOUT_SECONDS ?= 20
+JAEGER_SMOKE_TIMEOUT ?= 90s
 
-.PHONY: help bootstrap-env openapi-lint openapi-bundle openapi-codegen openapi-codegen-check openapi-ts-codegen openapi-ts-codegen-check sdk-ts-typecheck ent-generate ent-generate-check migration-diff migration-hash migration-check api-test api-run dev-up dev-down dev-logs smoke-health smoke-gateway smoke-rate-limit smoke-failover smoke-quality-eval smoke-release rate-limit-bench balance-charger-pressure otel-overhead-bench backup-postgres restore-postgres examples-check secret-scan architecture-check code-quality-check diff-check web-install web-check web-check-e2e web-dev check
+.PHONY: help bootstrap-env openapi-lint openapi-bundle openapi-codegen openapi-codegen-check openapi-ts-codegen openapi-ts-codegen-check sdk-ts-typecheck ent-generate ent-generate-check migration-diff migration-hash migration-check api-test api-run dev-up dev-down dev-logs smoke-health smoke-gateway smoke-rate-limit smoke-failover smoke-quality-eval smoke-release smoke-jaeger-trace rate-limit-bench balance-charger-pressure otel-overhead-bench backup-postgres restore-postgres examples-check secret-scan architecture-check code-quality-check diff-check web-install web-check web-check-e2e web-dev check
 
 help:
 	@printf '%s\n' \
@@ -53,6 +59,7 @@ help:
 		'  make smoke-failover  Verify Gateway retries from a 503 upstream to a fallback provider' \
 		'  make smoke-quality-eval  Verify QualityEval capture, worker judge, and Scheduler quality evidence' \
 		'  make smoke-release   Validate health, readiness, metrics, and gateway smoke on localhost' \
+		'  make smoke-jaeger-trace  Verify OTLP traces are visible through Jaeger query API' \
 		'  make rate-limit-bench RATE_LIMIT_BENCH_REDIS_ADDR=host:port  Check Redis rate limiter p99 budget' \
 		'  make balance-charger-pressure BALANCE_CHARGER_PRESSURE_DSN=postgres://...  Run PostgreSQL balance_charger pressure test' \
 		'  make otel-overhead-bench  Check OTel HTTP tracing p99 overhead budget' \
@@ -190,6 +197,30 @@ smoke-quality-eval:
 
 smoke-release:
 	node tools/smoke-local.mjs --release
+
+smoke-jaeger-trace:
+	@command -v docker >/dev/null 2>&1 || (echo 'docker is required for smoke-jaeger-trace' >&2; exit 127)
+	@set -e; \
+	cleanup() { docker rm -f "$(JAEGER_CONTAINER)" >/dev/null 2>&1 || true; }; \
+	trap cleanup EXIT INT TERM; \
+	docker rm -f "$(JAEGER_CONTAINER)" >/dev/null 2>&1 || true; \
+	docker run -d --rm --name "$(JAEGER_CONTAINER)" \
+		-e COLLECTOR_OTLP_ENABLED=true \
+		-p "127.0.0.1:$(JAEGER_QUERY_PORT):16686" \
+		-p "127.0.0.1:$(JAEGER_OTLP_PORT):4317" \
+		"$(JAEGER_IMAGE)" >/dev/null; \
+	ready=0; \
+	for _ in $$(seq 1 30); do \
+		if curl -fsS "http://127.0.0.1:$(JAEGER_QUERY_PORT)/api/services" >/dev/null 2>&1; then ready=1; break; fi; \
+		sleep 1; \
+	done; \
+	test "$$ready" = "1" || (docker logs "$(JAEGER_CONTAINER)" >&2; echo 'Jaeger query API did not become ready' >&2; exit 1); \
+	cd $(API_DIR) && \
+		SRAPI_OTEL_JAEGER_SMOKE=1 \
+		SRAPI_OTEL_JAEGER_OTLP_ENDPOINT="127.0.0.1:$(JAEGER_OTLP_PORT)" \
+		SRAPI_OTEL_JAEGER_QUERY_URL="http://127.0.0.1:$(JAEGER_QUERY_PORT)" \
+		SRAPI_OTEL_JAEGER_QUERY_TIMEOUT_SECONDS="$(JAEGER_QUERY_TIMEOUT_SECONDS)" \
+		go test ./internal/platform/otel -run TestNewTracerProviderExportsSpansToJaegerQuery -count=1 -timeout "$(JAEGER_SMOKE_TIMEOUT)" -v
 
 rate-limit-bench:
 	@test -n "$(RATE_LIMIT_BENCH_REDIS_ADDR)" || (echo 'RATE_LIMIT_BENCH_REDIS_ADDR is required, for example: make rate-limit-bench RATE_LIMIT_BENCH_REDIS_ADDR=127.0.0.1:6379' >&2; exit 2)

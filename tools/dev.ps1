@@ -1,5 +1,5 @@
 param(
-    [ValidateSet("check", "architecture-check", "api", "up", "down", "logs", "smoke-health", "smoke-gateway", "smoke-rate-limit", "smoke-failover", "smoke-release", "openapi", "openapi-check")]
+    [ValidateSet("check", "architecture-check", "api", "up", "down", "logs", "smoke-health", "smoke-gateway", "smoke-rate-limit", "smoke-failover", "smoke-release", "smoke-jaeger-trace", "openapi", "openapi-check")]
     [string]$Command = "check"
 )
 
@@ -154,6 +154,9 @@ switch ($Command) {
     }
     "smoke-release" {
         Invoke-Step "node" @("tools/smoke-local.mjs", "--release")
+    }
+    "smoke-jaeger-trace" {
+        Invoke-Step "make" @("smoke-jaeger-trace")
     }
     "openapi" {
         Invoke-OpenApiScript

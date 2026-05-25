@@ -111,7 +111,7 @@ Trace span attribute 只允许记录低敏诊断字段，例如 HTTP method、ro
 
 关键 service span 目前覆盖 `scheduler.Schedule`、`payments.HandleWebhook` 和 `accounts.ProbeAccount`。这些 span 必须记录业务 outcome、稳定错误分类和低敏诊断字段；错误 span 必须同时设置 `error.type`、record error event，并把 span status 设为 error。后续新增业务 span 应复用 `platform/otel.StartSpan` / `EndSpan`，并保持属性命名使用 `srapi.*` 前缀。
 
-Trace exporter 有本地 OTLP gRPC collector smoke 覆盖：`TestNewTracerProviderExportsSpansToOTLPCollector` 启动进程内 collector，启用 `OTEL_TRACES_ENABLED` 等价配置，验证 span 和 resource attributes 会经真实 OTLP 协议在 tracer provider shutdown 时 flush。该测试证明协议级导出路径可用；真实 Jaeger / Tempo UI 可视化仍需在部署环境中连接对应 collector 后单独 smoke。
+Trace exporter 有本地 OTLP gRPC collector smoke 覆盖：`TestNewTracerProviderExportsSpansToOTLPCollector` 启动进程内 collector，启用 `OTEL_TRACES_ENABLED` 等价配置，验证 span 和 resource attributes 会经真实 OTLP 协议在 tracer provider shutdown 时 flush。Jaeger 可视化路径有 opt-in smoke 覆盖：`make smoke-jaeger-trace` 会临时启动官方 Jaeger all-in-one 容器，把 span 写入 OTLP/gRPC 4317，并通过 Jaeger Query API `/api/traces/{trace_id}` 查回。部署环境中的 Tempo / 真实 collector backend 仍需按实际拓扑单独 smoke。
 
 Trace overhead 有 opt-in p99 guard 覆盖：`make otel-overhead-bench` 会对比 no-op tracer provider 与 batch tracer provider 下 `/livez` HTTP runtime 的 p99 延迟，并默认要求增量不超过 5ms。该测试不进入默认 `make check`，避免普通开发机抖动阻断提交；在发布前、collector/SDK 升级后或观测采样策略变更后应显式运行。
 

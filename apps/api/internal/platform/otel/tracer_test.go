@@ -2,8 +2,14 @@ package otel
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
+	"net/http"
+	"os"
+	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -95,6 +101,48 @@ func TestNewTracerProviderExportsSpansToOTLPCollector(t *testing.T) {
 	assertProtoAttr(t, collector.resourceAttributes(), "deployment.environment.name", "test")
 }
 
+func TestNewTracerProviderExportsSpansToJaegerQuery(t *testing.T) {
+	if os.Getenv("SRAPI_OTEL_JAEGER_SMOKE") != "1" {
+		t.Skip("set SRAPI_OTEL_JAEGER_SMOKE=1 to run the Jaeger OTLP/query smoke")
+	}
+	endpoint := strings.TrimSpace(os.Getenv("SRAPI_OTEL_JAEGER_OTLP_ENDPOINT"))
+	if endpoint == "" {
+		t.Fatal("SRAPI_OTEL_JAEGER_OTLP_ENDPOINT is required")
+	}
+	queryURL := strings.TrimRight(strings.TrimSpace(os.Getenv("SRAPI_OTEL_JAEGER_QUERY_URL")), "/")
+	if queryURL == "" {
+		t.Fatal("SRAPI_OTEL_JAEGER_QUERY_URL is required")
+	}
+
+	tp, shutdown, err := NewTracerProvider(context.Background(), config.ObservabilityConfig{
+		ServiceName:      "srapi-jaeger-smoke",
+		ServiceVersion:   "test",
+		Environment:      "local",
+		TracesEnabled:    true,
+		OTLPEndpoint:     endpoint,
+		OTLPInsecure:     true,
+		TraceSampleRatio: 1,
+		BatchTimeout:     10 * time.Millisecond,
+	})
+	if err != nil {
+		t.Fatalf("new tracer provider: %v", err)
+	}
+
+	_, span := tp.Tracer(tracerName).Start(context.Background(), "jaeger.visualization.smoke",
+		trace.WithAttributes(attribute.String("srapi.test.outcome", "jaeger_query_visible")),
+	)
+	traceID := span.SpanContext().TraceID().String()
+	span.End()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := shutdown(ctx); err != nil {
+		t.Fatalf("shutdown tracer provider: %v", err)
+	}
+
+	waitForJaegerTrace(t, queryURL, traceID, "jaeger.visualization.smoke", "srapi-jaeger-smoke")
+}
+
 func TestEndSpanRecordsErrorTypeAndStatus(t *testing.T) {
 	exporter := tracetest.NewInMemoryExporter()
 	tracerProvider := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
@@ -176,6 +224,87 @@ func (c *traceCollector) resourceAttributes() []*commonpb.KeyValue {
 		}
 	}
 	return nil
+}
+
+type jaegerTraceResponse struct {
+	Data []struct {
+		TraceID string `json:"traceID"`
+		Spans   []struct {
+			OperationName string `json:"operationName"`
+			ProcessID     string `json:"processID"`
+		} `json:"spans"`
+		Processes map[string]struct {
+			ServiceName string `json:"serviceName"`
+		} `json:"processes"`
+	} `json:"data"`
+}
+
+func waitForJaegerTrace(t *testing.T, queryURL string, traceID string, operationName string, serviceName string) {
+	t.Helper()
+	deadline := time.Now().Add(time.Duration(envInt(t, "SRAPI_OTEL_JAEGER_QUERY_TIMEOUT_SECONDS", 20)) * time.Second)
+	client := http.Client{Timeout: 2 * time.Second}
+	var lastErr error
+	for time.Now().Before(deadline) {
+		found, err := jaegerTraceContains(client, queryURL, traceID, operationName, serviceName)
+		if err != nil {
+			lastErr = err
+		}
+		if found {
+			return
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+	if lastErr != nil {
+		t.Fatalf("trace %s was not visible in Jaeger before timeout: %v", traceID, lastErr)
+	}
+	t.Fatalf("trace %s was not visible in Jaeger before timeout", traceID)
+}
+
+func envInt(t *testing.T, key string, fallback int) int {
+	t.Helper()
+	raw := os.Getenv(key)
+	if raw == "" {
+		return fallback
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil {
+		t.Fatalf("%s must be an integer, got %q", key, raw)
+	}
+	return value
+}
+
+func jaegerTraceContains(client http.Client, queryURL string, traceID string, operationName string, serviceName string) (bool, error) {
+	req, err := http.NewRequest(http.MethodGet, queryURL+"/api/traces/"+traceID, nil)
+	if err != nil {
+		return false, err
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return false, fmt.Errorf("jaeger query returned %s", resp.Status)
+	}
+	var body jaegerTraceResponse
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		return false, err
+	}
+	for _, trace := range body.Data {
+		if trace.TraceID != traceID {
+			continue
+		}
+		for _, span := range trace.Spans {
+			if span.OperationName != operationName {
+				continue
+			}
+			process := trace.Processes[span.ProcessID]
+			if process.ServiceName == serviceName {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
 }
 
 func assertAttr(t *testing.T, attrs []attribute.KeyValue, key attribute.Key, value string) {
