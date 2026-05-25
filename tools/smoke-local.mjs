@@ -15,6 +15,55 @@ export const CORE_GATEWAY_SMOKE_ENDPOINTS = Object.freeze([
   { name: "messages", method: "POST", path: "/v1/messages" },
 ]);
 
+export const RATE_LIMIT_SMOKE_ENDPOINT = Object.freeze({
+  name: "rate_limit",
+  method: "POST",
+  path: "/v1/chat/completions",
+});
+
+export const FAILOVER_SMOKE_ENDPOINT = Object.freeze({
+  name: "failover",
+  method: "POST",
+  path: "/v1/chat/completions",
+});
+
+export const FAILOVER_GATEWAY_SMOKE_TARGETS = Object.freeze([
+  {
+    name: "local-smoke-failover-primary",
+    displayName: "Local Smoke Failover Primary",
+    adapterType: "openai-compatible",
+    protocol: "openai-compatible",
+    providerCapabilities: { chat_completions: true },
+    modelCapabilities: [
+      { key: "text_input", level: "required", status: "stable", version: "v1" },
+      { key: "text_output", level: "required", status: "stable", version: "v1" },
+      { key: "chat_completions", level: "required", status: "stable", version: "v1" },
+    ],
+    upstreamModelName: "failover-primary-upstream",
+    accountCredential: { api_key: "failover-primary-secret" },
+    accountBasePath: "/v1",
+    accountMetadata: { health_score: 0.99, latency_p95_ms: 50, quality_score: 0.99 },
+    priority: 10,
+  },
+  {
+    name: "local-smoke-failover-secondary",
+    displayName: "Local Smoke Failover Secondary",
+    adapterType: "openai-compatible",
+    protocol: "openai-compatible",
+    providerCapabilities: { chat_completions: true },
+    modelCapabilities: [
+      { key: "text_input", level: "required", status: "stable", version: "v1" },
+      { key: "text_output", level: "required", status: "stable", version: "v1" },
+      { key: "chat_completions", level: "required", status: "stable", version: "v1" },
+    ],
+    upstreamModelName: "failover-secondary-upstream",
+    accountCredential: { api_key: "failover-secondary-secret" },
+    accountBasePath: "/v1",
+    accountMetadata: { health_score: 0.8, latency_p95_ms: 1000, quality_score: 0.5 },
+    priority: 100,
+  },
+]);
+
 export const RELEASE_GATEWAY_SMOKE_ENDPOINTS = Object.freeze([
   ...CORE_GATEWAY_SMOKE_ENDPOINTS,
   { name: "anthropic_count_tokens", method: "POST", path: "/v1/messages/count_tokens" },
@@ -80,9 +129,20 @@ const RELEASE_GATEWAY_SMOKE_MODEL_NAMES = new Set(RELEASE_GATEWAY_SMOKE_TARGETS.
 const RELEASE_GATEWAY_SMOKE_ACCOUNT_NAMES = new Set(
   RELEASE_GATEWAY_SMOKE_TARGETS.map((target) => `${target.name}-account`),
 );
+const FAILOVER_GATEWAY_SMOKE_TARGET_NAMES = new Set(FAILOVER_GATEWAY_SMOKE_TARGETS.map((target) => target.name));
+const FAILOVER_GATEWAY_SMOKE_MODEL_NAME = "local-smoke-failover-model";
+const FAILOVER_GATEWAY_SMOKE_ACCOUNT_NAMES = new Set(
+  FAILOVER_GATEWAY_SMOKE_TARGETS.map((target) => `${target.name}-account`),
+);
 
 async function main() {
   const releaseSmoke = process.argv.includes("--release");
+  const rateLimitSmoke = process.argv.includes("--rate-limit");
+  const failoverSmoke = process.argv.includes("--failover");
+  const selectedModes = [releaseSmoke, rateLimitSmoke, failoverSmoke].filter(Boolean);
+  if (selectedModes.length > 1) {
+    throw new Error("--release, --rate-limit, and --failover are separate smoke modes");
+  }
   const health = await request("GET", "/api/v1/health");
   if (!health.body?.request_id || health.body?.data?.status === undefined) {
     throw new Error("health response missing request_id or status");
@@ -107,12 +167,33 @@ async function main() {
   if (releaseSmoke) {
     await disableLegacySmokeGatewayTargets({ cookie, csrfToken });
   }
-  const apiKey = await createSmokeApiKey({ cookie, csrfToken });
+  if (failoverSmoke) {
+    await disableFixedSmokeGatewayTargets({
+      cookie,
+      csrfToken,
+      targetNames: FAILOVER_GATEWAY_SMOKE_TARGET_NAMES,
+      modelNames: new Set([FAILOVER_GATEWAY_SMOKE_MODEL_NAME]),
+      accountNames: FAILOVER_GATEWAY_SMOKE_ACCOUNT_NAMES,
+    });
+  }
+  const apiKey = await createSmokeApiKey({ cookie, csrfToken, rpmLimit: rateLimitSmoke ? 1 : undefined });
   const plaintextKey = apiKey.plaintextKey;
 
   let models;
+  let rateLimitResult;
+  let failoverResult;
   try {
-    models = await smokeCoreGatewayEndpoints(plaintextKey);
+    if (rateLimitSmoke) {
+      rateLimitResult = await smokeRateLimitEndpoint(plaintextKey);
+    } else if (failoverSmoke) {
+      failoverResult = await smokeFailoverEndpoint({
+        bearer: plaintextKey,
+        cookie,
+        csrfToken,
+      });
+    } else {
+      models = await smokeCoreGatewayEndpoints(plaintextKey);
+    }
     if (releaseSmoke) {
       await smokeReleaseGatewayEndpoints({
         bearer: plaintextKey,
@@ -125,14 +206,36 @@ async function main() {
     if (releaseSmoke) {
       await disableFixedSmokeGatewayTargets({ cookie, csrfToken });
     }
+    if (failoverSmoke) {
+      await disableFixedSmokeGatewayTargets({
+        cookie,
+        csrfToken,
+        targetNames: FAILOVER_GATEWAY_SMOKE_TARGET_NAMES,
+        modelNames: new Set([FAILOVER_GATEWAY_SMOKE_MODEL_NAME]),
+        accountNames: FAILOVER_GATEWAY_SMOKE_ACCOUNT_NAMES,
+      });
+    }
     await assertNoActiveSmokeResidue({ cookie });
   }
 
   console.log(`local smoke ok: ${baseURL}`);
   console.log(`health request_id: ${health.body.request_id}`);
-  console.log(`models: ${models.body.data.map((model) => model.id).join(", ")}`);
-  console.log(`gateway endpoints: ${CORE_GATEWAY_SMOKE_ENDPOINTS.map((endpoint) => endpoint.name).join(", ")}`);
-  if (releaseSmoke) {
+  if (rateLimitSmoke) {
+    console.log(
+      `rate-limit endpoint: ${RATE_LIMIT_SMOKE_ENDPOINT.method} ${RATE_LIMIT_SMOKE_ENDPOINT.path}`,
+    );
+    console.log(`rate-limit retry-after: ${rateLimitResult.retryAfter}`);
+  } else if (failoverSmoke) {
+    console.log(`failover endpoint: ${FAILOVER_SMOKE_ENDPOINT.method} ${FAILOVER_SMOKE_ENDPOINT.path}`);
+    console.log(
+      `failover attempts: primary=${failoverResult.primaryCalls} secondary=${failoverResult.secondaryCalls}`,
+    );
+    console.log(`failover request_id: ${failoverResult.requestId}`);
+  } else {
+    console.log(`models: ${models.body.data.map((model) => model.id).join(", ")}`);
+    console.log(`gateway endpoints: ${CORE_GATEWAY_SMOKE_ENDPOINTS.map((endpoint) => endpoint.name).join(", ")}`);
+  }
+  if (releaseSmoke && !rateLimitSmoke) {
     console.log("release endpoints: livez, readyz, metrics");
     console.log(
       `release gateway endpoints: ${RELEASE_GATEWAY_SMOKE_ENDPOINTS.map((endpoint) => endpoint.name).join(", ")}`,
@@ -140,14 +243,18 @@ async function main() {
   }
 }
 
-async function createSmokeApiKey({ cookie, csrfToken }) {
+async function createSmokeApiKey({ cookie, csrfToken, rpmLimit }) {
+  const body = {
+    name: `local-smoke-${Date.now()}`,
+    scopes: ["gateway:invoke"],
+  };
+  if (rpmLimit !== undefined) {
+    body.rpm_limit = rpmLimit;
+  }
   const apiKey = await request("POST", "/api/v1/api-keys", {
     cookie,
     csrfToken,
-    body: {
-      name: `local-smoke-${Date.now()}`,
-      scopes: ["gateway:invoke"],
-    },
+    body,
     expectedStatus: 201,
   });
   const plaintextKey = apiKey.body?.data?.plaintext_key;
@@ -211,27 +318,33 @@ async function disableLegacySmokeGatewayTargets({ cookie, csrfToken }) {
   });
 }
 
-async function disableFixedSmokeGatewayTargets({ cookie, csrfToken }) {
+async function disableFixedSmokeGatewayTargets({
+  cookie,
+  csrfToken,
+  targetNames = RELEASE_GATEWAY_SMOKE_TARGET_NAMES,
+  modelNames = RELEASE_GATEWAY_SMOKE_MODEL_NAMES,
+  accountNames = RELEASE_GATEWAY_SMOKE_ACCOUNT_NAMES,
+}) {
   await disableFixedSmokeAdminResources({
     cookie,
     csrfToken,
     path: "/api/v1/admin/accounts",
     nameField: "name",
-    fixedNames: RELEASE_GATEWAY_SMOKE_ACCOUNT_NAMES,
+    fixedNames: accountNames,
   });
   await disableFixedSmokeAdminResources({
     cookie,
     csrfToken,
     path: "/api/v1/admin/models",
     nameField: "canonical_name",
-    fixedNames: RELEASE_GATEWAY_SMOKE_MODEL_NAMES,
+    fixedNames: modelNames,
   });
   await disableFixedSmokeAdminResources({
     cookie,
     csrfToken,
     path: "/api/v1/admin/providers",
     nameField: "name",
-    fixedNames: RELEASE_GATEWAY_SMOKE_TARGET_NAMES,
+    fixedNames: targetNames,
   });
 }
 
@@ -406,6 +519,65 @@ async function smokeCoreGatewayEndpoints(bearer) {
   return models;
 }
 
+async function smokeRateLimitEndpoint(bearer) {
+  const first = await request(RATE_LIMIT_SMOKE_ENDPOINT.method, RATE_LIMIT_SMOKE_ENDPOINT.path, {
+    bearer,
+    body: {
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: "local smoke rate limit first call" }],
+    },
+  });
+  const content = first.body?.choices?.[0]?.message?.content;
+  if (typeof content !== "string" || !content.includes("local smoke rate limit first call")) {
+    throw new Error("mock gateway first rate-limit response did not include echoed prompt");
+  }
+
+  const limited = await request(RATE_LIMIT_SMOKE_ENDPOINT.method, RATE_LIMIT_SMOKE_ENDPOINT.path, {
+    bearer,
+    body: {
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: "local smoke rate limit second call" }],
+    },
+    expectedStatus: 429,
+  });
+  const retryAfter = limited.headers.get("retry-after");
+  if (!retryAfter || Number.parseInt(retryAfter, 10) <= 0) {
+    throw new Error("rate-limited gateway response did not include a positive Retry-After header");
+  }
+  const error = limited.body?.error;
+  if (error?.type !== "rate_limit_error" || error?.code !== "rpm_limit_exceeded") {
+    throw new Error(`rate-limited gateway response returned unexpected error: ${JSON.stringify(error)}`);
+  }
+  return { retryAfter };
+}
+
+async function smokeFailoverEndpoint({ bearer, cookie, csrfToken }) {
+  const upstream = await withFailoverSmokeUpstreams(async ({ primaryURL, secondaryURL, stats }) => {
+    await ensureFailoverGatewayTargets({ cookie, csrfToken, primaryURL, secondaryURL });
+    const response = await request(FAILOVER_SMOKE_ENDPOINT.method, FAILOVER_SMOKE_ENDPOINT.path, {
+      bearer,
+      body: {
+        model: FAILOVER_GATEWAY_SMOKE_MODEL_NAME,
+        messages: [{ role: "user", content: "local smoke failover call" }],
+      },
+    });
+    const content = response.body?.choices?.[0]?.message?.content;
+    if (typeof content !== "string" || !content.includes("local smoke failover ok")) {
+      throw new Error(`failover gateway response did not come from secondary upstream: ${JSON.stringify(response.body)}`);
+    }
+    if (stats.primaryCalls !== 1 || stats.secondaryCalls !== 1) {
+      throw new Error(`expected one call to each failover upstream, got primary=${stats.primaryCalls} secondary=${stats.secondaryCalls}`);
+    }
+    return {
+      primaryCalls: stats.primaryCalls,
+      secondaryCalls: stats.secondaryCalls,
+    };
+  });
+
+  const evidence = await assertFailoverEvidence({ cookie });
+  return { ...upstream, ...evidence };
+}
+
 async function smokeReleaseGatewayEndpoints({ bearer, cookie, csrfToken }) {
   await smokeOpenAICompatiblePassThroughEndpoints(bearer);
   await smokeGeminiTextEndpoints(bearer);
@@ -431,6 +603,22 @@ async function smokeReleaseGatewayEndpoints({ bearer, cookie, csrfToken }) {
     });
     await smokeGeminiCountTokensEndpoint(bearer, geminiCountModel);
   });
+}
+
+async function ensureFailoverGatewayTargets({ cookie, csrfToken, primaryURL, secondaryURL }) {
+  const model = await ensureModel({
+    cookie,
+    csrfToken,
+    target: FAILOVER_GATEWAY_SMOKE_TARGETS[0],
+    modelName: FAILOVER_GATEWAY_SMOKE_MODEL_NAME,
+  });
+  for (const target of FAILOVER_GATEWAY_SMOKE_TARGETS) {
+    const upstreamURL = target.name.endsWith("primary") ? primaryURL : secondaryURL;
+    const targetWithUpstream = withUpstreamMetadata(target, upstreamURL);
+    const provider = await ensureProvider({ cookie, csrfToken, target: targetWithUpstream });
+    await ensureModelMapping({ cookie, csrfToken, model, provider, target: targetWithUpstream });
+    await ensureProviderAccount({ cookie, csrfToken, provider, target: targetWithUpstream });
+  }
 }
 
 async function smokeOpenAICompatiblePassThroughEndpoints(bearer) {
@@ -588,7 +776,10 @@ async function smokeGeminiCountTokensEndpoint(bearer, model) {
 function withUpstreamMetadata(target, upstreamURL) {
   return {
     ...target,
-    accountMetadata: { base_url: `${upstreamURL}${target.accountBasePath}` },
+    accountMetadata: {
+      ...(target.accountMetadata || {}),
+      base_url: `${upstreamURL}${target.accountBasePath}`,
+    },
   };
 }
 
@@ -674,7 +865,7 @@ async function ensureProviderAccount({ cookie, csrfToken, provider, target }) {
     credential: target.accountCredential,
     metadata: target.accountMetadata,
     status: "active",
-    priority: 100,
+    priority: target.priority ?? 100,
     weight: 1,
   };
   const existing = await findAdminResource(
@@ -698,6 +889,67 @@ async function ensureProviderAccount({ cookie, csrfToken, provider, target }) {
       ...body,
     },
   });
+}
+
+async function assertFailoverEvidence({ cookie }) {
+  const usage = await request(
+    "GET",
+    `/api/v1/admin/usage-logs?model=${encodeURIComponent(FAILOVER_GATEWAY_SMOKE_MODEL_NAME)}`,
+    { cookie },
+  );
+  const usageLogs = usage.body?.data;
+  if (!Array.isArray(usageLogs)) {
+    throw new Error("GET /api/v1/admin/usage-logs did not return a data array");
+  }
+  const recentUsageLogs = usageLogs
+    .filter((item) => item.model === FAILOVER_GATEWAY_SMOKE_MODEL_NAME)
+    .sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime());
+  const secondUsage = recentUsageLogs.find((item) => item.attempt_no === 2 && item.success === true);
+  if (!secondUsage?.request_id) {
+    throw new Error(`failover smoke did not find a successful second usage attempt: ${JSON.stringify(recentUsageLogs)}`);
+  }
+  const requestID = secondUsage.request_id;
+  const attempts = recentUsageLogs.filter((item) => item.request_id === requestID);
+  const firstUsage = attempts.find((item) => item.attempt_no === 1);
+  if (!firstUsage || firstUsage.success !== false || !firstUsage.error_class) {
+    throw new Error(`failover smoke did not record failed first usage attempt: ${JSON.stringify(attempts)}`);
+  }
+  if (secondUsage.total_tokens !== 10) {
+    throw new Error(`failover smoke successful attempt did not record secondary usage tokens: ${JSON.stringify(secondUsage)}`);
+  }
+
+  const decisions = await request(
+    "GET",
+    `/api/v1/admin/scheduler/decisions?request_id=${encodeURIComponent(requestID)}`,
+    { cookie },
+  );
+  const decisionRows = decisions.body?.data;
+  if (!Array.isArray(decisionRows)) {
+    throw new Error("GET /api/v1/admin/scheduler/decisions did not return a data array");
+  }
+  const firstDecision = decisionRows.find((item) => item.attempt_no === 1);
+  const secondDecision = decisionRows.find((item) => item.attempt_no === 2);
+  if (!firstDecision || !secondDecision) {
+    throw new Error(`failover smoke did not find both scheduler attempts: ${JSON.stringify(decisionRows)}`);
+  }
+  if (secondDecision.fallback_from_decision_id !== firstDecision.id) {
+    throw new Error(`fallback decision was not linked to first decision: ${JSON.stringify(decisionRows)}`);
+  }
+  const rejectReasons = secondDecision.reject_reasons || {};
+  if (!Object.values(rejectReasons).includes("fallback_excluded")) {
+    throw new Error(`fallback decision did not include fallback_excluded evidence: ${JSON.stringify(secondDecision)}`);
+  }
+
+  const metrics = await request("GET", "/metrics", { responseType: "text" });
+  const failoverMetric = metricSampleValue(
+    metrics.text,
+    `srapi_gateway_failover_total{endpoint_family="chat_completions",model="${FAILOVER_GATEWAY_SMOKE_MODEL_NAME}",provider_protocol="openai-compatible",result="success"}`,
+  );
+  if (failoverMetric <= 0) {
+    throw new Error("/metrics missing positive failover counter sample");
+  }
+
+  return { requestId: requestID };
 }
 
 async function createAdminResource(method, path, options) {
@@ -799,6 +1051,43 @@ async function withSmokeUpstream(fn) {
   }
 }
 
+async function withFailoverSmokeUpstreams(fn) {
+  const stats = {
+    primaryCalls: 0,
+    secondaryCalls: 0,
+  };
+  const primary = http.createServer(async (req, res) => {
+    try {
+      await handleFailoverPrimaryRequest(req, res, stats);
+    } catch (error) {
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: { message: error.message } }));
+    }
+  });
+  const secondary = http.createServer(async (req, res) => {
+    try {
+      await handleFailoverSecondaryRequest(req, res, stats);
+    } catch (error) {
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: { message: error.message } }));
+    }
+  });
+  primary.listen(0, "127.0.0.1");
+  secondary.listen(0, "127.0.0.1");
+  await Promise.all([once(primary, "listening"), once(secondary, "listening")]);
+  const primaryAddress = primary.address();
+  const secondaryAddress = secondary.address();
+  try {
+    return await fn({
+      primaryURL: `http://127.0.0.1:${primaryAddress.port}`,
+      secondaryURL: `http://127.0.0.1:${secondaryAddress.port}`,
+      stats,
+    });
+  } finally {
+    await Promise.all([closeServer(primary), closeServer(secondary)]);
+  }
+}
+
 async function handleSmokeUpstreamRequest(req, res) {
   const url = new URL(req.url, "http://127.0.0.1");
   if (req.method === "POST" && url.pathname === "/v1/rerank") {
@@ -836,6 +1125,53 @@ async function handleSmokeUpstreamRequest(req, res) {
   writeJSON(res, { error: { message: `unexpected smoke upstream route ${req.method} ${url.pathname}` } }, 404);
 }
 
+async function handleFailoverPrimaryRequest(req, res, stats) {
+  const url = new URL(req.url, "http://127.0.0.1");
+  if (req.method !== "POST" || url.pathname !== "/v1/chat/completions") {
+    writeJSON(res, { error: { message: `unexpected failover primary route ${req.method} ${url.pathname}` } }, 404);
+    return;
+  }
+  stats.primaryCalls += 1;
+  if (req.headers.authorization !== "Bearer failover-primary-secret") {
+    writeJSON(res, { error: { message: "unexpected primary auth header" } }, 401);
+    return;
+  }
+  writeJSON(res, { error: { message: "primary unavailable", type: "server_error" } }, 503);
+}
+
+async function handleFailoverSecondaryRequest(req, res, stats) {
+  const url = new URL(req.url, "http://127.0.0.1");
+  if (req.method !== "POST" || url.pathname !== "/v1/chat/completions") {
+    writeJSON(res, { error: { message: `unexpected failover secondary route ${req.method} ${url.pathname}` } }, 404);
+    return;
+  }
+  stats.secondaryCalls += 1;
+  if (req.headers.authorization !== "Bearer failover-secondary-secret") {
+    writeJSON(res, { error: { message: "unexpected secondary auth header" } }, 401);
+    return;
+  }
+  const payload = await readJSON(req);
+  if (payload.model !== "failover-secondary-upstream") {
+    writeJSON(res, { error: { message: `unexpected secondary model ${payload.model}` } }, 400);
+    return;
+  }
+  writeJSON(res, {
+    choices: [
+      {
+        message: {
+          role: "assistant",
+          content: "local smoke failover ok",
+        },
+      },
+    ],
+    usage: {
+      prompt_tokens: 7,
+      completion_tokens: 3,
+      total_tokens: 10,
+    },
+  });
+}
+
 async function readJSON(req) {
   const chunks = [];
   for await (const chunk of req) {
@@ -851,6 +1187,23 @@ async function readJSON(req) {
 function writeJSON(res, body, status = 200) {
   res.writeHead(status, { "Content-Type": "application/json" });
   res.end(JSON.stringify(body));
+}
+
+async function closeServer(server) {
+  await new Promise((resolve, reject) => {
+    server.close((error) => (error ? reject(error) : resolve()));
+  });
+}
+
+function metricSampleValue(metrics, samplePrefix) {
+  for (const line of metrics.split("\n")) {
+    if (line.startsWith(`${samplePrefix} `)) {
+      const raw = line.slice(samplePrefix.length).trim();
+      const value = Number.parseFloat(raw);
+      return Number.isFinite(value) ? value : 0;
+    }
+  }
+  return 0;
 }
 
 async function request(method, path, options = {}) {

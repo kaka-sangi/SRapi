@@ -14,7 +14,7 @@ EXAMPLES_CHECK ?= node tools/examples-check.mjs
 API_DIR ?= apps/api
 MIGRATION_NAME ?=
 
-.PHONY: help bootstrap-env openapi-lint openapi-bundle openapi-codegen openapi-codegen-check openapi-ts-codegen openapi-ts-codegen-check sdk-ts-typecheck ent-generate ent-generate-check migration-diff migration-hash migration-check api-test api-run dev-up dev-down dev-logs smoke-health smoke-gateway smoke-release backup-postgres restore-postgres examples-check secret-scan architecture-check code-quality-check diff-check web-install web-check web-check-e2e web-dev check
+.PHONY: help bootstrap-env openapi-lint openapi-bundle openapi-codegen openapi-codegen-check openapi-ts-codegen openapi-ts-codegen-check sdk-ts-typecheck ent-generate ent-generate-check migration-diff migration-hash migration-check api-test api-run dev-up dev-down dev-logs smoke-health smoke-gateway smoke-rate-limit smoke-failover smoke-release backup-postgres restore-postgres examples-check secret-scan architecture-check code-quality-check diff-check web-install web-check web-check-e2e web-dev check
 
 help:
 	@printf '%s\n' \
@@ -38,6 +38,8 @@ help:
 		'  make dev-down        Stop local Docker Compose services' \
 		'  make smoke-health    Curl /api/v1/health on localhost' \
 		'  make smoke-gateway   Login, create an API key, and smoke test local gateway endpoints' \
+		'  make smoke-rate-limit  Verify Gateway API key RPM limiting returns 429 + Retry-After' \
+		'  make smoke-failover  Verify Gateway retries from a 503 upstream to a fallback provider' \
 		'  make smoke-release   Validate health, readiness, metrics, and gateway smoke on localhost' \
 		'  make backup-postgres BACKUP_FILE=...   Create a PostgreSQL custom-format backup' \
 		'  make restore-postgres BACKUP_FILE=...  Restore a PostgreSQL custom-format backup' \
@@ -161,6 +163,12 @@ smoke-health:
 
 smoke-gateway:
 	node tools/smoke-local.mjs
+
+smoke-rate-limit:
+	node tools/smoke-local.mjs --rate-limit
+
+smoke-failover:
+	node tools/smoke-local.mjs --failover
 
 smoke-release:
 	node tools/smoke-local.mjs --release

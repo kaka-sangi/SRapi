@@ -104,6 +104,22 @@ make smoke-release
 
 该 smoke 在已启动的 API 上检查 `/livez`、`/readyz`、`/metrics` 基线指标、管理员登录、API Key 创建，以及本地 mock Gateway 的 `/v1/models`、Chat Completions、Responses、Messages 闭环。
 
+Gateway 限流 smoke 可单独执行：
+
+```bash
+make smoke-rate-limit
+```
+
+该 smoke 会创建 `rpm_limit=1` 的临时 Gateway API Key，调用一次 `/v1/chat/completions` 并确认成功，再调用第二次并断言返回 429、`rate_limit_error` / `rpm_limit_exceeded` 和 `Retry-After`。该检查要求 API 进程已连接 Redis-backed rate limiter；本地模式 Redis 不可用时会失败而不是静默跳过。
+
+Gateway 跨供应商故障转移 smoke 可单独执行：
+
+```bash
+make smoke-failover
+```
+
+该 smoke 会创建两个临时 OpenAI-compatible Provider、同一个临时模型映射和两个本地 mock upstream。Primary upstream 固定返回 503，Gateway 应自动切换到 Secondary upstream 并返回成功响应；随后 smoke 会断言 `usage_logs` 出现失败/成功两条 attempt、第二个 SchedulerDecision 通过 `fallback_from_decision_id` 链到第一个 decision、`fallback_excluded` 证据存在，并且 `/metrics` 暴露正数 `srapi_gateway_failover_total`。
+
 ## 6. 备份与恢复
 
 ### 6.1 备份对象

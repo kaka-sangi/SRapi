@@ -76,6 +76,7 @@ last_completed:
 - A2.2: Scheduler account-level quota evidence now has an end-to-end Gateway path: successful account usage updates `rpm_used` / `tpm_used` runtime metadata from the recent usage window, scheduler candidates read those counters with existing `rpm_limit` / `tpm_limit` / `max_concurrency` metadata, and HTTP + scheduler regressions prove `rpm_limit_exceeded`, `tpm_limit_exceeded`, and `concurrency_full` reject reasons are recorded.
 - A4.1: Scheduler failover foundations now return ranked candidate lists, persist `fallback_from_decision_id` on scheduler decisions, expose the field through admin OpenAPI/SDK responses, and update memory/Redis leases by `(request_id, attempt_no)` so fallback attempts do not overwrite each other.
 - A4.2: Gateway text, Responses, Messages, Embeddings, and Gemini GenerateContent handlers now consume ranked scheduler candidates with a retry loop for retryable provider errors, persist one `usage_logs` evidence row per `(request_id, attempt_no)`, link fallback scheduler decisions through `fallback_from_decision_id`, record `fallback_excluded` evidence, and expose `srapi_gateway_failover_total`.
+- A2/A4 smoke gates: `make smoke-rate-limit` now verifies a one-RPM Gateway API key returns 429 + `Retry-After` on the second request, and `make smoke-failover` creates two temporary OpenAI-compatible providers with local mock upstreams to prove primary 503 → secondary success plus usage attempt, fallback decision, reject-reason, and metric evidence.
 - A5.1: Generic reverse-proxy adapter now accepts `generic-reverse-proxy` providers, reads provider/account metadata for `base_url`, custom auth headers, chat/embedding paths, body mapping, response text/usage paths, supports API-key HTTP client and custom reverse-proxy runtime dispatch, handles OpenAI-compatible streaming/embeddings, and has adapter plus Gateway regressions proving configured upstreams work end to end.
 - A5.2: Provider preset install now covers DeepSeek/Kimi/通义(qwen)/智谱(zhipu)/Grok/Mistral/Groq/Together, keeps new providers disabled by default, records preset metadata into provider config, exposes preset key/platform/default base URL in provider test diagnostics, and has representative DeepSeek/Qwen/Together install + enable + `/admin/providers/{id}/test` coverage. Together's OpenAI-compatible base URL was updated to `https://api.together.ai/v1` per current official docs.
 - C3.3: Gateway content safety now adds `internal/modules/content_safety`, redacts email/phone/SSN/national ID/credit-card text across CanonicalRequest prompt, messages, embeddings, image/audio/speech, moderation, and rerank fields before provider dispatch, records safe audit finding summaries without raw PII, and persists compatibility warnings on usage evidence.
@@ -99,21 +100,18 @@ last_completed:
 
 current:
 
-- package: B4 payment SDK adapters
-- status: Stripe, Alipay Official, and WeChat Pay APIv3 SDK integrations are implemented and locally verified; real Stripe/Alipay/WeChat sandbox smoke remains pending external credentials/environment.
-- objective: continue payment-provider closure without letting docs/specs drift.
+- package: Phase 1 production smoke gates
+- status: Local rate-limit and failover smoke entrypoints are implemented and locally verified at script/HTTP-regression level; live `make smoke-rate-limit` / `make smoke-failover` require a running API with PostgreSQL/Redis.
+- objective: continue closing production smoke, sandbox, and pressure-test gaps without letting docs/specs drift.
 
 next_recommended: Run real Stripe/Alipay/WeChat sandbox smoke when merchant credentials are available, or continue the remaining Phase 1 production smoke / pressure-test tasks from `specs/silly-stirring-turtle.md`.
 
 last_gates:
 
-- `cd apps/api && go test ./internal/modules/payments/...`: pass
-- `cd apps/api && go test ./internal/modules/payments/... ./internal/persistence/entstore/payments ./internal/httpserver -run 'Test.*Payment|Test.*Provider|TestStorePersistsProvidersOrdersAndIdempotentAuditLogs'`: pass
-- `make architecture-check`: pass
-- `make code-quality-check`: pass
-- `cd apps/web && npm test -- tests/unit/language-context.test.tsx`: pass
-- `node tools/web-check.mjs`: pass
-- `make check`: pass
+- `node --check tools/smoke-local.mjs`: pass
+- `node --test tools/smoke-local.test.mjs`: pass
+- `make diff-check`: pass
+- `cd apps/api && go test ./internal/httpserver -run 'TestGatewayChatCompletionFailoverRecordsAttemptEvidence|TestGatewayEnforcesAPIKeyRPMLimit|TestGatewayEnforcesAPIKeyConcurrencyLimit'`: pass
 
 notes:
 

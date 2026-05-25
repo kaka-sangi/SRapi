@@ -3,6 +3,9 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import {
   CORE_GATEWAY_SMOKE_ENDPOINTS,
+  FAILOVER_GATEWAY_SMOKE_TARGETS,
+  FAILOVER_SMOKE_ENDPOINT,
+  RATE_LIMIT_SMOKE_ENDPOINT,
   RELEASE_GATEWAY_SMOKE_ENDPOINTS,
   RELEASE_GATEWAY_SMOKE_TARGETS,
 } from "./smoke-local.mjs";
@@ -38,6 +41,35 @@ test("release gateway smoke covers provider-native token counting routes", () =>
   assert.equal(releaseEndpointPaths.has("/v1beta/models/{model}:countTokens"), true);
 });
 
+test("rate-limit smoke targets one OpenAI-compatible request path", () => {
+  assert.deepEqual(RATE_LIMIT_SMOKE_ENDPOINT, {
+    name: "rate_limit",
+    method: "POST",
+    path: "/v1/chat/completions",
+  });
+});
+
+test("failover smoke uses two stable OpenAI-compatible targets", () => {
+  assert.deepEqual(FAILOVER_SMOKE_ENDPOINT, {
+    name: "failover",
+    method: "POST",
+    path: "/v1/chat/completions",
+  });
+  assert.deepEqual(
+    FAILOVER_GATEWAY_SMOKE_TARGETS.map((target) => target.name),
+    ["local-smoke-failover-primary", "local-smoke-failover-secondary"],
+  );
+  assert.deepEqual(
+    FAILOVER_GATEWAY_SMOKE_TARGETS.map((target) => target.priority),
+    [10, 100],
+  );
+  for (const target of FAILOVER_GATEWAY_SMOKE_TARGETS) {
+    assert.equal(target.adapterType, "openai-compatible");
+    assert.equal(target.protocol, "openai-compatible");
+    assert.equal(target.providerCapabilities.chat_completions, true);
+  }
+});
+
 test("release gateway smoke uses stable reusable admin targets", () => {
   assert.deepEqual(
     RELEASE_GATEWAY_SMOKE_TARGETS.map((target) => target.name),
@@ -57,6 +89,32 @@ test("local smoke disables its temporary gateway api key", () => {
   assert.match(script, /finally\s*{\s*await disableSmokeApiKey/s);
   assert.match(script, /PATCH", `\/api\/v1\/api-keys\/\$\{apiKeyID\}`/);
   assert.match(script, /status: "disabled"/);
+});
+
+test("rate-limit smoke creates a one-rpm api key and expects 429 retry-after", () => {
+  const script = readFileSync("tools/smoke-local.mjs", "utf8");
+
+  assert.match(script, /process\.argv\.includes\("--rate-limit"\)/);
+  assert.match(script, /rpmLimit: rateLimitSmoke \? 1 : undefined/);
+  assert.match(script, /body\.rpm_limit = rpmLimit/);
+  assert.match(script, /expectedStatus: 429/);
+  assert.match(script, /headers\.get\("retry-after"\)/);
+  assert.match(script, /rpm_limit_exceeded/);
+});
+
+test("failover smoke verifies attempt evidence and failover metrics", () => {
+  const script = readFileSync("tools/smoke-local.mjs", "utf8");
+
+  assert.match(script, /process\.argv\.includes\("--failover"\)/);
+  assert.match(script, /withFailoverSmokeUpstreams/);
+  assert.match(script, /primary unavailable/);
+  assert.match(script, /expected one call to each failover upstream/);
+  assert.match(script, /\/api\/v1\/admin\/usage-logs\?model=/);
+  assert.match(script, /attempt_no === 1/);
+  assert.match(script, /attempt_no === 2/);
+  assert.match(script, /fallback_from_decision_id/);
+  assert.match(script, /fallback_excluded/);
+  assert.match(script, /srapi_gateway_failover_total/);
 });
 
 test("local smoke disables old active smoke api keys before creating another one", () => {
@@ -90,6 +148,18 @@ test("release smoke disables fixed gateway targets after the smoke run", () => {
   assert.match(script, /async function disableFixedSmokeGatewayTargets/);
   assert.match(script, /fixedNames\.has\(name\)/);
   assert.match(script, /resource\.status === "active"/);
+});
+
+test("failover smoke disables fixed gateway targets before and after the run", () => {
+  const script = readFileSync("tools/smoke-local.mjs", "utf8");
+
+  assert.match(script, /const FAILOVER_GATEWAY_SMOKE_TARGET_NAMES = new Set/);
+  assert.match(script, /const FAILOVER_GATEWAY_SMOKE_ACCOUNT_NAMES = new Set/);
+  assert.match(script, /const FAILOVER_GATEWAY_SMOKE_MODEL_NAME = "local-smoke-failover-model"/);
+  assert.match(script, /if \(failoverSmoke\) {\s*await disableFixedSmokeGatewayTargets/s);
+  assert.match(script, /targetNames: FAILOVER_GATEWAY_SMOKE_TARGET_NAMES/);
+  assert.match(script, /modelNames: new Set\(\[FAILOVER_GATEWAY_SMOKE_MODEL_NAME\]\)/);
+  assert.match(script, /accountNames: FAILOVER_GATEWAY_SMOKE_ACCOUNT_NAMES/);
 });
 
 test("local smoke asserts no active smoke residue before exiting", () => {
