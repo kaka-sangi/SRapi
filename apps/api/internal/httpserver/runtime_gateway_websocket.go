@@ -131,7 +131,8 @@ func (s *Server) handleResponsesWebSocket(w http.ResponseWriter, r *http.Request
 		if s.shouldUseCodexWebSocketRelay(r, requestPayload) {
 			relayed, err := s.relayCodexResponsesWebSocket(r, conn, requestPayload, authed)
 			if err != nil {
-				if err := writeResponsesWebSocketError(r.Context(), conn, http.StatusBadGateway, "upstream_error", err.Error(), nil); err != nil {
+				status, code, message := responsesWebSocketRelayError(err)
+				if err := writeResponsesWebSocketError(r.Context(), conn, status, code, message, nil); err != nil {
 					return
 				}
 				continue
@@ -237,6 +238,10 @@ func (s *Server) handleRealtimeWebSocket(w http.ResponseWriter, r *http.Request)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), responsesWebSocketUsageRecord(authed, canonical, result, nil, false, "no_available_account", http.StatusServiceUnavailable, elapsedMillis(startedAt), admission, nil))
 		writeGatewayError(w, http.StatusServiceUnavailable, apiopenapi.ServiceUnavailableError, "no available provider account", "no_available_account")
+		return
+	}
+	if err := s.reserveGatewayAccountQuotaForScheduledRequest(r.Context(), r, authed, canonical, result, admission, startedAt); err != nil {
+		writeProviderGatewayError(w, err)
 		return
 	}
 	session, credential, err := s.runtime.prepareProviderRealtime(r.Context(), providerRealtimeRequest(canonical, result.Candidate, nil, realtimeWebSocketHeaders(r)))
@@ -459,6 +464,9 @@ func (s *Server) relayCodexResponsesWebSocket(r *http.Request, conn *websocket.C
 		s.runtime.recordGatewayUsage(r.Context(), responsesWebSocketUsageRecord(authed, canonical, result, &result.Candidate, false, "invalid_request", http.StatusBadRequest, elapsedMillis(startedAt), admission, nil))
 		return true, errors.New("selected account does not support Codex Responses WebSocket reverse proxy")
 	}
+	if err := s.reserveGatewayAccountQuotaForScheduledRequest(r.Context(), r, authed, canonical, result, admission, startedAt); err != nil {
+		return true, err
+	}
 	session, credential, err := s.runtime.prepareProviderRealtime(r.Context(), providerRealtimeRequest(canonical, result.Candidate, payload))
 	if err != nil {
 		errorClass, upstreamStatus, _ := providerGatewayError(err)
@@ -489,6 +497,15 @@ func (s *Server) relayCodexResponsesWebSocket(r *http.Request, conn *websocket.C
 		return true, provideradaptercontract.ProviderError{Class: errorClass, StatusCode: statusCode, Message: providerGatewayMessage(errorClass)}
 	}
 	return true, nil
+}
+
+func responsesWebSocketRelayError(err error) (int, string, string) {
+	var providerErr provideradaptercontract.ProviderError
+	if errors.As(err, &providerErr) {
+		errorClass, upstreamStatus, _ := providerGatewayError(err)
+		return providerGatewayHTTPStatus(upstreamStatus), errorClass, providerGatewayMessage(errorClass)
+	}
+	return http.StatusBadGateway, "upstream_error", err.Error()
 }
 
 type responsesWebSocketRelayResult struct {

@@ -6066,6 +6066,133 @@ func TestGatewayUpdatesAccountRuntimeQuotaMetadataForScheduler(t *testing.T) {
 	}
 }
 
+func TestGatewayEnforcesAccountRPMWithRedisCounterWhenMetadataIsStale(t *testing.T) {
+	redisServer := miniredis.RunT(t)
+	redisClient := redis.NewClient(&redis.Options{Addr: redisServer.Addr()})
+	defer redisClient.Close()
+	limiter, err := ratelimit.New(redisClient)
+	if err != nil {
+		t.Fatalf("new rate limiter: %v", err)
+	}
+
+	upstreamHits := 0
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/chat/completions" {
+			t.Fatalf("unexpected upstream path %s", r.URL.Path)
+		}
+		upstreamHits++
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"quota ok"}}],"usage":{"prompt_tokens":3,"completion_tokens":2,"total_tokens":5}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil, WithRateLimiter(limiter))
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"account-redis-quota-provider","display_name":"Account Redis Quota","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"account-redis-quota-model","display_name":"Account Redis Quota Model","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"account-redis-quota-upstream","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"account-redis-quota-account","runtime_class":"api_key","credential":{"api_key":"upstream-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1","rpm_limit":1},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	firstReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"account-redis-quota-model","messages":[{"role":"user","content":"first redis quota request"}]}`))
+	firstReq.Header.Set("Content-Type", "application/json")
+	firstReq.Header.Set("Authorization", "Bearer "+apiKey)
+	firstRec := httptest.NewRecorder()
+	handler.ServeHTTP(firstRec, firstReq)
+	if firstRec.Code != http.StatusOK {
+		t.Fatalf("expected first gateway request 200, got %d body=%s", firstRec.Code, firstRec.Body.String())
+	}
+
+	updateReq := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/accounts/"+string(accountResp.Data.Id), strings.NewReader(`{"metadata":{"base_url":"`+upstream.URL+`/v1","rpm_limit":1,"rpm_used":0,"tpm_used":0}}`))
+	updateReq.Header.Set("Content-Type", "application/json")
+	updateReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	updateReq.AddCookie(sessionCookie)
+	updateRec := httptest.NewRecorder()
+	handler.ServeHTTP(updateRec, updateReq)
+	if updateRec.Code != http.StatusOK {
+		t.Fatalf("expected account metadata reset 200, got %d body=%s", updateRec.Code, updateRec.Body.String())
+	}
+
+	secondReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"account-redis-quota-model","messages":[{"role":"user","content":"second redis quota request"}]}`))
+	secondReq.Header.Set("Content-Type", "application/json")
+	secondReq.Header.Set("Authorization", "Bearer "+apiKey)
+	secondRec := httptest.NewRecorder()
+	handler.ServeHTTP(secondRec, secondReq)
+	if secondRec.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected account Redis quota rejection 429, got %d body=%s", secondRec.Code, secondRec.Body.String())
+	}
+	var errResp apiopenapi.GatewayErrorResponse
+	if err := json.NewDecoder(secondRec.Body).Decode(&errResp); err != nil {
+		t.Fatalf("decode account Redis quota response: %v", err)
+	}
+	if errResp.Error.Code == nil || *errResp.Error.Code != "rpm_limit_exceeded" || errResp.Error.Type != apiopenapi.RateLimitError {
+		t.Fatalf("unexpected account Redis quota response: %+v", errResp)
+	}
+	if upstreamHits != 1 {
+		t.Fatalf("expected account Redis quota to block before second upstream dispatch, upstream hits=%d", upstreamHits)
+	}
+}
+
+func TestGatewayEnforcesAccountRPMOnDirectDispatchRouteWithRedisCounter(t *testing.T) {
+	redisServer := miniredis.RunT(t)
+	redisClient := redis.NewClient(&redis.Options{Addr: redisServer.Addr()})
+	defer redisClient.Close()
+	limiter, err := ratelimit.New(redisClient)
+	if err != nil {
+		t.Fatalf("new rate limiter: %v", err)
+	}
+
+	upstreamHits := 0
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/images/generations" {
+			t.Fatalf("unexpected upstream path %s", r.URL.Path)
+		}
+		upstreamHits++
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"created":1710000001,"data":[{"url":"https://example.test/account-redis-image.png"}],"usage":{"prompt_tokens":4,"completion_tokens":1,"total_tokens":5}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil, WithRateLimiter(limiter))
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"account-redis-image-provider","display_name":"Account Redis Image","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active","capabilities":{"images":true}}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"account-redis-image-model","display_name":"Account Redis Image Model","status":"active","capabilities":[{"key":"images","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"account-redis-image-upstream","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"account-redis-image-account","runtime_class":"api_key","credential":{"api_key":"upstream-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1","rpm_limit":1},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/images/generations", `{"model":"account-redis-image-model","prompt":"first direct dispatch image","n":1}`)
+
+	updateReq := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/accounts/"+string(accountResp.Data.Id), strings.NewReader(`{"metadata":{"base_url":"`+upstream.URL+`/v1","rpm_limit":1,"rpm_used":0,"tpm_used":0}}`))
+	updateReq.Header.Set("Content-Type", "application/json")
+	updateReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	updateReq.AddCookie(sessionCookie)
+	updateRec := httptest.NewRecorder()
+	handler.ServeHTTP(updateRec, updateReq)
+	if updateRec.Code != http.StatusOK {
+		t.Fatalf("expected account metadata reset 200, got %d body=%s", updateRec.Code, updateRec.Body.String())
+	}
+
+	secondReq := httptest.NewRequest(http.MethodPost, "/v1/images/generations", strings.NewReader(`{"model":"account-redis-image-model","prompt":"second direct dispatch image","n":1}`))
+	secondReq.Header.Set("Content-Type", "application/json")
+	secondReq.Header.Set("Authorization", "Bearer "+apiKey)
+	secondRec := httptest.NewRecorder()
+	handler.ServeHTTP(secondRec, secondReq)
+	if secondRec.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected account Redis quota rejection 429, got %d body=%s", secondRec.Code, secondRec.Body.String())
+	}
+	var errResp apiopenapi.GatewayErrorResponse
+	if err := json.NewDecoder(secondRec.Body).Decode(&errResp); err != nil {
+		t.Fatalf("decode account Redis quota response: %v", err)
+	}
+	if errResp.Error.Code == nil || *errResp.Error.Code != "rpm_limit_exceeded" || errResp.Error.Type != apiopenapi.RateLimitError {
+		t.Fatalf("unexpected account Redis quota response: %+v", errResp)
+	}
+	if upstreamHits != 1 {
+		t.Fatalf("expected account Redis quota to block before second image upstream dispatch, upstream hits=%d", upstreamHits)
+	}
+}
+
 func TestGatewayVisionRequestUsesCapabilityTaxonomy(t *testing.T) {
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)

@@ -80,6 +80,10 @@ func (s *Server) handleAnthropicCountTokens(w http.ResponseWriter, r *http.Reque
 		writeGatewayError(w, http.StatusServiceUnavailable, apiopenapi.ServiceUnavailableError, "no available account", "no_available_account")
 		return
 	}
+	if err := s.reserveGatewayAccountQuotaForScheduledRequest(r.Context(), r, authed, canonical, result, admission, startedAt); err != nil {
+		writeProviderGatewayError(w, err)
+		return
+	}
 	providerResp, err := s.runtime.invokeProviderTokenCount(r.Context(), providerTokenCountRequest(canonical, rawBody, result.Candidate))
 	if err != nil {
 		errorClass, upstreamStatus, errorType := providerGatewayError(err)

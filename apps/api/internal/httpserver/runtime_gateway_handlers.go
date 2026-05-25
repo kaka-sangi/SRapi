@@ -885,6 +885,10 @@ func (s *Server) handleGeminiCountTokens(w http.ResponseWriter, r *http.Request)
 		writeGeminiGatewayError(w, http.StatusServiceUnavailable, "UNAVAILABLE", "no available account")
 		return
 	}
+	if err := s.reserveGatewayAccountQuotaForScheduledRequest(r.Context(), r, authed, canonical, result, admission, startedAt); err != nil {
+		writeGeminiProviderGatewayError(w, err)
+		return
+	}
 	providerResp, err := s.runtime.invokeProviderTokenCount(r.Context(), providerTokenCountRequest(canonical, rawBody, result.Candidate))
 	if err != nil {
 		errorClass, upstreamStatus, _ := providerGatewayError(err)

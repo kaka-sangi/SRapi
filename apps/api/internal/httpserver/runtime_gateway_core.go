@@ -242,6 +242,57 @@ func (rt *runtimeState) checkGatewayRateLimit(ctx context.Context, canonical gat
 	return rt.rateLimiter.Allow(ctx, checks, time.Now().UTC())
 }
 
+func (rt *runtimeState) reserveGatewayAccountQuota(ctx context.Context, usage gatewaycontract.Usage, candidate schedulercontract.Candidate) error {
+	if rt.rateLimiter == nil || candidate.Account.ID <= 0 {
+		return nil
+	}
+	checks := make([]ratelimit.Check, 0, 2)
+	if limit := positiveLimit(candidate.Limits.RPMLimit); limit > 0 {
+		checks = append(checks, ratelimit.Check{
+			Name:   "account_rpm",
+			Key:    fmt.Sprintf("account:%d:rpm", candidate.Account.ID),
+			Limit:  limit,
+			Cost:   1,
+			Window: accountRuntimeQuotaWindow(candidate.Account.Metadata),
+		})
+	}
+	if limit := positiveLimit(candidate.Limits.TPMLimit); limit > 0 {
+		checks = append(checks, ratelimit.Check{
+			Name:   "account_tpm",
+			Key:    fmt.Sprintf("account:%d:tpm", candidate.Account.ID),
+			Limit:  limit,
+			Cost:   max(1, usage.InputTokens+usage.OutputTokens+usage.CachedTokens),
+			Window: accountRuntimeQuotaWindow(candidate.Account.Metadata),
+		})
+	}
+	if len(checks) == 0 {
+		return nil
+	}
+	decision, err := rt.rateLimiter.Allow(ctx, checks, time.Now().UTC())
+	if err != nil {
+		return err
+	}
+	if decision.Allowed {
+		return nil
+	}
+	return provideradaptercontract.ProviderError{
+		Class:      gatewayAccountQuotaErrorClass(decision.Name),
+		StatusCode: http.StatusTooManyRequests,
+		Message:    "provider account rate limit exceeded",
+	}
+}
+
+func gatewayAccountQuotaErrorClass(name string) string {
+	switch strings.TrimSpace(name) {
+	case "account_rpm":
+		return "rpm_limit_exceeded"
+	case "account_tpm":
+		return "tpm_limit_exceeded"
+	default:
+		return "rate_limit"
+	}
+}
+
 func (rt *runtimeState) apiKeyByID(ctx context.Context, userID int, apiKeyID int) (apikeycontract.APIKey, error) {
 	keys, err := rt.apiKeys.ListByUser(ctx, userID)
 	if err != nil {
@@ -2043,7 +2094,7 @@ func gatewayErrorTypeForProviderClass(errorClass string) apiopenapi.GatewayError
 	switch errorClass {
 	case "invalid_request":
 		return apiopenapi.InvalidRequestError
-	case "rate_limit":
+	case "rate_limit", "rpm_limit_exceeded", "tpm_limit_exceeded":
 		return apiopenapi.RateLimitError
 	case "auth_failed", "auth_error", "permission_denied", "session_invalid", "account_locked", "account_banned", "abuse_detected", "device_unrecognized":
 		return apiopenapi.PermissionError
@@ -2076,6 +2127,10 @@ func providerGatewayMessage(errorClass string) string {
 	switch errorClass {
 	case "rate_limit":
 		return "provider rate limit"
+	case "rpm_limit_exceeded":
+		return "provider account RPM limit exceeded"
+	case "tpm_limit_exceeded":
+		return "provider account TPM limit exceeded"
 	case "auth_failed", "auth_error", "credential_error":
 		return "provider authentication failed"
 	case "invalid_request":

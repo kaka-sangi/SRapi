@@ -163,6 +163,10 @@ func (s *Server) handleCreateImageGeneration(w http.ResponseWriter, r *http.Requ
 		writeGatewayError(w, http.StatusServiceUnavailable, apiopenapi.ServiceUnavailableError, "no available account", "no_available_account")
 		return
 	}
+	if err := s.reserveGatewayAccountQuotaForScheduledRequest(r.Context(), r, authed, canonical, result, admission, startedAt); err != nil {
+		writeProviderGatewayError(w, err)
+		return
+	}
 	providerResp, err := s.runtime.invokeProviderImageGeneration(r.Context(), providerImageGenerationRequest(canonical, result.Candidate))
 	if err != nil {
 		errorClass, upstreamStatus, errorType := providerGatewayError(err)
@@ -361,6 +365,10 @@ func (s *Server) handleCreateImageEdit(w http.ResponseWriter, r *http.Request) {
 			CompatibilityWarnings: canonical.CompatibilityWarnings,
 		})
 		writeGatewayError(w, http.StatusServiceUnavailable, apiopenapi.ServiceUnavailableError, "no available account", "no_available_account")
+		return
+	}
+	if err := s.reserveGatewayAccountQuotaForScheduledRequest(r.Context(), r, authed, canonical, result, admission, startedAt); err != nil {
+		writeProviderGatewayError(w, err)
 		return
 	}
 	providerResp, err := s.runtime.invokeProviderImageEdit(r.Context(), providerImageEditRequest(canonical, result.Candidate))
@@ -568,6 +576,10 @@ func (s *Server) handleCreateImageVariation(w http.ResponseWriter, r *http.Reque
 			CompatibilityWarnings: canonical.CompatibilityWarnings,
 		})
 		writeGatewayError(w, http.StatusServiceUnavailable, apiopenapi.ServiceUnavailableError, "no available account", "no_available_account")
+		return
+	}
+	if err := s.reserveGatewayAccountQuotaForScheduledRequest(r.Context(), r, authed, canonical, result, admission, startedAt); err != nil {
+		writeProviderGatewayError(w, err)
 		return
 	}
 	providerResp, err := s.runtime.invokeProviderImageVariation(r.Context(), providerImageVariationRequest(canonical, result.Candidate))
@@ -1249,6 +1261,10 @@ func (s *Server) handleCreateModeration(w http.ResponseWriter, r *http.Request) 
 		writeGatewayError(w, http.StatusServiceUnavailable, apiopenapi.ServiceUnavailableError, "no available account", "no_available_account")
 		return
 	}
+	if err := s.reserveGatewayAccountQuotaForScheduledRequest(r.Context(), r, authed, canonical, result, admission, startedAt); err != nil {
+		writeProviderGatewayError(w, err)
+		return
+	}
 	providerResp, err := s.runtime.invokeProviderModerations(r.Context(), providerModerationRequest(canonical, result.Candidate))
 	if err != nil {
 		errorClass, upstreamStatus, errorType := providerGatewayError(err)
@@ -1446,6 +1462,10 @@ func (s *Server) handleCreateRerank(w http.ResponseWriter, r *http.Request) {
 			CompatibilityWarnings: canonical.CompatibilityWarnings,
 		})
 		writeGatewayError(w, http.StatusServiceUnavailable, apiopenapi.ServiceUnavailableError, "no available account", "no_available_account")
+		return
+	}
+	if err := s.reserveGatewayAccountQuotaForScheduledRequest(r.Context(), r, authed, canonical, result, admission, startedAt); err != nil {
+		writeProviderGatewayError(w, err)
 		return
 	}
 	providerResp, err := s.runtime.invokeProviderRerank(r.Context(), providerRerankRequest(canonical, result.Candidate))

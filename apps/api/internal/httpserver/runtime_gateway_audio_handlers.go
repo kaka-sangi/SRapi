@@ -158,6 +158,10 @@ func (s *Server) handleCreateAudioTranscription(w http.ResponseWriter, r *http.R
 		writeGatewayError(w, http.StatusServiceUnavailable, apiopenapi.ServiceUnavailableError, "no available account", "no_available_account")
 		return
 	}
+	if err := s.reserveGatewayAccountQuotaForScheduledRequest(r.Context(), r, authed, canonical, result, admission, startedAt); err != nil {
+		writeProviderGatewayError(w, err)
+		return
+	}
 	providerResp, err := s.runtime.invokeProviderAudioTranscription(r.Context(), providerAudioTranscriptionRequest(canonical, result.Candidate))
 	if err != nil {
 		errorClass, upstreamStatus, errorType := providerGatewayError(err)
@@ -468,6 +472,10 @@ func (s *Server) handleCreateAudioSpeech(w http.ResponseWriter, r *http.Request)
 			CompatibilityWarnings: canonical.CompatibilityWarnings,
 		})
 		writeGatewayError(w, http.StatusServiceUnavailable, apiopenapi.ServiceUnavailableError, "no available account", "no_available_account")
+		return
+	}
+	if err := s.reserveGatewayAccountQuotaForScheduledRequest(r.Context(), r, authed, canonical, result, admission, startedAt); err != nil {
+		writeProviderGatewayError(w, err)
 		return
 	}
 	providerResp, err := s.runtime.invokeProviderAudioSpeech(r.Context(), providerAudioSpeechRequest(canonical, result.Candidate))

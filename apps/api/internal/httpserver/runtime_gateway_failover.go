@@ -22,6 +22,34 @@ type gatewayFailoverResult[T any] struct {
 
 type gatewayCandidateInvoker[T any] func(context.Context, schedulercontract.Candidate) (T, error)
 
+func (s *Server) reserveGatewayAccountQuotaForScheduledRequest(
+	ctx context.Context,
+	r *http.Request,
+	authed apikeycontract.AuthResult,
+	canonical gatewaycontract.CanonicalRequest,
+	result schedulercontract.ScheduleResult,
+	admission gatewayAdmission,
+	startedAt time.Time,
+) error {
+	if err := s.runtime.reserveGatewayAccountQuota(ctx, admission.EstimatedUsage, result.Candidate); err != nil {
+		errorClass, upstreamStatus, _ := providerGatewayError(err)
+		s.recordGatewayProviderAttemptFailure(r, authed, canonical, result, errorClass, upstreamStatus, elapsedMillis(startedAt), admission)
+		return err
+	}
+	return nil
+}
+
+func writeProviderGatewayError(w http.ResponseWriter, err error) {
+	errorClass, upstreamStatus, errorType := providerGatewayError(err)
+	writeGatewayError(w, providerGatewayHTTPStatus(upstreamStatus), errorType, providerGatewayMessage(errorClass), errorClass)
+}
+
+func writeGeminiProviderGatewayError(w http.ResponseWriter, err error) {
+	errorClass, upstreamStatus, _ := providerGatewayError(err)
+	status := providerGatewayHTTPStatus(upstreamStatus)
+	writeGeminiGatewayError(w, status, geminiStatusForGatewayErrorClass(errorClass, status), providerGatewayMessage(errorClass))
+}
+
 func (s *Server) invokeProviderTextWithFailover(
 	ctx context.Context,
 	r *http.Request,
@@ -86,6 +114,21 @@ func invokeGatewayCandidateWithFailover[T any](
 				return lastFailure
 			}
 			return gatewayFailoverResult[T]{ScheduleResult: result, Err: err}
+		}
+		if err := s.reserveGatewayAccountQuotaForScheduledRequest(ctx, r, authed, canonical, result, admission, startedAt); err != nil {
+			errorClass, upstreamStatus, _ := providerGatewayError(err)
+			lastFailure = gatewayFailoverResult[T]{
+				ScheduleResult:  result,
+				Err:             err,
+				FailureRecorded: true,
+			}
+			if !gatewayShouldFailover(errorClass, upstreamStatus, attemptNo, len(result.Candidates)) {
+				return lastFailure
+			}
+			excluded = append(excluded, result.Candidate.Account.ID)
+			decisionID := result.Decision.ID
+			fallbackFromDecisionID = &decisionID
+			continue
 		}
 
 		response, err := invoke(ctx, result.Candidate)
