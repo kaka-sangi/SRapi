@@ -104,14 +104,15 @@ last_completed:
 - B4.3: WeChat Pay Official support now adds `wechatpay-apiv3/wechatpay-go`, a checkout provider for Native / H5 / JSAPI prepay flows, service-level WeChat APIv3 notification signature verification and AES-GCM decrypt handling, and regressions for checkout metadata, signed notification fulfillment, idempotency, and local config requirement checks. Real WeChat sandbox smoke still requires external merchant credentials.
 - C1.1: Structured trace service spans now cover `scheduler.Schedule`, `payments.HandleWebhook`, and `accounts.ProbeAccount` with reusable `platform/otel.StartSpan` / `EndSpan`, low-sensitive diagnostic attributes, business outcome fields, stable `error.type` classification, focused span export tests, and a local OTLP gRPC collector smoke proving enabled trace export flushes span/resource data through the real OTLP protocol.
 - C1.2: SLO burn-rate evaluator now adds `operations.Service.EvaluateSLOAlerts()`, a persistent-store `slo_evaluator` worker, `SLO_EVALUATOR_*` config, app lifecycle wiring, and tests proving multi-window availability breaches create/update/resolve only `slo.burn_rate.*` alert events while leaving manual alerts untouched.
+- B1.2.3: Added an opt-in PostgreSQL `balance_charger` pressure gate (`make balance-charger-pressure`) that creates a temporary schema, seeds 10,000 pending usage logs, runs the real Ent billing store and worker, and verifies charged usage, ledger batches, and final balance before dropping the schema.
 
 current:
 
 - package: Phase 1 production smoke and observability hardening
-- status: API key/user rate limits, API key concurrency, scheduler account quota evidence, provider-account RPM/TPM Redis counters, provider-account ordinary HTTP concurrency Redis leases, local schema repair for multi-attempt usage evidence, protocol-level OTLP trace export smoke, and the balance_charger local 10k pending-usage drain guard are implemented and locally verified; live external provider/payment smoke still depends on valid upstream or merchant credentials.
+- status: API key/user rate limits, API key concurrency, scheduler account quota evidence, provider-account RPM/TPM Redis counters, provider-account ordinary HTTP concurrency Redis leases, local schema repair for multi-attempt usage evidence, protocol-level OTLP trace export smoke, the balance_charger local 10k pending-usage drain guard, and an opt-in PostgreSQL balance_charger pressure harness are implemented and locally verified; live external provider/payment smoke still depends on valid upstream or merchant credentials.
 - objective: continue closing production smoke, sandbox, collector-visualization, and pressure-test gaps without letting docs/specs drift.
 
-next_recommended: Run real Stripe/Alipay/WeChat sandbox smoke when merchant credentials are available, run a Jaeger/Tempo UI trace visualization smoke against a deployed collector, run a production-adjacent PostgreSQL balance_charger pressure test, or continue the remaining Phase 1 production pressure-test tasks from `specs/silly-stirring-turtle.md`.
+next_recommended: Run real Stripe/Alipay/WeChat sandbox smoke when merchant credentials are available, run a Jaeger/Tempo UI trace visualization smoke against a deployed collector, rerun `make balance-charger-pressure BALANCE_CHARGER_PRESSURE_DSN=...` against a production-adjacent PostgreSQL database if local dev-container IO is not representative enough, or continue the remaining Phase 1 production pressure-test tasks from `specs/silly-stirring-turtle.md`.
 
 last_gates:
 
@@ -121,13 +122,15 @@ last_gates:
 - `make code-quality-check`: pass
 - `make diff-check`: pass
 - `make secret-scan`: pass
+- `cd apps/api && go test ./internal/workers/balance_charger -count=1 -v`: pass, pressure test skipped because `SRAPI_BALANCE_CHARGER_PRESSURE_DSN` was not configured
+- `make balance-charger-pressure BALANCE_CHARGER_PRESSURE_DSN=postgres://...`: pass against local `srapi-dev-postgres`, charged 10,000 usage logs in 1.55s inside the test run
 
 notes:
 
 - Existing `docs/` remains the architecture and domain source of truth.
 - Real Stripe/Alipay/WeChat sandbox smoke still requires merchant credentials.
 - Jaeger/Tempo UI trace visualization smoke still requires a deployed collector backend; local OTLP gRPC protocol export is covered by `TestNewTracerProviderExportsSpansToOTLPCollector`.
-- The balance_charger 10k usage/min guard is worker-level and deterministic; a production-adjacent PostgreSQL pressure test is still needed before claiming deployed database throughput under real IO.
+- The balance_charger PostgreSQL pressure gate passed against the local dev Postgres container; rerun it against production-adjacent storage before claiming deployed database throughput under real IO.
 - The rate-limit p99 guard is now available, but this workstation did not produce a valid 2ms Redis baseline; rerun it against local/native or production-adjacent Redis before claiming the limiter p99 budget is met.
 - Historical strategy replay can only be claimed for decisions that have `scheduler_request_snapshots`; older decision-only rows remain report-only because they lack the full request profile and candidate set.
 - Future goal runs must read `specs/README.md` first, then continue from `next_recommended`.

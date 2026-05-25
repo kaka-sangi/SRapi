@@ -18,8 +18,10 @@ RATE_LIMIT_BENCH_REDIS_PASSWORD ?=
 RATE_LIMIT_BENCH_REDIS_DB ?= 15
 RATE_LIMIT_BENCH_SAMPLES ?= 2000
 RATE_LIMIT_BENCH_BUDGET_MS ?= 2
+BALANCE_CHARGER_PRESSURE_DSN ?=
+BALANCE_CHARGER_PRESSURE_TIMEOUT ?= 120s
 
-.PHONY: help bootstrap-env openapi-lint openapi-bundle openapi-codegen openapi-codegen-check openapi-ts-codegen openapi-ts-codegen-check sdk-ts-typecheck ent-generate ent-generate-check migration-diff migration-hash migration-check api-test api-run dev-up dev-down dev-logs smoke-health smoke-gateway smoke-rate-limit smoke-failover smoke-release rate-limit-bench backup-postgres restore-postgres examples-check secret-scan architecture-check code-quality-check diff-check web-install web-check web-check-e2e web-dev check
+.PHONY: help bootstrap-env openapi-lint openapi-bundle openapi-codegen openapi-codegen-check openapi-ts-codegen openapi-ts-codegen-check sdk-ts-typecheck ent-generate ent-generate-check migration-diff migration-hash migration-check api-test api-run dev-up dev-down dev-logs smoke-health smoke-gateway smoke-rate-limit smoke-failover smoke-release rate-limit-bench balance-charger-pressure backup-postgres restore-postgres examples-check secret-scan architecture-check code-quality-check diff-check web-install web-check web-check-e2e web-dev check
 
 help:
 	@printf '%s\n' \
@@ -47,6 +49,7 @@ help:
 		'  make smoke-failover  Verify Gateway retries from a 503 upstream to a fallback provider' \
 		'  make smoke-release   Validate health, readiness, metrics, and gateway smoke on localhost' \
 		'  make rate-limit-bench RATE_LIMIT_BENCH_REDIS_ADDR=host:port  Check Redis rate limiter p99 budget' \
+		'  make balance-charger-pressure BALANCE_CHARGER_PRESSURE_DSN=postgres://...  Run PostgreSQL balance_charger pressure test' \
 		'  make backup-postgres BACKUP_FILE=...   Create a PostgreSQL custom-format backup' \
 		'  make restore-postgres BACKUP_FILE=...  Restore a PostgreSQL custom-format backup' \
 		'  make examples-check  Validate public examples and 2api migration guide' \
@@ -189,6 +192,12 @@ rate-limit-bench:
 		SRAPI_RATE_LIMIT_P99_SAMPLES="$(RATE_LIMIT_BENCH_SAMPLES)" \
 		SRAPI_RATE_LIMIT_P99_BUDGET_MS="$(RATE_LIMIT_BENCH_BUDGET_MS)" \
 		go test ./internal/platform/ratelimit -run TestLimiterP99Budget -count=1 -v
+
+balance-charger-pressure:
+	@test -n "$(BALANCE_CHARGER_PRESSURE_DSN)" || (echo 'BALANCE_CHARGER_PRESSURE_DSN is required, for example: make balance-charger-pressure BALANCE_CHARGER_PRESSURE_DSN=postgres://user:pass@127.0.0.1:5432/srapi?sslmode=disable' >&2; exit 2)
+	cd $(API_DIR) && \
+		SRAPI_BALANCE_CHARGER_PRESSURE_DSN="$(BALANCE_CHARGER_PRESSURE_DSN)" \
+		go test ./internal/workers/balance_charger -run TestBalanceChargerPostgresPressureDrainsDefaultBacklog -count=1 -timeout "$(BALANCE_CHARGER_PRESSURE_TIMEOUT)" -v
 
 backup-postgres:
 	@test -n "$(BACKUP_FILE)" || (echo 'BACKUP_FILE is required' >&2; exit 2)

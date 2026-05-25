@@ -216,6 +216,14 @@ make smoke-release
 
 相关配置项为 `BALANCE_CHARGER_INTERVAL_SECONDS`、`BALANCE_CHARGER_BATCH_LIMIT` 和 `BALANCE_CHARGER_MAX_BATCHES_PER_RUN`。默认每轮处理 `500 * 20 = 10,000` 条 pending usage，用于覆盖 10k usage/min 的生产 backlog 目标；单个 batch 仍在 Billing store 事务内完成 ledger、balance 和 usage 标记，确保吞吐配置不改变账务一致性边界。
 
+生产相邻 PostgreSQL 压测使用 opt-in gate：
+
+```bash
+make balance-charger-pressure BALANCE_CHARGER_PRESSURE_DSN='postgres://user:pass@127.0.0.1:5432/srapi?sslmode=disable'
+```
+
+该测试会在目标 database 内创建临时 schema，写入 10,000 条成功且未扣费的 usage logs，通过真实 Ent billing store 和 `balance_charger` worker 一轮扣费，然后校验 `charged_at`、billing ledger 批次和用户余额。测试结束会删除临时 schema；不要把 DSN 写入仓库或命令历史共享日志。
+
 ### 账号健康探测
 
 `health_probe` worker 由 `internal/app` 在持久化 account/provider store 可用时启动。它默认每 5 分钟遍历活跃 API-key provider account，调用上游 `/models` 类轻量端点，写入 `account_health_snapshots`，并在连续失败或错误率过高时给账号写入 cooldown / circuit metadata。相关配置项为 `ACCOUNT_HEALTH_PROBE_INTERVAL_SECONDS`、`ACCOUNT_HEALTH_PROBE_TIMEOUT_SECONDS`、`ACCOUNT_HEALTH_PROBE_MAX_CONCURRENT`、`ACCOUNT_HEALTH_PROBE_FAILURE_THRESHOLD`、`ACCOUNT_HEALTH_PROBE_ERROR_RATE_THRESHOLD_PERCENT`、`ACCOUNT_HEALTH_PROBE_MIN_SAMPLES_FOR_ERROR_RATE` 和 `ACCOUNT_HEALTH_PROBE_COOLDOWN_SECONDS`。
