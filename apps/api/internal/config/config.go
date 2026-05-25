@@ -29,6 +29,7 @@ type Config struct {
 	Retention     RetentionConfig
 	HealthProbe   HealthProbeConfig
 	QualityEval   QualityEvalConfig
+	SLOEvaluator  SLOEvaluatorConfig
 	Observability ObservabilityConfig
 }
 
@@ -103,6 +104,12 @@ type QualityEvalConfig struct {
 	OpenAIBaseURL string
 	JudgeModel    string
 	JudgeTimeout  time.Duration
+}
+
+// SLOEvaluatorConfig controls the SLO burn-rate alert evaluator worker.
+type SLOEvaluatorConfig struct {
+	Interval time.Duration
+	Timeout  time.Duration
 }
 
 // ObservabilityConfig controls process-wide tracing and structured diagnostics.
@@ -186,6 +193,10 @@ func Load() Config {
 			OpenAIBaseURL: getEnv("QUALITY_EVAL_OPENAI_BASE_URL", ""),
 			JudgeModel:    getEnv("QUALITY_EVAL_JUDGE_MODEL", "gpt-4o-mini"),
 			JudgeTimeout:  time.Duration(getIntEnv("QUALITY_EVAL_JUDGE_TIMEOUT_SECONDS", 20)) * time.Second,
+		},
+		SLOEvaluator: SLOEvaluatorConfig{
+			Interval: time.Duration(getIntEnv("SLO_EVALUATOR_INTERVAL_SECONDS", 60)) * time.Second,
+			Timeout:  time.Duration(getIntEnv("SLO_EVALUATOR_TIMEOUT_SECONDS", 30)) * time.Second,
 		},
 		Observability: ObservabilityConfig{
 			ServiceName:      getEnv("OTEL_SERVICE_NAME", getEnv("LOG_SERVICE_NAME", "srapi")),
@@ -288,6 +299,12 @@ func (c Config) Validate() error {
 	}
 	if c.QualityEval.Enabled && strings.TrimSpace(c.QualityEval.OpenAIAPIKey) == "" {
 		return fmt.Errorf("QUALITY_EVAL_OPENAI_API_KEY must be set when QUALITY_EVAL_ENABLED=true")
+	}
+	if c.SLOEvaluator.Interval <= 0 {
+		return fmt.Errorf("SLO_EVALUATOR_INTERVAL_SECONDS must be positive")
+	}
+	if c.SLOEvaluator.Timeout <= 0 {
+		return fmt.Errorf("SLO_EVALUATOR_TIMEOUT_SECONDS must be positive")
 	}
 	if strings.TrimSpace(c.Observability.ServiceName) == "" {
 		return fmt.Errorf("OTEL_SERVICE_NAME must not be empty")

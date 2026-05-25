@@ -255,6 +255,8 @@ ACCOUNT_HEALTH_PROBE_FAILURE_THRESHOLD=3
 ACCOUNT_HEALTH_PROBE_ERROR_RATE_THRESHOLD_PERCENT=50
 ACCOUNT_HEALTH_PROBE_MIN_SAMPLES_FOR_ERROR_RATE=3
 ACCOUNT_HEALTH_PROBE_COOLDOWN_SECONDS=300
+SLO_EVALUATOR_INTERVAL_SECONDS=60
+SLO_EVALUATOR_TIMEOUT_SECONDS=30
 ```
 
 运维实时 WebSocket 限额应作为部署级 circuit breaker。
@@ -262,6 +264,8 @@ ACCOUNT_HEALTH_PROBE_COOLDOWN_SECONDS=300
 数据保留天数为 `0` 时表示关闭对应表的自动清理。账务、支付、affiliate ledger 等追加账本不进入自动清理。
 
 账号健康探测 worker 默认每 5 分钟探测一次活跃 API-key provider account，单个探测 10 秒超时，并发上限为 8。连续 3 次失败或最小样本数内错误率超过 50% 时写入 unhealthy 快照和 cooldown metadata，scheduler 会基于 `cooldown_active` / `circuit_open` 避开该账号。
+
+SLO evaluator worker 默认每 1 分钟读取 `obs_slo_definitions` 与 `usage_logs`，用 availability SLO 的长/短窗口 burn-rate 阈值生成、更新或自动恢复 `obs_alert_events`。单次 evaluation 默认 30 秒超时；告警 details 只包含 SLO id/name、窗口秒数、请求计数和 burn-rate 数值，不包含 API key、credential、prompt、request body 或 provider secret。
 
 ## 14. Payment
 

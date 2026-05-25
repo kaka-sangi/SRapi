@@ -12,6 +12,7 @@ import (
 	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	eventsservice "github.com/srapi/srapi/apps/api/internal/modules/events/service"
 	eventsmemory "github.com/srapi/srapi/apps/api/internal/modules/events/store/memory"
+	operationsmemory "github.com/srapi/srapi/apps/api/internal/modules/operations/store/memory"
 	paymentmemory "github.com/srapi/srapi/apps/api/internal/modules/payments/store/memory"
 	qualitymemory "github.com/srapi/srapi/apps/api/internal/modules/quality_eval/store/memory"
 	subscriptionmemory "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/store/memory"
@@ -262,6 +263,24 @@ func TestRetentionWorkerRequiresPersistentOperationsStore(t *testing.T) {
 	}
 	if worker, err := retentionCleanupWorker(config.Load(), &entstore.Stores{}, logger); err != nil || worker != nil {
 		t.Fatalf("expected nil worker without operations store, worker=%v err=%v", worker, err)
+	}
+}
+
+func TestSLOEvaluatorWorkerRequiresPersistentOperationsStore(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	if worker, err := sloEvaluatorWorker(config.Load(), nil, logger); err != nil || worker != nil {
+		t.Fatalf("expected nil worker without persistent stores, worker=%v err=%v", worker, err)
+	}
+	if worker, err := sloEvaluatorWorker(config.Load(), &entstore.Stores{}, logger); err != nil || worker != nil {
+		t.Fatalf("expected nil worker without operations store, worker=%v err=%v", worker, err)
+	}
+
+	worker, err := sloEvaluatorWorker(config.Load(), &entstore.Stores{Operations: operationsmemory.New()}, logger)
+	if err != nil {
+		t.Fatalf("create SLO evaluator worker: %v", err)
+	}
+	if worker == nil {
+		t.Fatal("expected worker for persistent operations store")
 	}
 }
 

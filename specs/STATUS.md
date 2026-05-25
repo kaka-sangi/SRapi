@@ -92,14 +92,15 @@ last_completed:
 - C3.2: Role permission persistence now adds `roles.permissions_json`, admin roles APIs, merged user session permissions, `entitlements` query-cache rows materialized from active subscription snapshots, `000009_role_permissions_and_entitlements` up/down migrations, and an HTTP regression proving `payment_order:read` grants read-only admin payment order access while plain users are rejected.
 - B1.2.1: Usage charging performance indexing now replaces the single-column `usage_logs(charged_at)` index with `usage_logs(charged_at, success, created_at)`, makes `ListPendingUsageCharges` scan oldest pending usage first, and adds a persistence regression for deterministic pending charge ordering.
 - C1.1: Structured trace service spans now cover `scheduler.Schedule`, `payments.HandleWebhook`, and `accounts.ProbeAccount` with reusable `platform/otel.StartSpan` / `EndSpan`, low-sensitive diagnostic attributes, business outcome fields, stable `error.type` classification, and focused span export tests.
+- C1.2: SLO burn-rate evaluator now adds `operations.Service.EvaluateSLOAlerts()`, a persistent-store `slo_evaluator` worker, `SLO_EVALUATOR_*` config, app lifecycle wiring, and tests proving multi-window availability breaches create/update/resolve only `slo.burn_rate.*` alert events while leaving manual alerts untouched.
 
 current:
 
-- package: C1 structured trace
-- status: key service spans implemented; production QualityEval smoke still pending real judge credential/environment
-- objective: continue the critical path after structured trace service spans without letting docs/specs drift.
+- package: C1 observability
+- status: structured trace service spans and SLO burn-rate evaluator are implemented; production QualityEval smoke still pending real judge credential/environment
+- objective: continue the critical path after SLO evaluator wiring without letting docs/specs drift.
 
-next_recommended: Continue with the next pending backend package from `specs/silly-stirring-turtle.md`, prioritizing C1 Jaeger/Tempo collector smoke, C1 SLO evaluator wiring, or B2 payment SDK adapters unless the user redirects.
+next_recommended: Continue with the next pending backend package from `specs/silly-stirring-turtle.md`, prioritizing C1 Jaeger/Tempo collector smoke or B2 payment SDK adapters unless the user redirects.
 
 last_gates:
 

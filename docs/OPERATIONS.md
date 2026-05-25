@@ -188,6 +188,12 @@ make smoke-release
 
 `health_probe` worker 由 `internal/app` 在持久化 account/provider store 可用时启动。它默认每 5 分钟遍历活跃 API-key provider account，调用上游 `/models` 类轻量端点，写入 `account_health_snapshots`，并在连续失败或错误率过高时给账号写入 cooldown / circuit metadata。相关配置项为 `ACCOUNT_HEALTH_PROBE_INTERVAL_SECONDS`、`ACCOUNT_HEALTH_PROBE_TIMEOUT_SECONDS`、`ACCOUNT_HEALTH_PROBE_MAX_CONCURRENT`、`ACCOUNT_HEALTH_PROBE_FAILURE_THRESHOLD`、`ACCOUNT_HEALTH_PROBE_ERROR_RATE_THRESHOLD_PERCENT`、`ACCOUNT_HEALTH_PROBE_MIN_SAMPLES_FOR_ERROR_RATE` 和 `ACCOUNT_HEALTH_PROBE_COOLDOWN_SECONDS`。
 
+### SLO 告警评估
+
+`slo_evaluator` worker 由 `internal/app` 在持久化 operations store 可用时启动。它默认每 1 分钟读取 `obs_slo_definitions`、`usage_logs` 和当前 active `obs_alert_events`，对 active availability SLO 执行多窗口 burn-rate 判断：长窗口和短窗口都超过阈值才创建或更新告警，恢复时只自动 resolve `slo.burn_rate.*` 规则生成的 active/acknowledged 告警，不会修改人工或其他规则告警。
+
+默认短窗口为长窗口的 1/12，且不低于 1 分钟；SLO 阈值显式配置 `short_window_seconds` / `long_window_seconds` 时优先生效。相关配置项为 `SLO_EVALUATOR_INTERVAL_SECONDS` 和 `SLO_EVALUATOR_TIMEOUT_SECONDS`。告警 details 只保存 SLO id/name、severity、窗口秒数、请求计数、bad request 计数和 burn-rate 数值，不保存 API key、credential、prompt、request body、cookies 或 provider secret。
+
 ### QualityEval 在线评估
 
 `quality_eval` worker 仅在持久化 store 可用且 `QUALITY_EVAL_ENABLED=true` 时启动。Gateway 成功完成文本请求并写入 `scheduler_feedbacks` 后，会捕获 content-safety 后的脱敏 prompt/output 摘要到 `quality_eval_samples.sample_payload_ciphertext`；禁用时不会新增样本。
@@ -295,4 +301,4 @@ MVP 必须至少实现：
 
 Phase 2 起必须补齐 `/metrics`、备份恢复、发布 smoke、数据生命周期清理和 SLO 告警。
 
-当前 Phase 2 已补齐 `/metrics`、PostgreSQL 手动备份/恢复入口、release smoke、基础数据生命周期清理，以及 SLO/告警控制面 v1。SLO 定义和告警事件落库到 `obs_slo_definitions`、`obs_alert_events`；告警通知、抑制规则和聚合 rollup 仍按 `OBSERVABILITY_SPEC.md` 后续展开。
+当前 Phase 2 已补齐 `/metrics`、PostgreSQL 手动备份/恢复入口、release smoke、基础数据生命周期清理，以及 SLO/告警控制面 v1 和 SLO burn-rate evaluator。SLO 定义和告警事件落库到 `obs_slo_definitions`、`obs_alert_events`；告警通知、抑制规则和聚合 rollup 仍按 `OBSERVABILITY_SPEC.md` 后续展开。

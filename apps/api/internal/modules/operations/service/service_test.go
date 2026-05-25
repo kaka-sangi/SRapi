@@ -155,6 +155,128 @@ func TestAcknowledgeAlertMarksActorAndTimestamp(t *testing.T) {
 	}
 }
 
+func TestEvaluateSLOAlertsCreatesUpdatesAndResolvesBurnRateAlerts(t *testing.T) {
+	now := time.Date(2026, 5, 22, 12, 0, 0, 0, time.UTC)
+	store := newCaptureObservabilityStore()
+	svc, err := NewWithStores(nil, store, fixedClock{now: now})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	if _, err := svc.CreateSLO(t.Context(), contract.CreateSLORequest{
+		Name:       "Chat availability",
+		SLIType:    contract.SLITypeAvailability,
+		Objective:  0.99,
+		WindowDays: 1,
+		Filter: contract.SLOFilter{
+			SourceEndpoint:    "/v1/chat/completions",
+			ErrorOwnerExclude: []string{"client", "business"},
+		},
+		AlertPolicy: contract.AlertPolicy{
+			Thresholds: []contract.BurnRateThreshold{{
+				Severity:        contract.AlertSeverityCritical,
+				LongWindow:      time.Hour,
+				ShortWindow:     5 * time.Minute,
+				BurnRate:        2,
+				MinRequestCount: 2,
+			}},
+		},
+	}); err != nil {
+		t.Fatalf("create slo: %v", err)
+	}
+	manualAlert, err := store.CreateAlert(t.Context(), contract.AlertEvent{
+		RuleID:      "manual.operator",
+		Severity:    contract.AlertSeverityWarning,
+		Status:      contract.AlertStatusFiring,
+		Fingerprint: "manual:fingerprint",
+		Summary:     "manual alert",
+		Details:     map[string]any{"source": "operator"},
+		StartedAt:   now.Add(-10 * time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("seed manual alert: %v", err)
+	}
+	prefixOnlyAlert, err := store.CreateAlert(t.Context(), contract.AlertEvent{
+		RuleID:      "slo.burn_rate.external",
+		Severity:    contract.AlertSeverityWarning,
+		Status:      contract.AlertStatusFiring,
+		Fingerprint: "external:fingerprint",
+		Summary:     "external alert",
+		Details:     map[string]any{"source": "external"},
+		StartedAt:   now.Add(-9 * time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("seed prefix-only alert: %v", err)
+	}
+	store.usageLogs = []usagecontract.UsageLog{
+		{RequestID: "req_ok", SourceEndpoint: "/v1/chat/completions", Success: true, CreatedAt: now.Add(-2 * time.Minute)},
+		{RequestID: "req_bad_1", SourceEndpoint: "/v1/chat/completions", Success: false, ErrorClass: ptrString("upstream_error"), CreatedAt: now.Add(-2 * time.Minute)},
+		{RequestID: "req_bad_2", SourceEndpoint: "/v1/chat/completions", Success: false, ErrorClass: ptrString("timeout"), CreatedAt: now.Add(-3 * time.Minute)},
+	}
+
+	result, err := svc.EvaluateSLOAlerts(t.Context())
+	if err != nil {
+		t.Fatalf("evaluate slo alerts: %v", err)
+	}
+	if result.Evaluated != 1 || result.Breached != 1 || result.Created != 1 || result.Updated != 0 || result.Resolved != 0 {
+		t.Fatalf("unexpected create result: %+v", result)
+	}
+	alerts, err := svc.ListAlerts(t.Context())
+	if err != nil {
+		t.Fatalf("list alerts: %v", err)
+	}
+	if len(alerts) != 3 {
+		t.Fatalf("expected manual, prefix-only, and burn-rate alerts, got %+v", alerts)
+	}
+	burnAlert := findAlertByRule(t, alerts, "slo.burn_rate.critical")
+	if burnAlert.Status != contract.AlertStatusFiring || burnAlert.ResolvedAt != nil {
+		t.Fatalf("unexpected new burn-rate alert: %+v", burnAlert)
+	}
+	if burnAlert.Details["long_window_seconds"] != int(time.Hour/time.Second) || burnAlert.Details["short_window_seconds"] != int((5*time.Minute)/time.Second) {
+		t.Fatalf("unexpected burn-rate alert windows: %+v", burnAlert.Details)
+	}
+
+	result, err = svc.EvaluateSLOAlerts(t.Context())
+	if err != nil {
+		t.Fatalf("reevaluate slo alerts: %v", err)
+	}
+	if result.Created != 0 || result.Updated != 1 || result.Resolved != 0 {
+		t.Fatalf("expected existing burn-rate alert update, got %+v", result)
+	}
+
+	store.usageLogs = []usagecontract.UsageLog{
+		{RequestID: "req_ok_1", SourceEndpoint: "/v1/chat/completions", Success: true, CreatedAt: now.Add(-2 * time.Minute)},
+		{RequestID: "req_ok_2", SourceEndpoint: "/v1/chat/completions", Success: true, CreatedAt: now.Add(-3 * time.Minute)},
+	}
+	result, err = svc.EvaluateSLOAlerts(t.Context())
+	if err != nil {
+		t.Fatalf("evaluate recovery: %v", err)
+	}
+	if result.Breached != 0 || result.Resolved != 1 {
+		t.Fatalf("expected burn-rate alert resolution, got %+v", result)
+	}
+	manualAfter, err := store.FindAlertByID(t.Context(), manualAlert.ID)
+	if err != nil {
+		t.Fatalf("find manual alert: %v", err)
+	}
+	if manualAfter.Status != contract.AlertStatusFiring {
+		t.Fatalf("manual alert should not be auto-resolved: %+v", manualAfter)
+	}
+	prefixOnlyAfter, err := store.FindAlertByID(t.Context(), prefixOnlyAlert.ID)
+	if err != nil {
+		t.Fatalf("find prefix-only alert: %v", err)
+	}
+	if prefixOnlyAfter.Status != contract.AlertStatusFiring {
+		t.Fatalf("prefix-only alert should not be auto-resolved: %+v", prefixOnlyAfter)
+	}
+	burnAfter, err := store.FindAlertByID(t.Context(), burnAlert.ID)
+	if err != nil {
+		t.Fatalf("find burn-rate alert: %v", err)
+	}
+	if burnAfter.Status != contract.AlertStatusResolved || burnAfter.ResolvedAt == nil || !burnAfter.ResolvedAt.Equal(now) {
+		t.Fatalf("expected resolved burn-rate alert, got %+v", burnAfter)
+	}
+}
+
 type captureObservabilityStore struct {
 	nextSLOID   int
 	nextAlertID int
@@ -236,6 +358,17 @@ func (s *captureObservabilityStore) ListAlerts(_ context.Context) ([]contract.Al
 
 func (s *captureObservabilityStore) ListUsageLogs(_ context.Context) ([]usagecontract.UsageLog, error) {
 	return append([]usagecontract.UsageLog(nil), s.usageLogs...), nil
+}
+
+func findAlertByRule(t *testing.T, alerts []contract.AlertEvent, ruleID string) contract.AlertEvent {
+	t.Helper()
+	for _, alert := range alerts {
+		if alert.RuleID == ruleID {
+			return alert
+		}
+	}
+	t.Fatalf("alert with rule %q not found in %+v", ruleID, alerts)
+	return contract.AlertEvent{}
 }
 
 func ptrString(value string) *string { return &value }

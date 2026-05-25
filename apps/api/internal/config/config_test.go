@@ -293,6 +293,36 @@ func TestQualityEvalDefaultsOverridesAndValidation(t *testing.T) {
 	}
 }
 
+func TestSLOEvaluatorDefaultsOverridesAndValidation(t *testing.T) {
+	t.Setenv("SLO_EVALUATOR_INTERVAL_SECONDS", "")
+	t.Setenv("SLO_EVALUATOR_TIMEOUT_SECONDS", "")
+	cfg := Load()
+	if cfg.SLOEvaluator.Interval != time.Minute || cfg.SLOEvaluator.Timeout != 30*time.Second {
+		t.Fatalf("unexpected SLO evaluator defaults: %+v", cfg.SLOEvaluator)
+	}
+
+	t.Setenv("SLO_EVALUATOR_INTERVAL_SECONDS", "120")
+	t.Setenv("SLO_EVALUATOR_TIMEOUT_SECONDS", "5")
+	cfg = Load()
+	if cfg.SLOEvaluator.Interval != 2*time.Minute || cfg.SLOEvaluator.Timeout != 5*time.Second {
+		t.Fatalf("unexpected SLO evaluator overrides: %+v", cfg.SLOEvaluator)
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("expected SLO evaluator config to validate, got %v", err)
+	}
+
+	cfg.SLOEvaluator.Interval = 0
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "SLO_EVALUATOR_INTERVAL_SECONDS") {
+		t.Fatalf("expected SLO evaluator interval validation failure, got %v", err)
+	}
+
+	cfg = Load()
+	cfg.SLOEvaluator.Timeout = 0
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "SLO_EVALUATOR_TIMEOUT_SECONDS") {
+		t.Fatalf("expected SLO evaluator timeout validation failure, got %v", err)
+	}
+}
+
 func TestObservabilityDefaultsOverridesAndValidation(t *testing.T) {
 	t.Setenv("LOG_SERVICE_NAME", "")
 	t.Setenv("LOG_ENV", "")

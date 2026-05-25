@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"sort"
 	"strings"
@@ -10,6 +11,8 @@ import (
 	"github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
 )
+
+const burnRateAlertRulePrefix = "slo.burn_rate."
 
 type Clock interface {
 	Now() time.Time
@@ -142,6 +145,26 @@ func (s *Service) ListAlerts(ctx context.Context) ([]contract.AlertEvent, error)
 	return alerts, nil
 }
 
+// EvaluateSLOAlerts evaluates active availability SLO burn-rate thresholds and persists alert transitions.
+func (s *Service) EvaluateSLOAlerts(ctx context.Context) (contract.AlertEvaluationResult, error) {
+	if s == nil || s.observabilityStore == nil {
+		return contract.AlertEvaluationResult{}, ErrInvalidInput
+	}
+	definitions, err := s.observabilityStore.ListSLOs(ctx)
+	if err != nil {
+		return contract.AlertEvaluationResult{}, err
+	}
+	usageLogs, err := s.observabilityStore.ListUsageLogs(ctx)
+	if err != nil {
+		return contract.AlertEvaluationResult{}, err
+	}
+	alerts, err := s.observabilityStore.ListAlerts(ctx)
+	if err != nil {
+		return contract.AlertEvaluationResult{}, err
+	}
+	return s.evaluateAlerts(ctx, definitions, usageLogs, alerts, s.clock.Now())
+}
+
 func (s *Service) AcknowledgeAlert(ctx context.Context, id int, req contract.AckAlertRequest) (contract.AlertEvent, error) {
 	if s == nil || s.observabilityStore == nil || id <= 0 || req.ActorUserID <= 0 {
 		return contract.AlertEvent{}, ErrInvalidInput
@@ -159,6 +182,61 @@ func (s *Service) AcknowledgeAlert(ctx context.Context, id int, req contract.Ack
 	alert.AcknowledgedBy = &req.ActorUserID
 	alert.UpdatedAt = now
 	return s.observabilityStore.UpdateAlert(ctx, alert)
+}
+
+func (s *Service) evaluateAlerts(ctx context.Context, definitions []contract.SLODefinition, usageLogs []usagecontract.UsageLog, alerts []contract.AlertEvent, now time.Time) (contract.AlertEvaluationResult, error) {
+	result := contract.AlertEvaluationResult{}
+	activeAlerts := activeBurnRateAlertsByFingerprint(alerts)
+	seenBreaches := map[string]struct{}{}
+	for _, definition := range definitions {
+		if !sloAlertEligible(definition) {
+			continue
+		}
+		result.Evaluated++
+		for _, threshold := range definition.AlertPolicy.Thresholds {
+			if threshold.BurnRate <= 0 {
+				continue
+			}
+			longWindow := thresholdLongWindow(definition, threshold)
+			shortWindow := thresholdShortWindow(longWindow, threshold)
+			longEval := evaluateSLOWindow(definition, usageLogs, now, longWindow)
+			shortEval := evaluateSLOWindow(definition, usageLogs, now, shortWindow)
+			fingerprint := burnRateFingerprint(definition.ID, threshold, longWindow, shortWindow)
+			if !thresholdBreached(threshold, longEval, shortEval) {
+				continue
+			}
+			seenBreaches[fingerprint] = struct{}{}
+			result.Breached++
+			alert, ok := activeAlerts[fingerprint]
+			if !ok {
+				_, err := s.observabilityStore.CreateAlert(ctx, burnRateAlert(definition, threshold, longEval, shortEval, now))
+				if err != nil {
+					return result, err
+				}
+				result.Created++
+				continue
+			}
+			updated := updateBurnRateAlert(alert, definition, threshold, longEval, shortEval, now)
+			if _, err := s.observabilityStore.UpdateAlert(ctx, updated); err != nil {
+				return result, err
+			}
+			result.Updated++
+		}
+	}
+	for fingerprint, alert := range activeAlerts {
+		if _, ok := seenBreaches[fingerprint]; ok {
+			continue
+		}
+		alert.Status = contract.AlertStatusResolved
+		resolvedAt := now
+		alert.ResolvedAt = &resolvedAt
+		alert.UpdatedAt = now
+		if _, err := s.observabilityStore.UpdateAlert(ctx, alert); err != nil {
+			return result, err
+		}
+		result.Resolved++
+	}
+	return result, nil
 }
 
 func normalizeCreateSLO(req contract.CreateSLORequest, now time.Time) (contract.SLODefinition, error) {
@@ -253,8 +331,15 @@ func evaluateSLO(definition contract.SLODefinition, usageLogs []usagecontract.Us
 	if windowDays <= 0 {
 		windowDays = 28
 	}
+	return evaluateSLOWindow(definition, usageLogs, now, time.Duration(windowDays)*24*time.Hour)
+}
+
+func evaluateSLOWindow(definition contract.SLODefinition, usageLogs []usagecontract.UsageLog, now time.Time, window time.Duration) contract.SLOEvaluation {
+	if window <= 0 {
+		window = 28 * 24 * time.Hour
+	}
 	windowEnd := now
-	windowStart := now.Add(-time.Duration(windowDays) * 24 * time.Hour)
+	windowStart := now.Add(-window)
 	evaluation := contract.SLOEvaluation{
 		WindowStart: windowStart,
 		WindowEnd:   windowEnd,
@@ -290,6 +375,128 @@ func evaluateSLO(definition contract.SLODefinition, usageLogs []usagecontract.Us
 		evaluation.ErrorBudgetConsumed = math.Min(1, evaluation.ErrorRate/budget)
 	}
 	return evaluation
+}
+
+func sloAlertEligible(definition contract.SLODefinition) bool {
+	return definition.ID > 0 &&
+		definition.Status == contract.SLOStatusActive &&
+		definition.SLIType == contract.SLITypeAvailability &&
+		len(definition.AlertPolicy.Thresholds) > 0
+}
+
+func thresholdLongWindow(definition contract.SLODefinition, threshold contract.BurnRateThreshold) time.Duration {
+	if threshold.LongWindow > 0 {
+		return threshold.LongWindow
+	}
+	windowDays := definition.WindowDays
+	if windowDays <= 0 {
+		windowDays = 28
+	}
+	return time.Duration(windowDays) * 24 * time.Hour
+}
+
+func thresholdShortWindow(longWindow time.Duration, threshold contract.BurnRateThreshold) time.Duration {
+	if threshold.ShortWindow > 0 {
+		return threshold.ShortWindow
+	}
+	if longWindow <= 0 {
+		return time.Hour
+	}
+	shortWindow := longWindow / 12
+	if shortWindow < time.Minute {
+		return time.Minute
+	}
+	return shortWindow
+}
+
+func thresholdBreached(threshold contract.BurnRateThreshold, longEval contract.SLOEvaluation, shortEval contract.SLOEvaluation) bool {
+	if threshold.MinRequestCount > 0 && (longEval.TotalRequests < threshold.MinRequestCount || shortEval.TotalRequests < threshold.MinRequestCount) {
+		return false
+	}
+	return longEval.BurnRate >= threshold.BurnRate && shortEval.BurnRate >= threshold.BurnRate
+}
+
+func activeBurnRateAlertsByFingerprint(alerts []contract.AlertEvent) map[string]contract.AlertEvent {
+	out := map[string]contract.AlertEvent{}
+	for _, alert := range alerts {
+		if alert.SLOID == nil || alert.Fingerprint == "" || !strings.HasPrefix(alert.RuleID, burnRateAlertRulePrefix) {
+			continue
+		}
+		switch alert.Status {
+		case contract.AlertStatusFiring, contract.AlertStatusAcknowledged:
+			if existing, ok := out[alert.Fingerprint]; !ok || alert.StartedAt.After(existing.StartedAt) {
+				out[alert.Fingerprint] = cloneAlert(alert)
+			}
+		}
+	}
+	return out
+}
+
+func burnRateFingerprint(sloID int, threshold contract.BurnRateThreshold, longWindow, shortWindow time.Duration) string {
+	return fmt.Sprintf("slo:%d:burn_rate:%s:%d:%d:%.6f", sloID, threshold.Severity, int(longWindow/time.Second), int(shortWindow/time.Second), threshold.BurnRate)
+}
+
+func burnRateAlert(definition contract.SLODefinition, threshold contract.BurnRateThreshold, longEval contract.SLOEvaluation, shortEval contract.SLOEvaluation, now time.Time) contract.AlertEvent {
+	sloID := definition.ID
+	longWindow := thresholdLongWindow(definition, threshold)
+	shortWindow := thresholdShortWindow(longWindow, threshold)
+	return contract.AlertEvent{
+		SLOID:       &sloID,
+		RuleID:      burnRateRuleID(threshold),
+		Severity:    threshold.Severity,
+		Status:      contract.AlertStatusFiring,
+		Fingerprint: burnRateFingerprint(definition.ID, threshold, longWindow, shortWindow),
+		Summary:     burnRateSummary(definition, threshold),
+		Details:     burnRateDetails(definition, threshold, longEval, shortEval),
+		StartedAt:   now,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+}
+
+func updateBurnRateAlert(alert contract.AlertEvent, definition contract.SLODefinition, threshold contract.BurnRateThreshold, longEval contract.SLOEvaluation, shortEval contract.SLOEvaluation, now time.Time) contract.AlertEvent {
+	alert.RuleID = burnRateRuleID(threshold)
+	alert.Severity = threshold.Severity
+	if alert.Status != contract.AlertStatusAcknowledged {
+		alert.Status = contract.AlertStatusFiring
+	}
+	alert.Summary = burnRateSummary(definition, threshold)
+	alert.Details = burnRateDetails(definition, threshold, longEval, shortEval)
+	alert.UpdatedAt = now
+	return alert
+}
+
+func burnRateRuleID(threshold contract.BurnRateThreshold) string {
+	severity := strings.TrimSpace(string(threshold.Severity))
+	if severity == "" {
+		severity = string(contract.AlertSeverityWarning)
+	}
+	return burnRateAlertRulePrefix + severity
+}
+
+func burnRateSummary(definition contract.SLODefinition, threshold contract.BurnRateThreshold) string {
+	return fmt.Sprintf("%s SLO burn rate threshold %.2fx exceeded", definition.Name, threshold.BurnRate)
+}
+
+func burnRateDetails(definition contract.SLODefinition, threshold contract.BurnRateThreshold, longEval contract.SLOEvaluation, shortEval contract.SLOEvaluation) map[string]any {
+	return map[string]any{
+		"slo_id":                definition.ID,
+		"slo_name":              definition.Name,
+		"sli_type":              string(definition.SLIType),
+		"objective":             definition.Objective,
+		"window_days":           definition.WindowDays,
+		"severity":              string(threshold.Severity),
+		"burn_rate_threshold":   threshold.BurnRate,
+		"long_window_seconds":   int(thresholdLongWindow(definition, threshold) / time.Second),
+		"short_window_seconds":  int(thresholdShortWindow(thresholdLongWindow(definition, threshold), threshold) / time.Second),
+		"long_burn_rate":        longEval.BurnRate,
+		"short_burn_rate":       shortEval.BurnRate,
+		"long_total_requests":   longEval.TotalRequests,
+		"short_total_requests":  shortEval.TotalRequests,
+		"long_bad_requests":     longEval.BadRequests,
+		"short_bad_requests":    shortEval.BadRequests,
+		"error_budget_consumed": longEval.ErrorBudgetConsumed,
+	}
 }
 
 func sloFilterMatches(filter contract.SLOFilter, log usagecontract.UsageLog) bool {

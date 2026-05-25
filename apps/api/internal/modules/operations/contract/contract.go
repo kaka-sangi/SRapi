@@ -121,6 +121,15 @@ type SLOWithEvaluation struct {
 	Evaluation SLOEvaluation
 }
 
+// AlertEvaluationResult summarizes one SLO burn-rate alert evaluation pass.
+type AlertEvaluationResult struct {
+	Evaluated int
+	Breached  int
+	Created   int
+	Updated   int
+	Resolved  int
+}
+
 type CreateSLORequest struct {
 	Name        string
 	SLIType     SLIType
