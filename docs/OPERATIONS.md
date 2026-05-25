@@ -208,6 +208,8 @@ make smoke-release
 - `audit_logs`: `DATA_RETENTION_AUDIT_LOGS_DAYS`，默认 365。
 - `account_health_snapshots`: `DATA_RETENTION_ACCOUNT_HEALTH_SNAPSHOTS_DAYS`，默认 90。
 
+`auth_session_cleanup` worker 在持久化 AuthSession store 可用时随 API 进程启动，默认每 24 小时运行一次。它只处理 `expires_at <= now` 的 `active` 控制台 session，将其标记为 `expired` 并设置 `deleted_at`；登出产生的 `revoked` session 保持原状态。相关配置项为 `AUTH_SESSION_CLEANUP_INTERVAL_SECONDS`。
+
 ### 账号健康探测
 
 `health_probe` worker 由 `internal/app` 在持久化 account/provider store 可用时启动。它默认每 5 分钟遍历活跃 API-key provider account，调用上游 `/models` 类轻量端点，写入 `account_health_snapshots`，并在连续失败或错误率过高时给账号写入 cooldown / circuit metadata。相关配置项为 `ACCOUNT_HEALTH_PROBE_INTERVAL_SECONDS`、`ACCOUNT_HEALTH_PROBE_TIMEOUT_SECONDS`、`ACCOUNT_HEALTH_PROBE_MAX_CONCURRENT`、`ACCOUNT_HEALTH_PROBE_FAILURE_THRESHOLD`、`ACCOUNT_HEALTH_PROBE_ERROR_RATE_THRESHOLD_PERCENT`、`ACCOUNT_HEALTH_PROBE_MIN_SAMPLES_FOR_ERROR_RATE` 和 `ACCOUNT_HEALTH_PROBE_COOLDOWN_SECONDS`。

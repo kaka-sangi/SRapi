@@ -226,6 +226,7 @@ notes:
 - Antigravity refresh-token-only import requires encrypted credential `oauth_client_secret` / `client_secret`; SRapi intentionally does not hard-code the Google OAuth client secret or expose it through account metadata.
 - WP-700 added `docs/ADMIN_CONTROL_PLANE_SPEC.md`, settings-backed admin-control persistence through the existing `settings` table, global API-key inventory listing, dashboard/ops read models from existing usage/account/user/realtime evidence, and `TestAdminControlPlaneV1EndpointsAndAudit` proving new admin writes require CSRF and record audit evidence.
 - WP-700 intentionally stores low-frequency console-managed state as typed settings-backed collections first; high-volume transactional histories such as redeem redemption events can be promoted to dedicated Ent schemas in a later package when the product needs per-redemption concurrency semantics.
+- A1.2 added `auth_session_cleanup` worker, `AUTH_SESSION_CLEANUP_INTERVAL_SECONDS`, Ent and memory cleanup store support, app lifecycle wiring, and docs/spec governance so expired active console sessions are marked `expired` and soft-deleted without overwriting revoked logout records.
 
 ## Work Package Ledger
 

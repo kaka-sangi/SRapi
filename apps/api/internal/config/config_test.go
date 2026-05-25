@@ -158,12 +158,14 @@ func TestRetentionDefaultsOverridesAndValidation(t *testing.T) {
 	t.Setenv("DATA_RETENTION_SCHEDULER_FEEDBACKS_DAYS", "")
 	t.Setenv("DATA_RETENTION_AUDIT_LOGS_DAYS", "")
 	t.Setenv("DATA_RETENTION_ACCOUNT_HEALTH_SNAPSHOTS_DAYS", "")
+	t.Setenv("AUTH_SESSION_CLEANUP_INTERVAL_SECONDS", "")
 	cfg := Load()
 	if cfg.Retention.UsageLogsDays != 90 ||
 		cfg.Retention.SchedulerDecisionsDays != 90 ||
 		cfg.Retention.SchedulerFeedbacksDays != 90 ||
 		cfg.Retention.AuditLogsDays != 365 ||
-		cfg.Retention.AccountHealthSnapshotsDays != 90 {
+		cfg.Retention.AccountHealthSnapshotsDays != 90 ||
+		cfg.AuthCleanup.Interval != 24*time.Hour {
 		t.Fatalf("unexpected retention defaults: %+v", cfg.Retention)
 	}
 
@@ -172,18 +174,26 @@ func TestRetentionDefaultsOverridesAndValidation(t *testing.T) {
 	t.Setenv("DATA_RETENTION_SCHEDULER_FEEDBACKS_DAYS", "32")
 	t.Setenv("DATA_RETENTION_AUDIT_LOGS_DAYS", "180")
 	t.Setenv("DATA_RETENTION_ACCOUNT_HEALTH_SNAPSHOTS_DAYS", "45")
+	t.Setenv("AUTH_SESSION_CLEANUP_INTERVAL_SECONDS", "3600")
 	cfg = Load()
 	if cfg.Retention.UsageLogsDays != 30 ||
 		cfg.Retention.SchedulerDecisionsDays != 31 ||
 		cfg.Retention.SchedulerFeedbacksDays != 32 ||
 		cfg.Retention.AuditLogsDays != 180 ||
-		cfg.Retention.AccountHealthSnapshotsDays != 45 {
+		cfg.Retention.AccountHealthSnapshotsDays != 45 ||
+		cfg.AuthCleanup.Interval != time.Hour {
 		t.Fatalf("unexpected retention overrides: %+v", cfg.Retention)
 	}
 
 	cfg.Retention.UsageLogsDays = -1
 	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "DATA_RETENTION_USAGE_LOGS_DAYS") {
 		t.Fatalf("expected retention validation failure, got %v", err)
+	}
+
+	cfg = Load()
+	cfg.AuthCleanup.Interval = 0
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "AUTH_SESSION_CLEANUP_INTERVAL_SECONDS") {
+		t.Fatalf("expected auth session cleanup validation failure, got %v", err)
 	}
 }
 

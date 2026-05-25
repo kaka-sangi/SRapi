@@ -27,6 +27,7 @@ type Config struct {
 	Security      SecurityConfig
 	Bootstrap     BootstrapConfig
 	Retention     RetentionConfig
+	AuthCleanup   AuthCleanupConfig
 	HealthProbe   HealthProbeConfig
 	QualityEval   QualityEvalConfig
 	SLOEvaluator  SLOEvaluatorConfig
@@ -80,6 +81,11 @@ type RetentionConfig struct {
 	SchedulerFeedbacksDays     int
 	AuditLogsDays              int
 	AccountHealthSnapshotsDays int
+}
+
+// AuthCleanupConfig controls expired console session cleanup.
+type AuthCleanupConfig struct {
+	Interval time.Duration
 }
 
 // HealthProbeConfig controls the account health probe worker.
@@ -174,6 +180,9 @@ func Load() Config {
 			AuditLogsDays:              getIntEnv("DATA_RETENTION_AUDIT_LOGS_DAYS", 365),
 			AccountHealthSnapshotsDays: getIntEnv("DATA_RETENTION_ACCOUNT_HEALTH_SNAPSHOTS_DAYS", 90),
 		},
+		AuthCleanup: AuthCleanupConfig{
+			Interval: time.Duration(getIntEnv("AUTH_SESSION_CLEANUP_INTERVAL_SECONDS", 86400)) * time.Second,
+		},
 		HealthProbe: HealthProbeConfig{
 			Interval:               time.Duration(getIntEnv("ACCOUNT_HEALTH_PROBE_INTERVAL_SECONDS", 300)) * time.Second,
 			Timeout:                time.Duration(getIntEnv("ACCOUNT_HEALTH_PROBE_TIMEOUT_SECONDS", 10)) * time.Second,
@@ -260,6 +269,9 @@ func (c Config) Validate() error {
 	}
 	if c.Retention.AccountHealthSnapshotsDays < 0 {
 		return fmt.Errorf("DATA_RETENTION_ACCOUNT_HEALTH_SNAPSHOTS_DAYS must be zero or positive")
+	}
+	if c.AuthCleanup.Interval <= 0 {
+		return fmt.Errorf("AUTH_SESSION_CLEANUP_INTERVAL_SECONDS must be positive")
 	}
 	if c.HealthProbe.Interval <= 0 {
 		return fmt.Errorf("ACCOUNT_HEALTH_PROBE_INTERVAL_SECONDS must be positive")

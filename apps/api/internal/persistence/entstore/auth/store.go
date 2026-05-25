@@ -18,6 +18,12 @@ var (
 	ErrSessionNotFound = errors.New("auth session not found")
 )
 
+const (
+	sessionStatusActive  = "active"
+	sessionStatusExpired = "expired"
+	sessionStatusRevoked = "revoked"
+)
+
 type Store struct {
 	client *ent.Client
 }
@@ -41,7 +47,7 @@ func (s *Store) Create(ctx context.Context, input contract.CreateSession) (contr
 		SetCsrfTokenHash(tokenHash(csrfToken)).
 		SetUserID(input.UserID).
 		SetExpiresAt(input.ExpiresAt).
-		SetStatus("active")
+		SetStatus(sessionStatusActive)
 	if !input.CreatedAt.IsZero() {
 		create.SetCreatedAt(input.CreatedAt).SetUpdatedAt(input.CreatedAt)
 	}
@@ -66,7 +72,7 @@ func (s *Store) FindByID(ctx context.Context, id string) (contract.Session, erro
 	found, err := s.client.AuthSession.Query().
 		Where(
 			entauthsession.SessionIDHashEQ(tokenHash(sessionID)),
-			entauthsession.StatusEQ("active"),
+			entauthsession.StatusEQ(sessionStatusActive),
 			entauthsession.DeletedAtIsNil(),
 		).
 		Only(ctx)
@@ -87,7 +93,7 @@ func (s *Store) Delete(ctx context.Context, id string) error {
 			entauthsession.SessionIDHashEQ(tokenHash(sessionID)),
 			entauthsession.DeletedAtIsNil(),
 		).
-		SetStatus("revoked").
+		SetStatus(sessionStatusRevoked).
 		SetDeletedAt(now).
 		SetUpdatedAt(now).
 		Save(ctx)
@@ -102,7 +108,7 @@ func (s *Store) Touch(ctx context.Context, id string, at time.Time) error {
 	affected, err := s.client.AuthSession.Update().
 		Where(
 			entauthsession.SessionIDHashEQ(tokenHash(sessionID)),
-			entauthsession.StatusEQ("active"),
+			entauthsession.StatusEQ(sessionStatusActive),
 			entauthsession.DeletedAtIsNil(),
 		).
 		SetLastActiveAt(at).
@@ -115,6 +121,40 @@ func (s *Store) Touch(ctx context.Context, id string, at time.Time) error {
 		return ErrSessionNotFound
 	}
 	return err
+}
+
+func (s *Store) CleanupExpiredSessions(ctx context.Context, now time.Time) (contract.CleanupExpiredSessionsResult, error) {
+	if now.IsZero() {
+		return contract.CleanupExpiredSessionsResult{}, ErrInvalidStore
+	}
+	now = now.UTC()
+	query := s.client.AuthSession.Query().
+		Where(
+			entauthsession.StatusEQ(sessionStatusActive),
+			entauthsession.ExpiresAtLTE(now),
+			entauthsession.DeletedAtIsNil(),
+		)
+	selected, err := query.Count(ctx)
+	if err != nil {
+		return contract.CleanupExpiredSessionsResult{}, err
+	}
+	if selected == 0 {
+		return contract.CleanupExpiredSessionsResult{}, nil
+	}
+	expired, err := s.client.AuthSession.Update().
+		Where(
+			entauthsession.StatusEQ(sessionStatusActive),
+			entauthsession.ExpiresAtLTE(now),
+			entauthsession.DeletedAtIsNil(),
+		).
+		SetStatus(sessionStatusExpired).
+		SetDeletedAt(now).
+		SetUpdatedAt(now).
+		Save(ctx)
+	if err != nil {
+		return contract.CleanupExpiredSessionsResult{}, err
+	}
+	return contract.CleanupExpiredSessionsResult{Selected: selected, Expired: expired}, nil
 }
 
 func toSession(rawSessionID string, row *ent.AuthSession) contract.Session {

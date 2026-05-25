@@ -60,3 +60,21 @@ func (s *Store) Touch(_ context.Context, id string, at time.Time) error {
 	s.sessions[id] = session
 	return nil
 }
+
+func (s *Store) CleanupExpiredSessions(_ context.Context, now time.Time) (contract.CleanupExpiredSessionsResult, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	result := contract.CleanupExpiredSessionsResult{}
+	for id, session := range s.sessions {
+		if session.ExpiresAt.IsZero() || session.ExpiresAt.After(now) {
+			continue
+		}
+		result.Selected++
+		delete(s.sessions, id)
+		result.Expired++
+	}
+	return result, nil
+}

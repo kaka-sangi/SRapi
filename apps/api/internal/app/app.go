@@ -17,6 +17,7 @@ import (
 	platformdb "github.com/srapi/srapi/apps/api/internal/platform/db"
 	platformotel "github.com/srapi/srapi/apps/api/internal/platform/otel"
 	platformredis "github.com/srapi/srapi/apps/api/internal/platform/redis"
+	authcleanupworker "github.com/srapi/srapi/apps/api/internal/workers/auth_session_cleanup"
 	balancechargerworker "github.com/srapi/srapi/apps/api/internal/workers/balance_charger"
 	healthprobeworker "github.com/srapi/srapi/apps/api/internal/workers/health_probe"
 	orderexpirerworker "github.com/srapi/srapi/apps/api/internal/workers/order_expirer"
@@ -38,6 +39,7 @@ type App struct {
 	tracer    platformotel.ShutdownFunc
 	outbox    *outboxworker.Worker
 	retention *retentionworker.Worker
+	authClean *authcleanupworker.Worker
 	expirer   *orderexpirerworker.Worker
 	subExpiry *subscriptionexpirerworker.Worker
 	balance   *balancechargerworker.Worker
@@ -68,7 +70,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		return nil, err
 	}
 
-	handler, outbox, retention, expirer, subExpiry, balance, health, quality, sloEval, err := newHandler(cfg, logger, dbClient, redisClient)
+	handler, outbox, retention, authClean, expirer, subExpiry, balance, health, quality, sloEval, err := newHandler(cfg, logger, dbClient, redisClient)
 	if err != nil {
 		_ = dbClient.Close()
 		_ = redisClient.Close()
@@ -90,6 +92,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		tracer:    tracerShutdown,
 		outbox:    outbox,
 		retention: retention,
+		authClean: authClean,
 		expirer:   expirer,
 		subExpiry: subExpiry,
 		balance:   balance,
@@ -145,7 +148,7 @@ func Healthcheck(ctx context.Context, cfg config.Config) error {
 	return httpserver.Healthcheck(ctx, cfg.HealthcheckAddress())
 }
 
-func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Client, redisClient *platformredis.Client) (http.Handler, *outboxworker.Worker, *retentionworker.Worker, *orderexpirerworker.Worker, *subscriptionexpirerworker.Worker, *balancechargerworker.Worker, *healthprobeworker.Worker, *qualityevalworker.Worker, *sloevaluatorworker.Worker, error) {
+func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Client, redisClient *platformredis.Client) (http.Handler, *outboxworker.Worker, *retentionworker.Worker, *authcleanupworker.Worker, *orderexpirerworker.Worker, *subscriptionexpirerworker.Worker, *balancechargerworker.Worker, *healthprobeworker.Worker, *qualityevalworker.Worker, *sloevaluatorworker.Worker, error) {
 	var (
 		handler http.Handler
 		err     error
@@ -159,53 +162,57 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 	}
 	realtimeStore, err := realtimeSlotStore(context.Background(), cfg, logger, redisClient)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	if realtimeStore != nil {
 		options = append(options, httpserver.WithRealtimeStore(realtimeStore))
 	}
 	rateLimiterOption, err := gatewayRateLimiterOption(context.Background(), cfg, logger, redisClient)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	if rateLimiterOption != nil {
 		options = append(options, rateLimiterOption)
 	}
 	stores, err := persistentStores(context.Background(), cfg, logger, dbClient, redisClient)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	outbox, err := domainEventsWorker(stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	retention, err := retentionCleanupWorker(cfg, stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+	}
+	authClean, err := authSessionCleanupWorker(cfg, stores, logger)
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	expirer, err := paymentOrderExpirerWorker(cfg, stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	subExpiry, err := subscriptionExpirerWorker(stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	balance, err := balanceChargerWorker(stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	health, err := accountHealthProbeWorker(cfg, stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	quality, err := qualityEvalWorker(cfg, stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	sloEval, err := sloEvaluatorWorker(cfg, stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	if stores != nil {
 		options = append(options,
@@ -238,7 +245,7 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 		handler = httpserver.New(cfg, logger, options...)
 	}()
 
-	return handler, outbox, retention, expirer, subExpiry, balance, health, quality, sloEval, err
+	return handler, outbox, retention, authClean, expirer, subExpiry, balance, health, quality, sloEval, err
 }
 
 func persistentStores(ctx context.Context, cfg config.Config, logger *slog.Logger, dbClient *platformdb.Client, redisClient *platformredis.Client) (*entstore.Stores, error) {
@@ -359,6 +366,15 @@ func retentionCleanupWorker(cfg config.Config, stores *entstore.Stores, logger *
 	})
 }
 
+func authSessionCleanupWorker(cfg config.Config, stores *entstore.Stores, logger *slog.Logger) (*authcleanupworker.Worker, error) {
+	if stores == nil || stores.AuthSessions == nil {
+		return nil, nil
+	}
+	return authcleanupworker.NewFromStore(stores.AuthSessions, logger, authcleanupworker.Config{
+		Interval: cfg.AuthCleanup.Interval,
+	})
+}
+
 func paymentOrderExpirerWorker(cfg config.Config, stores *entstore.Stores, logger *slog.Logger) (*orderexpirerworker.Worker, error) {
 	if stores == nil || stores.Payments == nil {
 		return nil, nil
@@ -440,6 +456,9 @@ func (a *App) startWorkers() {
 	if a.retention != nil {
 		a.retention.Start(context.Background())
 	}
+	if a.authClean != nil {
+		a.authClean.Start(context.Background())
+	}
 	if a.expirer != nil {
 		a.expirer.Start(context.Background())
 	}
@@ -470,6 +489,9 @@ func (a *App) stopWorkers(ctx context.Context) error {
 	}
 	if a.retention != nil {
 		errs = append(errs, a.retention.Shutdown(ctx))
+	}
+	if a.authClean != nil {
+		errs = append(errs, a.authClean.Shutdown(ctx))
 	}
 	if a.expirer != nil {
 		errs = append(errs, a.expirer.Shutdown(ctx))

@@ -219,6 +219,7 @@ func TestAppBootstrapOnlyImportsBootstrapPackages(t *testing.T) {
 		"github.com/srapi/srapi/apps/api/internal/platform/db":                      true,
 		"github.com/srapi/srapi/apps/api/internal/platform/otel":                    true,
 		"github.com/srapi/srapi/apps/api/internal/platform/redis":                   true,
+		"github.com/srapi/srapi/apps/api/internal/workers/auth_session_cleanup":     true,
 		"github.com/srapi/srapi/apps/api/internal/workers/health_probe":             true,
 		"github.com/srapi/srapi/apps/api/internal/workers/order_expirer":            true,
 		"github.com/srapi/srapi/apps/api/internal/workers/outbox":                   true,

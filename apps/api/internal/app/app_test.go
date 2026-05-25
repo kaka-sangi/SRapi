@@ -9,6 +9,7 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/srapi/srapi/apps/api/internal/config"
+	authmemory "github.com/srapi/srapi/apps/api/internal/modules/auth/store/memory"
 	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	eventsservice "github.com/srapi/srapi/apps/api/internal/modules/events/service"
 	eventsmemory "github.com/srapi/srapi/apps/api/internal/modules/events/store/memory"
@@ -263,6 +264,24 @@ func TestRetentionWorkerRequiresPersistentOperationsStore(t *testing.T) {
 	}
 	if worker, err := retentionCleanupWorker(config.Load(), &entstore.Stores{}, logger); err != nil || worker != nil {
 		t.Fatalf("expected nil worker without operations store, worker=%v err=%v", worker, err)
+	}
+}
+
+func TestAuthSessionCleanupWorkerRequiresPersistentCleanupStore(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	if worker, err := authSessionCleanupWorker(config.Load(), nil, logger); err != nil || worker != nil {
+		t.Fatalf("expected nil worker without persistent stores, worker=%v err=%v", worker, err)
+	}
+	if worker, err := authSessionCleanupWorker(config.Load(), &entstore.Stores{}, logger); err != nil || worker != nil {
+		t.Fatalf("expected nil worker without auth session store, worker=%v err=%v", worker, err)
+	}
+
+	worker, err := authSessionCleanupWorker(config.Load(), &entstore.Stores{AuthSessions: authmemory.New()}, logger)
+	if err != nil {
+		t.Fatalf("create auth session cleanup worker: %v", err)
+	}
+	if worker == nil {
+		t.Fatal("expected worker for persistent auth cleanup store")
 	}
 }
 

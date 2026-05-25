@@ -184,6 +184,7 @@ index(expires_at)
 - 不存 Session ID 原文。
 - 不存 CSRF token 原文。
 - `session_id_hash` 和 `csrf_token_hash` 使用 SHA-256 派生值；登录响应只返回本次新建 Session 的明文 CSRF token。
+- 过期 session 由后台 worker 从 `active` 标记为 `expired` 并设置 `deleted_at`；用户登出产生的 `revoked` 状态不被过期清理覆盖。
 
 ### 6.4 roles
 

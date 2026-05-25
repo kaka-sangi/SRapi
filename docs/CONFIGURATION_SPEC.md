@@ -132,6 +132,7 @@ API_KEY_PEPPER=
 BOOTSTRAP_ADMIN_EMAIL=admin@srapi.local
 BOOTSTRAP_ADMIN_PASSWORD=
 BOOTSTRAP_ADMIN_NAME=Admin
+AUTH_SESSION_CLEANUP_INTERVAL_SECONDS=86400
 ```
 
 规则：
@@ -142,6 +143,7 @@ BOOTSTRAP_ADMIN_NAME=Admin
 - 多副本部署不得使用随机临时 TOTP key。
 - Gateway API Key HMAC pepper 必须固定且至少 32 字节。
 - release 模式必须拒绝默认管理员密码和开发占位密码。
+- 过期控制台 session 由 `auth_session_cleanup` worker 周期性标记为 `expired` 并软删除；该 worker 只在持久化 AuthSession store 可用时启动，默认每 24 小时运行一次。
 
 ## 8. Crypto
 
