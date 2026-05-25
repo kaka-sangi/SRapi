@@ -794,9 +794,11 @@ func toSchedulerSimulationRequest(body apiopenapi.SchedulerSimulationRequest) (s
 		current = schedulercontract.StrategyName(*body.CurrentStrategy)
 	}
 	return schedulercontract.StrategySimulationRequest{
-		Request:         request,
-		CurrentStrategy: current,
-		ShadowStrategy:  schedulercontract.StrategyName(body.ShadowStrategy),
+		Request:              request,
+		CurrentStrategy:      current,
+		ShadowStrategy:       schedulercontract.StrategyName(body.ShadowStrategy),
+		ShadowRolloutPercent: float64PtrFromFloat32(body.ShadowRolloutPercent),
+		RolloutKey:           optionalStringValue(body.RolloutKey),
 	}, nil
 }
 
@@ -953,6 +955,13 @@ func toAPISchedulerSimulationResult(result schedulercontract.StrategySimulationR
 			LatencyScoreDelta:         float32(result.Diff.LatencyScoreDelta),
 			QualityScoreDelta:         float32(result.Diff.QualityScoreDelta),
 			RiskPenaltyDelta:          float32(result.Diff.RiskPenaltyDelta),
+		},
+		Rollout: apiopenapi.SchedulerSimulationRollout{
+			Bucket:         float32(result.Rollout.Bucket),
+			Enabled:        result.Rollout.Enabled,
+			KeyHash:        result.Rollout.KeyHash,
+			Percent:        float32(result.Rollout.Percent),
+			ShadowSelected: result.Rollout.ShadowSelected,
 		},
 		DryRun: result.DryRun,
 	}

@@ -81,6 +81,8 @@ func TestAdminSchedulerSimulationIsDryRun(t *testing.T) {
 	body := `{
 		"current_strategy":"balanced",
 		"shadow_strategy":"cost_saver",
+		"shadow_rollout_percent":100,
+		"rollout_key":"raw-rollout-key",
 		"request":{
 			"request_id":"sim-http-1",
 			"user_id":"1",
@@ -128,6 +130,12 @@ func TestAdminSchedulerSimulationIsDryRun(t *testing.T) {
 	}
 	if !resp.Data.Diff.WinnerChanged || resp.Data.Diff.CostScoreDelta <= 0 {
 		t.Fatalf("expected winner and cost score delta, got %+v", resp.Data.Diff)
+	}
+	if !resp.Data.Rollout.Enabled || !resp.Data.Rollout.ShadowSelected || resp.Data.Rollout.Percent != 100 {
+		t.Fatalf("expected enabled 100 percent rollout, got %+v", resp.Data.Rollout)
+	}
+	if resp.Data.Rollout.KeyHash == "" || resp.Data.Rollout.KeyHash == "raw-rollout-key" || !strings.HasPrefix(resp.Data.Rollout.KeyHash, "sha256:") {
+		t.Fatalf("expected hashed rollout key only, got %+v", resp.Data.Rollout)
 	}
 
 	decisions, err := schedulerStore.ListDecisions(t.Context())

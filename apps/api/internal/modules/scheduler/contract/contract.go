@@ -160,9 +160,11 @@ type ScheduleResult struct {
 
 // StrategySimulationRequest compares two scheduler strategies against one request profile.
 type StrategySimulationRequest struct {
-	Request         ScheduleRequest
-	CurrentStrategy StrategyName
-	ShadowStrategy  StrategyName
+	Request              ScheduleRequest
+	CurrentStrategy      StrategyName
+	ShadowStrategy       StrategyName
+	ShadowRolloutPercent *float64
+	RolloutKey           string
 }
 
 // StrategySimulationResult contains side-effect-free current and shadow scheduler outcomes.
@@ -170,6 +172,7 @@ type StrategySimulationResult struct {
 	Current SimulatedStrategyDecision
 	Shadow  SimulatedStrategyDecision
 	Diff    StrategySimulationDiff
+	Rollout StrategySimulationRollout
 	DryRun  bool
 }
 
@@ -191,6 +194,15 @@ type StrategySimulationDiff struct {
 	LatencyScoreDelta         float64
 	QualityScoreDelta         float64
 	RiskPenaltyDelta          float64
+}
+
+// StrategySimulationRollout previews deterministic shadow gray-release routing for this request.
+type StrategySimulationRollout struct {
+	Enabled        bool
+	Percent        float64
+	Bucket         float64
+	ShadowSelected bool
+	KeyHash        string
 }
 
 type Lease struct {

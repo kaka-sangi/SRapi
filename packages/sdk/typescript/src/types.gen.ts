@@ -2071,6 +2071,10 @@ export type SchedulerSimulationProfile = {
 export type SchedulerSimulationRequest = {
     current_strategy?: SchedulerStrategyName;
     shadow_strategy: SchedulerStrategyName;
+    /**
+     * Optional deterministic gray-release percentage for previewing whether this request would use the shadow strategy.
+     */
+    shadow_rollout_percent?: number | null;
     request: SchedulerSimulationProfile;
 };
 
@@ -2118,11 +2122,32 @@ export type SchedulerSimulationDiff = {
     risk_penalty_delta: number;
 };
 
+export type SchedulerSimulationRollout = {
+    /**
+     * True when shadow_rollout_percent was supplied in the request.
+     */
+    enabled: boolean;
+    percent: number;
+    /**
+     * Stable deterministic bucket for the rollout key, in the range [0, 100).
+     */
+    bucket: number;
+    /**
+     * True when bucket is inside the supplied shadow rollout percentage.
+     */
+    shadow_selected: boolean;
+    /**
+     * SHA-256 hash of the rollout key; the raw key is never returned.
+     */
+    key_hash: string;
+};
+
 export type SchedulerSimulationResult = {
     dry_run: boolean;
     current: SchedulerSimulationDecision;
     shadow: SchedulerSimulationDecision;
     diff: SchedulerSimulationDiff;
+    rollout: SchedulerSimulationRollout;
 };
 
 export type SchedulerSimulationResponse = {
@@ -2800,6 +2825,14 @@ export type SchedulerSimulationProfileWritable = {
 export type SchedulerSimulationRequestWritable = {
     current_strategy?: SchedulerStrategyName;
     shadow_strategy: SchedulerStrategyName;
+    /**
+     * Optional deterministic gray-release percentage for previewing whether this request would use the shadow strategy.
+     */
+    shadow_rollout_percent?: number | null;
+    /**
+     * Optional stable bucketing key. Defaults to request.request_id when omitted.
+     */
+    rollout_key?: string;
     request: SchedulerSimulationProfileWritable;
 };
 

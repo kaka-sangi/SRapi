@@ -4818,7 +4818,13 @@ type SchedulerSimulationProfileUserTier string
 type SchedulerSimulationRequest struct {
 	CurrentStrategy *SchedulerStrategyName     `json:"current_strategy,omitempty"`
 	Request         SchedulerSimulationProfile `json:"request"`
-	ShadowStrategy  SchedulerStrategyName      `json:"shadow_strategy"`
+
+	// RolloutKey Optional stable bucketing key. Defaults to request.request_id when omitted.
+	RolloutKey *string `json:"rollout_key,omitempty"`
+
+	// ShadowRolloutPercent Optional deterministic gray-release percentage for previewing whether this request would use the shadow strategy.
+	ShadowRolloutPercent *float32              `json:"shadow_rollout_percent,omitempty"`
+	ShadowStrategy       SchedulerStrategyName `json:"shadow_strategy"`
 }
 
 // SchedulerSimulationResponse defines model for SchedulerSimulationResponse.
@@ -4832,7 +4838,24 @@ type SchedulerSimulationResult struct {
 	Current SchedulerSimulationDecision `json:"current"`
 	Diff    SchedulerSimulationDiff     `json:"diff"`
 	DryRun  bool                        `json:"dry_run"`
+	Rollout SchedulerSimulationRollout  `json:"rollout"`
 	Shadow  SchedulerSimulationDecision `json:"shadow"`
+}
+
+// SchedulerSimulationRollout defines model for SchedulerSimulationRollout.
+type SchedulerSimulationRollout struct {
+	// Bucket Stable deterministic bucket for the rollout key, in the range [0, 100).
+	Bucket float32 `json:"bucket"`
+
+	// Enabled True when shadow_rollout_percent was supplied in the request.
+	Enabled bool `json:"enabled"`
+
+	// KeyHash SHA-256 hash of the rollout key; the raw key is never returned.
+	KeyHash string  `json:"key_hash"`
+	Percent float32 `json:"percent"`
+
+	// ShadowSelected True when bucket is inside the supplied shadow rollout percentage.
+	ShadowSelected bool `json:"shadow_selected"`
 }
 
 // SchedulerSimulationRuntimeState defines model for SchedulerSimulationRuntimeState.

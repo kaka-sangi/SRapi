@@ -2,7 +2,11 @@ package service
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/binary"
 	"errors"
+	"math"
+	"strings"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 )
@@ -31,6 +35,10 @@ func (s *Service) SimulateStrategy(ctx context.Context, req contract.StrategySim
 	if shadowStrategy == "" {
 		return contract.StrategySimulationResult{}, ErrInvalidInput
 	}
+	rollout, err := simulationRollout(req, scheduleReq)
+	if err != nil {
+		return contract.StrategySimulationResult{}, err
+	}
 
 	current, err := s.simulateSingleStrategy(scheduleReq, currentStrategy)
 	if err != nil {
@@ -44,6 +52,7 @@ func (s *Service) SimulateStrategy(ctx context.Context, req contract.StrategySim
 		Current: current,
 		Shadow:  shadow,
 		Diff:    simulationDiff(current.Decision, shadow.Decision),
+		Rollout: rollout,
 		DryRun:  true,
 	}, nil
 }
@@ -111,4 +120,36 @@ func intPtrValue(value *int) int {
 		return 0
 	}
 	return *value
+}
+
+func simulationRollout(req contract.StrategySimulationRequest, scheduleReq contract.ScheduleRequest) (contract.StrategySimulationRollout, error) {
+	if req.ShadowRolloutPercent == nil {
+		return contract.StrategySimulationRollout{}, nil
+	}
+	percent := *req.ShadowRolloutPercent
+	if math.IsNaN(percent) || math.IsInf(percent, 0) || percent < 0 || percent > 100 {
+		return contract.StrategySimulationRollout{}, ErrInvalidInput
+	}
+	key := strings.TrimSpace(req.RolloutKey)
+	if key == "" {
+		key = strings.TrimSpace(scheduleReq.RequestID)
+	}
+	bucket := rolloutBucket(key)
+	return contract.StrategySimulationRollout{
+		Enabled:        true,
+		Percent:        percent,
+		Bucket:         bucket,
+		ShadowSelected: bucket < percent || percent >= 100,
+		KeyHash:        affinityKeyHash(key),
+	}, nil
+}
+
+func rolloutBucket(key string) float64 {
+	sum := sha256Sum(key)
+	value := binary.BigEndian.Uint64(sum[:8])
+	return float64(value%10000) / 100
+}
+
+func sha256Sum(value string) [32]byte {
+	return sha256.Sum256([]byte(value))
 }

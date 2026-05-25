@@ -815,6 +815,62 @@ func TestSimulateStrategyReportsRejectedShadowWithoutLease(t *testing.T) {
 	}
 }
 
+func TestSimulateStrategyReturnsStableRolloutPreview(t *testing.T) {
+	svc := newService(t)
+	req := baseRequest()
+	req.Candidates = []contract.Candidate{
+		candidate(1, withHealth(0.95), withRelativeCost("0.9"), withCapabilities(capabilitiescontract.KeyStreaming)),
+		candidate(2, withHealth(0.60), withRelativeCost("0.1"), withCapabilities(capabilitiescontract.KeyStreaming)),
+	}
+	percent := 100.0
+
+	first, err := svc.SimulateStrategy(context.Background(), contract.StrategySimulationRequest{
+		Request:              req,
+		ShadowStrategy:       contract.StrategyCostSaver,
+		ShadowRolloutPercent: &percent,
+		RolloutKey:           "api-key:1:model:sim-model",
+	})
+	if err != nil {
+		t.Fatalf("simulate strategy with rollout: %v", err)
+	}
+	second, err := svc.SimulateStrategy(context.Background(), contract.StrategySimulationRequest{
+		Request:              req,
+		ShadowStrategy:       contract.StrategyCostSaver,
+		ShadowRolloutPercent: &percent,
+		RolloutKey:           "api-key:1:model:sim-model",
+	})
+	if err != nil {
+		t.Fatalf("repeat simulate strategy with rollout: %v", err)
+	}
+	if !first.Rollout.Enabled || !first.Rollout.ShadowSelected || first.Rollout.Percent != 100 {
+		t.Fatalf("expected enabled 100 percent rollout to select shadow, got %+v", first.Rollout)
+	}
+	if first.Rollout.Bucket != second.Rollout.Bucket || first.Rollout.KeyHash != second.Rollout.KeyHash {
+		t.Fatalf("expected stable rollout bucket/hash, first=%+v second=%+v", first.Rollout, second.Rollout)
+	}
+	if first.Rollout.KeyHash == "" || first.Rollout.KeyHash == "api-key:1:model:sim-model" || !strings.HasPrefix(first.Rollout.KeyHash, "sha256:") {
+		t.Fatalf("expected hashed rollout key only, got %+v", first.Rollout)
+	}
+}
+
+func TestSimulateStrategyRejectsInvalidRolloutPercent(t *testing.T) {
+	svc := newService(t)
+	req := baseRequest()
+	req.Candidates = []contract.Candidate{
+		candidate(1, withCapabilities(capabilitiescontract.KeyStreaming)),
+	}
+	percent := 101.0
+
+	_, err := svc.SimulateStrategy(context.Background(), contract.StrategySimulationRequest{
+		Request:              req,
+		ShadowStrategy:       contract.StrategyCostSaver,
+		ShadowRolloutPercent: &percent,
+	})
+	if !errors.Is(err, service.ErrInvalidInput) {
+		t.Fatalf("expected invalid input for rollout percent, got %v", err)
+	}
+}
+
 func TestLeasePreventsConcurrentSchedulingAndFeedbackReleases(t *testing.T) {
 	svc := newService(t)
 	req := baseRequest()

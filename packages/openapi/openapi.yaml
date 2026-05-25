@@ -12256,6 +12256,16 @@ components:
           $ref: "#/components/schemas/SchedulerStrategyName"
         shadow_strategy:
           $ref: "#/components/schemas/SchedulerStrategyName"
+        shadow_rollout_percent:
+          type: number
+          minimum: 0
+          maximum: 100
+          nullable: true
+          description: Optional deterministic gray-release percentage for previewing whether this request would use the shadow strategy.
+        rollout_key:
+          type: string
+          writeOnly: true
+          description: Optional stable bucketing key. Defaults to request.request_id when omitted.
         request:
           $ref: "#/components/schemas/SchedulerSimulationProfile"
 
@@ -12381,6 +12391,34 @@ components:
         risk_penalty_delta:
           type: number
 
+    SchedulerSimulationRollout:
+      type: object
+      required:
+        - enabled
+        - percent
+        - bucket
+        - shadow_selected
+        - key_hash
+      properties:
+        enabled:
+          type: boolean
+          description: True when shadow_rollout_percent was supplied in the request.
+        percent:
+          type: number
+          minimum: 0
+          maximum: 100
+        bucket:
+          type: number
+          minimum: 0
+          maximum: 100
+          description: Stable deterministic bucket for the rollout key, in the range [0, 100).
+        shadow_selected:
+          type: boolean
+          description: True when bucket is inside the supplied shadow rollout percentage.
+        key_hash:
+          type: string
+          description: SHA-256 hash of the rollout key; the raw key is never returned.
+
     SchedulerSimulationResult:
       type: object
       required:
@@ -12388,6 +12426,7 @@ components:
         - current
         - shadow
         - diff
+        - rollout
       properties:
         dry_run:
           type: boolean
@@ -12397,6 +12436,8 @@ components:
           $ref: "#/components/schemas/SchedulerSimulationDecision"
         diff:
           $ref: "#/components/schemas/SchedulerSimulationDiff"
+        rollout:
+          $ref: "#/components/schemas/SchedulerSimulationRollout"
 
     SchedulerSimulationResponse:
       type: object

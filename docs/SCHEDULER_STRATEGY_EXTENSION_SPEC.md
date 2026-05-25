@@ -247,6 +247,7 @@ Shadow decision：
 - 不影响真实路由。
 - 使用同一 RequestProfile 和候选集。
 - 记录 shadow winner、score diff、cost diff、risk diff。
+- 可选传入 `shadow_rollout_percent` 和 `rollout_key`，预览同一请求在稳定百分比分流下是否会命中 shadow strategy；响应只返回 key hash，不返回原始 rollout key。
 - 用于评估新策略。
 
 Shadow decision 不得创建 Lease。
@@ -268,6 +269,7 @@ percentage
 - 分流必须稳定，同一 key 在窗口期内命中同一策略。
 - 可以一键回滚到上一 active version。
 - 灰度策略必须在 Observability 中显示效果。
+- K1.6 的 `POST /api/v1/admin/scheduler/simulate` 已提供稳定百分比分流预览，用于验证 bucket、命中结果和 key hash；它仍是 dry-run，不改变真实 Gateway 策略。
 
 ## 12. Fallback 策略
 
@@ -382,7 +384,9 @@ K1.2 起运行时已经读取 `status=active`、`scope_type=global` 且 `scope_i
 `scheduler_strategies` 行，并在每次调度和管理员策略列表读取前刷新到
 `StrategyRegistry`。同名多 active 版本按 `activated_at`、`updated_at` / `created_at`、
 `id` 选择最新行；内置 seed 仍作为本地 / memory store fallback。K1.6 起已支持单请求
-shadow dry-run；API key、model、provider 等 scoped override、百分比灰度和历史批量回放仍属于后续范围。
+shadow dry-run 和稳定 rollout 预览；API key、model、provider 等 scoped override、真实流量百分比灰度和历史批量回放仍属于后续范围。
+
+历史 replay 不能只依赖现有 `scheduler_decisions` 行重算，因为当前 decision 只保存已选账号、score、reject reason 和权重快照，不保存当时完整候选集。后续 replay 接口必须先持久化或重建可审计的 RequestProfile + CandidateSnapshot，否则只能做报表对比，不能声称完成“历史重算新策略”。
 
 ## 17. Admin API
 

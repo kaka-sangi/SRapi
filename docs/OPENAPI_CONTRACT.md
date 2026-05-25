@@ -586,7 +586,7 @@ POST /api/v1/admin/scheduler/strategies/{id}/activate
 GET  /api/v1/admin/scheduler/strategies/{id}/versions
 ```
 
-当前 dry-run / shadow comparison 使用 `POST /api/v1/admin/scheduler/simulate`，以同一请求 profile 显式传入 current 与 shadow strategy。策略 descriptor、配置 schema、版本、批量历史回放和回滚规则以 `SCHEDULER_STRATEGY_EXTENSION_SPEC.md` 为准。
+当前 dry-run / shadow comparison 使用 `POST /api/v1/admin/scheduler/simulate`，以同一请求 profile 显式传入 current 与 shadow strategy；可选 `shadow_rollout_percent` + `rollout_key` 返回稳定灰度 bucket 与 shadow 命中预览。策略 descriptor、配置 schema、版本、批量历史回放和回滚规则以 `SCHEDULER_STRATEGY_EXTENSION_SPEC.md` 为准。
 
 ### 16.8 Gateway
 
