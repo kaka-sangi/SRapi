@@ -4616,6 +4616,45 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/scheduler/replay:
+    post:
+      tags:
+        - AdminScheduler
+      operationId: replaySchedulerStrategy
+      summary: Replay scheduler strategies over persisted request snapshots.
+      description: Replays current and shadow scheduler strategies against sanitized scheduler_request_snapshots without creating decisions, leases, usage logs, or upstream calls.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+        operator: read
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SchedulerReplayRequest"
+      responses:
+        "200":
+          description: Scheduler replay result.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SchedulerReplayResponse"
+        "400":
+          $ref: "#/components/responses/StandardError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /v1/models:
     get:
       tags:
@@ -12447,6 +12486,140 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/SchedulerSimulationResult"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    SchedulerReplayRequest:
+      type: object
+      required:
+        - shadow_strategy
+      properties:
+        current_strategy:
+          $ref: "#/components/schemas/SchedulerStrategyName"
+          description: Defaults to the original snapshot strategy when omitted.
+        shadow_strategy:
+          $ref: "#/components/schemas/SchedulerStrategyName"
+        shadow_rollout_percent:
+          type: number
+          minimum: 0
+          maximum: 100
+          nullable: true
+          description: Optional deterministic gray-release percentage preview for each replayed request.
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 500
+          default: 100
+        since:
+          type: string
+          format: date-time
+          nullable: true
+        until:
+          type: string
+          format: date-time
+          nullable: true
+        model:
+          type: string
+        request_id:
+          type: string
+
+    SchedulerReplayItem:
+      type: object
+      required:
+        - snapshot_id
+        - decision_id
+        - request_id
+        - attempt_no
+        - created_at
+        - original_strategy
+        - current
+        - shadow
+        - diff
+        - rollout
+      properties:
+        snapshot_id:
+          $ref: "#/components/schemas/Id"
+        decision_id:
+          $ref: "#/components/schemas/Id"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+        attempt_no:
+          type: integer
+          minimum: 1
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+        original_strategy:
+          $ref: "#/components/schemas/SchedulerStrategyName"
+        original_selected_account_id:
+          type: string
+          nullable: true
+        current:
+          $ref: "#/components/schemas/SchedulerSimulationDecision"
+        shadow:
+          $ref: "#/components/schemas/SchedulerSimulationDecision"
+        diff:
+          $ref: "#/components/schemas/SchedulerSimulationDiff"
+        rollout:
+          $ref: "#/components/schemas/SchedulerSimulationRollout"
+
+    SchedulerReplayResult:
+      type: object
+      required:
+        - dry_run
+        - requested
+        - replayed
+        - skipped
+        - winner_changed
+        - current_win_counts
+        - shadow_win_counts
+        - average_final_score_delta
+        - average_cost_score_delta
+        - average_latency_score_delta
+        - average_quality_score_delta
+        - average_risk_penalty_delta
+        - items
+      properties:
+        dry_run:
+          type: boolean
+        requested:
+          type: integer
+          minimum: 0
+        replayed:
+          type: integer
+          minimum: 0
+        skipped:
+          type: integer
+          minimum: 0
+        winner_changed:
+          type: integer
+          minimum: 0
+        current_win_counts:
+          $ref: "#/components/schemas/JsonObject"
+        shadow_win_counts:
+          $ref: "#/components/schemas/JsonObject"
+        average_final_score_delta:
+          type: number
+        average_cost_score_delta:
+          type: number
+        average_latency_score_delta:
+          type: number
+        average_quality_score_delta:
+          type: number
+        average_risk_penalty_delta:
+          type: number
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/SchedulerReplayItem"
+
+    SchedulerReplayResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/SchedulerReplayResult"
         request_id:
           $ref: "#/components/schemas/RequestId"
 

@@ -361,6 +361,105 @@ func TestSchedulePersistsSanitizedRequestSnapshotForReplay(t *testing.T) {
 	if got := snapshot.RankedAccountIDs; len(got) != 1 || got[0] != result.Candidate.Account.ID {
 		t.Fatalf("expected ranked available account IDs, got %+v", got)
 	}
+	if first.AccountHasCredential == nil || !*first.AccountHasCredential {
+		t.Fatalf("expected credential presence marker without credential value, got %+v", first)
+	}
+}
+
+func TestReplayStrategiesReplaysRequestSnapshotsWithoutSideEffects(t *testing.T) {
+	store := schedulermemory.New()
+	svc, err := service.New(store, nil)
+	if err != nil {
+		t.Fatalf("create scheduler service: %v", err)
+	}
+	req := baseRequest()
+	req.Candidates = []contract.Candidate{
+		candidate(1, withHealth(0.95), withRelativeCost("0.9"), withCapabilities(capabilitiescontract.KeyStreaming)),
+		candidate(2, withHealth(0.60), withRelativeCost("0.1"), withCapabilities(capabilitiescontract.KeyStreaming)),
+	}
+
+	result, err := svc.Schedule(context.Background(), req)
+	if err != nil {
+		t.Fatalf("schedule: %v", err)
+	}
+	if result.Candidate.Account.ID != 1 {
+		t.Fatalf("expected balanced request to select account 1, got %+v", result.Candidate)
+	}
+
+	percent := 100.0
+	replay, err := svc.ReplayStrategies(context.Background(), contract.StrategyReplayRequest{
+		ShadowStrategy:       contract.StrategyCostSaver,
+		ShadowRolloutPercent: &percent,
+		Limit:                10,
+	})
+	if err != nil {
+		t.Fatalf("replay strategies: %v", err)
+	}
+	if !replay.DryRun || replay.Requested != 1 || replay.Replayed != 1 || replay.Skipped != 0 {
+		t.Fatalf("unexpected replay summary: %+v", replay)
+	}
+	if replay.WinnerChanged != 1 || replay.CurrentWinCounts["1"] != 1 || replay.ShadowWinCounts["2"] != 1 {
+		t.Fatalf("expected winner change summary, got %+v", replay)
+	}
+	item := replay.Items[0]
+	if item.SnapshotID == 0 || item.DecisionID != result.Decision.ID || item.RequestID != req.RequestID {
+		t.Fatalf("expected replay item to reference persisted snapshot, got %+v", item)
+	}
+	if item.Current.Decision.SelectedAccountID == nil || *item.Current.Decision.SelectedAccountID != 1 {
+		t.Fatalf("expected current strategy to replay account 1, got %+v", item.Current)
+	}
+	if item.Shadow.Decision.SelectedAccountID == nil || *item.Shadow.Decision.SelectedAccountID != 2 {
+		t.Fatalf("expected shadow strategy to replay account 2, got %+v", item.Shadow)
+	}
+	if !item.Rollout.Enabled || !item.Rollout.ShadowSelected || item.Rollout.KeyHash == "" || item.Rollout.KeyHash == req.RequestID {
+		t.Fatalf("expected hashed rollout preview, got %+v", item.Rollout)
+	}
+
+	decisions, err := store.ListDecisions(context.Background())
+	if err != nil {
+		t.Fatalf("list decisions: %v", err)
+	}
+	if len(decisions) != 1 {
+		t.Fatalf("expected replay not to create decisions, got %+v", decisions)
+	}
+	leases, err := store.ListLeases(context.Background())
+	if err != nil {
+		t.Fatalf("list leases: %v", err)
+	}
+	if len(leases) != 1 {
+		t.Fatalf("expected replay not to acquire leases, got %+v", leases)
+	}
+}
+
+func TestReplayStrategiesPreservesCredentialPresenceSemantics(t *testing.T) {
+	store := schedulermemory.New()
+	svc, err := service.New(store, nil)
+	if err != nil {
+		t.Fatalf("create scheduler service: %v", err)
+	}
+	req := baseRequest()
+	req.Candidates = []contract.Candidate{
+		candidate(1, withCredential(""), withCapabilities(capabilitiescontract.KeyStreaming)),
+	}
+	if _, err := svc.Schedule(context.Background(), req); !errors.Is(err, service.ErrNoAvailableAccount) {
+		t.Fatalf("expected schedule to persist failed no-account decision, got %v", err)
+	}
+
+	replay, err := svc.ReplayStrategies(context.Background(), contract.StrategyReplayRequest{
+		ShadowStrategy: contract.StrategyCostSaver,
+	})
+	if err != nil {
+		t.Fatalf("replay strategies: %v", err)
+	}
+	if replay.Replayed != 1 {
+		t.Fatalf("expected replayed failed snapshot, got %+v", replay)
+	}
+	item := replay.Items[0]
+	if item.Current.Error != "no_available_account" || item.Shadow.Error != "no_available_account" {
+		t.Fatalf("expected replay to preserve credential rejection, got current=%+v shadow=%+v", item.Current, item.Shadow)
+	}
+	assertRejectReason(t, item.Current.Decision.RejectReasons, 1, "credential_invalid")
+	assertRejectReason(t, item.Shadow.Decision.RejectReasons, 1, "credential_invalid")
 }
 
 func TestCostSaverPrefersLowerRelativeCost(t *testing.T) {

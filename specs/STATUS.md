@@ -84,14 +84,15 @@ last_completed:
 - K1.6: Scheduler strategy simulation now supports single-request dry-run/shadow comparison through `scheduler/service/simulator.go` and `POST /api/v1/admin/scheduler/simulate`; it evaluates current vs shadow strategies with the same request profile and candidates, returns winner and score deltas, and HTTP/service regressions prove it does not persist SchedulerDecision rows or acquire leases.
 - K1.6.1: Scheduler simulation now accepts optional `shadow_rollout_percent` and `rollout_key`, returns a deterministic rollout bucket, shadow-selected flag, and SHA-256 key hash without returning the raw key, and service/HTTP regressions prove rollout preview stays dry-run.
 - K1.6.2: Real Scheduler attempts now persist a sanitized `scheduler_request_snapshots` row atomically with each new decision, including request profile, candidate snapshot, ranked account IDs, selected IDs, strategy version/hash/weights, and compatibility warnings without raw affinity keys, rollout keys, credentials, cookies, or tokens.
+- K1.6.3: Scheduler historical replay now exposes `POST /api/v1/admin/scheduler/replay`, rebuilds side-effect-free replay inputs from sanitized `scheduler_request_snapshots`, compares current/shadow strategies across filtered historical attempts, returns winner-change counts, per-account win counts, average score deltas, rollout previews, and per-snapshot details, and service/HTTP regressions prove replay does not create SchedulerDecision rows or acquire leases.
 
 current:
 
 - package: K1.6 follow-up
 - status: pending
-- objective: extend Scheduler strategy simulator from snapshot-backed evidence to historical replay, scoped real-traffic gray release percentages, and admin strategy comparison reporting.
+- objective: extend Scheduler strategy simulator from snapshot-backed evidence to scoped real-traffic gray release percentages and admin strategy comparison reporting.
 
-next_recommended: K1.6 implement historical replay over `scheduler_request_snapshots`, or K1.7 `/admin/ops/strategy` comparison UI after replay evidence is queryable.
+next_recommended: K1.7 `/admin/ops/strategy` comparison UI using `POST /api/v1/admin/scheduler/replay`, or finish K1.6 scoped real-traffic gray release percentages before frontend reporting.
 
 last_gates:
 

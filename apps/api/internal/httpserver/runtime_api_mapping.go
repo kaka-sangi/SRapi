@@ -944,27 +944,102 @@ func toAPISchedulerSimulationResult(result schedulercontract.StrategySimulationR
 	return apiopenapi.SchedulerSimulationResult{
 		Current: toAPISchedulerSimulationDecision(result.Current),
 		Shadow:  toAPISchedulerSimulationDecision(result.Shadow),
-		Diff: apiopenapi.SchedulerSimulationDiff{
-			WinnerChanged:             result.Diff.WinnerChanged,
-			CurrentSelectedAccountId:  optionalIDString(result.Diff.CurrentSelectedAccountID),
-			ShadowSelectedAccountId:   optionalIDString(result.Diff.ShadowSelectedAccountID),
-			CurrentSelectedProviderId: optionalIDString(result.Diff.CurrentSelectedProviderID),
-			ShadowSelectedProviderId:  optionalIDString(result.Diff.ShadowSelectedProviderID),
-			FinalScoreDelta:           float32(result.Diff.FinalScoreDelta),
-			CostScoreDelta:            float32(result.Diff.CostScoreDelta),
-			LatencyScoreDelta:         float32(result.Diff.LatencyScoreDelta),
-			QualityScoreDelta:         float32(result.Diff.QualityScoreDelta),
-			RiskPenaltyDelta:          float32(result.Diff.RiskPenaltyDelta),
-		},
-		Rollout: apiopenapi.SchedulerSimulationRollout{
-			Bucket:         float32(result.Rollout.Bucket),
-			Enabled:        result.Rollout.Enabled,
-			KeyHash:        result.Rollout.KeyHash,
-			Percent:        float32(result.Rollout.Percent),
-			ShadowSelected: result.Rollout.ShadowSelected,
-		},
-		DryRun: result.DryRun,
+		Diff:    toAPISchedulerSimulationDiff(result.Diff),
+		Rollout: toAPISchedulerSimulationRollout(result.Rollout),
+		DryRun:  result.DryRun,
 	}
+}
+
+func toSchedulerReplayRequest(body apiopenapi.SchedulerReplayRequest) schedulercontract.StrategyReplayRequest {
+	var current schedulercontract.StrategyName
+	if body.CurrentStrategy != nil {
+		current = schedulercontract.StrategyName(*body.CurrentStrategy)
+	}
+	limit := 0
+	if body.Limit != nil {
+		limit = *body.Limit
+	}
+	return schedulercontract.StrategyReplayRequest{
+		CurrentStrategy:      current,
+		ShadowStrategy:       schedulercontract.StrategyName(body.ShadowStrategy),
+		ShadowRolloutPercent: float64PtrFromFloat32(body.ShadowRolloutPercent),
+		Limit:                limit,
+		Since:                cloneTimePtr(body.Since),
+		Until:                cloneTimePtr(body.Until),
+		Model:                optionalStringValue(body.Model),
+		RequestID:            optionalStringValue(body.RequestId),
+	}
+}
+
+func toAPISchedulerReplayResult(result schedulercontract.StrategyReplayResult) apiopenapi.SchedulerReplayResult {
+	items := make([]apiopenapi.SchedulerReplayItem, 0, len(result.Items))
+	for _, item := range result.Items {
+		items = append(items, toAPISchedulerReplayItem(item))
+	}
+	return apiopenapi.SchedulerReplayResult{
+		AverageCostScoreDelta:    float32(result.AverageCostScoreDelta),
+		AverageFinalScoreDelta:   float32(result.AverageFinalScoreDelta),
+		AverageLatencyScoreDelta: float32(result.AverageLatencyScoreDelta),
+		AverageQualityScoreDelta: float32(result.AverageQualityScoreDelta),
+		AverageRiskPenaltyDelta:  float32(result.AverageRiskPenaltyDelta),
+		CurrentWinCounts:         jsonObject(intCountsToAny(result.CurrentWinCounts)),
+		DryRun:                   result.DryRun,
+		Items:                    items,
+		Replayed:                 result.Replayed,
+		Requested:                result.Requested,
+		ShadowWinCounts:          jsonObject(intCountsToAny(result.ShadowWinCounts)),
+		Skipped:                  result.Skipped,
+		WinnerChanged:            result.WinnerChanged,
+	}
+}
+
+func toAPISchedulerReplayItem(item schedulercontract.StrategyReplayItem) apiopenapi.SchedulerReplayItem {
+	return apiopenapi.SchedulerReplayItem{
+		AttemptNo:                 item.AttemptNo,
+		CreatedAt:                 item.CreatedAt,
+		Current:                   toAPISchedulerSimulationDecision(item.Current),
+		DecisionId:                apiopenapi.Id(strconv.Itoa(item.DecisionID)),
+		Diff:                      toAPISchedulerSimulationDiff(item.Diff),
+		OriginalSelectedAccountId: optionalIDString(item.OriginalSelectedAccountID),
+		OriginalStrategy:          apiopenapi.SchedulerStrategyName(item.OriginalStrategy),
+		RequestId:                 item.RequestID,
+		Rollout:                   toAPISchedulerSimulationRollout(item.Rollout),
+		Shadow:                    toAPISchedulerSimulationDecision(item.Shadow),
+		SnapshotId:                apiopenapi.Id(strconv.Itoa(item.SnapshotID)),
+	}
+}
+
+func toAPISchedulerSimulationDiff(diff schedulercontract.StrategySimulationDiff) apiopenapi.SchedulerSimulationDiff {
+	return apiopenapi.SchedulerSimulationDiff{
+		WinnerChanged:             diff.WinnerChanged,
+		CurrentSelectedAccountId:  optionalIDString(diff.CurrentSelectedAccountID),
+		ShadowSelectedAccountId:   optionalIDString(diff.ShadowSelectedAccountID),
+		CurrentSelectedProviderId: optionalIDString(diff.CurrentSelectedProviderID),
+		ShadowSelectedProviderId:  optionalIDString(diff.ShadowSelectedProviderID),
+		FinalScoreDelta:           float32(diff.FinalScoreDelta),
+		CostScoreDelta:            float32(diff.CostScoreDelta),
+		LatencyScoreDelta:         float32(diff.LatencyScoreDelta),
+		QualityScoreDelta:         float32(diff.QualityScoreDelta),
+		RiskPenaltyDelta:          float32(diff.RiskPenaltyDelta),
+	}
+}
+
+func toAPISchedulerSimulationRollout(rollout schedulercontract.StrategySimulationRollout) apiopenapi.SchedulerSimulationRollout {
+	return apiopenapi.SchedulerSimulationRollout{
+		Bucket:         float32(rollout.Bucket),
+		Enabled:        rollout.Enabled,
+		KeyHash:        rollout.KeyHash,
+		Percent:        float32(rollout.Percent),
+		ShadowSelected: rollout.ShadowSelected,
+	}
+}
+
+func intCountsToAny(values map[string]int) map[string]any {
+	out := make(map[string]any, len(values))
+	for key, value := range values {
+		out[key] = value
+	}
+	return out
 }
 
 func toAPISchedulerSimulationDecision(result schedulercontract.SimulatedStrategyDecision) apiopenapi.SchedulerSimulationDecision {

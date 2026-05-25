@@ -996,10 +996,46 @@ func (s *Server) handleSimulateSchedulerStrategy(w http.ResponseWriter, r *http.
 	})
 }
 
+func (s *Server) handleReplaySchedulerStrategy(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	var body apiopenapi.SchedulerReplayRequest
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid scheduler replay request", requestID)
+		return
+	}
+	req := toSchedulerReplayRequest(body)
+	result, err := s.runtime.scheduler.ReplayStrategies(r.Context(), req)
+	if err != nil {
+		writeSchedulerReplayError(w, err, requestID)
+		return
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.SchedulerReplayResponse{
+		Data:      toAPISchedulerReplayResult(result),
+		RequestId: requestID,
+	})
+}
+
 func writeSchedulerSimulationError(w http.ResponseWriter, err error, requestID string) {
 	if errors.Is(err, schedulerservice.ErrInvalidInput) {
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid scheduler simulation request", requestID)
 		return
 	}
 	writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to simulate scheduler strategy", requestID)
+}
+
+func writeSchedulerReplayError(w http.ResponseWriter, err error, requestID string) {
+	if errors.Is(err, schedulerservice.ErrInvalidInput) {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid scheduler replay request", requestID)
+		return
+	}
+	writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to replay scheduler strategy", requestID)
 }

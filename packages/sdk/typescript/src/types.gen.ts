@@ -2155,6 +2155,55 @@ export type SchedulerSimulationResponse = {
     request_id: RequestId;
 };
 
+export type SchedulerReplayRequest = {
+    current_strategy?: SchedulerStrategyName;
+    shadow_strategy: SchedulerStrategyName;
+    /**
+     * Optional deterministic gray-release percentage preview for each replayed request.
+     */
+    shadow_rollout_percent?: number | null;
+    limit?: number;
+    since?: string | null;
+    until?: string | null;
+    model?: string;
+    request_id?: string;
+};
+
+export type SchedulerReplayItem = {
+    snapshot_id: Id;
+    decision_id: Id;
+    request_id: RequestId;
+    attempt_no: number;
+    created_at: Timestamp;
+    original_strategy: SchedulerStrategyName;
+    original_selected_account_id?: string | null;
+    current: SchedulerSimulationDecision;
+    shadow: SchedulerSimulationDecision;
+    diff: SchedulerSimulationDiff;
+    rollout: SchedulerSimulationRollout;
+};
+
+export type SchedulerReplayResult = {
+    dry_run: boolean;
+    requested: number;
+    replayed: number;
+    skipped: number;
+    winner_changed: number;
+    current_win_counts: JsonObject;
+    shadow_win_counts: JsonObject;
+    average_final_score_delta: number;
+    average_cost_score_delta: number;
+    average_latency_score_delta: number;
+    average_quality_score_delta: number;
+    average_risk_penalty_delta: number;
+    items: Array<SchedulerReplayItem>;
+};
+
+export type SchedulerReplayResponse = {
+    data: SchedulerReplayResult;
+    request_id: RequestId;
+};
+
 export type OpenAiModel = {
     id: string;
     object: 'model';
@@ -7671,6 +7720,43 @@ export type SimulateSchedulerStrategyResponses = {
 };
 
 export type SimulateSchedulerStrategyResponse = SimulateSchedulerStrategyResponses[keyof SimulateSchedulerStrategyResponses];
+
+export type ReplaySchedulerStrategyData = {
+    body: SchedulerReplayRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/scheduler/replay';
+};
+
+export type ReplaySchedulerStrategyErrors = {
+    /**
+     * Standard SRapi error.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ReplaySchedulerStrategyError = ReplaySchedulerStrategyErrors[keyof ReplaySchedulerStrategyErrors];
+
+export type ReplaySchedulerStrategyResponses = {
+    /**
+     * Scheduler replay result.
+     */
+    200: SchedulerReplayResponse;
+};
+
+export type ReplaySchedulerStrategyResponse = ReplaySchedulerStrategyResponses[keyof ReplaySchedulerStrategyResponses];
 
 export type ListModelsData = {
     body?: never;

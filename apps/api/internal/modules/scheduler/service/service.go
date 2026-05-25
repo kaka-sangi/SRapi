@@ -566,6 +566,7 @@ func sanitizedCandidateSnapshots(candidates []contract.Candidate) []contract.Can
 			MappingID:             candidate.Mapping.ID,
 			ModelID:               candidate.Mapping.ModelID,
 			RuntimeClass:          string(candidate.Account.RuntimeClass),
+			AccountHasCredential:  boolPtr(strings.TrimSpace(candidate.Account.CredentialCiphertext) != ""),
 			AccountStatus:         string(candidate.Account.Status),
 			AccountWeight:         candidate.Account.Weight,
 			AccountRiskLevel:      cloneStringPtr(candidate.Account.RiskLevel),
@@ -1273,6 +1274,10 @@ func scheduleAttemptNo(value int) int {
 		return 1
 	}
 	return value
+}
+
+func boolPtr(value bool) *bool {
+	return &value
 }
 
 func cloneIntPtr(value *int) *int {

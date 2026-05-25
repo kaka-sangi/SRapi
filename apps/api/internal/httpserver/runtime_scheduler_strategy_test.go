@@ -11,7 +11,12 @@ import (
 	"entgo.io/ent/dialect"
 	"github.com/srapi/srapi/apps/api/ent/enttest"
 	"github.com/srapi/srapi/apps/api/internal/config"
+	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
+	capabilitiescontract "github.com/srapi/srapi/apps/api/internal/modules/capabilities/contract"
+	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
+	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
+	schedulerservice "github.com/srapi/srapi/apps/api/internal/modules/scheduler/service"
 	schedulermemory "github.com/srapi/srapi/apps/api/internal/modules/scheduler/store/memory"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 	"github.com/srapi/srapi/apps/api/internal/persistence/entstore"
@@ -151,5 +156,113 @@ func TestAdminSchedulerSimulationIsDryRun(t *testing.T) {
 	}
 	if len(leases) != 0 {
 		t.Fatalf("expected no scheduler leases from simulation, got %+v", leases)
+	}
+}
+
+func TestAdminSchedulerReplayUsesPersistedSnapshots(t *testing.T) {
+	schedulerStore := schedulermemory.New()
+	schedulerSvc, err := schedulerservice.New(schedulerStore, nil)
+	if err != nil {
+		t.Fatalf("create scheduler service: %v", err)
+	}
+	request := schedulercontract.ScheduleRequest{
+		RequestID:      "replay-http-1",
+		UserID:         1,
+		APIKeyID:       1,
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/chat/completions",
+		Model:          "replay-model",
+		Strategy:       schedulercontract.StrategyBalanced,
+		Candidates: []schedulercontract.Candidate{
+			schedulerReplayCandidate(1, 0.95, "0.9"),
+			schedulerReplayCandidate(2, 0.60, "0.1"),
+		},
+	}
+	scheduled, err := schedulerSvc.Schedule(t.Context(), request)
+	if err != nil {
+		t.Fatalf("schedule replay seed: %v", err)
+	}
+	if scheduled.Candidate.Account.ID != 1 {
+		t.Fatalf("expected balanced seed to select account 1, got %+v", scheduled.Candidate)
+	}
+
+	handler := New(config.Load(), nil, WithSchedulerStore(schedulerStore))
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+
+	body := `{"shadow_strategy":"cost_saver","shadow_rollout_percent":100,"limit":10,"model":"replay-model"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/scheduler/replay", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	req.AddCookie(sessionCookie)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected scheduler replay 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	var resp apiopenapi.SchedulerReplayResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode scheduler replay response: %v", err)
+	}
+	if !resp.Data.DryRun || resp.Data.Requested != 1 || resp.Data.Replayed != 1 || resp.Data.WinnerChanged != 1 {
+		t.Fatalf("unexpected replay summary: %+v", resp.Data)
+	}
+	if len(resp.Data.Items) != 1 {
+		t.Fatalf("expected one replay item, got %+v", resp.Data.Items)
+	}
+	item := resp.Data.Items[0]
+	if item.DecisionId != apiopenapi.Id(strconv.Itoa(scheduled.Decision.ID)) || item.Current.SelectedAccountId == nil || *item.Current.SelectedAccountId != "1" {
+		t.Fatalf("expected current replay to reference seed decision/account 1, got %+v", item)
+	}
+	if item.Shadow.SelectedAccountId == nil || *item.Shadow.SelectedAccountId != "2" || !item.Diff.WinnerChanged {
+		t.Fatalf("expected shadow replay account 2 with winner change, got %+v", item)
+	}
+	if !item.Rollout.Enabled || !item.Rollout.ShadowSelected || item.Rollout.KeyHash == "" || item.Rollout.KeyHash == request.RequestID {
+		t.Fatalf("expected hashed rollout preview, got %+v", item.Rollout)
+	}
+
+	decisions, err := schedulerStore.ListDecisions(t.Context())
+	if err != nil {
+		t.Fatalf("list scheduler decisions: %v", err)
+	}
+	if len(decisions) != 1 {
+		t.Fatalf("expected replay not to create decisions, got %+v", decisions)
+	}
+	leases, err := schedulerStore.ListLeases(t.Context())
+	if err != nil {
+		t.Fatalf("list scheduler leases: %v", err)
+	}
+	if len(leases) != 1 {
+		t.Fatalf("expected replay not to acquire leases, got %+v", leases)
+	}
+}
+
+func schedulerReplayCandidate(id int, health float64, relativeCost string) schedulercontract.Candidate {
+	return schedulercontract.Candidate{
+		Account: accountcontract.ProviderAccount{
+			ID:                   id,
+			ProviderID:           id,
+			RuntimeClass:         accountcontract.RuntimeClassAPIKey,
+			CredentialCiphertext: "encrypted",
+			Status:               accountcontract.StatusActive,
+			Weight:               1,
+		},
+		Provider: providercontract.Provider{
+			ID:       id,
+			Protocol: "openai-compatible",
+			Status:   providercontract.StatusActive,
+		},
+		Mapping: modelcontract.ModelProviderMapping{
+			ID:                id,
+			ModelID:           1,
+			ProviderID:        id,
+			UpstreamModelName: "replay-model",
+			Status:            modelcontract.StatusActive,
+			PricingOverride:   map[string]any{"relative_cost": relativeCost},
+		},
+		EffectiveCapabilities: []capabilitiescontract.Descriptor{
+			{Key: capabilitiescontract.KeyStreaming, Level: capabilitiescontract.DescriptorLevelRequired, Status: capabilitiescontract.DescriptorStatusStable, Version: "v1"},
+		},
+		RuntimeState: schedulercontract.RuntimeState{HealthScore: &health},
 	}
 }

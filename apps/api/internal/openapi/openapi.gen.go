@@ -4703,6 +4703,58 @@ type SchedulerOverviewResponse struct {
 	RequestId RequestId         `json:"request_id"`
 }
 
+// SchedulerReplayItem defines model for SchedulerReplayItem.
+type SchedulerReplayItem struct {
+	AttemptNo                 int                         `json:"attempt_no"`
+	CreatedAt                 Timestamp                   `json:"created_at"`
+	Current                   SchedulerSimulationDecision `json:"current"`
+	DecisionId                Id                          `json:"decision_id"`
+	Diff                      SchedulerSimulationDiff     `json:"diff"`
+	OriginalSelectedAccountId *string                     `json:"original_selected_account_id,omitempty"`
+	OriginalStrategy          SchedulerStrategyName       `json:"original_strategy"`
+	RequestId                 RequestId                   `json:"request_id"`
+	Rollout                   SchedulerSimulationRollout  `json:"rollout"`
+	Shadow                    SchedulerSimulationDecision `json:"shadow"`
+	SnapshotId                Id                          `json:"snapshot_id"`
+}
+
+// SchedulerReplayRequest defines model for SchedulerReplayRequest.
+type SchedulerReplayRequest struct {
+	CurrentStrategy *SchedulerStrategyName `json:"current_strategy,omitempty"`
+	Limit           *int                   `json:"limit,omitempty"`
+	Model           *string                `json:"model,omitempty"`
+	RequestId       *string                `json:"request_id,omitempty"`
+
+	// ShadowRolloutPercent Optional deterministic gray-release percentage preview for each replayed request.
+	ShadowRolloutPercent *float32              `json:"shadow_rollout_percent,omitempty"`
+	ShadowStrategy       SchedulerStrategyName `json:"shadow_strategy"`
+	Since                *time.Time            `json:"since,omitempty"`
+	Until                *time.Time            `json:"until,omitempty"`
+}
+
+// SchedulerReplayResponse defines model for SchedulerReplayResponse.
+type SchedulerReplayResponse struct {
+	Data      SchedulerReplayResult `json:"data"`
+	RequestId RequestId             `json:"request_id"`
+}
+
+// SchedulerReplayResult defines model for SchedulerReplayResult.
+type SchedulerReplayResult struct {
+	AverageCostScoreDelta    float32               `json:"average_cost_score_delta"`
+	AverageFinalScoreDelta   float32               `json:"average_final_score_delta"`
+	AverageLatencyScoreDelta float32               `json:"average_latency_score_delta"`
+	AverageQualityScoreDelta float32               `json:"average_quality_score_delta"`
+	AverageRiskPenaltyDelta  float32               `json:"average_risk_penalty_delta"`
+	CurrentWinCounts         JsonObject            `json:"current_win_counts"`
+	DryRun                   bool                  `json:"dry_run"`
+	Items                    []SchedulerReplayItem `json:"items"`
+	Replayed                 int                   `json:"replayed"`
+	Requested                int                   `json:"requested"`
+	ShadowWinCounts          JsonObject            `json:"shadow_win_counts"`
+	Skipped                  int                   `json:"skipped"`
+	WinnerChanged            int                   `json:"winner_changed"`
+}
+
 // SchedulerSimulationCandidate defines model for SchedulerSimulationCandidate.
 type SchedulerSimulationCandidate struct {
 	AccountHasCredential  *bool                            `json:"account_has_credential,omitempty"`
@@ -5858,6 +5910,9 @@ type BatchGenerateAdminRedeemCodesJSONRequestBody = BatchGenerateRedeemCodesRequ
 
 // UpdateAdminRiskControlConfigJSONRequestBody defines body for UpdateAdminRiskControlConfig for application/json ContentType.
 type UpdateAdminRiskControlConfigJSONRequestBody = RiskControlConfig
+
+// ReplaySchedulerStrategyJSONRequestBody defines body for ReplaySchedulerStrategy for application/json ContentType.
+type ReplaySchedulerStrategyJSONRequestBody = SchedulerReplayRequest
 
 // SimulateSchedulerStrategyJSONRequestBody defines body for SimulateSchedulerStrategy for application/json ContentType.
 type SimulateSchedulerStrategyJSONRequestBody = SchedulerSimulationRequest
@@ -12112,6 +12167,9 @@ type ServerInterface interface {
 	// Get scheduler overview.
 	// (GET /api/v1/admin/scheduler/overview)
 	GetAdminSchedulerOverview(w http.ResponseWriter, r *http.Request)
+	// Replay scheduler strategies over persisted request snapshots.
+	// (POST /api/v1/admin/scheduler/replay)
+	ReplaySchedulerStrategy(w http.ResponseWriter, r *http.Request)
 	// Simulate scheduler strategy selection.
 	// (POST /api/v1/admin/scheduler/simulate)
 	SimulateSchedulerStrategy(w http.ResponseWriter, r *http.Request)
@@ -16245,6 +16303,28 @@ func (siw *ServerInterfaceWrapper) GetAdminSchedulerOverview(w http.ResponseWrit
 	handler.ServeHTTP(w, r)
 }
 
+// ReplaySchedulerStrategy operation middleware
+func (siw *ServerInterfaceWrapper) ReplaySchedulerStrategy(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReplaySchedulerStrategy(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // SimulateSchedulerStrategy operation middleware
 func (siw *ServerInterfaceWrapper) SimulateSchedulerStrategy(w http.ResponseWriter, r *http.Request) {
 
@@ -18490,6 +18570,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/risk-control/status", wrapper.GetAdminRiskControlStatus)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/scheduler/decisions", wrapper.ListAdminSchedulerDecisions)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/scheduler/overview", wrapper.GetAdminSchedulerOverview)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/scheduler/replay", wrapper.ReplaySchedulerStrategy)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/scheduler/simulate", wrapper.SimulateSchedulerStrategy)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/scheduler/strategies", wrapper.ListSchedulerStrategies)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/settings", wrapper.GetAdminSettings)

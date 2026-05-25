@@ -185,6 +185,7 @@ type CandidateSnapshot struct {
 	MappingID             int
 	ModelID               int
 	RuntimeClass          string
+	AccountHasCredential  *bool
 	AccountStatus         string
 	AccountWeight         float32
 	AccountRiskLevel      *string
@@ -246,6 +247,50 @@ type StrategySimulationRollout struct {
 	Bucket         float64
 	ShadowSelected bool
 	KeyHash        string
+}
+
+// StrategyReplayRequest compares scheduler strategies against persisted request snapshots.
+type StrategyReplayRequest struct {
+	CurrentStrategy      StrategyName
+	ShadowStrategy       StrategyName
+	ShadowRolloutPercent *float64
+	Limit                int
+	Since                *time.Time
+	Until                *time.Time
+	Model                string
+	RequestID            string
+}
+
+// StrategyReplayResult summarizes side-effect-free historical strategy replay.
+type StrategyReplayResult struct {
+	DryRun                   bool
+	Requested                int
+	Replayed                 int
+	Skipped                  int
+	WinnerChanged            int
+	CurrentWinCounts         map[string]int
+	ShadowWinCounts          map[string]int
+	AverageFinalScoreDelta   float64
+	AverageCostScoreDelta    float64
+	AverageLatencyScoreDelta float64
+	AverageQualityScoreDelta float64
+	AverageRiskPenaltyDelta  float64
+	Items                    []StrategyReplayItem
+}
+
+// StrategyReplayItem is one persisted snapshot replayed through current and shadow strategies.
+type StrategyReplayItem struct {
+	SnapshotID                int
+	DecisionID                int
+	RequestID                 string
+	AttemptNo                 int
+	CreatedAt                 time.Time
+	OriginalStrategy          StrategyName
+	OriginalSelectedAccountID *int
+	Current                   SimulatedStrategyDecision
+	Shadow                    SimulatedStrategyDecision
+	Diff                      StrategySimulationDiff
+	Rollout                   StrategySimulationRollout
 }
 
 type Lease struct {

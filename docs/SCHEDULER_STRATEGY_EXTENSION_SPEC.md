@@ -387,21 +387,22 @@ K1.2 起运行时已经读取 `status=active`、`scope_type=global` 且 `scope_i
 `StrategyRegistry`。同名多 active 版本按 `activated_at`、`updated_at` / `created_at`、
 `id` 选择最新行；内置 seed 仍作为本地 / memory store fallback。K1.6 起已支持单请求
 shadow dry-run 和稳定 rollout 预览；K1.6.2 起新的真实调度会持久化脱敏
-`scheduler_request_snapshots`，为后续历史 replay 提供 RequestProfile + CandidateSnapshot
-证据。
+`scheduler_request_snapshots`；K1.6.3 起 `POST /api/v1/admin/scheduler/replay`
+可用这些 snapshot 重建 RequestProfile + CandidateSnapshot 做历史策略回放。
 
 历史 replay 接口必须只对存在 snapshot 的决策声称可重算。没有 snapshot 的旧
-`scheduler_decisions` 行缺少当时完整候选集，只能用于报表对比，不能声称完成“历史重算新策略”。API key、model、provider 等 scoped override、真实流量百分比灰度和历史批量回放 API 仍属于后续范围。
+`scheduler_decisions` 行缺少当时完整候选集，只能用于报表对比，不能声称完成“历史重算新策略”。API key、model、provider 等 scoped override 和真实流量百分比灰度仍属于后续范围。
 
 ## 17. Admin API
 
-当前 OpenAPI 已落地单请求 dry-run：
+当前 OpenAPI 已落地单请求 dry-run 和 snapshot-backed 历史 replay：
 
 ```txt
 POST   /api/v1/admin/scheduler/simulate
+POST   /api/v1/admin/scheduler/replay
 ```
 
-后续策略管理与历史回放接口预留：
+后续策略管理接口预留：
 
 ```txt
 GET    /api/v1/admin/scheduler/strategies
@@ -409,7 +410,6 @@ POST   /api/v1/admin/scheduler/strategies
 GET    /api/v1/admin/scheduler/strategies/{id}
 PATCH  /api/v1/admin/scheduler/strategies/{id}
 POST   /api/v1/admin/scheduler/strategies/{id}/activate
-POST   /api/v1/admin/scheduler/strategies/{id}/replay
 GET    /api/v1/admin/scheduler/strategies/{id}/versions
 ```
 
