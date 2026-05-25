@@ -111,6 +111,8 @@ Trace span attribute 只允许记录低敏诊断字段，例如 HTTP method、ro
 
 关键 service span 目前覆盖 `scheduler.Schedule`、`payments.HandleWebhook` 和 `accounts.ProbeAccount`。这些 span 必须记录业务 outcome、稳定错误分类和低敏诊断字段；错误 span 必须同时设置 `error.type`、record error event，并把 span status 设为 error。后续新增业务 span 应复用 `platform/otel.StartSpan` / `EndSpan`，并保持属性命名使用 `srapi.*` 前缀。
 
+Trace exporter 有本地 OTLP gRPC collector smoke 覆盖：`TestNewTracerProviderExportsSpansToOTLPCollector` 启动进程内 collector，启用 `OTEL_TRACES_ENABLED` 等价配置，验证 span 和 resource attributes 会经真实 OTLP 协议在 tracer provider shutdown 时 flush。该测试证明协议级导出路径可用；真实 Jaeger / Tempo UI 可视化仍需在部署环境中连接对应 collector 后单独 smoke。
+
 ### 3.4 经济指标
 
 ```txt
