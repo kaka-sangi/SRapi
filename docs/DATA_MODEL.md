@@ -630,7 +630,47 @@ index(name, status)
 - 策略 descriptor、配置 schema、版本和灰度规则以 `SCHEDULER_STRATEGY_EXTENSION_SPEC.md` 为准。
 - `scheduler_decisions` 必须记录当次使用的策略版本、配置 hash 和权重快照。
 
-### 10.4 sticky_sessions
+### 10.4 scheduler_request_snapshots
+
+用于保存每次真实 Scheduler attempt 的可回放证据。它和 `scheduler_decisions` 同事务写入，供后续历史 replay 使用。
+
+```txt
+id
+request_id
+attempt_no
+decision_id
+request_profile_json
+candidate_snapshot_json
+rejected_snapshot_json
+ranked_account_ids_json
+selected_account_id
+selected_provider_id
+strategy
+strategy_version
+strategy_config_hash
+strategy_weights_json
+compatibility_warnings_json
+created_at
+updated_at
+```
+
+索引：
+
+```txt
+unique(request_id, attempt_no)
+unique(decision_id)
+index(strategy, created_at)
+index(selected_account_id, created_at)
+```
+
+规则：
+
+- 每条 `scheduler_decisions` 写入必须同步写入一条 snapshot，避免出现不可回放的新决策。
+- `request_profile_json` 只能保存调度必要字段、策略提示、模型/能力、价格估算和不可逆 affinity hash，不得保存原始 prompt、原始 session affinity key 或 rollout key。
+- `candidate_snapshot_json` 只能保存调度重算需要的 provider/account/mapping/runtime/capability 字段，不得保存账号凭证、cookie、OAuth token、API key、密码或 credential ciphertext。
+- 历史 replay 只能声称覆盖有 snapshot 的 decision；旧的 decision-only 行只能用于报表统计。
+
+### 10.5 sticky_sessions
 
 ```txt
 id
@@ -656,7 +696,7 @@ index(account_id)
 index(expires_at)
 ```
 
-### 10.5 cache_affinity_records
+### 10.6 cache_affinity_records
 
 ```txt
 id
@@ -680,7 +720,7 @@ index(prompt_prefix_hash)
 index(last_hit_time)
 ```
 
-### 10.6 account_health_snapshots
+### 10.7 account_health_snapshots
 
 ```txt
 id
@@ -706,7 +746,7 @@ index(provider_id, snapshot_at)
 index(status)
 ```
 
-### 10.7 account_quota_snapshots
+### 10.8 account_quota_snapshots
 
 ```txt
 id
@@ -1250,6 +1290,7 @@ unique(key)
 ```txt
 usage_logs
 scheduler_decisions
+scheduler_request_snapshots
 scheduler_feedbacks
 audit_logs
 account_health_snapshots
@@ -1325,6 +1366,7 @@ account_group_members
 usage_logs
 scheduler_decisions
 scheduler_feedbacks
+scheduler_request_snapshots
 scheduler_strategies
 billing_ledger
 account_health_snapshots

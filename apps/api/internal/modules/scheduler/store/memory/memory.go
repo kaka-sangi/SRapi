@@ -15,8 +15,10 @@ import (
 type Store struct {
 	mu             sync.Mutex
 	nextDecisionID int
+	nextSnapshotID int
 	nextFeedbackID int
 	decisions      map[int]contract.Decision
+	snapshots      map[int]contract.RequestSnapshot
 	feedbacks      map[int]contract.Feedback
 	leases         map[string]contract.Lease
 	leaseByRequest map[string]string
@@ -25,8 +27,10 @@ type Store struct {
 func New() *Store {
 	return &Store{
 		nextDecisionID: 1,
+		nextSnapshotID: 1,
 		nextFeedbackID: 1,
 		decisions:      map[int]contract.Decision{},
+		snapshots:      map[int]contract.RequestSnapshot{},
 		feedbacks:      map[int]contract.Feedback{},
 		leases:         map[string]contract.Lease{},
 		leaseByRequest: map[string]string{},
@@ -36,6 +40,19 @@ func New() *Store {
 func (s *Store) CreateDecision(_ context.Context, input contract.Decision) (contract.Decision, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	decision := s.createDecisionLocked(input)
+	return cloneDecision(decision), nil
+}
+
+func (s *Store) CreateDecisionWithSnapshot(_ context.Context, input contract.Decision, snapshot contract.RequestSnapshot) (contract.Decision, contract.RequestSnapshot, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	decision := s.createDecisionLocked(input)
+	createdSnapshot := s.createSnapshotLocked(decision, snapshot)
+	return cloneDecision(decision), cloneSnapshot(createdSnapshot), nil
+}
+
+func (s *Store) createDecisionLocked(input contract.Decision) contract.Decision {
 	decision := cloneDecision(input)
 	decision.ID = s.nextDecisionID
 	if decision.AttemptNo == 0 {
@@ -46,7 +63,31 @@ func (s *Store) CreateDecision(_ context.Context, input contract.Decision) (cont
 	}
 	s.decisions[decision.ID] = decision
 	s.nextDecisionID++
-	return cloneDecision(decision), nil
+	return decision
+}
+
+func (s *Store) createSnapshotLocked(decision contract.Decision, input contract.RequestSnapshot) contract.RequestSnapshot {
+	snapshot := cloneSnapshot(input)
+	snapshot.ID = s.nextSnapshotID
+	snapshot.DecisionID = decision.ID
+	snapshot.RequestID = decision.RequestID
+	snapshot.AttemptNo = decision.AttemptNo
+	snapshot.SelectedAccountID = cloneInt(decision.SelectedAccountID)
+	snapshot.SelectedProviderID = cloneInt(decision.SelectedProviderID)
+	snapshot.Strategy = decision.Strategy
+	snapshot.StrategyVersion = decision.StrategyVersion
+	snapshot.StrategyConfigHash = decision.StrategyConfigHash
+	snapshot.StrategyWeights = cloneMap(decision.StrategyWeights)
+	snapshot.CompatibilityWarnings = cloneStrings(decision.CompatibilityWarnings)
+	if snapshot.CreatedAt.IsZero() {
+		snapshot.CreatedAt = decision.CreatedAt
+	}
+	if snapshot.CreatedAt.IsZero() {
+		snapshot.CreatedAt = time.Now().UTC()
+	}
+	s.snapshots[snapshot.ID] = snapshot
+	s.nextSnapshotID++
+	return snapshot
 }
 
 func (s *Store) ListDecisions(_ context.Context) ([]contract.Decision, error) {
@@ -55,6 +96,17 @@ func (s *Store) ListDecisions(_ context.Context) ([]contract.Decision, error) {
 	out := make([]contract.Decision, 0, len(s.decisions))
 	for _, decision := range s.decisions {
 		out = append(out, cloneDecision(decision))
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out, nil
+}
+
+func (s *Store) ListRequestSnapshots(_ context.Context) ([]contract.RequestSnapshot, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]contract.RequestSnapshot, 0, len(s.snapshots))
+	for _, snapshot := range s.snapshots {
+		out = append(out, cloneSnapshot(snapshot))
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
 	return out, nil
@@ -183,6 +235,26 @@ func cloneDecision(value contract.Decision) contract.Decision {
 	value.StrategyWeights = cloneMap(value.StrategyWeights)
 	value.CompatibilityWarnings = cloneStrings(value.CompatibilityWarnings)
 	return value
+}
+
+func cloneSnapshot(value contract.RequestSnapshot) contract.RequestSnapshot {
+	raw, err := json.Marshal(value)
+	if err != nil {
+		return contract.RequestSnapshot{}
+	}
+	var cloned contract.RequestSnapshot
+	if err := json.Unmarshal(raw, &cloned); err != nil {
+		return contract.RequestSnapshot{}
+	}
+	return cloned
+}
+
+func cloneInt(value *int) *int {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
 }
 
 func cloneLease(value contract.Lease) contract.Lease {

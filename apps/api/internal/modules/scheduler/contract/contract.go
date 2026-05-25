@@ -158,6 +158,49 @@ type ScheduleResult struct {
 	Lease      Lease
 }
 
+// RequestSnapshot persists a sanitized scheduler request profile and candidate set for replay.
+type RequestSnapshot struct {
+	ID                    int
+	RequestID             string
+	AttemptNo             int
+	DecisionID            int
+	RequestProfile        map[string]any
+	CandidateSnapshot     []CandidateSnapshot
+	RejectedSnapshot      map[string]any
+	RankedAccountIDs      []int
+	SelectedAccountID     *int
+	SelectedProviderID    *int
+	Strategy              StrategyName
+	StrategyVersion       string
+	StrategyConfigHash    string
+	StrategyWeights       map[string]any
+	CompatibilityWarnings []string
+	CreatedAt             time.Time
+}
+
+// CandidateSnapshot contains only scheduler-replay fields and never stores credentials.
+type CandidateSnapshot struct {
+	AccountID             int
+	ProviderID            int
+	MappingID             int
+	ModelID               int
+	RuntimeClass          string
+	AccountStatus         string
+	AccountWeight         float32
+	AccountRiskLevel      *string
+	AccountMetadata       map[string]any
+	ProviderProtocol      string
+	ProviderStatus        string
+	ProviderCapabilities  map[string]any
+	ProviderConfig        map[string]any
+	MappingStatus         string
+	UpstreamModelName     string
+	PricingOverride       map[string]any
+	EffectiveCapabilities []capabilitiescontract.Descriptor
+	RuntimeState          RuntimeState
+	Limits                RuntimeLimits
+}
+
 // StrategySimulationRequest compares two scheduler strategies against one request profile.
 type StrategySimulationRequest struct {
 	Request              ScheduleRequest
@@ -256,7 +299,9 @@ type RecordFeedbackRequest struct {
 
 type Store interface {
 	CreateDecision(ctx context.Context, input Decision) (Decision, error)
+	CreateDecisionWithSnapshot(ctx context.Context, decision Decision, snapshot RequestSnapshot) (Decision, RequestSnapshot, error)
 	ListDecisions(ctx context.Context) ([]Decision, error)
+	ListRequestSnapshots(ctx context.Context) ([]RequestSnapshot, error)
 	CreateFeedback(ctx context.Context, input Feedback) (Feedback, error)
 	ListFeedbacks(ctx context.Context) ([]Feedback, error)
 	ListActiveStrategies(ctx context.Context) ([]StrategyDescriptor, error)

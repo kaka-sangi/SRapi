@@ -298,6 +298,71 @@ func TestRoutingHintsAreRecordedWithoutLeakingAffinityKey(t *testing.T) {
 	}
 }
 
+func TestSchedulePersistsSanitizedRequestSnapshotForReplay(t *testing.T) {
+	svc := newService(t)
+	req := baseRequest()
+	req.SessionAffinityKey = "conversation-secret"
+	req.SessionAffinitySource = "header:x-srapi-session-affinity-key"
+	req.EstimatedInputTokens = 1000
+	req.EstimatedOutputTokens = 200
+	req.Candidates = []contract.Candidate{
+		candidate(1, withCapabilities(capabilitiescontract.KeyStreaming), withAccountMetadata(map[string]any{
+			"quality_score":          "0.93",
+			"access_token":           "leak",
+			"cached_token_estimate":  125,
+			"nested":                 map[string]any{"cookie": "leak", "cache_score": 0.7},
+			"device_fingerprint_key": "not-sensitive",
+		}), withProviderConfig(map[string]any{
+			"base_url": "https://provider.example",
+			"api_key":  "leak",
+		})),
+		candidate(2, withCircuitOpen(), withCapabilities(capabilitiescontract.KeyStreaming)),
+	}
+
+	result, err := svc.Schedule(context.Background(), req)
+	if err != nil {
+		t.Fatalf("schedule: %v", err)
+	}
+	snapshots, err := svc.ListRequestSnapshots(context.Background())
+	if err != nil {
+		t.Fatalf("list request snapshots: %v", err)
+	}
+	if len(snapshots) != 1 {
+		t.Fatalf("expected one request snapshot, got %+v", snapshots)
+	}
+	snapshot := snapshots[0]
+	if snapshot.DecisionID != result.Decision.ID || snapshot.RequestID != result.Decision.RequestID || snapshot.AttemptNo != result.Decision.AttemptNo {
+		t.Fatalf("expected snapshot to reference persisted decision, snapshot=%+v decision=%+v", snapshot, result.Decision)
+	}
+	if snapshot.RequestProfile["session_affinity_key"] != nil || snapshot.RequestProfile["session_affinity_key_hash"] == "conversation-secret" {
+		t.Fatalf("expected hashed affinity key only, got %+v", snapshot.RequestProfile)
+	}
+	hash, ok := snapshot.RequestProfile["session_affinity_key_hash"].(string)
+	if !ok || !strings.HasPrefix(hash, "sha256:") {
+		t.Fatalf("expected hashed affinity key, got %+v", snapshot.RequestProfile)
+	}
+	if len(snapshot.CandidateSnapshot) != 2 {
+		t.Fatalf("expected all request candidates in snapshot, got %+v", snapshot.CandidateSnapshot)
+	}
+	first := snapshot.CandidateSnapshot[0]
+	if first.AccountMetadata["access_token"] != nil {
+		t.Fatalf("expected access token stripped from account metadata, got %+v", first.AccountMetadata)
+	}
+	if first.AccountMetadata["quality_score"] != "0.93" || first.AccountMetadata["cached_token_estimate"].(float64) != 125 {
+		t.Fatalf("expected scoring metadata retained, got %+v", first.AccountMetadata)
+	}
+	nested, ok := first.AccountMetadata["nested"].(map[string]any)
+	if !ok || nested["cookie"] != nil || nested["cache_score"].(float64) != 0.7 {
+		t.Fatalf("expected nested sensitive metadata stripped only, got %+v", first.AccountMetadata)
+	}
+	if first.ProviderConfig["api_key"] != nil || first.ProviderConfig["base_url"] != "https://provider.example" {
+		t.Fatalf("expected provider config sanitized, got %+v", first.ProviderConfig)
+	}
+	if got := snapshot.RankedAccountIDs; len(got) != 1 || got[0] != result.Candidate.Account.ID {
+		t.Fatalf("expected ranked available account IDs, got %+v", got)
+	}
+}
+
 func TestCostSaverPrefersLowerRelativeCost(t *testing.T) {
 	svc := newService(t)
 	req := baseRequest()
@@ -786,6 +851,13 @@ func TestSimulateStrategyDoesNotPersistDecisionOrLease(t *testing.T) {
 	if len(leases) != 0 {
 		t.Fatalf("expected simulation to avoid leases, got %+v", leases)
 	}
+	snapshots, err := svc.ListRequestSnapshots(context.Background())
+	if err != nil {
+		t.Fatalf("list request snapshots: %v", err)
+	}
+	if len(snapshots) != 0 {
+		t.Fatalf("expected simulation to avoid request snapshots, got %+v", snapshots)
+	}
 }
 
 func TestSimulateStrategyReportsRejectedShadowWithoutLease(t *testing.T) {
@@ -1211,6 +1283,18 @@ func withProtectedAccount() candidateOption {
 			candidate.Account.Metadata = map[string]any{}
 		}
 		candidate.Account.Metadata["quota_protected"] = true
+	}
+}
+
+func withAccountMetadata(metadata map[string]any) candidateOption {
+	return func(candidate *contract.Candidate) {
+		candidate.Account.Metadata = metadata
+	}
+}
+
+func withProviderConfig(config map[string]any) candidateOption {
+	return func(candidate *contract.Candidate) {
+		candidate.Provider.ConfigSchema = config
 	}
 }
 

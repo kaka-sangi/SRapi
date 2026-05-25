@@ -86,6 +86,7 @@ func TestEntSchemaAppliesToEmptyDatabase(t *testing.T) {
 		"roles",
 		"scheduler_decisions",
 		"scheduler_feedbacks",
+		"scheduler_request_snapshots",
 		"scheduler_strategies",
 		"settings",
 		"subscription_plans",

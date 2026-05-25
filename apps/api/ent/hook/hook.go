@@ -393,6 +393,18 @@ func (f SchedulerFeedbackFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.SchedulerFeedbackMutation", m)
 }
 
+// The SchedulerRequestSnapshotFunc type is an adapter to allow the use of ordinary
+// function as SchedulerRequestSnapshot mutator.
+type SchedulerRequestSnapshotFunc func(context.Context, *ent.SchedulerRequestSnapshotMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f SchedulerRequestSnapshotFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.SchedulerRequestSnapshotMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.SchedulerRequestSnapshotMutation", m)
+}
+
 // The SchedulerStrategyFunc type is an adapter to allow the use of ordinary
 // function as SchedulerStrategy mutator.
 type SchedulerStrategyFunc func(context.Context, *ent.SchedulerStrategyMutation) (ent.Value, error)

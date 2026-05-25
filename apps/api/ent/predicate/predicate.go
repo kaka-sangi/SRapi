@@ -102,6 +102,9 @@ type SchedulerDecision func(*sql.Selector)
 // SchedulerFeedback is the predicate function for schedulerfeedback builders.
 type SchedulerFeedback func(*sql.Selector)
 
+// SchedulerRequestSnapshot is the predicate function for schedulerrequestsnapshot builders.
+type SchedulerRequestSnapshot func(*sql.Selector)
+
 // SchedulerStrategy is the predicate function for schedulerstrategy builders.
 type SchedulerStrategy func(*sql.Selector)
 

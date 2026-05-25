@@ -37,6 +37,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/role"
 	"github.com/srapi/srapi/apps/api/ent/schedulerdecision"
 	"github.com/srapi/srapi/apps/api/ent/schedulerfeedback"
+	"github.com/srapi/srapi/apps/api/ent/schedulerrequestsnapshot"
 	"github.com/srapi/srapi/apps/api/ent/schedulerstrategy"
 	"github.com/srapi/srapi/apps/api/ent/schema"
 	"github.com/srapi/srapi/apps/api/ent/setting"
@@ -1157,6 +1158,41 @@ func init() {
 	schedulerfeedbackDescCurrency := schedulerfeedbackFields[14].Descriptor()
 	// schedulerfeedback.DefaultCurrency holds the default value on creation for the currency field.
 	schedulerfeedback.DefaultCurrency = schedulerfeedbackDescCurrency.Default.(string)
+	schedulerrequestsnapshotMixin := schema.SchedulerRequestSnapshot{}.Mixin()
+	schedulerrequestsnapshotMixinFields0 := schedulerrequestsnapshotMixin[0].Fields()
+	_ = schedulerrequestsnapshotMixinFields0
+	schedulerrequestsnapshotFields := schema.SchedulerRequestSnapshot{}.Fields()
+	_ = schedulerrequestsnapshotFields
+	// schedulerrequestsnapshotDescCreatedAt is the schema descriptor for created_at field.
+	schedulerrequestsnapshotDescCreatedAt := schedulerrequestsnapshotMixinFields0[0].Descriptor()
+	// schedulerrequestsnapshot.DefaultCreatedAt holds the default value on creation for the created_at field.
+	schedulerrequestsnapshot.DefaultCreatedAt = schedulerrequestsnapshotDescCreatedAt.Default.(func() time.Time)
+	// schedulerrequestsnapshotDescUpdatedAt is the schema descriptor for updated_at field.
+	schedulerrequestsnapshotDescUpdatedAt := schedulerrequestsnapshotMixinFields0[1].Descriptor()
+	// schedulerrequestsnapshot.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	schedulerrequestsnapshot.DefaultUpdatedAt = schedulerrequestsnapshotDescUpdatedAt.Default.(func() time.Time)
+	// schedulerrequestsnapshot.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	schedulerrequestsnapshot.UpdateDefaultUpdatedAt = schedulerrequestsnapshotDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// schedulerrequestsnapshotDescRequestID is the schema descriptor for request_id field.
+	schedulerrequestsnapshotDescRequestID := schedulerrequestsnapshotFields[0].Descriptor()
+	// schedulerrequestsnapshot.RequestIDValidator is a validator for the "request_id" field. It is called by the builders before save.
+	schedulerrequestsnapshot.RequestIDValidator = schedulerrequestsnapshotDescRequestID.Validators[0].(func(string) error)
+	// schedulerrequestsnapshotDescAttemptNo is the schema descriptor for attempt_no field.
+	schedulerrequestsnapshotDescAttemptNo := schedulerrequestsnapshotFields[1].Descriptor()
+	// schedulerrequestsnapshot.DefaultAttemptNo holds the default value on creation for the attempt_no field.
+	schedulerrequestsnapshot.DefaultAttemptNo = schedulerrequestsnapshotDescAttemptNo.Default.(int)
+	// schedulerrequestsnapshotDescStrategy is the schema descriptor for strategy field.
+	schedulerrequestsnapshotDescStrategy := schedulerrequestsnapshotFields[9].Descriptor()
+	// schedulerrequestsnapshot.DefaultStrategy holds the default value on creation for the strategy field.
+	schedulerrequestsnapshot.DefaultStrategy = schedulerrequestsnapshotDescStrategy.Default.(string)
+	// schedulerrequestsnapshotDescStrategyVersion is the schema descriptor for strategy_version field.
+	schedulerrequestsnapshotDescStrategyVersion := schedulerrequestsnapshotFields[10].Descriptor()
+	// schedulerrequestsnapshot.DefaultStrategyVersion holds the default value on creation for the strategy_version field.
+	schedulerrequestsnapshot.DefaultStrategyVersion = schedulerrequestsnapshotDescStrategyVersion.Default.(string)
+	// schedulerrequestsnapshotDescStrategyConfigHash is the schema descriptor for strategy_config_hash field.
+	schedulerrequestsnapshotDescStrategyConfigHash := schedulerrequestsnapshotFields[11].Descriptor()
+	// schedulerrequestsnapshot.DefaultStrategyConfigHash holds the default value on creation for the strategy_config_hash field.
+	schedulerrequestsnapshot.DefaultStrategyConfigHash = schedulerrequestsnapshotDescStrategyConfigHash.Default.(string)
 	schedulerstrategyMixin := schema.SchedulerStrategy{}.Mixin()
 	schedulerstrategyMixinFields0 := schedulerstrategyMixin[0].Fields()
 	_ = schedulerstrategyMixinFields0

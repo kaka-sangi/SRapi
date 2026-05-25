@@ -76,6 +76,8 @@ type Tx struct {
 	SchedulerDecision *SchedulerDecisionClient
 	// SchedulerFeedback is the client for interacting with the SchedulerFeedback builders.
 	SchedulerFeedback *SchedulerFeedbackClient
+	// SchedulerRequestSnapshot is the client for interacting with the SchedulerRequestSnapshot builders.
+	SchedulerRequestSnapshot *SchedulerRequestSnapshotClient
 	// SchedulerStrategy is the client for interacting with the SchedulerStrategy builders.
 	SchedulerStrategy *SchedulerStrategyClient
 	// Setting is the client for interacting with the Setting builders.
@@ -253,6 +255,7 @@ func (tx *Tx) init() {
 	tx.Role = NewRoleClient(tx.config)
 	tx.SchedulerDecision = NewSchedulerDecisionClient(tx.config)
 	tx.SchedulerFeedback = NewSchedulerFeedbackClient(tx.config)
+	tx.SchedulerRequestSnapshot = NewSchedulerRequestSnapshotClient(tx.config)
 	tx.SchedulerStrategy = NewSchedulerStrategyClient(tx.config)
 	tx.Setting = NewSettingClient(tx.config)
 	tx.SubscriptionPlan = NewSubscriptionPlanClient(tx.config)

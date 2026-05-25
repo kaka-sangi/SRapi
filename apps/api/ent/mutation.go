@@ -44,6 +44,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/role"
 	"github.com/srapi/srapi/apps/api/ent/schedulerdecision"
 	"github.com/srapi/srapi/apps/api/ent/schedulerfeedback"
+	"github.com/srapi/srapi/apps/api/ent/schedulerrequestsnapshot"
 	"github.com/srapi/srapi/apps/api/ent/schedulerstrategy"
 	"github.com/srapi/srapi/apps/api/ent/setting"
 	"github.com/srapi/srapi/apps/api/ent/subscriptionplan"
@@ -62,45 +63,46 @@ const (
 	OpUpdateOne = ent.OpUpdateOne
 
 	// Node types.
-	TypeAPIKey                  = "APIKey"
-	TypeAPIKeyGroup             = "APIKeyGroup"
-	TypeAccountGroup            = "AccountGroup"
-	TypeAccountGroupMember      = "AccountGroupMember"
-	TypeAccountHealthSnapshot   = "AccountHealthSnapshot"
-	TypeAccountQuotaSnapshot    = "AccountQuotaSnapshot"
-	TypeAffiliateLedger         = "AffiliateLedger"
-	TypeAffiliateRule           = "AffiliateRule"
-	TypeAuditLog                = "AuditLog"
-	TypeAuthSession             = "AuthSession"
-	TypeBillingLedger           = "BillingLedger"
-	TypeCapabilityDefinition    = "CapabilityDefinition"
-	TypeDomainEventsInbox       = "DomainEventsInbox"
-	TypeDomainEventsOutbox      = "DomainEventsOutbox"
-	TypeIdempotencyRecord       = "IdempotencyRecord"
-	TypeInviteCode              = "InviteCode"
-	TypeInviteRelationship      = "InviteRelationship"
-	TypeModelAlias              = "ModelAlias"
-	TypeModelProviderMapping    = "ModelProviderMapping"
-	TypeModelRegistry           = "ModelRegistry"
-	TypeObsAlertEvent           = "ObsAlertEvent"
-	TypeObsSLODefinition        = "ObsSLODefinition"
-	TypePaymentAuditLog         = "PaymentAuditLog"
-	TypePaymentOrder            = "PaymentOrder"
-	TypePaymentProviderInstance = "PaymentProviderInstance"
-	TypePricingRule             = "PricingRule"
-	TypeProvider                = "Provider"
-	TypeProviderAccount         = "ProviderAccount"
-	TypeProxy                   = "Proxy"
-	TypeRole                    = "Role"
-	TypeSchedulerDecision       = "SchedulerDecision"
-	TypeSchedulerFeedback       = "SchedulerFeedback"
-	TypeSchedulerStrategy       = "SchedulerStrategy"
-	TypeSetting                 = "Setting"
-	TypeSubscriptionPlan        = "SubscriptionPlan"
-	TypeUsageLog                = "UsageLog"
-	TypeUser                    = "User"
-	TypeUserRole                = "UserRole"
-	TypeUserSubscription        = "UserSubscription"
+	TypeAPIKey                   = "APIKey"
+	TypeAPIKeyGroup              = "APIKeyGroup"
+	TypeAccountGroup             = "AccountGroup"
+	TypeAccountGroupMember       = "AccountGroupMember"
+	TypeAccountHealthSnapshot    = "AccountHealthSnapshot"
+	TypeAccountQuotaSnapshot     = "AccountQuotaSnapshot"
+	TypeAffiliateLedger          = "AffiliateLedger"
+	TypeAffiliateRule            = "AffiliateRule"
+	TypeAuditLog                 = "AuditLog"
+	TypeAuthSession              = "AuthSession"
+	TypeBillingLedger            = "BillingLedger"
+	TypeCapabilityDefinition     = "CapabilityDefinition"
+	TypeDomainEventsInbox        = "DomainEventsInbox"
+	TypeDomainEventsOutbox       = "DomainEventsOutbox"
+	TypeIdempotencyRecord        = "IdempotencyRecord"
+	TypeInviteCode               = "InviteCode"
+	TypeInviteRelationship       = "InviteRelationship"
+	TypeModelAlias               = "ModelAlias"
+	TypeModelProviderMapping     = "ModelProviderMapping"
+	TypeModelRegistry            = "ModelRegistry"
+	TypeObsAlertEvent            = "ObsAlertEvent"
+	TypeObsSLODefinition         = "ObsSLODefinition"
+	TypePaymentAuditLog          = "PaymentAuditLog"
+	TypePaymentOrder             = "PaymentOrder"
+	TypePaymentProviderInstance  = "PaymentProviderInstance"
+	TypePricingRule              = "PricingRule"
+	TypeProvider                 = "Provider"
+	TypeProviderAccount          = "ProviderAccount"
+	TypeProxy                    = "Proxy"
+	TypeRole                     = "Role"
+	TypeSchedulerDecision        = "SchedulerDecision"
+	TypeSchedulerFeedback        = "SchedulerFeedback"
+	TypeSchedulerRequestSnapshot = "SchedulerRequestSnapshot"
+	TypeSchedulerStrategy        = "SchedulerStrategy"
+	TypeSetting                  = "Setting"
+	TypeSubscriptionPlan         = "SubscriptionPlan"
+	TypeUsageLog                 = "UsageLog"
+	TypeUser                     = "User"
+	TypeUserRole                 = "UserRole"
+	TypeUserSubscription         = "UserSubscription"
 )
 
 // APIKeyMutation represents an operation that mutates the APIKey nodes in the graph.
@@ -31837,6 +31839,1485 @@ func (m *SchedulerFeedbackMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *SchedulerFeedbackMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown SchedulerFeedback edge %s", name)
+}
+
+// SchedulerRequestSnapshotMutation represents an operation that mutates the SchedulerRequestSnapshot nodes in the graph.
+type SchedulerRequestSnapshotMutation struct {
+	config
+	op                                Op
+	typ                               string
+	id                                *int
+	created_at                        *time.Time
+	updated_at                        *time.Time
+	request_id                        *string
+	attempt_no                        *int
+	addattempt_no                     *int
+	decision_id                       *int
+	adddecision_id                    *int
+	request_profile_json              *map[string]interface{}
+	candidate_snapshot_json           *[]map[string]interface{}
+	appendcandidate_snapshot_json     []map[string]interface{}
+	rejected_snapshot_json            *map[string]interface{}
+	ranked_account_ids_json           *[]int
+	appendranked_account_ids_json     []int
+	selected_account_id               *int
+	addselected_account_id            *int
+	selected_provider_id              *int
+	addselected_provider_id           *int
+	strategy                          *string
+	strategy_version                  *string
+	strategy_config_hash              *string
+	strategy_weights_json             *map[string]interface{}
+	compatibility_warnings_json       *[]string
+	appendcompatibility_warnings_json []string
+	clearedFields                     map[string]struct{}
+	done                              bool
+	oldValue                          func(context.Context) (*SchedulerRequestSnapshot, error)
+	predicates                        []predicate.SchedulerRequestSnapshot
+}
+
+var _ ent.Mutation = (*SchedulerRequestSnapshotMutation)(nil)
+
+// schedulerrequestsnapshotOption allows management of the mutation configuration using functional options.
+type schedulerrequestsnapshotOption func(*SchedulerRequestSnapshotMutation)
+
+// newSchedulerRequestSnapshotMutation creates new mutation for the SchedulerRequestSnapshot entity.
+func newSchedulerRequestSnapshotMutation(c config, op Op, opts ...schedulerrequestsnapshotOption) *SchedulerRequestSnapshotMutation {
+	m := &SchedulerRequestSnapshotMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeSchedulerRequestSnapshot,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withSchedulerRequestSnapshotID sets the ID field of the mutation.
+func withSchedulerRequestSnapshotID(id int) schedulerrequestsnapshotOption {
+	return func(m *SchedulerRequestSnapshotMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *SchedulerRequestSnapshot
+		)
+		m.oldValue = func(ctx context.Context) (*SchedulerRequestSnapshot, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().SchedulerRequestSnapshot.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withSchedulerRequestSnapshot sets the old SchedulerRequestSnapshot of the mutation.
+func withSchedulerRequestSnapshot(node *SchedulerRequestSnapshot) schedulerrequestsnapshotOption {
+	return func(m *SchedulerRequestSnapshotMutation) {
+		m.oldValue = func(context.Context) (*SchedulerRequestSnapshot, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m SchedulerRequestSnapshotMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m SchedulerRequestSnapshotMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *SchedulerRequestSnapshotMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *SchedulerRequestSnapshotMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().SchedulerRequestSnapshot.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *SchedulerRequestSnapshotMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *SchedulerRequestSnapshotMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the SchedulerRequestSnapshot entity.
+// If the SchedulerRequestSnapshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SchedulerRequestSnapshotMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *SchedulerRequestSnapshotMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *SchedulerRequestSnapshotMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *SchedulerRequestSnapshotMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the SchedulerRequestSnapshot entity.
+// If the SchedulerRequestSnapshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SchedulerRequestSnapshotMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *SchedulerRequestSnapshotMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetRequestID sets the "request_id" field.
+func (m *SchedulerRequestSnapshotMutation) SetRequestID(s string) {
+	m.request_id = &s
+}
+
+// RequestID returns the value of the "request_id" field in the mutation.
+func (m *SchedulerRequestSnapshotMutation) RequestID() (r string, exists bool) {
+	v := m.request_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRequestID returns the old "request_id" field's value of the SchedulerRequestSnapshot entity.
+// If the SchedulerRequestSnapshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SchedulerRequestSnapshotMutation) OldRequestID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRequestID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRequestID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRequestID: %w", err)
+	}
+	return oldValue.RequestID, nil
+}
+
+// ResetRequestID resets all changes to the "request_id" field.
+func (m *SchedulerRequestSnapshotMutation) ResetRequestID() {
+	m.request_id = nil
+}
+
+// SetAttemptNo sets the "attempt_no" field.
+func (m *SchedulerRequestSnapshotMutation) SetAttemptNo(i int) {
+	m.attempt_no = &i
+	m.addattempt_no = nil
+}
+
+// AttemptNo returns the value of the "attempt_no" field in the mutation.
+func (m *SchedulerRequestSnapshotMutation) AttemptNo() (r int, exists bool) {
+	v := m.attempt_no
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAttemptNo returns the old "attempt_no" field's value of the SchedulerRequestSnapshot entity.
+// If the SchedulerRequestSnapshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SchedulerRequestSnapshotMutation) OldAttemptNo(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAttemptNo is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAttemptNo requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAttemptNo: %w", err)
+	}
+	return oldValue.AttemptNo, nil
+}
+
+// AddAttemptNo adds i to the "attempt_no" field.
+func (m *SchedulerRequestSnapshotMutation) AddAttemptNo(i int) {
+	if m.addattempt_no != nil {
+		*m.addattempt_no += i
+	} else {
+		m.addattempt_no = &i
+	}
+}
+
+// AddedAttemptNo returns the value that was added to the "attempt_no" field in this mutation.
+func (m *SchedulerRequestSnapshotMutation) AddedAttemptNo() (r int, exists bool) {
+	v := m.addattempt_no
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetAttemptNo resets all changes to the "attempt_no" field.
+func (m *SchedulerRequestSnapshotMutation) ResetAttemptNo() {
+	m.attempt_no = nil
+	m.addattempt_no = nil
+}
+
+// SetDecisionID sets the "decision_id" field.
+func (m *SchedulerRequestSnapshotMutation) SetDecisionID(i int) {
+	m.decision_id = &i
+	m.adddecision_id = nil
+}
+
+// DecisionID returns the value of the "decision_id" field in the mutation.
+func (m *SchedulerRequestSnapshotMutation) DecisionID() (r int, exists bool) {
+	v := m.decision_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDecisionID returns the old "decision_id" field's value of the SchedulerRequestSnapshot entity.
+// If the SchedulerRequestSnapshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SchedulerRequestSnapshotMutation) OldDecisionID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDecisionID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDecisionID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDecisionID: %w", err)
+	}
+	return oldValue.DecisionID, nil
+}
+
+// AddDecisionID adds i to the "decision_id" field.
+func (m *SchedulerRequestSnapshotMutation) AddDecisionID(i int) {
+	if m.adddecision_id != nil {
+		*m.adddecision_id += i
+	} else {
+		m.adddecision_id = &i
+	}
+}
+
+// AddedDecisionID returns the value that was added to the "decision_id" field in this mutation.
+func (m *SchedulerRequestSnapshotMutation) AddedDecisionID() (r int, exists bool) {
+	v := m.adddecision_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetDecisionID resets all changes to the "decision_id" field.
+func (m *SchedulerRequestSnapshotMutation) ResetDecisionID() {
+	m.decision_id = nil
+	m.adddecision_id = nil
+}
+
+// SetRequestProfileJSON sets the "request_profile_json" field.
+func (m *SchedulerRequestSnapshotMutation) SetRequestProfileJSON(value map[string]interface{}) {
+	m.request_profile_json = &value
+}
+
+// RequestProfileJSON returns the value of the "request_profile_json" field in the mutation.
+func (m *SchedulerRequestSnapshotMutation) RequestProfileJSON() (r map[string]interface{}, exists bool) {
+	v := m.request_profile_json
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRequestProfileJSON returns the old "request_profile_json" field's value of the SchedulerRequestSnapshot entity.
+// If the SchedulerRequestSnapshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SchedulerRequestSnapshotMutation) OldRequestProfileJSON(ctx context.Context) (v map[string]interface{}, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRequestProfileJSON is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRequestProfileJSON requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRequestProfileJSON: %w", err)
+	}
+	return oldValue.RequestProfileJSON, nil
+}
+
+// ClearRequestProfileJSON clears the value of the "request_profile_json" field.
+func (m *SchedulerRequestSnapshotMutation) ClearRequestProfileJSON() {
+	m.request_profile_json = nil
+	m.clearedFields[schedulerrequestsnapshot.FieldRequestProfileJSON] = struct{}{}
+}
+
+// RequestProfileJSONCleared returns if the "request_profile_json" field was cleared in this mutation.
+func (m *SchedulerRequestSnapshotMutation) RequestProfileJSONCleared() bool {
+	_, ok := m.clearedFields[schedulerrequestsnapshot.FieldRequestProfileJSON]
+	return ok
+}
+
+// ResetRequestProfileJSON resets all changes to the "request_profile_json" field.
+func (m *SchedulerRequestSnapshotMutation) ResetRequestProfileJSON() {
+	m.request_profile_json = nil
+	delete(m.clearedFields, schedulerrequestsnapshot.FieldRequestProfileJSON)
+}
+
+// SetCandidateSnapshotJSON sets the "candidate_snapshot_json" field.
+func (m *SchedulerRequestSnapshotMutation) SetCandidateSnapshotJSON(value []map[string]interface{}) {
+	m.candidate_snapshot_json = &value
+	m.appendcandidate_snapshot_json = nil
+}
+
+// CandidateSnapshotJSON returns the value of the "candidate_snapshot_json" field in the mutation.
+func (m *SchedulerRequestSnapshotMutation) CandidateSnapshotJSON() (r []map[string]interface{}, exists bool) {
+	v := m.candidate_snapshot_json
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCandidateSnapshotJSON returns the old "candidate_snapshot_json" field's value of the SchedulerRequestSnapshot entity.
+// If the SchedulerRequestSnapshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SchedulerRequestSnapshotMutation) OldCandidateSnapshotJSON(ctx context.Context) (v []map[string]interface{}, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCandidateSnapshotJSON is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCandidateSnapshotJSON requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCandidateSnapshotJSON: %w", err)
+	}
+	return oldValue.CandidateSnapshotJSON, nil
+}
+
+// AppendCandidateSnapshotJSON adds value to the "candidate_snapshot_json" field.
+func (m *SchedulerRequestSnapshotMutation) AppendCandidateSnapshotJSON(value []map[string]interface{}) {
+	m.appendcandidate_snapshot_json = append(m.appendcandidate_snapshot_json, value...)
+}
+
+// AppendedCandidateSnapshotJSON returns the list of values that were appended to the "candidate_snapshot_json" field in this mutation.
+func (m *SchedulerRequestSnapshotMutation) AppendedCandidateSnapshotJSON() ([]map[string]interface{}, bool) {
+	if len(m.appendcandidate_snapshot_json) == 0 {
+		return nil, false
+	}
+	return m.appendcandidate_snapshot_json, true
+}
+
+// ClearCandidateSnapshotJSON clears the value of the "candidate_snapshot_json" field.
+func (m *SchedulerRequestSnapshotMutation) ClearCandidateSnapshotJSON() {
+	m.candidate_snapshot_json = nil
+	m.appendcandidate_snapshot_json = nil
+	m.clearedFields[schedulerrequestsnapshot.FieldCandidateSnapshotJSON] = struct{}{}
+}
+
+// CandidateSnapshotJSONCleared returns if the "candidate_snapshot_json" field was cleared in this mutation.
+func (m *SchedulerRequestSnapshotMutation) CandidateSnapshotJSONCleared() bool {
+	_, ok := m.clearedFields[schedulerrequestsnapshot.FieldCandidateSnapshotJSON]
+	return ok
+}
+
+// ResetCandidateSnapshotJSON resets all changes to the "candidate_snapshot_json" field.
+func (m *SchedulerRequestSnapshotMutation) ResetCandidateSnapshotJSON() {
+	m.candidate_snapshot_json = nil
+	m.appendcandidate_snapshot_json = nil
+	delete(m.clearedFields, schedulerrequestsnapshot.FieldCandidateSnapshotJSON)
+}
+
+// SetRejectedSnapshotJSON sets the "rejected_snapshot_json" field.
+func (m *SchedulerRequestSnapshotMutation) SetRejectedSnapshotJSON(value map[string]interface{}) {
+	m.rejected_snapshot_json = &value
+}
+
+// RejectedSnapshotJSON returns the value of the "rejected_snapshot_json" field in the mutation.
+func (m *SchedulerRequestSnapshotMutation) RejectedSnapshotJSON() (r map[string]interface{}, exists bool) {
+	v := m.rejected_snapshot_json
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRejectedSnapshotJSON returns the old "rejected_snapshot_json" field's value of the SchedulerRequestSnapshot entity.
+// If the SchedulerRequestSnapshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SchedulerRequestSnapshotMutation) OldRejectedSnapshotJSON(ctx context.Context) (v map[string]interface{}, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRejectedSnapshotJSON is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRejectedSnapshotJSON requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRejectedSnapshotJSON: %w", err)
+	}
+	return oldValue.RejectedSnapshotJSON, nil
+}
+
+// ClearRejectedSnapshotJSON clears the value of the "rejected_snapshot_json" field.
+func (m *SchedulerRequestSnapshotMutation) ClearRejectedSnapshotJSON() {
+	m.rejected_snapshot_json = nil
+	m.clearedFields[schedulerrequestsnapshot.FieldRejectedSnapshotJSON] = struct{}{}
+}
+
+// RejectedSnapshotJSONCleared returns if the "rejected_snapshot_json" field was cleared in this mutation.
+func (m *SchedulerRequestSnapshotMutation) RejectedSnapshotJSONCleared() bool {
+	_, ok := m.clearedFields[schedulerrequestsnapshot.FieldRejectedSnapshotJSON]
+	return ok
+}
+
+// ResetRejectedSnapshotJSON resets all changes to the "rejected_snapshot_json" field.
+func (m *SchedulerRequestSnapshotMutation) ResetRejectedSnapshotJSON() {
+	m.rejected_snapshot_json = nil
+	delete(m.clearedFields, schedulerrequestsnapshot.FieldRejectedSnapshotJSON)
+}
+
+// SetRankedAccountIdsJSON sets the "ranked_account_ids_json" field.
+func (m *SchedulerRequestSnapshotMutation) SetRankedAccountIdsJSON(i []int) {
+	m.ranked_account_ids_json = &i
+	m.appendranked_account_ids_json = nil
+}
+
+// RankedAccountIdsJSON returns the value of the "ranked_account_ids_json" field in the mutation.
+func (m *SchedulerRequestSnapshotMutation) RankedAccountIdsJSON() (r []int, exists bool) {
+	v := m.ranked_account_ids_json
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRankedAccountIdsJSON returns the old "ranked_account_ids_json" field's value of the SchedulerRequestSnapshot entity.
+// If the SchedulerRequestSnapshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SchedulerRequestSnapshotMutation) OldRankedAccountIdsJSON(ctx context.Context) (v []int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRankedAccountIdsJSON is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRankedAccountIdsJSON requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRankedAccountIdsJSON: %w", err)
+	}
+	return oldValue.RankedAccountIdsJSON, nil
+}
+
+// AppendRankedAccountIdsJSON adds i to the "ranked_account_ids_json" field.
+func (m *SchedulerRequestSnapshotMutation) AppendRankedAccountIdsJSON(i []int) {
+	m.appendranked_account_ids_json = append(m.appendranked_account_ids_json, i...)
+}
+
+// AppendedRankedAccountIdsJSON returns the list of values that were appended to the "ranked_account_ids_json" field in this mutation.
+func (m *SchedulerRequestSnapshotMutation) AppendedRankedAccountIdsJSON() ([]int, bool) {
+	if len(m.appendranked_account_ids_json) == 0 {
+		return nil, false
+	}
+	return m.appendranked_account_ids_json, true
+}
+
+// ClearRankedAccountIdsJSON clears the value of the "ranked_account_ids_json" field.
+func (m *SchedulerRequestSnapshotMutation) ClearRankedAccountIdsJSON() {
+	m.ranked_account_ids_json = nil
+	m.appendranked_account_ids_json = nil
+	m.clearedFields[schedulerrequestsnapshot.FieldRankedAccountIdsJSON] = struct{}{}
+}
+
+// RankedAccountIdsJSONCleared returns if the "ranked_account_ids_json" field was cleared in this mutation.
+func (m *SchedulerRequestSnapshotMutation) RankedAccountIdsJSONCleared() bool {
+	_, ok := m.clearedFields[schedulerrequestsnapshot.FieldRankedAccountIdsJSON]
+	return ok
+}
+
+// ResetRankedAccountIdsJSON resets all changes to the "ranked_account_ids_json" field.
+func (m *SchedulerRequestSnapshotMutation) ResetRankedAccountIdsJSON() {
+	m.ranked_account_ids_json = nil
+	m.appendranked_account_ids_json = nil
+	delete(m.clearedFields, schedulerrequestsnapshot.FieldRankedAccountIdsJSON)
+}
+
+// SetSelectedAccountID sets the "selected_account_id" field.
+func (m *SchedulerRequestSnapshotMutation) SetSelectedAccountID(i int) {
+	m.selected_account_id = &i
+	m.addselected_account_id = nil
+}
+
+// SelectedAccountID returns the value of the "selected_account_id" field in the mutation.
+func (m *SchedulerRequestSnapshotMutation) SelectedAccountID() (r int, exists bool) {
+	v := m.selected_account_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSelectedAccountID returns the old "selected_account_id" field's value of the SchedulerRequestSnapshot entity.
+// If the SchedulerRequestSnapshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SchedulerRequestSnapshotMutation) OldSelectedAccountID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSelectedAccountID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSelectedAccountID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSelectedAccountID: %w", err)
+	}
+	return oldValue.SelectedAccountID, nil
+}
+
+// AddSelectedAccountID adds i to the "selected_account_id" field.
+func (m *SchedulerRequestSnapshotMutation) AddSelectedAccountID(i int) {
+	if m.addselected_account_id != nil {
+		*m.addselected_account_id += i
+	} else {
+		m.addselected_account_id = &i
+	}
+}
+
+// AddedSelectedAccountID returns the value that was added to the "selected_account_id" field in this mutation.
+func (m *SchedulerRequestSnapshotMutation) AddedSelectedAccountID() (r int, exists bool) {
+	v := m.addselected_account_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearSelectedAccountID clears the value of the "selected_account_id" field.
+func (m *SchedulerRequestSnapshotMutation) ClearSelectedAccountID() {
+	m.selected_account_id = nil
+	m.addselected_account_id = nil
+	m.clearedFields[schedulerrequestsnapshot.FieldSelectedAccountID] = struct{}{}
+}
+
+// SelectedAccountIDCleared returns if the "selected_account_id" field was cleared in this mutation.
+func (m *SchedulerRequestSnapshotMutation) SelectedAccountIDCleared() bool {
+	_, ok := m.clearedFields[schedulerrequestsnapshot.FieldSelectedAccountID]
+	return ok
+}
+
+// ResetSelectedAccountID resets all changes to the "selected_account_id" field.
+func (m *SchedulerRequestSnapshotMutation) ResetSelectedAccountID() {
+	m.selected_account_id = nil
+	m.addselected_account_id = nil
+	delete(m.clearedFields, schedulerrequestsnapshot.FieldSelectedAccountID)
+}
+
+// SetSelectedProviderID sets the "selected_provider_id" field.
+func (m *SchedulerRequestSnapshotMutation) SetSelectedProviderID(i int) {
+	m.selected_provider_id = &i
+	m.addselected_provider_id = nil
+}
+
+// SelectedProviderID returns the value of the "selected_provider_id" field in the mutation.
+func (m *SchedulerRequestSnapshotMutation) SelectedProviderID() (r int, exists bool) {
+	v := m.selected_provider_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSelectedProviderID returns the old "selected_provider_id" field's value of the SchedulerRequestSnapshot entity.
+// If the SchedulerRequestSnapshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SchedulerRequestSnapshotMutation) OldSelectedProviderID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSelectedProviderID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSelectedProviderID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSelectedProviderID: %w", err)
+	}
+	return oldValue.SelectedProviderID, nil
+}
+
+// AddSelectedProviderID adds i to the "selected_provider_id" field.
+func (m *SchedulerRequestSnapshotMutation) AddSelectedProviderID(i int) {
+	if m.addselected_provider_id != nil {
+		*m.addselected_provider_id += i
+	} else {
+		m.addselected_provider_id = &i
+	}
+}
+
+// AddedSelectedProviderID returns the value that was added to the "selected_provider_id" field in this mutation.
+func (m *SchedulerRequestSnapshotMutation) AddedSelectedProviderID() (r int, exists bool) {
+	v := m.addselected_provider_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearSelectedProviderID clears the value of the "selected_provider_id" field.
+func (m *SchedulerRequestSnapshotMutation) ClearSelectedProviderID() {
+	m.selected_provider_id = nil
+	m.addselected_provider_id = nil
+	m.clearedFields[schedulerrequestsnapshot.FieldSelectedProviderID] = struct{}{}
+}
+
+// SelectedProviderIDCleared returns if the "selected_provider_id" field was cleared in this mutation.
+func (m *SchedulerRequestSnapshotMutation) SelectedProviderIDCleared() bool {
+	_, ok := m.clearedFields[schedulerrequestsnapshot.FieldSelectedProviderID]
+	return ok
+}
+
+// ResetSelectedProviderID resets all changes to the "selected_provider_id" field.
+func (m *SchedulerRequestSnapshotMutation) ResetSelectedProviderID() {
+	m.selected_provider_id = nil
+	m.addselected_provider_id = nil
+	delete(m.clearedFields, schedulerrequestsnapshot.FieldSelectedProviderID)
+}
+
+// SetStrategy sets the "strategy" field.
+func (m *SchedulerRequestSnapshotMutation) SetStrategy(s string) {
+	m.strategy = &s
+}
+
+// Strategy returns the value of the "strategy" field in the mutation.
+func (m *SchedulerRequestSnapshotMutation) Strategy() (r string, exists bool) {
+	v := m.strategy
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStrategy returns the old "strategy" field's value of the SchedulerRequestSnapshot entity.
+// If the SchedulerRequestSnapshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SchedulerRequestSnapshotMutation) OldStrategy(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStrategy is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStrategy requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStrategy: %w", err)
+	}
+	return oldValue.Strategy, nil
+}
+
+// ResetStrategy resets all changes to the "strategy" field.
+func (m *SchedulerRequestSnapshotMutation) ResetStrategy() {
+	m.strategy = nil
+}
+
+// SetStrategyVersion sets the "strategy_version" field.
+func (m *SchedulerRequestSnapshotMutation) SetStrategyVersion(s string) {
+	m.strategy_version = &s
+}
+
+// StrategyVersion returns the value of the "strategy_version" field in the mutation.
+func (m *SchedulerRequestSnapshotMutation) StrategyVersion() (r string, exists bool) {
+	v := m.strategy_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStrategyVersion returns the old "strategy_version" field's value of the SchedulerRequestSnapshot entity.
+// If the SchedulerRequestSnapshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SchedulerRequestSnapshotMutation) OldStrategyVersion(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStrategyVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStrategyVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStrategyVersion: %w", err)
+	}
+	return oldValue.StrategyVersion, nil
+}
+
+// ResetStrategyVersion resets all changes to the "strategy_version" field.
+func (m *SchedulerRequestSnapshotMutation) ResetStrategyVersion() {
+	m.strategy_version = nil
+}
+
+// SetStrategyConfigHash sets the "strategy_config_hash" field.
+func (m *SchedulerRequestSnapshotMutation) SetStrategyConfigHash(s string) {
+	m.strategy_config_hash = &s
+}
+
+// StrategyConfigHash returns the value of the "strategy_config_hash" field in the mutation.
+func (m *SchedulerRequestSnapshotMutation) StrategyConfigHash() (r string, exists bool) {
+	v := m.strategy_config_hash
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStrategyConfigHash returns the old "strategy_config_hash" field's value of the SchedulerRequestSnapshot entity.
+// If the SchedulerRequestSnapshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SchedulerRequestSnapshotMutation) OldStrategyConfigHash(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStrategyConfigHash is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStrategyConfigHash requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStrategyConfigHash: %w", err)
+	}
+	return oldValue.StrategyConfigHash, nil
+}
+
+// ResetStrategyConfigHash resets all changes to the "strategy_config_hash" field.
+func (m *SchedulerRequestSnapshotMutation) ResetStrategyConfigHash() {
+	m.strategy_config_hash = nil
+}
+
+// SetStrategyWeightsJSON sets the "strategy_weights_json" field.
+func (m *SchedulerRequestSnapshotMutation) SetStrategyWeightsJSON(value map[string]interface{}) {
+	m.strategy_weights_json = &value
+}
+
+// StrategyWeightsJSON returns the value of the "strategy_weights_json" field in the mutation.
+func (m *SchedulerRequestSnapshotMutation) StrategyWeightsJSON() (r map[string]interface{}, exists bool) {
+	v := m.strategy_weights_json
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStrategyWeightsJSON returns the old "strategy_weights_json" field's value of the SchedulerRequestSnapshot entity.
+// If the SchedulerRequestSnapshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SchedulerRequestSnapshotMutation) OldStrategyWeightsJSON(ctx context.Context) (v map[string]interface{}, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStrategyWeightsJSON is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStrategyWeightsJSON requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStrategyWeightsJSON: %w", err)
+	}
+	return oldValue.StrategyWeightsJSON, nil
+}
+
+// ClearStrategyWeightsJSON clears the value of the "strategy_weights_json" field.
+func (m *SchedulerRequestSnapshotMutation) ClearStrategyWeightsJSON() {
+	m.strategy_weights_json = nil
+	m.clearedFields[schedulerrequestsnapshot.FieldStrategyWeightsJSON] = struct{}{}
+}
+
+// StrategyWeightsJSONCleared returns if the "strategy_weights_json" field was cleared in this mutation.
+func (m *SchedulerRequestSnapshotMutation) StrategyWeightsJSONCleared() bool {
+	_, ok := m.clearedFields[schedulerrequestsnapshot.FieldStrategyWeightsJSON]
+	return ok
+}
+
+// ResetStrategyWeightsJSON resets all changes to the "strategy_weights_json" field.
+func (m *SchedulerRequestSnapshotMutation) ResetStrategyWeightsJSON() {
+	m.strategy_weights_json = nil
+	delete(m.clearedFields, schedulerrequestsnapshot.FieldStrategyWeightsJSON)
+}
+
+// SetCompatibilityWarningsJSON sets the "compatibility_warnings_json" field.
+func (m *SchedulerRequestSnapshotMutation) SetCompatibilityWarningsJSON(s []string) {
+	m.compatibility_warnings_json = &s
+	m.appendcompatibility_warnings_json = nil
+}
+
+// CompatibilityWarningsJSON returns the value of the "compatibility_warnings_json" field in the mutation.
+func (m *SchedulerRequestSnapshotMutation) CompatibilityWarningsJSON() (r []string, exists bool) {
+	v := m.compatibility_warnings_json
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCompatibilityWarningsJSON returns the old "compatibility_warnings_json" field's value of the SchedulerRequestSnapshot entity.
+// If the SchedulerRequestSnapshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SchedulerRequestSnapshotMutation) OldCompatibilityWarningsJSON(ctx context.Context) (v []string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCompatibilityWarningsJSON is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCompatibilityWarningsJSON requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCompatibilityWarningsJSON: %w", err)
+	}
+	return oldValue.CompatibilityWarningsJSON, nil
+}
+
+// AppendCompatibilityWarningsJSON adds s to the "compatibility_warnings_json" field.
+func (m *SchedulerRequestSnapshotMutation) AppendCompatibilityWarningsJSON(s []string) {
+	m.appendcompatibility_warnings_json = append(m.appendcompatibility_warnings_json, s...)
+}
+
+// AppendedCompatibilityWarningsJSON returns the list of values that were appended to the "compatibility_warnings_json" field in this mutation.
+func (m *SchedulerRequestSnapshotMutation) AppendedCompatibilityWarningsJSON() ([]string, bool) {
+	if len(m.appendcompatibility_warnings_json) == 0 {
+		return nil, false
+	}
+	return m.appendcompatibility_warnings_json, true
+}
+
+// ClearCompatibilityWarningsJSON clears the value of the "compatibility_warnings_json" field.
+func (m *SchedulerRequestSnapshotMutation) ClearCompatibilityWarningsJSON() {
+	m.compatibility_warnings_json = nil
+	m.appendcompatibility_warnings_json = nil
+	m.clearedFields[schedulerrequestsnapshot.FieldCompatibilityWarningsJSON] = struct{}{}
+}
+
+// CompatibilityWarningsJSONCleared returns if the "compatibility_warnings_json" field was cleared in this mutation.
+func (m *SchedulerRequestSnapshotMutation) CompatibilityWarningsJSONCleared() bool {
+	_, ok := m.clearedFields[schedulerrequestsnapshot.FieldCompatibilityWarningsJSON]
+	return ok
+}
+
+// ResetCompatibilityWarningsJSON resets all changes to the "compatibility_warnings_json" field.
+func (m *SchedulerRequestSnapshotMutation) ResetCompatibilityWarningsJSON() {
+	m.compatibility_warnings_json = nil
+	m.appendcompatibility_warnings_json = nil
+	delete(m.clearedFields, schedulerrequestsnapshot.FieldCompatibilityWarningsJSON)
+}
+
+// Where appends a list predicates to the SchedulerRequestSnapshotMutation builder.
+func (m *SchedulerRequestSnapshotMutation) Where(ps ...predicate.SchedulerRequestSnapshot) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the SchedulerRequestSnapshotMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *SchedulerRequestSnapshotMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.SchedulerRequestSnapshot, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *SchedulerRequestSnapshotMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *SchedulerRequestSnapshotMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (SchedulerRequestSnapshot).
+func (m *SchedulerRequestSnapshotMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *SchedulerRequestSnapshotMutation) Fields() []string {
+	fields := make([]string, 0, 16)
+	if m.created_at != nil {
+		fields = append(fields, schedulerrequestsnapshot.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, schedulerrequestsnapshot.FieldUpdatedAt)
+	}
+	if m.request_id != nil {
+		fields = append(fields, schedulerrequestsnapshot.FieldRequestID)
+	}
+	if m.attempt_no != nil {
+		fields = append(fields, schedulerrequestsnapshot.FieldAttemptNo)
+	}
+	if m.decision_id != nil {
+		fields = append(fields, schedulerrequestsnapshot.FieldDecisionID)
+	}
+	if m.request_profile_json != nil {
+		fields = append(fields, schedulerrequestsnapshot.FieldRequestProfileJSON)
+	}
+	if m.candidate_snapshot_json != nil {
+		fields = append(fields, schedulerrequestsnapshot.FieldCandidateSnapshotJSON)
+	}
+	if m.rejected_snapshot_json != nil {
+		fields = append(fields, schedulerrequestsnapshot.FieldRejectedSnapshotJSON)
+	}
+	if m.ranked_account_ids_json != nil {
+		fields = append(fields, schedulerrequestsnapshot.FieldRankedAccountIdsJSON)
+	}
+	if m.selected_account_id != nil {
+		fields = append(fields, schedulerrequestsnapshot.FieldSelectedAccountID)
+	}
+	if m.selected_provider_id != nil {
+		fields = append(fields, schedulerrequestsnapshot.FieldSelectedProviderID)
+	}
+	if m.strategy != nil {
+		fields = append(fields, schedulerrequestsnapshot.FieldStrategy)
+	}
+	if m.strategy_version != nil {
+		fields = append(fields, schedulerrequestsnapshot.FieldStrategyVersion)
+	}
+	if m.strategy_config_hash != nil {
+		fields = append(fields, schedulerrequestsnapshot.FieldStrategyConfigHash)
+	}
+	if m.strategy_weights_json != nil {
+		fields = append(fields, schedulerrequestsnapshot.FieldStrategyWeightsJSON)
+	}
+	if m.compatibility_warnings_json != nil {
+		fields = append(fields, schedulerrequestsnapshot.FieldCompatibilityWarningsJSON)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *SchedulerRequestSnapshotMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case schedulerrequestsnapshot.FieldCreatedAt:
+		return m.CreatedAt()
+	case schedulerrequestsnapshot.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case schedulerrequestsnapshot.FieldRequestID:
+		return m.RequestID()
+	case schedulerrequestsnapshot.FieldAttemptNo:
+		return m.AttemptNo()
+	case schedulerrequestsnapshot.FieldDecisionID:
+		return m.DecisionID()
+	case schedulerrequestsnapshot.FieldRequestProfileJSON:
+		return m.RequestProfileJSON()
+	case schedulerrequestsnapshot.FieldCandidateSnapshotJSON:
+		return m.CandidateSnapshotJSON()
+	case schedulerrequestsnapshot.FieldRejectedSnapshotJSON:
+		return m.RejectedSnapshotJSON()
+	case schedulerrequestsnapshot.FieldRankedAccountIdsJSON:
+		return m.RankedAccountIdsJSON()
+	case schedulerrequestsnapshot.FieldSelectedAccountID:
+		return m.SelectedAccountID()
+	case schedulerrequestsnapshot.FieldSelectedProviderID:
+		return m.SelectedProviderID()
+	case schedulerrequestsnapshot.FieldStrategy:
+		return m.Strategy()
+	case schedulerrequestsnapshot.FieldStrategyVersion:
+		return m.StrategyVersion()
+	case schedulerrequestsnapshot.FieldStrategyConfigHash:
+		return m.StrategyConfigHash()
+	case schedulerrequestsnapshot.FieldStrategyWeightsJSON:
+		return m.StrategyWeightsJSON()
+	case schedulerrequestsnapshot.FieldCompatibilityWarningsJSON:
+		return m.CompatibilityWarningsJSON()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *SchedulerRequestSnapshotMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case schedulerrequestsnapshot.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case schedulerrequestsnapshot.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case schedulerrequestsnapshot.FieldRequestID:
+		return m.OldRequestID(ctx)
+	case schedulerrequestsnapshot.FieldAttemptNo:
+		return m.OldAttemptNo(ctx)
+	case schedulerrequestsnapshot.FieldDecisionID:
+		return m.OldDecisionID(ctx)
+	case schedulerrequestsnapshot.FieldRequestProfileJSON:
+		return m.OldRequestProfileJSON(ctx)
+	case schedulerrequestsnapshot.FieldCandidateSnapshotJSON:
+		return m.OldCandidateSnapshotJSON(ctx)
+	case schedulerrequestsnapshot.FieldRejectedSnapshotJSON:
+		return m.OldRejectedSnapshotJSON(ctx)
+	case schedulerrequestsnapshot.FieldRankedAccountIdsJSON:
+		return m.OldRankedAccountIdsJSON(ctx)
+	case schedulerrequestsnapshot.FieldSelectedAccountID:
+		return m.OldSelectedAccountID(ctx)
+	case schedulerrequestsnapshot.FieldSelectedProviderID:
+		return m.OldSelectedProviderID(ctx)
+	case schedulerrequestsnapshot.FieldStrategy:
+		return m.OldStrategy(ctx)
+	case schedulerrequestsnapshot.FieldStrategyVersion:
+		return m.OldStrategyVersion(ctx)
+	case schedulerrequestsnapshot.FieldStrategyConfigHash:
+		return m.OldStrategyConfigHash(ctx)
+	case schedulerrequestsnapshot.FieldStrategyWeightsJSON:
+		return m.OldStrategyWeightsJSON(ctx)
+	case schedulerrequestsnapshot.FieldCompatibilityWarningsJSON:
+		return m.OldCompatibilityWarningsJSON(ctx)
+	}
+	return nil, fmt.Errorf("unknown SchedulerRequestSnapshot field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *SchedulerRequestSnapshotMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case schedulerrequestsnapshot.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case schedulerrequestsnapshot.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case schedulerrequestsnapshot.FieldRequestID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRequestID(v)
+		return nil
+	case schedulerrequestsnapshot.FieldAttemptNo:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAttemptNo(v)
+		return nil
+	case schedulerrequestsnapshot.FieldDecisionID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDecisionID(v)
+		return nil
+	case schedulerrequestsnapshot.FieldRequestProfileJSON:
+		v, ok := value.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRequestProfileJSON(v)
+		return nil
+	case schedulerrequestsnapshot.FieldCandidateSnapshotJSON:
+		v, ok := value.([]map[string]interface{})
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCandidateSnapshotJSON(v)
+		return nil
+	case schedulerrequestsnapshot.FieldRejectedSnapshotJSON:
+		v, ok := value.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRejectedSnapshotJSON(v)
+		return nil
+	case schedulerrequestsnapshot.FieldRankedAccountIdsJSON:
+		v, ok := value.([]int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRankedAccountIdsJSON(v)
+		return nil
+	case schedulerrequestsnapshot.FieldSelectedAccountID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSelectedAccountID(v)
+		return nil
+	case schedulerrequestsnapshot.FieldSelectedProviderID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSelectedProviderID(v)
+		return nil
+	case schedulerrequestsnapshot.FieldStrategy:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStrategy(v)
+		return nil
+	case schedulerrequestsnapshot.FieldStrategyVersion:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStrategyVersion(v)
+		return nil
+	case schedulerrequestsnapshot.FieldStrategyConfigHash:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStrategyConfigHash(v)
+		return nil
+	case schedulerrequestsnapshot.FieldStrategyWeightsJSON:
+		v, ok := value.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStrategyWeightsJSON(v)
+		return nil
+	case schedulerrequestsnapshot.FieldCompatibilityWarningsJSON:
+		v, ok := value.([]string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCompatibilityWarningsJSON(v)
+		return nil
+	}
+	return fmt.Errorf("unknown SchedulerRequestSnapshot field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *SchedulerRequestSnapshotMutation) AddedFields() []string {
+	var fields []string
+	if m.addattempt_no != nil {
+		fields = append(fields, schedulerrequestsnapshot.FieldAttemptNo)
+	}
+	if m.adddecision_id != nil {
+		fields = append(fields, schedulerrequestsnapshot.FieldDecisionID)
+	}
+	if m.addselected_account_id != nil {
+		fields = append(fields, schedulerrequestsnapshot.FieldSelectedAccountID)
+	}
+	if m.addselected_provider_id != nil {
+		fields = append(fields, schedulerrequestsnapshot.FieldSelectedProviderID)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *SchedulerRequestSnapshotMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case schedulerrequestsnapshot.FieldAttemptNo:
+		return m.AddedAttemptNo()
+	case schedulerrequestsnapshot.FieldDecisionID:
+		return m.AddedDecisionID()
+	case schedulerrequestsnapshot.FieldSelectedAccountID:
+		return m.AddedSelectedAccountID()
+	case schedulerrequestsnapshot.FieldSelectedProviderID:
+		return m.AddedSelectedProviderID()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *SchedulerRequestSnapshotMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case schedulerrequestsnapshot.FieldAttemptNo:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddAttemptNo(v)
+		return nil
+	case schedulerrequestsnapshot.FieldDecisionID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddDecisionID(v)
+		return nil
+	case schedulerrequestsnapshot.FieldSelectedAccountID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddSelectedAccountID(v)
+		return nil
+	case schedulerrequestsnapshot.FieldSelectedProviderID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddSelectedProviderID(v)
+		return nil
+	}
+	return fmt.Errorf("unknown SchedulerRequestSnapshot numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *SchedulerRequestSnapshotMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(schedulerrequestsnapshot.FieldRequestProfileJSON) {
+		fields = append(fields, schedulerrequestsnapshot.FieldRequestProfileJSON)
+	}
+	if m.FieldCleared(schedulerrequestsnapshot.FieldCandidateSnapshotJSON) {
+		fields = append(fields, schedulerrequestsnapshot.FieldCandidateSnapshotJSON)
+	}
+	if m.FieldCleared(schedulerrequestsnapshot.FieldRejectedSnapshotJSON) {
+		fields = append(fields, schedulerrequestsnapshot.FieldRejectedSnapshotJSON)
+	}
+	if m.FieldCleared(schedulerrequestsnapshot.FieldRankedAccountIdsJSON) {
+		fields = append(fields, schedulerrequestsnapshot.FieldRankedAccountIdsJSON)
+	}
+	if m.FieldCleared(schedulerrequestsnapshot.FieldSelectedAccountID) {
+		fields = append(fields, schedulerrequestsnapshot.FieldSelectedAccountID)
+	}
+	if m.FieldCleared(schedulerrequestsnapshot.FieldSelectedProviderID) {
+		fields = append(fields, schedulerrequestsnapshot.FieldSelectedProviderID)
+	}
+	if m.FieldCleared(schedulerrequestsnapshot.FieldStrategyWeightsJSON) {
+		fields = append(fields, schedulerrequestsnapshot.FieldStrategyWeightsJSON)
+	}
+	if m.FieldCleared(schedulerrequestsnapshot.FieldCompatibilityWarningsJSON) {
+		fields = append(fields, schedulerrequestsnapshot.FieldCompatibilityWarningsJSON)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *SchedulerRequestSnapshotMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *SchedulerRequestSnapshotMutation) ClearField(name string) error {
+	switch name {
+	case schedulerrequestsnapshot.FieldRequestProfileJSON:
+		m.ClearRequestProfileJSON()
+		return nil
+	case schedulerrequestsnapshot.FieldCandidateSnapshotJSON:
+		m.ClearCandidateSnapshotJSON()
+		return nil
+	case schedulerrequestsnapshot.FieldRejectedSnapshotJSON:
+		m.ClearRejectedSnapshotJSON()
+		return nil
+	case schedulerrequestsnapshot.FieldRankedAccountIdsJSON:
+		m.ClearRankedAccountIdsJSON()
+		return nil
+	case schedulerrequestsnapshot.FieldSelectedAccountID:
+		m.ClearSelectedAccountID()
+		return nil
+	case schedulerrequestsnapshot.FieldSelectedProviderID:
+		m.ClearSelectedProviderID()
+		return nil
+	case schedulerrequestsnapshot.FieldStrategyWeightsJSON:
+		m.ClearStrategyWeightsJSON()
+		return nil
+	case schedulerrequestsnapshot.FieldCompatibilityWarningsJSON:
+		m.ClearCompatibilityWarningsJSON()
+		return nil
+	}
+	return fmt.Errorf("unknown SchedulerRequestSnapshot nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *SchedulerRequestSnapshotMutation) ResetField(name string) error {
+	switch name {
+	case schedulerrequestsnapshot.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case schedulerrequestsnapshot.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case schedulerrequestsnapshot.FieldRequestID:
+		m.ResetRequestID()
+		return nil
+	case schedulerrequestsnapshot.FieldAttemptNo:
+		m.ResetAttemptNo()
+		return nil
+	case schedulerrequestsnapshot.FieldDecisionID:
+		m.ResetDecisionID()
+		return nil
+	case schedulerrequestsnapshot.FieldRequestProfileJSON:
+		m.ResetRequestProfileJSON()
+		return nil
+	case schedulerrequestsnapshot.FieldCandidateSnapshotJSON:
+		m.ResetCandidateSnapshotJSON()
+		return nil
+	case schedulerrequestsnapshot.FieldRejectedSnapshotJSON:
+		m.ResetRejectedSnapshotJSON()
+		return nil
+	case schedulerrequestsnapshot.FieldRankedAccountIdsJSON:
+		m.ResetRankedAccountIdsJSON()
+		return nil
+	case schedulerrequestsnapshot.FieldSelectedAccountID:
+		m.ResetSelectedAccountID()
+		return nil
+	case schedulerrequestsnapshot.FieldSelectedProviderID:
+		m.ResetSelectedProviderID()
+		return nil
+	case schedulerrequestsnapshot.FieldStrategy:
+		m.ResetStrategy()
+		return nil
+	case schedulerrequestsnapshot.FieldStrategyVersion:
+		m.ResetStrategyVersion()
+		return nil
+	case schedulerrequestsnapshot.FieldStrategyConfigHash:
+		m.ResetStrategyConfigHash()
+		return nil
+	case schedulerrequestsnapshot.FieldStrategyWeightsJSON:
+		m.ResetStrategyWeightsJSON()
+		return nil
+	case schedulerrequestsnapshot.FieldCompatibilityWarningsJSON:
+		m.ResetCompatibilityWarningsJSON()
+		return nil
+	}
+	return fmt.Errorf("unknown SchedulerRequestSnapshot field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *SchedulerRequestSnapshotMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *SchedulerRequestSnapshotMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *SchedulerRequestSnapshotMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *SchedulerRequestSnapshotMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *SchedulerRequestSnapshotMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *SchedulerRequestSnapshotMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *SchedulerRequestSnapshotMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown SchedulerRequestSnapshot unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *SchedulerRequestSnapshotMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown SchedulerRequestSnapshot edge %s", name)
 }
 
 // SchedulerStrategyMutation represents an operation that mutates the SchedulerStrategy nodes in the graph.

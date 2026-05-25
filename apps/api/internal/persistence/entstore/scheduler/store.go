@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sort"
 	"strconv"
 	"sync"
@@ -12,6 +13,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent"
 	entschedulerdecision "github.com/srapi/srapi/apps/api/ent/schedulerdecision"
 	entschedulerfeedback "github.com/srapi/srapi/apps/api/ent/schedulerfeedback"
+	entschedulerrequestsnapshot "github.com/srapi/srapi/apps/api/ent/schedulerrequestsnapshot"
 	entschedulerstrategy "github.com/srapi/srapi/apps/api/ent/schedulerstrategy"
 	"github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 )
@@ -49,7 +51,30 @@ func NewWithLeaseStore(client *ent.Client, leaseStore LeaseStore) (*Store, error
 }
 
 func (s *Store) CreateDecision(ctx context.Context, input contract.Decision) (contract.Decision, error) {
-	create := s.client.SchedulerDecision.Create().
+	return createDecision(ctx, s.client, input)
+}
+
+func (s *Store) CreateDecisionWithSnapshot(ctx context.Context, input contract.Decision, snapshot contract.RequestSnapshot) (contract.Decision, contract.RequestSnapshot, error) {
+	tx, err := s.client.Tx(ctx)
+	if err != nil {
+		return contract.Decision{}, contract.RequestSnapshot{}, err
+	}
+	decision, err := createDecision(ctx, tx.Client(), input)
+	if err != nil {
+		return contract.Decision{}, contract.RequestSnapshot{}, rollback(tx, err)
+	}
+	createdSnapshot, err := createRequestSnapshot(ctx, tx.Client(), decision, snapshot)
+	if err != nil {
+		return contract.Decision{}, contract.RequestSnapshot{}, rollback(tx, err)
+	}
+	if err := tx.Commit(); err != nil {
+		return contract.Decision{}, contract.RequestSnapshot{}, err
+	}
+	return decision, createdSnapshot, nil
+}
+
+func createDecision(ctx context.Context, client *ent.Client, input contract.Decision) (contract.Decision, error) {
+	create := client.SchedulerDecision.Create().
 		SetRequestID(input.RequestID).
 		SetAttemptNo(input.AttemptNo).
 		SetUserID(input.UserID).
@@ -84,6 +109,50 @@ func (s *Store) CreateDecision(ctx context.Context, input contract.Decision) (co
 	return toDecision(created), nil
 }
 
+func createRequestSnapshot(ctx context.Context, client *ent.Client, decision contract.Decision, input contract.RequestSnapshot) (contract.RequestSnapshot, error) {
+	candidates, err := candidateSnapshotPayload(input.CandidateSnapshot)
+	if err != nil {
+		return contract.RequestSnapshot{}, err
+	}
+	snapshot := input
+	snapshot.DecisionID = decision.ID
+	snapshot.RequestID = decision.RequestID
+	snapshot.AttemptNo = decision.AttemptNo
+	snapshot.SelectedAccountID = cloneInt(decision.SelectedAccountID)
+	snapshot.SelectedProviderID = cloneInt(decision.SelectedProviderID)
+	snapshot.Strategy = decision.Strategy
+	snapshot.StrategyVersion = decision.StrategyVersion
+	snapshot.StrategyConfigHash = decision.StrategyConfigHash
+	snapshot.StrategyWeights = cloneMap(decision.StrategyWeights)
+	snapshot.CompatibilityWarnings = cloneStrings(decision.CompatibilityWarnings)
+	if snapshot.CreatedAt.IsZero() {
+		snapshot.CreatedAt = decision.CreatedAt
+	}
+	create := client.SchedulerRequestSnapshot.Create().
+		SetRequestID(snapshot.RequestID).
+		SetAttemptNo(snapshot.AttemptNo).
+		SetDecisionID(snapshot.DecisionID).
+		SetRequestProfileJSON(cloneMap(snapshot.RequestProfile)).
+		SetCandidateSnapshotJSON(candidates).
+		SetRejectedSnapshotJSON(cloneMap(snapshot.RejectedSnapshot)).
+		SetRankedAccountIdsJSON(cloneInts(snapshot.RankedAccountIDs)).
+		SetNillableSelectedAccountID(snapshot.SelectedAccountID).
+		SetNillableSelectedProviderID(snapshot.SelectedProviderID).
+		SetStrategy(string(snapshot.Strategy)).
+		SetStrategyVersion(snapshot.StrategyVersion).
+		SetStrategyConfigHash(snapshot.StrategyConfigHash).
+		SetStrategyWeightsJSON(cloneMap(snapshot.StrategyWeights)).
+		SetCompatibilityWarningsJSON(cloneStrings(snapshot.CompatibilityWarnings))
+	if !snapshot.CreatedAt.IsZero() {
+		create.SetCreatedAt(snapshot.CreatedAt).SetUpdatedAt(snapshot.CreatedAt)
+	}
+	created, err := create.Save(ctx)
+	if err != nil {
+		return contract.RequestSnapshot{}, err
+	}
+	return toRequestSnapshot(created)
+}
+
 func (s *Store) ListDecisions(ctx context.Context) ([]contract.Decision, error) {
 	rows, err := s.client.SchedulerDecision.Query().
 		Order(entschedulerdecision.ByID()).
@@ -94,6 +163,24 @@ func (s *Store) ListDecisions(ctx context.Context) ([]contract.Decision, error) 
 	out := make([]contract.Decision, 0, len(rows))
 	for _, row := range rows {
 		out = append(out, toDecision(row))
+	}
+	return out, nil
+}
+
+func (s *Store) ListRequestSnapshots(ctx context.Context) ([]contract.RequestSnapshot, error) {
+	rows, err := s.client.SchedulerRequestSnapshot.Query().
+		Order(entschedulerrequestsnapshot.ByID()).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]contract.RequestSnapshot, 0, len(rows))
+	for _, row := range rows {
+		snapshot, err := toRequestSnapshot(row)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, snapshot)
 	}
 	return out, nil
 }
@@ -200,6 +287,13 @@ func strategyRowEffectiveAt(row *ent.SchedulerStrategy) time.Time {
 		return row.UpdatedAt
 	}
 	return row.CreatedAt
+}
+
+func rollback(tx *ent.Tx, cause error) error {
+	if err := tx.Rollback(); err != nil {
+		return fmt.Errorf("%w: rollback: %v", cause, err)
+	}
+	return cause
 }
 
 func (s *Store) AcquireLease(ctx context.Context, input contract.Lease, maxConcurrency *int) (contract.Lease, error) {
@@ -331,6 +425,31 @@ func toDecision(row *ent.SchedulerDecision) contract.Decision {
 	}
 }
 
+func toRequestSnapshot(row *ent.SchedulerRequestSnapshot) (contract.RequestSnapshot, error) {
+	candidates, err := toCandidateSnapshots(row.CandidateSnapshotJSON)
+	if err != nil {
+		return contract.RequestSnapshot{}, err
+	}
+	return contract.RequestSnapshot{
+		ID:                    row.ID,
+		RequestID:             row.RequestID,
+		AttemptNo:             row.AttemptNo,
+		DecisionID:            row.DecisionID,
+		RequestProfile:        cloneMap(row.RequestProfileJSON),
+		CandidateSnapshot:     candidates,
+		RejectedSnapshot:      cloneMap(row.RejectedSnapshotJSON),
+		RankedAccountIDs:      cloneInts(row.RankedAccountIdsJSON),
+		SelectedAccountID:     cloneInt(row.SelectedAccountID),
+		SelectedProviderID:    cloneInt(row.SelectedProviderID),
+		Strategy:              contract.StrategyName(row.Strategy),
+		StrategyVersion:       row.StrategyVersion,
+		StrategyConfigHash:    row.StrategyConfigHash,
+		StrategyWeights:       cloneMap(row.StrategyWeightsJSON),
+		CompatibilityWarnings: cloneStrings(row.CompatibilityWarningsJSON),
+		CreatedAt:             row.CreatedAt,
+	}, nil
+}
+
 func toFeedback(row *ent.SchedulerFeedback) contract.Feedback {
 	return contract.Feedback{
 		ID:           row.ID,
@@ -369,6 +488,15 @@ func cloneString(value *string) *string {
 	return &cloned
 }
 
+func cloneInts(values []int) []int {
+	if values == nil {
+		return nil
+	}
+	cloned := make([]int, len(values))
+	copy(cloned, values)
+	return cloned
+}
+
 func cloneStrings(values []string) []string {
 	if values == nil {
 		return nil
@@ -376,6 +504,36 @@ func cloneStrings(values []string) []string {
 	cloned := make([]string, len(values))
 	copy(cloned, values)
 	return cloned
+}
+
+func candidateSnapshotPayload(values []contract.CandidateSnapshot) ([]map[string]any, error) {
+	if values == nil {
+		return []map[string]any{}, nil
+	}
+	raw, err := json.Marshal(values)
+	if err != nil {
+		return nil, err
+	}
+	var out []map[string]any
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func toCandidateSnapshots(values []map[string]any) ([]contract.CandidateSnapshot, error) {
+	if values == nil {
+		return nil, nil
+	}
+	raw, err := json.Marshal(values)
+	if err != nil {
+		return nil, err
+	}
+	var out []contract.CandidateSnapshot
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func cloneMap(value map[string]any) map[string]any {

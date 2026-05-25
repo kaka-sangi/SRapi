@@ -242,7 +242,7 @@ func (s *Service) Schedule(ctx context.Context, req contract.ScheduleRequest) (c
 	attemptNo := scheduleAttemptNo(req.AttemptNo)
 	evaluation := s.evaluateSchedule(req, strategy)
 	if evaluation.err != nil {
-		decision, err := s.store.CreateDecision(ctx, evaluation.decision)
+		decision, _, err := s.createDecisionWithSnapshot(ctx, req, strategy, evaluation.decision, evaluation.candidatesByRank)
 		if err != nil {
 			return contract.ScheduleResult{}, err
 		}
@@ -251,13 +251,14 @@ func (s *Service) Schedule(ctx context.Context, req contract.ScheduleRequest) (c
 	lease, err := s.acquireLease(ctx, req, attemptNo, evaluation.selected)
 	if err != nil {
 		evaluation.rejectReasons[accountKey(evaluation.selected.Account.ID)] = "concurrency_full"
-		decision, decisionErr := s.store.CreateDecision(ctx, s.buildDecision(req, strategy, nil, len(req.Candidates), len(evaluation.rejectReasons), evaluation.scorePayload, evaluation.rejectReasons))
-		if decisionErr != nil {
-			return contract.ScheduleResult{}, decisionErr
+		decisionInput := s.buildDecision(req, strategy, nil, len(req.Candidates), len(evaluation.rejectReasons), evaluation.scorePayload, evaluation.rejectReasons)
+		decision, _, err := s.createDecisionWithSnapshot(ctx, req, strategy, decisionInput, evaluation.candidatesByRank)
+		if err != nil {
+			return contract.ScheduleResult{}, err
 		}
 		return contract.ScheduleResult{Decision: decision}, ErrNoAvailableAccount
 	}
-	decision, err := s.store.CreateDecision(ctx, evaluation.decision)
+	decision, _, err := s.createDecisionWithSnapshot(ctx, req, strategy, evaluation.decision, evaluation.candidatesByRank)
 	if err != nil {
 		_, _ = s.store.UpdateLeaseStatus(ctx, strings.TrimSpace(req.RequestID), attemptNo, contract.LeaseStatusReleased)
 		return contract.ScheduleResult{}, err
@@ -356,6 +357,15 @@ func (s *Service) evaluateSchedule(req contract.ScheduleRequest, strategy contra
 
 func (s *Service) ListDecisions(ctx context.Context) ([]contract.Decision, error) {
 	return s.store.ListDecisions(ctx)
+}
+
+func (s *Service) createDecisionWithSnapshot(ctx context.Context, req contract.ScheduleRequest, strategy contract.StrategyDescriptor, decision contract.Decision, ranked []contract.Candidate) (contract.Decision, contract.RequestSnapshot, error) {
+	snapshot := s.buildRequestSnapshot(req, strategy, decision, ranked)
+	return s.store.CreateDecisionWithSnapshot(ctx, decision, snapshot)
+}
+
+func (s *Service) ListRequestSnapshots(ctx context.Context) ([]contract.RequestSnapshot, error) {
+	return s.store.ListRequestSnapshots(ctx)
 }
 
 func (s *Service) RecordFeedback(ctx context.Context, req contract.RecordFeedbackRequest) (contract.Feedback, error) {
@@ -485,6 +495,102 @@ func (s *Service) buildDecision(req contract.ScheduleRequest, strategy contract.
 		decision.CacheAffinityHit = cacheScore(*selected, req, healthScore(*selected)) > 0
 	}
 	return decision
+}
+
+func (s *Service) buildRequestSnapshot(req contract.ScheduleRequest, strategy contract.StrategyDescriptor, decision contract.Decision, ranked []contract.Candidate) contract.RequestSnapshot {
+	return contract.RequestSnapshot{
+		RequestID:             decision.RequestID,
+		AttemptNo:             decision.AttemptNo,
+		DecisionID:            decision.ID,
+		RequestProfile:        sanitizedRequestProfile(req),
+		CandidateSnapshot:     sanitizedCandidateSnapshots(req.Candidates),
+		RejectedSnapshot:      cloneMapAny(decision.RejectReasons),
+		RankedAccountIDs:      rankedAccountIDs(ranked),
+		SelectedAccountID:     cloneIntPtr(decision.SelectedAccountID),
+		SelectedProviderID:    cloneIntPtr(decision.SelectedProviderID),
+		Strategy:              strategy.Name,
+		StrategyVersion:       strategy.Version,
+		StrategyConfigHash:    strategy.ConfigHash,
+		StrategyWeights:       cloneMapAny(decision.StrategyWeights),
+		CompatibilityWarnings: cloneStrings(decision.CompatibilityWarnings),
+		CreatedAt:             decision.CreatedAt,
+	}
+}
+
+func sanitizedRequestProfile(req contract.ScheduleRequest) map[string]any {
+	profile := map[string]any{
+		"request_id":                strings.TrimSpace(req.RequestID),
+		"attempt_no":                scheduleAttemptNo(req.AttemptNo),
+		"fallback_from_decision_id": cloneIntPtr(req.FallbackFromDecisionID),
+		"user_id":                   req.UserID,
+		"api_key_id":                req.APIKeyID,
+		"source_protocol":           defaultString(req.SourceProtocol, "openai-compatible"),
+		"source_endpoint":           strings.TrimSpace(req.SourceEndpoint),
+		"target_protocol":           strings.TrimSpace(req.TargetProtocol),
+		"model":                     strings.TrimSpace(req.Model),
+		"model_alias":               strings.TrimSpace(req.ModelAlias),
+		"fallback_models":           cloneStrings(req.FallbackModels),
+		"account_group_scope":       cloneInts(req.AccountGroupScope),
+		"user_tier":                 string(req.UserTier),
+		"user_balance_insufficient": req.UserBalanceInsufficient,
+		"estimated_input_tokens":    req.EstimatedInputTokens,
+		"estimated_output_tokens":   req.EstimatedOutputTokens,
+		"estimated_cost":            strings.TrimSpace(req.EstimatedCost),
+		"currency":                  strings.TrimSpace(req.Currency),
+		"pricing_rule_id":           cloneIntPtr(req.PricingRuleID),
+		"pricing_source":            strings.TrimSpace(req.PricingSource),
+		"pricing_estimated":         req.PricingEstimated,
+		"is_stream":                 req.IsStream,
+		"sticky_account_id":         cloneIntPtr(req.StickyAccountID),
+		"sticky_strength":           string(req.StickyStrength),
+		"strategy":                  string(req.Strategy),
+		"warnings":                  cloneStrings(req.Warnings),
+		"request_capabilities":      req.RequestCapabilities,
+		"excluded_account_ids":      cloneInts(req.ExcludedAccountIDs),
+	}
+	if source := strings.TrimSpace(req.SessionAffinitySource); source != "" {
+		profile["session_affinity_source"] = source
+	}
+	if hash := affinityKeyHash(req.SessionAffinityKey); hash != "" {
+		profile["session_affinity_key_hash"] = hash
+	}
+	return removeNilValues(profile)
+}
+
+func sanitizedCandidateSnapshots(candidates []contract.Candidate) []contract.CandidateSnapshot {
+	out := make([]contract.CandidateSnapshot, 0, len(candidates))
+	for _, candidate := range candidates {
+		out = append(out, contract.CandidateSnapshot{
+			AccountID:             candidate.Account.ID,
+			ProviderID:            candidate.Provider.ID,
+			MappingID:             candidate.Mapping.ID,
+			ModelID:               candidate.Mapping.ModelID,
+			RuntimeClass:          string(candidate.Account.RuntimeClass),
+			AccountStatus:         string(candidate.Account.Status),
+			AccountWeight:         candidate.Account.Weight,
+			AccountRiskLevel:      cloneStringPtr(candidate.Account.RiskLevel),
+			AccountMetadata:       sanitizeSnapshotMap(candidate.Account.Metadata),
+			ProviderProtocol:      strings.TrimSpace(candidate.Provider.Protocol),
+			ProviderStatus:        string(candidate.Provider.Status),
+			ProviderCapabilities:  sanitizeSnapshotMap(candidate.Provider.Capabilities),
+			ProviderConfig:        sanitizeSnapshotMap(candidate.Provider.ConfigSchema),
+			MappingStatus:         string(candidate.Mapping.Status),
+			UpstreamModelName:     strings.TrimSpace(candidate.Mapping.UpstreamModelName),
+			PricingOverride:       sanitizeSnapshotMap(candidate.Mapping.PricingOverride),
+			EffectiveCapabilities: cloneCapabilityDescriptors(candidate.EffectiveCapabilities),
+			RuntimeState:          candidate.RuntimeState,
+			Limits:                cloneRuntimeLimits(candidate.Limits),
+		})
+	}
+	return out
+}
+
+func rankedAccountIDs(candidates []contract.Candidate) []int {
+	out := make([]int, 0, len(candidates))
+	for _, candidate := range candidates {
+		out = append(out, candidate.Account.ID)
+	}
+	return out
 }
 
 func attachPricingEvidence(decision *contract.Decision, req contract.ScheduleRequest) {
@@ -1052,6 +1158,114 @@ func cloneStrings(values []string) []string {
 	cloned := make([]string, len(values))
 	copy(cloned, values)
 	return cloned
+}
+
+func cloneInts(values []int) []int {
+	if values == nil {
+		return nil
+	}
+	cloned := make([]int, len(values))
+	copy(cloned, values)
+	return cloned
+}
+
+func cloneStringPtr(value *string) *string {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
+}
+
+func cloneCapabilityDescriptors(values []capabilitiescontract.Descriptor) []capabilitiescontract.Descriptor {
+	if values == nil {
+		return nil
+	}
+	cloned := make([]capabilitiescontract.Descriptor, len(values))
+	copy(cloned, values)
+	return cloned
+}
+
+func cloneRuntimeLimits(value contract.RuntimeLimits) contract.RuntimeLimits {
+	return contract.RuntimeLimits{
+		MaxConcurrency: cloneIntPtr(value.MaxConcurrency),
+		RPMLimit:       cloneIntPtr(value.RPMLimit),
+		TPMLimit:       cloneIntPtr(value.TPMLimit),
+	}
+}
+
+func defaultString(value string, fallback string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return fallback
+	}
+	return value
+}
+
+func removeNilValues(values map[string]any) map[string]any {
+	out := make(map[string]any, len(values))
+	for key, value := range values {
+		if value == nil {
+			continue
+		}
+		out[key] = value
+	}
+	return out
+}
+
+func sanitizeSnapshotMap(values map[string]any) map[string]any {
+	return sanitizeSnapshotValue(cloneMapAny(values)).(map[string]any)
+}
+
+func sanitizeSnapshotValue(value any) any {
+	switch typed := value.(type) {
+	case map[string]any:
+		out := make(map[string]any, len(typed))
+		for key, child := range typed {
+			if sensitiveSnapshotKey(key) {
+				continue
+			}
+			out[key] = sanitizeSnapshotValue(child)
+		}
+		return out
+	case []any:
+		out := make([]any, 0, len(typed))
+		for _, child := range typed {
+			out = append(out, sanitizeSnapshotValue(child))
+		}
+		return out
+	default:
+		return value
+	}
+}
+
+func sensitiveSnapshotKey(key string) bool {
+	normalized := strings.NewReplacer("-", "_", ".", "_", " ", "_").Replace(strings.ToLower(strings.TrimSpace(key)))
+	if normalized == "" {
+		return false
+	}
+	switch normalized {
+	case "cached_token_estimate", "estimated_cached_tokens", "cached_tokens", "input_tokens", "output_tokens", "total_tokens", "token_count", "token_budget", "estimated_input_tokens", "estimated_output_tokens":
+		return false
+	}
+	switch normalized {
+	case "api_key", "apikey", "access_token", "refresh_token", "authorization", "cookie", "secret", "password", "token", "credential", "credential_ciphertext", "cookie_jar_ciphertext", "device_fingerprint_ciphertext", "oauth_access_token", "oauth_refresh_token", "oauth_device_code", "web_session_cookie", "desktop_client_token", "cli_client_token", "ide_plugin_token", "service_account_json", "custom_headers", "custom_reverse_proxy_payload":
+		return true
+	}
+	sensitiveFragments := []string{"api_key", "access_token", "refresh_token", "authorization", "cookie", "secret", "password", "credential", "ciphertext", "device_fingerprint"}
+	for _, fragment := range sensitiveFragments {
+		if strings.Contains(normalized, fragment) {
+			return true
+		}
+	}
+	return strings.HasSuffix(normalized, "_secret") ||
+		strings.HasSuffix(normalized, "_password") ||
+		strings.HasSuffix(normalized, "_credential") ||
+		strings.HasSuffix(normalized, "_ciphertext") ||
+		strings.HasSuffix(normalized, "_cookie") ||
+		strings.HasSuffix(normalized, "_token") ||
+		strings.HasSuffix(normalized, "_access_token") ||
+		strings.HasSuffix(normalized, "_refresh_token")
 }
 
 func scheduleAttemptNo(value int) int {

@@ -232,7 +232,9 @@ strategy_config_hash
 strategy_weights_json
 ```
 
-历史 decision 必须可用当时策略版本复现。
+K1.6.2 起新的真实 Scheduler attempt 会同步写入 `scheduler_request_snapshots`，
+保存可回放的 RequestProfile 和 CandidateSnapshot。历史 decision 只有在存在 snapshot 时
+才能按当时策略版本和候选集复现；旧的 decision-only 行只能用于报表统计。
 
 ## 10. Dry-run 与 Shadow Decision
 
@@ -384,9 +386,12 @@ K1.2 起运行时已经读取 `status=active`、`scope_type=global` 且 `scope_i
 `scheduler_strategies` 行，并在每次调度和管理员策略列表读取前刷新到
 `StrategyRegistry`。同名多 active 版本按 `activated_at`、`updated_at` / `created_at`、
 `id` 选择最新行；内置 seed 仍作为本地 / memory store fallback。K1.6 起已支持单请求
-shadow dry-run 和稳定 rollout 预览；API key、model、provider 等 scoped override、真实流量百分比灰度和历史批量回放仍属于后续范围。
+shadow dry-run 和稳定 rollout 预览；K1.6.2 起新的真实调度会持久化脱敏
+`scheduler_request_snapshots`，为后续历史 replay 提供 RequestProfile + CandidateSnapshot
+证据。
 
-历史 replay 不能只依赖现有 `scheduler_decisions` 行重算，因为当前 decision 只保存已选账号、score、reject reason 和权重快照，不保存当时完整候选集。后续 replay 接口必须先持久化或重建可审计的 RequestProfile + CandidateSnapshot，否则只能做报表对比，不能声称完成“历史重算新策略”。
+历史 replay 接口必须只对存在 snapshot 的决策声称可重算。没有 snapshot 的旧
+`scheduler_decisions` 行缺少当时完整候选集，只能用于报表对比，不能声称完成“历史重算新策略”。API key、model、provider 等 scoped override、真实流量百分比灰度和历史批量回放 API 仍属于后续范围。
 
 ## 17. Admin API
 

@@ -83,34 +83,32 @@ last_completed:
 - K1.5: Scheduler ranking now applies a Cost/Latency/Quality Pareto frontier before final weighted selection, records `pareto.frontier_account_ids` in decision score evidence, keeps all available candidates in failover rank order, and uses explicit `quality_score` / `quality_tier` metadata as the quality objective.
 - K1.6: Scheduler strategy simulation now supports single-request dry-run/shadow comparison through `scheduler/service/simulator.go` and `POST /api/v1/admin/scheduler/simulate`; it evaluates current vs shadow strategies with the same request profile and candidates, returns winner and score deltas, and HTTP/service regressions prove it does not persist SchedulerDecision rows or acquire leases.
 - K1.6.1: Scheduler simulation now accepts optional `shadow_rollout_percent` and `rollout_key`, returns a deterministic rollout bucket, shadow-selected flag, and SHA-256 key hash without returning the raw key, and service/HTTP regressions prove rollout preview stays dry-run.
+- K1.6.2: Real Scheduler attempts now persist a sanitized `scheduler_request_snapshots` row atomically with each new decision, including request profile, candidate snapshot, ranked account IDs, selected IDs, strategy version/hash/weights, and compatibility warnings without raw affinity keys, rollout keys, credentials, cookies, or tokens.
 
 current:
 
 - package: K1.6 follow-up
 - status: pending
-- objective: extend Scheduler strategy simulator from rollout-preview dry-run to candidate-snapshot-backed historical replay, scoped real-traffic gray release percentages, and admin strategy comparison reporting.
+- objective: extend Scheduler strategy simulator from snapshot-backed evidence to historical replay, scoped real-traffic gray release percentages, and admin strategy comparison reporting.
 
-next_recommended: K1.6 persist/rebuild request candidate snapshots for historical replay, or K1.7 `/admin/ops/strategy` comparison UI once replay evidence exists.
+next_recommended: K1.6 implement historical replay over `scheduler_request_snapshots`, or K1.7 `/admin/ops/strategy` comparison UI after replay evidence is queryable.
 
 last_gates:
 
-- `cd apps/api && go test ./internal/modules/scheduler/... ./internal/persistence/entstore/scheduler ./internal/httpserver -run 'TestServiceRefreshesActiveStrategyBeforeSchedule|TestStrategyRegistryListsSeededStrategies|TestStoreListsActiveGlobalStrategies|TestAdminSchedulerStrategiesReflectActivePersistentStrategy|TestAdminProviderOperationsAndDiagnostics' -count=1`: pass
-- `cd apps/api && go test ./internal/modules/scheduler/service ./internal/httpserver`: pass
-- `make openapi-lint`: pass
-- `make openapi-bundle`: pass
-- `make openapi-codegen-check`: pass
-- `make openapi-ts-codegen-check`: pass
-- `make sdk-ts-typecheck`: pass
+- `cd apps/api && go test ./internal/modules/scheduler/... ./internal/persistence/entstore/scheduler ./internal/platform/db`: pass
+- `make ent-generate-check`: pass
+- `make migration-check`: pass
 - `cd apps/api && go test ./...`: pass
 - `make architecture-check`: pass
 - `make code-quality-check`: pass
 - `make secret-scan`: pass
+- `make diff-check`: pass
 - `git diff --check`: pass
 
 notes:
 
 - Existing `docs/` remains the architecture and domain source of truth.
-- Historical strategy replay cannot be honestly implemented from current `scheduler_decisions` alone because decisions do not persist the full request profile and candidate set. Add a candidate snapshot/evidence source before claiming historical replay accuracy.
+- Historical strategy replay can only be claimed for decisions that have `scheduler_request_snapshots`; older decision-only rows remain report-only because they lack the full request profile and candidate set.
 - Future goal runs must read `specs/README.md` first, then continue from `next_recommended`.
 - Future goal runs must preserve unrelated user worktree changes if present.
 - A5.2 now has code/test/docs evidence in the provider preset registry, admin provider install API, admin provider test diagnostics, and `docs/COMPATIBLE_PROVIDER_REGISTRY_SPEC.md`; no real upstream credential is required for the representative test coverage.

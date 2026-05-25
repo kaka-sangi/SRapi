@@ -95,6 +95,80 @@ func TestStoreListsActiveGlobalStrategies(t *testing.T) {
 	}
 }
 
+func TestStoreCreatesDecisionWithRequestSnapshot(t *testing.T) {
+	client := enttest.Open(t, dialect.SQLite, sqliteDSN(t))
+	defer client.Close()
+
+	store, err := New(client)
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+
+	ctx := context.Background()
+	now := time.Date(2026, 5, 25, 12, 30, 0, 0, time.UTC)
+	selectedAccountID := 10
+	selectedProviderID := 20
+	decision, snapshot, err := store.CreateDecisionWithSnapshot(ctx, contract.Decision{
+		RequestID:          "req_snapshot",
+		AttemptNo:          1,
+		UserID:             1,
+		APIKeyID:           2,
+		SourceProtocol:     "openai-compatible",
+		SourceEndpoint:     "/v1/chat/completions",
+		TargetProtocol:     "openai-compatible",
+		Model:              "gpt-test",
+		Strategy:           contract.StrategyBalanced,
+		StrategyVersion:    "v1",
+		StrategyConfigHash: "sha256:test",
+		SelectedProviderID: &selectedProviderID,
+		SelectedAccountID:  &selectedAccountID,
+		CandidateCount:     1,
+		Scores:             map[string]any{"account_10": map[string]any{"final_score": 0.9}},
+		StrategyWeights:    map[string]any{"health": 0.3},
+		CreatedAt:          now,
+	}, contract.RequestSnapshot{
+		RequestProfile: map[string]any{
+			"model":                     "gpt-test",
+			"session_affinity_key_hash": "sha256:test",
+		},
+		CandidateSnapshot: []contract.CandidateSnapshot{
+			{
+				AccountID:        selectedAccountID,
+				ProviderID:       selectedProviderID,
+				AccountMetadata:  map[string]any{"quality_score": 0.9},
+				ProviderProtocol: "openai-compatible",
+				ProviderConfig:   map[string]any{"base_url": "https://provider.example"},
+			},
+		},
+		RankedAccountIDs: []int{selectedAccountID},
+		CreatedAt:        now,
+	})
+	if err != nil {
+		t.Fatalf("create decision with snapshot: %v", err)
+	}
+	if snapshot.DecisionID != decision.ID || snapshot.RequestID != decision.RequestID || snapshot.AttemptNo != decision.AttemptNo {
+		t.Fatalf("expected linked snapshot, decision=%+v snapshot=%+v", decision, snapshot)
+	}
+	if snapshot.SelectedAccountID == nil || *snapshot.SelectedAccountID != selectedAccountID {
+		t.Fatalf("expected selected account copied from decision, got %+v", snapshot)
+	}
+
+	snapshots, err := store.ListRequestSnapshots(ctx)
+	if err != nil {
+		t.Fatalf("list snapshots: %v", err)
+	}
+	if len(snapshots) != 1 {
+		t.Fatalf("expected one snapshot, got %+v", snapshots)
+	}
+	loaded := snapshots[0]
+	if loaded.DecisionID != decision.ID || loaded.CandidateSnapshot[0].AccountID != selectedAccountID || loaded.RankedAccountIDs[0] != selectedAccountID {
+		t.Fatalf("unexpected loaded snapshot: %+v", loaded)
+	}
+	if loaded.CandidateSnapshot[0].ProviderConfig["base_url"] != "https://provider.example" {
+		t.Fatalf("expected provider config round trip, got %+v", loaded.CandidateSnapshot[0].ProviderConfig)
+	}
+}
+
 func sqliteDSN(t *testing.T) string {
 	t.Helper()
 	return "file:" + filepath.Join(t.TempDir(), "scheduler.db") + "?_fk=1"

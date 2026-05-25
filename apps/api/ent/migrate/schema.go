@@ -1209,6 +1209,54 @@ var (
 			},
 		},
 	}
+	// SchedulerRequestSnapshotsColumns holds the columns for the "scheduler_request_snapshots" table.
+	SchedulerRequestSnapshotsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "request_id", Type: field.TypeString},
+		{Name: "attempt_no", Type: field.TypeInt, Default: 1},
+		{Name: "decision_id", Type: field.TypeInt},
+		{Name: "request_profile_json", Type: field.TypeJSON, Nullable: true},
+		{Name: "candidate_snapshot_json", Type: field.TypeJSON, Nullable: true},
+		{Name: "rejected_snapshot_json", Type: field.TypeJSON, Nullable: true},
+		{Name: "ranked_account_ids_json", Type: field.TypeJSON, Nullable: true},
+		{Name: "selected_account_id", Type: field.TypeInt, Nullable: true},
+		{Name: "selected_provider_id", Type: field.TypeInt, Nullable: true},
+		{Name: "strategy", Type: field.TypeString, Default: "balanced"},
+		{Name: "strategy_version", Type: field.TypeString, Default: "v1"},
+		{Name: "strategy_config_hash", Type: field.TypeString, Default: ""},
+		{Name: "strategy_weights_json", Type: field.TypeJSON, Nullable: true},
+		{Name: "compatibility_warnings_json", Type: field.TypeJSON, Nullable: true},
+	}
+	// SchedulerRequestSnapshotsTable holds the schema information for the "scheduler_request_snapshots" table.
+	SchedulerRequestSnapshotsTable = &schema.Table{
+		Name:       "scheduler_request_snapshots",
+		Columns:    SchedulerRequestSnapshotsColumns,
+		PrimaryKey: []*schema.Column{SchedulerRequestSnapshotsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "schedulerrequestsnapshot_request_id_attempt_no",
+				Unique:  true,
+				Columns: []*schema.Column{SchedulerRequestSnapshotsColumns[3], SchedulerRequestSnapshotsColumns[4]},
+			},
+			{
+				Name:    "schedulerrequestsnapshot_decision_id",
+				Unique:  true,
+				Columns: []*schema.Column{SchedulerRequestSnapshotsColumns[5]},
+			},
+			{
+				Name:    "schedulerrequestsnapshot_strategy_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{SchedulerRequestSnapshotsColumns[12], SchedulerRequestSnapshotsColumns[1]},
+			},
+			{
+				Name:    "schedulerrequestsnapshot_selected_account_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{SchedulerRequestSnapshotsColumns[10], SchedulerRequestSnapshotsColumns[1]},
+			},
+		},
+	}
 	// SchedulerStrategiesColumns holds the columns for the "scheduler_strategies" table.
 	SchedulerStrategiesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -1515,6 +1563,7 @@ var (
 		RolesTable,
 		SchedulerDecisionsTable,
 		SchedulerFeedbacksTable,
+		SchedulerRequestSnapshotsTable,
 		SchedulerStrategiesTable,
 		SettingsTable,
 		SubscriptionPlansTable,
