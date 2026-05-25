@@ -197,6 +197,48 @@ func TestRetentionDefaultsOverridesAndValidation(t *testing.T) {
 	}
 }
 
+func TestBalanceChargerDefaultsOverridesAndValidation(t *testing.T) {
+	t.Setenv("BALANCE_CHARGER_INTERVAL_SECONDS", "")
+	t.Setenv("BALANCE_CHARGER_BATCH_LIMIT", "")
+	t.Setenv("BALANCE_CHARGER_MAX_BATCHES_PER_RUN", "")
+	cfg := Load()
+	if cfg.BalanceCharger.Interval != time.Minute ||
+		cfg.BalanceCharger.BatchLimit != 500 ||
+		cfg.BalanceCharger.MaxBatchesPerRun != 20 {
+		t.Fatalf("unexpected balance charger defaults: %+v", cfg.BalanceCharger)
+	}
+
+	t.Setenv("BALANCE_CHARGER_INTERVAL_SECONDS", "30")
+	t.Setenv("BALANCE_CHARGER_BATCH_LIMIT", "250")
+	t.Setenv("BALANCE_CHARGER_MAX_BATCHES_PER_RUN", "8")
+	cfg = Load()
+	if cfg.BalanceCharger.Interval != 30*time.Second ||
+		cfg.BalanceCharger.BatchLimit != 250 ||
+		cfg.BalanceCharger.MaxBatchesPerRun != 8 {
+		t.Fatalf("unexpected balance charger overrides: %+v", cfg.BalanceCharger)
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("expected balance charger config to validate, got %v", err)
+	}
+
+	cfg.BalanceCharger.Interval = 0
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "BALANCE_CHARGER_INTERVAL_SECONDS") {
+		t.Fatalf("expected balance charger interval validation failure, got %v", err)
+	}
+
+	cfg = Load()
+	cfg.BalanceCharger.BatchLimit = 0
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "BALANCE_CHARGER_BATCH_LIMIT") {
+		t.Fatalf("expected balance charger batch limit validation failure, got %v", err)
+	}
+
+	cfg = Load()
+	cfg.BalanceCharger.MaxBatchesPerRun = 0
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "BALANCE_CHARGER_MAX_BATCHES_PER_RUN") {
+		t.Fatalf("expected balance charger max batches validation failure, got %v", err)
+	}
+}
+
 func TestHealthProbeDefaultsOverridesAndValidation(t *testing.T) {
 	t.Setenv("ACCOUNT_HEALTH_PROBE_INTERVAL_SECONDS", "")
 	t.Setenv("ACCOUNT_HEALTH_PROBE_TIMEOUT_SECONDS", "")

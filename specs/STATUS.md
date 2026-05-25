@@ -99,6 +99,7 @@ last_completed:
 - C3.1: Workspace persistence now adds `workspaces`, nullable `users.workspace_id`, nullable `api_keys.workspace_id`, `000008_workspaces_and_user_workspace_id` up/down migrations, User store personal workspace creation, API Key workspace inheritance, and docs/spec migration parity.
 - C3.2: Role permission persistence now adds `roles.permissions_json`, admin roles APIs, merged user session permissions, `entitlements` query-cache rows materialized from active subscription snapshots, `000009_role_permissions_and_entitlements` up/down migrations, and an HTTP regression proving `payment_order:read` grants read-only admin payment order access while plain users are rejected.
 - B1.2.1: Usage charging performance indexing now replaces the single-column `usage_logs(charged_at)` index with `usage_logs(charged_at, success, created_at)`, makes `ListPendingUsageCharges` scan oldest pending usage first, and adds a persistence regression for deterministic pending charge ordering.
+- B1.2.2: Balance charger throughput is now configurable with `BALANCE_CHARGER_INTERVAL_SECONDS`, `BALANCE_CHARGER_BATCH_LIMIT`, and `BALANCE_CHARGER_MAX_BATCHES_PER_RUN`; app wiring passes those values into the worker, and a focused worker regression proves the default run drains 20 batches of 500 pending usage charges, covering the local 10k usage/min backlog guard without changing Billing store transaction boundaries.
 - B4.2: Alipay Official payment support now adds `smartwalle/alipay/v3`, a checkout provider for `alipay.trade.page.pay` / `alipay.trade.wap.pay`, service-level Alipay async notification verification with the order-bound provider instance, and regressions for signed checkout URL generation, webhook fulfillment, idempotency, invalid-signature fail-closed behavior, multi-instance ownership, and invalid return URL rejection. Real Alipay sandbox smoke still requires external merchant credentials.
 - B4.3: WeChat Pay Official support now adds `wechatpay-apiv3/wechatpay-go`, a checkout provider for Native / H5 / JSAPI prepay flows, service-level WeChat APIv3 notification signature verification and AES-GCM decrypt handling, and regressions for checkout metadata, signed notification fulfillment, idempotency, and local config requirement checks. Real WeChat sandbox smoke still requires external merchant credentials.
 - C1.1: Structured trace service spans now cover `scheduler.Schedule`, `payments.HandleWebhook`, and `accounts.ProbeAccount` with reusable `platform/otel.StartSpan` / `EndSpan`, low-sensitive diagnostic attributes, business outcome fields, stable `error.type` classification, focused span export tests, and a local OTLP gRPC collector smoke proving enabled trace export flushes span/resource data through the real OTLP protocol.
@@ -107,14 +108,15 @@ last_completed:
 current:
 
 - package: Phase 1 production smoke and observability hardening
-- status: API key/user rate limits, API key concurrency, scheduler account quota evidence, provider-account RPM/TPM Redis counters, provider-account ordinary HTTP concurrency Redis leases, local schema repair for multi-attempt usage evidence, and protocol-level OTLP trace export smoke are implemented and locally verified; live external provider/payment smoke still depends on valid upstream or merchant credentials.
+- status: API key/user rate limits, API key concurrency, scheduler account quota evidence, provider-account RPM/TPM Redis counters, provider-account ordinary HTTP concurrency Redis leases, local schema repair for multi-attempt usage evidence, protocol-level OTLP trace export smoke, and the balance_charger local 10k pending-usage drain guard are implemented and locally verified; live external provider/payment smoke still depends on valid upstream or merchant credentials.
 - objective: continue closing production smoke, sandbox, collector-visualization, and pressure-test gaps without letting docs/specs drift.
 
-next_recommended: Run real Stripe/Alipay/WeChat sandbox smoke when merchant credentials are available, run a Jaeger/Tempo UI trace visualization smoke against a deployed collector, or continue the remaining Phase 1 production pressure-test tasks from `specs/silly-stirring-turtle.md`.
+next_recommended: Run real Stripe/Alipay/WeChat sandbox smoke when merchant credentials are available, run a Jaeger/Tempo UI trace visualization smoke against a deployed collector, run a production-adjacent PostgreSQL balance_charger pressure test, or continue the remaining Phase 1 production pressure-test tasks from `specs/silly-stirring-turtle.md`.
 
 last_gates:
 
-- `cd apps/api && go test ./internal/platform/otel ./internal/httpserver -run 'Test(NewTracerProvider|EndSpan|TracingMiddlewareRecordsHTTPServerSpan)' -count=1`: pass
+- `cd apps/api && go test ./internal/workers/balance_charger ./internal/config ./internal/app -count=1`: pass
+- `cd apps/api && go test ./...`: pass
 - `make architecture-check`: pass
 - `make code-quality-check`: pass
 - `make diff-check`: pass
@@ -125,6 +127,7 @@ notes:
 - Existing `docs/` remains the architecture and domain source of truth.
 - Real Stripe/Alipay/WeChat sandbox smoke still requires merchant credentials.
 - Jaeger/Tempo UI trace visualization smoke still requires a deployed collector backend; local OTLP gRPC protocol export is covered by `TestNewTracerProviderExportsSpansToOTLPCollector`.
+- The balance_charger 10k usage/min guard is worker-level and deterministic; a production-adjacent PostgreSQL pressure test is still needed before claiming deployed database throughput under real IO.
 - The rate-limit p99 guard is now available, but this workstation did not produce a valid 2ms Redis baseline; rerun it against local/native or production-adjacent Redis before claiming the limiter p99 budget is met.
 - Historical strategy replay can only be claimed for decisions that have `scheduler_request_snapshots`; older decision-only rows remain report-only because they lack the full request profile and candidate set.
 - Future goal runs must read `specs/README.md` first, then continue from `next_recommended`.

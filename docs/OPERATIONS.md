@@ -210,6 +210,12 @@ make smoke-release
 
 `auth_session_cleanup` worker 在持久化 AuthSession store 可用时随 API 进程启动，默认每 24 小时运行一次。它只处理 `expires_at <= now` 的 `active` 控制台 session，将其标记为 `expired` 并设置 `deleted_at`；登出产生的 `revoked` session 保持原状态。相关配置项为 `AUTH_SESSION_CLEANUP_INTERVAL_SECONDS`。
 
+### 余额扣费
+
+`balance_charger` worker 由 `internal/app` 在持久化 usage charge store 可用时启动。它默认每 1 分钟扫描未扣费且成功的 `usage_logs`，按 user/currency 聚合为 `billing_ledgers`，扣减用户余额并标记 `charged_at`。
+
+相关配置项为 `BALANCE_CHARGER_INTERVAL_SECONDS`、`BALANCE_CHARGER_BATCH_LIMIT` 和 `BALANCE_CHARGER_MAX_BATCHES_PER_RUN`。默认每轮处理 `500 * 20 = 10,000` 条 pending usage，用于覆盖 10k usage/min 的生产 backlog 目标；单个 batch 仍在 Billing store 事务内完成 ledger、balance 和 usage 标记，确保吞吐配置不改变账务一致性边界。
+
 ### 账号健康探测
 
 `health_probe` worker 由 `internal/app` 在持久化 account/provider store 可用时启动。它默认每 5 分钟遍历活跃 API-key provider account，调用上游 `/models` 类轻量端点，写入 `account_health_snapshots`，并在连续失败或错误率过高时给账号写入 cooldown / circuit metadata。相关配置项为 `ACCOUNT_HEALTH_PROBE_INTERVAL_SECONDS`、`ACCOUNT_HEALTH_PROBE_TIMEOUT_SECONDS`、`ACCOUNT_HEALTH_PROBE_MAX_CONCURRENT`、`ACCOUNT_HEALTH_PROBE_FAILURE_THRESHOLD`、`ACCOUNT_HEALTH_PROBE_ERROR_RATE_THRESHOLD_PERCENT`、`ACCOUNT_HEALTH_PROBE_MIN_SAMPLES_FOR_ERROR_RATE` 和 `ACCOUNT_HEALTH_PROBE_COOLDOWN_SECONDS`。

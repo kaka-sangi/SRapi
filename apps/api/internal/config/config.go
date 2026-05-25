@@ -19,19 +19,20 @@ const (
 )
 
 type Config struct {
-	Server        ServerConfig
-	Storage       StorageConfig
-	Database      DependencyConfig
-	Redis         DependencyConfig
-	Gateway       GatewayConfig
-	Security      SecurityConfig
-	Bootstrap     BootstrapConfig
-	Retention     RetentionConfig
-	AuthCleanup   AuthCleanupConfig
-	HealthProbe   HealthProbeConfig
-	QualityEval   QualityEvalConfig
-	SLOEvaluator  SLOEvaluatorConfig
-	Observability ObservabilityConfig
+	Server         ServerConfig
+	Storage        StorageConfig
+	Database       DependencyConfig
+	Redis          DependencyConfig
+	Gateway        GatewayConfig
+	Security       SecurityConfig
+	Bootstrap      BootstrapConfig
+	Retention      RetentionConfig
+	AuthCleanup    AuthCleanupConfig
+	BalanceCharger BalanceChargerConfig
+	HealthProbe    HealthProbeConfig
+	QualityEval    QualityEvalConfig
+	SLOEvaluator   SLOEvaluatorConfig
+	Observability  ObservabilityConfig
 }
 
 type ServerConfig struct {
@@ -86,6 +87,13 @@ type RetentionConfig struct {
 // AuthCleanupConfig controls expired console session cleanup.
 type AuthCleanupConfig struct {
 	Interval time.Duration
+}
+
+// BalanceChargerConfig controls pending usage charging throughput.
+type BalanceChargerConfig struct {
+	Interval         time.Duration
+	BatchLimit       int
+	MaxBatchesPerRun int
 }
 
 // HealthProbeConfig controls the account health probe worker.
@@ -183,6 +191,11 @@ func Load() Config {
 		AuthCleanup: AuthCleanupConfig{
 			Interval: time.Duration(getIntEnv("AUTH_SESSION_CLEANUP_INTERVAL_SECONDS", 86400)) * time.Second,
 		},
+		BalanceCharger: BalanceChargerConfig{
+			Interval:         time.Duration(getIntEnv("BALANCE_CHARGER_INTERVAL_SECONDS", 60)) * time.Second,
+			BatchLimit:       getIntEnv("BALANCE_CHARGER_BATCH_LIMIT", 500),
+			MaxBatchesPerRun: getIntEnv("BALANCE_CHARGER_MAX_BATCHES_PER_RUN", 20),
+		},
 		HealthProbe: HealthProbeConfig{
 			Interval:               time.Duration(getIntEnv("ACCOUNT_HEALTH_PROBE_INTERVAL_SECONDS", 300)) * time.Second,
 			Timeout:                time.Duration(getIntEnv("ACCOUNT_HEALTH_PROBE_TIMEOUT_SECONDS", 10)) * time.Second,
@@ -272,6 +285,15 @@ func (c Config) Validate() error {
 	}
 	if c.AuthCleanup.Interval <= 0 {
 		return fmt.Errorf("AUTH_SESSION_CLEANUP_INTERVAL_SECONDS must be positive")
+	}
+	if c.BalanceCharger.Interval <= 0 {
+		return fmt.Errorf("BALANCE_CHARGER_INTERVAL_SECONDS must be positive")
+	}
+	if c.BalanceCharger.BatchLimit <= 0 {
+		return fmt.Errorf("BALANCE_CHARGER_BATCH_LIMIT must be positive")
+	}
+	if c.BalanceCharger.MaxBatchesPerRun <= 0 {
+		return fmt.Errorf("BALANCE_CHARGER_MAX_BATCHES_PER_RUN must be positive")
 	}
 	if c.HealthProbe.Interval <= 0 {
 		return fmt.Errorf("ACCOUNT_HEALTH_PROBE_INTERVAL_SECONDS must be positive")

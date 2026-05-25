@@ -20,13 +20,16 @@ const (
 	defaultInterval      = time.Minute
 	shutdownPollInterval = 10 * time.Millisecond
 	defaultBatchLimit    = 500
+	defaultMaxBatches    = 20
 )
 
 type Config struct {
-	Interval time.Duration
-	Clock    billingservice.Clock
-	Audit    auditcontract.Store
-	Users    userscontract.Store
+	Interval         time.Duration
+	BatchLimit       int
+	MaxBatchesPerRun int
+	Clock            billingservice.Clock
+	Audit            auditcontract.Store
+	Users            userscontract.Store
 }
 
 type Worker struct {
@@ -35,6 +38,8 @@ type Worker struct {
 	audit    *auditservice.Service
 	logger   *slog.Logger
 	interval time.Duration
+	limit    int
+	maxBatch int
 
 	mu     sync.Mutex
 	cancel context.CancelFunc
@@ -70,12 +75,22 @@ func New(store billingcontract.UsageChargeStore, logger *slog.Logger, cfg Config
 	if interval <= 0 {
 		interval = defaultInterval
 	}
+	limit := cfg.BatchLimit
+	if limit <= 0 {
+		limit = defaultBatchLimit
+	}
+	maxBatch := cfg.MaxBatchesPerRun
+	if maxBatch <= 0 {
+		maxBatch = defaultMaxBatches
+	}
 	return &Worker{
 		billing:  billingSvc,
 		users:    usersSvc,
 		audit:    auditSvc,
 		logger:   logger,
 		interval: interval,
+		limit:    limit,
+		maxBatch: maxBatch,
 	}, nil
 }
 
@@ -142,14 +157,26 @@ func (w *Worker) RunOnce(ctx context.Context) (billingcontract.ChargePendingUsag
 	if w == nil {
 		return billingcontract.ChargePendingUsageResult{}, nil
 	}
-	result, err := w.billing.ChargePendingUsage(ctx, billingcontract.ChargePendingUsageRequest{Limit: defaultBatchLimit})
-	if err != nil {
-		return result, err
+	aggregate := billingcontract.ChargePendingUsageResult{}
+	for batch := 0; batch < w.maxBatch; batch++ {
+		if err := ctx.Err(); err != nil {
+			return aggregate, err
+		}
+		result, err := w.billing.ChargePendingUsage(ctx, billingcontract.ChargePendingUsageRequest{Limit: w.limit})
+		if err != nil {
+			return aggregate, err
+		}
+		aggregate.Selected += result.Selected
+		aggregate.Charged += result.Charged
+		aggregate.Batches = append(aggregate.Batches, result.Batches...)
+		if result.Selected == 0 || result.Selected < w.limit || result.Charged == 0 {
+			break
+		}
 	}
-	if err := w.handleDisabledUsers(ctx, result.Batches); err != nil && !errors.Is(err, context.Canceled) {
-		return result, err
+	if err := w.handleDisabledUsers(ctx, aggregate.Batches); err != nil && !errors.Is(err, context.Canceled) {
+		return aggregate, err
 	}
-	return result, nil
+	return aggregate, nil
 }
 
 func (w *Worker) run(ctx context.Context) {

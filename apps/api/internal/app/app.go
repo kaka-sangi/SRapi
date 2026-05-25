@@ -198,7 +198,7 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 	if err != nil {
 		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
-	balance, err := balanceChargerWorker(stores, logger)
+	balance, err := balanceChargerWorker(cfg, stores, logger)
 	if err != nil {
 		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
@@ -393,13 +393,16 @@ func subscriptionExpirerWorker(stores *entstore.Stores, logger *slog.Logger) (*s
 	})
 }
 
-func balanceChargerWorker(stores *entstore.Stores, logger *slog.Logger) (*balancechargerworker.Worker, error) {
+func balanceChargerWorker(cfg config.Config, stores *entstore.Stores, logger *slog.Logger) (*balancechargerworker.Worker, error) {
 	if stores == nil || stores.UsageCharges == nil {
 		return nil, nil
 	}
 	return balancechargerworker.New(stores.UsageCharges, logger, balancechargerworker.Config{
-		Users: stores.Users,
-		Audit: stores.Audit,
+		Interval:         cfg.BalanceCharger.Interval,
+		BatchLimit:       cfg.BalanceCharger.BatchLimit,
+		MaxBatchesPerRun: cfg.BalanceCharger.MaxBatchesPerRun,
+		Users:            stores.Users,
+		Audit:            stores.Audit,
 	})
 }
 

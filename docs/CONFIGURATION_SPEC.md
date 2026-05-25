@@ -221,7 +221,21 @@ QUALITY_EVAL_OPENAI_API_KEY=
 - worker 默认每小时从未评估的 `quality_eval_samples` 中按 `sample_request_hash` 稳定抽样 1%，单批最多 100 条，单条 judge 调用 30 秒总超时、20 秒上游 HTTP 超时。
 - 样本捕获只保存 content-safety 之后的脱敏文本摘要，并以 `SRAPI_MASTER_KEY` 派生密钥加密；禁用时不新增样本，但已有 `quality_evaluations` 仍可继续作为 Scheduler quality 分数输入。
 
-## 12. Reverse Proxy Runtime
+## 12. Balance Charger
+
+```txt
+BALANCE_CHARGER_INTERVAL_SECONDS=60
+BALANCE_CHARGER_BATCH_LIMIT=500
+BALANCE_CHARGER_MAX_BATCHES_PER_RUN=20
+```
+
+规则：
+
+- `balance_charger` 只在持久化 PostgreSQL store 可用时启动，把未扣费 `usage_logs` 聚合成 `billing_ledgers` 并标记 `charged_at`。
+- worker 每轮最多处理 `BALANCE_CHARGER_BATCH_LIMIT * BALANCE_CHARGER_MAX_BATCHES_PER_RUN` 条 pending usage；默认值覆盖 10,000 usage/min 的规格目标。
+- 单个 batch 仍按 user/currency 聚合并在 Billing store 事务内写 ledger、扣余额和标记 usage，避免把 worker 吞吐配置泄漏到账务一致性边界。
+
+## 13. Reverse Proxy Runtime
 
 ```txt
 REVERSE_PROXY_DEFAULT_CONNECT_TIMEOUT_SECONDS=30
@@ -234,7 +248,7 @@ REVERSE_PROXY_EGRESS_PROFILE_STRICT=false
 
 高级 TLS / HTTP/2 指纹配置以 `REVERSE_PROXY_SPEC.md` 为准。
 
-## 13. Observability
+## 14. Observability
 
 ```txt
 OPS_ENABLED=true
@@ -269,7 +283,7 @@ SLO_EVALUATOR_TIMEOUT_SECONDS=30
 
 SLO evaluator worker 默认每 1 分钟读取 `obs_slo_definitions` 与 `usage_logs`，用 availability SLO 的长/短窗口 burn-rate 阈值生成、更新或自动恢复 `obs_alert_events`。单次 evaluation 默认 30 秒超时；告警 details 只包含 SLO id/name、窗口秒数、请求计数和 burn-rate 数值，不包含 API key、credential、prompt、request body 或 provider secret。
 
-## 14. Payment
+## 15. Payment
 
 ```txt
 PAYMENT_ENABLED=false
@@ -280,7 +294,7 @@ PAYMENT_DAILY_AMOUNT_LIMIT=
 
 支付服务商密钥不得通过 env 明文长期管理，优先使用后台加密 settings 或 secret manager。
 
-## 15. Security / URL Allowlist
+## 16. Security / URL Allowlist
 
 ```txt
 SECURITY_URL_ALLOWLIST_ENABLED=false
@@ -293,7 +307,7 @@ SECURITY_URL_ALLOWLIST_CRS_HOSTS=
 
 所有自定义 upstream、pricing、CRS URL 必须经过 SSRF 防护。
 
-## 16. OAuth Client Credentials
+## 17. OAuth Client Credentials
 
 ```txt
 GEMINI_CLI_OAUTH_CLIENT_ID=
@@ -306,7 +320,7 @@ ANTIGRAVITY_OAUTH_CLIENT_SECRET=
 
 SRapi 不得在代码仓库中内置第三方 OAuth client_secret。
 
-## 17. Update / External Fetch
+## 18. Update / External Fetch
 
 ```txt
 UPDATE_PROXY_URL=
@@ -316,7 +330,7 @@ PRICING_UPDATE_PROXY_URL=
 
 外部 fetch 必须遵守 URL allowlist / SSRF 规则。
 
-## 18. 配置变更审计
+## 19. 配置变更审计
 
 以下配置变更必须写 audit log：
 
@@ -328,7 +342,7 @@ PRICING_UPDATE_PROXY_URL=
 - Reverse Proxy Egress Profile。
 - Observability notification channel。
 
-## 19. MVP 最小要求
+## 20. MVP 最小要求
 
 MVP 至少提供：
 

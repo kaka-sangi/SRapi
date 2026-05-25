@@ -91,24 +91,87 @@ func TestRunOnceSuspendsAndAuditsNegativeBalanceUser(t *testing.T) {
 	}
 }
 
-type fakeUsageChargeStore struct {
-	pending []billingcontract.PendingUsageCharge
-	result  billingcontract.ChargeUsageResult
+func TestRunOnceDrainsConfiguredBatches(t *testing.T) {
+	store := &fakeUsageChargeStore{
+		pending: makePendingCharges(10000),
+	}
+	worker, err := New(store, slog.New(slog.NewTextHandler(io.Discard, nil)), Config{})
+	if err != nil {
+		t.Fatalf("new worker: %v", err)
+	}
+
+	result, err := worker.RunOnce(t.Context())
+	if err != nil {
+		t.Fatalf("run worker once: %v", err)
+	}
+
+	if result.Selected != 10000 || result.Charged != 10000 {
+		t.Fatalf("expected one run to charge 10000 pending usage logs, got %+v", result)
+	}
+	if len(store.pending) != 0 {
+		t.Fatalf("expected pending queue drained, got %d entries", len(store.pending))
+	}
+	if store.listCalls != defaultMaxBatches || store.chargeCalls != defaultMaxBatches {
+		t.Fatalf("expected %d list/charge batches, got list=%d charge=%d", defaultMaxBatches, store.listCalls, store.chargeCalls)
+	}
 }
 
-func (s *fakeUsageChargeStore) ListPendingUsageCharges(context.Context, int) ([]billingcontract.PendingUsageCharge, error) {
-	out := make([]billingcontract.PendingUsageCharge, len(s.pending))
-	copy(out, s.pending)
+type fakeUsageChargeStore struct {
+	pending     []billingcontract.PendingUsageCharge
+	result      billingcontract.ChargeUsageResult
+	listCalls   int
+	chargeCalls int
+}
+
+func (s *fakeUsageChargeStore) ListPendingUsageCharges(_ context.Context, limit int) ([]billingcontract.PendingUsageCharge, error) {
+	s.listCalls++
+	if limit <= 0 || limit > len(s.pending) {
+		limit = len(s.pending)
+	}
+	out := make([]billingcontract.PendingUsageCharge, limit)
+	copy(out, s.pending[:limit])
 	return out, nil
 }
 
 func (s *fakeUsageChargeStore) ChargeUsage(_ context.Context, req billingcontract.ChargeUsageRequest) (billingcontract.ChargeUsageResult, error) {
+	s.chargeCalls++
 	result := s.result
+	if result.UserID == 0 {
+		result.UserID = req.UserID
+	}
+	if result.LedgerEntry.ID == 0 {
+		result.LedgerEntry.ID = s.chargeCalls
+	}
 	result.ChargedUsageLogIDs = append([]int(nil), req.UsageLogIDs...)
 	if result.LedgerEntry.ReferenceID == "" {
 		result.LedgerEntry.ReferenceID = req.ReferenceID
 	}
+	charged := map[int]struct{}{}
+	for _, id := range req.UsageLogIDs {
+		charged[id] = struct{}{}
+	}
+	remaining := s.pending[:0]
+	for _, item := range s.pending {
+		if _, ok := charged[item.UsageLogID]; !ok {
+			remaining = append(remaining, item)
+		}
+	}
+	s.pending = remaining
 	return result, nil
+}
+
+func makePendingCharges(count int) []billingcontract.PendingUsageCharge {
+	out := make([]billingcontract.PendingUsageCharge, 0, count)
+	for id := 1; id <= count; id++ {
+		out = append(out, billingcontract.PendingUsageCharge{
+			UsageLogID: id,
+			RequestID:  "req_batch",
+			UserID:     1,
+			Cost:       "0.00010000",
+			Currency:   "USD",
+		})
+	}
+	return out
 }
 
 type fixedClock struct {
