@@ -1672,22 +1672,22 @@ func (e SchedulerDecisionStrategy) Valid() bool {
 
 // Defines values for SchedulerSimulationProfileUserTier.
 const (
-	SchedulerSimulationProfileUserTierAdmin    SchedulerSimulationProfileUserTier = "admin"
-	SchedulerSimulationProfileUserTierFree     SchedulerSimulationProfileUserTier = "free"
-	SchedulerSimulationProfileUserTierPro      SchedulerSimulationProfileUserTier = "pro"
-	SchedulerSimulationProfileUserTierStandard SchedulerSimulationProfileUserTier = "standard"
+	Admin    SchedulerSimulationProfileUserTier = "admin"
+	Free     SchedulerSimulationProfileUserTier = "free"
+	Pro      SchedulerSimulationProfileUserTier = "pro"
+	Standard SchedulerSimulationProfileUserTier = "standard"
 )
 
 // Valid indicates whether the value is a known member of the SchedulerSimulationProfileUserTier enum.
 func (e SchedulerSimulationProfileUserTier) Valid() bool {
 	switch e {
-	case SchedulerSimulationProfileUserTierAdmin:
+	case Admin:
 		return true
-	case SchedulerSimulationProfileUserTierFree:
+	case Free:
 		return true
-	case SchedulerSimulationProfileUserTierPro:
+	case Pro:
 		return true
-	case SchedulerSimulationProfileUserTierStandard:
+	case Standard:
 		return true
 	default:
 		return false
@@ -1829,30 +1829,6 @@ func (e UsageAggregateDimension) Valid() bool {
 	case UsageAggregateDimensionModel:
 		return true
 	case UsageAggregateDimensionUser:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for UserRole.
-const (
-	UserRoleAdmin    UserRole = "admin"
-	UserRoleOperator UserRole = "operator"
-	UserRoleOwner    UserRole = "owner"
-	UserRoleUser     UserRole = "user"
-)
-
-// Valid indicates whether the value is a known member of the UserRole enum.
-func (e UserRole) Valid() bool {
-	switch e {
-	case UserRoleAdmin:
-		return true
-	case UserRoleOperator:
-		return true
-	case UserRoleOwner:
-		return true
-	case UserRoleUser:
 		return true
 	default:
 		return false
@@ -3125,6 +3101,15 @@ type CreateRedeemCodeRequest struct {
 	MaxRedemptions *int           `json:"max_redemptions,omitempty"`
 	Type           RedeemCodeType `json:"type"`
 	Value          string         `json:"value"`
+}
+
+// CreateRoleRequest defines model for CreateRoleRequest.
+type CreateRoleRequest struct {
+	Description *string `json:"description,omitempty"`
+
+	// Name Role name. Built-in roles are owner, admin, operator, and user; custom roles are managed through the admin roles API.
+	Name        UserRole `json:"name"`
+	Permissions []string `json:"permissions"`
 }
 
 // CreateSubscriptionPlanRequest defines model for CreateSubscriptionPlanRequest.
@@ -4653,6 +4638,31 @@ type RiskControlStatusResponse struct {
 	RequestId RequestId         `json:"request_id"`
 }
 
+// Role defines model for Role.
+type Role struct {
+	CreatedAt   Timestamp `json:"created_at"`
+	Description string    `json:"description"`
+	Id          Id        `json:"id"`
+
+	// Name Role name. Built-in roles are owner, admin, operator, and user; custom roles are managed through the admin roles API.
+	Name        UserRole  `json:"name"`
+	Permissions []string  `json:"permissions"`
+	UpdatedAt   Timestamp `json:"updated_at"`
+}
+
+// RoleListResponse defines model for RoleListResponse.
+type RoleListResponse struct {
+	Data       []Role     `json:"data"`
+	Pagination Pagination `json:"pagination"`
+	RequestId  RequestId  `json:"request_id"`
+}
+
+// RoleResponse defines model for RoleResponse.
+type RoleResponse struct {
+	Data      Role      `json:"data"`
+	RequestId RequestId `json:"request_id"`
+}
+
 // RuntimeClass defines model for RuntimeClass.
 type RuntimeClass string
 
@@ -5265,8 +5275,8 @@ type UserResponse struct {
 	RequestId RequestId `json:"request_id"`
 }
 
-// UserRole defines model for UserRole.
-type UserRole string
+// UserRole Role name. Built-in roles are owner, admin, operator, and user; custom roles are managed through the admin roles API.
+type UserRole = string
 
 // UserStatus defines model for UserStatus.
 type UserStatus string
@@ -5921,6 +5931,9 @@ type BatchGenerateAdminRedeemCodesJSONRequestBody = BatchGenerateRedeemCodesRequ
 
 // UpdateAdminRiskControlConfigJSONRequestBody defines body for UpdateAdminRiskControlConfig for application/json ContentType.
 type UpdateAdminRiskControlConfigJSONRequestBody = RiskControlConfig
+
+// CreateAdminRoleJSONRequestBody defines body for CreateAdminRole for application/json ContentType.
+type CreateAdminRoleJSONRequestBody = CreateRoleRequest
 
 // ReplaySchedulerStrategyJSONRequestBody defines body for ReplaySchedulerStrategy for application/json ContentType.
 type ReplaySchedulerStrategyJSONRequestBody = SchedulerReplayRequest
@@ -12172,6 +12185,12 @@ type ServerInterface interface {
 	// Get risk-control runtime status.
 	// (GET /api/v1/admin/risk-control/status)
 	GetAdminRiskControlStatus(w http.ResponseWriter, r *http.Request)
+	// List role definitions.
+	// (GET /api/v1/admin/roles)
+	ListAdminRoles(w http.ResponseWriter, r *http.Request)
+	// Create a role definition.
+	// (POST /api/v1/admin/roles)
+	CreateAdminRole(w http.ResponseWriter, r *http.Request)
 	// List scheduler decisions.
 	// (GET /api/v1/admin/scheduler/decisions)
 	ListAdminSchedulerDecisions(w http.ResponseWriter, r *http.Request, params ListAdminSchedulerDecisionsParams)
@@ -16216,6 +16235,48 @@ func (siw *ServerInterfaceWrapper) GetAdminRiskControlStatus(w http.ResponseWrit
 	handler.ServeHTTP(w, r)
 }
 
+// ListAdminRoles operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminRoles(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminRoles(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAdminRole operation middleware
+func (siw *ServerInterfaceWrapper) CreateAdminRole(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAdminRole(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListAdminSchedulerDecisions operation middleware
 func (siw *ServerInterfaceWrapper) ListAdminSchedulerDecisions(w http.ResponseWriter, r *http.Request) {
 
@@ -18579,6 +18640,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/admin/risk-control/config", wrapper.UpdateAdminRiskControlConfig)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/risk-control/logs", wrapper.ListAdminRiskControlLogs)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/risk-control/status", wrapper.GetAdminRiskControlStatus)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/roles", wrapper.ListAdminRoles)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/roles", wrapper.CreateAdminRole)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/scheduler/decisions", wrapper.ListAdminSchedulerDecisions)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/scheduler/overview", wrapper.GetAdminSchedulerOverview)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/scheduler/replay", wrapper.ReplaySchedulerStrategy)

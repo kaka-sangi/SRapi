@@ -81,6 +81,44 @@ func TestStoreCreatesAndLoadsUserWithRoles(t *testing.T) {
 	}
 }
 
+func TestStoreCreatesRoleAndLoadsPermissions(t *testing.T) {
+	client := enttest.Open(t, dialect.SQLite, sqliteDSN(t))
+	defer client.Close()
+
+	store, err := New(client)
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+
+	ctx := context.Background()
+	role, err := store.CreateRole(ctx, contract.CreateStoredRole{
+		Name:        "payment_reader",
+		Description: "Payment reader",
+		Permissions: []string{contract.PermissionPaymentOrderRead},
+	})
+	if err != nil {
+		t.Fatalf("create role: %v", err)
+	}
+	if role.ID == 0 || len(role.Permissions) != 1 || role.Permissions[0] != contract.PermissionPaymentOrderRead {
+		t.Fatalf("unexpected role: %+v", role)
+	}
+	created, err := store.Create(ctx, contract.CreateStoredUser{
+		Email:        "reader@srapi.local",
+		Name:         "Reader",
+		PasswordHash: "hash",
+		Status:       contract.StatusActive,
+		Roles:        []contract.Role{"payment_reader"},
+		Balance:      "0.00000000",
+		Currency:     "USD",
+	})
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	if len(created.Permissions) != 1 || created.Permissions[0] != contract.PermissionPaymentOrderRead {
+		t.Fatalf("expected role permission on user, got %+v", created.Permissions)
+	}
+}
+
 func TestStoreListByIDsPreservesOrder(t *testing.T) {
 	client := enttest.Open(t, dialect.SQLite, sqliteDSN(t))
 	defer client.Close()

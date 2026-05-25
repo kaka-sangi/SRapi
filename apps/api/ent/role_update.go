@@ -10,6 +10,7 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
+	"entgo.io/ent/dialect/sql/sqljson"
 	"entgo.io/ent/schema/field"
 	"github.com/srapi/srapi/apps/api/ent/predicate"
 	"github.com/srapi/srapi/apps/api/ent/role"
@@ -59,6 +60,24 @@ func (_u *RoleUpdate) SetNillableDescription(v *string) *RoleUpdate {
 	if v != nil {
 		_u.SetDescription(*v)
 	}
+	return _u
+}
+
+// SetPermissionsJSON sets the "permissions_json" field.
+func (_u *RoleUpdate) SetPermissionsJSON(v []string) *RoleUpdate {
+	_u.mutation.SetPermissionsJSON(v)
+	return _u
+}
+
+// AppendPermissionsJSON appends value to the "permissions_json" field.
+func (_u *RoleUpdate) AppendPermissionsJSON(v []string) *RoleUpdate {
+	_u.mutation.AppendPermissionsJSON(v)
+	return _u
+}
+
+// ClearPermissionsJSON clears the value of the "permissions_json" field.
+func (_u *RoleUpdate) ClearPermissionsJSON() *RoleUpdate {
+	_u.mutation.ClearPermissionsJSON()
 	return _u
 }
 
@@ -134,6 +153,17 @@ func (_u *RoleUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.Description(); ok {
 		_spec.SetField(role.FieldDescription, field.TypeString, value)
 	}
+	if value, ok := _u.mutation.PermissionsJSON(); ok {
+		_spec.SetField(role.FieldPermissionsJSON, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedPermissionsJSON(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, role.FieldPermissionsJSON, value)
+		})
+	}
+	if _u.mutation.PermissionsJSONCleared() {
+		_spec.ClearField(role.FieldPermissionsJSON, field.TypeJSON)
+	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{role.Label}
@@ -185,6 +215,24 @@ func (_u *RoleUpdateOne) SetNillableDescription(v *string) *RoleUpdateOne {
 	if v != nil {
 		_u.SetDescription(*v)
 	}
+	return _u
+}
+
+// SetPermissionsJSON sets the "permissions_json" field.
+func (_u *RoleUpdateOne) SetPermissionsJSON(v []string) *RoleUpdateOne {
+	_u.mutation.SetPermissionsJSON(v)
+	return _u
+}
+
+// AppendPermissionsJSON appends value to the "permissions_json" field.
+func (_u *RoleUpdateOne) AppendPermissionsJSON(v []string) *RoleUpdateOne {
+	_u.mutation.AppendPermissionsJSON(v)
+	return _u
+}
+
+// ClearPermissionsJSON clears the value of the "permissions_json" field.
+func (_u *RoleUpdateOne) ClearPermissionsJSON() *RoleUpdateOne {
+	_u.mutation.ClearPermissionsJSON()
 	return _u
 }
 
@@ -289,6 +337,17 @@ func (_u *RoleUpdateOne) sqlSave(ctx context.Context) (_node *Role, err error) {
 	}
 	if value, ok := _u.mutation.Description(); ok {
 		_spec.SetField(role.FieldDescription, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.PermissionsJSON(); ok {
+		_spec.SetField(role.FieldPermissionsJSON, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedPermissionsJSON(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, role.FieldPermissionsJSON, value)
+		})
+	}
+	if _u.mutation.PermissionsJSONCleared() {
+		_spec.ClearField(role.FieldPermissionsJSON, field.TypeJSON)
 	}
 	_node = &Role{config: _u.config}
 	_spec.Assign = _node.assignValues

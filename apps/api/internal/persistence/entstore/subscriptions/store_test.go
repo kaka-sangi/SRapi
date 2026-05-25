@@ -87,6 +87,13 @@ func TestStorePersistsPlansSubscriptionsAndPricingRules(t *testing.T) {
 	if len(active) != 1 || active[0].ID != subscription.ID || active[0].EntitlementsSnapshot["allowed_models"] == nil {
 		t.Fatalf("expected only active subscription with snapshot, got %+v", active)
 	}
+	entitlements, err := store.ListActiveEntitlements(ctx, 1, now)
+	if err != nil {
+		t.Fatalf("list active entitlements: %v", err)
+	}
+	if len(entitlements) != 1 || entitlements[0].FeatureKey != "allowed_models" || entitlements[0].SourceSubscriptionID != subscription.ID {
+		t.Fatalf("expected cached entitlement from active subscription, got %+v", entitlements)
+	}
 	expiredActive, err := store.ListExpiredActiveUserSubscriptions(ctx, now)
 	if err != nil {
 		t.Fatalf("list expired active subscriptions: %v", err)

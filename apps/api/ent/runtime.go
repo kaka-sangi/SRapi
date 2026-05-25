@@ -19,6 +19,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/capabilitydefinition"
 	"github.com/srapi/srapi/apps/api/ent/domaineventsinbox"
 	"github.com/srapi/srapi/apps/api/ent/domaineventsoutbox"
+	"github.com/srapi/srapi/apps/api/ent/entitlement"
 	"github.com/srapi/srapi/apps/api/ent/idempotencyrecord"
 	"github.com/srapi/srapi/apps/api/ent/invitecode"
 	"github.com/srapi/srapi/apps/api/ent/inviterelationship"
@@ -523,6 +524,29 @@ func init() {
 	domaineventsoutboxDescAttemptCount := domaineventsoutboxFields[12].Descriptor()
 	// domaineventsoutbox.DefaultAttemptCount holds the default value on creation for the attempt_count field.
 	domaineventsoutbox.DefaultAttemptCount = domaineventsoutboxDescAttemptCount.Default.(int)
+	entitlementMixin := schema.Entitlement{}.Mixin()
+	entitlementMixinFields0 := entitlementMixin[0].Fields()
+	_ = entitlementMixinFields0
+	entitlementFields := schema.Entitlement{}.Fields()
+	_ = entitlementFields
+	// entitlementDescCreatedAt is the schema descriptor for created_at field.
+	entitlementDescCreatedAt := entitlementMixinFields0[0].Descriptor()
+	// entitlement.DefaultCreatedAt holds the default value on creation for the created_at field.
+	entitlement.DefaultCreatedAt = entitlementDescCreatedAt.Default.(func() time.Time)
+	// entitlementDescUpdatedAt is the schema descriptor for updated_at field.
+	entitlementDescUpdatedAt := entitlementMixinFields0[1].Descriptor()
+	// entitlement.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	entitlement.DefaultUpdatedAt = entitlementDescUpdatedAt.Default.(func() time.Time)
+	// entitlement.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	entitlement.UpdateDefaultUpdatedAt = entitlementDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// entitlementDescScopeType is the schema descriptor for scope_type field.
+	entitlementDescScopeType := entitlementFields[1].Descriptor()
+	// entitlement.DefaultScopeType holds the default value on creation for the scope_type field.
+	entitlement.DefaultScopeType = entitlementDescScopeType.Default.(string)
+	// entitlementDescFeatureKey is the schema descriptor for feature_key field.
+	entitlementDescFeatureKey := entitlementFields[3].Descriptor()
+	// entitlement.FeatureKeyValidator is a validator for the "feature_key" field. It is called by the builders before save.
+	entitlement.FeatureKeyValidator = entitlementDescFeatureKey.Validators[0].(func(string) error)
 	idempotencyrecordMixin := schema.IdempotencyRecord{}.Mixin()
 	idempotencyrecordMixinFields0 := idempotencyrecordMixin[0].Fields()
 	_ = idempotencyrecordMixinFields0

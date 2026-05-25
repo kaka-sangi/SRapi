@@ -73,6 +73,7 @@ packages/openapi/
 
 ```txt
 /api/v1/admin/users
+/api/v1/admin/roles
 /api/v1/admin/providers
 /api/v1/admin/models
 /api/v1/admin/accounts
@@ -166,6 +167,17 @@ Authorization: Bearer sk-xxxx
 ### 4.3 管理员 API
 
 管理员 API 使用控制台登录态，并要求 RBAC 权限。
+
+Admin route 的 `x-srapi-rbac` 可以声明内置角色权限，也可以声明细粒度 permission：
+
+```yaml
+x-srapi-rbac:
+  owner: read
+  admin: read
+  permission: payment_order:read
+```
+
+运行时保留 `owner/admin` 超级管理权限；普通用户必须通过自定义角色获得对应 `resource:action` permission 才能访问该 Admin API。Role 名称是可扩展 string，不再限制为固定 enum。
 
 ### 4.4 Security Schemes
 
@@ -635,8 +647,24 @@ POST /api/v1/admin/pricing-rules:bulk
 - 管理员创建用户订阅时必须复制套餐权益快照，后续套餐变更不得回写既有订阅权益。
 - Pricing Rule 的 `provider_id=0` 表示模型级通用价格，具体 Provider 规则优先。
 - Gateway admission 必须在 Scheduler 获取账号 lease 前执行用户/模型 entitlement 检查。
+- 创建 active user subscription 时必须 materialize `entitlements` 查询缓存；`entitlements_snapshot` 保留为审计/防漂移证据。
 
-### 16.10 Admin Ops
+### 16.10 Admin Roles
+
+```txt
+GET  /api/v1/admin/roles
+POST /api/v1/admin/roles
+```
+
+Role 控制面必须满足：
+
+- `name` 使用可扩展 role string，内置值为 `owner`、`admin`、`operator`、`user`。
+- `permissions` 是去重后的 `resource:action` 字符串数组，例如 `payment_order:read`。
+- 创建 role 必须要求控制台登录态和 CSRF。
+- User create/update/batch update 可分配已存在的自定义 role。
+- `GET /api/v1/admin/payments/orders` 接受 `owner/admin` 或 `payment_order:read` permission。
+
+### 16.11 Admin Ops
 
 ```txt
 GET  /api/v1/admin/ops/overview

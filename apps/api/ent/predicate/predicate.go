@@ -48,6 +48,9 @@ type DomainEventsInbox func(*sql.Selector)
 // DomainEventsOutbox is the predicate function for domaineventsoutbox builders.
 type DomainEventsOutbox func(*sql.Selector)
 
+// Entitlement is the predicate function for entitlement builders.
+type Entitlement func(*sql.Selector)
+
 // IdempotencyRecord is the predicate function for idempotencyrecord builders.
 type IdempotencyRecord func(*sql.Selector)
 

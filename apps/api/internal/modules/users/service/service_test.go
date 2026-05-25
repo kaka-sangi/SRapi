@@ -59,6 +59,37 @@ func TestAuthenticatePasswordAcceptsValidPassword(t *testing.T) {
 	}
 }
 
+func TestCustomRoleCarriesPermissions(t *testing.T) {
+	store := newMemoryStore()
+	svc, err := New(store, nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	role, err := svc.CreateRole(context.Background(), CreateRoleRequest{
+		Name:        "payment_reader",
+		Description: "Payment reader",
+		Permissions: []string{"payment_order:read", "payment_order:read"},
+	})
+	if err != nil {
+		t.Fatalf("create role: %v", err)
+	}
+	if role.Name != "payment_reader" || len(role.Permissions) != 1 || role.Permissions[0] != "payment_order:read" {
+		t.Fatalf("unexpected role definition: %+v", role)
+	}
+	created, err := svc.Create(context.Background(), CreateRequest{
+		Email:    "reader@srapi.local",
+		Name:     "Reader",
+		Password: "password123",
+		Roles:    []contract.Role{"payment_reader"},
+	})
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	if len(created.Permissions) != 1 || created.Permissions[0] != "payment_order:read" {
+		t.Fatalf("expected role permission on user, got %+v", created.Permissions)
+	}
+}
+
 func TestAuthenticatePasswordRejectsWrongPassword(t *testing.T) {
 	store := newMemoryStore()
 	svc, err := New(store, nil)

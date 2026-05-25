@@ -21,6 +21,8 @@ const (
 	FieldName = "name"
 	// FieldDescription holds the string denoting the description field in the database.
 	FieldDescription = "description"
+	// FieldPermissionsJSON holds the string denoting the permissions_json field in the database.
+	FieldPermissionsJSON = "permissions_json"
 	// Table holds the table name of the role in the database.
 	Table = "roles"
 )
@@ -32,6 +34,7 @@ var Columns = []string{
 	FieldUpdatedAt,
 	FieldName,
 	FieldDescription,
+	FieldPermissionsJSON,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).

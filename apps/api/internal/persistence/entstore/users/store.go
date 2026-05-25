@@ -228,8 +228,32 @@ func (s *Store) UpdateLastLogin(ctx context.Context, id int, at time.Time) error
 	return err
 }
 
+func (s *Store) CreateRole(ctx context.Context, input contract.CreateStoredRole) (contract.RoleDefinition, error) {
+	created, err := s.client.Role.Create().
+		SetName(strings.TrimSpace(string(input.Name))).
+		SetDescription(strings.TrimSpace(input.Description)).
+		SetPermissionsJSON(append([]string(nil), input.Permissions...)).
+		Save(ctx)
+	if err != nil {
+		return contract.RoleDefinition{}, err
+	}
+	return toRoleDefinition(created), nil
+}
+
+func (s *Store) ListRoles(ctx context.Context) ([]contract.RoleDefinition, error) {
+	rows, err := s.client.Role.Query().Order(entrole.ByName()).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]contract.RoleDefinition, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toRoleDefinition(row))
+	}
+	return out, nil
+}
+
 func (s *Store) toStoredUser(ctx context.Context, user *ent.User) (contract.StoredUser, error) {
-	roles, err := s.rolesForUser(ctx, user.ID)
+	roles, permissions, err := s.rolesForUser(ctx, user.ID)
 	if err != nil {
 		return contract.StoredUser{}, err
 	}
@@ -241,6 +265,7 @@ func (s *Store) toStoredUser(ctx context.Context, user *ent.User) (contract.Stor
 			Status:      contract.Status(user.Status),
 			WorkspaceID: cloneInt(user.WorkspaceID),
 			Roles:       roles,
+			Permissions: permissions,
 			Balance:     user.Balance,
 			Currency:    user.Currency,
 			RPMLimit:    cloneInt(user.RpmLimit),
@@ -252,36 +277,45 @@ func (s *Store) toStoredUser(ctx context.Context, user *ent.User) (contract.Stor
 	}, nil
 }
 
-func (s *Store) rolesForUser(ctx context.Context, userID int) ([]contract.Role, error) {
+func (s *Store) rolesForUser(ctx context.Context, userID int) ([]contract.Role, []string, error) {
 	joins, err := s.client.UserRole.Query().
 		Where(entuserrole.UserIDEQ(userID)).
 		Order(entuserrole.ByID()).
 		All(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	roleIDs := make([]int, 0, len(joins))
 	for _, join := range joins {
 		roleIDs = append(roleIDs, join.RoleID)
 	}
 	if len(roleIDs) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 	roles, err := s.client.Role.Query().Where(entrole.IDIn(roleIDs...)).All(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	out := make([]contract.Role, 0, len(roles))
-	roleByID := make(map[int]contract.Role, len(roles))
+	permissions := make([]string, 0)
+	seenPermission := map[string]bool{}
+	roleByID := make(map[int]*ent.Role, len(roles))
 	for _, role := range roles {
-		roleByID[role.ID] = contract.Role(role.Name)
+		roleByID[role.ID] = role
 	}
 	for _, id := range roleIDs {
 		if role, ok := roleByID[id]; ok {
-			out = append(out, role)
+			out = append(out, contract.Role(role.Name))
+			for _, permission := range role.PermissionsJSON {
+				if seenPermission[permission] {
+					continue
+				}
+				seenPermission[permission] = true
+				permissions = append(permissions, permission)
+			}
 		}
 	}
-	return out, nil
+	return out, permissions, nil
 }
 
 func ensureRole(ctx context.Context, tx *ent.Tx, roleName contract.Role) (*ent.Role, error) {
@@ -293,6 +327,9 @@ func ensureRole(ctx context.Context, tx *ent.Tx, roleName contract.Role) (*ent.R
 	if !ent.IsNotFound(err) {
 		return nil, err
 	}
+	if !contract.IsBuiltInRole(contract.Role(name)) {
+		return nil, fmt.Errorf("role %q not found", name)
+	}
 	created, err := tx.Role.Create().SetName(name).Save(ctx)
 	if err == nil {
 		return created, nil
@@ -301,6 +338,17 @@ func ensureRole(ctx context.Context, tx *ent.Tx, roleName contract.Role) (*ent.R
 		return tx.Role.Query().Where(entrole.NameEQ(name)).Only(ctx)
 	}
 	return nil, err
+}
+
+func toRoleDefinition(row *ent.Role) contract.RoleDefinition {
+	return contract.RoleDefinition{
+		ID:          row.ID,
+		Name:        contract.Role(row.Name),
+		Description: row.Description,
+		Permissions: append([]string(nil), row.PermissionsJSON...),
+		CreatedAt:   row.CreatedAt,
+		UpdatedAt:   row.UpdatedAt,
+	}
 }
 
 func normalizeRoles(roles []contract.Role) []contract.Role {

@@ -187,6 +187,17 @@ func toAPIUser(user userscontract.User) apiopenapi.User {
 	}
 }
 
+func toAPIRole(role userscontract.RoleDefinition) apiopenapi.Role {
+	return apiopenapi.Role{
+		CreatedAt:   role.CreatedAt,
+		Description: role.Description,
+		Id:          apiopenapi.Id(strconv.Itoa(role.ID)),
+		Name:        apiopenapi.UserRole(role.Name),
+		Permissions: append([]string(nil), role.Permissions...),
+		UpdatedAt:   role.UpdatedAt,
+	}
+}
+
 func toAPIKey(key apikeycontract.APIKey) apiopenapi.ApiKey {
 	groupIDs := make([]apiopenapi.Id, 0, len(key.GroupIDs))
 	for _, id := range key.GroupIDs {

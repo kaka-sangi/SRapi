@@ -264,6 +264,24 @@ func (s *Server) requireAdminSession(r *http.Request) (authcontract.LoginResult,
 	return authcontract.LoginResult{}, errors.New("admin access required")
 }
 
+func (s *Server) requireAdminPermission(r *http.Request, permission string) (authcontract.LoginResult, error) {
+	session, err := s.requireConsoleSession(r)
+	if err != nil {
+		return authcontract.LoginResult{}, err
+	}
+	for _, role := range session.User.Roles {
+		if role == userscontract.RoleOwner || role == userscontract.RoleAdmin {
+			return session, nil
+		}
+	}
+	for _, granted := range session.User.Permissions {
+		if granted == permission {
+			return session, nil
+		}
+	}
+	return authcontract.LoginResult{}, errors.New("permission required")
+}
+
 func (s *Server) requireGatewayKey(r *http.Request) (apikeycontract.AuthResult, error) {
 	header := strings.TrimSpace(r.Header.Get("Authorization"))
 	if header == "" {

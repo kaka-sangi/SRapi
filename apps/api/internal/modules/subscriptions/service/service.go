@@ -242,7 +242,7 @@ func (s *Service) CheckEntitlement(ctx context.Context, req contract.Entitlement
 	if now.IsZero() {
 		now = s.clock.Now()
 	}
-	active, err := s.store.ListActiveUserSubscriptions(ctx, req.UserID, now)
+	active, err := s.store.ListActiveEntitlements(ctx, req.UserID, now)
 	if err != nil {
 		return contract.EntitlementDecision{}, err
 	}
@@ -253,7 +253,7 @@ func (s *Service) CheckEntitlement(ctx context.Context, req contract.Entitlement
 			Entitlements: map[string]any{},
 		}, nil
 	}
-	entitlements := mergeEntitlements(active)
+	entitlements := mergeEntitlementRows(active)
 	decision := contract.EntitlementDecision{
 		Allowed:           true,
 		Reason:            "allowed",
@@ -338,6 +338,27 @@ func mergeEntitlements(subscriptions []contract.UserSubscription) map[string]any
 		for key, value := range sub.EntitlementsSnapshot {
 			merged[key] = cloneAny(value)
 		}
+	}
+	return merged
+}
+
+func mergeEntitlementRows(entitlements []contract.Entitlement) map[string]any {
+	sort.SliceStable(entitlements, func(i, j int) bool {
+		if entitlements[i].SourceSubscriptionID == entitlements[j].SourceSubscriptionID {
+			return entitlements[i].ID < entitlements[j].ID
+		}
+		return entitlements[i].SourceSubscriptionID < entitlements[j].SourceSubscriptionID
+	})
+	merged := map[string]any{}
+	for _, entitlement := range entitlements {
+		if entitlement.FeatureKey == "" {
+			continue
+		}
+		value, ok := entitlement.Value["value"]
+		if !ok {
+			value = entitlement.Value
+		}
+		merged[entitlement.FeatureKey] = cloneAny(value)
 	}
 	return merged
 }

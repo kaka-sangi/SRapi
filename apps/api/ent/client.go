@@ -28,6 +28,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/capabilitydefinition"
 	"github.com/srapi/srapi/apps/api/ent/domaineventsinbox"
 	"github.com/srapi/srapi/apps/api/ent/domaineventsoutbox"
+	"github.com/srapi/srapi/apps/api/ent/entitlement"
 	"github.com/srapi/srapi/apps/api/ent/idempotencyrecord"
 	"github.com/srapi/srapi/apps/api/ent/invitecode"
 	"github.com/srapi/srapi/apps/api/ent/inviterelationship"
@@ -92,6 +93,8 @@ type Client struct {
 	DomainEventsInbox *DomainEventsInboxClient
 	// DomainEventsOutbox is the client for interacting with the DomainEventsOutbox builders.
 	DomainEventsOutbox *DomainEventsOutboxClient
+	// Entitlement is the client for interacting with the Entitlement builders.
+	Entitlement *EntitlementClient
 	// IdempotencyRecord is the client for interacting with the IdempotencyRecord builders.
 	IdempotencyRecord *IdempotencyRecordClient
 	// InviteCode is the client for interacting with the InviteCode builders.
@@ -175,6 +178,7 @@ func (c *Client) init() {
 	c.CapabilityDefinition = NewCapabilityDefinitionClient(c.config)
 	c.DomainEventsInbox = NewDomainEventsInboxClient(c.config)
 	c.DomainEventsOutbox = NewDomainEventsOutboxClient(c.config)
+	c.Entitlement = NewEntitlementClient(c.config)
 	c.IdempotencyRecord = NewIdempotencyRecordClient(c.config)
 	c.InviteCode = NewInviteCodeClient(c.config)
 	c.InviteRelationship = NewInviteRelationshipClient(c.config)
@@ -310,6 +314,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		CapabilityDefinition:     NewCapabilityDefinitionClient(cfg),
 		DomainEventsInbox:        NewDomainEventsInboxClient(cfg),
 		DomainEventsOutbox:       NewDomainEventsOutboxClient(cfg),
+		Entitlement:              NewEntitlementClient(cfg),
 		IdempotencyRecord:        NewIdempotencyRecordClient(cfg),
 		InviteCode:               NewInviteCodeClient(cfg),
 		InviteRelationship:       NewInviteRelationshipClient(cfg),
@@ -372,6 +377,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		CapabilityDefinition:     NewCapabilityDefinitionClient(cfg),
 		DomainEventsInbox:        NewDomainEventsInboxClient(cfg),
 		DomainEventsOutbox:       NewDomainEventsOutboxClient(cfg),
+		Entitlement:              NewEntitlementClient(cfg),
 		IdempotencyRecord:        NewIdempotencyRecordClient(cfg),
 		InviteCode:               NewInviteCodeClient(cfg),
 		InviteRelationship:       NewInviteRelationshipClient(cfg),
@@ -434,13 +440,14 @@ func (c *Client) Use(hooks ...Hook) {
 		c.AccountHealthSnapshot, c.AccountQuotaSnapshot, c.AffiliateLedger,
 		c.AffiliateRule, c.AuditLog, c.AuthSession, c.BillingLedger,
 		c.CapabilityDefinition, c.DomainEventsInbox, c.DomainEventsOutbox,
-		c.IdempotencyRecord, c.InviteCode, c.InviteRelationship, c.ModelAlias,
-		c.ModelProviderMapping, c.ModelRegistry, c.ObsAlertEvent, c.ObsSLODefinition,
-		c.PaymentAuditLog, c.PaymentOrder, c.PaymentProviderInstance, c.PricingRule,
-		c.Provider, c.ProviderAccount, c.Proxy, c.QualityEvalSample,
-		c.QualityEvaluation, c.Role, c.SchedulerDecision, c.SchedulerFeedback,
-		c.SchedulerRequestSnapshot, c.SchedulerStrategy, c.Setting, c.SubscriptionPlan,
-		c.UsageLog, c.User, c.UserRole, c.UserSubscription, c.Workspace,
+		c.Entitlement, c.IdempotencyRecord, c.InviteCode, c.InviteRelationship,
+		c.ModelAlias, c.ModelProviderMapping, c.ModelRegistry, c.ObsAlertEvent,
+		c.ObsSLODefinition, c.PaymentAuditLog, c.PaymentOrder,
+		c.PaymentProviderInstance, c.PricingRule, c.Provider, c.ProviderAccount,
+		c.Proxy, c.QualityEvalSample, c.QualityEvaluation, c.Role, c.SchedulerDecision,
+		c.SchedulerFeedback, c.SchedulerRequestSnapshot, c.SchedulerStrategy,
+		c.Setting, c.SubscriptionPlan, c.UsageLog, c.User, c.UserRole,
+		c.UserSubscription, c.Workspace,
 	} {
 		n.Use(hooks...)
 	}
@@ -454,13 +461,14 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.AccountHealthSnapshot, c.AccountQuotaSnapshot, c.AffiliateLedger,
 		c.AffiliateRule, c.AuditLog, c.AuthSession, c.BillingLedger,
 		c.CapabilityDefinition, c.DomainEventsInbox, c.DomainEventsOutbox,
-		c.IdempotencyRecord, c.InviteCode, c.InviteRelationship, c.ModelAlias,
-		c.ModelProviderMapping, c.ModelRegistry, c.ObsAlertEvent, c.ObsSLODefinition,
-		c.PaymentAuditLog, c.PaymentOrder, c.PaymentProviderInstance, c.PricingRule,
-		c.Provider, c.ProviderAccount, c.Proxy, c.QualityEvalSample,
-		c.QualityEvaluation, c.Role, c.SchedulerDecision, c.SchedulerFeedback,
-		c.SchedulerRequestSnapshot, c.SchedulerStrategy, c.Setting, c.SubscriptionPlan,
-		c.UsageLog, c.User, c.UserRole, c.UserSubscription, c.Workspace,
+		c.Entitlement, c.IdempotencyRecord, c.InviteCode, c.InviteRelationship,
+		c.ModelAlias, c.ModelProviderMapping, c.ModelRegistry, c.ObsAlertEvent,
+		c.ObsSLODefinition, c.PaymentAuditLog, c.PaymentOrder,
+		c.PaymentProviderInstance, c.PricingRule, c.Provider, c.ProviderAccount,
+		c.Proxy, c.QualityEvalSample, c.QualityEvaluation, c.Role, c.SchedulerDecision,
+		c.SchedulerFeedback, c.SchedulerRequestSnapshot, c.SchedulerStrategy,
+		c.Setting, c.SubscriptionPlan, c.UsageLog, c.User, c.UserRole,
+		c.UserSubscription, c.Workspace,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -497,6 +505,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.DomainEventsInbox.mutate(ctx, m)
 	case *DomainEventsOutboxMutation:
 		return c.DomainEventsOutbox.mutate(ctx, m)
+	case *EntitlementMutation:
+		return c.Entitlement.mutate(ctx, m)
 	case *IdempotencyRecordMutation:
 		return c.IdempotencyRecord.mutate(ctx, m)
 	case *InviteCodeMutation:
@@ -2419,6 +2429,139 @@ func (c *DomainEventsOutboxClient) mutate(ctx context.Context, m *DomainEventsOu
 		return (&DomainEventsOutboxDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown DomainEventsOutbox mutation op: %q", m.Op())
+	}
+}
+
+// EntitlementClient is a client for the Entitlement schema.
+type EntitlementClient struct {
+	config
+}
+
+// NewEntitlementClient returns a client for the Entitlement from the given config.
+func NewEntitlementClient(c config) *EntitlementClient {
+	return &EntitlementClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `entitlement.Hooks(f(g(h())))`.
+func (c *EntitlementClient) Use(hooks ...Hook) {
+	c.hooks.Entitlement = append(c.hooks.Entitlement, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `entitlement.Intercept(f(g(h())))`.
+func (c *EntitlementClient) Intercept(interceptors ...Interceptor) {
+	c.inters.Entitlement = append(c.inters.Entitlement, interceptors...)
+}
+
+// Create returns a builder for creating a Entitlement entity.
+func (c *EntitlementClient) Create() *EntitlementCreate {
+	mutation := newEntitlementMutation(c.config, OpCreate)
+	return &EntitlementCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of Entitlement entities.
+func (c *EntitlementClient) CreateBulk(builders ...*EntitlementCreate) *EntitlementCreateBulk {
+	return &EntitlementCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *EntitlementClient) MapCreateBulk(slice any, setFunc func(*EntitlementCreate, int)) *EntitlementCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &EntitlementCreateBulk{err: fmt.Errorf("calling to EntitlementClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*EntitlementCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &EntitlementCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for Entitlement.
+func (c *EntitlementClient) Update() *EntitlementUpdate {
+	mutation := newEntitlementMutation(c.config, OpUpdate)
+	return &EntitlementUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *EntitlementClient) UpdateOne(_m *Entitlement) *EntitlementUpdateOne {
+	mutation := newEntitlementMutation(c.config, OpUpdateOne, withEntitlement(_m))
+	return &EntitlementUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *EntitlementClient) UpdateOneID(id int) *EntitlementUpdateOne {
+	mutation := newEntitlementMutation(c.config, OpUpdateOne, withEntitlementID(id))
+	return &EntitlementUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for Entitlement.
+func (c *EntitlementClient) Delete() *EntitlementDelete {
+	mutation := newEntitlementMutation(c.config, OpDelete)
+	return &EntitlementDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *EntitlementClient) DeleteOne(_m *Entitlement) *EntitlementDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *EntitlementClient) DeleteOneID(id int) *EntitlementDeleteOne {
+	builder := c.Delete().Where(entitlement.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &EntitlementDeleteOne{builder}
+}
+
+// Query returns a query builder for Entitlement.
+func (c *EntitlementClient) Query() *EntitlementQuery {
+	return &EntitlementQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeEntitlement},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a Entitlement entity by its id.
+func (c *EntitlementClient) Get(ctx context.Context, id int) (*Entitlement, error) {
+	return c.Query().Where(entitlement.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *EntitlementClient) GetX(ctx context.Context, id int) *Entitlement {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *EntitlementClient) Hooks() []Hook {
+	return c.hooks.Entitlement
+}
+
+// Interceptors returns the client interceptors.
+func (c *EntitlementClient) Interceptors() []Interceptor {
+	return c.inters.Entitlement
+}
+
+func (c *EntitlementClient) mutate(ctx context.Context, m *EntitlementMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&EntitlementCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&EntitlementUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&EntitlementUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&EntitlementDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown Entitlement mutation op: %q", m.Op())
 	}
 }
 
@@ -6285,7 +6428,7 @@ type (
 		APIKey, APIKeyGroup, AccountGroup, AccountGroupMember, AccountHealthSnapshot,
 		AccountQuotaSnapshot, AffiliateLedger, AffiliateRule, AuditLog, AuthSession,
 		BillingLedger, CapabilityDefinition, DomainEventsInbox, DomainEventsOutbox,
-		IdempotencyRecord, InviteCode, InviteRelationship, ModelAlias,
+		Entitlement, IdempotencyRecord, InviteCode, InviteRelationship, ModelAlias,
 		ModelProviderMapping, ModelRegistry, ObsAlertEvent, ObsSLODefinition,
 		PaymentAuditLog, PaymentOrder, PaymentProviderInstance, PricingRule, Provider,
 		ProviderAccount, Proxy, QualityEvalSample, QualityEvaluation, Role,
@@ -6297,7 +6440,7 @@ type (
 		APIKey, APIKeyGroup, AccountGroup, AccountGroupMember, AccountHealthSnapshot,
 		AccountQuotaSnapshot, AffiliateLedger, AffiliateRule, AuditLog, AuthSession,
 		BillingLedger, CapabilityDefinition, DomainEventsInbox, DomainEventsOutbox,
-		IdempotencyRecord, InviteCode, InviteRelationship, ModelAlias,
+		Entitlement, IdempotencyRecord, InviteCode, InviteRelationship, ModelAlias,
 		ModelProviderMapping, ModelRegistry, ObsAlertEvent, ObsSLODefinition,
 		PaymentAuditLog, PaymentOrder, PaymentProviderInstance, PricingRule, Provider,
 		ProviderAccount, Proxy, QualityEvalSample, QualityEvaluation, Role,

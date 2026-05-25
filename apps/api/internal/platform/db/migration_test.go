@@ -68,6 +68,7 @@ func TestEntSchemaAppliesToEmptyDatabase(t *testing.T) {
 		"capability_definitions",
 		"domain_events_inboxes",
 		"domain_events_outboxes",
+		"entitlements",
 		"idempotency_records",
 		"invite_codes",
 		"invite_relationships",

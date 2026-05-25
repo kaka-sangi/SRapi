@@ -156,9 +156,10 @@ Policy Contract 只能返回判断结果和原因，不得执行写操作。
 ```txt
 SessionReader.GetCurrentSession
 AdminAuthPolicy.RequireAdminRole
+AdminAuthPolicy.RequireAdminPermission
 ```
 
-不得对外暴露 password hash、refresh token 原文或 session 存储细节。
+不得对外暴露 password hash、refresh token 原文或 session 存储细节。Admin permission 判断只能使用 session user DTO 中由 Users 模块合并出的角色和 permissions，不得在 HTTP 层直接查询 Ent。
 
 ### 6.2 API Keys
 
@@ -171,6 +172,18 @@ ApiKeyGroupReader.ListBoundGroups
 ```
 
 Gateway 只能通过这些 contract 鉴权，不得直接查询 `api_keys` 表。API Key contract DTO 可以携带 nullable `workspace_id` 作为租户作用域；未显式指定时由持久化 store 从 owner user 继承，服务层和 HTTP 层不直接查询 Workspace 表。
+
+### 6.2.1 Users / Roles
+
+对外 contract：
+
+```txt
+UserReader.FindByID
+UserRoleCatalog.ListRoles
+UserRoleCatalog.CreateRole
+```
+
+Users 模块拥有 role catalog 和 user-role assignment。`Role.permissions` 是控制台 Admin API 的细粒度权限来源，格式为 `resource:action`。HTTP handler 只能调用 users service，不得直接查询 `roles` / `user_roles` / Ent schema。
 
 ### 6.3 Models
 
@@ -261,6 +274,18 @@ BillingCommand.ApplyRefundDebit
 ```
 
 Billing 可以提供用户余额、套餐权益和成本策略给 Scheduler，但不得参与账号选择。
+
+### 6.9.1 Subscriptions / Entitlements
+
+对外 contract：
+
+```txt
+SubscriptionCommand.CreateUserSubscription
+EntitlementReader.CheckEntitlement
+EntitlementCacheReader.ListActiveEntitlements
+```
+
+Subscriptions 模块拥有 subscription snapshot 与 entitlement cache 的一致性边界。创建 active user subscription 时，store 必须在同一持久化事务里写入 `user_subscriptions` 和派生的 `entitlements` rows；Gateway admission 只能通过 service/contract 查询 entitlement 决策，不得扫描 `user_subscriptions.entitlements_snapshot_json`。
 
 ### 6.10 Payments
 

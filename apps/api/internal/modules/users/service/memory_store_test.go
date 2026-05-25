@@ -11,18 +11,24 @@ import (
 )
 
 type memoryStore struct {
-	mu      sync.Mutex
-	nextID  int
-	byID    map[int]contract.StoredUser
-	byEmail map[string]int
+	mu         sync.Mutex
+	nextID     int
+	nextRoleID int
+	byID       map[int]contract.StoredUser
+	byEmail    map[string]int
+	roles      map[contract.Role]contract.RoleDefinition
 }
 
 func newMemoryStore() *memoryStore {
-	return &memoryStore{
-		nextID:  1,
-		byID:    map[int]contract.StoredUser{},
-		byEmail: map[string]int{},
+	store := &memoryStore{
+		nextID:     1,
+		nextRoleID: 1,
+		byID:       map[int]contract.StoredUser{},
+		byEmail:    map[string]int{},
+		roles:      map[contract.Role]contract.RoleDefinition{},
 	}
+	store.seedBuiltInRoles()
+	return store
 }
 
 func (s *memoryStore) Create(_ context.Context, input contract.CreateStoredUser) (contract.StoredUser, error) {
@@ -49,6 +55,7 @@ func (s *memoryStore) Create(_ context.Context, input contract.CreateStoredUser)
 		PasswordHash:    input.PasswordHash,
 		EmailVerifiedAt: input.EmailVerifiedAt,
 	}
+	user = s.withRolePermissions(user)
 	s.byID[user.ID] = user
 	s.byEmail[email] = user.ID
 	s.nextID++
@@ -62,7 +69,7 @@ func (s *memoryStore) FindByID(_ context.Context, id int) (contract.StoredUser, 
 	if !ok {
 		return contract.StoredUser{}, ErrUserNotFound
 	}
-	return cloneUser(user), nil
+	return cloneUser(s.withRolePermissions(user)), nil
 }
 
 func (s *memoryStore) FindByEmail(_ context.Context, email string) (contract.StoredUser, error) {
@@ -72,7 +79,7 @@ func (s *memoryStore) FindByEmail(_ context.Context, email string) (contract.Sto
 	if !ok {
 		return contract.StoredUser{}, ErrUserNotFound
 	}
-	return cloneUser(s.byID[id]), nil
+	return cloneUser(s.withRolePermissions(s.byID[id])), nil
 }
 
 func (s *memoryStore) List(_ context.Context, filter contract.ListUsersFilter) ([]contract.StoredUser, error) {
@@ -87,7 +94,7 @@ func (s *memoryStore) List(_ context.Context, filter contract.ListUsersFilter) (
 		if query != "" && !strings.Contains(strings.ToLower(user.Email), query) && !strings.Contains(strings.ToLower(user.Name), query) {
 			continue
 		}
-		users = append(users, cloneUser(user))
+		users = append(users, cloneUser(s.withRolePermissions(user)))
 	}
 	sort.Slice(users, func(i, j int) bool { return users[i].ID < users[j].ID })
 	return users, nil
@@ -102,7 +109,7 @@ func (s *memoryStore) ListByIDs(_ context.Context, ids []int) ([]contract.Stored
 		if !ok {
 			return nil, ErrUserNotFound
 		}
-		users = append(users, cloneUser(user))
+		users = append(users, cloneUser(s.withRolePermissions(user)))
 	}
 	return users, nil
 }
@@ -147,6 +154,7 @@ func (s *memoryStore) Update(_ context.Context, id int, input contract.UpdateSto
 	if input.RPMLimit != nil {
 		user.RPMLimit = cloneInt(*input.RPMLimit)
 	}
+	user = s.withRolePermissions(user)
 	s.byID[id] = user
 	return cloneUser(user), nil
 }
@@ -171,8 +179,74 @@ func (s *memoryStore) setStatus(id int, status contract.Status) {
 	s.byID[id] = user
 }
 
+func (s *memoryStore) CreateRole(_ context.Context, input contract.CreateStoredRole) (contract.RoleDefinition, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	name := contract.Role(strings.TrimSpace(string(input.Name)))
+	if _, ok := s.roles[name]; ok {
+		return contract.RoleDefinition{}, ErrUserAlreadyExists
+	}
+	now := time.Now().UTC()
+	role := contract.RoleDefinition{
+		ID:          s.nextRoleID,
+		Name:        name,
+		Description: strings.TrimSpace(input.Description),
+		Permissions: append([]string(nil), input.Permissions...),
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	s.roles[name] = role
+	s.nextRoleID++
+	return cloneRole(role), nil
+}
+
+func (s *memoryStore) ListRoles(_ context.Context) ([]contract.RoleDefinition, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]contract.RoleDefinition, 0, len(s.roles))
+	for _, role := range s.roles {
+		out = append(out, cloneRole(role))
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out, nil
+}
+
+func (s *memoryStore) seedBuiltInRoles() {
+	for _, role := range []contract.Role{contract.RoleOwner, contract.RoleAdmin, contract.RoleOperator, contract.RoleUser} {
+		now := time.Now().UTC()
+		s.roles[role] = contract.RoleDefinition{
+			ID:        s.nextRoleID,
+			Name:      role,
+			CreatedAt: now,
+			UpdatedAt: now,
+		}
+		s.nextRoleID++
+	}
+}
+
+func (s *memoryStore) withRolePermissions(user contract.StoredUser) contract.StoredUser {
+	seen := map[string]bool{}
+	permissions := make([]string, 0)
+	for _, roleName := range user.Roles {
+		role, ok := s.roles[roleName]
+		if !ok {
+			continue
+		}
+		for _, permission := range role.Permissions {
+			if seen[permission] {
+				continue
+			}
+			seen[permission] = true
+			permissions = append(permissions, permission)
+		}
+	}
+	user.Permissions = permissions
+	return user
+}
+
 func cloneUser(user contract.StoredUser) contract.StoredUser {
 	user.Roles = append([]contract.Role(nil), user.Roles...)
+	user.Permissions = append([]string(nil), user.Permissions...)
 	user.WorkspaceID = cloneInt(user.WorkspaceID)
 	user.RPMLimit = cloneInt(user.RPMLimit)
 	if user.LastLoginAt != nil {
@@ -184,4 +258,9 @@ func cloneUser(user contract.StoredUser) contract.StoredUser {
 		user.EmailVerifiedAt = &emailVerifiedAt
 	}
 	return user
+}
+
+func cloneRole(role contract.RoleDefinition) contract.RoleDefinition {
+	role.Permissions = append([]string(nil), role.Permissions...)
+	return role
 }

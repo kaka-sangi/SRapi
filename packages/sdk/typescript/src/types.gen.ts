@@ -75,7 +75,36 @@ export type HealthResponse = {
     request_id: RequestId;
 };
 
-export type UserRole = 'owner' | 'admin' | 'operator' | 'user';
+/**
+ * Role name. Built-in roles are owner, admin, operator, and user; custom roles are managed through the admin roles API.
+ */
+export type UserRole = string;
+
+export type Role = {
+    id: Id;
+    name: UserRole;
+    description: string;
+    permissions: Array<string>;
+    created_at: Timestamp;
+    updated_at: Timestamp;
+};
+
+export type CreateRoleRequest = {
+    name: UserRole;
+    description?: string;
+    permissions: Array<string>;
+};
+
+export type RoleResponse = {
+    data: Role;
+    request_id: RequestId;
+};
+
+export type RoleListResponse = {
+    data: Array<Role>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
 
 export type UserStatus = 'active' | 'disabled' | 'pending';
 
@@ -3765,6 +3794,80 @@ export type GetAdminDashboardSnapshotResponses = {
 };
 
 export type GetAdminDashboardSnapshotResponse = GetAdminDashboardSnapshotResponses[keyof GetAdminDashboardSnapshotResponses];
+
+export type ListAdminRolesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/roles';
+};
+
+export type ListAdminRolesErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminRolesError = ListAdminRolesErrors[keyof ListAdminRolesErrors];
+
+export type ListAdminRolesResponses = {
+    /**
+     * Role list.
+     */
+    200: RoleListResponse;
+};
+
+export type ListAdminRolesResponse = ListAdminRolesResponses[keyof ListAdminRolesResponses];
+
+export type CreateAdminRoleData = {
+    body: CreateRoleRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/roles';
+};
+
+export type CreateAdminRoleErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource conflict.
+     */
+    409: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type CreateAdminRoleError = CreateAdminRoleErrors[keyof CreateAdminRoleErrors];
+
+export type CreateAdminRoleResponses = {
+    /**
+     * Role created.
+     */
+    201: RoleResponse;
+};
+
+export type CreateAdminRoleResponse = CreateAdminRoleResponses[keyof CreateAdminRoleResponses];
 
 export type ListAdminUsersData = {
     body?: never;

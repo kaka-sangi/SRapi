@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/srapi/srapi/apps/api/ent"
+	ententitlement "github.com/srapi/srapi/apps/api/ent/entitlement"
 	entpricingrule "github.com/srapi/srapi/apps/api/ent/pricingrule"
 	entsubscriptionplan "github.com/srapi/srapi/apps/api/ent/subscriptionplan"
 	entusersubscription "github.com/srapi/srapi/apps/api/ent/usersubscription"
@@ -70,7 +72,11 @@ func (s *Store) ListPlans(ctx context.Context) ([]contract.SubscriptionPlan, err
 }
 
 func (s *Store) CreateUserSubscription(ctx context.Context, input contract.CreateStoredSubscription) (contract.UserSubscription, error) {
-	created, err := s.client.UserSubscription.Create().
+	tx, err := s.client.Tx(ctx)
+	if err != nil {
+		return contract.UserSubscription{}, err
+	}
+	created, err := tx.UserSubscription.Create().
 		SetUserID(input.UserID).
 		SetPlanID(input.PlanID).
 		SetStatus(string(input.Status)).
@@ -81,9 +87,30 @@ func (s *Store) CreateUserSubscription(ctx context.Context, input contract.Creat
 		SetSourceID(input.SourceID).
 		Save(ctx)
 	if err != nil {
+		_ = tx.Rollback()
 		if ent.IsNotFound(err) {
 			return contract.UserSubscription{}, contract.ErrNotFound
 		}
+		return contract.UserSubscription{}, err
+	}
+	if input.Status == contract.SubscriptionStatusActive {
+		for key, value := range cloneMap(input.EntitlementsSnapshot) {
+			create := tx.Entitlement.Create().
+				SetUserID(input.UserID).
+				SetScopeType("user").
+				SetScopeID(input.UserID).
+				SetFeatureKey(key).
+				SetValueJSON(entitlementValue(value)).
+				SetNillableQuotaLimit(entitlementQuotaLimit(key, value)).
+				SetExpiresAt(input.ExpiresAt).
+				SetSourceSubscriptionID(created.ID)
+			if _, err := create.Save(ctx); err != nil {
+				_ = tx.Rollback()
+				return contract.UserSubscription{}, err
+			}
+		}
+	}
+	if err := tx.Commit(); err != nil {
 		return contract.UserSubscription{}, err
 	}
 	return toSubscription(created), nil
@@ -153,6 +180,64 @@ func (s *Store) ListActiveUserSubscriptions(ctx context.Context, userID int, at 
 		out = append(out, toSubscription(row))
 	}
 	return out, nil
+}
+
+func (s *Store) ListActiveEntitlements(ctx context.Context, userID int, at time.Time) ([]contract.Entitlement, error) {
+	at = at.UTC()
+	rows, err := s.client.Entitlement.Query().
+		Where(
+			ententitlement.UserIDEQ(userID),
+			ententitlement.ScopeTypeEQ("user"),
+			ententitlement.ExpiresAtGT(at),
+		).
+		Order(ententitlement.BySourceSubscriptionID(), ententitlement.ByID()).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	activeSubscriptions, err := s.activeSubscriptionIDs(ctx, rows, at)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]contract.Entitlement, 0, len(rows))
+	for _, row := range rows {
+		if !activeSubscriptions[row.SourceSubscriptionID] {
+			continue
+		}
+		out = append(out, toEntitlement(row))
+	}
+	return out, nil
+}
+
+func (s *Store) activeSubscriptionIDs(ctx context.Context, rows []*ent.Entitlement, at time.Time) (map[int]bool, error) {
+	ids := make([]int, 0, len(rows))
+	seen := map[int]bool{}
+	for _, row := range rows {
+		if seen[row.SourceSubscriptionID] {
+			continue
+		}
+		seen[row.SourceSubscriptionID] = true
+		ids = append(ids, row.SourceSubscriptionID)
+	}
+	if len(ids) == 0 {
+		return map[int]bool{}, nil
+	}
+	subscriptions, err := s.client.UserSubscription.Query().
+		Where(
+			entusersubscription.IDIn(ids...),
+			entusersubscription.StatusEQ(string(contract.SubscriptionStatusActive)),
+			entusersubscription.StartsAtLTE(at),
+			entusersubscription.ExpiresAtGT(at),
+		).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	active := make(map[int]bool, len(subscriptions))
+	for _, subscription := range subscriptions {
+		active[subscription.ID] = true
+	}
+	return active, nil
 }
 
 func (s *Store) ListExpiredActiveUserSubscriptions(ctx context.Context, now time.Time) ([]contract.UserSubscription, error) {
@@ -267,6 +352,22 @@ func toSubscription(row *ent.UserSubscription) contract.UserSubscription {
 	}
 }
 
+func toEntitlement(row *ent.Entitlement) contract.Entitlement {
+	return contract.Entitlement{
+		ID:                   row.ID,
+		UserID:               row.UserID,
+		ScopeType:            row.ScopeType,
+		ScopeID:              row.ScopeID,
+		FeatureKey:           row.FeatureKey,
+		Value:                cloneMap(row.ValueJSON),
+		QuotaLimit:           cloneString(row.QuotaLimit),
+		ExpiresAt:            row.ExpiresAt,
+		SourceSubscriptionID: row.SourceSubscriptionID,
+		CreatedAt:            row.CreatedAt,
+		UpdatedAt:            row.UpdatedAt,
+	}
+}
+
 func toPricingRule(row *ent.PricingRule) contract.PricingRule {
 	return contract.PricingRule{
 		ID:                              row.ID,
@@ -284,6 +385,32 @@ func toPricingRule(row *ent.PricingRule) contract.PricingRule {
 	}
 }
 
+func entitlementValue(value any) map[string]any {
+	return map[string]any{"value": cloneAny(value)}
+}
+
+func entitlementQuotaLimit(key string, value any) *string {
+	switch key {
+	case "monthly_token_quota", "monthly_cost_quota":
+		quota := fmt.Sprint(value)
+		return &quota
+	default:
+		return nil
+	}
+}
+
+func cloneAny(value any) any {
+	raw, err := json.Marshal(value)
+	if err != nil {
+		return nil
+	}
+	var cloned any
+	if err := json.Unmarshal(raw, &cloned); err != nil {
+		return nil
+	}
+	return cloned
+}
+
 func cloneMap(value map[string]any) map[string]any {
 	if value == nil {
 		return map[string]any{}
@@ -297,6 +424,14 @@ func cloneMap(value map[string]any) map[string]any {
 		return map[string]any{}
 	}
 	return cloned
+}
+
+func cloneString(value *string) *string {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
 }
 
 func cloneTime(value *time.Time) *time.Time {

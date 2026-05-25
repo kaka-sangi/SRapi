@@ -831,6 +831,71 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/roles:
+    get:
+      tags:
+        - AdminUsers
+      operationId: listAdminRoles
+      summary: List role definitions.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+      responses:
+        "200":
+          description: Role list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+    post:
+      tags:
+        - AdminUsers
+      operationId: createAdminRole
+      summary: Create a role definition.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRoleRequest"
+      responses:
+        "201":
+          description: Role created.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/users:
     get:
       tags:
@@ -2867,6 +2932,7 @@ paths:
       x-srapi-rbac:
         owner: read
         admin: read
+        permission: payment_order:read
       parameters:
         - $ref: "#/components/parameters/Page"
         - $ref: "#/components/parameters/PageSize"
@@ -6739,11 +6805,79 @@ components:
 
     UserRole:
       type: string
-      enum:
-        - owner
-        - admin
-        - operator
-        - user
+      pattern: "^[a-z][a-z0-9_-]{0,63}$"
+      description: Role name. Built-in roles are owner, admin, operator, and user; custom roles are managed through the admin roles API.
+      example: payment_reader
+
+    Role:
+      type: object
+      required:
+        - id
+        - name
+        - description
+        - permissions
+        - created_at
+        - updated_at
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        name:
+          $ref: "#/components/schemas/UserRole"
+        description:
+          type: string
+        permissions:
+          type: array
+          items:
+            type: string
+            pattern: "^[a-z][a-z0-9_]*:[a-z][a-z0-9_]*$"
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+        updated_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    CreateRoleRequest:
+      type: object
+      required:
+        - name
+        - permissions
+      properties:
+        name:
+          $ref: "#/components/schemas/UserRole"
+        description:
+          type: string
+        permissions:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            pattern: "^[a-z][a-z0-9_]*:[a-z][a-z0-9_]*$"
+
+    RoleResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/Role"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    RoleListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Role"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
 
     UserStatus:
       type: string

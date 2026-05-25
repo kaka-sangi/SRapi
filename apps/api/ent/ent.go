@@ -26,6 +26,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/capabilitydefinition"
 	"github.com/srapi/srapi/apps/api/ent/domaineventsinbox"
 	"github.com/srapi/srapi/apps/api/ent/domaineventsoutbox"
+	"github.com/srapi/srapi/apps/api/ent/entitlement"
 	"github.com/srapi/srapi/apps/api/ent/idempotencyrecord"
 	"github.com/srapi/srapi/apps/api/ent/invitecode"
 	"github.com/srapi/srapi/apps/api/ent/inviterelationship"
@@ -129,6 +130,7 @@ func checkColumn(t, c string) error {
 			capabilitydefinition.Table:     capabilitydefinition.ValidColumn,
 			domaineventsinbox.Table:        domaineventsinbox.ValidColumn,
 			domaineventsoutbox.Table:       domaineventsoutbox.ValidColumn,
+			entitlement.Table:              entitlement.ValidColumn,
 			idempotencyrecord.Table:        idempotencyrecord.ValidColumn,
 			invitecode.Table:               invitecode.ValidColumn,
 			inviterelationship.Table:       inviterelationship.ValidColumn,

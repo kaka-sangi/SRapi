@@ -25,6 +25,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/capabilitydefinition"
 	"github.com/srapi/srapi/apps/api/ent/domaineventsinbox"
 	"github.com/srapi/srapi/apps/api/ent/domaineventsoutbox"
+	"github.com/srapi/srapi/apps/api/ent/entitlement"
 	"github.com/srapi/srapi/apps/api/ent/idempotencyrecord"
 	"github.com/srapi/srapi/apps/api/ent/invitecode"
 	"github.com/srapi/srapi/apps/api/ent/inviterelationship"
@@ -80,6 +81,7 @@ const (
 	TypeCapabilityDefinition     = "CapabilityDefinition"
 	TypeDomainEventsInbox        = "DomainEventsInbox"
 	TypeDomainEventsOutbox       = "DomainEventsOutbox"
+	TypeEntitlement              = "Entitlement"
 	TypeIdempotencyRecord        = "IdempotencyRecord"
 	TypeInviteCode               = "InviteCode"
 	TypeInviteRelationship       = "InviteRelationship"
@@ -13587,6 +13589,961 @@ func (m *DomainEventsOutboxMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *DomainEventsOutboxMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown DomainEventsOutbox edge %s", name)
+}
+
+// EntitlementMutation represents an operation that mutates the Entitlement nodes in the graph.
+type EntitlementMutation struct {
+	config
+	op                        Op
+	typ                       string
+	id                        *int
+	created_at                *time.Time
+	updated_at                *time.Time
+	user_id                   *int
+	adduser_id                *int
+	scope_type                *string
+	scope_id                  *int
+	addscope_id               *int
+	feature_key               *string
+	value_json                *map[string]interface{}
+	quota_limit               *string
+	expires_at                *time.Time
+	source_subscription_id    *int
+	addsource_subscription_id *int
+	clearedFields             map[string]struct{}
+	done                      bool
+	oldValue                  func(context.Context) (*Entitlement, error)
+	predicates                []predicate.Entitlement
+}
+
+var _ ent.Mutation = (*EntitlementMutation)(nil)
+
+// entitlementOption allows management of the mutation configuration using functional options.
+type entitlementOption func(*EntitlementMutation)
+
+// newEntitlementMutation creates new mutation for the Entitlement entity.
+func newEntitlementMutation(c config, op Op, opts ...entitlementOption) *EntitlementMutation {
+	m := &EntitlementMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeEntitlement,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withEntitlementID sets the ID field of the mutation.
+func withEntitlementID(id int) entitlementOption {
+	return func(m *EntitlementMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *Entitlement
+		)
+		m.oldValue = func(ctx context.Context) (*Entitlement, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().Entitlement.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withEntitlement sets the old Entitlement of the mutation.
+func withEntitlement(node *Entitlement) entitlementOption {
+	return func(m *EntitlementMutation) {
+		m.oldValue = func(context.Context) (*Entitlement, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m EntitlementMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m EntitlementMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *EntitlementMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *EntitlementMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().Entitlement.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *EntitlementMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *EntitlementMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the Entitlement entity.
+// If the Entitlement object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *EntitlementMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *EntitlementMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *EntitlementMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *EntitlementMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the Entitlement entity.
+// If the Entitlement object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *EntitlementMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *EntitlementMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetUserID sets the "user_id" field.
+func (m *EntitlementMutation) SetUserID(i int) {
+	m.user_id = &i
+	m.adduser_id = nil
+}
+
+// UserID returns the value of the "user_id" field in the mutation.
+func (m *EntitlementMutation) UserID() (r int, exists bool) {
+	v := m.user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUserID returns the old "user_id" field's value of the Entitlement entity.
+// If the Entitlement object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *EntitlementMutation) OldUserID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUserID: %w", err)
+	}
+	return oldValue.UserID, nil
+}
+
+// AddUserID adds i to the "user_id" field.
+func (m *EntitlementMutation) AddUserID(i int) {
+	if m.adduser_id != nil {
+		*m.adduser_id += i
+	} else {
+		m.adduser_id = &i
+	}
+}
+
+// AddedUserID returns the value that was added to the "user_id" field in this mutation.
+func (m *EntitlementMutation) AddedUserID() (r int, exists bool) {
+	v := m.adduser_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetUserID resets all changes to the "user_id" field.
+func (m *EntitlementMutation) ResetUserID() {
+	m.user_id = nil
+	m.adduser_id = nil
+}
+
+// SetScopeType sets the "scope_type" field.
+func (m *EntitlementMutation) SetScopeType(s string) {
+	m.scope_type = &s
+}
+
+// ScopeType returns the value of the "scope_type" field in the mutation.
+func (m *EntitlementMutation) ScopeType() (r string, exists bool) {
+	v := m.scope_type
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldScopeType returns the old "scope_type" field's value of the Entitlement entity.
+// If the Entitlement object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *EntitlementMutation) OldScopeType(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldScopeType is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldScopeType requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldScopeType: %w", err)
+	}
+	return oldValue.ScopeType, nil
+}
+
+// ResetScopeType resets all changes to the "scope_type" field.
+func (m *EntitlementMutation) ResetScopeType() {
+	m.scope_type = nil
+}
+
+// SetScopeID sets the "scope_id" field.
+func (m *EntitlementMutation) SetScopeID(i int) {
+	m.scope_id = &i
+	m.addscope_id = nil
+}
+
+// ScopeID returns the value of the "scope_id" field in the mutation.
+func (m *EntitlementMutation) ScopeID() (r int, exists bool) {
+	v := m.scope_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldScopeID returns the old "scope_id" field's value of the Entitlement entity.
+// If the Entitlement object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *EntitlementMutation) OldScopeID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldScopeID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldScopeID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldScopeID: %w", err)
+	}
+	return oldValue.ScopeID, nil
+}
+
+// AddScopeID adds i to the "scope_id" field.
+func (m *EntitlementMutation) AddScopeID(i int) {
+	if m.addscope_id != nil {
+		*m.addscope_id += i
+	} else {
+		m.addscope_id = &i
+	}
+}
+
+// AddedScopeID returns the value that was added to the "scope_id" field in this mutation.
+func (m *EntitlementMutation) AddedScopeID() (r int, exists bool) {
+	v := m.addscope_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetScopeID resets all changes to the "scope_id" field.
+func (m *EntitlementMutation) ResetScopeID() {
+	m.scope_id = nil
+	m.addscope_id = nil
+}
+
+// SetFeatureKey sets the "feature_key" field.
+func (m *EntitlementMutation) SetFeatureKey(s string) {
+	m.feature_key = &s
+}
+
+// FeatureKey returns the value of the "feature_key" field in the mutation.
+func (m *EntitlementMutation) FeatureKey() (r string, exists bool) {
+	v := m.feature_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFeatureKey returns the old "feature_key" field's value of the Entitlement entity.
+// If the Entitlement object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *EntitlementMutation) OldFeatureKey(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFeatureKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFeatureKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFeatureKey: %w", err)
+	}
+	return oldValue.FeatureKey, nil
+}
+
+// ResetFeatureKey resets all changes to the "feature_key" field.
+func (m *EntitlementMutation) ResetFeatureKey() {
+	m.feature_key = nil
+}
+
+// SetValueJSON sets the "value_json" field.
+func (m *EntitlementMutation) SetValueJSON(value map[string]interface{}) {
+	m.value_json = &value
+}
+
+// ValueJSON returns the value of the "value_json" field in the mutation.
+func (m *EntitlementMutation) ValueJSON() (r map[string]interface{}, exists bool) {
+	v := m.value_json
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldValueJSON returns the old "value_json" field's value of the Entitlement entity.
+// If the Entitlement object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *EntitlementMutation) OldValueJSON(ctx context.Context) (v map[string]interface{}, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldValueJSON is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldValueJSON requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldValueJSON: %w", err)
+	}
+	return oldValue.ValueJSON, nil
+}
+
+// ClearValueJSON clears the value of the "value_json" field.
+func (m *EntitlementMutation) ClearValueJSON() {
+	m.value_json = nil
+	m.clearedFields[entitlement.FieldValueJSON] = struct{}{}
+}
+
+// ValueJSONCleared returns if the "value_json" field was cleared in this mutation.
+func (m *EntitlementMutation) ValueJSONCleared() bool {
+	_, ok := m.clearedFields[entitlement.FieldValueJSON]
+	return ok
+}
+
+// ResetValueJSON resets all changes to the "value_json" field.
+func (m *EntitlementMutation) ResetValueJSON() {
+	m.value_json = nil
+	delete(m.clearedFields, entitlement.FieldValueJSON)
+}
+
+// SetQuotaLimit sets the "quota_limit" field.
+func (m *EntitlementMutation) SetQuotaLimit(s string) {
+	m.quota_limit = &s
+}
+
+// QuotaLimit returns the value of the "quota_limit" field in the mutation.
+func (m *EntitlementMutation) QuotaLimit() (r string, exists bool) {
+	v := m.quota_limit
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldQuotaLimit returns the old "quota_limit" field's value of the Entitlement entity.
+// If the Entitlement object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *EntitlementMutation) OldQuotaLimit(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldQuotaLimit is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldQuotaLimit requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldQuotaLimit: %w", err)
+	}
+	return oldValue.QuotaLimit, nil
+}
+
+// ClearQuotaLimit clears the value of the "quota_limit" field.
+func (m *EntitlementMutation) ClearQuotaLimit() {
+	m.quota_limit = nil
+	m.clearedFields[entitlement.FieldQuotaLimit] = struct{}{}
+}
+
+// QuotaLimitCleared returns if the "quota_limit" field was cleared in this mutation.
+func (m *EntitlementMutation) QuotaLimitCleared() bool {
+	_, ok := m.clearedFields[entitlement.FieldQuotaLimit]
+	return ok
+}
+
+// ResetQuotaLimit resets all changes to the "quota_limit" field.
+func (m *EntitlementMutation) ResetQuotaLimit() {
+	m.quota_limit = nil
+	delete(m.clearedFields, entitlement.FieldQuotaLimit)
+}
+
+// SetExpiresAt sets the "expires_at" field.
+func (m *EntitlementMutation) SetExpiresAt(t time.Time) {
+	m.expires_at = &t
+}
+
+// ExpiresAt returns the value of the "expires_at" field in the mutation.
+func (m *EntitlementMutation) ExpiresAt() (r time.Time, exists bool) {
+	v := m.expires_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExpiresAt returns the old "expires_at" field's value of the Entitlement entity.
+// If the Entitlement object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *EntitlementMutation) OldExpiresAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExpiresAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExpiresAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExpiresAt: %w", err)
+	}
+	return oldValue.ExpiresAt, nil
+}
+
+// ResetExpiresAt resets all changes to the "expires_at" field.
+func (m *EntitlementMutation) ResetExpiresAt() {
+	m.expires_at = nil
+}
+
+// SetSourceSubscriptionID sets the "source_subscription_id" field.
+func (m *EntitlementMutation) SetSourceSubscriptionID(i int) {
+	m.source_subscription_id = &i
+	m.addsource_subscription_id = nil
+}
+
+// SourceSubscriptionID returns the value of the "source_subscription_id" field in the mutation.
+func (m *EntitlementMutation) SourceSubscriptionID() (r int, exists bool) {
+	v := m.source_subscription_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSourceSubscriptionID returns the old "source_subscription_id" field's value of the Entitlement entity.
+// If the Entitlement object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *EntitlementMutation) OldSourceSubscriptionID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSourceSubscriptionID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSourceSubscriptionID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSourceSubscriptionID: %w", err)
+	}
+	return oldValue.SourceSubscriptionID, nil
+}
+
+// AddSourceSubscriptionID adds i to the "source_subscription_id" field.
+func (m *EntitlementMutation) AddSourceSubscriptionID(i int) {
+	if m.addsource_subscription_id != nil {
+		*m.addsource_subscription_id += i
+	} else {
+		m.addsource_subscription_id = &i
+	}
+}
+
+// AddedSourceSubscriptionID returns the value that was added to the "source_subscription_id" field in this mutation.
+func (m *EntitlementMutation) AddedSourceSubscriptionID() (r int, exists bool) {
+	v := m.addsource_subscription_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetSourceSubscriptionID resets all changes to the "source_subscription_id" field.
+func (m *EntitlementMutation) ResetSourceSubscriptionID() {
+	m.source_subscription_id = nil
+	m.addsource_subscription_id = nil
+}
+
+// Where appends a list predicates to the EntitlementMutation builder.
+func (m *EntitlementMutation) Where(ps ...predicate.Entitlement) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the EntitlementMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *EntitlementMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.Entitlement, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *EntitlementMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *EntitlementMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (Entitlement).
+func (m *EntitlementMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *EntitlementMutation) Fields() []string {
+	fields := make([]string, 0, 10)
+	if m.created_at != nil {
+		fields = append(fields, entitlement.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, entitlement.FieldUpdatedAt)
+	}
+	if m.user_id != nil {
+		fields = append(fields, entitlement.FieldUserID)
+	}
+	if m.scope_type != nil {
+		fields = append(fields, entitlement.FieldScopeType)
+	}
+	if m.scope_id != nil {
+		fields = append(fields, entitlement.FieldScopeID)
+	}
+	if m.feature_key != nil {
+		fields = append(fields, entitlement.FieldFeatureKey)
+	}
+	if m.value_json != nil {
+		fields = append(fields, entitlement.FieldValueJSON)
+	}
+	if m.quota_limit != nil {
+		fields = append(fields, entitlement.FieldQuotaLimit)
+	}
+	if m.expires_at != nil {
+		fields = append(fields, entitlement.FieldExpiresAt)
+	}
+	if m.source_subscription_id != nil {
+		fields = append(fields, entitlement.FieldSourceSubscriptionID)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *EntitlementMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case entitlement.FieldCreatedAt:
+		return m.CreatedAt()
+	case entitlement.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case entitlement.FieldUserID:
+		return m.UserID()
+	case entitlement.FieldScopeType:
+		return m.ScopeType()
+	case entitlement.FieldScopeID:
+		return m.ScopeID()
+	case entitlement.FieldFeatureKey:
+		return m.FeatureKey()
+	case entitlement.FieldValueJSON:
+		return m.ValueJSON()
+	case entitlement.FieldQuotaLimit:
+		return m.QuotaLimit()
+	case entitlement.FieldExpiresAt:
+		return m.ExpiresAt()
+	case entitlement.FieldSourceSubscriptionID:
+		return m.SourceSubscriptionID()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *EntitlementMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case entitlement.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case entitlement.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case entitlement.FieldUserID:
+		return m.OldUserID(ctx)
+	case entitlement.FieldScopeType:
+		return m.OldScopeType(ctx)
+	case entitlement.FieldScopeID:
+		return m.OldScopeID(ctx)
+	case entitlement.FieldFeatureKey:
+		return m.OldFeatureKey(ctx)
+	case entitlement.FieldValueJSON:
+		return m.OldValueJSON(ctx)
+	case entitlement.FieldQuotaLimit:
+		return m.OldQuotaLimit(ctx)
+	case entitlement.FieldExpiresAt:
+		return m.OldExpiresAt(ctx)
+	case entitlement.FieldSourceSubscriptionID:
+		return m.OldSourceSubscriptionID(ctx)
+	}
+	return nil, fmt.Errorf("unknown Entitlement field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *EntitlementMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case entitlement.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case entitlement.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case entitlement.FieldUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUserID(v)
+		return nil
+	case entitlement.FieldScopeType:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetScopeType(v)
+		return nil
+	case entitlement.FieldScopeID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetScopeID(v)
+		return nil
+	case entitlement.FieldFeatureKey:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFeatureKey(v)
+		return nil
+	case entitlement.FieldValueJSON:
+		v, ok := value.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetValueJSON(v)
+		return nil
+	case entitlement.FieldQuotaLimit:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetQuotaLimit(v)
+		return nil
+	case entitlement.FieldExpiresAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExpiresAt(v)
+		return nil
+	case entitlement.FieldSourceSubscriptionID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSourceSubscriptionID(v)
+		return nil
+	}
+	return fmt.Errorf("unknown Entitlement field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *EntitlementMutation) AddedFields() []string {
+	var fields []string
+	if m.adduser_id != nil {
+		fields = append(fields, entitlement.FieldUserID)
+	}
+	if m.addscope_id != nil {
+		fields = append(fields, entitlement.FieldScopeID)
+	}
+	if m.addsource_subscription_id != nil {
+		fields = append(fields, entitlement.FieldSourceSubscriptionID)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *EntitlementMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case entitlement.FieldUserID:
+		return m.AddedUserID()
+	case entitlement.FieldScopeID:
+		return m.AddedScopeID()
+	case entitlement.FieldSourceSubscriptionID:
+		return m.AddedSourceSubscriptionID()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *EntitlementMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case entitlement.FieldUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddUserID(v)
+		return nil
+	case entitlement.FieldScopeID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddScopeID(v)
+		return nil
+	case entitlement.FieldSourceSubscriptionID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddSourceSubscriptionID(v)
+		return nil
+	}
+	return fmt.Errorf("unknown Entitlement numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *EntitlementMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(entitlement.FieldValueJSON) {
+		fields = append(fields, entitlement.FieldValueJSON)
+	}
+	if m.FieldCleared(entitlement.FieldQuotaLimit) {
+		fields = append(fields, entitlement.FieldQuotaLimit)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *EntitlementMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *EntitlementMutation) ClearField(name string) error {
+	switch name {
+	case entitlement.FieldValueJSON:
+		m.ClearValueJSON()
+		return nil
+	case entitlement.FieldQuotaLimit:
+		m.ClearQuotaLimit()
+		return nil
+	}
+	return fmt.Errorf("unknown Entitlement nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *EntitlementMutation) ResetField(name string) error {
+	switch name {
+	case entitlement.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case entitlement.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case entitlement.FieldUserID:
+		m.ResetUserID()
+		return nil
+	case entitlement.FieldScopeType:
+		m.ResetScopeType()
+		return nil
+	case entitlement.FieldScopeID:
+		m.ResetScopeID()
+		return nil
+	case entitlement.FieldFeatureKey:
+		m.ResetFeatureKey()
+		return nil
+	case entitlement.FieldValueJSON:
+		m.ResetValueJSON()
+		return nil
+	case entitlement.FieldQuotaLimit:
+		m.ResetQuotaLimit()
+		return nil
+	case entitlement.FieldExpiresAt:
+		m.ResetExpiresAt()
+		return nil
+	case entitlement.FieldSourceSubscriptionID:
+		m.ResetSourceSubscriptionID()
+		return nil
+	}
+	return fmt.Errorf("unknown Entitlement field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *EntitlementMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *EntitlementMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *EntitlementMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *EntitlementMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *EntitlementMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *EntitlementMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *EntitlementMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown Entitlement unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *EntitlementMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown Entitlement edge %s", name)
 }
 
 // IdempotencyRecordMutation represents an operation that mutates the IdempotencyRecord nodes in the graph.
@@ -30339,17 +31296,19 @@ func (m *QualityEvaluationMutation) ResetEdge(name string) error {
 // RoleMutation represents an operation that mutates the Role nodes in the graph.
 type RoleMutation struct {
 	config
-	op            Op
-	typ           string
-	id            *int
-	created_at    *time.Time
-	updated_at    *time.Time
-	name          *string
-	description   *string
-	clearedFields map[string]struct{}
-	done          bool
-	oldValue      func(context.Context) (*Role, error)
-	predicates    []predicate.Role
+	op                     Op
+	typ                    string
+	id                     *int
+	created_at             *time.Time
+	updated_at             *time.Time
+	name                   *string
+	description            *string
+	permissions_json       *[]string
+	appendpermissions_json []string
+	clearedFields          map[string]struct{}
+	done                   bool
+	oldValue               func(context.Context) (*Role, error)
+	predicates             []predicate.Role
 }
 
 var _ ent.Mutation = (*RoleMutation)(nil)
@@ -30594,6 +31553,71 @@ func (m *RoleMutation) ResetDescription() {
 	m.description = nil
 }
 
+// SetPermissionsJSON sets the "permissions_json" field.
+func (m *RoleMutation) SetPermissionsJSON(s []string) {
+	m.permissions_json = &s
+	m.appendpermissions_json = nil
+}
+
+// PermissionsJSON returns the value of the "permissions_json" field in the mutation.
+func (m *RoleMutation) PermissionsJSON() (r []string, exists bool) {
+	v := m.permissions_json
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPermissionsJSON returns the old "permissions_json" field's value of the Role entity.
+// If the Role object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RoleMutation) OldPermissionsJSON(ctx context.Context) (v []string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPermissionsJSON is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPermissionsJSON requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPermissionsJSON: %w", err)
+	}
+	return oldValue.PermissionsJSON, nil
+}
+
+// AppendPermissionsJSON adds s to the "permissions_json" field.
+func (m *RoleMutation) AppendPermissionsJSON(s []string) {
+	m.appendpermissions_json = append(m.appendpermissions_json, s...)
+}
+
+// AppendedPermissionsJSON returns the list of values that were appended to the "permissions_json" field in this mutation.
+func (m *RoleMutation) AppendedPermissionsJSON() ([]string, bool) {
+	if len(m.appendpermissions_json) == 0 {
+		return nil, false
+	}
+	return m.appendpermissions_json, true
+}
+
+// ClearPermissionsJSON clears the value of the "permissions_json" field.
+func (m *RoleMutation) ClearPermissionsJSON() {
+	m.permissions_json = nil
+	m.appendpermissions_json = nil
+	m.clearedFields[role.FieldPermissionsJSON] = struct{}{}
+}
+
+// PermissionsJSONCleared returns if the "permissions_json" field was cleared in this mutation.
+func (m *RoleMutation) PermissionsJSONCleared() bool {
+	_, ok := m.clearedFields[role.FieldPermissionsJSON]
+	return ok
+}
+
+// ResetPermissionsJSON resets all changes to the "permissions_json" field.
+func (m *RoleMutation) ResetPermissionsJSON() {
+	m.permissions_json = nil
+	m.appendpermissions_json = nil
+	delete(m.clearedFields, role.FieldPermissionsJSON)
+}
+
 // Where appends a list predicates to the RoleMutation builder.
 func (m *RoleMutation) Where(ps ...predicate.Role) {
 	m.predicates = append(m.predicates, ps...)
@@ -30628,7 +31652,7 @@ func (m *RoleMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *RoleMutation) Fields() []string {
-	fields := make([]string, 0, 4)
+	fields := make([]string, 0, 5)
 	if m.created_at != nil {
 		fields = append(fields, role.FieldCreatedAt)
 	}
@@ -30640,6 +31664,9 @@ func (m *RoleMutation) Fields() []string {
 	}
 	if m.description != nil {
 		fields = append(fields, role.FieldDescription)
+	}
+	if m.permissions_json != nil {
+		fields = append(fields, role.FieldPermissionsJSON)
 	}
 	return fields
 }
@@ -30657,6 +31684,8 @@ func (m *RoleMutation) Field(name string) (ent.Value, bool) {
 		return m.Name()
 	case role.FieldDescription:
 		return m.Description()
+	case role.FieldPermissionsJSON:
+		return m.PermissionsJSON()
 	}
 	return nil, false
 }
@@ -30674,6 +31703,8 @@ func (m *RoleMutation) OldField(ctx context.Context, name string) (ent.Value, er
 		return m.OldName(ctx)
 	case role.FieldDescription:
 		return m.OldDescription(ctx)
+	case role.FieldPermissionsJSON:
+		return m.OldPermissionsJSON(ctx)
 	}
 	return nil, fmt.Errorf("unknown Role field %s", name)
 }
@@ -30711,6 +31742,13 @@ func (m *RoleMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetDescription(v)
 		return nil
+	case role.FieldPermissionsJSON:
+		v, ok := value.([]string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPermissionsJSON(v)
+		return nil
 	}
 	return fmt.Errorf("unknown Role field %s", name)
 }
@@ -30740,7 +31778,11 @@ func (m *RoleMutation) AddField(name string, value ent.Value) error {
 // ClearedFields returns all nullable fields that were cleared during this
 // mutation.
 func (m *RoleMutation) ClearedFields() []string {
-	return nil
+	var fields []string
+	if m.FieldCleared(role.FieldPermissionsJSON) {
+		fields = append(fields, role.FieldPermissionsJSON)
+	}
+	return fields
 }
 
 // FieldCleared returns a boolean indicating if a field with the given name was
@@ -30753,6 +31795,11 @@ func (m *RoleMutation) FieldCleared(name string) bool {
 // ClearField clears the value of the field with the given name. It returns an
 // error if the field is not defined in the schema.
 func (m *RoleMutation) ClearField(name string) error {
+	switch name {
+	case role.FieldPermissionsJSON:
+		m.ClearPermissionsJSON()
+		return nil
+	}
 	return fmt.Errorf("unknown Role nullable field %s", name)
 }
 
@@ -30771,6 +31818,9 @@ func (m *RoleMutation) ResetField(name string) error {
 		return nil
 	case role.FieldDescription:
 		m.ResetDescription()
+		return nil
+	case role.FieldPermissionsJSON:
+		m.ResetPermissionsJSON()
 		return nil
 	}
 	return fmt.Errorf("unknown Role field %s", name)

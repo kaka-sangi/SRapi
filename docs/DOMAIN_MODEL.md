@@ -103,7 +103,7 @@ updated_at
 
 ## 5. Role
 
-角色用于控制后台权限。
+角色用于控制后台权限。内置角色负责平台级管理入口，自定义角色用于细粒度 Admin API 授权。
 
 建议第一阶段内置：
 
@@ -114,7 +114,20 @@ operator
 user
 ```
 
-角色只控制控制台和管理 API 权限，不直接控制模型访问。模型访问由 API Key、Subscription、Entitlement 和 User Group 共同决定。
+角色字段：
+
+```txt
+name
+description
+permissions
+```
+
+规则：
+
+- `permissions` 是 `["resource:action"]` 字符串数组，例如 `payment_order:read`。
+- `owner` 和 `admin` 保留全量管理权限；自定义角色必须先通过 Admin Roles API 创建，再分配给用户。
+- 运行时从用户角色合并 permissions 到 session user DTO，Admin API 可以选择 `owner/admin` 或特定 permission 放行。
+- 角色只控制控制台和管理 API 权限，不直接控制模型访问。模型访问由 API Key、Subscription、Entitlement 和 User Group 共同决定。
 
 ## 6. User Group
 
@@ -474,6 +487,8 @@ created_at
 updated_at
 ```
 
+`entitlements_snapshot` 是订阅激活时复制的套餐权益证据，不作为 Gateway admission 的热查询源。active subscription 创建时会同步 materialize `Entitlement` 行，后续套餐变更不会回写既有订阅或 entitlement 缓存。
+
 状态：
 
 ```txt
@@ -485,7 +500,7 @@ suspended
 
 ## 19. Entitlement
 
-Entitlement 是用户权益。
+Entitlement 是用户权益的可查询执行层。当前落库为 `entitlements`，每行表示一个 feature，来源是 active user subscription 的 `entitlements_snapshot`。
 
 示例：
 
@@ -512,6 +527,12 @@ Entitlement 可以来自：
 ```txt
 API Key override > User override > Subscription > User Group > System default
 ```
+
+当前实现：
+
+- 已实现 Subscription 来源的 `entitlements` 查询缓存，字段包括 `user_id`、`scope_type`、`scope_id`、`feature_key`、`value_json`、`quota_limit`、`expires_at`、`source_subscription_id`。
+- `CheckEntitlement()` 从 active entitlement rows 合并 `allowed_models`、`account_group_scope`、`scheduler_strategy`、`monthly_token_quota`、`monthly_cost_quota` 后再进入 Scheduler。
+- `entitlements_snapshot` 仍保留为审计/防漂移证据；Gateway admission 读取 `entitlements`，并校验来源 subscription 的 active window。
 
 ## 20. Quota
 

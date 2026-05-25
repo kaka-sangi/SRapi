@@ -13,23 +13,27 @@ import (
 )
 
 type Store struct {
-	mu            sync.Mutex
-	nextPlanID    int
-	nextSubID     int
-	nextPricingID int
-	plans         map[int]contract.SubscriptionPlan
-	subscriptions map[int]contract.UserSubscription
-	pricingRules  map[int]contract.PricingRule
+	mu                sync.Mutex
+	nextPlanID        int
+	nextSubID         int
+	nextEntitlementID int
+	nextPricingID     int
+	plans             map[int]contract.SubscriptionPlan
+	subscriptions     map[int]contract.UserSubscription
+	entitlements      map[int]contract.Entitlement
+	pricingRules      map[int]contract.PricingRule
 }
 
 func New() *Store {
 	return &Store{
-		nextPlanID:    1,
-		nextSubID:     1,
-		nextPricingID: 1,
-		plans:         map[int]contract.SubscriptionPlan{},
-		subscriptions: map[int]contract.UserSubscription{},
-		pricingRules:  map[int]contract.PricingRule{},
+		nextPlanID:        1,
+		nextSubID:         1,
+		nextEntitlementID: 1,
+		nextPricingID:     1,
+		plans:             map[int]contract.SubscriptionPlan{},
+		subscriptions:     map[int]contract.UserSubscription{},
+		entitlements:      map[int]contract.Entitlement{},
+		pricingRules:      map[int]contract.PricingRule{},
 	}
 }
 
@@ -104,6 +108,9 @@ func (s *Store) CreateUserSubscription(_ context.Context, input contract.CreateS
 	}
 	s.subscriptions[subscription.ID] = subscription
 	s.nextSubID++
+	if subscription.Status == contract.SubscriptionStatusActive {
+		s.replaceSubscriptionEntitlementsLocked(subscription)
+	}
 	return cloneSubscription(subscription), nil
 }
 
@@ -158,6 +165,36 @@ func (s *Store) ListActiveUserSubscriptions(_ context.Context, userID int, at ti
 		out = append(out, cloneSubscription(subscription))
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].StartsAt.Before(out[j].StartsAt) })
+	return out, nil
+}
+
+func (s *Store) ListActiveEntitlements(_ context.Context, userID int, at time.Time) ([]contract.Entitlement, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	at = at.UTC()
+	out := make([]contract.Entitlement, 0)
+	for _, entitlement := range s.entitlements {
+		if entitlement.UserID != userID || entitlement.ScopeType != "user" {
+			continue
+		}
+		if !entitlement.ExpiresAt.After(at) {
+			continue
+		}
+		subscription, ok := s.subscriptions[entitlement.SourceSubscriptionID]
+		if !ok || subscription.Status != contract.SubscriptionStatusActive {
+			continue
+		}
+		if at.Before(subscription.StartsAt) || !at.Before(subscription.ExpiresAt) {
+			continue
+		}
+		out = append(out, cloneEntitlement(entitlement))
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].SourceSubscriptionID == out[j].SourceSubscriptionID {
+			return out[i].ID < out[j].ID
+		}
+		return out[i].SourceSubscriptionID < out[j].SourceSubscriptionID
+	})
 	return out, nil
 }
 
@@ -228,10 +265,51 @@ func cloneSubscription(value contract.UserSubscription) contract.UserSubscriptio
 	return value
 }
 
+func cloneEntitlement(value contract.Entitlement) contract.Entitlement {
+	value.Value = cloneMap(value.Value)
+	value.QuotaLimit = cloneString(value.QuotaLimit)
+	return value
+}
+
 func clonePricingRule(value contract.PricingRule) contract.PricingRule {
 	value.EffectiveFrom = cloneTime(value.EffectiveFrom)
 	value.EffectiveTo = cloneTime(value.EffectiveTo)
 	return value
+}
+
+func (s *Store) replaceSubscriptionEntitlementsLocked(subscription contract.UserSubscription) {
+	for id, entitlement := range s.entitlements {
+		if entitlement.SourceSubscriptionID == subscription.ID {
+			delete(s.entitlements, id)
+		}
+	}
+	for key, value := range cloneMap(subscription.EntitlementsSnapshot) {
+		entitlement := contract.Entitlement{
+			ID:                   s.nextEntitlementID,
+			UserID:               subscription.UserID,
+			ScopeType:            "user",
+			ScopeID:              subscription.UserID,
+			FeatureKey:           key,
+			Value:                map[string]any{"value": cloneAny(value)},
+			QuotaLimit:           entitlementQuotaLimit(key, value),
+			ExpiresAt:            subscription.ExpiresAt,
+			SourceSubscriptionID: subscription.ID,
+			CreatedAt:            subscription.CreatedAt,
+			UpdatedAt:            subscription.UpdatedAt,
+		}
+		s.entitlements[entitlement.ID] = entitlement
+		s.nextEntitlementID++
+	}
+}
+
+func entitlementQuotaLimit(key string, value any) *string {
+	switch key {
+	case "monthly_token_quota", "monthly_cost_quota":
+		quota := toString(value)
+		return &quota
+	default:
+		return nil
+	}
 }
 
 func cloneMap(value map[string]any) map[string]any {
@@ -247,6 +325,47 @@ func cloneMap(value map[string]any) map[string]any {
 		return map[string]any{}
 	}
 	return cloned
+}
+
+func cloneAny(value any) any {
+	raw, err := json.Marshal(value)
+	if err != nil {
+		return nil
+	}
+	var cloned any
+	if err := json.Unmarshal(raw, &cloned); err != nil {
+		return nil
+	}
+	return cloned
+}
+
+func toString(value any) string {
+	switch value := value.(type) {
+	case string:
+		return value
+	default:
+		return strings.TrimSpace(stringFromJSON(value))
+	}
+}
+
+func stringFromJSON(value any) string {
+	raw, err := json.Marshal(value)
+	if err != nil {
+		return ""
+	}
+	var out string
+	if err := json.Unmarshal(raw, &out); err == nil {
+		return out
+	}
+	return strings.Trim(string(raw), `"`)
+}
+
+func cloneString(value *string) *string {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
 }
 
 func cloneTime(value *time.Time) *time.Time {

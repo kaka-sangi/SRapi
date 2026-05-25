@@ -13,7 +13,8 @@ import (
 
 func TestCheckEntitlementRejectsBeforeSchedulingAndCarriesRoutingPolicy(t *testing.T) {
 	clock := fixedClock{now: time.Date(2026, 5, 22, 12, 0, 0, 0, time.UTC)}
-	svc, err := service.New(subscriptionmemory.New(), clock)
+	store := subscriptionmemory.New()
+	svc, err := service.New(store, clock)
 	if err != nil {
 		t.Fatalf("new subscription service: %v", err)
 	}
@@ -39,6 +40,13 @@ func TestCheckEntitlementRejectsBeforeSchedulingAndCarriesRoutingPolicy(t *testi
 		PlanID: plan.ID,
 	}); err != nil {
 		t.Fatalf("create user subscription: %v", err)
+	}
+	cached, err := store.ListActiveEntitlements(t.Context(), 1, clock.now)
+	if err != nil {
+		t.Fatalf("list cached entitlements: %v", err)
+	}
+	if len(cached) != 5 {
+		t.Fatalf("expected entitlement cache rows, got %+v", cached)
 	}
 
 	allowed, err := svc.CheckEntitlement(t.Context(), contract.EntitlementCheckRequest{

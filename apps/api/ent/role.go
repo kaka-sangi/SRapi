@@ -3,6 +3,7 @@
 package ent
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -24,8 +25,10 @@ type Role struct {
 	// Name holds the value of the "name" field.
 	Name string `json:"name,omitempty"`
 	// Description holds the value of the "description" field.
-	Description  string `json:"description,omitempty"`
-	selectValues sql.SelectValues
+	Description string `json:"description,omitempty"`
+	// PermissionsJSON holds the value of the "permissions_json" field.
+	PermissionsJSON []string `json:"permissions_json,omitempty"`
+	selectValues    sql.SelectValues
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -33,6 +36,8 @@ func (*Role) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
+		case role.FieldPermissionsJSON:
+			values[i] = new([]byte)
 		case role.FieldID:
 			values[i] = new(sql.NullInt64)
 		case role.FieldName, role.FieldDescription:
@@ -84,6 +89,14 @@ func (_m *Role) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.Description = value.String
 			}
+		case role.FieldPermissionsJSON:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field permissions_json", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.PermissionsJSON); err != nil {
+					return fmt.Errorf("unmarshal field permissions_json: %w", err)
+				}
+			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
 		}
@@ -131,6 +144,9 @@ func (_m *Role) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("description=")
 	builder.WriteString(_m.Description)
+	builder.WriteString(", ")
+	builder.WriteString("permissions_json=")
+	builder.WriteString(fmt.Sprintf("%v", _m.PermissionsJSON))
 	builder.WriteByte(')')
 	return builder.String()
 }

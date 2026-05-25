@@ -22,6 +22,11 @@ const (
 	RoleUser     Role = "user"
 )
 
+const (
+	// PermissionPaymentOrderRead permits read-only access to admin payment orders.
+	PermissionPaymentOrderRead = "payment_order:read"
+)
+
 type BalanceOperation string
 
 const (
@@ -43,11 +48,29 @@ type User struct {
 	Status      Status
 	WorkspaceID *int
 	Roles       []Role
+	Permissions []string
 	Balance     string
 	Currency    string
 	RPMLimit    *int
 	CreatedAt   time.Time
 	LastLoginAt *time.Time
+}
+
+// RoleDefinition is a persisted role catalog entry used to resolve user permissions.
+type RoleDefinition struct {
+	ID          int
+	Name        Role
+	Description string
+	Permissions []string
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
+// CreateStoredRole is the store-level payload for creating a role definition.
+type CreateStoredRole struct {
+	Name        Role
+	Description string
+	Permissions []string
 }
 
 type StoredUser struct {
@@ -94,4 +117,16 @@ type Store interface {
 	ListByIDs(ctx context.Context, ids []int) ([]StoredUser, error)
 	Update(ctx context.Context, id int, input UpdateStoredUser) (StoredUser, error)
 	UpdateLastLogin(ctx context.Context, id int, at time.Time) error
+	CreateRole(ctx context.Context, input CreateStoredRole) (RoleDefinition, error)
+	ListRoles(ctx context.Context) ([]RoleDefinition, error)
+}
+
+// IsBuiltInRole reports whether a role is one of SRapi's bootstrap roles.
+func IsBuiltInRole(role Role) bool {
+	switch role {
+	case RoleOwner, RoleAdmin, RoleOperator, RoleUser:
+		return true
+	default:
+		return false
+	}
 }

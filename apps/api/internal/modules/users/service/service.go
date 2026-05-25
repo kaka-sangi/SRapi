@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"math/big"
+	"regexp"
 	"strings"
 	"time"
 
@@ -12,6 +13,11 @@ import (
 )
 
 const defaultBcryptCost = 12
+
+var (
+	roleNamePattern   = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,63}$`)
+	permissionPattern = regexp.MustCompile(`^[a-z][a-z0-9_]*:[a-z][a-z0-9_]*$`)
+)
 
 type Clock interface {
 	Now() time.Time
@@ -51,6 +57,13 @@ type UpdateRequest struct {
 type ListRequest struct {
 	Status *contract.Status
 	Query  string
+}
+
+// CreateRoleRequest creates a role catalog entry with resource:action permissions.
+type CreateRoleRequest struct {
+	Name        string
+	Description string
+	Permissions []string
 }
 
 type BalanceOperation = contract.BalanceOperation
@@ -105,6 +118,9 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (contract.Store
 	roles := normalizeRoles(req.Roles)
 	if len(roles) == 0 {
 		roles = []contract.Role{contract.RoleUser}
+	}
+	if err := s.validateRolesExist(ctx, roles); err != nil {
+		return contract.StoredUser{}, err
 	}
 	balance := "0.00000000"
 	if strings.TrimSpace(req.Balance) != "" {
@@ -165,6 +181,31 @@ func (s *Service) List(ctx context.Context, req ListRequest) ([]contract.StoredU
 	})
 }
 
+// CreateRole validates and persists a role definition.
+func (s *Service) CreateRole(ctx context.Context, req CreateRoleRequest) (contract.RoleDefinition, error) {
+	name := contract.Role(strings.ToLower(strings.TrimSpace(req.Name)))
+	if !validRoleName(name) {
+		return contract.RoleDefinition{}, ErrInvalidInput
+	}
+	if err := s.validateNewRoleName(ctx, name); err != nil {
+		return contract.RoleDefinition{}, err
+	}
+	permissions, err := normalizePermissions(req.Permissions)
+	if err != nil {
+		return contract.RoleDefinition{}, err
+	}
+	return s.store.CreateRole(ctx, contract.CreateStoredRole{
+		Name:        name,
+		Description: strings.TrimSpace(req.Description),
+		Permissions: permissions,
+	})
+}
+
+// ListRoles returns persisted role definitions.
+func (s *Service) ListRoles(ctx context.Context) ([]contract.RoleDefinition, error) {
+	return s.store.ListRoles(ctx)
+}
+
 func (s *Service) Update(ctx context.Context, id int, req UpdateRequest) (contract.StoredUser, error) {
 	if id <= 0 {
 		return contract.StoredUser{}, ErrInvalidInput
@@ -201,6 +242,9 @@ func (s *Service) Update(ctx context.Context, id int, req UpdateRequest) (contra
 		roles := normalizeRoles(*req.Roles)
 		if len(roles) == 0 {
 			return contract.StoredUser{}, ErrInvalidInput
+		}
+		if err := s.validateRolesExist(ctx, roles); err != nil {
+			return contract.StoredUser{}, err
 		}
 		input.Roles = &roles
 	}
@@ -271,6 +315,18 @@ func (s *Service) BatchUpdate(ctx context.Context, req BatchUpdateRequest) Batch
 		result.Errors = append(result.Errors, ErrInvalidInput.Error())
 		return result
 	}
+	if req.Roles != nil {
+		roles := normalizeRoles(*req.Roles)
+		if len(roles) == 0 {
+			result.Errors = append(result.Errors, ErrInvalidInput.Error())
+			return result
+		}
+		if err := s.validateRolesExist(ctx, roles); err != nil {
+			result.Errors = append(result.Errors, strings.TrimSpace(err.Error()))
+			return result
+		}
+		req.Roles = &roles
+	}
 	for _, id := range req.UserIDs {
 		updated, err := s.Update(ctx, id, UpdateRequest{
 			Status:   req.Status,
@@ -321,14 +377,74 @@ func normalizeRoles(roles []contract.Role) []contract.Role {
 		return []contract.Role{contract.RoleUser}
 	}
 	cloned := make([]contract.Role, 0, len(roles))
+	seen := map[contract.Role]bool{}
 	for _, role := range roles {
-		role = contract.Role(strings.TrimSpace(string(role)))
-		switch role {
-		case contract.RoleOwner, contract.RoleAdmin, contract.RoleOperator, contract.RoleUser:
-			cloned = append(cloned, role)
+		role = contract.Role(strings.ToLower(strings.TrimSpace(string(role))))
+		if !validRoleName(role) || seen[role] {
+			continue
 		}
+		seen[role] = true
+		cloned = append(cloned, role)
 	}
 	return cloned
+}
+
+func validRoleName(role contract.Role) bool {
+	return roleNamePattern.MatchString(string(role))
+}
+
+func normalizePermissions(permissions []string) ([]string, error) {
+	out := make([]string, 0, len(permissions))
+	seen := map[string]bool{}
+	for _, permission := range permissions {
+		permission = strings.ToLower(strings.TrimSpace(permission))
+		if permission == "" {
+			continue
+		}
+		if !permissionPattern.MatchString(permission) {
+			return nil, ErrInvalidInput
+		}
+		if seen[permission] {
+			continue
+		}
+		seen[permission] = true
+		out = append(out, permission)
+	}
+	return out, nil
+}
+
+func (s *Service) validateNewRoleName(ctx context.Context, name contract.Role) error {
+	if contract.IsBuiltInRole(name) {
+		return ErrUserAlreadyExists
+	}
+	roles, err := s.store.ListRoles(ctx)
+	if err != nil {
+		return err
+	}
+	for _, role := range roles {
+		if role.Name == name {
+			return ErrUserAlreadyExists
+		}
+	}
+	return nil
+}
+
+func (s *Service) validateRolesExist(ctx context.Context, roles []contract.Role) error {
+	existing, err := s.store.ListRoles(ctx)
+	if err != nil {
+		return err
+	}
+	known := make(map[contract.Role]bool, len(existing))
+	for _, role := range existing {
+		known[role.Name] = true
+	}
+	for _, role := range roles {
+		if contract.IsBuiltInRole(role) || known[role] {
+			continue
+		}
+		return ErrInvalidInput
+	}
+	return nil
 }
 
 func validStatus(status contract.Status) bool {

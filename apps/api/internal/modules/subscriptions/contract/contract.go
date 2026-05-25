@@ -55,6 +55,21 @@ type UserSubscription struct {
 	UpdatedAt            time.Time
 }
 
+// Entitlement is the active query-cache row derived from a subscription snapshot.
+type Entitlement struct {
+	ID                   int
+	UserID               int
+	ScopeType            string
+	ScopeID              int
+	FeatureKey           string
+	Value                map[string]any
+	QuotaLimit           *string
+	ExpiresAt            time.Time
+	SourceSubscriptionID int
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
+}
+
 type PricingRule struct {
 	ID                              int
 	ModelID                         int
@@ -179,6 +194,7 @@ type Store interface {
 	ListUserSubscriptions(ctx context.Context) ([]UserSubscription, error)
 	ListUserSubscriptionsByUser(ctx context.Context, userID int) ([]UserSubscription, error)
 	ListActiveUserSubscriptions(ctx context.Context, userID int, at time.Time) ([]UserSubscription, error)
+	ListActiveEntitlements(ctx context.Context, userID int, at time.Time) ([]Entitlement, error)
 	ListExpiredActiveUserSubscriptions(ctx context.Context, now time.Time) ([]UserSubscription, error)
 	ExpireUserSubscription(ctx context.Context, id int, now time.Time) (UserSubscription, bool, error)
 	CreatePricingRule(ctx context.Context, input PricingRule) (PricingRule, error)

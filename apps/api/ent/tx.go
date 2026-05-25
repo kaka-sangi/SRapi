@@ -40,6 +40,8 @@ type Tx struct {
 	DomainEventsInbox *DomainEventsInboxClient
 	// DomainEventsOutbox is the client for interacting with the DomainEventsOutbox builders.
 	DomainEventsOutbox *DomainEventsOutboxClient
+	// Entitlement is the client for interacting with the Entitlement builders.
+	Entitlement *EntitlementClient
 	// IdempotencyRecord is the client for interacting with the IdempotencyRecord builders.
 	IdempotencyRecord *IdempotencyRecordClient
 	// InviteCode is the client for interacting with the InviteCode builders.
@@ -243,6 +245,7 @@ func (tx *Tx) init() {
 	tx.CapabilityDefinition = NewCapabilityDefinitionClient(tx.config)
 	tx.DomainEventsInbox = NewDomainEventsInboxClient(tx.config)
 	tx.DomainEventsOutbox = NewDomainEventsOutboxClient(tx.config)
+	tx.Entitlement = NewEntitlementClient(tx.config)
 	tx.IdempotencyRecord = NewIdempotencyRecordClient(tx.config)
 	tx.InviteCode = NewInviteCodeClient(tx.config)
 	tx.InviteRelationship = NewInviteRelationshipClient(tx.config)

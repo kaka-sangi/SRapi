@@ -284,6 +284,16 @@ func DescriptionContainsFold(v string) predicate.Role {
 	return predicate.Role(sql.FieldContainsFold(FieldDescription, v))
 }
 
+// PermissionsJSONIsNil applies the IsNil predicate on the "permissions_json" field.
+func PermissionsJSONIsNil() predicate.Role {
+	return predicate.Role(sql.FieldIsNull(FieldPermissionsJSON))
+}
+
+// PermissionsJSONNotNil applies the NotNil predicate on the "permissions_json" field.
+func PermissionsJSONNotNil() predicate.Role {
+	return predicate.Role(sql.FieldNotNull(FieldPermissionsJSON))
+}
+
 // And groups predicates with the AND operator between them.
 func And(predicates ...predicate.Role) predicate.Role {
 	return predicate.Role(sql.AndPredicates(predicates...))

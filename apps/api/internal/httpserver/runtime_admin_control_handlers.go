@@ -16,6 +16,7 @@ import (
 	paymentcontract "github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
 	schedulerservice "github.com/srapi/srapi/apps/api/internal/modules/scheduler/service"
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
+	userscontract "github.com/srapi/srapi/apps/api/internal/modules/users/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
 
@@ -157,8 +158,8 @@ func (s *Server) handleCreateAdminPaymentProvider(w http.ResponseWriter, r *http
 
 func (s *Server) handleListAdminPaymentOrders(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
-	if _, err := s.requireAdminSession(r); err != nil {
-		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+	if _, err := s.requireAdminPermission(r, userscontract.PermissionPaymentOrderRead); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "permission required", requestID)
 		return
 	}
 	var (

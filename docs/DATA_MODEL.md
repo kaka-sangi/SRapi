@@ -191,6 +191,7 @@ index(expires_at)
 id
 name
 description
+permissions_json
 created_at
 updated_at
 ```
@@ -200,6 +201,12 @@ updated_at
 ```txt
 unique(name)
 ```
+
+规则：
+
+- `permissions_json` 是 `["resource:action"]` 字符串数组，例如 `["payment_order:read"]`。
+- `owner` 和 `admin` 是控制台超级管理角色；自定义角色通过 Admin Roles API 创建后才能分配给用户。
+- 运行时会把用户所有角色的 `permissions_json` 去重合并到登录会话用户 DTO，用于细粒度 Admin API 门禁。
 
 ### 6.5 user_roles
 
@@ -1008,6 +1015,41 @@ index(user_id, status)
 index(expires_at)
 index(plan_id)
 ```
+
+`entitlements_snapshot_json` 是订阅创建时从套餐复制出的不可变权益快照，用于审计和防漂移。Gateway 的实时权益判定读取 `entitlements` 查询缓存，不直接扫描订阅 snapshot。
+
+### 12.3 entitlements
+
+`entitlements` 是从 active user subscription materialize 出来的查询缓存层。它保留一行一个 feature，服务层按 active subscription 状态、开始时间和过期时间过滤后合并。
+
+```txt
+id
+user_id
+scope_type
+scope_id
+feature_key
+value_json
+quota_limit nullable
+expires_at
+source_subscription_id
+created_at
+updated_at
+```
+
+索引：
+
+```txt
+index(user_id, feature_key, expires_at)
+unique(source_subscription_id, feature_key)
+index(scope_type, scope_id, feature_key)
+```
+
+规则：
+
+- 当前 `scope_type=user`，`scope_id=user_id`；后续 Workspace/Organization entitlement 可沿用同一表扩展。
+- `value_json` 以 `{"value": <snapshot value>}` 保存原始 feature 值，保证列表、字符串、数值都能无损参与 Gateway entitlement 判定。
+- `quota_limit` 对 `monthly_token_quota`、`monthly_cost_quota` 保存字符串化查询列；其他 feature 可为空。
+- 创建 active user subscription 时在同一持久化事务内写入 entitlement rows；过期判定依赖 `expires_at` 和来源 subscription 的 active window。
 
 ## 13. 支付
 

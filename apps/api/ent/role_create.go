@@ -68,6 +68,12 @@ func (_c *RoleCreate) SetNillableDescription(v *string) *RoleCreate {
 	return _c
 }
 
+// SetPermissionsJSON sets the "permissions_json" field.
+func (_c *RoleCreate) SetPermissionsJSON(v []string) *RoleCreate {
+	_c.mutation.SetPermissionsJSON(v)
+	return _c
+}
+
 // Mutation returns the RoleMutation object of the builder.
 func (_c *RoleCreate) Mutation() *RoleMutation {
 	return _c.mutation
@@ -177,6 +183,10 @@ func (_c *RoleCreate) createSpec() (*Role, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Description(); ok {
 		_spec.SetField(role.FieldDescription, field.TypeString, value)
 		_node.Description = value
+	}
+	if value, ok := _c.mutation.PermissionsJSON(); ok {
+		_spec.SetField(role.FieldPermissionsJSON, field.TypeJSON, value)
+		_node.PermissionsJSON = value
 	}
 	return _node, _spec
 }
