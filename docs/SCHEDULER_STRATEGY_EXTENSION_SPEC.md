@@ -431,14 +431,16 @@ GET    /api/v1/admin/scheduler/strategies/{id}/versions
 策略指标：
 
 ```txt
-scheduler_strategy_selected_total
-scheduler_strategy_fallback_total
-scheduler_strategy_shadow_diff
-scheduler_strategy_cost_delta
-scheduler_strategy_latency_delta
-scheduler_strategy_error_rate
-scheduler_strategy_reject_reason_total
+scheduler_strategy_selected_total{strategy, version}
+scheduler_strategy_fallback_total{strategy, version}
+scheduler_strategy_shadow_diff{strategy, version, shadow_strategy, selection}
+scheduler_strategy_cost_delta{strategy, version}
+scheduler_strategy_latency_delta{strategy, version}
+scheduler_strategy_error_rate{strategy, version}
+scheduler_strategy_reject_reason_total{strategy, version, reason}
 ```
+
+这些指标由 `/metrics` 在 scrape 时从 `scheduler_decisions` 与同 request/attempt 的 `usage_logs` 聚合，不在 Gateway 热路径新增写入。`cost_delta` / `latency_delta` 表示选中账号分数相对同次候选集平均分数的平均差值；`error_rate` 来自 usage 成败。标签必须保持低基数，不得加入 API key、account id、provider id、user id、request id、prompt 或 credential。
 
 Ops Dashboard 必须能按 strategy / version 过滤 decision、fallback、错误率和成本。
 

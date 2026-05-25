@@ -111,6 +111,20 @@ srapi_scheduler_cost_score_avg{strategy}
 
 该指标只使用低基数 strategy 标签，不得加入 account id、provider id、API key、user id、request id、prompt 或 credential。它用于观察 cost-aware routing 的总体趋势；逐账号排查应读取 Scheduler decision 的 score breakdown 和 request snapshot，而不是增加高基数 Prometheus label。
 
+Scheduler strategy 运营指标由已持久化的 `scheduler_decisions` 与同 request/attempt 的 `usage_logs` 在 scrape 时聚合：
+
+```txt
+scheduler_strategy_selected_total{strategy, version}
+scheduler_strategy_fallback_total{strategy, version}
+scheduler_strategy_shadow_diff{strategy, version, shadow_strategy, selection}
+scheduler_strategy_cost_delta{strategy, version}
+scheduler_strategy_latency_delta{strategy, version}
+scheduler_strategy_error_rate{strategy, version}
+scheduler_strategy_reject_reason_total{strategy, version, reason}
+```
+
+这些指标只允许 strategy、strategy version、shadow strategy、current/shadow selection 和结构化 reject reason 这类低基数标签。`cost_delta` / `latency_delta` 表示选中账号分数相对同次候选集平均分数的平均差值；`error_rate` 来自同 request_id + attempt_no 的 usage 成败。不得加入 API key、account id、provider id、user id、request id、prompt、cookie 或 credential label；逐请求排查仍应读取 Scheduler decision、request snapshot 和 usage log。
+
 ### 3.3.1 Trace and Log Correlation
 
 HTTP server 会创建 OpenTelemetry server span，并使用 W3C trace context 从请求头提取/传播 trace。日志 handler 从 context 注入 `request_id`、`trace_id`、`user_id` 和 `api_key_id`，用于把 Gateway request、scheduler decision、usage log、audit log 和 provider feedback 串联起来。

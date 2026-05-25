@@ -18,6 +18,8 @@ import (
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 	schedulerservice "github.com/srapi/srapi/apps/api/internal/modules/scheduler/service"
 	schedulermemory "github.com/srapi/srapi/apps/api/internal/modules/scheduler/store/memory"
+	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
+	usagememory "github.com/srapi/srapi/apps/api/internal/modules/usage/store/memory"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 	"github.com/srapi/srapi/apps/api/internal/persistence/entstore"
 
@@ -237,6 +239,91 @@ func TestAdminSchedulerReplayUsesPersistedSnapshots(t *testing.T) {
 	}
 }
 
+func TestMetricsExposeSchedulerStrategyOperationalSignals(t *testing.T) {
+	schedulerStore := schedulermemory.New()
+	usageStore := usagememory.New()
+
+	firstSelected := 2
+	firstDecision, err := schedulerStore.CreateDecision(t.Context(), schedulercontract.Decision{
+		RequestID:          "strategy-metrics",
+		AttemptNo:          1,
+		UserID:             1,
+		APIKeyID:           1,
+		Model:              "strategy-metrics-model",
+		Strategy:           schedulercontract.StrategyCostSaver,
+		StrategyVersion:    "v1",
+		SelectedAccountID:  &firstSelected,
+		SelectedProviderID: intPtrForSchedulerMetrics(2),
+		CandidateCount:     2,
+		Scores: map[string]any{
+			"account_1": map[string]any{"account_id": 1, "cost_score": 0.2, "latency_score": 0.9},
+			"account_2": map[string]any{"account_id": 2, "cost_score": 0.8, "latency_score": 0.5},
+			"routing_hints": map[string]any{
+				"strategy_rollout": map[string]any{
+					"shadow_strategy": "cost_saver",
+					"shadow_selected": true,
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("create first decision: %v", err)
+	}
+
+	secondSelected := 1
+	_, err = schedulerStore.CreateDecision(t.Context(), schedulercontract.Decision{
+		RequestID:              firstDecision.RequestID,
+		AttemptNo:              2,
+		UserID:                 1,
+		APIKeyID:               1,
+		Model:                  firstDecision.Model,
+		Strategy:               schedulercontract.StrategyCostSaver,
+		StrategyVersion:        "v1",
+		FallbackFromDecisionID: &firstDecision.ID,
+		SelectedAccountID:      &secondSelected,
+		SelectedProviderID:     intPtrForSchedulerMetrics(1),
+		CandidateCount:         2,
+		RejectedCount:          1,
+		RejectReasons:          map[string]any{"account_2": "fallback_excluded"},
+		CompatibilityWarnings:  []string{"strategy_rollout_current_selected"},
+		SelectionRationale:     "fallback selected another account",
+		EstimatedCost:          "0.00000000",
+		Currency:               "USD",
+		Scores: map[string]any{
+			"account_1": map[string]any{"account_id": 1, "cost_score": 0.6, "latency_score": 0.6},
+			"account_2": map[string]any{"account_id": 2, "cost_score": 0.4, "latency_score": 0.4},
+		},
+	})
+	if err != nil {
+		t.Fatalf("create fallback decision: %v", err)
+	}
+	errorClass := "upstream_error"
+	for _, log := range []usagecontract.UsageLog{
+		{RequestID: firstDecision.RequestID, AttemptNo: 1, Success: false, ErrorClass: &errorClass, SourceEndpoint: "/v1/chat/completions", TargetProtocol: "openai-compatible", Model: firstDecision.Model},
+		{RequestID: firstDecision.RequestID, AttemptNo: 2, Success: true, SourceEndpoint: "/v1/chat/completions", TargetProtocol: "openai-compatible", Model: firstDecision.Model},
+	} {
+		if _, err := usageStore.Create(t.Context(), log); err != nil {
+			t.Fatalf("create usage log: %v", err)
+		}
+	}
+
+	handler := New(config.Load(), nil, WithSchedulerStore(schedulerStore), WithUsageStore(usageStore))
+	metrics := metricsBody(t, handler)
+	for _, expected := range []string{
+		`scheduler_strategy_selected_total{strategy="cost_saver",version="v1"} 2`,
+		`scheduler_strategy_fallback_total{strategy="cost_saver",version="v1"} 1`,
+		`scheduler_strategy_shadow_diff{selection="shadow",shadow_strategy="cost_saver",strategy="cost_saver",version="v1"} 1`,
+		`scheduler_strategy_cost_delta{strategy="cost_saver",version="v1"}`,
+		`scheduler_strategy_latency_delta{strategy="cost_saver",version="v1"}`,
+		`scheduler_strategy_error_rate{strategy="cost_saver",version="v1"} 0.5`,
+		`scheduler_strategy_reject_reason_total{reason="fallback_excluded",strategy="cost_saver",version="v1"} 1`,
+	} {
+		if !strings.Contains(metrics, expected) {
+			t.Fatalf("expected metrics to contain %s, got:\n%s", expected, metrics)
+		}
+	}
+}
+
 func schedulerReplayCandidate(id int, health float64, relativeCost string) schedulercontract.Candidate {
 	return schedulercontract.Candidate{
 		Account: accountcontract.ProviderAccount{
@@ -265,4 +352,8 @@ func schedulerReplayCandidate(id int, health float64, relativeCost string) sched
 		},
 		RuntimeState: schedulercontract.RuntimeState{HealthScore: &health},
 	}
+}
+
+func intPtrForSchedulerMetrics(value int) *int {
+	return &value
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -40,6 +41,13 @@ type runtimeMetricDescs struct {
 	gatewayFailover               *prometheus.Desc
 	schedulerDecisions            *prometheus.Desc
 	schedulerCostScore            *prometheus.Desc
+	schedulerStrategySelected     *prometheus.Desc
+	schedulerStrategyFallback     *prometheus.Desc
+	schedulerStrategyShadowDiff   *prometheus.Desc
+	schedulerStrategyCostDelta    *prometheus.Desc
+	schedulerStrategyLatencyDelta *prometheus.Desc
+	schedulerStrategyErrorRate    *prometheus.Desc
+	schedulerStrategyRejectReason *prometheus.Desc
 	providerErrors                *prometheus.Desc
 	providerProbeLatency          *prometheus.Desc
 	usageTokens                   *prometheus.Desc
@@ -118,6 +126,48 @@ func newRuntimeMetricsCollector(ctx context.Context, rt *runtimeState) *runtimeM
 				[]string{"strategy"},
 				nil,
 			),
+			schedulerStrategySelected: prometheus.NewDesc(
+				"scheduler_strategy_selected_total",
+				"Scheduler selections by strategy and version.",
+				[]string{"strategy", "version"},
+				nil,
+			),
+			schedulerStrategyFallback: prometheus.NewDesc(
+				"scheduler_strategy_fallback_total",
+				"Scheduler fallback attempts by strategy and version.",
+				[]string{"strategy", "version"},
+				nil,
+			),
+			schedulerStrategyShadowDiff: prometheus.NewDesc(
+				"scheduler_strategy_shadow_diff",
+				"Scheduler real-traffic shadow rollout decisions by selected side.",
+				[]string{"strategy", "version", "shadow_strategy", "selection"},
+				nil,
+			),
+			schedulerStrategyCostDelta: prometheus.NewDesc(
+				"scheduler_strategy_cost_delta",
+				"Average selected cost score minus candidate-set average cost score by strategy and version.",
+				[]string{"strategy", "version"},
+				nil,
+			),
+			schedulerStrategyLatencyDelta: prometheus.NewDesc(
+				"scheduler_strategy_latency_delta",
+				"Average selected latency score minus candidate-set average latency score by strategy and version.",
+				[]string{"strategy", "version"},
+				nil,
+			),
+			schedulerStrategyErrorRate: prometheus.NewDesc(
+				"scheduler_strategy_error_rate",
+				"Usage-log error rate for scheduler decisions by strategy and version.",
+				[]string{"strategy", "version"},
+				nil,
+			),
+			schedulerStrategyRejectReason: prometheus.NewDesc(
+				"scheduler_strategy_reject_reason_total",
+				"Scheduler rejected candidates by strategy, version, and reject reason.",
+				[]string{"strategy", "version", "reason"},
+				nil,
+			),
 			providerErrors: prometheus.NewDesc(
 				"srapi_provider_errors_total",
 				"Provider-facing errors recorded by protocol and error class.",
@@ -191,6 +241,13 @@ func (d runtimeMetricDescs) all() []*prometheus.Desc {
 		d.gatewayFailover,
 		d.schedulerDecisions,
 		d.schedulerCostScore,
+		d.schedulerStrategySelected,
+		d.schedulerStrategyFallback,
+		d.schedulerStrategyShadowDiff,
+		d.schedulerStrategyCostDelta,
+		d.schedulerStrategyLatencyDelta,
+		d.schedulerStrategyErrorRate,
+		d.schedulerStrategyRejectReason,
 		d.providerErrors,
 		d.providerProbeLatency,
 		d.usageTokens,
@@ -207,19 +264,19 @@ func (d runtimeMetricDescs) all() []*prometheus.Desc {
 
 func (c *runtimeMetricsCollector) Collect(ch chan<- prometheus.Metric) {
 	emitted := map[string]bool{}
-	c.collectUsageMetrics(ch, emitted)
-	c.collectSchedulerMetrics(ch, emitted)
+	usageLogs := c.collectUsageMetrics(ch, emitted)
+	c.collectSchedulerMetrics(ch, emitted, usageLogs)
 	c.collectRealtimeMetrics(ch, emitted)
 	c.collectReverseProxyMetrics(ch, emitted)
 	c.collectProviderProbeMetrics(ch, emitted)
 	c.collectBaselineMetrics(ch, emitted)
 }
 
-func (c *runtimeMetricsCollector) collectUsageMetrics(ch chan<- prometheus.Metric, emitted map[string]bool) {
+func (c *runtimeMetricsCollector) collectUsageMetrics(ch chan<- prometheus.Metric, emitted map[string]bool) []usagecontract.UsageLog {
 	logs, err := c.rt.usage.List(c.ctx)
 	if err != nil {
 		c.rt.logger.Warn("failed to collect usage metrics", "error", err)
-		return
+		return nil
 	}
 	requests, failovers, providerErrors, gatewayErrors, tokenCounts := aggregateUsageMetrics(logs)
 	for _, key := range sortedKeys(requests) {
@@ -243,9 +300,10 @@ func (c *runtimeMetricsCollector) collectUsageMetrics(ch chan<- prometheus.Metri
 		labels := strings.Split(key, "\xff")
 		emitConstMetric(ch, emitted, "srapi_usage_tokens_total", c.descs.usageTokens, prometheus.CounterValue, float64(tokenCounts[key]), labels...)
 	}
+	return logs
 }
 
-func (c *runtimeMetricsCollector) collectSchedulerMetrics(ch chan<- prometheus.Metric, emitted map[string]bool) {
+func (c *runtimeMetricsCollector) collectSchedulerMetrics(ch chan<- prometheus.Metric, emitted map[string]bool, usageLogs []usagecontract.UsageLog) {
 	decisions, err := c.rt.scheduler.ListDecisions(c.ctx)
 	if err != nil {
 		c.rt.logger.Warn("failed to collect scheduler decision metrics", "error", err)
@@ -258,6 +316,35 @@ func (c *runtimeMetricsCollector) collectSchedulerMetrics(ch chan<- prometheus.M
 		costScores := schedulerCostScoreAverages(decisions)
 		for _, strategy := range sortedKeys(costScores) {
 			emitConstMetric(ch, emitted, "srapi_scheduler_cost_score_avg", c.descs.schedulerCostScore, prometheus.GaugeValue, costScores[strategy], strategy)
+		}
+		strategyMetrics := schedulerStrategyMetrics(decisions, usageLogs)
+		for _, key := range sortedKeys(strategyMetrics.selected) {
+			labels := strings.Split(key, "\xff")
+			emitConstMetric(ch, emitted, "scheduler_strategy_selected_total", c.descs.schedulerStrategySelected, prometheus.CounterValue, float64(strategyMetrics.selected[key]), labels...)
+		}
+		for _, key := range sortedKeys(strategyMetrics.fallback) {
+			labels := strings.Split(key, "\xff")
+			emitConstMetric(ch, emitted, "scheduler_strategy_fallback_total", c.descs.schedulerStrategyFallback, prometheus.CounterValue, float64(strategyMetrics.fallback[key]), labels...)
+		}
+		for _, key := range sortedKeys(strategyMetrics.shadowDiff) {
+			labels := strings.Split(key, "\xff")
+			emitConstMetric(ch, emitted, "scheduler_strategy_shadow_diff", c.descs.schedulerStrategyShadowDiff, prometheus.CounterValue, float64(strategyMetrics.shadowDiff[key]), labels...)
+		}
+		for _, key := range sortedKeys(strategyMetrics.costDelta) {
+			labels := strings.Split(key, "\xff")
+			emitConstMetric(ch, emitted, "scheduler_strategy_cost_delta", c.descs.schedulerStrategyCostDelta, prometheus.GaugeValue, strategyMetrics.costDelta[key], labels...)
+		}
+		for _, key := range sortedKeys(strategyMetrics.latencyDelta) {
+			labels := strings.Split(key, "\xff")
+			emitConstMetric(ch, emitted, "scheduler_strategy_latency_delta", c.descs.schedulerStrategyLatencyDelta, prometheus.GaugeValue, strategyMetrics.latencyDelta[key], labels...)
+		}
+		for _, key := range sortedKeys(strategyMetrics.errorRate) {
+			labels := strings.Split(key, "\xff")
+			emitConstMetric(ch, emitted, "scheduler_strategy_error_rate", c.descs.schedulerStrategyErrorRate, prometheus.GaugeValue, strategyMetrics.errorRate[key], labels...)
+		}
+		for _, key := range sortedKeys(strategyMetrics.rejectReason) {
+			labels := strings.Split(key, "\xff")
+			emitConstMetric(ch, emitted, "scheduler_strategy_reject_reason_total", c.descs.schedulerStrategyRejectReason, prometheus.CounterValue, float64(strategyMetrics.rejectReason[key]), labels...)
 		}
 	}
 	leases, err := c.rt.scheduler.ListLeases(c.ctx)
@@ -372,6 +459,27 @@ func (c *runtimeMetricsCollector) collectBaselineMetrics(ch chan<- prometheus.Me
 	}
 	if !emitted["srapi_scheduler_cost_score_avg"] {
 		emitConstMetric(ch, emitted, "srapi_scheduler_cost_score_avg", c.descs.schedulerCostScore, prometheus.GaugeValue, 0, "unknown")
+	}
+	if !emitted["scheduler_strategy_selected_total"] {
+		emitConstMetric(ch, emitted, "scheduler_strategy_selected_total", c.descs.schedulerStrategySelected, prometheus.CounterValue, 0, "unknown", "unknown")
+	}
+	if !emitted["scheduler_strategy_fallback_total"] {
+		emitConstMetric(ch, emitted, "scheduler_strategy_fallback_total", c.descs.schedulerStrategyFallback, prometheus.CounterValue, 0, "unknown", "unknown")
+	}
+	if !emitted["scheduler_strategy_shadow_diff"] {
+		emitConstMetric(ch, emitted, "scheduler_strategy_shadow_diff", c.descs.schedulerStrategyShadowDiff, prometheus.CounterValue, 0, "unknown", "unknown", "unknown", "current")
+	}
+	if !emitted["scheduler_strategy_cost_delta"] {
+		emitConstMetric(ch, emitted, "scheduler_strategy_cost_delta", c.descs.schedulerStrategyCostDelta, prometheus.GaugeValue, 0, "unknown", "unknown")
+	}
+	if !emitted["scheduler_strategy_latency_delta"] {
+		emitConstMetric(ch, emitted, "scheduler_strategy_latency_delta", c.descs.schedulerStrategyLatencyDelta, prometheus.GaugeValue, 0, "unknown", "unknown")
+	}
+	if !emitted["scheduler_strategy_error_rate"] {
+		emitConstMetric(ch, emitted, "scheduler_strategy_error_rate", c.descs.schedulerStrategyErrorRate, prometheus.GaugeValue, 0, "unknown", "unknown")
+	}
+	if !emitted["scheduler_strategy_reject_reason_total"] {
+		emitConstMetric(ch, emitted, "scheduler_strategy_reject_reason_total", c.descs.schedulerStrategyRejectReason, prometheus.CounterValue, 0, "unknown", "unknown", "unknown")
 	}
 	if !emitted["srapi_provider_errors_total"] {
 		emitConstMetric(ch, emitted, "srapi_provider_errors_total", c.descs.providerErrors, prometheus.CounterValue, 0, "unknown", "unknown")
@@ -507,6 +615,210 @@ func schedulerCostScoreAverages(decisions []schedulercontract.Decision) map[stri
 		out[strategy] = aggregate.sum / float64(aggregate.count)
 	}
 	return out
+}
+
+type schedulerStrategyMetricSet struct {
+	selected     map[string]int
+	fallback     map[string]int
+	shadowDiff   map[string]int
+	costDelta    map[string]float64
+	latencyDelta map[string]float64
+	errorRate    map[string]float64
+	rejectReason map[string]int
+}
+
+type averageMetric struct {
+	sum   float64
+	count int
+}
+
+type rateMetric struct {
+	total  int
+	errors int
+}
+
+func schedulerStrategyMetrics(decisions []schedulercontract.Decision, usageLogs []usagecontract.UsageLog) schedulerStrategyMetricSet {
+	metrics := schedulerStrategyMetricSet{
+		selected:     map[string]int{},
+		fallback:     map[string]int{},
+		shadowDiff:   map[string]int{},
+		costDelta:    map[string]float64{},
+		latencyDelta: map[string]float64{},
+		errorRate:    map[string]float64{},
+		rejectReason: map[string]int{},
+	}
+	decisionByAttempt := map[string]schedulercontract.Decision{}
+	costDeltas := map[string]averageMetric{}
+	latencyDeltas := map[string]averageMetric{}
+	for _, decision := range decisions {
+		key := schedulerStrategyKey(decision)
+		decisionByAttempt[schedulerAttemptKey(decision.RequestID, decision.AttemptNo)] = decision
+		if decision.SelectedAccountID != nil {
+			metrics.selected[key]++
+			if delta, ok := selectedScoreDelta(decision.Scores, *decision.SelectedAccountID, "cost_score"); ok {
+				costDeltas[key] = observeAverage(costDeltas[key], delta)
+			}
+			if delta, ok := selectedScoreDelta(decision.Scores, *decision.SelectedAccountID, "latency_score"); ok {
+				latencyDeltas[key] = observeAverage(latencyDeltas[key], delta)
+			}
+		}
+		if decision.FallbackFromDecisionID != nil || decision.AttemptNo > 1 {
+			metrics.fallback[key]++
+		}
+		for _, reason := range schedulerRejectReasons(decision.RejectReasons) {
+			metrics.rejectReason[strings.Join([]string{key, reason}, "\xff")]++
+		}
+		if shadowStrategy, selection, ok := schedulerRolloutSelection(decision.Scores); ok {
+			metrics.shadowDiff[strings.Join([]string{key, shadowStrategy, selection}, "\xff")]++
+		}
+	}
+
+	rates := map[string]rateMetric{}
+	for _, log := range usageLogs {
+		decision, ok := decisionByAttempt[schedulerAttemptKey(log.RequestID, log.AttemptNo)]
+		if !ok {
+			continue
+		}
+		key := schedulerStrategyKey(decision)
+		rate := rates[key]
+		rate.total++
+		if !log.Success {
+			rate.errors++
+		}
+		rates[key] = rate
+	}
+
+	for key, aggregate := range costDeltas {
+		if aggregate.count > 0 {
+			metrics.costDelta[key] = aggregate.sum / float64(aggregate.count)
+		}
+	}
+	for key, aggregate := range latencyDeltas {
+		if aggregate.count > 0 {
+			metrics.latencyDelta[key] = aggregate.sum / float64(aggregate.count)
+		}
+	}
+	for key, rate := range rates {
+		if rate.total > 0 {
+			metrics.errorRate[key] = float64(rate.errors) / float64(rate.total)
+		}
+	}
+	return metrics
+}
+
+func schedulerStrategyKey(decision schedulercontract.Decision) string {
+	return strings.Join([]string{
+		metricLabelValue(string(decision.Strategy), "unknown"),
+		metricLabelValue(decision.StrategyVersion, "unknown"),
+	}, "\xff")
+}
+
+func schedulerAttemptKey(requestID string, attemptNo int) string {
+	if attemptNo <= 0 {
+		attemptNo = 1
+	}
+	return strings.TrimSpace(requestID) + "\xff" + strconv.Itoa(attemptNo)
+}
+
+func observeAverage(aggregate averageMetric, value float64) averageMetric {
+	aggregate.sum += value
+	aggregate.count++
+	return aggregate
+}
+
+func selectedScoreDelta(scores map[string]any, selectedAccountID int, component string) (float64, bool) {
+	if len(scores) == 0 {
+		return 0, false
+	}
+	var selected float64
+	var selectedOK bool
+	var sum float64
+	var count int
+	for _, raw := range scores {
+		accountID, ok := scoreAccountID(raw)
+		if !ok {
+			continue
+		}
+		value, ok := scoreComponentValue(raw, component)
+		if !ok {
+			continue
+		}
+		sum += value
+		count++
+		if accountID == selectedAccountID {
+			selected = value
+			selectedOK = true
+		}
+	}
+	if !selectedOK || count == 0 {
+		return 0, false
+	}
+	return selected - sum/float64(count), true
+}
+
+func scoreAccountID(score any) (int, bool) {
+	values, ok := score.(map[string]any)
+	if !ok {
+		return 0, false
+	}
+	value, ok := values["account_id"]
+	if !ok {
+		return 0, false
+	}
+	floatValue, ok := metricFloatValue(value)
+	if !ok {
+		return 0, false
+	}
+	return int(floatValue), true
+}
+
+func scoreComponentValue(score any, component string) (float64, bool) {
+	values, ok := score.(map[string]any)
+	if !ok {
+		return 0, false
+	}
+	value, ok := values[component]
+	if !ok {
+		return 0, false
+	}
+	return metricFloatValue(value)
+}
+
+func schedulerRejectReasons(reasons map[string]any) []string {
+	if len(reasons) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(reasons))
+	for _, raw := range reasons {
+		reason, ok := raw.(string)
+		if !ok {
+			continue
+		}
+		if label := metricLabelValue(reason, ""); label != "" {
+			out = append(out, label)
+		}
+	}
+	return out
+}
+
+func schedulerRolloutSelection(scores map[string]any) (string, string, bool) {
+	routingHints, ok := scores["routing_hints"].(map[string]any)
+	if !ok {
+		return "", "", false
+	}
+	rawRollout, ok := routingHints["strategy_rollout"].(map[string]any)
+	if !ok {
+		return "", "", false
+	}
+	rawStrategy, ok := rawRollout["shadow_strategy"].(string)
+	if !ok {
+		return "", "", false
+	}
+	selection := "current"
+	if shadowSelected, ok := rawRollout["shadow_selected"].(bool); ok && shadowSelected {
+		selection = "shadow"
+	}
+	return metricLabelValue(rawStrategy, "unknown"), selection, true
 }
 
 func scoreCostValue(score any) (float64, bool) {
