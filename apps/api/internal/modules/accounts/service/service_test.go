@@ -10,6 +10,7 @@ import (
 
 	"github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	accountmemory "github.com/srapi/srapi/apps/api/internal/modules/accounts/store/memory"
+	"github.com/srapi/srapi/apps/api/internal/testsupport/oteltest"
 )
 
 func TestCreateEncryptsCredential(t *testing.T) {
@@ -313,6 +314,48 @@ func TestProbeAccountOpensCircuitAfterConsecutiveFailures(t *testing.T) {
 	if updated.Metadata["last_health_snapshot_id"] != snapshot.ID {
 		t.Fatalf("expected latest snapshot id in metadata, got %+v", updated.Metadata)
 	}
+}
+
+func TestProbeAccountRecordsTraceSpan(t *testing.T) {
+	exporter := oteltest.NewExporter(t)
+	store := accountmemory.New()
+	now := time.Date(2026, 5, 25, 10, 0, 0, 0, time.UTC)
+	svc, err := New(store, "0123456789abcdef0123456789abcdef", fixedClock{now: now})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	account, err := svc.Create(context.Background(), contract.CreateRequest{
+		ProviderID:   15,
+		Name:         "probe-traced",
+		RuntimeClass: contract.RuntimeClassAPIKey,
+		Credential:   map[string]any{"api_key": "secret-value"},
+	})
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+
+	_, _, err = svc.ProbeAccount(context.Background(), account.ID, fakeAccountProber{
+		result: contract.AccountProbeResult{
+			OK:         false,
+			ErrorClass: "timeout",
+			StatusCode: 504,
+			LatencyMS:  150,
+			CheckedAt:  now,
+		},
+	}, contract.AccountProbePolicy{})
+	if err != nil {
+		t.Fatalf("probe account: %v", err)
+	}
+
+	span := oteltest.FindSpan(t, exporter.GetSpans(), "accounts.ProbeAccount")
+	oteltest.AssertIntAttr(t, span.Attributes, "srapi.account.id", account.ID)
+	oteltest.AssertIntAttr(t, span.Attributes, "srapi.provider.id", account.ProviderID)
+	oteltest.AssertStringAttr(t, span.Attributes, "srapi.account.runtime_class", "api_key")
+	oteltest.AssertStringAttr(t, span.Attributes, "srapi.account.probe_outcome", "degraded")
+	oteltest.AssertStringAttr(t, span.Attributes, "srapi.account.health_status", "degraded")
+	oteltest.AssertStringAttr(t, span.Attributes, "srapi.account.circuit_state", "half_open")
+	oteltest.AssertStringAttr(t, span.Attributes, "srapi.account.error_class", "timeout")
+	oteltest.AssertIntAttr(t, span.Attributes, "srapi.account.probe_latency_ms", 150)
 }
 
 func TestProbeAccountSuccessfulProbeClearsProtectionMetadata(t *testing.T) {

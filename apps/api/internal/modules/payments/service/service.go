@@ -10,6 +10,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"net/url"
@@ -25,6 +26,8 @@ import (
 	stripeprovider "github.com/srapi/srapi/apps/api/internal/modules/payments/providers/stripe"
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	platformcrypto "github.com/srapi/srapi/apps/api/internal/platform/crypto"
+	platformotel "github.com/srapi/srapi/apps/api/internal/platform/otel"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 const (
@@ -293,8 +296,15 @@ func (s *Service) ExpirePendingOrders(ctx context.Context, now time.Time) (contr
 	return result, nil
 }
 
-func (s *Service) HandleWebhook(ctx context.Context, req contract.WebhookRequest) (contract.WebhookResult, error) {
+func (s *Service) HandleWebhook(ctx context.Context, req contract.WebhookRequest) (result contract.WebhookResult, err error) {
 	provider := strings.TrimSpace(req.Provider)
+	ctx, span := platformotel.StartSpan(ctx, "payments.HandleWebhook",
+		attribute.String("srapi.payment.provider", provider),
+	)
+	defer func() {
+		platformotel.EndSpan(span, err, paymentWebhookTraceErrorType(err), paymentWebhookTraceAttrs(result, err)...)
+	}()
+
 	normalized, err := s.normalizeWebhook(ctx, provider, req)
 	if err != nil {
 		return contract.WebhookResult{}, err
@@ -370,6 +380,43 @@ func (s *Service) HandleWebhook(ctx context.Context, req contract.WebhookRequest
 		return contract.WebhookResult{}, err
 	}
 	return contract.WebhookResult{Order: fulfilled, Handled: true}, nil
+}
+
+func paymentWebhookTraceErrorType(err error) string {
+	switch {
+	case err == nil:
+		return ""
+	case errors.Is(err, ErrInvalidInput):
+		return "invalid_input"
+	case errors.Is(err, ErrSignatureInvalid):
+		return "signature_invalid"
+	case errors.Is(err, ErrOrderMismatch):
+		return "order_mismatch"
+	case errors.Is(err, ErrInvalidTransition):
+		return "invalid_transition"
+	default:
+		return "payment_webhook_error"
+	}
+}
+
+func paymentWebhookTraceAttrs(result contract.WebhookResult, err error) []attribute.KeyValue {
+	outcome := "error"
+	if err == nil {
+		outcome = "ignored"
+		if result.Handled {
+			outcome = "handled"
+		}
+	}
+	attrs := []attribute.KeyValue{attribute.String("srapi.payment.webhook_outcome", outcome)}
+	if result.Order.ID > 0 {
+		attrs = append(attrs,
+			attribute.Int("srapi.payment.order_id", result.Order.ID),
+			attribute.Int("srapi.payment.provider_instance_id", result.Order.ProviderInstanceID),
+			attribute.String("srapi.payment.order_status", string(result.Order.Status)),
+			attribute.String("srapi.payment.product_type", string(result.Order.ProductType)),
+		)
+	}
+	return attrs
 }
 
 func (s *Service) attachProviderCheckout(ctx context.Context, order contract.PaymentOrder, instance contract.PaymentProviderInstance) (contract.PaymentOrder, error) {

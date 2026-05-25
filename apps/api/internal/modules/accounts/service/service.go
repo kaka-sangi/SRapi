@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"sort"
@@ -16,6 +17,8 @@ import (
 
 	"github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	platformcrypto "github.com/srapi/srapi/apps/api/internal/platform/crypto"
+	platformotel "github.com/srapi/srapi/apps/api/internal/platform/otel"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 const credentialVersionV1 = "v1"
@@ -600,7 +603,14 @@ func (s *Service) RecordHealthSnapshot(ctx context.Context, snapshot contract.Ac
 }
 
 // ProbeAccount probes one provider account and persists the resulting health state.
-func (s *Service) ProbeAccount(ctx context.Context, id int, prober contract.AccountProber, policy contract.AccountProbePolicy) (contract.AccountHealthSnapshot, contract.ProviderAccount, error) {
+func (s *Service) ProbeAccount(ctx context.Context, id int, prober contract.AccountProber, policy contract.AccountProbePolicy) (snapshot contract.AccountHealthSnapshot, updated contract.ProviderAccount, err error) {
+	ctx, span := platformotel.StartSpan(ctx, "accounts.ProbeAccount",
+		attribute.Int("srapi.account.id", id),
+	)
+	defer func() {
+		platformotel.EndSpan(span, err, accountProbeTraceErrorType(err), accountProbeTraceAttrs(snapshot, updated, err)...)
+	}()
+
 	if id <= 0 || prober == nil {
 		return contract.AccountHealthSnapshot{}, contract.ProviderAccount{}, ErrInvalidInput
 	}
@@ -633,11 +643,56 @@ func (s *Service) ProbeAccount(ctx context.Context, id int, prober contract.Acco
 		return contract.AccountHealthSnapshot{}, contract.ProviderAccount{}, err
 	}
 	update.Metadata["last_health_snapshot_id"] = recorded.ID
-	updated, err := s.store.Update(ctx, update)
+	updated, err = s.store.Update(ctx, update)
 	if err != nil {
 		return contract.AccountHealthSnapshot{}, contract.ProviderAccount{}, err
 	}
 	return recorded, updated, nil
+}
+
+func accountProbeTraceErrorType(err error) string {
+	switch {
+	case err == nil:
+		return ""
+	case errors.Is(err, ErrInvalidInput):
+		return "invalid_input"
+	case errors.Is(err, ErrCredentialMissing):
+		return "credential_missing"
+	case errors.Is(err, ErrProxyUnavailable):
+		return "proxy_unavailable"
+	default:
+		return "account_probe_error"
+	}
+}
+
+func accountProbeTraceAttrs(snapshot contract.AccountHealthSnapshot, updated contract.ProviderAccount, err error) []attribute.KeyValue {
+	outcome := "error"
+	if err == nil {
+		outcome = snapshot.Status
+		if outcome == "" {
+			outcome = "healthy"
+		}
+	}
+	attrs := []attribute.KeyValue{attribute.String("srapi.account.probe_outcome", outcome)}
+	if updated.ID > 0 {
+		attrs = append(attrs,
+			attribute.Int("srapi.account.id", updated.ID),
+			attribute.Int("srapi.provider.id", updated.ProviderID),
+			attribute.String("srapi.account.runtime_class", string(updated.RuntimeClass)),
+			attribute.String("srapi.account.status", string(updated.Status)),
+		)
+		if errorClass, ok := updated.Metadata["last_error_class"].(string); ok && strings.TrimSpace(errorClass) != "" {
+			attrs = append(attrs, attribute.String("srapi.account.error_class", strings.TrimSpace(errorClass)))
+		}
+	}
+	if snapshot.AccountID > 0 {
+		attrs = append(attrs,
+			attribute.String("srapi.account.health_status", snapshot.Status),
+			attribute.String("srapi.account.circuit_state", snapshot.CircuitState),
+			attribute.Int("srapi.account.probe_latency_ms", snapshot.LatencyP95MS),
+		)
+	}
+	return attrs
 }
 
 func (s *Service) LatestHealthSnapshotByAccount(ctx context.Context, accountID int) (contract.AccountHealthSnapshot, error) {

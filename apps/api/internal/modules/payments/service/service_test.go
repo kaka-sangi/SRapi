@@ -21,7 +21,9 @@ import (
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	subscriptionservice "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/service"
 	subscriptionmemory "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/store/memory"
+	"github.com/srapi/srapi/apps/api/internal/testsupport/oteltest"
 	"github.com/stripe/stripe-go/v78/webhook"
+	"go.opentelemetry.io/otel/codes"
 )
 
 const testMasterKey = "payment_master_key_32_bytes_minimum_value"
@@ -132,6 +134,7 @@ func TestPaymentWebhookFulfillsSubscriptionOrderIdempotently(t *testing.T) {
 }
 
 func TestPaymentWebhookRejectsInvalidSignatureFailClosed(t *testing.T) {
+	exporter := oteltest.NewExporter(t)
 	h := newHarness(t)
 	_, err := h.payments.CreateProviderInstance(t.Context(), contract.CreateProviderInstanceRequest{
 		Provider:         "easypay",
@@ -174,6 +177,13 @@ func TestPaymentWebhookRejectsInvalidSignatureFailClosed(t *testing.T) {
 	if len(orders) != 1 || orders[0].Status != contract.OrderStatusPending {
 		t.Fatalf("invalid signature must not mutate order, got %+v", orders)
 	}
+	span := oteltest.FindSpan(t, exporter.GetSpans(), "payments.HandleWebhook")
+	if span.Status.Code != codes.Error {
+		t.Fatalf("expected payment webhook span error status, got %+v", span.Status)
+	}
+	oteltest.AssertStringAttr(t, span.Attributes, "srapi.payment.provider", "easypay")
+	oteltest.AssertStringAttr(t, span.Attributes, "srapi.payment.webhook_outcome", "error")
+	oteltest.AssertStringAttr(t, span.Attributes, "error.type", "signature_invalid")
 	assertCounts(t, h, 0, 0, 0, 1)
 }
 

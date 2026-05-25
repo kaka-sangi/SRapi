@@ -16,6 +16,7 @@ import (
 	"github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 	"github.com/srapi/srapi/apps/api/internal/modules/scheduler/service"
 	schedulermemory "github.com/srapi/srapi/apps/api/internal/modules/scheduler/store/memory"
+	"github.com/srapi/srapi/apps/api/internal/testsupport/oteltest"
 )
 
 func TestScheduleRejectsRuntimeLimitAndCapabilityFailures(t *testing.T) {
@@ -132,6 +133,27 @@ func TestScheduleReturnsRankedAvailableCandidates(t *testing.T) {
 		}
 	}
 	assertRejectReason(t, result.Decision.RejectReasons, 2, "circuit_open")
+}
+
+func TestScheduleRecordsTraceSpan(t *testing.T) {
+	exporter := oteltest.NewExporter(t)
+	svc := newService(t)
+	req := baseRequest()
+	req.Candidates = []contract.Candidate{
+		candidate(7, withHealth(0.95), withQuotaRemaining(0.90), withCapabilities(capabilitiescontract.KeyStreaming)),
+	}
+
+	result, err := svc.Schedule(context.Background(), req)
+	if err != nil {
+		t.Fatalf("schedule: %v", err)
+	}
+
+	span := oteltest.FindSpan(t, exporter.GetSpans(), "scheduler.Schedule")
+	oteltest.AssertStringAttr(t, span.Attributes, "srapi.request_id", req.RequestID)
+	oteltest.AssertStringAttr(t, span.Attributes, "srapi.scheduler.outcome", "selected")
+	oteltest.AssertStringAttr(t, span.Attributes, "srapi.provider.protocol", "openai-compatible")
+	oteltest.AssertIntAttr(t, span.Attributes, "srapi.scheduler.selected_account_id", result.Candidate.Account.ID)
+	oteltest.AssertIntAttr(t, span.Attributes, "srapi.scheduler.candidate_count", 1)
 }
 
 func TestParetoFrontierExcludesDominatedCandidateBeforeWeightedSelection(t *testing.T) {

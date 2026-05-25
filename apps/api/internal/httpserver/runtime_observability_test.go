@@ -6,22 +6,12 @@ import (
 	"testing"
 
 	"github.com/srapi/srapi/apps/api/internal/config"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+	"github.com/srapi/srapi/apps/api/internal/testsupport/oteltest"
 	"go.opentelemetry.io/otel/trace"
-	"go.opentelemetry.io/otel/trace/noop"
 )
 
 func TestTracingMiddlewareRecordsHTTPServerSpan(t *testing.T) {
-	exporter := tracetest.NewInMemoryExporter()
-	tracerProvider := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
-	otel.SetTracerProvider(tracerProvider)
-	t.Cleanup(func() {
-		_ = tracerProvider.Shutdown(t.Context())
-		otel.SetTracerProvider(noop.NewTracerProvider())
-	})
+	exporter := oteltest.NewExporter(t)
 
 	handler := New(config.Load(), nil)
 	request := httptest.NewRequest(http.MethodGet, "/api/v1/health", nil)
@@ -41,28 +31,8 @@ func TestTracingMiddlewareRecordsHTTPServerSpan(t *testing.T) {
 	if span.Name != "GET /api/v1/health" || span.SpanKind != trace.SpanKindServer {
 		t.Fatalf("unexpected span shape: %+v", span)
 	}
-	assertSpanAttr(t, span.Attributes, "srapi.request_id", "req_trace")
-	assertSpanAttr(t, span.Attributes, "http.request.method", http.MethodGet)
-	assertSpanAttr(t, span.Attributes, "http.route", "/api/v1/health")
-	assertSpanIntAttr(t, span.Attributes, "http.response.status_code", http.StatusOK)
-}
-
-func assertSpanAttr(t *testing.T, attrs []attribute.KeyValue, key attribute.Key, value string) {
-	t.Helper()
-	for _, attr := range attrs {
-		if attr.Key == key && attr.Value.AsString() == value {
-			return
-		}
-	}
-	t.Fatalf("missing span attribute %s=%q in %+v", key, value, attrs)
-}
-
-func assertSpanIntAttr(t *testing.T, attrs []attribute.KeyValue, key attribute.Key, value int) {
-	t.Helper()
-	for _, attr := range attrs {
-		if attr.Key == key && attr.Value.AsInt64() == int64(value) {
-			return
-		}
-	}
-	t.Fatalf("missing span attribute %s=%d in %+v", key, value, attrs)
+	oteltest.AssertStringAttr(t, span.Attributes, "srapi.request_id", "req_trace")
+	oteltest.AssertStringAttr(t, span.Attributes, "http.request.method", http.MethodGet)
+	oteltest.AssertStringAttr(t, span.Attributes, "http.route", "/api/v1/health")
+	oteltest.AssertIntAttr(t, span.Attributes, "http.response.status_code", http.StatusOK)
 }

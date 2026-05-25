@@ -91,24 +91,23 @@ last_completed:
 - C3.1: Workspace persistence now adds `workspaces`, nullable `users.workspace_id`, nullable `api_keys.workspace_id`, `000008_workspaces_and_user_workspace_id` up/down migrations, User store personal workspace creation, API Key workspace inheritance, and docs/spec migration parity.
 - C3.2: Role permission persistence now adds `roles.permissions_json`, admin roles APIs, merged user session permissions, `entitlements` query-cache rows materialized from active subscription snapshots, `000009_role_permissions_and_entitlements` up/down migrations, and an HTTP regression proving `payment_order:read` grants read-only admin payment order access while plain users are rejected.
 - B1.2.1: Usage charging performance indexing now replaces the single-column `usage_logs(charged_at)` index with `usage_logs(charged_at, success, created_at)`, makes `ListPendingUsageCharges` scan oldest pending usage first, and adds a persistence regression for deterministic pending charge ordering.
+- C1.1: Structured trace service spans now cover `scheduler.Schedule`, `payments.HandleWebhook`, and `accounts.ProbeAccount` with reusable `platform/otel.StartSpan` / `EndSpan`, low-sensitive diagnostic attributes, business outcome fields, stable `error.type` classification, and focused span export tests.
 
 current:
 
-- package: next critical-path backend package
-- status: B1.2.1 implemented; production QualityEval smoke still pending real judge credential/environment
-- objective: continue the critical path after usage charging indexing without letting docs/specs drift.
+- package: C1 structured trace
+- status: key service spans implemented; production QualityEval smoke still pending real judge credential/environment
+- objective: continue the critical path after structured trace service spans without letting docs/specs drift.
 
-next_recommended: Continue with the next pending backend package from `specs/silly-stirring-turtle.md`, prioritizing C1 OTel structured trace / SLO evaluator wiring or B2 payment SDK adapters unless the user redirects.
+next_recommended: Continue with the next pending backend package from `specs/silly-stirring-turtle.md`, prioritizing C1 Jaeger/Tempo collector smoke, C1 SLO evaluator wiring, or B2 payment SDK adapters unless the user redirects.
 
 last_gates:
 
-- `make ent-generate-check`: pass
-- `make migration-check`: pass
-- `cd apps/api && go test ./internal/persistence/entstore/users ./internal/persistence/entstore/apikeys ./internal/modules/users/... ./internal/modules/api_keys/...`: pass
-- `cd apps/api && go test ./...`: pass
-- `make architecture-check`: pass
-- `make code-quality-check`: pass
 - `git diff --check`: pass
+- `cd apps/api && go test ./internal/platform/otel ./internal/testsupport/oteltest ./internal/modules/accounts/service ./internal/modules/payments/service ./internal/modules/scheduler/service ./internal/httpserver`: pass
+- `make architecture-check`: pass
+- `cd apps/api && go test ./internal/codequality`: pass
+- `cd apps/api && go test ./...`: pass
 - `make check`: pass
 
 notes:

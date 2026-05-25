@@ -2,10 +2,16 @@ package otel
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+	"go.opentelemetry.io/otel/trace/noop"
 
 	"github.com/srapi/srapi/apps/api/internal/config"
 )
@@ -40,6 +46,30 @@ func TestNewTracerProviderDisabledDoesNotRequireCollector(t *testing.T) {
 	if err := shutdown(context.Background()); err != nil {
 		t.Fatalf("shutdown tracer provider: %v", err)
 	}
+}
+
+func TestEndSpanRecordsErrorTypeAndStatus(t *testing.T) {
+	exporter := tracetest.NewInMemoryExporter()
+	tracerProvider := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
+	otel.SetTracerProvider(tracerProvider)
+	t.Cleanup(func() {
+		_ = tracerProvider.Shutdown(t.Context())
+		otel.SetTracerProvider(noop.NewTracerProvider())
+	})
+
+	ctx, span := StartSpan(context.Background(), "test.operation")
+	EndSpan(span, errors.New("operation failed"), "classified_error", attribute.String("srapi.test.outcome", "failed"))
+	_ = ctx
+
+	spans := exporter.GetSpans()
+	if len(spans) != 1 {
+		t.Fatalf("expected one span, got %+v", spans)
+	}
+	if spans[0].Status.Code != codes.Error || spans[0].Status.Description != "classified_error" {
+		t.Fatalf("expected error status, got %+v", spans[0].Status)
+	}
+	assertAttr(t, spans[0].Attributes, "error.type", "classified_error")
+	assertAttr(t, spans[0].Attributes, "srapi.test.outcome", "failed")
 }
 
 func assertAttr(t *testing.T, attrs []attribute.KeyValue, key attribute.Key, value string) {

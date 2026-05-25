@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"sort"
@@ -17,6 +18,8 @@ import (
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	capabilitiescontract "github.com/srapi/srapi/apps/api/internal/modules/capabilities/contract"
 	"github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
+	platformotel "github.com/srapi/srapi/apps/api/internal/platform/otel"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 type Clock interface {
@@ -226,7 +229,19 @@ func New(store contract.Store, clock Clock) (*Service, error) {
 	return &Service{store: store, clock: clock, registry: NewStrategyRegistry()}, nil
 }
 
-func (s *Service) Schedule(ctx context.Context, req contract.ScheduleRequest) (contract.ScheduleResult, error) {
+func (s *Service) Schedule(ctx context.Context, req contract.ScheduleRequest) (result contract.ScheduleResult, err error) {
+	ctx, span := platformotel.StartSpan(ctx, "scheduler.Schedule",
+		attribute.String("srapi.request_id", strings.TrimSpace(req.RequestID)),
+		attribute.Int("srapi.scheduler.attempt_no", scheduleAttemptNo(req.AttemptNo)),
+		attribute.String("srapi.scheduler.strategy", string(req.Strategy)),
+		attribute.String("srapi.gateway.model", strings.TrimSpace(req.Model)),
+		attribute.String("srapi.gateway.source_endpoint", strings.TrimSpace(req.SourceEndpoint)),
+		attribute.Int("srapi.scheduler.candidate_count", len(req.Candidates)),
+	)
+	defer func() {
+		platformotel.EndSpan(span, err, schedulerTraceErrorType(err), schedulerTraceAttrs(result, err)...)
+	}()
+
 	if err := validateScheduleRequest(req); err != nil {
 		return contract.ScheduleResult{}, ErrInvalidInput
 	}
@@ -269,6 +284,47 @@ func (s *Service) Schedule(ctx context.Context, req contract.ScheduleRequest) (c
 		return contract.ScheduleResult{}, err
 	}
 	return contract.ScheduleResult{Decision: decision, Candidate: evaluation.selected, Candidates: evaluation.candidatesByRank, Lease: lease}, nil
+}
+
+func schedulerTraceErrorType(err error) string {
+	switch {
+	case err == nil:
+		return ""
+	case errors.Is(err, ErrInvalidInput):
+		return "invalid_input"
+	case errors.Is(err, ErrNoAvailableAccount):
+		return "no_available_account"
+	case errors.Is(err, ErrUserBalanceInsufficient):
+		return "user_balance_insufficient"
+	default:
+		return "scheduler_error"
+	}
+}
+
+func schedulerTraceAttrs(result contract.ScheduleResult, err error) []attribute.KeyValue {
+	attrs := []attribute.KeyValue{attribute.String("srapi.scheduler.outcome", "error")}
+	if err == nil {
+		attrs[0] = attribute.String("srapi.scheduler.outcome", "selected")
+	} else if errors.Is(err, ErrNoAvailableAccount) || errors.Is(err, ErrUserBalanceInsufficient) {
+		attrs[0] = attribute.String("srapi.scheduler.outcome", "rejected")
+	}
+	if result.Decision.ID > 0 {
+		attrs = append(attrs, attribute.Int("srapi.scheduler.decision_id", result.Decision.ID))
+	}
+	if result.Decision.CandidateCount > 0 {
+		attrs = append(attrs, attribute.Int("srapi.scheduler.candidate_count", result.Decision.CandidateCount))
+	}
+	attrs = append(attrs, attribute.Int("srapi.scheduler.rejected_count", result.Decision.RejectedCount))
+	if result.Decision.SelectedProviderID != nil {
+		attrs = append(attrs, attribute.Int("srapi.scheduler.selected_provider_id", *result.Decision.SelectedProviderID))
+	}
+	if result.Decision.SelectedAccountID != nil {
+		attrs = append(attrs, attribute.Int("srapi.scheduler.selected_account_id", *result.Decision.SelectedAccountID))
+	}
+	if result.Decision.TargetProtocol != "" {
+		attrs = append(attrs, attribute.String("srapi.provider.protocol", result.Decision.TargetProtocol))
+	}
+	return attrs
 }
 
 func validateScheduleRequest(req contract.ScheduleRequest) error {
