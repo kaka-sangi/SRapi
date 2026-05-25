@@ -3864,6 +3864,139 @@ func TestGatewayChatCompletionFailoverRecordsAttemptEvidence(t *testing.T) {
 	}
 }
 
+func TestGatewayChatCompletionStreamFailoverBeforeDownstreamWrite(t *testing.T) {
+	var (
+		mu             sync.Mutex
+		primaryCalls   int
+		secondaryCalls int
+	)
+	primaryUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/chat/completions" {
+			t.Fatalf("unexpected primary upstream path %s", r.URL.Path)
+		}
+		mu.Lock()
+		primaryCalls++
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = w.Write([]byte(`{"error":{"message":"primary stream unavailable","type":"server_error"}}`))
+	}))
+	defer primaryUpstream.Close()
+
+	secondaryUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/chat/completions" {
+			t.Fatalf("unexpected secondary upstream path %s", r.URL.Path)
+		}
+		mu.Lock()
+		secondaryCalls++
+		mu.Unlock()
+		if got := r.Header.Get("Authorization"); got != "Bearer failover-stream-secondary-secret" {
+			t.Fatalf("expected secondary upstream auth, got %q", got)
+		}
+		var payload struct {
+			Model  string `json:"model"`
+			Stream bool   `json:"stream"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode secondary stream upstream request: %v", err)
+		}
+		if payload.Model != "failover-stream-secondary-upstream" || !payload.Stream {
+			t.Fatalf("unexpected secondary stream payload: %+v", payload)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"failover stream\"}}]}\n\n"))
+		_, _ = w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\" ok\"}}]}\n\n"))
+		_, _ = w.Write([]byte("data: {\"choices\":[],\"usage\":{\"prompt_tokens\":8,\"completion_tokens\":4,\"total_tokens\":12}}\n\n"))
+		_, _ = w.Write([]byte("data: [DONE]\n\n"))
+	}))
+	defer secondaryUpstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"failover-stream-model","display_name":"Failover Stream Model","status":"active","capabilities":[{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	primaryProvider := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"failover-stream-primary-provider","display_name":"Failover Stream Primary","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	secondaryProvider := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"failover-stream-secondary-provider","display_name":"Failover Stream Secondary","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(primaryProvider.Data.Id)+`","upstream_model_name":"failover-stream-primary-upstream","status":"active","capability_override":[{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(secondaryProvider.Data.Id)+`","upstream_model_name":"failover-stream-secondary-upstream","status":"active","capability_override":[{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	primaryAccount := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(primaryProvider.Data.Id)+`","name":"failover-stream-primary-account","runtime_class":"api_key","credential":{"api_key":"failover-stream-primary-secret"},"metadata":{"base_url":"`+primaryUpstream.URL+`/v1","health_score":0.99,"latency_p95_ms":50,"quality_score":0.99},"status":"active"}`)
+	secondaryAccount := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(secondaryProvider.Data.Id)+`","name":"failover-stream-secondary-account","runtime_class":"api_key","credential":{"api_key":"failover-stream-secondary-secret"},"metadata":{"base_url":"`+secondaryUpstream.URL+`/v1","health_score":0.80,"latency_p95_ms":1000,"quality_score":0.50},"status":"active"}`)
+
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/chat/completions", `{"model":"failover-stream-model","stream":true,"messages":[{"role":"user","content":"exercise stream failover"}]}`)
+	if got := rec.Header().Get("Content-Type"); got != "text/event-stream" {
+		t.Fatalf("expected event stream content type, got %q", got)
+	}
+	body := rec.Body.String()
+	for _, expected := range []string{"data:", "failover stream ok", "data: [DONE]"} {
+		if !strings.Contains(body, expected) {
+			t.Fatalf("expected stream body to contain %q, got %s", expected, body)
+		}
+	}
+	if strings.Contains(body, "primary stream unavailable") {
+		t.Fatalf("primary upstream error leaked into downstream stream: %s", body)
+	}
+
+	mu.Lock()
+	gotPrimaryCalls := primaryCalls
+	gotSecondaryCalls := secondaryCalls
+	mu.Unlock()
+	if gotPrimaryCalls != 1 || gotSecondaryCalls != 1 {
+		t.Fatalf("expected one call to each stream upstream, got primary=%d secondary=%d", gotPrimaryCalls, gotSecondaryCalls)
+	}
+
+	usageReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/usage-logs?model=failover-stream-model", nil)
+	usageReq.AddCookie(sessionCookie)
+	usageRec := httptest.NewRecorder()
+	handler.ServeHTTP(usageRec, usageReq)
+	if usageRec.Code != http.StatusOK {
+		t.Fatalf("expected usage logs 200, got %d body=%s", usageRec.Code, usageRec.Body.String())
+	}
+	var usageResp apiopenapi.UsageLogListResponse
+	if err := json.NewDecoder(usageRec.Body).Decode(&usageResp); err != nil {
+		t.Fatalf("decode usage logs: %v", err)
+	}
+	if len(usageResp.Data) != 2 {
+		t.Fatalf("expected failed and successful stream usage attempts, got %+v", usageResp.Data)
+	}
+	firstUsage := usageResp.Data[0]
+	secondUsage := usageResp.Data[1]
+	if firstUsage.AttemptNo != 1 || firstUsage.Success || firstUsage.ProviderId == nil || *firstUsage.ProviderId != string(primaryProvider.Data.Id) || firstUsage.AccountId == nil || *firstUsage.AccountId != string(primaryAccount.Data.Id) {
+		t.Fatalf("unexpected first stream usage attempt: %+v", firstUsage)
+	}
+	if secondUsage.AttemptNo != 2 || !secondUsage.Success || secondUsage.ProviderId == nil || *secondUsage.ProviderId != string(secondaryProvider.Data.Id) || secondUsage.AccountId == nil || *secondUsage.AccountId != string(secondaryAccount.Data.Id) || secondUsage.TotalTokens != 12 {
+		t.Fatalf("unexpected second stream usage attempt: %+v", secondUsage)
+	}
+	if firstUsage.RequestId != secondUsage.RequestId {
+		t.Fatalf("expected stream attempts to share request id, got %q and %q", firstUsage.RequestId, secondUsage.RequestId)
+	}
+
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?request_id="+string(firstUsage.RequestId), nil)
+	decisionsReq.AddCookie(sessionCookie)
+	decisionsRec := httptest.NewRecorder()
+	handler.ServeHTTP(decisionsRec, decisionsReq)
+	if decisionsRec.Code != http.StatusOK {
+		t.Fatalf("expected decisions 200, got %d body=%s", decisionsRec.Code, decisionsRec.Body.String())
+	}
+	var decisionsResp apiopenapi.SchedulerDecisionListResponse
+	if err := json.NewDecoder(decisionsRec.Body).Decode(&decisionsResp); err != nil {
+		t.Fatalf("decode scheduler decisions: %v", err)
+	}
+	if len(decisionsResp.Data) != 2 {
+		t.Fatalf("expected two stream scheduler decisions, got %+v", decisionsResp.Data)
+	}
+	firstDecision := decisionsResp.Data[0]
+	secondDecision := decisionsResp.Data[1]
+	if firstDecision.AttemptNo != 1 || firstDecision.SelectedAccountId == nil || *firstDecision.SelectedAccountId != string(primaryAccount.Data.Id) || firstDecision.FallbackFromDecisionId != nil {
+		t.Fatalf("unexpected first stream decision: %+v", firstDecision)
+	}
+	if secondDecision.AttemptNo != 2 || secondDecision.SelectedAccountId == nil || *secondDecision.SelectedAccountId != string(secondaryAccount.Data.Id) || secondDecision.FallbackFromDecisionId == nil || *secondDecision.FallbackFromDecisionId != string(firstDecision.Id) {
+		t.Fatalf("unexpected stream fallback decision: first=%+v second=%+v", firstDecision, secondDecision)
+	}
+	if got := secondDecision.RejectReasons["account_"+string(primaryAccount.Data.Id)]; got != "fallback_excluded" {
+		t.Fatalf("expected stream fallback exclusion evidence for primary account, got %+v", secondDecision.RejectReasons)
+	}
+}
+
 func TestGatewayProviderAliasUsesPresetProviderKey(t *testing.T) {
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
