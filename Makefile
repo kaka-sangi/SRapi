@@ -20,8 +20,12 @@ RATE_LIMIT_BENCH_SAMPLES ?= 2000
 RATE_LIMIT_BENCH_BUDGET_MS ?= 2
 BALANCE_CHARGER_PRESSURE_DSN ?=
 BALANCE_CHARGER_PRESSURE_TIMEOUT ?= 120s
+OTEL_OVERHEAD_SAMPLES ?= 2000
+OTEL_OVERHEAD_WARMUP ?= 200
+OTEL_OVERHEAD_BUDGET_MS ?= 5
+OTEL_OVERHEAD_TIMEOUT ?= 60s
 
-.PHONY: help bootstrap-env openapi-lint openapi-bundle openapi-codegen openapi-codegen-check openapi-ts-codegen openapi-ts-codegen-check sdk-ts-typecheck ent-generate ent-generate-check migration-diff migration-hash migration-check api-test api-run dev-up dev-down dev-logs smoke-health smoke-gateway smoke-rate-limit smoke-failover smoke-quality-eval smoke-release rate-limit-bench balance-charger-pressure backup-postgres restore-postgres examples-check secret-scan architecture-check code-quality-check diff-check web-install web-check web-check-e2e web-dev check
+.PHONY: help bootstrap-env openapi-lint openapi-bundle openapi-codegen openapi-codegen-check openapi-ts-codegen openapi-ts-codegen-check sdk-ts-typecheck ent-generate ent-generate-check migration-diff migration-hash migration-check api-test api-run dev-up dev-down dev-logs smoke-health smoke-gateway smoke-rate-limit smoke-failover smoke-quality-eval smoke-release rate-limit-bench balance-charger-pressure otel-overhead-bench backup-postgres restore-postgres examples-check secret-scan architecture-check code-quality-check diff-check web-install web-check web-check-e2e web-dev check
 
 help:
 	@printf '%s\n' \
@@ -51,6 +55,7 @@ help:
 		'  make smoke-release   Validate health, readiness, metrics, and gateway smoke on localhost' \
 		'  make rate-limit-bench RATE_LIMIT_BENCH_REDIS_ADDR=host:port  Check Redis rate limiter p99 budget' \
 		'  make balance-charger-pressure BALANCE_CHARGER_PRESSURE_DSN=postgres://...  Run PostgreSQL balance_charger pressure test' \
+		'  make otel-overhead-bench  Check OTel HTTP tracing p99 overhead budget' \
 		'  make backup-postgres BACKUP_FILE=...   Create a PostgreSQL custom-format backup' \
 		'  make restore-postgres BACKUP_FILE=...  Restore a PostgreSQL custom-format backup' \
 		'  make examples-check  Validate public examples and 2api migration guide' \
@@ -202,6 +207,14 @@ balance-charger-pressure:
 	cd $(API_DIR) && \
 		SRAPI_BALANCE_CHARGER_PRESSURE_DSN="$(BALANCE_CHARGER_PRESSURE_DSN)" \
 		go test ./internal/workers/balance_charger -run TestBalanceChargerPostgresPressureDrainsDefaultBacklog -count=1 -timeout "$(BALANCE_CHARGER_PRESSURE_TIMEOUT)" -v
+
+otel-overhead-bench:
+	cd $(API_DIR) && \
+		SRAPI_OTEL_P99_GUARD=1 \
+		SRAPI_OTEL_P99_SAMPLES="$(OTEL_OVERHEAD_SAMPLES)" \
+		SRAPI_OTEL_P99_WARMUP="$(OTEL_OVERHEAD_WARMUP)" \
+		SRAPI_OTEL_P99_BUDGET_MS="$(OTEL_OVERHEAD_BUDGET_MS)" \
+		go test ./internal/httpserver -run TestTracingMiddlewareP99OverheadBudget -count=1 -timeout "$(OTEL_OVERHEAD_TIMEOUT)" -v
 
 backup-postgres:
 	@test -n "$(BACKUP_FILE)" || (echo 'BACKUP_FILE is required' >&2; exit 2)

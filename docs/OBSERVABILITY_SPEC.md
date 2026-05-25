@@ -113,6 +113,8 @@ Trace span attribute 只允许记录低敏诊断字段，例如 HTTP method、ro
 
 Trace exporter 有本地 OTLP gRPC collector smoke 覆盖：`TestNewTracerProviderExportsSpansToOTLPCollector` 启动进程内 collector，启用 `OTEL_TRACES_ENABLED` 等价配置，验证 span 和 resource attributes 会经真实 OTLP 协议在 tracer provider shutdown 时 flush。该测试证明协议级导出路径可用；真实 Jaeger / Tempo UI 可视化仍需在部署环境中连接对应 collector 后单独 smoke。
 
+Trace overhead 有 opt-in p99 guard 覆盖：`make otel-overhead-bench` 会对比 no-op tracer provider 与 batch tracer provider 下 `/livez` HTTP runtime 的 p99 延迟，并默认要求增量不超过 5ms。该测试不进入默认 `make check`，避免普通开发机抖动阻断提交；在发布前、collector/SDK 升级后或观测采样策略变更后应显式运行。
+
 ### 3.4 经济指标
 
 ```txt

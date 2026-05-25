@@ -517,7 +517,7 @@ next   otel_structured_trace                （C1 OTel + slog trace）
 
 ### 性能基准
 - 限流中间件 p99 ≤ 2ms（Redis Lua；`make rate-limit-bench RATE_LIMIT_BENCH_REDIS_ADDR=...`）
-- OTel 启用后整体 p99 增加 ≤ 5ms
+- OTel 启用后 HTTP runtime p99 增加 ≤ 5ms（`make otel-overhead-bench`，默认对比 no-op tracer provider 与 batch tracer provider 的 `/livez` p99）
 - balance_charger worker 默认每轮可 drain 10k pending usage 的本地 worker guard 已落地；真实 PostgreSQL 部署压测仍需在生产相邻环境验证
 
 ### 手工验证

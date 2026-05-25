@@ -105,20 +105,23 @@ last_completed:
 - C1.1: Structured trace service spans now cover `scheduler.Schedule`, `payments.HandleWebhook`, and `accounts.ProbeAccount` with reusable `platform/otel.StartSpan` / `EndSpan`, low-sensitive diagnostic attributes, business outcome fields, stable `error.type` classification, focused span export tests, and a local OTLP gRPC collector smoke proving enabled trace export flushes span/resource data through the real OTLP protocol.
 - C1.2: SLO burn-rate evaluator now adds `operations.Service.EvaluateSLOAlerts()`, a persistent-store `slo_evaluator` worker, `SLO_EVALUATOR_*` config, app lifecycle wiring, and tests proving multi-window availability breaches create/update/resolve only `slo.burn_rate.*` alert events while leaving manual alerts untouched.
 - B1.2.3: Added an opt-in PostgreSQL `balance_charger` pressure gate (`make balance-charger-pressure`) that creates a temporary schema, seeds 10,000 pending usage logs, runs the real Ent billing store and worker, and verifies charged usage, ledger batches, and final balance before dropping the schema.
+- C1.1.1: Added an opt-in OpenTelemetry HTTP tracing overhead gate (`make otel-overhead-bench`) that compares no-op tracer provider vs batch tracer provider `/livez` p99 latency, defaults to a 5ms overhead budget, and documents when to run it before release or after observability changes.
 
 current:
 
 - package: Phase 1 production smoke and observability hardening
-- status: API key/user rate limits, API key concurrency, scheduler account quota evidence, provider-account RPM/TPM Redis counters, provider-account ordinary HTTP concurrency Redis leases, local schema repair for multi-attempt usage evidence, protocol-level OTLP trace export smoke, the balance_charger local 10k pending-usage drain guard, and an opt-in PostgreSQL balance_charger pressure harness are implemented and locally verified; live external provider/payment smoke still depends on valid upstream or merchant credentials.
+- status: API key/user rate limits, API key concurrency, scheduler account quota evidence, provider-account RPM/TPM Redis counters, provider-account ordinary HTTP concurrency Redis leases, local schema repair for multi-attempt usage evidence, protocol-level OTLP trace export smoke, the OTel HTTP p99 overhead guard, the balance_charger local 10k pending-usage drain guard, and an opt-in PostgreSQL balance_charger pressure harness are implemented and locally verified; live external provider/payment smoke still depends on valid upstream or merchant credentials.
 - objective: continue closing production smoke, sandbox, collector-visualization, and pressure-test gaps without letting docs/specs drift.
 
-next_recommended: Run real Stripe/Alipay/WeChat sandbox smoke when merchant credentials are available, run a Jaeger/Tempo UI trace visualization smoke against a deployed collector, rerun `make balance-charger-pressure BALANCE_CHARGER_PRESSURE_DSN=...` against a production-adjacent PostgreSQL database if local dev-container IO is not representative enough, or continue the remaining Phase 1 production pressure-test tasks from `specs/silly-stirring-turtle.md`.
+next_recommended: Run real Stripe/Alipay/WeChat sandbox smoke when merchant credentials are available, run a Jaeger/Tempo UI trace visualization smoke against a deployed collector, rerun `make balance-charger-pressure BALANCE_CHARGER_PRESSURE_DSN=...` against a production-adjacent PostgreSQL database if local dev-container IO is not representative enough, rerun `make otel-overhead-bench` after any OTel SDK/exporter or tracing middleware change, or continue the remaining Phase 1 production pressure-test tasks from `specs/silly-stirring-turtle.md`.
 
 last_gates:
 
-- `cd apps/api && go test ./internal/workers/balance_charger ./internal/config ./internal/app -count=1`: pass
+- `cd apps/api && go test ./internal/httpserver -run 'TestTracingMiddleware' -count=1 -v`: pass; overhead guard skips unless `SRAPI_OTEL_P99_GUARD=1`
+- `make otel-overhead-bench`: pass; local p99 overhead 0s against 5ms budget with 2,000 samples / 200 warmup
 - `cd apps/api && go test ./...`: pass
-- `make architecture-check`: pass
+- `cd apps/api && go test ./internal/httpserver -run TestGatewayRealtimeWebSocketRelaysOpenAIUpstreamWebSocket -count=1 -v`: pass after one concurrent `architecture-check` run exposed a transient existing realtime WebSocket timing failure
+- `make architecture-check`: pass on rerun
 - `make code-quality-check`: pass
 - `make diff-check`: pass
 - `make secret-scan`: pass
