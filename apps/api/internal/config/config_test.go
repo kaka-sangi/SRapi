@@ -293,6 +293,64 @@ func TestQualityEvalDefaultsOverridesAndValidation(t *testing.T) {
 	}
 }
 
+func TestObservabilityDefaultsOverridesAndValidation(t *testing.T) {
+	t.Setenv("LOG_SERVICE_NAME", "")
+	t.Setenv("LOG_ENV", "")
+	t.Setenv("OTEL_SERVICE_NAME", "")
+	t.Setenv("OTEL_SERVICE_VERSION", "")
+	t.Setenv("OTEL_ENVIRONMENT", "")
+	t.Setenv("OTEL_TRACES_ENABLED", "")
+	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+	t.Setenv("OTEL_EXPORTER_OTLP_INSECURE", "")
+	t.Setenv("OTEL_TRACES_SAMPLE_RATIO", "")
+	t.Setenv("OTEL_BATCH_TIMEOUT_SECONDS", "")
+	cfg := Load()
+	if cfg.Observability.ServiceName != "srapi" ||
+		cfg.Observability.Environment != "local" ||
+		cfg.Observability.TracesEnabled ||
+		cfg.Observability.OTLPEndpoint != "localhost:4317" ||
+		!cfg.Observability.OTLPInsecure ||
+		cfg.Observability.TraceSampleRatio != 1 ||
+		cfg.Observability.BatchTimeout != 5*time.Second {
+		t.Fatalf("unexpected observability defaults: %+v", cfg.Observability)
+	}
+
+	t.Setenv("OTEL_SERVICE_NAME", "srapi-api")
+	t.Setenv("OTEL_SERVICE_VERSION", "2026.5")
+	t.Setenv("OTEL_ENVIRONMENT", "staging")
+	t.Setenv("OTEL_TRACES_ENABLED", "true")
+	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "otel-collector:4317")
+	t.Setenv("OTEL_EXPORTER_OTLP_INSECURE", "false")
+	t.Setenv("OTEL_TRACES_SAMPLE_RATIO", "0.25")
+	t.Setenv("OTEL_BATCH_TIMEOUT_SECONDS", "2")
+	cfg = Load()
+	if cfg.Observability.ServiceName != "srapi-api" ||
+		cfg.Observability.ServiceVersion != "2026.5" ||
+		cfg.Observability.Environment != "staging" ||
+		!cfg.Observability.TracesEnabled ||
+		cfg.Observability.OTLPEndpoint != "otel-collector:4317" ||
+		cfg.Observability.OTLPInsecure ||
+		cfg.Observability.TraceSampleRatio != 0.25 ||
+		cfg.Observability.BatchTimeout != 2*time.Second {
+		t.Fatalf("unexpected observability overrides: %+v", cfg.Observability)
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("expected observability config to validate, got %v", err)
+	}
+
+	cfg.Observability.TraceSampleRatio = 1.01
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "OTEL_TRACES_SAMPLE_RATIO") {
+		t.Fatalf("expected trace sample ratio validation failure, got %v", err)
+	}
+
+	cfg = Load()
+	cfg.Observability.TracesEnabled = true
+	cfg.Observability.OTLPEndpoint = ""
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "OTEL_EXPORTER_OTLP_ENDPOINT") {
+		t.Fatalf("expected missing OTLP endpoint validation failure, got %v", err)
+	}
+}
+
 func validReleaseConfig() Config {
 	cfg := Load()
 	cfg.Server.Mode = "release"

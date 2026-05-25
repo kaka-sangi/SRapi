@@ -193,6 +193,7 @@ func TestMetricsExposeBaselineSRapiSignals(t *testing.T) {
 	body := metricsRec.Body.String()
 	for _, metric := range []string{
 		"srapi_gateway_requests_total",
+		"srapi_gateway_request_duration_seconds_bucket",
 		"srapi_gateway_request_duration_seconds_count",
 		"srapi_gateway_request_duration_seconds_sum",
 		"srapi_gateway_inflight_requests",

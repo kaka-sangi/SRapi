@@ -19,10 +19,13 @@ func NewWithWriter(w io.Writer) *slog.Logger {
 		Level:     parseLevel(os.Getenv("LOG_LEVEL")),
 		AddSource: parseBool(os.Getenv("LOG_CALLER")),
 	}
+	var handler slog.Handler
 	if strings.EqualFold(strings.TrimSpace(os.Getenv("LOG_FORMAT")), "text") {
-		return slog.New(slog.NewTextHandler(w, options))
+		handler = slog.NewTextHandler(w, options)
+	} else {
+		handler = slog.NewJSONHandler(w, options)
 	}
-	return slog.New(slog.NewJSONHandler(w, options))
+	return slog.New(NewContextHandler(handler))
 }
 
 func parseLevel(value string) slog.Level {

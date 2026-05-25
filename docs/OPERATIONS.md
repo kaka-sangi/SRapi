@@ -225,6 +225,7 @@ proxy credential
 ```txt
 srapi_gateway_requests_total
 srapi_gateway_request_duration_seconds
+srapi_gateway_request_duration_seconds_bucket
 srapi_gateway_inflight_requests
 srapi_gateway_errors_total
 srapi_scheduler_decisions_total
@@ -235,7 +236,9 @@ srapi_reverse_proxy_ban_signals_total
 
 AI Gateway 专项指标以 `OBSERVABILITY_SPEC.md` 为准。
 
-当前 `/metrics` 使用 Prometheus text format，基于持久化 usage logs、scheduler decisions/leases 和 Reverse Proxy Runtime 快照聚合，避免使用 API Key、用户邮箱、账号名、prompt 或 credential 作为 label。
+当前 `/metrics` 使用 Prometheus text format，基于持久化 usage logs、scheduler decisions/leases 和 Reverse Proxy Runtime 快照聚合；Gateway request duration 暴露为 histogram，固定 bucket 为 `0.1`、`0.5`、`1`、`5` 秒和 `+Inf`。指标 label 只允许低基数 route/model/protocol/result/error 类字段，避免使用 API Key、用户邮箱、账号名、prompt 或 credential。
+
+HTTP server 启用 OpenTelemetry server span 和 W3C trace context 传播。默认不导出 trace；设置 `OTEL_TRACES_ENABLED=true` 后会通过 OTLP gRPC 发往 `OTEL_EXPORTER_OTLP_ENDPOINT`。结构化日志 handler 会从 context 自动补充 `request_id`、`trace_id`、`user_id` 和 `api_key_id`，不得把原始 API Key、credential、prompt 或请求体加入日志字段。
 
 ## 10. 安全运营
 

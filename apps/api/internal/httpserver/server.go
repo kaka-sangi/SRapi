@@ -1,12 +1,14 @@
 package httpserver
 
 import (
+	"bufio"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -35,7 +37,13 @@ import (
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
 	userscontract "github.com/srapi/srapi/apps/api/internal/modules/users/contract"
+	platformlogger "github.com/srapi/srapi/apps/api/internal/platform/logger"
 	"github.com/srapi/srapi/apps/api/internal/platform/ratelimit"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const requestIDHeader = "X-Request-ID"
@@ -389,7 +397,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("POST /v1beta/models/", server.handleGeminiModelAction)
 	server.registerGatewayProviderAliases(mux)
 
-	return requestIDMiddleware(server.gatewayConcurrencyMiddleware(mux))
+	return requestIDMiddleware(server.tracingMiddleware(server.gatewayConcurrencyMiddleware(mux)))
 }
 
 func (s *Server) handleLive(w http.ResponseWriter, r *http.Request) {
@@ -465,8 +473,134 @@ func requestIDMiddleware(next http.Handler) http.Handler {
 		}
 		w.Header().Set(requestIDHeader, requestID)
 		ctx := context.WithValue(r.Context(), requestIDContextKey{}, requestID)
+		ctx = platformlogger.WithRequestID(ctx, requestID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+func (s *Server) tracingMiddleware(next http.Handler) http.Handler {
+	tracer := otel.Tracer("github.com/srapi/srapi/apps/api/internal/httpserver")
+	propagator := otel.GetTextMapPropagator()
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := propagator.Extract(r.Context(), propagation.HeaderCarrier(r.Header))
+		requestID := requestIDFromContext(ctx)
+		route := normalizedHTTPPath(r.URL.Path)
+		ctx, span := tracer.Start(ctx,
+			r.Method+" "+route,
+			trace.WithSpanKind(trace.SpanKindServer),
+			trace.WithAttributes(
+				attribute.String("http.request.method", r.Method),
+				attribute.String("url.path", r.URL.Path),
+				attribute.String("http.route", route),
+				attribute.String("srapi.request_id", requestID),
+			),
+		)
+		if traceID := span.SpanContext().TraceID(); traceID.IsValid() {
+			ctx = platformlogger.WithTraceID(ctx, traceID.String())
+		}
+
+		recorder := &traceResponseWriter{ResponseWriter: w, status: http.StatusOK}
+		next.ServeHTTP(recorder, r.WithContext(ctx))
+		span.SetAttributes(
+			attribute.Int("http.response.status_code", recorder.status),
+			attribute.Int64("http.response.body.size", recorder.bytes),
+		)
+		if recorder.status >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(recorder.status))
+		}
+		span.End()
+	})
+}
+
+type traceResponseWriter struct {
+	http.ResponseWriter
+	status      int
+	bytes       int64
+	wroteHeader bool
+}
+
+func (w *traceResponseWriter) WriteHeader(status int) {
+	if w.wroteHeader {
+		return
+	}
+	w.wroteHeader = true
+	w.status = status
+	w.ResponseWriter.WriteHeader(status)
+}
+
+func (w *traceResponseWriter) Write(data []byte) (int, error) {
+	if !w.wroteHeader {
+		w.wroteHeader = true
+	}
+	written, err := w.ResponseWriter.Write(data)
+	w.bytes += int64(written)
+	return written, err
+}
+
+func (w *traceResponseWriter) Flush() {
+	if flusher, ok := w.ResponseWriter.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
+func (w *traceResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hijacker, ok := w.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, http.ErrNotSupported
+	}
+	return hijacker.Hijack()
+}
+
+func (w *traceResponseWriter) Push(target string, opts *http.PushOptions) error {
+	pusher, ok := w.ResponseWriter.(http.Pusher)
+	if !ok {
+		return http.ErrNotSupported
+	}
+	return pusher.Push(target, opts)
+}
+
+func (w *traceResponseWriter) ReadFrom(reader io.Reader) (int64, error) {
+	if !w.wroteHeader {
+		w.wroteHeader = true
+	}
+	if readerFrom, ok := w.ResponseWriter.(io.ReaderFrom); ok {
+		read, err := readerFrom.ReadFrom(reader)
+		w.bytes += read
+		return read, err
+	}
+	written, err := io.Copy(w.ResponseWriter, reader)
+	w.bytes += written
+	return written, err
+}
+
+func (w *traceResponseWriter) Unwrap() http.ResponseWriter {
+	return w.ResponseWriter
+}
+
+func normalizedHTTPPath(path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return "/"
+	}
+	parts := strings.Split(path, "/")
+	for idx, part := range parts {
+		if isPathID(part) {
+			parts[idx] = "{id}"
+		}
+	}
+	return strings.Join(parts, "/")
+}
+
+func isPathID(value string) bool {
+	if value == "" {
+		return false
+	}
+	for _, char := range value {
+		if char < '0' || char > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *Server) gatewayConcurrencyMiddleware(next http.Handler) http.Handler {

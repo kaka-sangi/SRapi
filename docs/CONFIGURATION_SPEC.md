@@ -58,6 +58,23 @@ LOG_SAMPLING_ENABLED=false
 
 日志必须通过统一脱敏器处理。
 
+结构化日志 handler 会从 request context 自动追加安全字段：`request_id`、`trace_id`、`user_id`、`api_key_id`。这些字段用于运维串联，不得替代鉴权，也不得加入原始 API Key、credential、prompt、request body 或 provider secret。
+
+## 4.1 OpenTelemetry
+
+```txt
+OTEL_SERVICE_NAME=srapi
+OTEL_SERVICE_VERSION=dev
+OTEL_ENVIRONMENT=local
+OTEL_TRACES_ENABLED=false
+OTEL_EXPORTER_OTLP_ENDPOINT=localhost:4317
+OTEL_EXPORTER_OTLP_INSECURE=true
+OTEL_TRACES_SAMPLE_RATIO=1
+OTEL_BATCH_TIMEOUT_SECONDS=5
+```
+
+默认只安装本进程 tracer provider 和 HTTP server span，不向外部 collector 导出 trace。生产启用 trace 导出时必须设置 `OTEL_TRACES_ENABLED=true` 并指向内部 OTLP gRPC collector；`OTEL_TRACES_SAMPLE_RATIO` 必须在 `0` 到 `1` 之间。外部 collector、Jaeger、Tempo 等后端不应接收包含原始 prompt 或 credential 的 span attribute。
+
 ## 5. Database
 
 ```txt

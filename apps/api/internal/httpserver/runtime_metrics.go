@@ -23,8 +23,8 @@ func (rt *runtimeState) metricsLines(ctx context.Context) []string {
 	lines := []string{
 		"# HELP srapi_gateway_requests_total Gateway requests recorded by endpoint family, model, provider protocol, and result.",
 		"# TYPE srapi_gateway_requests_total counter",
-		"# HELP srapi_gateway_request_duration_seconds Gateway request latency summary derived from usage logs.",
-		"# TYPE srapi_gateway_request_duration_seconds summary",
+		"# HELP srapi_gateway_request_duration_seconds Gateway request latency histogram derived from usage logs.",
+		"# TYPE srapi_gateway_request_duration_seconds histogram",
 		"# HELP srapi_gateway_inflight_requests Gateway requests with pending scheduler leases.",
 		"# TYPE srapi_gateway_inflight_requests gauge",
 		"# HELP srapi_realtime_active_slots Active realtime WebSocket slots.",
@@ -123,6 +123,7 @@ func gatewayUsageMetricLines(logs []usagecontract.UsageLog) []string {
 	type aggregate struct {
 		count     int
 		latencyMS int
+		buckets   map[float64]int
 	}
 	requests := map[string]*aggregate{}
 	errors := map[string]int{}
@@ -138,10 +139,15 @@ func gatewayUsageMetricLines(logs []usagecontract.UsageLog) []string {
 			result,
 		}, "\xff")
 		if requests[key] == nil {
-			requests[key] = &aggregate{}
+			requests[key] = &aggregate{buckets: map[float64]int{}}
 		}
 		requests[key].count++
 		requests[key].latencyMS += log.LatencyMS
+		for _, bucket := range gatewayDurationBuckets {
+			if float64(log.LatencyMS)/1000 <= bucket {
+				requests[key].buckets[bucket]++
+			}
+		}
 		if !log.Success {
 			errorClass := metricLabelValue(derefString(log.ErrorClass), "unknown")
 			errors[errorClass]++
@@ -153,7 +159,11 @@ func gatewayUsageMetricLines(logs []usagecontract.UsageLog) []string {
 		parts := strings.Split(key, "\xff")
 		value := requests[key]
 		labels := fmt.Sprintf(`endpoint_family=%q,model=%q,provider_protocol=%q,result=%q`, parts[0], parts[1], parts[2], parts[3])
+		for _, bucket := range gatewayDurationBuckets {
+			lines = append(lines, fmt.Sprintf("srapi_gateway_request_duration_seconds_bucket{%s,le=%q} %d", labels, formatDurationBucket(bucket), value.buckets[bucket]))
+		}
 		lines = append(lines,
+			fmt.Sprintf("srapi_gateway_request_duration_seconds_bucket{%s,le=\"+Inf\"} %d", labels, value.count),
 			fmt.Sprintf("srapi_gateway_requests_total{%s} %d", labels, value.count),
 			fmt.Sprintf("srapi_gateway_request_duration_seconds_count{%s} %d", labels, value.count),
 			fmt.Sprintf("srapi_gateway_request_duration_seconds_sum{%s} %.6f", labels, float64(value.latencyMS)/1000),
@@ -163,6 +173,12 @@ func gatewayUsageMetricLines(logs []usagecontract.UsageLog) []string {
 		lines = append(lines, fmt.Sprintf("srapi_gateway_errors_total{error_class=%q} %d", errorClass, errors[errorClass]))
 	}
 	return lines
+}
+
+var gatewayDurationBuckets = []float64{0.1, 0.5, 1, 5}
+
+func formatDurationBucket(bucket float64) string {
+	return fmt.Sprintf("%.1f", bucket)
 }
 
 func schedulerDecisionMetricLines(decisions []schedulercontract.Decision) []string {
@@ -339,6 +355,7 @@ func sortMetricLines(lines []string) {
 func appendZeroValueBaselineMetrics(lines []string) []string {
 	for _, sample := range []string{
 		`srapi_gateway_requests_total{endpoint_family="unknown",model="unknown",provider_protocol="unknown",result="success"} 0`,
+		`srapi_gateway_request_duration_seconds_bucket{endpoint_family="unknown",model="unknown",provider_protocol="unknown",result="success",le="0.1"} 0`,
 		`srapi_gateway_request_duration_seconds_count{endpoint_family="unknown",model="unknown",provider_protocol="unknown",result="success"} 0`,
 		`srapi_gateway_request_duration_seconds_sum{endpoint_family="unknown",model="unknown",provider_protocol="unknown",result="success"} 0.000000`,
 		`srapi_gateway_inflight_requests 0`,

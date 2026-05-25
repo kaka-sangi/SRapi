@@ -217,6 +217,7 @@ func TestAppBootstrapOnlyImportsBootstrapPackages(t *testing.T) {
 		"github.com/srapi/srapi/apps/api/internal/persistence/redisstore/realtime":  true,
 		"github.com/srapi/srapi/apps/api/internal/persistence/redisstore/scheduler": true,
 		"github.com/srapi/srapi/apps/api/internal/platform/db":                      true,
+		"github.com/srapi/srapi/apps/api/internal/platform/otel":                    true,
 		"github.com/srapi/srapi/apps/api/internal/platform/redis":                   true,
 		"github.com/srapi/srapi/apps/api/internal/workers/health_probe":             true,
 		"github.com/srapi/srapi/apps/api/internal/workers/order_expirer":            true,

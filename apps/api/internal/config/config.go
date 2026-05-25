@@ -19,16 +19,17 @@ const (
 )
 
 type Config struct {
-	Server      ServerConfig
-	Storage     StorageConfig
-	Database    DependencyConfig
-	Redis       DependencyConfig
-	Gateway     GatewayConfig
-	Security    SecurityConfig
-	Bootstrap   BootstrapConfig
-	Retention   RetentionConfig
-	HealthProbe HealthProbeConfig
-	QualityEval QualityEvalConfig
+	Server        ServerConfig
+	Storage       StorageConfig
+	Database      DependencyConfig
+	Redis         DependencyConfig
+	Gateway       GatewayConfig
+	Security      SecurityConfig
+	Bootstrap     BootstrapConfig
+	Retention     RetentionConfig
+	HealthProbe   HealthProbeConfig
+	QualityEval   QualityEvalConfig
+	Observability ObservabilityConfig
 }
 
 type ServerConfig struct {
@@ -104,6 +105,18 @@ type QualityEvalConfig struct {
 	JudgeTimeout  time.Duration
 }
 
+// ObservabilityConfig controls process-wide tracing and structured diagnostics.
+type ObservabilityConfig struct {
+	ServiceName      string
+	ServiceVersion   string
+	Environment      string
+	TracesEnabled    bool
+	OTLPEndpoint     string
+	OTLPInsecure     bool
+	TraceSampleRatio float64
+	BatchTimeout     time.Duration
+}
+
 func Load() Config {
 	return Config{
 		Server: ServerConfig{
@@ -173,6 +186,16 @@ func Load() Config {
 			OpenAIBaseURL: getEnv("QUALITY_EVAL_OPENAI_BASE_URL", ""),
 			JudgeModel:    getEnv("QUALITY_EVAL_JUDGE_MODEL", "gpt-4o-mini"),
 			JudgeTimeout:  time.Duration(getIntEnv("QUALITY_EVAL_JUDGE_TIMEOUT_SECONDS", 20)) * time.Second,
+		},
+		Observability: ObservabilityConfig{
+			ServiceName:      getEnv("OTEL_SERVICE_NAME", getEnv("LOG_SERVICE_NAME", "srapi")),
+			ServiceVersion:   getEnv("OTEL_SERVICE_VERSION", getEnv("SRAPI_VERSION", defaultVersion)),
+			Environment:      getEnv("OTEL_ENVIRONMENT", getEnv("LOG_ENV", "local")),
+			TracesEnabled:    getBoolEnv("OTEL_TRACES_ENABLED", false),
+			OTLPEndpoint:     getEnv("OTEL_EXPORTER_OTLP_ENDPOINT", "localhost:4317"),
+			OTLPInsecure:     getBoolEnv("OTEL_EXPORTER_OTLP_INSECURE", true),
+			TraceSampleRatio: getFloatEnv("OTEL_TRACES_SAMPLE_RATIO", 1),
+			BatchTimeout:     time.Duration(getIntEnv("OTEL_BATCH_TIMEOUT_SECONDS", 5)) * time.Second,
 		},
 	}
 }
@@ -265,6 +288,21 @@ func (c Config) Validate() error {
 	}
 	if c.QualityEval.Enabled && strings.TrimSpace(c.QualityEval.OpenAIAPIKey) == "" {
 		return fmt.Errorf("QUALITY_EVAL_OPENAI_API_KEY must be set when QUALITY_EVAL_ENABLED=true")
+	}
+	if strings.TrimSpace(c.Observability.ServiceName) == "" {
+		return fmt.Errorf("OTEL_SERVICE_NAME must not be empty")
+	}
+	if strings.TrimSpace(c.Observability.Environment) == "" {
+		return fmt.Errorf("OTEL_ENVIRONMENT must not be empty")
+	}
+	if c.Observability.TraceSampleRatio < 0 || c.Observability.TraceSampleRatio > 1 {
+		return fmt.Errorf("OTEL_TRACES_SAMPLE_RATIO must be between 0 and 1")
+	}
+	if c.Observability.BatchTimeout <= 0 {
+		return fmt.Errorf("OTEL_BATCH_TIMEOUT_SECONDS must be positive")
+	}
+	if c.Observability.TracesEnabled && strings.TrimSpace(c.Observability.OTLPEndpoint) == "" {
+		return fmt.Errorf("OTEL_EXPORTER_OTLP_ENDPOINT must be set when OTEL_TRACES_ENABLED=true")
 	}
 	if c.Server.Mode == "release" {
 		if c.StorageBackend() == StorageBackendMemory {

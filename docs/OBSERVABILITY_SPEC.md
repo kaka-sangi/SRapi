@@ -83,6 +83,22 @@ srapi_gateway_failover_total{endpoint_family, model, provider_protocol, result}
 
 该指标只使用低基数 route/model/protocol/result 标签，不得加入 API key、account id、user id、request id、prompt 或 credential。
 
+当前 Gateway latency 由 `/metrics` 暴露为 Prometheus histogram：
+
+```txt
+srapi_gateway_request_duration_seconds_bucket{endpoint_family, model, provider_protocol, result, le}
+srapi_gateway_request_duration_seconds_count{endpoint_family, model, provider_protocol, result}
+srapi_gateway_request_duration_seconds_sum{endpoint_family, model, provider_protocol, result}
+```
+
+MVP bucket 固定为 `0.1`、`0.5`、`1`、`5` 秒和 `+Inf`；不得引入 API key、account id、user id、request id、prompt 或 credential label。后续若替换为 Prometheus client SDK，必须保持同名指标语义和 label 基数约束。
+
+### 3.3.1 Trace and Log Correlation
+
+HTTP server 会创建 OpenTelemetry server span，并使用 W3C trace context 从请求头提取/传播 trace。日志 handler 从 context 注入 `request_id`、`trace_id`、`user_id` 和 `api_key_id`，用于把 Gateway request、scheduler decision、usage log、audit log 和 provider feedback 串联起来。
+
+Trace span attribute 只允许记录低敏诊断字段，例如 HTTP method、route、status、response size、SRapi request id、scheduler strategy、provider protocol、错误分类和 latency。不得记录原始 prompt、messages、tool arguments、API key、provider credential、Authorization header、cookie 或 payment secret。
+
 ### 3.4 经济指标
 
 ```txt

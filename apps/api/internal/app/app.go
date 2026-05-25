@@ -15,6 +15,7 @@ import (
 	redisrealtimestore "github.com/srapi/srapi/apps/api/internal/persistence/redisstore/realtime"
 	redisschedulerstore "github.com/srapi/srapi/apps/api/internal/persistence/redisstore/scheduler"
 	platformdb "github.com/srapi/srapi/apps/api/internal/platform/db"
+	platformotel "github.com/srapi/srapi/apps/api/internal/platform/otel"
 	platformredis "github.com/srapi/srapi/apps/api/internal/platform/redis"
 	balancechargerworker "github.com/srapi/srapi/apps/api/internal/workers/balance_charger"
 	healthprobeworker "github.com/srapi/srapi/apps/api/internal/workers/health_probe"
@@ -33,6 +34,7 @@ type App struct {
 	server    *http.Server
 	db        *platformdb.Client
 	redis     *platformredis.Client
+	tracer    platformotel.ShutdownFunc
 	outbox    *outboxworker.Worker
 	retention *retentionworker.Worker
 	expirer   *orderexpirerworker.Worker
@@ -47,13 +49,20 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		logger = slog.Default()
 	}
 
+	tracerShutdown, err := platformotel.SetupTracerProvider(context.Background(), cfg.Observability)
+	if err != nil {
+		return nil, err
+	}
+
 	dbClient, err := platformdb.Open(cfg.Database)
 	if err != nil {
+		_ = tracerShutdown(context.Background())
 		return nil, err
 	}
 	redisClient, err := platformredis.Open(cfg.Redis)
 	if err != nil {
 		_ = dbClient.Close()
+		_ = tracerShutdown(context.Background())
 		return nil, err
 	}
 
@@ -61,6 +70,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 	if err != nil {
 		_ = dbClient.Close()
 		_ = redisClient.Close()
+		_ = tracerShutdown(context.Background())
 		return nil, err
 	}
 
@@ -75,6 +85,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		server:    server,
 		db:        dbClient,
 		redis:     redisClient,
+		tracer:    tracerShutdown,
 		outbox:    outbox,
 		retention: retention,
 		expirer:   expirer,
@@ -112,6 +123,11 @@ func (a *App) Shutdown(ctx context.Context) error {
 	}
 	if a.redis != nil {
 		if err := a.redis.Close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if a.tracer != nil {
+		if err := a.tracer(ctx); err != nil {
 			errs = append(errs, err)
 		}
 	}

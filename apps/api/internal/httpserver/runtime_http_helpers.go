@@ -22,6 +22,7 @@ import (
 	paymentservice "github.com/srapi/srapi/apps/api/internal/modules/payments/service"
 	userscontract "github.com/srapi/srapi/apps/api/internal/modules/users/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
+	platformlogger "github.com/srapi/srapi/apps/api/internal/platform/logger"
 	"github.com/srapi/srapi/apps/api/internal/platform/ratelimit"
 )
 
@@ -248,7 +249,12 @@ func (s *Server) requireConsoleSession(r *http.Request) (authcontract.LoginResul
 	if err != nil || strings.TrimSpace(cookie.Value) == "" {
 		return authcontract.LoginResult{}, authservice.ErrSessionNotFound
 	}
-	return s.runtime.auth.AuthenticateSession(r.Context(), cookie.Value)
+	session, err := s.runtime.auth.AuthenticateSession(r.Context(), cookie.Value)
+	if err != nil {
+		return authcontract.LoginResult{}, err
+	}
+	*r = *r.WithContext(platformlogger.WithUserID(r.Context(), session.User.ID))
+	return session, nil
 }
 
 func (s *Server) requireAdminSession(r *http.Request) (authcontract.LoginResult, error) {
@@ -298,6 +304,9 @@ func (s *Server) requireGatewayKey(r *http.Request) (apikeycontract.AuthResult, 
 	if err := s.acquireGatewayConcurrency(r.Context(), authed.Key); err != nil {
 		return apikeycontract.AuthResult{}, err
 	}
+	ctx := platformlogger.WithUserID(r.Context(), authed.UserID)
+	ctx = platformlogger.WithAPIKeyID(ctx, authed.Key.ID)
+	*r = *r.WithContext(ctx)
 	return authed, nil
 }
 
