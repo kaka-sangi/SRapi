@@ -14,6 +14,7 @@ import (
 
 	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
 	paymentcontract "github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
+	schedulerservice "github.com/srapi/srapi/apps/api/internal/modules/scheduler/service"
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
@@ -961,4 +962,44 @@ func (s *Server) handleListSchedulerStrategies(w http.ResponseWriter, r *http.Re
 		Pagination: pagination(len(data)),
 		RequestId:  requestID,
 	})
+}
+
+func (s *Server) handleSimulateSchedulerStrategy(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	var body apiopenapi.SchedulerSimulationRequest
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid scheduler simulation request", requestID)
+		return
+	}
+	req, err := toSchedulerSimulationRequest(body)
+	if err != nil {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid scheduler simulation request", requestID)
+		return
+	}
+	result, err := s.runtime.scheduler.SimulateStrategy(r.Context(), req)
+	if err != nil {
+		writeSchedulerSimulationError(w, err, requestID)
+		return
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.SchedulerSimulationResponse{
+		Data:      toAPISchedulerSimulationResult(result),
+		RequestId: requestID,
+	})
+}
+
+func writeSchedulerSimulationError(w http.ResponseWriter, err error, requestID string) {
+	if errors.Is(err, schedulerservice.ErrInvalidInput) {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid scheduler simulation request", requestID)
+		return
+	}
+	writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to simulate scheduler strategy", requestID)
 }

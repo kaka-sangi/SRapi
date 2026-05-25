@@ -225,10 +225,7 @@ func New(store contract.Store, clock Clock) (*Service, error) {
 }
 
 func (s *Service) Schedule(ctx context.Context, req contract.ScheduleRequest) (contract.ScheduleResult, error) {
-	requestID := strings.TrimSpace(req.RequestID)
-	model := strings.TrimSpace(req.Model)
-	sourceEndpoint := strings.TrimSpace(req.SourceEndpoint)
-	if requestID == "" || req.UserID <= 0 || req.APIKeyID <= 0 || model == "" || sourceEndpoint == "" {
+	if err := validateScheduleRequest(req); err != nil {
 		return contract.ScheduleResult{}, ErrInvalidInput
 	}
 	if err := normalizeScheduleCapabilities(&req); err != nil {
@@ -243,13 +240,74 @@ func (s *Service) Schedule(ctx context.Context, req contract.ScheduleRequest) (c
 		return contract.ScheduleResult{}, err
 	}
 	attemptNo := scheduleAttemptNo(req.AttemptNo)
-	if req.UserBalanceInsufficient {
-		rejectReasons := rejectAllCandidates(req.Candidates, "user_balance_insufficient")
-		decision, err := s.store.CreateDecision(ctx, s.buildDecision(req, strategy, nil, len(req.Candidates), len(rejectReasons), nil, rejectReasons))
+	evaluation := s.evaluateSchedule(req, strategy)
+	if evaluation.err != nil {
+		decision, err := s.store.CreateDecision(ctx, evaluation.decision)
 		if err != nil {
 			return contract.ScheduleResult{}, err
 		}
-		return contract.ScheduleResult{Decision: decision}, ErrUserBalanceInsufficient
+		return contract.ScheduleResult{Decision: decision}, evaluation.err
+	}
+	lease, err := s.acquireLease(ctx, req, attemptNo, evaluation.selected)
+	if err != nil {
+		evaluation.rejectReasons[accountKey(evaluation.selected.Account.ID)] = "concurrency_full"
+		decision, decisionErr := s.store.CreateDecision(ctx, s.buildDecision(req, strategy, nil, len(req.Candidates), len(evaluation.rejectReasons), evaluation.scorePayload, evaluation.rejectReasons))
+		if decisionErr != nil {
+			return contract.ScheduleResult{}, decisionErr
+		}
+		return contract.ScheduleResult{Decision: decision}, ErrNoAvailableAccount
+	}
+	decision, err := s.store.CreateDecision(ctx, evaluation.decision)
+	if err != nil {
+		_, _ = s.store.UpdateLeaseStatus(ctx, strings.TrimSpace(req.RequestID), attemptNo, contract.LeaseStatusReleased)
+		return contract.ScheduleResult{}, err
+	}
+	return contract.ScheduleResult{Decision: decision, Candidate: evaluation.selected, Candidates: evaluation.candidatesByRank, Lease: lease}, nil
+}
+
+func validateScheduleRequest(req contract.ScheduleRequest) error {
+	requestID := strings.TrimSpace(req.RequestID)
+	model := strings.TrimSpace(req.Model)
+	sourceEndpoint := strings.TrimSpace(req.SourceEndpoint)
+	if requestID == "" || req.UserID <= 0 || req.APIKeyID <= 0 || model == "" || sourceEndpoint == "" {
+		return ErrInvalidInput
+	}
+	return nil
+}
+
+func normalizeScheduleCapabilities(req *contract.ScheduleRequest) error {
+	requestCapabilities, err := capabilitiescontract.NormalizeDescriptors(req.RequestCapabilities)
+	if err != nil {
+		return err
+	}
+	req.RequestCapabilities = requestCapabilities
+	for idx := range req.Candidates {
+		effectiveCapabilities, err := capabilitiescontract.NormalizeDescriptors(req.Candidates[idx].EffectiveCapabilities)
+		if err != nil {
+			return err
+		}
+		req.Candidates[idx].EffectiveCapabilities = effectiveCapabilities
+	}
+	return nil
+}
+
+type scheduleEvaluation struct {
+	decision         contract.Decision
+	selected         contract.Candidate
+	candidatesByRank []contract.Candidate
+	scorePayload     map[string]any
+	rejectReasons    map[string]any
+	err              error
+}
+
+func (s *Service) evaluateSchedule(req contract.ScheduleRequest, strategy contract.StrategyDescriptor) scheduleEvaluation {
+	if req.UserBalanceInsufficient {
+		rejectReasons := rejectAllCandidates(req.Candidates, "user_balance_insufficient")
+		return scheduleEvaluation{
+			decision:      s.buildDecision(req, strategy, nil, len(req.Candidates), len(rejectReasons), nil, rejectReasons),
+			rejectReasons: rejectReasons,
+			err:           ErrUserBalanceInsufficient,
+		}
 	}
 
 	scores := make([]candidateScore, 0, len(req.Candidates))
@@ -267,11 +325,11 @@ func (s *Service) Schedule(ctx context.Context, req contract.ScheduleRequest) (c
 	}
 	addStickyBrokenReason(rejectReasons, req)
 	if len(scores) == 0 {
-		decision, err := s.store.CreateDecision(ctx, s.buildDecision(req, strategy, nil, len(req.Candidates), len(rejectReasons), nil, rejectReasons))
-		if err != nil {
-			return contract.ScheduleResult{}, err
+		return scheduleEvaluation{
+			decision:      s.buildDecision(req, strategy, nil, len(req.Candidates), len(rejectReasons), nil, rejectReasons),
+			rejectReasons: rejectReasons,
+			err:           ErrNoAvailableAccount,
 		}
-		return contract.ScheduleResult{Decision: decision}, ErrNoAvailableAccount
 	}
 
 	scorePayload := map[string]any{}
@@ -287,37 +345,13 @@ func (s *Service) Schedule(ctx context.Context, req contract.ScheduleRequest) (c
 	}
 	selected := frontier[0].Candidate
 	candidatesByRank := rankedCandidates(frontier, scores)
-	lease, err := s.acquireLease(ctx, req, attemptNo, selected)
-	if err != nil {
-		rejectReasons[accountKey(selected.Account.ID)] = "concurrency_full"
-		decision, decisionErr := s.store.CreateDecision(ctx, s.buildDecision(req, strategy, nil, len(req.Candidates), len(rejectReasons), scorePayload, rejectReasons))
-		if decisionErr != nil {
-			return contract.ScheduleResult{}, decisionErr
-		}
-		return contract.ScheduleResult{Decision: decision}, ErrNoAvailableAccount
+	return scheduleEvaluation{
+		decision:         s.buildDecision(req, strategy, &selected, len(req.Candidates), len(rejectReasons), scorePayload, rejectReasons),
+		selected:         selected,
+		candidatesByRank: candidatesByRank,
+		scorePayload:     scorePayload,
+		rejectReasons:    rejectReasons,
 	}
-	decision, err := s.store.CreateDecision(ctx, s.buildDecision(req, strategy, &selected, len(req.Candidates), len(rejectReasons), scorePayload, rejectReasons))
-	if err != nil {
-		_, _ = s.store.UpdateLeaseStatus(ctx, requestID, attemptNo, contract.LeaseStatusReleased)
-		return contract.ScheduleResult{}, err
-	}
-	return contract.ScheduleResult{Decision: decision, Candidate: selected, Candidates: candidatesByRank, Lease: lease}, nil
-}
-
-func normalizeScheduleCapabilities(req *contract.ScheduleRequest) error {
-	requestCapabilities, err := capabilitiescontract.NormalizeDescriptors(req.RequestCapabilities)
-	if err != nil {
-		return err
-	}
-	req.RequestCapabilities = requestCapabilities
-	for idx := range req.Candidates {
-		effectiveCapabilities, err := capabilitiescontract.NormalizeDescriptors(req.Candidates[idx].EffectiveCapabilities)
-		if err != nil {
-			return err
-		}
-		req.Candidates[idx].EffectiveCapabilities = effectiveCapabilities
-	}
-	return nil
 }
 
 func (s *Service) ListDecisions(ctx context.Context) ([]contract.Decision, error) {

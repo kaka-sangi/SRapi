@@ -1670,6 +1670,72 @@ func (e SchedulerDecisionStrategy) Valid() bool {
 	}
 }
 
+// Defines values for SchedulerSimulationProfileUserTier.
+const (
+	SchedulerSimulationProfileUserTierAdmin    SchedulerSimulationProfileUserTier = "admin"
+	SchedulerSimulationProfileUserTierFree     SchedulerSimulationProfileUserTier = "free"
+	SchedulerSimulationProfileUserTierPro      SchedulerSimulationProfileUserTier = "pro"
+	SchedulerSimulationProfileUserTierStandard SchedulerSimulationProfileUserTier = "standard"
+)
+
+// Valid indicates whether the value is a known member of the SchedulerSimulationProfileUserTier enum.
+func (e SchedulerSimulationProfileUserTier) Valid() bool {
+	switch e {
+	case SchedulerSimulationProfileUserTierAdmin:
+		return true
+	case SchedulerSimulationProfileUserTierFree:
+		return true
+	case SchedulerSimulationProfileUserTierPro:
+		return true
+	case SchedulerSimulationProfileUserTierStandard:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SchedulerSimulationStickyStrength.
+const (
+	SchedulerSimulationStickyStrengthHard SchedulerSimulationStickyStrength = "hard"
+	SchedulerSimulationStickyStrengthNone SchedulerSimulationStickyStrength = "none"
+	SchedulerSimulationStickyStrengthSoft SchedulerSimulationStickyStrength = "soft"
+)
+
+// Valid indicates whether the value is a known member of the SchedulerSimulationStickyStrength enum.
+func (e SchedulerSimulationStickyStrength) Valid() bool {
+	switch e {
+	case SchedulerSimulationStickyStrengthHard:
+		return true
+	case SchedulerSimulationStickyStrengthNone:
+		return true
+	case SchedulerSimulationStickyStrengthSoft:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SchedulerStrategyStatus.
+const (
+	SchedulerStrategyStatusActive     SchedulerStrategyStatus = "active"
+	SchedulerStrategyStatusDeprecated SchedulerStrategyStatus = "deprecated"
+	SchedulerStrategyStatusDraft      SchedulerStrategyStatus = "draft"
+)
+
+// Valid indicates whether the value is a known member of the SchedulerStrategyStatus enum.
+func (e SchedulerStrategyStatus) Valid() bool {
+	switch e {
+	case SchedulerStrategyStatusActive:
+		return true
+	case SchedulerStrategyStatusDeprecated:
+		return true
+	case SchedulerStrategyStatusDraft:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for SchedulerStrategyName.
 const (
 	SchedulerStrategyNameBalanced           SchedulerStrategyName = "balanced"
@@ -1697,27 +1763,6 @@ func (e SchedulerStrategyName) Valid() bool {
 	case SchedulerStrategyNameQuotaProtect:
 		return true
 	case SchedulerStrategyNameStickyFirst:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for SchedulerStrategyStatus.
-const (
-	SchedulerStrategyStatusActive     SchedulerStrategyStatus = "active"
-	SchedulerStrategyStatusDeprecated SchedulerStrategyStatus = "deprecated"
-	SchedulerStrategyStatusDraft      SchedulerStrategyStatus = "draft"
-)
-
-// Valid indicates whether the value is a known member of the SchedulerStrategyStatus enum.
-func (e SchedulerStrategyStatus) Valid() bool {
-	switch e {
-	case SchedulerStrategyStatusActive:
-		return true
-	case SchedulerStrategyStatusDeprecated:
-		return true
-	case SchedulerStrategyStatusDraft:
 		return true
 	default:
 		return false
@@ -1933,16 +1978,16 @@ func (e ConnectRealtimeWebSocketParamsStickyStrength) Valid() bool {
 
 // Defines values for ConnectResponsesWebSocketParamsStickyStrength.
 const (
-	ConnectResponsesWebSocketParamsStickyStrengthHard ConnectResponsesWebSocketParamsStickyStrength = "hard"
-	ConnectResponsesWebSocketParamsStickyStrengthSoft ConnectResponsesWebSocketParamsStickyStrength = "soft"
+	Hard ConnectResponsesWebSocketParamsStickyStrength = "hard"
+	Soft ConnectResponsesWebSocketParamsStickyStrength = "soft"
 )
 
 // Valid indicates whether the value is a known member of the ConnectResponsesWebSocketParamsStickyStrength enum.
 func (e ConnectResponsesWebSocketParamsStickyStrength) Valid() bool {
 	switch e {
-	case ConnectResponsesWebSocketParamsStickyStrengthHard:
+	case Hard:
 		return true
-	case ConnectResponsesWebSocketParamsStickyStrengthSoft:
+	case Soft:
 		return true
 	default:
 		return false
@@ -4658,6 +4703,154 @@ type SchedulerOverviewResponse struct {
 	RequestId RequestId         `json:"request_id"`
 }
 
+// SchedulerSimulationCandidate defines model for SchedulerSimulationCandidate.
+type SchedulerSimulationCandidate struct {
+	AccountHasCredential  *bool                            `json:"account_has_credential,omitempty"`
+	AccountId             Id                               `json:"account_id"`
+	AccountMetadata       *JsonObject                      `json:"account_metadata,omitempty"`
+	AccountRiskLevel      *string                          `json:"account_risk_level,omitempty"`
+	AccountRuntimeClass   *RuntimeClass                    `json:"account_runtime_class,omitempty"`
+	AccountStatus         *ProviderAccountStatus           `json:"account_status,omitempty"`
+	AccountWeight         *float32                         `json:"account_weight,omitempty"`
+	EffectiveCapabilities *[]CapabilityDescriptor          `json:"effective_capabilities,omitempty"`
+	Limits                *SchedulerSimulationLimits       `json:"limits,omitempty"`
+	MappingId             *Id                              `json:"mapping_id,omitempty"`
+	MappingStatus         *ResourceStatus                  `json:"mapping_status,omitempty"`
+	ModelId               *Id                              `json:"model_id,omitempty"`
+	PricingOverride       *JsonObject                      `json:"pricing_override,omitempty"`
+	ProviderCapabilities  *JsonObject                      `json:"provider_capabilities,omitempty"`
+	ProviderConfig        *JsonObject                      `json:"provider_config,omitempty"`
+	ProviderId            Id                               `json:"provider_id"`
+	ProviderProtocol      *ProviderProtocol                `json:"provider_protocol,omitempty"`
+	ProviderStatus        *ResourceStatus                  `json:"provider_status,omitempty"`
+	RuntimeState          *SchedulerSimulationRuntimeState `json:"runtime_state,omitempty"`
+	UpstreamModelName     *string                          `json:"upstream_model_name,omitempty"`
+}
+
+// SchedulerSimulationDecision defines model for SchedulerSimulationDecision.
+type SchedulerSimulationDecision struct {
+	ApiKeyId              Id        `json:"api_key_id"`
+	AttemptNo             int       `json:"attempt_no"`
+	CacheAffinityHit      bool      `json:"cache_affinity_hit"`
+	CandidateCount        int       `json:"candidate_count"`
+	CompatibilityWarnings []string  `json:"compatibility_warnings"`
+	CreatedAt             Timestamp `json:"created_at"`
+	Currency              string    `json:"currency"`
+
+	// Error Empty when the simulated strategy selected an account.
+	Error              string                `json:"error"`
+	EstimatedCost      string                `json:"estimated_cost"`
+	Model              string                `json:"model"`
+	RejectReasons      JsonObject            `json:"reject_reasons"`
+	RejectedCount      int                   `json:"rejected_count"`
+	RequestId          RequestId             `json:"request_id"`
+	Scores             JsonObject            `json:"scores"`
+	SelectedAccountId  *string               `json:"selected_account_id,omitempty"`
+	SelectedProviderId *string               `json:"selected_provider_id,omitempty"`
+	SourceEndpoint     string                `json:"source_endpoint"`
+	SourceProtocol     string                `json:"source_protocol"`
+	StickyHit          bool                  `json:"sticky_hit"`
+	Strategy           SchedulerStrategyName `json:"strategy"`
+	StrategyConfigHash string                `json:"strategy_config_hash"`
+	StrategyVersion    string                `json:"strategy_version"`
+	StrategyWeights    JsonObject            `json:"strategy_weights"`
+	TargetProtocol     string                `json:"target_protocol"`
+	UserId             Id                    `json:"user_id"`
+}
+
+// SchedulerSimulationDiff defines model for SchedulerSimulationDiff.
+type SchedulerSimulationDiff struct {
+	CostScoreDelta            float32 `json:"cost_score_delta"`
+	CurrentSelectedAccountId  *string `json:"current_selected_account_id,omitempty"`
+	CurrentSelectedProviderId *string `json:"current_selected_provider_id,omitempty"`
+	FinalScoreDelta           float32 `json:"final_score_delta"`
+	LatencyScoreDelta         float32 `json:"latency_score_delta"`
+	QualityScoreDelta         float32 `json:"quality_score_delta"`
+	RiskPenaltyDelta          float32 `json:"risk_penalty_delta"`
+	ShadowSelectedAccountId   *string `json:"shadow_selected_account_id,omitempty"`
+	ShadowSelectedProviderId  *string `json:"shadow_selected_provider_id,omitempty"`
+	WinnerChanged             bool    `json:"winner_changed"`
+}
+
+// SchedulerSimulationLimits defines model for SchedulerSimulationLimits.
+type SchedulerSimulationLimits struct {
+	MaxConcurrency *int `json:"max_concurrency,omitempty"`
+	RpmLimit       *int `json:"rpm_limit,omitempty"`
+	TpmLimit       *int `json:"tpm_limit,omitempty"`
+}
+
+// SchedulerSimulationProfile defines model for SchedulerSimulationProfile.
+type SchedulerSimulationProfile struct {
+	ApiKeyId                Id                                  `json:"api_key_id"`
+	AttemptNo               *int                                `json:"attempt_no,omitempty"`
+	Candidates              []SchedulerSimulationCandidate      `json:"candidates"`
+	Currency                *string                             `json:"currency,omitempty"`
+	EstimatedCost           *string                             `json:"estimated_cost,omitempty"`
+	EstimatedInputTokens    *int                                `json:"estimated_input_tokens,omitempty"`
+	EstimatedOutputTokens   *int                                `json:"estimated_output_tokens,omitempty"`
+	ExcludedAccountIds      *[]Id                               `json:"excluded_account_ids,omitempty"`
+	FallbackModels          *[]string                           `json:"fallback_models,omitempty"`
+	IsStream                *bool                               `json:"is_stream,omitempty"`
+	Model                   string                              `json:"model"`
+	ModelAlias              *string                             `json:"model_alias,omitempty"`
+	PricingEstimated        *bool                               `json:"pricing_estimated,omitempty"`
+	PricingRuleId           *Id                                 `json:"pricing_rule_id,omitempty"`
+	PricingSource           *string                             `json:"pricing_source,omitempty"`
+	RequestCapabilities     *[]CapabilityDescriptor             `json:"request_capabilities,omitempty"`
+	RequestId               RequestId                           `json:"request_id"`
+	SessionAffinityKey      *string                             `json:"session_affinity_key,omitempty"`
+	SessionAffinitySource   *string                             `json:"session_affinity_source,omitempty"`
+	SourceEndpoint          string                              `json:"source_endpoint"`
+	SourceProtocol          *string                             `json:"source_protocol,omitempty"`
+	StickyAccountId         *Id                                 `json:"sticky_account_id,omitempty"`
+	StickyStrength          *SchedulerSimulationStickyStrength  `json:"sticky_strength,omitempty"`
+	TargetProtocol          *string                             `json:"target_protocol,omitempty"`
+	UserBalanceInsufficient *bool                               `json:"user_balance_insufficient,omitempty"`
+	UserId                  Id                                  `json:"user_id"`
+	UserTier                *SchedulerSimulationProfileUserTier `json:"user_tier,omitempty"`
+	Warnings                *[]string                           `json:"warnings,omitempty"`
+}
+
+// SchedulerSimulationProfileUserTier defines model for SchedulerSimulationProfile.UserTier.
+type SchedulerSimulationProfileUserTier string
+
+// SchedulerSimulationRequest defines model for SchedulerSimulationRequest.
+type SchedulerSimulationRequest struct {
+	CurrentStrategy *SchedulerStrategyName     `json:"current_strategy,omitempty"`
+	Request         SchedulerSimulationProfile `json:"request"`
+	ShadowStrategy  SchedulerStrategyName      `json:"shadow_strategy"`
+}
+
+// SchedulerSimulationResponse defines model for SchedulerSimulationResponse.
+type SchedulerSimulationResponse struct {
+	Data      SchedulerSimulationResult `json:"data"`
+	RequestId RequestId                 `json:"request_id"`
+}
+
+// SchedulerSimulationResult defines model for SchedulerSimulationResult.
+type SchedulerSimulationResult struct {
+	Current SchedulerSimulationDecision `json:"current"`
+	Diff    SchedulerSimulationDiff     `json:"diff"`
+	DryRun  bool                        `json:"dry_run"`
+	Shadow  SchedulerSimulationDecision `json:"shadow"`
+}
+
+// SchedulerSimulationRuntimeState defines model for SchedulerSimulationRuntimeState.
+type SchedulerSimulationRuntimeState struct {
+	CircuitOpen         *bool    `json:"circuit_open,omitempty"`
+	CooldownActive      *bool    `json:"cooldown_active,omitempty"`
+	CurrentConcurrency  *int     `json:"current_concurrency,omitempty"`
+	HealthScore         *float32 `json:"health_score,omitempty"`
+	LatencyP95Ms        *int     `json:"latency_p95_ms,omitempty"`
+	QuotaExhausted      *bool    `json:"quota_exhausted,omitempty"`
+	QuotaRemainingRatio *float32 `json:"quota_remaining_ratio,omitempty"`
+	RpmUsed             *int     `json:"rpm_used,omitempty"`
+	TpmUsed             *int     `json:"tpm_used,omitempty"`
+}
+
+// SchedulerSimulationStickyStrength defines model for SchedulerSimulationStickyStrength.
+type SchedulerSimulationStickyStrength string
+
 // SchedulerStrategy defines model for SchedulerStrategy.
 type SchedulerStrategy struct {
 	ActivatedAt *time.Time              `json:"activated_at,omitempty"`
@@ -4670,9 +4863,6 @@ type SchedulerStrategy struct {
 	Version     string                  `json:"version"`
 }
 
-// SchedulerStrategyName defines model for SchedulerStrategy.Name.
-type SchedulerStrategyName string
-
 // SchedulerStrategyStatus defines model for SchedulerStrategy.Status.
 type SchedulerStrategyStatus string
 
@@ -4682,6 +4872,9 @@ type SchedulerStrategyListResponse struct {
 	Pagination Pagination          `json:"pagination"`
 	RequestId  RequestId           `json:"request_id"`
 }
+
+// SchedulerStrategyName defines model for SchedulerStrategyName.
+type SchedulerStrategyName string
 
 // SecretConfigured defines model for SecretConfigured.
 type SecretConfigured struct {
@@ -5642,6 +5835,9 @@ type BatchGenerateAdminRedeemCodesJSONRequestBody = BatchGenerateRedeemCodesRequ
 
 // UpdateAdminRiskControlConfigJSONRequestBody defines body for UpdateAdminRiskControlConfig for application/json ContentType.
 type UpdateAdminRiskControlConfigJSONRequestBody = RiskControlConfig
+
+// SimulateSchedulerStrategyJSONRequestBody defines body for SimulateSchedulerStrategy for application/json ContentType.
+type SimulateSchedulerStrategyJSONRequestBody = SchedulerSimulationRequest
 
 // UpdateAdminSettingsJSONRequestBody defines body for UpdateAdminSettings for application/json ContentType.
 type UpdateAdminSettingsJSONRequestBody = AdminSettings
@@ -11893,6 +12089,9 @@ type ServerInterface interface {
 	// Get scheduler overview.
 	// (GET /api/v1/admin/scheduler/overview)
 	GetAdminSchedulerOverview(w http.ResponseWriter, r *http.Request)
+	// Simulate scheduler strategy selection.
+	// (POST /api/v1/admin/scheduler/simulate)
+	SimulateSchedulerStrategy(w http.ResponseWriter, r *http.Request)
 	// List scheduler strategies.
 	// (GET /api/v1/admin/scheduler/strategies)
 	ListSchedulerStrategies(w http.ResponseWriter, r *http.Request, params ListSchedulerStrategiesParams)
@@ -16023,6 +16222,28 @@ func (siw *ServerInterfaceWrapper) GetAdminSchedulerOverview(w http.ResponseWrit
 	handler.ServeHTTP(w, r)
 }
 
+// SimulateSchedulerStrategy operation middleware
+func (siw *ServerInterfaceWrapper) SimulateSchedulerStrategy(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SimulateSchedulerStrategy(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListSchedulerStrategies operation middleware
 func (siw *ServerInterfaceWrapper) ListSchedulerStrategies(w http.ResponseWriter, r *http.Request) {
 
@@ -18246,6 +18467,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/risk-control/status", wrapper.GetAdminRiskControlStatus)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/scheduler/decisions", wrapper.ListAdminSchedulerDecisions)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/scheduler/overview", wrapper.GetAdminSchedulerOverview)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/scheduler/simulate", wrapper.SimulateSchedulerStrategy)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/scheduler/strategies", wrapper.ListSchedulerStrategies)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/settings", wrapper.GetAdminSettings)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/admin/settings", wrapper.UpdateAdminSettings)

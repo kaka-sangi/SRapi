@@ -744,6 +744,77 @@ func TestServiceRefreshesActiveStrategyBeforeSchedule(t *testing.T) {
 	}
 }
 
+func TestSimulateStrategyDoesNotPersistDecisionOrLease(t *testing.T) {
+	svc := newService(t)
+	req := baseRequest()
+	req.Candidates = []contract.Candidate{
+		candidate(1, withHealth(0.95), withRelativeCost("0.9"), withCapabilities(capabilitiescontract.KeyStreaming)),
+		candidate(2, withHealth(0.60), withRelativeCost("0.1"), withCapabilities(capabilitiescontract.KeyStreaming)),
+	}
+
+	result, err := svc.SimulateStrategy(context.Background(), contract.StrategySimulationRequest{
+		Request:         req,
+		CurrentStrategy: contract.StrategyBalanced,
+		ShadowStrategy:  contract.StrategyCostSaver,
+	})
+	if err != nil {
+		t.Fatalf("simulate strategy: %v", err)
+	}
+	if !result.DryRun {
+		t.Fatalf("expected dry-run result, got %+v", result)
+	}
+	if selectedAccountID(result.Current.Decision) != 1 || selectedAccountID(result.Shadow.Decision) != 2 {
+		t.Fatalf("expected balanced account 1 and cost_saver account 2, got current=%+v shadow=%+v", result.Current.Decision, result.Shadow.Decision)
+	}
+	if !result.Diff.WinnerChanged || selectedAccountIDPtr(result.Diff.CurrentSelectedAccountID) != 1 || selectedAccountIDPtr(result.Diff.ShadowSelectedAccountID) != 2 {
+		t.Fatalf("expected winner diff, got %+v", result.Diff)
+	}
+	if result.Diff.CostScoreDelta <= 0 {
+		t.Fatalf("expected shadow winner to improve cost score, got %+v", result.Diff)
+	}
+	decisions, err := svc.ListDecisions(context.Background())
+	if err != nil {
+		t.Fatalf("list decisions: %v", err)
+	}
+	if len(decisions) != 0 {
+		t.Fatalf("expected simulation to avoid persisted decisions, got %+v", decisions)
+	}
+	leases, err := svc.ListLeases(context.Background())
+	if err != nil {
+		t.Fatalf("list leases: %v", err)
+	}
+	if len(leases) != 0 {
+		t.Fatalf("expected simulation to avoid leases, got %+v", leases)
+	}
+}
+
+func TestSimulateStrategyReportsRejectedShadowWithoutLease(t *testing.T) {
+	svc := newService(t)
+	req := baseRequest()
+	req.Candidates = []contract.Candidate{
+		candidate(1, withAccountStatus(accountcontract.StatusDisabled), withCapabilities(capabilitiescontract.KeyStreaming)),
+	}
+
+	result, err := svc.SimulateStrategy(context.Background(), contract.StrategySimulationRequest{
+		Request:        req,
+		ShadowStrategy: contract.StrategyCostSaver,
+	})
+	if err != nil {
+		t.Fatalf("simulate strategy: %v", err)
+	}
+	if result.Current.Error != "no_available_account" || result.Shadow.Error != "no_available_account" {
+		t.Fatalf("expected no available account errors, got %+v", result)
+	}
+	assertRejectReason(t, result.Shadow.Decision.RejectReasons, 1, "account_disabled")
+	leases, err := svc.ListLeases(context.Background())
+	if err != nil {
+		t.Fatalf("list leases: %v", err)
+	}
+	if len(leases) != 0 {
+		t.Fatalf("expected no lease from rejected simulation, got %+v", leases)
+	}
+}
+
 func TestLeasePreventsConcurrentSchedulingAndFeedbackReleases(t *testing.T) {
 	svc := newService(t)
 	req := baseRequest()
@@ -1144,6 +1215,17 @@ func assertRejectReason(t *testing.T, reasons map[string]any, accountID int, exp
 	if got != expected {
 		t.Fatalf("expected account %d reject reason %q, got %v", accountID, expected, got)
 	}
+}
+
+func selectedAccountID(decision contract.Decision) int {
+	return selectedAccountIDPtr(decision.SelectedAccountID)
+}
+
+func selectedAccountIDPtr(value *int) int {
+	if value == nil {
+		return 0
+	}
+	return *value
 }
 
 func decisionScore(t *testing.T, scores map[string]any, accountID int) map[string]any {

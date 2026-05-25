@@ -358,6 +358,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("GET /api/v1/admin/scheduler/overview", server.handleAdminSchedulerOverview)
 	mux.HandleFunc("GET /api/v1/admin/scheduler/decisions", server.handleListAdminSchedulerDecisions)
 	mux.HandleFunc("GET /api/v1/admin/scheduler/strategies", server.handleListSchedulerStrategies)
+	mux.HandleFunc("POST /api/v1/admin/scheduler/simulate", server.handleSimulateSchedulerStrategy)
 	mux.HandleFunc("GET /v1/models", server.handleListModels)
 	mux.HandleFunc("GET /v1beta/models", server.handleListGeminiModels)
 	mux.HandleFunc("POST /v1/chat/completions", server.handleCreateChatCompletion)

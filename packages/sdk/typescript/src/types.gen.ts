@@ -1978,7 +1978,7 @@ export type SchedulerOverviewResponse = {
 
 export type SchedulerStrategy = {
     id: Id;
-    name: 'balanced' | 'cost_saver' | 'latency_first' | 'quota_protect' | 'sticky_first' | 'cache_affinity_first' | 'premium_quality';
+    name: SchedulerStrategyName;
     version: string;
     status: 'active' | 'draft' | 'deprecated';
     config_hash: string;
@@ -1990,6 +1990,143 @@ export type SchedulerStrategy = {
 export type SchedulerStrategyListResponse = {
     data: Array<SchedulerStrategy>;
     pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type SchedulerStrategyName = 'balanced' | 'cost_saver' | 'latency_first' | 'quota_protect' | 'sticky_first' | 'cache_affinity_first' | 'premium_quality';
+
+export type SchedulerSimulationStickyStrength = 'none' | 'soft' | 'hard';
+
+export type SchedulerSimulationRuntimeState = {
+    quota_exhausted?: boolean;
+    health_score?: number | null;
+    quota_remaining_ratio?: number | null;
+    latency_p95_ms?: number | null;
+    circuit_open?: boolean;
+    cooldown_active?: boolean;
+    current_concurrency?: number;
+    rpm_used?: number;
+    tpm_used?: number;
+};
+
+export type SchedulerSimulationLimits = {
+    max_concurrency?: number | null;
+    rpm_limit?: number | null;
+    tpm_limit?: number | null;
+};
+
+export type SchedulerSimulationCandidate = {
+    account_id: Id;
+    account_status?: ProviderAccountStatus;
+    account_runtime_class?: RuntimeClass;
+    account_weight?: number;
+    account_risk_level?: string | null;
+    account_has_credential?: boolean;
+    account_metadata?: JsonObject;
+    provider_id: Id;
+    provider_status?: ResourceStatus;
+    provider_protocol?: ProviderProtocol;
+    provider_capabilities?: JsonObject;
+    provider_config?: JsonObject;
+    mapping_id?: Id;
+    model_id?: Id;
+    mapping_status?: ResourceStatus;
+    upstream_model_name?: string;
+    pricing_override?: JsonObject;
+    effective_capabilities?: Array<CapabilityDescriptor>;
+    runtime_state?: SchedulerSimulationRuntimeState;
+    limits?: SchedulerSimulationLimits;
+};
+
+export type SchedulerSimulationProfile = {
+    request_id: RequestId;
+    attempt_no?: number;
+    user_id: Id;
+    api_key_id: Id;
+    source_protocol?: string;
+    source_endpoint: string;
+    target_protocol?: string;
+    model: string;
+    model_alias?: string;
+    fallback_models?: Array<string>;
+    session_affinity_source?: string;
+    user_tier?: 'free' | 'standard' | 'pro' | 'admin';
+    user_balance_insufficient?: boolean;
+    estimated_input_tokens?: number;
+    estimated_output_tokens?: number;
+    estimated_cost?: string;
+    currency?: string;
+    pricing_rule_id?: Id;
+    pricing_source?: string;
+    pricing_estimated?: boolean;
+    is_stream?: boolean;
+    sticky_account_id?: Id;
+    sticky_strength?: SchedulerSimulationStickyStrength;
+    warnings?: Array<string>;
+    request_capabilities?: Array<CapabilityDescriptor>;
+    excluded_account_ids?: Array<Id>;
+    candidates: Array<SchedulerSimulationCandidate>;
+};
+
+export type SchedulerSimulationRequest = {
+    current_strategy?: SchedulerStrategyName;
+    shadow_strategy: SchedulerStrategyName;
+    request: SchedulerSimulationProfile;
+};
+
+export type SchedulerSimulationDecision = {
+    /**
+     * Empty when the simulated strategy selected an account.
+     */
+    error: string;
+    request_id: RequestId;
+    attempt_no: number;
+    user_id: Id;
+    api_key_id: Id;
+    source_protocol: string;
+    source_endpoint: string;
+    target_protocol: string;
+    model: string;
+    strategy: SchedulerStrategyName;
+    strategy_version: string;
+    strategy_config_hash: string;
+    selected_provider_id?: string | null;
+    selected_account_id?: string | null;
+    candidate_count: number;
+    rejected_count: number;
+    scores: JsonObject;
+    reject_reasons: JsonObject;
+    strategy_weights: JsonObject;
+    compatibility_warnings: Array<string>;
+    sticky_hit: boolean;
+    cache_affinity_hit: boolean;
+    estimated_cost: string;
+    currency: string;
+    created_at: Timestamp;
+};
+
+export type SchedulerSimulationDiff = {
+    winner_changed: boolean;
+    current_selected_account_id?: string | null;
+    shadow_selected_account_id?: string | null;
+    current_selected_provider_id?: string | null;
+    shadow_selected_provider_id?: string | null;
+    final_score_delta: number;
+    cost_score_delta: number;
+    latency_score_delta: number;
+    quality_score_delta: number;
+    risk_penalty_delta: number;
+};
+
+export type SchedulerSimulationResult = {
+    dry_run: boolean;
+    current: SchedulerSimulationDecision;
+    shadow: SchedulerSimulationDecision;
+    diff: SchedulerSimulationDiff;
+};
+
+export type SchedulerSimulationResponse = {
+    data: SchedulerSimulationResult;
     request_id: RequestId;
 };
 
@@ -2627,6 +2764,43 @@ export type ProviderAccountImportItemWritable = {
 
 export type ProviderAccountImportRequestWritable = {
     accounts: Array<ProviderAccountImportItemWritable>;
+};
+
+export type SchedulerSimulationProfileWritable = {
+    request_id: RequestId;
+    attempt_no?: number;
+    user_id: Id;
+    api_key_id: Id;
+    source_protocol?: string;
+    source_endpoint: string;
+    target_protocol?: string;
+    model: string;
+    model_alias?: string;
+    fallback_models?: Array<string>;
+    session_affinity_key?: string;
+    session_affinity_source?: string;
+    user_tier?: 'free' | 'standard' | 'pro' | 'admin';
+    user_balance_insufficient?: boolean;
+    estimated_input_tokens?: number;
+    estimated_output_tokens?: number;
+    estimated_cost?: string;
+    currency?: string;
+    pricing_rule_id?: Id;
+    pricing_source?: string;
+    pricing_estimated?: boolean;
+    is_stream?: boolean;
+    sticky_account_id?: Id;
+    sticky_strength?: SchedulerSimulationStickyStrength;
+    warnings?: Array<string>;
+    request_capabilities?: Array<CapabilityDescriptor>;
+    excluded_account_ids?: Array<Id>;
+    candidates: Array<SchedulerSimulationCandidate>;
+};
+
+export type SchedulerSimulationRequestWritable = {
+    current_strategy?: SchedulerStrategyName;
+    shadow_strategy: SchedulerStrategyName;
+    request: SchedulerSimulationProfileWritable;
 };
 
 export type RerankDocumentWritable = string | JsonObject;
@@ -7427,6 +7601,43 @@ export type ListSchedulerStrategiesResponses = {
 };
 
 export type ListSchedulerStrategiesResponse = ListSchedulerStrategiesResponses[keyof ListSchedulerStrategiesResponses];
+
+export type SimulateSchedulerStrategyData = {
+    body: SchedulerSimulationRequestWritable;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/scheduler/simulate';
+};
+
+export type SimulateSchedulerStrategyErrors = {
+    /**
+     * Standard SRapi error.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type SimulateSchedulerStrategyError = SimulateSchedulerStrategyErrors[keyof SimulateSchedulerStrategyErrors];
+
+export type SimulateSchedulerStrategyResponses = {
+    /**
+     * Scheduler simulation result.
+     */
+    200: SchedulerSimulationResponse;
+};
+
+export type SimulateSchedulerStrategyResponse = SimulateSchedulerStrategyResponses[keyof SimulateSchedulerStrategyResponses];
 
 export type ListModelsData = {
     body?: never;

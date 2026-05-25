@@ -158,6 +158,41 @@ type ScheduleResult struct {
 	Lease      Lease
 }
 
+// StrategySimulationRequest compares two scheduler strategies against one request profile.
+type StrategySimulationRequest struct {
+	Request         ScheduleRequest
+	CurrentStrategy StrategyName
+	ShadowStrategy  StrategyName
+}
+
+// StrategySimulationResult contains side-effect-free current and shadow scheduler outcomes.
+type StrategySimulationResult struct {
+	Current SimulatedStrategyDecision
+	Shadow  SimulatedStrategyDecision
+	Diff    StrategySimulationDiff
+	DryRun  bool
+}
+
+// SimulatedStrategyDecision is a scheduler outcome that was not persisted and did not acquire a lease.
+type SimulatedStrategyDecision struct {
+	Decision Decision
+	Error    string
+}
+
+// StrategySimulationDiff captures the operator-facing differences between current and shadow outcomes.
+type StrategySimulationDiff struct {
+	WinnerChanged             bool
+	CurrentSelectedAccountID  *int
+	ShadowSelectedAccountID   *int
+	CurrentSelectedProviderID *int
+	ShadowSelectedProviderID  *int
+	FinalScoreDelta           float64
+	CostScoreDelta            float64
+	LatencyScoreDelta         float64
+	QualityScoreDelta         float64
+	RiskPenaltyDelta          float64
+}
+
 type Lease struct {
 	ID        string
 	RequestID string

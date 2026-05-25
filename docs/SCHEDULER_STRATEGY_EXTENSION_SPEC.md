@@ -381,12 +381,18 @@ index(name, status)
 K1.2 起运行时已经读取 `status=active`、`scope_type=global` 且 `scope_id IS NULL` 的
 `scheduler_strategies` 行，并在每次调度和管理员策略列表读取前刷新到
 `StrategyRegistry`。同名多 active 版本按 `activated_at`、`updated_at` / `created_at`、
-`id` 选择最新行；内置 seed 仍作为本地 / memory store fallback。API key、model、provider
-等 scoped override、灰度和 shadow decision 仍属于 K1.6+ 范围。
+`id` 选择最新行；内置 seed 仍作为本地 / memory store fallback。K1.6 起已支持单请求
+shadow dry-run；API key、model、provider 等 scoped override、百分比灰度和历史批量回放仍属于后续范围。
 
 ## 17. Admin API
 
-OpenAPI 中必须预留：
+当前 OpenAPI 已落地单请求 dry-run：
+
+```txt
+POST   /api/v1/admin/scheduler/simulate
+```
+
+后续策略管理与历史回放接口预留：
 
 ```txt
 GET    /api/v1/admin/scheduler/strategies
@@ -394,7 +400,7 @@ POST   /api/v1/admin/scheduler/strategies
 GET    /api/v1/admin/scheduler/strategies/{id}
 PATCH  /api/v1/admin/scheduler/strategies/{id}
 POST   /api/v1/admin/scheduler/strategies/{id}/activate
-POST   /api/v1/admin/scheduler/strategies/{id}/simulate
+POST   /api/v1/admin/scheduler/strategies/{id}/replay
 GET    /api/v1/admin/scheduler/strategies/{id}/versions
 ```
 

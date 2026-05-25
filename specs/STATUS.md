@@ -81,14 +81,15 @@ last_completed:
 - C3.3: Gateway content safety now adds `internal/modules/content_safety`, redacts email/phone/SSN/national ID/credit-card text across CanonicalRequest prompt, messages, embeddings, image/audio/speech, moderation, and rerank fields before provider dispatch, records safe audit finding summaries without raw PII, and persists compatibility warnings on usage evidence.
 - K1.2: Scheduler strategy loading now refreshes active global `scheduler_strategies` rows before scheduling and admin strategy listing, normalizes persisted weight config into runtime strategy descriptors, records updated version/hash/weights snapshots on decisions, and keeps seeded strategies as the memory/local fallback.
 - K1.5: Scheduler ranking now applies a Cost/Latency/Quality Pareto frontier before final weighted selection, records `pareto.frontier_account_ids` in decision score evidence, keeps all available candidates in failover rank order, and uses explicit `quality_score` / `quality_tier` metadata as the quality objective.
+- K1.6: Scheduler strategy simulation now supports single-request dry-run/shadow comparison through `scheduler/service/simulator.go` and `POST /api/v1/admin/scheduler/simulate`; it evaluates current vs shadow strategies with the same request profile and candidates, returns winner and score deltas, and HTTP/service regressions prove it does not persist SchedulerDecision rows or acquire leases.
 
 current:
 
-- package: K1.6
+- package: K1.6 follow-up
 - status: pending
-- objective: implement Scheduler strategy simulator dry-run/shadow decisions without creating leases or mutating real routing state.
+- objective: extend Scheduler strategy simulator from single-request dry-run to historical replay, scoped gray release percentages, and admin strategy comparison reporting.
 
-next_recommended: K1.6 strategy_simulator（dry-run + shadow）.
+next_recommended: K1.6 historical replay + gray release simulator, or K1.7 `/admin/ops/strategy` comparison UI.
 
 last_gates:
 

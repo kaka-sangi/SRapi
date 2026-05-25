@@ -784,6 +784,320 @@ func toAPISchedulerDecision(decision schedulercontract.Decision) apiopenapi.Sche
 	}
 }
 
+func toSchedulerSimulationRequest(body apiopenapi.SchedulerSimulationRequest) (schedulercontract.StrategySimulationRequest, error) {
+	request, err := toSchedulerSimulationScheduleRequest(body.Request)
+	if err != nil {
+		return schedulercontract.StrategySimulationRequest{}, err
+	}
+	var current schedulercontract.StrategyName
+	if body.CurrentStrategy != nil {
+		current = schedulercontract.StrategyName(*body.CurrentStrategy)
+	}
+	return schedulercontract.StrategySimulationRequest{
+		Request:         request,
+		CurrentStrategy: current,
+		ShadowStrategy:  schedulercontract.StrategyName(body.ShadowStrategy),
+	}, nil
+}
+
+func toSchedulerSimulationScheduleRequest(profile apiopenapi.SchedulerSimulationProfile) (schedulercontract.ScheduleRequest, error) {
+	userID, err := apiIDToInt(profile.UserId)
+	if err != nil {
+		return schedulercontract.ScheduleRequest{}, err
+	}
+	apiKeyID, err := apiIDToInt(profile.ApiKeyId)
+	if err != nil {
+		return schedulercontract.ScheduleRequest{}, err
+	}
+	pricingRuleID, err := optionalAPIIDToInt(profile.PricingRuleId)
+	if err != nil {
+		return schedulercontract.ScheduleRequest{}, err
+	}
+	stickyAccountID, err := optionalAPIIDToInt(profile.StickyAccountId)
+	if err != nil {
+		return schedulercontract.ScheduleRequest{}, err
+	}
+	excludedAccountIDs, err := idsToInts(profile.ExcludedAccountIds)
+	if err != nil {
+		return schedulercontract.ScheduleRequest{}, err
+	}
+	candidates := make([]schedulercontract.Candidate, 0, len(profile.Candidates))
+	for _, candidate := range profile.Candidates {
+		converted, err := toSchedulerSimulationCandidate(candidate, profile.Model)
+		if err != nil {
+			return schedulercontract.ScheduleRequest{}, err
+		}
+		candidates = append(candidates, converted)
+	}
+	return schedulercontract.ScheduleRequest{
+		RequestID:               strings.TrimSpace(string(profile.RequestId)),
+		AttemptNo:               intValue(profile.AttemptNo),
+		UserID:                  userID,
+		APIKeyID:                apiKeyID,
+		SourceProtocol:          optionalStringValue(profile.SourceProtocol),
+		SourceEndpoint:          profile.SourceEndpoint,
+		TargetProtocol:          optionalStringValue(profile.TargetProtocol),
+		Model:                   profile.Model,
+		ModelAlias:              optionalStringValue(profile.ModelAlias),
+		FallbackModels:          derefStrings(profile.FallbackModels),
+		SessionAffinityKey:      optionalStringValue(profile.SessionAffinityKey),
+		SessionAffinitySource:   optionalStringValue(profile.SessionAffinitySource),
+		UserTier:                schedulerSimulationUserTier(profile.UserTier),
+		UserBalanceInsufficient: boolPtrValue(profile.UserBalanceInsufficient),
+		EstimatedInputTokens:    intValue(profile.EstimatedInputTokens),
+		EstimatedOutputTokens:   intValue(profile.EstimatedOutputTokens),
+		EstimatedCost:           optionalStringValue(profile.EstimatedCost),
+		Currency:                optionalStringValue(profile.Currency),
+		PricingRuleID:           pricingRuleID,
+		PricingSource:           optionalStringValue(profile.PricingSource),
+		PricingEstimated:        boolPtrValue(profile.PricingEstimated),
+		IsStream:                boolPtrValue(profile.IsStream),
+		StickyAccountID:         stickyAccountID,
+		StickyStrength:          schedulerSimulationStickyStrength(profile.StickyStrength),
+		Warnings:                derefStrings(profile.Warnings),
+		RequestCapabilities:     toCapabilityDescriptors(profile.RequestCapabilities),
+		Candidates:              candidates,
+		ExcludedAccountIDs:      excludedAccountIDs,
+	}, nil
+}
+
+func toSchedulerSimulationCandidate(input apiopenapi.SchedulerSimulationCandidate, defaultModel string) (schedulercontract.Candidate, error) {
+	accountID, err := apiIDToInt(input.AccountId)
+	if err != nil {
+		return schedulercontract.Candidate{}, err
+	}
+	providerID, err := apiIDToInt(input.ProviderId)
+	if err != nil {
+		return schedulercontract.Candidate{}, err
+	}
+	mappingID, err := optionalAPIIDToIntValue(input.MappingId)
+	if err != nil {
+		return schedulercontract.Candidate{}, err
+	}
+	modelID, err := optionalAPIIDToIntValue(input.ModelId)
+	if err != nil {
+		return schedulercontract.Candidate{}, err
+	}
+	return schedulercontract.Candidate{
+		Account: accountcontract.ProviderAccount{
+			ID:                   accountID,
+			ProviderID:           providerID,
+			RuntimeClass:         schedulerSimulationRuntimeClass(input.AccountRuntimeClass),
+			CredentialCiphertext: schedulerSimulationCredential(input.AccountHasCredential),
+			Status:               schedulerSimulationAccountStatus(input.AccountStatus),
+			Weight:               schedulerSimulationWeight(input.AccountWeight),
+			RiskLevel:            input.AccountRiskLevel,
+			Metadata:             jsonObjectToMap(input.AccountMetadata),
+		},
+		Provider: providercontract.Provider{
+			ID:           providerID,
+			Protocol:     schedulerSimulationProviderProtocol(input.ProviderProtocol),
+			Status:       schedulerSimulationProviderStatus(input.ProviderStatus),
+			Capabilities: jsonObjectToMap(input.ProviderCapabilities),
+			ConfigSchema: jsonObjectToMap(input.ProviderConfig),
+		},
+		Mapping: modelcontract.ModelProviderMapping{
+			ID:                mappingID,
+			ModelID:           modelID,
+			ProviderID:        providerID,
+			UpstreamModelName: schedulerSimulationUpstreamModel(input.UpstreamModelName, defaultModel),
+			Status:            schedulerSimulationMappingStatus(input.MappingStatus),
+			PricingOverride:   jsonObjectToMap(input.PricingOverride),
+		},
+		EffectiveCapabilities: toCapabilityDescriptors(input.EffectiveCapabilities),
+		RuntimeState:          toSchedulerSimulationRuntimeState(input.RuntimeState),
+		Limits:                toSchedulerSimulationRuntimeLimits(input.Limits),
+	}, nil
+}
+
+func toSchedulerSimulationRuntimeState(input *apiopenapi.SchedulerSimulationRuntimeState) schedulercontract.RuntimeState {
+	if input == nil {
+		return schedulercontract.RuntimeState{}
+	}
+	return schedulercontract.RuntimeState{
+		QuotaExhausted:      boolPtrValue(input.QuotaExhausted),
+		HealthScore:         float64PtrFromFloat32(input.HealthScore),
+		QuotaRemainingRatio: float64PtrFromFloat32(input.QuotaRemainingRatio),
+		LatencyP95MS:        cloneIntPtr(input.LatencyP95Ms),
+		CircuitOpen:         boolPtrValue(input.CircuitOpen),
+		CooldownActive:      boolPtrValue(input.CooldownActive),
+		CurrentConcurrency:  intValue(input.CurrentConcurrency),
+		RPMUsed:             intValue(input.RpmUsed),
+		TPMUsed:             intValue(input.TpmUsed),
+	}
+}
+
+func toSchedulerSimulationRuntimeLimits(input *apiopenapi.SchedulerSimulationLimits) schedulercontract.RuntimeLimits {
+	if input == nil {
+		return schedulercontract.RuntimeLimits{}
+	}
+	return schedulercontract.RuntimeLimits{
+		MaxConcurrency: cloneIntPtr(input.MaxConcurrency),
+		RPMLimit:       cloneIntPtr(input.RpmLimit),
+		TPMLimit:       cloneIntPtr(input.TpmLimit),
+	}
+}
+
+func toAPISchedulerSimulationResult(result schedulercontract.StrategySimulationResult) apiopenapi.SchedulerSimulationResult {
+	return apiopenapi.SchedulerSimulationResult{
+		Current: toAPISchedulerSimulationDecision(result.Current),
+		Shadow:  toAPISchedulerSimulationDecision(result.Shadow),
+		Diff: apiopenapi.SchedulerSimulationDiff{
+			WinnerChanged:             result.Diff.WinnerChanged,
+			CurrentSelectedAccountId:  optionalIDString(result.Diff.CurrentSelectedAccountID),
+			ShadowSelectedAccountId:   optionalIDString(result.Diff.ShadowSelectedAccountID),
+			CurrentSelectedProviderId: optionalIDString(result.Diff.CurrentSelectedProviderID),
+			ShadowSelectedProviderId:  optionalIDString(result.Diff.ShadowSelectedProviderID),
+			FinalScoreDelta:           float32(result.Diff.FinalScoreDelta),
+			CostScoreDelta:            float32(result.Diff.CostScoreDelta),
+			LatencyScoreDelta:         float32(result.Diff.LatencyScoreDelta),
+			QualityScoreDelta:         float32(result.Diff.QualityScoreDelta),
+			RiskPenaltyDelta:          float32(result.Diff.RiskPenaltyDelta),
+		},
+		DryRun: result.DryRun,
+	}
+}
+
+func toAPISchedulerSimulationDecision(result schedulercontract.SimulatedStrategyDecision) apiopenapi.SchedulerSimulationDecision {
+	decision := result.Decision
+	return apiopenapi.SchedulerSimulationDecision{
+		ApiKeyId:              apiopenapi.Id(strconv.Itoa(decision.APIKeyID)),
+		AttemptNo:             decision.AttemptNo,
+		CacheAffinityHit:      decision.CacheAffinityHit,
+		CandidateCount:        decision.CandidateCount,
+		CompatibilityWarnings: nonNilStrings(decision.CompatibilityWarnings),
+		CreatedAt:             decision.CreatedAt,
+		Currency:              decision.Currency,
+		Error:                 result.Error,
+		EstimatedCost:         decision.EstimatedCost,
+		Model:                 decision.Model,
+		RejectReasons:         jsonObject(decision.RejectReasons),
+		RejectedCount:         decision.RejectedCount,
+		RequestId:             decision.RequestID,
+		Scores:                jsonObject(decision.Scores),
+		SelectedAccountId:     optionalIDString(decision.SelectedAccountID),
+		SelectedProviderId:    optionalIDString(decision.SelectedProviderID),
+		SourceEndpoint:        decision.SourceEndpoint,
+		SourceProtocol:        decision.SourceProtocol,
+		StickyHit:             decision.StickyHit,
+		Strategy:              apiopenapi.SchedulerStrategyName(decision.Strategy),
+		StrategyConfigHash:    decision.StrategyConfigHash,
+		StrategyVersion:       decision.StrategyVersion,
+		StrategyWeights:       jsonObject(decision.StrategyWeights),
+		TargetProtocol:        decision.TargetProtocol,
+		UserId:                apiopenapi.Id(strconv.Itoa(decision.UserID)),
+	}
+}
+
+func apiIDToInt(value apiopenapi.Id) (int, error) {
+	parsed, err := strconv.Atoi(string(value))
+	if err != nil || parsed <= 0 {
+		return 0, fmt.Errorf("invalid id %q", value)
+	}
+	return parsed, nil
+}
+
+func optionalAPIIDToInt(value *apiopenapi.Id) (*int, error) {
+	if value == nil {
+		return nil, nil
+	}
+	parsed, err := apiIDToInt(*value)
+	if err != nil {
+		return nil, err
+	}
+	return &parsed, nil
+}
+
+func optionalAPIIDToIntValue(value *apiopenapi.Id) (int, error) {
+	parsed, err := optionalAPIIDToInt(value)
+	if err != nil || parsed == nil {
+		return 0, err
+	}
+	return *parsed, nil
+}
+
+func schedulerSimulationUserTier(value *apiopenapi.SchedulerSimulationProfileUserTier) schedulercontract.UserTier {
+	if value == nil {
+		return schedulercontract.UserTierFree
+	}
+	return schedulercontract.UserTier(*value)
+}
+
+func schedulerSimulationStickyStrength(value *apiopenapi.SchedulerSimulationStickyStrength) schedulercontract.StickyStrength {
+	if value == nil || *value == apiopenapi.SchedulerSimulationStickyStrengthNone {
+		return schedulercontract.StickyStrengthNone
+	}
+	return schedulercontract.StickyStrength(*value)
+}
+
+func schedulerSimulationRuntimeClass(value *apiopenapi.RuntimeClass) accountcontract.RuntimeClass {
+	if value == nil {
+		return accountcontract.RuntimeClassAPIKey
+	}
+	return accountcontract.RuntimeClass(*value)
+}
+
+func schedulerSimulationCredential(hasCredential *bool) string {
+	if hasCredential != nil && !*hasCredential {
+		return ""
+	}
+	return "simulation-credential"
+}
+
+func schedulerSimulationAccountStatus(value *apiopenapi.ProviderAccountStatus) accountcontract.Status {
+	if value == nil {
+		return accountcontract.StatusActive
+	}
+	return accountcontract.Status(*value)
+}
+
+func schedulerSimulationWeight(value *float32) float32 {
+	if value == nil {
+		return 1
+	}
+	return *value
+}
+
+func schedulerSimulationProviderStatus(value *apiopenapi.ResourceStatus) providercontract.Status {
+	if value == nil {
+		return providercontract.StatusActive
+	}
+	return providercontract.Status(*value)
+}
+
+func schedulerSimulationProviderProtocol(value *apiopenapi.ProviderProtocol) string {
+	if value == nil {
+		return "openai-compatible"
+	}
+	return string(*value)
+}
+
+func schedulerSimulationMappingStatus(value *apiopenapi.ResourceStatus) modelcontract.Status {
+	if value == nil {
+		return modelcontract.StatusActive
+	}
+	return modelcontract.Status(*value)
+}
+
+func schedulerSimulationUpstreamModel(value *string, fallback string) string {
+	if model := optionalStringValue(value); model != "" {
+		return model
+	}
+	return fallback
+}
+
+func boolPtrValue(value *bool) bool {
+	return value != nil && *value
+}
+
+func float64PtrFromFloat32(value *float32) *float64 {
+	if value == nil {
+		return nil
+	}
+	out := float64(*value)
+	return &out
+}
+
 func toAPICapabilityDefinition(def capabilitiescontract.Definition) apiopenapi.CapabilityDefinition {
 	return apiopenapi.CapabilityDefinition{
 		Category:       def.Category,

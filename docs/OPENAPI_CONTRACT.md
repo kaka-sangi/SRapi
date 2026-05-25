@@ -583,11 +583,10 @@ POST /api/v1/admin/scheduler/strategies
 GET  /api/v1/admin/scheduler/strategies/{id}
 PATCH /api/v1/admin/scheduler/strategies/{id}
 POST /api/v1/admin/scheduler/strategies/{id}/activate
-POST /api/v1/admin/scheduler/strategies/{id}/simulate
 GET  /api/v1/admin/scheduler/strategies/{id}/versions
 ```
 
-策略 descriptor、配置 schema、版本、dry-run、shadow decision 和回滚规则以 `SCHEDULER_STRATEGY_EXTENSION_SPEC.md` 为准。
+当前 dry-run / shadow comparison 使用 `POST /api/v1/admin/scheduler/simulate`，以同一请求 profile 显式传入 current 与 shadow strategy。策略 descriptor、配置 schema、版本、批量历史回放和回滚规则以 `SCHEDULER_STRATEGY_EXTENSION_SPEC.md` 为准。
 
 ### 16.8 Gateway
 
@@ -767,7 +766,7 @@ createAdminProvider
 testAdminProvider
 listAdminAccounts
 testAdminAccount
-simulateScheduler
+simulateSchedulerStrategy
 listSchedulerDecisions
 createChatCompletion
 listModels
