@@ -577,6 +577,7 @@ func (s *Service) buildDecision(req contract.ScheduleRequest, strategy contract.
 		RejectReasons:          rejectReasons,
 		StrategyWeights:        strategyWeightsPayload(strategy),
 		CompatibilityWarnings:  cloneStrings(req.Warnings),
+		SelectionRationale:     selectionRationale(selected, candidateCount, rejectedCount, scores, rejectReasons),
 		EstimatedCost:          estimatedCost,
 		Currency:               currency,
 		CreatedAt:              s.clock.Now(),
@@ -612,6 +613,137 @@ func (s *Service) buildRequestSnapshot(req contract.ScheduleRequest, strategy co
 		CompatibilityWarnings: cloneStrings(decision.CompatibilityWarnings),
 		CreatedAt:             decision.CreatedAt,
 	}
+}
+
+func selectionRationale(selected *contract.Candidate, candidateCount int, rejectedCount int, scores map[string]any, rejectReasons map[string]any) string {
+	if selected == nil {
+		if rejectedCount == 0 {
+			return "No account selected because no schedulable candidates were available."
+		}
+		reason, count := mostCommonRejectReason(rejectReasons)
+		if reason == "" {
+			return fmt.Sprintf("No account selected because %d of %d candidates were rejected.", rejectedCount, candidateCount)
+		}
+		return fmt.Sprintf("No account selected because %d of %d candidates were rejected; the most common reason was %s (%d).", rejectedCount, candidateCount, reason, count)
+	}
+
+	selectedScore, ok := scoreForAccount(scores, selected.Account.ID)
+	if !ok {
+		return fmt.Sprintf("Selected account %d on provider %d after %d eligible candidates were evaluated.", selected.Account.ID, selected.Provider.ID, candidateCount-rejectedCount)
+	}
+
+	factors := topScoreFactors(selectedScore, 2)
+	rationale := fmt.Sprintf("Selected account %d on provider %d with final score %.3f", selected.Account.ID, selected.Provider.ID, selectedScore.Final)
+	if len(factors) > 0 {
+		rationale += " driven by " + strings.Join(factors, " and ")
+	}
+	if nextScore, nextOK := runnerUpScore(scores, selected.Account.ID); nextOK {
+		rationale += fmt.Sprintf("; next best account %d scored %.3f", nextScore.AccountID, nextScore.Final)
+	}
+	if rejectedCount > 0 {
+		rationale += fmt.Sprintf("; %d of %d candidates were rejected", rejectedCount, candidateCount)
+	}
+	return rationale + "."
+}
+
+func scoreForAccount(scores map[string]any, accountID int) (scoreBreakdown, bool) {
+	value, ok := scores[accountKey(accountID)]
+	if !ok {
+		return scoreBreakdown{}, false
+	}
+	return scoreBreakdownValue(value)
+}
+
+func runnerUpScore(scores map[string]any, selectedAccountID int) (scoreBreakdown, bool) {
+	var runnerUp scoreBreakdown
+	found := false
+	for key, value := range scores {
+		if key == "pareto" {
+			continue
+		}
+		score, ok := scoreBreakdownValue(value)
+		if !ok || score.AccountID == selectedAccountID {
+			continue
+		}
+		if !found || score.Final > runnerUp.Final || (score.Final == runnerUp.Final && score.AccountID < runnerUp.AccountID) {
+			runnerUp = score
+			found = true
+		}
+	}
+	return runnerUp, found
+}
+
+func scoreBreakdownValue(value any) (scoreBreakdown, bool) {
+	switch typed := value.(type) {
+	case scoreBreakdown:
+		return typed, true
+	case map[string]any:
+		raw, err := json.Marshal(typed)
+		if err != nil {
+			return scoreBreakdown{}, false
+		}
+		var score scoreBreakdown
+		if err := json.Unmarshal(raw, &score); err != nil {
+			return scoreBreakdown{}, false
+		}
+		return score, score.AccountID > 0
+	default:
+		return scoreBreakdown{}, false
+	}
+}
+
+func topScoreFactors(score scoreBreakdown, limit int) []string {
+	type factor struct {
+		name  string
+		value float64
+	}
+	factors := []factor{
+		{name: "health", value: score.Health},
+		{name: "quota", value: score.Quota},
+		{name: "latency", value: score.Latency},
+		{name: "quality", value: score.Quality},
+		{name: "sticky", value: score.Sticky},
+		{name: "cache", value: score.Cache},
+		{name: "cost", value: score.Cost},
+		{name: "fairness", value: score.Fairness},
+	}
+	sort.SliceStable(factors, func(i, j int) bool {
+		if factors[i].value == factors[j].value {
+			return factors[i].name < factors[j].name
+		}
+		return factors[i].value > factors[j].value
+	})
+	out := make([]string, 0, limit)
+	for _, factor := range factors {
+		if factor.value <= 0 {
+			continue
+		}
+		out = append(out, fmt.Sprintf("%s %.2f", factor.name, factor.value))
+		if len(out) == limit {
+			break
+		}
+	}
+	return out
+}
+
+func mostCommonRejectReason(rejectReasons map[string]any) (string, int) {
+	counts := map[string]int{}
+	for _, value := range rejectReasons {
+		reason := strings.TrimSpace(fmt.Sprint(value))
+		if reason == "" {
+			continue
+		}
+		counts[reason]++
+	}
+	bestReason := ""
+	bestCount := 0
+	for reason, count := range counts {
+		if count > bestCount || (count == bestCount && reason < bestReason) {
+			bestReason = reason
+			bestCount = count
+		}
+	}
+	return bestReason, bestCount
 }
 
 func sanitizedRequestProfile(req contract.ScheduleRequest) map[string]any {

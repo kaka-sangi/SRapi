@@ -36,6 +36,7 @@ func (SchedulerDecision) Fields() []ent.Field {
 		field.JSON("reject_reasons_json", map[string]any{}).Optional(),
 		field.JSON("strategy_weights_json", map[string]any{}).Optional(),
 		field.JSON("compatibility_warnings_json", []string{}).Optional(),
+		field.String("selection_rationale").Default(""),
 		field.Bool("sticky_hit").Default(false),
 		field.Bool("cache_affinity_hit").Default(false),
 		field.String("estimated_cost").Default("0.00000000"),

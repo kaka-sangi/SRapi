@@ -31911,6 +31911,7 @@ type SchedulerDecisionMutation struct {
 	strategy_weights_json             *map[string]interface{}
 	compatibility_warnings_json       *[]string
 	appendcompatibility_warnings_json []string
+	selection_rationale               *string
 	sticky_hit                        *bool
 	cache_affinity_hit                *bool
 	estimated_cost                    *string
@@ -33081,6 +33082,42 @@ func (m *SchedulerDecisionMutation) ResetCompatibilityWarningsJSON() {
 	delete(m.clearedFields, schedulerdecision.FieldCompatibilityWarningsJSON)
 }
 
+// SetSelectionRationale sets the "selection_rationale" field.
+func (m *SchedulerDecisionMutation) SetSelectionRationale(s string) {
+	m.selection_rationale = &s
+}
+
+// SelectionRationale returns the value of the "selection_rationale" field in the mutation.
+func (m *SchedulerDecisionMutation) SelectionRationale() (r string, exists bool) {
+	v := m.selection_rationale
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSelectionRationale returns the old "selection_rationale" field's value of the SchedulerDecision entity.
+// If the SchedulerDecision object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SchedulerDecisionMutation) OldSelectionRationale(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSelectionRationale is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSelectionRationale requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSelectionRationale: %w", err)
+	}
+	return oldValue.SelectionRationale, nil
+}
+
+// ResetSelectionRationale resets all changes to the "selection_rationale" field.
+func (m *SchedulerDecisionMutation) ResetSelectionRationale() {
+	m.selection_rationale = nil
+}
+
 // SetStickyHit sets the "sticky_hit" field.
 func (m *SchedulerDecisionMutation) SetStickyHit(b bool) {
 	m.sticky_hit = &b
@@ -33259,7 +33296,7 @@ func (m *SchedulerDecisionMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *SchedulerDecisionMutation) Fields() []string {
-	fields := make([]string, 0, 26)
+	fields := make([]string, 0, 27)
 	if m.created_at != nil {
 		fields = append(fields, schedulerdecision.FieldCreatedAt)
 	}
@@ -33326,6 +33363,9 @@ func (m *SchedulerDecisionMutation) Fields() []string {
 	if m.compatibility_warnings_json != nil {
 		fields = append(fields, schedulerdecision.FieldCompatibilityWarningsJSON)
 	}
+	if m.selection_rationale != nil {
+		fields = append(fields, schedulerdecision.FieldSelectionRationale)
+	}
 	if m.sticky_hit != nil {
 		fields = append(fields, schedulerdecision.FieldStickyHit)
 	}
@@ -33390,6 +33430,8 @@ func (m *SchedulerDecisionMutation) Field(name string) (ent.Value, bool) {
 		return m.StrategyWeightsJSON()
 	case schedulerdecision.FieldCompatibilityWarningsJSON:
 		return m.CompatibilityWarningsJSON()
+	case schedulerdecision.FieldSelectionRationale:
+		return m.SelectionRationale()
 	case schedulerdecision.FieldStickyHit:
 		return m.StickyHit()
 	case schedulerdecision.FieldCacheAffinityHit:
@@ -33451,6 +33493,8 @@ func (m *SchedulerDecisionMutation) OldField(ctx context.Context, name string) (
 		return m.OldStrategyWeightsJSON(ctx)
 	case schedulerdecision.FieldCompatibilityWarningsJSON:
 		return m.OldCompatibilityWarningsJSON(ctx)
+	case schedulerdecision.FieldSelectionRationale:
+		return m.OldSelectionRationale(ctx)
 	case schedulerdecision.FieldStickyHit:
 		return m.OldStickyHit(ctx)
 	case schedulerdecision.FieldCacheAffinityHit:
@@ -33621,6 +33665,13 @@ func (m *SchedulerDecisionMutation) SetField(name string, value ent.Value) error
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetCompatibilityWarningsJSON(v)
+		return nil
+	case schedulerdecision.FieldSelectionRationale:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSelectionRationale(v)
 		return nil
 	case schedulerdecision.FieldStickyHit:
 		v, ok := value.(bool)
@@ -33908,6 +33959,9 @@ func (m *SchedulerDecisionMutation) ResetField(name string) error {
 		return nil
 	case schedulerdecision.FieldCompatibilityWarningsJSON:
 		m.ResetCompatibilityWarningsJSON()
+		return nil
+	case schedulerdecision.FieldSelectionRationale:
+		m.ResetSelectionRationale()
 		return nil
 	case schedulerdecision.FieldStickyHit:
 		m.ResetStickyHit()

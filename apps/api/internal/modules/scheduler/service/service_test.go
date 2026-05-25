@@ -78,6 +78,10 @@ func TestScheduleReturnsNoAvailableAccountWithStructuredReasons(t *testing.T) {
 	if result.Decision.SelectedAccountID != nil {
 		t.Fatalf("expected no selected account, got %+v", result.Decision.SelectedAccountID)
 	}
+	if !strings.Contains(result.Decision.SelectionRationale, "No account selected") ||
+		!strings.Contains(result.Decision.SelectionRationale, "5 of 5 candidates were rejected") {
+		t.Fatalf("expected rejected decision rationale, got %q", result.Decision.SelectionRationale)
+	}
 }
 
 func TestBalancedStrategyPrefersHealthyCandidate(t *testing.T) {
@@ -94,6 +98,10 @@ func TestBalancedStrategyPrefersHealthyCandidate(t *testing.T) {
 	}
 	if result.Candidate.Account.ID != 1 {
 		t.Fatalf("expected healthier account 1 selected, got %d", result.Candidate.Account.ID)
+	}
+	if !strings.Contains(result.Decision.SelectionRationale, "Selected account 1 on provider 1") ||
+		!strings.Contains(result.Decision.SelectionRationale, "next best account 2") {
+		t.Fatalf("expected selected decision rationale with runner-up evidence, got %q", result.Decision.SelectionRationale)
 	}
 	if len(result.Decision.RejectReasons) != 0 {
 		t.Fatalf("expected no hard filter rejects, got %+v", result.Decision.RejectReasons)

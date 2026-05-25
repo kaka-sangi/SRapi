@@ -1196,20 +1196,24 @@ func init() {
 	schedulerdecisionDescRejectedCount := schedulerdecisionFields[15].Descriptor()
 	// schedulerdecision.DefaultRejectedCount holds the default value on creation for the rejected_count field.
 	schedulerdecision.DefaultRejectedCount = schedulerdecisionDescRejectedCount.Default.(int)
+	// schedulerdecisionDescSelectionRationale is the schema descriptor for selection_rationale field.
+	schedulerdecisionDescSelectionRationale := schedulerdecisionFields[20].Descriptor()
+	// schedulerdecision.DefaultSelectionRationale holds the default value on creation for the selection_rationale field.
+	schedulerdecision.DefaultSelectionRationale = schedulerdecisionDescSelectionRationale.Default.(string)
 	// schedulerdecisionDescStickyHit is the schema descriptor for sticky_hit field.
-	schedulerdecisionDescStickyHit := schedulerdecisionFields[20].Descriptor()
+	schedulerdecisionDescStickyHit := schedulerdecisionFields[21].Descriptor()
 	// schedulerdecision.DefaultStickyHit holds the default value on creation for the sticky_hit field.
 	schedulerdecision.DefaultStickyHit = schedulerdecisionDescStickyHit.Default.(bool)
 	// schedulerdecisionDescCacheAffinityHit is the schema descriptor for cache_affinity_hit field.
-	schedulerdecisionDescCacheAffinityHit := schedulerdecisionFields[21].Descriptor()
+	schedulerdecisionDescCacheAffinityHit := schedulerdecisionFields[22].Descriptor()
 	// schedulerdecision.DefaultCacheAffinityHit holds the default value on creation for the cache_affinity_hit field.
 	schedulerdecision.DefaultCacheAffinityHit = schedulerdecisionDescCacheAffinityHit.Default.(bool)
 	// schedulerdecisionDescEstimatedCost is the schema descriptor for estimated_cost field.
-	schedulerdecisionDescEstimatedCost := schedulerdecisionFields[22].Descriptor()
+	schedulerdecisionDescEstimatedCost := schedulerdecisionFields[23].Descriptor()
 	// schedulerdecision.DefaultEstimatedCost holds the default value on creation for the estimated_cost field.
 	schedulerdecision.DefaultEstimatedCost = schedulerdecisionDescEstimatedCost.Default.(string)
 	// schedulerdecisionDescCurrency is the schema descriptor for currency field.
-	schedulerdecisionDescCurrency := schedulerdecisionFields[23].Descriptor()
+	schedulerdecisionDescCurrency := schedulerdecisionFields[24].Descriptor()
 	// schedulerdecision.DefaultCurrency holds the default value on creation for the currency field.
 	schedulerdecision.DefaultCurrency = schedulerdecisionDescCurrency.Default.(string)
 	schedulerfeedbackMixin := schema.SchedulerFeedback{}.Mixin()

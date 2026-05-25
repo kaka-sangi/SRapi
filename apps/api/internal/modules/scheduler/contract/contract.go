@@ -156,6 +156,7 @@ type Decision struct {
 	RejectReasons          map[string]any
 	StrategyWeights        map[string]any
 	CompatibilityWarnings  []string
+	SelectionRationale     string
 	StickyHit              bool
 	CacheAffinityHit       bool
 	EstimatedCost          string

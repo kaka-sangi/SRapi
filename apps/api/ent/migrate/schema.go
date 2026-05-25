@@ -1264,6 +1264,7 @@ var (
 		{Name: "reject_reasons_json", Type: field.TypeJSON, Nullable: true},
 		{Name: "strategy_weights_json", Type: field.TypeJSON, Nullable: true},
 		{Name: "compatibility_warnings_json", Type: field.TypeJSON, Nullable: true},
+		{Name: "selection_rationale", Type: field.TypeString, Default: ""},
 		{Name: "sticky_hit", Type: field.TypeBool, Default: false},
 		{Name: "cache_affinity_hit", Type: field.TypeBool, Default: false},
 		{Name: "estimated_cost", Type: field.TypeString, Default: "0.00000000"},

@@ -585,6 +585,7 @@ scores_json
 reject_reasons_json
 strategy_weights_json
 compatibility_warnings_json
+selection_rationale
 sticky_hit
 cache_affinity_hit
 estimated_cost
@@ -607,6 +608,7 @@ index(strategy, created_at)
 - 同一 Gateway 请求如果发生 fallback，必须使用同一个 `request_id` 和递增 `attempt_no`。
 - fallback attempt 必须通过 `fallback_from_decision_id` 指向上一条 `scheduler_decisions.id`，形成可审计链路。
 - 每个 attempt 必须保留当时的 `strategy_version` 与 `strategy_weights_json`。
+- `selection_rationale` 只保存非敏感解释文本，可引用账号 / Provider ID、分数和拒绝原因，不得保存 prompt、凭证、cookie、原始 affinity key 或上游响应正文。
 - 历史 decision 不得因策略权重变更而被重写。
 
 ### 10.2 scheduler_feedbacks

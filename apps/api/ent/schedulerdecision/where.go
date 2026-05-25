@@ -144,6 +144,11 @@ func RejectedCount(v int) predicate.SchedulerDecision {
 	return predicate.SchedulerDecision(sql.FieldEQ(FieldRejectedCount, v))
 }
 
+// SelectionRationale applies equality check predicate on the "selection_rationale" field. It's identical to SelectionRationaleEQ.
+func SelectionRationale(v string) predicate.SchedulerDecision {
+	return predicate.SchedulerDecision(sql.FieldEQ(FieldSelectionRationale, v))
+}
+
 // StickyHit applies equality check predicate on the "sticky_hit" field. It's identical to StickyHitEQ.
 func StickyHit(v bool) predicate.SchedulerDecision {
 	return predicate.SchedulerDecision(sql.FieldEQ(FieldStickyHit, v))
@@ -1152,6 +1157,71 @@ func CompatibilityWarningsJSONIsNil() predicate.SchedulerDecision {
 // CompatibilityWarningsJSONNotNil applies the NotNil predicate on the "compatibility_warnings_json" field.
 func CompatibilityWarningsJSONNotNil() predicate.SchedulerDecision {
 	return predicate.SchedulerDecision(sql.FieldNotNull(FieldCompatibilityWarningsJSON))
+}
+
+// SelectionRationaleEQ applies the EQ predicate on the "selection_rationale" field.
+func SelectionRationaleEQ(v string) predicate.SchedulerDecision {
+	return predicate.SchedulerDecision(sql.FieldEQ(FieldSelectionRationale, v))
+}
+
+// SelectionRationaleNEQ applies the NEQ predicate on the "selection_rationale" field.
+func SelectionRationaleNEQ(v string) predicate.SchedulerDecision {
+	return predicate.SchedulerDecision(sql.FieldNEQ(FieldSelectionRationale, v))
+}
+
+// SelectionRationaleIn applies the In predicate on the "selection_rationale" field.
+func SelectionRationaleIn(vs ...string) predicate.SchedulerDecision {
+	return predicate.SchedulerDecision(sql.FieldIn(FieldSelectionRationale, vs...))
+}
+
+// SelectionRationaleNotIn applies the NotIn predicate on the "selection_rationale" field.
+func SelectionRationaleNotIn(vs ...string) predicate.SchedulerDecision {
+	return predicate.SchedulerDecision(sql.FieldNotIn(FieldSelectionRationale, vs...))
+}
+
+// SelectionRationaleGT applies the GT predicate on the "selection_rationale" field.
+func SelectionRationaleGT(v string) predicate.SchedulerDecision {
+	return predicate.SchedulerDecision(sql.FieldGT(FieldSelectionRationale, v))
+}
+
+// SelectionRationaleGTE applies the GTE predicate on the "selection_rationale" field.
+func SelectionRationaleGTE(v string) predicate.SchedulerDecision {
+	return predicate.SchedulerDecision(sql.FieldGTE(FieldSelectionRationale, v))
+}
+
+// SelectionRationaleLT applies the LT predicate on the "selection_rationale" field.
+func SelectionRationaleLT(v string) predicate.SchedulerDecision {
+	return predicate.SchedulerDecision(sql.FieldLT(FieldSelectionRationale, v))
+}
+
+// SelectionRationaleLTE applies the LTE predicate on the "selection_rationale" field.
+func SelectionRationaleLTE(v string) predicate.SchedulerDecision {
+	return predicate.SchedulerDecision(sql.FieldLTE(FieldSelectionRationale, v))
+}
+
+// SelectionRationaleContains applies the Contains predicate on the "selection_rationale" field.
+func SelectionRationaleContains(v string) predicate.SchedulerDecision {
+	return predicate.SchedulerDecision(sql.FieldContains(FieldSelectionRationale, v))
+}
+
+// SelectionRationaleHasPrefix applies the HasPrefix predicate on the "selection_rationale" field.
+func SelectionRationaleHasPrefix(v string) predicate.SchedulerDecision {
+	return predicate.SchedulerDecision(sql.FieldHasPrefix(FieldSelectionRationale, v))
+}
+
+// SelectionRationaleHasSuffix applies the HasSuffix predicate on the "selection_rationale" field.
+func SelectionRationaleHasSuffix(v string) predicate.SchedulerDecision {
+	return predicate.SchedulerDecision(sql.FieldHasSuffix(FieldSelectionRationale, v))
+}
+
+// SelectionRationaleEqualFold applies the EqualFold predicate on the "selection_rationale" field.
+func SelectionRationaleEqualFold(v string) predicate.SchedulerDecision {
+	return predicate.SchedulerDecision(sql.FieldEqualFold(FieldSelectionRationale, v))
+}
+
+// SelectionRationaleContainsFold applies the ContainsFold predicate on the "selection_rationale" field.
+func SelectionRationaleContainsFold(v string) predicate.SchedulerDecision {
+	return predicate.SchedulerDecision(sql.FieldContainsFold(FieldSelectionRationale, v))
 }
 
 // StickyHitEQ applies the EQ predicate on the "sticky_hit" field.

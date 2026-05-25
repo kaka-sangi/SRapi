@@ -783,6 +783,7 @@ func toAPISchedulerDecision(decision schedulercontract.Decision) apiopenapi.Sche
 		Scores:                 jsonObject(decision.Scores),
 		SelectedAccountId:      optionalIDString(decision.SelectedAccountID),
 		SelectedProviderId:     optionalIDString(decision.SelectedProviderID),
+		SelectionRationale:     decision.SelectionRationale,
 		SourceEndpoint:         decision.SourceEndpoint,
 		SourceProtocol:         decision.SourceProtocol,
 		StickyHit:              decision.StickyHit,

@@ -95,6 +95,7 @@ func createDecision(ctx context.Context, client *ent.Client, input contract.Deci
 		SetRejectReasonsJSON(cloneMap(input.RejectReasons)).
 		SetStrategyWeightsJSON(cloneMap(input.StrategyWeights)).
 		SetCompatibilityWarningsJSON(cloneStrings(input.CompatibilityWarnings)).
+		SetSelectionRationale(input.SelectionRationale).
 		SetStickyHit(input.StickyHit).
 		SetCacheAffinityHit(input.CacheAffinityHit).
 		SetEstimatedCost(input.EstimatedCost).
@@ -417,6 +418,7 @@ func toDecision(row *ent.SchedulerDecision) contract.Decision {
 		RejectReasons:          cloneMap(row.RejectReasonsJSON),
 		StrategyWeights:        cloneMap(row.StrategyWeightsJSON),
 		CompatibilityWarnings:  cloneStrings(row.CompatibilityWarningsJSON),
+		SelectionRationale:     row.SelectionRationale,
 		StickyHit:              row.StickyHit,
 		CacheAffinityHit:       row.CacheAffinityHit,
 		EstimatedCost:          row.EstimatedCost,

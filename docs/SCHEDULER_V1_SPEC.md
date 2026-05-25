@@ -414,6 +414,7 @@ scores_json
 reject_reasons_json
 strategy_weights_json
 compatibility_warnings_json
+selection_rationale
 sticky_hit
 cache_affinity_hit
 estimated_cost
@@ -428,6 +429,7 @@ created_at
 - fallback attempt 必须保存 `fallback_from_decision_id`，指向触发 fallback 的上一条 decision。
 - 数据库唯一约束应为 `unique(request_id, attempt_no)`。
 - `strategy_weights_json` 必须保存当次决策使用的权重快照。
+- `selection_rationale` 必须是短文本解释，只能包含账号 / Provider ID、分数、策略名和拒绝原因等低敏证据。
 
 `scores_json` 至少包含每个候选账号的：
 

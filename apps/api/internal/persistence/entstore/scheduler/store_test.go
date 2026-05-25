@@ -125,6 +125,7 @@ func TestStoreCreatesDecisionWithRequestSnapshot(t *testing.T) {
 		CandidateCount:     1,
 		Scores:             map[string]any{"account_10": map[string]any{"final_score": 0.9}},
 		StrategyWeights:    map[string]any{"health": 0.3},
+		SelectionRationale: "Selected account 10 on provider 20 with final score 0.900.",
 		CreatedAt:          now,
 	}, contract.RequestSnapshot{
 		RequestProfile: map[string]any{
@@ -152,6 +153,9 @@ func TestStoreCreatesDecisionWithRequestSnapshot(t *testing.T) {
 	if snapshot.SelectedAccountID == nil || *snapshot.SelectedAccountID != selectedAccountID {
 		t.Fatalf("expected selected account copied from decision, got %+v", snapshot)
 	}
+	if decision.SelectionRationale != "Selected account 10 on provider 20 with final score 0.900." {
+		t.Fatalf("expected decision rationale round trip on create, got %+v", decision)
+	}
 
 	snapshots, err := store.ListRequestSnapshots(ctx)
 	if err != nil {
@@ -166,6 +170,13 @@ func TestStoreCreatesDecisionWithRequestSnapshot(t *testing.T) {
 	}
 	if loaded.CandidateSnapshot[0].ProviderConfig["base_url"] != "https://provider.example" {
 		t.Fatalf("expected provider config round trip, got %+v", loaded.CandidateSnapshot[0].ProviderConfig)
+	}
+	decisions, err := store.ListDecisions(ctx)
+	if err != nil {
+		t.Fatalf("list decisions: %v", err)
+	}
+	if len(decisions) != 1 || decisions[0].SelectionRationale != decision.SelectionRationale {
+		t.Fatalf("expected listed decision rationale, got %+v", decisions)
 	}
 }
 

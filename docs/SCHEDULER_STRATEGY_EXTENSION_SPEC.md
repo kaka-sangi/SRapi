@@ -230,6 +230,7 @@ strategy
 strategy_version
 strategy_config_hash
 strategy_weights_json
+selection_rationale
 ```
 
 K1.6.2 起新的真实 Scheduler attempt 会同步写入 `scheduler_request_snapshots`，

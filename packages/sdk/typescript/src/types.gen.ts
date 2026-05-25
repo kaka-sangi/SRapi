@@ -1990,6 +1990,10 @@ export type SchedulerDecision = {
     reject_reasons: JsonObject;
     strategy_weights: JsonObject;
     compatibility_warnings: Array<string>;
+    /**
+     * Non-sensitive scheduler explanation for why the selected account won, or why no account was selected.
+     */
+    selection_rationale: string;
     sticky_hit: boolean;
     cache_affinity_hit: boolean;
     estimated_cost: string;

@@ -12014,6 +12014,7 @@ components:
         - reject_reasons
         - strategy_weights
         - compatibility_warnings
+        - selection_rationale
         - sticky_hit
         - cache_affinity_hit
         - estimated_cost
@@ -12079,6 +12080,9 @@ components:
           items:
             type: string
           default: []
+        selection_rationale:
+          type: string
+          description: Non-sensitive scheduler explanation for why the selected account won, or why no account was selected.
         sticky_hit:
           type: boolean
         cache_affinity_hit:

@@ -88,6 +88,7 @@ last_completed:
 - K1.6.4: Scoped real-traffic Scheduler strategy rollout now lets admin settings enable a shadow Scheduler strategy for real Gateway requests with a stable rollout percentage, optional canonical model / alias scope, and optional API key prefix hash scope. Gateway computes sanitized rollout inputs, Scheduler applies the provider-neutral split before resolving the active strategy, and decisions/snapshots persist only hash/bucket/percent/selection evidence without raw API keys, rollout keys, prompts, cookies, or credentials.
 - K1.7: Admin strategy comparison UI now exposes `/admin/ops/strategy`, uses the generated TypeScript SDK through `adminApi` and `useAdminSchedulerReplay`, calls `POST /api/v1/admin/scheduler/replay`, renders strategy/time/model/request replay controls, summary cards, Recharts current-vs-shadow score curves, winner distributions, and per-snapshot replay evidence, and is included in admin smoke targets.
 - K1.4: QualityEval now adds encrypted `quality_eval_samples`, persisted `quality_evaluations`, contract/service/memory/Ent stores, an hourly worker, and OpenAI-compatible Chat Completions JSON-mode judge support. Gateway captures content-safety-sanitized text samples only when `QUALITY_EVAL_ENABLED=true`, worker samples 1% by stable hash and records correctness/coherence/safety rubric, and Scheduler candidates receive recent account+model aggregate `quality_score` / `quality_tier` evidence.
+- K1.8: Scheduler explainability now persists `scheduler_decisions.selection_rationale`, exposes it through Admin Scheduler Decisions OpenAPI/Go/TypeScript SDK responses, generates short non-sensitive selected/rejected decision explanations from score breakdown and reject evidence, and adds `000011_scheduler_decision_selection_rationale` migration coverage.
 - C3.1: Workspace persistence now adds `workspaces`, nullable `users.workspace_id`, nullable `api_keys.workspace_id`, `000008_workspaces_and_user_workspace_id` up/down migrations, User store personal workspace creation, API Key workspace inheritance, and docs/spec migration parity.
 - C3.2: Role permission persistence now adds `roles.permissions_json`, admin roles APIs, merged user session permissions, `entitlements` query-cache rows materialized from active subscription snapshots, `000009_role_permissions_and_entitlements` up/down migrations, and an HTTP regression proving `payment_order:read` grants read-only admin payment order access while plain users are rejected.
 - B1.2.1: Usage charging performance indexing now replaces the single-column `usage_logs(charged_at)` index with `usage_logs(charged_at, success, created_at)`, makes `ListPendingUsageCharges` scan oldest pending usage first, and adds a persistence regression for deterministic pending charge ordering.
@@ -96,19 +97,19 @@ last_completed:
 
 current:
 
-- package: C1 observability
-- status: structured trace service spans and SLO burn-rate evaluator are implemented; production QualityEval smoke still pending real judge credential/environment
-- objective: continue the critical path after SLO evaluator wiring without letting docs/specs drift.
+- package: K1 explainability
+- status: Scheduler selection rationale persistence/API exposure is implemented; production QualityEval smoke still pending real judge credential/environment
+- objective: continue the critical path after explainability without letting docs/specs drift.
 
-next_recommended: Continue with the next pending backend package from `specs/silly-stirring-turtle.md`, prioritizing C1 Jaeger/Tempo collector smoke or B2 payment SDK adapters unless the user redirects.
+next_recommended: Continue with the next pending backend package from `specs/silly-stirring-turtle.md`, prioritizing C1 Jaeger/Tempo collector smoke, B2 Alipay/WeChat payment SDK adapters, or remaining production smoke/benchmark work unless the user redirects.
 
 last_gates:
 
-- `git diff --check`: pass
-- `cd apps/api && go test ./internal/platform/otel ./internal/testsupport/oteltest ./internal/modules/accounts/service ./internal/modules/payments/service ./internal/modules/scheduler/service ./internal/httpserver`: pass
-- `make architecture-check`: pass
-- `cd apps/api && go test ./internal/codequality`: pass
-- `cd apps/api && go test ./...`: pass
+- `cd apps/api && go test ./internal/modules/scheduler/service ./internal/persistence/entstore/scheduler`: pass
+- `make openapi-codegen-check`: pass
+- `make openapi-ts-codegen-check`: pass
+- `make ent-generate-check`: pass
+- `make migration-check`: pass
 - `make check`: pass
 
 notes:

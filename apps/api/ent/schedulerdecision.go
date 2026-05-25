@@ -62,6 +62,8 @@ type SchedulerDecision struct {
 	StrategyWeightsJSON map[string]interface{} `json:"strategy_weights_json,omitempty"`
 	// CompatibilityWarningsJSON holds the value of the "compatibility_warnings_json" field.
 	CompatibilityWarningsJSON []string `json:"compatibility_warnings_json,omitempty"`
+	// SelectionRationale holds the value of the "selection_rationale" field.
+	SelectionRationale string `json:"selection_rationale,omitempty"`
 	// StickyHit holds the value of the "sticky_hit" field.
 	StickyHit bool `json:"sticky_hit,omitempty"`
 	// CacheAffinityHit holds the value of the "cache_affinity_hit" field.
@@ -84,7 +86,7 @@ func (*SchedulerDecision) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case schedulerdecision.FieldID, schedulerdecision.FieldAttemptNo, schedulerdecision.FieldUserID, schedulerdecision.FieldAPIKeyID, schedulerdecision.FieldFallbackFromDecisionID, schedulerdecision.FieldSelectedProviderID, schedulerdecision.FieldSelectedAccountID, schedulerdecision.FieldCandidateCount, schedulerdecision.FieldRejectedCount:
 			values[i] = new(sql.NullInt64)
-		case schedulerdecision.FieldRequestID, schedulerdecision.FieldSourceProtocol, schedulerdecision.FieldSourceEndpoint, schedulerdecision.FieldTargetProtocol, schedulerdecision.FieldModel, schedulerdecision.FieldStrategy, schedulerdecision.FieldStrategyVersion, schedulerdecision.FieldStrategyConfigHash, schedulerdecision.FieldEstimatedCost, schedulerdecision.FieldCurrency:
+		case schedulerdecision.FieldRequestID, schedulerdecision.FieldSourceProtocol, schedulerdecision.FieldSourceEndpoint, schedulerdecision.FieldTargetProtocol, schedulerdecision.FieldModel, schedulerdecision.FieldStrategy, schedulerdecision.FieldStrategyVersion, schedulerdecision.FieldStrategyConfigHash, schedulerdecision.FieldSelectionRationale, schedulerdecision.FieldEstimatedCost, schedulerdecision.FieldCurrency:
 			values[i] = new(sql.NullString)
 		case schedulerdecision.FieldCreatedAt, schedulerdecision.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -252,6 +254,12 @@ func (_m *SchedulerDecision) assignValues(columns []string, values []any) error 
 					return fmt.Errorf("unmarshal field compatibility_warnings_json: %w", err)
 				}
 			}
+		case schedulerdecision.FieldSelectionRationale:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field selection_rationale", values[i])
+			} else if value.Valid {
+				_m.SelectionRationale = value.String
+			}
 		case schedulerdecision.FieldStickyHit:
 			if value, ok := values[i].(*sql.NullBool); !ok {
 				return fmt.Errorf("unexpected type %T for field sticky_hit", values[i])
@@ -383,6 +391,9 @@ func (_m *SchedulerDecision) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("compatibility_warnings_json=")
 	builder.WriteString(fmt.Sprintf("%v", _m.CompatibilityWarningsJSON))
+	builder.WriteString(", ")
+	builder.WriteString("selection_rationale=")
+	builder.WriteString(_m.SelectionRationale)
 	builder.WriteString(", ")
 	builder.WriteString("sticky_hit=")
 	builder.WriteString(fmt.Sprintf("%v", _m.StickyHit))

@@ -387,6 +387,20 @@ func (_u *SchedulerDecisionUpdate) ClearCompatibilityWarningsJSON() *SchedulerDe
 	return _u
 }
 
+// SetSelectionRationale sets the "selection_rationale" field.
+func (_u *SchedulerDecisionUpdate) SetSelectionRationale(v string) *SchedulerDecisionUpdate {
+	_u.mutation.SetSelectionRationale(v)
+	return _u
+}
+
+// SetNillableSelectionRationale sets the "selection_rationale" field if the given value is not nil.
+func (_u *SchedulerDecisionUpdate) SetNillableSelectionRationale(v *string) *SchedulerDecisionUpdate {
+	if v != nil {
+		_u.SetSelectionRationale(*v)
+	}
+	return _u
+}
+
 // SetStickyHit sets the "sticky_hit" field.
 func (_u *SchedulerDecisionUpdate) SetStickyHit(v bool) *SchedulerDecisionUpdate {
 	_u.mutation.SetStickyHit(v)
@@ -618,6 +632,9 @@ func (_u *SchedulerDecisionUpdate) sqlSave(ctx context.Context) (_node int, err 
 	}
 	if _u.mutation.CompatibilityWarningsJSONCleared() {
 		_spec.ClearField(schedulerdecision.FieldCompatibilityWarningsJSON, field.TypeJSON)
+	}
+	if value, ok := _u.mutation.SelectionRationale(); ok {
+		_spec.SetField(schedulerdecision.FieldSelectionRationale, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.StickyHit(); ok {
 		_spec.SetField(schedulerdecision.FieldStickyHit, field.TypeBool, value)
@@ -1009,6 +1026,20 @@ func (_u *SchedulerDecisionUpdateOne) ClearCompatibilityWarningsJSON() *Schedule
 	return _u
 }
 
+// SetSelectionRationale sets the "selection_rationale" field.
+func (_u *SchedulerDecisionUpdateOne) SetSelectionRationale(v string) *SchedulerDecisionUpdateOne {
+	_u.mutation.SetSelectionRationale(v)
+	return _u
+}
+
+// SetNillableSelectionRationale sets the "selection_rationale" field if the given value is not nil.
+func (_u *SchedulerDecisionUpdateOne) SetNillableSelectionRationale(v *string) *SchedulerDecisionUpdateOne {
+	if v != nil {
+		_u.SetSelectionRationale(*v)
+	}
+	return _u
+}
+
 // SetStickyHit sets the "sticky_hit" field.
 func (_u *SchedulerDecisionUpdateOne) SetStickyHit(v bool) *SchedulerDecisionUpdateOne {
 	_u.mutation.SetStickyHit(v)
@@ -1270,6 +1301,9 @@ func (_u *SchedulerDecisionUpdateOne) sqlSave(ctx context.Context) (_node *Sched
 	}
 	if _u.mutation.CompatibilityWarningsJSONCleared() {
 		_spec.ClearField(schedulerdecision.FieldCompatibilityWarningsJSON, field.TypeJSON)
+	}
+	if value, ok := _u.mutation.SelectionRationale(); ok {
+		_spec.SetField(schedulerdecision.FieldSelectionRationale, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.StickyHit(); ok {
 		_spec.SetField(schedulerdecision.FieldStickyHit, field.TypeBool, value)

@@ -57,6 +57,8 @@ const (
 	FieldStrategyWeightsJSON = "strategy_weights_json"
 	// FieldCompatibilityWarningsJSON holds the string denoting the compatibility_warnings_json field in the database.
 	FieldCompatibilityWarningsJSON = "compatibility_warnings_json"
+	// FieldSelectionRationale holds the string denoting the selection_rationale field in the database.
+	FieldSelectionRationale = "selection_rationale"
 	// FieldStickyHit holds the string denoting the sticky_hit field in the database.
 	FieldStickyHit = "sticky_hit"
 	// FieldCacheAffinityHit holds the string denoting the cache_affinity_hit field in the database.
@@ -94,6 +96,7 @@ var Columns = []string{
 	FieldRejectReasonsJSON,
 	FieldStrategyWeightsJSON,
 	FieldCompatibilityWarningsJSON,
+	FieldSelectionRationale,
 	FieldStickyHit,
 	FieldCacheAffinityHit,
 	FieldEstimatedCost,
@@ -139,6 +142,8 @@ var (
 	DefaultCandidateCount int
 	// DefaultRejectedCount holds the default value on creation for the "rejected_count" field.
 	DefaultRejectedCount int
+	// DefaultSelectionRationale holds the default value on creation for the "selection_rationale" field.
+	DefaultSelectionRationale string
 	// DefaultStickyHit holds the default value on creation for the "sticky_hit" field.
 	DefaultStickyHit bool
 	// DefaultCacheAffinityHit holds the default value on creation for the "cache_affinity_hit" field.
@@ -245,6 +250,11 @@ func ByCandidateCount(opts ...sql.OrderTermOption) OrderOption {
 // ByRejectedCount orders the results by the rejected_count field.
 func ByRejectedCount(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldRejectedCount, opts...).ToFunc()
+}
+
+// BySelectionRationale orders the results by the selection_rationale field.
+func BySelectionRationale(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSelectionRationale, opts...).ToFunc()
 }
 
 // ByStickyHit orders the results by the sticky_hit field.

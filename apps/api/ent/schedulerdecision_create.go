@@ -272,6 +272,20 @@ func (_c *SchedulerDecisionCreate) SetCompatibilityWarningsJSON(v []string) *Sch
 	return _c
 }
 
+// SetSelectionRationale sets the "selection_rationale" field.
+func (_c *SchedulerDecisionCreate) SetSelectionRationale(v string) *SchedulerDecisionCreate {
+	_c.mutation.SetSelectionRationale(v)
+	return _c
+}
+
+// SetNillableSelectionRationale sets the "selection_rationale" field if the given value is not nil.
+func (_c *SchedulerDecisionCreate) SetNillableSelectionRationale(v *string) *SchedulerDecisionCreate {
+	if v != nil {
+		_c.SetSelectionRationale(*v)
+	}
+	return _c
+}
+
 // SetStickyHit sets the "sticky_hit" field.
 func (_c *SchedulerDecisionCreate) SetStickyHit(v bool) *SchedulerDecisionCreate {
 	_c.mutation.SetStickyHit(v)
@@ -411,6 +425,10 @@ func (_c *SchedulerDecisionCreate) defaults() {
 		v := schedulerdecision.DefaultRejectedCount
 		_c.mutation.SetRejectedCount(v)
 	}
+	if _, ok := _c.mutation.SelectionRationale(); !ok {
+		v := schedulerdecision.DefaultSelectionRationale
+		_c.mutation.SetSelectionRationale(v)
+	}
 	if _, ok := _c.mutation.StickyHit(); !ok {
 		v := schedulerdecision.DefaultStickyHit
 		_c.mutation.SetStickyHit(v)
@@ -480,6 +498,9 @@ func (_c *SchedulerDecisionCreate) check() error {
 	}
 	if _, ok := _c.mutation.RejectedCount(); !ok {
 		return &ValidationError{Name: "rejected_count", err: errors.New(`ent: missing required field "SchedulerDecision.rejected_count"`)}
+	}
+	if _, ok := _c.mutation.SelectionRationale(); !ok {
+		return &ValidationError{Name: "selection_rationale", err: errors.New(`ent: missing required field "SchedulerDecision.selection_rationale"`)}
 	}
 	if _, ok := _c.mutation.StickyHit(); !ok {
 		return &ValidationError{Name: "sticky_hit", err: errors.New(`ent: missing required field "SchedulerDecision.sticky_hit"`)}
@@ -606,6 +627,10 @@ func (_c *SchedulerDecisionCreate) createSpec() (*SchedulerDecision, *sqlgraph.C
 	if value, ok := _c.mutation.CompatibilityWarningsJSON(); ok {
 		_spec.SetField(schedulerdecision.FieldCompatibilityWarningsJSON, field.TypeJSON, value)
 		_node.CompatibilityWarningsJSON = value
+	}
+	if value, ok := _c.mutation.SelectionRationale(); ok {
+		_spec.SetField(schedulerdecision.FieldSelectionRationale, field.TypeString, value)
+		_node.SelectionRationale = value
 	}
 	if value, ok := _c.mutation.StickyHit(); ok {
 		_spec.SetField(schedulerdecision.FieldStickyHit, field.TypeBool, value)
