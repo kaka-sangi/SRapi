@@ -237,11 +237,11 @@ latency_budget_ms = 10000
 
 ### 7.4 Cost Score
 
+候选账号可通过显式 mapping metadata 提供 `relative_cost`，也可由近 30 天成功 `scheduler_feedbacks` 的 account+model 聚合信号补齐。聚合信号按实际成本和 token 计算：
+
 ```txt
-estimated_cost =
-  estimated_input_tokens  * input_price_per_token
-+ estimated_output_tokens * output_price_per_token
-- estimated_cached_tokens * cache_discount_per_token
+cost_per_1k_tokens =
+  sum(actual_cost) / sum(input_tokens + output_tokens + cached_tokens) * 1000
 ```
 
 ```txt
@@ -254,7 +254,7 @@ cost_score = 1 - normalized_cost
 normalized_cost = (candidate_cost - min_cost) / max(max_cost - min_cost, epsilon)
 ```
 
-如果所有候选成本相同，`cost_score = 0.5`。
+如果所有候选成本相同，`cost_score = 0.5`。没有显式 metadata 且没有历史反馈的候选保留默认成本分，避免新账号被误判为最低或最高成本。
 
 ### 7.5 Sticky Score
 
@@ -269,10 +269,10 @@ Hard sticky 不能绕过硬过滤。
 
 ### 7.6 Cache Score
 
-MVP 可以只实现 cache-only 分数，不强制落库。
+候选账号可通过显式 mapping/account/provider metadata 提供 `cache_score`、`cache_hit_rate` 等缓存信号，也可由近 30 天成功 `scheduler_feedbacks` 的 account+model 聚合信号补齐。当前落库信号按 cached token 比例计算：
 
 ```txt
-cache_score = clamp(estimated_cache_saving / estimated_total_cost, 0, 1)
+cache_score = cached_tokens / max(input_tokens + cached_tokens, total_tokens)
 ```
 
 当 `health_score < 0.40` 时，cache_score 不得使该账号胜出，除非无其他账号且策略显式允许。

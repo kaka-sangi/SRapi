@@ -10,7 +10,9 @@ import (
 	"sync"
 	"time"
 
+	"entgo.io/ent/dialect/sql"
 	"github.com/srapi/srapi/apps/api/ent"
+	"github.com/srapi/srapi/apps/api/ent/predicate"
 	entschedulerdecision "github.com/srapi/srapi/apps/api/ent/schedulerdecision"
 	entschedulerfeedback "github.com/srapi/srapi/apps/api/ent/schedulerfeedback"
 	entschedulerrequestsnapshot "github.com/srapi/srapi/apps/api/ent/schedulerrequestsnapshot"
@@ -225,6 +227,86 @@ func (s *Store) ListFeedbacks(ctx context.Context) ([]contract.Feedback, error) 
 		out = append(out, toFeedback(row))
 	}
 	return out, nil
+}
+
+func (s *Store) ListFeedbackSignals(ctx context.Context, query contract.FeedbackSignalQuery) ([]contract.FeedbackSignal, error) {
+	if len(query.AccountIDs) == 0 {
+		return []contract.FeedbackSignal{}, nil
+	}
+	predicates := []predicate.SchedulerFeedback{
+		entschedulerfeedback.SuccessEQ(true),
+		entschedulerfeedback.AccountIDIn(query.AccountIDs...),
+		entschedulerfeedback.Or(
+			entschedulerfeedback.InputTokensGT(0),
+			entschedulerfeedback.OutputTokensGT(0),
+			entschedulerfeedback.CachedTokensGT(0),
+		),
+	}
+	if query.Model != "" {
+		predicates = append(predicates, entschedulerfeedback.ModelEQ(query.Model))
+	}
+	if !query.Since.IsZero() {
+		predicates = append(predicates, entschedulerfeedback.CreatedAtGTE(query.Since))
+	}
+	var rows []feedbackSignalRow
+	err := s.client.SchedulerFeedback.Query().
+		Where(predicates...).
+		GroupBy(entschedulerfeedback.FieldAccountID).
+		Aggregate(
+			ent.As(ent.Count(), "sample_count"),
+			ent.As(ent.Sum(entschedulerfeedback.FieldInputTokens), "input_tokens"),
+			ent.As(ent.Sum(entschedulerfeedback.FieldOutputTokens), "output_tokens"),
+			ent.As(ent.Sum(entschedulerfeedback.FieldCachedTokens), "cached_tokens"),
+			ent.As(sumActualCost(), "total_cost"),
+		).
+		Scan(ctx, &rows)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]contract.FeedbackSignal, 0, len(rows))
+	for _, row := range rows {
+		totalTokens := row.InputTokens + row.OutputTokens + row.CachedTokens
+		if row.AccountID <= 0 || row.SampleCount <= 0 || totalTokens <= 0 {
+			continue
+		}
+		signal := contract.FeedbackSignal{
+			AccountID:    row.AccountID,
+			SampleCount:  int(row.SampleCount),
+			InputTokens:  int(row.InputTokens),
+			OutputTokens: int(row.OutputTokens),
+			CachedTokens: int(row.CachedTokens),
+		}
+		if row.TotalCost > 0 {
+			signal.CostPer1KTokens = row.TotalCost / float64(totalTokens) * 1000
+			signal.HasCost = true
+		}
+		cacheBasis := row.InputTokens + row.CachedTokens
+		if cacheBasis <= 0 {
+			cacheBasis = totalTokens
+		}
+		if cacheBasis > 0 {
+			signal.CacheHitRate = float64(row.CachedTokens) / float64(cacheBasis)
+			signal.HasCache = true
+		}
+		out = append(out, signal)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].AccountID < out[j].AccountID })
+	return out, nil
+}
+
+type feedbackSignalRow struct {
+	AccountID    int     `sql:"account_id"`
+	SampleCount  int64   `sql:"sample_count"`
+	InputTokens  int64   `sql:"input_tokens"`
+	OutputTokens int64   `sql:"output_tokens"`
+	CachedTokens int64   `sql:"cached_tokens"`
+	TotalCost    float64 `sql:"total_cost"`
+}
+
+func sumActualCost() ent.AggregateFunc {
+	return func(selector *sql.Selector) string {
+		return "SUM(CAST(" + selector.C(entschedulerfeedback.FieldActualCost) + " AS DOUBLE PRECISION))"
+	}
 }
 
 func (s *Store) ListActiveStrategies(ctx context.Context) ([]contract.StrategyDescriptor, error) {

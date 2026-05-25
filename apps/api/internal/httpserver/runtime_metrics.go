@@ -39,6 +39,7 @@ type runtimeMetricDescs struct {
 	gatewayErrors                 *prometheus.Desc
 	gatewayFailover               *prometheus.Desc
 	schedulerDecisions            *prometheus.Desc
+	schedulerCostScore            *prometheus.Desc
 	providerErrors                *prometheus.Desc
 	providerProbeLatency          *prometheus.Desc
 	usageTokens                   *prometheus.Desc
@@ -109,6 +110,12 @@ func newRuntimeMetricsCollector(ctx context.Context, rt *runtimeState) *runtimeM
 				"srapi_scheduler_decisions_total",
 				"Scheduler decisions by strategy and outcome.",
 				[]string{"strategy", "outcome", "reason"},
+				nil,
+			),
+			schedulerCostScore: prometheus.NewDesc(
+				"srapi_scheduler_cost_score_avg",
+				"Average scheduler cost score by strategy, derived from persisted decision score breakdowns.",
+				[]string{"strategy"},
 				nil,
 			),
 			providerErrors: prometheus.NewDesc(
@@ -183,6 +190,7 @@ func (d runtimeMetricDescs) all() []*prometheus.Desc {
 		d.gatewayErrors,
 		d.gatewayFailover,
 		d.schedulerDecisions,
+		d.schedulerCostScore,
 		d.providerErrors,
 		d.providerProbeLatency,
 		d.usageTokens,
@@ -246,6 +254,10 @@ func (c *runtimeMetricsCollector) collectSchedulerMetrics(ch chan<- prometheus.M
 		for _, key := range sortedKeys(counts) {
 			labels := strings.Split(key, "\xff")
 			emitConstMetric(ch, emitted, "srapi_scheduler_decisions_total", c.descs.schedulerDecisions, prometheus.CounterValue, float64(counts[key]), labels...)
+		}
+		costScores := schedulerCostScoreAverages(decisions)
+		for _, strategy := range sortedKeys(costScores) {
+			emitConstMetric(ch, emitted, "srapi_scheduler_cost_score_avg", c.descs.schedulerCostScore, prometheus.GaugeValue, costScores[strategy], strategy)
 		}
 	}
 	leases, err := c.rt.scheduler.ListLeases(c.ctx)
@@ -358,6 +370,9 @@ func (c *runtimeMetricsCollector) collectBaselineMetrics(ch chan<- prometheus.Me
 	if !emitted["srapi_scheduler_decisions_total"] {
 		emitConstMetric(ch, emitted, "srapi_scheduler_decisions_total", c.descs.schedulerDecisions, prometheus.CounterValue, 0, "unknown", "selected", "selected")
 	}
+	if !emitted["srapi_scheduler_cost_score_avg"] {
+		emitConstMetric(ch, emitted, "srapi_scheduler_cost_score_avg", c.descs.schedulerCostScore, prometheus.GaugeValue, 0, "unknown")
+	}
 	if !emitted["srapi_provider_errors_total"] {
 		emitConstMetric(ch, emitted, "srapi_provider_errors_total", c.descs.providerErrors, prometheus.CounterValue, 0, "unknown", "unknown")
 	}
@@ -463,6 +478,62 @@ func schedulerDecisionCounts(decisions []schedulercontract.Decision) map[string]
 		counts[strings.Join([]string{string(decision.Strategy), outcome, reason}, "\xff")]++
 	}
 	return counts
+}
+
+func schedulerCostScoreAverages(decisions []schedulercontract.Decision) map[string]float64 {
+	type aggregate struct {
+		sum   float64
+		count int
+	}
+	aggregates := map[string]aggregate{}
+	for _, decision := range decisions {
+		strategy := metricLabelValue(string(decision.Strategy), "unknown")
+		for _, score := range decision.Scores {
+			costScore, ok := scoreCostValue(score)
+			if !ok {
+				continue
+			}
+			aggregate := aggregates[strategy]
+			aggregate.sum += costScore
+			aggregate.count++
+			aggregates[strategy] = aggregate
+		}
+	}
+	out := make(map[string]float64, len(aggregates))
+	for strategy, aggregate := range aggregates {
+		if aggregate.count == 0 {
+			continue
+		}
+		out[strategy] = aggregate.sum / float64(aggregate.count)
+	}
+	return out
+}
+
+func scoreCostValue(score any) (float64, bool) {
+	values, ok := score.(map[string]any)
+	if !ok {
+		return 0, false
+	}
+	value, ok := values["cost_score"]
+	if !ok {
+		return 0, false
+	}
+	return metricFloatValue(value)
+}
+
+func metricFloatValue(value any) (float64, bool) {
+	switch typed := value.(type) {
+	case float64:
+		return typed, true
+	case float32:
+		return float64(typed), true
+	case int:
+		return float64(typed), true
+	case int64:
+		return float64(typed), true
+	default:
+		return 0, false
+	}
 }
 
 func pendingLeaseCount(leases []schedulercontract.Lease) int {

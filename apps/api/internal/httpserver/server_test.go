@@ -200,6 +200,7 @@ func TestMetricsExposeBaselineSRapiSignals(t *testing.T) {
 		"srapi_gateway_errors_total",
 		"srapi_gateway_failover_total",
 		"srapi_scheduler_decisions_total",
+		"srapi_scheduler_cost_score_avg",
 		"srapi_provider_errors_total",
 		"srapi_provider_probe_latency_seconds_bucket",
 		"srapi_usage_tokens_total",

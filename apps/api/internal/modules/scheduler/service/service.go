@@ -30,6 +30,8 @@ type SystemClock struct{}
 
 func (SystemClock) Now() time.Time { return time.Now().UTC() }
 
+const feedbackSignalWindow = 30 * 24 * time.Hour
+
 type Service struct {
 	store    contract.Store
 	clock    Clock
@@ -247,6 +249,9 @@ func (s *Service) Schedule(ctx context.Context, req contract.ScheduleRequest) (r
 	}
 	if err := normalizeScheduleCapabilities(&req); err != nil {
 		return contract.ScheduleResult{}, ErrInvalidInput
+	}
+	if err := s.enrichFeedbackSignals(ctx, &req); err != nil {
+		return contract.ScheduleResult{}, err
 	}
 	if err := s.RefreshStrategies(ctx); err != nil {
 		return contract.ScheduleResult{}, err
@@ -1332,6 +1337,128 @@ func costScore(candidate contract.Candidate) float64 {
 		}
 	}
 	return 0.6
+}
+
+func (s *Service) enrichFeedbackSignals(ctx context.Context, req *contract.ScheduleRequest) error {
+	if req == nil || len(req.Candidates) == 0 {
+		return nil
+	}
+	accountIDs := candidateAccountIDs(req.Candidates)
+	if len(accountIDs) == 0 {
+		return nil
+	}
+	signalRows, err := s.store.ListFeedbackSignals(ctx, contract.FeedbackSignalQuery{
+		AccountIDs: accountIDs,
+		Model:      strings.TrimSpace(req.Model),
+		Since:      s.clock.Now().Add(-feedbackSignalWindow),
+	})
+	if err != nil {
+		return err
+	}
+	signals := feedbackSignalMap(signalRows)
+	if len(signals) == 0 {
+		return nil
+	}
+	minCost, maxCost, hasCostRange := feedbackCostRange(signals)
+	for idx := range req.Candidates {
+		signal, ok := signals[req.Candidates[idx].Account.ID]
+		if !ok {
+			continue
+		}
+		applyFeedbackSignal(&req.Candidates[idx], signal, minCost, maxCost, hasCostRange)
+	}
+	return nil
+}
+
+func candidateAccountIDs(candidates []contract.Candidate) []int {
+	seen := map[int]bool{}
+	out := make([]int, 0, len(candidates))
+	for _, candidate := range candidates {
+		id := candidate.Account.ID
+		if id <= 0 || seen[id] {
+			continue
+		}
+		seen[id] = true
+		out = append(out, id)
+	}
+	sort.Ints(out)
+	return out
+}
+
+func feedbackSignalMap(signals []contract.FeedbackSignal) map[int]contract.FeedbackSignal {
+	out := make(map[int]contract.FeedbackSignal, len(signals))
+	for _, signal := range signals {
+		totalTokens := signal.InputTokens + signal.OutputTokens + signal.CachedTokens
+		if signal.AccountID <= 0 || signal.SampleCount <= 0 || totalTokens <= 0 {
+			continue
+		}
+		if signal.HasCache {
+			signal.CacheHitRate = clamp01(signal.CacheHitRate)
+		}
+		if signal.HasCost {
+			signal.CostPer1KTokens = math.Max(0, signal.CostPer1KTokens)
+		}
+		out[signal.AccountID] = signal
+	}
+	return out
+}
+
+func feedbackCostRange(signals map[int]contract.FeedbackSignal) (float64, float64, bool) {
+	minCost := math.MaxFloat64
+	maxCost := 0.0
+	found := false
+	for _, signal := range signals {
+		if !signal.HasCost {
+			continue
+		}
+		if signal.CostPer1KTokens < minCost {
+			minCost = signal.CostPer1KTokens
+		}
+		if signal.CostPer1KTokens > maxCost {
+			maxCost = signal.CostPer1KTokens
+		}
+		found = true
+	}
+	return minCost, maxCost, found
+}
+
+func applyFeedbackSignal(candidate *contract.Candidate, signal contract.FeedbackSignal, minCost float64, maxCost float64, hasCostRange bool) {
+	if candidate.Mapping.PricingOverride == nil {
+		candidate.Mapping.PricingOverride = map[string]any{}
+	}
+	metadata := candidate.Mapping.PricingOverride
+	metadata["feedback_sample_count"] = signal.SampleCount
+	metadata["feedback_input_tokens"] = signal.InputTokens
+	metadata["feedback_output_tokens"] = signal.OutputTokens
+	metadata["feedback_cached_tokens"] = signal.CachedTokens
+	if signal.HasCost {
+		metadata["feedback_cost_per_1k_tokens"] = signal.CostPer1KTokens
+	}
+	if signal.HasCache {
+		metadata["feedback_cache_hit_rate"] = signal.CacheHitRate
+	}
+	if signal.HasCost && hasCostRange && !hasAnyMetadataKey(metadata, "relative_cost") {
+		metadata["relative_cost"] = normalizedFeedbackCost(signal.CostPer1KTokens, minCost, maxCost)
+	}
+	if signal.HasCache && !hasAnyMetadataKey(metadata, "cache_score", "cache_affinity_score", "cache_hit_rate", "prompt_cache_hit_rate", "cache_saving_ratio") {
+		metadata["cache_hit_rate"] = signal.CacheHitRate
+	}
+}
+
+func normalizedFeedbackCost(cost float64, minCost float64, maxCost float64) float64 {
+	if maxCost <= minCost {
+		return 0.5
+	}
+	return clamp01((cost - minCost) / (maxCost - minCost))
+}
+
+func hasAnyMetadataKey(metadata map[string]any, keys ...string) bool {
+	for _, key := range keys {
+		if _, ok := metadataValue(metadata, key); ok {
+			return true
+		}
+	}
+	return false
 }
 
 func firstScoreValue(values []map[string]any, keys ...string) (float64, bool) {

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -133,6 +134,76 @@ func (s *Store) ListFeedbacks(_ context.Context) ([]contract.Feedback, error) {
 		out = append(out, feedback)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out, nil
+}
+
+func (s *Store) ListFeedbackSignals(_ context.Context, query contract.FeedbackSignalQuery) ([]contract.FeedbackSignal, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(query.AccountIDs) == 0 {
+		return []contract.FeedbackSignal{}, nil
+	}
+	accountIDs := intSet(query.AccountIDs)
+	accumulators := map[int]*feedbackSignalAccumulator{}
+	for _, feedback := range s.feedbacks {
+		if !feedback.Success {
+			continue
+		}
+		if len(accountIDs) > 0 && !accountIDs[feedback.AccountID] {
+			continue
+		}
+		if query.Model != "" && feedback.Model != query.Model {
+			continue
+		}
+		if !query.Since.IsZero() && feedback.CreatedAt.Before(query.Since) {
+			continue
+		}
+		totalTokens := positiveInt(feedback.InputTokens) + positiveInt(feedback.OutputTokens) + positiveInt(feedback.CachedTokens)
+		if totalTokens <= 0 {
+			continue
+		}
+		accumulator := accumulators[feedback.AccountID]
+		if accumulator == nil {
+			accumulator = &feedbackSignalAccumulator{}
+			accumulators[feedback.AccountID] = accumulator
+		}
+		accumulator.sampleCount++
+		accumulator.inputTokens += positiveInt(feedback.InputTokens)
+		accumulator.outputTokens += positiveInt(feedback.OutputTokens)
+		accumulator.cachedTokens += positiveInt(feedback.CachedTokens)
+		if cost, ok := positiveCost(feedback.ActualCost); ok {
+			accumulator.totalCost += cost
+			accumulator.hasCost = true
+		}
+	}
+	out := make([]contract.FeedbackSignal, 0, len(accumulators))
+	for accountID, accumulator := range accumulators {
+		totalTokens := accumulator.inputTokens + accumulator.outputTokens + accumulator.cachedTokens
+		if totalTokens <= 0 {
+			continue
+		}
+		signal := contract.FeedbackSignal{
+			AccountID:    accountID,
+			SampleCount:  accumulator.sampleCount,
+			InputTokens:  accumulator.inputTokens,
+			OutputTokens: accumulator.outputTokens,
+			CachedTokens: accumulator.cachedTokens,
+		}
+		if accumulator.hasCost {
+			signal.CostPer1KTokens = accumulator.totalCost / float64(totalTokens) * 1000
+			signal.HasCost = true
+		}
+		cacheBasis := accumulator.inputTokens + accumulator.cachedTokens
+		if cacheBasis <= 0 {
+			cacheBasis = totalTokens
+		}
+		if cacheBasis > 0 {
+			signal.CacheHitRate = clamp01(float64(accumulator.cachedTokens) / float64(cacheBasis))
+			signal.HasCache = true
+		}
+		out = append(out, signal)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].AccountID < out[j].AccountID })
 	return out, nil
 }
 
@@ -283,4 +354,46 @@ func cloneMap(value map[string]any) map[string]any {
 		return nil
 	}
 	return cloned
+}
+
+func intSet(values []int) map[int]bool {
+	out := make(map[int]bool, len(values))
+	for _, value := range values {
+		out[value] = true
+	}
+	return out
+}
+
+type feedbackSignalAccumulator struct {
+	sampleCount  int
+	inputTokens  int
+	outputTokens int
+	cachedTokens int
+	totalCost    float64
+	hasCost      bool
+}
+
+func positiveInt(value int) int {
+	if value <= 0 {
+		return 0
+	}
+	return value
+}
+
+func positiveCost(value string) (float64, bool) {
+	parsed, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
+	if err != nil || parsed <= 0 {
+		return 0, false
+	}
+	return parsed, true
+}
+
+func clamp01(value float64) float64 {
+	if value < 0 {
+		return 0
+	}
+	if value > 1 {
+		return 1
+	}
+	return value
 }

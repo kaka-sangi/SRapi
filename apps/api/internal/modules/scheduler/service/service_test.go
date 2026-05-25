@@ -672,6 +672,87 @@ func TestCacheAffinityDoesNotOverridePoorHealth(t *testing.T) {
 	}
 }
 
+func TestFeedbackSignalsDriveCostAndCacheScores(t *testing.T) {
+	store := schedulermemory.New()
+	svc, err := service.New(store, nil)
+	if err != nil {
+		t.Fatalf("create scheduler service: %v", err)
+	}
+	seedFeedbackSignal(t, svc, 1, "0.09000000", 900, 100, 0)
+	seedFeedbackSignal(t, svc, 2, "0.01000000", 900, 100, 0)
+	seedFeedbackSignal(t, svc, 3, "0.02000000", 1000, 100, 0)
+	seedFeedbackSignal(t, svc, 4, "0.02000000", 200, 100, 800)
+
+	costReq := baseRequest()
+	costReq.Strategy = contract.StrategyCostSaver
+	costReq.Candidates = []contract.Candidate{
+		candidate(1, withCapabilities(capabilitiescontract.KeyStreaming)),
+		candidate(2, withCapabilities(capabilitiescontract.KeyStreaming)),
+	}
+	costResult, err := svc.Schedule(context.Background(), costReq)
+	if err != nil {
+		t.Fatalf("schedule cost request: %v", err)
+	}
+	if costResult.Candidate.Account.ID != 2 {
+		t.Fatalf("expected cheaper historical account 2 selected, got %d", costResult.Candidate.Account.ID)
+	}
+	account1Cost := decisionScore(t, costResult.Decision.Scores, 1)["cost_score"].(float64)
+	account2Cost := decisionScore(t, costResult.Decision.Scores, 2)["cost_score"].(float64)
+	if account2Cost <= account1Cost {
+		t.Fatalf("expected account 2 cost score to exceed account 1, got account1=%v account2=%v scores=%+v", account1Cost, account2Cost, costResult.Decision.Scores)
+	}
+
+	cacheReq := baseRequest()
+	cacheReq.RequestID = "req_scheduler_feedback_cache"
+	cacheReq.Strategy = contract.StrategyCacheAffinityFirst
+	cacheReq.Candidates = []contract.Candidate{
+		candidate(3, withCapabilities(capabilitiescontract.KeyStreaming)),
+		candidate(4, withCapabilities(capabilitiescontract.KeyStreaming)),
+	}
+	cacheResult, err := svc.Schedule(context.Background(), cacheReq)
+	if err != nil {
+		t.Fatalf("schedule cache request: %v", err)
+	}
+	if cacheResult.Candidate.Account.ID != 4 {
+		t.Fatalf("expected cached historical account 4 selected, got %d", cacheResult.Candidate.Account.ID)
+	}
+	account3Cache := decisionScore(t, cacheResult.Decision.Scores, 3)["cache_score"].(float64)
+	account4Cache := decisionScore(t, cacheResult.Decision.Scores, 4)["cache_score"].(float64)
+	if account4Cache <= account3Cache {
+		t.Fatalf("expected account 4 cache score to exceed account 3, got account3=%v account4=%v scores=%+v", account3Cache, account4Cache, cacheResult.Decision.Scores)
+	}
+}
+
+func TestExplicitCostAndCacheMetadataOverrideFeedbackSignals(t *testing.T) {
+	store := schedulermemory.New()
+	svc, err := service.New(store, nil)
+	if err != nil {
+		t.Fatalf("create scheduler service: %v", err)
+	}
+	seedFeedbackSignal(t, svc, 1, "0.01000000", 900, 100, 900)
+	seedFeedbackSignal(t, svc, 2, "0.09000000", 900, 100, 0)
+
+	req := baseRequest()
+	req.Strategy = contract.StrategyCostSaver
+	req.Candidates = []contract.Candidate{
+		candidate(1, withRelativeCost("0.95"), withCacheScore("0.10"), withCapabilities(capabilitiescontract.KeyStreaming)),
+		candidate(2, withRelativeCost("0.05"), withCacheScore("0.90"), withCapabilities(capabilitiescontract.KeyStreaming)),
+	}
+	result, err := svc.Schedule(context.Background(), req)
+	if err != nil {
+		t.Fatalf("schedule: %v", err)
+	}
+	if result.Candidate.Account.ID != 2 {
+		t.Fatalf("expected explicit metadata to keep account 2 selected, got %d", result.Candidate.Account.ID)
+	}
+	if got := decisionScore(t, result.Decision.Scores, 1)["cost_score"].(float64); got >= 0.2 {
+		t.Fatalf("expected explicit high relative_cost to suppress account 1 cost score, got %v", got)
+	}
+	if got := decisionScore(t, result.Decision.Scores, 1)["cache_score"].(float64); got != 0.10 {
+		t.Fatalf("expected explicit cache score to override feedback signal, got %v", got)
+	}
+}
+
 func TestSchedulingScenarioMatrixMVP(t *testing.T) {
 	cases := []struct {
 		name          string
@@ -1383,6 +1464,28 @@ func TestScheduleRejectsUnknownCapabilityKeys(t *testing.T) {
 	}
 	if _, err := svc.Schedule(context.Background(), req); !errors.Is(err, service.ErrInvalidInput) {
 		t.Fatalf("expected ErrInvalidInput for misspelled effective capability, got %v", err)
+	}
+}
+
+func seedFeedbackSignal(t *testing.T, svc *service.Service, accountID int, actualCost string, inputTokens int, outputTokens int, cachedTokens int) {
+	t.Helper()
+	_, err := svc.RecordFeedback(context.Background(), contract.RecordFeedbackRequest{
+		RequestID:    fmt.Sprintf("req_feedback_signal_%d_%d", accountID, inputTokens+outputTokens+cachedTokens),
+		DecisionID:   accountID,
+		AttemptNo:    1,
+		AccountID:    accountID,
+		ProviderID:   1,
+		Model:        "gpt-test",
+		Success:      true,
+		LatencyMS:    100,
+		InputTokens:  inputTokens,
+		OutputTokens: outputTokens,
+		CachedTokens: cachedTokens,
+		ActualCost:   actualCost,
+		Currency:     "USD",
+	})
+	if err != nil {
+		t.Fatalf("seed feedback signal: %v", err)
 	}
 }
 

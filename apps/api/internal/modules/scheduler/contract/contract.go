@@ -337,6 +337,26 @@ type Feedback struct {
 	CreatedAt    time.Time
 }
 
+// FeedbackSignalQuery selects successful feedback used to derive cost/cache scheduler signals.
+type FeedbackSignalQuery struct {
+	AccountIDs []int
+	Model      string
+	Since      time.Time
+}
+
+// FeedbackSignal is an account-level aggregate used to enrich scheduler cost/cache scores.
+type FeedbackSignal struct {
+	AccountID       int
+	SampleCount     int
+	InputTokens     int
+	OutputTokens    int
+	CachedTokens    int
+	CostPer1KTokens float64
+	HasCost         bool
+	CacheHitRate    float64
+	HasCache        bool
+}
+
 type RecordFeedbackRequest struct {
 	RequestID    string
 	DecisionID   int
@@ -362,6 +382,7 @@ type Store interface {
 	ListRequestSnapshots(ctx context.Context) ([]RequestSnapshot, error)
 	CreateFeedback(ctx context.Context, input Feedback) (Feedback, error)
 	ListFeedbacks(ctx context.Context) ([]Feedback, error)
+	ListFeedbackSignals(ctx context.Context, query FeedbackSignalQuery) ([]FeedbackSignal, error)
 	ListActiveStrategies(ctx context.Context) ([]StrategyDescriptor, error)
 	AcquireLease(ctx context.Context, input Lease, maxConcurrency *int) (Lease, error)
 	UpdateLeaseStatus(ctx context.Context, requestID string, attemptNo int, status LeaseStatus) (Lease, error)

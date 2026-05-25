@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"math"
 	"path/filepath"
 	"testing"
 	"time"
@@ -180,7 +181,163 @@ func TestStoreCreatesDecisionWithRequestSnapshot(t *testing.T) {
 	}
 }
 
+func TestStoreAggregatesFeedbackSignals(t *testing.T) {
+	client := enttest.Open(t, dialect.SQLite, sqliteDSN(t))
+	defer client.Close()
+
+	store, err := New(client)
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+
+	ctx := context.Background()
+	now := time.Date(2026, 5, 25, 13, 0, 0, 0, time.UTC)
+	createFeedbackRow(t, store, contract.Feedback{
+		RequestID:    "req_signal_1",
+		DecisionID:   1,
+		AttemptNo:    1,
+		AccountID:    10,
+		ProviderID:   1,
+		Model:        "gpt-test",
+		Success:      true,
+		InputTokens:  900,
+		OutputTokens: 100,
+		ActualCost:   "0.03000000",
+		Currency:     "USD",
+		CreatedAt:    now.Add(-time.Hour),
+	})
+	createFeedbackRow(t, store, contract.Feedback{
+		RequestID:    "req_signal_2",
+		DecisionID:   2,
+		AttemptNo:    1,
+		AccountID:    10,
+		ProviderID:   1,
+		Model:        "gpt-test",
+		Success:      true,
+		InputTokens:  100,
+		OutputTokens: 100,
+		CachedTokens: 800,
+		ActualCost:   "0.01000000",
+		Currency:     "USD",
+		CreatedAt:    now.Add(-30 * time.Minute),
+	})
+	createFeedbackRow(t, store, contract.Feedback{
+		RequestID:    "req_signal_other_account",
+		DecisionID:   3,
+		AttemptNo:    1,
+		AccountID:    20,
+		ProviderID:   1,
+		Model:        "gpt-test",
+		Success:      true,
+		InputTokens:  400,
+		OutputTokens: 100,
+		ActualCost:   "0.05000000",
+		Currency:     "USD",
+		CreatedAt:    now.Add(-time.Minute),
+	})
+	createFeedbackRow(t, store, contract.Feedback{
+		RequestID:    "req_signal_failed",
+		DecisionID:   4,
+		AttemptNo:    1,
+		AccountID:    10,
+		ProviderID:   1,
+		Model:        "gpt-test",
+		Success:      false,
+		InputTokens:  10000,
+		OutputTokens: 10000,
+		ActualCost:   "99.00000000",
+		Currency:     "USD",
+		CreatedAt:    now.Add(-time.Minute),
+	})
+	createFeedbackRow(t, store, contract.Feedback{
+		RequestID:    "req_signal_other_model",
+		DecisionID:   5,
+		AttemptNo:    1,
+		AccountID:    10,
+		ProviderID:   1,
+		Model:        "other-model",
+		Success:      true,
+		InputTokens:  10000,
+		OutputTokens: 10000,
+		ActualCost:   "99.00000000",
+		Currency:     "USD",
+		CreatedAt:    now.Add(-time.Minute),
+	})
+	createFeedbackRow(t, store, contract.Feedback{
+		RequestID:   "req_signal_old",
+		DecisionID:  6,
+		AttemptNo:   1,
+		AccountID:   10,
+		ProviderID:  1,
+		Model:       "gpt-test",
+		Success:     true,
+		InputTokens: 10000,
+		ActualCost:  "99.00000000",
+		Currency:    "USD",
+		CreatedAt:   now.Add(-48 * time.Hour),
+	})
+	createFeedbackRow(t, store, contract.Feedback{
+		RequestID:  "req_signal_zero_tokens",
+		DecisionID: 7,
+		AttemptNo:  1,
+		AccountID:  10,
+		ProviderID: 1,
+		Model:      "gpt-test",
+		Success:    true,
+		ActualCost: "99.00000000",
+		Currency:   "USD",
+		CreatedAt:  now.Add(-time.Minute),
+	})
+
+	signals, err := store.ListFeedbackSignals(ctx, contract.FeedbackSignalQuery{
+		AccountIDs: []int{10, 20},
+		Model:      "gpt-test",
+		Since:      now.Add(-24 * time.Hour),
+	})
+	if err != nil {
+		t.Fatalf("list feedback signals: %v", err)
+	}
+	if len(signals) != 2 {
+		t.Fatalf("expected two account signals, got %+v", signals)
+	}
+	account10 := signals[0]
+	account20 := signals[1]
+	if account10.AccountID != 10 || account20.AccountID != 20 {
+		t.Fatalf("expected signals sorted by account id, got %+v", signals)
+	}
+	if account10.SampleCount != 2 || account10.InputTokens != 1000 || account10.OutputTokens != 200 || account10.CachedTokens != 800 {
+		t.Fatalf("unexpected account 10 aggregate: %+v", account10)
+	}
+	assertClose(t, account10.CostPer1KTokens, 0.02)
+	assertClose(t, account10.CacheHitRate, 800.0/1800.0)
+	if !account10.HasCost || !account10.HasCache {
+		t.Fatalf("expected account 10 cost and cache signals, got %+v", account10)
+	}
+	if account20.SampleCount != 1 || account20.InputTokens != 400 || account20.OutputTokens != 100 || account20.CachedTokens != 0 {
+		t.Fatalf("unexpected account 20 aggregate: %+v", account20)
+	}
+	assertClose(t, account20.CostPer1KTokens, 0.1)
+	assertClose(t, account20.CacheHitRate, 0)
+	if !account20.HasCost || !account20.HasCache {
+		t.Fatalf("expected account 20 cost and cache signals, got %+v", account20)
+	}
+}
+
 func sqliteDSN(t *testing.T) string {
 	t.Helper()
 	return "file:" + filepath.Join(t.TempDir(), "scheduler.db") + "?_fk=1"
+}
+
+func createFeedbackRow(t *testing.T, store *Store, feedback contract.Feedback) {
+	t.Helper()
+	if _, err := store.CreateFeedback(context.Background(), feedback); err != nil {
+		t.Fatalf("create feedback row: %v", err)
+	}
+}
+
+func assertClose(t *testing.T, got float64, want float64) {
+	t.Helper()
+	if math.Abs(got-want) > 0.000001 {
+		t.Fatalf("expected %v, got %v", want, got)
+	}
 }

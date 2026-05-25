@@ -103,6 +103,14 @@ srapi_provider_probe_latency_seconds_sum{provider_protocol, status}
 
 该指标只使用 provider protocol 和健康状态标签，不得加入 provider id、account id、账号名、凭证、proxy URL 或 request id。
 
+Scheduler cost score 由已持久化的 `SchedulerDecision.scores_json` 聚合为：
+
+```txt
+srapi_scheduler_cost_score_avg{strategy}
+```
+
+该指标只使用低基数 strategy 标签，不得加入 account id、provider id、API key、user id、request id、prompt 或 credential。它用于观察 cost-aware routing 的总体趋势；逐账号排查应读取 Scheduler decision 的 score breakdown 和 request snapshot，而不是增加高基数 Prometheus label。
+
 ### 3.3.1 Trace and Log Correlation
 
 HTTP server 会创建 OpenTelemetry server span，并使用 W3C trace context 从请求头提取/传播 trace。日志 handler 从 context 注入 `request_id`、`trace_id`、`user_id` 和 `api_key_id`，用于把 Gateway request、scheduler decision、usage log、audit log 和 provider feedback 串联起来。

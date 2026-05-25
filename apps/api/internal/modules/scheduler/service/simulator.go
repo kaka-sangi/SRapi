@@ -26,6 +26,9 @@ func (s *Service) SimulateStrategy(ctx context.Context, req contract.StrategySim
 	if err := normalizeScheduleCapabilities(&scheduleReq); err != nil {
 		return contract.StrategySimulationResult{}, ErrInvalidInput
 	}
+	if err := s.enrichFeedbackSignals(ctx, &scheduleReq); err != nil {
+		return contract.StrategySimulationResult{}, err
+	}
 	if err := s.RefreshStrategies(ctx); err != nil {
 		return contract.StrategySimulationResult{}, err
 	}
