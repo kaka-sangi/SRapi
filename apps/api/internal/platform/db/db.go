@@ -68,7 +68,18 @@ func (c *Client) CreateSchema(ctx context.Context) error {
 	if c == nil || c.ent == nil {
 		return nil
 	}
-	return c.ent.Schema.Create(ctx)
+	if err := c.ent.Schema.Create(ctx); err != nil {
+		return err
+	}
+	return c.dropObsoleteSchemaArtifacts(ctx)
+}
+
+func (c *Client) dropObsoleteSchemaArtifacts(ctx context.Context) error {
+	if c == nil || c.db == nil {
+		return nil
+	}
+	_, err := c.db.ExecContext(ctx, `DROP INDEX IF EXISTS "usagelog_request_id"`)
+	return err
 }
 
 func (c *Client) Close() error {

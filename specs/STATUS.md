@@ -80,6 +80,7 @@ last_completed:
 - A2.4: Gateway ordinary HTTP provider dispatch now acquires provider-account `max_concurrency` Redis ZSet leases after Scheduler selection and before credential materialization / upstream adapter invocation, releases leases on success and error paths, maps blocked attempts to provider-style 429 `concurrency_limit_exceeded`, and has a two-node HTTP regression proving stale per-node Scheduler leases cannot bypass account concurrency.
 - A4.1: Scheduler failover foundations now return ranked candidate lists, persist `fallback_from_decision_id` on scheduler decisions, expose the field through admin OpenAPI/SDK responses, and update memory/Redis leases by `(request_id, attempt_no)` so fallback attempts do not overwrite each other.
 - A4.2: Gateway text, Responses, Messages, Embeddings, and Gemini GenerateContent handlers now consume ranked scheduler candidates with a retry loop for retryable provider errors, persist one `usage_logs` evidence row per `(request_id, attempt_no)`, link fallback scheduler decisions through `fallback_from_decision_id`, record `fallback_excluded` evidence, and expose `srapi_gateway_failover_total`.
+- A4.2.1: Local schema repair now drops the obsolete single-column `usagelog_request_id` index after Ent auto schema creation, so development databases upgraded before `000005_usage_log_attempts` no longer reject multiple `usage_logs` rows for the same Gateway `request_id` with different `attempt_no` values.
 - A2/A4 smoke gates: `make smoke-rate-limit` now verifies a one-RPM Gateway API key returns 429 + `Retry-After` on the second request, and `make smoke-failover` creates two temporary OpenAI-compatible providers with local mock upstreams to prove primary 503 → secondary success plus usage attempt, fallback decision, reject-reason, and metric evidence.
 - A5.1: Generic reverse-proxy adapter now accepts `generic-reverse-proxy` providers, reads provider/account metadata for `base_url`, custom auth headers, chat/embedding paths, body mapping, response text/usage paths, supports API-key HTTP client and custom reverse-proxy runtime dispatch, handles OpenAI-compatible streaming/embeddings, and has adapter plus Gateway regressions proving configured upstreams work end to end.
 - A5.2: Provider preset install now covers DeepSeek/Kimi/通义(qwen)/智谱(zhipu)/Grok/Mistral/Groq/Together, keeps new providers disabled by default, records preset metadata into provider config, exposes preset key/platform/default base URL in provider test diagnostics, and has representative DeepSeek/Qwen/Together install + enable + `/admin/providers/{id}/test` coverage. Together's OpenAI-compatible base URL was updated to `https://api.together.ai/v1` per current official docs.
@@ -104,14 +105,17 @@ last_completed:
 
 current:
 
-- package: Phase 1 Gateway rate-limit hardening
-- status: API key/user rate limits, API key concurrency, scheduler account quota evidence, provider-account RPM/TPM Redis counters, and provider-account ordinary HTTP concurrency Redis leases are implemented and locally verified at HTTP-regression level; live `make smoke-rate-limit` / `make smoke-failover` still require a running API with PostgreSQL/Redis.
+- package: Phase 1 Gateway evidence hardening
+- status: API key/user rate limits, API key concurrency, scheduler account quota evidence, provider-account RPM/TPM Redis counters, provider-account ordinary HTTP concurrency Redis leases, and local schema repair for multi-attempt usage evidence are implemented and locally verified; live external provider smoke still depends on valid upstream credentials.
 - objective: continue closing production smoke, sandbox, and pressure-test gaps without letting docs/specs drift.
 
 next_recommended: Run real Stripe/Alipay/WeChat sandbox smoke when merchant credentials are available, or continue the remaining Phase 1 production smoke / pressure-test tasks from `specs/silly-stirring-turtle.md`.
 
 last_gates:
 
+- `cd apps/api && go test ./internal/platform/db`: pass
+- `make migration-check`: pass
+- `cd apps/api && go test ./internal/httpserver -run TestGatewayChatCompletionFailoverRecordsAttemptEvidence -count=1`: pass
 - `cd apps/api && go test ./internal/httpserver -count=1 -run 'TestGatewayEnforces(APIKeyConcurrencyLimit|ProviderAccountConcurrencyAcrossNodes|AccountRPMWithRedisCounterWhenMetadataIsStale|AccountRPMOnDirectDispatchRouteWithRedisCounter)$'`: pass
 - `cd apps/api && go test ./internal/platform/ratelimit -count=1`: pass
 - `cd apps/api && go test ./internal/httpserver ./internal/modules/...`: pass
