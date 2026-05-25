@@ -3,7 +3,7 @@
 ## Current Snapshot
 
 status_version: 1
-updated_at: 2026-05-25
+updated_at: 2026-05-26
 
 last_completed:
 
@@ -28,6 +28,7 @@ last_completed:
 - WP-190: Payment order foundations now include encrypted provider instances, current-user order APIs, signed/idempotent webhooks, refund hooks, fulfillment into billing/subscription state, audit/outbox evidence, Ent/Postgres persistence, and generated SDK/OpenAPI parity.
 - WP-200: Affiliate rebate Phase 2 now includes invite codes, invite relationships, affiliate rules, idempotent payment-paid accrual, refund compensation ledgers, transfer-to-balance accounting, audit/outbox evidence, Ent/Postgres persistence, and migration/data-model parity.
 - WP-210: Production operations now includes baseline Prometheus `/metrics`, release-mode weak secret/default admin password rejection, data retention cleanup worker, PostgreSQL backup/restore targets, release smoke script coverage, and deployment/config docs.
+- C2.1: `/metrics` now uses `github.com/prometheus/client_golang` with a scrape-time custom collector, standard Prometheus counters/gauges/histograms, expanded Gateway latency buckets `0.05/0.1/0.25/0.5/1/2.5/5/10/+Inf`, and provider probe latency histogram evidence from latest account health snapshots.
 - WP-220: Anthropic-compatible upstream adapter now dispatches Messages payloads to `/messages`, parses non-streaming and SSE usage, classifies Anthropic error objects, preserves reverse-proxy runtime dispatch, and proves provider aliases record Scheduler/usage evidence.
 - WP-230: Gemini-native Gateway route foundation now exposes GenerateContent and StreamGenerateContent routes, converts Gemini requests to Canonical AI Request, renders Gemini JSON/SSE responses, returns Google-style errors, and proves Gateway auth/model policy/Scheduler/usage evidence.
 - WP-240: Gemini-compatible/native-gemini upstream adapter now dispatches GenerateContent and StreamGenerateContent payloads to Gemini APIs, parses usage metadata, classifies Google errors, preserves reverse-proxy Gemini runtime dispatch, and proves Gateway Gemini routes schedule Gemini-compatible upstream accounts.

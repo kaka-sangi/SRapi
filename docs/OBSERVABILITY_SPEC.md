@@ -83,7 +83,7 @@ srapi_gateway_failover_total{endpoint_family, model, provider_protocol, result}
 
 该指标只使用低基数 route/model/protocol/result 标签，不得加入 API key、account id、user id、request id、prompt 或 credential。
 
-当前 Gateway latency 由 `/metrics` 暴露为 Prometheus histogram：
+当前 `/metrics` 由 Prometheus client SDK 渲染，Gateway latency 由 scrape-time 自定义 collector 暴露为 Prometheus histogram：
 
 ```txt
 srapi_gateway_request_duration_seconds_bucket{endpoint_family, model, provider_protocol, result, le}
@@ -91,7 +91,17 @@ srapi_gateway_request_duration_seconds_count{endpoint_family, model, provider_pr
 srapi_gateway_request_duration_seconds_sum{endpoint_family, model, provider_protocol, result}
 ```
 
-MVP bucket 固定为 `0.1`、`0.5`、`1`、`5` 秒和 `+Inf`；不得引入 API key、account id、user id、request id、prompt 或 credential label。后续若替换为 Prometheus client SDK，必须保持同名指标语义和 label 基数约束。
+bucket 固定为 `0.05`、`0.1`、`0.25`、`0.5`、`1`、`2.5`、`5`、`10` 秒和 `+Inf`；不得引入 API key、account id、user id、request id、prompt 或 credential label。
+
+Provider account probe latency 由最新健康快照聚合为：
+
+```txt
+srapi_provider_probe_latency_seconds_bucket{provider_protocol, status, le}
+srapi_provider_probe_latency_seconds_count{provider_protocol, status}
+srapi_provider_probe_latency_seconds_sum{provider_protocol, status}
+```
+
+该指标只使用 provider protocol 和健康状态标签，不得加入 provider id、account id、账号名、凭证、proxy URL 或 request id。
 
 ### 3.3.1 Trace and Log Correlation
 

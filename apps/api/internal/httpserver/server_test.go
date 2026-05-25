@@ -201,6 +201,7 @@ func TestMetricsExposeBaselineSRapiSignals(t *testing.T) {
 		"srapi_gateway_failover_total",
 		"srapi_scheduler_decisions_total",
 		"srapi_provider_errors_total",
+		"srapi_provider_probe_latency_seconds_bucket",
 		"srapi_usage_tokens_total",
 		"srapi_reverse_proxy_ban_signals_total",
 	} {
@@ -210,6 +211,14 @@ func TestMetricsExposeBaselineSRapiSignals(t *testing.T) {
 	}
 	if !strings.Contains(body, `srapi_gateway_requests_total{endpoint_family="chat_completions",model="gpt-4o-mini",provider_protocol="openai-compatible",result="success"} 1`) {
 		t.Fatalf("expected gateway request metric, got:\n%s", body)
+	}
+	for _, bucket := range []string{`le="0.05"`, `le="0.1"`, `le="0.25"`, `le="0.5"`, `le="1"`, `le="2.5"`, `le="5"`, `le="10"`, `le="+Inf"`} {
+		if !strings.Contains(body, `srapi_gateway_request_duration_seconds_bucket{endpoint_family="chat_completions",model="gpt-4o-mini",provider_protocol="openai-compatible",result="success",`+bucket+`}`) {
+			t.Fatalf("expected gateway duration bucket %s, got:\n%s", bucket, body)
+		}
+		if !strings.Contains(body, `srapi_provider_probe_latency_seconds_bucket{provider_protocol="openai-compatible",status="healthy",`+bucket+`}`) {
+			t.Fatalf("expected provider probe latency bucket %s, got:\n%s", bucket, body)
+		}
 	}
 	if !strings.Contains(body, `srapi_usage_tokens_total{model="gpt-4o-mini",provider_protocol="openai-compatible",token_kind="input"}`) {
 		t.Fatalf("expected usage token metric, got:\n%s", body)
