@@ -97,11 +97,23 @@ type ScheduleRequest struct {
 	StickyAccountID         *int
 	StickyStrength          StickyStrength
 	Strategy                StrategyName
+	StrategyRollout         StrategyRollout
 	Warnings                []string
 	RequestCapabilities     []capabilitiescontract.Descriptor
 	Candidates              []Candidate
 	ExcludedAccountIDs      []int
 	LeaseTTL                time.Duration
+}
+
+// StrategyRollout applies a deterministic shadow strategy percentage to real scheduler attempts.
+type StrategyRollout struct {
+	Enabled        bool
+	ShadowStrategy StrategyName
+	Percent        float64
+	Key            string
+	Bucket         float64
+	ShadowSelected bool
+	KeyHash        string
 }
 
 type RuntimeState struct {

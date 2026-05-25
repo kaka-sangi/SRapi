@@ -96,6 +96,7 @@ func (rt *runtimeState) scheduleGatewayRequest(ctx context.Context, req schedule
 		req.StickyAccountID = stickyAccountIDFromCandidates(candidates, req.SessionAffinityKey)
 	}
 	req.Candidates = candidates
+	rt.applyGatewayStrategyRollout(ctx, &req, apiKey)
 	return rt.scheduler.Schedule(ctx, req)
 }
 

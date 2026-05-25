@@ -3,6 +3,7 @@ package httpserver
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	admincontrol "github.com/srapi/srapi/apps/api/internal/modules/admin_control/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
@@ -517,11 +518,16 @@ func toAPIAdminSettings(in admincontrol.AdminSettings) apiopenapi.AdminSettings 
 			PaymentsEnabled:          in.Features.PaymentsEnabled,
 		},
 		Gateway: apiopenapi.AdminSettingsGateway{
-			BetaStrategy:             in.Gateway.BetaStrategy,
-			OverloadCooldownSeconds:  in.Gateway.OverloadCooldownSeconds,
-			RateLimitCooldownSeconds: in.Gateway.RateLimitCooldownSeconds,
-			RequestShaperEnabled:     in.Gateway.RequestShaperEnabled,
-			StreamTimeoutSeconds:     in.Gateway.StreamTimeoutSeconds,
+			BetaStrategy:                         in.Gateway.BetaStrategy,
+			OverloadCooldownSeconds:              in.Gateway.OverloadCooldownSeconds,
+			RateLimitCooldownSeconds:             in.Gateway.RateLimitCooldownSeconds,
+			RequestShaperEnabled:                 in.Gateway.RequestShaperEnabled,
+			SchedulerStrategyRolloutApiKeyHashes: stringSlicePtr(in.Gateway.SchedulerStrategyRolloutAPIKeyHashes),
+			SchedulerStrategyRolloutEnabled:      boolPtrValueForAPI(in.Gateway.SchedulerStrategyRolloutEnabled),
+			SchedulerStrategyRolloutModels:       stringSlicePtr(in.Gateway.SchedulerStrategyRolloutModels),
+			SchedulerStrategyRolloutPercent:      float32Ptr(float32(in.Gateway.SchedulerStrategyRolloutPercent)),
+			SchedulerStrategyShadowStrategy:      apiSchedulerStrategyNamePtr(in.Gateway.SchedulerStrategyShadowStrategy),
+			StreamTimeoutSeconds:                 in.Gateway.StreamTimeoutSeconds,
 		},
 		General: apiopenapi.AdminSettingsGeneral{
 			CustomMenus:  mapsToJsonObjects(in.General.CustomMenus),
@@ -571,11 +577,16 @@ func adminSettingsFromAPI(in apiopenapi.AdminSettings) admincontrol.AdminSetting
 			PaymentsEnabled:          in.Features.PaymentsEnabled,
 		},
 		Gateway: admincontrol.AdminSettingsGateway{
-			BetaStrategy:             in.Gateway.BetaStrategy,
-			OverloadCooldownSeconds:  in.Gateway.OverloadCooldownSeconds,
-			RateLimitCooldownSeconds: in.Gateway.RateLimitCooldownSeconds,
-			RequestShaperEnabled:     in.Gateway.RequestShaperEnabled,
-			StreamTimeoutSeconds:     in.Gateway.StreamTimeoutSeconds,
+			BetaStrategy:                         in.Gateway.BetaStrategy,
+			OverloadCooldownSeconds:              in.Gateway.OverloadCooldownSeconds,
+			RateLimitCooldownSeconds:             in.Gateway.RateLimitCooldownSeconds,
+			RequestShaperEnabled:                 in.Gateway.RequestShaperEnabled,
+			SchedulerStrategyRolloutAPIKeyHashes: stringSliceFromPtr(in.Gateway.SchedulerStrategyRolloutApiKeyHashes),
+			SchedulerStrategyRolloutEnabled:      boolFromPtr(in.Gateway.SchedulerStrategyRolloutEnabled),
+			SchedulerStrategyRolloutModels:       stringSliceFromPtr(in.Gateway.SchedulerStrategyRolloutModels),
+			SchedulerStrategyRolloutPercent:      float64FromPtr(in.Gateway.SchedulerStrategyRolloutPercent),
+			SchedulerStrategyShadowStrategy:      schedulerStrategyNameString(in.Gateway.SchedulerStrategyShadowStrategy),
+			StreamTimeoutSeconds:                 in.Gateway.StreamTimeoutSeconds,
 		},
 		General: admincontrol.AdminSettingsGeneral{
 			CustomMenus:  jsonObjectsToMaps(in.General.CustomMenus),
@@ -601,6 +612,53 @@ func adminSettingsFromAPI(in apiopenapi.AdminSettings) admincontrol.AdminSetting
 			UserSelfDeleteEnabled: in.Users.UserSelfDeleteEnabled,
 		},
 	}
+}
+
+func stringSlicePtr(values []string) *[]string {
+	out := append([]string(nil), values...)
+	return &out
+}
+
+func stringSliceFromPtr(values *[]string) []string {
+	if values == nil {
+		return nil
+	}
+	return append([]string(nil), (*values)...)
+}
+
+func boolFromPtr(value *bool) bool {
+	return value != nil && *value
+}
+
+func boolPtrValueForAPI(value bool) *bool {
+	return &value
+}
+
+func float32Ptr(value float32) *float32 {
+	return &value
+}
+
+func float64FromPtr(value *float32) float64 {
+	if value == nil {
+		return 0
+	}
+	return float64(*value)
+}
+
+func apiSchedulerStrategyNamePtr(value string) *apiopenapi.SchedulerStrategyName {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return nil
+	}
+	out := apiopenapi.SchedulerStrategyName(trimmed)
+	return &out
+}
+
+func schedulerStrategyNameString(value *apiopenapi.SchedulerStrategyName) string {
+	if value == nil {
+		return ""
+	}
+	return string(*value)
 }
 
 func toAPIOpsSettings(in admincontrol.OpsSettings) apiopenapi.OpsSettings {

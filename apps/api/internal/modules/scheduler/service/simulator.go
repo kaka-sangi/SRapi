@@ -2,8 +2,6 @@ package service
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -246,6 +244,7 @@ func scheduleRequestFromSnapshot(snapshot contract.RequestSnapshot) (contract.Sc
 		StickyAccountID:         snapshotOptionalInt(profile, "sticky_account_id"),
 		StickyStrength:          contract.StickyStrength(snapshotString(profile, "sticky_strength")),
 		Strategy:                contract.StrategyName(defaultString(snapshotString(profile, "strategy"), string(snapshot.Strategy))),
+		StrategyRollout:         snapshotStrategyRollout(profile),
 		Warnings:                snapshotStrings(profile, "warnings"),
 		RequestCapabilities:     snapshotCapabilities(profile, "request_capabilities"),
 		ExcludedAccountIDs:      snapshotInts(profile, "excluded_account_ids"),
@@ -454,6 +453,48 @@ func snapshotCapabilities(values map[string]any, key string) []capabilitiescontr
 	return descriptors
 }
 
+func snapshotStrategyRollout(values map[string]any) contract.StrategyRollout {
+	raw, ok := values["routing_hints"].(map[string]any)
+	if !ok || raw == nil {
+		return contract.StrategyRollout{}
+	}
+	rawRollout, ok := raw["strategy_rollout"].(map[string]any)
+	if !ok || rawRollout == nil {
+		return contract.StrategyRollout{}
+	}
+	return contract.StrategyRollout{
+		Enabled:        true,
+		ShadowStrategy: contract.StrategyName(snapshotString(rawRollout, "shadow_strategy")),
+		Percent:        snapshotFloat(rawRollout, "percent"),
+		Bucket:         snapshotFloat(rawRollout, "bucket"),
+		ShadowSelected: snapshotBool(rawRollout, "shadow_selected"),
+		KeyHash:        snapshotString(rawRollout, "rollout_key_hash"),
+	}
+}
+
+func snapshotFloat(values map[string]any, key string) float64 {
+	value, ok := values[key]
+	if !ok || value == nil {
+		return 0
+	}
+	switch typed := value.(type) {
+	case float64:
+		return typed
+	case float32:
+		return float64(typed)
+	case int:
+		return float64(typed)
+	case int64:
+		return float64(typed)
+	case string:
+		parsed, err := strconv.ParseFloat(strings.TrimSpace(typed), 64)
+		if err == nil {
+			return parsed
+		}
+	}
+	return 0
+}
+
 func anyToInt(value any) (int, bool) {
 	switch typed := value.(type) {
 	case int:
@@ -528,14 +569,4 @@ func simulationRollout(req contract.StrategySimulationRequest, scheduleReq contr
 		ShadowSelected: bucket < percent || percent >= 100,
 		KeyHash:        affinityKeyHash(key),
 	}, nil
-}
-
-func rolloutBucket(key string) float64 {
-	sum := sha256Sum(key)
-	value := binary.BigEndian.Uint64(sum[:8])
-	return float64(value%10000) / 100
-}
-
-func sha256Sum(value string) [32]byte {
-	return sha256.Sum256([]byte(value))
 }

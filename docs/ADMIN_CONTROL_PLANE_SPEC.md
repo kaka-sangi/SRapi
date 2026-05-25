@@ -241,9 +241,22 @@ The settings service stores typed JSON under stable keys. Secret-bearing fields
 must use encrypted storage before production use; v1 responses expose only
 configured flags for secrets.
 
-PUT is a partial update. Omitted tabs retain previous values. Each write creates
-an audit record containing the changed tab names and redacted before/after
-snapshots.
+PUT currently accepts the full typed settings snapshot defined by
+`AdminSettings`. Each write creates an audit record containing redacted
+before/after snapshots.
+
+Gateway settings include the K1.6.4 Scheduler real-traffic rollout controls:
+
+- `scheduler_strategy_rollout_enabled`
+- `scheduler_strategy_shadow_strategy`
+- `scheduler_strategy_rollout_percent`
+- `scheduler_strategy_rollout_models`
+- `scheduler_strategy_rollout_api_key_hashes`
+
+The model and API key prefix hash arrays are optional scopes. Empty arrays mean
+all models or all API keys. Runtime evidence must store only SHA-256 rollout
+key hashes, not raw API key prefixes, API keys, prompts, cookies, or provider
+credentials.
 
 ## 4. Persistence Strategy
 

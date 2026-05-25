@@ -85,15 +85,16 @@ last_completed:
 - K1.6.1: Scheduler simulation now accepts optional `shadow_rollout_percent` and `rollout_key`, returns a deterministic rollout bucket, shadow-selected flag, and SHA-256 key hash without returning the raw key, and service/HTTP regressions prove rollout preview stays dry-run.
 - K1.6.2: Real Scheduler attempts now persist a sanitized `scheduler_request_snapshots` row atomically with each new decision, including request profile, candidate snapshot, ranked account IDs, selected IDs, strategy version/hash/weights, and compatibility warnings without raw affinity keys, rollout keys, credentials, cookies, or tokens.
 - K1.6.3: Scheduler historical replay now exposes `POST /api/v1/admin/scheduler/replay`, rebuilds side-effect-free replay inputs from sanitized `scheduler_request_snapshots`, compares current/shadow strategies across filtered historical attempts, returns winner-change counts, per-account win counts, average score deltas, rollout previews, and per-snapshot details, and service/HTTP regressions prove replay does not create SchedulerDecision rows or acquire leases.
+- K1.6.4: Scoped real-traffic Scheduler strategy rollout now lets admin settings enable a shadow Scheduler strategy for real Gateway requests with a stable rollout percentage, optional canonical model / alias scope, and optional API key prefix hash scope. Gateway computes sanitized rollout inputs, Scheduler applies the provider-neutral split before resolving the active strategy, and decisions/snapshots persist only hash/bucket/percent/selection evidence without raw API keys, rollout keys, prompts, cookies, or credentials.
 - K1.7: Admin strategy comparison UI now exposes `/admin/ops/strategy`, uses the generated TypeScript SDK through `adminApi` and `useAdminSchedulerReplay`, calls `POST /api/v1/admin/scheduler/replay`, renders strategy/time/model/request replay controls, summary cards, Recharts current-vs-shadow score curves, winner distributions, and per-snapshot replay evidence, and is included in admin smoke targets.
 
 current:
 
-- package: K1.6 follow-up
+- package: K1.4
 - status: pending
-- objective: extend Scheduler strategy simulator from snapshot-backed evidence to scoped real-traffic gray release percentages.
+- objective: add QualityEval module + worker so online quality feedback can feed Scheduler quality_score / quality_tier signals.
 
-next_recommended: Finish K1.6 scoped real-traffic gray release percentages, then continue the critical path toward K1.4 QualityEval module + worker.
+next_recommended: Continue the critical path toward K1.4 QualityEval module + worker.
 
 last_gates:
 

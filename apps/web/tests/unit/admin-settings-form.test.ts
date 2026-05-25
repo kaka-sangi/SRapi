@@ -44,6 +44,11 @@ const baseSettings: AdminSettings = {
     stream_timeout_seconds: 600,
     request_shaper_enabled: true,
     beta_strategy: "allow_configured",
+    scheduler_strategy_rollout_enabled: false,
+    scheduler_strategy_shadow_strategy: "cost_saver",
+    scheduler_strategy_rollout_percent: 0,
+    scheduler_strategy_rollout_models: [],
+    scheduler_strategy_rollout_api_key_hashes: [],
   },
   payment: {
     enabled: false,
@@ -74,6 +79,8 @@ describe("admin-settings-form", () => {
     const draft = createSettingsDraft(baseSettings);
     draft.enabledChannelsText = "openai-compatible\nanthropic-compatible";
     draft.oauthProvidersText = "github, google";
+    draft.schedulerRolloutModelsText = "gpt-4o\nclaude-sonnet";
+    draft.schedulerRolloutApiKeyHashesText = "sha256:first, sha256:second";
     draft.paymentProvidersText = "stripe";
     draft.customMenusJson = '[{"label":"Ops","href":"/admin/ops"}]';
     draft.emailTemplatesJson = '{"welcome":"Welcome to SRapi"}';
@@ -86,6 +93,8 @@ describe("admin-settings-form", () => {
       "anthropic-compatible",
     ]);
     expect(materialized.security.oauth_providers).toEqual(["github", "google"]);
+    expect(materialized.gateway.scheduler_strategy_rollout_models).toEqual(["gpt-4o", "claude-sonnet"]);
+    expect(materialized.gateway.scheduler_strategy_rollout_api_key_hashes).toEqual(["sha256:first", "sha256:second"]);
     expect(materialized.payment.providers).toEqual(["stripe"]);
     expect(materialized.email.templates).toEqual({ welcome: "Welcome to SRapi" });
   });

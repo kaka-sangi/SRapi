@@ -3,6 +3,7 @@ package service_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"testing"
@@ -908,6 +909,82 @@ func TestServiceRefreshesActiveStrategyBeforeSchedule(t *testing.T) {
 	}
 }
 
+func TestScheduleAppliesStableStrategyRollout(t *testing.T) {
+	svc := newService(t)
+	req := baseRequest()
+	req.Candidates = []contract.Candidate{
+		candidate(1, withHealth(0.95), withRelativeCost("0.9"), withCapabilities(capabilitiescontract.KeyStreaming)),
+		candidate(2, withHealth(0.60), withRelativeCost("0.1"), withCapabilities(capabilitiescontract.KeyStreaming)),
+	}
+	req.StrategyRollout = contract.StrategyRollout{
+		Enabled:        true,
+		ShadowStrategy: contract.StrategyCostSaver,
+		Percent:        100,
+		Key:            "raw-rollout-key",
+	}
+
+	result, err := svc.Schedule(context.Background(), req)
+	if err != nil {
+		t.Fatalf("schedule with rollout: %v", err)
+	}
+	if result.Decision.Strategy != contract.StrategyCostSaver || result.Candidate.Account.ID != 2 {
+		t.Fatalf("expected rollout to select cost_saver account 2, got decision=%+v candidate=%+v", result.Decision, result.Candidate)
+	}
+	if !containsString(result.Decision.CompatibilityWarnings, "strategy_rollout_shadow_selected") {
+		t.Fatalf("expected rollout selection warning, got %+v", result.Decision.CompatibilityWarnings)
+	}
+	hints, ok := result.Decision.Scores["routing_hints"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected routing hints, got %+v", result.Decision.Scores)
+	}
+	rollout, ok := hints["strategy_rollout"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected rollout hint, got %+v", hints)
+	}
+	if rollout["shadow_strategy"] != string(contract.StrategyCostSaver) || rollout["shadow_selected"] != true {
+		t.Fatalf("unexpected rollout evidence: %+v", rollout)
+	}
+	keyHash, ok := rollout["rollout_key_hash"].(string)
+	if !ok || !strings.HasPrefix(keyHash, "sha256:") || strings.Contains(keyHash, "raw-rollout-key") {
+		t.Fatalf("expected hashed rollout key only, got %+v", rollout)
+	}
+
+	snapshots, err := svc.ListRequestSnapshots(context.Background())
+	if err != nil {
+		t.Fatalf("list request snapshots: %v", err)
+	}
+	if len(snapshots) != 1 {
+		t.Fatalf("expected one rollout snapshot, got %+v", snapshots)
+	}
+	profileHints, ok := snapshots[0].RequestProfile["routing_hints"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected routing hints in snapshot profile, got %+v", snapshots[0].RequestProfile)
+	}
+	profileRollout, ok := profileHints["strategy_rollout"].(map[string]any)
+	if !ok || strings.Contains(fmtAnyForTest(profileRollout["rollout_key_hash"]), "raw-rollout-key") {
+		t.Fatalf("expected sanitized rollout snapshot, got %+v", profileHints)
+	}
+}
+
+func TestScheduleRejectsInvalidStrategyRolloutPercent(t *testing.T) {
+	svc := newService(t)
+	req := baseRequest()
+	req.Candidates = []contract.Candidate{
+		candidate(1, withCapabilities(capabilitiescontract.KeyStreaming)),
+	}
+	req.StrategyRollout = contract.StrategyRollout{
+		Enabled:        true,
+		ShadowStrategy: contract.StrategyCostSaver,
+		Percent:        101,
+		Key:            "rollout-key",
+	}
+
+	_, err := svc.Schedule(context.Background(), req)
+	if !errors.Is(err, service.ErrInvalidInput) {
+		t.Fatalf("expected invalid rollout percent, got %v", err)
+	}
+}
+
 func TestSimulateStrategyDoesNotPersistDecisionOrLease(t *testing.T) {
 	svc := newService(t)
 	req := baseRequest()
@@ -1465,6 +1542,19 @@ func selectedAccountIDPtr(value *int) int {
 		return 0
 	}
 	return *value
+}
+
+func containsString(values []string, expected string) bool {
+	for _, value := range values {
+		if value == expected {
+			return true
+		}
+	}
+	return false
+}
+
+func fmtAnyForTest(value any) string {
+	return fmt.Sprint(value)
 }
 
 func decisionScore(t *testing.T, scores map[string]any, accountID int) map[string]any {

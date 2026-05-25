@@ -3,9 +3,11 @@ package service
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -234,6 +236,9 @@ func (s *Service) Schedule(ctx context.Context, req contract.ScheduleRequest) (c
 	if err := s.RefreshStrategies(ctx); err != nil {
 		return contract.ScheduleResult{}, err
 	}
+	if err := s.applyStrategyRollout(&req); err != nil {
+		return contract.ScheduleResult{}, err
+	}
 
 	strategy, err := s.registry.Resolve(req.Strategy)
 	if err != nil {
@@ -366,6 +371,42 @@ func (s *Service) createDecisionWithSnapshot(ctx context.Context, req contract.S
 
 func (s *Service) ListRequestSnapshots(ctx context.Context) ([]contract.RequestSnapshot, error) {
 	return s.store.ListRequestSnapshots(ctx)
+}
+
+func (s *Service) applyStrategyRollout(req *contract.ScheduleRequest) error {
+	if req == nil || !req.StrategyRollout.Enabled {
+		return nil
+	}
+	rollout := req.StrategyRollout
+	if math.IsNaN(rollout.Percent) || math.IsInf(rollout.Percent, 0) || rollout.Percent < 0 || rollout.Percent > 100 {
+		return ErrInvalidInput
+	}
+	if rollout.ShadowStrategy == "" {
+		return ErrInvalidInput
+	}
+	if _, err := s.registry.Resolve(rollout.ShadowStrategy); err != nil {
+		return err
+	}
+	key := strings.TrimSpace(rollout.Key)
+	if key == "" {
+		key = strings.TrimSpace(req.RequestID)
+	}
+	if key == "" {
+		return ErrInvalidInput
+	}
+	bucket := rolloutBucket(key)
+	rollout.Key = ""
+	rollout.Bucket = bucket
+	rollout.KeyHash = affinityKeyHash(key)
+	rollout.ShadowSelected = bucket < rollout.Percent || rollout.Percent >= 100
+	req.StrategyRollout = rollout
+	if rollout.ShadowSelected {
+		req.Strategy = rollout.ShadowStrategy
+		req.Warnings = appendUniqueString(req.Warnings, "strategy_rollout_shadow_selected")
+		return nil
+	}
+	req.Warnings = appendUniqueString(req.Warnings, "strategy_rollout_current_selected")
+	return nil
 }
 
 func (s *Service) RecordFeedback(ctx context.Context, req contract.RecordFeedbackRequest) (contract.Feedback, error) {
@@ -554,6 +595,9 @@ func sanitizedRequestProfile(req contract.ScheduleRequest) map[string]any {
 	if hash := affinityKeyHash(req.SessionAffinityKey); hash != "" {
 		profile["session_affinity_key_hash"] = hash
 	}
+	if hints := routingHints(req); len(hints) > 0 {
+		profile["routing_hints"] = hints
+	}
 	return removeNilValues(profile)
 }
 
@@ -655,6 +699,9 @@ func routingHints(req contract.ScheduleRequest) map[string]any {
 	if req.StickyStrength != "" {
 		hints["sticky_strength"] = string(req.StickyStrength)
 	}
+	if rollout := strategyRolloutHint(req.StrategyRollout); len(rollout) > 0 {
+		hints["strategy_rollout"] = rollout
+	}
 	return hints
 }
 
@@ -665,6 +712,29 @@ func affinityKeyHash(value string) string {
 	}
 	sum := sha256.Sum256([]byte(value))
 	return "sha256:" + hex.EncodeToString(sum[:])
+}
+
+func strategyRolloutHint(rollout contract.StrategyRollout) map[string]any {
+	if !rollout.Enabled {
+		return nil
+	}
+	return map[string]any{
+		"shadow_strategy":  string(rollout.ShadowStrategy),
+		"percent":          rollout.Percent,
+		"bucket":           rollout.Bucket,
+		"shadow_selected":  rollout.ShadowSelected,
+		"rollout_key_hash": strings.TrimSpace(rollout.KeyHash),
+	}
+}
+
+func rolloutBucket(key string) float64 {
+	sum := sha256Sum(key)
+	value := binary.BigEndian.Uint64(sum[:8])
+	return float64(value%10000) / 100
+}
+
+func sha256Sum(value string) [32]byte {
+	return sha256.Sum256([]byte(value))
 }
 
 type candidateScore struct {
@@ -1159,6 +1229,19 @@ func cloneStrings(values []string) []string {
 	cloned := make([]string, len(values))
 	copy(cloned, values)
 	return cloned
+}
+
+func appendUniqueString(values []string, value string) []string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return values
+	}
+	for _, existing := range values {
+		if existing == value {
+			return values
+		}
+	}
+	return append(values, value)
 }
 
 func cloneInts(values []int) []int {

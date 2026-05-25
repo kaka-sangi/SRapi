@@ -285,6 +285,7 @@ import type {
   RedeemCodeStatus,
   PromoCodeStatus,
   RiskControlConfig,
+  SchedulerStrategyName,
   SubscriptionPlan,
   UsageLog,
   UserSubscription,
@@ -303,6 +304,21 @@ function dateLabel(value: string) {
     return value;
   }
   return new Intl.DateTimeFormat(undefined, { month: "short", day: "2-digit" }).format(date);
+}
+
+function schedulerStrategyNameFromSelect(value: string): SchedulerStrategyName | undefined {
+  switch (value) {
+    case "balanced":
+    case "cost_saver":
+    case "latency_first":
+    case "quota_protect":
+    case "sticky_first":
+    case "cache_affinity_first":
+    case "premium_quality":
+      return value;
+    default:
+      return undefined;
+  }
 }
 
 type OpsEvidenceSelection =
@@ -3834,7 +3850,14 @@ export function AdminSettingsProductionPage() {
                 <div><Label htmlFor="settings-rate-limit-cooldown">429 Cooldown Seconds</Label><Input id="settings-rate-limit-cooldown" type="number" min="0" value={value.gateway.rate_limit_cooldown_seconds} onChange={(event) => update((current) => ({ ...current, gateway: { ...current.gateway, rate_limit_cooldown_seconds: Number(event.target.value) } }))} /></div>
                 <div><Label htmlFor="settings-stream-timeout">Stream Timeout Seconds</Label><Input id="settings-stream-timeout" type="number" min="1" value={value.gateway.stream_timeout_seconds} onChange={(event) => update((current) => ({ ...current, gateway: { ...current.gateway, stream_timeout_seconds: Number(event.target.value) } }))} /></div>
                 <div><Label htmlFor="settings-beta-strategy">Beta Strategy</Label><Input id="settings-beta-strategy" value={value.gateway.beta_strategy} onChange={(event) => update((current) => ({ ...current, gateway: { ...current.gateway, beta_strategy: event.target.value } }))} /></div>
+                <div><Label htmlFor="settings-rollout-shadow-strategy">Shadow Strategy</Label><Select id="settings-rollout-shadow-strategy" value={value.gateway.scheduler_strategy_shadow_strategy ?? ""} onChange={(event) => update((current) => ({ ...current, gateway: { ...current.gateway, scheduler_strategy_shadow_strategy: schedulerStrategyNameFromSelect(event.target.value) } }))}><option value="">None</option><option value="balanced">Balanced</option><option value="cost_saver">Cost Saver</option><option value="latency_first">Latency First</option><option value="quota_protect">Quota Protect</option><option value="sticky_first">Sticky First</option><option value="cache_affinity_first">Cache Affinity</option><option value="premium_quality">Premium Quality</option></Select></div>
+                <div><Label htmlFor="settings-rollout-percent">Rollout Percent</Label><Input id="settings-rollout-percent" type="number" min="0" max="100" step="0.01" value={value.gateway.scheduler_strategy_rollout_percent ?? 0} onChange={(event) => update((current) => ({ ...current, gateway: { ...current.gateway, scheduler_strategy_rollout_percent: Number(event.target.value) } }))} /></div>
                 <SettingsToggle label="Request Shaper" checked={value.gateway.request_shaper_enabled} onChange={(checked) => update((current) => ({ ...current, gateway: { ...current.gateway, request_shaper_enabled: checked } }))} />
+                <SettingsToggle label="Strategy Rollout" checked={value.gateway.scheduler_strategy_rollout_enabled ?? false} onChange={(checked) => update((current) => ({ ...current, gateway: { ...current.gateway, scheduler_strategy_rollout_enabled: checked } }))} />
+              </div>
+              <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div><Label htmlFor="settings-rollout-models">Rollout Models</Label><Textarea id="settings-rollout-models" rows={8} value={effectiveDraft.schedulerRolloutModelsText} onChange={(event) => updateDraft((current) => ({ ...current, schedulerRolloutModelsText: event.target.value }))} /></div>
+                <div><Label htmlFor="settings-rollout-api-key-hashes">API Key Prefix Hashes</Label><Textarea id="settings-rollout-api-key-hashes" rows={8} value={effectiveDraft.schedulerRolloutApiKeyHashesText} onChange={(event) => updateDraft((current) => ({ ...current, schedulerRolloutApiKeyHashesText: event.target.value }))} /></div>
               </div>
             </AdminSection>
           ) : null}

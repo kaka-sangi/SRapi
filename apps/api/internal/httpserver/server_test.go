@@ -5611,6 +5611,77 @@ func TestGatewayModelAliasAndSessionAffinityFeedScheduler(t *testing.T) {
 	}
 }
 
+func TestGatewayAdminSettingsApplySchedulerStrategyRollout(t *testing.T) {
+	var upstreamCalls int
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamCalls++
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"rollout response"}}],"usage":{"prompt_tokens":3,"completion_tokens":4,"total_tokens":7}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	healthyProvider := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"rollout-healthy-provider","display_name":"Rollout Healthy Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	cheapProvider := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"rollout-cheap-provider","display_name":"Rollout Cheap Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"rollout-model","display_name":"Rollout Model","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(healthyProvider.Data.Id)+`","upstream_model_name":"rollout-healthy-upstream","status":"active","pricing_override":{"relative_cost":"0.9"}}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(cheapProvider.Data.Id)+`","upstream_model_name":"rollout-cheap-upstream","status":"active","pricing_override":{"relative_cost":"0.1"}}`)
+	healthyAccount := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(healthyProvider.Data.Id)+`","name":"rollout-healthy","runtime_class":"api_key","credential":{"api_key":"healthy-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1","health_score":0.95},"status":"active"}`)
+	cheapAccount := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(cheapProvider.Data.Id)+`","name":"rollout-cheap","runtime_class":"api_key","credential":{"api_key":"cheap-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1","health_score":0.60,"quality_score":0.6},"status":"active"}`)
+
+	keyResp, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	settingsBody := `{"general":{"site_name":"SRapi","logo_url":"","version_label":"","custom_menus":[]},"agreement":{"user_agreement":"","privacy_policy":""},"features":{"enabled_channels":[],"channel_monitoring_enabled":true,"invitation_rebate_enabled":false,"payments_enabled":false},"security":{"admin_api_key":{"configured":false},"registration_enabled":true,"oauth_enabled":false,"oauth_providers":[]},"users":{"default_balance":"0","default_group":"default","user_self_delete_enabled":false,"rpm_limit_default":0},"gateway":{"overload_cooldown_seconds":30,"rate_limit_cooldown_seconds":30,"stream_timeout_seconds":600,"request_shaper_enabled":true,"beta_strategy":"allow_configured","scheduler_strategy_rollout_enabled":true,"scheduler_strategy_shadow_strategy":"cost_saver","scheduler_strategy_rollout_percent":100,"scheduler_strategy_rollout_models":["rollout-model"],"scheduler_strategy_rollout_api_key_hashes":[]},"payment":{"enabled":false,"providers":[],"subscription_plans_enabled":false},"email":{"smtp_configured":false,"templates":{}},"backup":{"enabled":false,"retention_days":30}}`
+	settingsReq := httptest.NewRequest(http.MethodPut, "/api/v1/admin/settings", strings.NewReader(settingsBody))
+	settingsReq.Header.Set("Content-Type", "application/json")
+	settingsReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	settingsReq.AddCookie(sessionCookie)
+	settingsRec := httptest.NewRecorder()
+	handler.ServeHTTP(settingsRec, settingsReq)
+	if settingsRec.Code != http.StatusOK {
+		t.Fatalf("expected settings update 200, got %d body=%s", settingsRec.Code, settingsRec.Body.String())
+	}
+
+	mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/chat/completions", `{"model":"rollout-model","messages":[{"role":"user","content":"rollout request"}]}`)
+	if upstreamCalls != 1 {
+		t.Fatalf("expected one upstream call, got %d", upstreamCalls)
+	}
+
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=rollout-model", nil)
+	decisionsReq.AddCookie(sessionCookie)
+	decisionsRec := httptest.NewRecorder()
+	handler.ServeHTTP(decisionsRec, decisionsReq)
+	if decisionsRec.Code != http.StatusOK {
+		t.Fatalf("expected decisions 200, got %d body=%s", decisionsRec.Code, decisionsRec.Body.String())
+	}
+	var decisionsResp apiopenapi.SchedulerDecisionListResponse
+	if err := json.NewDecoder(decisionsRec.Body).Decode(&decisionsResp); err != nil {
+		t.Fatalf("decode decisions: %v", err)
+	}
+	if len(decisionsResp.Data) != 1 {
+		t.Fatalf("expected one rollout decision, got %+v", decisionsResp.Data)
+	}
+	decision := decisionsResp.Data[0]
+	if decision.Strategy != apiopenapi.SchedulerDecisionStrategyCostSaver || decision.SelectedAccountId == nil || *decision.SelectedAccountId != string(cheapAccount.Data.Id) {
+		t.Fatalf("expected rollout cost_saver to select cheap account %s, got %+v healthy=%s", cheapAccount.Data.Id, decision, healthyAccount.Data.Id)
+	}
+	if !stringSliceContains(decision.CompatibilityWarnings, "strategy_rollout_shadow_selected") {
+		t.Fatalf("expected rollout warning evidence, got %+v", decision.CompatibilityWarnings)
+	}
+	hints, ok := decision.Scores["routing_hints"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected routing hints, got %+v", decision.Scores)
+	}
+	rollout, ok := hints["strategy_rollout"].(map[string]any)
+	if !ok || rollout["shadow_strategy"] != "cost_saver" || rollout["shadow_selected"] != true {
+		t.Fatalf("expected rollout hints, got %+v", hints)
+	}
+	hash, ok := rollout["rollout_key_hash"].(string)
+	if !ok || !strings.HasPrefix(hash, "sha256:") || strings.Contains(hash, keyResp.Data.PlaintextKey) {
+		t.Fatalf("expected hashed rollout key only, got %+v", rollout)
+	}
+}
+
 func TestGatewayRateLimitFeedbackAppliesAccountCooldown(t *testing.T) {
 	var upstreamCalls int
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -2285,7 +2285,18 @@ type AdminSettingsGateway struct {
 	OverloadCooldownSeconds  int    `json:"overload_cooldown_seconds"`
 	RateLimitCooldownSeconds int    `json:"rate_limit_cooldown_seconds"`
 	RequestShaperEnabled     bool   `json:"request_shaper_enabled"`
-	StreamTimeoutSeconds     int    `json:"stream_timeout_seconds"`
+
+	// SchedulerStrategyRolloutApiKeyHashes Optional SHA-256 API key prefix hash scope. Empty means all API keys.
+	SchedulerStrategyRolloutApiKeyHashes *[]string `json:"scheduler_strategy_rollout_api_key_hashes,omitempty"`
+
+	// SchedulerStrategyRolloutEnabled Enables deterministic real-traffic Scheduler shadow strategy rollout.
+	SchedulerStrategyRolloutEnabled *bool `json:"scheduler_strategy_rollout_enabled,omitempty"`
+
+	// SchedulerStrategyRolloutModels Optional canonical model or alias scope. Empty means all models.
+	SchedulerStrategyRolloutModels  *[]string              `json:"scheduler_strategy_rollout_models,omitempty"`
+	SchedulerStrategyRolloutPercent *float32               `json:"scheduler_strategy_rollout_percent,omitempty"`
+	SchedulerStrategyShadowStrategy *SchedulerStrategyName `json:"scheduler_strategy_shadow_strategy,omitempty"`
+	StreamTimeoutSeconds            int                    `json:"stream_timeout_seconds"`
 }
 
 // AdminSettingsGeneral defines model for AdminSettingsGeneral.

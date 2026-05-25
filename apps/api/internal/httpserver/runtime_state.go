@@ -135,89 +135,7 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 		logger.Warn("running with ephemeral in-memory stores", "storage_backend", cfg.StorageBackend())
 	}
 
-	userStore := opts.users
-	if userStore == nil {
-		if !allowMemoryStores {
-			return nil, missingRuntimeStoreError("users")
-		}
-		userStore = usermemory.New()
-	}
-	usersSvc, err := usersservice.New(userStore, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	sessionStore := opts.authSessions
-	if sessionStore == nil {
-		if !allowMemoryStores {
-			return nil, missingRuntimeStoreError("auth sessions")
-		}
-		sessionStore = authmemory.New()
-	}
-	authSvc, err := authservice.New(usersSvc, sessionStore, 0, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	apiKeyStore := opts.apiKeys
-	if apiKeyStore == nil {
-		if !allowMemoryStores {
-			return nil, missingRuntimeStoreError("api keys")
-		}
-		apiKeyStore = apikeymemory.New()
-	}
-	apiKeysSvc, err := apikeyservice.New(apiKeyStore, cfg.Security.APIKeyPepper, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	auditStore := opts.audit
-	if auditStore == nil {
-		if !allowMemoryStores {
-			return nil, missingRuntimeStoreError("audit")
-		}
-		auditStore = auditmemory.New()
-	}
-	auditSvc, err := auditservice.New(auditStore, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	billingStore := opts.billing
-	if billingStore == nil {
-		if !allowMemoryStores {
-			return nil, missingRuntimeStoreError("billing")
-		}
-		billingStore = billingmemory.New()
-	}
-	billingSvc, err := billingservice.New(billingStore, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	eventsStore := opts.events
-	if eventsStore == nil {
-		if !allowMemoryStores {
-			return nil, missingRuntimeStoreError("events")
-		}
-		eventsStore = eventsmemory.New()
-	}
-	eventsSvc, err := eventsservice.New(eventsStore, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	affiliateStore := opts.affiliate
-	if affiliateStore == nil {
-		if !allowMemoryStores {
-			return nil, missingRuntimeStoreError("affiliate")
-		}
-		affiliateStore = affiliatememory.New()
-	}
-	affiliateSvc, err := affiliateservice.New(affiliateStore, affiliateservice.Dependencies{
-		Audit:  auditSvc,
-		Events: eventsSvc,
-	}, nil)
+	access, err := newAccessRuntime(cfg, opts, allowMemoryStores)
 	if err != nil {
 		return nil, err
 	}
@@ -315,7 +233,7 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 		return nil, err
 	}
 
-	subscriptionStore, subscriptionSvc, paymentStore, paymentsSvc, err := newCommerceRuntime(cfg, opts, billingSvc, auditSvc, eventsSvc, allowMemoryStores)
+	subscriptionStore, subscriptionSvc, paymentStore, paymentsSvc, err := newCommerceRuntime(cfg, opts, access.billingSvc, access.auditSvc, access.eventsSvc, allowMemoryStores)
 	if err != nil {
 		return nil, err
 	}
@@ -326,13 +244,13 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 	}
 
 	rt := assembleRuntimeState(cfg, logger, opts, runtimeAssembly{
-		usersSvc:          usersSvc,
-		authSvc:           authSvc,
-		apiKeysSvc:        apiKeysSvc,
-		auditSvc:          auditSvc,
-		billingSvc:        billingSvc,
-		eventsSvc:         eventsSvc,
-		affiliateSvc:      affiliateSvc,
+		usersSvc:          access.usersSvc,
+		authSvc:           access.authSvc,
+		apiKeysSvc:        access.apiKeysSvc,
+		auditSvc:          access.auditSvc,
+		billingSvc:        access.billingSvc,
+		eventsSvc:         access.eventsSvc,
+		affiliateSvc:      access.affiliateSvc,
 		contentSafetySvc:  contentSafetySvc,
 		gatewaySvc:        gatewaySvc,
 		providersSvc:      providersSvc,
@@ -347,13 +265,13 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 		paymentsSvc:       paymentsSvc,
 		operationsSvc:     operationsSvc,
 		usageSvc:          usageSvc,
-		userStore:         userStore,
-		sessionStore:      sessionStore,
-		apiKeyStore:       apiKeyStore,
-		auditStore:        auditStore,
-		billingStore:      billingStore,
-		eventsStore:       eventsStore,
-		affiliateStore:    affiliateStore,
+		userStore:         access.userStore,
+		sessionStore:      access.sessionStore,
+		apiKeyStore:       access.apiKeyStore,
+		auditStore:        access.auditStore,
+		billingStore:      access.billingStore,
+		eventsStore:       access.eventsStore,
+		affiliateStore:    access.affiliateStore,
 		operationsStore:   operationsStore,
 		providerStore:     providerStore,
 		modelStore:        modelStore,
@@ -371,6 +289,129 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 		return nil, err
 	}
 	return rt, nil
+}
+
+type accessRuntime struct {
+	usersSvc       *usersservice.Service
+	authSvc        *authservice.Service
+	apiKeysSvc     *apikeyservice.Service
+	auditSvc       *auditservice.Service
+	billingSvc     *billingservice.Service
+	eventsSvc      *eventsservice.Service
+	affiliateSvc   *affiliateservice.Service
+	userStore      userscontract.Store
+	sessionStore   authcontract.Store
+	apiKeyStore    apikeycontract.Store
+	auditStore     auditcontract.Store
+	billingStore   billingcontract.Store
+	eventsStore    eventscontract.Store
+	affiliateStore affiliatecontract.Store
+}
+
+func newAccessRuntime(cfg config.Config, opts runtimeOptions, allowMemoryStores bool) (accessRuntime, error) {
+	userStore := opts.users
+	if userStore == nil {
+		if !allowMemoryStores {
+			return accessRuntime{}, missingRuntimeStoreError("users")
+		}
+		userStore = usermemory.New()
+	}
+	usersSvc, err := usersservice.New(userStore, nil)
+	if err != nil {
+		return accessRuntime{}, err
+	}
+
+	sessionStore := opts.authSessions
+	if sessionStore == nil {
+		if !allowMemoryStores {
+			return accessRuntime{}, missingRuntimeStoreError("auth sessions")
+		}
+		sessionStore = authmemory.New()
+	}
+	authSvc, err := authservice.New(usersSvc, sessionStore, 0, nil)
+	if err != nil {
+		return accessRuntime{}, err
+	}
+
+	apiKeyStore := opts.apiKeys
+	if apiKeyStore == nil {
+		if !allowMemoryStores {
+			return accessRuntime{}, missingRuntimeStoreError("api keys")
+		}
+		apiKeyStore = apikeymemory.New()
+	}
+	apiKeysSvc, err := apikeyservice.New(apiKeyStore, cfg.Security.APIKeyPepper, nil)
+	if err != nil {
+		return accessRuntime{}, err
+	}
+
+	auditStore := opts.audit
+	if auditStore == nil {
+		if !allowMemoryStores {
+			return accessRuntime{}, missingRuntimeStoreError("audit")
+		}
+		auditStore = auditmemory.New()
+	}
+	auditSvc, err := auditservice.New(auditStore, nil)
+	if err != nil {
+		return accessRuntime{}, err
+	}
+
+	billingStore := opts.billing
+	if billingStore == nil {
+		if !allowMemoryStores {
+			return accessRuntime{}, missingRuntimeStoreError("billing")
+		}
+		billingStore = billingmemory.New()
+	}
+	billingSvc, err := billingservice.New(billingStore, nil)
+	if err != nil {
+		return accessRuntime{}, err
+	}
+
+	eventsStore := opts.events
+	if eventsStore == nil {
+		if !allowMemoryStores {
+			return accessRuntime{}, missingRuntimeStoreError("events")
+		}
+		eventsStore = eventsmemory.New()
+	}
+	eventsSvc, err := eventsservice.New(eventsStore, nil)
+	if err != nil {
+		return accessRuntime{}, err
+	}
+
+	affiliateStore := opts.affiliate
+	if affiliateStore == nil {
+		if !allowMemoryStores {
+			return accessRuntime{}, missingRuntimeStoreError("affiliate")
+		}
+		affiliateStore = affiliatememory.New()
+	}
+	affiliateSvc, err := affiliateservice.New(affiliateStore, affiliateservice.Dependencies{
+		Audit:  auditSvc,
+		Events: eventsSvc,
+	}, nil)
+	if err != nil {
+		return accessRuntime{}, err
+	}
+
+	return accessRuntime{
+		usersSvc:       usersSvc,
+		authSvc:        authSvc,
+		apiKeysSvc:     apiKeysSvc,
+		auditSvc:       auditSvc,
+		billingSvc:     billingSvc,
+		eventsSvc:      eventsSvc,
+		affiliateSvc:   affiliateSvc,
+		userStore:      userStore,
+		sessionStore:   sessionStore,
+		apiKeyStore:    apiKeyStore,
+		auditStore:     auditStore,
+		billingStore:   billingStore,
+		eventsStore:    eventsStore,
+		affiliateStore: affiliateStore,
+	}, nil
 }
 
 func newCommerceRuntime(

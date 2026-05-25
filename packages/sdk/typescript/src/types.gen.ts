@@ -1293,6 +1293,20 @@ export type AdminSettingsGateway = {
     stream_timeout_seconds: number;
     request_shaper_enabled: boolean;
     beta_strategy: string;
+    /**
+     * Enables deterministic real-traffic Scheduler shadow strategy rollout.
+     */
+    scheduler_strategy_rollout_enabled?: boolean;
+    scheduler_strategy_shadow_strategy?: SchedulerStrategyName;
+    scheduler_strategy_rollout_percent?: number;
+    /**
+     * Optional canonical model or alias scope. Empty means all models.
+     */
+    scheduler_strategy_rollout_models?: Array<string>;
+    /**
+     * Optional SHA-256 API key prefix hash scope. Empty means all API keys.
+     */
+    scheduler_strategy_rollout_api_key_hashes?: Array<string>;
 };
 
 export type AdminSettingsPayment = {

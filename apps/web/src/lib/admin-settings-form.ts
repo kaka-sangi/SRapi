@@ -28,6 +28,8 @@ export interface AdminSettingsDraft {
   customMenusJson: string;
   enabledChannelsText: string;
   oauthProvidersText: string;
+  schedulerRolloutModelsText: string;
+  schedulerRolloutApiKeyHashesText: string;
   paymentProvidersText: string;
   emailTemplatesJson: string;
 }
@@ -44,6 +46,8 @@ export function createSettingsDraft(value: AdminSettings): AdminSettingsDraft {
     customMenusJson: JSON.stringify(value.general.custom_menus ?? [], null, 2),
     enabledChannelsText: listToText(value.features.enabled_channels),
     oauthProvidersText: listToText(value.security.oauth_providers),
+    schedulerRolloutModelsText: listToText(value.gateway.scheduler_strategy_rollout_models),
+    schedulerRolloutApiKeyHashesText: listToText(value.gateway.scheduler_strategy_rollout_api_key_hashes),
     paymentProvidersText: listToText(value.payment.providers),
     emailTemplatesJson: JSON.stringify(value.email.templates ?? {}, null, 2),
   };
@@ -65,6 +69,11 @@ export function materializeSettingsDraft(draft: AdminSettingsDraft): AdminSettin
     security: {
       ...draft.value.security,
       oauth_providers: textToList(draft.oauthProvidersText),
+    },
+    gateway: {
+      ...draft.value.gateway,
+      scheduler_strategy_rollout_models: textToList(draft.schedulerRolloutModelsText),
+      scheduler_strategy_rollout_api_key_hashes: textToList(draft.schedulerRolloutApiKeyHashesText),
     },
     payment: {
       ...draft.value.payment,

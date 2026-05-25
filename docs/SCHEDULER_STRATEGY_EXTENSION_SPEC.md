@@ -272,6 +272,9 @@ percentage
 - 可以一键回滚到上一 active version。
 - 灰度策略必须在 Observability 中显示效果。
 - K1.6 的 `POST /api/v1/admin/scheduler/simulate` 已提供稳定百分比分流预览，用于验证 bucket、命中结果和 key hash；它仍是 dry-run，不改变真实 Gateway 策略。
+- K1.6.4 起真实 Gateway 流量可通过 `AdminSettings.gateway` 启用 `scheduler_strategy_rollout_enabled`，指定 `scheduler_strategy_shadow_strategy`、`scheduler_strategy_rollout_percent`，并可用 `scheduler_strategy_rollout_models` 与 `scheduler_strategy_rollout_api_key_hashes` 做作用域过滤。Gateway 只把稳定分流输入传给 Scheduler；Scheduler core 不读取 HTTP/API key 明文细节。
+- 真实分流命中结果会写入 `scheduler_decisions.compatibility_warnings` 和 `scores.routing_hints.strategy_rollout`，并进入 `scheduler_request_snapshots.request_profile_json`。证据只保存 rollout key hash、bucket、percent、shadow strategy 和 shadow selected，不保存原始 rollout key、API key、prompt、cookie 或凭证。
+- user_group / provider 专属 rollout scope 尚未作为独立配置字段落地；当前可通过 model 与 API key prefix hash scope 控制真实分流范围。
 
 ## 12. Fallback 策略
 
@@ -388,10 +391,11 @@ K1.2 起运行时已经读取 `status=active`、`scope_type=global` 且 `scope_i
 `id` 选择最新行；内置 seed 仍作为本地 / memory store fallback。K1.6 起已支持单请求
 shadow dry-run 和稳定 rollout 预览；K1.6.2 起新的真实调度会持久化脱敏
 `scheduler_request_snapshots`；K1.6.3 起 `POST /api/v1/admin/scheduler/replay`
-可用这些 snapshot 重建 RequestProfile + CandidateSnapshot 做历史策略回放。
+可用这些 snapshot 重建 RequestProfile + CandidateSnapshot 做历史策略回放；K1.6.4 起
+`AdminSettings.gateway` 可把 model / API key prefix hash 作用域内的真实 Gateway 流量按稳定百分比分到 shadow strategy。
 
 历史 replay 接口必须只对存在 snapshot 的决策声称可重算。没有 snapshot 的旧
-`scheduler_decisions` 行缺少当时完整候选集，只能用于报表对比，不能声称完成“历史重算新策略”。API key、model、provider 等 scoped override 和真实流量百分比灰度仍属于后续范围。
+`scheduler_decisions` 行缺少当时完整候选集，只能用于报表对比，不能声称完成“历史重算新策略”。user_group / provider 独立 scoped override 仍属于后续范围。
 
 ## 17. Admin API
 

@@ -67,11 +67,16 @@ type AdminSettingsUsers struct {
 	RPMLimitDefault       int    `json:"rpm_limit_default"`
 }
 type AdminSettingsGateway struct {
-	OverloadCooldownSeconds  int    `json:"overload_cooldown_seconds"`
-	RateLimitCooldownSeconds int    `json:"rate_limit_cooldown_seconds"`
-	StreamTimeoutSeconds     int    `json:"stream_timeout_seconds"`
-	RequestShaperEnabled     bool   `json:"request_shaper_enabled"`
-	BetaStrategy             string `json:"beta_strategy"`
+	OverloadCooldownSeconds              int      `json:"overload_cooldown_seconds"`
+	RateLimitCooldownSeconds             int      `json:"rate_limit_cooldown_seconds"`
+	StreamTimeoutSeconds                 int      `json:"stream_timeout_seconds"`
+	RequestShaperEnabled                 bool     `json:"request_shaper_enabled"`
+	BetaStrategy                         string   `json:"beta_strategy"`
+	SchedulerStrategyRolloutEnabled      bool     `json:"scheduler_strategy_rollout_enabled"`
+	SchedulerStrategyShadowStrategy      string   `json:"scheduler_strategy_shadow_strategy"`
+	SchedulerStrategyRolloutPercent      float64  `json:"scheduler_strategy_rollout_percent"`
+	SchedulerStrategyRolloutModels       []string `json:"scheduler_strategy_rollout_models"`
+	SchedulerStrategyRolloutAPIKeyHashes []string `json:"scheduler_strategy_rollout_api_key_hashes"`
 }
 type AdminSettingsPayment struct {
 	Enabled                  bool     `json:"enabled"`

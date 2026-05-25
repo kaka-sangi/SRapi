@@ -661,11 +661,16 @@ func defaultAdminSettings(now time.Time) admincontrol.AdminSettings {
 			RPMLimitDefault:       0,
 		},
 		Gateway: admincontrol.AdminSettingsGateway{
-			OverloadCooldownSeconds:  30,
-			RateLimitCooldownSeconds: 30,
-			StreamTimeoutSeconds:     600,
-			RequestShaperEnabled:     true,
-			BetaStrategy:             "allow_configured",
+			OverloadCooldownSeconds:              30,
+			RateLimitCooldownSeconds:             30,
+			StreamTimeoutSeconds:                 600,
+			RequestShaperEnabled:                 true,
+			BetaStrategy:                         "allow_configured",
+			SchedulerStrategyRolloutEnabled:      false,
+			SchedulerStrategyShadowStrategy:      "",
+			SchedulerStrategyRolloutPercent:      0,
+			SchedulerStrategyRolloutModels:       []string{},
+			SchedulerStrategyRolloutAPIKeyHashes: []string{},
 		},
 		Payment: admincontrol.AdminSettingsPayment{
 			Enabled:                  false,
@@ -691,7 +696,16 @@ func normalizeAdminSettings(settings admincontrol.AdminSettings) (admincontrol.A
 	settings.Users.DefaultBalance = strings.TrimSpace(settings.Users.DefaultBalance)
 	settings.Users.DefaultGroup = strings.TrimSpace(settings.Users.DefaultGroup)
 	settings.Gateway.BetaStrategy = strings.TrimSpace(settings.Gateway.BetaStrategy)
+	settings.Gateway.SchedulerStrategyShadowStrategy = strings.TrimSpace(settings.Gateway.SchedulerStrategyShadowStrategy)
+	settings.Gateway.SchedulerStrategyRolloutModels = uniqueTrimmedStrings(settings.Gateway.SchedulerStrategyRolloutModels)
+	settings.Gateway.SchedulerStrategyRolloutAPIKeyHashes = uniqueTrimmedStrings(settings.Gateway.SchedulerStrategyRolloutAPIKeyHashes)
 	if settings.General.SiteName == "" || !validDecimal(settings.Users.DefaultBalance) || settings.Users.RPMLimitDefault < 0 || settings.Gateway.StreamTimeoutSeconds <= 0 || settings.Backup.RetentionDays <= 0 {
+		return admincontrol.AdminSettings{}, admincontrol.ErrInvalidInput
+	}
+	if settings.Gateway.SchedulerStrategyRolloutPercent < 0 || settings.Gateway.SchedulerStrategyRolloutPercent > 100 {
+		return admincontrol.AdminSettings{}, admincontrol.ErrInvalidInput
+	}
+	if settings.Gateway.SchedulerStrategyRolloutEnabled && (settings.Gateway.SchedulerStrategyShadowStrategy == "" || settings.Gateway.SchedulerStrategyRolloutPercent <= 0) {
 		return admincontrol.AdminSettings{}, admincontrol.ErrInvalidInput
 	}
 	if settings.General.CustomMenus == nil {
@@ -709,7 +723,31 @@ func normalizeAdminSettings(settings admincontrol.AdminSettings) (admincontrol.A
 	if settings.Email.Templates == nil {
 		settings.Email.Templates = map[string]string{}
 	}
+	if settings.Gateway.SchedulerStrategyRolloutModels == nil {
+		settings.Gateway.SchedulerStrategyRolloutModels = []string{}
+	}
+	if settings.Gateway.SchedulerStrategyRolloutAPIKeyHashes == nil {
+		settings.Gateway.SchedulerStrategyRolloutAPIKeyHashes = []string{}
+	}
 	return settings, nil
+}
+
+func uniqueTrimmedStrings(values []string) []string {
+	out := make([]string, 0, len(values))
+	seen := map[string]struct{}{}
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			continue
+		}
+		key := strings.ToLower(trimmed)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, trimmed)
+	}
+	return out
 }
 
 func defaultOpsSettings() admincontrol.OpsSettings {
