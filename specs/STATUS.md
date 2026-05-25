@@ -108,6 +108,7 @@ last_completed:
 - C1.1.1: Added an opt-in OpenTelemetry HTTP tracing overhead gate (`make otel-overhead-bench`) that compares no-op tracer provider vs batch tracer provider `/livez` p99 latency, defaults to a 5ms overhead budget, and documents when to run it before release or after observability changes.
 - C1.1.2: Added an opt-in Jaeger visualization smoke (`make smoke-jaeger-trace`) that starts official Jaeger all-in-one locally, exports a span over OTLP/gRPC, and verifies the trace is visible through the Jaeger Query API before removing the temporary container.
 - Quality gate: Fixed `tools/web-check.mjs` so Vitest no longer shares one Node `--localstorage-file` across parallel unit files; the web harness now uses each browser test environment's storage and `make check` is repeatable for language persistence assertions.
+- Spec governance: Reconciled stale A5.2 guidance in `specs/silly-stirring-turtle.md` with current provider preset evidence; the engineering plan now records the implemented preset registry, install API, default-disabled behavior, and representative provider test diagnostics instead of listing A5.2 as missing.
 
 current:
 
@@ -124,6 +125,8 @@ last_gates:
 - `cd apps/api && go test ./internal/platform/otel -count=1 -v`: pass; Jaeger smoke skips unless `SRAPI_OTEL_JAEGER_SMOKE=1`
 - `make smoke-jaeger-trace`: pass; local Jaeger all-in-one accepted OTLP/gRPC span and Query API returned the trace
 - `make check`: pass; includes OpenAPI lint/bundle/codegen checks, SDK typecheck, migration check, architecture/code-quality/API tests, examples check, secret scan, web typecheck/lint/unit/build, and bundle budget
+- `cd apps/api && go test ./internal/modules/providers/preset -run TestDefaultRegistrySeedsCompatiblePresets -count=1 -v`: pass
+- `cd apps/api && go test ./internal/httpserver -run TestAdminInstallProviderPresetsIsIdempotent -count=1 -v`: pass
 - `cd apps/api && go test ./...`: pass
 - `cd apps/api && go test ./internal/httpserver -run TestGatewayRealtimeWebSocketRelaysOpenAIUpstreamWebSocket -count=1 -v`: pass after one concurrent `architecture-check` run exposed a transient existing realtime WebSocket timing failure
 - `make architecture-check`: pass on rerun
