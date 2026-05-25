@@ -93,16 +93,17 @@ last_completed:
 - C3.2: Role permission persistence now adds `roles.permissions_json`, admin roles APIs, merged user session permissions, `entitlements` query-cache rows materialized from active subscription snapshots, `000009_role_permissions_and_entitlements` up/down migrations, and an HTTP regression proving `payment_order:read` grants read-only admin payment order access while plain users are rejected.
 - B1.2.1: Usage charging performance indexing now replaces the single-column `usage_logs(charged_at)` index with `usage_logs(charged_at, success, created_at)`, makes `ListPendingUsageCharges` scan oldest pending usage first, and adds a persistence regression for deterministic pending charge ordering.
 - B4.2: Alipay Official payment support now adds `smartwalle/alipay/v3`, a checkout provider for `alipay.trade.page.pay` / `alipay.trade.wap.pay`, service-level Alipay async notification verification with the order-bound provider instance, and regressions for signed checkout URL generation, webhook fulfillment, idempotency, invalid-signature fail-closed behavior, multi-instance ownership, and invalid return URL rejection. Real Alipay sandbox smoke still requires external merchant credentials.
+- B4.3: WeChat Pay Official support now adds `wechatpay-apiv3/wechatpay-go`, a checkout provider for Native / H5 / JSAPI prepay flows, service-level WeChat APIv3 notification signature verification and AES-GCM decrypt handling, and regressions for checkout metadata, signed notification fulfillment, idempotency, and local config requirement checks. Real WeChat sandbox smoke still requires external merchant credentials.
 - C1.1: Structured trace service spans now cover `scheduler.Schedule`, `payments.HandleWebhook`, and `accounts.ProbeAccount` with reusable `platform/otel.StartSpan` / `EndSpan`, low-sensitive diagnostic attributes, business outcome fields, stable `error.type` classification, and focused span export tests.
 - C1.2: SLO burn-rate evaluator now adds `operations.Service.EvaluateSLOAlerts()`, a persistent-store `slo_evaluator` worker, `SLO_EVALUATOR_*` config, app lifecycle wiring, and tests proving multi-window availability breaches create/update/resolve only `slo.burn_rate.*` alert events while leaving manual alerts untouched.
 
 current:
 
 - package: B4 payment SDK adapters
-- status: Alipay Official SDK integration is implemented and locally verified; WeChat Pay APIv3 and real Stripe/Alipay/WeChat sandbox smoke remain pending external credentials/environment.
+- status: Stripe, Alipay Official, and WeChat Pay APIv3 SDK integrations are implemented and locally verified; real Stripe/Alipay/WeChat sandbox smoke remains pending external credentials/environment.
 - objective: continue payment-provider closure without letting docs/specs drift.
 
-next_recommended: Continue with B4.3 WeChat Pay APIv3 SDK integration from `specs/silly-stirring-turtle.md`, or run real Stripe/Alipay sandbox smoke when merchant credentials are available.
+next_recommended: Run real Stripe/Alipay/WeChat sandbox smoke when merchant credentials are available, or continue the remaining Phase 1 production smoke / pressure-test tasks from `specs/silly-stirring-turtle.md`.
 
 last_gates:
 

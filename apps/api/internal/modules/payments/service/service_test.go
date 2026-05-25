@@ -1,8 +1,12 @@
 package service
 
 import (
+	"crypto"
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
@@ -24,6 +28,7 @@ import (
 	eventsservice "github.com/srapi/srapi/apps/api/internal/modules/events/service"
 	eventsmemory "github.com/srapi/srapi/apps/api/internal/modules/events/store/memory"
 	"github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
+	checkoutprovider "github.com/srapi/srapi/apps/api/internal/modules/payments/providers/checkout"
 	stripeprovider "github.com/srapi/srapi/apps/api/internal/modules/payments/providers/stripe"
 	paymentmemory "github.com/srapi/srapi/apps/api/internal/modules/payments/store/memory"
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
@@ -280,6 +285,87 @@ func TestStripeWebhookFulfillsCheckoutSession(t *testing.T) {
 	}
 }
 
+func TestWechatWebhookFulfillsSignedNotification(t *testing.T) {
+	h := newHarness(t)
+	keys := newWechatTestKeys(t)
+	provider, err := h.payments.CreateProviderInstance(t.Context(), contract.CreateProviderInstanceRequest{
+		Provider: "wechat",
+		Name:     "wechat-primary",
+		Config: map[string]any{
+			"app_id":                  "wx_app_123",
+			"mch_id":                  "mch_123",
+			"api_v3_key":              keys.apiV3Key,
+			"serial_no":               "merchant_serial_123",
+			"private_key":             keys.merchantPrivateKey,
+			"notify_url":              "https://api.example/api/v1/webhooks/payments/wechat",
+			"wechatpay_public_key":    keys.platformPublicKey,
+			"wechatpay_public_key_id": keys.platformPublicKeyID,
+		},
+		SupportedMethods: []string{"wechat"},
+		Limits:           map[string]any{"currency": "CNY"},
+	})
+	if err != nil {
+		t.Fatalf("create wechat provider: %v", err)
+	}
+	order, err := h.store.CreateOrder(t.Context(), contract.CreateStoredOrder{
+		UserID:             1,
+		OrderNo:            "pay_wechat_123",
+		ProviderInstanceID: provider.ID,
+		Amount:             "12.34000000",
+		Currency:           "CNY",
+		Status:             contract.OrderStatusPending,
+		ProductType:        contract.ProductTypeBalanceCredit,
+		ProviderSnapshot: map[string]any{
+			"provider": "wechat",
+			"method":   "wechat",
+		},
+	})
+	if err != nil {
+		t.Fatalf("create stored wechat order: %v", err)
+	}
+	payload, headers := signedWechatNotification(t, keys, map[string]any{
+		"appid":          "wx_app_123",
+		"mchid":          "mch_123",
+		"out_trade_no":   order.OrderNo,
+		"transaction_id": "4200000000202605221234567890",
+		"trade_state":    "SUCCESS",
+		"trade_type":     "NATIVE",
+		"amount": map[string]any{
+			"total":    1234,
+			"currency": "CNY",
+		},
+	})
+	result, err := h.payments.HandleWebhook(t.Context(), contract.WebhookRequest{
+		Provider: "wechat",
+		Headers:  headers,
+		Payload:  map[string]any{"raw_body": payload},
+	})
+	if err != nil {
+		t.Fatalf("handle wechat webhook: %v", err)
+	}
+	if !result.Handled || result.Order.Status != contract.OrderStatusFulfilled || stringValue(result.Order.ProviderTransactionID) != "4200000000202605221234567890" {
+		t.Fatalf("expected fulfilled wechat order, got %+v", result)
+	}
+	ledger, err := h.billing.List(t.Context())
+	if err != nil {
+		t.Fatalf("list billing ledger: %v", err)
+	}
+	if len(ledger) != 1 || ledger[0].Type != billingcontract.LedgerTypePaymentCredit || ledger[0].ReferenceID != order.OrderNo {
+		t.Fatalf("expected payment credit ledger, got %+v", ledger)
+	}
+	duplicate, err := h.payments.HandleWebhook(t.Context(), contract.WebhookRequest{
+		Provider: "wechat",
+		Headers:  headers,
+		Payload:  map[string]any{"raw_body": payload},
+	})
+	if err != nil {
+		t.Fatalf("handle duplicate wechat webhook: %v", err)
+	}
+	if duplicate.Handled {
+		t.Fatalf("duplicate wechat webhook should be idempotent, got %+v", duplicate)
+	}
+}
+
 func TestEasyPayOrderCreatesSignedCheckoutURL(t *testing.T) {
 	h := newHarness(t)
 	provider, err := h.payments.CreateProviderInstance(t.Context(), contract.CreateProviderInstanceRequest{
@@ -311,6 +397,57 @@ func TestEasyPayOrderCreatesSignedCheckoutURL(t *testing.T) {
 	}
 	if order.Metadata["easypay_pay_url"] != checkoutURL || order.Metadata["easypay_sign"] == "" {
 		t.Fatalf("expected easypay metadata, got %+v", order.Metadata)
+	}
+}
+
+func TestWechatOrderCreatesPrepayCheckoutMetadata(t *testing.T) {
+	h := newHarnessWithDeps(t, Dependencies{
+		Checkout: checkoutprovider.Registry{
+			"wechat": fakeCheckoutProvider{session: checkoutprovider.Session{
+				ID:  "prepay_id=test",
+				URL: "weixin://wxpay/bizpayurl?pr=test",
+				Metadata: map[string]any{
+					"wechat_pay_mode": "native",
+					"wechat_code_url": "weixin://wxpay/bizpayurl?pr=test",
+				},
+			}},
+		},
+	})
+	provider, err := h.payments.CreateProviderInstance(t.Context(), contract.CreateProviderInstanceRequest{
+		Provider: "wechat",
+		Name:     "wechat-primary",
+		Config: map[string]any{
+			"app_id":      "wx_app_123",
+			"mch_id":      "mch_123",
+			"api_v3_key":  "0123456789abcdef0123456789abcdef",
+			"serial_no":   "merchant_serial_123",
+			"private_key": "merchant-private-key",
+			"notify_url":  "https://api.example/api/v1/webhooks/payments/wechat",
+		},
+		SupportedMethods: []string{"wechat"},
+		Limits:           map[string]any{"currency": "CNY"},
+	})
+	if err != nil {
+		t.Fatalf("create wechat provider: %v", err)
+	}
+	order, err := h.payments.CreateOrder(t.Context(), contract.CreateOrderRequest{
+		UserID:      1,
+		Method:      "wechat",
+		Amount:      "12.34000000",
+		Currency:    "CNY",
+		ProductType: contract.ProductTypeBalanceCredit,
+	})
+	if err != nil {
+		t.Fatalf("create wechat order: %v", err)
+	}
+	if order.ProviderInstanceID != provider.ID {
+		t.Fatalf("expected wechat provider instance %d, got %+v", provider.ID, order)
+	}
+	if order.Metadata["checkout_session_id"] != "prepay_id=test" || order.Metadata["checkout_url"] != "weixin://wxpay/bizpayurl?pr=test" {
+		t.Fatalf("expected wechat checkout identifiers, got %+v", order.Metadata)
+	}
+	if order.Metadata["wechat_pay_mode"] != "native" || order.Metadata["wechat_code_url"] != "weixin://wxpay/bizpayurl?pr=test" {
+		t.Fatalf("expected wechat checkout metadata, got %+v", order.Metadata)
 	}
 }
 
@@ -606,6 +743,24 @@ func TestPaymentProviderTestReportsMissingConfigRequirements(t *testing.T) {
 	if result.OK || !ok || len(missing) != 2 || missing[0] != "config.success_url" || missing[1] != "config.cancel_url" {
 		t.Fatalf("expected missing stripe checkout URLs, got %+v", result)
 	}
+
+	wechat, err := h.payments.CreateProviderInstance(t.Context(), contract.CreateProviderInstanceRequest{
+		Provider:         "wechat",
+		Name:             "wechat-incomplete",
+		Config:           map[string]any{"app_id": "wx_app_123", "api_v3_key": "0123456789abcdef0123456789abcdef"},
+		SupportedMethods: []string{"wechat"},
+	})
+	if err != nil {
+		t.Fatalf("create incomplete wechat provider: %v", err)
+	}
+	result, err = h.payments.TestProviderInstance(t.Context(), wechat.ID)
+	if err != nil {
+		t.Fatalf("test wechat provider: %v", err)
+	}
+	missing, ok = result.Checks["missing_requirements"].([]string)
+	if result.OK || !ok || len(missing) != 4 || missing[0] != "config.mch_id" || missing[1] != "config.serial_no" || missing[2] != "config.private_key" || missing[3] != "config.notify_url" {
+		t.Fatalf("expected missing wechat APIv3 requirements, got %+v", result)
+	}
 }
 
 func TestUpdateProviderInstanceRejectsDuplicateProviderName(t *testing.T) {
@@ -799,6 +954,11 @@ type harness struct {
 
 func newHarness(t *testing.T) harness {
 	t.Helper()
+	return newHarnessWithDeps(t, Dependencies{})
+}
+
+func newHarnessWithDeps(t *testing.T, deps Dependencies) harness {
+	t.Helper()
 	store := paymentmemory.New()
 	billingSvc, err := billingservice.New(billingmemory.New(), fixedClock{now: time.Date(2026, 5, 22, 12, 0, 0, 0, time.UTC)})
 	if err != nil {
@@ -817,13 +977,12 @@ func newHarness(t *testing.T) harness {
 		t.Fatalf("new events service: %v", err)
 	}
 	stripeFake := &fakeStripeCheckout{}
-	paymentsSvc, err := New(store, testMasterKey, Dependencies{
-		Billing:       billingSvc,
-		Subscriptions: subSvc,
-		Audit:         auditSvc,
-		Events:        eventsSvc,
-		Stripe:        stripeFake,
-	}, fixedClock{now: time.Date(2026, 5, 22, 12, 0, 0, 0, time.UTC)})
+	deps.Billing = billingSvc
+	deps.Subscriptions = subSvc
+	deps.Audit = auditSvc
+	deps.Events = eventsSvc
+	deps.Stripe = stripeFake
+	paymentsSvc, err := New(store, testMasterKey, deps, fixedClock{now: time.Date(2026, 5, 22, 12, 0, 0, 0, time.UTC)})
 	if err != nil {
 		t.Fatalf("new payment service: %v", err)
 	}
@@ -891,6 +1050,14 @@ type alipayTestKeys struct {
 	alipayPublicKey    string
 }
 
+type wechatTestKeys struct {
+	apiV3Key            string
+	merchantPrivateKey  string
+	platformPrivateKey  *rsa.PrivateKey
+	platformPublicKey   string
+	platformPublicKeyID string
+}
+
 func newAlipayTestKeys(t *testing.T) alipayTestKeys {
 	t.Helper()
 	merchantKey, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -905,6 +1072,25 @@ func newAlipayTestKeys(t *testing.T) alipayTestKeys {
 		merchantPrivateKey: encodePrivateKey(merchantKey),
 		alipayPrivateKey:   encodePrivateKey(alipayKey),
 		alipayPublicKey:    encodePublicKey(&alipayKey.PublicKey),
+	}
+}
+
+func newWechatTestKeys(t *testing.T) wechatTestKeys {
+	t.Helper()
+	merchantKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("generate wechat merchant key: %v", err)
+	}
+	platformKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("generate wechat platform key: %v", err)
+	}
+	return wechatTestKeys{
+		apiV3Key:            "0123456789abcdef0123456789abcdef",
+		merchantPrivateKey:  encodePrivateKey(merchantKey),
+		platformPrivateKey:  platformKey,
+		platformPublicKey:   encodePublicKey(&platformKey.PublicKey),
+		platformPublicKeyID: "PUB_KEY_ID_123",
 	}
 }
 
@@ -931,6 +1117,57 @@ func signedAlipayNotification(t *testing.T, keys alipayTestKeys, fields map[stri
 		}
 	}
 	return payload
+}
+
+func signedWechatNotification(t *testing.T, keys wechatTestKeys, transaction map[string]any) (string, map[string]string) {
+	t.Helper()
+	plaintext, err := json.Marshal(transaction)
+	if err != nil {
+		t.Fatalf("marshal wechat transaction: %v", err)
+	}
+	block, err := aes.NewCipher([]byte(keys.apiV3Key))
+	if err != nil {
+		t.Fatalf("new wechat aes cipher: %v", err)
+	}
+	aead, err := cipher.NewGCM(block)
+	if err != nil {
+		t.Fatalf("new wechat gcm: %v", err)
+	}
+	associatedData := "transaction"
+	resourceNonce := "notify123456"
+	ciphertext := aead.Seal(nil, []byte(resourceNonce), plaintext, []byte(associatedData))
+	body := map[string]any{
+		"id":            "evt_wechat_paid",
+		"create_time":   time.Now().UTC().Format(time.RFC3339),
+		"event_type":    "TRANSACTION.SUCCESS",
+		"resource_type": "encrypt-resource",
+		"summary":       "transaction success",
+		"resource": map[string]any{
+			"algorithm":       "AEAD_AES_256_GCM",
+			"ciphertext":      base64.StdEncoding.EncodeToString(ciphertext),
+			"associated_data": associatedData,
+			"nonce":           resourceNonce,
+			"original_type":   "transaction",
+		},
+	}
+	raw, err := json.Marshal(body)
+	if err != nil {
+		t.Fatalf("marshal wechat notification: %v", err)
+	}
+	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
+	signNonce := "signnonce123"
+	message := timestamp + "\n" + signNonce + "\n" + string(raw) + "\n"
+	digest := sha256.Sum256([]byte(message))
+	signature, err := rsa.SignPKCS1v15(rand.Reader, keys.platformPrivateKey, crypto.SHA256, digest[:])
+	if err != nil {
+		t.Fatalf("sign wechat notification: %v", err)
+	}
+	return string(raw), map[string]string{
+		"Wechatpay-Nonce":     signNonce,
+		"Wechatpay-Serial":    keys.platformPublicKeyID,
+		"Wechatpay-Signature": base64.StdEncoding.EncodeToString(signature),
+		"Wechatpay-Timestamp": timestamp,
+	}
 }
 
 func encodePrivateKey(key *rsa.PrivateKey) string {
@@ -975,6 +1212,18 @@ func (f *fakeStripeCheckout) CreateCheckoutSession(req stripeprovider.CheckoutSe
 	f.last = req
 	if f.err != nil {
 		return stripeprovider.CheckoutSession{}, f.err
+	}
+	return f.session, nil
+}
+
+type fakeCheckoutProvider struct {
+	session checkoutprovider.Session
+	err     error
+}
+
+func (f fakeCheckoutProvider) CreateSession(checkoutprovider.Request) (checkoutprovider.Session, error) {
+	if f.err != nil {
+		return checkoutprovider.Session{}, f.err
 	}
 	return f.session, nil
 }

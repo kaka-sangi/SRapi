@@ -619,6 +619,9 @@ func (s *Service) normalizeWebhook(ctx context.Context, provider string, req con
 	if provider == "alipay" {
 		return s.normalizeAlipayWebhook(ctx, req)
 	}
+	if provider == "wechat" {
+		return s.normalizeWechatWebhook(ctx, req)
+	}
 	return normalizedWebhook{
 		OrderNo:        payloadString(req.Payload, "order_no"),
 		TransactionID:  payloadString(req.Payload, "transaction_id", "trade_no", "provider_transaction_id"),
@@ -1067,6 +1070,13 @@ func missingProviderConfigFields(provider string, config map[string]any) []strin
 		requireAny("config.signing_secret", "signing_secret", "webhook_secret", "key", "secret")
 		requireAny("config.notify_url", "notify_url", "webhook_url")
 		requireAny("config.return_url", "return_url", "success_url")
+	case "wechat":
+		requireAny("config.app_id", "app_id", "appid")
+		requireAny("config.mch_id", "mch_id", "mchid", "merchant_id")
+		requireAny("config.api_v3_key", "api_v3_key", "apiV3Key")
+		requireAny("config.serial_no", "serial_no", "certificate_serial_no", "mch_certificate_serial_no")
+		requireAny("config.private_key", "private_key", "merchant_private_key")
+		requireAny("config.notify_url", "notify_url", "webhook_url")
 	default:
 		requireAny("config.webhook_secret", "webhook_secret", "signing_secret", "secret")
 	}

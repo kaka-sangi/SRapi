@@ -5,6 +5,7 @@ import (
 	checkoutprovider "github.com/srapi/srapi/apps/api/internal/modules/payments/providers/checkout"
 	easypayprovider "github.com/srapi/srapi/apps/api/internal/modules/payments/providers/easypay"
 	stripeprovider "github.com/srapi/srapi/apps/api/internal/modules/payments/providers/stripe"
+	wechatprovider "github.com/srapi/srapi/apps/api/internal/modules/payments/providers/wechat"
 )
 
 func defaultCheckoutRegistry(stripe stripeprovider.CheckoutCreator) checkoutprovider.Registry {
@@ -12,6 +13,7 @@ func defaultCheckoutRegistry(stripe stripeprovider.CheckoutCreator) checkoutprov
 		"alipay":  alipayprovider.New(),
 		"easypay": easypayprovider.New(),
 		"stripe":  stripeCheckoutAdapter{creator: stripe},
+		"wechat":  wechatprovider.New(),
 	}
 }
 

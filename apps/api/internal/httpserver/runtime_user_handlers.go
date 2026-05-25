@@ -309,7 +309,7 @@ func (s *Server) handlePaymentWebhook(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	provider := strings.TrimSpace(r.PathValue("provider"))
 	var body apiopenapi.PaymentWebhookRequest
-	if provider == "stripe" {
+	if provider == "stripe" || provider == "wechat" {
 		raw, err := io.ReadAll(http.MaxBytesReader(w, r.Body, s.cfg.Gateway.MaxBodySize))
 		if err != nil {
 			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid payment webhook request", requestID)
