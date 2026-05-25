@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"math/big"
 	"strconv"
 	"strings"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/stripe/stripe-go/v78/webhook"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
+	stripeprovider "github.com/srapi/srapi/apps/api/internal/modules/payments/providers/stripe"
 )
 
 func (s *Service) normalizeStripeWebhook(ctx context.Context, req contract.WebhookRequest) (normalizedWebhook, error) {
@@ -92,7 +92,7 @@ func (s *Service) normalizeStripeWebhook(ctx context.Context, req contract.Webho
 
 func stripeAmount(amount int64, currency string) string {
 	scale := int64(100)
-	if stripeZeroDecimalCurrency(currency) {
+	if stripeprovider.ZeroDecimalCurrency(currency) {
 		scale = 1
 	}
 	whole := amount / scale
@@ -101,35 +101,6 @@ func stripeAmount(amount int64, currency string) string {
 		return strconv.FormatInt(whole, 10) + ".00000000"
 	}
 	return strconv.FormatInt(whole, 10) + "." + leftPad(strconv.FormatInt(fraction, 10), 2) + "000000"
-}
-
-func stripeMinorAmount(amount string, currency string) (int64, bool) {
-	rat, ok := decimalRat(amount)
-	if !ok || rat.Sign() < 0 {
-		return 0, false
-	}
-	scale := int64(100)
-	if stripeZeroDecimalCurrency(currency) {
-		scale = 1
-	}
-	rat.Mul(rat, new(big.Rat).SetInt64(scale))
-	if !rat.IsInt() {
-		return 0, false
-	}
-	value := rat.Num()
-	if !value.IsInt64() || value.Sign() < 0 {
-		return 0, false
-	}
-	return value.Int64(), true
-}
-
-func stripeZeroDecimalCurrency(currency string) bool {
-	switch strings.ToUpper(strings.TrimSpace(currency)) {
-	case "BIF", "CLP", "DJF", "GNF", "JPY", "KMF", "KRW", "MGA", "PYG", "RWF", "UGX", "VND", "VUV", "XAF", "XOF", "XPF":
-		return true
-	default:
-		return false
-	}
 }
 
 func leftPad(value string, width int) string {

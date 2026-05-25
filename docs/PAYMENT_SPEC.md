@@ -101,7 +101,32 @@ metadata_json
 | LDCPay | Phase 3 | Linux DO Credit 或类似积分支付。 |
 | Custom Webhook | Phase 3 | 外部支付系统通过受控 API 入账。 |
 
-MVP 只需要保留抽象，不需要接入真实渠道。
+当前实现已超过最初 MVP 抽象：`payments/providers/checkout` 定义统一下单接口，`payments/providers/stripe` 使用 `stripe-go/v78` 创建 Stripe Checkout Session 并由 Stripe webhook SDK 验签，`payments/providers/easypay` 生成带签名的 EasyPay 跳转 URL。Alipay Official 与 WeChat Pay Official 仍是待接入渠道，计划分别使用 `smartwalle/alipay/v3` 和 `wechatpay-apiv3/wechatpay-go`。
+
+Stripe provider config 至少包含：
+
+```json
+{
+  "secret_key": "sk_test_...",
+  "webhook_secret": "whsec_...",
+  "success_url": "https://app.example/pay/success",
+  "cancel_url": "https://app.example/pay/cancel"
+}
+```
+
+EasyPay provider config 至少包含：
+
+```json
+{
+  "gateway_url": "https://pay.example/submit",
+  "merchant_id": "1000",
+  "webhook_secret": "provider-signing-secret",
+  "notify_url": "https://api.example/api/v1/webhooks/payments/easypay",
+  "return_url": "https://app.example/pay/return"
+}
+```
+
+这些配置通过 payment provider instance 的 `config_ciphertext` 加密保存；订单 metadata 只保存 checkout URL、session id、签名摘要等非密钥信息。
 
 ## 5. 前台可见支付方式
 

@@ -13,7 +13,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -23,6 +22,7 @@ import (
 	billingcontract "github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
 	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	"github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
+	checkoutprovider "github.com/srapi/srapi/apps/api/internal/modules/payments/providers/checkout"
 	stripeprovider "github.com/srapi/srapi/apps/api/internal/modules/payments/providers/stripe"
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	platformcrypto "github.com/srapi/srapi/apps/api/internal/platform/crypto"
@@ -66,6 +66,7 @@ type Dependencies struct {
 	Subscriptions SubscriptionActivator
 	Audit         AuditRecorder
 	Events        EventEnqueuer
+	Checkout      checkoutprovider.Registry
 	Stripe        stripeprovider.CheckoutCreator
 }
 
@@ -89,6 +90,9 @@ func New(store contract.Store, masterKey string, deps Dependencies, clock Clock)
 	}
 	if deps.Stripe == nil {
 		deps.Stripe = stripeprovider.New()
+	}
+	if deps.Checkout == nil {
+		deps.Checkout = defaultCheckoutRegistry(deps.Stripe)
 	}
 	return &Service{store: store, masterKey: derivedKey, deps: deps, clock: clock}, nil
 }
@@ -420,65 +424,47 @@ func paymentWebhookTraceAttrs(result contract.WebhookResult, err error) []attrib
 }
 
 func (s *Service) attachProviderCheckout(ctx context.Context, order contract.PaymentOrder, instance contract.PaymentProviderInstance) (contract.PaymentOrder, error) {
-	if instance.Provider != "stripe" {
+	provider, ok := s.deps.Checkout[instance.Provider]
+	if !ok {
 		return order, nil
 	}
 	config, err := s.decryptConfig(instance, instance.ConfigCiphertext)
 	if err != nil {
 		return contract.PaymentOrder{}, err
 	}
-	secretKey := payloadString(config, "secret_key", "api_key")
-	if secretKey == "" {
-		return contract.PaymentOrder{}, ErrInvalidInput
-	}
-	successURL := checkoutURL(config, "success_url", order.OrderNo)
-	cancelURL := checkoutURL(config, "cancel_url", order.OrderNo)
-	if successURL == "" || cancelURL == "" {
-		return contract.PaymentOrder{}, ErrInvalidInput
-	}
-	amountMinor, ok := stripeMinorAmount(order.Amount, order.Currency)
-	if !ok {
-		return contract.PaymentOrder{}, ErrInvalidInput
-	}
-	session, err := s.deps.Stripe.CreateCheckoutSession(stripeprovider.CheckoutSessionRequest{
-		APIKey:     secretKey,
-		OrderNo:    order.OrderNo,
-		Amount:     amountMinor,
-		Currency:   strings.ToLower(order.Currency),
-		SuccessURL: successURL,
-		CancelURL:  cancelURL,
-		Metadata: map[string]string{
-			"order_no":     order.OrderNo,
-			"user_id":      strconv.Itoa(order.UserID),
-			"product_type": string(order.ProductType),
-			"product_id":   order.ProductID,
+	session, err := provider.CreateSession(checkoutprovider.Request{
+		Provider: instance.Provider,
+		Config:   config,
+		OrderNo:  order.OrderNo,
+		UserID:   order.UserID,
+		Amount:   order.Amount,
+		Currency: order.Currency,
+		Product: checkoutprovider.Product{
+			Type: string(order.ProductType),
+			ID:   order.ProductID,
+		},
+		Metadata: map[string]any{
+			"method": payloadString(order.ProviderSnapshot, "method"),
 		},
 	})
 	if err != nil {
-		return contract.PaymentOrder{}, err
+		if errors.Is(err, checkoutprovider.ErrUnavailable) {
+			return contract.PaymentOrder{}, ErrProviderUnavailable
+		}
+		return contract.PaymentOrder{}, ErrInvalidInput
 	}
 	order.Metadata = cloneMap(order.Metadata)
-	order.Metadata["stripe_checkout_session_id"] = session.ID
-	order.Metadata["stripe_checkout_url"] = session.URL
+	if session.ID != "" {
+		order.Metadata["checkout_session_id"] = session.ID
+	}
+	if session.URL != "" {
+		order.Metadata["checkout_url"] = session.URL
+	}
+	for key, value := range session.Metadata {
+		order.Metadata[key] = value
+	}
 	order.UpdatedAt = s.clock.Now()
 	return s.store.UpdateOrder(ctx, order)
-}
-
-func checkoutURL(config map[string]any, key string, orderNo string) string {
-	raw := payloadString(config, key)
-	if raw == "" {
-		return ""
-	}
-	parsed, err := url.Parse(raw)
-	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
-		return ""
-	}
-	query := parsed.Query()
-	if query.Get("order_no") == "" {
-		query.Set("order_no", orderNo)
-	}
-	parsed.RawQuery = query.Encode()
-	return parsed.String()
 }
 
 type normalizedWebhook struct {

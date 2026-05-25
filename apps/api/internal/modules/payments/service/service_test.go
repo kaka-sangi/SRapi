@@ -43,7 +43,7 @@ func TestPaymentWebhookFulfillsSubscriptionOrderIdempotently(t *testing.T) {
 	provider, err := h.payments.CreateProviderInstance(t.Context(), contract.CreateProviderInstanceRequest{
 		Provider:         "easypay",
 		Name:             "primary",
-		Config:           map[string]any{"webhook_secret": "provider-signing-secret", "merchant_id": "merchant-1"},
+		Config:           easypayTestConfig("provider-signing-secret"),
 		SupportedMethods: []string{"alipay"},
 		Limits:           map[string]any{"currency": "USD", "min_amount": "1.00", "max_amount": "100.00"},
 		Metadata:         map[string]any{"display_name": "AliPay"},
@@ -139,7 +139,7 @@ func TestPaymentWebhookRejectsInvalidSignatureFailClosed(t *testing.T) {
 	_, err := h.payments.CreateProviderInstance(t.Context(), contract.CreateProviderInstanceRequest{
 		Provider:         "easypay",
 		Name:             "primary",
-		Config:           map[string]any{"webhook_secret": "provider-signing-secret"},
+		Config:           easypayTestConfig("provider-signing-secret"),
 		SupportedMethods: []string{"alipay"},
 	})
 	if err != nil {
@@ -269,6 +269,64 @@ func TestStripeWebhookFulfillsCheckoutSession(t *testing.T) {
 	}
 	if len(ledger) != 1 || ledger[0].Type != billingcontract.LedgerTypePaymentCredit || ledger[0].ReferenceID != order.OrderNo {
 		t.Fatalf("expected payment credit ledger, got %+v", ledger)
+	}
+}
+
+func TestEasyPayOrderCreatesSignedCheckoutURL(t *testing.T) {
+	h := newHarness(t)
+	provider, err := h.payments.CreateProviderInstance(t.Context(), contract.CreateProviderInstanceRequest{
+		Provider:         "easypay",
+		Name:             "easypay-primary",
+		Config:           easypayTestConfig("easypay-signing-secret"),
+		SupportedMethods: []string{"wechat"},
+		Limits:           map[string]any{"currency": "USD"},
+	})
+	if err != nil {
+		t.Fatalf("create easypay provider: %v", err)
+	}
+	order, err := h.payments.CreateOrder(t.Context(), contract.CreateOrderRequest{
+		UserID:      1,
+		Method:      "wechat",
+		Amount:      "12.34000000",
+		Currency:    "USD",
+		ProductType: contract.ProductTypeBalanceCredit,
+	})
+	if err != nil {
+		t.Fatalf("create easypay order: %v", err)
+	}
+	if order.ProviderInstanceID != provider.ID {
+		t.Fatalf("expected easypay provider instance %d, got %+v", provider.ID, order)
+	}
+	checkoutURL := stringValueFromMap(order.Metadata, "checkout_url")
+	if checkoutURL == "" || !strings.Contains(checkoutURL, "out_trade_no="+order.OrderNo) || !strings.Contains(checkoutURL, "type=wxpay") {
+		t.Fatalf("expected signed easypay checkout url, got %+v", order.Metadata)
+	}
+	if order.Metadata["easypay_pay_url"] != checkoutURL || order.Metadata["easypay_sign"] == "" {
+		t.Fatalf("expected easypay metadata, got %+v", order.Metadata)
+	}
+}
+
+func TestStripeCheckoutFailureReturnsProviderUnavailable(t *testing.T) {
+	h := newHarness(t)
+	h.stripe.err = errors.New("stripe api unavailable")
+	if _, err := h.payments.CreateProviderInstance(t.Context(), contract.CreateProviderInstanceRequest{
+		Provider:         "stripe",
+		Name:             "stripe-primary",
+		Config:           map[string]any{"secret_key": "stripe_test_api_key", "webhook_secret": "stripe_test_webhook_secret", "success_url": "https://app.example/success", "cancel_url": "https://app.example/cancel"},
+		SupportedMethods: []string{"card"},
+		Limits:           map[string]any{"currency": "USD"},
+	}); err != nil {
+		t.Fatalf("create stripe provider: %v", err)
+	}
+	_, err := h.payments.CreateOrder(t.Context(), contract.CreateOrderRequest{
+		UserID:      1,
+		Method:      "card",
+		Amount:      "12.34",
+		Currency:    "USD",
+		ProductType: contract.ProductTypeBalanceCredit,
+	})
+	if !errors.Is(err, ErrProviderUnavailable) {
+		t.Fatalf("expected checkout failure to return provider unavailable, got %v", err)
 	}
 }
 
@@ -487,6 +545,28 @@ func mustJSON(t *testing.T, value map[string]any) string {
 		t.Fatalf("marshal json: %v", err)
 	}
 	return string(raw)
+}
+
+func easypayTestConfig(secret string) map[string]any {
+	return map[string]any{
+		"gateway_url":    "https://pay.example/submit",
+		"merchant_id":    "merchant-1",
+		"webhook_secret": secret,
+		"notify_url":     "https://api.example/api/v1/webhooks/payments/easypay",
+		"return_url":     "https://app.example/payments/return",
+	}
+}
+
+func stringValueFromMap(values map[string]any, key string) string {
+	value, ok := values[key]
+	if !ok {
+		return ""
+	}
+	typed, ok := value.(string)
+	if !ok {
+		return ""
+	}
+	return typed
 }
 
 type fixedClock struct {
