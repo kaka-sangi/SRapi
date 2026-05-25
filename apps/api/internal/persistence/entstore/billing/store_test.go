@@ -82,6 +82,34 @@ func TestChargeUsageCreatesLedgerUpdatesBalanceAndMarksUsageLogs(t *testing.T) {
 	}
 }
 
+func TestListPendingUsageChargesOrdersByCreatedAtThenID(t *testing.T) {
+	client := enttest.Open(t, dialect.SQLite, sqliteDSN(t))
+	defer client.Close()
+
+	store, err := New(client)
+	if err != nil {
+		t.Fatalf("new billing store: %v", err)
+	}
+
+	ctx := context.Background()
+	userID := createUser(t, client, "ordered-pending@srapi.local", "1.00000000")
+	older := time.Date(2026, 5, 24, 8, 0, 0, 0, time.UTC)
+	newer := older.Add(time.Minute)
+	newerID := createUsageLogAt(t, client, userID, "req_pending_newer", "0.10000000", nil, newer)
+	olderID := createUsageLogAt(t, client, userID, "req_pending_older", "0.20000000", nil, older)
+
+	pending, err := store.ListPendingUsageCharges(ctx, 10)
+	if err != nil {
+		t.Fatalf("list pending usage charges: %v", err)
+	}
+	if len(pending) != 2 {
+		t.Fatalf("expected two pending usage charges, got %+v", pending)
+	}
+	if pending[0].UsageLogID != olderID || pending[1].UsageLogID != newerID {
+		t.Fatalf("expected oldest pending usage first, got %+v", pending)
+	}
+}
+
 func TestChargeUsageFlagsNegativeBalance(t *testing.T) {
 	client := enttest.Open(t, dialect.SQLite, sqliteDSN(t))
 	defer client.Close()
@@ -160,6 +188,11 @@ func createUser(t *testing.T, client *ent.Client, email, balance string) int {
 
 func createUsageLog(t *testing.T, client *ent.Client, userID int, requestID, cost string, chargedAt *time.Time) int {
 	t.Helper()
+	return createUsageLogAt(t, client, userID, requestID, cost, chargedAt, time.Time{})
+}
+
+func createUsageLogAt(t *testing.T, client *ent.Client, userID int, requestID, cost string, chargedAt *time.Time, createdAt time.Time) int {
+	t.Helper()
 	create := client.UsageLog.Create().
 		SetRequestID(requestID).
 		SetUserID(userID).
@@ -174,6 +207,9 @@ func createUsageLog(t *testing.T, client *ent.Client, userID int, requestID, cos
 		SetCurrency("USD")
 	if chargedAt != nil {
 		create.SetChargedAt(*chargedAt)
+	}
+	if !createdAt.IsZero() {
+		create.SetCreatedAt(createdAt).SetUpdatedAt(createdAt)
 	}
 	log, err := create.Save(context.Background())
 	if err != nil {

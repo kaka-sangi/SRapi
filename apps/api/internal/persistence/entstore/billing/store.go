@@ -78,7 +78,7 @@ func (s *Store) ListPendingUsageCharges(ctx context.Context, limit int) ([]contr
 			entusagelog.ChargedAtIsNil(),
 			entusagelog.CostNEQ(""),
 		).
-		Order(entusagelog.ByID()).
+		Order(entusagelog.ByCreatedAt(), entusagelog.ByID()).
 		Limit(limit).
 		All(ctx)
 	if err != nil {

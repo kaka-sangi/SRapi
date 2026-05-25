@@ -1548,9 +1548,9 @@ var (
 				Columns: []*schema.Column{UsageLogsColumns[5], UsageLogsColumns[1]},
 			},
 			{
-				Name:    "usagelog_charged_at",
+				Name:    "usagelog_charged_at_success_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[23]},
+				Columns: []*schema.Column{UsageLogsColumns[23], UsageLogsColumns[19], UsageLogsColumns[1]},
 			},
 			{
 				Name:    "usagelog_api_key_id_created_at",

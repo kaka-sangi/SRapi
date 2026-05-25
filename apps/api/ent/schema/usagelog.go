@@ -45,7 +45,7 @@ func (UsageLog) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("request_id", "attempt_no").Unique(),
 		index.Fields("user_id", "created_at"),
-		index.Fields("charged_at"),
+		index.Fields("charged_at", "success", "created_at"),
 		index.Fields("api_key_id", "created_at"),
 		index.Fields("account_id", "created_at"),
 		index.Fields("source_endpoint", "created_at"),

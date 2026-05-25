@@ -916,6 +916,7 @@ success
 error_class
 cost
 currency
+charged_at nullable
 compatibility_warnings_json
 created_at
 ```
@@ -929,12 +930,15 @@ index(api_key_id, created_at)
 index(account_id, created_at)
 index(source_endpoint, created_at)
 index(model, created_at)
+index(charged_at, success, created_at)
 ```
 
 规则：
 
 - 同一 Gateway 请求如果发生 fallback，必须为每次 provider attempt 记录一条 `usage_logs`。
 - 所有 attempt 共用同一个 `request_id`，并递增 `attempt_no`，便于和 `scheduler_decisions` / `scheduler_feedbacks` 串联。
+- `cost` 和 `currency` 是 balance charger 的扣费输入；成功且 `charged_at IS NULL` 的记录会被后台 worker 按 `created_at` 顺序批量转成 `billing_ledger.usage_charge`。
+- `index(charged_at, success, created_at)` 服务未扣费 usage 扫描，避免在高吞吐 Gateway 日志中对已扣费记录做全表过滤。
 
 ### 11.2 billing_ledger
 

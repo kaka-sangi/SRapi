@@ -90,14 +90,15 @@ last_completed:
 - K1.4: QualityEval now adds encrypted `quality_eval_samples`, persisted `quality_evaluations`, contract/service/memory/Ent stores, an hourly worker, and OpenAI-compatible Chat Completions JSON-mode judge support. Gateway captures content-safety-sanitized text samples only when `QUALITY_EVAL_ENABLED=true`, worker samples 1% by stable hash and records correctness/coherence/safety rubric, and Scheduler candidates receive recent account+model aggregate `quality_score` / `quality_tier` evidence.
 - C3.1: Workspace persistence now adds `workspaces`, nullable `users.workspace_id`, nullable `api_keys.workspace_id`, `000008_workspaces_and_user_workspace_id` up/down migrations, User store personal workspace creation, API Key workspace inheritance, and docs/spec migration parity.
 - C3.2: Role permission persistence now adds `roles.permissions_json`, admin roles APIs, merged user session permissions, `entitlements` query-cache rows materialized from active subscription snapshots, `000009_role_permissions_and_entitlements` up/down migrations, and an HTTP regression proving `payment_order:read` grants read-only admin payment order access while plain users are rejected.
+- B1.2.1: Usage charging performance indexing now replaces the single-column `usage_logs(charged_at)` index with `usage_logs(charged_at, success, created_at)`, makes `ListPendingUsageCharges` scan oldest pending usage first, and adds a persistence regression for deterministic pending charge ordering.
 
 current:
 
 - package: next critical-path backend package
-- status: C3.2 implemented; production QualityEval smoke still pending real judge credential/environment
-- objective: continue the critical path after role permissions and entitlement cache without letting docs/specs drift.
+- status: B1.2.1 implemented; production QualityEval smoke still pending real judge credential/environment
+- objective: continue the critical path after usage charging indexing without letting docs/specs drift.
 
-next_recommended: Continue with the next pending backend package from `specs/silly-stirring-turtle.md`, prioritizing B1.2 usage performance indexing or C2 observability/SLO evaluator wiring unless the user redirects.
+next_recommended: Continue with the next pending backend package from `specs/silly-stirring-turtle.md`, prioritizing C1 OTel structured trace / SLO evaluator wiring or B2 payment SDK adapters unless the user redirects.
 
 last_gates:
 
@@ -286,4 +287,5 @@ notes:
 | WP-720 | completed | K1.4 QualityEval module, encrypted samples, worker, judge client, migration, Scheduler quality aggregation, and docs/spec governance. |
 | WP-730 | completed | C3.1 Workspace schema, nullable User/APIKey workspace scope, personal workspace defaults, API Key inheritance, incremental migration, and docs/spec governance. |
 | WP-740 | completed | C3.2 Role permissions, admin roles API, entitlement cache table/materialization, payment_order:read RBAC, incremental migration, and docs/spec governance. |
+| WP-750 | completed | B1.2.1 usage charging pending-scan index, oldest-first batch ordering, migration, and data-model/spec governance. |
 | WP-500+ | pending | Remaining ecosystem and advanced endpoint packages. |
