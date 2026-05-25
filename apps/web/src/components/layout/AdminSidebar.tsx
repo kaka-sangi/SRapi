@@ -17,6 +17,7 @@ import {
   BarChart3,
   Settings,
   DollarSign,
+  GitCompareArrows,
   HeartPulse,
   Share2,
   ShoppingBag,
@@ -65,6 +66,12 @@ export function AdminSidebar() {
   const mainItems: SidebarItem[] = [
     { name: "Dashboard", nameZh: "数据面板", href: ADMIN_HOME_ROUTE, icon: LayoutDashboard },
     { name: "Operations", nameZh: "大屏监控", href: "/admin/ops", icon: Activity },
+    {
+      name: "Strategy Lab",
+      nameZh: "策略对比",
+      href: "/admin/ops/strategy",
+      icon: GitCompareArrows,
+    },
     { name: "User Management", nameZh: "用户管理", href: "/admin/users", icon: Users },
     { name: "Group Settings", nameZh: "分组配置", href: "/admin/groups", icon: Layers },
     { name: "Subscriptions", nameZh: "订阅计划", href: "/admin/subscriptions", icon: Sparkles },

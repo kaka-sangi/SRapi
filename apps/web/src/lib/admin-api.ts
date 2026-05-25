@@ -78,6 +78,7 @@ import {
   listAdminUserSubscriptions,
   refundAdminPaymentOrder,
   removeAdminAccountGroupMember,
+  replaySchedulerStrategy,
   recoverAdminAccount,
   testAdminAccount,
   testAdminProvider,
@@ -173,9 +174,11 @@ import type {
   RealtimeActiveSlot,
   RedeemCode,
   RedeemCodeStats,
+  ReplaySchedulerStrategyData,
   RiskControlConfig,
   RiskControlLog,
   RiskControlStatus,
+  SchedulerReplayResult,
   SubscriptionPlan,
   UpdateAccountGroupRequest,
   UpdateAdminAccountData,
@@ -338,6 +341,12 @@ export const adminApi = {
 
   listOpsSlos(): Promise<AdminListResult<OpsSlo>> {
     return unwrapList(() => listAdminOpsSlos({ throwOnError: true }));
+  },
+
+  replaySchedulerStrategy(
+    body: ReplaySchedulerStrategyData["body"],
+  ): Promise<SchedulerReplayResult> {
+    return unwrapData(() => replaySchedulerStrategy({ body, throwOnError: true }));
   },
 
   acknowledgeAlert(id: Id): Promise<OpsAlertEvent> {

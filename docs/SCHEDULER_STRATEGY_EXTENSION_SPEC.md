@@ -402,6 +402,12 @@ POST   /api/v1/admin/scheduler/simulate
 POST   /api/v1/admin/scheduler/replay
 ```
 
+K1.7 起，Admin Console `/admin/ops/strategy` 通过生成 TypeScript SDK 调用
+`POST /api/v1/admin/scheduler/replay`，展示 strategy / time range / model / request replay 过滤、current-vs-shadow
+score 曲线、winner 分布和逐 snapshot 证据。该页面不新增 dashboard 专用后端
+handler，也不展示 mock 数据；它只声明覆盖存在 `scheduler_request_snapshots`
+的历史决策。
+
 后续策略管理接口预留：
 
 ```txt

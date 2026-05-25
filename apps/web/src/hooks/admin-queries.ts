@@ -17,6 +17,8 @@ import type {
   PromoCodeStatus,
   RedeemCodeStatus,
   RiskControlConfig,
+  SchedulerReplayRequest,
+  SchedulerReplayResult,
   User,
   UserStatus,
   UsageAggregateDimension,
@@ -114,6 +116,12 @@ export function useAdminOpsMutations() {
       onSuccess: invalidateSlos,
     }),
   };
+}
+
+export function useAdminSchedulerReplay() {
+  return useMutation<SchedulerReplayResult, Error, SchedulerReplayRequest>({
+    mutationFn: (body) => adminApi.replaySchedulerStrategy(body),
+  });
 }
 
 export function useAdminUsers(filters: { page?: number; q?: string; status?: UserStatus | "all" }) {

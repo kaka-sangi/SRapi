@@ -39,6 +39,7 @@ apps/web/
 │  │  ├─ global-error.tsx       # 应用级硬错误兜底
 │  │  ├─ globals.css            # @theme 设计令牌 + paper-grain + tactile-card
 │  │  ├─ admin/page.tsx         # 管理后台
+│  │  ├─ admin/ops/strategy/page.tsx # Scheduler 策略 replay 对比页
 │  │  ├─ dashboard/page.tsx     # 工作台
 │  │  ├─ api-keys/page.tsx
 │  │  ├─ usage/page.tsx
@@ -55,6 +56,7 @@ apps/web/
 │  │
 │  ├─ components/
 │  │  ├─ ui/                    # 设计系统原语（Button / Card / Badge / Dialog ...）
+│  │  ├─ admin/                 # AdminShell / admin primitives / resource pages / strategy replay page
 │  │  ├─ layout/                # AppShell / TopNav / SmokeDrawer / AuthGate ...
 │  │  └─ DashboardLayout.tsx    # 兼容 shim，转发到 AppShell
 │  │

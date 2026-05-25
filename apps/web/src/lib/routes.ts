@@ -4,6 +4,7 @@ export const USER_HOME_ROUTE = "/dashboard";
 export const ADMIN_ROUTE_SMOKE_TARGETS = [
   { path: "/admin/dashboard", heading: "Admin Dashboard" },
   { path: "/admin/ops", heading: "Operations Center" },
+  { path: "/admin/ops/strategy", heading: "Strategy Comparison" },
   { path: "/admin/users", heading: "User Management" },
   { path: "/admin/groups", heading: "Group Management" },
   { path: "/admin/subscriptions", heading: "Subscription Management" },
