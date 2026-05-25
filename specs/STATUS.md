@@ -73,6 +73,7 @@ last_completed:
 - WP-710: Incremental migration workflow now adds `apps/api/atlas.hcl`, pinned Atlas `migration-diff` / `migration-hash` Makefile targets, `atlas.sum`, up/down pairing plus contiguous numbering checks in `make migration-check`, and updated migration architecture docs so future Ent schema changes generate `000002+` migrations instead of expanding the initial schema.
 - A1.1: AuthSession persistence now adds hashed `auth_sessions` Ent/PostgreSQL storage, `entstore/auth`, HTTP/app runtime injection, old-cookie runtime rebuild coverage, and migration/docs alignment so console sessions survive API restart without storing session or CSRF token plaintext.
 - A2.1: Gateway API key/user RPM and API key TPM limits now use Redis-backed atomic counters through `internal/platform/ratelimit`, app/httpserver injection, admission-stage enforcement before Scheduler dispatch, 429 + `Retry-After` Gateway errors, and HTTP/unit regressions proving repeated calls are throttled without partial counter updates.
+- A2.1.1: Redis rate-limit p99 guard now adds `TestLimiterP99Budget` plus `make rate-limit-bench`, measuring real Redis `PING`, Allow, AcquireConcurrency, and ReleaseConcurrency p99 with a default 2ms budget and failing early when Redis baseline latency itself exceeds the budget.
 - A2.2: Scheduler account-level quota evidence now has an end-to-end Gateway path: successful account usage updates `rpm_used` / `tpm_used` runtime metadata from the recent usage window, scheduler candidates read those counters with existing `rpm_limit` / `tpm_limit` / `max_concurrency` metadata, and HTTP + scheduler regressions prove `rpm_limit_exceeded`, `tpm_limit_exceeded`, and `concurrency_full` reject reasons are recorded.
 - A4.1: Scheduler failover foundations now return ranked candidate lists, persist `fallback_from_decision_id` on scheduler decisions, expose the field through admin OpenAPI/SDK responses, and update memory/Redis leases by `(request_id, attempt_no)` so fallback attempts do not overwrite each other.
 - A4.2: Gateway text, Responses, Messages, Embeddings, and Gemini GenerateContent handlers now consume ranked scheduler candidates with a retry loop for retryable provider errors, persist one `usage_logs` evidence row per `(request_id, attempt_no)`, link fallback scheduler decisions through `fallback_from_decision_id`, record `fallback_excluded` evidence, and expose `srapi_gateway_failover_total`.
@@ -101,21 +102,27 @@ last_completed:
 current:
 
 - package: Phase 1 production smoke gates
-- status: Local rate-limit and failover smoke entrypoints are implemented and locally verified at script/HTTP-regression level; live `make smoke-rate-limit` / `make smoke-failover` require a running API with PostgreSQL/Redis.
+- status: Local rate-limit and failover smoke entrypoints are implemented and locally verified at script/HTTP-regression level; `make rate-limit-bench` is implemented as a real Redis p99 guard; live `make smoke-rate-limit` / `make smoke-failover` require a running API with PostgreSQL/Redis.
 - objective: continue closing production smoke, sandbox, and pressure-test gaps without letting docs/specs drift.
 
 next_recommended: Run real Stripe/Alipay/WeChat sandbox smoke when merchant credentials are available, or continue the remaining Phase 1 production smoke / pressure-test tasks from `specs/silly-stirring-turtle.md`.
 
 last_gates:
 
+- `cd apps/api && go test ./internal/platform/ratelimit`: pass
+- `make architecture-check`: pass
+- `make code-quality-check`: pass
+- `make diff-check`: pass
+- `make rate-limit-bench RATE_LIMIT_BENCH_REDIS_ADDR=127.0.0.1:6381`: failed, Docker published-port Redis baseline was too slow (`PING` p99 10.891894ms, then 4.576365ms) for the 2ms guard.
+- `make rate-limit-bench RATE_LIMIT_BENCH_REDIS_ADDR=127.0.0.1:6382`: failed, host-network Redis baseline was still too slow (`PING` p99 3.850917ms) for the 2ms guard.
 - `node --check tools/smoke-local.mjs`: pass
 - `node --test tools/smoke-local.test.mjs`: pass
-- `make diff-check`: pass
 - `cd apps/api && go test ./internal/httpserver -run 'TestGatewayChatCompletionFailoverRecordsAttemptEvidence|TestGatewayEnforcesAPIKeyRPMLimit|TestGatewayEnforcesAPIKeyConcurrencyLimit'`: pass
 
 notes:
 
 - Existing `docs/` remains the architecture and domain source of truth.
+- The rate-limit p99 guard is now available, but this workstation did not produce a valid 2ms Redis baseline; rerun it against local/native or production-adjacent Redis before claiming the limiter p99 budget is met.
 - Historical strategy replay can only be claimed for decisions that have `scheduler_request_snapshots`; older decision-only rows remain report-only because they lack the full request profile and candidate set.
 - Future goal runs must read `specs/README.md` first, then continue from `next_recommended`.
 - Future goal runs must preserve unrelated user worktree changes if present.

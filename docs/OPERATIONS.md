@@ -112,6 +112,14 @@ make smoke-rate-limit
 
 该 smoke 会创建 `rpm_limit=1` 的临时 Gateway API Key，调用一次 `/v1/chat/completions` 并确认成功，再调用第二次并断言返回 429、`rate_limit_error` / `rpm_limit_exceeded` 和 `Retry-After`。该检查要求 API 进程已连接 Redis-backed rate limiter；本地模式 Redis 不可用时会失败而不是静默跳过。
 
+Gateway 限流 Redis p99 guard 可单独执行：
+
+```bash
+make rate-limit-bench RATE_LIMIT_BENCH_REDIS_ADDR=127.0.0.1:6379
+```
+
+该 guard 会先检查 Redis `PING` p99 基线，再对真实 Redis 运行 `internal/platform/ratelimit` 的 Allow、AcquireConcurrency 和 ReleaseConcurrency 热路径，并要求各自 p99 不超过 2ms。可用 `RATE_LIMIT_BENCH_SAMPLES` 调整采样数，`RATE_LIMIT_BENCH_BUDGET_MS` 调整预算，`RATE_LIMIT_BENCH_REDIS_DB` 指向可清理的测试 DB。
+
 Gateway 跨供应商故障转移 smoke 可单独执行：
 
 ```bash

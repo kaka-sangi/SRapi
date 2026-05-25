@@ -3,6 +3,10 @@ package ratelimit
 import (
 	"context"
 	"errors"
+	"os"
+	"sort"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -179,6 +183,82 @@ func TestLimiterConcurrencySkipsUnsetLimitAndRejectsInvalidCheck(t *testing.T) {
 	}
 }
 
+func TestLimiterP99Budget(t *testing.T) {
+	if os.Getenv("SRAPI_RATE_LIMIT_P99_GUARD") != "1" {
+		t.Skip("set SRAPI_RATE_LIMIT_P99_GUARD=1 to run the rate limiter p99 guard")
+	}
+	addr := strings.TrimSpace(os.Getenv("SRAPI_RATE_LIMIT_P99_REDIS_ADDR"))
+	if addr == "" {
+		t.Fatal("SRAPI_RATE_LIMIT_P99_REDIS_ADDR is required for the rate limiter p99 guard")
+	}
+	limiter, closeRedis := newExternalRedisLimiter(t, addr)
+	defer closeRedis()
+
+	ctx := context.Background()
+	samples := envInt("SRAPI_RATE_LIMIT_P99_SAMPLES", 2000)
+	budget := time.Duration(envInt("SRAPI_RATE_LIMIT_P99_BUDGET_MS", 2)) * time.Millisecond
+	now := time.Date(2026, 5, 24, 10, 0, 0, 0, time.UTC)
+
+	pingP99 := measureP99(t, samples, func(int) {
+		if err := limiter.client.Ping(ctx).Err(); err != nil {
+			t.Fatalf("redis ping: %v", err)
+		}
+	})
+	if pingP99 > budget {
+		t.Fatalf("redis ping p99 %s exceeds budget %s over %d samples; run this guard against low-latency Redis before evaluating limiter p99", pingP99, budget, samples)
+	}
+
+	warmLimiter(t, limiter, ctx, now)
+
+	allowP99 := measureP99(t, samples, func(i int) {
+		decision, err := limiter.Allow(ctx, []Check{
+			{Name: "rpm", Key: "bench:p99:rpm", Limit: samples * 2, Cost: 1, Window: time.Minute},
+			{Name: "tpm", Key: "bench:p99:tpm", Limit: samples * 400, Cost: 100, Window: time.Minute},
+		}, now.Add(time.Duration(i)*time.Millisecond))
+		if err != nil {
+			t.Fatalf("allow sample %d: %v", i, err)
+		}
+		if !decision.Allowed {
+			t.Fatalf("allow sample %d unexpectedly limited: %+v", i, decision)
+		}
+	})
+	if allowP99 > budget {
+		t.Fatalf("rate limiter Allow p99 %s exceeds budget %s over %d samples; redis ping p99=%s", allowP99, budget, samples, pingP99)
+	}
+
+	leases := make([]ConcurrencyLease, 0, samples)
+	acquireP99 := measureP99(t, samples, func(i int) {
+		lease, decision, err := limiter.AcquireConcurrency(ctx, ConcurrencyCheck{
+			Name:  "concurrency",
+			Key:   "bench:p99:concurrency",
+			Limit: samples * 2,
+			TTL:   time.Minute,
+		}, now.Add(time.Duration(i)*time.Millisecond))
+		if err != nil {
+			t.Fatalf("acquire concurrency sample %d: %v", i, err)
+		}
+		if !decision.Allowed {
+			t.Fatalf("acquire concurrency sample %d unexpectedly limited: %+v", i, decision)
+		}
+		leases = append(leases, lease)
+	})
+	if acquireP99 > budget {
+		t.Fatalf("rate limiter AcquireConcurrency p99 %s exceeds budget %s over %d samples; redis ping p99=%s", acquireP99, budget, samples, pingP99)
+	}
+
+	releaseP99 := measureP99(t, samples, func(i int) {
+		lease := leases[i]
+		if err := limiter.ReleaseConcurrency(ctx, lease); err != nil {
+			t.Fatalf("release concurrency sample %d: %v", i, err)
+		}
+	})
+	if releaseP99 > budget {
+		t.Fatalf("rate limiter ReleaseConcurrency p99 %s exceeds budget %s over %d samples; redis ping p99=%s", releaseP99, budget, samples, pingP99)
+	}
+
+	t.Logf("rate limiter p99 budget passed: ping=%s allow=%s acquire=%s release=%s budget=%s samples=%d redis=%s", pingP99, allowP99, acquireP99, releaseP99, budget, samples, addr)
+}
+
 func newLimiter(t *testing.T) (*Limiter, *miniredis.Miniredis, func()) {
 	t.Helper()
 	server := miniredis.RunT(t)
@@ -193,6 +273,30 @@ func newLimiter(t *testing.T) (*Limiter, *miniredis.Miniredis, func()) {
 	}
 }
 
+func newExternalRedisLimiter(t *testing.T, addr string) (*Limiter, func()) {
+	t.Helper()
+	client := redis.NewClient(&redis.Options{
+		Addr:     addr,
+		Password: os.Getenv("SRAPI_RATE_LIMIT_P99_REDIS_PASSWORD"),
+		DB:       envInt("SRAPI_RATE_LIMIT_P99_REDIS_DB", 15),
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := client.Ping(ctx).Err(); err != nil {
+		_ = client.Close()
+		t.Fatalf("ping Redis %s: %v", addr, err)
+	}
+	limiter, err := New(client)
+	if err != nil {
+		_ = client.Close()
+		t.Fatalf("new limiter: %v", err)
+	}
+	limiter.prefix = defaultKeyPrefix + "bench:" + strconv.FormatInt(time.Now().UnixNano(), 36) + ":"
+	return limiter, func() {
+		_ = client.Close()
+	}
+}
+
 func redisValue(t *testing.T, server *miniredis.Miniredis, key string) string {
 	t.Helper()
 	value, err := server.Get(key)
@@ -200,4 +304,62 @@ func redisValue(t *testing.T, server *miniredis.Miniredis, key string) string {
 		t.Fatalf("get redis key %s: %v", key, err)
 	}
 	return value
+}
+
+func warmLimiter(t *testing.T, limiter *Limiter, ctx context.Context, now time.Time) {
+	t.Helper()
+	for i := 0; i < 20; i++ {
+		if _, err := limiter.Allow(ctx, []Check{
+			{Name: "rpm", Key: "bench:warm:rpm", Limit: 1000, Cost: 1, Window: time.Minute},
+			{Name: "tpm", Key: "bench:warm:tpm", Limit: 100000, Cost: 100, Window: time.Minute},
+		}, now.Add(time.Duration(i)*time.Millisecond)); err != nil {
+			t.Fatalf("warm allow: %v", err)
+		}
+		lease, _, err := limiter.AcquireConcurrency(ctx, ConcurrencyCheck{
+			Name:  "concurrency",
+			Key:   "bench:warm:concurrency",
+			Limit: 1000,
+			TTL:   time.Minute,
+		}, now.Add(time.Duration(i)*time.Millisecond))
+		if err != nil {
+			t.Fatalf("warm concurrency acquire: %v", err)
+		}
+		if err := limiter.ReleaseConcurrency(ctx, lease); err != nil {
+			t.Fatalf("warm concurrency release: %v", err)
+		}
+	}
+}
+
+func measureP99(t *testing.T, samples int, run func(int)) time.Duration {
+	t.Helper()
+	if samples <= 0 {
+		t.Fatal("p99 samples must be positive")
+	}
+	durations := make([]time.Duration, samples)
+	for i := 0; i < samples; i++ {
+		startedAt := time.Now()
+		run(i)
+		durations[i] = time.Since(startedAt)
+	}
+	sort.Slice(durations, func(i, j int) bool { return durations[i] < durations[j] })
+	index := ((samples * 99) + 99) / 100
+	if index <= 0 {
+		index = 1
+	}
+	if index > samples {
+		index = samples
+	}
+	return durations[index-1]
+}
+
+func envInt(name string, fallback int) int {
+	value := os.Getenv(name)
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed <= 0 {
+		return fallback
+	}
+	return parsed
 }
