@@ -95,13 +95,13 @@ metadata_json
 | 渠道 | 阶段 | 说明 |
 | --- | --- | --- |
 | EasyPay | Phase 2 | 兼容易支付协议，可承接支付宝/微信聚合支付。 |
-| Alipay Official | Phase 2+ | 支付宝官方开放平台。 |
+| Alipay Official | Phase 2+ | 支付宝官方开放平台，已接入 PC Page Pay / H5 Wap Pay 下单和异步通知验签。 |
 | WeChat Pay Official | Phase 2+ | 微信支付 APIv3。 |
 | Stripe | Phase 2+ | 国际银行卡和多币种支付。 |
 | LDCPay | Phase 3 | Linux DO Credit 或类似积分支付。 |
 | Custom Webhook | Phase 3 | 外部支付系统通过受控 API 入账。 |
 
-当前实现已超过最初 MVP 抽象：`payments/providers/checkout` 定义统一下单接口，`payments/providers/stripe` 使用 `stripe-go/v78` 创建 Stripe Checkout Session 并由 Stripe webhook SDK 验签，`payments/providers/easypay` 生成带签名的 EasyPay 跳转 URL。管理员侧已支持 provider instance 的创建、更新和本地配置测试；测试接口只解密并校验必需配置，不发起外部扣款或网络请求。Alipay Official 与 WeChat Pay Official 仍是待接入渠道，计划分别使用 `smartwalle/alipay/v3` 和 `wechatpay-apiv3/wechatpay-go`。
+当前实现已超过最初 MVP 抽象：`payments/providers/checkout` 定义统一下单接口，`payments/providers/stripe` 使用 `stripe-go/v78` 创建 Stripe Checkout Session 并由 Stripe webhook SDK 验签，`payments/providers/easypay` 生成带签名的 EasyPay 跳转 URL，`payments/providers/alipay` 使用 `smartwalle/alipay/v3` 生成支付宝 Page/Wap Pay 支付 URL，并由 `payments/service` 使用支付宝公钥验签异步通知。管理员侧已支持 provider instance 的创建、更新和本地配置测试；测试接口只解密并校验必需配置，不发起外部扣款或网络请求。WeChat Pay Official 仍是待接入渠道，计划使用 `wechatpay-apiv3/wechatpay-go`；Stripe/Alipay/WeChat 真实沙箱 smoke 仍需外部凭证。
 
 Stripe provider config 至少包含：
 
@@ -125,6 +125,20 @@ EasyPay provider config 至少包含：
   "return_url": "https://app.example/pay/return"
 }
 ```
+
+Alipay Official provider config 至少包含：
+
+```json
+{
+  "app_id": "2021000000000000",
+  "private_key": "-----BEGIN RSA PRIVATE KEY-----...",
+  "alipay_public_key": "-----BEGIN PUBLIC KEY-----...",
+  "notify_url": "https://api.example/api/v1/webhooks/payments/alipay",
+  "return_url": "https://app.example/pay/return"
+}
+```
+
+可选字段包括 `gateway_url`、`production`、`mode`、`subject`、`body`、`qr_pay_mode` 和 `qr_code_width`。`mode=page` 走 `alipay.trade.page.pay`，`mode=wap` / `mode=h5` 走 `alipay.trade.wap.pay`；回调归属按本地 `out_trade_no` 对应订单绑定的 provider instance 验签，避免多商户实例互相抢签。
 
 这些配置通过 payment provider instance 的 `config_ciphertext` 加密保存；订单 metadata 只保存 checkout URL、session id、签名摘要等非密钥信息。
 

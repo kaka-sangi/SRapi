@@ -1,12 +1,20 @@
 package service
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
+	"net/url"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	alipaysdk "github.com/smartwalle/alipay/v3"
 
 	auditservice "github.com/srapi/srapi/apps/api/internal/modules/audit/service"
 	auditmemory "github.com/srapi/srapi/apps/api/internal/modules/audit/store/memory"
@@ -303,6 +311,227 @@ func TestEasyPayOrderCreatesSignedCheckoutURL(t *testing.T) {
 	}
 	if order.Metadata["easypay_pay_url"] != checkoutURL || order.Metadata["easypay_sign"] == "" {
 		t.Fatalf("expected easypay metadata, got %+v", order.Metadata)
+	}
+}
+
+func TestAlipayOrderCreatesSignedCheckoutURL(t *testing.T) {
+	keys := newAlipayTestKeys(t)
+	h := newHarness(t)
+	provider, err := h.payments.CreateProviderInstance(t.Context(), contract.CreateProviderInstanceRequest{
+		Provider: "alipay",
+		Name:     "alipay-primary",
+		Config: map[string]any{
+			"app_id":            "app_test_123",
+			"private_key":       keys.merchantPrivateKey,
+			"alipay_public_key": keys.alipayPublicKey,
+			"notify_url":        "https://api.example/api/v1/webhooks/payments/alipay",
+			"return_url":        "https://app.example/payments/return",
+			"gateway_url":       "https://openapi.alipay.test/gateway.do",
+			"subject":           "SRapi balance top-up",
+		},
+		SupportedMethods: []string{"alipay"},
+		Limits:           map[string]any{"currency": "CNY"},
+	})
+	if err != nil {
+		t.Fatalf("create alipay provider: %v", err)
+	}
+	order, err := h.payments.CreateOrder(t.Context(), contract.CreateOrderRequest{
+		UserID:      1,
+		Method:      "alipay",
+		Amount:      "12.34",
+		Currency:    "CNY",
+		ProductType: contract.ProductTypeBalanceCredit,
+	})
+	if err != nil {
+		t.Fatalf("create alipay order: %v", err)
+	}
+	if order.ProviderInstanceID != provider.ID {
+		t.Fatalf("expected alipay provider instance %d, got %+v", provider.ID, order)
+	}
+	checkoutURL := stringValueFromMap(order.Metadata, "checkout_url")
+	if checkoutURL == "" || !strings.Contains(checkoutURL, "method=alipay.trade.page.pay") || !strings.Contains(checkoutURL, "sign=") {
+		t.Fatalf("expected signed alipay checkout url, got %+v", order.Metadata)
+	}
+	if order.Metadata["alipay_pay_url"] != checkoutURL || order.Metadata["alipay_mode"] != "page" {
+		t.Fatalf("expected alipay metadata, got %+v", order.Metadata)
+	}
+}
+
+func TestAlipayWebhookFulfillsSignedNotification(t *testing.T) {
+	keys := newAlipayTestKeys(t)
+	h := newHarness(t)
+	if _, err := h.payments.CreateProviderInstance(t.Context(), contract.CreateProviderInstanceRequest{
+		Provider: "alipay",
+		Name:     "alipay-primary",
+		Config: map[string]any{
+			"app_id":            "app_test_123",
+			"private_key":       keys.merchantPrivateKey,
+			"alipay_public_key": keys.alipayPublicKey,
+			"notify_url":        "https://api.example/api/v1/webhooks/payments/alipay",
+			"return_url":        "https://app.example/payments/return",
+		},
+		SupportedMethods: []string{"alipay"},
+		Limits:           map[string]any{"currency": "CNY"},
+	}); err != nil {
+		t.Fatalf("create alipay provider: %v", err)
+	}
+	order, err := h.payments.CreateOrder(t.Context(), contract.CreateOrderRequest{
+		UserID:      1,
+		Method:      "alipay",
+		Amount:      "12.34",
+		Currency:    "CNY",
+		ProductType: contract.ProductTypeBalanceCredit,
+	})
+	if err != nil {
+		t.Fatalf("create alipay order: %v", err)
+	}
+	payload := signedAlipayNotification(t, keys, map[string]string{
+		"notify_id":    "notify_paid_1",
+		"notify_type":  alipaysdk.NotifyTypeTradeStatusSync,
+		"out_trade_no": order.OrderNo,
+		"trade_no":     "2026052522001400000001",
+		"trade_status": string(alipaysdk.TradeStatusSuccess),
+		"total_amount": "12.34",
+		"app_id":       "app_test_123",
+		"charset":      "utf-8",
+		"version":      "1.0",
+	})
+	result, err := h.payments.HandleWebhook(t.Context(), contract.WebhookRequest{
+		Provider: "alipay",
+		Payload:  payload,
+	})
+	if err != nil {
+		t.Fatalf("handle alipay webhook: %v", err)
+	}
+	if !result.Handled || result.Order.Status != contract.OrderStatusFulfilled || stringValue(result.Order.ProviderTransactionID) != "2026052522001400000001" {
+		t.Fatalf("expected fulfilled alipay order, got %+v", result)
+	}
+	audits, err := h.store.ListAuditLogsByOrder(t.Context(), order.ID)
+	if err != nil {
+		t.Fatalf("list payment audit logs: %v", err)
+	}
+	if len(audits) != 1 || !audits[0].SignatureValid || strings.Contains(mustJSON(t, audits[0].Payload), keys.merchantPrivateKey) {
+		t.Fatalf("expected signed secret-free alipay audit log, got %+v", audits)
+	}
+	duplicate, err := h.payments.HandleWebhook(t.Context(), contract.WebhookRequest{Provider: "alipay", Payload: payload})
+	if err != nil {
+		t.Fatalf("handle duplicate alipay webhook: %v", err)
+	}
+	if duplicate.Handled {
+		t.Fatalf("duplicate alipay webhook should be idempotent, got %+v", duplicate)
+	}
+}
+
+func TestAlipayWebhookUsesOrderProviderInstance(t *testing.T) {
+	keys := newAlipayTestKeys(t)
+	h := newHarness(t)
+	if _, err := h.payments.CreateProviderInstance(t.Context(), contract.CreateProviderInstanceRequest{
+		Provider: "alipay",
+		Name:     "alipay-shadow",
+		Config: map[string]any{
+			"app_id":            "app_test_123",
+			"private_key":       keys.merchantPrivateKey,
+			"alipay_public_key": keys.alipayPublicKey,
+			"notify_url":        "https://api.example/api/v1/webhooks/payments/alipay",
+			"return_url":        "https://app.example/payments/return",
+		},
+		SupportedMethods: []string{"alipay"},
+		Limits:           map[string]any{"currency": "JPY"},
+	}); err != nil {
+		t.Fatalf("create shadow alipay provider: %v", err)
+	}
+	provider, err := h.payments.CreateProviderInstance(t.Context(), contract.CreateProviderInstanceRequest{
+		Provider: "alipay",
+		Name:     "alipay-primary",
+		Config: map[string]any{
+			"app_id":            "app_test_123",
+			"private_key":       keys.merchantPrivateKey,
+			"alipay_public_key": keys.alipayPublicKey,
+			"notify_url":        "https://api.example/api/v1/webhooks/payments/alipay",
+			"return_url":        "https://app.example/payments/return",
+		},
+		SupportedMethods: []string{"alipay"},
+		Limits:           map[string]any{"currency": "CNY"},
+	})
+	if err != nil {
+		t.Fatalf("create primary alipay provider: %v", err)
+	}
+	order, err := h.payments.CreateOrder(t.Context(), contract.CreateOrderRequest{
+		UserID:      1,
+		Method:      "alipay",
+		Amount:      "7.00",
+		Currency:    "CNY",
+		ProductType: contract.ProductTypeBalanceCredit,
+	})
+	if err != nil {
+		t.Fatalf("create alipay order: %v", err)
+	}
+	if order.ProviderInstanceID != provider.ID {
+		t.Fatalf("expected order on primary provider %d, got %+v", provider.ID, order)
+	}
+	payload := signedAlipayNotification(t, keys, map[string]string{
+		"notify_id":    "notify_paid_primary",
+		"notify_type":  alipaysdk.NotifyTypeTradeStatusSync,
+		"out_trade_no": order.OrderNo,
+		"trade_no":     "2026052522001400000003",
+		"trade_status": string(alipaysdk.TradeStatusSuccess),
+		"total_amount": "7.00",
+		"app_id":       "app_test_123",
+		"charset":      "utf-8",
+		"version":      "1.0",
+	})
+	result, err := h.payments.HandleWebhook(t.Context(), contract.WebhookRequest{Provider: "alipay", Payload: payload})
+	if err != nil {
+		t.Fatalf("handle alipay webhook: %v", err)
+	}
+	if !result.Handled || result.Order.ProviderInstanceID != provider.ID || result.Order.Status != contract.OrderStatusFulfilled {
+		t.Fatalf("expected webhook to use order provider instance, got %+v", result)
+	}
+}
+
+func TestAlipayWebhookRejectsInvalidSignature(t *testing.T) {
+	keys := newAlipayTestKeys(t)
+	h := newHarness(t)
+	if _, err := h.payments.CreateProviderInstance(t.Context(), contract.CreateProviderInstanceRequest{
+		Provider: "alipay",
+		Name:     "alipay-primary",
+		Config: map[string]any{
+			"app_id":            "app_test_123",
+			"private_key":       keys.merchantPrivateKey,
+			"alipay_public_key": keys.alipayPublicKey,
+			"notify_url":        "https://api.example/api/v1/webhooks/payments/alipay",
+			"return_url":        "https://app.example/payments/return",
+		},
+		SupportedMethods: []string{"alipay"},
+		Limits:           map[string]any{"currency": "CNY"},
+	}); err != nil {
+		t.Fatalf("create alipay provider: %v", err)
+	}
+	order, err := h.payments.CreateOrder(t.Context(), contract.CreateOrderRequest{
+		UserID:      1,
+		Method:      "alipay",
+		Amount:      "12.34",
+		Currency:    "CNY",
+		ProductType: contract.ProductTypeBalanceCredit,
+	})
+	if err != nil {
+		t.Fatalf("create alipay order: %v", err)
+	}
+	payload := signedAlipayNotification(t, keys, map[string]string{
+		"notify_id":    "notify_bad_1",
+		"notify_type":  alipaysdk.NotifyTypeTradeStatusSync,
+		"out_trade_no": order.OrderNo,
+		"trade_no":     "2026052522001400000002",
+		"trade_status": string(alipaysdk.TradeStatusSuccess),
+		"total_amount": "12.34",
+		"app_id":       "app_test_123",
+		"charset":      "utf-8",
+		"version":      "1.0",
+	})
+	payload["sign"] = "invalid-signature"
+	_, err = h.payments.HandleWebhook(t.Context(), contract.WebhookRequest{Provider: "alipay", Payload: payload})
+	if !errors.Is(err, ErrSignatureInvalid) {
+		t.Fatalf("expected invalid alipay signature rejection, got %v", err)
 	}
 }
 
@@ -654,6 +883,66 @@ func easypayTestConfig(secret string) map[string]any {
 		"notify_url":     "https://api.example/api/v1/webhooks/payments/easypay",
 		"return_url":     "https://app.example/payments/return",
 	}
+}
+
+type alipayTestKeys struct {
+	merchantPrivateKey string
+	alipayPrivateKey   string
+	alipayPublicKey    string
+}
+
+func newAlipayTestKeys(t *testing.T) alipayTestKeys {
+	t.Helper()
+	merchantKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("generate merchant key: %v", err)
+	}
+	alipayKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("generate alipay key: %v", err)
+	}
+	return alipayTestKeys{
+		merchantPrivateKey: encodePrivateKey(merchantKey),
+		alipayPrivateKey:   encodePrivateKey(alipayKey),
+		alipayPublicKey:    encodePublicKey(&alipayKey.PublicKey),
+	}
+}
+
+func signedAlipayNotification(t *testing.T, keys alipayTestKeys, fields map[string]string) map[string]any {
+	t.Helper()
+	client, err := alipaysdk.New("app_test_123", keys.alipayPrivateKey, false)
+	if err != nil {
+		t.Fatalf("new alipay signer: %v", err)
+	}
+	values := url.Values{}
+	for key, value := range fields {
+		values.Set(key, value)
+	}
+	signature, err := client.SignValues(values)
+	if err != nil {
+		t.Fatalf("sign alipay notification: %v", err)
+	}
+	values.Set("sign_type", "RSA2")
+	values.Set("sign", base64.StdEncoding.EncodeToString(signature))
+	payload := make(map[string]any, len(values))
+	for key, values := range values {
+		if len(values) > 0 {
+			payload[key] = values[0]
+		}
+	}
+	return payload
+}
+
+func encodePrivateKey(key *rsa.PrivateKey) string {
+	return string(pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)}))
+}
+
+func encodePublicKey(key *rsa.PublicKey) string {
+	raw, err := x509.MarshalPKIXPublicKey(key)
+	if err != nil {
+		panic(err)
+	}
+	return string(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: raw}))
 }
 
 func stringValueFromMap(values map[string]any, key string) string {

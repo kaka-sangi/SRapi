@@ -1,6 +1,7 @@
 package service
 
 import (
+	alipayprovider "github.com/srapi/srapi/apps/api/internal/modules/payments/providers/alipay"
 	checkoutprovider "github.com/srapi/srapi/apps/api/internal/modules/payments/providers/checkout"
 	easypayprovider "github.com/srapi/srapi/apps/api/internal/modules/payments/providers/easypay"
 	stripeprovider "github.com/srapi/srapi/apps/api/internal/modules/payments/providers/stripe"
@@ -8,6 +9,7 @@ import (
 
 func defaultCheckoutRegistry(stripe stripeprovider.CheckoutCreator) checkoutprovider.Registry {
 	return checkoutprovider.Registry{
+		"alipay":  alipayprovider.New(),
 		"easypay": easypayprovider.New(),
 		"stripe":  stripeCheckoutAdapter{creator: stripe},
 	}

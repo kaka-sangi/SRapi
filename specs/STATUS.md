@@ -92,24 +92,26 @@ last_completed:
 - C3.1: Workspace persistence now adds `workspaces`, nullable `users.workspace_id`, nullable `api_keys.workspace_id`, `000008_workspaces_and_user_workspace_id` up/down migrations, User store personal workspace creation, API Key workspace inheritance, and docs/spec migration parity.
 - C3.2: Role permission persistence now adds `roles.permissions_json`, admin roles APIs, merged user session permissions, `entitlements` query-cache rows materialized from active subscription snapshots, `000009_role_permissions_and_entitlements` up/down migrations, and an HTTP regression proving `payment_order:read` grants read-only admin payment order access while plain users are rejected.
 - B1.2.1: Usage charging performance indexing now replaces the single-column `usage_logs(charged_at)` index with `usage_logs(charged_at, success, created_at)`, makes `ListPendingUsageCharges` scan oldest pending usage first, and adds a persistence regression for deterministic pending charge ordering.
+- B4.2: Alipay Official payment support now adds `smartwalle/alipay/v3`, a checkout provider for `alipay.trade.page.pay` / `alipay.trade.wap.pay`, service-level Alipay async notification verification with the order-bound provider instance, and regressions for signed checkout URL generation, webhook fulfillment, idempotency, invalid-signature fail-closed behavior, multi-instance ownership, and invalid return URL rejection. Real Alipay sandbox smoke still requires external merchant credentials.
 - C1.1: Structured trace service spans now cover `scheduler.Schedule`, `payments.HandleWebhook`, and `accounts.ProbeAccount` with reusable `platform/otel.StartSpan` / `EndSpan`, low-sensitive diagnostic attributes, business outcome fields, stable `error.type` classification, and focused span export tests.
 - C1.2: SLO burn-rate evaluator now adds `operations.Service.EvaluateSLOAlerts()`, a persistent-store `slo_evaluator` worker, `SLO_EVALUATOR_*` config, app lifecycle wiring, and tests proving multi-window availability breaches create/update/resolve only `slo.burn_rate.*` alert events while leaving manual alerts untouched.
 
 current:
 
-- package: K1 explainability
-- status: Scheduler selection rationale persistence/API exposure is implemented; production QualityEval smoke still pending real judge credential/environment
-- objective: continue the critical path after explainability without letting docs/specs drift.
+- package: B4 payment SDK adapters
+- status: Alipay Official SDK integration is implemented and locally verified; WeChat Pay APIv3 and real Stripe/Alipay/WeChat sandbox smoke remain pending external credentials/environment.
+- objective: continue payment-provider closure without letting docs/specs drift.
 
-next_recommended: Continue with the next pending backend package from `specs/silly-stirring-turtle.md`, prioritizing C1 Jaeger/Tempo collector smoke, B2 Alipay/WeChat payment SDK adapters, or remaining production smoke/benchmark work unless the user redirects.
+next_recommended: Continue with B4.3 WeChat Pay APIv3 SDK integration from `specs/silly-stirring-turtle.md`, or run real Stripe/Alipay sandbox smoke when merchant credentials are available.
 
 last_gates:
 
-- `cd apps/api && go test ./internal/modules/scheduler/service ./internal/persistence/entstore/scheduler`: pass
-- `make openapi-codegen-check`: pass
-- `make openapi-ts-codegen-check`: pass
-- `make ent-generate-check`: pass
-- `make migration-check`: pass
+- `cd apps/api && go test ./internal/modules/payments/...`: pass
+- `cd apps/api && go test ./internal/modules/payments/... ./internal/persistence/entstore/payments ./internal/httpserver -run 'Test.*Payment|Test.*Provider|TestStorePersistsProvidersOrdersAndIdempotentAuditLogs'`: pass
+- `make architecture-check`: pass
+- `make code-quality-check`: pass
+- `cd apps/web && npm test -- tests/unit/language-context.test.tsx`: pass
+- `node tools/web-check.mjs`: pass
 - `make check`: pass
 
 notes:

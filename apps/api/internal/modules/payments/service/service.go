@@ -616,6 +616,9 @@ func (s *Service) normalizeWebhook(ctx context.Context, provider string, req con
 	if provider == "stripe" {
 		return s.normalizeStripeWebhook(ctx, req)
 	}
+	if provider == "alipay" {
+		return s.normalizeAlipayWebhook(ctx, req)
+	}
 	return normalizedWebhook{
 		OrderNo:        payloadString(req.Payload, "order_no"),
 		TransactionID:  payloadString(req.Payload, "transaction_id", "trade_no", "provider_transaction_id"),
@@ -1052,6 +1055,12 @@ func missingProviderConfigFields(provider string, config map[string]any) []strin
 		requireAny("config.success_url", "success_url")
 		requireAny("config.cancel_url", "cancel_url")
 		requireAny("config.webhook_secret", "webhook_secret", "signing_secret")
+	case "alipay":
+		requireAny("config.app_id", "app_id", "appId")
+		requireAny("config.private_key", "private_key", "app_private_key")
+		requireAny("config.alipay_public_key", "alipay_public_key", "public_key")
+		requireAny("config.notify_url", "notify_url", "webhook_url")
+		requireAny("config.return_url", "return_url", "success_url")
 	case "easypay":
 		requireAny("config.gateway_url", "gateway_url", "base_url", "payment_url")
 		requireAny("config.merchant_id", "merchant_id", "pid")

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { render, screen, act } from "@testing-library/react";
+import { render, screen, act, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { LanguageProvider, useLanguage } from "@/context/LanguageContext";
 
@@ -18,7 +18,7 @@ function Probe() {
 
 describe("LanguageProvider", () => {
   beforeEach(() => {
-    localStorage.clear();
+    window.localStorage.clear();
   });
 
   it("starts in English and renders the v0.1.0 sign-in title", () => {
@@ -43,7 +43,7 @@ describe("LanguageProvider", () => {
 
     expect(screen.getByTestId("lang")).toHaveTextContent("zh");
     expect(screen.getByTestId("title")).toHaveTextContent("登录 SRapi");
-    expect(localStorage.getItem("srapi_lang")).toBe("zh");
+    await waitFor(() => expect(window.localStorage.getItem("srapi_lang")).toBe("zh"));
   });
 
   it("falls back to the key when no translation exists", () => {
@@ -60,7 +60,7 @@ describe("LanguageProvider", () => {
   });
 
   it("reads persisted language on remount", async () => {
-    localStorage.setItem("srapi_lang", "zh");
+    window.localStorage.setItem("srapi_lang", "zh");
     render(
       <LanguageProvider>
         <Probe />
