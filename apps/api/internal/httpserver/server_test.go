@@ -356,6 +356,119 @@ func TestGatewayEnforcesAPIKeyConcurrencyLimit(t *testing.T) {
 	}
 }
 
+func TestGatewayEnforcesProviderAccountConcurrencyAcrossNodes(t *testing.T) {
+	redisServer := miniredis.RunT(t)
+	redisClient := redis.NewClient(&redis.Options{Addr: redisServer.Addr()})
+	defer redisClient.Close()
+	limiter, err := ratelimit.New(redisClient)
+	if err != nil {
+		t.Fatalf("new rate limiter: %v", err)
+	}
+
+	upstreamStarted := make(chan struct{})
+	releaseUpstream := make(chan struct{})
+	var startOnce sync.Once
+	var releaseOnce sync.Once
+	var upstreamMu sync.Mutex
+	upstreamHits := 0
+	defer releaseOnce.Do(func() { close(releaseUpstream) })
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/chat/completions" {
+			t.Fatalf("unexpected upstream path %s", r.URL.Path)
+		}
+		upstreamMu.Lock()
+		upstreamHits++
+		hitNo := upstreamHits
+		upstreamMu.Unlock()
+		if hitNo == 1 {
+			startOnce.Do(func() {
+				close(upstreamStarted)
+				<-releaseUpstream
+			})
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"account concurrency ok"}}],"usage":{"prompt_tokens":3,"completion_tokens":2,"total_tokens":5}}`))
+	}))
+	defer upstream.Close()
+
+	cfg := config.Load()
+	cfg.Gateway.RequestTimeout = time.Minute
+	node := func(t *testing.T, suffix string) (http.Handler, string) {
+		t.Helper()
+		handler := New(cfg, nil, WithRateLimiter(limiter))
+		loginResp, sessionCookie := mustLoginAdmin(t, handler)
+		providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"account-concurrency-provider-`+suffix+`","display_name":"Account Concurrency","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+		modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"account-concurrency-model","display_name":"Account Concurrency Model","status":"active"}`)
+		mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"account-concurrency-upstream","status":"active"}`)
+		mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"account-concurrency-account","runtime_class":"api_key","credential":{"api_key":"upstream-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1","max_concurrency":1},"status":"active"}`)
+		keyResp := mustCreateAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"account-concurrency-key","scopes":["gateway:invoke"]}`)
+		return handler, keyResp.Data.PlaintextKey
+	}
+	firstNode, firstKey := node(t, "a")
+	secondNode, secondKey := node(t, "b")
+
+	firstDone := make(chan *httptest.ResponseRecorder, 1)
+	go func() {
+		req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"account-concurrency-model","messages":[{"role":"user","content":"first"}]}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+firstKey)
+		rec := httptest.NewRecorder()
+		firstNode.ServeHTTP(rec, req)
+		firstDone <- rec
+	}()
+
+	select {
+	case <-upstreamStarted:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for first gateway request to reach upstream")
+	}
+
+	secondReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"account-concurrency-model","messages":[{"role":"user","content":"second"}]}`))
+	secondReq.Header.Set("Content-Type", "application/json")
+	secondReq.Header.Set("Authorization", "Bearer "+secondKey)
+	secondRec := httptest.NewRecorder()
+	secondNode.ServeHTTP(secondRec, secondReq)
+	if secondRec.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected second node account concurrency rejection 429, got %d body=%s", secondRec.Code, secondRec.Body.String())
+	}
+	if secondRec.Header().Get("Retry-After") == "" {
+		t.Fatal("expected Retry-After header on account concurrency rejection")
+	}
+	var errResp apiopenapi.GatewayErrorResponse
+	if err := json.NewDecoder(secondRec.Body).Decode(&errResp); err != nil {
+		t.Fatalf("decode account concurrency response: %v", err)
+	}
+	if errResp.Error.Code == nil || *errResp.Error.Code != "concurrency_limit_exceeded" || errResp.Error.Type != apiopenapi.RateLimitError {
+		t.Fatalf("unexpected account concurrency response: %+v", errResp)
+	}
+	upstreamMu.Lock()
+	hitsWhileLimited := upstreamHits
+	upstreamMu.Unlock()
+	if hitsWhileLimited != 1 {
+		t.Fatalf("expected account concurrency to block second upstream dispatch, upstream hits=%d", hitsWhileLimited)
+	}
+
+	releaseOnce.Do(func() { close(releaseUpstream) })
+	var firstRec *httptest.ResponseRecorder
+	select {
+	case firstRec = <-firstDone:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for first gateway request to finish")
+	}
+	if firstRec.Code != http.StatusOK {
+		t.Fatalf("expected first gateway request 200, got %d body=%s", firstRec.Code, firstRec.Body.String())
+	}
+
+	thirdReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"account-concurrency-model","messages":[{"role":"user","content":"third"}]}`))
+	thirdReq.Header.Set("Content-Type", "application/json")
+	thirdReq.Header.Set("Authorization", "Bearer "+secondKey)
+	thirdRec := httptest.NewRecorder()
+	secondNode.ServeHTTP(thirdRec, thirdReq)
+	if thirdRec.Code != http.StatusOK {
+		t.Fatalf("expected released account concurrency slot to allow third request 200, got %d body=%s", thirdRec.Code, thirdRec.Body.String())
+	}
+}
+
 func TestGatewayGeminiRateLimitUsesGoogleEnvelopeAndRetryAfter(t *testing.T) {
 	redisServer := miniredis.RunT(t)
 	redisClient := redis.NewClient(&redis.Options{Addr: redisServer.Addr()})

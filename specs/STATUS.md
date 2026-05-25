@@ -76,6 +76,7 @@ last_completed:
 - A2.1.1: Redis rate-limit p99 guard now adds `TestLimiterP99Budget` plus `make rate-limit-bench`, measuring real Redis `PING`, Allow, AcquireConcurrency, and ReleaseConcurrency p99 with a default 2ms budget and failing early when Redis baseline latency itself exceeds the budget.
 - A2.2: Scheduler account-level quota evidence now has an end-to-end Gateway path: successful account usage updates `rpm_used` / `tpm_used` runtime metadata from the recent usage window, scheduler candidates read those counters with existing `rpm_limit` / `tpm_limit` / `max_concurrency` metadata, and HTTP + scheduler regressions prove `rpm_limit_exceeded`, `tpm_limit_exceeded`, and `concurrency_full` reject reasons are recorded.
 - A2.3: Gateway provider-account RPM/TPM now uses Redis-backed atomic counters after Scheduler selection and before upstream dispatch across failover, direct media/audio/token-count, Gemini countTokens, and realtime relay paths. Stale account metadata can no longer bypass account RPM, blocked attempts return provider-style 429 errors, and HTTP regressions prove both chat/failover and image direct-dispatch routes stop before upstream.
+- A2.4: Gateway ordinary HTTP provider dispatch now acquires provider-account `max_concurrency` Redis ZSet leases after Scheduler selection and before credential materialization / upstream adapter invocation, releases leases on success and error paths, maps blocked attempts to provider-style 429 `concurrency_limit_exceeded`, and has a two-node HTTP regression proving stale per-node Scheduler leases cannot bypass account concurrency.
 - A4.1: Scheduler failover foundations now return ranked candidate lists, persist `fallback_from_decision_id` on scheduler decisions, expose the field through admin OpenAPI/SDK responses, and update memory/Redis leases by `(request_id, attempt_no)` so fallback attempts do not overwrite each other.
 - A4.2: Gateway text, Responses, Messages, Embeddings, and Gemini GenerateContent handlers now consume ranked scheduler candidates with a retry loop for retryable provider errors, persist one `usage_logs` evidence row per `(request_id, attempt_no)`, link fallback scheduler decisions through `fallback_from_decision_id`, record `fallback_excluded` evidence, and expose `srapi_gateway_failover_total`.
 - A2/A4 smoke gates: `make smoke-rate-limit` now verifies a one-RPM Gateway API key returns 429 + `Retry-After` on the second request, and `make smoke-failover` creates two temporary OpenAI-compatible providers with local mock upstreams to prove primary 503 → secondary success plus usage attempt, fallback decision, reject-reason, and metric evidence.
@@ -103,27 +104,29 @@ last_completed:
 current:
 
 - package: Phase 1 Gateway rate-limit hardening
-- status: API key/user rate limits, API key concurrency, scheduler account quota evidence, and provider-account RPM/TPM Redis counters are implemented and locally verified at HTTP-regression level; live `make smoke-rate-limit` / `make smoke-failover` still require a running API with PostgreSQL/Redis.
+- status: API key/user rate limits, API key concurrency, scheduler account quota evidence, provider-account RPM/TPM Redis counters, and provider-account ordinary HTTP concurrency Redis leases are implemented and locally verified at HTTP-regression level; live `make smoke-rate-limit` / `make smoke-failover` still require a running API with PostgreSQL/Redis.
 - objective: continue closing production smoke, sandbox, and pressure-test gaps without letting docs/specs drift.
 
 next_recommended: Run real Stripe/Alipay/WeChat sandbox smoke when merchant credentials are available, or continue the remaining Phase 1 production smoke / pressure-test tasks from `specs/silly-stirring-turtle.md`.
 
 last_gates:
 
-- `cd apps/api && go test ./internal/httpserver -run 'TestGateway(UpdatesAccountRuntimeQuotaMetadataForScheduler|EnforcesAccountRPMWithRedisCounterWhenMetadataIsStale|EnforcesAccountRPMOnDirectDispatchRouteWithRedisCounter|ImageGenerationRouteTargetsOpenAICompatibleUpstream|AnthropicCountTokensSchedulesAnthropicCompatibleUpstream|GeminiCountTokensSchedulesGeminiCompatibleUpstream)'`: pass
-- `cd apps/api && go test ./internal/platform/ratelimit`: pass
+- `cd apps/api && go test ./internal/httpserver -count=1 -run 'TestGatewayEnforces(APIKeyConcurrencyLimit|ProviderAccountConcurrencyAcrossNodes|AccountRPMWithRedisCounterWhenMetadataIsStale|AccountRPMOnDirectDispatchRouteWithRedisCounter)$'`: pass
+- `cd apps/api && go test ./internal/platform/ratelimit -count=1`: pass
+- `cd apps/api && go test ./internal/httpserver ./internal/modules/...`: pass
+- `cd apps/api && go test ./...`: pass
 - `make architecture-check`: pass
 - `make code-quality-check`: pass
 - `make diff-check`: pass
-- `make rate-limit-bench RATE_LIMIT_BENCH_REDIS_ADDR=127.0.0.1:6381`: failed, Docker published-port Redis baseline was too slow (`PING` p99 10.891894ms, then 4.576365ms) for the 2ms guard.
-- `make rate-limit-bench RATE_LIMIT_BENCH_REDIS_ADDR=127.0.0.1:6382`: failed, host-network Redis baseline was still too slow (`PING` p99 3.850917ms) for the 2ms guard.
-- `node --check tools/smoke-local.mjs`: pass
-- `node --test tools/smoke-local.test.mjs`: pass
-- `cd apps/api && go test ./internal/httpserver -run 'TestGatewayChatCompletionFailoverRecordsAttemptEvidence|TestGatewayEnforcesAPIKeyRPMLimit|TestGatewayEnforcesAPIKeyConcurrencyLimit'`: pass
+- `make secret-scan`: pass
+- `cd apps/api && go test ./internal/platform/crypto ./internal/modules/accounts/...`: pass
+- `make smoke-rate-limit`: skipped, no API process is listening on `localhost:8080` in this workspace.
+- `make smoke-failover`: skipped, no API process is listening on `localhost:8080` in this workspace.
 
 notes:
 
 - Existing `docs/` remains the architecture and domain source of truth.
+- `make smoke-rate-limit`, `make smoke-failover`, and real payment sandbox smoke still require a running API plus PostgreSQL/Redis or merchant credentials.
 - The rate-limit p99 guard is now available, but this workstation did not produce a valid 2ms Redis baseline; rerun it against local/native or production-adjacent Redis before claiming the limiter p99 budget is met.
 - Historical strategy replay can only be claimed for decisions that have `scheduler_request_snapshots`; older decision-only rows remain report-only because they lack the full request profile and candidate set.
 - Future goal runs must read `specs/README.md` first, then continue from `next_recommended`.

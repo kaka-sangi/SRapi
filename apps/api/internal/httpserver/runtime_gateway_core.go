@@ -71,6 +71,11 @@ type gatewayPricingEvidence struct {
 	PricingEstimated bool
 }
 
+type providerDispatchState struct {
+	credential       map[string]any
+	concurrencyLease ratelimit.ConcurrencyLease
+}
+
 func (e gatewayPricingEvidence) withDefaults() gatewayPricingEvidence {
 	if strings.TrimSpace(e.Amount) == "" {
 		e.Amount = "0.00000000"
@@ -280,6 +285,81 @@ func (rt *runtimeState) reserveGatewayAccountQuota(ctx context.Context, usage ga
 		StatusCode: http.StatusTooManyRequests,
 		Message:    "provider account rate limit exceeded",
 	}
+}
+
+func (rt *runtimeState) acquireProviderAccountConcurrency(ctx context.Context, account accountcontract.ProviderAccount) (ratelimit.ConcurrencyLease, error) {
+	if rt.rateLimiter == nil || account.ID <= 0 {
+		return ratelimit.ConcurrencyLease{}, nil
+	}
+	limit := positiveLimit(metadataOptionalInt(account.Metadata, "max_concurrency"))
+	if limit <= 0 {
+		return ratelimit.ConcurrencyLease{}, nil
+	}
+	lease, decision, err := rt.rateLimiter.AcquireConcurrency(ctx, ratelimit.ConcurrencyCheck{
+		Name:  "account_concurrency",
+		Key:   fmt.Sprintf("account:%d:concurrency", account.ID),
+		Limit: limit,
+		TTL:   rt.providerAccountConcurrencyTTL(),
+	}, time.Now().UTC())
+	if err != nil {
+		return ratelimit.ConcurrencyLease{}, err
+	}
+	if !decision.Allowed {
+		return ratelimit.ConcurrencyLease{}, provideradaptercontract.ProviderError{
+			Class:      "concurrency_limit_exceeded",
+			StatusCode: http.StatusTooManyRequests,
+			Message:    "provider account concurrency limit exceeded",
+		}
+	}
+	return lease, nil
+}
+
+func (rt *runtimeState) releaseProviderAccountConcurrency(lease ratelimit.ConcurrencyLease) {
+	if rt == nil || rt.rateLimiter == nil || strings.TrimSpace(lease.Key) == "" || strings.TrimSpace(lease.Token) == "" {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := rt.rateLimiter.ReleaseConcurrency(ctx, lease); err != nil {
+		rt.logger.Warn("failed to release provider account concurrency slot", "error", err, "lease_key", lease.Key)
+	}
+}
+
+func (rt *runtimeState) providerAccountConcurrencyTTL() time.Duration {
+	if rt == nil || rt.cfg.Gateway.RequestTimeout <= 0 {
+		return time.Minute
+	}
+	return rt.cfg.Gateway.RequestTimeout
+}
+
+func (rt *runtimeState) prepareProviderDispatch(ctx context.Context, account *accountcontract.ProviderAccount) (providerDispatchState, error) {
+	if account == nil || account.ID <= 0 {
+		return providerDispatchState{}, provideradaptercontract.ProviderError{Class: "no_available_account", StatusCode: http.StatusServiceUnavailable, Message: "provider account missing"}
+	}
+	if err := rt.materializeProviderProxy(ctx, account); err != nil {
+		return providerDispatchState{}, err
+	}
+	lease, err := rt.acquireProviderAccountConcurrency(ctx, *account)
+	if err != nil {
+		return providerDispatchState{}, err
+	}
+	releaseOnError := true
+	defer func() {
+		if releaseOnError {
+			rt.releaseProviderAccountConcurrency(lease)
+		}
+	}()
+	credential, err := rt.accounts.DecryptCredential(ctx, account.ID)
+	if err != nil {
+		return providerDispatchState{}, provideradaptercontract.ProviderError{Class: "credential_error", StatusCode: http.StatusBadGateway, Message: "provider credential unavailable"}
+	}
+	if refreshed, ok, err := rt.refreshReverseProxyCredential(ctx, *account, credential); err != nil {
+		return providerDispatchState{}, provideradaptercontract.ProviderError{Class: "auth_failed", StatusCode: http.StatusBadGateway, Message: "provider credential refresh failed"}
+	} else if ok {
+		credential = refreshed
+	}
+	releaseOnError = false
+	return providerDispatchState{credential: credential, concurrencyLease: lease}, nil
 }
 
 func gatewayAccountQuotaErrorClass(name string) string {
@@ -1257,22 +1337,12 @@ func metadataCooldownActive(metadata map[string]any, now time.Time) bool {
 }
 
 func (rt *runtimeState) invokeProviderText(ctx context.Context, req provideradaptercontract.TextRequest) (provideradaptercontract.TextResponse, error) {
-	if req.Account.ID <= 0 {
-		return provideradaptercontract.TextResponse{}, provideradaptercontract.ProviderError{Class: "no_available_account", StatusCode: http.StatusServiceUnavailable, Message: "provider account missing"}
-	}
-	if err := rt.materializeProviderProxy(ctx, &req.Account); err != nil {
+	dispatch, err := rt.prepareProviderDispatch(ctx, &req.Account)
+	if err != nil {
 		return provideradaptercontract.TextResponse{}, err
 	}
-	credential, err := rt.accounts.DecryptCredential(ctx, req.Account.ID)
-	if err != nil {
-		return provideradaptercontract.TextResponse{}, provideradaptercontract.ProviderError{Class: "credential_error", StatusCode: http.StatusBadGateway, Message: "provider credential unavailable"}
-	}
-	if refreshed, ok, err := rt.refreshReverseProxyCredential(ctx, req.Account, credential); err != nil {
-		return provideradaptercontract.TextResponse{}, provideradaptercontract.ProviderError{Class: "auth_failed", StatusCode: http.StatusBadGateway, Message: "provider credential refresh failed"}
-	} else if ok {
-		credential = refreshed
-	}
-	req.Credential = credential
+	defer rt.releaseProviderAccountConcurrency(dispatch.concurrencyLease)
+	req.Credential = dispatch.credential
 	resp, err := rt.adapters.InvokeText(ctx, req)
 	if err != nil {
 		rt.applyProviderAccountProtection(ctx, req.Account, err)
@@ -1282,22 +1352,12 @@ func (rt *runtimeState) invokeProviderText(ctx context.Context, req provideradap
 }
 
 func (rt *runtimeState) invokeProviderTokenCount(ctx context.Context, req provideradaptercontract.TokenCountRequest) (provideradaptercontract.TokenCountResponse, error) {
-	if req.Account.ID <= 0 {
-		return provideradaptercontract.TokenCountResponse{}, provideradaptercontract.ProviderError{Class: "no_available_account", StatusCode: http.StatusServiceUnavailable, Message: "provider account missing"}
-	}
-	if err := rt.materializeProviderProxy(ctx, &req.Account); err != nil {
+	dispatch, err := rt.prepareProviderDispatch(ctx, &req.Account)
+	if err != nil {
 		return provideradaptercontract.TokenCountResponse{}, err
 	}
-	credential, err := rt.accounts.DecryptCredential(ctx, req.Account.ID)
-	if err != nil {
-		return provideradaptercontract.TokenCountResponse{}, provideradaptercontract.ProviderError{Class: "credential_error", StatusCode: http.StatusBadGateway, Message: "provider credential unavailable"}
-	}
-	if refreshed, ok, err := rt.refreshReverseProxyCredential(ctx, req.Account, credential); err != nil {
-		return provideradaptercontract.TokenCountResponse{}, provideradaptercontract.ProviderError{Class: "auth_failed", StatusCode: http.StatusBadGateway, Message: "provider credential refresh failed"}
-	} else if ok {
-		credential = refreshed
-	}
-	req.Credential = credential
+	defer rt.releaseProviderAccountConcurrency(dispatch.concurrencyLease)
+	req.Credential = dispatch.credential
 	resp, err := rt.adapters.InvokeTokenCount(ctx, req)
 	if err != nil {
 		rt.applyProviderAccountProtection(ctx, req.Account, err)
@@ -1307,22 +1367,12 @@ func (rt *runtimeState) invokeProviderTokenCount(ctx context.Context, req provid
 }
 
 func (rt *runtimeState) invokeProviderEmbeddings(ctx context.Context, req provideradaptercontract.EmbeddingRequest) (provideradaptercontract.EmbeddingResponse, error) {
-	if req.Account.ID <= 0 {
-		return provideradaptercontract.EmbeddingResponse{}, provideradaptercontract.ProviderError{Class: "no_available_account", StatusCode: http.StatusServiceUnavailable, Message: "provider account missing"}
-	}
-	if err := rt.materializeProviderProxy(ctx, &req.Account); err != nil {
+	dispatch, err := rt.prepareProviderDispatch(ctx, &req.Account)
+	if err != nil {
 		return provideradaptercontract.EmbeddingResponse{}, err
 	}
-	credential, err := rt.accounts.DecryptCredential(ctx, req.Account.ID)
-	if err != nil {
-		return provideradaptercontract.EmbeddingResponse{}, provideradaptercontract.ProviderError{Class: "credential_error", StatusCode: http.StatusBadGateway, Message: "provider credential unavailable"}
-	}
-	if refreshed, ok, err := rt.refreshReverseProxyCredential(ctx, req.Account, credential); err != nil {
-		return provideradaptercontract.EmbeddingResponse{}, provideradaptercontract.ProviderError{Class: "auth_failed", StatusCode: http.StatusBadGateway, Message: "provider credential refresh failed"}
-	} else if ok {
-		credential = refreshed
-	}
-	req.Credential = credential
+	defer rt.releaseProviderAccountConcurrency(dispatch.concurrencyLease)
+	req.Credential = dispatch.credential
 	resp, err := rt.adapters.InvokeEmbeddings(ctx, req)
 	if err != nil {
 		rt.applyProviderAccountProtection(ctx, req.Account, err)
@@ -1332,22 +1382,12 @@ func (rt *runtimeState) invokeProviderEmbeddings(ctx context.Context, req provid
 }
 
 func (rt *runtimeState) invokeProviderImageGeneration(ctx context.Context, req provideradaptercontract.ImageGenerationRequest) (provideradaptercontract.ImageGenerationResponse, error) {
-	if req.Account.ID <= 0 {
-		return provideradaptercontract.ImageGenerationResponse{}, provideradaptercontract.ProviderError{Class: "no_available_account", StatusCode: http.StatusServiceUnavailable, Message: "provider account missing"}
-	}
-	if err := rt.materializeProviderProxy(ctx, &req.Account); err != nil {
+	dispatch, err := rt.prepareProviderDispatch(ctx, &req.Account)
+	if err != nil {
 		return provideradaptercontract.ImageGenerationResponse{}, err
 	}
-	credential, err := rt.accounts.DecryptCredential(ctx, req.Account.ID)
-	if err != nil {
-		return provideradaptercontract.ImageGenerationResponse{}, provideradaptercontract.ProviderError{Class: "credential_error", StatusCode: http.StatusBadGateway, Message: "provider credential unavailable"}
-	}
-	if refreshed, ok, err := rt.refreshReverseProxyCredential(ctx, req.Account, credential); err != nil {
-		return provideradaptercontract.ImageGenerationResponse{}, provideradaptercontract.ProviderError{Class: "auth_failed", StatusCode: http.StatusBadGateway, Message: "provider credential refresh failed"}
-	} else if ok {
-		credential = refreshed
-	}
-	req.Credential = credential
+	defer rt.releaseProviderAccountConcurrency(dispatch.concurrencyLease)
+	req.Credential = dispatch.credential
 	resp, err := rt.adapters.InvokeImageGeneration(ctx, req)
 	if err != nil {
 		rt.applyProviderAccountProtection(ctx, req.Account, err)
@@ -1357,22 +1397,12 @@ func (rt *runtimeState) invokeProviderImageGeneration(ctx context.Context, req p
 }
 
 func (rt *runtimeState) invokeProviderImageEdit(ctx context.Context, req provideradaptercontract.ImageEditRequest) (provideradaptercontract.ImageGenerationResponse, error) {
-	if req.Account.ID <= 0 {
-		return provideradaptercontract.ImageGenerationResponse{}, provideradaptercontract.ProviderError{Class: "no_available_account", StatusCode: http.StatusServiceUnavailable, Message: "provider account missing"}
-	}
-	if err := rt.materializeProviderProxy(ctx, &req.Account); err != nil {
+	dispatch, err := rt.prepareProviderDispatch(ctx, &req.Account)
+	if err != nil {
 		return provideradaptercontract.ImageGenerationResponse{}, err
 	}
-	credential, err := rt.accounts.DecryptCredential(ctx, req.Account.ID)
-	if err != nil {
-		return provideradaptercontract.ImageGenerationResponse{}, provideradaptercontract.ProviderError{Class: "credential_error", StatusCode: http.StatusBadGateway, Message: "provider credential unavailable"}
-	}
-	if refreshed, ok, err := rt.refreshReverseProxyCredential(ctx, req.Account, credential); err != nil {
-		return provideradaptercontract.ImageGenerationResponse{}, provideradaptercontract.ProviderError{Class: "auth_failed", StatusCode: http.StatusBadGateway, Message: "provider credential refresh failed"}
-	} else if ok {
-		credential = refreshed
-	}
-	req.Credential = credential
+	defer rt.releaseProviderAccountConcurrency(dispatch.concurrencyLease)
+	req.Credential = dispatch.credential
 	resp, err := rt.adapters.InvokeImageEdit(ctx, req)
 	if err != nil {
 		rt.applyProviderAccountProtection(ctx, req.Account, err)
@@ -1382,22 +1412,12 @@ func (rt *runtimeState) invokeProviderImageEdit(ctx context.Context, req provide
 }
 
 func (rt *runtimeState) invokeProviderImageVariation(ctx context.Context, req provideradaptercontract.ImageVariationRequest) (provideradaptercontract.ImageGenerationResponse, error) {
-	if req.Account.ID <= 0 {
-		return provideradaptercontract.ImageGenerationResponse{}, provideradaptercontract.ProviderError{Class: "no_available_account", StatusCode: http.StatusServiceUnavailable, Message: "provider account missing"}
-	}
-	if err := rt.materializeProviderProxy(ctx, &req.Account); err != nil {
+	dispatch, err := rt.prepareProviderDispatch(ctx, &req.Account)
+	if err != nil {
 		return provideradaptercontract.ImageGenerationResponse{}, err
 	}
-	credential, err := rt.accounts.DecryptCredential(ctx, req.Account.ID)
-	if err != nil {
-		return provideradaptercontract.ImageGenerationResponse{}, provideradaptercontract.ProviderError{Class: "credential_error", StatusCode: http.StatusBadGateway, Message: "provider credential unavailable"}
-	}
-	if refreshed, ok, err := rt.refreshReverseProxyCredential(ctx, req.Account, credential); err != nil {
-		return provideradaptercontract.ImageGenerationResponse{}, provideradaptercontract.ProviderError{Class: "auth_failed", StatusCode: http.StatusBadGateway, Message: "provider credential refresh failed"}
-	} else if ok {
-		credential = refreshed
-	}
-	req.Credential = credential
+	defer rt.releaseProviderAccountConcurrency(dispatch.concurrencyLease)
+	req.Credential = dispatch.credential
 	resp, err := rt.adapters.InvokeImageVariation(ctx, req)
 	if err != nil {
 		rt.applyProviderAccountProtection(ctx, req.Account, err)
@@ -1407,22 +1427,12 @@ func (rt *runtimeState) invokeProviderImageVariation(ctx context.Context, req pr
 }
 
 func (rt *runtimeState) invokeProviderAudioTranscription(ctx context.Context, req provideradaptercontract.AudioTranscriptionRequest) (provideradaptercontract.AudioTranscriptionResponse, error) {
-	if req.Account.ID <= 0 {
-		return provideradaptercontract.AudioTranscriptionResponse{}, provideradaptercontract.ProviderError{Class: "no_available_account", StatusCode: http.StatusServiceUnavailable, Message: "provider account missing"}
-	}
-	if err := rt.materializeProviderProxy(ctx, &req.Account); err != nil {
+	dispatch, err := rt.prepareProviderDispatch(ctx, &req.Account)
+	if err != nil {
 		return provideradaptercontract.AudioTranscriptionResponse{}, err
 	}
-	credential, err := rt.accounts.DecryptCredential(ctx, req.Account.ID)
-	if err != nil {
-		return provideradaptercontract.AudioTranscriptionResponse{}, provideradaptercontract.ProviderError{Class: "credential_error", StatusCode: http.StatusBadGateway, Message: "provider credential unavailable"}
-	}
-	if refreshed, ok, err := rt.refreshReverseProxyCredential(ctx, req.Account, credential); err != nil {
-		return provideradaptercontract.AudioTranscriptionResponse{}, provideradaptercontract.ProviderError{Class: "auth_failed", StatusCode: http.StatusBadGateway, Message: "provider credential refresh failed"}
-	} else if ok {
-		credential = refreshed
-	}
-	req.Credential = credential
+	defer rt.releaseProviderAccountConcurrency(dispatch.concurrencyLease)
+	req.Credential = dispatch.credential
 	resp, err := rt.adapters.InvokeAudioTranscription(ctx, req)
 	if err != nil {
 		rt.applyProviderAccountProtection(ctx, req.Account, err)
@@ -1432,22 +1442,12 @@ func (rt *runtimeState) invokeProviderAudioTranscription(ctx context.Context, re
 }
 
 func (rt *runtimeState) invokeProviderAudioSpeech(ctx context.Context, req provideradaptercontract.AudioSpeechRequest) (provideradaptercontract.AudioSpeechResponse, error) {
-	if req.Account.ID <= 0 {
-		return provideradaptercontract.AudioSpeechResponse{}, provideradaptercontract.ProviderError{Class: "no_available_account", StatusCode: http.StatusServiceUnavailable, Message: "provider account missing"}
-	}
-	if err := rt.materializeProviderProxy(ctx, &req.Account); err != nil {
+	dispatch, err := rt.prepareProviderDispatch(ctx, &req.Account)
+	if err != nil {
 		return provideradaptercontract.AudioSpeechResponse{}, err
 	}
-	credential, err := rt.accounts.DecryptCredential(ctx, req.Account.ID)
-	if err != nil {
-		return provideradaptercontract.AudioSpeechResponse{}, provideradaptercontract.ProviderError{Class: "credential_error", StatusCode: http.StatusBadGateway, Message: "provider credential unavailable"}
-	}
-	if refreshed, ok, err := rt.refreshReverseProxyCredential(ctx, req.Account, credential); err != nil {
-		return provideradaptercontract.AudioSpeechResponse{}, provideradaptercontract.ProviderError{Class: "auth_failed", StatusCode: http.StatusBadGateway, Message: "provider credential refresh failed"}
-	} else if ok {
-		credential = refreshed
-	}
-	req.Credential = credential
+	defer rt.releaseProviderAccountConcurrency(dispatch.concurrencyLease)
+	req.Credential = dispatch.credential
 	resp, err := rt.adapters.InvokeAudioSpeech(ctx, req)
 	if err != nil {
 		rt.applyProviderAccountProtection(ctx, req.Account, err)
@@ -1457,22 +1457,12 @@ func (rt *runtimeState) invokeProviderAudioSpeech(ctx context.Context, req provi
 }
 
 func (rt *runtimeState) invokeProviderModerations(ctx context.Context, req provideradaptercontract.ModerationRequest) (provideradaptercontract.ModerationResponse, error) {
-	if req.Account.ID <= 0 {
-		return provideradaptercontract.ModerationResponse{}, provideradaptercontract.ProviderError{Class: "no_available_account", StatusCode: http.StatusServiceUnavailable, Message: "provider account missing"}
-	}
-	if err := rt.materializeProviderProxy(ctx, &req.Account); err != nil {
+	dispatch, err := rt.prepareProviderDispatch(ctx, &req.Account)
+	if err != nil {
 		return provideradaptercontract.ModerationResponse{}, err
 	}
-	credential, err := rt.accounts.DecryptCredential(ctx, req.Account.ID)
-	if err != nil {
-		return provideradaptercontract.ModerationResponse{}, provideradaptercontract.ProviderError{Class: "credential_error", StatusCode: http.StatusBadGateway, Message: "provider credential unavailable"}
-	}
-	if refreshed, ok, err := rt.refreshReverseProxyCredential(ctx, req.Account, credential); err != nil {
-		return provideradaptercontract.ModerationResponse{}, provideradaptercontract.ProviderError{Class: "auth_failed", StatusCode: http.StatusBadGateway, Message: "provider credential refresh failed"}
-	} else if ok {
-		credential = refreshed
-	}
-	req.Credential = credential
+	defer rt.releaseProviderAccountConcurrency(dispatch.concurrencyLease)
+	req.Credential = dispatch.credential
 	resp, err := rt.adapters.InvokeModerations(ctx, req)
 	if err != nil {
 		rt.applyProviderAccountProtection(ctx, req.Account, err)
@@ -1482,22 +1472,12 @@ func (rt *runtimeState) invokeProviderModerations(ctx context.Context, req provi
 }
 
 func (rt *runtimeState) invokeProviderRerank(ctx context.Context, req provideradaptercontract.RerankRequest) (provideradaptercontract.RerankResponse, error) {
-	if req.Account.ID <= 0 {
-		return provideradaptercontract.RerankResponse{}, provideradaptercontract.ProviderError{Class: "no_available_account", StatusCode: http.StatusServiceUnavailable, Message: "provider account missing"}
-	}
-	if err := rt.materializeProviderProxy(ctx, &req.Account); err != nil {
+	dispatch, err := rt.prepareProviderDispatch(ctx, &req.Account)
+	if err != nil {
 		return provideradaptercontract.RerankResponse{}, err
 	}
-	credential, err := rt.accounts.DecryptCredential(ctx, req.Account.ID)
-	if err != nil {
-		return provideradaptercontract.RerankResponse{}, provideradaptercontract.ProviderError{Class: "credential_error", StatusCode: http.StatusBadGateway, Message: "provider credential unavailable"}
-	}
-	if refreshed, ok, err := rt.refreshReverseProxyCredential(ctx, req.Account, credential); err != nil {
-		return provideradaptercontract.RerankResponse{}, provideradaptercontract.ProviderError{Class: "auth_failed", StatusCode: http.StatusBadGateway, Message: "provider credential refresh failed"}
-	} else if ok {
-		credential = refreshed
-	}
-	req.Credential = credential
+	defer rt.releaseProviderAccountConcurrency(dispatch.concurrencyLease)
+	req.Credential = dispatch.credential
 	resp, err := rt.adapters.InvokeRerank(ctx, req)
 	if err != nil {
 		rt.applyProviderAccountProtection(ctx, req.Account, err)
@@ -2094,7 +2074,7 @@ func gatewayErrorTypeForProviderClass(errorClass string) apiopenapi.GatewayError
 	switch errorClass {
 	case "invalid_request":
 		return apiopenapi.InvalidRequestError
-	case "rate_limit", "rpm_limit_exceeded", "tpm_limit_exceeded":
+	case "rate_limit", "rpm_limit_exceeded", "tpm_limit_exceeded", "concurrency_limit_exceeded":
 		return apiopenapi.RateLimitError
 	case "auth_failed", "auth_error", "permission_denied", "session_invalid", "account_locked", "account_banned", "abuse_detected", "device_unrecognized":
 		return apiopenapi.PermissionError
@@ -2131,6 +2111,8 @@ func providerGatewayMessage(errorClass string) string {
 		return "provider account RPM limit exceeded"
 	case "tpm_limit_exceeded":
 		return "provider account TPM limit exceeded"
+	case "concurrency_limit_exceeded":
+		return "provider account concurrency limit exceeded"
 	case "auth_failed", "auth_error", "credential_error":
 		return "provider authentication failed"
 	case "invalid_request":
