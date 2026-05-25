@@ -143,6 +143,48 @@ func TestNewTracerProviderExportsSpansToJaegerQuery(t *testing.T) {
 	waitForJaegerTrace(t, queryURL, traceID, "jaeger.visualization.smoke", "srapi-jaeger-smoke")
 }
 
+func TestNewTracerProviderExportsSpansToTempoQuery(t *testing.T) {
+	if os.Getenv("SRAPI_OTEL_TEMPO_SMOKE") != "1" {
+		t.Skip("set SRAPI_OTEL_TEMPO_SMOKE=1 to run the Tempo OTLP/query smoke")
+	}
+	endpoint := strings.TrimSpace(os.Getenv("SRAPI_OTEL_TEMPO_OTLP_ENDPOINT"))
+	if endpoint == "" {
+		t.Fatal("SRAPI_OTEL_TEMPO_OTLP_ENDPOINT is required")
+	}
+	queryURL := strings.TrimRight(strings.TrimSpace(os.Getenv("SRAPI_OTEL_TEMPO_QUERY_URL")), "/")
+	if queryURL == "" {
+		t.Fatal("SRAPI_OTEL_TEMPO_QUERY_URL is required")
+	}
+
+	tp, shutdown, err := NewTracerProvider(context.Background(), config.ObservabilityConfig{
+		ServiceName:      "srapi-tempo-smoke",
+		ServiceVersion:   "test",
+		Environment:      "local",
+		TracesEnabled:    true,
+		OTLPEndpoint:     endpoint,
+		OTLPInsecure:     true,
+		TraceSampleRatio: 1,
+		BatchTimeout:     10 * time.Millisecond,
+	})
+	if err != nil {
+		t.Fatalf("new tracer provider: %v", err)
+	}
+
+	_, span := tp.Tracer(tracerName).Start(context.Background(), "tempo.visualization.smoke",
+		trace.WithAttributes(attribute.String("srapi.test.outcome", "tempo_query_visible")),
+	)
+	traceID := span.SpanContext().TraceID().String()
+	span.End()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := shutdown(ctx); err != nil {
+		t.Fatalf("shutdown tracer provider: %v", err)
+	}
+
+	waitForTempoTrace(t, queryURL, traceID, "tempo.visualization.smoke", "srapi-tempo-smoke")
+}
+
 func TestEndSpanRecordsErrorTypeAndStatus(t *testing.T) {
 	exporter := tracetest.NewInMemoryExporter()
 	tracerProvider := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
@@ -239,6 +281,30 @@ type jaegerTraceResponse struct {
 	} `json:"data"`
 }
 
+type tempoTraceResponse struct {
+	Trace struct {
+		ResourceSpans []tempoResourceSpan `json:"resourceSpans"`
+	} `json:"trace"`
+}
+
+type tempoResourceSpan struct {
+	Resource struct {
+		Attributes []tempoAttribute `json:"attributes"`
+	} `json:"resource"`
+	ScopeSpans []struct {
+		Spans []struct {
+			Name string `json:"name"`
+		} `json:"spans"`
+	} `json:"scopeSpans"`
+}
+
+type tempoAttribute struct {
+	Key   string `json:"key"`
+	Value struct {
+		StringValue string `json:"stringValue"`
+	} `json:"value"`
+}
+
 func waitForJaegerTrace(t *testing.T, queryURL string, traceID string, operationName string, serviceName string) {
 	t.Helper()
 	deadline := time.Now().Add(time.Duration(envInt(t, "SRAPI_OTEL_JAEGER_QUERY_TIMEOUT_SECONDS", 20)) * time.Second)
@@ -258,6 +324,27 @@ func waitForJaegerTrace(t *testing.T, queryURL string, traceID string, operation
 		t.Fatalf("trace %s was not visible in Jaeger before timeout: %v", traceID, lastErr)
 	}
 	t.Fatalf("trace %s was not visible in Jaeger before timeout", traceID)
+}
+
+func waitForTempoTrace(t *testing.T, queryURL string, traceID string, operationName string, serviceName string) {
+	t.Helper()
+	deadline := time.Now().Add(time.Duration(envInt(t, "SRAPI_OTEL_TEMPO_QUERY_TIMEOUT_SECONDS", 20)) * time.Second)
+	client := http.Client{Timeout: 2 * time.Second}
+	var lastErr error
+	for time.Now().Before(deadline) {
+		found, err := tempoTraceContains(client, queryURL, traceID, operationName, serviceName)
+		if err != nil {
+			lastErr = err
+		}
+		if found {
+			return
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+	if lastErr != nil {
+		t.Fatalf("trace %s was not visible in Tempo before timeout: %v", traceID, lastErr)
+	}
+	t.Fatalf("trace %s was not visible in Tempo before timeout", traceID)
 }
 
 func envInt(t *testing.T, key string, fallback int) int {
@@ -305,6 +392,47 @@ func jaegerTraceContains(client http.Client, queryURL string, traceID string, op
 		}
 	}
 	return false, nil
+}
+
+func tempoTraceContains(client http.Client, queryURL string, traceID string, operationName string, serviceName string) (bool, error) {
+	req, err := http.NewRequest(http.MethodGet, queryURL+"/api/v2/traces/"+traceID, nil)
+	if err != nil {
+		return false, err
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return false, fmt.Errorf("tempo query returned %s", resp.Status)
+	}
+	var body tempoTraceResponse
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		return false, err
+	}
+	for _, batch := range body.Trace.ResourceSpans {
+		if !tempoResourceHasServiceName(batch.Resource.Attributes, serviceName) {
+			continue
+		}
+		for _, scopeSpan := range batch.ScopeSpans {
+			for _, span := range scopeSpan.Spans {
+				if span.Name == operationName {
+					return true, nil
+				}
+			}
+		}
+	}
+	return false, nil
+}
+
+func tempoResourceHasServiceName(attrs []tempoAttribute, serviceName string) bool {
+	for _, attr := range attrs {
+		if attr.Key == "service.name" && attr.Value.StringValue == serviceName {
+			return true
+		}
+	}
+	return false
 }
 
 func assertAttr(t *testing.T, attrs []attribute.KeyValue, key attribute.Key, value string) {

@@ -107,16 +107,17 @@ last_completed:
 - B1.2.3: Added an opt-in PostgreSQL `balance_charger` pressure gate (`make balance-charger-pressure`) that creates a temporary schema, seeds 10,000 pending usage logs, runs the real Ent billing store and worker, and verifies charged usage, ledger batches, and final balance before dropping the schema.
 - C1.1.1: Added an opt-in OpenTelemetry HTTP tracing overhead gate (`make otel-overhead-bench`) that compares no-op tracer provider vs batch tracer provider `/livez` p99 latency, defaults to a 5ms overhead budget, and documents when to run it before release or after observability changes.
 - C1.1.2: Added an opt-in Jaeger visualization smoke (`make smoke-jaeger-trace`) that starts official Jaeger all-in-one locally, exports a span over OTLP/gRPC, and verifies the trace is visible through the Jaeger Query API before removing the temporary container.
+- C1.1.3: Added an opt-in Tempo visualization smoke (`make smoke-tempo-trace`) that starts official Tempo locally with `deploy/tempo-smoke.yaml`, exports a span over OTLP/gRPC, and verifies the trace is visible through the Tempo Query API before removing the temporary container.
 - Quality gate: Fixed `tools/web-check.mjs` so Vitest no longer shares one Node `--localstorage-file` across parallel unit files; the web harness now uses each browser test environment's storage and `make check` is repeatable for language persistence assertions.
 - Spec governance: Reconciled stale A5.2 guidance in `specs/silly-stirring-turtle.md` with current provider preset evidence; the engineering plan now records the implemented preset registry, install API, default-disabled behavior, and representative provider test diagnostics instead of listing A5.2 as missing.
 
 current:
 
 - package: Phase 1 production smoke and observability hardening
-- status: API key/user rate limits, API key concurrency, scheduler account quota evidence, provider-account RPM/TPM Redis counters, provider-account ordinary HTTP concurrency Redis leases, local schema repair for multi-attempt usage evidence, protocol-level OTLP trace export smoke, local Jaeger query visibility smoke, the OTel HTTP p99 overhead guard, the balance_charger local 10k pending-usage drain guard, and an opt-in PostgreSQL balance_charger pressure harness are implemented and locally verified; live external provider/payment smoke still depends on valid upstream or merchant credentials.
+- status: API key/user rate limits, API key concurrency, scheduler account quota evidence, provider-account RPM/TPM Redis counters, provider-account ordinary HTTP concurrency Redis leases, local schema repair for multi-attempt usage evidence, protocol-level OTLP trace export smoke, local Jaeger query visibility smoke, local Tempo query visibility smoke, the OTel HTTP p99 overhead guard, the balance_charger local 10k pending-usage drain guard, and an opt-in PostgreSQL balance_charger pressure harness are implemented and locally verified; live external provider/payment smoke still depends on valid upstream or merchant credentials.
 - objective: continue closing production smoke, sandbox, collector-visualization, and pressure-test gaps without letting docs/specs drift.
 
-next_recommended: Run real Stripe/Alipay/WeChat sandbox smoke when merchant credentials are available, run Tempo or deployed collector trace visualization smoke against production topology, rerun `make balance-charger-pressure BALANCE_CHARGER_PRESSURE_DSN=...` against a production-adjacent PostgreSQL database if local dev-container IO is not representative enough, rerun `make otel-overhead-bench` after any OTel SDK/exporter or tracing middleware change, or continue the remaining Phase 1 production pressure-test tasks from `specs/silly-stirring-turtle.md`.
+next_recommended: Run real Stripe/Alipay/WeChat sandbox smoke when merchant credentials are available, run deployed collector trace visualization smoke against production topology, rerun `make balance-charger-pressure BALANCE_CHARGER_PRESSURE_DSN=...` against a production-adjacent PostgreSQL database if local dev-container IO is not representative enough, rerun `make otel-overhead-bench` after any OTel SDK/exporter or tracing middleware change, or continue the remaining Phase 1 production pressure-test tasks from `specs/silly-stirring-turtle.md`.
 
 last_gates:
 
@@ -124,6 +125,7 @@ last_gates:
 - `make otel-overhead-bench`: pass; local p99 overhead 0s against 5ms budget with 2,000 samples / 200 warmup
 - `cd apps/api && go test ./internal/platform/otel -count=1 -v`: pass; Jaeger smoke skips unless `SRAPI_OTEL_JAEGER_SMOKE=1`
 - `make smoke-jaeger-trace`: pass; local Jaeger all-in-one accepted OTLP/gRPC span and Query API returned the trace
+- `make smoke-tempo-trace`: pass; local Tempo accepted OTLP/gRPC span and Query API returned the trace
 - `make check`: pass; includes OpenAPI lint/bundle/codegen checks, SDK typecheck, migration check, architecture/code-quality/API tests, examples check, secret scan, web typecheck/lint/unit/build, and bundle budget
 - `cd apps/api && go test ./internal/modules/providers/preset -run TestDefaultRegistrySeedsCompatiblePresets -count=1 -v`: pass
 - `cd apps/api && go test ./internal/httpserver -run TestAdminInstallProviderPresetsIsIdempotent -count=1 -v`: pass
@@ -140,7 +142,7 @@ notes:
 
 - Existing `docs/` remains the architecture and domain source of truth.
 - Real Stripe/Alipay/WeChat sandbox smoke still requires merchant credentials.
-- Local Jaeger trace visibility is covered by `make smoke-jaeger-trace`; Tempo and deployed collector/query backends still require topology-specific smoke.
+- Local Jaeger trace visibility is covered by `make smoke-jaeger-trace`; local Tempo trace visibility is covered by `make smoke-tempo-trace`; deployed collector/query backends still require topology-specific smoke.
 - The balance_charger PostgreSQL pressure gate passed against the local dev Postgres container; rerun it against production-adjacent storage before claiming deployed database throughput under real IO.
 - The rate-limit p99 guard is now available, but this workstation did not produce a valid 2ms Redis baseline; rerun it against local/native or production-adjacent Redis before claiming the limiter p99 budget is met.
 - Historical strategy replay can only be claimed for decisions that have `scheduler_request_snapshots`; older decision-only rows remain report-only because they lack the full request profile and candidate set.

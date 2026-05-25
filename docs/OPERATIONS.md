@@ -136,6 +136,14 @@ make smoke-jaeger-trace
 
 该 smoke 会临时启动官方 Jaeger all-in-one 容器（默认 `jaegertracing/all-in-one:1.76.0`），映射 Query/UI `16686` 和 OTLP/gRPC `4317`，通过 SRapi OTLP exporter 写入一条测试 span，再调用 Jaeger Query API `/api/traces/{trace_id}` 查回同一个 trace。测试结束会删除临时容器。它用于本地验证 Jaeger collector/query/UI 后端可见性；部署环境中的 Tempo、托管 collector 或多节点拓扑仍应按实际地址单独 smoke。
 
+OpenTelemetry 到 Tempo 的可视化链路可单独执行：
+
+```bash
+make smoke-tempo-trace
+```
+
+该 smoke 会临时启动官方 Tempo 容器（默认 `grafana/tempo:2.9.0`），加载 `deploy/tempo-smoke.yaml`，映射 Query `13201` 和 OTLP/gRPC `14318` 到容器内 `3200` / `4317`，通过 SRapi OTLP exporter 写入一条测试 span，再调用 Tempo Query API `/api/v2/traces/{trace_id}` 查回同一个 trace。测试结束会删除临时容器。端口可通过 `TEMPO_QUERY_PORT`、`TEMPO_OTLP_PORT` 覆盖；部署环境中的托管 collector 或多节点 Tempo 拓扑仍应按实际地址单独 smoke。
+
 ## 6. 备份与恢复
 
 ### 6.1 备份对象
@@ -307,7 +315,7 @@ AI Gateway 专项指标以 `OBSERVABILITY_SPEC.md` 为准。
 
 当前 `/metrics` 使用 Prometheus client SDK 输出 text format，基于持久化 usage logs、scheduler decisions/leases、account health snapshots 和 Reverse Proxy Runtime 快照聚合；Gateway request duration 和 provider probe latency 暴露为 histogram，固定 bucket 为 `0.05`、`0.1`、`0.25`、`0.5`、`1`、`2.5`、`5`、`10` 秒和 `+Inf`。指标 label 只允许低基数 route/model/protocol/result/error/status 类字段，避免使用 API Key、用户邮箱、账号名、account id、prompt 或 credential。
 
-HTTP server 启用 OpenTelemetry server span 和 W3C trace context 传播。默认不导出 trace；设置 `OTEL_TRACES_ENABLED=true` 后会通过 OTLP gRPC 发往 `OTEL_EXPORTER_OTLP_ENDPOINT`。`internal/platform/otel` 的本地 collector smoke 会启动进程内 OTLP gRPC receiver，验证 span 和 service resource attributes 能经真实 OTLP 协议 flush；`make smoke-jaeger-trace` 会把 span 写入真实 Jaeger all-in-one 后端并经 Query API 查回。结构化日志 handler 会从 context 自动补充 `request_id`、`trace_id`、`user_id` 和 `api_key_id`，不得把原始 API Key、credential、prompt 或请求体加入日志字段。
+HTTP server 启用 OpenTelemetry server span 和 W3C trace context 传播。默认不导出 trace；设置 `OTEL_TRACES_ENABLED=true` 后会通过 OTLP gRPC 发往 `OTEL_EXPORTER_OTLP_ENDPOINT`。`internal/platform/otel` 的本地 collector smoke 会启动进程内 OTLP gRPC receiver，验证 span 和 service resource attributes 能经真实 OTLP 协议 flush；`make smoke-jaeger-trace` 会把 span 写入真实 Jaeger all-in-one 后端并经 Query API 查回；`make smoke-tempo-trace` 会把 span 写入真实 Tempo 后端并经 Query API 查回。结构化日志 handler 会从 context 自动补充 `request_id`、`trace_id`、`user_id` 和 `api_key_id`，不得把原始 API Key、credential、prompt 或请求体加入日志字段。
 
 ## 10. 安全运营
 

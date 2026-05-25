@@ -30,8 +30,15 @@ JAEGER_OTLP_PORT ?= 4317
 JAEGER_QUERY_PORT ?= 16686
 JAEGER_QUERY_TIMEOUT_SECONDS ?= 20
 JAEGER_SMOKE_TIMEOUT ?= 90s
+TEMPO_IMAGE ?= grafana/tempo:2.9.0
+TEMPO_CONTAINER ?= srapi-tempo-smoke
+TEMPO_CONFIG ?= $(CURDIR)/deploy/tempo-smoke.yaml
+TEMPO_OTLP_PORT ?= 14318
+TEMPO_QUERY_PORT ?= 13201
+TEMPO_QUERY_TIMEOUT_SECONDS ?= 20
+TEMPO_SMOKE_TIMEOUT ?= 90s
 
-.PHONY: help bootstrap-env openapi-lint openapi-bundle openapi-codegen openapi-codegen-check openapi-ts-codegen openapi-ts-codegen-check sdk-ts-typecheck ent-generate ent-generate-check migration-diff migration-hash migration-check api-test api-run dev-up dev-down dev-logs smoke-health smoke-gateway smoke-rate-limit smoke-failover smoke-quality-eval smoke-release smoke-jaeger-trace rate-limit-bench balance-charger-pressure otel-overhead-bench backup-postgres restore-postgres examples-check secret-scan architecture-check code-quality-check diff-check web-install web-check web-check-e2e web-dev check
+.PHONY: help bootstrap-env openapi-lint openapi-bundle openapi-codegen openapi-codegen-check openapi-ts-codegen openapi-ts-codegen-check sdk-ts-typecheck ent-generate ent-generate-check migration-diff migration-hash migration-check api-test api-run dev-up dev-down dev-logs smoke-health smoke-gateway smoke-rate-limit smoke-failover smoke-quality-eval smoke-release smoke-jaeger-trace smoke-tempo-trace rate-limit-bench balance-charger-pressure otel-overhead-bench backup-postgres restore-postgres examples-check secret-scan architecture-check code-quality-check diff-check web-install web-check web-check-e2e web-dev check
 
 help:
 	@printf '%s\n' \
@@ -60,6 +67,7 @@ help:
 		'  make smoke-quality-eval  Verify QualityEval capture, worker judge, and Scheduler quality evidence' \
 		'  make smoke-release   Validate health, readiness, metrics, and gateway smoke on localhost' \
 		'  make smoke-jaeger-trace  Verify OTLP traces are visible through Jaeger query API' \
+		'  make smoke-tempo-trace  Verify OTLP traces are visible through Tempo query API' \
 		'  make rate-limit-bench RATE_LIMIT_BENCH_REDIS_ADDR=host:port  Check Redis rate limiter p99 budget' \
 		'  make balance-charger-pressure BALANCE_CHARGER_PRESSURE_DSN=postgres://...  Run PostgreSQL balance_charger pressure test' \
 		'  make otel-overhead-bench  Check OTel HTTP tracing p99 overhead budget' \
@@ -221,6 +229,31 @@ smoke-jaeger-trace:
 		SRAPI_OTEL_JAEGER_QUERY_URL="http://127.0.0.1:$(JAEGER_QUERY_PORT)" \
 		SRAPI_OTEL_JAEGER_QUERY_TIMEOUT_SECONDS="$(JAEGER_QUERY_TIMEOUT_SECONDS)" \
 		go test ./internal/platform/otel -run TestNewTracerProviderExportsSpansToJaegerQuery -count=1 -timeout "$(JAEGER_SMOKE_TIMEOUT)" -v
+
+smoke-tempo-trace:
+	@command -v docker >/dev/null 2>&1 || (echo 'docker is required for smoke-tempo-trace' >&2; exit 127)
+	@test -f "$(TEMPO_CONFIG)" || (echo 'TEMPO_CONFIG does not exist: $(TEMPO_CONFIG)' >&2; exit 2)
+	@set -e; \
+	cleanup() { docker rm -f "$(TEMPO_CONTAINER)" >/dev/null 2>&1 || true; }; \
+	trap cleanup EXIT INT TERM; \
+	docker rm -f "$(TEMPO_CONTAINER)" >/dev/null 2>&1 || true; \
+	docker run -d --rm --name "$(TEMPO_CONTAINER)" \
+		-v "$(TEMPO_CONFIG):/etc/tempo.yaml:ro" \
+		-p "127.0.0.1:$(TEMPO_QUERY_PORT):3200" \
+		-p "127.0.0.1:$(TEMPO_OTLP_PORT):4317" \
+		"$(TEMPO_IMAGE)" -config.file=/etc/tempo.yaml >/dev/null; \
+	ready=0; \
+	for _ in $$(seq 1 30); do \
+		if curl -fsS "http://127.0.0.1:$(TEMPO_QUERY_PORT)/ready" >/dev/null 2>&1; then ready=1; break; fi; \
+		sleep 1; \
+	done; \
+	test "$$ready" = "1" || (docker logs "$(TEMPO_CONTAINER)" >&2; echo 'Tempo query API did not become ready' >&2; exit 1); \
+	cd $(API_DIR) && \
+		SRAPI_OTEL_TEMPO_SMOKE=1 \
+		SRAPI_OTEL_TEMPO_OTLP_ENDPOINT="127.0.0.1:$(TEMPO_OTLP_PORT)" \
+		SRAPI_OTEL_TEMPO_QUERY_URL="http://127.0.0.1:$(TEMPO_QUERY_PORT)" \
+		SRAPI_OTEL_TEMPO_QUERY_TIMEOUT_SECONDS="$(TEMPO_QUERY_TIMEOUT_SECONDS)" \
+		go test ./internal/platform/otel -run TestNewTracerProviderExportsSpansToTempoQuery -count=1 -timeout "$(TEMPO_SMOKE_TIMEOUT)" -v
 
 rate-limit-bench:
 	@test -n "$(RATE_LIMIT_BENCH_REDIS_ADDR)" || (echo 'RATE_LIMIT_BENCH_REDIS_ADDR is required, for example: make rate-limit-bench RATE_LIMIT_BENCH_REDIS_ADDR=127.0.0.1:6379' >&2; exit 2)
