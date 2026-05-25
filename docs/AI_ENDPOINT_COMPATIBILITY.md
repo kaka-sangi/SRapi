@@ -628,8 +628,9 @@ OpenAI-compatible Realtime WebSocket relay
 
 - `GET /v1/realtime?model=<model>` 建立 OpenAI-compatible Realtime WebSocket；不是 `POST /v1/realtime`。
 - Gateway 先执行 API Key auth、模型可见性、entitlement、Scheduler、`realtime_websocket` capability 过滤和 realtime slot acquisition，再 upgrade WebSocket。
-- Provider Adapter 从选中账号和模型映射构造上游 `ws/wss` `/realtime?model=<mapped_upstream_model>` session；Reverse Proxy Runtime 用选中账号 OAuth/session/client-token credential 注入上游身份并双向 relay text/binary frames。
-- 当前 2api Realtime 路径拒绝 `runtime_class = api_key`；官方 API-key Realtime Adapter 属后续能力，不与 2api/OAuth 反代混用。
+- Provider Adapter 从选中账号和模型映射构造上游 `ws/wss` `/realtime?model=<mapped_upstream_model>` session。
+- `runtime_class = api_key` 的 OpenAI-compatible / native-openai 账号走官方 API-key Realtime 路径：Gateway 只用选中账号的 `api_key`/`openai_api_key` 连接上游，不把 caller `Authorization`、cookie 或 SRapi headers 透传给上游，也不进入 2api Reverse Proxy Runtime。
+- `runtime_class != api_key` 的 OpenAI-compatible Realtime 仍通过 Reverse Proxy Runtime 使用选中账号 OAuth/session/client-token credential 双向 relay text/binary frames；`reverse-proxy-*` 2api Realtime 路径继续拒绝 `runtime_class = api_key`。
 - 只允许 `OpenAI-Safety-Identifier` 等显式白名单握手 header 进入上游；caller `Authorization`、`Cookie`、`Sec-WebSocket-*`、`X-SRapi-*` 和 Gateway headers 不得定义上游身份。
 
 Phase 2 继续实现：

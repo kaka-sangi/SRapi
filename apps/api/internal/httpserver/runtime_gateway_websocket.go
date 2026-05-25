@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
+	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
 	gatewaycontract "github.com/srapi/srapi/apps/api/internal/modules/gateway/contract"
 	gatewayservice "github.com/srapi/srapi/apps/api/internal/modules/gateway/service"
@@ -292,6 +294,9 @@ func realtimeWebSocketHeaders(r *http.Request) http.Header {
 }
 
 func (s *Server) relayRealtimeWebSocket(ctx context.Context, conn *websocket.Conn, session providerRealtimeSession) (bool, string, int) {
+	if strings.EqualFold(strings.TrimSpace(session.Account.RuntimeClass), string(accountcontract.RuntimeClassAPIKey)) {
+		return s.relayOfficialAPIKeyRealtimeWebSocket(ctx, conn, session)
+	}
 	clientToUpstream := make(chan reverseproxycontract.WebSocketMessage, 32)
 	upstreamToClient := make(chan reverseproxycontract.WebSocketMessage, 32)
 	relayCtx, cancelRelay := context.WithCancel(ctx)
@@ -371,6 +376,168 @@ func (s *Server) relayRealtimeWebSocket(ctx context.Context, conn *websocket.Con
 			return false, "client_closed", statusClientClosedRequest
 		}
 	}
+}
+
+func (s *Server) relayOfficialAPIKeyRealtimeWebSocket(ctx context.Context, conn *websocket.Conn, session providerRealtimeSession) (bool, string, int) {
+	apiKey := firstNonEmpty(
+		mapString(session.Account.Credential, "api_key"),
+		mapString(session.Account.Credential, "openai_api_key"),
+	)
+	if apiKey == "" {
+		return false, "auth_failed", http.StatusUnauthorized
+	}
+	headers := cloneHTTPHeader(session.Headers)
+	if headers == nil {
+		headers = http.Header{}
+	}
+	headers.Set("Authorization", "Bearer "+apiKey)
+	if headers.Get("User-Agent") == "" {
+		if userAgent := mapString(session.Account.Metadata, "user_agent"); userAgent != "" {
+			headers.Set("User-Agent", userAgent)
+		}
+	}
+	client, err := realtimeAPIKeyHTTPClient(session.Account)
+	if err != nil {
+		return false, "network_error", http.StatusBadGateway
+	}
+	dialCtx, cancelDial := context.WithTimeout(ctx, 30*time.Second)
+	upstream, resp, err := websocket.Dial(dialCtx, session.URL, &websocket.DialOptions{
+		HTTPClient:      client,
+		HTTPHeader:      headers,
+		CompressionMode: websocket.CompressionDisabled,
+	})
+	cancelDial()
+	if err != nil {
+		return false, realtimeWebSocketDialErrorClass(dialCtx, err), realtimeWebSocketDialStatus(dialCtx, resp)
+	}
+	defer upstream.Close(websocket.StatusNormalClosure, "")
+
+	clientDone := make(chan error, 1)
+	upstreamDone := make(chan realtimeDirectRelayResult, 1)
+	go relayWebSocketClientToUpstream(ctx, conn, upstream, clientDone)
+	go relayWebSocketUpstreamToClient(ctx, upstream, conn, upstreamDone)
+	for {
+		select {
+		case result := <-upstreamDone:
+			if result.err != nil {
+				if result.forwarded {
+					return true, "", http.StatusOK
+				}
+				return false, realtimeWebSocketRelayErrorClass(ctx, result.err), realtimeWebSocketRelayStatus(ctx, result.err)
+			}
+			return true, "", http.StatusOK
+		case err := <-clientDone:
+			upstream.Close(websocket.StatusNormalClosure, "")
+			if err != nil {
+				return false, "client_closed", statusClientClosedRequest
+			}
+			return true, "", http.StatusOK
+		case <-ctx.Done():
+			upstream.Close(websocket.StatusNormalClosure, "")
+			return false, "client_closed", statusClientClosedRequest
+		}
+	}
+}
+
+type realtimeDirectRelayResult struct {
+	err       error
+	forwarded bool
+}
+
+func relayWebSocketClientToUpstream(ctx context.Context, client *websocket.Conn, upstream *websocket.Conn, done chan<- error) {
+	for {
+		messageType, payload, err := client.Read(ctx)
+		if err != nil {
+			if status := websocket.CloseStatus(err); status == websocket.StatusNormalClosure || status == websocket.StatusGoingAway {
+				done <- nil
+				return
+			}
+			if errors.Is(err, context.Canceled) {
+				done <- nil
+				return
+			}
+			done <- err
+			return
+		}
+		if err := upstream.Write(ctx, messageType, payload); err != nil {
+			done <- err
+			return
+		}
+	}
+}
+
+func relayWebSocketUpstreamToClient(ctx context.Context, upstream *websocket.Conn, client *websocket.Conn, done chan<- realtimeDirectRelayResult) {
+	forwarded := false
+	for {
+		messageType, payload, err := upstream.Read(ctx)
+		if err != nil {
+			if status := websocket.CloseStatus(err); status == websocket.StatusNormalClosure || status == websocket.StatusGoingAway {
+				done <- realtimeDirectRelayResult{forwarded: forwarded}
+				return
+			}
+			if errors.Is(err, context.Canceled) {
+				done <- realtimeDirectRelayResult{forwarded: forwarded}
+				return
+			}
+			done <- realtimeDirectRelayResult{err: err, forwarded: forwarded}
+			return
+		}
+		if err := client.Write(ctx, messageType, payload); err != nil {
+			done <- realtimeDirectRelayResult{err: err, forwarded: forwarded}
+			return
+		}
+		forwarded = true
+	}
+}
+
+func realtimeAPIKeyHTTPClient(account reverseproxycontract.AccountRuntime) (*http.Client, error) {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.Proxy = http.ProxyFromEnvironment
+	if account.ProxyID != nil && strings.TrimSpace(*account.ProxyID) != "" {
+		proxyURL, err := url.Parse(strings.TrimSpace(*account.ProxyID))
+		if err != nil {
+			return nil, err
+		}
+		transport.Proxy = http.ProxyURL(proxyURL)
+	}
+	return &http.Client{Transport: transport}, nil
+}
+
+func realtimeWebSocketDialErrorClass(ctx context.Context, err error) string {
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return "timeout"
+	}
+	return "network_error"
+}
+
+func realtimeWebSocketDialStatus(ctx context.Context, resp *http.Response) int {
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return http.StatusGatewayTimeout
+	}
+	if resp != nil && resp.StatusCode > 0 {
+		return resp.StatusCode
+	}
+	return http.StatusBadGateway
+}
+
+func realtimeWebSocketRelayErrorClass(ctx context.Context, err error) string {
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return "timeout"
+	}
+	if errors.Is(ctx.Err(), context.Canceled) {
+		return "client_closed"
+	}
+	return "network_error"
+}
+
+func realtimeWebSocketRelayStatus(ctx context.Context, err error) int {
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return http.StatusGatewayTimeout
+	}
+	if errors.Is(ctx.Err(), context.Canceled) {
+		return statusClientClosedRequest
+	}
+	return http.StatusBadGateway
 }
 
 func readRealtimeWebSocketClient(ctx context.Context, conn *websocket.Conn, clientToUpstream chan<- reverseproxycontract.WebSocketMessage, done chan<- error) {

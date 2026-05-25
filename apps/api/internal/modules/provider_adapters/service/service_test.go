@@ -2545,16 +2545,47 @@ func TestOpenAICompatiblePrepareRealtimeBuildsRealtimeWebSocketSession(t *testin
 	}
 }
 
-func TestOpenAICompatiblePrepareRealtimeRejectsAPIKeyRuntime(t *testing.T) {
+func TestOpenAICompatiblePrepareRealtimeAllowsAPIKeyRuntime(t *testing.T) {
+	svc, err := service.New(nil)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	session, err := svc.PrepareRealtime(context.Background(), contract.RealtimeRequest{
+		RequestID: "req_openai_realtime_api_key",
+		Model:     "local-realtime",
+		Provider: providercontract.Provider{
+			AdapterType: "openai-compatible",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:           10,
+			RuntimeClass: accountcontract.RuntimeClassAPIKey,
+			Metadata:     map[string]any{"base_url": "https://api.openai.example/v1"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-realtime-2"},
+		Credential: map[string]any{"api_key": "sk-secret"},
+	})
+	if err != nil {
+		t.Fatalf("prepare api-key openai realtime: %v", err)
+	}
+	if session.URL != "wss://api.openai.example/v1/realtime?model=gpt-realtime-2" {
+		t.Fatalf("unexpected realtime websocket URL %q", session.URL)
+	}
+	if session.Headers.Get("Authorization") != "" || session.InitialFrame != nil {
+		t.Fatalf("expected adapter to leave official api-key auth to gateway relay, got headers=%+v frame=%s", session.Headers, session.InitialFrame)
+	}
+}
+
+func TestReverseProxyOpenAICompatiblePrepareRealtimeRejectsAPIKeyRuntime(t *testing.T) {
 	svc, err := service.New(nil)
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
 	_, err = svc.PrepareRealtime(context.Background(), contract.RealtimeRequest{
-		RequestID: "req_openai_realtime_api_key",
+		RequestID: "req_openai_realtime_reverse_proxy_api_key",
 		Model:     "local-realtime",
 		Provider: providercontract.Provider{
-			AdapterType: "openai-compatible",
+			AdapterType: "reverse-proxy-openai-compatible",
 			Protocol:    "openai-compatible",
 		},
 		Account: accountcontract.ProviderAccount{

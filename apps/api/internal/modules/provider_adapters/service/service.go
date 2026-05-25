@@ -86,7 +86,7 @@ func (s *Service) PrepareRealtime(ctx context.Context, req contract.RealtimeRequ
 	if isCodexRealtimeReverseProxy(req) {
 		return s.prepareCodexRealtime(ctx, req, baseURL)
 	}
-	if isOpenAIRealtimeReverseProxy(req) {
+	if isOpenAIRealtimeCompatible(req) {
 		return s.prepareOpenAIRealtime(ctx, req, baseURL)
 	}
 	return contract.RealtimeSession{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "realtime reverse proxy adapter unsupported"}

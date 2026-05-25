@@ -449,6 +449,123 @@ func TestGatewayRealtimeWebSocketRelaysOpenAIUpstreamWebSocket(t *testing.T) {
 	}
 }
 
+func TestGatewayRealtimeWebSocketRelaysOpenAIAPIKeyUpstreamWebSocket(t *testing.T) {
+	type upstreamObservation struct {
+		Path             string
+		QueryModel       string
+		Authorization    string
+		SafetyIdentifier string
+		Cookie           string
+		LeakedHeader     string
+		ClientFrame      []byte
+	}
+	observations := make(chan upstreamObservation, 1)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{CompressionMode: websocket.CompressionDisabled})
+		if err != nil {
+			t.Errorf("accept api-key realtime upstream websocket: %v", err)
+			return
+		}
+		defer conn.Close(websocket.StatusNormalClosure, "")
+
+		msgType, payload, err := conn.Read(r.Context())
+		if err != nil {
+			t.Errorf("read api-key realtime upstream frame: %v", err)
+			return
+		}
+		if msgType != websocket.MessageText {
+			t.Errorf("expected api-key realtime upstream text frame, got %v", msgType)
+			return
+		}
+		observations <- upstreamObservation{
+			Path:             r.URL.Path,
+			QueryModel:       r.URL.Query().Get("model"),
+			Authorization:    r.Header.Get("Authorization"),
+			SafetyIdentifier: r.Header.Get("OpenAI-Safety-Identifier"),
+			Cookie:           r.Header.Get("Cookie"),
+			LeakedHeader:     r.Header.Get("X-SRapi-Leak"),
+			ClientFrame:      append([]byte(nil), payload...),
+		}
+		if err := conn.Write(r.Context(), websocket.MessageText, []byte(`{"type":"session.created","session":{"id":"sess_api_key_realtime"}}`)); err != nil {
+			t.Errorf("write api-key realtime upstream frame: %v", err)
+			return
+		}
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"wp630-realtime-api-key-provider","display_name":"WP630 Realtime API Key Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active","capabilities":{"realtime_websocket":true,"streaming":true}}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"wp630-realtime-api-key-model","display_name":"WP630 Realtime API Key Model","status":"active","capabilities":[{"key":"realtime_websocket","level":"required","status":"experimental","version":"v1"},{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"gpt-realtime-2","status":"active","capability_override":[{"key":"realtime_websocket","level":"required","status":"experimental","version":"v1"},{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"wp630-realtime-api-key-account","runtime_class":"api_key","credential":{"api_key":"official-realtime-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1","capability_realtime_websocket":true},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	conn := mustDialRealtimeWebSocket(t, server.URL+"/v1/realtime?model=wp630-realtime-api-key-model", apiKey, http.Header{
+		"OpenAI-Safety-Identifier": {"api-key-safe-user-hash"},
+		"Cookie":                   {"caller-cookie=leaked"},
+		"X-SRapi-Leak":             {"leaked"},
+	})
+	defer conn.Close(websocket.StatusNormalClosure, "")
+
+	writeWebSocketJSON(t, conn, map[string]any{
+		"type": "session.update",
+		"session": map[string]any{
+			"type":         "realtime",
+			"instructions": "api key path",
+		},
+	})
+	event := readWebSocketEvent(t, conn)
+	if event["type"] != "session.created" {
+		t.Fatalf("expected session.created event, got %+v", event)
+	}
+
+	var obs upstreamObservation
+	select {
+	case obs = <-observations:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for api-key realtime upstream observation")
+	}
+	if obs.Path != "/v1/realtime" ||
+		obs.QueryModel != "gpt-realtime-2" ||
+		obs.Authorization != "Bearer official-realtime-secret" ||
+		obs.SafetyIdentifier != "api-key-safe-user-hash" ||
+		obs.Cookie != "" ||
+		obs.LeakedHeader != "" {
+		t.Fatalf("unexpected api-key realtime upstream request: %+v", obs)
+	}
+	if !strings.Contains(string(obs.ClientFrame), "api key path") {
+		t.Fatalf("expected downstream realtime frame to reach upstream, got %s", obs.ClientFrame)
+	}
+	conn.Close(websocket.StatusNormalClosure, "")
+
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=wp630-realtime-api-key-model", nil)
+	decisionsReq.AddCookie(sessionCookie)
+	decisionsRec := httptest.NewRecorder()
+	handler.ServeHTTP(decisionsRec, decisionsReq)
+	if decisionsRec.Code != http.StatusOK {
+		t.Fatalf("expected scheduler decisions 200, got %d body=%s", decisionsRec.Code, decisionsRec.Body.String())
+	}
+	var decisionsResp apiopenapi.SchedulerDecisionListResponse
+	if err := json.NewDecoder(decisionsRec.Body).Decode(&decisionsResp); err != nil {
+		t.Fatalf("decode decisions: %v", err)
+	}
+	if len(decisionsResp.Data) != 1 {
+		t.Fatalf("expected one scheduler decision, got %+v", decisionsResp.Data)
+	}
+	decision := decisionsResp.Data[0]
+	if decision.SourceEndpoint != realtimeWebSocketSourceEndpoint || decision.SelectedAccountId == nil || *decision.SelectedAccountId != string(accountResp.Data.Id) {
+		t.Fatalf("expected api-key realtime scheduler evidence, got %+v", decision)
+	}
+
+	usageResp := waitForRealtimeUsageLog(t, handler, sessionCookie, "wp630-realtime-api-key-model")
+	if len(usageResp.Data) != 1 || !usageResp.Data[0].Success || usageResp.Data[0].SourceEndpoint != realtimeWebSocketSourceEndpoint {
+		t.Fatalf("unexpected api-key realtime usage record: %+v", usageResp.Data)
+	}
+}
+
 func TestAdminOpsRealtimeSlotsListsActiveSlotsSafely(t *testing.T) {
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)

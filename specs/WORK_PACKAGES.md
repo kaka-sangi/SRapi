@@ -2539,6 +2539,47 @@ Required gates:
 - `make secret-scan`
 - `git diff --check`
 
+## WP-630: OpenAI-compatible API-key Realtime WebSocket Relay v1
+
+Objective: close the official API-key Realtime gap for trusted server-side `/v1/realtime` WebSocket clients while preserving SRapi's 2api boundary: `runtime_class = api_key` accounts use selected-account API-key credentials directly, and `reverse-proxy-*` / non-API-key accounts continue to use Reverse Proxy Runtime.
+
+Read first:
+
+- `docs/AI_ENDPOINT_COMPATIBILITY.md`
+- `docs/GATEWAY_ROUTE_MATRIX.md`
+- `docs/PROVIDER_ADAPTER_SPEC.md`
+- `docs/REVERSE_PROXY_SPEC.md`
+- official OpenAI Realtime WebSocket docs: `https://developers.openai.com/api/docs/guides/realtime-websocket`
+- `apps/api/internal/httpserver/runtime_gateway_websocket.go`
+- `apps/api/internal/modules/provider_adapters/service/realtime.go`
+
+Owns:
+
+- Provider Adapter `PrepareRealtime` support for OpenAI-compatible `runtime_class = api_key` accounts.
+- Gateway direct upstream WebSocket relay for official API-key Realtime sessions.
+- Header hygiene proving caller `Authorization`, `Cookie`, and SRapi headers do not define upstream identity.
+- Scheduler/usage evidence preserving `/v1/realtime` source endpoint.
+- Docs/spec governance clarifying API-key Realtime versus 2api Reverse Proxy Runtime.
+
+Definition of Done:
+
+- `/v1/realtime?model=...` can schedule an OpenAI-compatible API-key account with `realtime_websocket` capability and connect upstream to `/realtime?model=<mapped_upstream_model>`.
+- The upstream `Authorization` header uses only selected account `api_key` / `openai_api_key`.
+- `OpenAI-Safety-Identifier` is preserved, while caller `Authorization`, `Cookie`, `Sec-WebSocket-*`, `X-SRapi-*`, and Gateway headers do not reach upstream.
+- Non-API-key OpenAI-compatible Realtime still uses Reverse Proxy Runtime, and `reverse-proxy-*` 2api adapters still reject `runtime_class = api_key`.
+- Success paths preserve Scheduler decisions and usage logs with `/v1/realtime` source endpoint.
+- Persistent upstream session pools, browser ephemeral token minting, local client ingress, and Claude Code / Antigravity provider-native realtime adapters remain out of scope.
+- No frontend visuals are added.
+
+Required gates:
+
+- `cd apps/api && go test ./internal/modules/provider_adapters/... ./internal/httpserver -run 'TestOpenAICompatiblePrepareRealtime|TestGatewayRealtimeWebSocketRelaysOpenAI' -count=1`
+- `cd apps/api && go test ./internal/modules/provider_adapters/... ./internal/modules/reverse_proxy/... ./internal/httpserver -run 'Test.*Realtime|Test.*WebSocket' -count=1`
+- `make architecture-check`
+- `make code-quality-check`
+- `make secret-scan`
+- `git diff --check`
+
 ## WP-700: Admin Control Plane v1
 
 Objective: deliver SRapi's first complete management control-plane backend for
