@@ -101,7 +101,7 @@ metadata_json
 | LDCPay | Phase 3 | Linux DO Credit 或类似积分支付。 |
 | Custom Webhook | Phase 3 | 外部支付系统通过受控 API 入账。 |
 
-当前实现已超过最初 MVP 抽象：`payments/providers/checkout` 定义统一下单接口，`payments/providers/stripe` 使用 `stripe-go/v78` 创建 Stripe Checkout Session 并由 Stripe webhook SDK 验签，`payments/providers/easypay` 生成带签名的 EasyPay 跳转 URL。Alipay Official 与 WeChat Pay Official 仍是待接入渠道，计划分别使用 `smartwalle/alipay/v3` 和 `wechatpay-apiv3/wechatpay-go`。
+当前实现已超过最初 MVP 抽象：`payments/providers/checkout` 定义统一下单接口，`payments/providers/stripe` 使用 `stripe-go/v78` 创建 Stripe Checkout Session 并由 Stripe webhook SDK 验签，`payments/providers/easypay` 生成带签名的 EasyPay 跳转 URL。管理员侧已支持 provider instance 的创建、更新和本地配置测试；测试接口只解密并校验必需配置，不发起外部扣款或网络请求。Alipay Official 与 WeChat Pay Official 仍是待接入渠道，计划分别使用 `smartwalle/alipay/v3` 和 `wechatpay-apiv3/wechatpay-go`。
 
 Stripe provider config 至少包含：
 
@@ -127,6 +127,8 @@ EasyPay provider config 至少包含：
 ```
 
 这些配置通过 payment provider instance 的 `config_ciphertext` 加密保存；订单 metadata 只保存 checkout URL、session id、签名摘要等非密钥信息。
+
+管理员更新 provider instance 时，`provider` 类型保持不可变，`name/status/supported_methods/limits/sort_order/metadata/config` 可更新。若重命名或替换配置，服务端会用新的 AAD 重新加密 config；响应和 audit 只暴露 `config_configured` / `config_version`，不回显密钥字段。
 
 ## 5. 前台可见支付方式
 

@@ -306,6 +306,105 @@ func TestEasyPayOrderCreatesSignedCheckoutURL(t *testing.T) {
 	}
 }
 
+func TestUpdateProviderInstanceReencryptsConfigAfterRename(t *testing.T) {
+	h := newHarness(t)
+	provider, err := h.payments.CreateProviderInstance(t.Context(), contract.CreateProviderInstanceRequest{
+		Provider:         "easypay",
+		Name:             "easypay-primary",
+		Config:           easypayTestConfig("easypay-signing-secret"),
+		SupportedMethods: []string{"alipay"},
+	})
+	if err != nil {
+		t.Fatalf("create easypay provider: %v", err)
+	}
+	beforeCiphertext := provider.ConfigCiphertext
+	name := "easypay-renamed"
+	status := contract.ProviderStatusDisabled
+	methods := []string{"wechat", "alipay", "wechat"}
+	metadata := map[string]any{"display_name": "EasyPay Renamed"}
+	updated, err := h.payments.UpdateProviderInstance(t.Context(), provider.ID, contract.UpdateProviderInstanceRequest{
+		Name:             &name,
+		Status:           &status,
+		SupportedMethods: &methods,
+		Metadata:         &metadata,
+	})
+	if err != nil {
+		t.Fatalf("update easypay provider: %v", err)
+	}
+	if updated.Name != name || updated.Status != status || strings.Join(updated.SupportedMethods, ",") != "alipay,wechat" {
+		t.Fatalf("unexpected updated provider: %+v", updated)
+	}
+	if updated.ConfigCiphertext == "" || updated.ConfigCiphertext == beforeCiphertext {
+		t.Fatalf("expected provider config to be re-encrypted on rename")
+	}
+	test, err := h.payments.TestProviderInstance(t.Context(), provider.ID)
+	if err != nil {
+		t.Fatalf("test updated provider: %v", err)
+	}
+	if test.OK || test.Message != "payment provider instance is not active" || test.Checks["config_decrypts"] != true {
+		t.Fatalf("expected disabled provider to decrypt but fail active check, got %+v", test)
+	}
+	status = contract.ProviderStatusActive
+	updated, err = h.payments.UpdateProviderInstance(t.Context(), provider.ID, contract.UpdateProviderInstanceRequest{Status: &status})
+	if err != nil {
+		t.Fatalf("reactivate provider: %v", err)
+	}
+	test, err = h.payments.TestProviderInstance(t.Context(), updated.ID)
+	if err != nil {
+		t.Fatalf("test reactivated provider: %v", err)
+	}
+	if !test.OK || test.Status != "ok" {
+		t.Fatalf("expected reactivated provider test to pass, got %+v", test)
+	}
+}
+
+func TestPaymentProviderTestReportsMissingConfigRequirements(t *testing.T) {
+	h := newHarness(t)
+	provider, err := h.payments.CreateProviderInstance(t.Context(), contract.CreateProviderInstanceRequest{
+		Provider:         "stripe",
+		Name:             "stripe-incomplete",
+		Config:           map[string]any{"secret_key": "stripe_test_api_key", "webhook_secret": "stripe_test_webhook_secret"},
+		SupportedMethods: []string{"card"},
+	})
+	if err != nil {
+		t.Fatalf("create stripe provider: %v", err)
+	}
+	result, err := h.payments.TestProviderInstance(t.Context(), provider.ID)
+	if err != nil {
+		t.Fatalf("test stripe provider: %v", err)
+	}
+	missing, ok := result.Checks["missing_requirements"].([]string)
+	if result.OK || !ok || len(missing) != 2 || missing[0] != "config.success_url" || missing[1] != "config.cancel_url" {
+		t.Fatalf("expected missing stripe checkout URLs, got %+v", result)
+	}
+}
+
+func TestUpdateProviderInstanceRejectsDuplicateProviderName(t *testing.T) {
+	h := newHarness(t)
+	first, err := h.payments.CreateProviderInstance(t.Context(), contract.CreateProviderInstanceRequest{
+		Provider:         "easypay",
+		Name:             "primary",
+		Config:           easypayTestConfig("secret-1"),
+		SupportedMethods: []string{"alipay"},
+	})
+	if err != nil {
+		t.Fatalf("create first provider: %v", err)
+	}
+	if _, err := h.payments.CreateProviderInstance(t.Context(), contract.CreateProviderInstanceRequest{
+		Provider:         "easypay",
+		Name:             "secondary",
+		Config:           easypayTestConfig("secret-2"),
+		SupportedMethods: []string{"wechat"},
+	}); err != nil {
+		t.Fatalf("create second provider: %v", err)
+	}
+	duplicate := "secondary"
+	_, err = h.payments.UpdateProviderInstance(t.Context(), first.ID, contract.UpdateProviderInstanceRequest{Name: &duplicate})
+	if !errors.Is(err, contract.ErrConflict) {
+		t.Fatalf("expected duplicate provider name conflict, got %v", err)
+	}
+}
+
 func TestStripeCheckoutFailureReturnsProviderUnavailable(t *testing.T) {
 	h := newHarness(t)
 	h.stripe.err = errors.New("stripe api unavailable")

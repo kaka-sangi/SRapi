@@ -39,6 +39,19 @@ func TestStorePersistsProvidersOrdersAndIdempotentAuditLogs(t *testing.T) {
 	if provider.ConfigCiphertext != "v1:nonce:ciphertext" || provider.SupportedMethods[0] != "alipay" {
 		t.Fatalf("unexpected provider: %+v", provider)
 	}
+	provider.Name = "renamed"
+	provider.Status = contract.ProviderStatusDisabled
+	provider.ConfigCiphertext = "v1:nonce:updated"
+	provider.SupportedMethods = []string{"wechat", "alipay"}
+	provider.Metadata = map[string]any{"display_name": "Renamed"}
+	provider.UpdatedAt = time.Date(2026, 5, 22, 12, 0, 0, 0, time.UTC)
+	provider, err = store.UpdateProviderInstance(ctx, provider)
+	if err != nil {
+		t.Fatalf("update provider: %v", err)
+	}
+	if provider.Name != "renamed" || provider.Status != contract.ProviderStatusDisabled || provider.ConfigCiphertext != "v1:nonce:updated" || len(provider.SupportedMethods) != 2 {
+		t.Fatalf("unexpected updated provider: %+v", provider)
+	}
 
 	expiresAt := time.Date(2026, 5, 22, 12, 30, 0, 0, time.UTC)
 	order, err := store.CreateOrder(ctx, contract.CreateStoredOrder{

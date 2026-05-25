@@ -2921,6 +2921,88 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/payments/providers/{id}:
+    patch:
+      tags:
+        - AdminPayments
+      operationId: updateAdminPaymentProvider
+      summary: Update an encrypted payment provider instance.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePaymentProviderInstanceRequest"
+      responses:
+        "200":
+          description: Payment provider instance updated.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentProviderInstanceResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/payments/providers/{id}/test:
+    post:
+      tags:
+        - AdminPayments
+      operationId: testAdminPaymentProvider
+      summary: Test a payment provider instance configuration without charging.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Payment provider configuration test result.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminTestResultResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/payments/orders:
     get:
       tags:
@@ -7463,6 +7545,27 @@ components:
         provider:
           type: string
           minLength: 1
+        name:
+          type: string
+          minLength: 1
+        status:
+          $ref: "#/components/schemas/PaymentProviderStatus"
+        config:
+          $ref: "#/components/schemas/JsonObject"
+        supported_methods:
+          type: array
+          items:
+            type: string
+        limits:
+          $ref: "#/components/schemas/JsonObject"
+        sort_order:
+          type: integer
+        metadata:
+          $ref: "#/components/schemas/JsonObject"
+
+    UpdatePaymentProviderInstanceRequest:
+      type: object
+      properties:
         name:
           type: string
           minLength: 1

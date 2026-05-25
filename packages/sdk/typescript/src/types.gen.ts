@@ -331,6 +331,16 @@ export type CreatePaymentProviderInstanceRequest = {
     metadata?: JsonObject;
 };
 
+export type UpdatePaymentProviderInstanceRequest = {
+    name?: string;
+    status?: PaymentProviderStatus;
+    config?: JsonObject;
+    supported_methods?: Array<string>;
+    limits?: JsonObject;
+    sort_order?: number;
+    metadata?: JsonObject;
+};
+
 export type PaymentProviderInstanceResponse = {
     data: PaymentProviderInstance;
     request_id: RequestId;
@@ -5981,6 +5991,88 @@ export type CreateAdminPaymentProviderResponses = {
 };
 
 export type CreateAdminPaymentProviderResponse = CreateAdminPaymentProviderResponses[keyof CreateAdminPaymentProviderResponses];
+
+export type UpdateAdminPaymentProviderData = {
+    body: UpdatePaymentProviderInstanceRequest;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/payments/providers/{id}';
+};
+
+export type UpdateAdminPaymentProviderErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UpdateAdminPaymentProviderError = UpdateAdminPaymentProviderErrors[keyof UpdateAdminPaymentProviderErrors];
+
+export type UpdateAdminPaymentProviderResponses = {
+    /**
+     * Payment provider instance updated.
+     */
+    200: PaymentProviderInstanceResponse;
+};
+
+export type UpdateAdminPaymentProviderResponse = UpdateAdminPaymentProviderResponses[keyof UpdateAdminPaymentProviderResponses];
+
+export type TestAdminPaymentProviderData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/payments/providers/{id}/test';
+};
+
+export type TestAdminPaymentProviderErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type TestAdminPaymentProviderError = TestAdminPaymentProviderErrors[keyof TestAdminPaymentProviderErrors];
+
+export type TestAdminPaymentProviderResponses = {
+    /**
+     * Payment provider configuration test result.
+     */
+    200: AdminTestResultResponse;
+};
+
+export type TestAdminPaymentProviderResponse = TestAdminPaymentProviderResponses[keyof TestAdminPaymentProviderResponses];
 
 export type ListAdminPaymentOrdersData = {
     body?: never;

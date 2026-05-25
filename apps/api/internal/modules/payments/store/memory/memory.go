@@ -84,6 +84,27 @@ func (s *Store) FindProviderInstanceByID(_ context.Context, id int) (contract.Pa
 	return cloneProvider(provider), nil
 }
 
+func (s *Store) UpdateProviderInstance(_ context.Context, input contract.PaymentProviderInstance) (contract.PaymentProviderInstance, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	current, ok := s.providers[input.ID]
+	if !ok || current.DeletedAt != nil {
+		return contract.PaymentProviderInstance{}, contract.ErrNotFound
+	}
+	for _, candidate := range s.providers {
+		if candidate.ID != input.ID && candidate.DeletedAt == nil && candidate.Provider == input.Provider && candidate.Name == input.Name {
+			return contract.PaymentProviderInstance{}, contract.ErrConflict
+		}
+	}
+	provider := cloneProvider(input)
+	provider.CreatedAt = current.CreatedAt
+	if provider.UpdatedAt.IsZero() {
+		provider.UpdatedAt = time.Now().UTC()
+	}
+	s.providers[provider.ID] = provider
+	return cloneProvider(provider), nil
+}
+
 func (s *Store) CreateOrder(_ context.Context, input contract.CreateStoredOrder) (contract.PaymentOrder, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

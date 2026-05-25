@@ -156,6 +156,87 @@ func (s *Server) handleCreateAdminPaymentProvider(w http.ResponseWriter, r *http
 	})
 }
 
+func (s *Server) handleUpdateAdminPaymentProvider(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	providerID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || providerID <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid payment provider id", requestID)
+		return
+	}
+	var body apiopenapi.UpdatePaymentProviderInstanceRequest
+	if err := s.decodeJSONBody(w, r, &body); err != nil {
+		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid payment provider request", requestID)
+		return
+	}
+	before, err := s.runtime.payments.FindProviderInstanceByID(r.Context(), providerID)
+	if err != nil {
+		writePaymentServiceError(w, err, requestID)
+		return
+	}
+	updated, err := s.runtime.payments.UpdateProviderInstance(r.Context(), providerID, paymentcontract.UpdateProviderInstanceRequest{
+		Name:             body.Name,
+		Status:           toPaymentProviderStatusPtr(body.Status),
+		Config:           jsonObjectToMapPtr(body.Config),
+		SupportedMethods: body.SupportedMethods,
+		Limits:           jsonObjectToMapPtr(body.Limits),
+		SortOrder:        body.SortOrder,
+		Metadata:         jsonObjectToMapPtr(body.Metadata),
+	})
+	if err != nil {
+		writePaymentServiceError(w, err, requestID)
+		return
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "payment_provider.update", "payment_provider", strconv.Itoa(updated.ID), paymentProviderAuditSnapshot(before), paymentProviderAuditSnapshot(updated)))
+	writeJSONAny(w, http.StatusOK, apiopenapi.PaymentProviderInstanceResponse{
+		Data:      toAPIPaymentProviderInstance(updated),
+		RequestId: requestID,
+	})
+}
+
+func (s *Server) handleTestAdminPaymentProvider(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	providerID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || providerID <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid payment provider id", requestID)
+		return
+	}
+	startedAt := time.Now()
+	test, err := s.runtime.payments.TestProviderInstance(r.Context(), providerID)
+	if err != nil {
+		writePaymentServiceError(w, err, requestID)
+		return
+	}
+	result := adminTestResult(test.OK, test.Message, startedAt, apiopenapi.Id(strconv.Itoa(test.ProviderInstance.ID)), nil, test.Checks)
+	result.Status = apiopenapi.AdminTestResultStatus(test.Status)
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "payment_provider.test", "payment_provider", strconv.Itoa(test.ProviderInstance.ID), nil, map[string]any{
+		"ok":     result.Ok,
+		"status": result.Status,
+		"checks": result.Checks,
+	}))
+	writeJSONAny(w, http.StatusOK, apiopenapi.AdminTestResultResponse{
+		Data:      result,
+		RequestId: requestID,
+	})
+}
+
 func (s *Server) handleListAdminPaymentOrders(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	if _, err := s.requireAdminPermission(r, userscontract.PermissionPaymentOrderRead); err != nil {

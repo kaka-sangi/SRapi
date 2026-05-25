@@ -139,6 +139,141 @@ func (s *Service) ListProviderInstances(ctx context.Context) ([]contract.Payment
 	return s.store.ListProviderInstances(ctx)
 }
 
+// FindProviderInstanceByID returns a non-deleted payment provider instance.
+func (s *Service) FindProviderInstanceByID(ctx context.Context, id int) (contract.PaymentProviderInstance, error) {
+	if id <= 0 {
+		return contract.PaymentProviderInstance{}, ErrInvalidInput
+	}
+	return s.store.FindProviderInstanceByID(ctx, id)
+}
+
+// UpdateProviderInstance patches mutable payment provider instance fields.
+func (s *Service) UpdateProviderInstance(ctx context.Context, id int, req contract.UpdateProviderInstanceRequest) (contract.PaymentProviderInstance, error) {
+	if id <= 0 {
+		return contract.PaymentProviderInstance{}, ErrInvalidInput
+	}
+	provider, err := s.store.FindProviderInstanceByID(ctx, id)
+	if err != nil {
+		return contract.PaymentProviderInstance{}, err
+	}
+	if provider.DeletedAt != nil {
+		return contract.PaymentProviderInstance{}, contract.ErrNotFound
+	}
+
+	config := map[string]any(nil)
+	needsEncrypt := req.Config != nil
+	if req.Name != nil {
+		name := strings.TrimSpace(*req.Name)
+		if name == "" {
+			return contract.PaymentProviderInstance{}, ErrInvalidInput
+		}
+		if name != provider.Name {
+			if req.Config == nil {
+				config, err = s.decryptConfig(provider, provider.ConfigCiphertext)
+				if err != nil {
+					return contract.PaymentProviderInstance{}, err
+				}
+			}
+			provider.Name = name
+			needsEncrypt = true
+		}
+	}
+	if req.Status != nil {
+		if !validProviderStatus(*req.Status) {
+			return contract.PaymentProviderInstance{}, ErrInvalidInput
+		}
+		provider.Status = *req.Status
+	}
+	if req.SupportedMethods != nil {
+		methods := normalizeMethods(*req.SupportedMethods)
+		if len(methods) == 0 {
+			methods = []string{provider.Provider}
+		}
+		provider.SupportedMethods = methods
+	}
+	if req.Limits != nil {
+		provider.Limits = cloneMap(*req.Limits)
+	}
+	if req.SortOrder != nil {
+		provider.SortOrder = *req.SortOrder
+	}
+	if req.Metadata != nil {
+		provider.Metadata = cloneMap(*req.Metadata)
+	}
+	if req.Config != nil {
+		if len(*req.Config) == 0 {
+			return contract.PaymentProviderInstance{}, ErrInvalidInput
+		}
+		config = cloneMap(*req.Config)
+	}
+	if needsEncrypt {
+		ciphertext, err := s.encryptConfig(provider.Provider, provider.Name, config)
+		if err != nil {
+			return contract.PaymentProviderInstance{}, err
+		}
+		provider.ConfigCiphertext = ciphertext
+		provider.ConfigVersion = configVersionV1
+	}
+	provider.UpdatedAt = s.clock.Now()
+	return s.store.UpdateProviderInstance(ctx, provider)
+}
+
+// TestProviderInstance validates locally stored payment provider configuration without calling upstream payment APIs.
+func (s *Service) TestProviderInstance(ctx context.Context, id int) (contract.ProviderInstanceTestResult, error) {
+	start := contract.ProviderInstanceTestResult{Status: "failed"}
+	instance, err := s.FindProviderInstanceByID(ctx, id)
+	if err != nil {
+		return start, err
+	}
+	checks := map[string]any{
+		"payment_provider_instance_id": instance.ID,
+		"provider":                     instance.Provider,
+		"status":                       string(instance.Status),
+		"active":                       instance.Status == contract.ProviderStatusActive,
+		"supported_methods":            append([]string(nil), instance.SupportedMethods...),
+		"config_decrypts":              false,
+	}
+	config, err := s.decryptConfig(instance, instance.ConfigCiphertext)
+	if err != nil {
+		checks["config_error"] = "decrypt_failed"
+		return contract.ProviderInstanceTestResult{
+			ProviderInstance: instance,
+			OK:               false,
+			Status:           "failed",
+			Message:          "payment provider config could not be decrypted",
+			Checks:           checks,
+		}, nil
+	}
+	checks["config_decrypts"] = true
+	missing := missingProviderConfigFields(instance.Provider, config)
+	if len(missing) > 0 {
+		checks["missing_requirements"] = missing
+		return contract.ProviderInstanceTestResult{
+			ProviderInstance: instance,
+			OK:               false,
+			Status:           "failed",
+			Message:          "payment provider config is incomplete",
+			Checks:           checks,
+		}, nil
+	}
+	if instance.Status != contract.ProviderStatusActive {
+		return contract.ProviderInstanceTestResult{
+			ProviderInstance: instance,
+			OK:               false,
+			Status:           "failed",
+			Message:          "payment provider instance is not active",
+			Checks:           checks,
+		}, nil
+	}
+	return contract.ProviderInstanceTestResult{
+		ProviderInstance: instance,
+		OK:               true,
+		Status:           "ok",
+		Message:          "payment provider instance is configured",
+		Checks:           checks,
+	}, nil
+}
+
 func (s *Service) ListMethods(ctx context.Context) ([]contract.PaymentMethod, error) {
 	instances, err := s.store.ListProviderInstances(ctx)
 	if err != nil {
@@ -902,6 +1037,31 @@ func normalizeMethods(values []string) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+func missingProviderConfigFields(provider string, config map[string]any) []string {
+	var missing []string
+	requireAny := func(label string, keys ...string) {
+		if payloadString(config, keys...) == "" {
+			missing = append(missing, label)
+		}
+	}
+	switch strings.ToLower(strings.TrimSpace(provider)) {
+	case "stripe":
+		requireAny("config.secret_key", "secret_key", "api_key")
+		requireAny("config.success_url", "success_url")
+		requireAny("config.cancel_url", "cancel_url")
+		requireAny("config.webhook_secret", "webhook_secret", "signing_secret")
+	case "easypay":
+		requireAny("config.gateway_url", "gateway_url", "base_url", "payment_url")
+		requireAny("config.merchant_id", "merchant_id", "pid")
+		requireAny("config.signing_secret", "signing_secret", "webhook_secret", "key", "secret")
+		requireAny("config.notify_url", "notify_url", "webhook_url")
+		requireAny("config.return_url", "return_url", "success_url")
+	default:
+		requireAny("config.webhook_secret", "webhook_secret", "signing_secret", "secret")
+	}
+	return missing
 }
 
 func supportsMethod(instance contract.PaymentProviderInstance, method string) bool {

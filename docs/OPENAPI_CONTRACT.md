@@ -693,6 +693,10 @@ POST /api/v1/payment/orders
 GET  /api/v1/payment/orders
 GET  /api/v1/payment/orders/{id}
 POST /api/v1/payment/orders/{id}/cancel
+GET  /api/v1/admin/payments/providers
+POST /api/v1/admin/payments/providers
+PATCH /api/v1/admin/payments/providers/{id}
+POST /api/v1/admin/payments/providers/{id}/test
 GET  /api/v1/admin/payments/orders
 POST /api/v1/admin/payments/orders/{id}/refund
 ```

@@ -105,6 +105,17 @@ type CreateProviderInstanceRequest struct {
 	Metadata         map[string]any
 }
 
+// UpdateProviderInstanceRequest patches mutable payment provider instance fields.
+type UpdateProviderInstanceRequest struct {
+	Name             *string
+	Status           *ProviderStatus
+	Config           *map[string]any
+	SupportedMethods *[]string
+	Limits           *map[string]any
+	SortOrder        *int
+	Metadata         *map[string]any
+}
+
 type CreateStoredProviderInstance struct {
 	Provider         string
 	Name             string
@@ -115,6 +126,15 @@ type CreateStoredProviderInstance struct {
 	Limits           map[string]any
 	SortOrder        int
 	Metadata         map[string]any
+}
+
+// ProviderInstanceTestResult reports local payment provider configuration health.
+type ProviderInstanceTestResult struct {
+	ProviderInstance PaymentProviderInstance
+	OK               bool
+	Status           string
+	Message          string
+	Checks           map[string]any
 }
 
 type CreateOrderRequest struct {
@@ -170,6 +190,7 @@ type Store interface {
 	CreateProviderInstance(ctx context.Context, input CreateStoredProviderInstance) (PaymentProviderInstance, error)
 	ListProviderInstances(ctx context.Context) ([]PaymentProviderInstance, error)
 	FindProviderInstanceByID(ctx context.Context, id int) (PaymentProviderInstance, error)
+	UpdateProviderInstance(ctx context.Context, input PaymentProviderInstance) (PaymentProviderInstance, error)
 	CreateOrder(ctx context.Context, input CreateStoredOrder) (PaymentOrder, error)
 	UpdateOrder(ctx context.Context, input PaymentOrder) (PaymentOrder, error)
 	FindOrderByID(ctx context.Context, id int) (PaymentOrder, error)

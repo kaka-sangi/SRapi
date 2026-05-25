@@ -75,6 +75,34 @@ func (s *Store) FindProviderInstanceByID(ctx context.Context, id int) (contract.
 	return toProvider(row), nil
 }
 
+func (s *Store) UpdateProviderInstance(ctx context.Context, input contract.PaymentProviderInstance) (contract.PaymentProviderInstance, error) {
+	update := s.client.PaymentProviderInstance.UpdateOneID(input.ID).
+		Where(entpaymentproviderinstance.DeletedAtIsNil()).
+		SetProvider(input.Provider).
+		SetName(input.Name).
+		SetStatus(string(input.Status)).
+		SetConfigCiphertext([]byte(input.ConfigCiphertext)).
+		SetConfigVersion(input.ConfigVersion).
+		SetSupportedMethodsJSON(cloneStringSlice(input.SupportedMethods)).
+		SetLimitsJSON(cloneMap(input.Limits)).
+		SetSortOrder(input.SortOrder).
+		SetMetadataJSON(cloneMap(input.Metadata))
+	if !input.UpdatedAt.IsZero() {
+		update.SetUpdatedAt(input.UpdatedAt)
+	}
+	updated, err := update.Save(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return contract.PaymentProviderInstance{}, contract.ErrNotFound
+		}
+		if ent.IsConstraintError(err) {
+			return contract.PaymentProviderInstance{}, contract.ErrConflict
+		}
+		return contract.PaymentProviderInstance{}, err
+	}
+	return toProvider(updated), nil
+}
+
 func (s *Store) CreateOrder(ctx context.Context, input contract.CreateStoredOrder) (contract.PaymentOrder, error) {
 	create := s.client.PaymentOrder.Create().
 		SetUserID(input.UserID).

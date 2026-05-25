@@ -11,6 +11,7 @@ import (
 	auditcontract "github.com/srapi/srapi/apps/api/internal/modules/audit/contract"
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
 	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
+	paymentcontract "github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	userscontract "github.com/srapi/srapi/apps/api/internal/modules/users/contract"
@@ -241,6 +242,20 @@ func pricingRuleAuditSnapshot(rule subscriptioncontract.PricingRule) map[string]
 		"currency":                             rule.Currency,
 		"effective_from":                       rule.EffectiveFrom,
 		"effective_to":                         rule.EffectiveTo,
+	}
+}
+
+func paymentProviderAuditSnapshot(provider paymentcontract.PaymentProviderInstance) map[string]any {
+	return map[string]any{
+		"provider":          provider.Provider,
+		"name":              provider.Name,
+		"status":            provider.Status,
+		"config_configured": provider.ConfigCiphertext != "",
+		"config_version":    provider.ConfigVersion,
+		"supported_methods": append([]string(nil), provider.SupportedMethods...),
+		"limits":            cloneAnyMap(provider.Limits),
+		"sort_order":        provider.SortOrder,
+		"metadata":          cloneAnyMap(provider.Metadata),
 	}
 }
 

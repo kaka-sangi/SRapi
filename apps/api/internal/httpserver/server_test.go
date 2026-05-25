@@ -1117,6 +1117,69 @@ func TestAdminSubscriptionPricingControlPlane(t *testing.T) {
 	}
 }
 
+func TestAdminPaymentProviderUpdateAndTest(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+
+	createResp := mustCreatePaymentProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider":"easypay","name":"easypay-primary","config":{"gateway_url":"https://pay.example/submit","merchant_id":"merchant-1","webhook_secret":"payment-provider-secret","notify_url":"https://api.example/api/v1/webhooks/payments/easypay","return_url":"https://app.example/payments/return"},"supported_methods":["alipay"],"metadata":{"display_name":"EasyPay"}}`)
+	if createResp.Data.Provider != "easypay" || createResp.Data.Name != "easypay-primary" || len(createResp.Data.SupportedMethods) != 1 {
+		t.Fatalf("unexpected payment provider create response: %+v", createResp.Data)
+	}
+
+	testResp := mustTestPaymentProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, createResp.Data.Id)
+	if !testResp.Data.Ok || testResp.Data.ProviderId == nil || *testResp.Data.ProviderId != createResp.Data.Id {
+		t.Fatalf("expected active payment provider test to pass, got %+v", testResp.Data)
+	}
+	if testResp.Data.Checks == nil || (*testResp.Data.Checks)["config_decrypts"] != true {
+		t.Fatalf("expected payment provider test to report decryptable config, got %+v", testResp.Data.Checks)
+	}
+
+	updateReq := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/payments/providers/"+string(createResp.Data.Id), strings.NewReader(`{"name":"easypay-renamed","status":"disabled","supported_methods":["wechat","alipay","wechat"],"metadata":{"display_name":"EasyPay Renamed"},"sort_order":7}`))
+	updateReq.Header.Set("Content-Type", "application/json")
+	updateReq.AddCookie(sessionCookie)
+	updateReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	updateRec := httptest.NewRecorder()
+	handler.ServeHTTP(updateRec, updateReq)
+	if updateRec.Code != http.StatusOK {
+		t.Fatalf("expected payment provider update 200, got %d body=%s", updateRec.Code, updateRec.Body.String())
+	}
+	if strings.Contains(updateRec.Body.String(), "payment-provider-secret") {
+		t.Fatalf("payment provider response leaked config secret: %s", updateRec.Body.String())
+	}
+	var updateResp apiopenapi.PaymentProviderInstanceResponse
+	if err := json.NewDecoder(updateRec.Body).Decode(&updateResp); err != nil {
+		t.Fatalf("decode payment provider update: %v", err)
+	}
+	if updateResp.Data.Name != "easypay-renamed" || updateResp.Data.Status != apiopenapi.PaymentProviderStatusDisabled || strings.Join(updateResp.Data.SupportedMethods, ",") != "alipay,wechat" || updateResp.Data.SortOrder != 7 {
+		t.Fatalf("unexpected payment provider update response: %+v", updateResp.Data)
+	}
+
+	testResp = mustTestPaymentProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, createResp.Data.Id)
+	if testResp.Data.Ok || testResp.Data.Status != "failed" || testResp.Data.Message == nil || *testResp.Data.Message != "payment provider instance is not active" {
+		t.Fatalf("expected disabled payment provider test to fail active check, got %+v", testResp.Data)
+	}
+
+	auditReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/audit-logs", nil)
+	auditReq.AddCookie(sessionCookie)
+	auditRec := httptest.NewRecorder()
+	handler.ServeHTTP(auditRec, auditReq)
+	if auditRec.Code != http.StatusOK {
+		t.Fatalf("expected audit log list 200, got %d body=%s", auditRec.Code, auditRec.Body.String())
+	}
+	if strings.Contains(auditRec.Body.String(), "payment-provider-secret") {
+		t.Fatalf("payment provider audit leaked config secret: %s", auditRec.Body.String())
+	}
+	var auditResp apiopenapi.AuditLogListResponse
+	if err := json.NewDecoder(auditRec.Body).Decode(&auditResp); err != nil {
+		t.Fatalf("decode audit logs: %v", err)
+	}
+	for _, action := range []string{"payment_provider.create", "payment_provider.update", "payment_provider.test"} {
+		if !auditLogHasAction(auditResp.Data, action) {
+			t.Fatalf("expected audit action %s in %+v", action, auditResp.Data)
+		}
+	}
+}
+
 func TestBulkImportAdminPricingRulesAcceptsCSV(t *testing.T) {
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
@@ -6714,6 +6777,41 @@ func mustCreateAPIKey(t *testing.T, handler http.Handler, sessionCookie *http.Co
 	var resp apiopenapi.CreateApiKeyResponse
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode api key response: %v", err)
+	}
+	return resp
+}
+
+func mustCreatePaymentProvider(t *testing.T, handler http.Handler, sessionCookie *http.Cookie, csrfToken, body string) apiopenapi.PaymentProviderInstanceResponse {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/payments/providers", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(sessionCookie)
+	req.Header.Set("X-CSRF-Token", csrfToken)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected payment provider create 201, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var resp apiopenapi.PaymentProviderInstanceResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode payment provider response: %v", err)
+	}
+	return resp
+}
+
+func mustTestPaymentProvider(t *testing.T, handler http.Handler, sessionCookie *http.Cookie, csrfToken string, providerID apiopenapi.Id) apiopenapi.AdminTestResultResponse {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/payments/providers/"+string(providerID)+"/test", nil)
+	req.AddCookie(sessionCookie)
+	req.Header.Set("X-CSRF-Token", csrfToken)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected payment provider test 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var resp apiopenapi.AdminTestResultResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode payment provider test response: %v", err)
 	}
 	return resp
 }

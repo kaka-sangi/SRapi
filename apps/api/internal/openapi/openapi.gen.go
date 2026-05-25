@@ -5106,6 +5106,17 @@ type UpdateOpsSLORequest struct {
 	WindowDays *int          `json:"window_days,omitempty"`
 }
 
+// UpdatePaymentProviderInstanceRequest defines model for UpdatePaymentProviderInstanceRequest.
+type UpdatePaymentProviderInstanceRequest struct {
+	Config           *JsonObject            `json:"config,omitempty"`
+	Limits           *JsonObject            `json:"limits,omitempty"`
+	Metadata         *JsonObject            `json:"metadata,omitempty"`
+	Name             *string                `json:"name,omitempty"`
+	SortOrder        *int                   `json:"sort_order,omitempty"`
+	Status           *PaymentProviderStatus `json:"status,omitempty"`
+	SupportedMethods *[]string              `json:"supported_methods,omitempty"`
+}
+
 // UpdatePromoCodeRequest defines model for UpdatePromoCodeRequest.
 type UpdatePromoCodeRequest = CreatePromoCodeRequest
 
@@ -5898,6 +5909,9 @@ type RefundAdminPaymentOrderJSONRequestBody = RefundPaymentOrderRequest
 
 // CreateAdminPaymentProviderJSONRequestBody defines body for CreateAdminPaymentProvider for application/json ContentType.
 type CreateAdminPaymentProviderJSONRequestBody = CreatePaymentProviderInstanceRequest
+
+// UpdateAdminPaymentProviderJSONRequestBody defines body for UpdateAdminPaymentProvider for application/json ContentType.
+type UpdateAdminPaymentProviderJSONRequestBody = UpdatePaymentProviderInstanceRequest
 
 // CreateAdminPricingRuleJSONRequestBody defines body for CreateAdminPricingRule for application/json ContentType.
 type CreateAdminPricingRuleJSONRequestBody = CreatePricingRuleRequest
@@ -12116,6 +12130,12 @@ type ServerInterface interface {
 	// Create an encrypted payment provider instance.
 	// (POST /api/v1/admin/payments/providers)
 	CreateAdminPaymentProvider(w http.ResponseWriter, r *http.Request)
+	// Update an encrypted payment provider instance.
+	// (PATCH /api/v1/admin/payments/providers/{id})
+	UpdateAdminPaymentProvider(w http.ResponseWriter, r *http.Request, id Id)
+	// Test a payment provider instance configuration without charging.
+	// (POST /api/v1/admin/payments/providers/{id}/test)
+	TestAdminPaymentProvider(w http.ResponseWriter, r *http.Request, id Id)
 	// List pricing rules.
 	// (GET /api/v1/admin/pricing-rules)
 	ListAdminPricingRules(w http.ResponseWriter, r *http.Request, params ListAdminPricingRulesParams)
@@ -15379,6 +15399,74 @@ func (siw *ServerInterfaceWrapper) CreateAdminPaymentProvider(w http.ResponseWri
 	handler.ServeHTTP(w, r)
 }
 
+// UpdateAdminPaymentProvider operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAdminPaymentProvider(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAdminPaymentProvider(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// TestAdminPaymentProvider operation middleware
+func (siw *ServerInterfaceWrapper) TestAdminPaymentProvider(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.TestAdminPaymentProvider(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListAdminPricingRules operation middleware
 func (siw *ServerInterfaceWrapper) ListAdminPricingRules(w http.ResponseWriter, r *http.Request) {
 
@@ -18619,6 +18707,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/payments/orders/{id}/refund", wrapper.RefundAdminPaymentOrder)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/payments/providers", wrapper.ListAdminPaymentProviders)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/payments/providers", wrapper.CreateAdminPaymentProvider)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/payments/providers/{id}", wrapper.UpdateAdminPaymentProvider)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/payments/providers/{id}/test", wrapper.TestAdminPaymentProvider)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/pricing-rules", wrapper.ListAdminPricingRules)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/pricing-rules", wrapper.CreateAdminPricingRule)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/pricing-rules:bulk", wrapper.BulkImportAdminPricingRules)
