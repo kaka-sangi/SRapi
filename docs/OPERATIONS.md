@@ -46,6 +46,7 @@ GET /api/v1/health
 
 - `/livez` 只验证 HTTP server 可响应。
 - `/readyz` 通过注入 pinger 或 TCP fallback 检查 PostgreSQL 和 Redis。
+- 默认 `STORAGE_BACKEND=postgres` 要求启动时 PostgreSQL 可用；只有显式设置 `STORAGE_BACKEND=memory` 才会进入临时内存模式。
 - release 模式在启动前拒绝弱 `JWT_SECRET`、`SRAPI_MASTER_KEY`、`API_KEY_PEPPER`、`DATABASE_PASSWORD` 和默认 `BOOTSTRAP_ADMIN_PASSWORD`。
 
 ## 4. 启动就绪门禁

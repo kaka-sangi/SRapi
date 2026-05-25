@@ -15,6 +15,7 @@ import (
 	paymentmemory "github.com/srapi/srapi/apps/api/internal/modules/payments/store/memory"
 	subscriptionmemory "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/store/memory"
 	"github.com/srapi/srapi/apps/api/internal/persistence/entstore"
+	platformdb "github.com/srapi/srapi/apps/api/internal/platform/db"
 	platformredis "github.com/srapi/srapi/apps/api/internal/platform/redis"
 )
 
@@ -22,6 +23,7 @@ func TestNewBuildsServerAtConfiguredAddress(t *testing.T) {
 	cfg := config.Load()
 	cfg.Server.Host = "127.0.0.1"
 	cfg.Server.Port = 9090
+	cfg.Storage.Backend = config.StorageBackendMemory
 	cfg.Database.Host = "127.0.0.1"
 	cfg.Database.Port = 1
 
@@ -78,6 +80,37 @@ func TestSchedulerLeaseStoreRequiresRedisInRelease(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	if _, err := schedulerLeaseStore(t.Context(), cfg, logger, redisClient); err == nil {
 		t.Fatal("expected release mode to require redis-backed scheduler leases")
+	}
+}
+
+func TestPersistentStoresFailFastWhenPostgresUnavailable(t *testing.T) {
+	cfg := config.Load()
+	cfg.Storage.Backend = config.StorageBackendPostgres
+	cfg.Database.Host = "127.0.0.1"
+	cfg.Database.Port = 1
+	dbClient, err := platformdb.Open(cfg.Database)
+	if err != nil {
+		t.Fatalf("open database client: %v", err)
+	}
+	defer dbClient.Close()
+
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	if _, err := persistentStores(t.Context(), cfg, logger, dbClient, nil); err == nil {
+		t.Fatal("expected postgres storage backend to fail when database is unavailable")
+	}
+}
+
+func TestPersistentStoresAllowExplicitMemoryBackend(t *testing.T) {
+	cfg := config.Load()
+	cfg.Storage.Backend = config.StorageBackendMemory
+
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	stores, err := persistentStores(t.Context(), cfg, logger, nil, nil)
+	if err != nil {
+		t.Fatalf("expected explicit memory backend to skip persistent stores, got %v", err)
+	}
+	if stores != nil {
+		t.Fatalf("expected no persistent stores for explicit memory backend")
 	}
 }
 

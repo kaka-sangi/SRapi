@@ -14,10 +14,13 @@ const (
 	defaultShutdownSeconds = 45
 	defaultVersion         = "0.1.0"
 	defaultGatewayBodySize = 268435456
+	StorageBackendPostgres = "postgres"
+	StorageBackendMemory   = "memory"
 )
 
 type Config struct {
 	Server      ServerConfig
+	Storage     StorageConfig
 	Database    DependencyConfig
 	Redis       DependencyConfig
 	Gateway     GatewayConfig
@@ -33,6 +36,10 @@ type ServerConfig struct {
 	Mode            string
 	Version         string
 	ShutdownTimeout time.Duration
+}
+
+type StorageConfig struct {
+	Backend string
 }
 
 type DependencyConfig struct {
@@ -91,6 +98,9 @@ func Load() Config {
 			Mode:            getEnv("SERVER_MODE", "local"),
 			Version:         getEnv("SRAPI_VERSION", defaultVersion),
 			ShutdownTimeout: time.Duration(getIntEnv("SERVER_SHUTDOWN_TIMEOUT_SECONDS", defaultShutdownSeconds)) * time.Second,
+		},
+		Storage: StorageConfig{
+			Backend: normalizeStorageBackend(getEnv("STORAGE_BACKEND", StorageBackendPostgres)),
 		},
 		Database: DependencyConfig{
 			Host:     getEnv("DATABASE_HOST", "localhost"),
@@ -154,6 +164,11 @@ func (c Config) HealthcheckAddress() string {
 }
 
 func (c Config) Validate() error {
+	switch c.StorageBackend() {
+	case StorageBackendPostgres, StorageBackendMemory:
+	default:
+		return fmt.Errorf("STORAGE_BACKEND must be postgres or memory")
+	}
 	if c.Server.Port <= 0 || c.Server.Port > 65535 {
 		return fmt.Errorf("SERVER_PORT must be between 1 and 65535")
 	}
@@ -209,6 +224,9 @@ func (c Config) Validate() error {
 		return fmt.Errorf("ACCOUNT_HEALTH_PROBE_COOLDOWN_SECONDS must be positive")
 	}
 	if c.Server.Mode == "release" {
+		if c.StorageBackend() == StorageBackendMemory {
+			return fmt.Errorf("STORAGE_BACKEND=memory is not allowed in release mode")
+		}
 		if weakSecret(c.Security.JWTSecret) {
 			return fmt.Errorf("JWT_SECRET must be strong and at least 32 bytes in release mode")
 		}
@@ -228,6 +246,14 @@ func (c Config) Validate() error {
 	return nil
 }
 
+func (c Config) StorageBackend() string {
+	return normalizeStorageBackend(c.Storage.Backend)
+}
+
+func (c Config) UsesMemoryStorage() bool {
+	return c.StorageBackend() == StorageBackendMemory
+}
+
 func (d DependencyConfig) Address() string {
 	return fmt.Sprintf("%s:%d", d.Host, d.Port)
 }
@@ -238,6 +264,14 @@ func getEnv(key, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func normalizeStorageBackend(value string) string {
+	backend := strings.ToLower(strings.TrimSpace(value))
+	if backend == "" {
+		return StorageBackendPostgres
+	}
+	return backend
 }
 
 func getIntEnv(key string, fallback int) int {

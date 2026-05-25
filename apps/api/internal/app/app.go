@@ -129,9 +129,11 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 		err     error
 	)
 
-	options := []httpserver.Option{
-		httpserver.WithDatabasePinger(dbClient),
-		httpserver.WithRedisPinger(redisClient),
+	options := []httpserver.Option{httpserver.WithRedisPinger(redisClient)}
+	if cfg.UsesMemoryStorage() {
+		options = append(options, httpserver.WithDatabasePinger(notRequiredPinger{}))
+	} else {
+		options = append(options, httpserver.WithDatabasePinger(dbClient))
 	}
 	realtimeStore, err := realtimeSlotStore(context.Background(), cfg, logger, redisClient)
 	if err != nil {
@@ -209,19 +211,19 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 }
 
 func persistentStores(ctx context.Context, cfg config.Config, logger *slog.Logger, dbClient *platformdb.Client, redisClient *platformredis.Client) (*entstore.Stores, error) {
-	if dbClient == nil || dbClient.Ent() == nil {
+	if cfg.UsesMemoryStorage() {
+		logger.Warn("running without persistent stores", "storage_backend", cfg.StorageBackend())
 		return nil, nil
+	}
+	if dbClient == nil || dbClient.Ent() == nil {
+		return nil, fmt.Errorf("postgres storage backend requires a database client")
 	}
 
 	pingCtx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
 	err := dbClient.Ping(pingCtx)
 	cancel()
 	if err != nil {
-		if cfg.Server.Mode == "release" {
-			return nil, fmt.Errorf("database unavailable for persistent stores: %w", err)
-		}
-		logger.Warn("database unavailable; using in-memory stores", "error", err)
-		return nil, nil
+		return nil, fmt.Errorf("database unavailable for persistent stores: %w", err)
 	}
 
 	if cfg.Server.Mode != "release" {
@@ -422,4 +424,10 @@ func (a *App) stopWorkers(ctx context.Context) error {
 
 type dependencyPinger interface {
 	Ping(context.Context) error
+}
+
+type notRequiredPinger struct{}
+
+func (notRequiredPinger) Ping(context.Context) error {
+	return nil
 }

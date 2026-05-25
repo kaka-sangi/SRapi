@@ -29,6 +29,7 @@ SERVER_PORT=8080
 SERVER_MODE=release
 SERVER_SHUTDOWN_TIMEOUT_SECONDS=45
 SERVER_MAX_REQUEST_BODY_SIZE=268435456
+STORAGE_BACKEND=postgres
 ```
 
 要求：
@@ -36,6 +37,7 @@ SERVER_MAX_REQUEST_BODY_SIZE=268435456
 - release 模式缺少关键 secret 必须启动失败。
 - shutdown 必须等待 HTTP server、worker、inflight gateway request 有序退出。
 - request body size 必须有全局上限和 Gateway 单独上限。
+- `STORAGE_BACKEND=postgres` 是默认持久化路径；`STORAGE_BACKEND=memory` 只用于显式本地/测试的临时内存模式，`release` 模式禁止使用。
 
 ## 4. Logging
 

@@ -3,6 +3,7 @@ package httpserver
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -129,8 +130,16 @@ type dependencyHealth struct {
 }
 
 func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions) (*runtimeState, error) {
+	allowMemoryStores := cfg.UsesMemoryStorage()
+	if allowMemoryStores {
+		logger.Warn("running with ephemeral in-memory stores", "storage_backend", cfg.StorageBackend())
+	}
+
 	userStore := opts.users
 	if userStore == nil {
+		if !allowMemoryStores {
+			return nil, missingRuntimeStoreError("users")
+		}
 		userStore = usermemory.New()
 	}
 	usersSvc, err := usersservice.New(userStore, nil)
@@ -140,6 +149,9 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 
 	sessionStore := opts.authSessions
 	if sessionStore == nil {
+		if !allowMemoryStores {
+			return nil, missingRuntimeStoreError("auth sessions")
+		}
 		sessionStore = authmemory.New()
 	}
 	authSvc, err := authservice.New(usersSvc, sessionStore, 0, nil)
@@ -149,6 +161,9 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 
 	apiKeyStore := opts.apiKeys
 	if apiKeyStore == nil {
+		if !allowMemoryStores {
+			return nil, missingRuntimeStoreError("api keys")
+		}
 		apiKeyStore = apikeymemory.New()
 	}
 	apiKeysSvc, err := apikeyservice.New(apiKeyStore, cfg.Security.APIKeyPepper, nil)
@@ -158,6 +173,9 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 
 	auditStore := opts.audit
 	if auditStore == nil {
+		if !allowMemoryStores {
+			return nil, missingRuntimeStoreError("audit")
+		}
 		auditStore = auditmemory.New()
 	}
 	auditSvc, err := auditservice.New(auditStore, nil)
@@ -167,6 +185,9 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 
 	billingStore := opts.billing
 	if billingStore == nil {
+		if !allowMemoryStores {
+			return nil, missingRuntimeStoreError("billing")
+		}
 		billingStore = billingmemory.New()
 	}
 	billingSvc, err := billingservice.New(billingStore, nil)
@@ -176,6 +197,9 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 
 	eventsStore := opts.events
 	if eventsStore == nil {
+		if !allowMemoryStores {
+			return nil, missingRuntimeStoreError("events")
+		}
 		eventsStore = eventsmemory.New()
 	}
 	eventsSvc, err := eventsservice.New(eventsStore, nil)
@@ -185,6 +209,9 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 
 	affiliateStore := opts.affiliate
 	if affiliateStore == nil {
+		if !allowMemoryStores {
+			return nil, missingRuntimeStoreError("affiliate")
+		}
 		affiliateStore = affiliatememory.New()
 	}
 	affiliateSvc, err := affiliateservice.New(affiliateStore, affiliateservice.Dependencies{
@@ -207,6 +234,9 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 
 	providerStore := opts.providers
 	if providerStore == nil {
+		if !allowMemoryStores {
+			return nil, missingRuntimeStoreError("providers")
+		}
 		providerStore = providermemory.New()
 	}
 	providersSvc, err := providerservice.New(providerStore, nil)
@@ -216,6 +246,9 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 
 	modelStore := opts.models
 	if modelStore == nil {
+		if !allowMemoryStores {
+			return nil, missingRuntimeStoreError("models")
+		}
 		modelStore = modelmemory.New()
 	}
 	modelsSvc, err := modelservice.New(modelStore, nil)
@@ -248,6 +281,9 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 
 	accountStore := opts.accounts
 	if accountStore == nil {
+		if !allowMemoryStores {
+			return nil, missingRuntimeStoreError("accounts")
+		}
 		accountStore = accountmemory.New()
 	}
 	accountsSvc, err := accountservice.New(accountStore, cfg.Security.MasterKey, nil)
@@ -257,6 +293,9 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 
 	adminControlStore := opts.adminControl
 	if adminControlStore == nil {
+		if !allowMemoryStores {
+			return nil, missingRuntimeStoreError("admin control")
+		}
 		adminControlStore = admincontrolmemory.New()
 	}
 	adminControlSvc, err := admincontrolservice.New(adminControlStore, nil)
@@ -266,6 +305,9 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 
 	schedulerStore := opts.scheduler
 	if schedulerStore == nil {
+		if !allowMemoryStores {
+			return nil, missingRuntimeStoreError("scheduler")
+		}
 		schedulerStore = schedulermemory.New()
 	}
 	schedulerSvc, err := schedulerservice.New(schedulerStore, nil)
@@ -273,12 +315,12 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 		return nil, err
 	}
 
-	subscriptionStore, subscriptionSvc, paymentStore, paymentsSvc, err := newCommerceRuntime(cfg, opts, billingSvc, auditSvc, eventsSvc)
+	subscriptionStore, subscriptionSvc, paymentStore, paymentsSvc, err := newCommerceRuntime(cfg, opts, billingSvc, auditSvc, eventsSvc, allowMemoryStores)
 	if err != nil {
 		return nil, err
 	}
 
-	usageStore, usageSvc, operationsStore, operationsSvc, err := newUsageRuntime(opts)
+	usageStore, usageSvc, operationsStore, operationsSvc, err := newUsageRuntime(opts, allowMemoryStores)
 	if err != nil {
 		return nil, err
 	}
@@ -337,9 +379,13 @@ func newCommerceRuntime(
 	billingSvc *billingservice.Service,
 	auditSvc *auditservice.Service,
 	eventsSvc *eventsservice.Service,
+	allowMemoryStores bool,
 ) (subscriptioncontract.Store, *subscriptionservice.Service, paymentcontract.Store, *paymentservice.Service, error) {
 	subscriptionStore := opts.subscriptions
 	if subscriptionStore == nil {
+		if !allowMemoryStores {
+			return nil, nil, nil, nil, missingRuntimeStoreError("subscriptions")
+		}
 		subscriptionStore = subscriptionmemory.New()
 	}
 	subscriptionSvc, err := subscriptionservice.New(subscriptionStore, nil)
@@ -349,6 +395,9 @@ func newCommerceRuntime(
 
 	paymentStore := opts.payments
 	if paymentStore == nil {
+		if !allowMemoryStores {
+			return nil, nil, nil, nil, missingRuntimeStoreError("payments")
+		}
 		paymentStore = paymentmemory.New()
 	}
 	paymentsSvc, err := paymentservice.New(paymentStore, cfg.Security.MasterKey, paymentservice.Dependencies{
@@ -364,9 +413,12 @@ func newCommerceRuntime(
 	return subscriptionStore, subscriptionSvc, paymentStore, paymentsSvc, nil
 }
 
-func newUsageRuntime(opts runtimeOptions) (usagecontract.Store, *usageservice.Service, operationscontract.Store, *operationsservice.Service, error) {
+func newUsageRuntime(opts runtimeOptions, allowMemoryStores bool) (usagecontract.Store, *usageservice.Service, operationscontract.Store, *operationsservice.Service, error) {
 	usageStore := opts.usage
 	if usageStore == nil {
+		if !allowMemoryStores {
+			return nil, nil, nil, nil, missingRuntimeStoreError("usage")
+		}
 		usageStore = usagememory.New()
 	}
 	usageSvc, err := usageservice.New(usageStore, nil)
@@ -374,7 +426,7 @@ func newUsageRuntime(opts runtimeOptions) (usagecontract.Store, *usageservice.Se
 		return nil, nil, nil, nil, err
 	}
 
-	operationsStore, operationsSvc, err := newOperationsRuntime(opts.operations, usageStore)
+	operationsStore, operationsSvc, err := newOperationsRuntime(opts.operations, usageStore, allowMemoryStores)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -471,8 +523,11 @@ func assembleRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOp
 	}
 }
 
-func newOperationsRuntime(store operationscontract.Store, usageStore usagecontract.Store) (operationscontract.Store, *operationsservice.Service, error) {
+func newOperationsRuntime(store operationscontract.Store, usageStore usagecontract.Store, allowMemoryStores bool) (operationscontract.Store, *operationsservice.Service, error) {
 	if store == nil {
+		if !allowMemoryStores {
+			return nil, nil, missingRuntimeStoreError("operations")
+		}
 		store = operationsmemory.NewWithUsageStore(usageStore)
 	}
 	service, err := operationsservice.NewWithStores(store, store, nil)
@@ -480,6 +535,10 @@ func newOperationsRuntime(store operationscontract.Store, usageStore usagecontra
 		return nil, nil, err
 	}
 	return store, service, nil
+}
+
+func missingRuntimeStoreError(name string) error {
+	return fmt.Errorf("missing %s store: inject a persistent store or set STORAGE_BACKEND=memory for explicit ephemeral mode", name)
 }
 
 func (rt *runtimeState) bootstrapAdmin(ctx context.Context) error {

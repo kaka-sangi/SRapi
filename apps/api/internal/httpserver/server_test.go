@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"net/textproto"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -34,6 +35,18 @@ import (
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 	"github.com/srapi/srapi/apps/api/internal/platform/ratelimit"
 )
+
+func TestMain(m *testing.M) {
+	original, hadOriginal := os.LookupEnv("STORAGE_BACKEND")
+	_ = os.Setenv("STORAGE_BACKEND", config.StorageBackendMemory)
+	code := m.Run()
+	if hadOriginal {
+		_ = os.Setenv("STORAGE_BACKEND", original)
+	} else {
+		_ = os.Unsetenv("STORAGE_BACKEND")
+	}
+	os.Exit(code)
+}
 
 type upstreamMessage struct {
 	Role    string `json:"role"`
@@ -82,6 +95,23 @@ func TestLivezDoesNotRequireDependencies(t *testing.T) {
 	if response.Header().Get("X-Request-ID") == "" {
 		t.Fatal("expected generated request id")
 	}
+}
+
+func TestRuntimeRequiresStoresUnlessMemoryBackendIsExplicit(t *testing.T) {
+	cfg := config.Load()
+	cfg.Storage.Backend = config.StorageBackendPostgres
+
+	defer func() {
+		recovered := recover()
+		if recovered == nil {
+			t.Fatal("expected runtime initialization to fail without injected stores")
+		}
+		if !strings.Contains(fmt.Sprint(recovered), "missing users store") {
+			t.Fatalf("expected missing users store error, got %v", recovered)
+		}
+	}()
+
+	_ = New(cfg, nil)
 }
 
 func TestGatewayMaxBodySizeRejectsOversizedJSON(t *testing.T) {

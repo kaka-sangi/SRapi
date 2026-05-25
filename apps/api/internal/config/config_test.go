@@ -46,6 +46,31 @@ func TestValidateRejectsReleaseWeakSecrets(t *testing.T) {
 	}
 }
 
+func TestStorageBackendDefaultsOverridesAndValidation(t *testing.T) {
+	t.Setenv("STORAGE_BACKEND", "")
+	cfg := Load()
+	if cfg.StorageBackend() != StorageBackendPostgres {
+		t.Fatalf("expected default postgres storage backend, got %s", cfg.StorageBackend())
+	}
+
+	t.Setenv("STORAGE_BACKEND", "memory")
+	cfg = Load()
+	if !cfg.UsesMemoryStorage() {
+		t.Fatalf("expected memory storage backend, got %s", cfg.StorageBackend())
+	}
+
+	cfg.Storage.Backend = "sqlite"
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "STORAGE_BACKEND") {
+		t.Fatalf("expected invalid storage backend rejection, got %v", err)
+	}
+
+	cfg = validReleaseConfig()
+	cfg.Storage.Backend = StorageBackendMemory
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "STORAGE_BACKEND=memory") {
+		t.Fatalf("expected release memory backend rejection, got %v", err)
+	}
+}
+
 func TestValidateAcceptsReleaseStrongSecrets(t *testing.T) {
 	cfg := validReleaseConfig()
 	if err := cfg.Validate(); err != nil {
@@ -218,6 +243,7 @@ func validReleaseConfig() Config {
 	cfg.Security.MasterKey = "master_key_release_value_32_bytes_min"
 	cfg.Security.APIKeyPepper = "api_key_pepper_release_value_32_bytes_min"
 	cfg.Database.Password = "postgres_release_password_32_bytes_min"
+	cfg.Storage.Backend = StorageBackendPostgres
 	cfg.Bootstrap.AdminPassword = "bootstrap_admin_release_password_minimum"
 	return cfg
 }
