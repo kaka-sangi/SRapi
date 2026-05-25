@@ -201,6 +201,30 @@ func TestParetoFrontierExcludesDominatedCandidateBeforeWeightedSelection(t *test
 	}
 }
 
+func TestScheduleTreatsZeroQualityEvalScoreAsExplicitEvidence(t *testing.T) {
+	svc := newService(t)
+	req := baseRequest()
+	req.Candidates = []contract.Candidate{
+		candidate(1, withHealth(0.90), withQuotaRemaining(0.90), withQualityEvalScore("0"), withCapabilities(capabilitiescontract.KeyStreaming)),
+	}
+
+	result, err := svc.Schedule(context.Background(), req)
+	if err != nil {
+		t.Fatalf("schedule: %v", err)
+	}
+	score := decisionScore(t, result.Decision.Scores, 1)
+	if score["quality_score"].(float64) != 0 {
+		t.Fatalf("expected explicit zero quality score, got %+v", score)
+	}
+	if score["quality_eval_score"].(float64) != 0 {
+		t.Fatalf("expected explicit zero quality eval score, got %+v", score)
+	}
+	frontierIDs := paretoFrontierIDs(t, result.Decision.Scores)
+	if len(frontierIDs) != 1 || frontierIDs[0] != 1 {
+		t.Fatalf("expected explicit quality candidate in Pareto evidence, got %v", frontierIDs)
+	}
+}
+
 func TestFreeTierRejectsProtectedLowQuotaAccount(t *testing.T) {
 	svc := newService(t)
 	req := baseRequest()
@@ -1549,6 +1573,12 @@ func withCacheScore(value string) candidateOption {
 func withQualityScore(value string) candidateOption {
 	return func(candidate *contract.Candidate) {
 		candidate.Mapping.PricingOverride["quality_score"] = value
+	}
+}
+
+func withQualityEvalScore(value string) candidateOption {
+	return func(candidate *contract.Candidate) {
+		candidate.Mapping.PricingOverride["quality_eval_score"] = value
 	}
 }
 

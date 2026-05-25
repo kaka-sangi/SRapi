@@ -145,6 +145,12 @@ Also add or update tests for:
 - scheduler decision creation
 - scheduler feedback creation
 
+QualityEval capture, judge worker, or Scheduler quality evidence changes must also run:
+
+```bash
+make smoke-quality-eval
+```
+
 ## 6. Scheduler Gates
 
 Required when changing scheduling, strategies, leases, feedback, account runtime state, or Redis scheduler persistence:

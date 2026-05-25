@@ -1,7 +1,10 @@
 package httpserver
 
 import (
+	"context"
 	"encoding/json"
+	"io"
+	"log/slog"
 	"math"
 	"net/http"
 	"net/http/httptest"
@@ -14,6 +17,7 @@ import (
 	qualitycontract "github.com/srapi/srapi/apps/api/internal/modules/quality_eval/contract"
 	qualitymemory "github.com/srapi/srapi/apps/api/internal/modules/quality_eval/store/memory"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
+	qualityevalworker "github.com/srapi/srapi/apps/api/internal/workers/quality_eval"
 )
 
 func TestSchedulerRuntimeMetadataParsesHealthQuotaLatency(t *testing.T) {
@@ -188,6 +192,105 @@ func TestGatewayCapturesQualitySampleWhenEnabled(t *testing.T) {
 	}
 }
 
+func TestQualityEvalSmokeCapturesEvaluatesAndFeedsScheduler(t *testing.T) {
+	qualityStore := qualitymemory.New()
+	upstream := openAIChatCompletionTestServer(t)
+	cfg := config.Load()
+	cfg.QualityEval.Enabled = true
+	cfg.QualityEval.OpenAIAPIKey = "not-used-by-smoke"
+	handler := New(cfg, nil, WithQualityEvalStore(qualityStore))
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"quality-smoke-provider","display_name":"Quality Smoke","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"quality-smoke-model","display_name":"Quality Smoke Model","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"quality-smoke-upstream","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"quality-smoke-account","runtime_class":"api_key","credential":{"api_key":"quality-smoke-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
+
+	mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/chat/completions", `{"model":"quality-smoke-model","messages":[{"role":"user","content":"quality smoke capture"}]}`)
+
+	samples, err := qualityStore.ListPendingSamples(t.Context(), qualitycontract.PendingSampleFilter{SamplePercent: 100, Limit: 10, Now: time.Now().UTC()})
+	if err != nil {
+		t.Fatalf("list pending quality samples: %v", err)
+	}
+	if len(samples) != 1 {
+		t.Fatalf("expected one pending quality sample, got %+v", samples)
+	}
+
+	worker, err := qualityevalworker.New(qualityStore, slog.New(slog.NewTextHandler(io.Discard, nil)), qualityevalworker.Config{
+		MasterKey:     cfg.Security.MasterKey,
+		SamplePercent: 100,
+		Judge: qualitySmokeJudge{
+			model: "quality-smoke-judge",
+			score: 0.93,
+		},
+	})
+	if err != nil {
+		t.Fatalf("create quality eval worker: %v", err)
+	}
+	result, err := worker.RunOnce(t.Context())
+	if err != nil {
+		t.Fatalf("run quality eval worker: %v", err)
+	}
+	if result.Selected != 1 || result.Evaluated != 1 || result.Failed != 0 {
+		t.Fatalf("unexpected quality eval worker result: %+v", result)
+	}
+
+	evaluations, err := qualityStore.ListEvaluations(t.Context())
+	if err != nil {
+		t.Fatalf("list quality evaluations: %v", err)
+	}
+	if len(evaluations) != 1 || evaluations[0].Score != 0.93 || evaluations[0].JudgeModel != "quality-smoke-judge" {
+		t.Fatalf("expected one quality smoke evaluation, got %+v", evaluations)
+	}
+
+	mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/chat/completions", `{"model":"quality-smoke-model","messages":[{"role":"user","content":"quality smoke scheduler evidence"}]}`)
+
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=quality-smoke-model", nil)
+	decisionsReq.AddCookie(sessionCookie)
+	decisionsRec := httptest.NewRecorder()
+	handler.ServeHTTP(decisionsRec, decisionsReq)
+	if decisionsRec.Code != http.StatusOK {
+		t.Fatalf("expected scheduler decisions 200, got %d body=%s", decisionsRec.Code, decisionsRec.Body.String())
+	}
+	var decisionsResp apiopenapi.SchedulerDecisionListResponse
+	if err := json.NewDecoder(decisionsRec.Body).Decode(&decisionsResp); err != nil {
+		t.Fatalf("decode scheduler decisions: %v", err)
+	}
+	if len(decisionsResp.Data) != 2 {
+		t.Fatalf("expected two quality-smoke decisions, got %d", len(decisionsResp.Data))
+	}
+	accountID, err := strconv.Atoi(string(accountResp.Data.Id))
+	if err != nil {
+		t.Fatalf("parse account id: %v", err)
+	}
+	score := schedulerDecisionScore(t, decisionsResp.Data[len(decisionsResp.Data)-1].Scores, accountID)
+	assertNumberNear(t, score["quality_score"], 0.93)
+	assertNumberNear(t, score["quality_eval_score"], 0.93)
+	if score["quality_tier"] != "premium" || intFromScoreValue(score["quality_eval_samples"]) != 1 {
+		t.Fatalf("unexpected quality scheduler evidence: %+v", score)
+	}
+}
+
+type qualitySmokeJudge struct {
+	model string
+	score float64
+}
+
+func (j qualitySmokeJudge) Evaluate(_ context.Context, sample qualitycontract.EvaluationSample) (qualitycontract.JudgeResult, error) {
+	if strings.TrimSpace(sample.SanitizedPrompt) == "" || strings.TrimSpace(sample.SanitizedOutput) == "" {
+		return qualitycontract.JudgeResult{}, nil
+	}
+	return qualitycontract.JudgeResult{
+		JudgeModel:  j.model,
+		Score:       j.score,
+		Correctness: 5,
+		Coherence:   5,
+		Safety:      4,
+		Rationale:   "local quality smoke",
+		JudgedAt:    time.Now().UTC(),
+	}, nil
+}
+
 func openAIChatCompletionTestServer(t *testing.T) *httptest.Server {
 	t.Helper()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -239,5 +342,19 @@ func assertNumberNear(t *testing.T, value any, expected float64) {
 	}
 	if math.Abs(got-expected) > 0.0001 {
 		t.Fatalf("expected %.4f, got %.4f", expected, got)
+	}
+}
+
+func intFromScoreValue(value any) int {
+	switch typed := value.(type) {
+	case int:
+		return typed
+	case float64:
+		return int(typed)
+	case json.Number:
+		parsed, _ := typed.Int64()
+		return int(parsed)
+	default:
+		return 0
 	}
 }

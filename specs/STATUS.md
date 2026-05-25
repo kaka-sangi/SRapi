@@ -235,6 +235,7 @@ notes:
 - WP-700 added `docs/ADMIN_CONTROL_PLANE_SPEC.md`, settings-backed admin-control persistence through the existing `settings` table, global API-key inventory listing, dashboard/ops read models from existing usage/account/user/realtime evidence, and `TestAdminControlPlaneV1EndpointsAndAudit` proving new admin writes require CSRF and record audit evidence.
 - WP-700 intentionally stores low-frequency console-managed state as typed settings-backed collections first; high-volume transactional histories such as redeem redemption events can be promoted to dedicated Ent schemas in a later package when the product needs per-redemption concurrency semantics.
 - A1.2 added `auth_session_cleanup` worker, `AUTH_SESSION_CLEANUP_INTERVAL_SECONDS`, Ent and memory cleanup store support, app lifecycle wiring, and docs/spec governance so expired active console sessions are marked `expired` and soft-deleted without overwriting revoked logout records.
+- K1.4 quality gate hardening added `make smoke-quality-eval`, proving local QualityEval sample capture, worker evaluation, and Scheduler quality evidence in one command. Scheduler decision score evidence now preserves `quality_eval_score`, `quality_eval_samples`, and `quality_tier`; explicit zero quality scores remain valid evidence instead of falling back to the default quality score.
 
 ## Work Package Ledger
 

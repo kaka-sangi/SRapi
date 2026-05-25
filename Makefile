@@ -21,7 +21,7 @@ RATE_LIMIT_BENCH_BUDGET_MS ?= 2
 BALANCE_CHARGER_PRESSURE_DSN ?=
 BALANCE_CHARGER_PRESSURE_TIMEOUT ?= 120s
 
-.PHONY: help bootstrap-env openapi-lint openapi-bundle openapi-codegen openapi-codegen-check openapi-ts-codegen openapi-ts-codegen-check sdk-ts-typecheck ent-generate ent-generate-check migration-diff migration-hash migration-check api-test api-run dev-up dev-down dev-logs smoke-health smoke-gateway smoke-rate-limit smoke-failover smoke-release rate-limit-bench balance-charger-pressure backup-postgres restore-postgres examples-check secret-scan architecture-check code-quality-check diff-check web-install web-check web-check-e2e web-dev check
+.PHONY: help bootstrap-env openapi-lint openapi-bundle openapi-codegen openapi-codegen-check openapi-ts-codegen openapi-ts-codegen-check sdk-ts-typecheck ent-generate ent-generate-check migration-diff migration-hash migration-check api-test api-run dev-up dev-down dev-logs smoke-health smoke-gateway smoke-rate-limit smoke-failover smoke-quality-eval smoke-release rate-limit-bench balance-charger-pressure backup-postgres restore-postgres examples-check secret-scan architecture-check code-quality-check diff-check web-install web-check web-check-e2e web-dev check
 
 help:
 	@printf '%s\n' \
@@ -47,6 +47,7 @@ help:
 		'  make smoke-gateway   Login, create an API key, and smoke test local gateway endpoints' \
 		'  make smoke-rate-limit  Verify Gateway API key RPM limiting returns 429 + Retry-After' \
 		'  make smoke-failover  Verify Gateway retries from a 503 upstream to a fallback provider' \
+		'  make smoke-quality-eval  Verify QualityEval capture, worker judge, and Scheduler quality evidence' \
 		'  make smoke-release   Validate health, readiness, metrics, and gateway smoke on localhost' \
 		'  make rate-limit-bench RATE_LIMIT_BENCH_REDIS_ADDR=host:port  Check Redis rate limiter p99 budget' \
 		'  make balance-charger-pressure BALANCE_CHARGER_PRESSURE_DSN=postgres://...  Run PostgreSQL balance_charger pressure test' \
@@ -178,6 +179,9 @@ smoke-rate-limit:
 
 smoke-failover:
 	node tools/smoke-local.mjs --failover
+
+smoke-quality-eval:
+	cd $(API_DIR) && go test ./internal/httpserver -run TestQualityEvalSmokeCapturesEvaluatesAndFeedsScheduler -count=1 -v
 
 smoke-release:
 	node tools/smoke-local.mjs --release

@@ -66,7 +66,7 @@
 | **cacheScore 子分数** | 硬编码 `0.0` | 实现 `cacheScore(candidate)`：从 cache hit history + prompt prefix hash 算 |
 | **运行时策略加载** | `StrategyRegistry` 仅编译时注册 | 新增 `strategy_loader.go`：从 `SchedulerStrategy` 表读 config_json → unmarshal 为运行时 strategy |
 | **缺失的 5 个内置策略** | spec 设计了 9 个但只实现 2 个（balanced / cost_saver） | 实现 latency_first / quota_protect / sticky_first / cache_affinity_first / premium_quality |
-| **质量评估闭环（杀手锏核心）** | 已落地 `modules/quality_eval/`、`ent/schema/{qualityevalsample,qualityevaluation}.go`、`internal/workers/quality_eval/worker.go` 和 `000007_quality_evaluations` 迁移；Gateway 在 `QUALITY_EVAL_ENABLED=true` 时捕获加密脱敏文本样本，worker 每小时按 hash 稳定抽样 1% 调用 OpenAI-compatible judge（默认 `gpt-4o-mini`），写入 `QualityEvaluation`，Scheduler candidate enrichment 按 account+model 聚合最近 30 天平均分并注入 `quality_score` / `quality_tier` | 生产 smoke 需配置真实 `QUALITY_EVAL_OPENAI_API_KEY` 后跑 100+ 请求验证外部 judge 端到端比例 |
+| **质量评估闭环（杀手锏核心）** | 已落地 `modules/quality_eval/`、`ent/schema/{qualityevalsample,qualityevaluation}.go`、`internal/workers/quality_eval/worker.go` 和 `000007_quality_evaluations` 迁移；Gateway 在 `QUALITY_EVAL_ENABLED=true` 时捕获加密脱敏文本样本，worker 每小时按 hash 稳定抽样 1% 调用 OpenAI-compatible judge（默认 `gpt-4o-mini`），写入 `QualityEvaluation`，Scheduler candidate enrichment 按 account+model 聚合最近 30 天平均分并注入 `quality_score` / `quality_eval_score` / `quality_eval_samples` / `quality_tier`；`make smoke-quality-eval` 已用本地 judge 验证 capture → worker → Scheduler evidence 闭环 | 生产 smoke 需配置真实 `QUALITY_EVAL_OPENAI_API_KEY` 后跑 100+ 请求验证外部 judge 端到端比例 |
 | **Pareto 前沿优化** | 已落地 `scheduler/service/pareto.go`：Cost / Latency / Quality Pareto 前沿筛选先于加权排序执行，`Decision.Scores["pareto"].frontier_account_ids` 记录前沿证据；缺失明确输入的目标不参与支配判断，避免默认分数误剪候选；K1.4 已把在线 QualityEval 聚合写入候选 `quality_score` / `quality_tier` 信号 | 后续可补更细粒度质量策略可视化和真实生产评估报表 |
 | **策略灰度/dry-run** | 已落地 `scheduler/service/simulator.go`、`POST /api/v1/admin/scheduler/simulate`、snapshot-backed `POST /api/v1/admin/scheduler/replay` 和真实 Gateway 流量稳定百分比分流；Admin Settings 可按 model / API key prefix hash scope 启用 shadow strategy，Decision/Snapshot 只落 hash/bucket/selection 证据 | 后续可补 user_group / provider 独立 scope、完整灰度效果指标和一键回滚 UI |
 | **可解释性** | 已落地 `SchedulerDecision.selection_rationale`，真实决策会持久化一条非敏感解释文本，说明选中账号的 Pareto/评分胜出原因、主要分数因素和第二名/拒绝候选关系；Admin Scheduler Decisions API 同步暴露该字段 | 后续可在前端把 rationale 与 score breakdown 组合成更完整的可视化解释 |
@@ -512,7 +512,7 @@ next   otel_structured_trace                （C1 OTel + slog trace）
   1. `smoke-payment-stripe`：Stripe test mode 完整充值闭环
   2. `smoke-failover`：已落地为 `make smoke-failover`，创建两个临时 OpenAI-compatible Provider 和本地 mock upstream，验证 primary 503 后自动切到 secondary，并核验 usage attempts、`fallback_from_decision_id`、`fallback_excluded` 和 `srapi_gateway_failover_total`
   3. `smoke-rate-limit`：已落地为 `make smoke-rate-limit`，使用 `rpm_limit=1` 临时 API Key 验证第二个 Gateway 请求返回 429、`rpm_limit_exceeded` 和 `Retry-After`
-  4. `smoke-quality-eval`：100 个请求后 QualityEvaluation 出现记录
+  4. `smoke-quality-eval`：已落地为 `make smoke-quality-eval`，使用本地 judge 验证 QualityEval sample capture、worker evaluation 和 Scheduler quality evidence；真实外部 judge 比例 smoke 仍需生产凭证
   5. `rate-limit-bench`：已落地为 `make rate-limit-bench`，对真实 Redis 执行 Allow / AcquireConcurrency / ReleaseConcurrency p99 ≤ 2ms guard
 
 ### 性能基准

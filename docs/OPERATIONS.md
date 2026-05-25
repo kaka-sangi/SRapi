@@ -238,7 +238,9 @@ make balance-charger-pressure BALANCE_CHARGER_PRESSURE_DSN='postgres://user:pass
 
 `quality_eval` worker 仅在持久化 store 可用且 `QUALITY_EVAL_ENABLED=true` 时启动。Gateway 成功完成文本请求并写入 `scheduler_feedbacks` 后，会捕获 content-safety 后的脱敏 prompt/output 摘要到 `quality_eval_samples.sample_payload_ciphertext`；禁用时不会新增样本。
 
-worker 默认每小时按 `sample_request_hash` 稳定抽样 1% 未评估样本，调用 OpenAI-compatible Chat Completions judge model（默认 `gpt-4o-mini`）返回 `correctness` / `coherence` / `safety` 三项 0-5 分，写入 `quality_evaluations`。Scheduler Gateway 候选构建会按最近 30 天 `(account_id, model)` 平均分注入 `quality_score` / `quality_tier`，使 decision score 中出现真实质量维度。
+worker 默认每小时按 `sample_request_hash` 稳定抽样 1% 未评估样本，调用 OpenAI-compatible Chat Completions judge model（默认 `gpt-4o-mini`）返回 `correctness` / `coherence` / `safety` 三项 0-5 分，写入 `quality_evaluations`。Scheduler Gateway 候选构建会按最近 30 天 `(account_id, model)` 平均分注入 `quality_score` / `quality_eval_score` / `quality_eval_samples` / `quality_tier`，使 decision score 中出现真实质量维度。
+
+本地闭环可用 `make smoke-quality-eval` 验证：它使用内存 store 和本地 judge，覆盖 Gateway sample capture、worker evaluation 和 Scheduler decision quality evidence，不需要外部 judge API key。
 
 生产启用前必须配置 `QUALITY_EVAL_OPENAI_API_KEY`，并确认 judge endpoint 的数据处理边界；该路径会把脱敏样本发送给外部评估模型。
 

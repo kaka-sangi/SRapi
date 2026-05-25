@@ -956,18 +956,21 @@ func rankedCandidates(frontier []candidateScore, scores []candidateScore) []cont
 }
 
 type scoreBreakdown struct {
-	AccountID         int     `json:"account_id"`
-	Final             float64 `json:"final_score"`
-	Health            float64 `json:"health_score"`
-	Quota             float64 `json:"quota_score"`
-	Latency           float64 `json:"latency_score"`
-	Quality           float64 `json:"quality_score"`
-	Sticky            float64 `json:"sticky_score"`
-	Cache             float64 `json:"cache_score"`
-	Cost              float64 `json:"cost_score"`
-	Fairness          float64 `json:"fairness_score"`
-	RiskPenalty       float64 `json:"risk_penalty"`
-	SaturationPenalty float64 `json:"saturation_penalty"`
+	AccountID          int      `json:"account_id"`
+	Final              float64  `json:"final_score"`
+	Health             float64  `json:"health_score"`
+	Quota              float64  `json:"quota_score"`
+	Latency            float64  `json:"latency_score"`
+	Quality            float64  `json:"quality_score"`
+	QualityEval        *float64 `json:"quality_eval_score,omitempty"`
+	QualityEvalSamples int      `json:"quality_eval_samples,omitempty"`
+	QualityTier        string   `json:"quality_tier,omitempty"`
+	Sticky             float64  `json:"sticky_score"`
+	Cache              float64  `json:"cache_score"`
+	Cost               float64  `json:"cost_score"`
+	Fairness           float64  `json:"fairness_score"`
+	RiskPenalty        float64  `json:"risk_penalty"`
+	SaturationPenalty  float64  `json:"saturation_penalty"`
 }
 
 func scoreCandidate(candidate contract.Candidate, req contract.ScheduleRequest, strategy contract.StrategyDescriptor) scoreBreakdown {
@@ -976,6 +979,9 @@ func scoreCandidate(candidate contract.Candidate, req contract.ScheduleRequest, 
 	quota := quotaScore(candidate)
 	latency := latencyScore(candidate)
 	quality := qualityScore(candidate)
+	qualityEval := qualityEvalScore(candidate)
+	qualitySamples := qualityEvalSamples(candidate)
+	qualityTier := qualityTierValue(candidate)
 	sticky := stickyScore(candidate, req)
 	cache := cacheScore(candidate, req, health)
 	cost := costScore(candidate)
@@ -984,18 +990,21 @@ func scoreCandidate(candidate contract.Candidate, req contract.ScheduleRequest, 
 	saturationPenalty := saturationPenalty(candidate)
 	final := health*weights["health"] + quota*weights["quota"] + latency*weights["latency"] + sticky*weights["sticky"] + cache*weights["cache"] + cost*weights["cost"] + fairness*weights["fairness"] + quality*weights["priority"] - riskPenalty - saturationPenalty
 	return scoreBreakdown{
-		AccountID:         candidate.Account.ID,
-		Final:             final,
-		Health:            health,
-		Quota:             quota,
-		Latency:           latency,
-		Quality:           quality,
-		Sticky:            sticky,
-		Cache:             cache,
-		Cost:              cost,
-		Fairness:          fairness,
-		RiskPenalty:       riskPenalty,
-		SaturationPenalty: saturationPenalty,
+		AccountID:          candidate.Account.ID,
+		Final:              final,
+		Health:             health,
+		Quota:              quota,
+		Latency:            latency,
+		Quality:            quality,
+		QualityEval:        qualityEval,
+		QualityEvalSamples: qualitySamples,
+		QualityTier:        qualityTier,
+		Sticky:             sticky,
+		Cache:              cache,
+		Cost:               cost,
+		Fairness:           fairness,
+		RiskPenalty:        riskPenalty,
+		SaturationPenalty:  saturationPenalty,
 	}
 }
 
@@ -1174,6 +1183,30 @@ func qualityScore(candidate contract.Candidate) float64 {
 	return 0.50
 }
 
+func qualityEvalScore(candidate contract.Candidate) *float64 {
+	valueMaps := []map[string]any{candidate.Mapping.PricingOverride, candidate.Account.Metadata, candidate.Provider.Capabilities, candidate.Provider.ConfigSchema}
+	if score, ok := firstScoreValue(valueMaps, "quality_eval_score", "online_eval_score", "judge_score"); ok {
+		return &score
+	}
+	return nil
+}
+
+func qualityEvalSamples(candidate contract.Candidate) int {
+	valueMaps := []map[string]any{candidate.Mapping.PricingOverride, candidate.Account.Metadata, candidate.Provider.Capabilities, candidate.Provider.ConfigSchema}
+	if count, ok := firstPositiveInt(valueMaps, "quality_eval_samples", "online_eval_samples", "judge_samples"); ok {
+		return count
+	}
+	return 0
+}
+
+func qualityTierValue(candidate contract.Candidate) string {
+	valueMaps := []map[string]any{candidate.Mapping.PricingOverride, candidate.Account.Metadata, candidate.Provider.Capabilities, candidate.Provider.ConfigSchema}
+	if tier, ok := firstQualityTier(valueMaps); ok {
+		return tier
+	}
+	return ""
+}
+
 func firstQualityTier(values []map[string]any) (string, bool) {
 	for _, metadata := range values {
 		for _, key := range []string{"quality_tier", "quality"} {
@@ -1302,11 +1335,27 @@ func costScore(candidate contract.Candidate) float64 {
 }
 
 func firstScoreValue(values []map[string]any, keys ...string) (float64, bool) {
-	value, ok := firstPositiveFloat(values, keys...)
+	value, ok := firstFloat(values, keys...)
 	if !ok {
 		return 0, false
 	}
 	return clamp01(value), true
+}
+
+func firstFloat(values []map[string]any, keys ...string) (float64, bool) {
+	for _, metadata := range values {
+		for _, key := range keys {
+			value, ok := metadataValue(metadata, key)
+			if !ok {
+				continue
+			}
+			parsed, ok := floatValue(value)
+			if ok {
+				return parsed, true
+			}
+		}
+	}
+	return 0, false
 }
 
 func firstPositiveFloat(values []map[string]any, keys ...string) (float64, bool) {
@@ -1317,6 +1366,22 @@ func firstPositiveFloat(values []map[string]any, keys ...string) (float64, bool)
 				continue
 			}
 			parsed, ok := floatValue(value)
+			if ok && parsed > 0 {
+				return parsed, true
+			}
+		}
+	}
+	return 0, false
+}
+
+func firstPositiveInt(values []map[string]any, keys ...string) (int, bool) {
+	for _, metadata := range values {
+		for _, key := range keys {
+			value, ok := metadataValue(metadata, key)
+			if !ok {
+				continue
+			}
+			parsed, ok := intValue(value)
 			if ok && parsed > 0 {
 				return parsed, true
 			}
@@ -1348,6 +1413,25 @@ func floatValue(value any) (float64, bool) {
 		return parsed, err == nil
 	case string:
 		parsed, err := strconv.ParseFloat(strings.TrimSpace(typed), 64)
+		return parsed, err == nil
+	default:
+		return 0, false
+	}
+}
+
+func intValue(value any) (int, bool) {
+	switch typed := value.(type) {
+	case int:
+		return typed, true
+	case int64:
+		return int(typed), true
+	case float64:
+		return int(typed), true
+	case json.Number:
+		parsed, err := typed.Int64()
+		return int(parsed), err == nil
+	case string:
+		parsed, err := strconv.Atoi(strings.TrimSpace(typed))
 		return parsed, err == nil
 	default:
 		return 0, false
