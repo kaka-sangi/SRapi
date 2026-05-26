@@ -223,6 +223,21 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 		writeGatewayError(w, jsonDecodeStatus(err), apiopenapi.InvalidRequestError, "invalid responses request", "invalid_request")
 		return
 	}
+	if err := s.runtime.gateway.ValidateResponsesRequest(rawBody); err != nil {
+		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
+			RequestID:      requestID,
+			Authed:         authed,
+			SourceProtocol: "openai-compatible",
+			SourceEndpoint: sourceEndpoint,
+			Model:          fallbackModelName(body.Model),
+			Success:        false,
+			ErrorClass:     ptrStringValue("invalid_request"),
+			LatencyMS:      elapsedMillis(startedAt),
+			UsageEstimated: true,
+		})
+		writeGatewayError(w, http.StatusBadRequest, apiopenapi.InvalidRequestError, err.Error(), "invalid_request")
+		return
+	}
 	modelResolution, err := s.runtime.models.ResolveModelReference(r.Context(), body.Model)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{

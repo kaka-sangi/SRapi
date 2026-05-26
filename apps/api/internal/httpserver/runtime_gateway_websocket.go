@@ -130,6 +130,12 @@ func (s *Server) handleResponsesWebSocket(w http.ResponseWriter, r *http.Request
 			}
 			continue
 		}
+		if err := s.runtime.gateway.ValidateResponsesRequest(requestPayload); err != nil {
+			if err := writeResponsesWebSocketError(r.Context(), conn, http.StatusBadRequest, "invalid_request", err.Error(), nil); err != nil {
+				return
+			}
+			continue
+		}
 		if s.shouldUseCodexWebSocketRelay(r, requestPayload) {
 			relayed, err := s.relayCodexResponsesWebSocket(r, conn, requestPayload, authed)
 			if err != nil {

@@ -197,6 +197,37 @@ func TestGatewayResponsesWebSocketForwardsStreamingEvents(t *testing.T) {
 	}
 }
 
+func TestGatewayResponsesWebSocketRejectsFunctionCallOutputWithoutCallID(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	conn := mustDialResponsesWebSocket(t, server.URL+"/v1/responses/ws", apiKey)
+	defer conn.Close(websocket.StatusNormalClosure, "")
+
+	writeWebSocketJSON(t, conn, map[string]any{
+		"type": "response.create",
+		"response": map[string]any{
+			"model": "missing-call-id-model",
+			"input": []map[string]any{
+				{"type": "function_call_output", "output": "{}"},
+			},
+		},
+	})
+
+	event := readWebSocketEvent(t, conn)
+	if event["type"] != "error" || event["status"] != float64(http.StatusBadRequest) {
+		t.Fatalf("expected bad request error event, got %+v", event)
+	}
+	errorBody, _ := event["error"].(map[string]any)
+	message, _ := errorBody["message"].(string)
+	if errorBody["code"] != "invalid_request" || !strings.Contains(message, "function_call_output input item requires call_id") {
+		t.Fatalf("expected missing call_id error body, got %+v", event)
+	}
+}
+
 func TestGatewayResponsesWebSocketRelaysCodexUpstreamWebSocket(t *testing.T) {
 	type upstreamObservation struct {
 		Path          string

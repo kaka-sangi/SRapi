@@ -742,6 +742,31 @@ func rawResponsesInput(rawBody []byte) ([]gatewaycontract.ContentBlock, string, 
 	return blocks, strings.Join(uniqueStrings(instructions), "\n"), uniqueStrings(warnings)
 }
 
+func validateRawResponsesInput(rawBody []byte) error {
+	var payload map[string]any
+	if err := json.Unmarshal(rawBody, &payload); err != nil {
+		return nil
+	}
+	return validateRawResponsesInputValue(payload["input"])
+}
+
+func validateRawResponsesInputValue(value any) error {
+	switch typed := value.(type) {
+	case []any:
+		for _, item := range typed {
+			if err := validateRawResponsesInputValue(item); err != nil {
+				return err
+			}
+		}
+	case map[string]any:
+		if strings.TrimSpace(rawMapString(typed, "type")) == "function_call_output" && strings.TrimSpace(rawMapString(typed, "call_id")) == "" {
+			return fmt.Errorf("Responses function_call_output input item requires call_id")
+		}
+		return validateRawResponsesInputValue(typed["content"])
+	}
+	return nil
+}
+
 func rawResponsesInputValue(value any, defaultRole string) ([]gatewaycontract.ContentBlock, []string, []string) {
 	switch typed := value.(type) {
 	case string:

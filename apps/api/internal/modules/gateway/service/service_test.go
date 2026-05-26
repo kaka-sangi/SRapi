@@ -175,6 +175,34 @@ func TestNormalizeResponsesPreservesRawFunctionItems(t *testing.T) {
 	}
 }
 
+func TestValidateResponsesRequestRequiresFunctionCallOutputCallID(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	err = svc.ValidateResponsesRequest([]byte(`{
+		"model":"gpt-5.4",
+		"input":[{"type":"function_call_output","output":"{}"}]
+	}`))
+
+	if err == nil || err.Error() != "Responses function_call_output input item requires call_id" {
+		t.Fatalf("expected missing call_id error, got %v", err)
+	}
+}
+
+func TestValidateResponsesRequestAllowsFunctionCallOutputCallID(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	if err := svc.ValidateResponsesRequest([]byte(`{
+		"model":"gpt-5.4",
+		"input":[{"type":"function_call_output","call_id":"call_1","output":"{}"}]
+	}`)); err != nil {
+		t.Fatalf("expected valid function_call_output, got %v", err)
+	}
+}
+
 func TestNormalizeResponsesPreservesRawContextItems(t *testing.T) {
 	svc, err := New()
 	if err != nil {

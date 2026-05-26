@@ -3957,6 +3957,25 @@ func TestGatewayCompatibilityEndpointsTargetSameOpenAICompatibleUpstream(t *test
 	}
 }
 
+func TestGatewayResponsesRejectsFunctionCallOutputWithoutCallID(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(`{"model":"missing-call-id-model","input":[{"type":"function_call_output","output":"{}"}]}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "function_call_output input item requires call_id") {
+		t.Fatalf("expected missing call_id error, got %s", rec.Body.String())
+	}
+}
+
 func TestGatewayProviderAliasForcesProviderContext(t *testing.T) {
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
