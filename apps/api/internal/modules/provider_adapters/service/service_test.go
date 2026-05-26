@@ -3096,6 +3096,63 @@ func TestAnthropicCompatibleAdapterStreamsUpstream(t *testing.T) {
 	}
 }
 
+func TestAnthropicCompatibleAdapterPreservesContextManagement(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/messages" {
+			t.Fatalf("unexpected upstream path %s", r.URL.Path)
+		}
+		var payload struct {
+			Model             string         `json:"model"`
+			Thinking          map[string]any `json:"thinking"`
+			ContextManagement map[string]any `json:"context_management"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		if payload.Model != "claude-upstream" || payload.Thinking["type"] != "enabled" || payload.Thinking["budget_tokens"] != float64(2048) {
+			t.Fatalf("unexpected thinking payload: %+v", payload)
+		}
+		edits, ok := payload.ContextManagement["edits"].([]any)
+		if !ok || len(edits) != 1 {
+			t.Fatalf("expected context_management edits, got %+v", payload.ContextManagement)
+		}
+		edit, ok := edits[0].(map[string]any)
+		if !ok || edit["type"] != "clear_thinking_20251015" || edit["trigger"] != "input_tokens" || edit["value"] != float64(20000) {
+			t.Fatalf("unexpected context_management edit: %+v", edits[0])
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"content":[{"type":"text","text":"kept context"}],"usage":{"input_tokens":3,"output_tokens":2}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:         "req_anthropic_context_management",
+		Model:             "claude-local",
+		InputParts:        textParts("hello"),
+		MaxOutputTokens:   ptrInt(4096),
+		Reasoning:         map[string]any{"type": "enabled", "budget_tokens": 2048},
+		ContextManagement: map[string]any{"edits": []any{map[string]any{"type": "clear_thinking_20251015", "trigger": "input_tokens", "value": 20000}}},
+		Provider: providercontract.Provider{
+			ID:          2,
+			AdapterType: "anthropic-compatible",
+			Protocol:    "anthropic-compatible",
+		},
+		Account:    accountcontract.ProviderAccount{ID: 2, Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "claude-upstream"},
+		Credential: map[string]any{"api_key": "anthropic-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke anthropic upstream: %v", err)
+	}
+	if conversationResponseText(resp) != "kept context" {
+		t.Fatalf("unexpected anthropic response: %+v", resp)
+	}
+}
+
 func TestAnthropicCompatibleAdapterStreamsThinkingSignature(t *testing.T) {
 	rawSSE := "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":5,\"output_tokens\":0}}}\n\n" +
 		"event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"thinking\",\"thinking\":\"\"}}\n\n" +

@@ -152,6 +152,12 @@ func (s *Service) NormalizeAnthropicMessages(req apiopenapi.AnthropicMessagesReq
 	canonical.Tools = anthropicToolsToOpenAITools(req.Tools)
 	canonical.ToolChoice = anthropicToolChoice(req.ToolChoice)
 	canonical.Reasoning = cloneJSONMap(req.Thinking)
+	switch contextManagement := req.AdditionalProperties["context_management"].(type) {
+	case map[string]any:
+		canonical.ContextManagement = cloneMap(contextManagement)
+	case apiopenapi.JsonObject:
+		canonical.ContextManagement = cloneMap(contextManagement)
+	}
 	canonical.CompatibilityWarnings = uniqueStrings(warnings)
 	refreshRequestCapabilities(&canonical)
 	return canonical

@@ -11,17 +11,18 @@ import (
 )
 
 type anthropicMessagesRequest struct {
-	Model         string             `json:"model"`
-	Messages      []anthropicMessage `json:"messages"`
-	System        string             `json:"system,omitempty"`
-	Stream        bool               `json:"stream"`
-	MaxTokens     int                `json:"max_tokens"`
-	Thinking      map[string]any     `json:"thinking,omitempty"`
-	Temperature   *float32           `json:"temperature,omitempty"`
-	TopP          *float32           `json:"top_p,omitempty"`
-	StopSequences []string           `json:"stop_sequences,omitempty"`
-	Tools         []map[string]any   `json:"tools,omitempty"`
-	ToolChoice    any                `json:"tool_choice,omitempty"`
+	Model             string             `json:"model"`
+	Messages          []anthropicMessage `json:"messages"`
+	System            string             `json:"system,omitempty"`
+	Stream            bool               `json:"stream"`
+	MaxTokens         int                `json:"max_tokens"`
+	Thinking          map[string]any     `json:"thinking,omitempty"`
+	ContextManagement map[string]any     `json:"context_management,omitempty"`
+	Temperature       *float32           `json:"temperature,omitempty"`
+	TopP              *float32           `json:"top_p,omitempty"`
+	StopSequences     []string           `json:"stop_sequences,omitempty"`
+	Tools             []map[string]any   `json:"tools,omitempty"`
+	ToolChoice        any                `json:"tool_choice,omitempty"`
 }
 
 type anthropicMessage struct {
@@ -35,17 +36,18 @@ func anthropicCompatiblePayload(req contract.ConversationRequest) anthropicMessa
 		maxTokens = *req.MaxOutputTokens
 	}
 	return anthropicMessagesRequest{
-		Model:         req.Mapping.UpstreamModelName,
-		Messages:      anthropicCompatibleMessages(req),
-		System:        anthropicCompatibleSystem(req),
-		Stream:        req.Stream,
-		MaxTokens:     maxTokens,
-		Thinking:      anthropicCompatibleThinking(req.Reasoning, maxTokens),
-		Temperature:   req.Temperature,
-		TopP:          req.TopP,
-		StopSequences: cloneStrings(req.Stop),
-		Tools:         anthropicCompatibleTools(req.Tools),
-		ToolChoice:    anthropicCompatibleToolChoice(req.ToolChoice),
+		Model:             req.Mapping.UpstreamModelName,
+		Messages:          anthropicCompatibleMessages(req),
+		System:            anthropicCompatibleSystem(req),
+		Stream:            req.Stream,
+		MaxTokens:         maxTokens,
+		Thinking:          anthropicCompatibleThinking(req.Reasoning, maxTokens),
+		ContextManagement: cloneMap(req.ContextManagement),
+		Temperature:       req.Temperature,
+		TopP:              req.TopP,
+		StopSequences:     cloneStrings(req.Stop),
+		Tools:             anthropicCompatibleTools(req.Tools),
+		ToolChoice:        anthropicCompatibleToolChoice(req.ToolChoice),
 	}
 }
 

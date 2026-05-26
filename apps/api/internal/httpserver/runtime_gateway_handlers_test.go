@@ -302,3 +302,32 @@ func TestProviderConversationRequestGroupsInputItemsByRole(t *testing.T) {
 		t.Fatalf("expected flat input parts to remain available, got %+v", providerReq.InputParts)
 	}
 }
+
+func TestProviderConversationRequestPreservesContextManagement(t *testing.T) {
+	contextManagement := map[string]any{
+		"edits": []any{
+			map[string]any{"type": "clear_thinking_20251015"},
+		},
+	}
+	req := gatewaycontract.CanonicalRequest{
+		RequestID:         "req_context_management",
+		SourceProtocol:    gatewaycontract.ProtocolAnthropicCompatible,
+		SourceEndpoint:    "/v1/messages",
+		ContextManagement: contextManagement,
+	}
+
+	providerReq := providerConversationRequest(req, schedulercontract.Candidate{})
+
+	edits, ok := providerReq.ContextManagement["edits"].([]any)
+	if !ok || len(edits) != 1 {
+		t.Fatalf("expected context_management edits, got %+v", providerReq.ContextManagement)
+	}
+	edit, ok := edits[0].(map[string]any)
+	if !ok || edit["type"] != "clear_thinking_20251015" {
+		t.Fatalf("unexpected context_management edit: %+v", edits[0])
+	}
+	contextManagement["edits"] = []any{}
+	if len(providerReq.ContextManagement["edits"].([]any)) != 1 {
+		t.Fatalf("expected provider context_management to be cloned, got %+v", providerReq.ContextManagement)
+	}
+}

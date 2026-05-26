@@ -11,29 +11,30 @@ import (
 )
 
 type ConversationRequest struct {
-	RequestID       string
-	SourceProtocol  string
-	SourceEndpoint  string
-	TargetProtocol  string
-	Model           string
-	Messages        []ConversationMessage
-	InputParts      []ContentPart
-	System          []ContentPart
-	Instructions    string
-	Stream          bool
-	Temperature     *float32
-	TopP            *float32
-	MaxOutputTokens *int
-	Stop            []string
-	Tools           []map[string]any
-	ToolChoice      any
-	ResponseFormat  map[string]any
-	Reasoning       map[string]any
-	RawBody         []byte
-	Provider        providercontract.Provider
-	Account         accountcontract.ProviderAccount
-	Mapping         modelcontract.ModelProviderMapping
-	Credential      map[string]any
+	RequestID         string
+	SourceProtocol    string
+	SourceEndpoint    string
+	TargetProtocol    string
+	Model             string
+	Messages          []ConversationMessage
+	InputParts        []ContentPart
+	System            []ContentPart
+	Instructions      string
+	Stream            bool
+	Temperature       *float32
+	TopP              *float32
+	MaxOutputTokens   *int
+	Stop              []string
+	Tools             []map[string]any
+	ToolChoice        any
+	ResponseFormat    map[string]any
+	Reasoning         map[string]any
+	ContextManagement map[string]any
+	RawBody           []byte
+	Provider          providercontract.Provider
+	Account           accountcontract.ProviderAccount
+	Mapping           modelcontract.ModelProviderMapping
+	Credential        map[string]any
 }
 
 type TokenCountRequest struct {

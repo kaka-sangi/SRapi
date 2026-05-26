@@ -93,6 +93,7 @@ type CanonicalRequest struct {
 	ToolChoice            any
 	ResponseFormat        map[string]any
 	Reasoning             map[string]any
+	ContextManagement     map[string]any
 	RawBody               []byte
 	EmbeddingInput        []string
 	EmbeddingEncoding     string

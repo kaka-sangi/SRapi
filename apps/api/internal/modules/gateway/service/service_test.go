@@ -433,6 +433,56 @@ func TestNormalizeAnthropicMessagesPreservesToolResultImages(t *testing.T) {
 	}
 }
 
+func TestNormalizeAnthropicMessagesPreservesContextManagement(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	content := apiopenapi.AnthropicMessage_Content{}
+	if err := content.FromAnthropicMessageContent0("continue"); err != nil {
+		t.Fatalf("set message content: %v", err)
+	}
+	contextManagement := apiopenapi.JsonObject{
+		"edits": []any{
+			map[string]any{"type": "clear_thinking_20251015", "trigger": "input_tokens", "value": float64(20000)},
+		},
+	}
+	req := apiopenapi.AnthropicMessagesRequest{
+		Model:     "claude-sonnet",
+		MaxTokens: 4096,
+		Messages: []apiopenapi.AnthropicMessage{{
+			Role:    apiopenapi.AnthropicMessageRoleUser,
+			Content: content,
+		}},
+		Thinking: &apiopenapi.JsonObject{"type": "enabled", "budget_tokens": float64(2048)},
+		AdditionalProperties: map[string]any{
+			"context_management": contextManagement,
+			"experimental_extra": "ignored",
+		},
+	}
+
+	canonical := svc.NormalizeAnthropicMessages(req, RequestMeta{SourceEndpoint: "/v1/messages"})
+
+	if canonical.Reasoning["type"] != "enabled" {
+		t.Fatalf("expected thinking config to remain preserved, got %+v", canonical.Reasoning)
+	}
+	edits, ok := canonical.ContextManagement["edits"].([]any)
+	if !ok || len(edits) != 1 {
+		t.Fatalf("expected context_management edits, got %+v", canonical.ContextManagement)
+	}
+	edit, ok := edits[0].(map[string]any)
+	if !ok || edit["type"] != "clear_thinking_20251015" || edit["trigger"] != "input_tokens" || edit["value"] != float64(20000) {
+		t.Fatalf("unexpected context_management edit: %+v", edits[0])
+	}
+	contextManagement["edits"] = []any{}
+	if len(canonical.ContextManagement["edits"].([]any)) != 1 {
+		t.Fatalf("expected canonical context_management to be cloned, got %+v", canonical.ContextManagement)
+	}
+	if _, ok := canonical.ContextManagement["experimental_extra"]; ok {
+		t.Fatalf("did not expect unrelated additional property to be copied, got %+v", canonical.ContextManagement)
+	}
+}
+
 func TestRenderProtocolResponses(t *testing.T) {
 	svc, err := New()
 	if err != nil {
