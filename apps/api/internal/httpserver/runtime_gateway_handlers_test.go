@@ -36,6 +36,19 @@ func TestSameProtocolRawConversationStreamAllowsEndpointMatchedSSE(t *testing.T)
 	}
 }
 
+func TestSameProtocolRawConversationStreamAllowsCodexResponsesSSE(t *testing.T) {
+	raw := []byte("event: response.output_text.delta\ndata: {\"type\":\"response.output_text.delta\",\"delta\":\"raw\"}\n\n")
+	req := gatewaycontract.CanonicalRequest{
+		SourceProtocol: gatewaycontract.ProtocolOpenAICompatible,
+		SourceEndpoint: "/v1/responses",
+		Stream:         true,
+	}
+
+	if !sameProtocolRawConversationStream(req, "openai-compatible", "reverse-proxy-codex-cli", raw) {
+		t.Fatal("expected Codex Responses stream to be eligible for raw SSE replay")
+	}
+}
+
 func TestSameProtocolRawConversationResponseRejectsUnsafeCases(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -125,7 +138,7 @@ func TestSameProtocolRawConversationStreamRejectsUnsafeCases(t *testing.T) {
 			raw:            []byte("data: {}\n\n"),
 		},
 		{
-			name: "responses endpoint",
+			name: "responses endpoint generic openai adapter",
 			req: gatewaycontract.CanonicalRequest{
 				SourceProtocol: gatewaycontract.ProtocolOpenAICompatible,
 				SourceEndpoint: "/v1/responses",

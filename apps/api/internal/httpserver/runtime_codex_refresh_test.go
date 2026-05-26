@@ -101,6 +101,50 @@ func TestGatewayCodexRefreshTokenOnlyCreateCanRequestResponses(t *testing.T) {
 	}
 }
 
+func TestGatewayCodexResponsesStreamReplaysRawSSE(t *testing.T) {
+	rawSSE := "event: response.created\n" +
+		"data: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_raw\",\"raw_marker\":\"created\"}}\n\n" +
+		"event: response.output_text.delta\n" +
+		"data: {\"type\":\"response.output_text.delta\",\"delta\":\"raw codex\",\"raw_marker\":\"delta\"}\n\n" +
+		"event: response.completed\n" +
+		"data: {\"type\":\"response.completed\",\"response\":{\"output\":[{\"type\":\"message\",\"content\":[{\"type\":\"output_text\",\"text\":\"raw codex\"}]}],\"usage\":{\"input_tokens\":2,\"output_tokens\":3}},\"raw_marker\":\"completed\"}\n\n" +
+		"data: [DONE]\n\n"
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/backend-api/codex/responses" {
+			t.Fatalf("unexpected codex upstream path %s", r.URL.Path)
+		}
+		if r.Header.Get("Authorization") != "Bearer codex-stream-token" {
+			t.Fatalf("expected codex stream auth header, got %q", r.Header.Get("Authorization"))
+		}
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode codex stream payload: %v", err)
+		}
+		if payload["stream"] != true {
+			t.Fatalf("expected codex stream payload, got %+v", payload)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, rawSSE)
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"codex-raw-stream-provider","display_name":"Codex Raw Stream","adapter_type":"reverse-proxy-codex-cli","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"codex-raw-stream-model","display_name":"Codex Raw Stream Model","status":"active","capabilities":[{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"codex-upstream","status":"active","capability_override":[{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"codex-raw-stream-account","runtime_class":"cli_client_token","upstream_client":"codex_cli","credential":{"cli_client_token":"codex-stream-token"},"metadata":{"base_url":"`+upstream.URL+`/backend-api/codex"},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/responses", `{"model":"codex-raw-stream-model","input":"raw stream","stream":true}`)
+	if got := rec.Header().Get("Content-Type"); got != "text/event-stream" {
+		t.Fatalf("expected text/event-stream content type, got %q", got)
+	}
+	if got := rec.Body.String(); got != rawSSE {
+		t.Fatalf("expected raw Codex Responses SSE replay\nexpected:\n%s\nactual:\n%s", rawSSE, got)
+	}
+}
+
 func TestGatewayCodexConvertsTextEndpointsToResponsesUpstream(t *testing.T) {
 	var calls []codexUpstreamObservation
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -3128,7 +3128,7 @@ func TestReverseProxyCodexCLIAdapterUsesResponsesOfficialClientShape(t *testing.
 	if string(resp.Raw) != "data: {\"type\":\"response.output_text.delta\",\"delta\":\"ignored \"}\n\n"+
 		"data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"type\":\"message\",\"content\":[{\"type\":\"output_text\",\"text\":\"codex response\"}]}}\n\n"+
 		"data: {\"type\":\"response.completed\",\"response\":{\"output\":[],\"usage\":{\"input_tokens\":4,\"output_tokens\":5,\"cached_tokens\":1}}}\n\n"+
-		"data: [DONE]" {
+		"data: [DONE]\n\n" {
 		t.Fatalf("expected raw Codex stream to be preserved, got %q", string(resp.Raw))
 	}
 	if len(resp.StreamEvents) < 3 {

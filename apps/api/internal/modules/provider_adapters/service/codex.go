@@ -642,7 +642,7 @@ func parseCodexResponsesBody(body []byte, statusCode int) (contract.Conversation
 		return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response contained no text"}
 	}
 	if bytes.HasPrefix(trimmed, []byte("data:")) || bytes.Contains(trimmed, []byte("\ndata:")) {
-		return parseCodexResponsesStream(trimmed, statusCode)
+		return parseCodexResponsesStream(body, statusCode)
 	}
 	return parseCodexResponsesJSON(trimmed, statusCode)
 }

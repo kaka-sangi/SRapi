@@ -893,6 +893,9 @@ func sameProtocolRawConversationStream(req gatewaycontract.CanonicalRequest, tar
 	}
 	switch sourceProtocol {
 	case string(gatewaycontract.ProtocolOpenAICompatible):
+		if strings.HasSuffix(sourceEndpoint, "/responses") {
+			return adapterType == "reverse-proxy-codex-cli"
+		}
 		return strings.HasSuffix(sourceEndpoint, "/chat/completions") &&
 			(adapterType == "openai-compatible" || adapterType == "reverse-proxy-openai-compatible")
 	case string(gatewaycontract.ProtocolAnthropicCompatible):
