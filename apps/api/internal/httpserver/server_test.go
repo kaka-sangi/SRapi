@@ -6808,8 +6808,8 @@ func TestGatewayVisionRequestUsesCapabilityTaxonomy(t *testing.T) {
 	if !jsonObjectContainsString(decisionsResp.Data[0].RejectReasons, "capability_mismatch") {
 		t.Fatalf("expected capability_mismatch reject reason, got %+v", decisionsResp.Data[0].RejectReasons)
 	}
-	if !stringSliceContains(decisionsResp.Data[0].CompatibilityWarnings, "vision_ignored") {
-		t.Fatalf("expected vision compatibility warning, got %+v", decisionsResp.Data[0].CompatibilityWarnings)
+	if stringSliceContains(decisionsResp.Data[0].CompatibilityWarnings, "vision_ignored") {
+		t.Fatalf("did not expect preserved vision input to be marked ignored, got %+v", decisionsResp.Data[0].CompatibilityWarnings)
 	}
 
 	usageReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/usage-logs?model=text-only-model", nil)

@@ -43,8 +43,11 @@ func TestNormalizeChatCompletionsProducesCanonicalRequest(t *testing.T) {
 	if canonical.Prompt != "user: hello\n[image]" {
 		t.Fatalf("unexpected prompt: %q", canonical.Prompt)
 	}
-	if len(canonical.CompatibilityWarnings) != 1 || !stringSliceContains(canonical.CompatibilityWarnings, "vision_ignored") {
-		t.Fatalf("expected compatibility warnings, got %+v", canonical.CompatibilityWarnings)
+	if len(canonical.CompatibilityWarnings) != 0 {
+		t.Fatalf("did not expect compatibility warnings for preserved image input, got %+v", canonical.CompatibilityWarnings)
+	}
+	if len(canonical.Messages) != 1 || len(canonical.Messages[0].Content) != 2 || canonical.Messages[0].Content[1].MediaURL != "https://example.invalid/image.png" {
+		t.Fatalf("expected image media URL to be preserved, got %+v", canonical.Messages)
 	}
 	if canonical.ResponseFormat["type"] != "json_object" {
 		t.Fatalf("expected response format to be preserved, got %+v", canonical.ResponseFormat)
@@ -149,10 +152,13 @@ func TestNormalizeGeminiGenerateContentProducesCanonicalRequest(t *testing.T) {
 	if canonical.MaxOutputTokens == nil || *canonical.MaxOutputTokens != 32 || canonical.ResponseFormat["type"] != "application/json" {
 		t.Fatalf("expected generation config fields, got %+v", canonical)
 	}
-	for _, warning := range []string{"vision_ignored", "safety_settings_ignored", "top_k_ignored"} {
+	for _, warning := range []string{"safety_settings_ignored", "top_k_ignored"} {
 		if !stringSliceContains(canonical.CompatibilityWarnings, warning) {
 			t.Fatalf("expected warning %s, got %+v", warning, canonical.CompatibilityWarnings)
 		}
+	}
+	if len(canonical.Messages) != 3 || len(canonical.Messages[1].Content) != 2 || canonical.Messages[1].Content[1].MediaBase64 != "abc" || canonical.Messages[1].Content[1].MIMEType != "image/png" {
+		t.Fatalf("expected Gemini inline media to be preserved, got %+v", canonical.Messages)
 	}
 	if !requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyStreaming) || !requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyVisionInput) || !requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyStructuredOutput) {
 		t.Fatalf("expected request capabilities, got %+v", canonical.RequestCapabilities)

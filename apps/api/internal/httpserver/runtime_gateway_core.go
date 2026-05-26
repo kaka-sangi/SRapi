@@ -1660,18 +1660,8 @@ func gatewayContentBlocksFromProvider(parts []provideradaptercontract.ContentPar
 			ToolResultForID:   strings.TrimSpace(part.ToolResultForID),
 			ToolResultIsError: part.ToolResultIsError,
 			Metadata:          cloneAnyMap(part.Metadata),
-		}
-		if block.Metadata == nil {
-			block.Metadata = map[string]any{}
-		}
-		if origin := strings.TrimSpace(part.OriginProtocol); origin != "" {
-			block.Metadata["origin_protocol"] = origin
-		}
-		if len(part.Raw) > 0 {
-			block.Metadata["raw"] = append([]byte(nil), part.Raw...)
-		}
-		if len(block.Metadata) == 0 {
-			block.Metadata = nil
+			Raw:               append([]byte(nil), part.Raw...),
+			OriginProtocol:    strings.TrimSpace(part.OriginProtocol),
 		}
 		out = append(out, block)
 	}

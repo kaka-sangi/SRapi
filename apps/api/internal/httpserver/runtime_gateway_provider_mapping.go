@@ -17,7 +17,7 @@ func providerConversationRequest(req gatewaycontract.CanonicalRequest, candidate
 		Model:           req.CanonicalModel,
 		Messages:        providerConversationMessages(req),
 		InputParts:      providerContentParts(req.InputItems),
-		Instructions:    req.Instructions,
+		Instructions:    providerInstructions(req),
 		Stream:          req.Stream,
 		Temperature:     req.Temperature,
 		TopP:            req.TopP,
@@ -32,6 +32,22 @@ func providerConversationRequest(req gatewaycontract.CanonicalRequest, candidate
 		Account:         candidate.Account,
 		Mapping:         candidate.Mapping,
 	}
+}
+
+func providerInstructions(req gatewaycontract.CanonicalRequest) string {
+	instructions := strings.TrimSpace(req.Instructions)
+	if instructions == "" {
+		return ""
+	}
+	for _, message := range req.Messages {
+		if strings.TrimSpace(message.Role) != "system" {
+			continue
+		}
+		if canonicalContentText(message.Content) == instructions {
+			return ""
+		}
+	}
+	return instructions
 }
 
 func providerTokenCountRequest(req gatewaycontract.CanonicalRequest, rawBody []byte, candidate schedulercontract.Candidate) provideradaptercontract.TokenCountRequest {
@@ -249,7 +265,8 @@ func providerContentParts(blocks []gatewaycontract.ContentBlock) []provideradapt
 			ToolResultForID:   strings.TrimSpace(block.ToolResultForID),
 			ToolResultIsError: block.ToolResultIsError,
 			Metadata:          cloneAnyMap(block.Metadata),
-			OriginProtocol:    providerContentPartOrigin(block),
+			Raw:               append([]byte(nil), block.Raw...),
+			OriginProtocol:    strings.TrimSpace(block.OriginProtocol),
 		}
 		if part.Kind == provideradaptercontract.ContentPartMetadata && len(part.Metadata) == 0 && part.Text == "" {
 			continue
@@ -257,13 +274,6 @@ func providerContentParts(blocks []gatewaycontract.ContentBlock) []provideradapt
 		out = append(out, part)
 	}
 	return out
-}
-
-func providerContentPartOrigin(block gatewaycontract.ContentBlock) string {
-	if value, ok := block.Metadata["origin_protocol"].(string); ok {
-		return strings.TrimSpace(value)
-	}
-	return ""
 }
 
 func providerContentPartKind(value gatewaycontract.ContentBlockType) provideradaptercontract.ContentPartKind {

@@ -33,6 +33,8 @@ func normalizeOutputItems(blocks []gatewaycontract.ContentBlock) []gatewaycontra
 		}
 		block.Text = strings.TrimSpace(block.Text)
 		block.Metadata = cloneMap(block.Metadata)
+		block.Raw = append([]byte(nil), block.Raw...)
+		block.OriginProtocol = strings.TrimSpace(block.OriginProtocol)
 		out = append(out, block)
 	}
 	if len(out) == 0 {
@@ -541,7 +543,10 @@ func rawResponsesInputObject(value map[string]any, defaultRole string) ([]gatewa
 		role = defaultRole
 	}
 	if rawType := strings.TrimSpace(rawMapString(value, "type")); rawType == "input_image" || rawType == "image_url" {
-		return []gatewaycontract.ContentBlock{{Type: gatewaycontract.ContentBlockImage, Role: role, Text: "[image]"}}, nil, []string{"vision_ignored"}
+		if block, ok := rawResponsesImageBlock(value, role); ok {
+			return []gatewaycontract.ContentBlock{block}, nil, nil
+		}
+		return nil, nil, nil
 	}
 	if text := strings.TrimSpace(rawMapString(value, "text")); text != "" {
 		block := gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockText, Role: role, Text: text}
@@ -559,6 +564,41 @@ func rawResponsesInputObject(value map[string]any, defaultRole string) ([]gatewa
 		return nil, append(instructions, text), warnings
 	}
 	return blocks, instructions, warnings
+}
+
+func rawResponsesImageBlock(value map[string]any, role string) (gatewaycontract.ContentBlock, bool) {
+	props := cloneMap(value)
+	imageURL, _ := value["image_url"].(map[string]any)
+	if len(imageURL) > 0 {
+		for key, item := range imageURL {
+			props[key] = cloneAny(item)
+		}
+	}
+	url := firstNonEmpty(rawMapString(value, "image_url"), rawMapString(value, "url"), mapStringAny(imageURL, "url"))
+	base64Data, mimeType := splitDataURL(url)
+	if base64Data != "" {
+		url = ""
+	}
+	if base64Data == "" {
+		base64Data = firstNonEmpty(rawMapString(value, "data"), rawMapString(value, "media_base64"))
+	}
+	mimeType = firstNonEmpty(mimeType, rawMapString(value, "mime_type"), rawMapString(value, "media_type"))
+	fileID := firstNonEmpty(rawMapString(value, "file_id"), rawMapString(value, "fileId"))
+	if url == "" && base64Data == "" && fileID == "" {
+		return gatewaycontract.ContentBlock{}, false
+	}
+	return gatewaycontract.ContentBlock{
+		Type:           gatewaycontract.ContentBlockImage,
+		Role:           role,
+		Text:           "[image]",
+		MediaURL:       url,
+		MediaBase64:    base64Data,
+		MIMEType:       mimeType,
+		FileID:         fileID,
+		Metadata:       props,
+		OriginProtocol: string(gatewaycontract.ProtocolOpenAICompatible),
+		Raw:            marshalRawJSON(value),
+	}, true
 }
 
 func rawMapString(value map[string]any, key string) string {

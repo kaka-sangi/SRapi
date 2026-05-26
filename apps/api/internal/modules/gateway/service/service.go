@@ -26,14 +26,16 @@ type StreamEvent struct {
 
 func (s *Service) NormalizeChatCompletions(req apiopenapi.ChatCompletionRequest, meta RequestMeta) gatewaycontract.CanonicalRequest {
 	var parts []string
-	var warnings []string
 	var messages []gatewaycontract.Message
 	for _, msg := range req.Messages {
 		role := string(msg.Role)
-		if chatMessageHasImage(msg.Content) {
-			warnings = append(warnings, "vision_ignored")
-		}
 		blocks := chatContentBlocks(msg.Content)
+		if role == "tool" {
+			blocks = chatToolResultBlocks(blocks, msg.ToolCallId)
+		}
+		if msg.ToolCalls != nil {
+			blocks = append(blocks, chatToolCallBlocks(*msg.ToolCalls)...)
+		}
 		if len(blocks) > 0 {
 			messages = append(messages, gatewaycontract.Message{Role: role, Content: blocks})
 		}
@@ -42,7 +44,7 @@ func (s *Service) NormalizeChatCompletions(req apiopenapi.ChatCompletionRequest,
 			parts = append(parts, role+": "+text)
 		}
 	}
-	canonical := canonical(meta, gatewaycontract.ProtocolOpenAICompatible, gatewaycontract.ProtocolOpenAICompatible, req.Model, "", req.Stream != nil && *req.Stream, strings.Join(parts, "\n"), messages, nil, "", uniqueStrings(warnings))
+	canonical := canonical(meta, gatewaycontract.ProtocolOpenAICompatible, gatewaycontract.ProtocolOpenAICompatible, req.Model, "", req.Stream != nil && *req.Stream, strings.Join(parts, "\n"), messages, nil, "", nil)
 	canonical.Temperature = req.Temperature
 	canonical.TopP = req.TopP
 	canonical.MaxOutputTokens = cloneInt(req.MaxTokens)
@@ -50,7 +52,6 @@ func (s *Service) NormalizeChatCompletions(req apiopenapi.ChatCompletionRequest,
 	canonical.Tools = toolDefinitionsToMaps(req.Tools)
 	canonical.ToolChoice = chatToolChoice(req.ToolChoice)
 	canonical.ResponseFormat = cloneJSONMap(req.ResponseFormat)
-	canonical.CompatibilityWarnings = uniqueStrings(warnings)
 	refreshRequestCapabilities(&canonical)
 	return canonical
 }
@@ -67,9 +68,6 @@ func (s *Service) NormalizeResponses(req apiopenapi.ResponsesRequest, meta Reque
 			parts = append(parts, text)
 		}
 	} else if blocks, err := req.Input.AsResponsesRequestInput1(); err == nil {
-		if contentBlocksHaveImage(blocks) {
-			warnings = append(warnings, "vision_ignored")
-		}
 		inputItems = append(inputItems, openAIContentBlocks(blocks, "user")...)
 		parts = append(parts, extractContentBlocksText(blocks))
 	}
@@ -129,10 +127,11 @@ func (s *Service) NormalizeAnthropicMessages(req apiopenapi.AnthropicMessagesReq
 				parts = append(parts, "system: "+instructions)
 			}
 		} else if blocks, err := req.System.AsAnthropicMessagesRequestSystem1(); err == nil {
-			if anthropicContentBlocksHaveImage(blocks) {
-				warnings = append(warnings, "vision_ignored")
+			systemBlocks := anthropicContentBlocks(blocks, "system")
+			instructions = textFromBlocks(systemBlocks)
+			if len(systemBlocks) > 0 {
+				messages = append(messages, gatewaycontract.Message{Role: "system", Content: systemBlocks})
 			}
-			instructions = extractAnthropicContentBlocksText(blocks)
 			if instructions != "" {
 				parts = append(parts, "system: "+instructions)
 			}
@@ -140,9 +139,6 @@ func (s *Service) NormalizeAnthropicMessages(req apiopenapi.AnthropicMessagesReq
 	}
 	for _, msg := range req.Messages {
 		role := string(msg.Role)
-		if anthropicMessageHasImage(msg.Content) {
-			warnings = append(warnings, "vision_ignored")
-		}
 		blocks := anthropicMessageBlocks(msg.Content, role)
 		if len(blocks) > 0 {
 			messages = append(messages, gatewaycontract.Message{Role: role, Content: blocks})
@@ -171,7 +167,15 @@ func (s *Service) NormalizeGeminiGenerateContent(req apiopenapi.GeminiGenerateCo
 	var warnings []string
 	var parts []string
 	var messages []gatewaycontract.Message
-	instructions := geminiContentText(req.SystemInstruction)
+	instructions := ""
+	var systemBlocks []gatewaycontract.ContentBlock
+	if req.SystemInstruction != nil {
+		systemBlocks = geminiContentBlocks(*req.SystemInstruction, "system")
+		instructions = textFromBlocks(systemBlocks)
+		if len(systemBlocks) > 0 {
+			messages = append(messages, gatewaycontract.Message{Role: "system", Content: systemBlocks})
+		}
+	}
 	if instructions != "" {
 		parts = append(parts, "system: "+instructions)
 	}
@@ -185,12 +189,6 @@ func (s *Service) NormalizeGeminiGenerateContent(req apiopenapi.GeminiGenerateCo
 		if text != "" {
 			parts = append(parts, role+": "+text)
 		}
-		if geminiContentHasMedia(content) {
-			warnings = append(warnings, "vision_ignored")
-		}
-	}
-	if req.SystemInstruction != nil && geminiContentHasMedia(*req.SystemInstruction) {
-		warnings = append(warnings, "vision_ignored")
 	}
 	if req.SafetySettings != nil && len(*req.SafetySettings) > 0 {
 		warnings = append(warnings, "safety_settings_ignored")
@@ -1088,14 +1086,8 @@ func chatContentBlocks(content apiopenapi.ChatMessage_Content) []gatewaycontract
 func openAIContentBlocks(blocks []apiopenapi.ContentBlock, role string) []gatewaycontract.ContentBlock {
 	out := make([]gatewaycontract.ContentBlock, 0, len(blocks))
 	for _, block := range blocks {
-		if block.Text != nil {
-			text := strings.TrimSpace(*block.Text)
-			if text != "" {
-				out = append(out, gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockText, Role: role, Text: text})
-			}
-		}
-		if block.ImageUrl != nil || block.Type == apiopenapi.ContentBlockTypeImageUrl || block.Type == apiopenapi.ContentBlockTypeInputImage {
-			out = append(out, gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockImage, Role: role, Text: "[image]", Metadata: jsonObjectToMap(block.ImageUrl)})
+		if item, ok := openAIContentBlock(block, role); ok {
+			out = append(out, item)
 		}
 	}
 	return out
@@ -1118,15 +1110,8 @@ func anthropicMessageBlocks(content apiopenapi.AnthropicMessage_Content, role st
 func anthropicContentBlocks(blocks []apiopenapi.AnthropicContentBlock, role string) []gatewaycontract.ContentBlock {
 	out := make([]gatewaycontract.ContentBlock, 0, len(blocks))
 	for _, block := range blocks {
-		if block.Text != nil {
-			text := strings.TrimSpace(*block.Text)
-			if text != "" {
-				out = append(out, gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockText, Role: role, Text: text})
-			}
-			continue
-		}
-		if block.Type == apiopenapi.AnthropicContentBlockTypeImage {
-			out = append(out, gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockImage, Role: role, Text: "[image]"})
+		if item, ok := anthropicContentBlock(block, role); ok {
+			out = append(out, item)
 		}
 	}
 	return out
@@ -1143,75 +1128,14 @@ func textFromBlocks(blocks []gatewaycontract.ContentBlock) string {
 	return strings.Join(parts, "\n")
 }
 
-func chatMessageHasImage(content apiopenapi.ChatMessage_Content) bool {
-	blocks, err := content.AsChatMessageContent1()
-	return err == nil && contentBlocksHaveImage(blocks)
-}
-
-func contentBlocksHaveImage(blocks []apiopenapi.ContentBlock) bool {
-	for _, block := range blocks {
-		if block.ImageUrl != nil || block.Type == apiopenapi.ContentBlockTypeImageUrl || block.Type == apiopenapi.ContentBlockTypeInputImage {
-			return true
-		}
-	}
-	return false
-}
-
-func anthropicMessageHasImage(content apiopenapi.AnthropicMessage_Content) bool {
-	blocks, err := content.AsAnthropicMessageContent1()
-	return err == nil && anthropicContentBlocksHaveImage(blocks)
-}
-
-func anthropicContentBlocksHaveImage(blocks []apiopenapi.AnthropicContentBlock) bool {
-	for _, block := range blocks {
-		if block.Type == apiopenapi.AnthropicContentBlockTypeImage {
-			return true
-		}
-	}
-	return false
-}
-
 func geminiContentBlocks(content apiopenapi.GeminiContent, role string) []gatewaycontract.ContentBlock {
 	out := make([]gatewaycontract.ContentBlock, 0, len(content.Parts))
 	for _, part := range content.Parts {
-		if part.Text != nil {
-			text := strings.TrimSpace(*part.Text)
-			if text != "" {
-				out = append(out, gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockText, Role: role, Text: text})
-			}
-		}
-		if part.InlineData != nil || part.FileData != nil {
-			out = append(out, gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockImage, Role: role, Text: "[image]", Metadata: geminiPartMediaMetadata(part)})
-		}
-		if part.FunctionCall != nil {
-			out = append(out, gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockToolCall, Role: role, Text: "[function_call]", Metadata: cloneMap(*part.FunctionCall)})
-		}
-		if part.FunctionResponse != nil {
-			out = append(out, gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockToolCall, Role: role, Text: "[function_response]", Metadata: cloneMap(*part.FunctionResponse)})
+		if item, ok := geminiContentBlock(part, role); ok {
+			out = append(out, item)
 		}
 	}
 	return out
-}
-
-func geminiPartMediaMetadata(part apiopenapi.GeminiPart) map[string]any {
-	out := map[string]any{}
-	if part.InlineData != nil {
-		out["inline_data"] = cloneMap(*part.InlineData)
-	}
-	if part.FileData != nil {
-		out["file_data"] = cloneMap(*part.FileData)
-	}
-	if len(out) == 0 {
-		return nil
-	}
-	return out
-}
-
-func geminiContentText(content *apiopenapi.GeminiContent) string {
-	if content == nil {
-		return ""
-	}
-	return textFromBlocks(geminiContentBlocks(*content, "system"))
 }
 
 func geminiRole(role *apiopenapi.GeminiContentRole) string {
@@ -1230,15 +1154,6 @@ func geminiRole(role *apiopenapi.GeminiContentRole) string {
 		}
 		return value
 	}
-}
-
-func geminiContentHasMedia(content apiopenapi.GeminiContent) bool {
-	for _, part := range content.Parts {
-		if part.InlineData != nil || part.FileData != nil {
-			return true
-		}
-	}
-	return false
 }
 
 func extractContentBlocksText(blocks []apiopenapi.ContentBlock) string {
@@ -1769,6 +1684,9 @@ func requestCapabilities(req gatewaycontract.CanonicalRequest) []gatewaycontract
 	if len(req.Reasoning) > 0 {
 		out = append(out, gatewaycontract.RequestCapability{Key: capabilitiescontract.KeyReasoningControl, Version: "v1"})
 	}
+	if conversationEndpointHasContentBlockType(req, gatewaycontract.ContentBlockImage) {
+		out = append(out, gatewaycontract.RequestCapability{Key: capabilitiescontract.KeyVisionInput, Version: "v1"})
+	}
 	for _, warning := range req.CompatibilityWarnings {
 		switch warning {
 		case "tools_ignored", "tool_choice_ignored":
@@ -1782,6 +1700,34 @@ func requestCapabilities(req gatewaycontract.CanonicalRequest) []gatewaycontract
 		}
 	}
 	return dedupeRequestCapabilities(out)
+}
+
+func conversationEndpointHasContentBlockType(req gatewaycontract.CanonicalRequest, blockType gatewaycontract.ContentBlockType) bool {
+	if !isConversationEndpoint(req.SourceEndpoint) {
+		return false
+	}
+	for _, block := range req.InputItems {
+		if block.Type == blockType {
+			return true
+		}
+	}
+	for _, message := range req.Messages {
+		for _, block := range message.Content {
+			if block.Type == blockType {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func isConversationEndpoint(endpoint string) bool {
+	endpoint = strings.ToLower(strings.TrimSpace(endpoint))
+	return strings.HasSuffix(endpoint, "/chat/completions") ||
+		strings.HasSuffix(endpoint, "/responses") ||
+		strings.HasSuffix(endpoint, "/messages") ||
+		strings.Contains(endpoint, ":generatecontent") ||
+		strings.Contains(endpoint, ":streamgeneratecontent")
 }
 
 func chatStopStrings(value *apiopenapi.ChatCompletionRequest_Stop) []string {

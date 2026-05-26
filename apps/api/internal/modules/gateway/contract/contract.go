@@ -1,5 +1,7 @@
 package contract
 
+import "encoding/json"
+
 type Protocol string
 
 const (
@@ -56,6 +58,8 @@ type ContentBlock struct {
 	ToolResultForID   string
 	ToolResultIsError bool
 	Metadata          map[string]any
+	Raw               json.RawMessage
+	OriginProtocol    string
 }
 
 type Message struct {

@@ -9,6 +9,28 @@
   "canonical_model": "canonical-text-model",
   "messages": [
     {
+      "role": "system",
+      "content": [
+        {
+          "type": "text",
+          "role": "system",
+          "text": "You are careful."
+        },
+        {
+          "type": "image",
+          "role": "system",
+          "text": "[image]",
+          "media_url": "https://example.invalid/system.png",
+          "metadata": {
+            "source": {
+              "type": "url",
+              "url": "https://example.invalid/system.png"
+            }
+          }
+        }
+      ]
+    },
+    {
       "role": "user",
       "content": [
         {
@@ -19,7 +41,14 @@
         {
           "type": "image",
           "role": "user",
-          "text": "[image]"
+          "text": "[image]",
+          "media_url": "https://example.invalid/prompt.png",
+          "metadata": {
+            "source": {
+              "type": "url",
+              "url": "https://example.invalid/prompt.png"
+            }
+          }
         }
       ]
     },
@@ -55,7 +84,6 @@
   },
   "prompt": "system: You are careful.\n[image]\nuser: Draft a response.\n[image]\nassistant: Existing context.",
   "compatibility_warnings": [
-    "vision_ignored",
     "thinking_ignored"
   ],
   "request_capabilities": [

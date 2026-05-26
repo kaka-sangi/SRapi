@@ -27,6 +27,7 @@
         {
           "type": "image",
           "text": "[image]",
+          "media_url": "https://example.invalid/image.png",
           "metadata": {
             "url": "https://example.invalid/image.png"
           }
@@ -51,9 +52,6 @@
     "type": "json_object"
   },
   "prompt": "system: You are terse.\nuser: Describe this\n[image]",
-  "compatibility_warnings": [
-    "vision_ignored"
-  ],
   "request_capabilities": [
     {
       "key": "streaming",

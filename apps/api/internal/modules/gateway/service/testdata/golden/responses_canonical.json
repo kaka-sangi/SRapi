@@ -17,6 +17,7 @@
       "type": "image",
       "role": "user",
       "text": "[image]",
+      "media_url": "https://example.invalid/diagram.png",
       "metadata": {
         "url": "https://example.invalid/diagram.png"
       }
@@ -41,7 +42,6 @@
   },
   "prompt": "instructions: Be concise.\nSummarize the attached image.\n[image]",
   "compatibility_warnings": [
-    "vision_ignored",
     "reasoning_ignored"
   ],
   "request_capabilities": [
