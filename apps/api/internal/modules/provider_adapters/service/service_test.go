@@ -3115,6 +3115,24 @@ func TestReverseProxyCodexCLIAdapterUsesResponsesOfficialClientShape(t *testing.
 	if conversationResponseText(resp) != "codex response" || resp.Usage.Estimated || resp.Usage.InputTokens != 4 || resp.Usage.OutputTokens != 5 || resp.Usage.CachedTokens != 1 {
 		t.Fatalf("unexpected codex response: %+v", resp)
 	}
+	if string(resp.Raw) != "data: {\"type\":\"response.output_text.delta\",\"delta\":\"ignored \"}\n\n"+
+		"data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"type\":\"message\",\"content\":[{\"type\":\"output_text\",\"text\":\"codex response\"}]}}\n\n"+
+		"data: {\"type\":\"response.completed\",\"response\":{\"output\":[],\"usage\":{\"input_tokens\":4,\"output_tokens\":5,\"cached_tokens\":1}}}\n\n"+
+		"data: [DONE]" {
+		t.Fatalf("expected raw Codex stream to be preserved, got %q", string(resp.Raw))
+	}
+	if len(resp.StreamEvents) < 3 {
+		t.Fatalf("expected Codex stream events, got %+v", resp.StreamEvents)
+	}
+	if resp.StreamEvents[0].Type != contract.ConversationStreamEventContentDelta || resp.StreamEvents[0].Delta.Text != "ignored " {
+		t.Fatalf("expected Codex text delta event, got %+v", resp.StreamEvents[0])
+	}
+	if resp.StreamEvents[1].Type != contract.ConversationStreamEventUsage || resp.StreamEvents[1].Usage.InputTokens != 4 || resp.StreamEvents[1].Usage.OutputTokens != 5 {
+		t.Fatalf("expected Codex usage event, got %+v", resp.StreamEvents[1])
+	}
+	if resp.StreamEvents[len(resp.StreamEvents)-1].Type != contract.ConversationStreamEventStop {
+		t.Fatalf("expected Codex terminal stop event, got %+v", resp.StreamEvents)
+	}
 	if upstreamHeaders.Get("Authorization") != "Bearer codex-token" {
 		t.Fatalf("expected runtime to inject codex auth, got %+v", upstreamHeaders)
 	}
@@ -3163,6 +3181,22 @@ func TestReverseProxyCodexCLIAdapterPreservesFunctionCallResponse(t *testing.T) 
 		t.Fatalf("unexpected codex function call response: %+v", resp)
 	}
 	assertToolUsePart(t, resp.Parts[0], "call_1", "lookup", `{"query":"weather"}`)
+	if len(resp.StreamEvents) < 3 {
+		t.Fatalf("expected Codex function call stream events, got %+v", resp.StreamEvents)
+	}
+	if resp.StreamEvents[0].Type != contract.ConversationStreamEventToolCallDelta ||
+		resp.StreamEvents[0].ContentIndex != 0 ||
+		resp.StreamEvents[0].Delta.ToolCallID != "call_1" ||
+		resp.StreamEvents[0].Delta.ToolName != "lookup" ||
+		resp.StreamEvents[0].Delta.ToolArgumentsJSON != `{"query":"weather"}` {
+		t.Fatalf("expected Codex function call stream event, got %+v", resp.StreamEvents[0])
+	}
+	if resp.StreamEvents[1].Type != contract.ConversationStreamEventUsage || resp.StreamEvents[1].Usage.OutputTokens != 2 {
+		t.Fatalf("expected Codex function call usage event, got %+v", resp.StreamEvents[1])
+	}
+	if resp.StreamEvents[len(resp.StreamEvents)-1].Type != contract.ConversationStreamEventStop {
+		t.Fatalf("expected Codex function call terminal stop event, got %+v", resp.StreamEvents)
+	}
 }
 
 func TestReverseProxyCodexCLIAdapterPassesCliRuntimeContext(t *testing.T) {

@@ -533,6 +533,62 @@ func TestRenderCanonicalStreamEventsPreservesToolCallDeltas(t *testing.T) {
 	}
 }
 
+func TestRenderCanonicalStreamEventsPreservesResponsesStyleToolCalls(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	resp := gatewaycontract.CanonicalResponse{
+		ID:         "resp_responses_tool_stream",
+		Model:      "gpt-4o-mini",
+		StopReason: "tool_use",
+		OutputItems: []gatewaycontract.ContentBlock{{
+			Type:              gatewaycontract.ContentBlockToolCall,
+			Role:              "assistant",
+			ToolCallID:        "call_1",
+			ToolName:          "lookup",
+			ToolArgumentsJSON: `{"query":"weather"}`,
+		}},
+		StreamEvents: []gatewaycontract.StreamEvent{
+			{
+				Index:        0,
+				Type:         gatewaycontract.StreamEventToolCallDelta,
+				ContentIndex: 0,
+				Delta: gatewaycontract.ContentBlock{
+					Type:              gatewaycontract.ContentBlockToolCall,
+					Role:              "assistant",
+					ToolCallID:        "call_1",
+					ToolName:          "lookup",
+					ToolArgumentsJSON: `{"query":"weather"}`,
+				},
+				OriginProtocol: "openai-compatible",
+				RawEventType:   "response.output_item.done",
+			},
+			{
+				Index:      1,
+				Type:       gatewaycontract.StreamEventStop,
+				StopReason: "tool_use",
+			},
+		},
+		Usage: gatewaycontract.Usage{InputTokens: 4, OutputTokens: 2},
+	}
+
+	responsesEvents := svc.RenderResponsesStreamEvents(resp)
+	added := streamEventByName(responsesEvents, "response.output_item.added")
+	argsDelta := streamEventByName(responsesEvents, "response.function_call_arguments.delta")
+	argsDone := streamEventByName(responsesEvents, "response.function_call_arguments.done")
+	if added == nil || argsDelta == nil || argsDone == nil {
+		t.Fatalf("expected responses function call stream events, got %+v", responsesEvents)
+	}
+	item, _ := added.Data["item"].(map[string]any)
+	if item["type"] != "function_call" || item["call_id"] != "call_1" || item["name"] != "lookup" {
+		t.Fatalf("expected responses function call identity, got %+v", item)
+	}
+	if argsDelta.Data["delta"] != `{"query":"weather"}` || argsDone.Data["arguments"] != `{"query":"weather"}` {
+		t.Fatalf("expected responses function call arguments, got delta=%+v done=%+v", argsDelta, argsDone)
+	}
+}
+
 func streamEventByName(events []StreamEvent, name string) *StreamEvent {
 	for idx := range events {
 		if events[idx].Event == name {

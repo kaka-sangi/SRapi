@@ -655,6 +655,8 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 	indexedItems := map[int]codexResponsesOutputItem{}
 	fallbackItems := []codexResponsesOutputItem{}
 	var finalResponse *codexResponsesResponse
+	streamEvents := make([]contract.ConversationStreamEvent, 0)
+	eventIndex := 0
 	seenEvent := false
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
@@ -682,12 +684,20 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 		if event.Usage != nil && event.Usage.HasTokenUsage() {
 			copied := *event.Usage
 			usage = &copied
+			streamEvents = append(streamEvents, codexStreamUsageEvent(eventIndex, copied, data, deltaBuilder.String()))
+			eventIndex++
 		}
 		if event.Type == "response.output_item.done" && event.Item != nil {
 			if event.OutputIndex != nil {
 				indexedItems[*event.OutputIndex] = *event.Item
 			} else {
 				fallbackItems = append(fallbackItems, *event.Item)
+			}
+			if codexOutputItemIsFunctionCall(*event.Item) {
+				if streamEvent, ok := codexFunctionCallStreamEvent(*event.Item, eventIndex, codexOutputIndex(event), data); ok {
+					streamEvents = append(streamEvents, streamEvent)
+					eventIndex++
+				}
 			}
 		}
 		if event.Response != nil {
@@ -699,11 +709,24 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 			if copiedResponse.Usage.HasTokenUsage() {
 				copiedUsage := copiedResponse.Usage
 				usage = &copiedUsage
+				streamEvents = append(streamEvents, codexStreamUsageEvent(eventIndex, copiedUsage, data, deltaBuilder.String()))
+				eventIndex++
 			}
 		}
 		switch event.Type {
 		case "response.output_text.delta":
 			deltaBuilder.WriteString(event.Delta)
+			if event.Delta != "" {
+				streamEvents = append(streamEvents, contract.ConversationStreamEvent{
+					Index:          eventIndex,
+					Type:           contract.ConversationStreamEventContentDelta,
+					Delta:          textContentDelta(event.Delta),
+					RawEventType:   strings.TrimSpace(event.Type),
+					Raw:            append(json.RawMessage(nil), data...),
+					OriginProtocol: "openai-compatible",
+				})
+				eventIndex++
+			}
 		case "response.output_text.done":
 			if strings.TrimSpace(event.Text) != "" {
 				completedText = event.Text
@@ -712,6 +735,15 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 			if text := codexEventText(event); strings.TrimSpace(text) != "" {
 				completedText = text
 			}
+			streamEvents = append(streamEvents, contract.ConversationStreamEvent{
+				Index:          eventIndex,
+				Type:           contract.ConversationStreamEventStop,
+				StopReason:     codexEventStopReason(event),
+				RawEventType:   strings.TrimSpace(event.Type),
+				Raw:            append(json.RawMessage(nil), data...),
+				OriginProtocol: "openai-compatible",
+			})
+			eventIndex++
 		default:
 			if text := codexEventText(event); strings.TrimSpace(text) != "" && strings.TrimSpace(completedText) == "" {
 				completedText = text
@@ -753,12 +785,57 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 	if usage != nil {
 		parsedUsage = usage.ToUsage(text)
 	}
+	if len(streamEvents) > 0 && streamEvents[len(streamEvents)-1].Type != contract.ConversationStreamEventStop {
+		streamEvents = append(streamEvents, contract.ConversationStreamEvent{
+			Index:          eventIndex,
+			Type:           contract.ConversationStreamEventStop,
+			StopReason:     stopReason,
+			RawEventType:   "done",
+			OriginProtocol: "openai-compatible",
+		})
+	}
 	return contract.ConversationResponse{
-		Parts:      parts,
-		StopReason: stopReason,
-		StatusCode: statusCode,
-		Usage:      parsedUsage,
+		Parts:        parts,
+		StopReason:   stopReason,
+		StatusCode:   statusCode,
+		Usage:        parsedUsage,
+		Raw:          append(json.RawMessage(nil), body...),
+		StreamEvents: streamEvents,
 	}, nil
+}
+
+func codexStreamUsageEvent(index int, usage openAIUsage, raw string, text string) contract.ConversationStreamEvent {
+	return contract.ConversationStreamEvent{
+		Index:          index,
+		Type:           contract.ConversationStreamEventUsage,
+		Usage:          usage.ToUsage(text),
+		RawEventType:   "usage",
+		Raw:            append(json.RawMessage(nil), raw...),
+		OriginProtocol: "openai-compatible",
+	}
+}
+
+func codexOutputIndex(event codexResponsesEvent) int {
+	if event.OutputIndex != nil {
+		return *event.OutputIndex
+	}
+	return 0
+}
+
+func codexFunctionCallStreamEvent(item codexResponsesOutputItem, eventIndex int, contentIndex int, raw string) (contract.ConversationStreamEvent, bool) {
+	part, ok := codexFunctionCallPart(item)
+	if !ok {
+		return contract.ConversationStreamEvent{}, false
+	}
+	return contract.ConversationStreamEvent{
+		Index:          eventIndex,
+		Type:           contract.ConversationStreamEventToolCallDelta,
+		ContentIndex:   contentIndex,
+		Delta:          part,
+		RawEventType:   "response.output_item.done",
+		Raw:            append(json.RawMessage(nil), raw...),
+		OriginProtocol: "openai-compatible",
+	}, true
 }
 
 func parseCodexResponsesJSON(body []byte, statusCode int) (contract.ConversationResponse, error) {
