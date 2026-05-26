@@ -97,9 +97,6 @@ func (s *Service) NormalizeResponses(req apiopenapi.ResponsesRequest, meta Reque
 	canonical.Tools = toolDefinitionsToMaps(req.Tools)
 	canonical.ResponseFormat = responseFormatFromResponsesText(req.Text)
 	canonical.Reasoning = cloneJSONMap(req.Reasoning)
-	if len(canonical.Reasoning) > 0 {
-		warnings = append(warnings, "reasoning_ignored")
-	}
 	canonical.CompatibilityWarnings = uniqueStrings(warnings)
 	refreshRequestCapabilities(&canonical)
 	return canonical
@@ -155,9 +152,6 @@ func (s *Service) NormalizeAnthropicMessages(req apiopenapi.AnthropicMessagesReq
 	canonical.Tools = anthropicToolsToOpenAITools(req.Tools)
 	canonical.ToolChoice = anthropicToolChoice(req.ToolChoice)
 	canonical.Reasoning = cloneJSONMap(req.Thinking)
-	if len(canonical.Reasoning) > 0 {
-		warnings = append(warnings, "thinking_ignored")
-	}
 	canonical.CompatibilityWarnings = uniqueStrings(warnings)
 	refreshRequestCapabilities(&canonical)
 	return canonical

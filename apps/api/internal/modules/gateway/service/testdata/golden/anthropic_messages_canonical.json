@@ -83,9 +83,6 @@
     "type": "enabled"
   },
   "prompt": "system: You are careful.\n[image]\nuser: Draft a response.\n[image]\nassistant: Existing context.",
-  "compatibility_warnings": [
-    "thinking_ignored"
-  ],
   "request_capabilities": [
     {
       "key": "reasoning_control",

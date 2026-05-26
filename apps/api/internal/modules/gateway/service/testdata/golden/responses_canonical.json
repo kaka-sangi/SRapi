@@ -41,9 +41,6 @@
     "effort": "low"
   },
   "prompt": "instructions: Be concise.\nSummarize the attached image.\n[image]",
-  "compatibility_warnings": [
-    "reasoning_ignored"
-  ],
   "request_capabilities": [
     {
       "key": "reasoning_control",

@@ -57,7 +57,7 @@ func TestNormalizeChatCompletionsProducesCanonicalRequest(t *testing.T) {
 	}
 }
 
-func TestNormalizeResponsesPreservesInstructionsAndWarnings(t *testing.T) {
+func TestNormalizeResponsesPreservesInstructionsAndReasoning(t *testing.T) {
 	svc, err := New()
 	if err != nil {
 		t.Fatalf("new service: %v", err)
@@ -82,8 +82,11 @@ func TestNormalizeResponsesPreservesInstructionsAndWarnings(t *testing.T) {
 	if canonical.Prompt != "instructions: be concise\nsummarize this" {
 		t.Fatalf("unexpected prompt: %q", canonical.Prompt)
 	}
-	if !stringSliceContains(canonical.CompatibilityWarnings, "reasoning_ignored") {
-		t.Fatalf("expected reasoning warning, got %+v", canonical.CompatibilityWarnings)
+	if len(canonical.CompatibilityWarnings) != 0 {
+		t.Fatalf("did not expect reasoning to be marked ignored, got %+v", canonical.CompatibilityWarnings)
+	}
+	if canonical.Reasoning["effort"] != "low" {
+		t.Fatalf("expected reasoning control to be preserved, got %+v", canonical.Reasoning)
 	}
 }
 
