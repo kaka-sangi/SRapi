@@ -471,6 +471,16 @@ func writeSSEEvents(w http.ResponseWriter, events []gatewayservice.StreamEvent) 
 	writeSSEDone(w)
 }
 
+func writeRawSSEResponse(w http.ResponseWriter, raw []byte) {
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	_, _ = w.Write(raw)
+	if flusher, ok := w.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
 func writeSSEJSONAny(w http.ResponseWriter, payload any) {
 	encoder := json.NewEncoder(w)
 	w.Write([]byte("data: "))

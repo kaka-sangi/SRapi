@@ -1332,6 +1332,7 @@ func parseOpenAICompatibleStream(body []byte, statusCode int) (contract.Conversa
 		StopReason: stopReason,
 		StatusCode: statusCode,
 		Usage:      parsedUsage,
+		Raw:        append(json.RawMessage(nil), body...),
 	}, nil
 }
 
@@ -1544,6 +1545,7 @@ func parseGeminiCompatibleStream(body []byte, statusCode int) (contract.Conversa
 		StopReason: stopReason,
 		StatusCode: statusCode,
 		Usage:      usage.ToUsage(text),
+		Raw:        append(json.RawMessage(nil), body...),
 	}, nil
 }
 
@@ -1813,6 +1815,7 @@ func parseAnthropicCompatibleStream(body []byte, statusCode int) (contract.Conve
 		StopReason: stopReason,
 		StatusCode: statusCode,
 		Usage:      usage.ToUsage(text),
+		Raw:        append(json.RawMessage(nil), body...),
 	}, nil
 }
 

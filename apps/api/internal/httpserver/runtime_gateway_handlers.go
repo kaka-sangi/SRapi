@@ -182,6 +182,10 @@ func (s *Server) handleCreateChatCompletion(w http.ResponseWriter, r *http.Reque
 		QualityOutput:         canonicalResp.Message,
 	})
 	if canonical.Stream {
+		if sameProtocolRawConversationStream(canonical, result.Candidate.Provider.Protocol, result.Candidate.Provider.AdapterType, canonicalResp.RawProviderMetadata) {
+			writeRawSSEResponse(w, canonicalResp.RawProviderMetadata)
+			return
+		}
 		writeSSEJSON(w, s.runtime.gateway.RenderChatStreamChunk(canonicalResp))
 		return
 	}
@@ -341,6 +345,10 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 	})
 	response := s.runtime.gateway.RenderResponses(canonicalResp)
 	if canonical.Stream {
+		if sameProtocolRawConversationStream(canonical, result.Candidate.Provider.Protocol, result.Candidate.Provider.AdapterType, canonicalResp.RawProviderMetadata) {
+			writeRawSSEResponse(w, canonicalResp.RawProviderMetadata)
+			return
+		}
 		writeSSEEvents(w, s.runtime.gateway.RenderResponsesStreamEvents(canonicalResp))
 		return
 	}
@@ -496,6 +504,10 @@ func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
 	})
 	response := s.runtime.gateway.RenderAnthropicMessages(canonicalResp)
 	if canonical.Stream {
+		if sameProtocolRawConversationStream(canonical, result.Candidate.Provider.Protocol, result.Candidate.Provider.AdapterType, canonicalResp.RawProviderMetadata) {
+			writeRawSSEResponse(w, canonicalResp.RawProviderMetadata)
+			return
+		}
 		writeSSEEvents(w, s.runtime.gateway.RenderAnthropicMessagesStreamEvents(canonicalResp))
 		return
 	}
@@ -825,6 +837,10 @@ func (s *Server) handleGeminiModelAction(w http.ResponseWriter, r *http.Request)
 		QualityOutput:         canonicalResp.Message,
 	})
 	if canonical.Stream {
+		if sameProtocolRawConversationStream(canonical, result.Candidate.Provider.Protocol, result.Candidate.Provider.AdapterType, canonicalResp.RawProviderMetadata) {
+			writeRawSSEResponse(w, canonicalResp.RawProviderMetadata)
+			return
+		}
 		writeSSEEvents(w, s.runtime.gateway.RenderGeminiGenerateContentStreamEvents(canonicalResp))
 		return
 	}
@@ -862,6 +878,41 @@ func sameProtocolRawConversationResponse(req gatewaycontract.CanonicalRequest, t
 	default:
 		return false
 	}
+}
+
+func sameProtocolRawConversationStream(req gatewaycontract.CanonicalRequest, targetProtocol, adapterType string, raw []byte) bool {
+	if !req.Stream || !looksLikeSSE(raw) {
+		return false
+	}
+	sourceProtocol := strings.ToLower(strings.TrimSpace(string(req.SourceProtocol)))
+	targetProtocol = strings.ToLower(strings.TrimSpace(targetProtocol))
+	adapterType = strings.ToLower(strings.TrimSpace(adapterType))
+	sourceEndpoint := strings.ToLower(strings.TrimSpace(req.SourceEndpoint))
+	if sourceProtocol == "" || sourceProtocol != targetProtocol {
+		return false
+	}
+	switch sourceProtocol {
+	case string(gatewaycontract.ProtocolOpenAICompatible):
+		return strings.HasSuffix(sourceEndpoint, "/chat/completions") &&
+			(adapterType == "openai-compatible" || adapterType == "reverse-proxy-openai-compatible")
+	case string(gatewaycontract.ProtocolAnthropicCompatible):
+		return strings.HasSuffix(sourceEndpoint, "/messages") &&
+			(adapterType == "anthropic-compatible" || adapterType == "reverse-proxy-claude-code-cli")
+	case string(gatewaycontract.ProtocolGeminiCompatible):
+		return strings.Contains(sourceEndpoint, ":streamgeneratecontent") &&
+			(adapterType == "gemini-compatible" || adapterType == "native-gemini" || adapterType == "reverse-proxy-gemini-cli")
+	default:
+		return false
+	}
+}
+
+func looksLikeSSE(raw []byte) bool {
+	for _, line := range bytes.Split(bytes.TrimSpace(raw), []byte("\n")) {
+		if bytes.HasPrefix(bytes.TrimSpace(line), []byte("data:")) {
+			return true
+		}
+	}
+	return false
 }
 
 func writeRawJSONResponse(w http.ResponseWriter, status int, raw []byte) {

@@ -4208,10 +4208,17 @@ func TestGatewayChatCompletionStreamFailoverBeforeDownstreamWrite(t *testing.T) 
 		t.Fatalf("expected event stream content type, got %q", got)
 	}
 	body := rec.Body.String()
-	for _, expected := range []string{"data:", "failover stream ok", "data: [DONE]"} {
+	for _, expected := range []string{
+		`data: {"choices":[{"delta":{"content":"failover stream"}}]}`,
+		`data: {"choices":[{"delta":{"content":" ok"}}]}`,
+		"data: [DONE]",
+	} {
 		if !strings.Contains(body, expected) {
 			t.Fatalf("expected stream body to contain %q, got %s", expected, body)
 		}
+	}
+	if strings.Contains(body, "failover stream ok") {
+		t.Fatalf("expected raw upstream chunks, got aggregated synthetic stream: %s", body)
 	}
 	if strings.Contains(body, "primary stream unavailable") {
 		t.Fatalf("primary upstream error leaked into downstream stream: %s", body)

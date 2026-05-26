@@ -913,6 +913,10 @@ func TestOpenAICompatibleAdapterForwardsConversionFields(t *testing.T) {
 }
 
 func TestOpenAICompatibleAdapterStreamsUpstream(t *testing.T) {
+	rawSSE := "data: {\"choices\":[{\"delta\":{\"content\":\"hello\"}}]}\n\n" +
+		"data: {\"choices\":[{\"delta\":{\"content\":\" stream\"}}]}\n\n" +
+		"data: {\"choices\":[],\"usage\":{\"prompt_tokens\":5,\"completion_tokens\":6,\"total_tokens\":11,\"prompt_tokens_details\":{\"cached_tokens\":2}}}\n\n" +
+		"data: [DONE]\n\n"
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/chat/completions" {
 			t.Fatalf("unexpected upstream path %s", r.URL.Path)
@@ -937,10 +941,7 @@ func TestOpenAICompatibleAdapterStreamsUpstream(t *testing.T) {
 			t.Fatalf("unexpected stream messages: %+v", payload.Messages)
 		}
 		w.Header().Set("Content-Type", "text/event-stream")
-		_, _ = w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"hello\"}}]}\n\n"))
-		_, _ = w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\" stream\"}}]}\n\n"))
-		_, _ = w.Write([]byte("data: {\"choices\":[],\"usage\":{\"prompt_tokens\":5,\"completion_tokens\":6,\"total_tokens\":11,\"prompt_tokens_details\":{\"cached_tokens\":2}}}\n\n"))
-		_, _ = w.Write([]byte("data: [DONE]\n\n"))
+		_, _ = w.Write([]byte(rawSSE))
 	}))
 	defer upstream.Close()
 
@@ -970,6 +971,9 @@ func TestOpenAICompatibleAdapterStreamsUpstream(t *testing.T) {
 	}
 	if conversationResponseText(resp) != "hello stream" || resp.Usage.Estimated || resp.Usage.InputTokens != 5 || resp.Usage.OutputTokens != 6 || resp.Usage.CachedTokens != 2 {
 		t.Fatalf("unexpected stream response: %+v", resp)
+	}
+	if string(resp.Raw) != rawSSE {
+		t.Fatalf("expected raw OpenAI stream to be preserved\nexpected:\n%s\nactual:\n%s", rawSSE, string(resp.Raw))
 	}
 }
 
@@ -1564,6 +1568,8 @@ func TestGeminiCompatibleAdapterPreservesFinishReason(t *testing.T) {
 }
 
 func TestGeminiCompatibleAdapterStreamsUpstream(t *testing.T) {
+	rawSSE := "data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"hello\"}]}}]}\n\n" +
+		"data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\" stream\"}]}}],\"usageMetadata\":{\"promptTokenCount\":5,\"candidatesTokenCount\":6,\"totalTokenCount\":11}}\n\n"
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1beta/models/gemini-pro:streamGenerateContent" {
 			t.Fatalf("unexpected upstream path %s", r.URL.Path)
@@ -1582,8 +1588,7 @@ func TestGeminiCompatibleAdapterStreamsUpstream(t *testing.T) {
 			t.Fatalf("unexpected stream payload: %+v", payload)
 		}
 		w.Header().Set("Content-Type", "text/event-stream")
-		_, _ = w.Write([]byte("data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"hello\"}]}}]}\n\n"))
-		_, _ = w.Write([]byte("data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\" stream\"}]}}],\"usageMetadata\":{\"promptTokenCount\":5,\"candidatesTokenCount\":6,\"totalTokenCount\":11}}\n\n"))
+		_, _ = w.Write([]byte(rawSSE))
 	}))
 	defer upstream.Close()
 
@@ -1609,6 +1614,9 @@ func TestGeminiCompatibleAdapterStreamsUpstream(t *testing.T) {
 	}
 	if conversationResponseText(resp) != "hello stream" || resp.Usage.Estimated || resp.Usage.InputTokens != 5 || resp.Usage.OutputTokens != 6 {
 		t.Fatalf("unexpected gemini stream response: %+v", resp)
+	}
+	if string(resp.Raw) != rawSSE {
+		t.Fatalf("expected raw Gemini stream to be preserved\nexpected:\n%s\nactual:\n%s", rawSSE, string(resp.Raw))
 	}
 }
 
@@ -2226,6 +2234,11 @@ func TestAnthropicCompatibleAdapterPreservesToolUseResponse(t *testing.T) {
 }
 
 func TestAnthropicCompatibleAdapterStreamsUpstream(t *testing.T) {
+	rawSSE := "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":5,\"output_tokens\":0}}}\n\n" +
+		"event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"hello\"}}\n\n" +
+		"event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\" stream\"}}\n\n" +
+		"event: message_delta\ndata: {\"type\":\"message_delta\",\"usage\":{\"output_tokens\":6,\"cache_creation_input_tokens\":1}}\n\n" +
+		"event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/messages" {
 			t.Fatalf("unexpected upstream path %s", r.URL.Path)
@@ -2248,11 +2261,7 @@ func TestAnthropicCompatibleAdapterStreamsUpstream(t *testing.T) {
 			t.Fatalf("unexpected stream messages: %+v", payload.Messages)
 		}
 		w.Header().Set("Content-Type", "text/event-stream")
-		_, _ = w.Write([]byte("event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":5,\"output_tokens\":0}}}\n\n"))
-		_, _ = w.Write([]byte("event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"hello\"}}\n\n"))
-		_, _ = w.Write([]byte("event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\" stream\"}}\n\n"))
-		_, _ = w.Write([]byte("event: message_delta\ndata: {\"type\":\"message_delta\",\"usage\":{\"output_tokens\":6,\"cache_creation_input_tokens\":1}}\n\n"))
-		_, _ = w.Write([]byte("event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"))
+		_, _ = w.Write([]byte(rawSSE))
 	}))
 	defer upstream.Close()
 
@@ -2279,6 +2288,9 @@ func TestAnthropicCompatibleAdapterStreamsUpstream(t *testing.T) {
 	}
 	if conversationResponseText(resp) != "hello stream" || resp.Usage.Estimated || resp.Usage.InputTokens != 5 || resp.Usage.OutputTokens != 6 || resp.Usage.CachedTokens != 1 {
 		t.Fatalf("unexpected anthropic stream response: %+v", resp)
+	}
+	if string(resp.Raw) != rawSSE {
+		t.Fatalf("expected raw Anthropic stream to be preserved\nexpected:\n%s\nactual:\n%s", rawSSE, string(resp.Raw))
 	}
 }
 
