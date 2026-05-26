@@ -4775,6 +4775,116 @@ func TestReverseProxyCodexCLIAdapterPreservesFunctionCallArgumentDeltas(t *testi
 	}
 }
 
+func TestReverseProxyCodexCLIAdapterPreservesRefusalDeltas(t *testing.T) {
+	rawSSE := "data: {\"type\":\"response.refusal.delta\",\"item_id\":\"msg_1\",\"output_index\":0,\"content_index\":0,\"delta\":\"I can't \"}\n\n" +
+		"data: {\"type\":\"response.refusal.delta\",\"item_id\":\"msg_1\",\"output_index\":0,\"content_index\":0,\"delta\":\"help\"}\n\n" +
+		"data: {\"type\":\"response.refusal.done\",\"item_id\":\"msg_1\",\"output_index\":0,\"content_index\":0,\"refusal\":\"I can't help\"}\n\n" +
+		"data: {\"type\":\"response.completed\",\"response\":{\"output\":[],\"usage\":{\"input_tokens\":4,\"output_tokens\":2,\"input_tokens_details\":{\"cached_tokens\":1}}}}\n\n" +
+		"data: [DONE]\n\n"
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body:       []byte(rawSSE),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_codex_refusal_delta",
+		Model:      "codex-local",
+		InputParts: textParts("restricted request"),
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": "https://codex.example.test/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+		Credential: map[string]any{"cli_client_token": "codex-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke codex reverse proxy adapter: %v", err)
+	}
+	if len(resp.Parts) != 1 ||
+		resp.Parts[0].Kind != contract.ContentPartRefusal ||
+		resp.Parts[0].Text != "I can't help" ||
+		resp.StopReason != contract.StopReasonRefusal ||
+		resp.Usage.Estimated ||
+		resp.Usage.InputTokens != 4 ||
+		resp.Usage.OutputTokens != 2 ||
+		resp.Usage.CachedTokens != 1 {
+		t.Fatalf("unexpected Codex refusal response: %+v", resp)
+	}
+	if string(resp.Raw) != rawSSE {
+		t.Fatalf("expected raw Codex refusal stream to be preserved, got %q", string(resp.Raw))
+	}
+	refusalEvents := conversationStreamEventsByType(resp.StreamEvents, contract.ConversationStreamEventContentDelta)
+	if len(refusalEvents) != 2 ||
+		refusalEvents[0].Delta.Kind != contract.ContentPartRefusal ||
+		refusalEvents[0].Delta.Text != "I can't " ||
+		refusalEvents[0].RawEventType != "response.refusal.delta" ||
+		refusalEvents[1].Delta.Kind != contract.ContentPartRefusal ||
+		refusalEvents[1].Delta.Text != "help" {
+		t.Fatalf("expected Codex refusal delta events, got %+v", resp.StreamEvents)
+	}
+	stopEvent := resp.StreamEvents[len(resp.StreamEvents)-1]
+	if stopEvent.Type != contract.ConversationStreamEventStop ||
+		stopEvent.StopReason != contract.StopReasonRefusal ||
+		stopEvent.RawEventType != "response.completed" {
+		t.Fatalf("expected Codex refusal terminal stop, got %+v", resp.StreamEvents)
+	}
+}
+
+func TestReverseProxyCodexCLIAdapterParsesRefusalOutputContent(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body: []byte(
+				`{"output":[{"type":"message","content":[{"type":"refusal","refusal":"I can't help"}]}],"usage":{"input_tokens":4,"output_tokens":2}}`,
+			),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_codex_refusal_content",
+		Model:      "codex-local",
+		InputParts: textParts("restricted request"),
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": "https://codex.example.test/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+		Credential: map[string]any{"cli_client_token": "codex-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke codex reverse proxy adapter: %v", err)
+	}
+	if len(resp.Parts) != 1 ||
+		resp.Parts[0].Kind != contract.ContentPartRefusal ||
+		resp.Parts[0].Text != "I can't help" ||
+		resp.StopReason != contract.StopReasonRefusal ||
+		resp.Usage.OutputTokens != 2 {
+		t.Fatalf("unexpected Codex refusal content response: %+v", resp)
+	}
+}
+
 func TestReverseProxyCodexCLIAdapterPreservesReasoningTextDeltas(t *testing.T) {
 	runtime := capturingRuntime{
 		response: reverseproxycontract.Response{

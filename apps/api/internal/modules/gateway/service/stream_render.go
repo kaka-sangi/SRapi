@@ -498,6 +498,12 @@ func (s *Service) renderResponsesCanonicalStreamEvents(resp gatewaycontract.Cano
 }
 
 func responseStreamTextStartEvents(itemID string, outputIndex int, blockType gatewaycontract.ContentBlockType) []StreamEvent {
+	part := map[string]any{"type": responseStreamContentPartType(blockType)}
+	if blockType == gatewaycontract.ContentBlockRefusal {
+		part["refusal"] = ""
+	} else {
+		part["text"] = ""
+	}
 	return []StreamEvent{
 		{
 			Event: "response.output_item.added",
@@ -519,10 +525,7 @@ func responseStreamTextStartEvents(itemID string, outputIndex int, blockType gat
 				"item_id":       itemID,
 				"output_index":  outputIndex,
 				"content_index": 0,
-				"part": map[string]any{
-					"type": responseStreamContentPartType(blockType),
-					"text": "",
-				},
+				"part":          part,
 			},
 		},
 	}
@@ -544,19 +547,30 @@ func responseStreamTextDeltaEvent(itemID string, outputIndex int, blockType gate
 
 func responseStreamTextDoneEvent(itemID string, outputIndex int, blockType gatewaycontract.ContentBlockType, text string) StreamEvent {
 	eventName := responseStreamTextEventName(blockType, "done")
+	data := map[string]any{
+		"type":          eventName,
+		"item_id":       itemID,
+		"output_index":  outputIndex,
+		"content_index": 0,
+	}
+	if blockType == gatewaycontract.ContentBlockRefusal {
+		data["refusal"] = text
+	} else {
+		data["text"] = text
+	}
 	return StreamEvent{
 		Event: eventName,
-		Data: map[string]any{
-			"type":          eventName,
-			"item_id":       itemID,
-			"output_index":  outputIndex,
-			"content_index": 0,
-			"text":          text,
-		},
+		Data:  data,
 	}
 }
 
 func responseStreamContentPartDoneEvent(itemID string, outputIndex int, blockType gatewaycontract.ContentBlockType, text string) StreamEvent {
+	part := map[string]any{"type": responseStreamContentPartType(blockType)}
+	if blockType == gatewaycontract.ContentBlockRefusal {
+		part["refusal"] = text
+	} else {
+		part["text"] = text
+	}
 	return StreamEvent{
 		Event: "response.content_part.done",
 		Data: map[string]any{
@@ -564,15 +578,18 @@ func responseStreamContentPartDoneEvent(itemID string, outputIndex int, blockTyp
 			"item_id":       itemID,
 			"output_index":  outputIndex,
 			"content_index": 0,
-			"part": map[string]any{
-				"type": responseStreamContentPartType(blockType),
-				"text": text,
-			},
+			"part":          part,
 		},
 	}
 }
 
 func responseStreamMessageDoneEvent(itemID string, outputIndex int, blockType gatewaycontract.ContentBlockType, text string) StreamEvent {
+	content := map[string]any{"type": responseStreamContentPartType(blockType)}
+	if blockType == gatewaycontract.ContentBlockRefusal {
+		content["refusal"] = text
+	} else {
+		content["text"] = text
+	}
 	return StreamEvent{
 		Event: "response.output_item.done",
 		Data: map[string]any{
@@ -582,7 +599,7 @@ func responseStreamMessageDoneEvent(itemID string, outputIndex int, blockType ga
 				"id":      itemID,
 				"type":    "message",
 				"role":    "assistant",
-				"content": []map[string]any{{"type": responseStreamContentPartType(blockType), "text": text}},
+				"content": []map[string]any{content},
 			},
 		},
 	}
@@ -591,6 +608,9 @@ func responseStreamMessageDoneEvent(itemID string, outputIndex int, blockType ga
 func responseStreamTextEventName(blockType gatewaycontract.ContentBlockType, suffix string) string {
 	if blockType == gatewaycontract.ContentBlockReasoning {
 		return "response.reasoning_text." + suffix
+	}
+	if blockType == gatewaycontract.ContentBlockRefusal {
+		return "response.refusal." + suffix
 	}
 	return "response.output_text." + suffix
 }

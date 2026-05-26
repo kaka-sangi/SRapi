@@ -54,6 +54,7 @@ type codexResponsesEvent struct {
 	Type        string                    `json:"type"`
 	Delta       string                    `json:"delta"`
 	Text        string                    `json:"text"`
+	Refusal     string                    `json:"refusal"`
 	ItemID      string                    `json:"item_id"`
 	Item        *codexResponsesOutputItem `json:"item"`
 	OutputIndex *int                      `json:"output_index"`
@@ -83,12 +84,14 @@ type codexResponsesOutputItem struct {
 	Arguments string                        `json:"arguments"`
 	Status    string                        `json:"status"`
 	Text      string                        `json:"text"`
+	Refusal   string                        `json:"refusal"`
 	Content   []codexResponsesOutputContent `json:"content"`
 }
 
 type codexResponsesOutputContent struct {
-	Type string `json:"type"`
-	Text string `json:"text"`
+	Type    string `json:"type"`
+	Text    string `json:"text"`
+	Refusal string `json:"refusal"`
 }
 
 type codexResponsesError struct {
@@ -780,6 +783,8 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 	var completedText string
 	var reasoningBuilder strings.Builder
 	var completedReasoning string
+	var refusalBuilder strings.Builder
+	var completedRefusal string
 	var usage *openAIUsage
 	indexedItems := map[int]codexResponsesOutputItem{}
 	fallbackItems := []codexResponsesOutputItem{}
@@ -788,6 +793,11 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 	functionStates := newCodexFunctionCallStreamStates()
 	eventIndex := 0
 	seenEvent := false
+	appendStreamEvent := func(event contract.ConversationStreamEvent) {
+		event.Index = eventIndex
+		streamEvents = append(streamEvents, event)
+		eventIndex++
+	}
 	for _, frame := range frames {
 		data := strings.TrimSpace(frame.Data)
 		if data == "" {
@@ -809,8 +819,7 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 		if event.Usage != nil && event.Usage.HasTokenUsage() {
 			copied := *event.Usage
 			usage = &copied
-			streamEvents = append(streamEvents, codexStreamUsageEvent(eventIndex, copied, data, deltaBuilder.String()))
-			eventIndex++
+			appendStreamEvent(codexStreamUsageEvent(copied, data, deltaBuilder.String()))
 		}
 		functionStates.mergeEvent(event)
 		if event.Response != nil {
@@ -822,8 +831,7 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 			if copiedResponse.Usage.HasTokenUsage() {
 				copiedUsage := copiedResponse.Usage
 				usage = &copiedUsage
-				streamEvents = append(streamEvents, codexStreamUsageEvent(eventIndex, copiedUsage, data, deltaBuilder.String()))
-				eventIndex++
+				appendStreamEvent(codexStreamUsageEvent(copiedUsage, data, deltaBuilder.String()))
 			}
 		}
 		switch eventType {
@@ -835,52 +843,41 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 					fallbackItems = append(fallbackItems, *event.Item)
 				}
 				if codexOutputItemIsFunctionCall(*event.Item) && !functionStates.hasArgumentDeltas(event) {
-					if streamEvent, ok := codexFunctionCallStreamEvent(*event.Item, eventIndex, codexOutputIndex(event), data); ok {
-						streamEvents = append(streamEvents, streamEvent)
-						eventIndex++
+					if streamEvent, ok := codexFunctionCallStreamEvent(*event.Item, codexOutputIndex(event), data); ok {
+						appendStreamEvent(streamEvent)
 					}
 				}
 			}
 		case "response.output_text.delta":
 			deltaBuilder.WriteString(event.Delta)
 			if event.Delta != "" {
-				streamEvents = append(streamEvents, contract.ConversationStreamEvent{
-					Index:          eventIndex,
-					Type:           contract.ConversationStreamEventContentDelta,
-					ContentIndex:   codexOutputIndex(event),
-					Delta:          textContentDelta(event.Delta),
-					RawEventType:   eventType,
-					Raw:            append(json.RawMessage(nil), data...),
+				appendStreamEvent(codexContentStreamEvent(event, eventType, data, textContentDelta(event.Delta)))
+			}
+		case "response.refusal.delta":
+			refusalBuilder.WriteString(event.Delta)
+			if event.Delta != "" {
+				appendStreamEvent(codexContentStreamEvent(event, eventType, data, contract.ContentPart{
+					Kind:           contract.ContentPartRefusal,
+					Text:           event.Delta,
 					OriginProtocol: "openai-compatible",
-				})
-				eventIndex++
+				}))
 			}
 		case "response.reasoning_text.delta":
 			reasoningBuilder.WriteString(event.Delta)
 			if event.Delta != "" {
-				streamEvents = append(streamEvents, contract.ConversationStreamEvent{
-					Index:        eventIndex,
-					Type:         contract.ConversationStreamEventReasoning,
-					ContentIndex: codexOutputIndex(event),
-					Delta: contract.ContentPart{
-						Kind:           contract.ContentPartThinking,
-						Text:           event.Delta,
-						OriginProtocol: "openai-compatible",
-					},
-					RawEventType:   eventType,
-					Raw:            append(json.RawMessage(nil), data...),
-					OriginProtocol: "openai-compatible",
-				})
-				eventIndex++
+				appendStreamEvent(codexReasoningStreamEvent(event, eventType, data))
 			}
 		case "response.function_call_arguments.delta":
 			if event.Delta != "" {
-				streamEvents = append(streamEvents, functionStates.deltaEvent(event, eventType, eventIndex, data))
-				eventIndex++
+				appendStreamEvent(functionStates.deltaEvent(event, eventType, data))
 			}
 		case "response.output_text.done":
 			if strings.TrimSpace(event.Text) != "" {
 				completedText = event.Text
+			}
+		case "response.refusal.done":
+			if strings.TrimSpace(event.Refusal) != "" {
+				completedRefusal = event.Refusal
 			}
 		case "response.reasoning_text.done":
 			if strings.TrimSpace(event.Text) != "" {
@@ -890,15 +887,13 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 			if text := codexEventText(event); strings.TrimSpace(text) != "" {
 				completedText = text
 			}
-			streamEvents = append(streamEvents, contract.ConversationStreamEvent{
-				Index:          eventIndex,
+			appendStreamEvent(contract.ConversationStreamEvent{
 				Type:           contract.ConversationStreamEventStop,
-				StopReason:     codexEventStopReason(event),
+				StopReason:     codexStreamStopReason(event, completedRefusal, refusalBuilder.String()),
 				RawEventType:   eventType,
 				Raw:            append(json.RawMessage(nil), data...),
 				OriginProtocol: "openai-compatible",
 			})
-			eventIndex++
 		default:
 			if text := codexEventText(event); strings.TrimSpace(text) != "" && strings.TrimSpace(completedText) == "" {
 				completedText = text
@@ -915,9 +910,12 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 		stopReason = codexStopReason(*finalResponse)
 	}
 	if len(parts) == 0 {
-		parts = codexResponsesOutputItemsParts(codexCollectedOutputItems(indexedItems, fallbackItems))
-		if codexOutputItemsIncludeFunctionCall(codexCollectedOutputItems(indexedItems, fallbackItems)) {
+		collectedItems := codexCollectedOutputItems(indexedItems, fallbackItems)
+		parts = codexResponsesOutputItemsParts(collectedItems)
+		if codexOutputItemsIncludeFunctionCall(collectedItems) {
 			stopReason = contract.StopReasonToolUse
+		} else if codexOutputItemsIncludeRefusal(collectedItems) {
+			stopReason = contract.StopReasonRefusal
 		}
 	}
 	if len(parts) == 0 {
@@ -927,6 +925,16 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 		}
 		if text != "" {
 			parts = append(parts, textContentPart(text))
+		}
+	}
+	if len(parts) == 0 {
+		refusalText := strings.TrimSpace(completedRefusal)
+		if refusalText == "" {
+			refusalText = strings.TrimSpace(refusalBuilder.String())
+		}
+		if refusalText != "" {
+			parts = append(parts, contract.ContentPart{Kind: contract.ContentPartRefusal, Text: refusalText, OriginProtocol: "openai"})
+			stopReason = contract.StopReasonRefusal
 		}
 	}
 	parts = prependCodexReasoningPart(parts, completedReasoning, reasoningBuilder.String())
@@ -974,9 +982,34 @@ func prependCodexReasoningPart(parts []contract.ContentPart, completedReasoning 
 	return append([]contract.ContentPart{reasoningPart}, parts...)
 }
 
-func codexStreamUsageEvent(index int, usage openAIUsage, raw string, text string) contract.ConversationStreamEvent {
+func codexContentStreamEvent(event codexResponsesEvent, eventType string, raw string, delta contract.ContentPart) contract.ConversationStreamEvent {
 	return contract.ConversationStreamEvent{
-		Index:          index,
+		Type:           contract.ConversationStreamEventContentDelta,
+		ContentIndex:   codexOutputIndex(event),
+		Delta:          delta,
+		RawEventType:   eventType,
+		Raw:            append(json.RawMessage(nil), raw...),
+		OriginProtocol: "openai-compatible",
+	}
+}
+
+func codexReasoningStreamEvent(event codexResponsesEvent, eventType string, raw string) contract.ConversationStreamEvent {
+	return contract.ConversationStreamEvent{
+		Type:         contract.ConversationStreamEventReasoning,
+		ContentIndex: codexOutputIndex(event),
+		Delta: contract.ContentPart{
+			Kind:           contract.ContentPartThinking,
+			Text:           event.Delta,
+			OriginProtocol: "openai-compatible",
+		},
+		RawEventType:   eventType,
+		Raw:            append(json.RawMessage(nil), raw...),
+		OriginProtocol: "openai-compatible",
+	}
+}
+
+func codexStreamUsageEvent(usage openAIUsage, raw string, text string) contract.ConversationStreamEvent {
+	return contract.ConversationStreamEvent{
 		Type:           contract.ConversationStreamEventUsage,
 		Usage:          usage.ToUsage(text),
 		RawEventType:   "usage",
@@ -1034,11 +1067,10 @@ func (s *codexFunctionCallStreamStates) hasArgumentDeltas(event codexResponsesEv
 	return state.ArgumentsLen > 0
 }
 
-func (s *codexFunctionCallStreamStates) deltaEvent(event codexResponsesEvent, eventType string, index int, raw string) contract.ConversationStreamEvent {
+func (s *codexFunctionCallStreamStates) deltaEvent(event codexResponsesEvent, eventType string, raw string) contract.ConversationStreamEvent {
 	state := s.stateFor(event)
 	state.ArgumentsLen += len(event.Delta)
 	return contract.ConversationStreamEvent{
-		Index:        index,
 		Type:         contract.ConversationStreamEventToolCallDelta,
 		ContentIndex: state.OutputIndex,
 		Delta: contract.ContentPart{
@@ -1081,13 +1113,12 @@ func (s *codexFunctionCallStreamStates) stateFor(event codexResponsesEvent) *cod
 	return state
 }
 
-func codexFunctionCallStreamEvent(item codexResponsesOutputItem, eventIndex int, contentIndex int, raw string) (contract.ConversationStreamEvent, bool) {
+func codexFunctionCallStreamEvent(item codexResponsesOutputItem, contentIndex int, raw string) (contract.ConversationStreamEvent, bool) {
 	part, ok := codexFunctionCallPart(item)
 	if !ok {
 		return contract.ConversationStreamEvent{}, false
 	}
 	return contract.ConversationStreamEvent{
-		Index:          eventIndex,
 		Type:           contract.ConversationStreamEventToolCallDelta,
 		ContentIndex:   contentIndex,
 		Delta:          part,
@@ -1134,6 +1165,9 @@ func codexEventText(event codexResponsesEvent) string {
 	if strings.TrimSpace(event.Text) != "" {
 		return event.Text
 	}
+	if strings.TrimSpace(event.Refusal) != "" {
+		return event.Refusal
+	}
 	if event.Response != nil {
 		return event.Response.Text()
 	}
@@ -1157,6 +1191,9 @@ func codexEventParts(event codexResponsesEvent) []contract.ContentPart {
 	if event.Item != nil {
 		return codexResponsesOutputItemParts(*event.Item)
 	}
+	if refusal := strings.TrimSpace(event.Refusal); refusal != "" {
+		return []contract.ContentPart{{Kind: contract.ContentPartRefusal, Text: refusal, OriginProtocol: "openai"}}
+	}
 	if text := strings.TrimSpace(event.Text); text != "" {
 		return []contract.ContentPart{textContentPart(text)}
 	}
@@ -1170,7 +1207,22 @@ func codexEventStopReason(event codexResponsesEvent) contract.StopReason {
 	if event.Item != nil && codexOutputItemIsFunctionCall(*event.Item) {
 		return contract.StopReasonToolUse
 	}
+	if event.Item != nil && codexOutputItemIsRefusal(*event.Item) {
+		return contract.StopReasonRefusal
+	}
+	if strings.TrimSpace(event.Refusal) != "" {
+		return contract.StopReasonRefusal
+	}
 	return contract.StopReasonEndTurn
+}
+
+func codexStreamStopReason(event codexResponsesEvent, completedRefusal string, streamedRefusal string) contract.StopReason {
+	stopReason := codexEventStopReason(event)
+	if stopReason == contract.StopReasonEndTurn &&
+		(strings.TrimSpace(completedRefusal) != "" || strings.TrimSpace(streamedRefusal) != "") {
+		return contract.StopReasonRefusal
+	}
+	return stopReason
 }
 
 func codexCollectedOutputItems(indexed map[int]codexResponsesOutputItem, fallback []codexResponsesOutputItem) []codexResponsesOutputItem {
@@ -1199,12 +1251,20 @@ func (r codexResponsesResponse) Text() string {
 		if strings.TrimSpace(item.Text) != "" {
 			parts = append(parts, strings.TrimSpace(item.Text))
 		}
+		if strings.TrimSpace(item.Refusal) != "" {
+			parts = append(parts, strings.TrimSpace(item.Refusal))
+		}
 		for _, content := range item.Content {
 			contentType := strings.ToLower(strings.TrimSpace(content.Type))
-			if strings.TrimSpace(content.Text) == "" || (contentType != "" && !strings.Contains(contentType, "text")) {
+			if contentType == "refusal" {
+				if refusal := strings.TrimSpace(firstNonEmpty(content.Refusal, content.Text)); refusal != "" {
+					parts = append(parts, refusal)
+				}
 				continue
 			}
-			parts = append(parts, strings.TrimSpace(content.Text))
+			if text := strings.TrimSpace(content.Text); text != "" && (contentType == "" || strings.Contains(contentType, "text")) {
+				parts = append(parts, text)
+			}
 		}
 	}
 	return strings.Join(parts, "\n")
@@ -1251,6 +1311,12 @@ func codexResponsesOutputItemParts(item codexResponsesOutputItem) []contract.Con
 		}
 		return parts
 	}
+	if itemType == "refusal" {
+		if text := strings.TrimSpace(firstNonEmpty(item.Refusal, item.Text)); text != "" {
+			parts = append(parts, contract.ContentPart{Kind: contract.ContentPartRefusal, Text: text, OriginProtocol: "openai"})
+		}
+		return parts
+	}
 	if text := strings.TrimSpace(item.Text); text != "" {
 		kind := contract.ContentPartText
 		if itemType == "reasoning" {
@@ -1260,11 +1326,16 @@ func codexResponsesOutputItemParts(item codexResponsesOutputItem) []contract.Con
 	}
 	for _, content := range item.Content {
 		contentType := strings.ToLower(strings.TrimSpace(content.Type))
-		text := strings.TrimSpace(content.Text)
-		if text == "" || (contentType != "" && !strings.Contains(contentType, "text")) {
+		if contentType == "refusal" {
+			if text := strings.TrimSpace(firstNonEmpty(content.Refusal, content.Text)); text != "" {
+				parts = append(parts, contract.ContentPart{Kind: contract.ContentPartRefusal, Text: text, OriginProtocol: "openai"})
+			}
 			continue
 		}
-		parts = append(parts, textContentPart(text))
+		text := strings.TrimSpace(content.Text)
+		if text != "" && (contentType == "" || strings.Contains(contentType, "text")) {
+			parts = append(parts, textContentPart(text))
+		}
 	}
 	return parts
 }
@@ -1306,6 +1377,9 @@ func codexStopReason(response codexResponsesResponse) contract.StopReason {
 	if codexOutputItemsIncludeFunctionCall(response.Output) {
 		return contract.StopReasonToolUse
 	}
+	if codexOutputItemsIncludeRefusal(response.Output) {
+		return contract.StopReasonRefusal
+	}
 	if strings.EqualFold(strings.TrimSpace(response.Status), "incomplete") {
 		return contract.StopReasonMaxTokens
 	}
@@ -1323,6 +1397,27 @@ func codexOutputItemsIncludeFunctionCall(items []codexResponsesOutputItem) bool 
 
 func codexOutputItemIsFunctionCall(item codexResponsesOutputItem) bool {
 	return strings.EqualFold(strings.TrimSpace(item.Type), "function_call")
+}
+
+func codexOutputItemsIncludeRefusal(items []codexResponsesOutputItem) bool {
+	for _, item := range items {
+		if codexOutputItemIsRefusal(item) {
+			return true
+		}
+	}
+	return false
+}
+
+func codexOutputItemIsRefusal(item codexResponsesOutputItem) bool {
+	if strings.EqualFold(strings.TrimSpace(item.Type), "refusal") || strings.TrimSpace(item.Refusal) != "" {
+		return true
+	}
+	for _, content := range item.Content {
+		if strings.EqualFold(strings.TrimSpace(content.Type), "refusal") {
+			return true
+		}
+	}
+	return false
 }
 
 func codexEventProviderError(event codexResponsesEvent) (contract.ProviderError, bool) {

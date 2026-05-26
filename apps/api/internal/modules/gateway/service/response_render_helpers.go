@@ -170,7 +170,9 @@ func outputResponsesContentBlocks(blocks []gatewaycontract.ContentBlock) []apiop
 			Type:                 apiopenapi.ContentBlockType(responseStreamContentPartType(block.Type)),
 			AdditionalProperties: outputBlockProperties(block),
 		}
-		if block.Type != gatewaycontract.ContentBlockToolCall {
+		if block.Type == gatewaycontract.ContentBlockRefusal {
+			setStringProperty(item.AdditionalProperties, "refusal", block.Text)
+		} else if block.Type != gatewaycontract.ContentBlockToolCall {
 			if text := strings.TrimSpace(block.Text); text != "" {
 				item.Text = &text
 			}
@@ -452,7 +454,11 @@ func responseStreamFunctionCallItem(itemID string, block gatewaycontract.Content
 func responseStreamContentPart(block gatewaycontract.ContentBlock) map[string]any {
 	part := outputBlockProperties(block)
 	part["type"] = responseStreamContentPartType(block.Type)
-	setStringProperty(part, "text", block.Text)
+	if block.Type == gatewaycontract.ContentBlockRefusal {
+		setStringProperty(part, "refusal", block.Text)
+	} else {
+		setStringProperty(part, "text", block.Text)
+	}
 	return part
 }
 

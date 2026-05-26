@@ -1149,6 +1149,93 @@ func TestRenderResponsesStreamEventsFallbackPreservesReasoningPartLifecycle(t *t
 	}
 }
 
+func TestRenderResponsesStreamEventsPreservesRefusalPartLifecycle(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	resp := gatewaycontract.CanonicalResponse{
+		ID:         "resp_refusal_stream",
+		Model:      "gpt-4o-mini",
+		StopReason: "refusal",
+		OutputItems: []gatewaycontract.ContentBlock{{
+			Type: gatewaycontract.ContentBlockRefusal,
+			Role: "assistant",
+			Text: "I can't help",
+		}},
+		StreamEvents: []gatewaycontract.StreamEvent{
+			{
+				Index:        0,
+				Type:         gatewaycontract.StreamEventContentDelta,
+				ContentIndex: 0,
+				Delta:        gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockRefusal, Role: "assistant", Text: "I can't "},
+			},
+			{
+				Index:        1,
+				Type:         gatewaycontract.StreamEventContentDelta,
+				ContentIndex: 0,
+				Delta:        gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockRefusal, Role: "assistant", Text: "help"},
+			},
+			{
+				Index:      2,
+				Type:       gatewaycontract.StreamEventStop,
+				StopReason: "refusal",
+			},
+		},
+		Usage: gatewaycontract.Usage{InputTokens: 3, OutputTokens: 4},
+	}
+
+	responsesEvents := svc.RenderResponsesStreamEvents(resp)
+	refusalDeltas := streamEventsByName(responsesEvents, "response.refusal.delta")
+	if len(refusalDeltas) != 2 ||
+		refusalDeltas[0].Data["delta"] != "I can't " ||
+		refusalDeltas[1].Data["delta"] != "help" {
+		t.Fatalf("expected responses refusal deltas, got %+v", responsesEvents)
+	}
+	if outputTextDeltas := streamEventsByName(responsesEvents, "response.output_text.delta"); len(outputTextDeltas) != 0 {
+		t.Fatalf("did not expect refusal as output_text delta, got %+v", outputTextDeltas)
+	}
+	refusalDone := streamEventByName(responsesEvents, "response.refusal.done")
+	if refusalDone == nil || refusalDone.Data["refusal"] != "I can't help" || refusalDone.Data["text"] != nil {
+		t.Fatalf("expected completed responses refusal text, got %+v", refusalDone)
+	}
+	contentPartAdded := streamEventByName(responsesEvents, "response.content_part.added")
+	if contentPartAdded == nil {
+		t.Fatalf("expected refusal content part added event, got %+v", responsesEvents)
+	}
+	addedPart, _ := contentPartAdded.Data["part"].(map[string]any)
+	if addedPart["type"] != "refusal" || addedPart["refusal"] != "" || addedPart["text"] != nil {
+		t.Fatalf("expected empty refusal content part, got %+v", addedPart)
+	}
+	contentPartDone := streamEventByName(responsesEvents, "response.content_part.done")
+	if contentPartDone == nil {
+		t.Fatalf("expected refusal content part done event, got %+v", responsesEvents)
+	}
+	donePart, _ := contentPartDone.Data["part"].(map[string]any)
+	if donePart["type"] != "refusal" || donePart["refusal"] != "I can't help" || donePart["text"] != nil {
+		t.Fatalf("expected refusal content part done payload, got %+v", donePart)
+	}
+	itemDone := streamEventByName(responsesEvents, "response.output_item.done")
+	if itemDone == nil {
+		t.Fatalf("expected refusal output item done event, got %+v", responsesEvents)
+	}
+	item, _ := itemDone.Data["item"].(map[string]any)
+	content, _ := item["content"].([]map[string]any)
+	if len(content) != 1 || content[0]["type"] != "refusal" || content[0]["refusal"] != "I can't help" {
+		t.Fatalf("expected refusal output item content, got %+v", item)
+	}
+	completed := svc.RenderResponses(resp)
+	if len(completed.Output) == 0 || completed.Output[0].Content == nil || len(*completed.Output[0].Content) == 0 {
+		t.Fatalf("expected completed responses refusal content, got %+v", completed)
+	}
+	completedPart := (*completed.Output[0].Content)[0]
+	if completedPart.Type != apiopenapi.ContentBlockType("refusal") ||
+		completedPart.Text != nil ||
+		completedPart.AdditionalProperties["refusal"] != "I can't help" {
+		t.Fatalf("expected final responses output to preserve refusal field, got %+v", completedPart)
+	}
+}
+
 func TestRenderAnthropicStreamEventsPreservesThinkingSignatureDeltas(t *testing.T) {
 	svc, err := New()
 	if err != nil {
