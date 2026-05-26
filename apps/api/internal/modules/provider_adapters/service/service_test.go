@@ -3286,6 +3286,89 @@ func TestReverseProxyCodexCLIAdapterUsesResponsesOfficialClientShape(t *testing.
 	}
 }
 
+func TestReverseProxyCodexCLIAdapterPreservesResponsesToolResultImageInputs(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/backend-api/codex/responses" {
+			t.Fatalf("unexpected codex upstream path %s", r.URL.Path)
+		}
+		var payload struct {
+			Input []struct {
+				Type    string `json:"type"`
+				Role    string `json:"role"`
+				CallID  string `json:"call_id"`
+				Output  string `json:"output"`
+				Content []struct {
+					Type     string `json:"type"`
+					Text     string `json:"text"`
+					ImageURL string `json:"image_url"`
+				} `json:"content"`
+			} `json:"input"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode codex payload: %v", err)
+		}
+		if len(payload.Input) != 2 {
+			t.Fatalf("expected image message and function output items, got %+v", payload.Input)
+		}
+		if payload.Input[0].Type != "function_call_output" ||
+			payload.Input[0].CallID != "call_1" ||
+			payload.Input[0].Output != "File metadata: 800x600 PNG" {
+			t.Fatalf("expected tool result text to become function_call_output, got %+v", payload.Input[0])
+		}
+		if payload.Input[1].Type != "message" ||
+			payload.Input[1].Role != "user" ||
+			len(payload.Input[1].Content) != 1 ||
+			payload.Input[1].Content[0].Type != "input_image" ||
+			payload.Input[1].Content[0].ImageURL != "data:image/png;base64,iVBOR" {
+			t.Fatalf("expected nested tool result image to become input_image, got %+v", payload.Input[1])
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: {\"type\":\"response.output_text.delta\",\"delta\":\"ok\"}\n\ndata: [DONE]\n\n"))
+	}))
+	defer upstream.Close()
+
+	runtime, err := reverseproxyservice.New(nil)
+	if err != nil {
+		t.Fatalf("create reverse proxy runtime: %v", err)
+	}
+	svc, err := service.NewWithReverseProxy(nil, runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_codex_tool_result_image",
+		Model:          "codex-local",
+		SourceProtocol: "anthropic-compatible",
+		SourceEndpoint: "/v1/messages",
+		Messages: []contract.ConversationMessage{{
+			Role: "user",
+			Parts: []contract.ContentPart{
+				toolResultPart("call_1", "File metadata: 800x600 PNG"),
+				{Kind: contract.ContentPartImage, MediaBase64: "iVBOR", MIMEType: "image/png"},
+			},
+		}},
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": upstream.URL + "/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+		Credential: map[string]any{"cli_client_token": "codex-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke codex upstream: %v", err)
+	}
+	if conversationResponseText(resp) != "ok" {
+		t.Fatalf("unexpected codex response: %+v", resp)
+	}
+}
+
 func TestReverseProxyCodexCLIAdapterStreamsMultilineSSEData(t *testing.T) {
 	rawSSE := "data: {\"type\":\"response.output_text.delta\",\n" +
 		"data: \"delta\":\"codex\"}\n\n" +

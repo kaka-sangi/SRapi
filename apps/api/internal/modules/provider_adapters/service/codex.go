@@ -27,12 +27,16 @@ const (
 type codexResponsesInputItem struct {
 	Type    string                       `json:"type"`
 	Role    string                       `json:"role,omitempty"`
-	Content []codexResponsesInputContent `json:"content"`
+	Content []codexResponsesInputContent `json:"content,omitempty"`
+	CallID  string                       `json:"call_id,omitempty"`
+	Output  string                       `json:"output,omitempty"`
 }
 
 type codexResponsesInputContent struct {
-	Type string `json:"type"`
-	Text string `json:"text,omitempty"`
+	Type     string `json:"type"`
+	Text     string `json:"text,omitempty"`
+	ImageURL string `json:"image_url,omitempty"`
+	FileID   string `json:"file_id,omitempty"`
 }
 
 type codexResponsesEvent struct {
@@ -414,22 +418,11 @@ func codexResponsesInput(req contract.ConversationRequest) []codexResponsesInput
 		if role == "system" || role == "developer" {
 			continue
 		}
-		content := conversationMessageText(message)
-		if content == "" {
+		items := codexResponsesInputItemsFromMessage(role, message.Parts)
+		if len(items) == 0 {
 			continue
 		}
-		contentType := "input_text"
-		if role == "assistant" {
-			contentType = "output_text"
-		}
-		out = append(out, codexResponsesInputItem{
-			Type: "message",
-			Role: role,
-			Content: []codexResponsesInputContent{{
-				Type: contentType,
-				Text: content,
-			}},
-		})
+		out = append(out, items...)
 	}
 	if len(out) == 0 {
 		prompt := conversationPrompt(req)
@@ -443,6 +436,79 @@ func codexResponsesInput(req contract.ConversationRequest) []codexResponsesInput
 		})
 	}
 	return out
+}
+
+func codexResponsesInputItemsFromMessage(role string, parts []contract.ContentPart) []codexResponsesInputItem {
+	out := make([]codexResponsesInputItem, 0, 1)
+	messageContent := make([]codexResponsesInputContent, 0, len(parts))
+	flushMessage := func() {
+		if len(messageContent) == 0 {
+			return
+		}
+		out = append(out, codexResponsesInputItem{
+			Type:    "message",
+			Role:    role,
+			Content: messageContent,
+		})
+		messageContent = nil
+	}
+	for _, part := range parts {
+		switch part.Kind {
+		case contract.ContentPartToolResult:
+			callID := strings.TrimSpace(firstNonEmpty(part.ToolResultForID, part.ToolCallID))
+			if callID == "" {
+				continue
+			}
+			flushMessage()
+			out = append(out, codexResponsesInputItem{
+				Type:   "function_call_output",
+				CallID: callID,
+				Output: strings.TrimSpace(part.Text),
+			})
+		default:
+			if content, ok := codexResponsesInputContentFromPart(role, part); ok {
+				messageContent = append(messageContent, content)
+			}
+		}
+	}
+	flushMessage()
+	return out
+}
+
+func codexResponsesInputContentFromPart(role string, part contract.ContentPart) (codexResponsesInputContent, bool) {
+	switch part.Kind {
+	case "", contract.ContentPartText, contract.ContentPartThinking, contract.ContentPartRefusal:
+		if text := strings.TrimSpace(part.Text); text != "" {
+			return codexResponsesTextContent(role, text), true
+		}
+	case contract.ContentPartImage:
+		if url := mediaURLValue(part); url != "" {
+			return codexResponsesInputContent{Type: "input_image", ImageURL: url}, true
+		}
+		if fileID := strings.TrimSpace(part.FileID); fileID != "" {
+			return codexResponsesInputContent{Type: "input_image", FileID: fileID}, true
+		}
+		if text := strings.TrimSpace(part.Text); text != "" {
+			return codexResponsesTextContent(role, text), true
+		}
+	case contract.ContentPartFile:
+		if text := strings.TrimSpace(part.Text); text != "" {
+			return codexResponsesTextContent(role, text), true
+		}
+	default:
+		if text := strings.TrimSpace(part.Text); text != "" {
+			return codexResponsesTextContent(role, text), true
+		}
+	}
+	return codexResponsesInputContent{}, false
+}
+
+func codexResponsesTextContent(role string, text string) codexResponsesInputContent {
+	contentType := "input_text"
+	if role == "assistant" {
+		contentType = "output_text"
+	}
+	return codexResponsesInputContent{Type: contentType, Text: strings.TrimSpace(text)}
 }
 
 func codexResponsesRole(role string) string {

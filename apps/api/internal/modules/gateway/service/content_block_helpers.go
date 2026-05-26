@@ -157,20 +157,7 @@ func anthropicContentBlock(block apiopenapi.AnthropicContentBlock, role string) 
 	props := cloneMap(block.AdditionalProperties)
 	switch block.Type {
 	case apiopenapi.AnthropicContentBlockTypeImage:
-		source, _ := props["source"].(map[string]any)
-		url := firstNonEmpty(mapStringAny(source, "url"), mapStringAny(props, "url"))
-		base64Data := firstNonEmpty(mapStringAny(source, "data"), mapStringAny(props, "data"))
-		mimeType := firstNonEmpty(mapStringAny(source, "media_type"), mapStringAny(props, "media_type"))
-		if url == "" && base64Data == "" {
-			return gatewaycontract.ContentBlock{}, false
-		}
-		base.Type = gatewaycontract.ContentBlockImage
-		base.Text = "[image]"
-		base.MediaURL = url
-		base.MediaBase64 = base64Data
-		base.MIMEType = mimeType
-		base.Metadata = props
-		return base, true
+		return anthropicImageContentBlock(props, base)
 	case apiopenapi.AnthropicContentBlockTypeToolUse:
 		base.Type = gatewaycontract.ContentBlockToolCall
 		base.Text = "[tool_use]"
@@ -180,13 +167,11 @@ func anthropicContentBlock(block apiopenapi.AnthropicContentBlock, role string) 
 		base.Metadata = props
 		return base, base.ToolCallID != "" || base.ToolName != "" || base.ToolArgumentsJSON != ""
 	case apiopenapi.AnthropicContentBlockTypeToolResult:
-		base.Type = gatewaycontract.ContentBlockToolResult
-		base.ToolCallID = mapStringAny(props, "tool_use_id")
-		base.ToolResultForID = base.ToolCallID
-		base.ToolResultIsError = mapBoolAny(props, "is_error")
-		base.Text = anthropicToolResultText(block, props)
-		base.Metadata = props
-		return base, base.ToolCallID != "" || base.Text != ""
+		items := anthropicToolResultContentBlocks(block, role)
+		if len(items) == 0 {
+			return gatewaycontract.ContentBlock{}, false
+		}
+		return items[0], true
 	default:
 		if block.Text == nil {
 			return gatewaycontract.ContentBlock{}, false
@@ -201,14 +186,89 @@ func anthropicContentBlock(block apiopenapi.AnthropicContentBlock, role string) 
 	}
 }
 
-func anthropicToolResultText(block apiopenapi.AnthropicContentBlock, props map[string]any) string {
+func anthropicContentBlocksFromBlock(block apiopenapi.AnthropicContentBlock, role string) []gatewaycontract.ContentBlock {
+	if block.Type != apiopenapi.AnthropicContentBlockTypeToolResult {
+		if item, ok := anthropicContentBlock(block, role); ok {
+			return []gatewaycontract.ContentBlock{item}
+		}
+		return nil
+	}
+	return anthropicToolResultContentBlocks(block, role)
+}
+
+func anthropicImageContentBlock(props map[string]any, base gatewaycontract.ContentBlock) (gatewaycontract.ContentBlock, bool) {
+	source, _ := props["source"].(map[string]any)
+	url := firstNonEmpty(mapStringAny(source, "url"), mapStringAny(props, "url"))
+	base64Data := firstNonEmpty(mapStringAny(source, "data"), mapStringAny(props, "data"))
+	mimeType := firstNonEmpty(mapStringAny(source, "media_type"), mapStringAny(props, "media_type"))
+	if url == "" && base64Data == "" {
+		return gatewaycontract.ContentBlock{}, false
+	}
+	base.Type = gatewaycontract.ContentBlockImage
+	base.Text = "[image]"
+	base.MediaURL = url
+	base.MediaBase64 = base64Data
+	base.MIMEType = mimeType
+	base.Metadata = props
+	return base, true
+}
+
+func anthropicToolResultContentBlocks(block apiopenapi.AnthropicContentBlock, role string) []gatewaycontract.ContentBlock {
+	base := sourceContentBlockBase(role, gatewaycontract.ProtocolAnthropicCompatible, block)
+	props := cloneMap(block.AdditionalProperties)
+	base.Type = gatewaycontract.ContentBlockToolResult
+	base.ToolCallID = mapStringAny(props, "tool_use_id")
+	base.ToolResultForID = base.ToolCallID
+	base.ToolResultIsError = mapBoolAny(props, "is_error")
+	base.Metadata = props
+
+	text, mediaBlocks := anthropicToolResultContent(block, props, role)
+	base.Text = text
+	if base.ToolCallID == "" && base.Text == "" && len(mediaBlocks) == 0 {
+		return nil
+	}
+	out := []gatewaycontract.ContentBlock{base}
+	return append(out, mediaBlocks...)
+}
+
+func anthropicToolResultContent(block apiopenapi.AnthropicContentBlock, props map[string]any, role string) (string, []gatewaycontract.ContentBlock) {
 	if block.Text != nil {
-		return strings.TrimSpace(*block.Text)
+		return strings.TrimSpace(*block.Text), nil
 	}
-	if text := mapStringAny(props, "content"); text != "" {
-		return text
+	if text, ok := props["content"].(string); ok {
+		return strings.TrimSpace(text), nil
 	}
-	return jsonStringOrMarshal(props["content"])
+	items, ok := props["content"].([]any)
+	if !ok {
+		return jsonStringOrMarshal(props["content"]), nil
+	}
+	texts := make([]string, 0, len(items))
+	mediaBlocks := make([]gatewaycontract.ContentBlock, 0)
+	for _, item := range items {
+		nested, ok := item.(map[string]any)
+		if !ok {
+			if text := jsonStringOrMarshal(item); text != "" {
+				texts = append(texts, text)
+			}
+			continue
+		}
+		switch strings.TrimSpace(mapStringAny(nested, "type")) {
+		case "text":
+			if text := mapStringAny(nested, "text"); text != "" {
+				texts = append(texts, text)
+			}
+		case "image":
+			base := sourceContentBlockBase(role, gatewaycontract.ProtocolAnthropicCompatible, nested)
+			if mediaBlock, ok := anthropicImageContentBlock(cloneMap(nested), base); ok {
+				mediaBlocks = append(mediaBlocks, mediaBlock)
+			}
+		default:
+			if text := jsonStringOrMarshal(nested); text != "" {
+				texts = append(texts, text)
+			}
+		}
+	}
+	return strings.Join(texts, "\n\n"), mediaBlocks
 }
 
 func geminiContentBlock(part apiopenapi.GeminiPart, role string) (gatewaycontract.ContentBlock, bool) {

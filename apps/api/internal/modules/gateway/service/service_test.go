@@ -271,6 +271,65 @@ func TestNormalizeAnthropicMessagesDoesNotTreatFunctionNamedWebSearchAsHosted(t 
 	}
 }
 
+func TestNormalizeAnthropicMessagesPreservesToolResultImages(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	blocks := []apiopenapi.AnthropicContentBlock{{
+		Type: apiopenapi.AnthropicContentBlockTypeToolResult,
+		AdditionalProperties: map[string]any{
+			"tool_use_id": "toolu_1",
+			"content": []any{
+				map[string]any{"type": "text", "text": "File metadata: 800x600 PNG"},
+				map[string]any{
+					"type": "image",
+					"source": map[string]any{
+						"type":       "base64",
+						"media_type": "image/png",
+						"data":       "iVBOR",
+					},
+				},
+			},
+		},
+	}}
+	content := apiopenapi.AnthropicMessage_Content{}
+	if err := content.FromAnthropicMessageContent1(blocks); err != nil {
+		t.Fatalf("set message content: %v", err)
+	}
+	req := apiopenapi.AnthropicMessagesRequest{
+		Model:     "claude-sonnet",
+		MaxTokens: 32,
+		Messages: []apiopenapi.AnthropicMessage{{
+			Role:    apiopenapi.AnthropicMessageRoleUser,
+			Content: content,
+		}},
+	}
+
+	canonical := svc.NormalizeAnthropicMessages(req, RequestMeta{SourceEndpoint: "/v1/messages"})
+
+	if len(canonical.Messages) != 1 || len(canonical.Messages[0].Content) != 2 {
+		t.Fatalf("expected tool result plus nested image block, got %+v", canonical.Messages)
+	}
+	toolResult := canonical.Messages[0].Content[0]
+	if toolResult.Type != gatewaycontract.ContentBlockToolResult ||
+		toolResult.ToolResultForID != "toolu_1" ||
+		toolResult.Text != "File metadata: 800x600 PNG" {
+		t.Fatalf("unexpected tool result block: %+v", toolResult)
+	}
+	image := canonical.Messages[0].Content[1]
+	if image.Type != gatewaycontract.ContentBlockImage ||
+		image.MediaBase64 != "iVBOR" ||
+		image.MIMEType != "image/png" ||
+		image.OriginProtocol != string(gatewaycontract.ProtocolAnthropicCompatible) {
+		t.Fatalf("unexpected nested image block: %+v", image)
+	}
+	if !requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyVisionInput) ||
+		!requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyToolCalling) {
+		t.Fatalf("expected vision and tool calling capabilities, got %+v", canonical.RequestCapabilities)
+	}
+}
+
 func TestRenderProtocolResponses(t *testing.T) {
 	svc, err := New()
 	if err != nil {

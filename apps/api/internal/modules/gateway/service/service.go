@@ -732,9 +732,7 @@ func anthropicMessageBlocks(content apiopenapi.AnthropicMessage_Content, role st
 func anthropicContentBlocks(blocks []apiopenapi.AnthropicContentBlock, role string) []gatewaycontract.ContentBlock {
 	out := make([]gatewaycontract.ContentBlock, 0, len(blocks))
 	for _, block := range blocks {
-		if item, ok := anthropicContentBlock(block, role); ok {
-			out = append(out, item)
-		}
+		out = append(out, anthropicContentBlocksFromBlock(block, role)...)
 	}
 	return out
 }
@@ -1300,6 +1298,9 @@ func requestCapabilities(req gatewaycontract.CanonicalRequest) []gatewaycontract
 	if len(req.Tools) > 0 || req.ToolChoice != nil {
 		out = append(out, gatewaycontract.RequestCapability{Key: capabilitiescontract.KeyToolCalling, Version: "v1"})
 	}
+	if conversationEndpointHasAnyContentBlockType(req, gatewaycontract.ContentBlockToolCall, gatewaycontract.ContentBlockToolResult) {
+		out = append(out, gatewaycontract.RequestCapability{Key: capabilitiescontract.KeyToolCalling, Version: "v1"})
+	}
 	if requestUsesHostedWebSearch(req) {
 		out = append(out, gatewaycontract.RequestCapability{Key: capabilitiescontract.KeyWebSearch, Version: "v1"})
 	}
@@ -1341,6 +1342,15 @@ func conversationEndpointHasContentBlockType(req gatewaycontract.CanonicalReques
 			if block.Type == blockType {
 				return true
 			}
+		}
+	}
+	return false
+}
+
+func conversationEndpointHasAnyContentBlockType(req gatewaycontract.CanonicalRequest, blockTypes ...gatewaycontract.ContentBlockType) bool {
+	for _, blockType := range blockTypes {
+		if conversationEndpointHasContentBlockType(req, blockType) {
+			return true
 		}
 	}
 	return false
