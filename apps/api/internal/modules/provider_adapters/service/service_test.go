@@ -2298,6 +2298,68 @@ func TestAnthropicCompatibleAdapterRendersBlockContentToUpstream(t *testing.T) {
 	}
 }
 
+func TestAnthropicCompatibleAdapterPreservesBlockCacheControl(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload struct {
+			Messages []struct {
+				Role    string           `json:"role"`
+				Content []map[string]any `json:"content"`
+			} `json:"messages"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		if len(payload.Messages) != 2 {
+			t.Fatalf("expected user and tool result messages, got %+v", payload.Messages)
+		}
+		textCache, _ := payload.Messages[0].Content[0]["cache_control"].(map[string]any)
+		if payload.Messages[0].Role != "user" ||
+			payload.Messages[0].Content[0]["type"] != "text" ||
+			textCache["type"] != "ephemeral" ||
+			textCache["ttl"] != "1h" {
+			t.Fatalf("expected text cache_control to be preserved, got %+v", payload.Messages[0])
+		}
+		resultCache, _ := payload.Messages[1].Content[0]["cache_control"].(map[string]any)
+		if payload.Messages[1].Role != "user" ||
+			payload.Messages[1].Content[0]["type"] != "tool_result" ||
+			resultCache["type"] != "ephemeral" {
+			t.Fatalf("expected tool result cache_control to be preserved, got %+v", payload.Messages[1])
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"content":[{"type":"text","text":"done"}],"usage":{"input_tokens":5,"output_tokens":1}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID: "req_anthropic_cache_control",
+		Model:     "claude-local",
+		Messages: []contract.ConversationMessage{
+			{Role: "user", Parts: []contract.ContentPart{{
+				Kind:     contract.ContentPartText,
+				Text:     "cached context",
+				Metadata: map[string]any{"cache_control": map[string]any{"type": "ephemeral", "ttl": "1h"}, "internal_note": "drop"},
+			}}},
+			{Role: "tool", Parts: []contract.ContentPart{{
+				Kind:            contract.ContentPartToolResult,
+				ToolResultForID: "call_1",
+				Text:            "sunny",
+				Metadata:        map[string]any{"cache_control": map[string]any{"type": "ephemeral"}},
+			}}},
+		},
+		Provider:   providercontract.Provider{AdapterType: "anthropic-compatible", Protocol: "anthropic-compatible"},
+		Account:    accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "claude-upstream"},
+		Credential: map[string]any{"api_key": "anthropic-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke anthropic upstream: %v", err)
+	}
+}
+
 func TestAnthropicCompatibleAdapterPreservesSameProtocolRawBody(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var payload map[string]any

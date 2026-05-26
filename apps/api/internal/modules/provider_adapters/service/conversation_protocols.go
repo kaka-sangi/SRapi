@@ -388,8 +388,11 @@ func anthropicContentFromParts(parts []contract.ContentPart) any {
 		switch part.Kind {
 		case "", contract.ContentPartText, contract.ContentPartRefusal:
 			if text := strings.TrimSpace(part.Text); text != "" {
+				if anthropicPartHasBlockMetadata(part) {
+					plainTextOnly = false
+				}
 				textParts = append(textParts, text)
-				blocks = append(blocks, map[string]any{"type": "text", "text": text})
+				blocks = append(blocks, anthropicBlockWithMetadata(map[string]any{"type": "text", "text": text}, part))
 			}
 		case contract.ContentPartThinking:
 			plainTextOnly = false
@@ -415,6 +418,7 @@ func anthropicContentFromParts(parts []contract.ContentPart) any {
 			} else {
 				block["input"] = map[string]any{}
 			}
+			block = anthropicBlockWithMetadata(block, part)
 			blocks = append(blocks, block)
 		case contract.ContentPartToolResult:
 			plainTextOnly = false
@@ -426,11 +430,15 @@ func anthropicContentFromParts(parts []contract.ContentPart) any {
 			if part.ToolResultIsError {
 				block["is_error"] = true
 			}
+			block = anthropicBlockWithMetadata(block, part)
 			blocks = append(blocks, block)
 		default:
 			if text := strings.TrimSpace(part.Text); text != "" {
+				if anthropicPartHasBlockMetadata(part) {
+					plainTextOnly = false
+				}
 				textParts = append(textParts, text)
-				blocks = append(blocks, map[string]any{"type": "text", "text": text})
+				blocks = append(blocks, anthropicBlockWithMetadata(map[string]any{"type": "text", "text": text}, part))
 			}
 		}
 	}
@@ -456,7 +464,7 @@ func anthropicImageBlock(part contract.ContentPart) map[string]any {
 	if len(source) == 0 {
 		return nil
 	}
-	return map[string]any{"type": "image", "source": source}
+	return anthropicBlockWithMetadata(map[string]any{"type": "image", "source": source}, part)
 }
 
 func anthropicThinkingBlock(part contract.ContentPart) map[string]any {
@@ -467,6 +475,32 @@ func anthropicThinkingBlock(part contract.ContentPart) map[string]any {
 	block := map[string]any{"type": "thinking", "thinking": text}
 	if signature := metadataString(part.Metadata, "signature"); signature != "" {
 		block["signature"] = signature
+	}
+	return anthropicBlockWithMetadata(block, part)
+}
+
+func anthropicPartHasBlockMetadata(part contract.ContentPart) bool {
+	for _, key := range []string{"cache_control", "citations"} {
+		if value, ok := part.Metadata[key]; ok && value != nil {
+			return true
+		}
+	}
+	return false
+}
+
+func anthropicBlockWithMetadata(block map[string]any, part contract.ContentPart) map[string]any {
+	if len(block) == 0 || len(part.Metadata) == 0 {
+		return block
+	}
+	for _, key := range []string{"cache_control", "citations"} {
+		value, ok := part.Metadata[key]
+		if !ok || value == nil {
+			continue
+		}
+		if _, exists := block[key]; exists {
+			continue
+		}
+		block[key] = cloneAny(value)
 	}
 	return block
 }
