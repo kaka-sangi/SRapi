@@ -835,6 +835,10 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 			}
 		}
 		switch eventType {
+		case "response.output_item.added":
+			if streamEvent, ok := functionStates.startEvent(event, eventType, data); ok {
+				appendStreamEvent(streamEvent)
+			}
 		case "response.output_item.done":
 			if event.Item != nil {
 				if event.OutputIndex != nil {
@@ -1065,6 +1069,31 @@ func (s *codexFunctionCallStreamStates) mergeEvent(event codexResponsesEvent) {
 func (s *codexFunctionCallStreamStates) hasArgumentDeltas(event codexResponsesEvent) bool {
 	state := s.stateFor(event)
 	return state.ArgumentsLen > 0
+}
+
+func (s *codexFunctionCallStreamStates) startEvent(event codexResponsesEvent, eventType string, raw string) (contract.ConversationStreamEvent, bool) {
+	if event.Item == nil || !codexOutputItemIsFunctionCall(*event.Item) {
+		return contract.ConversationStreamEvent{}, false
+	}
+	state := s.stateFor(event)
+	part := contract.ContentPart{
+		Kind:           contract.ContentPartToolUse,
+		ToolCallID:     firstNonEmpty(state.CallID, state.ItemID),
+		ToolName:       state.Name,
+		Metadata:       map[string]any{"type": "function_call"},
+		OriginProtocol: "openai-compatible",
+	}
+	if part.ToolCallID == "" && part.ToolName == "" {
+		return contract.ConversationStreamEvent{}, false
+	}
+	return contract.ConversationStreamEvent{
+		Type:           contract.ConversationStreamEventToolCallDelta,
+		ContentIndex:   state.OutputIndex,
+		Delta:          part,
+		RawEventType:   eventType,
+		Raw:            append(json.RawMessage(nil), raw...),
+		OriginProtocol: "openai-compatible",
+	}, true
 }
 
 func (s *codexFunctionCallStreamStates) deltaEvent(event codexResponsesEvent, eventType string, raw string) contract.ConversationStreamEvent {

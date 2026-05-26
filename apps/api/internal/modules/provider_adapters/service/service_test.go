@@ -4874,18 +4874,74 @@ func TestReverseProxyCodexCLIAdapterPreservesFunctionCallArgumentDeltas(t *testi
 	}
 	assertToolUsePart(t, resp.Parts[0], "call_1", "lookup", `{"query":"weather"}`)
 	toolEvents := conversationStreamEventsByType(resp.StreamEvents, contract.ConversationStreamEventToolCallDelta)
-	if len(toolEvents) != 2 {
-		t.Fatalf("expected two Codex function argument delta events, got %+v", resp.StreamEvents)
+	if len(toolEvents) != 3 {
+		t.Fatalf("expected Codex function start plus two argument delta events, got %+v", resp.StreamEvents)
 	}
-	if toolEvents[0].Delta.ToolCallID != "call_1" || toolEvents[0].Delta.ToolName != "lookup" || toolEvents[0].Delta.ToolArgumentsJSON != `{"query":` {
-		t.Fatalf("expected first Codex argument delta, got %+v", toolEvents[0])
+	if toolEvents[0].RawEventType != "response.output_item.added" || toolEvents[0].Delta.ToolCallID != "call_1" || toolEvents[0].Delta.ToolName != "lookup" || toolEvents[0].Delta.ToolArgumentsJSON != "" {
+		t.Fatalf("expected Codex function start event, got %+v", toolEvents[0])
 	}
-	if toolEvents[1].Delta.ToolCallID != "call_1" || toolEvents[1].Delta.ToolName != "lookup" || toolEvents[1].Delta.ToolArgumentsJSON != `"weather"}` {
-		t.Fatalf("expected second Codex argument delta, got %+v", toolEvents[1])
+	if toolEvents[1].Delta.ToolCallID != "call_1" || toolEvents[1].Delta.ToolName != "lookup" || toolEvents[1].Delta.ToolArgumentsJSON != `{"query":` {
+		t.Fatalf("expected first Codex argument delta, got %+v", toolEvents[1])
+	}
+	if toolEvents[2].Delta.ToolCallID != "call_1" || toolEvents[2].Delta.ToolName != "lookup" || toolEvents[2].Delta.ToolArgumentsJSON != `"weather"}` {
+		t.Fatalf("expected second Codex argument delta, got %+v", toolEvents[2])
 	}
 	if resp.StreamEvents[len(resp.StreamEvents)-1].Type != contract.ConversationStreamEventStop {
 		t.Fatalf("expected Codex terminal stop stream event, got %+v", resp.StreamEvents)
 	}
+}
+
+func TestReverseProxyCodexCLIAdapterPreservesFunctionCallStartEvent(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body: []byte(
+				"data: {\"type\":\"response.output_item.added\",\"output_index\":1,\"item\":{\"type\":\"function_call\",\"id\":\"fc_1\",\"call_id\":\"call_1\",\"name\":\"lookup\"}}\n\n" +
+					"data: {\"type\":\"response.function_call_arguments.delta\",\"item_id\":\"fc_1\",\"output_index\":1,\"delta\":\"{\\\"city\\\":\"}\n\n" +
+					"data: {\"type\":\"response.function_call_arguments.delta\",\"item_id\":\"fc_1\",\"output_index\":1,\"delta\":\"\\\"Tokyo\\\"}\"}\n\n" +
+					"data: {\"type\":\"response.output_item.done\",\"output_index\":1,\"item\":{\"type\":\"function_call\",\"id\":\"fc_1\",\"call_id\":\"call_1\",\"name\":\"lookup\",\"arguments\":\"{\\\"city\\\":\\\"Tokyo\\\"}\"}}\n\n" +
+					"data: {\"type\":\"response.completed\",\"response\":{\"output\":[],\"usage\":{\"input_tokens\":4,\"output_tokens\":2}}}\n\n" +
+					"data: [DONE]\n\n",
+			),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_codex_tool_start",
+		Model:      "codex-local",
+		InputParts: textParts("call lookup"),
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": "https://codex.example.test/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+		Credential: map[string]any{"cli_client_token": "codex-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke codex reverse proxy adapter: %v", err)
+	}
+	toolEvents := conversationStreamEventsByType(resp.StreamEvents, contract.ConversationStreamEventToolCallDelta)
+	if len(toolEvents) != 3 {
+		t.Fatalf("expected Codex function call start plus two argument deltas, got %+v", resp.StreamEvents)
+	}
+	start := toolEvents[0]
+	if start.RawEventType != "response.output_item.added" || start.ContentIndex != 1 || start.Delta.ToolCallID != "call_1" || start.Delta.ToolName != "lookup" || start.Delta.ToolArgumentsJSON != "" {
+		t.Fatalf("expected Codex function call start event, got %+v", start)
+	}
+	if toolEvents[1].Delta.ToolArgumentsJSON != `{"city":` || toolEvents[2].Delta.ToolArgumentsJSON != `"Tokyo"}` {
+		t.Fatalf("expected Codex argument deltas after start, got %+v", toolEvents)
+	}
+	assertToolUsePart(t, resp.Parts[0], "call_1", "lookup", `{"city":"Tokyo"}`)
 }
 
 func TestReverseProxyCodexCLIAdapterPreservesRefusalDeltas(t *testing.T) {
