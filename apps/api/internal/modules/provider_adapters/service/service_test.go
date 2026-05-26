@@ -3369,6 +3369,98 @@ func TestReverseProxyCodexCLIAdapterPreservesResponsesToolResultImageInputs(t *t
 	}
 }
 
+func TestReverseProxyCodexCLIAdapterPreservesResponsesFunctionCallInputs(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/backend-api/codex/responses" {
+			t.Fatalf("unexpected codex upstream path %s", r.URL.Path)
+		}
+		var payload struct {
+			Input []struct {
+				Type      string `json:"type"`
+				Role      string `json:"role"`
+				CallID    string `json:"call_id"`
+				Name      string `json:"name"`
+				Arguments string `json:"arguments"`
+				Output    string `json:"output"`
+				Content   []struct {
+					Type string `json:"type"`
+					Text string `json:"text"`
+				} `json:"content"`
+			} `json:"input"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode codex payload: %v", err)
+		}
+		if len(payload.Input) != 3 {
+			t.Fatalf("expected assistant message, function call, and function output items, got %+v", payload.Input)
+		}
+		if payload.Input[0].Type != "message" ||
+			payload.Input[0].Role != "assistant" ||
+			len(payload.Input[0].Content) != 1 ||
+			payload.Input[0].Content[0].Type != "output_text" ||
+			payload.Input[0].Content[0].Text != "I will check." {
+			t.Fatalf("expected assistant message item, got %+v", payload.Input[0])
+		}
+		if payload.Input[1].Type != "function_call" ||
+			payload.Input[1].CallID != "call_1" ||
+			payload.Input[1].Name != "lookup_weather" ||
+			payload.Input[1].Arguments != `{"city":"Boston"}` {
+			t.Fatalf("expected function_call item, got %+v", payload.Input[1])
+		}
+		if payload.Input[2].Type != "function_call_output" ||
+			payload.Input[2].CallID != "call_1" ||
+			payload.Input[2].Output != `{"forecast":"sunny"}` {
+			t.Fatalf("expected function_call_output item, got %+v", payload.Input[2])
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: {\"type\":\"response.output_text.delta\",\"delta\":\"ok\"}\n\ndata: [DONE]\n\n"))
+	}))
+	defer upstream.Close()
+
+	runtime, err := reverseproxyservice.New(nil)
+	if err != nil {
+		t.Fatalf("create reverse proxy runtime: %v", err)
+	}
+	svc, err := service.NewWithReverseProxy(nil, runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_codex_function_call_input",
+		Model:          "codex-local",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/responses",
+		Messages: []contract.ConversationMessage{
+			{Role: "assistant", Parts: []contract.ContentPart{
+				{Kind: contract.ContentPartText, Text: "I will check."},
+				toolUsePart("call_1", "lookup_weather", `{"city":"Boston"}`),
+			}},
+			{Role: "tool", Parts: []contract.ContentPart{
+				toolResultPart("call_1", `{"forecast":"sunny"}`),
+			}},
+		},
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": upstream.URL + "/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+		Credential: map[string]any{"cli_client_token": "codex-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke codex upstream: %v", err)
+	}
+	if conversationResponseText(resp) != "ok" {
+		t.Fatalf("unexpected codex response: %+v", resp)
+	}
+}
+
 func TestReverseProxyCodexCLIAdapterStreamsMultilineSSEData(t *testing.T) {
 	rawSSE := "data: {\"type\":\"response.output_text.delta\",\n" +
 		"data: \"delta\":\"codex\"}\n\n" +

@@ -29,6 +29,8 @@ type codexResponsesInputItem struct {
 	Role    string                       `json:"role,omitempty"`
 	Content []codexResponsesInputContent `json:"content,omitempty"`
 	CallID  string                       `json:"call_id,omitempty"`
+	Name    string                       `json:"name,omitempty"`
+	Args    string                       `json:"arguments,omitempty"`
 	Output  string                       `json:"output,omitempty"`
 }
 
@@ -454,6 +456,13 @@ func codexResponsesInputItemsFromMessage(role string, parts []contract.ContentPa
 	}
 	for _, part := range parts {
 		switch part.Kind {
+		case contract.ContentPartToolUse:
+			item, ok := codexResponsesFunctionCallItem(part)
+			if !ok {
+				continue
+			}
+			flushMessage()
+			out = append(out, item)
 		case contract.ContentPartToolResult:
 			callID := strings.TrimSpace(firstNonEmpty(part.ToolResultForID, part.ToolCallID))
 			if callID == "" {
@@ -473,6 +482,21 @@ func codexResponsesInputItemsFromMessage(role string, parts []contract.ContentPa
 	}
 	flushMessage()
 	return out
+}
+
+func codexResponsesFunctionCallItem(part contract.ContentPart) (codexResponsesInputItem, bool) {
+	callID := strings.TrimSpace(part.ToolCallID)
+	name := strings.TrimSpace(part.ToolName)
+	arguments := strings.TrimSpace(part.ToolArgumentsJSON)
+	if callID == "" && name == "" && arguments == "" {
+		return codexResponsesInputItem{}, false
+	}
+	return codexResponsesInputItem{
+		Type:   "function_call",
+		CallID: callID,
+		Name:   name,
+		Args:   arguments,
+	}, true
 }
 
 func codexResponsesInputContentFromPart(role string, part contract.ContentPart) (codexResponsesInputContent, bool) {
