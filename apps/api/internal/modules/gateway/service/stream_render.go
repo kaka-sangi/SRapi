@@ -822,10 +822,7 @@ func (s *Service) RenderAnthropicMessagesStreamEvents(resp gatewaycontract.Canon
 					"content":       []any{},
 					"stop_reason":   nil,
 					"stop_sequence": nil,
-					"usage": map[string]any{
-						"input_tokens":  resp.Usage.InputTokens,
-						"output_tokens": 0,
-					},
+					"usage":         anthropicStreamUsage(ptrInt(resp.Usage.InputTokens), ptrInt(0), resp.Usage.CachedTokens),
 				},
 			},
 		},
@@ -866,9 +863,7 @@ func (s *Service) RenderAnthropicMessagesStreamEvents(resp gatewaycontract.Canon
 					"stop_reason":   anthropicStopReason(resp.StopReason),
 					"stop_sequence": nil,
 				},
-				"usage": map[string]any{
-					"output_tokens": resp.Usage.OutputTokens,
-				},
+				"usage": anthropicStreamUsage(nil, ptrInt(resp.Usage.OutputTokens), 0),
 			},
 		},
 		StreamEvent{
@@ -898,10 +893,7 @@ func (s *Service) renderAnthropicCanonicalStreamEvents(resp gatewaycontract.Cano
 				"content":       []any{},
 				"stop_reason":   nil,
 				"stop_sequence": nil,
-				"usage": map[string]any{
-					"input_tokens":  resp.Usage.InputTokens,
-					"output_tokens": 0,
-				},
+				"usage":         anthropicStreamUsage(ptrInt(resp.Usage.InputTokens), ptrInt(0), resp.Usage.CachedTokens),
 			},
 		},
 	}}
@@ -990,9 +982,7 @@ func (s *Service) renderAnthropicCanonicalStreamEvents(resp gatewaycontract.Cano
 			Data: map[string]any{
 				"type":  "message_delta",
 				"delta": delta,
-				"usage": map[string]any{
-					"output_tokens": outputTokens,
-				},
+				"usage": anthropicStreamUsage(nil, ptrInt(outputTokens), 0),
 			},
 		})
 	}
@@ -1003,6 +993,20 @@ func (s *Service) renderAnthropicCanonicalStreamEvents(resp gatewaycontract.Cano
 		},
 	})
 	return out
+}
+
+func anthropicStreamUsage(inputTokens *int, outputTokens *int, cachedTokens int) map[string]any {
+	usage := map[string]any{}
+	if inputTokens != nil {
+		usage["input_tokens"] = *inputTokens
+	}
+	if outputTokens != nil {
+		usage["output_tokens"] = *outputTokens
+	}
+	if cachedTokens > 0 {
+		usage["cache_read_input_tokens"] = cachedTokens
+	}
+	return usage
 }
 
 func anthropicStreamEventStartBlock(event gatewaycontract.StreamEvent) gatewaycontract.ContentBlock {

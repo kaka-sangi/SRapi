@@ -1689,10 +1689,14 @@ func tokenUsage(usage gatewaycontract.Usage) *apiopenapi.TokenUsage {
 }
 
 func anthropicUsage(usage gatewaycontract.Usage) *apiopenapi.AnthropicUsage {
-	return &apiopenapi.AnthropicUsage{
+	rendered := &apiopenapi.AnthropicUsage{
 		InputTokens:  ptrInt(usage.InputTokens),
 		OutputTokens: ptrInt(usage.OutputTokens),
 	}
+	if usage.CachedTokens > 0 {
+		rendered.CacheReadInputTokens = ptrInt(usage.CachedTokens)
+	}
+	return rendered
 }
 
 func geminiUsage(usage gatewaycontract.Usage) *apiopenapi.GeminiUsageMetadata {

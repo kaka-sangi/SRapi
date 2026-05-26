@@ -576,6 +576,45 @@ func TestRenderAnthropicMessagesPreservesThinkingBlocks(t *testing.T) {
 	}
 }
 
+func TestRenderAnthropicMessagesPreservesCachedUsage(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	resp := gatewaycontract.CanonicalResponse{
+		ID:         "resp_anthropic_cached_usage",
+		Model:      "claude-local",
+		StopReason: "end_turn",
+		OutputItems: []gatewaycontract.ContentBlock{{
+			Type: gatewaycontract.ContentBlockText,
+			Role: "assistant",
+			Text: "cached response",
+		}},
+		Usage: gatewaycontract.Usage{InputTokens: 10, OutputTokens: 3, CachedTokens: 4},
+	}
+
+	anthropic := svc.RenderAnthropicMessages(resp)
+	if anthropic.Usage == nil || anthropic.Usage.CacheReadInputTokens == nil || *anthropic.Usage.CacheReadInputTokens != 4 {
+		t.Fatalf("expected anthropic cache read usage, got %+v", anthropic.Usage)
+	}
+
+	events := svc.RenderAnthropicMessagesStreamEvents(resp)
+	messageStart := streamEventByName(events, "message_start")
+	messageDelta := streamEventByName(events, "message_delta")
+	if messageStart == nil || messageDelta == nil {
+		t.Fatalf("expected anthropic usage events, got %+v", events)
+	}
+	startMessage, _ := messageStart.Data["message"].(map[string]any)
+	startUsage, _ := startMessage["usage"].(map[string]any)
+	deltaUsage, _ := messageDelta.Data["usage"].(map[string]any)
+	if startUsage["cache_read_input_tokens"] != 4 {
+		t.Fatalf("expected cached usage in stream events, got start=%+v delta=%+v", startUsage, deltaUsage)
+	}
+	if _, ok := deltaUsage["cache_read_input_tokens"]; ok {
+		t.Fatalf("did not expect input cache usage on message_delta, got %+v", deltaUsage)
+	}
+}
+
 func TestRenderProtocolResponsesPreservesToolCallOutput(t *testing.T) {
 	svc, err := New()
 	if err != nil {
