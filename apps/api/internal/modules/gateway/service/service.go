@@ -424,7 +424,7 @@ func (s *Service) BuildConversationResponse(model, canonicalModel, text string, 
 	}}, "end_turn", estimateUsage(text), warnings)
 }
 
-func (s *Service) BuildCanonicalConversationResponse(req gatewaycontract.CanonicalRequest, outputItems []gatewaycontract.ContentBlock, stopReason string, usage gatewaycontract.Usage, warnings []string, rawProviderMetadata []byte) gatewaycontract.CanonicalResponse {
+func (s *Service) BuildCanonicalConversationResponse(req gatewaycontract.CanonicalRequest, outputItems []gatewaycontract.ContentBlock, stopReason string, usage gatewaycontract.Usage, warnings []string, rawProviderMetadata []byte, streamEvents []gatewaycontract.StreamEvent) gatewaycontract.CanonicalResponse {
 	model := strings.TrimSpace(req.Model)
 	if model == "" {
 		model = req.CanonicalModel
@@ -441,6 +441,7 @@ func (s *Service) BuildCanonicalConversationResponse(req gatewaycontract.Canonic
 	warnings = append(append([]string(nil), req.CompatibilityWarnings...), warnings...)
 	resp := s.buildConversationResponse(req.RequestID, model, canonicalModel, outputItems, stopReason, usage, warnings)
 	resp.RawProviderMetadata = append([]byte(nil), rawProviderMetadata...)
+	resp.StreamEvents = normalizeStreamEvents(streamEvents)
 	return resp
 }
 
@@ -882,7 +883,179 @@ func (s *Service) RenderChatStreamChunk(resp gatewaycontract.CanonicalResponse) 
 	return chunk
 }
 
+func (s *Service) RenderChatStreamChunks(resp gatewaycontract.CanonicalResponse) []map[string]any {
+	events := normalizeStreamEvents(resp.StreamEvents)
+	if len(events) == 0 {
+		return []map[string]any{s.RenderChatStreamChunk(resp)}
+	}
+	chunks := make([]map[string]any, 0, len(events))
+	for _, event := range events {
+		switch event.Type {
+		case gatewaycontract.StreamEventContentDelta, gatewaycontract.StreamEventReasoning, gatewaycontract.StreamEventToolResult:
+			if text := event.Delta.Text; text != "" {
+				chunks = append(chunks, chatStreamChunk(resp, map[string]any{"content": text}, nil, nil))
+			}
+		case gatewaycontract.StreamEventToolCallDelta:
+			toolCall := chatStreamToolCallDelta(event)
+			if toolCall != nil {
+				chunks = append(chunks, chatStreamChunk(resp, map[string]any{"tool_calls": []map[string]any{toolCall}}, nil, nil))
+			}
+		case gatewaycontract.StreamEventUsage:
+			chunk := chatStreamChunk(resp, nil, nil, tokenUsage(event.Usage))
+			chunk["choices"] = []map[string]any{}
+			chunks = append(chunks, chunk)
+		case gatewaycontract.StreamEventStop:
+			reason := firstNonEmpty(event.StopReason, resp.StopReason)
+			chunks = append(chunks, chatStreamChunk(resp, map[string]any{}, openAIChatFinishReason(reason), nil))
+		}
+	}
+	if len(chunks) == 0 {
+		return []map[string]any{s.RenderChatStreamChunk(resp)}
+	}
+	return chunks
+}
+
+func chatStreamChunk(resp gatewaycontract.CanonicalResponse, delta map[string]any, finishReason any, usage *apiopenapi.TokenUsage) map[string]any {
+	chunk := map[string]any{
+		"id":      "chatcmpl_" + responseID(resp),
+		"object":  "chat.completion.chunk",
+		"created": time.Now().Unix(),
+		"model":   resp.Model,
+		"choices": []map[string]any{
+			{
+				"index":         0,
+				"delta":         delta,
+				"finish_reason": finishReason,
+			},
+		},
+	}
+	if usage != nil {
+		chunk["usage"] = usage
+	}
+	if len(resp.CompatibilityWarnings) > 0 {
+		chunk["compatibility_warnings"] = append([]string(nil), resp.CompatibilityWarnings...)
+	}
+	return chunk
+}
+
+func chatStreamToolCallDelta(event gatewaycontract.StreamEvent) map[string]any {
+	call := map[string]any{
+		"index": event.ContentIndex,
+		"type":  "function",
+	}
+	if id := strings.TrimSpace(event.Delta.ToolCallID); id != "" {
+		call["id"] = id
+	}
+	function := map[string]any{}
+	if name := strings.TrimSpace(event.Delta.ToolName); name != "" {
+		function["name"] = name
+	}
+	if args := event.Delta.ToolArgumentsJSON; args != "" {
+		function["arguments"] = args
+	}
+	if len(function) > 0 {
+		call["function"] = function
+	}
+	if len(call) <= 2 {
+		return nil
+	}
+	return call
+}
+
+func (s *Service) renderResponsesCanonicalStreamEvents(resp gatewaycontract.CanonicalResponse) []StreamEvent {
+	events := normalizeStreamEvents(resp.StreamEvents)
+	if !streamEventsHaveTextDelta(events) {
+		return nil
+	}
+	itemID := "msg_0"
+	out := []StreamEvent{
+		{
+			Event: "response.created",
+			Data: map[string]any{
+				"type": "response.created",
+				"response": map[string]any{
+					"id":         "resp_" + responseID(resp),
+					"object":     "response",
+					"created_at": time.Now().Unix(),
+					"model":      resp.Model,
+					"status":     "in_progress",
+				},
+			},
+		},
+		{
+			Event: "response.output_item.added",
+			Data: map[string]any{
+				"type":         "response.output_item.added",
+				"output_index": 0,
+				"item": map[string]any{
+					"id":      itemID,
+					"type":    "message",
+					"role":    "assistant",
+					"content": []any{},
+				},
+			},
+		},
+		{
+			Event: "response.content_part.added",
+			Data: map[string]any{
+				"type":          "response.content_part.added",
+				"item_id":       itemID,
+				"output_index":  0,
+				"content_index": 0,
+				"part": map[string]any{
+					"type": "output_text",
+					"text": "",
+				},
+			},
+		},
+	}
+	var text strings.Builder
+	for _, event := range events {
+		switch event.Type {
+		case gatewaycontract.StreamEventContentDelta, gatewaycontract.StreamEventReasoning, gatewaycontract.StreamEventToolResult:
+			delta := event.Delta.Text
+			if delta == "" {
+				continue
+			}
+			text.WriteString(delta)
+			out = append(out, StreamEvent{
+				Event: "response.output_text.delta",
+				Data: map[string]any{
+					"type":          "response.output_text.delta",
+					"item_id":       itemID,
+					"output_index":  0,
+					"content_index": 0,
+					"delta":         delta,
+				},
+			})
+		}
+	}
+	out = append(out,
+		StreamEvent{
+			Event: "response.output_text.done",
+			Data: map[string]any{
+				"type":          "response.output_text.done",
+				"item_id":       itemID,
+				"output_index":  0,
+				"content_index": 0,
+				"text":          text.String(),
+			},
+		},
+		StreamEvent{
+			Event: "response.completed",
+			Data: map[string]any{
+				"type":     "response.completed",
+				"response": s.RenderResponses(resp),
+			},
+		},
+	)
+	return out
+}
+
 func (s *Service) RenderResponsesStreamEvents(resp gatewaycontract.CanonicalResponse) []StreamEvent {
+	if events := s.renderResponsesCanonicalStreamEvents(resp); len(events) > 0 {
+		return events
+	}
 	id := "resp_" + responseID(resp)
 	completed := s.RenderResponses(resp)
 	createdAt := time.Now().Unix()
@@ -919,6 +1092,9 @@ func (s *Service) RenderResponsesStreamEvents(resp gatewaycontract.CanonicalResp
 }
 
 func (s *Service) RenderAnthropicMessagesStreamEvents(resp gatewaycontract.CanonicalResponse) []StreamEvent {
+	if events := s.renderAnthropicCanonicalStreamEvents(resp); len(events) > 0 {
+		return events
+	}
 	id := "msg_" + responseID(resp)
 	events := []StreamEvent{
 		{
@@ -992,7 +1168,152 @@ func (s *Service) RenderAnthropicMessagesStreamEvents(resp gatewaycontract.Canon
 	return events
 }
 
+func (s *Service) renderAnthropicCanonicalStreamEvents(resp gatewaycontract.CanonicalResponse) []StreamEvent {
+	events := normalizeStreamEvents(resp.StreamEvents)
+	if !streamEventsHaveTextDelta(events) {
+		return nil
+	}
+	out := []StreamEvent{{
+		Event: "message_start",
+		Data: map[string]any{
+			"type": "message_start",
+			"message": map[string]any{
+				"id":            "msg_" + responseID(resp),
+				"type":          "message",
+				"role":          "assistant",
+				"model":         resp.Model,
+				"content":       []any{},
+				"stop_reason":   nil,
+				"stop_sequence": nil,
+				"usage": map[string]any{
+					"input_tokens":  resp.Usage.InputTokens,
+					"output_tokens": 0,
+				},
+			},
+		},
+	}}
+	openBlocks := map[int]bool{}
+	openBlockOrder := make([]int, 0)
+	var pendingUsage *gatewaycontract.Usage
+	pendingStopReason := ""
+	for _, event := range events {
+		switch event.Type {
+		case gatewaycontract.StreamEventContentDelta, gatewaycontract.StreamEventReasoning, gatewaycontract.StreamEventToolCallDelta, gatewaycontract.StreamEventToolResult:
+			if !openBlocks[event.ContentIndex] {
+				openBlocks[event.ContentIndex] = true
+				openBlockOrder = append(openBlockOrder, event.ContentIndex)
+				out = append(out, StreamEvent{
+					Event: "content_block_start",
+					Data: map[string]any{
+						"type":          "content_block_start",
+						"index":         event.ContentIndex,
+						"content_block": anthropicStreamContentBlock(anthropicStreamEventStartBlock(event)),
+					},
+				})
+			}
+			if delta := anthropicStreamEventDelta(event); len(delta) > 0 {
+				out = append(out, StreamEvent{
+					Event: "content_block_delta",
+					Data: map[string]any{
+						"type":  "content_block_delta",
+						"index": event.ContentIndex,
+						"delta": delta,
+					},
+				})
+			}
+		case gatewaycontract.StreamEventUsage:
+			copied := event.Usage
+			pendingUsage = &copied
+		case gatewaycontract.StreamEventStop:
+			pendingStopReason = firstNonEmpty(event.StopReason, pendingStopReason)
+		}
+	}
+	for _, index := range openBlockOrder {
+		out = append(out, StreamEvent{
+			Event: "content_block_stop",
+			Data: map[string]any{
+				"type":  "content_block_stop",
+				"index": index,
+			},
+		})
+	}
+	if pendingUsage != nil || pendingStopReason != "" {
+		outputTokens := resp.Usage.OutputTokens
+		if pendingUsage != nil {
+			outputTokens = pendingUsage.OutputTokens
+		}
+		delta := map[string]any{}
+		if pendingStopReason != "" {
+			delta["stop_reason"] = anthropicStopReason(firstNonEmpty(pendingStopReason, resp.StopReason))
+			delta["stop_sequence"] = nil
+		}
+		out = append(out, StreamEvent{
+			Event: "message_delta",
+			Data: map[string]any{
+				"type":  "message_delta",
+				"delta": delta,
+				"usage": map[string]any{
+					"output_tokens": outputTokens,
+				},
+			},
+		})
+	}
+	out = append(out, StreamEvent{
+		Event: "message_stop",
+		Data: map[string]any{
+			"type": "message_stop",
+		},
+	})
+	return out
+}
+
+func anthropicStreamEventStartBlock(event gatewaycontract.StreamEvent) gatewaycontract.ContentBlock {
+	block := event.Delta
+	switch event.Type {
+	case gatewaycontract.StreamEventToolCallDelta:
+		block.Type = gatewaycontract.ContentBlockToolCall
+		block.ToolArgumentsJSON = ""
+	case gatewaycontract.StreamEventReasoning:
+		block.Type = gatewaycontract.ContentBlockReasoning
+		block.Text = ""
+	default:
+		block.Type = gatewaycontract.ContentBlockText
+		block.Text = ""
+	}
+	return block
+}
+
+func anthropicStreamEventDelta(event gatewaycontract.StreamEvent) map[string]any {
+	switch event.Type {
+	case gatewaycontract.StreamEventToolCallDelta:
+		if args := event.Delta.ToolArgumentsJSON; args != "" {
+			return map[string]any{
+				"type":         "input_json_delta",
+				"partial_json": args,
+			}
+		}
+	case gatewaycontract.StreamEventReasoning:
+		if text := event.Delta.Text; text != "" {
+			return map[string]any{
+				"type": "thinking_delta",
+				"text": text,
+			}
+		}
+	default:
+		if text := event.Delta.Text; text != "" {
+			return map[string]any{
+				"type": "text_delta",
+				"text": text,
+			}
+		}
+	}
+	return nil
+}
+
 func (s *Service) RenderGeminiGenerateContentStreamEvents(resp gatewaycontract.CanonicalResponse) []StreamEvent {
+	if events := s.renderGeminiCanonicalStreamEvents(resp); len(events) > 0 {
+		return events
+	}
 	rendered := s.RenderGeminiGenerateContent(resp)
 	return []StreamEvent{{
 		Data: map[string]any{
@@ -1003,6 +1324,89 @@ func (s *Service) RenderGeminiGenerateContentStreamEvents(resp gatewaycontract.C
 			"compatibilityWarnings": rendered.CompatibilityWarnings,
 		},
 	}}
+}
+
+func (s *Service) renderGeminiCanonicalStreamEvents(resp gatewaycontract.CanonicalResponse) []StreamEvent {
+	events := normalizeStreamEvents(resp.StreamEvents)
+	if !streamEventsHaveTextDelta(events) {
+		return nil
+	}
+	out := make([]StreamEvent, 0, len(events))
+	for _, event := range events {
+		switch event.Type {
+		case gatewaycontract.StreamEventContentDelta, gatewaycontract.StreamEventReasoning, gatewaycontract.StreamEventToolCallDelta, gatewaycontract.StreamEventToolResult:
+			part, ok := outputGeminiStreamPart(event.Delta)
+			if !ok {
+				continue
+			}
+			out = append(out, StreamEvent{Data: map[string]any{
+				"candidates": []apiopenapi.GeminiCandidate{{
+					Index: event.ContentIndex,
+					Content: apiopenapi.GeminiContent{
+						Parts: []apiopenapi.GeminiPart{part},
+					},
+				}},
+			}})
+		case gatewaycontract.StreamEventUsage:
+			out = append(out, StreamEvent{Data: map[string]any{
+				"candidates":    []apiopenapi.GeminiCandidate{},
+				"usageMetadata": geminiUsage(event.Usage),
+			}})
+		case gatewaycontract.StreamEventStop:
+			out = append(out, StreamEvent{Data: map[string]any{
+				"candidates": []apiopenapi.GeminiCandidate{{
+					Index:        event.ContentIndex,
+					FinishReason: geminiFinishReason(firstNonEmpty(event.StopReason, resp.StopReason)),
+					Content: apiopenapi.GeminiContent{
+						Parts: []apiopenapi.GeminiPart{},
+					},
+				}},
+			}})
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func outputGeminiStreamPart(block gatewaycontract.ContentBlock) (apiopenapi.GeminiPart, bool) {
+	part := apiopenapi.GeminiPart{}
+	switch block.Type {
+	case gatewaycontract.ContentBlockToolCall:
+		call := outputBlockProperties(block)
+		if args := parseJSONObject(block.ToolArgumentsJSON); len(args) > 0 {
+			call["args"] = args
+		}
+		functionCall := apiopenapi.JsonObject(call)
+		part.FunctionCall = &functionCall
+	case gatewaycontract.ContentBlockToolResult:
+		response := outputBlockProperties(block)
+		if block.Text != "" {
+			response["response"] = block.Text
+		}
+		functionResponse := apiopenapi.JsonObject(response)
+		part.FunctionResponse = &functionResponse
+	default:
+		text := block.Text
+		if text == "" {
+			return apiopenapi.GeminiPart{}, false
+		}
+		part.Text = &text
+	}
+	return part, true
+}
+
+func streamEventsHaveTextDelta(events []gatewaycontract.StreamEvent) bool {
+	for _, event := range events {
+		switch event.Type {
+		case gatewaycontract.StreamEventContentDelta, gatewaycontract.StreamEventReasoning, gatewaycontract.StreamEventToolResult:
+			if event.Delta.Text != "" {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func CapabilityDescriptors(req gatewaycontract.CanonicalRequest) []capabilitiescontract.Descriptor {

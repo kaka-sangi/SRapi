@@ -156,7 +156,7 @@ func (s *Server) handleCreateChatCompletion(w http.ResponseWriter, r *http.Reque
 	}
 	providerResp := failover.Response
 	usage := gatewayUsageFromProvider(providerResp)
-	canonicalResp := s.runtime.gateway.BuildCanonicalConversationResponse(canonical, gatewayContentBlocksFromProvider(providerResp.Parts), gatewayStopReasonFromProvider(providerResp.StopReason), usage, providerResp.Warnings, providerResp.Raw)
+	canonicalResp := s.runtime.gateway.BuildCanonicalConversationResponse(canonical, gatewayContentBlocksFromProvider(providerResp.Parts), gatewayStopReasonFromProvider(providerResp.StopReason), usage, providerResp.Warnings, providerResp.Raw, gatewayStreamEventsFromProvider(providerResp.StreamEvents))
 	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequest(model.ID, result.Candidate, canonicalResp.Usage), canonicalResp.Usage.Estimated)
 	s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 		RequestID:             canonical.RequestID,
@@ -186,7 +186,7 @@ func (s *Server) handleCreateChatCompletion(w http.ResponseWriter, r *http.Reque
 			writeRawSSEResponse(w, canonicalResp.RawProviderMetadata)
 			return
 		}
-		writeSSEJSON(w, s.runtime.gateway.RenderChatStreamChunk(canonicalResp))
+		writeSSEJSONChunks(w, s.runtime.gateway.RenderChatStreamChunks(canonicalResp))
 		return
 	}
 	if sameProtocolRawConversationResponse(canonical, result.Candidate.Provider.Protocol, result.Candidate.Provider.AdapterType, canonicalResp.RawProviderMetadata) {
@@ -318,7 +318,7 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 	}
 	providerResp := failover.Response
 	usage := gatewayUsageFromProvider(providerResp)
-	canonicalResp := s.runtime.gateway.BuildCanonicalConversationResponse(canonical, gatewayContentBlocksFromProvider(providerResp.Parts), gatewayStopReasonFromProvider(providerResp.StopReason), usage, providerResp.Warnings, providerResp.Raw)
+	canonicalResp := s.runtime.gateway.BuildCanonicalConversationResponse(canonical, gatewayContentBlocksFromProvider(providerResp.Parts), gatewayStopReasonFromProvider(providerResp.StopReason), usage, providerResp.Warnings, providerResp.Raw, gatewayStreamEventsFromProvider(providerResp.StreamEvents))
 	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequest(model.ID, result.Candidate, canonicalResp.Usage), canonicalResp.Usage.Estimated)
 	s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 		RequestID:             canonical.RequestID,
@@ -477,7 +477,7 @@ func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	providerResp := failover.Response
 	usage := gatewayUsageFromProvider(providerResp)
-	canonicalResp := s.runtime.gateway.BuildCanonicalConversationResponse(canonical, gatewayContentBlocksFromProvider(providerResp.Parts), gatewayStopReasonFromProvider(providerResp.StopReason), usage, providerResp.Warnings, providerResp.Raw)
+	canonicalResp := s.runtime.gateway.BuildCanonicalConversationResponse(canonical, gatewayContentBlocksFromProvider(providerResp.Parts), gatewayStopReasonFromProvider(providerResp.StopReason), usage, providerResp.Warnings, providerResp.Raw, gatewayStreamEventsFromProvider(providerResp.StreamEvents))
 	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequest(model.ID, result.Candidate, canonicalResp.Usage), canonicalResp.Usage.Estimated)
 	s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 		RequestID:             canonical.RequestID,
@@ -811,7 +811,7 @@ func (s *Server) handleGeminiModelAction(w http.ResponseWriter, r *http.Request)
 	}
 	providerResp := failover.Response
 	usage := gatewayUsageFromProvider(providerResp)
-	canonicalResp := s.runtime.gateway.BuildCanonicalConversationResponse(canonical, gatewayContentBlocksFromProvider(providerResp.Parts), gatewayStopReasonFromProvider(providerResp.StopReason), usage, providerResp.Warnings, providerResp.Raw)
+	canonicalResp := s.runtime.gateway.BuildCanonicalConversationResponse(canonical, gatewayContentBlocksFromProvider(providerResp.Parts), gatewayStopReasonFromProvider(providerResp.StopReason), usage, providerResp.Warnings, providerResp.Raw, gatewayStreamEventsFromProvider(providerResp.StreamEvents))
 	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequest(model.ID, result.Candidate, canonicalResp.Usage), canonicalResp.Usage.Estimated)
 	s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 		RequestID:             canonical.RequestID,

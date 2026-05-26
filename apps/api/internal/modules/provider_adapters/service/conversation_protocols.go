@@ -1252,6 +1252,8 @@ func parseOpenAICompatibleStream(body []byte, statusCode int) (contract.Conversa
 	var usage *openAIUsage
 	toolCalls := map[int]*openAIToolCall{}
 	toolOrder := []int{}
+	streamEvents := make([]contract.ConversationStreamEvent, 0)
+	eventIndex := 0
 	stopReason := contract.StopReasonEndTurn
 	done := false
 	for scanner.Scan() {
@@ -1277,9 +1279,29 @@ func parseOpenAICompatibleStream(body []byte, statusCode int) (contract.Conversa
 		if chunk.Usage != nil {
 			copied := *chunk.Usage
 			usage = &copied
+			streamEvents = append(streamEvents, contract.ConversationStreamEvent{
+				Index:          eventIndex,
+				Type:           contract.ConversationStreamEventUsage,
+				Usage:          copied.ToUsage(builder.String()),
+				RawEventType:   "usage",
+				Raw:            append(json.RawMessage(nil), data...),
+				OriginProtocol: "openai-compatible",
+			})
+			eventIndex++
 		}
 		for _, choice := range chunk.Choices {
-			builder.WriteString(choice.Delta.Content)
+			if choice.Delta.Content != "" {
+				builder.WriteString(choice.Delta.Content)
+				streamEvents = append(streamEvents, contract.ConversationStreamEvent{
+					Index:          eventIndex,
+					Type:           contract.ConversationStreamEventContentDelta,
+					Delta:          textContentDelta(choice.Delta.Content),
+					RawEventType:   "chat.completion.chunk",
+					Raw:            append(json.RawMessage(nil), data...),
+					OriginProtocol: "openai-compatible",
+				})
+				eventIndex++
+			}
 			for _, delta := range choice.Delta.ToolCalls {
 				toolCall := openAIStreamToolCallState(toolCalls, &toolOrder, delta.Index)
 				if delta.ID != "" {
@@ -1290,15 +1312,57 @@ func parseOpenAICompatibleStream(body []byte, statusCode int) (contract.Conversa
 				}
 				toolCall.Function.Name += delta.Function.Name
 				toolCall.Function.Arguments += delta.Function.Arguments
+				streamEvents = append(streamEvents, contract.ConversationStreamEvent{
+					Index:        eventIndex,
+					Type:         contract.ConversationStreamEventToolCallDelta,
+					ContentIndex: delta.Index,
+					Delta: contract.ContentPart{
+						Kind:              contract.ContentPartToolUse,
+						ToolCallID:        strings.TrimSpace(delta.ID),
+						ToolName:          delta.Function.Name,
+						ToolArgumentsJSON: delta.Function.Arguments,
+						Metadata:          map[string]any{"type": firstNonEmpty(delta.Type, "function")},
+						OriginProtocol:    "openai-compatible",
+					},
+					RawEventType:   "chat.completion.chunk",
+					Raw:            append(json.RawMessage(nil), data...),
+					OriginProtocol: "openai-compatible",
+				})
+				eventIndex++
 			}
 			if choice.Delta.FunctionCall != nil {
 				toolCall := openAIStreamToolCallState(toolCalls, &toolOrder, 0)
 				toolCall.Type = "function"
 				toolCall.Function.Name += choice.Delta.FunctionCall.Name
 				toolCall.Function.Arguments += choice.Delta.FunctionCall.Arguments
+				streamEvents = append(streamEvents, contract.ConversationStreamEvent{
+					Index:        eventIndex,
+					Type:         contract.ConversationStreamEventToolCallDelta,
+					ContentIndex: 0,
+					Delta: contract.ContentPart{
+						Kind:              contract.ContentPartToolUse,
+						ToolName:          choice.Delta.FunctionCall.Name,
+						ToolArgumentsJSON: choice.Delta.FunctionCall.Arguments,
+						Metadata:          map[string]any{"type": "function"},
+						OriginProtocol:    "openai-compatible",
+					},
+					RawEventType:   "chat.completion.chunk",
+					Raw:            append(json.RawMessage(nil), data...),
+					OriginProtocol: "openai-compatible",
+				})
+				eventIndex++
 			}
 			if choice.FinishReason != "" {
 				stopReason = openAIStopReason(choice.FinishReason)
+				streamEvents = append(streamEvents, contract.ConversationStreamEvent{
+					Index:          eventIndex,
+					Type:           contract.ConversationStreamEventStop,
+					StopReason:     stopReason,
+					RawEventType:   "chat.completion.chunk",
+					Raw:            append(json.RawMessage(nil), data...),
+					OriginProtocol: "openai-compatible",
+				})
+				eventIndex++
 			}
 		}
 	}
@@ -1307,6 +1371,16 @@ func parseOpenAICompatibleStream(body []byte, statusCode int) (contract.Conversa
 	}
 	if !done {
 		return contract.ConversationResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream ended before done"}
+	}
+	if len(streamEvents) > 0 && streamEvents[len(streamEvents)-1].Type != contract.ConversationStreamEventStop {
+		streamEvents = append(streamEvents, contract.ConversationStreamEvent{
+			Index:          eventIndex,
+			Type:           contract.ConversationStreamEventStop,
+			StopReason:     stopReason,
+			RawEventType:   "done",
+			OriginProtocol: "openai-compatible",
+		})
+		eventIndex++
 	}
 	parts := make([]contract.ContentPart, 0, 1+len(toolOrder))
 	if text := strings.TrimSpace(builder.String()); text != "" {
@@ -1328,11 +1402,12 @@ func parseOpenAICompatibleStream(body []byte, statusCode int) (contract.Conversa
 		parsedUsage = usage.ToUsage(text)
 	}
 	return contract.ConversationResponse{
-		Parts:      parts,
-		StopReason: stopReason,
-		StatusCode: statusCode,
-		Usage:      parsedUsage,
-		Raw:        append(json.RawMessage(nil), body...),
+		Parts:        parts,
+		StopReason:   stopReason,
+		StatusCode:   statusCode,
+		Usage:        parsedUsage,
+		Raw:          append(json.RawMessage(nil), body...),
+		StreamEvents: streamEvents,
 	}, nil
 }
 
@@ -1497,11 +1572,20 @@ func (u *geminiUsageMetadata) Merge(next geminiUsageMetadata) {
 	}
 }
 
+func (u geminiUsageMetadata) HasTokenUsage() bool {
+	return u.PromptTokenCount != nil ||
+		u.CandidatesTokenCount != nil ||
+		u.TotalTokenCount != nil ||
+		u.CachedContentTokenCount != nil
+}
+
 func parseGeminiCompatibleStream(body []byte, statusCode int) (contract.ConversationResponse, error) {
 	scanner := bufio.NewScanner(bytes.NewReader(body))
 	scanner.Buffer(make([]byte, 0, 64*1024), 4<<20)
 	var usage geminiUsageMetadata
 	var parts []contract.ContentPart
+	streamEvents := make([]contract.ConversationStreamEvent, 0)
+	eventIndex := 0
 	stopReason := contract.StopReasonEndTurn
 	seenChunk := false
 	for scanner.Scan() {
@@ -1524,11 +1608,53 @@ func parseGeminiCompatibleStream(body []byte, statusCode int) (contract.Conversa
 			return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider returned invalid stream json"}
 		}
 		seenChunk = true
-		parts = appendStreamContentParts(parts, chunk.ContentParts())
+		chunkParts := chunk.ContentParts()
+		parts = appendStreamContentParts(parts, chunkParts)
+		for _, part := range chunkParts {
+			eventType := contract.ConversationStreamEventContentDelta
+			switch part.Kind {
+			case contract.ContentPartToolUse:
+				eventType = contract.ConversationStreamEventToolCallDelta
+			case contract.ContentPartToolResult:
+				eventType = contract.ConversationStreamEventToolResult
+			case contract.ContentPartThinking:
+				eventType = contract.ConversationStreamEventReasoning
+			}
+			part.OriginProtocol = firstNonEmpty(part.OriginProtocol, "gemini-compatible")
+			streamEvents = append(streamEvents, contract.ConversationStreamEvent{
+				Index:          eventIndex,
+				Type:           eventType,
+				Delta:          part,
+				RawEventType:   "generateContentResponse",
+				Raw:            append(json.RawMessage(nil), data...),
+				OriginProtocol: "gemini-compatible",
+			})
+			eventIndex++
+		}
 		if reason := chunk.StopReason(); reason != contract.StopReasonEndTurn {
 			stopReason = reason
+			streamEvents = append(streamEvents, contract.ConversationStreamEvent{
+				Index:          eventIndex,
+				Type:           contract.ConversationStreamEventStop,
+				StopReason:     stopReason,
+				RawEventType:   "generateContentResponse",
+				Raw:            append(json.RawMessage(nil), data...),
+				OriginProtocol: "gemini-compatible",
+			})
+			eventIndex++
 		}
 		usage.Merge(chunk.UsageMetadata)
+		if chunk.UsageMetadata.HasTokenUsage() {
+			streamEvents = append(streamEvents, contract.ConversationStreamEvent{
+				Index:          eventIndex,
+				Type:           contract.ConversationStreamEventUsage,
+				Usage:          usage.ToUsage(contentPartsText(parts)),
+				RawEventType:   "generateContentResponse",
+				Raw:            append(json.RawMessage(nil), data...),
+				OriginProtocol: "gemini-compatible",
+			})
+			eventIndex++
+		}
 	}
 	if err := scanner.Err(); err != nil {
 		return contract.ConversationResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream interrupted"}
@@ -1541,11 +1667,12 @@ func parseGeminiCompatibleStream(body []byte, statusCode int) (contract.Conversa
 	}
 	text := contentPartsText(parts)
 	return contract.ConversationResponse{
-		Parts:      parts,
-		StopReason: stopReason,
-		StatusCode: statusCode,
-		Usage:      usage.ToUsage(text),
-		Raw:        append(json.RawMessage(nil), body...),
+		Parts:        parts,
+		StopReason:   stopReason,
+		StatusCode:   statusCode,
+		Usage:        usage.ToUsage(text),
+		Raw:          append(json.RawMessage(nil), body...),
+		StreamEvents: streamEvents,
 	}, nil
 }
 
@@ -1722,6 +1849,8 @@ func parseAnthropicCompatibleStream(body []byte, statusCode int) (contract.Conve
 	blocks := map[int]*anthropicContentBlock{}
 	order := []int{}
 	lastIndex := -1
+	streamEvents := make([]contract.ConversationStreamEvent, 0)
+	eventIndex := 0
 	stopReason := contract.StopReasonEndTurn
 	done := false
 	for scanner.Scan() {
@@ -1755,6 +1884,16 @@ func parseAnthropicCompatibleStream(body []byte, statusCode int) (contract.Conve
 				}
 				if strings.TrimSpace(chunk.ContentBlock.Text) != "" {
 					builder.WriteString(chunk.ContentBlock.Text)
+					streamEvents = append(streamEvents, contract.ConversationStreamEvent{
+						Index:          eventIndex,
+						Type:           contract.ConversationStreamEventContentDelta,
+						ContentIndex:   index,
+						Delta:          textContentDelta(chunk.ContentBlock.Text),
+						RawEventType:   strings.TrimSpace(chunk.Type),
+						Raw:            append(json.RawMessage(nil), data...),
+						OriginProtocol: "anthropic-compatible",
+					})
+					eventIndex++
 				}
 			}
 		case "content_block_delta":
@@ -1767,26 +1906,94 @@ func parseAnthropicCompatibleStream(body []byte, statusCode int) (contract.Conve
 					block.Input = nil
 				}
 				block.Input = append(block.Input, chunk.Delta.PartialJSON...)
+				streamEvents = append(streamEvents, contract.ConversationStreamEvent{
+					Index:        eventIndex,
+					Type:         contract.ConversationStreamEventToolCallDelta,
+					ContentIndex: index,
+					Delta: contract.ContentPart{
+						Kind:              contract.ContentPartToolUse,
+						ToolCallID:        strings.TrimSpace(block.ID),
+						ToolName:          strings.TrimSpace(block.Name),
+						ToolArgumentsJSON: chunk.Delta.PartialJSON,
+						Metadata:          map[string]any{"type": "tool_use"},
+						OriginProtocol:    "anthropic-compatible",
+					},
+					RawEventType:   strings.TrimSpace(chunk.Type),
+					Raw:            append(json.RawMessage(nil), data...),
+					OriginProtocol: "anthropic-compatible",
+				})
+				eventIndex++
 			case "thinking_delta":
 				block.Type = "thinking"
 				block.Text += chunk.Delta.Text
+				if chunk.Delta.Text != "" {
+					streamEvents = append(streamEvents, contract.ConversationStreamEvent{
+						Index:          eventIndex,
+						Type:           contract.ConversationStreamEventReasoning,
+						ContentIndex:   index,
+						Delta:          contract.ContentPart{Kind: contract.ContentPartThinking, Text: chunk.Delta.Text, OriginProtocol: "anthropic-compatible"},
+						RawEventType:   strings.TrimSpace(chunk.Type),
+						Raw:            append(json.RawMessage(nil), data...),
+						OriginProtocol: "anthropic-compatible",
+					})
+					eventIndex++
+				}
 			default:
 				if strings.TrimSpace(block.Type) == "" {
 					block.Type = "text"
 				}
 				block.Text += chunk.Delta.Text
 				builder.WriteString(chunk.Delta.Text)
+				if chunk.Delta.Text != "" {
+					streamEvents = append(streamEvents, contract.ConversationStreamEvent{
+						Index:          eventIndex,
+						Type:           contract.ConversationStreamEventContentDelta,
+						ContentIndex:   index,
+						Delta:          textContentDelta(chunk.Delta.Text),
+						RawEventType:   strings.TrimSpace(chunk.Type),
+						Raw:            append(json.RawMessage(nil), data...),
+						OriginProtocol: "anthropic-compatible",
+					})
+					eventIndex++
+				}
 			}
 		case "message_start":
 			if chunk.Message != nil {
 				usage.Merge(chunk.Message.Usage)
+				streamEvents = append(streamEvents, contract.ConversationStreamEvent{
+					Index:          eventIndex,
+					Type:           contract.ConversationStreamEventUsage,
+					Usage:          chunk.Message.Usage.ToUsage(builder.String()),
+					RawEventType:   strings.TrimSpace(chunk.Type),
+					Raw:            append(json.RawMessage(nil), data...),
+					OriginProtocol: "anthropic-compatible",
+				})
+				eventIndex++
 			}
 		case "message_delta":
 			if chunk.Delta.StopReason != "" {
 				stopReason = anthropicStopReason(chunk.Delta.StopReason)
+				streamEvents = append(streamEvents, contract.ConversationStreamEvent{
+					Index:          eventIndex,
+					Type:           contract.ConversationStreamEventStop,
+					StopReason:     stopReason,
+					RawEventType:   strings.TrimSpace(chunk.Type),
+					Raw:            append(json.RawMessage(nil), data...),
+					OriginProtocol: "anthropic-compatible",
+				})
+				eventIndex++
 			}
 			if chunk.Usage != nil {
 				usage.Merge(*chunk.Usage)
+				streamEvents = append(streamEvents, contract.ConversationStreamEvent{
+					Index:          eventIndex,
+					Type:           contract.ConversationStreamEventUsage,
+					Usage:          usage.ToUsage(builder.String()),
+					RawEventType:   strings.TrimSpace(chunk.Type),
+					Raw:            append(json.RawMessage(nil), data...),
+					OriginProtocol: "anthropic-compatible",
+				})
+				eventIndex++
 			}
 		case "message_stop":
 			done = true
@@ -1797,6 +2004,16 @@ func parseAnthropicCompatibleStream(body []byte, statusCode int) (contract.Conve
 	}
 	if !done {
 		return contract.ConversationResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream ended before done"}
+	}
+	if len(streamEvents) > 0 && streamEvents[len(streamEvents)-1].Type != contract.ConversationStreamEventStop {
+		streamEvents = append(streamEvents, contract.ConversationStreamEvent{
+			Index:          eventIndex,
+			Type:           contract.ConversationStreamEventStop,
+			StopReason:     stopReason,
+			RawEventType:   "message_stop",
+			OriginProtocol: "anthropic-compatible",
+		})
+		eventIndex++
 	}
 	parts := make([]contract.ContentPart, 0, len(order))
 	for _, index := range order {
@@ -1811,11 +2028,12 @@ func parseAnthropicCompatibleStream(body []byte, statusCode int) (contract.Conve
 	}
 	text := contentPartsText(parts)
 	return contract.ConversationResponse{
-		Parts:      parts,
-		StopReason: stopReason,
-		StatusCode: statusCode,
-		Usage:      usage.ToUsage(text),
-		Raw:        append(json.RawMessage(nil), body...),
+		Parts:        parts,
+		StopReason:   stopReason,
+		StatusCode:   statusCode,
+		Usage:        usage.ToUsage(text),
+		Raw:          append(json.RawMessage(nil), body...),
+		StreamEvents: streamEvents,
 	}, nil
 }
 

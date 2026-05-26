@@ -43,6 +43,32 @@ func normalizeOutputItems(blocks []gatewaycontract.ContentBlock) []gatewaycontra
 	return out
 }
 
+func normalizeStreamEvents(events []gatewaycontract.StreamEvent) []gatewaycontract.StreamEvent {
+	out := make([]gatewaycontract.StreamEvent, 0, len(events))
+	for _, event := range events {
+		event.RawEventType = strings.TrimSpace(event.RawEventType)
+		event.Raw = append([]byte(nil), event.Raw...)
+		event.OriginProtocol = strings.TrimSpace(event.OriginProtocol)
+		event.Metadata = cloneMap(event.Metadata)
+		event.Delta = normalizeStreamDelta(event.Delta)
+		out = append(out, event)
+	}
+	return out
+}
+
+func normalizeStreamDelta(block gatewaycontract.ContentBlock) gatewaycontract.ContentBlock {
+	if block.Type == "" {
+		block.Type = gatewaycontract.ContentBlockText
+	}
+	if strings.TrimSpace(block.Role) == "" {
+		block.Role = "assistant"
+	}
+	block.Metadata = cloneMap(block.Metadata)
+	block.Raw = append([]byte(nil), block.Raw...)
+	block.OriginProtocol = strings.TrimSpace(block.OriginProtocol)
+	return block
+}
+
 func chatContentShouldRenderAsBlocks(blocks []gatewaycontract.ContentBlock) bool {
 	for _, block := range blocks {
 		if block.Type != "" && block.Type != gatewaycontract.ContentBlockText {

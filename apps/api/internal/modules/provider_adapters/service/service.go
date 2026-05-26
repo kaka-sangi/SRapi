@@ -832,6 +832,13 @@ func textContentPart(text string) contract.ContentPart {
 	}
 }
 
+func textContentDelta(text string) contract.ContentPart {
+	return contract.ContentPart{
+		Kind: contract.ContentPartText,
+		Text: text,
+	}
+}
+
 func conversationText(resp contract.ConversationResponse) string {
 	return contentPartsText(resp.Parts)
 }

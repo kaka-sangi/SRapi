@@ -178,14 +178,19 @@ func TestGatewayResponsesWebSocketForwardsStreamingEvents(t *testing.T) {
 	created := websocketEventByType(events, "response.created")
 	itemAdded := websocketEventByType(events, "response.output_item.added")
 	partAdded := websocketEventByType(events, "response.content_part.added")
-	delta := websocketEventByType(events, "response.output_text.delta")
+	deltas := websocketEventsByType(events, "response.output_text.delta")
 	doneText := websocketEventByType(events, "response.output_text.done")
 	completed := websocketEventByType(events, "response.completed")
-	if created == nil || itemAdded == nil || partAdded == nil || delta == nil || doneText == nil || completed == nil {
+	if created == nil || itemAdded == nil || partAdded == nil || len(deltas) == 0 || doneText == nil || completed == nil {
 		t.Fatalf("unexpected stream events: %+v", events)
 	}
-	if (*delta)["delta"] != "ws stream" {
-		t.Fatalf("expected aggregated stream delta, got %+v", delta)
+	var deltaText strings.Builder
+	for _, delta := range deltas {
+		value, _ := delta["delta"].(string)
+		deltaText.WriteString(value)
+	}
+	if deltaText.String() != "ws stream" {
+		t.Fatalf("expected stream deltas to preserve text, got %+v", deltas)
 	}
 	if !strings.Contains(mustMarshalString(t, *completed), "ws stream") {
 		t.Fatalf("expected completed stream payload, got %+v", completed)
@@ -768,6 +773,16 @@ func websocketEventByType(events []map[string]any, eventType string) *map[string
 		}
 	}
 	return nil
+}
+
+func websocketEventsByType(events []map[string]any, eventType string) []map[string]any {
+	out := make([]map[string]any, 0)
+	for _, event := range events {
+		if event["type"] == eventType {
+			out = append(out, event)
+		}
+	}
+	return out
 }
 
 func httpToWebSocketURL(rawURL string) string {

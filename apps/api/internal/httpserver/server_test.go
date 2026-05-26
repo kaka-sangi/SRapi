@@ -3651,7 +3651,8 @@ func TestGatewayAnthropicCountTokensRequiresProviderScopedCapability(t *testing.
 func TestGatewayGeminiStreamGenerateContentEmitsGeminiSSE(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
-		_, _ = w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"gemini stream response\"}}]}\n\n"))
+		_, _ = w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"gemini stream\"}}]}\n\n"))
+		_, _ = w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\" response\"}}]}\n\n"))
 		_, _ = w.Write([]byte("data: {\"choices\":[],\"usage\":{\"prompt_tokens\":3,\"completion_tokens\":4,\"total_tokens\":7}}\n\n"))
 		_, _ = w.Write([]byte("data: [DONE]\n\n"))
 	}))
@@ -3667,10 +3668,13 @@ func TestGatewayGeminiStreamGenerateContentEmitsGeminiSSE(t *testing.T) {
 		t.Fatalf("expected event stream content type, got %q", got)
 	}
 	body := rec.Body.String()
-	for _, expected := range []string{"data:", "gemini stream response", "usageMetadata", "data: [DONE]"} {
+	for _, expected := range []string{"data:", `"text":"gemini stream"`, `"text":" response"`, "usageMetadata", "data: [DONE]"} {
 		if !strings.Contains(body, expected) {
 			t.Fatalf("expected SSE body to contain %q, got %s", expected, body)
 		}
+	}
+	if strings.Contains(body, "gemini stream response") {
+		t.Fatalf("expected split Gemini stream deltas, got aggregated stream body: %s", body)
 	}
 }
 
@@ -4211,6 +4215,7 @@ func TestGatewayChatCompletionStreamFailoverBeforeDownstreamWrite(t *testing.T) 
 	for _, expected := range []string{
 		`data: {"choices":[{"delta":{"content":"failover stream"}}]}`,
 		`data: {"choices":[{"delta":{"content":" ok"}}]}`,
+		`"usage":{"prompt_tokens":8,"completion_tokens":4,"total_tokens":12}`,
 		"data: [DONE]",
 	} {
 		if !strings.Contains(body, expected) {

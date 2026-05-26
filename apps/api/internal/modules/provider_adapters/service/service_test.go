@@ -975,6 +975,21 @@ func TestOpenAICompatibleAdapterStreamsUpstream(t *testing.T) {
 	if string(resp.Raw) != rawSSE {
 		t.Fatalf("expected raw OpenAI stream to be preserved\nexpected:\n%s\nactual:\n%s", rawSSE, string(resp.Raw))
 	}
+	if len(resp.StreamEvents) < 3 {
+		t.Fatalf("expected OpenAI stream events, got %+v", resp.StreamEvents)
+	}
+	if resp.StreamEvents[0].Type != contract.ConversationStreamEventContentDelta || resp.StreamEvents[0].Delta.Text != "hello" {
+		t.Fatalf("expected first OpenAI content delta, got %+v", resp.StreamEvents[0])
+	}
+	if resp.StreamEvents[1].Type != contract.ConversationStreamEventContentDelta || resp.StreamEvents[1].Delta.Text != " stream" {
+		t.Fatalf("expected second OpenAI content delta preserving leading space, got %+v", resp.StreamEvents[1])
+	}
+	if resp.StreamEvents[2].Type != contract.ConversationStreamEventUsage || resp.StreamEvents[2].Usage.InputTokens != 5 {
+		t.Fatalf("expected OpenAI usage stream event, got %+v", resp.StreamEvents[2])
+	}
+	if resp.StreamEvents[len(resp.StreamEvents)-1].Type != contract.ConversationStreamEventStop {
+		t.Fatalf("expected OpenAI terminal stop stream event, got %+v", resp.StreamEvents)
+	}
 }
 
 func TestOpenAICompatibleAdapterEstimatesStreamUsageWhenMissing(t *testing.T) {
@@ -1617,6 +1632,18 @@ func TestGeminiCompatibleAdapterStreamsUpstream(t *testing.T) {
 	}
 	if string(resp.Raw) != rawSSE {
 		t.Fatalf("expected raw Gemini stream to be preserved\nexpected:\n%s\nactual:\n%s", rawSSE, string(resp.Raw))
+	}
+	if len(resp.StreamEvents) < 3 {
+		t.Fatalf("expected Gemini stream events, got %+v", resp.StreamEvents)
+	}
+	if resp.StreamEvents[0].Type != contract.ConversationStreamEventContentDelta || resp.StreamEvents[0].Delta.Text != "hello" {
+		t.Fatalf("expected first Gemini content delta, got %+v", resp.StreamEvents[0])
+	}
+	if resp.StreamEvents[1].Type != contract.ConversationStreamEventContentDelta || resp.StreamEvents[1].Delta.Text != " stream" {
+		t.Fatalf("expected second Gemini content delta preserving leading space, got %+v", resp.StreamEvents[1])
+	}
+	if resp.StreamEvents[2].Type != contract.ConversationStreamEventUsage || resp.StreamEvents[2].Usage.InputTokens != 5 {
+		t.Fatalf("expected Gemini usage stream event, got %+v", resp.StreamEvents[2])
 	}
 }
 
@@ -2291,6 +2318,21 @@ func TestAnthropicCompatibleAdapterStreamsUpstream(t *testing.T) {
 	}
 	if string(resp.Raw) != rawSSE {
 		t.Fatalf("expected raw Anthropic stream to be preserved\nexpected:\n%s\nactual:\n%s", rawSSE, string(resp.Raw))
+	}
+	if len(resp.StreamEvents) < 4 {
+		t.Fatalf("expected Anthropic stream events, got %+v", resp.StreamEvents)
+	}
+	if resp.StreamEvents[1].Type != contract.ConversationStreamEventContentDelta || resp.StreamEvents[1].Delta.Text != "hello" {
+		t.Fatalf("expected first Anthropic content delta, got %+v", resp.StreamEvents[1])
+	}
+	if resp.StreamEvents[2].Type != contract.ConversationStreamEventContentDelta || resp.StreamEvents[2].Delta.Text != " stream" {
+		t.Fatalf("expected second Anthropic content delta preserving leading space, got %+v", resp.StreamEvents[2])
+	}
+	if resp.StreamEvents[3].Type != contract.ConversationStreamEventUsage || resp.StreamEvents[3].Usage.OutputTokens != 6 {
+		t.Fatalf("expected Anthropic usage stream event, got %+v", resp.StreamEvents[3])
+	}
+	if resp.StreamEvents[len(resp.StreamEvents)-1].Type != contract.ConversationStreamEventStop {
+		t.Fatalf("expected Anthropic terminal stop stream event, got %+v", resp.StreamEvents)
 	}
 }
 

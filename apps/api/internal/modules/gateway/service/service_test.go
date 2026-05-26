@@ -352,6 +352,87 @@ func TestRenderProtocolStreamEventsPreservesToolCallOutput(t *testing.T) {
 	}
 }
 
+func TestRenderCanonicalStreamEventsPreservesTextDeltas(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	resp := gatewaycontract.CanonicalResponse{
+		ID:         "resp_delta_stream",
+		Model:      "gpt-4o-mini",
+		StopReason: "end_turn",
+		OutputItems: []gatewaycontract.ContentBlock{{
+			Type: gatewaycontract.ContentBlockText,
+			Role: "assistant",
+			Text: "hello stream",
+		}},
+		StreamEvents: []gatewaycontract.StreamEvent{
+			{
+				Index: 0,
+				Type:  gatewaycontract.StreamEventContentDelta,
+				Delta: gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockText, Role: "assistant", Text: "hello"},
+			},
+			{
+				Index: 1,
+				Type:  gatewaycontract.StreamEventContentDelta,
+				Delta: gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockText, Role: "assistant", Text: " stream"},
+			},
+			{
+				Index: 2,
+				Type:  gatewaycontract.StreamEventUsage,
+				Usage: gatewaycontract.Usage{InputTokens: 3, OutputTokens: 2},
+			},
+			{
+				Index:      3,
+				Type:       gatewaycontract.StreamEventStop,
+				StopReason: "end_turn",
+			},
+		},
+		Usage: gatewaycontract.Usage{InputTokens: 3, OutputTokens: 2},
+	}
+
+	chatChunks := svc.RenderChatStreamChunks(resp)
+	if len(chatChunks) != 4 {
+		t.Fatalf("expected four chat chunks, got %+v", chatChunks)
+	}
+	firstDelta := chatStreamContentDelta(t, chatChunks[0])
+	secondDelta := chatStreamContentDelta(t, chatChunks[1])
+	if firstDelta != "hello" || secondDelta != " stream" {
+		t.Fatalf("expected preserved chat deltas, got %q and %q", firstDelta, secondDelta)
+	}
+	if choices, _ := chatChunks[2]["choices"].([]map[string]any); len(choices) != 0 || chatChunks[2]["usage"] == nil {
+		t.Fatalf("expected usage-only chat stream chunk, got %+v", chatChunks[2])
+	}
+
+	responsesEvents := svc.RenderResponsesStreamEvents(resp)
+	responseDeltas := streamEventsByName(responsesEvents, "response.output_text.delta")
+	if len(responseDeltas) != 2 || responseDeltas[0].Data["delta"] != "hello" || responseDeltas[1].Data["delta"] != " stream" {
+		t.Fatalf("expected preserved responses deltas, got %+v", responseDeltas)
+	}
+
+	anthropicEvents := svc.RenderAnthropicMessagesStreamEvents(resp)
+	anthropicDeltas := streamEventsByName(anthropicEvents, "content_block_delta")
+	if len(anthropicDeltas) != 2 {
+		t.Fatalf("expected two anthropic deltas, got %+v", anthropicEvents)
+	}
+	firstAnthropicDelta, _ := anthropicDeltas[0].Data["delta"].(map[string]any)
+	secondAnthropicDelta, _ := anthropicDeltas[1].Data["delta"].(map[string]any)
+	if firstAnthropicDelta["text"] != "hello" || secondAnthropicDelta["text"] != " stream" {
+		t.Fatalf("expected preserved anthropic deltas, got %+v and %+v", firstAnthropicDelta, secondAnthropicDelta)
+	}
+
+	geminiEvents := svc.RenderGeminiGenerateContentStreamEvents(resp)
+	if len(geminiEvents) < 2 {
+		t.Fatalf("expected Gemini delta events, got %+v", geminiEvents)
+	}
+	if got := geminiStreamText(t, geminiEvents[0]); got != "hello" {
+		t.Fatalf("expected first Gemini delta, got %q", got)
+	}
+	if got := geminiStreamText(t, geminiEvents[1]); got != " stream" {
+		t.Fatalf("expected second Gemini delta, got %q", got)
+	}
+}
+
 func streamEventByName(events []StreamEvent, name string) *StreamEvent {
 	for idx := range events {
 		if events[idx].Event == name {
@@ -359,6 +440,36 @@ func streamEventByName(events []StreamEvent, name string) *StreamEvent {
 		}
 	}
 	return nil
+}
+
+func streamEventsByName(events []StreamEvent, name string) []StreamEvent {
+	out := make([]StreamEvent, 0)
+	for _, event := range events {
+		if event.Event == name {
+			out = append(out, event)
+		}
+	}
+	return out
+}
+
+func chatStreamContentDelta(t *testing.T, chunk map[string]any) string {
+	t.Helper()
+	choices, _ := chunk["choices"].([]map[string]any)
+	if len(choices) != 1 {
+		t.Fatalf("expected one chat choice, got %+v", chunk)
+	}
+	delta, _ := choices[0]["delta"].(map[string]any)
+	text, _ := delta["content"].(string)
+	return text
+}
+
+func geminiStreamText(t *testing.T, event StreamEvent) string {
+	t.Helper()
+	candidates, _ := event.Data["candidates"].([]apiopenapi.GeminiCandidate)
+	if len(candidates) != 1 || len(candidates[0].Content.Parts) != 1 || candidates[0].Content.Parts[0].Text == nil {
+		t.Fatalf("expected Gemini text candidate, got %+v", event)
+	}
+	return *candidates[0].Content.Parts[0].Text
 }
 
 func mustChatContentBlocks(t *testing.T, blocks []apiopenapi.ContentBlock) apiopenapi.ChatMessage_Content {

@@ -1668,6 +1668,65 @@ func gatewayContentBlocksFromProvider(parts []provideradaptercontract.ContentPar
 	return out
 }
 
+func gatewayStreamEventsFromProvider(events []provideradaptercontract.ConversationStreamEvent) []gatewaycontract.StreamEvent {
+	if len(events) == 0 {
+		return nil
+	}
+	out := make([]gatewaycontract.StreamEvent, 0, len(events))
+	for _, event := range events {
+		out = append(out, gatewaycontract.StreamEvent{
+			Index:          event.Index,
+			Type:           gatewayStreamEventTypeFromProvider(event.Type),
+			ContentIndex:   event.ContentIndex,
+			Delta:          gatewayStreamDeltaFromProvider(event.Delta),
+			Usage:          gatewayUsageFromProviderUsage(event.Usage),
+			StopReason:     gatewayStopReasonFromProvider(event.StopReason),
+			RawEventType:   strings.TrimSpace(event.RawEventType),
+			Raw:            append([]byte(nil), event.Raw...),
+			OriginProtocol: strings.TrimSpace(event.OriginProtocol),
+			Metadata:       cloneAnyMap(event.Metadata),
+		})
+	}
+	return out
+}
+
+func gatewayStreamDeltaFromProvider(part provideradaptercontract.ContentPart) gatewaycontract.ContentBlock {
+	return gatewaycontract.ContentBlock{
+		Type:              gatewayContentBlockTypeFromProvider(part.Kind),
+		Role:              "assistant",
+		Text:              part.Text,
+		MediaURL:          strings.TrimSpace(part.MediaURL),
+		MediaBase64:       strings.TrimSpace(part.MediaBase64),
+		MIMEType:          strings.TrimSpace(part.MIMEType),
+		FileID:            strings.TrimSpace(part.FileID),
+		ToolCallID:        strings.TrimSpace(part.ToolCallID),
+		ToolName:          strings.TrimSpace(part.ToolName),
+		ToolArgumentsJSON: part.ToolArgumentsJSON,
+		ToolResultForID:   strings.TrimSpace(part.ToolResultForID),
+		ToolResultIsError: part.ToolResultIsError,
+		Metadata:          cloneAnyMap(part.Metadata),
+		Raw:               append([]byte(nil), part.Raw...),
+		OriginProtocol:    strings.TrimSpace(part.OriginProtocol),
+	}
+}
+
+func gatewayStreamEventTypeFromProvider(eventType provideradaptercontract.ConversationStreamEventType) gatewaycontract.StreamEventType {
+	switch eventType {
+	case provideradaptercontract.ConversationStreamEventToolCallDelta:
+		return gatewaycontract.StreamEventToolCallDelta
+	case provideradaptercontract.ConversationStreamEventToolResult:
+		return gatewaycontract.StreamEventToolResult
+	case provideradaptercontract.ConversationStreamEventReasoning:
+		return gatewaycontract.StreamEventReasoning
+	case provideradaptercontract.ConversationStreamEventUsage:
+		return gatewaycontract.StreamEventUsage
+	case provideradaptercontract.ConversationStreamEventStop:
+		return gatewaycontract.StreamEventStop
+	default:
+		return gatewaycontract.StreamEventContentDelta
+	}
+}
+
 func gatewayContentBlockTypeFromProvider(kind provideradaptercontract.ContentPartKind) gatewaycontract.ContentBlockType {
 	switch kind {
 	case provideradaptercontract.ContentPartImage:
@@ -1707,11 +1766,15 @@ func gatewayStopReasonFromProvider(reason provideradaptercontract.StopReason) st
 }
 
 func gatewayUsageFromProvider(resp provideradaptercontract.ConversationResponse) gatewaycontract.Usage {
+	return gatewayUsageFromProviderUsage(resp.Usage)
+}
+
+func gatewayUsageFromProviderUsage(usage provideradaptercontract.Usage) gatewaycontract.Usage {
 	return gatewaycontract.Usage{
-		InputTokens:  resp.Usage.InputTokens,
-		OutputTokens: resp.Usage.OutputTokens,
-		CachedTokens: resp.Usage.CachedTokens,
-		Estimated:    resp.Usage.Estimated,
+		InputTokens:  usage.InputTokens,
+		OutputTokens: usage.OutputTokens,
+		CachedTokens: usage.CachedTokens,
+		Estimated:    usage.Estimated,
 	}
 }
 

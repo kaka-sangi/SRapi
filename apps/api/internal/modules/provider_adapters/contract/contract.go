@@ -359,14 +359,41 @@ type ModalityTokenCount struct {
 	Metadata   map[string]any
 }
 
+// ConversationStreamEvent captures provider stream semantics after protocol parsing.
+type ConversationStreamEvent struct {
+	Index          int
+	Type           ConversationStreamEventType
+	ContentIndex   int
+	Delta          ContentPart
+	Usage          Usage
+	StopReason     StopReason
+	RawEventType   string
+	Raw            json.RawMessage
+	OriginProtocol string
+	Metadata       map[string]any
+}
+
+// ConversationStreamEventType identifies the canonical meaning of a provider stream event.
+type ConversationStreamEventType string
+
+const (
+	ConversationStreamEventContentDelta  ConversationStreamEventType = "content_delta"
+	ConversationStreamEventToolCallDelta ConversationStreamEventType = "tool_call_delta"
+	ConversationStreamEventToolResult    ConversationStreamEventType = "tool_result_delta"
+	ConversationStreamEventReasoning     ConversationStreamEventType = "reasoning_delta"
+	ConversationStreamEventUsage         ConversationStreamEventType = "usage"
+	ConversationStreamEventStop          ConversationStreamEventType = "stop"
+)
+
 type ConversationResponse struct {
-	ID         string
-	Parts      []ContentPart
-	StopReason StopReason
-	StatusCode int
-	Usage      Usage
-	Raw        json.RawMessage
-	Warnings   []string
+	ID           string
+	Parts        []ContentPart
+	StopReason   StopReason
+	StatusCode   int
+	Usage        Usage
+	Raw          json.RawMessage
+	Warnings     []string
+	StreamEvents []ConversationStreamEvent
 }
 
 // ProbeRequest contains the provider, account, and credential used for a health probe.

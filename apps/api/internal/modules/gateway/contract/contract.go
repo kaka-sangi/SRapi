@@ -149,6 +149,33 @@ type Usage struct {
 	Estimated    bool
 }
 
+// StreamEvent captures canonical stream deltas so protocol renderers do not
+// need to synthesize every stream from the final aggregated response.
+type StreamEvent struct {
+	Index          int
+	Type           StreamEventType
+	ContentIndex   int
+	Delta          ContentBlock
+	Usage          Usage
+	StopReason     string
+	RawEventType   string
+	Raw            json.RawMessage
+	OriginProtocol string
+	Metadata       map[string]any
+}
+
+// StreamEventType identifies the canonical meaning of a stream event.
+type StreamEventType string
+
+const (
+	StreamEventContentDelta  StreamEventType = "content_delta"
+	StreamEventToolCallDelta StreamEventType = "tool_call_delta"
+	StreamEventToolResult    StreamEventType = "tool_result_delta"
+	StreamEventReasoning     StreamEventType = "reasoning_delta"
+	StreamEventUsage         StreamEventType = "usage"
+	StreamEventStop          StreamEventType = "stop"
+)
+
 type CanonicalResponse struct {
 	ID                    string
 	RequestID             string
@@ -156,6 +183,7 @@ type CanonicalResponse struct {
 	CanonicalModel        string
 	Message               string
 	OutputItems           []ContentBlock
+	StreamEvents          []StreamEvent
 	StopReason            string
 	Usage                 Usage
 	RawProviderMetadata   []byte

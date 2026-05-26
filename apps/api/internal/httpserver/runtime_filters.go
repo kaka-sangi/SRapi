@@ -458,6 +458,16 @@ func writeSSEJSON(w http.ResponseWriter, payload any) {
 	writeSSEDone(w)
 }
 
+func writeSSEJSONChunks(w http.ResponseWriter, payloads []map[string]any) {
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	for _, payload := range payloads {
+		writeSSEJSONAny(w, payload)
+	}
+	writeSSEDone(w)
+}
+
 func writeSSEEvents(w http.ResponseWriter, events []gatewayservice.StreamEvent) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
