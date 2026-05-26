@@ -2792,6 +2792,122 @@ func TestAnthropicCompatibleAdapterPreservesSameProtocolRawBody(t *testing.T) {
 	}
 }
 
+func TestAnthropicCompatibleAdapterPreservesThinkingConfig(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload struct {
+			MaxTokens int            `json:"max_tokens"`
+			Thinking  map[string]any `json:"thinking"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		if payload.MaxTokens != 4096 ||
+			payload.Thinking["type"] != "enabled" ||
+			payload.Thinking["budget_tokens"].(float64) != 2048 {
+			t.Fatalf("expected Anthropic thinking config to be preserved, got %+v", payload)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"content":[{"type":"text","text":"thinking config ok"}],"usage":{"input_tokens":2,"output_tokens":1}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	maxTokens := 4096
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:       "req_anthropic_thinking_config",
+		Model:           "claude-local",
+		InputParts:      textParts("think"),
+		MaxOutputTokens: &maxTokens,
+		Reasoning:       map[string]any{"type": "enabled", "budget_tokens": 2048},
+		Provider:        providercontract.Provider{AdapterType: "anthropic-compatible", Protocol: "anthropic-compatible"},
+		Account:         accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:         modelcontract.ModelProviderMapping{UpstreamModelName: "claude-upstream"},
+		Credential:      map[string]any{"api_key": "anthropic-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke anthropic upstream: %v", err)
+	}
+	if conversationResponseText(resp) != "thinking config ok" {
+		t.Fatalf("unexpected anthropic response: %+v", resp)
+	}
+}
+
+func TestAnthropicCompatibleAdapterRectifiesThinkingBudget(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload struct {
+			MaxTokens int            `json:"max_tokens"`
+			Thinking  map[string]any `json:"thinking"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		if payload.MaxTokens != 2048 ||
+			payload.Thinking["type"] != "enabled" ||
+			payload.Thinking["budget_tokens"].(float64) != 2047 {
+			t.Fatalf("expected Anthropic thinking budget to be rectified below max_tokens, got %+v", payload)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"content":[{"type":"text","text":"budget ok"}],"usage":{"input_tokens":2,"output_tokens":1}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	maxTokens := 2048
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:       "req_anthropic_thinking_budget",
+		Model:           "claude-local",
+		InputParts:      textParts("think"),
+		MaxOutputTokens: &maxTokens,
+		Reasoning:       map[string]any{"type": "enabled", "budget_tokens": 32000},
+		Provider:        providercontract.Provider{AdapterType: "anthropic-compatible", Protocol: "anthropic-compatible"},
+		Account:         accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:         modelcontract.ModelProviderMapping{UpstreamModelName: "claude-upstream"},
+		Credential:      map[string]any{"api_key": "anthropic-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke anthropic upstream: %v", err)
+	}
+}
+
+func TestAnthropicCompatibleAdapterDoesNotSendOpenAIReasoningAsThinking(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		if _, ok := payload["thinking"]; ok {
+			t.Fatalf("did not expect OpenAI reasoning shape to be sent as Anthropic thinking, got %+v", payload)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"content":[{"type":"text","text":"reasoning ignored"}],"usage":{"input_tokens":2,"output_tokens":1}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_anthropic_openai_reasoning",
+		Model:      "claude-local",
+		InputParts: textParts("think"),
+		Reasoning:  map[string]any{"effort": "high"},
+		Provider:   providercontract.Provider{AdapterType: "anthropic-compatible", Protocol: "anthropic-compatible"},
+		Account:    accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "claude-upstream"},
+		Credential: map[string]any{"api_key": "anthropic-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke anthropic upstream: %v", err)
+	}
+}
+
 func TestAnthropicCompatibleAdapterPreservesToolUseResponse(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

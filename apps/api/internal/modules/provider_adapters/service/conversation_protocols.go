@@ -16,6 +16,7 @@ type anthropicMessagesRequest struct {
 	System        string             `json:"system,omitempty"`
 	Stream        bool               `json:"stream"`
 	MaxTokens     int                `json:"max_tokens"`
+	Thinking      map[string]any     `json:"thinking,omitempty"`
 	Temperature   *float32           `json:"temperature,omitempty"`
 	TopP          *float32           `json:"top_p,omitempty"`
 	StopSequences []string           `json:"stop_sequences,omitempty"`
@@ -39,6 +40,7 @@ func anthropicCompatiblePayload(req contract.ConversationRequest) anthropicMessa
 		System:        anthropicCompatibleSystem(req),
 		Stream:        req.Stream,
 		MaxTokens:     maxTokens,
+		Thinking:      anthropicCompatibleThinking(req.Reasoning, maxTokens),
 		Temperature:   req.Temperature,
 		TopP:          req.TopP,
 		StopSequences: cloneStrings(req.Stop),
@@ -55,6 +57,53 @@ func anthropicCompatibleRequestBody(req contract.ConversationRequest) ([]byte, e
 		return json.Marshal(payload)
 	}
 	return json.Marshal(anthropicCompatiblePayload(req))
+}
+
+func anthropicCompatibleThinking(reasoning map[string]any, maxTokens int) map[string]any {
+	thinkingType := strings.ToLower(strings.TrimSpace(metadataString(reasoning, "type")))
+	switch thinkingType {
+	case "enabled":
+	case "adaptive":
+		out := cloneMap(reasoning)
+		out["type"] = "adaptive"
+		delete(out, "budget_tokens")
+		return out
+	default:
+		return nil
+	}
+	out := cloneMap(reasoning)
+	out["type"] = "enabled"
+	budget := positiveIntValue(out["budget_tokens"])
+	if budget <= 0 || budget >= maxTokens {
+		budget = maxTokens - 1
+	}
+	if budget < 1024 {
+		return nil
+	}
+	out["budget_tokens"] = budget
+	return out
+}
+
+func positiveIntValue(value any) int {
+	switch typed := value.(type) {
+	case int:
+		if typed > 0 {
+			return typed
+		}
+	case int64:
+		if typed > 0 {
+			return int(typed)
+		}
+	case float64:
+		if typed > 0 {
+			return int(typed)
+		}
+	case json.Number:
+		if value, err := typed.Int64(); err == nil && value > 0 {
+			return int(value)
+		}
+	}
+	return 0
 }
 
 func anthropicCompatibleMessages(req contract.ConversationRequest) []anthropicMessage {
