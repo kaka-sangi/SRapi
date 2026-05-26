@@ -237,6 +237,9 @@ func (s *Service) RenderChatStreamChunk(resp gatewaycontract.CanonicalResponse) 
 	if text := outputTextFromBlocks(blocks); text != "" {
 		delta["content"] = text
 	}
+	if reasoning := openAIReasoningContentFromBlocks(blocks); reasoning != "" {
+		delta["reasoning_content"] = reasoning
+	}
 	if toolCalls := chatStreamToolCalls(blocks); len(toolCalls) > 0 {
 		delta["tool_calls"] = toolCalls
 	}
@@ -270,9 +273,13 @@ func (s *Service) RenderChatStreamChunks(resp gatewaycontract.CanonicalResponse)
 	chunks := make([]map[string]any, 0, len(events))
 	for _, event := range events {
 		switch event.Type {
-		case gatewaycontract.StreamEventContentDelta, gatewaycontract.StreamEventReasoning, gatewaycontract.StreamEventToolResult:
+		case gatewaycontract.StreamEventContentDelta, gatewaycontract.StreamEventToolResult:
 			if text := event.Delta.Text; text != "" {
 				chunks = append(chunks, chatStreamChunkWithIndex(resp, event.ContentIndex, map[string]any{"content": text}, nil, nil))
+			}
+		case gatewaycontract.StreamEventReasoning:
+			if text := event.Delta.Text; text != "" {
+				chunks = append(chunks, chatStreamChunkWithIndex(resp, event.ContentIndex, map[string]any{"reasoning_content": text}, nil, nil))
 			}
 		case gatewaycontract.StreamEventToolCallDelta:
 			toolCall := chatStreamToolCallDelta(event)

@@ -568,6 +568,29 @@ func TestRenderChatCompletionsPreservesReasoningContent(t *testing.T) {
 	}
 }
 
+func TestRenderChatStreamChunkPreservesReasoningContentFallback(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	resp := gatewaycontract.CanonicalResponse{
+		ID:         "resp_chat_reasoning_stream_fallback",
+		Model:      "deepseek-reasoner",
+		StopReason: "end_turn",
+		OutputItems: []gatewaycontract.ContentBlock{
+			{Type: gatewaycontract.ContentBlockReasoning, Role: "assistant", Text: "think first"},
+			{Type: gatewaycontract.ContentBlockText, Role: "assistant", Text: "final answer"},
+		},
+		Usage: gatewaycontract.Usage{InputTokens: 3, OutputTokens: 5},
+	}
+
+	chunk := svc.RenderChatStreamChunk(resp)
+	delta := chatStreamDelta(t, chunk)
+	if delta["reasoning_content"] != "think first" || delta["content"] != "final answer" {
+		t.Fatalf("expected chat stream fallback to preserve reasoning/content separately, got %+v", delta)
+	}
+}
+
 func TestRenderAnthropicMessagesPreservesThinkingBlocks(t *testing.T) {
 	svc, err := New()
 	if err != nil {
@@ -1022,6 +1045,23 @@ func TestRenderCanonicalStreamEventsPreservesResponsesReasoningDeltas(t *testing
 			},
 		},
 		Usage: gatewaycontract.Usage{InputTokens: 3, OutputTokens: 4},
+	}
+
+	chatChunks := svc.RenderChatStreamChunks(resp)
+	if len(chatChunks) != 4 {
+		t.Fatalf("expected reasoning, content, and stop chat chunks, got %+v", chatChunks)
+	}
+	firstReasoningDelta := chatStreamDelta(t, chatChunks[0])
+	secondReasoningDelta := chatStreamDelta(t, chatChunks[1])
+	if firstReasoningDelta["reasoning_content"] != "think " || secondReasoningDelta["reasoning_content"] != "first" {
+		t.Fatalf("expected preserved chat reasoning deltas, got %+v and %+v", firstReasoningDelta, secondReasoningDelta)
+	}
+	if _, ok := firstReasoningDelta["content"]; ok {
+		t.Fatalf("did not expect chat reasoning delta as content, got %+v", firstReasoningDelta)
+	}
+	contentDelta := chatStreamDelta(t, chatChunks[2])
+	if contentDelta["content"] != "answer" {
+		t.Fatalf("expected chat content delta after reasoning, got %+v", contentDelta)
 	}
 
 	responsesEvents := svc.RenderResponsesStreamEvents(resp)
@@ -1552,13 +1592,22 @@ func chatStreamToolDelta(t *testing.T, chunk map[string]any) map[string]any {
 
 func chatStreamContentDelta(t *testing.T, chunk map[string]any) string {
 	t.Helper()
+	delta := chatStreamDelta(t, chunk)
+	text, _ := delta["content"].(string)
+	return text
+}
+
+func chatStreamDelta(t *testing.T, chunk map[string]any) map[string]any {
+	t.Helper()
 	choices, _ := chunk["choices"].([]map[string]any)
 	if len(choices) != 1 {
 		t.Fatalf("expected one chat choice, got %+v", chunk)
 	}
 	delta, _ := choices[0]["delta"].(map[string]any)
-	text, _ := delta["content"].(string)
-	return text
+	if delta == nil {
+		t.Fatalf("expected chat delta, got %+v", choices[0])
+	}
+	return delta
 }
 
 func choiceIndex(t *testing.T, chunk map[string]any) int {
