@@ -22,6 +22,9 @@ func (s *Service) RenderChatCompletions(resp gatewaycontract.CanonicalResponse) 
 	if toolCalls := outputOpenAIChatToolCalls(resp.OutputItems); len(toolCalls) > 0 {
 		msg.ToolCalls = &toolCalls
 	}
+	if reasoning := openAIReasoningContentFromBlocks(resp.OutputItems); reasoning != "" {
+		msg.ReasoningContent = &reasoning
+	}
 	msg.Role = apiopenapi.ChatMessageRoleAssistant
 	return apiopenapi.ChatCompletionResponse{
 		Choices: []apiopenapi.ChatCompletionChoice{{

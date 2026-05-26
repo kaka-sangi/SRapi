@@ -458,10 +458,11 @@ type openAIStreamOptions struct {
 }
 
 type openAIChatMessage struct {
-	Role       string           `json:"role"`
-	Content    any              `json:"content"`
-	ToolCallID string           `json:"tool_call_id,omitempty"`
-	ToolCalls  []openAIToolCall `json:"tool_calls,omitempty"`
+	Role             string           `json:"role"`
+	Content          any              `json:"content"`
+	ReasoningContent string           `json:"reasoning_content,omitempty"`
+	ToolCallID       string           `json:"tool_call_id,omitempty"`
+	ToolCalls        []openAIToolCall `json:"tool_calls,omitempty"`
 }
 
 type openAIToolCall struct {
@@ -860,6 +861,9 @@ func (r openAIChatCompletionResponse) ConversationResponse(statusCode int) (cont
 
 func openAIMessageParts(message openAIChatMessage) []contract.ContentPart {
 	parts := make([]contract.ContentPart, 0, 1+len(message.ToolCalls))
+	if reasoning := strings.TrimSpace(message.ReasoningContent); reasoning != "" {
+		parts = append(parts, contract.ContentPart{Kind: contract.ContentPartThinking, Text: reasoning, OriginProtocol: "openai-compatible"})
+	}
 	parts = append(parts, openAIContentParts(message.Content)...)
 	for _, toolCall := range message.ToolCalls {
 		if part, ok := openAIToolCallPart(toolCall); ok {

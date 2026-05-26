@@ -2608,6 +2608,10 @@ export type RerankResponse = {
 export type ChatMessage = {
     role: 'system' | 'developer' | 'user' | 'assistant' | 'tool';
     content: string | Array<ContentBlock>;
+    /**
+     * OpenAI-compatible reasoning text used by providers such as DeepSeek reasoner models.
+     */
+    reasoning_content?: string;
     name?: string;
     tool_call_id?: string;
     tool_calls?: Array<ChatToolCall>;

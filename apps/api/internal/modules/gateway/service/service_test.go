@@ -539,6 +539,35 @@ func TestRenderProtocolResponses(t *testing.T) {
 	}
 }
 
+func TestRenderChatCompletionsPreservesReasoningContent(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	resp := gatewaycontract.CanonicalResponse{
+		ID:         "resp_chat_reasoning",
+		Model:      "deepseek-reasoner",
+		StopReason: "end_turn",
+		OutputItems: []gatewaycontract.ContentBlock{
+			{Type: gatewaycontract.ContentBlockReasoning, Role: "assistant", Text: "think first"},
+			{Type: gatewaycontract.ContentBlockText, Role: "assistant", Text: "final answer"},
+		},
+		Usage: gatewaycontract.Usage{InputTokens: 3, OutputTokens: 5},
+	}
+
+	chat := svc.RenderChatCompletions(resp)
+	if len(chat.Choices) != 1 {
+		t.Fatalf("unexpected chat response: %+v", chat)
+	}
+	if chat.Choices[0].Message.ReasoningContent == nil || *chat.Choices[0].Message.ReasoningContent != "think first" {
+		t.Fatalf("expected chat reasoning_content, got %+v", chat.Choices[0].Message)
+	}
+	content, err := chat.Choices[0].Message.Content.AsChatMessageContent0()
+	if err != nil || content != "final answer" {
+		t.Fatalf("expected chat content without reasoning, content=%q err=%v", content, err)
+	}
+}
+
 func TestRenderAnthropicMessagesPreservesThinkingBlocks(t *testing.T) {
 	svc, err := New()
 	if err != nil {

@@ -14,7 +14,7 @@ func outputTextFromBlocks(blocks []gatewaycontract.ContentBlock) string {
 	var parts []string
 	for _, block := range blocks {
 		switch block.Type {
-		case "", gatewaycontract.ContentBlockText, gatewaycontract.ContentBlockReasoning, gatewaycontract.ContentBlockRefusal, gatewaycontract.ContentBlockToolResult:
+		case "", gatewaycontract.ContentBlockText, gatewaycontract.ContentBlockRefusal, gatewaycontract.ContentBlockToolResult:
 			if text := strings.TrimSpace(block.Text); text != "" {
 				parts = append(parts, text)
 			}
@@ -72,6 +72,9 @@ func normalizeStreamDelta(block gatewaycontract.ContentBlock) gatewaycontract.Co
 
 func chatContentShouldRenderAsBlocks(blocks []gatewaycontract.ContentBlock) bool {
 	for _, block := range blocks {
+		if block.Type == gatewaycontract.ContentBlockReasoning {
+			continue
+		}
 		if block.Type != "" && block.Type != gatewaycontract.ContentBlockText {
 			return true
 		}
@@ -95,6 +98,19 @@ func chatMessageContentBlocks(blocks []gatewaycontract.ContentBlock) []gatewayco
 		return []gatewaycontract.ContentBlock{{Type: gatewaycontract.ContentBlockText, Role: "assistant"}}
 	}
 	return out
+}
+
+func openAIReasoningContentFromBlocks(blocks []gatewaycontract.ContentBlock) string {
+	var parts []string
+	for _, block := range normalizeOutputItems(blocks) {
+		if block.Type != gatewaycontract.ContentBlockReasoning {
+			continue
+		}
+		if text := strings.TrimSpace(block.Text); text != "" {
+			parts = append(parts, text)
+		}
+	}
+	return strings.Join(parts, "\n")
 }
 
 func outputOpenAIChatToolCalls(blocks []gatewaycontract.ContentBlock) []apiopenapi.ChatToolCall {
@@ -186,6 +202,9 @@ func outputOpenAIContentBlocks(blocks []gatewaycontract.ContentBlock) []apiopena
 	blocks = normalizeOutputItems(blocks)
 	out := make([]apiopenapi.ContentBlock, 0, len(blocks))
 	for _, block := range blocks {
+		if block.Type == gatewaycontract.ContentBlockReasoning {
+			continue
+		}
 		item := apiopenapi.ContentBlock{
 			Type:                 openAIContentBlockType(block.Type),
 			AdditionalProperties: outputBlockProperties(block),

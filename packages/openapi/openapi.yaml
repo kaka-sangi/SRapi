@@ -13818,6 +13818,9 @@ components:
             - type: array
               items:
                 $ref: "#/components/schemas/ContentBlock"
+        reasoning_content:
+          type: string
+          description: OpenAI-compatible reasoning text used by providers such as DeepSeek reasoner models.
         name:
           type: string
         tool_call_id:

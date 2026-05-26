@@ -2939,11 +2939,14 @@ type ChatCompletionResponseObject string
 
 // ChatMessage defines model for ChatMessage.
 type ChatMessage struct {
-	Content    ChatMessage_Content `json:"content"`
-	Name       *string             `json:"name,omitempty"`
-	Role       ChatMessageRole     `json:"role"`
-	ToolCallId *string             `json:"tool_call_id,omitempty"`
-	ToolCalls  *[]ChatToolCall     `json:"tool_calls,omitempty"`
+	Content ChatMessage_Content `json:"content"`
+	Name    *string             `json:"name,omitempty"`
+
+	// ReasoningContent OpenAI-compatible reasoning text used by providers such as DeepSeek reasoner models.
+	ReasoningContent *string         `json:"reasoning_content,omitempty"`
+	Role             ChatMessageRole `json:"role"`
+	ToolCallId       *string         `json:"tool_call_id,omitempty"`
+	ToolCalls        *[]ChatToolCall `json:"tool_calls,omitempty"`
 }
 
 // ChatMessageContent0 defines model for .

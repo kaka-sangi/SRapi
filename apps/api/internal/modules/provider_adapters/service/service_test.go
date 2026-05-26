@@ -174,6 +174,46 @@ func TestOpenAICompatibleAdapterPreservesToolCallResponse(t *testing.T) {
 	assertToolUsePart(t, resp.Parts[0], "call_1", "lookup", `{"query":"weather"}`)
 }
 
+func TestOpenAICompatibleAdapterPreservesReasoningContentResponse(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"finish_reason":"stop","message":{"role":"assistant","reasoning_content":"think first","content":"final answer"}}],"usage":{"prompt_tokens":3,"completion_tokens":5,"total_tokens":8}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_reasoning_content",
+		Model:      "gpt-local",
+		InputParts: textParts("think"),
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "openai-compatible",
+			Protocol:    "openai-compatible",
+		},
+		Account:    accountcontract.ProviderAccount{ID: 1, Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "deepseek-reasoner"},
+		Credential: map[string]any{"api_key": "upstream-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke upstream: %v", err)
+	}
+	if len(resp.Parts) != 2 ||
+		resp.Parts[0].Kind != contract.ContentPartThinking ||
+		resp.Parts[0].Text != "think first" ||
+		resp.Parts[0].OriginProtocol != "openai-compatible" ||
+		resp.Parts[1].Kind != contract.ContentPartText ||
+		resp.Parts[1].Text != "final answer" {
+		t.Fatalf("expected reasoning and text parts, got %+v", resp.Parts)
+	}
+	if conversationResponseText(resp) != "think first\nfinal answer" || resp.Usage.OutputTokens != 5 {
+		t.Fatalf("unexpected reasoning response: %+v", resp)
+	}
+}
+
 func TestOpenAICompatibleAdapterPreservesSameProtocolRawBody(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var payload map[string]any
