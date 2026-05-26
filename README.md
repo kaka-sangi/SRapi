@@ -202,6 +202,16 @@ make smoke-release
 
 `make smoke-release` 会额外检查 `/livez`、`/readyz` 和 `/metrics` 基线指标，适合在 Docker Compose 或单机 release 配置启动后执行。
 
+Stripe test mode 支付闭环 smoke：
+
+```bash
+STRIPE_SMOKE_SECRET_KEY=<stripe-test-secret-key> \
+STRIPE_SMOKE_WEBHOOK_SECRET=<stripe-webhook-signing-secret> \
+make smoke-payment-stripe
+```
+
+该 smoke 需要已启动的 API 和可用 Stripe test mode 凭证。它会创建或更新一个临时 Stripe provider instance，发起 Checkout Session，向 SRapi webhook 入口提交本地签名的 `checkout.session.completed` 事件，验证幂等和余额入账，最后禁用临时 provider。
+
 PostgreSQL 手动备份和恢复：
 
 ```bash

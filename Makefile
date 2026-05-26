@@ -38,7 +38,7 @@ TEMPO_QUERY_PORT ?= 13201
 TEMPO_QUERY_TIMEOUT_SECONDS ?= 20
 TEMPO_SMOKE_TIMEOUT ?= 90s
 
-.PHONY: help bootstrap-env openapi-lint openapi-bundle openapi-codegen openapi-codegen-check openapi-ts-codegen openapi-ts-codegen-check sdk-ts-typecheck ent-generate ent-generate-check migration-diff migration-hash migration-check api-test api-run dev-up dev-down dev-logs smoke-health smoke-gateway smoke-rate-limit smoke-failover smoke-quality-eval smoke-release smoke-jaeger-trace smoke-tempo-trace rate-limit-bench balance-charger-pressure otel-overhead-bench backup-postgres restore-postgres examples-check secret-scan architecture-check code-quality-check diff-check web-install web-check web-check-e2e web-dev check
+.PHONY: help bootstrap-env openapi-lint openapi-bundle openapi-codegen openapi-codegen-check openapi-ts-codegen openapi-ts-codegen-check sdk-ts-typecheck ent-generate ent-generate-check migration-diff migration-hash migration-check api-test api-run dev-up dev-down dev-logs smoke-health smoke-gateway smoke-rate-limit smoke-failover smoke-quality-eval smoke-payment-stripe smoke-release smoke-jaeger-trace smoke-tempo-trace rate-limit-bench balance-charger-pressure otel-overhead-bench backup-postgres restore-postgres examples-check secret-scan architecture-check code-quality-check diff-check web-install web-check web-check-e2e web-dev check
 
 help:
 	@printf '%s\n' \
@@ -65,6 +65,7 @@ help:
 		'  make smoke-rate-limit  Verify Gateway API key RPM limiting returns 429 + Retry-After' \
 		'  make smoke-failover  Verify Gateway retries from a 503 upstream to a fallback provider' \
 		'  make smoke-quality-eval  Verify QualityEval capture, worker judge, and Scheduler quality evidence' \
+		'  make smoke-payment-stripe  Verify Stripe test-mode checkout + webhook + balance credit on a running API' \
 		'  make smoke-release   Validate health, readiness, metrics, and gateway smoke on localhost' \
 		'  make smoke-jaeger-trace  Verify OTLP traces are visible through Jaeger query API' \
 		'  make smoke-tempo-trace  Verify OTLP traces are visible through Tempo query API' \
@@ -171,7 +172,7 @@ architecture-check:
 	cd $(API_DIR) && go test ./internal/config ./internal/architecture ./internal/app ./internal/platform/crypto ./internal/platform/db ./internal/platform/logger ./internal/platform/redis ./internal/modules/providers/preset ./internal/persistence/entstore/... ./internal/persistence/redisstore/... ./internal/workers/... ./internal/httpserver
 
 code-quality-check:
-	cd $(API_DIR) && go test ./internal/codequality
+	cd $(API_DIR) && go test ./internal/codequality -count=1
 
 diff-check:
 	git diff --check
@@ -202,6 +203,9 @@ smoke-failover:
 
 smoke-quality-eval:
 	cd $(API_DIR) && go test ./internal/httpserver -run TestQualityEvalSmokeCapturesEvaluatesAndFeedsScheduler -count=1 -v
+
+smoke-payment-stripe:
+	node tools/smoke-payment-stripe.mjs
 
 smoke-release:
 	node tools/smoke-local.mjs --release

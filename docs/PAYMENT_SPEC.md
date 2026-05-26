@@ -101,7 +101,7 @@ metadata_json
 | LDCPay | Phase 3 | Linux DO Credit 或类似积分支付。 |
 | Custom Webhook | Phase 3 | 外部支付系统通过受控 API 入账。 |
 
-当前实现已超过最初 MVP 抽象：`payments/providers/checkout` 定义统一下单接口，`payments/providers/stripe` 使用 `stripe-go/v78` 创建 Stripe Checkout Session 并由 Stripe webhook SDK 验签，`payments/providers/easypay` 生成带签名的 EasyPay 跳转 URL，`payments/providers/alipay` 使用 `smartwalle/alipay/v3` 生成支付宝 Page/Wap Pay 支付 URL，并由 `payments/service` 使用支付宝公钥验签异步通知。`payments/providers/wechat` 使用 `wechatpay-apiv3/wechatpay-go` 创建微信 Native / H5 / JSAPI 预支付订单，并由 `payments/service` 使用微信 APIv3 通知签名验证和 AES-GCM 解密后复用现有幂等、金额校验和履约链路。管理员侧已支持 provider instance 的创建、更新和本地配置测试；测试接口只解密并校验必需配置，不发起外部扣款或网络请求。Stripe/Alipay/WeChat 真实沙箱 smoke 仍需外部凭证。
+当前实现已超过最初 MVP 抽象：`payments/providers/checkout` 定义统一下单接口，`payments/providers/stripe` 使用 `stripe-go/v78` 创建 Stripe Checkout Session 并由 Stripe webhook SDK 验签，`payments/providers/easypay` 生成带签名的 EasyPay 跳转 URL，`payments/providers/alipay` 使用 `smartwalle/alipay/v3` 生成支付宝 Page/Wap Pay 支付 URL，并由 `payments/service` 使用支付宝公钥验签异步通知。`payments/providers/wechat` 使用 `wechatpay-apiv3/wechatpay-go` 创建微信 Native / H5 / JSAPI 预支付订单，并由 `payments/service` 使用微信 APIv3 通知签名验证和 AES-GCM 解密后复用现有幂等、金额校验和履约链路。管理员侧已支持 provider instance 的创建、更新和本地配置测试；测试接口只解密并校验必需配置，不发起外部扣款或网络请求。Stripe test-mode 充值闭环已有 `make smoke-payment-stripe` 入口；Alipay/WeChat 真实沙箱 smoke 仍需外部凭证。
 
 Stripe provider config 至少包含：
 
@@ -113,6 +113,16 @@ Stripe provider config 至少包含：
   "cancel_url": "https://app.example/pay/cancel"
 }
 ```
+
+Stripe test-mode smoke 运行方式：
+
+```bash
+STRIPE_SMOKE_SECRET_KEY=<stripe-test-secret-key> \
+STRIPE_SMOKE_WEBHOOK_SECRET=<stripe-webhook-signing-secret> \
+make smoke-payment-stripe
+```
+
+该 smoke 要求 API 已启动，并使用 `BOOTSTRAP_ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_PASSWORD` 登录。脚本会创建或更新一个 `stripe-smoke` provider instance，发起一笔 `balance_credit` Checkout Session，校验 checkout URL/session id，向 `/api/v1/webhooks/payments/stripe` 提交本地签名的 `checkout.session.completed` 事件，确认订单 fulfilled、重复 webhook 幂等、余额增加，最后禁用临时 provider。它只验证 SRapi 到 Stripe Checkout 创建 API 的真实 test-mode 出站调用；webhook 入站用本地签名事件复用同一个 SRapi 验签和履约路径，生产环境仍应配置 Stripe Dashboard webhook endpoint 并执行真实回调演练。
 
 EasyPay provider config 至少包含：
 
@@ -329,6 +339,11 @@ payment_provider_instances.config_ciphertext
 - 退款反向 ledger。
 - 支付配置脱敏。
 - 多实例限额和负载均衡。
+
+外部 smoke：
+
+- Stripe：`make smoke-payment-stripe`，需要 Stripe test mode secret key 和 webhook signing secret，覆盖 Checkout Session 创建、SRapi webhook 验签/幂等/履约、余额入账和临时 provider 清理。
+- Alipay / WeChat：仍需商户沙箱或测试商户凭证后补等价 smoke，不得用本地伪签名替代真实渠道下单连通性结论。
 
 ## 14. 阶段规划
 

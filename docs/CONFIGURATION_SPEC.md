@@ -221,6 +221,18 @@ QUALITY_EVAL_OPENAI_API_KEY=
 - worker 默认每小时从未评估的 `quality_eval_samples` 中按 `sample_request_hash` 稳定抽样 1%，单批最多 100 条，单条 judge 调用 30 秒总超时、20 秒上游 HTTP 超时。
 - 样本捕获只保存 content-safety 之后的脱敏文本摘要，并以 `SRAPI_MASTER_KEY` 派生密钥加密；禁用时不新增样本，但已有 `quality_evaluations` 仍可继续作为 Scheduler quality 分数输入。
 
+## 11.1 Payment Smoke
+
+```txt
+STRIPE_SMOKE_SECRET_KEY=
+STRIPE_SMOKE_WEBHOOK_SECRET=
+STRIPE_SMOKE_AMOUNT=1.00
+STRIPE_SMOKE_CURRENCY=USD
+STRIPE_SMOKE_PROVIDER_NAME=stripe-smoke
+```
+
+这些变量只供 `make smoke-payment-stripe` 使用，不参与 API 进程启动配置。`STRIPE_SMOKE_SECRET_KEY` 和 `STRIPE_SMOKE_WEBHOOK_SECRET` 应来自 CI secret 或临时 shell 环境；不要把真实 Stripe test-mode secret 长期写入共享 `.env`。脚本会把密钥写入临时 payment provider instance 的加密 config，运行结束禁用该 provider。
+
 ## 12. Balance Charger
 
 ```txt

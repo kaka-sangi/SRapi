@@ -100,6 +100,7 @@ last_completed:
 - C3.2: Role permission persistence now adds `roles.permissions_json`, admin roles APIs, merged user session permissions, `entitlements` query-cache rows materialized from active subscription snapshots, `000009_role_permissions_and_entitlements` up/down migrations, and an HTTP regression proving `payment_order:read` grants read-only admin payment order access while plain users are rejected.
 - B1.2.1: Usage charging performance indexing now replaces the single-column `usage_logs(charged_at)` index with `usage_logs(charged_at, success, created_at)`, makes `ListPendingUsageCharges` scan oldest pending usage first, and adds a persistence regression for deterministic pending charge ordering.
 - B1.2.2: Balance charger throughput is now configurable with `BALANCE_CHARGER_INTERVAL_SECONDS`, `BALANCE_CHARGER_BATCH_LIMIT`, and `BALANCE_CHARGER_MAX_BATCHES_PER_RUN`; app wiring passes those values into the worker, and a focused worker regression proves the default run drains 20 batches of 500 pending usage charges, covering the local 10k usage/min backlog guard without changing Billing store transaction boundaries.
+- B4.1.1: Added an opt-in Stripe test-mode payment smoke (`make smoke-payment-stripe`) that creates or updates an encrypted temporary Stripe provider instance, creates a real Stripe Checkout Session with supplied test-mode credentials, posts a locally signed `checkout.session.completed` event through SRapi's Stripe webhook path, verifies fulfillment, duplicate-webhook idempotency, balance credit, and disables the temporary provider on exit. The script has Node unit coverage for config gating, amount conversion, Stripe signature shape, checkout event reconciliation fields, and cleanup/idempotency assertions.
 - B4.2: Alipay Official payment support now adds `smartwalle/alipay/v3`, a checkout provider for `alipay.trade.page.pay` / `alipay.trade.wap.pay`, service-level Alipay async notification verification with the order-bound provider instance, and regressions for signed checkout URL generation, webhook fulfillment, idempotency, invalid-signature fail-closed behavior, multi-instance ownership, and invalid return URL rejection. Real Alipay sandbox smoke still requires external merchant credentials.
 - B4.3: WeChat Pay Official support now adds `wechatpay-apiv3/wechatpay-go`, a checkout provider for Native / H5 / JSAPI prepay flows, service-level WeChat APIv3 notification signature verification and AES-GCM decrypt handling, and regressions for checkout metadata, signed notification fulfillment, idempotency, and local config requirement checks. Real WeChat sandbox smoke still requires external merchant credentials.
 - C1.1: Structured trace service spans now cover `scheduler.Schedule`, `payments.HandleWebhook`, and `accounts.ProbeAccount` with reusable `platform/otel.StartSpan` / `EndSpan`, low-sensitive diagnostic attributes, business outcome fields, stable `error.type` classification, focused span export tests, and a local OTLP gRPC collector smoke proving enabled trace export flushes span/resource data through the real OTLP protocol.
@@ -115,13 +116,20 @@ last_completed:
 current:
 
 - package: Phase 1 production smoke and observability hardening
-- status: API key/user rate limits, API key concurrency, scheduler account quota evidence, provider-account RPM/TPM Redis counters, provider-account ordinary HTTP concurrency Redis leases, local schema repair for multi-attempt usage evidence, non-streaming and streaming local failover attempt evidence, protocol-level OTLP trace export smoke, local Jaeger query visibility smoke, local Tempo query visibility smoke, the OTel HTTP p99 overhead guard, the balance_charger local 10k pending-usage drain guard, and an opt-in PostgreSQL balance_charger pressure harness are implemented and locally verified; live external provider/payment smoke still depends on valid upstream or merchant credentials.
+- status: API key/user rate limits, API key concurrency, scheduler account quota evidence, provider-account RPM/TPM Redis counters, provider-account ordinary HTTP concurrency Redis leases, local schema repair for multi-attempt usage evidence, non-streaming and streaming local failover attempt evidence, protocol-level OTLP trace export smoke, local Jaeger query visibility smoke, local Tempo query visibility smoke, the OTel HTTP p99 overhead guard, the balance_charger local 10k pending-usage drain guard, an opt-in PostgreSQL balance_charger pressure harness, and an opt-in Stripe test-mode payment smoke entry are implemented and locally verified where credentials are not required; live external provider/payment smoke still depends on valid upstream or merchant credentials.
 - objective: continue closing production smoke, sandbox, collector-visualization, and pressure-test gaps without letting docs/specs drift.
 
-next_recommended: Run real Stripe/Alipay/WeChat sandbox smoke when merchant credentials are available, run deployed collector trace visualization smoke against production topology, rerun `make balance-charger-pressure BALANCE_CHARGER_PRESSURE_DSN=...` against a production-adjacent PostgreSQL database if local dev-container IO is not representative enough, rerun `make otel-overhead-bench` after any OTel SDK/exporter or tracing middleware change, or continue the remaining Phase 1 production pressure-test tasks from `specs/silly-stirring-turtle.md`.
+next_recommended: Run `make smoke-payment-stripe` with real Stripe test-mode credentials when available, add equivalent Alipay/WeChat sandbox smoke once merchant credentials exist, run deployed collector trace visualization smoke against production topology, rerun `make balance-charger-pressure BALANCE_CHARGER_PRESSURE_DSN=...` against a production-adjacent PostgreSQL database if local dev-container IO is not representative enough, rerun `make otel-overhead-bench` after any OTel SDK/exporter or tracing middleware change, or continue the remaining Phase 1 production pressure-test tasks from `specs/silly-stirring-turtle.md`.
 
 last_gates:
 
+- `node --test tools/smoke-payment-stripe.test.mjs`: pass
+- `cd apps/api && go test ./internal/modules/payments/... -count=1`: pass
+- `make architecture-check`: pass
+- `make code-quality-check`: pass; now runs `go test ./internal/codequality -count=1` so Node/script/doc hygiene checks are not hidden by Go test cache
+- `make diff-check`: pass
+- `make secret-scan`: pass
+- `make smoke-payment-stripe`: skipped, requires real Stripe test-mode secret key and webhook signing secret
 - `cd apps/api && go test ./internal/httpserver -run 'TestTracingMiddleware' -count=1 -v`: pass; overhead guard skips unless `SRAPI_OTEL_P99_GUARD=1`
 - `make otel-overhead-bench`: pass; local p99 overhead 0s against 5ms budget with 2,000 samples / 200 warmup
 - `cd apps/api && go test ./internal/platform/otel -count=1 -v`: pass; Jaeger smoke skips unless `SRAPI_OTEL_JAEGER_SMOKE=1`
@@ -134,16 +142,13 @@ last_gates:
 - `cd apps/api && go test ./...`: pass
 - `cd apps/api && go test ./internal/httpserver -run TestGatewayRealtimeWebSocketRelaysOpenAIUpstreamWebSocket -count=1 -v`: pass after one concurrent `architecture-check` run exposed a transient existing realtime WebSocket timing failure
 - `make architecture-check`: pass on rerun
-- `make code-quality-check`: pass
-- `make diff-check`: pass
-- `make secret-scan`: pass
 - `cd apps/api && go test ./internal/workers/balance_charger -count=1 -v`: pass, pressure test skipped because `SRAPI_BALANCE_CHARGER_PRESSURE_DSN` was not configured
 - `make balance-charger-pressure BALANCE_CHARGER_PRESSURE_DSN=postgres://...`: pass against local `srapi-dev-postgres`, charged 10,000 usage logs in 1.55s inside the test run
 
 notes:
 
 - Existing `docs/` remains the architecture and domain source of truth.
-- Real Stripe/Alipay/WeChat sandbox smoke still requires merchant credentials.
+- Stripe smoke now has a first-class Make target and script tests, but the actual external Stripe test-mode run still requires merchant/test credentials; Alipay/WeChat sandbox smoke still requires merchant credentials and equivalent scripts.
 - Local Jaeger trace visibility is covered by `make smoke-jaeger-trace`; local Tempo trace visibility is covered by `make smoke-tempo-trace`; deployed collector/query backends still require topology-specific smoke.
 - The balance_charger PostgreSQL pressure gate passed against the local dev Postgres container; rerun it against production-adjacent storage before claiming deployed database throughput under real IO.
 - The rate-limit p99 guard is now available, but this workstation did not produce a valid 2ms Redis baseline; rerun it against local/native or production-adjacent Redis before claiming the limiter p99 budget is met.

@@ -128,6 +128,14 @@ make smoke-failover
 
 该 smoke 会创建两个临时 OpenAI-compatible Provider、同一个临时模型映射和两个本地 mock upstream。Primary upstream 固定返回 503，Gateway 应自动切换到 Secondary upstream 并返回成功响应；随后 smoke 会断言 `usage_logs` 出现失败/成功两条 attempt、第二个 SchedulerDecision 通过 `fallback_from_decision_id` 链到第一个 decision、`fallback_excluded` 证据存在，并且 `/metrics` 暴露正数 `srapi_gateway_failover_total`。
 
+Stripe test mode 支付闭环 smoke 可单独执行：
+
+```bash
+STRIPE_SMOKE_SECRET_KEY=... STRIPE_SMOKE_WEBHOOK_SECRET=... make smoke-payment-stripe
+```
+
+该 smoke 需要已启动的 API、默认或显式配置的管理员账号，以及 Stripe test mode secret key / webhook signing secret。它会创建或更新名为 `STRIPE_SMOKE_PROVIDER_NAME` 的临时 Stripe provider instance，调用用户下单 API 发起 Checkout Session，验证返回的 Stripe checkout URL 和 session id，通过 SRapi webhook 入口提交本地签名的 `checkout.session.completed` 事件，确认订单 fulfilled、重复 webhook 幂等、余额按 `STRIPE_SMOKE_AMOUNT` 增加，并在退出前禁用临时 provider。它不会保存真实卡号或绕过 service 层的金额、币种、签名、provider instance 归属校验。
+
 OpenTelemetry 到 Jaeger 的可视化链路可单独执行：
 
 ```bash
