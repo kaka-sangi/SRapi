@@ -239,6 +239,8 @@ quality_preferences:
 
 Scheduler hard filter 只使用 `required_capabilities`，不得因 optional capability 不满足而直接拒绝候选。
 
+当请求使用 Provider-hosted web search 工具时，Gateway 必须同时要求 `tool_calling.v1` 与 `web_search.v1`。只有工具 `type` 明确表示 hosted web search（例如 Responses `web_search` / `web_search_preview` 或 Anthropic 日期版本 web search server tool）时才生成 `web_search.v1`；普通自定义 function 即使名为 `web_search` 也只要求 `tool_calling.v1`。
+
 ## 7. ModelCapability
 
 Model Registry 中的能力用于表达 canonical model 的业务能力。

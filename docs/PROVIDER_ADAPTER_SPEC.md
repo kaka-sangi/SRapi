@@ -366,6 +366,8 @@ Adapter 根据 Provider 协议转换。
 - Anthropic Messages：messages/system/max_tokens/tools/thinking 需要转换。
 - Gemini：contents/generationConfig/tools 需要转换。
 
+Hosted web search tools are provider-native tools, not ordinary functions. Adapters and Gateway normalization must preserve explicit web search tool `type` values and metadata when the target protocol supports them; protocol conversion may warn or reject when the target cannot represent hosted search without changing behavior.
+
 ## 10. 响应标准化
 
 Adapter 输出统一响应必须以 `AI_ENDPOINT_COMPATIBILITY.md` 的 Canonical AI Response 为准。
