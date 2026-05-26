@@ -414,6 +414,12 @@ func (s *Server) handlePaymentWebhook(w http.ResponseWriter, r *http.Request) {
 		writePaymentServiceError(w, err, requestID)
 		return
 	}
+	if provider == "alipay" {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("success"))
+		return
+	}
 	writeJSONAny(w, http.StatusOK, apiopenapi.PaymentWebhookResponse{
 		Data: apiopenapi.PaymentWebhookResult{
 			Handled: result.Handled,

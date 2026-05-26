@@ -212,6 +212,17 @@ make smoke-payment-stripe
 
 该 smoke 需要已启动的 API 和可用 Stripe test mode 凭证。它会创建或更新一个临时 Stripe provider instance，发起 Checkout Session，向 SRapi webhook 入口提交本地签名的 `checkout.session.completed` 事件，验证幂等和余额入账，最后禁用临时 provider。
 
+Alipay Page Pay 支付 smoke：
+
+```bash
+ALIPAY_SMOKE_APP_ID=<alipay-app-id> \
+ALIPAY_SMOKE_PRIVATE_KEY=<merchant-private-key-pem> \
+ALIPAY_SMOKE_ALIPAY_PUBLIC_KEY=<alipay-public-key-pem> \
+make smoke-payment-alipay
+```
+
+该 smoke 需要已启动的 API 和可用支付宝沙箱或测试商户凭证。默认路径会创建临时 Alipay provider instance 并验证 Page Pay RSA2 checkout URL；`ALIPAY_SMOKE_LOCAL_WEBHOOK=1` 可额外用本地签名通知验证 SRapi webhook、`success` 应答、履约、幂等和余额入账，但不能替代支付宝沙箱真实回调。
+
 PostgreSQL 手动备份和恢复：
 
 ```bash

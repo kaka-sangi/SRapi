@@ -101,7 +101,7 @@ metadata_json
 | LDCPay | Phase 3 | Linux DO Credit 或类似积分支付。 |
 | Custom Webhook | Phase 3 | 外部支付系统通过受控 API 入账。 |
 
-当前实现已超过最初 MVP 抽象：`payments/providers/checkout` 定义统一下单接口，`payments/providers/stripe` 使用 `stripe-go/v78` 创建 Stripe Checkout Session 并由 Stripe webhook SDK 验签，`payments/providers/easypay` 生成带签名的 EasyPay 跳转 URL，`payments/providers/alipay` 使用 `smartwalle/alipay/v3` 生成支付宝 Page/Wap Pay 支付 URL，并由 `payments/service` 使用支付宝公钥验签异步通知。`payments/providers/wechat` 使用 `wechatpay-apiv3/wechatpay-go` 创建微信 Native / H5 / JSAPI 预支付订单，并由 `payments/service` 使用微信 APIv3 通知签名验证和 AES-GCM 解密后复用现有幂等、金额校验和履约链路。管理员侧已支持 provider instance 的创建、更新和本地配置测试；测试接口只解密并校验必需配置，不发起外部扣款或网络请求。Stripe test-mode 充值闭环已有 `make smoke-payment-stripe` 入口；Alipay/WeChat 真实沙箱 smoke 仍需外部凭证。
+当前实现已超过最初 MVP 抽象：`payments/providers/checkout` 定义统一下单接口，`payments/providers/stripe` 使用 `stripe-go/v78` 创建 Stripe Checkout Session 并由 Stripe webhook SDK 验签，`payments/providers/easypay` 生成带签名的 EasyPay 跳转 URL，`payments/providers/alipay` 使用 `smartwalle/alipay/v3` 生成支付宝 Page/Wap Pay 支付 URL，并由 `payments/service` 使用支付宝公钥验签异步通知。`payments/providers/wechat` 使用 `wechatpay-apiv3/wechatpay-go` 创建微信 Native / H5 / JSAPI 预支付订单，并由 `payments/service` 使用微信 APIv3 通知签名验证和 AES-GCM 解密后复用现有幂等、金额校验和履约链路。管理员侧已支持 provider instance 的创建、更新和本地配置测试；测试接口只解密并校验必需配置，不发起外部扣款或网络请求。Stripe test-mode 充值闭环已有 `make smoke-payment-stripe` 入口；Alipay Page Pay checkout smoke 已有 `make smoke-payment-alipay` 入口，并可选用本地签名通知验证 SRapi webhook 链路；Alipay/WeChat 真实沙箱回调 smoke 仍需外部凭证。
 
 Stripe provider config 至少包含：
 
@@ -148,7 +148,7 @@ Alipay Official provider config 至少包含：
 }
 ```
 
-可选字段包括 `gateway_url`、`production`、`mode`、`subject`、`body`、`qr_pay_mode` 和 `qr_code_width`。`mode=page` 走 `alipay.trade.page.pay`，`mode=wap` / `mode=h5` 走 `alipay.trade.wap.pay`；回调归属按本地 `out_trade_no` 对应订单绑定的 provider instance 验签，避免多商户实例互相抢签。
+可选字段包括 `gateway_url`、`production`、`mode`、`subject`、`body`、`qr_pay_mode` 和 `qr_code_width`。`mode=page` 走 `alipay.trade.page.pay`，`mode=wap` / `mode=h5` 走 `alipay.trade.wap.pay`；回调归属按本地 `out_trade_no` 对应订单绑定的 provider instance 验签，避免多商户实例互相抢签。按 [Alipay 异步通知说明](https://global.alipay.com/developer/helpcenter/detail?_route=sg&categoryId=67617&knowId=201602452303&sceneCode=AC_DEV)，HTTP webhook 成功处理支付宝异步通知后返回纯文本 `success`，否则支付宝会按渠道规则重试通知；验签时保留支付宝返回的全部参数，排除 `sign` 和 `sign_type`。
 
 WeChat Pay Official provider config 至少包含：
 
@@ -343,7 +343,8 @@ payment_provider_instances.config_ciphertext
 外部 smoke：
 
 - Stripe：`make smoke-payment-stripe`，需要 Stripe test mode secret key 和 webhook signing secret，覆盖 Checkout Session 创建、SRapi webhook 验签/幂等/履约、余额入账和临时 provider 清理。
-- Alipay / WeChat：仍需商户沙箱或测试商户凭证后补等价 smoke，不得用本地伪签名替代真实渠道下单连通性结论。
+- Alipay：`make smoke-payment-alipay`，需要支付宝沙箱或测试商户 `app_id`、应用私钥和支付宝公钥。默认覆盖 Page Pay RSA2 checkout URL 生成和临时 provider 清理；`ALIPAY_SMOKE_LOCAL_WEBHOOK=1` 可额外用本地签名通知覆盖 SRapi webhook 验签/`success` 应答/履约/余额入账/重复通知幂等。该本地签名模式不得替代支付宝沙箱真实回调结论。
+- WeChat：仍需商户沙箱或测试商户凭证后补等价 smoke，不得用本地伪签名替代真实渠道下单连通性结论。
 
 ## 14. 阶段规划
 

@@ -3,7 +3,12 @@ package httpserver
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
@@ -21,6 +26,7 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/redis/go-redis/v9"
+	alipaysdk "github.com/smartwalle/alipay/v3"
 	"github.com/srapi/srapi/apps/api/internal/config"
 	auditcontract "github.com/srapi/srapi/apps/api/internal/modules/audit/contract"
 	auditmemory "github.com/srapi/srapi/apps/api/internal/modules/audit/store/memory"
@@ -1300,6 +1306,66 @@ func TestAdminPaymentProviderUpdateAndTest(t *testing.T) {
 		if !auditLogHasAction(auditResp.Data, action) {
 			t.Fatalf("expected audit action %s in %+v", action, auditResp.Data)
 		}
+	}
+}
+
+func TestAlipayPaymentWebhookRespondsWithChannelAck(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	keys := newAlipayWebhookHTTPTestKeys(t)
+	providerBody := mustMarshalJSON(t, map[string]any{
+		"provider": "alipay",
+		"name":     "alipay-http-primary",
+		"config": map[string]any{
+			"app_id":            "app_test_123",
+			"private_key":       keys.merchantPrivateKey,
+			"alipay_public_key": keys.alipayPublicKey,
+			"notify_url":        "https://api.example/api/v1/webhooks/payments/alipay",
+			"return_url":        "https://app.example/payments/return",
+			"gateway_url":       "https://openapi.alipay.test/gateway.do",
+		},
+		"supported_methods": []string{"alipay_http_smoke"},
+		"limits":            map[string]any{"currency": "CNY"},
+	})
+	mustCreatePaymentProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, providerBody)
+
+	orderReq := httptest.NewRequest(http.MethodPost, "/api/v1/payment/orders", strings.NewReader(`{"method":"alipay_http_smoke","amount":"1.00","currency":"CNY","product_type":"balance_credit"}`))
+	orderReq.Header.Set("Content-Type", "application/json")
+	orderReq.AddCookie(sessionCookie)
+	orderReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	orderRec := httptest.NewRecorder()
+	handler.ServeHTTP(orderRec, orderReq)
+	if orderRec.Code != http.StatusCreated {
+		t.Fatalf("expected alipay payment order create 201, got %d body=%s", orderRec.Code, orderRec.Body.String())
+	}
+	var orderResp apiopenapi.PaymentOrderResponse
+	if err := json.NewDecoder(orderRec.Body).Decode(&orderResp); err != nil {
+		t.Fatalf("decode alipay payment order response: %v", err)
+	}
+
+	payload := signedAlipayHTTPNotification(t, keys, map[string]string{
+		"notify_id":    "notify_http_paid_1",
+		"notify_type":  alipaysdk.NotifyTypeTradeStatusSync,
+		"out_trade_no": orderResp.Data.OrderNo,
+		"trade_no":     "2026052622001400000009",
+		"trade_status": string(alipaysdk.TradeStatusSuccess),
+		"total_amount": "1.00",
+		"app_id":       "app_test_123",
+		"charset":      "utf-8",
+		"version":      "1.0",
+	})
+	webhookReq := httptest.NewRequest(http.MethodPost, "/api/v1/webhooks/payments/alipay", strings.NewReader(mustMarshalJSON(t, payload)))
+	webhookReq.Header.Set("Content-Type", "application/json")
+	webhookRec := httptest.NewRecorder()
+	handler.ServeHTTP(webhookRec, webhookReq)
+	if webhookRec.Code != http.StatusOK {
+		t.Fatalf("expected alipay payment webhook 200, got %d body=%s", webhookRec.Code, webhookRec.Body.String())
+	}
+	if strings.TrimSpace(webhookRec.Body.String()) != "success" {
+		t.Fatalf("expected alipay webhook channel ack success, got %q", webhookRec.Body.String())
+	}
+	if got := webhookRec.Header().Get("Content-Type"); !strings.HasPrefix(got, "text/plain") {
+		t.Fatalf("expected alipay webhook text/plain content type, got %q", got)
 	}
 }
 
@@ -7197,6 +7263,76 @@ func mustTestPaymentProvider(t *testing.T, handler http.Handler, sessionCookie *
 		t.Fatalf("decode payment provider test response: %v", err)
 	}
 	return resp
+}
+
+type alipayWebhookHTTPTestKeys struct {
+	merchantPrivateKey string
+	alipayPrivateKey   string
+	alipayPublicKey    string
+}
+
+func newAlipayWebhookHTTPTestKeys(t *testing.T) alipayWebhookHTTPTestKeys {
+	t.Helper()
+	merchantKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("generate merchant key: %v", err)
+	}
+	alipayKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("generate alipay key: %v", err)
+	}
+	return alipayWebhookHTTPTestKeys{
+		merchantPrivateKey: encodeRSAPrivateKeyForHTTPTest(merchantKey),
+		alipayPrivateKey:   encodeRSAPrivateKeyForHTTPTest(alipayKey),
+		alipayPublicKey:    encodeRSAPublicKeyForHTTPTest(t, &alipayKey.PublicKey),
+	}
+}
+
+func signedAlipayHTTPNotification(t *testing.T, keys alipayWebhookHTTPTestKeys, fields map[string]string) map[string]any {
+	t.Helper()
+	client, err := alipaysdk.New("app_test_123", keys.alipayPrivateKey, false)
+	if err != nil {
+		t.Fatalf("new alipay signer: %v", err)
+	}
+	values := url.Values{}
+	for key, value := range fields {
+		values.Set(key, value)
+	}
+	signature, err := client.SignValues(values)
+	if err != nil {
+		t.Fatalf("sign alipay notification: %v", err)
+	}
+	values.Set("sign_type", "RSA2")
+	values.Set("sign", base64.StdEncoding.EncodeToString(signature))
+	payload := make(map[string]any, len(values))
+	for key, values := range values {
+		if len(values) > 0 {
+			payload[key] = values[0]
+		}
+	}
+	return payload
+}
+
+func encodeRSAPrivateKeyForHTTPTest(key *rsa.PrivateKey) string {
+	return string(pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)}))
+}
+
+func encodeRSAPublicKeyForHTTPTest(t *testing.T, key *rsa.PublicKey) string {
+	t.Helper()
+	raw, err := x509.MarshalPKIXPublicKey(key)
+	if err != nil {
+		t.Fatalf("marshal public key: %v", err)
+	}
+	return string(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: raw}))
+}
+
+func mustMarshalJSON(t *testing.T, value any) string {
+	t.Helper()
+	raw, err := json.Marshal(value)
+	if err != nil {
+		t.Fatalf("marshal json: %v", err)
+	}
+	return string(raw)
 }
 
 func geminiModelMethodsContain(methods []apiopenapi.GeminiModelInfoSupportedGenerationMethods, expected apiopenapi.GeminiModelInfoSupportedGenerationMethods) bool {

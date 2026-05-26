@@ -136,6 +136,17 @@ STRIPE_SMOKE_SECRET_KEY=... STRIPE_SMOKE_WEBHOOK_SECRET=... make smoke-payment-s
 
 该 smoke 需要已启动的 API、默认或显式配置的管理员账号，以及 Stripe test mode secret key / webhook signing secret。它会创建或更新名为 `STRIPE_SMOKE_PROVIDER_NAME` 的临时 Stripe provider instance，调用用户下单 API 发起 Checkout Session，验证返回的 Stripe checkout URL 和 session id，通过 SRapi webhook 入口提交本地签名的 `checkout.session.completed` 事件，确认订单 fulfilled、重复 webhook 幂等、余额按 `STRIPE_SMOKE_AMOUNT` 增加，并在退出前禁用临时 provider。它不会保存真实卡号或绕过 service 层的金额、币种、签名、provider instance 归属校验。
 
+Alipay Page Pay 支付 smoke 可单独执行：
+
+```bash
+ALIPAY_SMOKE_APP_ID=... \
+ALIPAY_SMOKE_PRIVATE_KEY='-----BEGIN RSA PRIVATE KEY-----...' \
+ALIPAY_SMOKE_ALIPAY_PUBLIC_KEY='-----BEGIN PUBLIC KEY-----...' \
+make smoke-payment-alipay
+```
+
+该 smoke 需要已启动的 API、默认或显式配置的管理员账号，以及支付宝沙箱或测试商户凭证。默认路径会创建或更新名为 `ALIPAY_SMOKE_PROVIDER_NAME` 的临时 Alipay provider instance，调用用户下单 API 并验证 Page Pay checkout URL 包含 `alipay.trade.page.pay`、`sign_type=RSA2` 和签名参数，最后禁用临时 provider。若设置 `ALIPAY_SMOKE_LOCAL_WEBHOOK=1` 且提供 `ALIPAY_SMOKE_NOTIFY_PRIVATE_KEY`，脚本会提交本地签名的 `TRADE_SUCCESS` 通知，确认 SRapi 返回支付宝异步通知要求的纯文本 `success`、订单 fulfilled、余额按 `ALIPAY_SMOKE_AMOUNT` 增加，并用重复通知验证余额不二次入账。该本地签名模式只验证 SRapi webhook 链路，不能替代支付宝沙箱真实异步通知演练。
+
 OpenTelemetry 到 Jaeger 的可视化链路可单独执行：
 
 ```bash

@@ -229,9 +229,25 @@ STRIPE_SMOKE_WEBHOOK_SECRET=
 STRIPE_SMOKE_AMOUNT=1.00
 STRIPE_SMOKE_CURRENCY=USD
 STRIPE_SMOKE_PROVIDER_NAME=stripe-smoke
+
+ALIPAY_SMOKE_APP_ID=
+ALIPAY_SMOKE_PRIVATE_KEY=
+ALIPAY_SMOKE_ALIPAY_PUBLIC_KEY=
+ALIPAY_SMOKE_AMOUNT=1.00
+ALIPAY_SMOKE_CURRENCY=CNY
+ALIPAY_SMOKE_PROVIDER_NAME=alipay-smoke
+ALIPAY_SMOKE_METHOD=alipay_smoke
+ALIPAY_SMOKE_MODE=page
+ALIPAY_SMOKE_GATEWAY_URL=
+ALIPAY_SMOKE_NOTIFY_URL=
+ALIPAY_SMOKE_RETURN_URL=
+ALIPAY_SMOKE_LOCAL_WEBHOOK=0
+ALIPAY_SMOKE_NOTIFY_PRIVATE_KEY=
 ```
 
 这些变量只供 `make smoke-payment-stripe` 使用，不参与 API 进程启动配置。`STRIPE_SMOKE_SECRET_KEY` 和 `STRIPE_SMOKE_WEBHOOK_SECRET` 应来自 CI secret 或临时 shell 环境；不要把真实 Stripe test-mode secret 长期写入共享 `.env`。脚本会把密钥写入临时 payment provider instance 的加密 config，运行结束禁用该 provider。
+
+`ALIPAY_SMOKE_*` 只供 `make smoke-payment-alipay` 使用，不参与 API 进程启动配置。脚本会创建或更新临时 Alipay provider instance，验证 Page Pay RSA2 checkout URL，并在退出前禁用该 provider。`ALIPAY_SMOKE_LOCAL_WEBHOOK=1` 时必须提供 `ALIPAY_SMOKE_NOTIFY_PRIVATE_KEY`；脚本会从该私钥派生临时验签公钥写入 provider config，再提交本地签名的 `TRADE_SUCCESS` 通知来验证 SRapi webhook 验签、`success` 应答、履约、余额入账和重复通知幂等。该模式不能替代支付宝沙箱真实回调演练。
 
 ## 12. Balance Charger
 
