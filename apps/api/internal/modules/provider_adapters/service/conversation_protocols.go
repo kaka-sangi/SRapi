@@ -29,7 +29,10 @@ type geminiPart struct {
 	FileData         map[string]any `json:"fileData,omitempty"`
 	FunctionCall     map[string]any `json:"functionCall,omitempty"`
 	FunctionResponse map[string]any `json:"functionResponse,omitempty"`
+	ThoughtSignature string         `json:"thoughtSignature,omitempty"`
 }
+
+const geminiDummyThoughtSignature = "skip_thought_signature_validator"
 
 type geminiGenerationConfig struct {
 	Temperature      *float32       `json:"temperature,omitempty"`
@@ -128,7 +131,7 @@ func geminiPartsFromContentParts(parts []contract.ContentPart) []geminiPart {
 				call["args"] = map[string]any{}
 			}
 			if len(call) > 0 {
-				out = append(out, geminiPart{FunctionCall: call})
+				out = append(out, geminiPart{FunctionCall: call, ThoughtSignature: geminiThoughtSignature(part, true)})
 			}
 		case contract.ContentPartToolResult:
 			response := map[string]any{}
@@ -152,6 +155,18 @@ func geminiPartsFromContentParts(parts []contract.ContentPart) []geminiPart {
 		}
 	}
 	return out
+}
+
+func geminiThoughtSignature(part contract.ContentPart, useDummyForFunctionCall bool) string {
+	signature := firstNonEmpty(
+		metadataString(part.Metadata, "thoughtSignature"),
+		metadataString(part.Metadata, "thought_signature"),
+	)
+	signature = firstNonEmpty(signature, metadataString(part.Metadata, "signature"))
+	if signature == "" && useDummyForFunctionCall {
+		return geminiDummyThoughtSignature
+	}
+	return signature
 }
 
 func geminiMediaPart(part contract.ContentPart) (geminiPart, bool) {
@@ -1504,7 +1519,8 @@ func (r geminiGenerateContentResponse) StopReason() contract.StopReason {
 
 func geminiContentPart(part geminiPart) (contract.ContentPart, bool) {
 	if text := strings.TrimSpace(part.Text); text != "" {
-		return contract.ContentPart{Kind: contract.ContentPartText, Text: part.Text}, true
+		metadata := geminiPartMetadata(part)
+		return contract.ContentPart{Kind: contract.ContentPartText, Text: part.Text, Metadata: metadata, OriginProtocol: "gemini"}, true
 	}
 	if len(part.FunctionCall) > 0 {
 		name := mapString(part.FunctionCall, "name")
@@ -1521,7 +1537,7 @@ func geminiContentPart(part geminiPart) (contract.ContentPart, bool) {
 			Kind:              contract.ContentPartToolUse,
 			ToolName:          name,
 			ToolArgumentsJSON: arguments,
-			Metadata:          map[string]any{"type": "function"},
+			Metadata:          geminiPartMetadata(part, map[string]any{"type": "function"}),
 			OriginProtocol:    "gemini",
 		}, true
 	}
@@ -1544,6 +1560,21 @@ func geminiContentPart(part geminiPart) (contract.ContentPart, bool) {
 		}, true
 	}
 	return contract.ContentPart{}, false
+}
+
+func geminiPartMetadata(part geminiPart, base ...map[string]any) map[string]any {
+	var metadata map[string]any
+	if len(base) > 0 {
+		metadata = cloneMap(base[0])
+	}
+	if signature := strings.TrimSpace(part.ThoughtSignature); signature != "" {
+		if metadata == nil {
+			metadata = map[string]any{}
+		}
+		metadata["thoughtSignature"] = signature
+		metadata["signature"] = signature
+	}
+	return metadata
 }
 
 func geminiStopReason(reason string, parts []geminiPart) contract.StopReason {
@@ -1731,11 +1762,12 @@ type anthropicMessagesResponse struct {
 }
 
 type anthropicContentBlock struct {
-	Type  string          `json:"type"`
-	ID    string          `json:"id"`
-	Name  string          `json:"name"`
-	Input json.RawMessage `json:"input"`
-	Text  string          `json:"text"`
+	Type      string          `json:"type"`
+	ID        string          `json:"id"`
+	Name      string          `json:"name"`
+	Input     json.RawMessage `json:"input"`
+	Text      string          `json:"text"`
+	Signature string          `json:"signature"`
 }
 
 type anthropicStreamChunk struct {
@@ -1803,17 +1835,25 @@ func anthropicContentPart(block anthropicContentBlock) (contract.ContentPart, bo
 		if strings.TrimSpace(block.ID) == "" && strings.TrimSpace(block.Name) == "" && arguments == "" {
 			return contract.ContentPart{}, false
 		}
+		metadata := map[string]any{"type": blockType}
+		if signature := strings.TrimSpace(block.Signature); signature != "" {
+			metadata["signature"] = signature
+		}
 		return contract.ContentPart{
 			Kind:              contract.ContentPartToolUse,
 			ToolCallID:        strings.TrimSpace(block.ID),
 			ToolName:          strings.TrimSpace(block.Name),
 			ToolArgumentsJSON: arguments,
-			Metadata:          map[string]any{"type": blockType},
+			Metadata:          metadata,
 			OriginProtocol:    "anthropic",
 		}, true
 	case "thinking":
 		if text := strings.TrimSpace(block.Text); text != "" {
-			return contract.ContentPart{Kind: contract.ContentPartThinking, Text: text, OriginProtocol: "anthropic"}, true
+			metadata := map[string]any(nil)
+			if signature := strings.TrimSpace(block.Signature); signature != "" {
+				metadata = map[string]any{"signature": signature}
+			}
+			return contract.ContentPart{Kind: contract.ContentPartThinking, Text: text, Metadata: metadata, OriginProtocol: "anthropic"}, true
 		}
 	case "redacted_thinking":
 		return contract.ContentPart{Kind: contract.ContentPartThinking, Metadata: map[string]any{"type": blockType}, OriginProtocol: "anthropic"}, true

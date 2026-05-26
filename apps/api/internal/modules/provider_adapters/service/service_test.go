@@ -1516,6 +1516,7 @@ func TestGeminiCompatibleAdapterRendersFunctionPartsToUpstream(t *testing.T) {
 				Parts []struct {
 					FunctionCall     map[string]any `json:"functionCall"`
 					FunctionResponse map[string]any `json:"functionResponse"`
+					ThoughtSignature string         `json:"thoughtSignature"`
 				} `json:"parts"`
 			} `json:"contents"`
 		}
@@ -1531,6 +1532,9 @@ func TestGeminiCompatibleAdapterRendersFunctionPartsToUpstream(t *testing.T) {
 		args, _ := payload.Contents[0].Parts[0].FunctionCall["args"].(map[string]any)
 		if args["query"] != "weather" {
 			t.Fatalf("unexpected Gemini function args: %+v", args)
+		}
+		if payload.Contents[0].Parts[0].ThoughtSignature != "sig_tool_1" {
+			t.Fatalf("expected Gemini thoughtSignature to be preserved, got %+v", payload.Contents[0].Parts[0])
 		}
 		if payload.Contents[1].Role != "user" || payload.Contents[1].Parts[0].FunctionResponse["response"] == nil {
 			t.Fatalf("unexpected Gemini function response content: %+v", payload.Contents[1])
@@ -1548,7 +1552,13 @@ func TestGeminiCompatibleAdapterRendersFunctionPartsToUpstream(t *testing.T) {
 		RequestID: "req_gemini_functions",
 		Model:     "gemini-local",
 		Messages: []contract.ConversationMessage{
-			{Role: "assistant", Parts: []contract.ContentPart{toolUsePart("call_1", "lookup", `{"query":"weather"}`)}},
+			{Role: "assistant", Parts: []contract.ContentPart{{
+				Kind:              contract.ContentPartToolUse,
+				ToolCallID:        "call_1",
+				ToolName:          "lookup",
+				ToolArgumentsJSON: `{"query":"weather"}`,
+				Metadata:          map[string]any{"signature": "sig_tool_1"},
+			}}},
 			{Role: "tool", Parts: []contract.ContentPart{{
 				Kind:            contract.ContentPartToolResult,
 				ToolName:        "lookup",
@@ -1566,10 +1576,55 @@ func TestGeminiCompatibleAdapterRendersFunctionPartsToUpstream(t *testing.T) {
 	}
 }
 
+func TestGeminiCompatibleAdapterAddsDummyThoughtSignatureForFunctionCallHistory(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload struct {
+			Contents []struct {
+				Parts []struct {
+					FunctionCall     map[string]any `json:"functionCall"`
+					ThoughtSignature string         `json:"thoughtSignature"`
+				} `json:"parts"`
+			} `json:"contents"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		if len(payload.Contents) != 1 ||
+			len(payload.Contents[0].Parts) != 1 ||
+			payload.Contents[0].Parts[0].FunctionCall["name"] != "lookup" ||
+			payload.Contents[0].Parts[0].ThoughtSignature != "skip_thought_signature_validator" {
+			t.Fatalf("expected dummy thoughtSignature for function call history, got %+v", payload.Contents)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"candidates":[{"content":{"role":"model","parts":[{"text":"done"}]}}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":1}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID: "req_gemini_dummy_signature",
+		Model:     "gemini-local",
+		Messages: []contract.ConversationMessage{{
+			Role:  "assistant",
+			Parts: []contract.ContentPart{toolUsePart("call_1", "lookup", `{"query":"weather"}`)},
+		}},
+		Provider:   providercontract.Provider{AdapterType: "gemini-compatible", Protocol: "gemini-compatible"},
+		Account:    accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1beta"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "models/gemini-pro"},
+		Credential: map[string]any{"api_key": "gemini-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke gemini upstream: %v", err)
+	}
+}
+
 func TestGeminiCompatibleAdapterPreservesFunctionCallResponse(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"candidates":[{"finishReason":"STOP","content":{"role":"model","parts":[{"functionCall":{"name":"lookup","args":{"query":"weather"}}}]}}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":1}}`))
+		_, _ = w.Write([]byte(`{"candidates":[{"finishReason":"STOP","content":{"role":"model","parts":[{"thoughtSignature":"sig_gemini_1","functionCall":{"name":"lookup","args":{"query":"weather"}}}]}}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":1}}`))
 	}))
 	defer upstream.Close()
 
@@ -1593,6 +1648,10 @@ func TestGeminiCompatibleAdapterPreservesFunctionCallResponse(t *testing.T) {
 		t.Fatalf("unexpected gemini tool call response: %+v", resp)
 	}
 	assertToolUsePart(t, resp.Parts[0], "", "lookup", `{"query":"weather"}`)
+	if resp.Parts[0].Metadata["signature"] != "sig_gemini_1" ||
+		resp.Parts[0].Metadata["thoughtSignature"] != "sig_gemini_1" {
+		t.Fatalf("expected Gemini thoughtSignature metadata, got %+v", resp.Parts[0])
+	}
 }
 
 func TestGeminiCompatibleAdapterPreservesFinishReason(t *testing.T) {
@@ -2430,6 +2489,39 @@ func TestAnthropicCompatibleAdapterPreservesToolUseResponse(t *testing.T) {
 		t.Fatalf("unexpected anthropic tool use response: %+v", resp)
 	}
 	assertToolUsePart(t, resp.Parts[0], "toolu_1", "lookup", `{"query":"weather"}`)
+}
+
+func TestAnthropicCompatibleAdapterPreservesToolUseSignatureResponse(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"stop_reason":"tool_use","content":[{"type":"tool_use","id":"toolu_1","name":"lookup","input":{"query":"weather"},"signature":"sig_tool_abc"}],"usage":{"input_tokens":6,"output_tokens":2}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_anthropic_tool_use_signature",
+		Model:      "claude-local",
+		InputParts: textParts("call lookup"),
+		Provider: providercontract.Provider{
+			ID:          2,
+			AdapterType: "anthropic-compatible",
+			Protocol:    "anthropic-compatible",
+		},
+		Account:    accountcontract.ProviderAccount{ID: 2, Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "claude-upstream"},
+		Credential: map[string]any{"api_key": "anthropic-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke anthropic upstream: %v", err)
+	}
+	assertToolUsePart(t, resp.Parts[0], "toolu_1", "lookup", `{"query":"weather"}`)
+	if resp.Parts[0].Metadata["signature"] != "sig_tool_abc" {
+		t.Fatalf("expected Anthropic tool signature metadata, got %+v", resp.Parts[0])
+	}
 }
 
 func TestAnthropicCompatibleAdapterStreamsUpstream(t *testing.T) {
