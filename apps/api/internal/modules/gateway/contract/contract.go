@@ -31,19 +31,31 @@ const (
 type ContentBlockType string
 
 const (
-	ContentBlockText     ContentBlockType = "text"
-	ContentBlockImage    ContentBlockType = "image"
-	ContentBlockAudio    ContentBlockType = "audio"
-	ContentBlockToolCall ContentBlockType = "tool_call"
-	ContentBlockMetadata ContentBlockType = "metadata"
+	ContentBlockText       ContentBlockType = "text"
+	ContentBlockImage      ContentBlockType = "image"
+	ContentBlockAudio      ContentBlockType = "audio"
+	ContentBlockFile       ContentBlockType = "file"
+	ContentBlockToolCall   ContentBlockType = "tool_call"
+	ContentBlockToolResult ContentBlockType = "tool_result"
+	ContentBlockReasoning  ContentBlockType = "reasoning"
+	ContentBlockRefusal    ContentBlockType = "refusal"
+	ContentBlockMetadata   ContentBlockType = "metadata"
 )
 
 type ContentBlock struct {
-	Type     ContentBlockType
-	Role     string
-	Text     string
-	MediaURL string
-	Metadata map[string]any
+	Type              ContentBlockType
+	Role              string
+	Text              string
+	MediaURL          string
+	MediaBase64       string
+	MIMEType          string
+	FileID            string
+	ToolCallID        string
+	ToolName          string
+	ToolArgumentsJSON string
+	ToolResultForID   string
+	ToolResultIsError bool
+	Metadata          map[string]any
 }
 
 type Message struct {
@@ -77,6 +89,7 @@ type CanonicalRequest struct {
 	ToolChoice            any
 	ResponseFormat        map[string]any
 	Reasoning             map[string]any
+	RawBody               []byte
 	EmbeddingInput        []string
 	EmbeddingEncoding     string
 	EmbeddingDimensions   *int
@@ -139,7 +152,9 @@ type CanonicalResponse struct {
 	CanonicalModel        string
 	Message               string
 	OutputItems           []ContentBlock
+	StopReason            string
 	Usage                 Usage
+	RawProviderMetadata   []byte
 	CompatibilityWarnings []string
 }
 

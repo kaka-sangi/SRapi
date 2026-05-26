@@ -17,7 +17,7 @@ const (
 	claudeCodeAgentText   = "You are Claude Code, Anthropic's official CLI for Claude."
 )
 
-func isClaudeCodeReverseProxy(req contract.TextRequest) bool {
+func isClaudeCodeReverseProxy(req contract.ConversationRequest) bool {
 	return strings.EqualFold(strings.TrimSpace(req.Provider.AdapterType), "reverse-proxy-claude-code-cli")
 }
 
@@ -25,7 +25,7 @@ func isClaudeCodeTokenCountReverseProxy(req contract.TokenCountRequest) bool {
 	return strings.EqualFold(strings.TrimSpace(req.Provider.AdapterType), "reverse-proxy-claude-code-cli")
 }
 
-func claudeCodeReverseProxyRuntimeIsAPIKey(req contract.TextRequest) bool {
+func claudeCodeReverseProxyRuntimeIsAPIKey(req contract.ConversationRequest) bool {
 	return strings.EqualFold(strings.TrimSpace(string(req.Account.RuntimeClass)), "api_key")
 }
 
@@ -79,7 +79,7 @@ func claudeCodeCountTokensEndpoint(baseURL string) string {
 	return parsed.String()
 }
 
-func claudeCodeMessagesHeaders(req contract.TextRequest) http.Header {
+func claudeCodeMessagesHeaders(req contract.ConversationRequest) http.Header {
 	headers := http.Header{
 		"Content-Type": {"application/json"},
 	}
@@ -121,7 +121,7 @@ func claudeCodeTokenCountHeaders(req contract.TokenCountRequest) http.Header {
 	return claudeCodeMessagesHeaders(textReq)
 }
 
-func claudeCodeMessagesPayload(req contract.TextRequest, raw []byte) ([]byte, error) {
+func claudeCodeMessagesPayload(req contract.ConversationRequest, raw []byte) ([]byte, error) {
 	var payload map[string]any
 	if err := json.Unmarshal(raw, &payload); err != nil {
 		return nil, err
@@ -137,8 +137,8 @@ func claudeCodeTokenCountPayload(req contract.TokenCountRequest, raw []byte) ([]
 	return claudeCodeMessagesPayload(tokenCountTextRequest(req), raw)
 }
 
-func tokenCountTextRequest(req contract.TokenCountRequest) contract.TextRequest {
-	return contract.TextRequest{
+func tokenCountTextRequest(req contract.TokenCountRequest) contract.ConversationRequest {
+	return contract.ConversationRequest{
 		RequestID:      req.RequestID,
 		SourceProtocol: req.SourceProtocol,
 		SourceEndpoint: req.SourceEndpoint,
@@ -150,7 +150,7 @@ func tokenCountTextRequest(req contract.TokenCountRequest) contract.TextRequest 
 	}
 }
 
-func claudeCodeSystemBlocks(req contract.TextRequest, raw []byte, original any) []map[string]any {
+func claudeCodeSystemBlocks(req contract.ConversationRequest, raw []byte, original any) []map[string]any {
 	blocks := []map[string]any{
 		{"type": "text", "text": claudeCodeBillingHeader(req, raw, original)},
 		{"type": "text", "text": claudeCodeAgentText},
@@ -213,7 +213,7 @@ func firstSystemTextHasPrefix(value any, prefix string) bool {
 	return false
 }
 
-func claudeCodeBillingHeader(req contract.TextRequest, raw []byte, original any) string {
+func claudeCodeBillingHeader(req contract.ConversationRequest, raw []byte, original any) string {
 	version := defaultRequestSetting(req, "2.1.63", "claude_code_version", "cc_version")
 	build := requestSetting(req, "claude_code_build", "claude_code_build_hash", "cc_build")
 	if build == "" {
@@ -248,7 +248,7 @@ func sha256HexPrefix(raw []byte, n int) string {
 	return encoded[:n]
 }
 
-func defaultRequestSetting(req contract.TextRequest, fallback string, keys ...string) string {
+func defaultRequestSetting(req contract.ConversationRequest, fallback string, keys ...string) string {
 	if value := requestSetting(req, keys...); value != "" {
 		return value
 	}

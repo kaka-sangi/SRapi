@@ -59,6 +59,7 @@ func (s *Service) NormalizeResponses(req apiopenapi.ResponsesRequest, meta Reque
 	var warnings []string
 	var parts []string
 	var inputItems []gatewaycontract.ContentBlock
+	rawInstructions := ""
 	if value, err := req.Input.AsResponsesRequestInput0(); err == nil {
 		text := strings.TrimSpace(value)
 		if text != "" {
@@ -72,12 +73,24 @@ func (s *Service) NormalizeResponses(req apiopenapi.ResponsesRequest, meta Reque
 		inputItems = append(inputItems, openAIContentBlocks(blocks, "user")...)
 		parts = append(parts, extractContentBlocksText(blocks))
 	}
+	if len(inputItems) == 0 && len(meta.RawBody) > 0 {
+		rawInputItems, extractedInstructions, rawWarnings := rawResponsesInput(meta.RawBody)
+		rawInstructions = extractedInstructions
+		inputItems = append(inputItems, rawInputItems...)
+		warnings = append(warnings, rawWarnings...)
+		if text := textFromBlocks(rawInputItems); text != "" {
+			parts = append(parts, text)
+		}
+	}
 	instructions := ""
 	if req.Instructions != nil {
 		instructions = strings.TrimSpace(*req.Instructions)
-		if instructions != "" {
-			parts = append([]string{"instructions: " + instructions}, parts...)
-		}
+	}
+	if rawInstructions != "" {
+		instructions = strings.Join(uniqueStrings([]string{instructions, rawInstructions}), "\n")
+	}
+	if instructions != "" {
+		parts = append([]string{"instructions: " + instructions}, parts...)
 	}
 	canonical := canonical(meta, gatewaycontract.ProtocolOpenAICompatible, gatewaycontract.ProtocolOpenAICompatible, req.Model, "", req.Stream != nil && *req.Stream, strings.Join(parts, "\n"), nil, inputItems, instructions, uniqueStrings(warnings))
 	canonical.Temperature = req.Temperature
@@ -411,11 +424,15 @@ func (s *Service) NormalizeRerank(req apiopenapi.RerankRequest, meta RequestMeta
 	return canonical, nil
 }
 
-func (s *Service) BuildTextResponse(model, canonicalModel, text string, warnings []string) gatewaycontract.CanonicalResponse {
-	return s.buildTextResponse("", model, canonicalModel, text, estimateUsage(text), warnings)
+func (s *Service) BuildConversationResponse(model, canonicalModel, text string, warnings []string) gatewaycontract.CanonicalResponse {
+	return s.buildConversationResponse("", model, canonicalModel, []gatewaycontract.ContentBlock{{
+		Type: gatewaycontract.ContentBlockText,
+		Role: "assistant",
+		Text: strings.TrimSpace(text),
+	}}, "end_turn", estimateUsage(text), warnings)
 }
 
-func (s *Service) BuildCanonicalTextResponse(req gatewaycontract.CanonicalRequest, text string, usage gatewaycontract.Usage) gatewaycontract.CanonicalResponse {
+func (s *Service) BuildCanonicalConversationResponse(req gatewaycontract.CanonicalRequest, outputItems []gatewaycontract.ContentBlock, stopReason string, usage gatewaycontract.Usage, warnings []string, rawProviderMetadata []byte) gatewaycontract.CanonicalResponse {
 	model := strings.TrimSpace(req.Model)
 	if model == "" {
 		model = req.CanonicalModel
@@ -424,24 +441,32 @@ func (s *Service) BuildCanonicalTextResponse(req gatewaycontract.CanonicalReques
 	if canonicalModel == "" {
 		canonicalModel = model
 	}
+	outputItems = normalizeOutputItems(outputItems)
+	text := outputTextFromBlocks(outputItems)
 	if usage.InputTokens == 0 && usage.OutputTokens == 0 && usage.CachedTokens == 0 {
 		usage = estimateUsage(text)
 	}
-	return s.buildTextResponse(req.RequestID, model, canonicalModel, text, usage, req.CompatibilityWarnings)
+	warnings = append(append([]string(nil), req.CompatibilityWarnings...), warnings...)
+	resp := s.buildConversationResponse(req.RequestID, model, canonicalModel, outputItems, stopReason, usage, warnings)
+	resp.RawProviderMetadata = append([]byte(nil), rawProviderMetadata...)
+	return resp
 }
 
-func (s *Service) buildTextResponse(requestID, model, canonicalModel, text string, usage gatewaycontract.Usage, warnings []string) gatewaycontract.CanonicalResponse {
+func (s *Service) buildConversationResponse(requestID, model, canonicalModel string, outputItems []gatewaycontract.ContentBlock, stopReason string, usage gatewaycontract.Usage, warnings []string) gatewaycontract.CanonicalResponse {
+	outputItems = normalizeOutputItems(outputItems)
+	text := outputTextFromBlocks(outputItems)
+	stopReason = strings.TrimSpace(stopReason)
+	if stopReason == "" {
+		stopReason = "end_turn"
+	}
 	return gatewaycontract.CanonicalResponse{
-		ID:             randomHexString(12),
-		RequestID:      strings.TrimSpace(requestID),
-		Model:          model,
-		CanonicalModel: canonicalModel,
-		Message:        text,
-		OutputItems: []gatewaycontract.ContentBlock{{
-			Type: gatewaycontract.ContentBlockText,
-			Role: "assistant",
-			Text: text,
-		}},
+		ID:                    randomHexString(12),
+		RequestID:             strings.TrimSpace(requestID),
+		Model:                 model,
+		CanonicalModel:        canonicalModel,
+		Message:               text,
+		OutputItems:           outputItems,
+		StopReason:            stopReason,
 		Usage:                 usage,
 		CompatibilityWarnings: uniqueStrings(warnings),
 	}
@@ -619,12 +644,20 @@ func (s *Service) RenderChatCompletions(resp gatewaycontract.CanonicalResponse) 
 	now := time.Now().UTC()
 	systemFingerprint := "srapi"
 	msg := apiopenapi.ChatMessage{}
-	_ = msg.Content.FromChatMessageContent0(resp.Message)
+	contentBlocks := chatMessageContentBlocks(resp.OutputItems)
+	if chatContentShouldRenderAsBlocks(contentBlocks) {
+		_ = msg.Content.FromChatMessageContent1(outputOpenAIContentBlocks(contentBlocks))
+	} else {
+		_ = msg.Content.FromChatMessageContent0(outputTextFromBlocks(contentBlocks))
+	}
+	if toolCalls := outputOpenAIChatToolCalls(resp.OutputItems); len(toolCalls) > 0 {
+		msg.ToolCalls = &toolCalls
+	}
 	msg.Role = apiopenapi.ChatMessageRoleAssistant
 	return apiopenapi.ChatCompletionResponse{
 		Choices: []apiopenapi.ChatCompletionChoice{{
 			Index:        0,
-			FinishReason: ptrString("stop"),
+			FinishReason: ptrString(openAIChatFinishReason(resp.StopReason)),
 			Message:      msg,
 		}},
 		Created:           int(now.Unix()),
@@ -638,22 +671,15 @@ func (s *Service) RenderChatCompletions(resp gatewaycontract.CanonicalResponse) 
 
 func (s *Service) RenderResponses(resp gatewaycontract.CanonicalResponse) apiopenapi.ResponsesResponse {
 	now := time.Now().UTC()
-	role := "assistant"
-	text := resp.Message
-	content := []apiopenapi.ContentBlock{{Type: apiopenapi.ContentBlockTypeText, Text: &text}}
 	status := "completed"
 	rendered := apiopenapi.ResponsesResponse{
 		CreatedAt: int(now.Unix()),
 		Id:        "resp_" + responseID(resp),
 		Model:     resp.Model,
 		Object:    apiopenapi.Response,
-		Output: []apiopenapi.ResponsesOutputItem{{
-			Type:    "message",
-			Role:    &role,
-			Content: &content,
-		}},
-		Status: &status,
-		Usage:  tokenUsage(resp.Usage),
+		Output:    responseOutputItems(resp.OutputItems),
+		Status:    &status,
+		Usage:     tokenUsage(resp.Usage),
 	}
 	if len(resp.CompatibilityWarnings) > 0 {
 		warnings := append([]string(nil), resp.CompatibilityWarnings...)
@@ -663,10 +689,9 @@ func (s *Service) RenderResponses(resp gatewaycontract.CanonicalResponse) apiope
 }
 
 func (s *Service) RenderAnthropicMessages(resp gatewaycontract.CanonicalResponse) apiopenapi.AnthropicMessagesResponse {
-	text := resp.Message
-	stopReason := "end_turn"
+	stopReason := anthropicStopReason(resp.StopReason)
 	rendered := apiopenapi.AnthropicMessagesResponse{
-		Content:    []apiopenapi.AnthropicContentBlock{{Type: apiopenapi.AnthropicContentBlockTypeText, Text: &text}},
+		Content:    outputAnthropicContentBlocks(resp.OutputItems),
 		Id:         "msg_" + responseID(resp),
 		Model:      resp.Model,
 		Role:       apiopenapi.AnthropicMessagesResponseRoleAssistant,
@@ -683,14 +708,13 @@ func (s *Service) RenderAnthropicMessages(resp gatewaycontract.CanonicalResponse
 
 func (s *Service) RenderGeminiGenerateContent(resp gatewaycontract.CanonicalResponse) apiopenapi.GeminiGenerateContentResponse {
 	role := apiopenapi.GeminiContentRoleModel
-	text := resp.Message
 	rendered := apiopenapi.GeminiGenerateContentResponse{
 		Candidates: []apiopenapi.GeminiCandidate{{
 			Content: apiopenapi.GeminiContent{
 				Role:  &role,
-				Parts: []apiopenapi.GeminiPart{{Text: &text}},
+				Parts: outputGeminiParts(resp.OutputItems),
 			},
-			FinishReason: "STOP",
+			FinishReason: geminiFinishReason(resp.StopReason),
 			Index:        0,
 		}},
 		ModelVersion:  ptrString(resp.Model),
@@ -836,6 +860,17 @@ func (s *Service) RenderRerank(resp gatewaycontract.RerankResponse) apiopenapi.R
 }
 
 func (s *Service) RenderChatStreamChunk(resp gatewaycontract.CanonicalResponse) map[string]any {
+	blocks := normalizeOutputItems(resp.OutputItems)
+	delta := map[string]any{"role": "assistant"}
+	if text := outputTextFromBlocks(blocks); text != "" {
+		delta["content"] = text
+	}
+	if toolCalls := chatStreamToolCalls(blocks); len(toolCalls) > 0 {
+		delta["tool_calls"] = toolCalls
+	}
+	if len(delta) == 1 {
+		delta["content"] = ""
+	}
 	chunk := map[string]any{
 		"id":      "chatcmpl_" + responseID(resp),
 		"object":  "chat.completion.chunk",
@@ -843,12 +878,9 @@ func (s *Service) RenderChatStreamChunk(resp gatewaycontract.CanonicalResponse) 
 		"model":   resp.Model,
 		"choices": []map[string]any{
 			{
-				"index": 0,
-				"delta": map[string]any{
-					"role":    "assistant",
-					"content": resp.Message,
-				},
-				"finish_reason": "stop",
+				"index":         0,
+				"delta":         delta,
+				"finish_reason": openAIChatFinishReason(resp.StopReason),
 			},
 		},
 	}
@@ -872,7 +904,7 @@ func (s *Service) RenderResponsesStreamEvents(resp gatewaycontract.CanonicalResp
 	if len(resp.CompatibilityWarnings) > 0 {
 		created["compatibility_warnings"] = append([]string(nil), resp.CompatibilityWarnings...)
 	}
-	return []StreamEvent{
+	events := []StreamEvent{
 		{
 			Event: "response.created",
 			Data: map[string]any{
@@ -880,39 +912,23 @@ func (s *Service) RenderResponsesStreamEvents(resp gatewaycontract.CanonicalResp
 				"response": created,
 			},
 		},
-		{
-			Event: "response.output_text.delta",
-			Data: map[string]any{
-				"type":          "response.output_text.delta",
-				"item_id":       "msg_0",
-				"output_index":  0,
-				"content_index": 0,
-				"delta":         resp.Message,
-			},
-		},
-		{
-			Event: "response.output_text.done",
-			Data: map[string]any{
-				"type":          "response.output_text.done",
-				"item_id":       "msg_0",
-				"output_index":  0,
-				"content_index": 0,
-				"text":          resp.Message,
-			},
-		},
-		{
+	}
+	events = append(events, responseStreamOutputEvents(resp.OutputItems)...)
+	events = append(events,
+		StreamEvent{
 			Event: "response.completed",
 			Data: map[string]any{
 				"type":     "response.completed",
 				"response": completed,
 			},
 		},
-	}
+	)
+	return events
 }
 
 func (s *Service) RenderAnthropicMessagesStreamEvents(resp gatewaycontract.CanonicalResponse) []StreamEvent {
 	id := "msg_" + responseID(resp)
-	return []StreamEvent{
+	events := []StreamEvent{
 		{
 			Event: "message_start",
 			Data: map[string]any{
@@ -932,41 +948,41 @@ func (s *Service) RenderAnthropicMessagesStreamEvents(resp gatewaycontract.Canon
 				},
 			},
 		},
-		{
+	}
+	for index, block := range normalizeOutputItems(resp.OutputItems) {
+		events = append(events, StreamEvent{
 			Event: "content_block_start",
 			Data: map[string]any{
-				"type":  "content_block_start",
-				"index": 0,
-				"content_block": map[string]any{
-					"type": "text",
-					"text": "",
-				},
+				"type":          "content_block_start",
+				"index":         index,
+				"content_block": anthropicStreamContentBlock(block),
 			},
-		},
-		{
-			Event: "content_block_delta",
-			Data: map[string]any{
-				"type":  "content_block_delta",
-				"index": 0,
-				"delta": map[string]any{
-					"type": "text_delta",
-					"text": resp.Message,
+		})
+		if delta := anthropicStreamContentDelta(block); len(delta) > 0 {
+			events = append(events, StreamEvent{
+				Event: "content_block_delta",
+				Data: map[string]any{
+					"type":  "content_block_delta",
+					"index": index,
+					"delta": delta,
 				},
-			},
-		},
-		{
+			})
+		}
+		events = append(events, StreamEvent{
 			Event: "content_block_stop",
 			Data: map[string]any{
 				"type":  "content_block_stop",
-				"index": 0,
+				"index": index,
 			},
-		},
-		{
+		})
+	}
+	events = append(events,
+		StreamEvent{
 			Event: "message_delta",
 			Data: map[string]any{
 				"type": "message_delta",
 				"delta": map[string]any{
-					"stop_reason":   "end_turn",
+					"stop_reason":   anthropicStopReason(resp.StopReason),
 					"stop_sequence": nil,
 				},
 				"usage": map[string]any{
@@ -974,13 +990,14 @@ func (s *Service) RenderAnthropicMessagesStreamEvents(resp gatewaycontract.Canon
 				},
 			},
 		},
-		{
+		StreamEvent{
 			Event: "message_stop",
 			Data: map[string]any{
 				"type": "message_stop",
 			},
 		},
-	}
+	)
+	return events
 }
 
 func (s *Service) RenderGeminiGenerateContentStreamEvents(resp gatewaycontract.CanonicalResponse) []StreamEvent {
@@ -1023,6 +1040,7 @@ type RequestMeta struct {
 	UserID         int
 	APIKeyID       int
 	CanonicalModel string
+	RawBody        []byte
 }
 
 func canonical(meta RequestMeta, sourceProtocol, responseProtocol gatewaycontract.Protocol, model, canonicalModel string, stream bool, prompt string, messages []gatewaycontract.Message, inputItems []gatewaycontract.ContentBlock, instructions string, warnings []string) gatewaycontract.CanonicalRequest {
@@ -1047,6 +1065,7 @@ func canonical(meta RequestMeta, sourceProtocol, responseProtocol gatewaycontrac
 		Stream:                stream,
 		Prompt:                strings.TrimSpace(prompt),
 		CompatibilityWarnings: warnings,
+		RawBody:               append([]byte(nil), meta.RawBody...),
 	}
 	refreshRequestCapabilities(&req)
 	return req

@@ -112,21 +112,21 @@ type chatGPTWebRequirementsResponse struct {
 	} `json:"arkose"`
 }
 
-func (s *Service) invokeReverseProxyChatGPTWebConversation(ctx context.Context, req contract.TextRequest, baseURL string) (contract.TextResponse, error) {
+func (s *Service) invokeReverseProxyChatGPTWebConversation(ctx context.Context, req contract.ConversationRequest, baseURL string) (contract.ConversationResponse, error) {
 	if s.reverseProxy == nil {
-		return contract.TextResponse{}, contract.ProviderError{Class: "network_error", StatusCode: http.StatusBadGateway, Message: "reverse proxy runtime unavailable"}
+		return contract.ConversationResponse{}, contract.ProviderError{Class: "network_error", StatusCode: http.StatusBadGateway, Message: "reverse proxy runtime unavailable"}
 	}
 	if chatGPTWebRuntimeIsAPIKey(req) {
-		return contract.TextResponse{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "chatgpt web reverse proxy requires OAuth/session/client-token runtime credentials"}
+		return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "chatgpt web reverse proxy requires OAuth/session/client-token runtime credentials"}
 	}
 	path := chatGPTWebPath(req)
 	headers, err := s.chatGPTWebConversationHeaders(ctx, req, baseURL, path)
 	if err != nil {
-		return contract.TextResponse{}, err
+		return contract.ConversationResponse{}, err
 	}
 	raw, err := json.Marshal(chatGPTWebConversationPayload(req))
 	if err != nil {
-		return contract.TextResponse{}, err
+		return contract.ConversationResponse{}, err
 	}
 	runtimeResp, err := s.reverseProxy.Do(ctx, reverseproxycontract.Request{
 		Account:      chatGPTWebReverseProxyAccount(req),
@@ -137,15 +137,15 @@ func (s *Service) invokeReverseProxyChatGPTWebConversation(ctx context.Context, 
 		ExpectStream: true,
 	})
 	if err != nil {
-		return contract.TextResponse{}, providerErrorFromReverseProxy(err)
+		return contract.ConversationResponse{}, providerErrorFromReverseProxy(err)
 	}
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
-		return contract.TextResponse{}, classifyProviderHTTPError(runtimeResp.StatusCode, runtimeResp.Body)
+		return contract.ConversationResponse{}, classifyProviderHTTPError(runtimeResp.StatusCode, runtimeResp.Body)
 	}
 	return parseChatGPTWebConversationBody(runtimeResp.Body, runtimeResp.StatusCode)
 }
 
-func chatGPTWebConversationPayload(req contract.TextRequest) chatGPTWebConversationRequest {
+func chatGPTWebConversationPayload(req contract.ConversationRequest) chatGPTWebConversationRequest {
 	timezone := requestSetting(req, "chatgpt_timezone", "timezone")
 	if timezone == "" {
 		timezone = chatGPTWebDefaultTimezone
@@ -174,7 +174,7 @@ func chatGPTWebConversationPayload(req contract.TextRequest) chatGPTWebConversat
 	}
 }
 
-func chatGPTWebMessages(req contract.TextRequest) []chatGPTWebMessage {
+func chatGPTWebMessages(req contract.ConversationRequest) []chatGPTWebMessage {
 	out := make([]chatGPTWebMessage, 0, len(req.Messages)+2)
 	if instructions := strings.TrimSpace(req.Instructions); instructions != "" {
 		out = append(out, chatGPTWebMessage{
@@ -185,7 +185,7 @@ func chatGPTWebMessages(req contract.TextRequest) []chatGPTWebMessage {
 	}
 	hasConversationMessage := false
 	for idx, message := range req.Messages {
-		content := strings.TrimSpace(message.Content)
+		content := conversationMessageText(message)
 		if content == "" {
 			continue
 		}
@@ -200,7 +200,7 @@ func chatGPTWebMessages(req contract.TextRequest) []chatGPTWebMessage {
 		})
 	}
 	if !hasConversationMessage {
-		prompt := strings.TrimSpace(req.Prompt)
+		prompt := conversationPrompt(req)
 		if prompt == "" {
 			if len(out) == 0 {
 				prompt = strings.TrimSpace(req.Instructions)
@@ -218,7 +218,7 @@ func chatGPTWebMessages(req contract.TextRequest) []chatGPTWebMessage {
 	return out
 }
 
-func (s *Service) chatGPTWebConversationHeaders(ctx context.Context, req contract.TextRequest, baseURL string, path string) (http.Header, error) {
+func (s *Service) chatGPTWebConversationHeaders(ctx context.Context, req contract.ConversationRequest, baseURL string, path string) (http.Header, error) {
 	requirements, err := s.chatGPTWebRequirements(ctx, req, baseURL)
 	if err != nil {
 		return nil, err
@@ -239,7 +239,7 @@ func (s *Service) chatGPTWebConversationHeaders(ctx context.Context, req contrac
 	return headers, nil
 }
 
-func (s *Service) chatGPTWebRequirements(ctx context.Context, req contract.TextRequest, baseURL string) (chatGPTWebSentinelRequirements, error) {
+func (s *Service) chatGPTWebRequirements(ctx context.Context, req contract.ConversationRequest, baseURL string) (chatGPTWebSentinelRequirements, error) {
 	requirements := chatGPTWebSentinelRequirements{
 		Token:          requestSetting(req, "chatgpt_requirements_token", "openai_sentinel_chat_requirements_token", "sentinel_chat_requirements_token"),
 		ProofToken:     requestSetting(req, "chatgpt_proof_token", "openai_sentinel_proof_token", "sentinel_proof_token"),
@@ -255,7 +255,7 @@ func (s *Service) chatGPTWebRequirements(ctx context.Context, req contract.TextR
 	return s.fetchChatGPTWebRequirements(ctx, req, baseURL)
 }
 
-func (s *Service) fetchChatGPTWebRequirements(ctx context.Context, req contract.TextRequest, baseURL string) (chatGPTWebSentinelRequirements, error) {
+func (s *Service) fetchChatGPTWebRequirements(ctx context.Context, req contract.ConversationRequest, baseURL string) (chatGPTWebSentinelRequirements, error) {
 	origin := chatGPTWebOrigin(baseURL)
 	bootstrapResp, err := s.reverseProxy.Do(ctx, reverseproxycontract.Request{
 		Account: chatGPTWebReverseProxyAccount(req),
@@ -293,7 +293,7 @@ func (s *Service) fetchChatGPTWebRequirements(ctx context.Context, req contract.
 	return chatGPTWebBuildRequirements(req, decoded, legacyToken, powSources, dataBuild)
 }
 
-func chatGPTWebBuildRequirements(req contract.TextRequest, decoded chatGPTWebRequirementsResponse, legacyToken string, powSources []string, dataBuild string) (chatGPTWebSentinelRequirements, error) {
+func chatGPTWebBuildRequirements(req contract.ConversationRequest, decoded chatGPTWebRequirementsResponse, legacyToken string, powSources []string, dataBuild string) (chatGPTWebSentinelRequirements, error) {
 	requirements := chatGPTWebSentinelRequirements{
 		Token:          strings.TrimSpace(decoded.Token),
 		TurnstileToken: requestSetting(req, "chatgpt_turnstile_token", "openai_sentinel_turnstile_token", "sentinel_turnstile_token"),
@@ -319,7 +319,7 @@ func chatGPTWebBuildRequirements(req contract.TextRequest, decoded chatGPTWebReq
 	return requirements, nil
 }
 
-func chatGPTWebBaseHeaders(req contract.TextRequest, baseURL string, path string) http.Header {
+func chatGPTWebBaseHeaders(req contract.ConversationRequest, baseURL string, path string) http.Header {
 	origin := chatGPTWebOrigin(baseURL)
 	return http.Header{
 		"Accept":                      {"text/event-stream"},
@@ -351,14 +351,14 @@ func chatGPTWebBaseHeaders(req contract.TextRequest, baseURL string, path string
 	}
 }
 
-func chatGPTWebJSONHeaders(req contract.TextRequest, baseURL string, path string) http.Header {
+func chatGPTWebJSONHeaders(req contract.ConversationRequest, baseURL string, path string) http.Header {
 	headers := chatGPTWebBaseHeaders(req, baseURL, path)
 	headers.Set("Accept", "application/json")
 	headers.Set("Content-Type", "application/json")
 	return headers
 }
 
-func chatGPTWebBootstrapHeaders(req contract.TextRequest, origin string) http.Header {
+func chatGPTWebBootstrapHeaders(req contract.ConversationRequest, origin string) http.Header {
 	return http.Header{
 		"User-Agent":                {chatGPTWebUserAgent(req)},
 		"Accept":                    {"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"},
@@ -403,14 +403,14 @@ func chatGPTWebPoWResources(body []byte) ([]string, string) {
 	return sources, dataBuild
 }
 
-func chatGPTWebLegacyRequirementsToken(req contract.TextRequest, scriptSources []string, dataBuild string) string {
+func chatGPTWebLegacyRequirementsToken(req contract.ConversationRequest, scriptSources []string, dataBuild string) string {
 	seed := fmt.Sprintf("0.%d", time.Now().UnixNano())
 	config := chatGPTWebPoWConfig(req, scriptSources, dataBuild)
 	answer, _ := chatGPTWebPoWGenerate(seed, "0fffff", config, chatGPTWebPoWLimit)
 	return "gAAAAAC" + answer
 }
 
-func chatGPTWebProofToken(req contract.TextRequest, seed string, difficulty string, scriptSources []string, dataBuild string) (string, error) {
+func chatGPTWebProofToken(req contract.ConversationRequest, seed string, difficulty string, scriptSources []string, dataBuild string) (string, error) {
 	seed = strings.TrimSpace(seed)
 	difficulty = strings.TrimSpace(difficulty)
 	if seed == "" || difficulty == "" {
@@ -470,7 +470,7 @@ func chatGPTWebPoWFallback(seed string) string {
 	return "wQ8Lk5FbGpA2NcR9dShT6gYjU7VxZ4D" + base64.StdEncoding.EncodeToString(raw)
 }
 
-func chatGPTWebPoWConfig(req contract.TextRequest, scriptSources []string, dataBuild string) []any {
+func chatGPTWebPoWConfig(req contract.ConversationRequest, scriptSources []string, dataBuild string) []any {
 	scriptSource := chatGPTWebDefaultPoWScript
 	if len(scriptSources) > 0 && strings.TrimSpace(scriptSources[0]) != "" {
 		scriptSource = strings.TrimSpace(scriptSources[0])
@@ -498,12 +498,12 @@ func chatGPTWebPoWConfig(req contract.TextRequest, scriptSources []string, dataB
 	}
 }
 
-func chatGPTWebAutoRequirementsEnabled(req contract.TextRequest) bool {
+func chatGPTWebAutoRequirementsEnabled(req contract.ConversationRequest) bool {
 	value := strings.ToLower(requestSetting(req, "chatgpt_requirements_auto", "requirements_auto"))
 	return value != "false" && value != "0" && value != "disabled"
 }
 
-func chatGPTWebRequirementsPath(req contract.TextRequest) string {
+func chatGPTWebRequirementsPath(req contract.ConversationRequest) string {
 	if strings.EqualFold(requestSetting(req, "chatgpt_anon", "anonymous"), "true") {
 		return "/backend-anon/sentinel/chat-requirements"
 	}
@@ -513,24 +513,24 @@ func chatGPTWebRequirementsPath(req contract.TextRequest) string {
 	return "/backend-api/sentinel/chat-requirements"
 }
 
-func chatGPTWebUserAgent(req contract.TextRequest) string {
+func chatGPTWebUserAgent(req contract.ConversationRequest) string {
 	if value := requestSetting(req, "user_agent", "chatgpt_user_agent"); value != "" {
 		return value
 	}
 	return "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0"
 }
 
-func parseChatGPTWebConversationBody(body []byte, statusCode int) (contract.TextResponse, error) {
+func parseChatGPTWebConversationBody(body []byte, statusCode int) (contract.ConversationResponse, error) {
 	trimmed := bytes.TrimSpace(body)
 	if len(trimmed) == 0 {
-		return contract.TextResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response contained no text"}
+		return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response contained no text"}
 	}
 	if !bytes.Contains(trimmed, []byte("data:")) {
 		text, err := chatGPTWebTextFromJSON(trimmed)
 		if err != nil {
-			return contract.TextResponse{}, err
+			return contract.ConversationResponse{}, err
 		}
-		return contract.TextResponse{Text: text, StatusCode: statusCode, Usage: estimatedUsage(text)}, nil
+		return conversationTextResponse(text, statusCode, estimatedUsage(text)), nil
 	}
 
 	scanner := bufio.NewScanner(bytes.NewReader(trimmed))
@@ -554,7 +554,7 @@ func parseChatGPTWebConversationBody(body []byte, statusCode int) (contract.Text
 		}
 		var event map[string]any
 		if err := json.Unmarshal([]byte(data), &event); err != nil {
-			return contract.TextResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider returned invalid stream json"}
+			return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider returned invalid stream json"}
 		}
 		if delta := chatGPTWebDelta(event); delta != "" {
 			deltas.WriteString(delta)
@@ -565,16 +565,16 @@ func parseChatGPTWebConversationBody(body []byte, statusCode int) (contract.Text
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		return contract.TextResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream interrupted"}
+		return contract.ConversationResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream interrupted"}
 	}
 	text := strings.TrimSpace(latestFullText)
 	if text == "" {
 		text = strings.TrimSpace(deltas.String())
 	}
 	if text == "" {
-		return contract.TextResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider stream contained no text"}
+		return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider stream contained no text"}
 	}
-	return contract.TextResponse{Text: text, StatusCode: statusCode, Usage: estimatedUsage(text)}, nil
+	return conversationTextResponse(text, statusCode, estimatedUsage(text)), nil
 }
 
 func chatGPTWebTextFromJSON(body []byte) (string, error) {
@@ -648,15 +648,15 @@ func chatGPTWebContentText(value map[string]any) string {
 	return strings.Join(out, "")
 }
 
-func isChatGPTWebReverseProxy(req contract.TextRequest) bool {
+func isChatGPTWebReverseProxy(req contract.ConversationRequest) bool {
 	return strings.EqualFold(strings.TrimSpace(req.Provider.AdapterType), "reverse-proxy-chatgpt-web")
 }
 
-func chatGPTWebRuntimeIsAPIKey(req contract.TextRequest) bool {
+func chatGPTWebRuntimeIsAPIKey(req contract.ConversationRequest) bool {
 	return strings.EqualFold(strings.TrimSpace(string(req.Account.RuntimeClass)), "api_key")
 }
 
-func chatGPTWebReverseProxyAccount(req contract.TextRequest) reverseproxycontract.AccountRuntime {
+func chatGPTWebReverseProxyAccount(req contract.ConversationRequest) reverseproxycontract.AccountRuntime {
 	return reverseproxycontract.AccountRuntime{
 		AccountID:      req.Account.ID,
 		RuntimeClass:   string(req.Account.RuntimeClass),
@@ -667,7 +667,7 @@ func chatGPTWebReverseProxyAccount(req contract.TextRequest) reverseproxycontrac
 	}
 }
 
-func chatGPTWebPath(req contract.TextRequest) string {
+func chatGPTWebPath(req contract.ConversationRequest) string {
 	if path := requestSetting(req, "chatgpt_conversation_path", "conversation_path"); strings.HasPrefix(path, "/") {
 		return path
 	}
@@ -705,7 +705,7 @@ func chatGPTWebOrigin(baseURL string) string {
 	return parsed.Scheme + "://" + parsed.Host
 }
 
-func chatGPTWebClientContextInfo(req contract.TextRequest) chatGPTWebClientContext {
+func chatGPTWebClientContextInfo(req contract.ConversationRequest) chatGPTWebClientContext {
 	return chatGPTWebClientContext{
 		IsDarkMode:      false,
 		TimeSinceLoaded: chatGPTWebIntSetting(req, 120, "chatgpt_time_since_loaded", "time_since_loaded"),
@@ -730,21 +730,21 @@ func chatGPTWebRole(role string) string {
 	}
 }
 
-func chatGPTWebStringSetting(req contract.TextRequest, fallback string, keys ...string) string {
+func chatGPTWebStringSetting(req contract.ConversationRequest, fallback string, keys ...string) string {
 	if value := requestSetting(req, keys...); value != "" {
 		return value
 	}
 	return fallback
 }
 
-func chatGPTWebSettingOrStableID(req contract.TextRequest, suffix string, keys ...string) string {
+func chatGPTWebSettingOrStableID(req contract.ConversationRequest, suffix string, keys ...string) string {
 	if value := requestSetting(req, keys...); value != "" {
 		return value
 	}
 	return chatGPTWebStableID(req, suffix)
 }
 
-func chatGPTWebStableID(req contract.TextRequest, suffix string) string {
+func chatGPTWebStableID(req contract.ConversationRequest, suffix string) string {
 	seed := strings.TrimSpace(req.RequestID)
 	if seed == "" {
 		seed = strings.TrimSpace(req.Model)
@@ -753,7 +753,7 @@ func chatGPTWebStableID(req contract.TextRequest, suffix string) string {
 	return fmt.Sprintf("%x-%x-%x-%x-%x", sum[0:4], sum[4:6], sum[6:8], sum[8:10], sum[10:16])
 }
 
-func chatGPTWebIntSetting(req contract.TextRequest, fallback int, keys ...string) int {
+func chatGPTWebIntSetting(req contract.ConversationRequest, fallback int, keys ...string) int {
 	if value := requestSetting(req, keys...); value != "" {
 		if parsed, err := strconv.Atoi(value); err == nil {
 			return parsed
@@ -762,7 +762,7 @@ func chatGPTWebIntSetting(req contract.TextRequest, fallback int, keys ...string
 	return fallback
 }
 
-func chatGPTWebFloatSetting(req contract.TextRequest, fallback float64, keys ...string) float64 {
+func chatGPTWebFloatSetting(req contract.ConversationRequest, fallback float64, keys ...string) float64 {
 	if value := requestSetting(req, keys...); value != "" {
 		if parsed, err := strconv.ParseFloat(value, 64); err == nil {
 			return parsed

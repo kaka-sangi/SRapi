@@ -58,20 +58,20 @@ type antigravityResponseEnvelope struct {
 	TraceID  string                        `json:"traceId"`
 }
 
-func (s *Service) invokeReverseProxyAntigravity(ctx context.Context, req contract.TextRequest, baseURL string) (contract.TextResponse, error) {
+func (s *Service) invokeReverseProxyAntigravity(ctx context.Context, req contract.ConversationRequest, baseURL string) (contract.ConversationResponse, error) {
 	if s.reverseProxy == nil {
-		return contract.TextResponse{}, contract.ProviderError{Class: "network_error", StatusCode: http.StatusBadGateway, Message: "reverse proxy runtime unavailable"}
+		return contract.ConversationResponse{}, contract.ProviderError{Class: "network_error", StatusCode: http.StatusBadGateway, Message: "reverse proxy runtime unavailable"}
 	}
 	if antigravityReverseProxyRuntimeIsAPIKey(req) {
-		return contract.TextResponse{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "antigravity reverse proxy requires OAuth/session/desktop/IDE/client-token runtime credentials"}
+		return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "antigravity reverse proxy requires OAuth/session/desktop/IDE/client-token runtime credentials"}
 	}
 	payload, err := antigravityPayload(req)
 	if err != nil {
-		return contract.TextResponse{}, err
+		return contract.ConversationResponse{}, err
 	}
 	raw, err := json.Marshal(payload)
 	if err != nil {
-		return contract.TextResponse{}, err
+		return contract.ConversationResponse{}, err
 	}
 	runtimeResp, err := s.reverseProxy.Do(ctx, reverseproxycontract.Request{
 		Account:      antigravityReverseProxyAccount(req),
@@ -82,30 +82,27 @@ func (s *Service) invokeReverseProxyAntigravity(ctx context.Context, req contrac
 		ExpectStream: req.Stream,
 	})
 	if err != nil {
-		return contract.TextResponse{}, providerErrorFromReverseProxy(err)
+		return contract.ConversationResponse{}, providerErrorFromReverseProxy(err)
 	}
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
-		return contract.TextResponse{}, classifyGeminiProviderHTTPError(runtimeResp.StatusCode, runtimeResp.Body)
+		return contract.ConversationResponse{}, classifyGeminiProviderHTTPError(runtimeResp.StatusCode, runtimeResp.Body)
 	}
 	if req.Stream {
 		return parseAntigravityStream(runtimeResp.Body, runtimeResp.StatusCode)
 	}
 	unwrapped, err := parseAntigravityResponse(runtimeResp.Body)
 	if err != nil {
-		return contract.TextResponse{}, err
+		return contract.ConversationResponse{}, err
 	}
-	text := strings.TrimSpace(unwrapped.FirstText())
-	if text == "" {
-		return contract.TextResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response contained no text"}
+	parsed, err := unwrapped.ConversationResponse(runtimeResp.StatusCode)
+	if err != nil {
+		return contract.ConversationResponse{}, err
 	}
-	return contract.TextResponse{
-		Text:       text,
-		StatusCode: runtimeResp.StatusCode,
-		Usage:      unwrapped.UsageMetadata.ToUsage(text),
-	}, nil
+	parsed.Raw = append([]byte(nil), runtimeResp.Body...)
+	return parsed, nil
 }
 
-func antigravityPayload(req contract.TextRequest) (antigravityRequest, error) {
+func antigravityPayload(req contract.ConversationRequest) (antigravityRequest, error) {
 	projectID := requestSetting(req, "project_id", "antigravity_project_id", "cloudaicompanion_project")
 	if projectID == "" {
 		return antigravityRequest{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "antigravity reverse proxy project_id missing"}
@@ -121,7 +118,7 @@ func antigravityPayload(req contract.TextRequest) (antigravityRequest, error) {
 	}, nil
 }
 
-func antigravityInnerRequest(req contract.TextRequest) antigravityGenerateTextRequest {
+func antigravityInnerRequest(req contract.ConversationRequest) antigravityGenerateTextRequest {
 	inner := antigravityGenerateTextRequest{
 		Contents:         geminiCompatibleContents(req),
 		GenerationConfig: geminiCompatibleGenerationConfig(req),
@@ -143,7 +140,7 @@ func antigravityInnerRequest(req contract.TextRequest) antigravityGenerateTextRe
 	return inner
 }
 
-func antigravityTools(req contract.TextRequest) []map[string]any {
+func antigravityTools(req contract.ConversationRequest) []map[string]any {
 	tools := geminiCompatibleTools(req.Tools)
 	if len(tools) == 0 {
 		return nil
@@ -267,7 +264,7 @@ func appendAntigravityAlt(rawURL string, alt string) string {
 	return parsed.String()
 }
 
-func antigravityHeaders(req contract.TextRequest) http.Header {
+func antigravityHeaders(req contract.ConversationRequest) http.Header {
 	headers := http.Header{
 		"Content-Type": {"application/json"},
 	}
@@ -299,11 +296,12 @@ func geminiUsageMetadataPresent(usage geminiUsageMetadata) bool {
 		usage.CachedContentTokenCount != nil
 }
 
-func parseAntigravityStream(body []byte, statusCode int) (contract.TextResponse, error) {
+func parseAntigravityStream(body []byte, statusCode int) (contract.ConversationResponse, error) {
 	scanner := bufio.NewScanner(bytes.NewReader(body))
 	scanner.Buffer(make([]byte, 0, 64*1024), 4<<20)
-	var builder strings.Builder
 	var usage geminiUsageMetadata
+	var parts []contract.ContentPart
+	stopReason := contract.StopReasonEndTurn
 	seenChunk := false
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
@@ -322,32 +320,34 @@ func parseAntigravityStream(body []byte, statusCode int) (contract.TextResponse,
 		}
 		chunk, err := parseAntigravityResponse([]byte(data))
 		if err != nil {
-			return contract.TextResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider returned invalid stream json"}
+			return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider returned invalid stream json"}
 		}
 		seenChunk = true
-		if text := chunk.StreamText(); strings.TrimSpace(text) != "" {
-			builder.WriteString(text)
+		parts = appendStreamContentParts(parts, chunk.ContentParts())
+		if reason := chunk.StopReason(); reason != contract.StopReasonEndTurn {
+			stopReason = reason
 		}
 		usage.Merge(chunk.UsageMetadata)
 	}
 	if err := scanner.Err(); err != nil {
-		return contract.TextResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream interrupted"}
+		return contract.ConversationResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream interrupted"}
 	}
 	if !seenChunk {
-		return contract.TextResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream ended before chunk"}
+		return contract.ConversationResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream ended before chunk"}
 	}
-	text := strings.TrimSpace(builder.String())
-	if text == "" {
-		return contract.TextResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider stream contained no text"}
+	if len(parts) == 0 {
+		return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider stream contained no content"}
 	}
-	return contract.TextResponse{
-		Text:       text,
+	text := contentPartsText(parts)
+	return contract.ConversationResponse{
+		Parts:      parts,
+		StopReason: stopReason,
 		StatusCode: statusCode,
 		Usage:      usage.ToUsage(text),
 	}, nil
 }
 
-func antigravityReverseProxyAccount(req contract.TextRequest) reverseproxycontract.AccountRuntime {
+func antigravityReverseProxyAccount(req contract.ConversationRequest) reverseproxycontract.AccountRuntime {
 	upstreamClient := req.Account.UpstreamClient
 	if upstreamClient == nil || strings.TrimSpace(*upstreamClient) == "" {
 		value := "antigravity_desktop"
@@ -363,15 +363,15 @@ func antigravityReverseProxyAccount(req contract.TextRequest) reverseproxycontra
 	}
 }
 
-func isAntigravityReverseProxy(req contract.TextRequest) bool {
+func isAntigravityReverseProxy(req contract.ConversationRequest) bool {
 	return strings.EqualFold(strings.TrimSpace(req.Provider.AdapterType), "reverse-proxy-antigravity")
 }
 
-func antigravityReverseProxyRuntimeIsAPIKey(req contract.TextRequest) bool {
+func antigravityReverseProxyRuntimeIsAPIKey(req contract.ConversationRequest) bool {
 	return strings.EqualFold(strings.TrimSpace(string(req.Account.RuntimeClass)), "api_key")
 }
 
-func antigravityRequestType(req contract.TextRequest) string {
+func antigravityRequestType(req contract.ConversationRequest) string {
 	if value := requestSetting(req, "antigravity_request_type", "request_type"); value != "" {
 		return value
 	}
@@ -381,7 +381,7 @@ func antigravityRequestType(req contract.TextRequest) string {
 	return "agent"
 }
 
-func antigravityRequestID(req contract.TextRequest) string {
+func antigravityRequestID(req contract.ConversationRequest) string {
 	if value := requestSetting(req, "antigravity_request_id", "request_id"); value != "" {
 		return value
 	}
@@ -391,7 +391,7 @@ func antigravityRequestID(req contract.TextRequest) string {
 	return "agent-" + randomHex(16)
 }
 
-func antigravitySessionID(req contract.TextRequest) string {
+func antigravitySessionID(req contract.ConversationRequest) string {
 	if value := requestSetting(req, "antigravity_session_id", "session_id"); value != "" {
 		return value
 	}
@@ -405,16 +405,16 @@ func antigravitySessionID(req contract.TextRequest) string {
 	return "-" + strconv.FormatInt(timeNowMillis(), 10)
 }
 
-func antigravityInnerContentsForSession(req contract.TextRequest) []string {
+func antigravityInnerContentsForSession(req contract.ConversationRequest) []string {
 	out := make([]string, 0, len(req.Messages)+1)
 	for _, message := range req.Messages {
 		if strings.TrimSpace(message.Role) != "user" {
 			continue
 		}
-		out = append(out, message.Content)
+		out = append(out, conversationMessageText(message))
 	}
 	if len(out) == 0 {
-		out = append(out, req.Prompt)
+		out = append(out, conversationPrompt(req))
 	}
 	return out
 }

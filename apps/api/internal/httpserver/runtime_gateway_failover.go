@@ -50,7 +50,7 @@ func writeGeminiProviderGatewayError(w http.ResponseWriter, err error) {
 	writeGeminiGatewayError(w, status, geminiStatusForGatewayErrorClass(errorClass, status), providerGatewayMessage(errorClass))
 }
 
-func (s *Server) invokeProviderTextWithFailover(
+func (s *Server) invokeProviderConversationWithFailover(
 	ctx context.Context,
 	r *http.Request,
 	authed apikeycontract.AuthResult,
@@ -60,10 +60,10 @@ func (s *Server) invokeProviderTextWithFailover(
 	forcedProviderKey string,
 	admission gatewayAdmission,
 	startedAt time.Time,
-) gatewayFailoverResult[provideradaptercontract.TextResponse] {
+) gatewayFailoverResult[provideradaptercontract.ConversationResponse] {
 	return invokeGatewayCandidateWithFailover(s, ctx, r, authed, canonical, scheduleReq, modelID, forcedProviderKey, admission, startedAt,
-		func(ctx context.Context, candidate schedulercontract.Candidate) (provideradaptercontract.TextResponse, error) {
-			return s.runtime.invokeProviderText(ctx, providerTextRequest(canonical, candidate))
+		func(ctx context.Context, candidate schedulercontract.Candidate) (provideradaptercontract.ConversationResponse, error) {
+			return s.runtime.invokeProviderConversation(ctx, providerConversationRequest(canonical, candidate))
 		})
 }
 

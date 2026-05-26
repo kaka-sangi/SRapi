@@ -1,9 +1,11 @@
 package httpserver
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net"
 	"net/http"
 	"strconv"
@@ -365,6 +367,23 @@ func (s *Server) decodeJSONBody(w http.ResponseWriter, r *http.Request, dst any)
 		return err
 	}
 	return nil
+}
+
+func (s *Server) decodeJSONBodyWithRaw(w http.ResponseWriter, r *http.Request, dst any) ([]byte, error) {
+	raw, err := io.ReadAll(http.MaxBytesReader(w, r.Body, s.cfg.Gateway.MaxBodySize))
+	if err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			return nil, errRequestTooLarge
+		}
+		return nil, err
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(dst); err != nil {
+		return nil, err
+	}
+	return append([]byte(nil), raw...), nil
 }
 
 func jsonDecodeStatus(err error) int {

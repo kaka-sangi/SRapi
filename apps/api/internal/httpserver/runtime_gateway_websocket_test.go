@@ -174,17 +174,20 @@ func TestGatewayResponsesWebSocketForwardsStreamingEvents(t *testing.T) {
 		},
 	})
 
-	created := readWebSocketEvent(t, conn)
-	delta := readWebSocketEvent(t, conn)
-	doneText := readWebSocketEvent(t, conn)
-	completed := readWebSocketEvent(t, conn)
-	if created["type"] != "response.created" || delta["type"] != "response.output_text.delta" || doneText["type"] != "response.output_text.done" || completed["type"] != "response.completed" {
-		t.Fatalf("unexpected stream events: created=%+v delta=%+v done=%+v completed=%+v", created, delta, doneText, completed)
+	events := readWebSocketEventsUntil(t, conn, "response.completed")
+	created := websocketEventByType(events, "response.created")
+	itemAdded := websocketEventByType(events, "response.output_item.added")
+	partAdded := websocketEventByType(events, "response.content_part.added")
+	delta := websocketEventByType(events, "response.output_text.delta")
+	doneText := websocketEventByType(events, "response.output_text.done")
+	completed := websocketEventByType(events, "response.completed")
+	if created == nil || itemAdded == nil || partAdded == nil || delta == nil || doneText == nil || completed == nil {
+		t.Fatalf("unexpected stream events: %+v", events)
 	}
-	if delta["delta"] != "ws stream" {
+	if (*delta)["delta"] != "ws stream" {
 		t.Fatalf("expected aggregated stream delta, got %+v", delta)
 	}
-	if !strings.Contains(mustMarshalString(t, completed), "ws stream") {
+	if !strings.Contains(mustMarshalString(t, *completed), "ws stream") {
 		t.Fatalf("expected completed stream payload, got %+v", completed)
 	}
 }
@@ -742,6 +745,29 @@ func readWebSocketEvent(t *testing.T, conn *websocket.Conn) map[string]any {
 		t.Fatalf("decode websocket event %s: %v", payload, err)
 	}
 	return event
+}
+
+func readWebSocketEventsUntil(t *testing.T, conn *websocket.Conn, eventType string) []map[string]any {
+	t.Helper()
+	events := []map[string]any{}
+	for len(events) < 32 {
+		event := readWebSocketEvent(t, conn)
+		events = append(events, event)
+		if event["type"] == eventType {
+			return events
+		}
+	}
+	t.Fatalf("websocket event %q not received, events=%+v", eventType, events)
+	return nil
+}
+
+func websocketEventByType(events []map[string]any, eventType string) *map[string]any {
+	for idx := range events {
+		if events[idx]["type"] == eventType {
+			return &events[idx]
+		}
+	}
+	return nil
 }
 
 func httpToWebSocketURL(rawURL string) string {

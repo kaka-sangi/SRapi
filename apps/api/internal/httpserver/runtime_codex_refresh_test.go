@@ -15,6 +15,18 @@ import (
 
 const codexOAuthClientIDForTest = "app_EMoamEEZ73f0CkXaXp7hrann"
 
+type codexUpstreamObservation struct {
+	Path          string
+	Authorization string
+	Originator    string
+	Beta          string
+	UserAgent     string
+	SessionID     string
+	Version       string
+	RequestID     string
+	Payload       map[string]any
+}
+
 func TestGatewayCodexRefreshTokenOnlyCreateCanRequestResponses(t *testing.T) {
 	var tokenCalls int
 	var responseCalls int
@@ -87,6 +99,162 @@ func TestGatewayCodexRefreshTokenOnlyCreateCanRequestResponses(t *testing.T) {
 	if responseCalls != 1 || responseAuthorization != "Bearer create-access" || responsePath != "/backend-api/codex/responses" {
 		t.Fatalf("unexpected codex upstream call count=%d auth=%q path=%q", responseCalls, responseAuthorization, responsePath)
 	}
+}
+
+func TestGatewayCodexConvertsTextEndpointsToResponsesUpstream(t *testing.T) {
+	var calls []codexUpstreamObservation
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/backend-api/codex/responses" {
+			t.Fatalf("unexpected upstream path %s", r.URL.Path)
+		}
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode codex payload: %v", err)
+		}
+		calls = append(calls, codexUpstreamObservation{
+			Path:          r.URL.Path,
+			Authorization: r.Header.Get("Authorization"),
+			Originator:    r.Header.Get("Originator"),
+			Beta:          r.Header.Get("OpenAI-Beta"),
+			UserAgent:     r.Header.Get("User-Agent"),
+			SessionID:     r.Header.Get("Session_id"),
+			Version:       r.Header.Get("Version"),
+			RequestID:     r.Header.Get("X-Client-Request-Id"),
+			Payload:       payload,
+		})
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, "data: {\"type\":\"response.output_text.delta\",\"delta\":\"codex converted ok\"}\n\ndata: [DONE]\n\n")
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"codex-convert-provider","display_name":"Codex Convert","adapter_type":"reverse-proxy-codex-cli","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"codex-convert-model","display_name":"Codex Convert Model","status":"active","capabilities":[{"key":"streaming","level":"required","status":"stable","version":"v1"},{"key":"structured_output","level":"optional","status":"stable","version":"v1"},{"key":"reasoning_control","level":"optional","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"codex-upstream","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"codex-convert-account","runtime_class":"cli_client_token","upstream_client":"codex_cli","credential":{"cli_client_token":"codex-convert-token"},"metadata":{"base_url":"`+upstream.URL+`/backend-api/codex"},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	responsesBody := `{"model":"codex-convert-model","instructions":"raw instructions","input":[{"role":"system","content":"raw system"},{"role":"user","content":"raw responses"}],"stream":false,"store":true,"service_tier":"fast","reasoning":{"effort":"high"},"text":{"format":{"type":"text"},"verbosity":"low"},"previous_response_id":"resp_prev","parallel_tool_calls":true,"metadata":{"downstream":"removed"},"temperature":0.2,"max_output_tokens":32}`
+	if rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/responses", responsesBody); !strings.Contains(rec.Body.String(), "codex converted ok") {
+		t.Fatalf("expected responses conversion output, got %s", rec.Body.String())
+	}
+	if rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/chat/completions", `{"model":"codex-convert-model","messages":[{"role":"system","content":"chat system"},{"role":"user","content":"chat prompt"}],"response_format":{"type":"json_object"},"stream":false}`); !strings.Contains(rec.Body.String(), "codex converted ok") {
+		t.Fatalf("expected chat conversion output, got %s", rec.Body.String())
+	}
+	if rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/messages", `{"model":"codex-convert-model","system":"messages system","max_tokens":32,"messages":[{"role":"user","content":"messages prompt"}]}`); !strings.Contains(rec.Body.String(), "codex converted ok") {
+		t.Fatalf("expected messages conversion output, got %s", rec.Body.String())
+	}
+
+	if len(calls) != 3 {
+		t.Fatalf("expected three codex upstream calls, got %d: %+v", len(calls), calls)
+	}
+	for idx, call := range calls {
+		if call.Path != "/backend-api/codex/responses" ||
+			call.Authorization != "Bearer codex-convert-token" ||
+			call.Originator != "codex_cli_rs" ||
+			call.Beta != "responses=experimental" ||
+			call.UserAgent != "codex_cli_rs/0.125.0" ||
+			call.Version != "0.125.0" ||
+			!strings.HasPrefix(call.SessionID, "srapi-codex-account-") ||
+			strings.TrimSpace(call.RequestID) == "" {
+			t.Fatalf("unexpected codex headers for call %d: %+v", idx, call)
+		}
+		if call.Payload["model"] != "codex-upstream" || call.Payload["stream"] != true || call.Payload["store"] != false {
+			t.Fatalf("unexpected codex payload defaults for call %d: %+v", idx, call.Payload)
+		}
+	}
+	first := calls[0].Payload
+	if first["instructions"] != "raw instructions\nraw system" ||
+		first["service_tier"] != "priority" ||
+		first["previous_response_id"] != "resp_prev" ||
+		first["parallel_tool_calls"] != true {
+		t.Fatalf("unexpected raw responses conversion: %+v", first)
+	}
+	if _, ok := first["metadata"]; ok {
+		t.Fatalf("metadata should be stripped for Codex internal upstream: %+v", first)
+	}
+	if _, ok := first["max_output_tokens"]; ok {
+		t.Fatalf("max_output_tokens should be stripped for Codex internal upstream: %+v", first)
+	}
+	if got := codexObservationUserText(first); got != "raw responses" {
+		t.Fatalf("expected raw responses user text, got %q from %+v", got, first)
+	}
+	if got := codexObservationUserText(calls[1].Payload); got != "chat prompt" {
+		t.Fatalf("expected chat user text, got %q from %+v", got, calls[1].Payload)
+	}
+	if calls[1].Payload["instructions"] != "chat system" {
+		t.Fatalf("expected chat system instructions, got %+v", calls[1].Payload)
+	}
+	if got := codexObservationUserText(calls[2].Payload); got != "messages prompt" {
+		t.Fatalf("expected messages user text, got %q from %+v", got, calls[2].Payload)
+	}
+	if calls[2].Payload["instructions"] != "messages system" {
+		t.Fatalf("expected messages system instructions, got %+v", calls[2].Payload)
+	}
+}
+
+func TestGatewayCodexResponsesRawBodyClearedAfterContentSafetyRedaction(t *testing.T) {
+	var payload map[string]any
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/backend-api/codex/responses" {
+			t.Fatalf("unexpected upstream path %s", r.URL.Path)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode codex payload: %v", err)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, "data: {\"type\":\"response.output_text.delta\",\"delta\":\"codex redacted ok\"}\n\ndata: [DONE]\n\n")
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"codex-redact-provider","display_name":"Codex Redact","adapter_type":"reverse-proxy-codex-cli","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"codex-redact-model","display_name":"Codex Redact Model","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"codex-upstream","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"codex-redact-account","runtime_class":"cli_client_token","upstream_client":"codex_cli","credential":{"cli_client_token":"codex-redact-token"},"metadata":{"base_url":"`+upstream.URL+`/backend-api/codex"},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	rawEmail := "ada@example.com"
+	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/responses", `{"model":"codex-redact-model","input":"Email ada@example.com before replying"}`)
+	if !strings.Contains(rec.Body.String(), "codex redacted ok") {
+		t.Fatalf("expected redacted output, got %s", rec.Body.String())
+	}
+	if payload == nil {
+		t.Fatal("expected codex upstream payload")
+	}
+	rendered, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("marshal codex payload: %v", err)
+	}
+	if strings.Contains(string(rendered), rawEmail) {
+		t.Fatalf("raw responses body bypassed content safety: %s", rendered)
+	}
+	if !strings.Contains(string(rendered), "[REDACTED_EMAIL]") {
+		t.Fatalf("expected redacted email in codex payload, got %s", rendered)
+	}
+}
+
+func codexObservationUserText(payload map[string]any) string {
+	input, ok := payload["input"].([]any)
+	if !ok || len(input) == 0 {
+		return ""
+	}
+	item, ok := input[0].(map[string]any)
+	if !ok {
+		return ""
+	}
+	content, ok := item["content"].([]any)
+	if !ok || len(content) == 0 {
+		return ""
+	}
+	part, ok := content[0].(map[string]any)
+	if !ok {
+		return ""
+	}
+	text, _ := part["text"].(string)
+	return strings.TrimSpace(text)
 }
 
 func TestAdminAccountImportCodexRefreshTokenOnlyExchangesTokenWithoutLeakingCredential(t *testing.T) {

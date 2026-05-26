@@ -2937,6 +2937,7 @@ type ChatMessage struct {
 	Name       *string             `json:"name,omitempty"`
 	Role       ChatMessageRole     `json:"role"`
 	ToolCallId *string             `json:"tool_call_id,omitempty"`
+	ToolCalls  *[]ChatToolCall     `json:"tool_calls,omitempty"`
 }
 
 // ChatMessageContent0 defines model for .
@@ -2952,6 +2953,14 @@ type ChatMessage_Content struct {
 
 // ChatMessageRole defines model for ChatMessage.Role.
 type ChatMessageRole string
+
+// ChatToolCall defines model for ChatToolCall.
+type ChatToolCall struct {
+	Function             JsonObject             `json:"function"`
+	Id                   string                 `json:"id"`
+	Type                 string                 `json:"type"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
 
 // ContentBlock defines model for ContentBlock.
 type ContentBlock struct {
@@ -7439,6 +7448,98 @@ func (a ChatCompletionRequest) MarshalJSON() ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error marshaling 'top_p': %w", err)
 		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for ChatToolCall. Returns the specified
+// element and whether it was found
+func (a ChatToolCall) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for ChatToolCall
+func (a *ChatToolCall) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for ChatToolCall to handle AdditionalProperties
+func (a *ChatToolCall) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["function"]; found {
+		err = json.Unmarshal(raw, &a.Function)
+		if err != nil {
+			return fmt.Errorf("error reading 'function': %w", err)
+		}
+		delete(object, "function")
+	}
+
+	if raw, found := object["id"]; found {
+		err = json.Unmarshal(raw, &a.Id)
+		if err != nil {
+			return fmt.Errorf("error reading 'id': %w", err)
+		}
+		delete(object, "id")
+	}
+
+	if raw, found := object["type"]; found {
+		err = json.Unmarshal(raw, &a.Type)
+		if err != nil {
+			return fmt.Errorf("error reading 'type': %w", err)
+		}
+		delete(object, "type")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for ChatToolCall to handle AdditionalProperties
+func (a ChatToolCall) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	object["function"], err = json.Marshal(a.Function)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'function': %w", err)
+	}
+
+	object["id"], err = json.Marshal(a.Id)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'id': %w", err)
+	}
+
+	object["type"], err = json.Marshal(a.Type)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'type': %w", err)
 	}
 
 	for fieldName, field := range a.AdditionalProperties {

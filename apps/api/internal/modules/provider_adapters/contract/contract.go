@@ -2,6 +2,7 @@ package contract
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
@@ -9,13 +10,15 @@ import (
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 )
 
-type TextRequest struct {
+type ConversationRequest struct {
 	RequestID       string
 	SourceProtocol  string
 	SourceEndpoint  string
+	TargetProtocol  string
 	Model           string
-	Prompt          string
-	Messages        []TextMessage
+	Messages        []ConversationMessage
+	InputParts      []ContentPart
+	System          []ContentPart
 	Instructions    string
 	Stream          bool
 	Temperature     *float32
@@ -25,6 +28,8 @@ type TextRequest struct {
 	Tools           []map[string]any
 	ToolChoice      any
 	ResponseFormat  map[string]any
+	Reasoning       map[string]any
+	RawBody         []byte
 	Provider        providercontract.Provider
 	Account         accountcontract.ProviderAccount
 	Mapping         modelcontract.ModelProviderMapping
@@ -43,10 +48,51 @@ type TokenCountRequest struct {
 	Credential     map[string]any
 }
 
-type TextMessage struct {
-	Role    string
-	Content string
+type ConversationMessage struct {
+	Role  string
+	Parts []ContentPart
 }
+
+type ContentPartKind string
+
+const (
+	ContentPartText       ContentPartKind = "text"
+	ContentPartImage      ContentPartKind = "image"
+	ContentPartAudio      ContentPartKind = "audio"
+	ContentPartFile       ContentPartKind = "file"
+	ContentPartToolUse    ContentPartKind = "tool_use"
+	ContentPartToolResult ContentPartKind = "tool_result"
+	ContentPartThinking   ContentPartKind = "thinking"
+	ContentPartRefusal    ContentPartKind = "refusal"
+	ContentPartMetadata   ContentPartKind = "metadata"
+)
+
+type ContentPart struct {
+	Kind              ContentPartKind
+	Text              string
+	MediaURL          string
+	MediaBase64       string
+	MIMEType          string
+	FileID            string
+	ToolCallID        string
+	ToolName          string
+	ToolArgumentsJSON string
+	ToolResultForID   string
+	ToolResultIsError bool
+	Metadata          map[string]any
+	Raw               json.RawMessage
+	OriginProtocol    string
+}
+
+type StopReason string
+
+const (
+	StopReasonEndTurn       StopReason = "end_turn"
+	StopReasonMaxTokens     StopReason = "max_tokens"
+	StopReasonToolUse       StopReason = "tool_use"
+	StopReasonContentFilter StopReason = "content_filter"
+	StopReasonRefusal       StopReason = "refusal"
+)
 
 type Usage struct {
 	InputTokens  int
@@ -313,10 +359,14 @@ type ModalityTokenCount struct {
 	Metadata   map[string]any
 }
 
-type TextResponse struct {
-	Text       string
+type ConversationResponse struct {
+	ID         string
+	Parts      []ContentPart
+	StopReason StopReason
 	StatusCode int
 	Usage      Usage
+	Raw        json.RawMessage
+	Warnings   []string
 }
 
 // ProbeRequest contains the provider, account, and credential used for a health probe.
@@ -370,8 +420,8 @@ func (e ProviderError) Error() string {
 	return "provider adapter error"
 }
 
-type TextAdapter interface {
-	InvokeText(ctx context.Context, req TextRequest) (TextResponse, error)
+type ConversationAdapter interface {
+	InvokeConversation(ctx context.Context, req ConversationRequest) (ConversationResponse, error)
 }
 
 // ProbeAdapter checks whether a provider account can reach its upstream.

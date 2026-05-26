@@ -15,23 +15,15 @@ import (
 	reverseproxycontract "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"
 )
 
-const codexOriginator = "codex_cli_rs"
-const codexResponsesWebsocketBetaHeaderValue = "responses_websockets=2026-02-06"
-
-type codexResponsesRequest struct {
-	Model           string                    `json:"model"`
-	Input           []codexResponsesInputItem `json:"input"`
-	Instructions    string                    `json:"instructions"`
-	Stream          bool                      `json:"stream"`
-	Temperature     *float32                  `json:"temperature,omitempty"`
-	TopP            *float32                  `json:"top_p,omitempty"`
-	MaxOutputTokens *int                      `json:"max_output_tokens,omitempty"`
-	Stop            []string                  `json:"stop,omitempty"`
-	Tools           []map[string]any          `json:"tools,omitempty"`
-	ToolChoice      any                       `json:"tool_choice,omitempty"`
-	ResponseFormat  map[string]any            `json:"response_format,omitempty"`
-	PromptCacheKey  string                    `json:"prompt_cache_key,omitempty"`
-}
+const (
+	codexOriginator                         = "codex_cli_rs"
+	codexDefaultVersion                     = "0.125.0"
+	codexDefaultUserAgent                   = codexOriginator + "/" + codexDefaultVersion
+	codexResponsesBetaHeaderValue           = "responses=experimental"
+	codexResponsesWebsocketBetaHeaderValue  = "responses_websockets=2026-02-06"
+	codexDefaultAccountSessionIDPrefix      = "srapi-codex-account-"
+	codexResponsesDefaultInternalStoreValue = false
+)
 
 type codexResponsesInputItem struct {
 	Type    string                       `json:"type"`
@@ -58,16 +50,25 @@ type codexResponsesEvent struct {
 }
 
 type codexResponsesResponse struct {
-	Output     []codexResponsesOutputItem `json:"output"`
-	OutputText string                     `json:"output_text"`
-	Usage      openAIUsage                `json:"usage"`
-	Error      *codexResponsesError       `json:"error"`
+	Output            []codexResponsesOutputItem `json:"output"`
+	OutputText        string                     `json:"output_text"`
+	Status            string                     `json:"status"`
+	IncompleteDetails *struct {
+		Reason string `json:"reason"`
+	} `json:"incomplete_details"`
+	Usage openAIUsage          `json:"usage"`
+	Error *codexResponsesError `json:"error"`
 }
 
 type codexResponsesOutputItem struct {
-	Type    string                        `json:"type"`
-	Text    string                        `json:"text"`
-	Content []codexResponsesOutputContent `json:"content"`
+	ID        string                        `json:"id"`
+	Type      string                        `json:"type"`
+	CallID    string                        `json:"call_id"`
+	Name      string                        `json:"name"`
+	Arguments string                        `json:"arguments"`
+	Status    string                        `json:"status"`
+	Text      string                        `json:"text"`
+	Content   []codexResponsesOutputContent `json:"content"`
 }
 
 type codexResponsesOutputContent struct {
@@ -81,30 +82,34 @@ type codexResponsesError struct {
 	Type    string `json:"type"`
 }
 
-func (s *Service) invokeReverseProxyCodexResponses(ctx context.Context, req contract.TextRequest, baseURL string) (contract.TextResponse, error) {
+func (s *Service) invokeReverseProxyCodexResponses(ctx context.Context, req contract.ConversationRequest, baseURL string) (contract.ConversationResponse, error) {
 	if s.reverseProxy == nil {
-		return contract.TextResponse{}, contract.ProviderError{Class: "network_error", StatusCode: http.StatusBadGateway, Message: "reverse proxy runtime unavailable"}
+		return contract.ConversationResponse{}, contract.ProviderError{Class: "network_error", StatusCode: http.StatusBadGateway, Message: "reverse proxy runtime unavailable"}
 	}
 	if codexReverseProxyRuntimeIsAPIKey(req) {
-		return contract.TextResponse{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "codex reverse proxy requires OAuth/session/client-token runtime credentials"}
+		return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "codex reverse proxy requires OAuth/session/client-token runtime credentials"}
 	}
-	raw, err := json.Marshal(codexResponsesPayload(req))
+	payload, stream, err := codexResponsesPayload(req)
 	if err != nil {
-		return contract.TextResponse{}, err
+		return contract.ConversationResponse{}, err
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return contract.ConversationResponse{}, err
 	}
 	runtimeResp, err := s.reverseProxy.Do(ctx, reverseproxycontract.Request{
 		Account:      codexReverseProxyAccount(req),
 		Method:       http.MethodPost,
 		URL:          strings.TrimRight(baseURL, "/") + "/responses",
-		Headers:      codexResponsesHeaders(req),
+		Headers:      codexResponsesHeaders(req, stream),
 		Body:         raw,
-		ExpectStream: true,
+		ExpectStream: stream,
 	})
 	if err != nil {
-		return contract.TextResponse{}, providerErrorFromReverseProxy(err)
+		return contract.ConversationResponse{}, providerErrorFromReverseProxy(err)
 	}
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
-		return contract.TextResponse{}, classifyProviderHTTPError(runtimeResp.StatusCode, runtimeResp.Body)
+		return contract.ConversationResponse{}, classifyProviderHTTPError(runtimeResp.StatusCode, runtimeResp.Body)
 	}
 	return parseCodexResponsesBody(runtimeResp.Body, runtimeResp.StatusCode)
 }
@@ -128,34 +133,288 @@ func (s *Service) prepareCodexRealtime(_ context.Context, req contract.RealtimeR
 	}, nil
 }
 
-func codexResponsesPayload(req contract.TextRequest) codexResponsesRequest {
-	payload := codexResponsesRequest{
-		Model:           req.Mapping.UpstreamModelName,
-		Input:           codexResponsesInput(req),
-		Instructions:    codexResponsesInstructions(req),
-		Stream:          true,
-		Temperature:     req.Temperature,
-		TopP:            req.TopP,
-		MaxOutputTokens: req.MaxOutputTokens,
-		Stop:            cloneStrings(req.Stop),
-		Tools:           cloneMapSlice(req.Tools),
-		ToolChoice:      cloneAny(req.ToolChoice),
-		ResponseFormat:  cloneMap(req.ResponseFormat),
+func codexResponsesPayload(req contract.ConversationRequest) (map[string]any, bool, error) {
+	payload, err := codexRawResponsesPayload(req)
+	if err != nil {
+		return nil, false, err
+	}
+	if payload == nil {
+		payload = codexCanonicalResponsesPayload(req)
+	}
+	codexApplyResponsesPayloadDefaults(req, payload)
+	return payload, codexResponsesPayloadStream(payload), nil
+}
+
+func codexRawResponsesPayload(req contract.ConversationRequest) (map[string]any, error) {
+	if !codexShouldUseRawResponsesPayload(req) {
+		return nil, nil
+	}
+	raw := bytes.TrimSpace(req.RawBody)
+	if len(raw) == 0 {
+		return nil, nil
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return nil, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "invalid raw responses payload"}
+	}
+	return payload, nil
+}
+
+func codexShouldUseRawResponsesPayload(req contract.ConversationRequest) bool {
+	if !strings.EqualFold(strings.TrimSpace(req.SourceProtocol), "openai-compatible") {
+		return false
+	}
+	return strings.HasSuffix(strings.ToLower(strings.TrimSpace(req.SourceEndpoint)), "/responses")
+}
+
+func codexCanonicalResponsesPayload(req contract.ConversationRequest) map[string]any {
+	payload := map[string]any{
+		"model":  req.Mapping.UpstreamModelName,
+		"input":  codexResponsesInput(req),
+		"stream": true,
+	}
+	if instructions := codexResponsesInstructions(req); instructions != "" {
+		payload["instructions"] = instructions
+	}
+	if len(req.Stop) > 0 {
+		payload["stop"] = cloneStrings(req.Stop)
+	}
+	if len(req.Tools) > 0 {
+		payload["tools"] = cloneMapSlice(req.Tools)
+	}
+	if req.ToolChoice != nil {
+		payload["tool_choice"] = cloneAny(req.ToolChoice)
+	}
+	if len(req.ResponseFormat) > 0 {
+		payload["text"] = map[string]any{"format": cloneMap(req.ResponseFormat)}
+	}
+	if len(req.Reasoning) > 0 {
+		payload["reasoning"] = cloneMap(req.Reasoning)
 	}
 	if promptCacheKey := requestSetting(req, "codex_prompt_cache_key", "prompt_cache_key"); promptCacheKey != "" {
-		payload.PromptCacheKey = promptCacheKey
+		payload["prompt_cache_key"] = promptCacheKey
 	}
 	return payload
 }
 
-func codexResponsesInput(req contract.TextRequest) []codexResponsesInputItem {
+func codexApplyResponsesPayloadDefaults(req contract.ConversationRequest, payload map[string]any) {
+	if payload == nil {
+		return
+	}
+	if model := strings.TrimSpace(req.Mapping.UpstreamModelName); model != "" {
+		payload["model"] = model
+	}
+	codexNormalizeResponsesInput(payload)
+	codexLiftInstructionInputItems(payload)
+	codexNormalizeResponsesText(payload)
+	codexNormalizeServiceTier(req, payload)
+	payload["stream"] = true
+	payload["store"] = codexResponsesDefaultInternalStoreValue
+	for _, field := range codexUnsupportedResponsesFields() {
+		delete(payload, field)
+	}
+}
+
+func codexUnsupportedResponsesFields() []string {
+	return []string{
+		"frequency_penalty",
+		"max_completion_tokens",
+		"max_output_tokens",
+		"metadata",
+		"presence_penalty",
+		"prompt_cache_retention",
+		"response_format",
+		"safety_identifier",
+		"stream_options",
+		"temperature",
+		"top_p",
+		"user",
+	}
+}
+
+func codexResponsesPayloadStream(payload map[string]any) bool {
+	value, ok := payload["stream"].(bool)
+	return !ok || value
+}
+
+func codexNormalizeResponsesText(payload map[string]any) {
+	responseFormat, ok := payload["response_format"]
+	if !ok {
+		return
+	}
+	if _, hasText := payload["text"]; !hasText {
+		payload["text"] = map[string]any{"format": cloneAny(responseFormat)}
+	}
+}
+
+func codexNormalizeServiceTier(req contract.ConversationRequest, payload map[string]any) {
+	if value, ok := payload["service_tier"].(string); ok {
+		if strings.EqualFold(strings.TrimSpace(value), "fast") {
+			payload["service_tier"] = "priority"
+		}
+		return
+	}
+	if serviceTier := requestSetting(req, "codex_service_tier", "service_tier"); serviceTier != "" {
+		if strings.EqualFold(serviceTier, "fast") {
+			serviceTier = "priority"
+		}
+		payload["service_tier"] = serviceTier
+	}
+}
+
+func codexNormalizeResponsesInput(payload map[string]any) {
+	input, ok := payload["input"]
+	if !ok || input == nil {
+		payload["input"] = []any{}
+		return
+	}
+	switch typed := input.(type) {
+	case string:
+		payload["input"] = codexStringInputMessage(typed)
+	case []any:
+		out := make([]any, 0, len(typed))
+		for _, item := range typed {
+			out = append(out, codexNormalizeResponsesInputItem(item))
+		}
+		payload["input"] = out
+	}
+}
+
+func codexStringInputMessage(text string) []any {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return []any{}
+	}
+	return []any{map[string]any{
+		"type": "message",
+		"role": "user",
+		"content": []any{map[string]any{
+			"type": "input_text",
+			"text": text,
+		}},
+	}}
+}
+
+func codexNormalizeResponsesInputItem(item any) any {
+	object, ok := item.(map[string]any)
+	if !ok {
+		return item
+	}
+	out := cloneMap(object)
+	role := codexResponsesRole(codexStringValue(out["role"]))
+	if _, hasType := out["type"]; !hasType && codexStringValue(out["role"]) != "" {
+		out["type"] = "message"
+	}
+	if _, hasContent := out["content"]; hasContent {
+		out["content"] = codexNormalizeMessageContent(out["content"], role)
+	}
+	return out
+}
+
+func codexNormalizeMessageContent(content any, role string) any {
+	switch typed := content.(type) {
+	case string:
+		text := strings.TrimSpace(typed)
+		if text == "" {
+			return []any{}
+		}
+		return []any{map[string]any{
+			"type": codexMessageContentType(role),
+			"text": text,
+		}}
+	case []any:
+		out := make([]any, 0, len(typed))
+		for _, item := range typed {
+			part, ok := item.(map[string]any)
+			if !ok {
+				out = append(out, item)
+				continue
+			}
+			normalized := cloneMap(part)
+			if text, ok := normalized["text"]; ok {
+				normalized["text"] = codexInputItemText(text)
+			}
+			out = append(out, normalized)
+		}
+		return out
+	default:
+		return content
+	}
+}
+
+func codexMessageContentType(role string) string {
+	if codexResponsesRole(role) == "assistant" {
+		return "output_text"
+	}
+	return "input_text"
+}
+
+func codexLiftInstructionInputItems(payload map[string]any) {
+	input, ok := payload["input"].([]any)
+	if !ok {
+		return
+	}
+	instructions := []string{codexStringValue(payload["instructions"])}
+	kept := make([]any, 0, len(input))
+	for _, item := range input {
+		object, ok := item.(map[string]any)
+		if !ok {
+			kept = append(kept, item)
+			continue
+		}
+		role := codexResponsesRole(codexStringValue(object["role"]))
+		if role != "system" && role != "developer" {
+			kept = append(kept, item)
+			continue
+		}
+		if text := codexInputItemText(object["content"]); text != "" {
+			instructions = append(instructions, text)
+		}
+	}
+	payload["input"] = kept
+	if joined := strings.Join(uniqueTrimmedStrings(instructions), "\n"); joined != "" {
+		payload["instructions"] = joined
+	}
+}
+
+func codexInputItemText(value any) string {
+	switch typed := value.(type) {
+	case string:
+		return strings.TrimSpace(typed)
+	case []any:
+		parts := make([]string, 0, len(typed))
+		for _, item := range typed {
+			if text := codexInputItemText(item); text != "" {
+				parts = append(parts, text)
+			}
+		}
+		return strings.Join(parts, "\n")
+	case map[string]any:
+		if text := codexStringValue(typed["text"]); text != "" {
+			return text
+		}
+		return codexInputItemText(typed["content"])
+	default:
+		return ""
+	}
+}
+
+func codexStringValue(value any) string {
+	text, ok := value.(string)
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(text)
+}
+
+func codexResponsesInput(req contract.ConversationRequest) []codexResponsesInputItem {
 	out := make([]codexResponsesInputItem, 0, len(req.Messages)+1)
 	for _, message := range req.Messages {
 		role := codexResponsesRole(message.Role)
 		if role == "system" || role == "developer" {
 			continue
 		}
-		content := strings.TrimSpace(message.Content)
+		content := conversationMessageText(message)
 		if content == "" {
 			continue
 		}
@@ -173,7 +432,7 @@ func codexResponsesInput(req contract.TextRequest) []codexResponsesInputItem {
 		})
 	}
 	if len(out) == 0 {
-		prompt := strings.TrimSpace(req.Prompt)
+		prompt := conversationPrompt(req)
 		if prompt == "" {
 			prompt = strings.TrimSpace(req.Instructions)
 		}
@@ -199,7 +458,7 @@ func codexResponsesRole(role string) string {
 	}
 }
 
-func codexResponsesInstructions(req contract.TextRequest) string {
+func codexResponsesInstructions(req contract.ConversationRequest) string {
 	parts := make([]string, 0, len(req.Messages)+1)
 	if instructions := strings.TrimSpace(req.Instructions); instructions != "" {
 		parts = append(parts, instructions)
@@ -209,27 +468,35 @@ func codexResponsesInstructions(req contract.TextRequest) string {
 		if role != "system" && role != "developer" {
 			continue
 		}
-		if content := strings.TrimSpace(message.Content); content != "" {
+		if content := conversationMessageText(message); content != "" {
 			parts = append(parts, content)
 		}
 	}
 	return strings.Join(uniqueTrimmedStrings(parts), "\n")
 }
 
-func codexResponsesHeaders(req contract.TextRequest) http.Header {
+func codexResponsesHeaders(req contract.ConversationRequest, stream bool) http.Header {
+	accept := "application/json"
+	if stream {
+		accept = "text/event-stream"
+	}
 	headers := http.Header{
-		"Accept":       {"text/event-stream"},
+		"Accept":       {accept},
 		"Content-Type": {"application/json"},
 	}
+	headers.Set("OpenAI-Beta", codexResponsesBetaHeaderValue)
 	headers.Set("Originator", codexOriginator)
+	headers.Set("User-Agent", codexUserAgent(req))
 	if accountID := requestSetting(req, "chatgpt_account_id", "account_id"); accountID != "" {
-		headers.Set("Chatgpt-Account-Id", accountID)
+		headers.Set("ChatGPT-Account-ID", accountID)
 	}
 	if betaFeatures := requestSetting(req, "codex_beta_features", "x_codex_beta_features", "X-Codex-Beta-Features"); betaFeatures != "" {
 		headers.Set("X-Codex-Beta-Features", betaFeatures)
 	}
 	if version := requestSetting(req, "codex_version", "version", "Version"); version != "" {
 		headers.Set("Version", version)
+	} else {
+		headers.Set("Version", codexDefaultVersion)
 	}
 	if turnMetadata := requestSetting(req, "codex_turn_metadata", "x_codex_turn_metadata", "X-Codex-Turn-Metadata"); turnMetadata != "" {
 		headers.Set("X-Codex-Turn-Metadata", turnMetadata)
@@ -241,13 +508,27 @@ func codexResponsesHeaders(req contract.TextRequest) http.Header {
 	}
 	if sessionID := requestSetting(req, "codex_session_id", "session_id", "Session_id"); sessionID != "" {
 		headers.Set("Session_id", sessionID)
-	} else if strings.Contains(requestSetting(req, "user_agent"), "Mac OS") && strings.TrimSpace(req.RequestID) != "" {
-		headers.Set("Session_id", strings.TrimSpace(req.RequestID))
+	} else if req.Account.ID > 0 {
+		headers.Set("Session_id", codexDefaultAccountSessionID(req.Account.ID))
 	}
 	return headers
 }
 
-func codexReverseProxyRuntimeIsAPIKey(req contract.TextRequest) bool {
+func codexUserAgent(req contract.ConversationRequest) string {
+	if userAgent := requestSetting(req, "user_agent"); userAgent != "" {
+		return userAgent
+	}
+	return codexDefaultUserAgent
+}
+
+func codexDefaultAccountSessionID(accountID int) string {
+	if accountID <= 0 {
+		return ""
+	}
+	return fmt.Sprintf("%s%d", codexDefaultAccountSessionIDPrefix, accountID)
+}
+
+func codexReverseProxyRuntimeIsAPIKey(req contract.ConversationRequest) bool {
 	return strings.EqualFold(strings.TrimSpace(string(req.Account.RuntimeClass)), "api_key")
 }
 
@@ -255,7 +536,7 @@ func codexRealtimeRuntimeIsAPIKey(req contract.RealtimeRequest) bool {
 	return strings.EqualFold(strings.TrimSpace(string(req.Account.RuntimeClass)), "api_key")
 }
 
-func codexReverseProxyAccount(req contract.TextRequest) reverseproxycontract.AccountRuntime {
+func codexReverseProxyAccount(req contract.ConversationRequest) reverseproxycontract.AccountRuntime {
 	return reverseproxycontract.AccountRuntime{
 		AccountID:      req.Account.ID,
 		RuntimeClass:   string(req.Account.RuntimeClass),
@@ -354,10 +635,10 @@ func realtimeSetting(req contract.RealtimeRequest, keys ...string) string {
 	return ""
 }
 
-func parseCodexResponsesBody(body []byte, statusCode int) (contract.TextResponse, error) {
+func parseCodexResponsesBody(body []byte, statusCode int) (contract.ConversationResponse, error) {
 	trimmed := bytes.TrimSpace(body)
 	if len(trimmed) == 0 {
-		return contract.TextResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response contained no text"}
+		return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response contained no text"}
 	}
 	if bytes.HasPrefix(trimmed, []byte("data:")) || bytes.Contains(trimmed, []byte("\ndata:")) {
 		return parseCodexResponsesStream(trimmed, statusCode)
@@ -365,7 +646,7 @@ func parseCodexResponsesBody(body []byte, statusCode int) (contract.TextResponse
 	return parseCodexResponsesJSON(trimmed, statusCode)
 }
 
-func parseCodexResponsesStream(body []byte, statusCode int) (contract.TextResponse, error) {
+func parseCodexResponsesStream(body []byte, statusCode int) (contract.ConversationResponse, error) {
 	scanner := bufio.NewScanner(bytes.NewReader(body))
 	scanner.Buffer(make([]byte, 0, 64*1024), 4<<20)
 	var deltaBuilder strings.Builder
@@ -373,6 +654,7 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.TextRespon
 	var usage *openAIUsage
 	indexedItems := map[int]codexResponsesOutputItem{}
 	fallbackItems := []codexResponsesOutputItem{}
+	var finalResponse *codexResponsesResponse
 	seenEvent := false
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
@@ -391,11 +673,11 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.TextRespon
 		}
 		var event codexResponsesEvent
 		if err := json.Unmarshal([]byte(data), &event); err != nil {
-			return contract.TextResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider returned invalid stream json"}
+			return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider returned invalid stream json"}
 		}
 		seenEvent = true
 		if providerErr, ok := codexEventProviderError(event); ok {
-			return contract.TextResponse{}, providerErr
+			return contract.ConversationResponse{}, providerErr
 		}
 		if event.Usage != nil && event.Usage.HasTokenUsage() {
 			copied := *event.Usage
@@ -408,12 +690,16 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.TextRespon
 				fallbackItems = append(fallbackItems, *event.Item)
 			}
 		}
-		if event.Response != nil && len(event.Response.Output) == 0 {
-			event.Response.Output = codexCollectedOutputItems(indexedItems, fallbackItems)
-		}
-		if event.Response != nil && event.Response.Usage.HasTokenUsage() {
-			copied := event.Response.Usage
-			usage = &copied
+		if event.Response != nil {
+			copiedResponse := *event.Response
+			if len(copiedResponse.Output) == 0 {
+				copiedResponse.Output = codexCollectedOutputItems(indexedItems, fallbackItems)
+			}
+			finalResponse = &copiedResponse
+			if copiedResponse.Usage.HasTokenUsage() {
+				copiedUsage := copiedResponse.Usage
+				usage = &copiedUsage
+			}
 		}
 		switch event.Type {
 		case "response.output_text.delta":
@@ -433,48 +719,79 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.TextRespon
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		return contract.TextResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream interrupted"}
+		return contract.ConversationResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream interrupted"}
 	}
 	if !seenEvent {
-		return contract.TextResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream ended before chunk"}
+		return contract.ConversationResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream ended before chunk"}
 	}
-	text := strings.TrimSpace(completedText)
-	if text == "" {
-		text = strings.TrimSpace(deltaBuilder.String())
+	parts := []contract.ContentPart(nil)
+	stopReason := contract.StopReasonEndTurn
+	if finalResponse != nil {
+		parts = finalResponse.Parts()
+		stopReason = codexStopReason(*finalResponse)
 	}
-	if text == "" {
-		return contract.TextResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider stream contained no text"}
+	if len(parts) == 0 {
+		parts = codexResponsesOutputItemsParts(codexCollectedOutputItems(indexedItems, fallbackItems))
+		if codexOutputItemsIncludeFunctionCall(codexCollectedOutputItems(indexedItems, fallbackItems)) {
+			stopReason = contract.StopReasonToolUse
+		}
 	}
+	if len(parts) == 0 {
+		text := strings.TrimSpace(completedText)
+		if text == "" {
+			text = strings.TrimSpace(deltaBuilder.String())
+		}
+		if text != "" {
+			parts = append(parts, textContentPart(text))
+		}
+	}
+	if len(parts) == 0 {
+		return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider stream contained no content"}
+	}
+	text := contentPartsText(parts)
 	parsedUsage := estimatedUsage(text)
 	if usage != nil {
 		parsedUsage = usage.ToUsage(text)
 	}
-	return contract.TextResponse{Text: text, StatusCode: statusCode, Usage: parsedUsage}, nil
+	return contract.ConversationResponse{
+		Parts:      parts,
+		StopReason: stopReason,
+		StatusCode: statusCode,
+		Usage:      parsedUsage,
+	}, nil
 }
 
-func parseCodexResponsesJSON(body []byte, statusCode int) (contract.TextResponse, error) {
+func parseCodexResponsesJSON(body []byte, statusCode int) (contract.ConversationResponse, error) {
 	var event codexResponsesEvent
 	if err := json.Unmarshal(body, &event); err == nil {
 		if providerErr, ok := codexEventProviderError(event); ok {
-			return contract.TextResponse{}, providerErr
+			return contract.ConversationResponse{}, providerErr
 		}
-		text := strings.TrimSpace(codexEventText(event))
-		if text != "" {
-			return contract.TextResponse{Text: text, StatusCode: statusCode, Usage: codexEventUsage(event, text)}, nil
+		if parts := codexEventParts(event); len(parts) > 0 {
+			text := contentPartsText(parts)
+			resp := contract.ConversationResponse{
+				Parts:      parts,
+				StopReason: codexEventStopReason(event),
+				StatusCode: statusCode,
+				Usage:      codexEventUsage(event, text),
+				Raw:        append(json.RawMessage(nil), body...),
+			}
+			return resp, nil
 		}
 	}
 	var response codexResponsesResponse
 	if err := json.Unmarshal(body, &response); err != nil {
-		return contract.TextResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider returned invalid json"}
+		return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider returned invalid json"}
 	}
 	if response.Error != nil {
-		return contract.TextResponse{}, codexProviderError(*response.Error)
+		return contract.ConversationResponse{}, codexProviderError(*response.Error)
 	}
-	text := strings.TrimSpace(response.Text())
-	if text == "" {
-		return contract.TextResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response contained no text"}
+	resp, err := response.ConversationResponse(statusCode)
+	if err != nil {
+		return contract.ConversationResponse{}, err
 	}
-	return contract.TextResponse{Text: text, StatusCode: statusCode, Usage: response.Usage.ToUsage(text)}, nil
+	resp.Raw = append(json.RawMessage(nil), body...)
+	return resp, nil
 }
 
 func codexEventText(event codexResponsesEvent) string {
@@ -495,6 +812,29 @@ func codexEventUsage(event codexResponsesEvent, text string) contract.Usage {
 		return event.Usage.ToUsage(text)
 	}
 	return estimatedUsage(text)
+}
+
+func codexEventParts(event codexResponsesEvent) []contract.ContentPart {
+	if event.Response != nil {
+		return event.Response.Parts()
+	}
+	if event.Item != nil {
+		return codexResponsesOutputItemParts(*event.Item)
+	}
+	if text := strings.TrimSpace(event.Text); text != "" {
+		return []contract.ContentPart{textContentPart(text)}
+	}
+	return nil
+}
+
+func codexEventStopReason(event codexResponsesEvent) contract.StopReason {
+	if event.Response != nil {
+		return codexStopReason(*event.Response)
+	}
+	if event.Item != nil && codexOutputItemIsFunctionCall(*event.Item) {
+		return contract.StopReasonToolUse
+	}
+	return contract.StopReasonEndTurn
 }
 
 func codexCollectedOutputItems(indexed map[int]codexResponsesOutputItem, fallback []codexResponsesOutputItem) []codexResponsesOutputItem {
@@ -532,6 +872,121 @@ func (r codexResponsesResponse) Text() string {
 		}
 	}
 	return strings.Join(parts, "\n")
+}
+
+func (r codexResponsesResponse) ConversationResponse(statusCode int) (contract.ConversationResponse, error) {
+	parts := r.Parts()
+	if len(parts) == 0 {
+		return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response contained no content"}
+	}
+	text := contentPartsText(parts)
+	return contract.ConversationResponse{
+		Parts:      parts,
+		StopReason: codexStopReason(r),
+		StatusCode: statusCode,
+		Usage:      r.Usage.ToUsage(text),
+	}, nil
+}
+
+func (r codexResponsesResponse) Parts() []contract.ContentPart {
+	parts := codexResponsesOutputItemsParts(r.Output)
+	if len(parts) == 0 {
+		if text := strings.TrimSpace(r.OutputText); text != "" {
+			parts = append(parts, textContentPart(text))
+		}
+	}
+	return parts
+}
+
+func codexResponsesOutputItemsParts(items []codexResponsesOutputItem) []contract.ContentPart {
+	parts := make([]contract.ContentPart, 0, len(items))
+	for _, item := range items {
+		parts = append(parts, codexResponsesOutputItemParts(item)...)
+	}
+	return parts
+}
+
+func codexResponsesOutputItemParts(item codexResponsesOutputItem) []contract.ContentPart {
+	parts := []contract.ContentPart(nil)
+	itemType := strings.ToLower(strings.TrimSpace(item.Type))
+	if itemType == "function_call" {
+		if part, ok := codexFunctionCallPart(item); ok {
+			parts = append(parts, part)
+		}
+		return parts
+	}
+	if text := strings.TrimSpace(item.Text); text != "" {
+		kind := contract.ContentPartText
+		if itemType == "reasoning" {
+			kind = contract.ContentPartThinking
+		}
+		parts = append(parts, contract.ContentPart{Kind: kind, Text: text, OriginProtocol: "openai"})
+	}
+	for _, content := range item.Content {
+		contentType := strings.ToLower(strings.TrimSpace(content.Type))
+		text := strings.TrimSpace(content.Text)
+		if text == "" || (contentType != "" && !strings.Contains(contentType, "text")) {
+			continue
+		}
+		parts = append(parts, textContentPart(text))
+	}
+	return parts
+}
+
+func codexFunctionCallPart(item codexResponsesOutputItem) (contract.ContentPart, bool) {
+	id := strings.TrimSpace(item.CallID)
+	if id == "" {
+		id = strings.TrimSpace(item.ID)
+	}
+	name := strings.TrimSpace(item.Name)
+	arguments := strings.TrimSpace(item.Arguments)
+	if id == "" && name == "" && arguments == "" {
+		return contract.ContentPart{}, false
+	}
+	metadata := map[string]any{"type": strings.TrimSpace(item.Type)}
+	if status := strings.TrimSpace(item.Status); status != "" {
+		metadata["status"] = status
+	}
+	return contract.ContentPart{
+		Kind:              contract.ContentPartToolUse,
+		ToolCallID:        id,
+		ToolName:          name,
+		ToolArgumentsJSON: arguments,
+		Metadata:          metadata,
+		OriginProtocol:    "openai",
+	}, true
+}
+
+func codexStopReason(response codexResponsesResponse) contract.StopReason {
+	if response.IncompleteDetails != nil {
+		reason := strings.ToLower(strings.TrimSpace(response.IncompleteDetails.Reason))
+		if strings.Contains(reason, "filter") || strings.Contains(reason, "safety") {
+			return contract.StopReasonContentFilter
+		}
+		if reason != "" {
+			return contract.StopReasonMaxTokens
+		}
+	}
+	if codexOutputItemsIncludeFunctionCall(response.Output) {
+		return contract.StopReasonToolUse
+	}
+	if strings.EqualFold(strings.TrimSpace(response.Status), "incomplete") {
+		return contract.StopReasonMaxTokens
+	}
+	return contract.StopReasonEndTurn
+}
+
+func codexOutputItemsIncludeFunctionCall(items []codexResponsesOutputItem) bool {
+	for _, item := range items {
+		if codexOutputItemIsFunctionCall(item) {
+			return true
+		}
+	}
+	return false
+}
+
+func codexOutputItemIsFunctionCall(item codexResponsesOutputItem) bool {
+	return strings.EqualFold(strings.TrimSpace(item.Type), "function_call")
 }
 
 func codexEventProviderError(event codexResponsesEvent) (contract.ProviderError, bool) {

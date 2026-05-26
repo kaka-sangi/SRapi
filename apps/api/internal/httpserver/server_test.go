@@ -3007,6 +3007,113 @@ func TestGatewayInvokesOpenAICompatibleProviderAdapter(t *testing.T) {
 	}
 }
 
+func TestGatewaySameProtocolRawPassthroughPreservesRequestAndResponse(t *testing.T) {
+	decodeObject := func(t *testing.T, raw []byte) map[string]any {
+		t.Helper()
+		var payload map[string]any
+		if err := json.Unmarshal(raw, &payload); err != nil {
+			t.Fatalf("decode json object: %v body=%s", err, string(raw))
+		}
+		return payload
+	}
+
+	t.Run("openai chat", func(t *testing.T) {
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path != "/v1/chat/completions" {
+				t.Fatalf("unexpected OpenAI upstream path %s", r.URL.Path)
+			}
+			payload := decodeObject(t, mustReadAll(t, r.Body))
+			streamOptions, _ := payload["stream_options"].(map[string]any)
+			if payload["model"] != "raw-openai-upstream" ||
+				payload["parallel_tool_calls"] != true ||
+				payload["user"] != "raw-user" ||
+				payload["stream"] != false ||
+				streamOptions["include_usage"] != false {
+				t.Fatalf("expected raw OpenAI request fields to be preserved, got %+v", payload)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"id":"chatcmpl_raw","object":"chat.completion","created":123,"model":"raw-openai-upstream","choices":[{"index":0,"message":{"role":"assistant","content":"raw openai"},"finish_reason":"stop"}],"usage":{"prompt_tokens":2,"completion_tokens":1,"total_tokens":3},"raw_only_marker":"openai-upstream"}`))
+		}))
+		defer upstream.Close()
+
+		handler := New(config.Load(), nil)
+		loginResp, sessionCookie := mustLoginAdmin(t, handler)
+		providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"raw-openai-provider","display_name":"Raw OpenAI","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+		modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"raw-openai-model","display_name":"Raw OpenAI Model","status":"active"}`)
+		mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"raw-openai-upstream","status":"active"}`)
+		mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"raw-openai-account","runtime_class":"api_key","credential":{"api_key":"raw-openai-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
+		_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+		rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/chat/completions", `{"model":"raw-openai-model","messages":[{"role":"user","content":"raw chat"}],"parallel_tool_calls":true,"stream_options":{"include_usage":false},"user":"raw-user"}`)
+		response := decodeObject(t, rec.Body.Bytes())
+		if response["id"] != "chatcmpl_raw" || response["raw_only_marker"] != "openai-upstream" {
+			t.Fatalf("expected raw OpenAI response to be replayed, got %+v", response)
+		}
+	})
+
+	t.Run("anthropic messages", func(t *testing.T) {
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path != "/v1/messages" {
+				t.Fatalf("unexpected Anthropic upstream path %s", r.URL.Path)
+			}
+			payload := decodeObject(t, mustReadAll(t, r.Body))
+			container, _ := payload["container"].(map[string]any)
+			if payload["model"] != "raw-claude-upstream" ||
+				payload["service_tier"] != "auto" ||
+				payload["stream"] != false ||
+				container["id"] != "container-raw" {
+				t.Fatalf("expected raw Anthropic request fields to be preserved, got %+v", payload)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"id":"msg_raw","type":"message","role":"assistant","model":"raw-claude-upstream","content":[{"type":"text","text":"raw anthropic"}],"stop_reason":"end_turn","usage":{"input_tokens":2,"output_tokens":1},"raw_only_marker":"anthropic-upstream"}`))
+		}))
+		defer upstream.Close()
+
+		handler := New(config.Load(), nil)
+		loginResp, sessionCookie := mustLoginAdmin(t, handler)
+		providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"raw-anthropic-provider","display_name":"Raw Anthropic","adapter_type":"anthropic-compatible","protocol":"anthropic-compatible","status":"active"}`)
+		modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"raw-anthropic-model","display_name":"Raw Anthropic Model","status":"active"}`)
+		mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"raw-claude-upstream","status":"active"}`)
+		mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"raw-anthropic-account","runtime_class":"api_key","credential":{"api_key":"raw-anthropic-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
+		_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+		rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/messages", `{"model":"raw-anthropic-model","max_tokens":32,"messages":[{"role":"user","content":"raw messages"}],"service_tier":"auto","container":{"id":"container-raw"}}`)
+		response := decodeObject(t, rec.Body.Bytes())
+		if response["id"] != "msg_raw" || response["raw_only_marker"] != "anthropic-upstream" {
+			t.Fatalf("expected raw Anthropic response to be replayed, got %+v", response)
+		}
+	})
+
+	t.Run("gemini generate content", func(t *testing.T) {
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path != "/v1beta/models/raw-gemini-upstream:generateContent" {
+				t.Fatalf("unexpected Gemini upstream path %s", r.URL.Path)
+			}
+			payload := decodeObject(t, mustReadAll(t, r.Body))
+			if payload["cachedContent"] != "cachedContents/raw" || payload["model"] != nil || payload["stream"] != nil {
+				t.Fatalf("expected raw Gemini request fields to be preserved, got %+v", payload)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"candidates":[{"content":{"role":"model","parts":[{"text":"raw gemini"}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":2,"candidatesTokenCount":1},"rawOnlyMarker":"gemini-upstream"}`))
+		}))
+		defer upstream.Close()
+
+		handler := New(config.Load(), nil)
+		loginResp, sessionCookie := mustLoginAdmin(t, handler)
+		providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"raw-gemini-provider","display_name":"Raw Gemini","adapter_type":"gemini-compatible","protocol":"gemini-compatible","status":"active"}`)
+		modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"raw-gemini-model","display_name":"Raw Gemini Model","status":"active"}`)
+		mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"raw-gemini-upstream","status":"active"}`)
+		mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"raw-gemini-account","runtime_class":"api_key","credential":{"api_key":"raw-gemini-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1beta"},"status":"active"}`)
+		_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+		rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1beta/models/raw-gemini-model:generateContent", `{"contents":[{"role":"user","parts":[{"text":"raw gemini"}]}],"cachedContent":"cachedContents/raw"}`)
+		response := decodeObject(t, rec.Body.Bytes())
+		if response["rawOnlyMarker"] != "gemini-upstream" {
+			t.Fatalf("expected raw Gemini response to be replayed, got %+v", response)
+		}
+	})
+}
+
 func TestGatewayInvokesGenericReverseProxyProviderAdapter(t *testing.T) {
 	var upstreamCalls int
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -7540,6 +7647,15 @@ func mustGatewayRequest(t *testing.T, handler http.Handler, apiKey, method, path
 		t.Fatalf("expected %s %s 200, got %d body=%s", method, path, rec.Code, rec.Body.String())
 	}
 	return rec
+}
+
+func mustReadAll(t *testing.T, r io.Reader) []byte {
+	t.Helper()
+	body, err := io.ReadAll(r)
+	if err != nil {
+		t.Fatalf("read body: %v", err)
+	}
+	return body
 }
 
 func mustGatewayMultipartRequest(t *testing.T, handler http.Handler, apiKey, path string, fields map[string]string, filename string, contentType string, payload []byte) *httptest.ResponseRecorder {

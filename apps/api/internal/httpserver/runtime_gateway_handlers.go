@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	gatewaycontract "github.com/srapi/srapi/apps/api/internal/modules/gateway/contract"
@@ -44,7 +45,8 @@ func (s *Server) handleCreateChatCompletion(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	var body apiopenapi.ChatCompletionRequest
-	if err := s.decodeJSONBody(w, r, &body); err != nil {
+	rawBody, err := s.decodeJSONBodyWithRaw(w, r, &body)
+	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:      requestID,
 			Authed:         authed,
@@ -97,6 +99,7 @@ func (s *Server) handleCreateChatCompletion(w http.ResponseWriter, r *http.Reque
 		UserID:         authed.UserID,
 		APIKeyID:       authed.Key.ID,
 		CanonicalModel: model.CanonicalName,
+		RawBody:        rawBody,
 	})
 	admission, err := s.runtime.prepareGatewayAdmission(r.Context(), &canonical, modelResolution, model.ID)
 	if err != nil {
@@ -139,7 +142,7 @@ func (s *Server) handleCreateChatCompletion(w http.ResponseWriter, r *http.Reque
 	}
 	scheduleReq := gatewayScheduleRequest(r, canonical, modelResolution)
 	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
-	failover := s.invokeProviderTextWithFailover(r.Context(), r, authed, canonical, scheduleReq, model.ID, forcedProviderKey, admission, startedAt)
+	failover := s.invokeProviderConversationWithFailover(r.Context(), r, authed, canonical, scheduleReq, model.ID, forcedProviderKey, admission, startedAt)
 	result := failover.ScheduleResult
 	if failover.Err != nil {
 		if !failover.FailureRecorded {
@@ -153,7 +156,7 @@ func (s *Server) handleCreateChatCompletion(w http.ResponseWriter, r *http.Reque
 	}
 	providerResp := failover.Response
 	usage := gatewayUsageFromProvider(providerResp)
-	canonicalResp := s.runtime.gateway.BuildCanonicalTextResponse(canonical, providerResp.Text, usage)
+	canonicalResp := s.runtime.gateway.BuildCanonicalConversationResponse(canonical, gatewayContentBlocksFromProvider(providerResp.Parts), gatewayStopReasonFromProvider(providerResp.StopReason), usage, providerResp.Warnings, providerResp.Raw)
 	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequest(model.ID, result.Candidate, canonicalResp.Usage), canonicalResp.Usage.Estimated)
 	s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 		RequestID:             canonical.RequestID,
@@ -182,6 +185,10 @@ func (s *Server) handleCreateChatCompletion(w http.ResponseWriter, r *http.Reque
 		writeSSEJSON(w, s.runtime.gateway.RenderChatStreamChunk(canonicalResp))
 		return
 	}
+	if sameProtocolRawConversationResponse(canonical, result.Candidate.Provider.Protocol, result.Candidate.Provider.AdapterType, canonicalResp.RawProviderMetadata) {
+		writeRawJSONResponse(w, http.StatusOK, canonicalResp.RawProviderMetadata)
+		return
+	}
 	writeJSONAny(w, http.StatusOK, s.runtime.gateway.RenderChatCompletions(canonicalResp))
 }
 
@@ -196,7 +203,8 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body apiopenapi.ResponsesRequest
-	if err := s.decodeJSONBody(w, r, &body); err != nil {
+	rawBody, err := s.decodeJSONBodyWithRaw(w, r, &body)
+	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:      requestID,
 			Authed:         authed,
@@ -249,6 +257,7 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 		UserID:         authed.UserID,
 		APIKeyID:       authed.Key.ID,
 		CanonicalModel: model.CanonicalName,
+		RawBody:        rawBody,
 	})
 	admission, err := s.runtime.prepareGatewayAdmission(r.Context(), &canonical, modelResolution, model.ID)
 	if err != nil {
@@ -291,7 +300,7 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 	}
 	scheduleReq := gatewayScheduleRequest(r, canonical, modelResolution)
 	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
-	failover := s.invokeProviderTextWithFailover(r.Context(), r, authed, canonical, scheduleReq, model.ID, forcedProviderKey, admission, startedAt)
+	failover := s.invokeProviderConversationWithFailover(r.Context(), r, authed, canonical, scheduleReq, model.ID, forcedProviderKey, admission, startedAt)
 	result := failover.ScheduleResult
 	if failover.Err != nil {
 		if !failover.FailureRecorded {
@@ -305,7 +314,7 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 	}
 	providerResp := failover.Response
 	usage := gatewayUsageFromProvider(providerResp)
-	canonicalResp := s.runtime.gateway.BuildCanonicalTextResponse(canonical, providerResp.Text, usage)
+	canonicalResp := s.runtime.gateway.BuildCanonicalConversationResponse(canonical, gatewayContentBlocksFromProvider(providerResp.Parts), gatewayStopReasonFromProvider(providerResp.StopReason), usage, providerResp.Warnings, providerResp.Raw)
 	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequest(model.ID, result.Candidate, canonicalResp.Usage), canonicalResp.Usage.Estimated)
 	s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 		RequestID:             canonical.RequestID,
@@ -349,7 +358,8 @@ func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body apiopenapi.AnthropicMessagesRequest
-	if err := s.decodeJSONBody(w, r, &body); err != nil {
+	rawBody, err := s.decodeJSONBodyWithRaw(w, r, &body)
+	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:      requestID,
 			Authed:         authed,
@@ -402,6 +412,7 @@ func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
 		UserID:         authed.UserID,
 		APIKeyID:       authed.Key.ID,
 		CanonicalModel: model.CanonicalName,
+		RawBody:        rawBody,
 	})
 	admission, err := s.runtime.prepareGatewayAdmission(r.Context(), &canonical, modelResolution, model.ID)
 	if err != nil {
@@ -444,7 +455,7 @@ func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	scheduleReq := gatewayScheduleRequest(r, canonical, modelResolution)
 	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
-	failover := s.invokeProviderTextWithFailover(r.Context(), r, authed, canonical, scheduleReq, model.ID, forcedProviderKey, admission, startedAt)
+	failover := s.invokeProviderConversationWithFailover(r.Context(), r, authed, canonical, scheduleReq, model.ID, forcedProviderKey, admission, startedAt)
 	result := failover.ScheduleResult
 	if failover.Err != nil {
 		if !failover.FailureRecorded {
@@ -458,7 +469,7 @@ func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	providerResp := failover.Response
 	usage := gatewayUsageFromProvider(providerResp)
-	canonicalResp := s.runtime.gateway.BuildCanonicalTextResponse(canonical, providerResp.Text, usage)
+	canonicalResp := s.runtime.gateway.BuildCanonicalConversationResponse(canonical, gatewayContentBlocksFromProvider(providerResp.Parts), gatewayStopReasonFromProvider(providerResp.StopReason), usage, providerResp.Warnings, providerResp.Raw)
 	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequest(model.ID, result.Candidate, canonicalResp.Usage), canonicalResp.Usage.Estimated)
 	s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 		RequestID:             canonical.RequestID,
@@ -486,6 +497,10 @@ func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
 	response := s.runtime.gateway.RenderAnthropicMessages(canonicalResp)
 	if canonical.Stream {
 		writeSSEEvents(w, s.runtime.gateway.RenderAnthropicMessagesStreamEvents(canonicalResp))
+		return
+	}
+	if sameProtocolRawConversationResponse(canonical, result.Candidate.Provider.Protocol, result.Candidate.Provider.AdapterType, canonicalResp.RawProviderMetadata) {
+		writeRawJSONResponse(w, http.StatusOK, canonicalResp.RawProviderMetadata)
 		return
 	}
 	writeJSONAny(w, http.StatusOK, response)
@@ -672,7 +687,8 @@ func (s *Server) handleGeminiModelAction(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	var body apiopenapi.GeminiGenerateContentRequest
-	if err := s.decodeJSONBody(w, r, &body); err != nil {
+	rawBody, err := s.decodeJSONBodyWithRaw(w, r, &body)
+	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 			RequestID:      requestID,
 			Authed:         authed,
@@ -725,6 +741,7 @@ func (s *Server) handleGeminiModelAction(w http.ResponseWriter, r *http.Request)
 		UserID:         authed.UserID,
 		APIKeyID:       authed.Key.ID,
 		CanonicalModel: model.CanonicalName,
+		RawBody:        rawBody,
 	})
 	admission, err := s.runtime.prepareGatewayAdmission(r.Context(), &canonical, modelResolution, model.ID)
 	if err != nil {
@@ -767,7 +784,7 @@ func (s *Server) handleGeminiModelAction(w http.ResponseWriter, r *http.Request)
 	}
 	scheduleReq := gatewayScheduleRequest(r, canonical, modelResolution)
 	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
-	failover := s.invokeProviderTextWithFailover(r.Context(), r, authed, canonical, scheduleReq, model.ID, forcedProviderKey, admission, startedAt)
+	failover := s.invokeProviderConversationWithFailover(r.Context(), r, authed, canonical, scheduleReq, model.ID, forcedProviderKey, admission, startedAt)
 	result := failover.ScheduleResult
 	if failover.Err != nil {
 		if !failover.FailureRecorded {
@@ -782,7 +799,7 @@ func (s *Server) handleGeminiModelAction(w http.ResponseWriter, r *http.Request)
 	}
 	providerResp := failover.Response
 	usage := gatewayUsageFromProvider(providerResp)
-	canonicalResp := s.runtime.gateway.BuildCanonicalTextResponse(canonical, providerResp.Text, usage)
+	canonicalResp := s.runtime.gateway.BuildCanonicalConversationResponse(canonical, gatewayContentBlocksFromProvider(providerResp.Parts), gatewayStopReasonFromProvider(providerResp.StopReason), usage, providerResp.Warnings, providerResp.Raw)
 	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequest(model.ID, result.Candidate, canonicalResp.Usage), canonicalResp.Usage.Estimated)
 	s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
 		RequestID:             canonical.RequestID,
@@ -811,7 +828,46 @@ func (s *Server) handleGeminiModelAction(w http.ResponseWriter, r *http.Request)
 		writeSSEEvents(w, s.runtime.gateway.RenderGeminiGenerateContentStreamEvents(canonicalResp))
 		return
 	}
+	if sameProtocolRawConversationResponse(canonical, result.Candidate.Provider.Protocol, result.Candidate.Provider.AdapterType, canonicalResp.RawProviderMetadata) {
+		writeRawJSONResponse(w, http.StatusOK, canonicalResp.RawProviderMetadata)
+		return
+	}
 	writeJSONAny(w, http.StatusOK, s.runtime.gateway.RenderGeminiGenerateContent(canonicalResp))
+}
+
+func sameProtocolRawConversationResponse(req gatewaycontract.CanonicalRequest, targetProtocol, adapterType string, raw []byte) bool {
+	if len(bytes.TrimSpace(raw)) == 0 {
+		return false
+	}
+	if req.Stream {
+		return false
+	}
+	sourceProtocol := strings.ToLower(strings.TrimSpace(string(req.SourceProtocol)))
+	targetProtocol = strings.ToLower(strings.TrimSpace(targetProtocol))
+	adapterType = strings.ToLower(strings.TrimSpace(adapterType))
+	sourceEndpoint := strings.ToLower(strings.TrimSpace(req.SourceEndpoint))
+	if sourceProtocol == "" || sourceProtocol != targetProtocol {
+		return false
+	}
+	switch sourceProtocol {
+	case string(gatewaycontract.ProtocolOpenAICompatible):
+		return strings.HasSuffix(sourceEndpoint, "/chat/completions") &&
+			(adapterType == "openai-compatible" || adapterType == "reverse-proxy-openai-compatible")
+	case string(gatewaycontract.ProtocolAnthropicCompatible):
+		return strings.HasSuffix(sourceEndpoint, "/messages") &&
+			(adapterType == "anthropic-compatible" || adapterType == "reverse-proxy-claude-code-cli")
+	case string(gatewaycontract.ProtocolGeminiCompatible):
+		return (strings.Contains(sourceEndpoint, ":generatecontent") || strings.Contains(sourceEndpoint, ":streamgeneratecontent")) &&
+			(adapterType == "gemini-compatible" || adapterType == "native-gemini" || adapterType == "reverse-proxy-gemini-cli")
+	default:
+		return false
+	}
+}
+
+func writeRawJSONResponse(w http.ResponseWriter, status int, raw []byte) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_, _ = w.Write(bytes.TrimSpace(raw))
 }
 
 func (s *Server) handleGeminiCountTokens(w http.ResponseWriter, r *http.Request) {

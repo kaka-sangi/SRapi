@@ -19,29 +19,29 @@ import (
 
 const genericReverseProxyAdapterType = "generic-reverse-proxy"
 
-func (s *Service) invokeGenericReverseProxyText(ctx context.Context, req contract.TextRequest, baseURL string) (contract.TextResponse, error) {
+func (s *Service) invokeGenericReverseProxyText(ctx context.Context, req contract.ConversationRequest, baseURL string) (contract.ConversationResponse, error) {
 	payload, err := genericReverseProxyTextPayload(req)
 	if err != nil {
-		return contract.TextResponse{}, err
+		return contract.ConversationResponse{}, err
 	}
 	if req.Stream {
 		payload["stream_options"] = map[string]any{"include_usage": true}
 	}
 	raw, err := json.Marshal(payload)
 	if err != nil {
-		return contract.TextResponse{}, err
+		return contract.ConversationResponse{}, err
 	}
 	endpoint, err := genericReverseProxyEndpoint(req, baseURL, "chat_path", "/chat/completions")
 	if err != nil {
-		return contract.TextResponse{}, err
+		return contract.ConversationResponse{}, err
 	}
 	headers := genericReverseProxyHeaders(req, "chat")
 	runtimeResp, err := s.doGenericReverseProxy(ctx, req.Account, req.Credential, http.MethodPost, endpoint, headers, raw, req.Stream)
 	if err != nil {
-		return contract.TextResponse{}, providerErrorFromGenericReverseProxy(err)
+		return contract.ConversationResponse{}, providerErrorFromGenericReverseProxy(err)
 	}
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
-		return contract.TextResponse{}, classifyProviderHTTPError(runtimeResp.StatusCode, runtimeResp.Body)
+		return contract.ConversationResponse{}, classifyProviderHTTPError(runtimeResp.StatusCode, runtimeResp.Body)
 	}
 	if req.Stream {
 		return parseOpenAICompatibleStream(runtimeResp.Body, runtimeResp.StatusCode)
@@ -110,7 +110,7 @@ func (s *Service) doGenericReverseProxy(ctx context.Context, account accountcont
 	return reverseproxycontract.Response{StatusCode: resp.StatusCode, Headers: cloneGenericHeaders(resp.Header), Body: respBody}, nil
 }
 
-func genericReverseProxyTextPayload(req contract.TextRequest) (map[string]any, error) {
+func genericReverseProxyTextPayload(req contract.ConversationRequest) (map[string]any, error) {
 	raw, err := json.Marshal(openAICompatiblePayload(req))
 	if err != nil {
 		return nil, err
@@ -136,24 +136,24 @@ func genericReverseProxyEmbeddingPayload(req contract.EmbeddingRequest) (map[str
 	return payload, nil
 }
 
-func parseGenericReverseProxyText(body []byte, statusCode int, req contract.TextRequest) (contract.TextResponse, error) {
+func parseGenericReverseProxyText(body []byte, statusCode int, req contract.ConversationRequest) (contract.ConversationResponse, error) {
 	if statusCode < 200 || statusCode >= 300 {
-		return contract.TextResponse{}, classifyProviderHTTPError(statusCode, body)
+		return contract.ConversationResponse{}, classifyProviderHTTPError(statusCode, body)
 	}
 	var decoded map[string]any
 	if err := json.Unmarshal(body, &decoded); err != nil {
-		return contract.TextResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider returned invalid json"}
+		return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider returned invalid json"}
 	}
 	textPath := genericReverseProxyResponsePath(req, "text_path", "choices.0.message.content")
 	text := strings.TrimSpace(genericPathString(decoded, textPath))
 	if text == "" {
-		return contract.TextResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response contained no text"}
+		return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response contained no text"}
 	}
 	usage := genericReverseProxyUsage(decoded, req, text)
-	return contract.TextResponse{Text: text, StatusCode: statusCode, Usage: usage}, nil
+	return conversationTextResponse(text, statusCode, usage), nil
 }
 
-func genericReverseProxyUsage(decoded map[string]any, req contract.TextRequest, text string) contract.Usage {
+func genericReverseProxyUsage(decoded map[string]any, req contract.ConversationRequest, text string) contract.Usage {
 	if usage, ok := genericPath(decoded, genericReverseProxyResponsePath(req, "usage_path", "usage")).(openAIUsage); ok {
 		return usage.ToUsage(text)
 	}
@@ -171,7 +171,7 @@ func genericReverseProxyUsage(decoded map[string]any, req contract.TextRequest, 
 	return estimatedUsage(text)
 }
 
-func genericReverseProxyHeaders(req contract.TextRequest, endpointKind string) http.Header {
+func genericReverseProxyHeaders(req contract.ConversationRequest, endpointKind string) http.Header {
 	return genericReverseProxyHeadersFromMaps([]map[string]any{req.Credential, req.Account.Metadata, req.Provider.ConfigSchema, req.Provider.Capabilities}, endpointKind)
 }
 
@@ -231,7 +231,7 @@ func genericReverseProxyStaticHeaders(values []map[string]any, endpointKind stri
 	return out
 }
 
-func genericReverseProxyEndpoint(req contract.TextRequest, baseURL string, pathKey string, defaultPath string) (string, error) {
+func genericReverseProxyEndpoint(req contract.ConversationRequest, baseURL string, pathKey string, defaultPath string) (string, error) {
 	return genericReverseProxyEndpointFromMaps([]map[string]any{req.Account.Metadata, req.Provider.ConfigSchema, req.Provider.Capabilities}, baseURL, pathKey, defaultPath)
 }
 
@@ -326,7 +326,7 @@ func mergeGenericPayloadExtra(payload map[string]any, raw any) {
 	}
 }
 
-func genericReverseProxyResponsePath(req contract.TextRequest, key string, fallback string) string {
+func genericReverseProxyResponsePath(req contract.ConversationRequest, key string, fallback string) string {
 	if responseRules, ok := firstMapValue([]map[string]any{req.Account.Metadata, req.Provider.ConfigSchema, req.Provider.Capabilities}, "response_path_rules").(map[string]any); ok {
 		if value := mapString(responseRules, key); value != "" {
 			return value
@@ -442,7 +442,7 @@ func firstMapValue(values []map[string]any, keys ...string) any {
 	return nil
 }
 
-func isGenericReverseProxy(req contract.TextRequest) bool {
+func isGenericReverseProxy(req contract.ConversationRequest) bool {
 	return strings.EqualFold(strings.TrimSpace(req.Provider.AdapterType), genericReverseProxyAdapterType)
 }
 

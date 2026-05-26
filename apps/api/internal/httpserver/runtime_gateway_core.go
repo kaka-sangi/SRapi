@@ -169,6 +169,9 @@ func (rt *runtimeState) applyGatewayContentSafety(ctx context.Context, canonical
 		return canonical
 	}
 	updated, result := rt.contentSafety.Apply(canonical)
+	if result.Changed {
+		updated.RawBody = nil
+	}
 	if len(result.Findings) == 0 {
 		return updated
 	}
@@ -1336,17 +1339,17 @@ func metadataCooldownActive(metadata map[string]any, now time.Time) bool {
 	return err == nil && now.Before(until)
 }
 
-func (rt *runtimeState) invokeProviderText(ctx context.Context, req provideradaptercontract.TextRequest) (provideradaptercontract.TextResponse, error) {
+func (rt *runtimeState) invokeProviderConversation(ctx context.Context, req provideradaptercontract.ConversationRequest) (provideradaptercontract.ConversationResponse, error) {
 	dispatch, err := rt.prepareProviderDispatch(ctx, &req.Account)
 	if err != nil {
-		return provideradaptercontract.TextResponse{}, err
+		return provideradaptercontract.ConversationResponse{}, err
 	}
 	defer rt.releaseProviderAccountConcurrency(dispatch.concurrencyLease)
 	req.Credential = dispatch.credential
-	resp, err := rt.adapters.InvokeText(ctx, req)
+	resp, err := rt.adapters.InvokeConversation(ctx, req)
 	if err != nil {
 		rt.applyProviderAccountProtection(ctx, req.Account, err)
-		return provideradaptercontract.TextResponse{}, err
+		return provideradaptercontract.ConversationResponse{}, err
 	}
 	return resp, nil
 }
@@ -1484,236 +1487,6 @@ func (rt *runtimeState) invokeProviderRerank(ctx context.Context, req providerad
 		return provideradaptercontract.RerankResponse{}, err
 	}
 	return resp, nil
-}
-
-func providerTextRequest(req gatewaycontract.CanonicalRequest, candidate schedulercontract.Candidate) provideradaptercontract.TextRequest {
-	return provideradaptercontract.TextRequest{
-		RequestID:       req.RequestID,
-		SourceProtocol:  string(req.SourceProtocol),
-		SourceEndpoint:  req.SourceEndpoint,
-		Model:           req.CanonicalModel,
-		Prompt:          req.Prompt,
-		Messages:        providerTextMessages(req),
-		Instructions:    req.Instructions,
-		Stream:          req.Stream,
-		Temperature:     req.Temperature,
-		TopP:            req.TopP,
-		MaxOutputTokens: req.MaxOutputTokens,
-		Stop:            append([]string(nil), req.Stop...),
-		Tools:           cloneMapSlice(req.Tools),
-		ToolChoice:      cloneAnyValue(req.ToolChoice),
-		ResponseFormat:  cloneAnyMap(req.ResponseFormat),
-		Provider:        candidate.Provider,
-		Account:         candidate.Account,
-		Mapping:         candidate.Mapping,
-	}
-}
-
-func providerTokenCountRequest(req gatewaycontract.CanonicalRequest, rawBody []byte, candidate schedulercontract.Candidate) provideradaptercontract.TokenCountRequest {
-	return provideradaptercontract.TokenCountRequest{
-		RequestID:      req.RequestID,
-		SourceProtocol: string(req.SourceProtocol),
-		SourceEndpoint: req.SourceEndpoint,
-		Model:          req.CanonicalModel,
-		RawBody:        append([]byte(nil), rawBody...),
-		Provider:       candidate.Provider,
-		Account:        candidate.Account,
-		Mapping:        candidate.Mapping,
-	}
-}
-
-func providerEmbeddingRequest(req gatewaycontract.CanonicalRequest, candidate schedulercontract.Candidate) provideradaptercontract.EmbeddingRequest {
-	return provideradaptercontract.EmbeddingRequest{
-		RequestID:      req.RequestID,
-		SourceProtocol: string(req.SourceProtocol),
-		SourceEndpoint: req.SourceEndpoint,
-		Model:          req.CanonicalModel,
-		Input:          append([]string(nil), req.EmbeddingInput...),
-		EncodingFormat: req.EmbeddingEncoding,
-		Dimensions:     cloneIntPtr(req.EmbeddingDimensions),
-		User:           req.EmbeddingUser,
-		Provider:       candidate.Provider,
-		Account:        candidate.Account,
-		Mapping:        candidate.Mapping,
-	}
-}
-
-func providerImageGenerationRequest(req gatewaycontract.CanonicalRequest, candidate schedulercontract.Candidate) provideradaptercontract.ImageGenerationRequest {
-	return provideradaptercontract.ImageGenerationRequest{
-		RequestID:      req.RequestID,
-		SourceProtocol: string(req.SourceProtocol),
-		SourceEndpoint: req.SourceEndpoint,
-		Model:          req.CanonicalModel,
-		Prompt:         req.ImagePrompt,
-		Count:          req.ImageCount,
-		Size:           req.ImageSize,
-		Quality:        req.ImageQuality,
-		Style:          req.ImageStyle,
-		ResponseFormat: req.ImageResponseFormat,
-		User:           req.ImageUser,
-		Extra:          cloneAnyMap(req.ImageExtra),
-		Provider:       candidate.Provider,
-		Account:        candidate.Account,
-		Mapping:        candidate.Mapping,
-	}
-}
-
-func providerImageEditRequest(req gatewaycontract.CanonicalRequest, candidate schedulercontract.Candidate) provideradaptercontract.ImageEditRequest {
-	return provideradaptercontract.ImageEditRequest{
-		RequestID:      req.RequestID,
-		SourceProtocol: string(req.SourceProtocol),
-		SourceEndpoint: req.SourceEndpoint,
-		Model:          req.CanonicalModel,
-		Prompt:         req.ImagePrompt,
-		Images:         providerImageInputs(req.ImageInputs),
-		Mask:           providerImageInputPtr(req.ImageMask),
-		Count:          req.ImageCount,
-		Size:           req.ImageSize,
-		Quality:        req.ImageQuality,
-		ResponseFormat: req.ImageResponseFormat,
-		User:           req.ImageUser,
-		Extra:          cloneAnyMap(req.ImageExtra),
-		Provider:       candidate.Provider,
-		Account:        candidate.Account,
-		Mapping:        candidate.Mapping,
-	}
-}
-
-func providerImageVariationRequest(req gatewaycontract.CanonicalRequest, candidate schedulercontract.Candidate) provideradaptercontract.ImageVariationRequest {
-	return provideradaptercontract.ImageVariationRequest{
-		RequestID:      req.RequestID,
-		SourceProtocol: string(req.SourceProtocol),
-		SourceEndpoint: req.SourceEndpoint,
-		Model:          req.CanonicalModel,
-		Image:          providerImageInputValue(req.ImageInputs),
-		Count:          req.ImageCount,
-		Size:           req.ImageSize,
-		ResponseFormat: req.ImageResponseFormat,
-		User:           req.ImageUser,
-		Extra:          cloneAnyMap(req.ImageExtra),
-		Provider:       candidate.Provider,
-		Account:        candidate.Account,
-		Mapping:        candidate.Mapping,
-	}
-}
-
-func providerAudioTranscriptionRequest(req gatewaycontract.CanonicalRequest, candidate schedulercontract.Candidate) provideradaptercontract.AudioTranscriptionRequest {
-	return provideradaptercontract.AudioTranscriptionRequest{
-		RequestID:      req.RequestID,
-		SourceProtocol: string(req.SourceProtocol),
-		SourceEndpoint: req.SourceEndpoint,
-		Model:          req.CanonicalModel,
-		FileName:       req.AudioFileName,
-		ContentType:    req.AudioContentType,
-		Audio:          append([]byte(nil), req.AudioBytes...),
-		Language:       req.AudioLanguage,
-		Prompt:         req.AudioPrompt,
-		ResponseFormat: req.AudioResponseFormat,
-		Temperature:    cloneFloat32Ptr(req.AudioTemperature),
-		User:           req.AudioUser,
-		Extra:          cloneAnyMap(req.AudioExtra),
-		Provider:       candidate.Provider,
-		Account:        candidate.Account,
-		Mapping:        candidate.Mapping,
-	}
-}
-
-func providerAudioSpeechRequest(req gatewaycontract.CanonicalRequest, candidate schedulercontract.Candidate) provideradaptercontract.AudioSpeechRequest {
-	return provideradaptercontract.AudioSpeechRequest{
-		RequestID:      req.RequestID,
-		SourceProtocol: string(req.SourceProtocol),
-		SourceEndpoint: req.SourceEndpoint,
-		Model:          req.CanonicalModel,
-		Input:          req.SpeechInput,
-		Voice:          req.SpeechVoice,
-		ResponseFormat: req.SpeechResponseFormat,
-		Speed:          cloneFloat32Ptr(req.SpeechSpeed),
-		Instructions:   req.SpeechInstructions,
-		User:           req.SpeechUser,
-		Extra:          cloneAnyMap(req.SpeechExtra),
-		Provider:       candidate.Provider,
-		Account:        candidate.Account,
-		Mapping:        candidate.Mapping,
-	}
-}
-
-func providerModerationRequest(req gatewaycontract.CanonicalRequest, candidate schedulercontract.Candidate) provideradaptercontract.ModerationRequest {
-	return provideradaptercontract.ModerationRequest{
-		RequestID:      req.RequestID,
-		SourceProtocol: string(req.SourceProtocol),
-		SourceEndpoint: req.SourceEndpoint,
-		Model:          req.CanonicalModel,
-		Input:          append([]string(nil), req.ModerationInput...),
-		User:           req.ModerationUser,
-		Provider:       candidate.Provider,
-		Account:        candidate.Account,
-		Mapping:        candidate.Mapping,
-	}
-}
-
-func providerRerankRequest(req gatewaycontract.CanonicalRequest, candidate schedulercontract.Candidate) provideradaptercontract.RerankRequest {
-	return provideradaptercontract.RerankRequest{
-		RequestID:       req.RequestID,
-		SourceProtocol:  string(req.SourceProtocol),
-		SourceEndpoint:  req.SourceEndpoint,
-		Model:           req.CanonicalModel,
-		Query:           req.RerankQuery,
-		Documents:       providerRerankDocuments(req.RerankDocuments),
-		TopN:            cloneIntPtr(req.RerankTopN),
-		ReturnDocuments: req.RerankReturnDocuments,
-		User:            req.RerankUser,
-		Provider:        candidate.Provider,
-		Account:         candidate.Account,
-		Mapping:         candidate.Mapping,
-	}
-}
-
-func providerRerankDocuments(values []gatewaycontract.RerankDocument) []provideradaptercontract.RerankDocument {
-	if values == nil {
-		return nil
-	}
-	out := make([]provideradaptercontract.RerankDocument, len(values))
-	for idx, value := range values {
-		out[idx] = provideradaptercontract.RerankDocument{
-			Text:     value.Text,
-			Fields:   cloneAnyMap(value.Fields),
-			Original: cloneAnyValue(value.Original),
-		}
-	}
-	return out
-}
-
-func providerTextMessages(req gatewaycontract.CanonicalRequest) []provideradaptercontract.TextMessage {
-	out := make([]provideradaptercontract.TextMessage, 0, len(req.Messages)+1)
-	for _, message := range req.Messages {
-		role := strings.TrimSpace(message.Role)
-		if role == "" {
-			role = "user"
-		}
-		content := canonicalContentText(message.Content)
-		if content == "" {
-			continue
-		}
-		out = append(out, provideradaptercontract.TextMessage{Role: role, Content: content})
-	}
-	if len(out) == 0 {
-		content := canonicalContentText(req.InputItems)
-		if content != "" {
-			out = append(out, provideradaptercontract.TextMessage{Role: "user", Content: content})
-		}
-	}
-	return out
-}
-
-func canonicalContentText(blocks []gatewaycontract.ContentBlock) string {
-	parts := make([]string, 0, len(blocks))
-	for _, block := range blocks {
-		text := strings.TrimSpace(block.Text)
-		if text != "" {
-			parts = append(parts, text)
-		}
-	}
-	return strings.Join(parts, "\n")
 }
 
 func (rt *runtimeState) materializeProviderProxy(ctx context.Context, account *accountcontract.ProviderAccount) error {
@@ -1867,7 +1640,83 @@ func gatewayModalityTokenCountsFromProvider(values []provideradaptercontract.Mod
 	return out
 }
 
-func gatewayUsageFromProvider(resp provideradaptercontract.TextResponse) gatewaycontract.Usage {
+func gatewayContentBlocksFromProvider(parts []provideradaptercontract.ContentPart) []gatewaycontract.ContentBlock {
+	if len(parts) == 0 {
+		return nil
+	}
+	out := make([]gatewaycontract.ContentBlock, 0, len(parts))
+	for _, part := range parts {
+		block := gatewaycontract.ContentBlock{
+			Type:              gatewayContentBlockTypeFromProvider(part.Kind),
+			Role:              "assistant",
+			Text:              strings.TrimSpace(part.Text),
+			MediaURL:          strings.TrimSpace(part.MediaURL),
+			MediaBase64:       strings.TrimSpace(part.MediaBase64),
+			MIMEType:          strings.TrimSpace(part.MIMEType),
+			FileID:            strings.TrimSpace(part.FileID),
+			ToolCallID:        strings.TrimSpace(part.ToolCallID),
+			ToolName:          strings.TrimSpace(part.ToolName),
+			ToolArgumentsJSON: strings.TrimSpace(part.ToolArgumentsJSON),
+			ToolResultForID:   strings.TrimSpace(part.ToolResultForID),
+			ToolResultIsError: part.ToolResultIsError,
+			Metadata:          cloneAnyMap(part.Metadata),
+		}
+		if block.Metadata == nil {
+			block.Metadata = map[string]any{}
+		}
+		if origin := strings.TrimSpace(part.OriginProtocol); origin != "" {
+			block.Metadata["origin_protocol"] = origin
+		}
+		if len(part.Raw) > 0 {
+			block.Metadata["raw"] = append([]byte(nil), part.Raw...)
+		}
+		if len(block.Metadata) == 0 {
+			block.Metadata = nil
+		}
+		out = append(out, block)
+	}
+	return out
+}
+
+func gatewayContentBlockTypeFromProvider(kind provideradaptercontract.ContentPartKind) gatewaycontract.ContentBlockType {
+	switch kind {
+	case provideradaptercontract.ContentPartImage:
+		return gatewaycontract.ContentBlockImage
+	case provideradaptercontract.ContentPartAudio:
+		return gatewaycontract.ContentBlockAudio
+	case provideradaptercontract.ContentPartFile:
+		return gatewaycontract.ContentBlockFile
+	case provideradaptercontract.ContentPartToolUse:
+		return gatewaycontract.ContentBlockToolCall
+	case provideradaptercontract.ContentPartToolResult:
+		return gatewaycontract.ContentBlockToolResult
+	case provideradaptercontract.ContentPartThinking:
+		return gatewaycontract.ContentBlockReasoning
+	case provideradaptercontract.ContentPartRefusal:
+		return gatewaycontract.ContentBlockRefusal
+	case provideradaptercontract.ContentPartMetadata:
+		return gatewaycontract.ContentBlockMetadata
+	default:
+		return gatewaycontract.ContentBlockText
+	}
+}
+
+func gatewayStopReasonFromProvider(reason provideradaptercontract.StopReason) string {
+	switch reason {
+	case provideradaptercontract.StopReasonMaxTokens:
+		return "max_tokens"
+	case provideradaptercontract.StopReasonToolUse:
+		return "tool_use"
+	case provideradaptercontract.StopReasonContentFilter:
+		return "content_filter"
+	case provideradaptercontract.StopReasonRefusal:
+		return "refusal"
+	default:
+		return "end_turn"
+	}
+}
+
+func gatewayUsageFromProvider(resp provideradaptercontract.ConversationResponse) gatewaycontract.Usage {
 	return gatewaycontract.Usage{
 		InputTokens:  resp.Usage.InputTokens,
 		OutputTokens: resp.Usage.OutputTokens,

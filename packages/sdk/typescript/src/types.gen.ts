@@ -2610,6 +2610,14 @@ export type ChatMessage = {
     content: string | Array<ContentBlock>;
     name?: string;
     tool_call_id?: string;
+    tool_calls?: Array<ChatToolCall>;
+};
+
+export type ChatToolCall = {
+    id: string;
+    type: string;
+    function: JsonObject;
+    [key: string]: unknown;
 };
 
 export type ContentBlock = {

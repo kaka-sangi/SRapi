@@ -13822,6 +13822,25 @@ components:
           type: string
         tool_call_id:
           type: string
+        tool_calls:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatToolCall"
+
+    ChatToolCall:
+      type: object
+      required:
+        - id
+        - type
+        - function
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        function:
+          $ref: "#/components/schemas/JsonObject"
+      additionalProperties: true
 
     ContentBlock:
       type: object

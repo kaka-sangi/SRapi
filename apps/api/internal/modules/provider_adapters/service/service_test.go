@@ -18,6 +18,51 @@ import (
 	reverseproxyservice "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/service"
 )
 
+func textParts(text string) []contract.ContentPart {
+	return []contract.ContentPart{{Kind: contract.ContentPartText, Text: text}}
+}
+
+func conversationResponseText(resp contract.ConversationResponse) string {
+	parts := make([]string, 0, len(resp.Parts))
+	for _, part := range resp.Parts {
+		switch part.Kind {
+		case "", contract.ContentPartText, contract.ContentPartThinking, contract.ContentPartRefusal, contract.ContentPartToolResult:
+			if text := strings.TrimSpace(part.Text); text != "" {
+				parts = append(parts, text)
+			}
+		}
+	}
+	return strings.Join(parts, "\n")
+}
+
+func assertToolUsePart(t *testing.T, part contract.ContentPart, id string, name string, arguments string) {
+	t.Helper()
+	if part.Kind != contract.ContentPartToolUse || part.ToolCallID != id || part.ToolName != name || part.ToolArgumentsJSON != arguments {
+		t.Fatalf("unexpected tool use part: %+v", part)
+	}
+}
+
+func imageURLPart(url string) contract.ContentPart {
+	return contract.ContentPart{Kind: contract.ContentPartImage, MediaURL: url, MIMEType: "image/png"}
+}
+
+func toolUsePart(id string, name string, arguments string) contract.ContentPart {
+	return contract.ContentPart{
+		Kind:              contract.ContentPartToolUse,
+		ToolCallID:        id,
+		ToolName:          name,
+		ToolArgumentsJSON: arguments,
+	}
+}
+
+func toolResultPart(id string, text string) contract.ContentPart {
+	return contract.ContentPart{
+		Kind:            contract.ContentPartToolResult,
+		ToolResultForID: id,
+		Text:            text,
+	}
+}
+
 func TestOpenAICompatibleAdapterInvokesUpstream(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/chat/completions" {
@@ -51,10 +96,10 @@ func TestOpenAICompatibleAdapterInvokesUpstream(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
-	resp, err := svc.InvokeText(context.Background(), contract.TextRequest{
-		RequestID: "req_adapter",
-		Model:     "gpt-local",
-		Prompt:    "hello upstream",
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_adapter",
+		Model:      "gpt-local",
+		InputParts: textParts("hello upstream"),
 		Provider: providercontract.Provider{
 			ID:          1,
 			AdapterType: "openai-compatible",
@@ -72,8 +117,195 @@ func TestOpenAICompatibleAdapterInvokesUpstream(t *testing.T) {
 	if err != nil {
 		t.Fatalf("invoke upstream: %v", err)
 	}
-	if resp.Text != "upstream says hi" || resp.Usage.Estimated || resp.Usage.InputTokens != 3 || resp.Usage.OutputTokens != 4 {
+	if conversationResponseText(resp) != "upstream says hi" || resp.Usage.Estimated || resp.Usage.InputTokens != 3 || resp.Usage.OutputTokens != 4 {
 		t.Fatalf("unexpected adapter response: %+v", resp)
+	}
+}
+
+func TestOpenAICompatibleAdapterPreservesToolCallResponse(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"finish_reason":"tool_calls","message":{"role":"assistant","content":"","tool_calls":[{"id":"call_1","type":"function","function":{"name":"lookup","arguments":"{\"query\":\"weather\"}"}}]}}],"usage":{"prompt_tokens":3,"completion_tokens":1,"total_tokens":4}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_tool_call",
+		Model:      "gpt-local",
+		InputParts: textParts("call lookup"),
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "openai-compatible",
+			Protocol:    "openai-compatible",
+		},
+		Account:    accountcontract.ProviderAccount{ID: 1, Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-upstream"},
+		Credential: map[string]any{"api_key": "upstream-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke upstream: %v", err)
+	}
+	if len(resp.Parts) != 1 || resp.StopReason != contract.StopReasonToolUse || resp.Usage.OutputTokens != 1 {
+		t.Fatalf("unexpected tool call response: %+v", resp)
+	}
+	assertToolUsePart(t, resp.Parts[0], "call_1", "lookup", `{"query":"weather"}`)
+}
+
+func TestOpenAICompatibleAdapterPreservesSameProtocolRawBody(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		if payload["model"] != "gpt-upstream" || payload["parallel_tool_calls"] != true || payload["user"] != "user-raw" {
+			t.Fatalf("expected raw OpenAI fields to be preserved with mapped model, got %+v", payload)
+		}
+		if streamOptions, _ := payload["stream_options"].(map[string]any); streamOptions["include_usage"] != false {
+			t.Fatalf("expected raw stream usage option to be preserved, got %+v", payload["stream_options"])
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"raw ok"}}],"usage":{"prompt_tokens":2,"completion_tokens":1}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_openai_raw",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/chat/completions",
+		TargetProtocol: "openai-compatible",
+		Model:          "gpt-local",
+		InputParts:     textParts("canonical fallback"),
+		RawBody:        []byte(`{"model":"gpt-local","messages":[{"role":"user","content":"raw"}],"parallel_tool_calls":true,"stream_options":{"include_usage":false},"user":"user-raw"}`),
+		Provider:       providercontract.Provider{AdapterType: "openai-compatible", Protocol: "openai-compatible"},
+		Account:        accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:        modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-upstream"},
+		Credential:     map[string]any{"api_key": "upstream-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke raw OpenAI upstream: %v", err)
+	}
+	if conversationResponseText(resp) != "raw ok" {
+		t.Fatalf("unexpected raw OpenAI response: %+v", resp)
+	}
+}
+
+func TestOpenAICompatibleAdapterDoesNotUseResponsesRawBodyForChatUpstream(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		if _, hasInput := payload["input"]; hasInput {
+			t.Fatalf("responses raw input must not be forwarded to chat upstream: %+v", payload)
+		}
+		if payload["model"] != "gpt-upstream" || payload["messages"] == nil {
+			t.Fatalf("expected canonical chat payload, got %+v", payload)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"fallback ok"}}],"usage":{"prompt_tokens":2,"completion_tokens":1}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_openai_no_raw_responses",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/responses",
+		TargetProtocol: "openai-compatible",
+		Model:          "gpt-local",
+		InputParts:     textParts("canonical fallback"),
+		RawBody:        []byte(`{"model":"gpt-local","input":"raw responses input","parallel_tool_calls":true}`),
+		Provider:       providercontract.Provider{AdapterType: "openai-compatible", Protocol: "openai-compatible"},
+		Account:        accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:        modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-upstream"},
+		Credential:     map[string]any{"api_key": "upstream-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke OpenAI fallback upstream: %v", err)
+	}
+}
+
+func TestOpenAICompatibleAdapterRendersContentPartsToUpstream(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload struct {
+			Messages []struct {
+				Role       string           `json:"role"`
+				Content    json.RawMessage  `json:"content"`
+				ToolCallID string           `json:"tool_call_id"`
+				ToolCalls  []map[string]any `json:"tool_calls"`
+			} `json:"messages"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		if len(payload.Messages) != 3 {
+			t.Fatalf("expected user, assistant tool call, and tool result messages, got %+v", payload.Messages)
+		}
+		var userContent []map[string]any
+		if err := json.Unmarshal(payload.Messages[0].Content, &userContent); err != nil {
+			t.Fatalf("decode user content blocks: %v", err)
+		}
+		if payload.Messages[0].Role != "user" || len(userContent) != 2 || userContent[0]["text"] != "look at this" {
+			t.Fatalf("unexpected OpenAI user content: role=%s content=%+v", payload.Messages[0].Role, userContent)
+		}
+		imageURL, _ := userContent[1]["image_url"].(map[string]any)
+		if userContent[1]["type"] != "image_url" || imageURL["url"] != "https://example.test/image.png" {
+			t.Fatalf("expected image_url block, got %+v", userContent[1])
+		}
+		if payload.Messages[1].Role != "assistant" || len(payload.Messages[1].ToolCalls) != 1 {
+			t.Fatalf("expected assistant tool call message, got %+v", payload.Messages[1])
+		}
+		function, _ := payload.Messages[1].ToolCalls[0]["function"].(map[string]any)
+		if payload.Messages[1].ToolCalls[0]["id"] != "call_1" || function["name"] != "lookup" || function["arguments"] != `{"query":"weather"}` {
+			t.Fatalf("unexpected OpenAI tool call: %+v", payload.Messages[1].ToolCalls[0])
+		}
+		var toolContent string
+		if err := json.Unmarshal(payload.Messages[2].Content, &toolContent); err != nil {
+			t.Fatalf("decode tool content: %v", err)
+		}
+		if payload.Messages[2].Role != "tool" || payload.Messages[2].ToolCallID != "call_1" || toolContent != "sunny" {
+			t.Fatalf("unexpected OpenAI tool result message: %+v content=%q", payload.Messages[2], toolContent)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"done"}}],"usage":{"prompt_tokens":5,"completion_tokens":1}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID: "req_openai_parts",
+		Model:     "gpt-local",
+		Messages: []contract.ConversationMessage{
+			{Role: "user", Parts: []contract.ContentPart{
+				{Kind: contract.ContentPartText, Text: "look at this"},
+				imageURLPart("https://example.test/image.png"),
+			}},
+			{Role: "assistant", Parts: []contract.ContentPart{toolUsePart("call_1", "lookup", `{"query":"weather"}`)}},
+			{Role: "tool", Parts: []contract.ContentPart{toolResultPart("call_1", "sunny")}},
+		},
+		Provider: providercontract.Provider{AdapterType: "openai-compatible", Protocol: "openai-compatible"},
+		Account:  accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:  modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-upstream"},
+		Credential: map[string]any{
+			"api_key": "upstream-secret",
+		},
+	})
+	if err != nil {
+		t.Fatalf("invoke upstream: %v", err)
 	}
 }
 
@@ -646,10 +878,10 @@ func TestOpenAICompatibleAdapterForwardsConversionFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
-	resp, err := svc.InvokeText(context.Background(), contract.TextRequest{
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
 		RequestID:       "req_conversion_fields",
 		Model:           "gpt-local",
-		Prompt:          "run lookup",
+		InputParts:      textParts("run lookup"),
 		Instructions:    "be precise",
 		MaxOutputTokens: ptrInt(128),
 		Tools: []map[string]any{{
@@ -675,7 +907,7 @@ func TestOpenAICompatibleAdapterForwardsConversionFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("invoke upstream: %v", err)
 	}
-	if resp.Text != "lookup done" || resp.Usage.InputTokens != 8 || resp.Usage.OutputTokens != 2 {
+	if conversationResponseText(resp) != "lookup done" || resp.Usage.InputTokens != 8 || resp.Usage.OutputTokens != 2 {
 		t.Fatalf("unexpected adapter response: %+v", resp)
 	}
 }
@@ -716,11 +948,11 @@ func TestOpenAICompatibleAdapterStreamsUpstream(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
-	resp, err := svc.InvokeText(context.Background(), contract.TextRequest{
-		RequestID: "req_stream",
-		Model:     "gpt-local",
-		Prompt:    "hello stream",
-		Stream:    true,
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_stream",
+		Model:      "gpt-local",
+		InputParts: textParts("hello stream"),
+		Stream:     true,
 		Provider: providercontract.Provider{
 			ID:          1,
 			AdapterType: "openai-compatible",
@@ -736,7 +968,7 @@ func TestOpenAICompatibleAdapterStreamsUpstream(t *testing.T) {
 	if err != nil {
 		t.Fatalf("invoke stream upstream: %v", err)
 	}
-	if resp.Text != "hello stream" || resp.Usage.Estimated || resp.Usage.InputTokens != 5 || resp.Usage.OutputTokens != 6 || resp.Usage.CachedTokens != 2 {
+	if conversationResponseText(resp) != "hello stream" || resp.Usage.Estimated || resp.Usage.InputTokens != 5 || resp.Usage.OutputTokens != 6 || resp.Usage.CachedTokens != 2 {
 		t.Fatalf("unexpected stream response: %+v", resp)
 	}
 }
@@ -753,10 +985,10 @@ func TestOpenAICompatibleAdapterEstimatesStreamUsageWhenMissing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
-	resp, err := svc.InvokeText(context.Background(), contract.TextRequest{
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
 		RequestID:  "req_stream_estimated",
 		Model:      "gpt-local",
-		Prompt:     "hello",
+		InputParts: textParts("hello"),
 		Stream:     true,
 		Account:    accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
 		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-upstream"},
@@ -765,7 +997,7 @@ func TestOpenAICompatibleAdapterEstimatesStreamUsageWhenMissing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("invoke stream upstream: %v", err)
 	}
-	if resp.Text != "estimated usage" || !resp.Usage.Estimated {
+	if conversationResponseText(resp) != "estimated usage" || !resp.Usage.Estimated {
 		t.Fatalf("expected estimated stream usage, got %+v", resp)
 	}
 }
@@ -800,10 +1032,10 @@ func TestGenericReverseProxyAdapterInvokesConfiguredChatUpstream(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
-	resp, err := svc.InvokeText(context.Background(), contract.TextRequest{
-		RequestID: "req_generic_chat",
-		Model:     "generic-local",
-		Prompt:    "hello generic",
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_generic_chat",
+		Model:      "generic-local",
+		InputParts: textParts("hello generic"),
 		Provider: providercontract.Provider{
 			ID:          1,
 			AdapterType: "generic-reverse-proxy",
@@ -830,7 +1062,7 @@ func TestGenericReverseProxyAdapterInvokesConfiguredChatUpstream(t *testing.T) {
 	if err != nil {
 		t.Fatalf("invoke generic chat upstream: %v", err)
 	}
-	if resp.Text != "generic says hi" || resp.Usage.Estimated || resp.Usage.InputTokens != 6 || resp.Usage.OutputTokens != 7 || resp.Usage.CachedTokens != 2 {
+	if conversationResponseText(resp) != "generic says hi" || resp.Usage.Estimated || resp.Usage.InputTokens != 6 || resp.Usage.OutputTokens != 7 || resp.Usage.CachedTokens != 2 {
 		t.Fatalf("unexpected generic chat response: %+v", resp)
 	}
 }
@@ -865,11 +1097,11 @@ func TestGenericReverseProxyAdapterStreamsConfiguredChatUpstream(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
-	resp, err := svc.InvokeText(context.Background(), contract.TextRequest{
-		RequestID: "req_generic_stream",
-		Model:     "generic-local",
-		Prompt:    "hello stream",
-		Stream:    true,
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_generic_stream",
+		Model:      "generic-local",
+		InputParts: textParts("hello stream"),
+		Stream:     true,
 		Provider: providercontract.Provider{
 			AdapterType:  "generic-reverse-proxy",
 			Protocol:     "openai-compatible",
@@ -882,7 +1114,7 @@ func TestGenericReverseProxyAdapterStreamsConfiguredChatUpstream(t *testing.T) {
 	if err != nil {
 		t.Fatalf("invoke generic stream upstream: %v", err)
 	}
-	if resp.Text != "generic stream" || resp.Usage.Estimated || resp.Usage.InputTokens != 4 || resp.Usage.OutputTokens != 5 {
+	if conversationResponseText(resp) != "generic stream" || resp.Usage.Estimated || resp.Usage.InputTokens != 4 || resp.Usage.OutputTokens != 5 {
 		t.Fatalf("unexpected generic stream response: %+v", resp)
 	}
 }
@@ -953,10 +1185,10 @@ func TestOpenAICompatibleAdapterClassifiesInterruptedStream(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
-	_, err = svc.InvokeText(context.Background(), contract.TextRequest{
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
 		RequestID:  "req_stream_interrupted",
 		Model:      "gpt-local",
-		Prompt:     "hello",
+		InputParts: textParts("hello"),
 		Stream:     true,
 		Account:    accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
 		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-upstream"},
@@ -970,10 +1202,10 @@ func TestAdapterFallsBackToLocalResponseWithoutBaseURL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
-	resp, err := svc.InvokeText(context.Background(), contract.TextRequest{
-		RequestID: "req_local",
-		Model:     "gpt-local",
-		Prompt:    "hello local",
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_local",
+		Model:      "gpt-local",
+		InputParts: textParts("hello local"),
 		Mapping: modelcontract.ModelProviderMapping{
 			UpstreamModelName: "gpt-local",
 		},
@@ -981,7 +1213,7 @@ func TestAdapterFallsBackToLocalResponseWithoutBaseURL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("invoke local fallback: %v", err)
 	}
-	if !strings.Contains(resp.Text, "hello local") || !resp.Usage.Estimated {
+	if !strings.Contains(conversationResponseText(resp), "hello local") || !resp.Usage.Estimated {
 		t.Fatalf("unexpected local fallback response: %+v", resp)
 	}
 }
@@ -996,10 +1228,10 @@ func TestOpenAICompatibleAdapterClassifiesAuthFailure(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
-	_, err = svc.InvokeText(context.Background(), contract.TextRequest{
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
 		RequestID:  "req_auth",
 		Model:      "gpt-local",
-		Prompt:     "hello",
+		InputParts: textParts("hello"),
 		Account:    accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
 		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-upstream"},
 		Credential: map[string]any{"api_key": "upstream-secret"},
@@ -1017,10 +1249,10 @@ func TestOpenAICompatibleAdapterClassifiesRateLimit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
-	_, err = svc.InvokeText(context.Background(), contract.TextRequest{
-		RequestID: "req_rate_limit",
-		Model:     "gpt-local",
-		Prompt:    "hello",
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_rate_limit",
+		Model:      "gpt-local",
+		InputParts: textParts("hello"),
 		Account: accountcontract.ProviderAccount{
 			Metadata: map[string]any{"base_url": upstream.URL + "/v1"},
 		},
@@ -1051,10 +1283,10 @@ func TestOpenAICompatibleAdapterClassifiesProvider5xx(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
-	_, err = svc.InvokeText(context.Background(), contract.TextRequest{
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
 		RequestID:  "req_5xx",
 		Model:      "gpt-local",
-		Prompt:     "hello",
+		InputParts: textParts("hello"),
 		Account:    accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
 		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-upstream"},
 		Credential: map[string]any{"api_key": "upstream-secret"},
@@ -1072,10 +1304,10 @@ func TestOpenAICompatibleAdapterClassifiesInvalidRequest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
-	_, err = svc.InvokeText(context.Background(), contract.TextRequest{
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
 		RequestID:  "req_invalid",
 		Model:      "gpt-local",
-		Prompt:     "hello",
+		InputParts: textParts("hello"),
 		Account:    accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
 		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-upstream"},
 		Credential: map[string]any{"api_key": "upstream-secret"},
@@ -1138,7 +1370,7 @@ func TestGeminiCompatibleAdapterInvokesGenerateContentUpstream(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
-	resp, err := svc.InvokeText(context.Background(), contract.TextRequest{
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
 		RequestID:       "req_gemini_adapter",
 		Model:           "gemini-local",
 		Instructions:    "be concise",
@@ -1146,9 +1378,9 @@ func TestGeminiCompatibleAdapterInvokesGenerateContentUpstream(t *testing.T) {
 		Temperature:     ptrFloat32(0.3),
 		TopP:            ptrFloat32(0.7),
 		Stop:            []string{"stop"},
-		Messages: []contract.TextMessage{
-			{Role: "user", Content: "hello gemini"},
-			{Role: "assistant", Content: "prior answer"},
+		Messages: []contract.ConversationMessage{
+			{Role: "user", Parts: textParts("hello gemini")},
+			{Role: "assistant", Parts: textParts("prior answer")},
 		},
 		Tools: []map[string]any{{
 			"type": "function",
@@ -1169,8 +1401,165 @@ func TestGeminiCompatibleAdapterInvokesGenerateContentUpstream(t *testing.T) {
 	if err != nil {
 		t.Fatalf("invoke gemini upstream: %v", err)
 	}
-	if resp.Text != "gemini says hi" || resp.Usage.Estimated || resp.Usage.InputTokens != 9 || resp.Usage.OutputTokens != 4 || resp.Usage.CachedTokens != 1 {
+	if conversationResponseText(resp) != "gemini says hi" || resp.Usage.Estimated || resp.Usage.InputTokens != 9 || resp.Usage.OutputTokens != 4 || resp.Usage.CachedTokens != 1 {
 		t.Fatalf("unexpected gemini response: %+v", resp)
+	}
+}
+
+func TestGeminiCompatibleAdapterPreservesSameProtocolRawBody(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		if payload["model"] != nil || payload["stream"] != nil || payload["cachedContent"] != "cachedContents/raw" {
+			t.Fatalf("expected raw Gemini fields without body model/stream injection, got %+v", payload)
+		}
+		if _, ok := payload["generationConfig"].(map[string]any); !ok {
+			t.Fatalf("expected raw generationConfig, got %+v", payload)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"candidates":[{"content":{"role":"model","parts":[{"text":"gemini raw ok"}]}}],"usageMetadata":{"promptTokenCount":2,"candidatesTokenCount":1}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_gemini_raw",
+		SourceProtocol: "gemini-compatible",
+		SourceEndpoint: "/v1beta/models/gemini-local:generateContent",
+		TargetProtocol: "gemini-compatible",
+		Model:          "gemini-local",
+		InputParts:     textParts("canonical fallback"),
+		RawBody:        []byte(`{"contents":[{"role":"user","parts":[{"text":"raw"}]}],"generationConfig":{"responseMimeType":"application/json"},"cachedContent":"cachedContents/raw"}`),
+		Provider:       providercontract.Provider{AdapterType: "gemini-compatible", Protocol: "gemini-compatible"},
+		Account:        accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1beta"}},
+		Mapping:        modelcontract.ModelProviderMapping{UpstreamModelName: "models/gemini-pro"},
+		Credential:     map[string]any{"api_key": "gemini-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke raw Gemini upstream: %v", err)
+	}
+	if conversationResponseText(resp) != "gemini raw ok" {
+		t.Fatalf("unexpected raw Gemini response: %+v", resp)
+	}
+}
+
+func TestGeminiCompatibleAdapterRendersFunctionPartsToUpstream(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload struct {
+			Contents []struct {
+				Role  string `json:"role"`
+				Parts []struct {
+					FunctionCall     map[string]any `json:"functionCall"`
+					FunctionResponse map[string]any `json:"functionResponse"`
+				} `json:"parts"`
+			} `json:"contents"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		if len(payload.Contents) != 2 {
+			t.Fatalf("expected function call and response contents, got %+v", payload.Contents)
+		}
+		if payload.Contents[0].Role != "model" || payload.Contents[0].Parts[0].FunctionCall["name"] != "lookup" {
+			t.Fatalf("unexpected Gemini function call content: %+v", payload.Contents[0])
+		}
+		args, _ := payload.Contents[0].Parts[0].FunctionCall["args"].(map[string]any)
+		if args["query"] != "weather" {
+			t.Fatalf("unexpected Gemini function args: %+v", args)
+		}
+		if payload.Contents[1].Role != "user" || payload.Contents[1].Parts[0].FunctionResponse["response"] == nil {
+			t.Fatalf("unexpected Gemini function response content: %+v", payload.Contents[1])
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"candidates":[{"content":{"role":"model","parts":[{"text":"done"}]}}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":1}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID: "req_gemini_functions",
+		Model:     "gemini-local",
+		Messages: []contract.ConversationMessage{
+			{Role: "assistant", Parts: []contract.ContentPart{toolUsePart("call_1", "lookup", `{"query":"weather"}`)}},
+			{Role: "tool", Parts: []contract.ContentPart{{
+				Kind:            contract.ContentPartToolResult,
+				ToolName:        "lookup",
+				ToolResultForID: "call_1",
+				Text:            `{"forecast":"sunny"}`,
+			}}},
+		},
+		Provider:   providercontract.Provider{AdapterType: "gemini-compatible", Protocol: "gemini-compatible"},
+		Account:    accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1beta"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "models/gemini-pro"},
+		Credential: map[string]any{"api_key": "gemini-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke gemini upstream: %v", err)
+	}
+}
+
+func TestGeminiCompatibleAdapterPreservesFunctionCallResponse(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"candidates":[{"finishReason":"STOP","content":{"role":"model","parts":[{"functionCall":{"name":"lookup","args":{"query":"weather"}}}]}}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":1}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_gemini_tool_call",
+		Model:      "gemini-local",
+		InputParts: textParts("call lookup"),
+		Provider:   providercontract.Provider{AdapterType: "gemini-compatible", Protocol: "gemini-compatible"},
+		Account:    accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1beta"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "models/gemini-pro"},
+		Credential: map[string]any{"api_key": "gemini-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke gemini upstream: %v", err)
+	}
+	if len(resp.Parts) != 1 || resp.StopReason != contract.StopReasonToolUse || resp.Usage.OutputTokens != 1 {
+		t.Fatalf("unexpected gemini tool call response: %+v", resp)
+	}
+	assertToolUsePart(t, resp.Parts[0], "", "lookup", `{"query":"weather"}`)
+}
+
+func TestGeminiCompatibleAdapterPreservesFinishReason(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"candidates":[{"finishReason":"MAX_TOKENS","content":{"role":"model","parts":[{"text":"partial"}]}}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":2}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_gemini_max_tokens",
+		Model:      "gemini-local",
+		InputParts: textParts("short"),
+		Provider:   providercontract.Provider{AdapterType: "gemini-compatible", Protocol: "gemini-compatible"},
+		Account:    accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1beta"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "models/gemini-pro"},
+		Credential: map[string]any{"api_key": "gemini-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke gemini upstream: %v", err)
+	}
+	if resp.StopReason != contract.StopReasonMaxTokens || conversationResponseText(resp) != "partial" {
+		t.Fatalf("expected Gemini MAX_TOKENS stop reason, got %+v", resp)
 	}
 }
 
@@ -1202,11 +1591,11 @@ func TestGeminiCompatibleAdapterStreamsUpstream(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
-	resp, err := svc.InvokeText(context.Background(), contract.TextRequest{
-		RequestID: "req_gemini_stream",
-		Model:     "gemini-local",
-		Prompt:    "stream gemini",
-		Stream:    true,
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_gemini_stream",
+		Model:      "gemini-local",
+		InputParts: textParts("stream gemini"),
+		Stream:     true,
 		Provider: providercontract.Provider{
 			AdapterType: "native-gemini",
 			Protocol:    "gemini-compatible",
@@ -1218,9 +1607,39 @@ func TestGeminiCompatibleAdapterStreamsUpstream(t *testing.T) {
 	if err != nil {
 		t.Fatalf("invoke gemini stream: %v", err)
 	}
-	if resp.Text != "hello stream" || resp.Usage.Estimated || resp.Usage.InputTokens != 5 || resp.Usage.OutputTokens != 6 {
+	if conversationResponseText(resp) != "hello stream" || resp.Usage.Estimated || resp.Usage.InputTokens != 5 || resp.Usage.OutputTokens != 6 {
 		t.Fatalf("unexpected gemini stream response: %+v", resp)
 	}
+}
+
+func TestGeminiCompatibleAdapterStreamsFunctionCall(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: {\"candidates\":[{\"content\":{\"parts\":[{\"functionCall\":{\"name\":\"lookup\",\"args\":{\"query\":\"weather\"}}}]}}],\"usageMetadata\":{\"promptTokenCount\":5,\"candidatesTokenCount\":1}}\n\n"))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_gemini_stream_tool",
+		Model:      "gemini-local",
+		InputParts: textParts("call lookup"),
+		Stream:     true,
+		Provider:   providercontract.Provider{AdapterType: "native-gemini", Protocol: "gemini-compatible"},
+		Account:    accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1beta"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gemini-pro"},
+		Credential: map[string]any{"api_key": "gemini-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke gemini stream: %v", err)
+	}
+	if len(resp.Parts) != 1 || resp.StopReason != contract.StopReasonToolUse {
+		t.Fatalf("unexpected gemini stream tool response: %+v", resp)
+	}
+	assertToolUsePart(t, resp.Parts[0], "", "lookup", `{"query":"weather"}`)
 }
 
 func TestGeminiCompatibleAdapterAcceptsModelsBaseURL(t *testing.T) {
@@ -1237,10 +1656,10 @@ func TestGeminiCompatibleAdapterAcceptsModelsBaseURL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
-	resp, err := svc.InvokeText(context.Background(), contract.TextRequest{
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
 		RequestID:  "req_gemini_models_base",
 		Model:      "gemini-local",
-		Prompt:     "hello",
+		InputParts: textParts("hello"),
 		Provider:   providercontract.Provider{AdapterType: "gemini-compatible", Protocol: "gemini-compatible"},
 		Account:    accountcontract.ProviderAccount{ID: 1, Metadata: map[string]any{"base_url": upstream.URL + "/v1beta/models"}},
 		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gemini-pro"},
@@ -1249,7 +1668,7 @@ func TestGeminiCompatibleAdapterAcceptsModelsBaseURL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("invoke gemini upstream: %v", err)
 	}
-	if resp.Text != "ok" {
+	if conversationResponseText(resp) != "ok" {
 		t.Fatalf("unexpected gemini response: %+v", resp)
 	}
 }
@@ -1360,10 +1779,10 @@ func TestGeminiCompatibleAdapterClassifiesGoogleError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
-	_, err = svc.InvokeText(context.Background(), contract.TextRequest{
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
 		RequestID:  "req_gemini_error",
 		Model:      "gemini-local",
-		Prompt:     "hello",
+		InputParts: textParts("hello"),
 		Provider:   providercontract.Provider{AdapterType: "gemini-compatible", Protocol: "gemini-compatible"},
 		Account:    accountcontract.ProviderAccount{ID: 1, Metadata: map[string]any{"base_url": upstream.URL + "/v1beta"}},
 		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gemini-pro"},
@@ -1383,10 +1802,10 @@ func TestReverseProxyGeminiAdapterDispatchesThroughRuntime(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
-	resp, err := svc.InvokeText(context.Background(), contract.TextRequest{
-		RequestID: "req_reverse_gemini",
-		Model:     "gemini-local",
-		Prompt:    "hello",
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_reverse_gemini",
+		Model:      "gemini-local",
+		InputParts: textParts("hello"),
 		Provider: providercontract.Provider{
 			AdapterType: "reverse-proxy-gemini-cli",
 			Protocol:    "gemini-compatible",
@@ -1403,7 +1822,7 @@ func TestReverseProxyGeminiAdapterDispatchesThroughRuntime(t *testing.T) {
 	if err != nil {
 		t.Fatalf("invoke reverse gemini adapter: %v", err)
 	}
-	if resp.Text != "gemini runtime response" || resp.Usage.InputTokens != 2 || resp.Usage.OutputTokens != 3 {
+	if conversationResponseText(resp) != "gemini runtime response" || resp.Usage.InputTokens != 2 || resp.Usage.OutputTokens != 3 {
 		t.Fatalf("unexpected reverse gemini response: %+v", resp)
 	}
 	if runtime.request.Method != http.MethodPost || runtime.request.URL != "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent" || runtime.request.ExpectStream {
@@ -1424,6 +1843,49 @@ func TestReverseProxyGeminiAdapterDispatchesThroughRuntime(t *testing.T) {
 	}
 	if len(payload.Contents) != 1 || payload.Contents[0].Parts[0].Text != "hello" {
 		t.Fatalf("unexpected reverse gemini payload: %+v", payload)
+	}
+}
+
+func TestReverseProxyGeminiAdapterPreservesSameProtocolRawBody(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body:       []byte(`{"candidates":[{"content":{"parts":[{"text":"gemini raw runtime"}]}}],"usageMetadata":{"promptTokenCount":2,"candidatesTokenCount":1}}`),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_reverse_gemini_raw",
+		SourceProtocol: "gemini-compatible",
+		SourceEndpoint: "/v1beta/models/gemini-local:generateContent",
+		TargetProtocol: "gemini-compatible",
+		Model:          "gemini-local",
+		InputParts:     textParts("canonical fallback"),
+		RawBody:        []byte(`{"contents":[{"role":"user","parts":[{"text":"raw"}]}],"cachedContent":"cachedContents/raw"}`),
+		Provider:       providercontract.Provider{AdapterType: "reverse-proxy-gemini-cli", Protocol: "gemini-compatible"},
+		Account: accountcontract.ProviderAccount{
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("gemini_cli"),
+			Metadata:       map[string]any{"base_url": "https://generativelanguage.googleapis.com/v1beta"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gemini-pro"},
+		Credential: map[string]any{"cli_client_token": "cli-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke reverse raw gemini: %v", err)
+	}
+	if conversationResponseText(resp) != "gemini raw runtime" {
+		t.Fatalf("unexpected reverse raw gemini response: %+v", resp)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(runtime.request.Body, &payload); err != nil {
+		t.Fatalf("decode reverse raw gemini payload: %v", err)
+	}
+	if payload["cachedContent"] != "cachedContents/raw" || payload["model"] != nil {
+		t.Fatalf("expected reverse Gemini raw body to be preserved, got %+v", payload)
 	}
 }
 
@@ -1596,15 +2058,15 @@ func TestAnthropicCompatibleAdapterInvokesMessagesUpstream(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
-	resp, err := svc.InvokeText(context.Background(), contract.TextRequest{
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
 		RequestID:       "req_anthropic",
 		Model:           "claude-local",
-		Prompt:          "hello anthropic",
+		InputParts:      textParts("hello anthropic"),
 		Instructions:    "be concise",
 		MaxOutputTokens: ptrInt(128),
-		Messages: []contract.TextMessage{
-			{Role: "system", Content: "system from chat"},
-			{Role: "user", Content: "hello anthropic"},
+		Messages: []contract.ConversationMessage{
+			{Role: "system", Parts: textParts("system from chat")},
+			{Role: "user", Parts: textParts("hello anthropic")},
 		},
 		Tools: []map[string]any{{
 			"type": "function",
@@ -1633,9 +2095,134 @@ func TestAnthropicCompatibleAdapterInvokesMessagesUpstream(t *testing.T) {
 	if err != nil {
 		t.Fatalf("invoke anthropic upstream: %v", err)
 	}
-	if resp.Text != "anthropic says hi" || resp.Usage.Estimated || resp.Usage.InputTokens != 6 || resp.Usage.OutputTokens != 7 || resp.Usage.CachedTokens != 2 {
+	if conversationResponseText(resp) != "anthropic says hi" || resp.Usage.Estimated || resp.Usage.InputTokens != 6 || resp.Usage.OutputTokens != 7 || resp.Usage.CachedTokens != 2 {
 		t.Fatalf("unexpected anthropic adapter response: %+v", resp)
 	}
+}
+
+func TestAnthropicCompatibleAdapterRendersBlockContentToUpstream(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload struct {
+			Messages []struct {
+				Role    string           `json:"role"`
+				Content []map[string]any `json:"content"`
+			} `json:"messages"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		if len(payload.Messages) != 2 {
+			t.Fatalf("expected user blocks and tool result messages, got %+v", payload.Messages)
+		}
+		if payload.Messages[0].Role != "user" || len(payload.Messages[0].Content) != 2 || payload.Messages[0].Content[0]["text"] != "inspect" {
+			t.Fatalf("unexpected Anthropic user content: %+v", payload.Messages[0])
+		}
+		source, _ := payload.Messages[0].Content[1]["source"].(map[string]any)
+		if payload.Messages[0].Content[1]["type"] != "image" || source["url"] != "https://example.test/image.png" {
+			t.Fatalf("expected Anthropic image block, got %+v", payload.Messages[0].Content[1])
+		}
+		if payload.Messages[1].Role != "tool" || payload.Messages[1].Content[0]["type"] != "tool_result" || payload.Messages[1].Content[0]["tool_use_id"] != "call_1" {
+			t.Fatalf("unexpected Anthropic tool result content: %+v", payload.Messages[1])
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"content":[{"type":"text","text":"done"}],"usage":{"input_tokens":5,"output_tokens":1}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID: "req_anthropic_blocks",
+		Model:     "claude-local",
+		Messages: []contract.ConversationMessage{
+			{Role: "user", Parts: []contract.ContentPart{
+				{Kind: contract.ContentPartText, Text: "inspect"},
+				imageURLPart("https://example.test/image.png"),
+			}},
+			{Role: "tool", Parts: []contract.ContentPart{toolResultPart("call_1", "sunny")}},
+		},
+		Provider:   providercontract.Provider{AdapterType: "anthropic-compatible", Protocol: "anthropic-compatible"},
+		Account:    accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "claude-upstream"},
+		Credential: map[string]any{"api_key": "anthropic-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke anthropic upstream: %v", err)
+	}
+}
+
+func TestAnthropicCompatibleAdapterPreservesSameProtocolRawBody(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		if payload["model"] != "claude-upstream" || payload["service_tier"] != "auto" || payload["container"] == nil {
+			t.Fatalf("expected raw Anthropic fields with mapped model, got %+v", payload)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"content":[{"type":"text","text":"anthropic raw ok"}],"usage":{"input_tokens":2,"output_tokens":1}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_anthropic_raw",
+		SourceProtocol: "anthropic-compatible",
+		SourceEndpoint: "/v1/messages",
+		TargetProtocol: "anthropic-compatible",
+		Model:          "claude-local",
+		InputParts:     textParts("canonical fallback"),
+		RawBody:        []byte(`{"model":"claude-local","messages":[{"role":"user","content":"raw"}],"service_tier":"auto","container":{"id":"container-1"}}`),
+		Provider:       providercontract.Provider{AdapterType: "anthropic-compatible", Protocol: "anthropic-compatible"},
+		Account:        accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:        modelcontract.ModelProviderMapping{UpstreamModelName: "claude-upstream"},
+		Credential:     map[string]any{"api_key": "anthropic-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke raw Anthropic upstream: %v", err)
+	}
+	if conversationResponseText(resp) != "anthropic raw ok" {
+		t.Fatalf("unexpected raw Anthropic response: %+v", resp)
+	}
+}
+
+func TestAnthropicCompatibleAdapterPreservesToolUseResponse(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"stop_reason":"tool_use","content":[{"type":"tool_use","id":"toolu_1","name":"lookup","input":{"query":"weather"}}],"usage":{"input_tokens":6,"output_tokens":2}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_anthropic_tool_use",
+		Model:      "claude-local",
+		InputParts: textParts("call lookup"),
+		Provider: providercontract.Provider{
+			ID:          2,
+			AdapterType: "anthropic-compatible",
+			Protocol:    "anthropic-compatible",
+		},
+		Account:    accountcontract.ProviderAccount{ID: 2, Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "claude-upstream"},
+		Credential: map[string]any{"api_key": "anthropic-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke anthropic upstream: %v", err)
+	}
+	if len(resp.Parts) != 1 || resp.StopReason != contract.StopReasonToolUse || resp.Usage.OutputTokens != 2 {
+		t.Fatalf("unexpected anthropic tool use response: %+v", resp)
+	}
+	assertToolUsePart(t, resp.Parts[0], "toolu_1", "lookup", `{"query":"weather"}`)
 }
 
 func TestAnthropicCompatibleAdapterStreamsUpstream(t *testing.T) {
@@ -1673,11 +2260,11 @@ func TestAnthropicCompatibleAdapterStreamsUpstream(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
-	resp, err := svc.InvokeText(context.Background(), contract.TextRequest{
-		RequestID: "req_anthropic_stream",
-		Model:     "claude-local",
-		Prompt:    "hello stream",
-		Stream:    true,
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_anthropic_stream",
+		Model:      "claude-local",
+		InputParts: textParts("hello stream"),
+		Stream:     true,
 		Provider: providercontract.Provider{
 			ID:          2,
 			AdapterType: "anthropic-compatible",
@@ -1690,7 +2277,7 @@ func TestAnthropicCompatibleAdapterStreamsUpstream(t *testing.T) {
 	if err != nil {
 		t.Fatalf("invoke anthropic stream upstream: %v", err)
 	}
-	if resp.Text != "hello stream" || resp.Usage.Estimated || resp.Usage.InputTokens != 5 || resp.Usage.OutputTokens != 6 || resp.Usage.CachedTokens != 1 {
+	if conversationResponseText(resp) != "hello stream" || resp.Usage.Estimated || resp.Usage.InputTokens != 5 || resp.Usage.OutputTokens != 6 || resp.Usage.CachedTokens != 1 {
 		t.Fatalf("unexpected anthropic stream response: %+v", resp)
 	}
 }
@@ -1707,10 +2294,10 @@ func TestAnthropicCompatibleAdapterClassifiesRateLimitErrorObject(t *testing.T) 
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
-	_, err = svc.InvokeText(context.Background(), contract.TextRequest{
-		RequestID: "req_anthropic_rate",
-		Model:     "claude-local",
-		Prompt:    "hello",
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_anthropic_rate",
+		Model:      "claude-local",
+		InputParts: textParts("hello"),
 		Provider: providercontract.Provider{
 			AdapterType: "anthropic-compatible",
 			Protocol:    "anthropic-compatible",
@@ -1733,10 +2320,10 @@ func TestReverseProxyClaudeCodeCLIAdapterUsesOfficialClientMessagesShape(t *test
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
-	resp, err := svc.InvokeText(context.Background(), contract.TextRequest{
-		RequestID: "req_reverse_anthropic",
-		Model:     "claude-local",
-		Prompt:    "hello",
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_reverse_anthropic",
+		Model:      "claude-local",
+		InputParts: textParts("hello"),
 		Provider: providercontract.Provider{
 			AdapterType: "reverse-proxy-claude-code-cli",
 			Protocol:    "anthropic-compatible",
@@ -1761,7 +2348,7 @@ func TestReverseProxyClaudeCodeCLIAdapterUsesOfficialClientMessagesShape(t *test
 	if err != nil {
 		t.Fatalf("invoke reverse anthropic adapter: %v", err)
 	}
-	if resp.Text != "reverse anthropic response" || resp.Usage.InputTokens != 2 || resp.Usage.OutputTokens != 3 {
+	if conversationResponseText(resp) != "reverse anthropic response" || resp.Usage.InputTokens != 2 || resp.Usage.OutputTokens != 3 {
 		t.Fatalf("unexpected reverse anthropic response: %+v", resp)
 	}
 	if runtime.request.URL != "https://upstream.example/v1/messages?beta=true" {
@@ -1818,10 +2405,10 @@ func TestReverseProxyClaudeCodeCLIRejectsAPIKeyRuntime(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
-	_, err = svc.InvokeText(context.Background(), contract.TextRequest{
-		RequestID: "req_reverse_claude_api_key",
-		Model:     "claude-local",
-		Prompt:    "hello",
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_reverse_claude_api_key",
+		Model:      "claude-local",
+		InputParts: textParts("hello"),
 		Provider: providercontract.Provider{
 			AdapterType: "reverse-proxy-claude-code-cli",
 			Protocol:    "anthropic-compatible",
@@ -1838,6 +2425,61 @@ func TestReverseProxyClaudeCodeCLIRejectsAPIKeyRuntime(t *testing.T) {
 	assertProviderError(t, err, "invalid_request", http.StatusBadRequest)
 	if runtime.request.URL != "" {
 		t.Fatalf("runtime should not be called for api_key Claude Code reverse proxy, got %s", runtime.request.URL)
+	}
+}
+
+func TestReverseProxyAnthropicCompatibleAdapterPreservesSameProtocolRawBody(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body:       []byte(`{"content":[{"type":"text","text":"anthropic raw runtime"}],"usage":{"input_tokens":2,"output_tokens":1}}`),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_reverse_anthropic_raw",
+		SourceProtocol: "anthropic-compatible",
+		SourceEndpoint: "/v1/messages",
+		TargetProtocol: "anthropic-compatible",
+		Model:          "claude-local",
+		InputParts:     textParts("canonical fallback"),
+		RawBody:        []byte(`{"model":"claude-local","messages":[{"role":"user","content":"raw"}],"service_tier":"auto","container":{"id":"container-1"},"stream":true}`),
+		Provider: providercontract.Provider{
+			ID:          2,
+			AdapterType: "anthropic-compatible",
+			Protocol:    "anthropic-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             12,
+			RuntimeClass:   accountcontract.RuntimeClassOauthRefresh,
+			UpstreamClient: ptrString("claude_code_cli"),
+			Metadata:       map[string]any{"base_url": "https://anthropic.example/v1"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "claude-upstream"},
+		Credential: map[string]any{"access_token": "oauth-access"},
+	})
+	if err != nil {
+		t.Fatalf("invoke reverse raw anthropic adapter: %v", err)
+	}
+	if conversationResponseText(resp) != "anthropic raw runtime" || resp.Usage.InputTokens != 2 || resp.Usage.OutputTokens != 1 {
+		t.Fatalf("unexpected reverse raw anthropic response: %+v", resp)
+	}
+	if runtime.request.URL != "https://anthropic.example/v1/messages" || runtime.request.ExpectStream {
+		t.Fatalf("unexpected reverse raw anthropic runtime request: %+v", runtime.request)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(runtime.request.Body, &payload); err != nil {
+		t.Fatalf("decode reverse raw anthropic payload: %v", err)
+	}
+	container, _ := payload["container"].(map[string]any)
+	if payload["model"] != "claude-upstream" ||
+		payload["service_tier"] != "auto" ||
+		payload["stream"] != false ||
+		container["id"] != "container-1" {
+		t.Fatalf("expected reverse Anthropic raw body to be preserved with mapped stream fields, got %+v", payload)
 	}
 }
 
@@ -1866,10 +2508,10 @@ func TestReverseProxyOpenAICompatibleAdapterUsesRuntimeForNonAPIKeyAccount(t *te
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
-	resp, err := svc.InvokeText(context.Background(), contract.TextRequest{
-		RequestID: "req_reverse_proxy",
-		Model:     "rp-local",
-		Prompt:    "hello",
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_reverse_proxy",
+		Model:      "rp-local",
+		InputParts: textParts("hello"),
 		Provider: providercontract.Provider{
 			ID:          1,
 			AdapterType: "reverse-proxy-openai-compatible",
@@ -1889,7 +2531,7 @@ func TestReverseProxyOpenAICompatibleAdapterUsesRuntimeForNonAPIKeyAccount(t *te
 	if err != nil {
 		t.Fatalf("invoke reverse proxy adapter: %v", err)
 	}
-	if resp.Text != "reverse proxy response" || resp.Usage.InputTokens != 2 || resp.Usage.OutputTokens != 3 {
+	if conversationResponseText(resp) != "reverse proxy response" || resp.Usage.InputTokens != 2 || resp.Usage.OutputTokens != 3 {
 		t.Fatalf("unexpected reverse proxy adapter response: %+v", resp)
 	}
 	if upstreamHeaders.Get("User-Agent") != "Codex/1.0" {
@@ -1897,6 +2539,67 @@ func TestReverseProxyOpenAICompatibleAdapterUsesRuntimeForNonAPIKeyAccount(t *te
 	}
 	if metrics := runtime.Metrics(); metrics.RequestTotal != 1 || metrics.RequestSuccessTotal != 1 {
 		t.Fatalf("expected reverse proxy runtime metrics, got %+v", metrics)
+	}
+}
+
+func TestReverseProxyOpenAICompatibleAdapterPreservesSameProtocolRawBody(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body: []byte(
+				"data: {\"choices\":[{\"delta\":{\"content\":\"reverse raw\"}}]}\n\n" +
+					"data: {\"choices\":[],\"usage\":{\"prompt_tokens\":2,\"completion_tokens\":1}}\n\n" +
+					"data: [DONE]\n\n",
+			),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_reverse_openai_raw",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/chat/completions",
+		TargetProtocol: "openai-compatible",
+		Model:          "gpt-local",
+		InputParts:     textParts("canonical fallback"),
+		Stream:         true,
+		RawBody:        []byte(`{"model":"gpt-local","messages":[{"role":"user","content":"raw"}],"parallel_tool_calls":true,"stream":false,"stream_options":{"include_usage":false},"user":"user-raw"}`),
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "reverse-proxy-openai-compatible",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             7,
+			RuntimeClass:   accountcontract.RuntimeClassOauthRefresh,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": "https://openai.example/v1"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-upstream"},
+		Credential: map[string]any{"access_token": "oauth-access"},
+	})
+	if err != nil {
+		t.Fatalf("invoke reverse raw openai adapter: %v", err)
+	}
+	if conversationResponseText(resp) != "reverse raw" || resp.Usage.InputTokens != 2 || resp.Usage.OutputTokens != 1 {
+		t.Fatalf("unexpected reverse raw openai response: %+v", resp)
+	}
+	if runtime.request.URL != "https://openai.example/v1/chat/completions" || !runtime.request.ExpectStream {
+		t.Fatalf("unexpected reverse raw openai runtime request: %+v", runtime.request)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(runtime.request.Body, &payload); err != nil {
+		t.Fatalf("decode reverse raw openai payload: %v", err)
+	}
+	streamOptions, _ := payload["stream_options"].(map[string]any)
+	if payload["model"] != "gpt-upstream" ||
+		payload["parallel_tool_calls"] != true ||
+		payload["user"] != "user-raw" ||
+		payload["stream"] != true ||
+		streamOptions["include_usage"] != true {
+		t.Fatalf("expected reverse OpenAI raw body to be preserved with mapped stream fields, got %+v", payload)
 	}
 }
 
@@ -1987,10 +2690,10 @@ func TestReverseProxyChatGPTWebAdapterUsesConversationOfficialClientShape(t *tes
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
-	resp, err := svc.InvokeText(context.Background(), contract.TextRequest{
-		RequestID: "req_chatgpt_web_proxy",
-		Model:     "chatgpt-local",
-		Prompt:    "hello chatgpt web",
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_chatgpt_web_proxy",
+		Model:      "chatgpt-local",
+		InputParts: textParts("hello chatgpt web"),
 		Provider: providercontract.Provider{
 			ID:          1,
 			AdapterType: "reverse-proxy-chatgpt-web",
@@ -2016,7 +2719,7 @@ func TestReverseProxyChatGPTWebAdapterUsesConversationOfficialClientShape(t *tes
 	if err != nil {
 		t.Fatalf("invoke chatgpt web reverse proxy adapter: %v", err)
 	}
-	if resp.Text != "chatgpt web response" || !resp.Usage.Estimated {
+	if conversationResponseText(resp) != "chatgpt web response" || !resp.Usage.Estimated {
 		t.Fatalf("unexpected chatgpt web response: %+v", resp)
 	}
 	if upstreamHeaders.Get("Authorization") != "Bearer chatgpt-web-token" {
@@ -2082,10 +2785,10 @@ func TestReverseProxyChatGPTWebAdapterAutoFetchesRequirements(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
-	resp, err := svc.InvokeText(context.Background(), contract.TextRequest{
-		RequestID: "req_chatgpt_web_auto_requirements",
-		Model:     "chatgpt-local",
-		Prompt:    "hello auto requirements",
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_chatgpt_web_auto_requirements",
+		Model:      "chatgpt-local",
+		InputParts: textParts("hello auto requirements"),
 		Provider: providercontract.Provider{
 			ID:          1,
 			AdapterType: "reverse-proxy-chatgpt-web",
@@ -2108,7 +2811,7 @@ func TestReverseProxyChatGPTWebAdapterAutoFetchesRequirements(t *testing.T) {
 	if err != nil {
 		t.Fatalf("invoke chatgpt web reverse proxy adapter: %v", err)
 	}
-	if resp.Text != "auto requirements ok" {
+	if conversationResponseText(resp) != "auto requirements ok" {
 		t.Fatalf("unexpected chatgpt web response: %+v", resp)
 	}
 	if strings.Join(paths, ",") != "/,/backend-api/sentinel/chat-requirements,/backend-api/conversation" {
@@ -2133,10 +2836,10 @@ func TestReverseProxyChatGPTWebMissingRequirementsCanDisableAutoFetch(t *testing
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
-	_, err = svc.InvokeText(context.Background(), contract.TextRequest{
-		RequestID: "req_chatgpt_web_manual_requirements",
-		Model:     "chatgpt-local",
-		Prompt:    "hello",
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_chatgpt_web_manual_requirements",
+		Model:      "chatgpt-local",
+		InputParts: textParts("hello"),
 		Provider: providercontract.Provider{
 			AdapterType: "reverse-proxy-chatgpt-web",
 			Protocol:    "openai-compatible",
@@ -2167,10 +2870,10 @@ func TestReverseProxyChatGPTWebRejectsAPIKeyRuntime(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
-	_, err = svc.InvokeText(context.Background(), contract.TextRequest{
-		RequestID: "req_chatgpt_web_api_key_runtime",
-		Model:     "chatgpt-local",
-		Prompt:    "hello",
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_chatgpt_web_api_key_runtime",
+		Model:      "chatgpt-local",
+		InputParts: textParts("hello"),
 		Provider: providercontract.Provider{
 			AdapterType: "reverse-proxy-chatgpt-web",
 			Protocol:    "openai-compatible",
@@ -2204,6 +2907,7 @@ func TestReverseProxyCodexCLIAdapterUsesResponsesOfficialClientShape(t *testing.
 		if r.Header.Get("Originator") != "codex_cli_rs" ||
 			r.Header.Get("User-Agent") != codexUserAgent ||
 			r.Header.Get("Accept") != "text/event-stream" ||
+			r.Header.Get("OpenAI-Beta") != "responses=experimental" ||
 			r.Header.Get("Chatgpt-Account-Id") != "chatgpt-account" ||
 			r.Header.Get("Session_id") != "session-123" ||
 			r.Header.Get("X-Client-Request-Id") != "req_codex_proxy" ||
@@ -2215,6 +2919,7 @@ func TestReverseProxyCodexCLIAdapterUsesResponsesOfficialClientShape(t *testing.
 			Model        string `json:"model"`
 			Instructions string `json:"instructions"`
 			Stream       bool   `json:"stream"`
+			Store        *bool  `json:"store"`
 			Input        []struct {
 				Type    string `json:"type"`
 				Role    string `json:"role"`
@@ -2231,6 +2936,8 @@ func TestReverseProxyCodexCLIAdapterUsesResponsesOfficialClientShape(t *testing.
 		if payload.Model != "codex-upstream" ||
 			payload.Instructions != "be concise\nsystem guardrail" ||
 			!payload.Stream ||
+			payload.Store == nil ||
+			*payload.Store ||
 			payload.StreamOptions != nil ||
 			len(payload.Input) != 1 ||
 			payload.Input[0].Type != "message" ||
@@ -2258,13 +2965,13 @@ func TestReverseProxyCodexCLIAdapterUsesResponsesOfficialClientShape(t *testing.
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
-	resp, err := svc.InvokeText(context.Background(), contract.TextRequest{
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
 		RequestID:    "req_codex_proxy",
 		Model:        "codex-local",
 		Instructions: "be concise",
-		Messages: []contract.TextMessage{
-			{Role: "system", Content: "system guardrail"},
-			{Role: "user", Content: "hello codex"},
+		Messages: []contract.ConversationMessage{
+			{Role: "system", Parts: textParts("system guardrail")},
+			{Role: "user", Parts: textParts("hello codex")},
 		},
 		Provider: providercontract.Provider{
 			ID:          1,
@@ -2290,7 +2997,7 @@ func TestReverseProxyCodexCLIAdapterUsesResponsesOfficialClientShape(t *testing.
 	if err != nil {
 		t.Fatalf("invoke codex reverse proxy adapter: %v", err)
 	}
-	if resp.Text != "codex response" || resp.Usage.Estimated || resp.Usage.InputTokens != 4 || resp.Usage.OutputTokens != 5 || resp.Usage.CachedTokens != 1 {
+	if conversationResponseText(resp) != "codex response" || resp.Usage.Estimated || resp.Usage.InputTokens != 4 || resp.Usage.OutputTokens != 5 || resp.Usage.CachedTokens != 1 {
 		t.Fatalf("unexpected codex response: %+v", resp)
 	}
 	if upstreamHeaders.Get("Authorization") != "Bearer codex-token" {
@@ -2299,6 +3006,48 @@ func TestReverseProxyCodexCLIAdapterUsesResponsesOfficialClientShape(t *testing.
 	if metrics := runtime.Metrics(); metrics.RequestTotal != 1 || metrics.RequestSuccessTotal != 1 {
 		t.Fatalf("expected reverse proxy runtime metrics, got %+v", metrics)
 	}
+}
+
+func TestReverseProxyCodexCLIAdapterPreservesFunctionCallResponse(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body: []byte(
+				"data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"id\":\"fc_1\",\"call_id\":\"call_1\",\"name\":\"lookup\",\"arguments\":\"{\\\"query\\\":\\\"weather\\\"}\"}}\n\n" +
+					"data: {\"type\":\"response.completed\",\"response\":{\"output\":[],\"usage\":{\"input_tokens\":4,\"output_tokens\":2}}}\n\n" +
+					"data: [DONE]\n\n",
+			),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_codex_tool_call",
+		Model:      "codex-local",
+		InputParts: textParts("call lookup"),
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": "https://codex.example.test/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+		Credential: map[string]any{"cli_client_token": "codex-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke codex reverse proxy adapter: %v", err)
+	}
+	if len(resp.Parts) != 1 || resp.StopReason != contract.StopReasonToolUse || resp.Usage.OutputTokens != 2 {
+		t.Fatalf("unexpected codex function call response: %+v", resp)
+	}
+	assertToolUsePart(t, resp.Parts[0], "call_1", "lookup", `{"query":"weather"}`)
 }
 
 func TestReverseProxyCodexCLIAdapterPassesCliRuntimeContext(t *testing.T) {
@@ -2316,10 +3065,10 @@ func TestReverseProxyCodexCLIAdapterPassesCliRuntimeContext(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
-	resp, err := svc.InvokeText(context.Background(), contract.TextRequest{
-		RequestID: "req_cli_runtime",
-		Model:     "codex-local",
-		Prompt:    "hello",
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_cli_runtime",
+		Model:      "codex-local",
+		InputParts: textParts("hello"),
 		Provider: providercontract.Provider{
 			AdapterType: "reverse-proxy-codex-cli",
 			Protocol:    "openai-compatible",
@@ -2336,14 +3085,18 @@ func TestReverseProxyCodexCLIAdapterPassesCliRuntimeContext(t *testing.T) {
 	if err != nil {
 		t.Fatalf("invoke cli reverse proxy adapter: %v", err)
 	}
-	if resp.Text != "cli response" {
+	if conversationResponseText(resp) != "cli response" {
 		t.Fatalf("unexpected cli response: %+v", resp)
 	}
 	if runtime.request.Method != http.MethodPost || runtime.request.URL != "https://upstream.example/backend-api/codex/responses" || !runtime.request.ExpectStream {
 		t.Fatalf("unexpected codex runtime request: %+v", runtime.request)
 	}
 	if runtime.request.Headers.Get("Accept") != "text/event-stream" ||
+		runtime.request.Headers.Get("OpenAI-Beta") != "responses=experimental" ||
 		runtime.request.Headers.Get("Originator") != "codex_cli_rs" ||
+		runtime.request.Headers.Get("User-Agent") != "codex_cli_rs/0.125.0" ||
+		runtime.request.Headers.Get("Version") != "0.125.0" ||
+		runtime.request.Headers.Get("Session_id") != "srapi-codex-account-9" ||
 		runtime.request.Headers.Get("Authorization") != "" {
 		t.Fatalf("unexpected codex runtime headers before auth injection: %+v", runtime.request.Headers)
 	}
@@ -2370,6 +3123,102 @@ func TestReverseProxyCodexCLIAdapterPassesCliRuntimeContext(t *testing.T) {
 		*runtime.request.Account.UpstreamClient != "codex_cli" ||
 		runtime.request.Account.Credential["cli_client_token"] != "cli-token" {
 		t.Fatalf("expected cli runtime context, got %+v", runtime.request.Account)
+	}
+}
+
+func TestReverseProxyCodexCLIAdapterPreservesRawResponsesPayload(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body: []byte(
+				"data: {\"type\":\"response.output_text.delta\",\"delta\":\"raw response\"}\n\n" +
+					"data: [DONE]\n\n",
+			),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	rawPayload := []byte(`{
+		"model":"codex-local",
+		"input":[
+			{"role":"system","content":"raw system"},
+			{"role":"user","content":"raw user"}
+		],
+		"stream":false,
+		"store":true,
+		"service_tier":"fast",
+		"reasoning":{"effort":"high"},
+		"text":{"format":{"type":"text"},"verbosity":"low"},
+		"previous_response_id":"resp_prev",
+		"parallel_tool_calls":true,
+		"prompt_cache_key":"cache-123",
+		"temperature":0.2,
+		"max_output_tokens":64,
+		"metadata":{"tenant":"downstream"},
+		"stream_options":{"include_usage":true},
+		"user":"downstream-user"
+	}`)
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_raw_codex",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/responses",
+		Model:          "codex-local",
+		RawBody:        rawPayload,
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             16,
+			RuntimeClass:   accountcontract.RuntimeClassOauthRefresh,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": "https://upstream.example/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+		Credential: map[string]any{"access_token": "oauth-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke raw codex reverse proxy adapter: %v", err)
+	}
+	if conversationResponseText(resp) != "raw response" {
+		t.Fatalf("unexpected raw codex response: %+v", resp)
+	}
+	if runtime.request.Headers.Get("OpenAI-Beta") != "responses=experimental" ||
+		runtime.request.Headers.Get("User-Agent") != "codex_cli_rs/0.125.0" ||
+		runtime.request.Headers.Get("Session_id") != "srapi-codex-account-16" {
+		t.Fatalf("unexpected raw codex headers: %+v", runtime.request.Headers)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(runtime.request.Body, &payload); err != nil {
+		t.Fatalf("decode raw codex payload: %v", err)
+	}
+	if payload["model"] != "codex-upstream" || payload["stream"] != true || payload["store"] != false || payload["service_tier"] != "priority" {
+		t.Fatalf("unexpected raw codex payload defaults: %+v", payload)
+	}
+	if payload["instructions"] != "raw system" || payload["previous_response_id"] != "resp_prev" || payload["parallel_tool_calls"] != true || payload["prompt_cache_key"] != "cache-123" {
+		t.Fatalf("expected raw codex metadata to be preserved, got %+v", payload)
+	}
+	for _, removed := range []string{"temperature", "max_output_tokens", "metadata", "stream_options", "user"} {
+		if _, ok := payload[removed]; ok {
+			t.Fatalf("expected unsupported field %q to be removed from %+v", removed, payload)
+		}
+	}
+	reasoning, _ := payload["reasoning"].(map[string]any)
+	text, _ := payload["text"].(map[string]any)
+	if reasoning["effort"] != "high" || text["verbosity"] != "low" {
+		t.Fatalf("expected reasoning/text to be preserved, got reasoning=%+v text=%+v", reasoning, text)
+	}
+	input, ok := payload["input"].([]any)
+	if !ok || len(input) != 1 {
+		t.Fatalf("expected one normalized user input, got %+v", payload["input"])
+	}
+	item, _ := input[0].(map[string]any)
+	content, _ := item["content"].([]any)
+	part, _ := content[0].(map[string]any)
+	if item["role"] != "user" || item["type"] != "message" || part["type"] != "input_text" || part["text"] != "raw user" {
+		t.Fatalf("unexpected normalized raw input: %+v", item)
 	}
 }
 
@@ -2448,10 +3297,10 @@ func TestReverseProxyCodexCLIRejectsAPIKeyRuntime(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
-	_, err = svc.InvokeText(context.Background(), contract.TextRequest{
-		RequestID: "req_codex_api_key_runtime",
-		Model:     "codex-local",
-		Prompt:    "hello",
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_codex_api_key_runtime",
+		Model:      "codex-local",
+		InputParts: textParts("hello"),
 		Provider: providercontract.Provider{
 			AdapterType: "reverse-proxy-codex-cli",
 			Protocol:    "openai-compatible",
@@ -2610,10 +3459,10 @@ func TestReverseProxyAntigravityOpenAIAdapterDispatchesThroughRuntime(t *testing
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
-	resp, err := svc.InvokeText(context.Background(), contract.TextRequest{
-		RequestID: "req_antigravity_openai",
-		Model:     "antigravity-local",
-		Prompt:    "hello",
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_antigravity_openai",
+		Model:      "antigravity-local",
+		InputParts: textParts("hello"),
 		Provider: providercontract.Provider{
 			AdapterType: "reverse-proxy-antigravity",
 			Protocol:    "openai-compatible",
@@ -2630,7 +3479,7 @@ func TestReverseProxyAntigravityOpenAIAdapterDispatchesThroughRuntime(t *testing
 	if err != nil {
 		t.Fatalf("invoke antigravity openai adapter: %v", err)
 	}
-	if resp.Text != "antigravity openai response" || resp.Usage.InputTokens != 2 || resp.Usage.OutputTokens != 3 {
+	if conversationResponseText(resp) != "antigravity openai response" || resp.Usage.InputTokens != 2 || resp.Usage.OutputTokens != 3 {
 		t.Fatalf("unexpected antigravity openai response: %+v", resp)
 	}
 	if runtime.request.Method != http.MethodPost || runtime.request.URL != "https://antigravity.example/v1internal:generateContent" {
@@ -2698,10 +3547,10 @@ func TestReverseProxyAntigravityAnthropicAdapterDispatchesThroughRuntime(t *test
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
-	resp, err := svc.InvokeText(context.Background(), contract.TextRequest{
-		RequestID: "req_antigravity_anthropic",
-		Model:     "antigravity-claude-local",
-		Prompt:    "hello anthropic",
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_antigravity_anthropic",
+		Model:      "antigravity-claude-local",
+		InputParts: textParts("hello anthropic"),
 		Provider: providercontract.Provider{
 			AdapterType: "reverse-proxy-antigravity",
 			Protocol:    "anthropic-compatible",
@@ -2718,7 +3567,7 @@ func TestReverseProxyAntigravityAnthropicAdapterDispatchesThroughRuntime(t *test
 	if err != nil {
 		t.Fatalf("invoke antigravity anthropic adapter: %v", err)
 	}
-	if resp.Text != "antigravity anthropic response" || resp.Usage.InputTokens != 3 || resp.Usage.OutputTokens != 4 {
+	if conversationResponseText(resp) != "antigravity anthropic response" || resp.Usage.InputTokens != 3 || resp.Usage.OutputTokens != 4 {
 		t.Fatalf("unexpected antigravity anthropic response: %+v", resp)
 	}
 	if runtime.request.Method != http.MethodPost || runtime.request.URL != "https://antigravity.example/v1internal:generateContent" {
@@ -2770,10 +3619,10 @@ func TestReverseProxyAntigravityGeminiAdapterDispatchesThroughRuntime(t *testing
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
-	resp, err := svc.InvokeText(context.Background(), contract.TextRequest{
-		RequestID: "req_antigravity_gemini",
-		Model:     "antigravity-gemini-local",
-		Prompt:    "hello gemini",
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_antigravity_gemini",
+		Model:      "antigravity-gemini-local",
+		InputParts: textParts("hello gemini"),
 		Provider: providercontract.Provider{
 			AdapterType: "reverse-proxy-antigravity",
 			Protocol:    "gemini-compatible",
@@ -2790,7 +3639,7 @@ func TestReverseProxyAntigravityGeminiAdapterDispatchesThroughRuntime(t *testing
 	if err != nil {
 		t.Fatalf("invoke antigravity gemini adapter: %v", err)
 	}
-	if resp.Text != "antigravity gemini response" || resp.Usage.InputTokens != 4 || resp.Usage.OutputTokens != 5 {
+	if conversationResponseText(resp) != "antigravity gemini response" || resp.Usage.InputTokens != 4 || resp.Usage.OutputTokens != 5 {
 		t.Fatalf("unexpected antigravity gemini response: %+v", resp)
 	}
 	if runtime.request.Method != http.MethodPost || runtime.request.URL != "https://antigravity.example/v1internal:generateContent" {
@@ -2831,10 +3680,10 @@ func TestReverseProxyAntigravityCleansToolSchemas(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
-	_, err = svc.InvokeText(context.Background(), contract.TextRequest{
-		RequestID: "req_antigravity_schema",
-		Model:     "antigravity-local",
-		Prompt:    "hello",
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_antigravity_schema",
+		Model:      "antigravity-local",
+		InputParts: textParts("hello"),
 		Provider: providercontract.Provider{
 			AdapterType: "reverse-proxy-antigravity",
 			Protocol:    "openai-compatible",
@@ -2923,10 +3772,10 @@ func TestReverseProxyAntigravityRejectsAPIKeyRuntime(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
-	_, err = svc.InvokeText(context.Background(), contract.TextRequest{
-		RequestID: "req_antigravity_api_key_runtime",
-		Model:     "antigravity-local",
-		Prompt:    "hello",
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_antigravity_api_key_runtime",
+		Model:      "antigravity-local",
+		InputParts: textParts("hello"),
 		Provider: providercontract.Provider{
 			AdapterType: "reverse-proxy-antigravity",
 			Protocol:    "openai-compatible",
@@ -2962,11 +3811,11 @@ func TestReverseProxyAdapterStreamsThroughRuntime(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
-	resp, err := svc.InvokeText(context.Background(), contract.TextRequest{
-		RequestID: "req_reverse_stream",
-		Model:     "rp-local",
-		Prompt:    "hello",
-		Stream:    true,
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_reverse_stream",
+		Model:      "rp-local",
+		InputParts: textParts("hello"),
+		Stream:     true,
 		Provider: providercontract.Provider{
 			AdapterType: "reverse-proxy-openai-compatible",
 			Protocol:    "openai-compatible",
@@ -2997,7 +3846,7 @@ func TestReverseProxyAdapterStreamsThroughRuntime(t *testing.T) {
 	if !payload.Stream || payload.StreamOptions == nil || !payload.StreamOptions.IncludeUsage {
 		t.Fatalf("expected streaming runtime payload, got %+v", payload)
 	}
-	if resp.Text != "runtime stream" || resp.Usage.Estimated || resp.Usage.InputTokens != 4 || resp.Usage.OutputTokens != 5 {
+	if conversationResponseText(resp) != "runtime stream" || resp.Usage.Estimated || resp.Usage.InputTokens != 4 || resp.Usage.OutputTokens != 5 {
 		t.Fatalf("unexpected reverse proxy stream response: %+v", resp)
 	}
 }
@@ -3013,10 +3862,10 @@ func TestGenericReverseProxyAdapterDispatchesCustomRuntimeThroughRuntime(t *test
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
-	resp, err := svc.InvokeText(context.Background(), contract.TextRequest{
-		RequestID: "req_generic_runtime",
-		Model:     "generic-local",
-		Prompt:    "hello runtime",
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_generic_runtime",
+		Model:      "generic-local",
+		InputParts: textParts("hello runtime"),
 		Provider: providercontract.Provider{
 			AdapterType: "generic-reverse-proxy",
 			Protocol:    "openai-compatible",
@@ -3039,7 +3888,7 @@ func TestGenericReverseProxyAdapterDispatchesCustomRuntimeThroughRuntime(t *test
 	if err != nil {
 		t.Fatalf("invoke generic runtime adapter: %v", err)
 	}
-	if resp.Text != "runtime generic response" || resp.Usage.InputTokens != 2 || resp.Usage.OutputTokens != 3 {
+	if conversationResponseText(resp) != "runtime generic response" || resp.Usage.InputTokens != 2 || resp.Usage.OutputTokens != 3 {
 		t.Fatalf("unexpected generic runtime response: %+v", resp)
 	}
 	if runtime.request.Method != http.MethodPost || runtime.request.URL != "https://generic.example/api/chat" {
@@ -3072,7 +3921,7 @@ func TestReverseProxyAdapterMapsRuntimeErrors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
-	_, err = svc.InvokeText(context.Background(), contract.TextRequest{
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
 		RequestID: "req_reverse_error",
 		Model:     "rp-local",
 		Provider: providercontract.Provider{
@@ -3105,7 +3954,7 @@ func TestReverseProxyAdapterNormalizesLegacyUpstreamError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
-	_, err = svc.InvokeText(context.Background(), contract.TextRequest{
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
 		RequestID: "req_reverse_legacy",
 		Model:     "rp-local",
 		Provider: providercontract.Provider{
