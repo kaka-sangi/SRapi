@@ -1882,6 +1882,24 @@ func parseAnthropicCompatibleStream(body []byte, statusCode int) (contract.Conve
 				if strings.TrimSpace(block.Type) == "" {
 					block.Type = "text"
 				}
+				if strings.EqualFold(strings.TrimSpace(block.Type), "tool_use") || strings.EqualFold(strings.TrimSpace(block.Type), "server_tool_use") {
+					streamEvents = append(streamEvents, contract.ConversationStreamEvent{
+						Index:        eventIndex,
+						Type:         contract.ConversationStreamEventToolCallDelta,
+						ContentIndex: index,
+						Delta: contract.ContentPart{
+							Kind:           contract.ContentPartToolUse,
+							ToolCallID:     strings.TrimSpace(block.ID),
+							ToolName:       strings.TrimSpace(block.Name),
+							Metadata:       map[string]any{"type": strings.TrimSpace(block.Type)},
+							OriginProtocol: "anthropic-compatible",
+						},
+						RawEventType:   strings.TrimSpace(chunk.Type),
+						Raw:            append(json.RawMessage(nil), data...),
+						OriginProtocol: "anthropic-compatible",
+					})
+					eventIndex++
+				}
 				if strings.TrimSpace(chunk.ContentBlock.Text) != "" {
 					builder.WriteString(chunk.ContentBlock.Text)
 					streamEvents = append(streamEvents, contract.ConversationStreamEvent{

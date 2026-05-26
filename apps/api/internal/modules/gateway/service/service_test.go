@@ -433,6 +433,106 @@ func TestRenderCanonicalStreamEventsPreservesTextDeltas(t *testing.T) {
 	}
 }
 
+func TestRenderCanonicalStreamEventsPreservesToolCallDeltas(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	resp := gatewaycontract.CanonicalResponse{
+		ID:         "resp_tool_delta_stream",
+		Model:      "gpt-4o-mini",
+		StopReason: "tool_use",
+		OutputItems: []gatewaycontract.ContentBlock{{
+			Type:              gatewaycontract.ContentBlockToolCall,
+			Role:              "assistant",
+			ToolCallID:        "call_1",
+			ToolName:          "lookup",
+			ToolArgumentsJSON: `{"query":"weather"}`,
+		}},
+		StreamEvents: []gatewaycontract.StreamEvent{
+			{
+				Index:        0,
+				Type:         gatewaycontract.StreamEventToolCallDelta,
+				ContentIndex: 0,
+				Delta: gatewaycontract.ContentBlock{
+					Type:              gatewaycontract.ContentBlockToolCall,
+					Role:              "assistant",
+					ToolCallID:        "call_1",
+					ToolName:          "lookup",
+					ToolArgumentsJSON: `{"query":`,
+				},
+				OriginProtocol: "openai-compatible",
+			},
+			{
+				Index:        1,
+				Type:         gatewaycontract.StreamEventToolCallDelta,
+				ContentIndex: 0,
+				Delta: gatewaycontract.ContentBlock{
+					Type:              gatewaycontract.ContentBlockToolCall,
+					Role:              "assistant",
+					ToolArgumentsJSON: `"weather"}`,
+				},
+				OriginProtocol: "openai-compatible",
+			},
+			{
+				Index:      2,
+				Type:       gatewaycontract.StreamEventStop,
+				StopReason: "tool_use",
+			},
+		},
+		Usage: gatewaycontract.Usage{InputTokens: 3, OutputTokens: 1},
+	}
+
+	chatChunks := svc.RenderChatStreamChunks(resp)
+	if len(chatChunks) != 3 {
+		t.Fatalf("expected two tool chunks plus stop, got %+v", chatChunks)
+	}
+	firstTool := chatStreamToolDelta(t, chatChunks[0])
+	secondTool := chatStreamToolDelta(t, chatChunks[1])
+	firstFunction, _ := firstTool["function"].(map[string]any)
+	secondFunction, _ := secondTool["function"].(map[string]any)
+	if firstTool["id"] != "call_1" || firstFunction["name"] != "lookup" || firstFunction["arguments"] != `{"query":` {
+		t.Fatalf("expected first chat tool delta, got %+v", firstTool)
+	}
+	if secondFunction["arguments"] != `"weather"}` {
+		t.Fatalf("expected second chat tool arguments delta, got %+v", secondTool)
+	}
+
+	responsesEvents := svc.RenderResponsesStreamEvents(resp)
+	responsesDeltas := streamEventsByName(responsesEvents, "response.function_call_arguments.delta")
+	if len(responsesDeltas) != 2 || responsesDeltas[0].Data["delta"] != `{"query":` || responsesDeltas[1].Data["delta"] != `"weather"}` {
+		t.Fatalf("expected preserved responses tool argument deltas, got %+v", responsesDeltas)
+	}
+	responsesDone := streamEventByName(responsesEvents, "response.function_call_arguments.done")
+	if responsesDone == nil || responsesDone.Data["arguments"] != `{"query":"weather"}` {
+		t.Fatalf("expected completed responses arguments, got %+v", responsesEvents)
+	}
+
+	anthropicEvents := svc.RenderAnthropicMessagesStreamEvents(resp)
+	blockStart := streamEventByName(anthropicEvents, "content_block_start")
+	if blockStart == nil {
+		t.Fatalf("expected anthropic tool block start, got %+v", anthropicEvents)
+	}
+	contentBlock, _ := blockStart.Data["content_block"].(map[string]any)
+	if contentBlock["type"] != "tool_use" || contentBlock["id"] != "call_1" || contentBlock["name"] != "lookup" {
+		t.Fatalf("expected anthropic tool block identity, got %+v", contentBlock)
+	}
+	anthropicDeltas := streamEventsByName(anthropicEvents, "content_block_delta")
+	if len(anthropicDeltas) != 2 {
+		t.Fatalf("expected anthropic tool argument deltas, got %+v", anthropicEvents)
+	}
+	firstAnthropicDelta, _ := anthropicDeltas[0].Data["delta"].(map[string]any)
+	secondAnthropicDelta, _ := anthropicDeltas[1].Data["delta"].(map[string]any)
+	if firstAnthropicDelta["partial_json"] != `{"query":` || secondAnthropicDelta["partial_json"] != `"weather"}` {
+		t.Fatalf("expected preserved anthropic partial json deltas, got %+v and %+v", firstAnthropicDelta, secondAnthropicDelta)
+	}
+
+	geminiEvents := svc.RenderGeminiGenerateContentStreamEvents(resp)
+	if len(geminiEvents) != 1 || len(geminiEvents[0].Data) == 0 {
+		t.Fatalf("expected Gemini to fall back to final render for invalid partial JSON, got %+v", geminiEvents)
+	}
+}
+
 func streamEventByName(events []StreamEvent, name string) *StreamEvent {
 	for idx := range events {
 		if events[idx].Event == name {
@@ -450,6 +550,20 @@ func streamEventsByName(events []StreamEvent, name string) []StreamEvent {
 		}
 	}
 	return out
+}
+
+func chatStreamToolDelta(t *testing.T, chunk map[string]any) map[string]any {
+	t.Helper()
+	choices, _ := chunk["choices"].([]map[string]any)
+	if len(choices) != 1 {
+		t.Fatalf("expected one chat choice, got %+v", chunk)
+	}
+	delta, _ := choices[0]["delta"].(map[string]any)
+	toolCalls, _ := delta["tool_calls"].([]map[string]any)
+	if len(toolCalls) != 1 {
+		t.Fatalf("expected one tool call delta, got %+v", delta)
+	}
+	return toolCalls[0]
 }
 
 func chatStreamContentDelta(t *testing.T, chunk map[string]any) string {

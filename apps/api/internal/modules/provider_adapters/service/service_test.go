@@ -2336,6 +2336,67 @@ func TestAnthropicCompatibleAdapterStreamsUpstream(t *testing.T) {
 	}
 }
 
+func TestAnthropicCompatibleAdapterStreamsToolUseEvents(t *testing.T) {
+	rawSSE := "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":5,\"output_tokens\":0}}}\n\n" +
+		"event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"tool_use\",\"id\":\"toolu_1\",\"name\":\"lookup\",\"input\":{}}}\n\n" +
+		"event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"query\\\":\"}}\n\n" +
+		"event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"\\\"weather\\\"}\"}}\n\n" +
+		"event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"tool_use\"},\"usage\":{\"output_tokens\":2}}\n\n" +
+		"event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/messages" {
+			t.Fatalf("unexpected upstream path %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte(rawSSE))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_anthropic_tool_stream",
+		Model:      "claude-local",
+		InputParts: textParts("call lookup"),
+		Stream:     true,
+		Provider: providercontract.Provider{
+			ID:          2,
+			AdapterType: "anthropic-compatible",
+			Protocol:    "anthropic-compatible",
+		},
+		Account:    accountcontract.ProviderAccount{ID: 2, Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "claude-upstream"},
+		Credential: map[string]any{"api_key": "anthropic-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke anthropic tool stream upstream: %v", err)
+	}
+	if len(resp.Parts) != 1 || resp.StopReason != contract.StopReasonToolUse || resp.Usage.OutputTokens != 2 {
+		t.Fatalf("unexpected anthropic tool stream response: %+v", resp)
+	}
+	assertToolUsePart(t, resp.Parts[0], "toolu_1", "lookup", `{"query":"weather"}`)
+	if len(resp.StreamEvents) < 5 {
+		t.Fatalf("expected Anthropic tool stream events, got %+v", resp.StreamEvents)
+	}
+	start := resp.StreamEvents[1]
+	if start.Type != contract.ConversationStreamEventToolCallDelta || start.Delta.ToolCallID != "toolu_1" || start.Delta.ToolName != "lookup" || start.Delta.ToolArgumentsJSON != "" {
+		t.Fatalf("expected Anthropic tool start event, got %+v", start)
+	}
+	firstDelta := resp.StreamEvents[2]
+	secondDelta := resp.StreamEvents[3]
+	if firstDelta.Type != contract.ConversationStreamEventToolCallDelta || firstDelta.Delta.ToolArgumentsJSON != `{"query":` {
+		t.Fatalf("expected first Anthropic tool delta, got %+v", firstDelta)
+	}
+	if secondDelta.Type != contract.ConversationStreamEventToolCallDelta || secondDelta.Delta.ToolArgumentsJSON != `"weather"}` {
+		t.Fatalf("expected second Anthropic tool delta, got %+v", secondDelta)
+	}
+	if resp.StreamEvents[len(resp.StreamEvents)-1].Type != contract.ConversationStreamEventStop {
+		t.Fatalf("expected Anthropic terminal stop stream event, got %+v", resp.StreamEvents)
+	}
+}
+
 func TestAnthropicCompatibleAdapterClassifiesRateLimitErrorObject(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

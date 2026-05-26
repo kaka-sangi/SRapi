@@ -964,10 +964,9 @@ func chatStreamToolCallDelta(event gatewaycontract.StreamEvent) map[string]any {
 
 func (s *Service) renderResponsesCanonicalStreamEvents(resp gatewaycontract.CanonicalResponse) []StreamEvent {
 	events := normalizeStreamEvents(resp.StreamEvents)
-	if !streamEventsHaveTextDelta(events) {
+	if !streamEventsHaveRenderableOutput(events) {
 		return nil
 	}
-	itemID := "msg_0"
 	out := []StreamEvent{
 		{
 			Event: "response.created",
@@ -982,11 +981,128 @@ func (s *Service) renderResponsesCanonicalStreamEvents(resp gatewaycontract.Cano
 				},
 			},
 		},
+	}
+	nextOutputIndex := 0
+	textOutputIndex := -1
+	textItemID := ""
+	var text strings.Builder
+	toolStates := newStreamToolCallStates(resp.OutputItems)
+	for _, event := range events {
+		switch event.Type {
+		case gatewaycontract.StreamEventContentDelta, gatewaycontract.StreamEventReasoning, gatewaycontract.StreamEventToolResult:
+			delta := event.Delta.Text
+			if delta == "" {
+				continue
+			}
+			if textOutputIndex < 0 {
+				textOutputIndex = nextOutputIndex
+				nextOutputIndex++
+				textItemID = fmt.Sprintf("msg_%d", textOutputIndex)
+				out = append(out, responseStreamTextStartEvents(textItemID, textOutputIndex)...)
+			}
+			text.WriteString(delta)
+			out = append(out, StreamEvent{
+				Event: "response.output_text.delta",
+				Data: map[string]any{
+					"type":          "response.output_text.delta",
+					"item_id":       textItemID,
+					"output_index":  textOutputIndex,
+					"content_index": 0,
+					"delta":         delta,
+				},
+			})
+		case gatewaycontract.StreamEventToolCallDelta:
+			state := toolStates.stateFor(event)
+			if state.OutputIndex < 0 {
+				state.OutputIndex = nextOutputIndex
+				nextOutputIndex++
+				out = append(out, responseStreamToolCallStartEvent(state))
+			}
+			if delta := event.Delta.ToolArgumentsJSON; delta != "" {
+				state.Arguments.WriteString(delta)
+				out = append(out, StreamEvent{
+					Event: "response.function_call_arguments.delta",
+					Data: map[string]any{
+						"type":         "response.function_call_arguments.delta",
+						"item_id":      state.ItemID,
+						"output_index": state.OutputIndex,
+						"delta":        delta,
+					},
+				})
+			}
+		}
+	}
+	if textOutputIndex >= 0 {
+		out = append(out,
+			StreamEvent{
+				Event: "response.output_text.done",
+				Data: map[string]any{
+					"type":          "response.output_text.done",
+					"item_id":       textItemID,
+					"output_index":  textOutputIndex,
+					"content_index": 0,
+					"text":          text.String(),
+				},
+			},
+			StreamEvent{
+				Event: "response.output_item.done",
+				Data: map[string]any{
+					"type":         "response.output_item.done",
+					"output_index": textOutputIndex,
+					"item": map[string]any{
+						"id":      textItemID,
+						"type":    "message",
+						"role":    "assistant",
+						"content": []map[string]any{{"type": "output_text", "text": text.String()}},
+					},
+				},
+			},
+		)
+	}
+	for _, state := range toolStates.openStates() {
+		arguments := state.Arguments.String()
+		if arguments == "" {
+			arguments = state.Block.ToolArgumentsJSON
+		}
+		out = append(out,
+			StreamEvent{
+				Event: "response.function_call_arguments.done",
+				Data: map[string]any{
+					"type":         "response.function_call_arguments.done",
+					"item_id":      state.ItemID,
+					"output_index": state.OutputIndex,
+					"arguments":    arguments,
+				},
+			},
+			StreamEvent{
+				Event: "response.output_item.done",
+				Data: map[string]any{
+					"type":         "response.output_item.done",
+					"output_index": state.OutputIndex,
+					"item":         responseStreamFunctionCallItem(state.ItemID, state.completedBlock(arguments)),
+				},
+			},
+		)
+	}
+	out = append(out,
+		StreamEvent{
+			Event: "response.completed",
+			Data: map[string]any{
+				"type":     "response.completed",
+				"response": s.RenderResponses(resp),
+			},
+		},
+	)
+	return out
+}
+
+func responseStreamTextStartEvents(itemID string, outputIndex int) []StreamEvent {
+	return []StreamEvent{
 		{
 			Event: "response.output_item.added",
 			Data: map[string]any{
 				"type":         "response.output_item.added",
-				"output_index": 0,
+				"output_index": outputIndex,
 				"item": map[string]any{
 					"id":      itemID,
 					"type":    "message",
@@ -1000,7 +1116,7 @@ func (s *Service) renderResponsesCanonicalStreamEvents(resp gatewaycontract.Cano
 			Data: map[string]any{
 				"type":          "response.content_part.added",
 				"item_id":       itemID,
-				"output_index":  0,
+				"output_index":  outputIndex,
 				"content_index": 0,
 				"part": map[string]any{
 					"type": "output_text",
@@ -1009,47 +1125,173 @@ func (s *Service) renderResponsesCanonicalStreamEvents(resp gatewaycontract.Cano
 			},
 		},
 	}
-	var text strings.Builder
+}
+
+func responseStreamToolCallStartEvent(state *streamToolCallState) StreamEvent {
+	return StreamEvent{
+		Event: "response.output_item.added",
+		Data: map[string]any{
+			"type":         "response.output_item.added",
+			"output_index": state.OutputIndex,
+			"item":         responseStreamFunctionCallStartItem(state),
+		},
+	}
+}
+
+func responseStreamFunctionCallStartItem(state *streamToolCallState) map[string]any {
+	item := outputBlockProperties(state.startBlock())
+	item["id"] = state.ItemID
+	item["type"] = "function_call"
+	item["status"] = "in_progress"
+	setStringProperty(item, "call_id", state.Block.ToolCallID)
+	setStringProperty(item, "name", state.Block.ToolName)
+	return item
+}
+
+type streamToolCallStates struct {
+	byContentIndex map[int]*streamToolCallState
+	order          []*streamToolCallState
+}
+
+type streamToolCallState struct {
+	ContentIndex int
+	OutputIndex  int
+	ItemID       string
+	Block        gatewaycontract.ContentBlock
+	Arguments    strings.Builder
+}
+
+func newStreamToolCallStates(blocks []gatewaycontract.ContentBlock) *streamToolCallStates {
+	states := &streamToolCallStates{
+		byContentIndex: map[int]*streamToolCallState{},
+		order:          make([]*streamToolCallState, 0),
+	}
+	toolIndex := 0
+	for blockIndex, block := range normalizeOutputItems(blocks) {
+		if block.Type != gatewaycontract.ContentBlockToolCall {
+			continue
+		}
+		state := &streamToolCallState{
+			ContentIndex: toolIndex,
+			OutputIndex:  -1,
+			ItemID:       responseStreamItemID(toolIndex, block),
+			Block:        block,
+		}
+		states.byContentIndex[blockIndex] = state
+		states.order = append(states.order, state)
+		toolIndex++
+	}
+	return states
+}
+
+func (s *streamToolCallStates) stateFor(event gatewaycontract.StreamEvent) *streamToolCallState {
+	if strings.Contains(strings.ToLower(event.OriginProtocol), "openai") && event.ContentIndex >= 0 && event.ContentIndex < len(s.order) {
+		state := s.order[event.ContentIndex]
+		state.mergeDelta(event.Delta)
+		return state
+	}
+	if state := s.byContentIndex[event.ContentIndex]; state != nil {
+		state.mergeDelta(event.Delta)
+		return state
+	}
+	if event.ContentIndex >= 0 && event.ContentIndex < len(s.order) {
+		state := s.order[event.ContentIndex]
+		state.mergeDelta(event.Delta)
+		return state
+	}
+	block := event.Delta
+	block.Type = gatewaycontract.ContentBlockToolCall
+	state := &streamToolCallState{
+		ContentIndex: event.ContentIndex,
+		OutputIndex:  -1,
+		ItemID:       responseStreamItemID(len(s.order), block),
+		Block:        block,
+	}
+	if strings.TrimSpace(state.ItemID) == "" {
+		state.ItemID = fmt.Sprintf("fc_%d", len(s.order))
+	}
+	state.mergeDelta(event.Delta)
+	s.byContentIndex[event.ContentIndex] = state
+	s.order = append(s.order, state)
+	return state
+}
+
+func (s *streamToolCallStates) openStates() []*streamToolCallState {
+	out := make([]*streamToolCallState, 0, len(s.order))
+	for _, state := range s.order {
+		if state.OutputIndex >= 0 {
+			out = append(out, state)
+		}
+	}
+	return out
+}
+
+func (s *streamToolCallState) mergeDelta(delta gatewaycontract.ContentBlock) {
+	if id := strings.TrimSpace(delta.ToolCallID); id != "" {
+		s.Block.ToolCallID = id
+		s.ItemID = id
+	}
+	if name := strings.TrimSpace(delta.ToolName); name != "" {
+		s.Block.ToolName = name
+	}
+	if len(delta.Metadata) > 0 {
+		if s.Block.Metadata == nil {
+			s.Block.Metadata = map[string]any{}
+		}
+		for key, value := range delta.Metadata {
+			s.Block.Metadata[key] = value
+		}
+	}
+}
+
+func (s *streamToolCallState) startBlock() gatewaycontract.ContentBlock {
+	block := s.Block
+	block.Type = gatewaycontract.ContentBlockToolCall
+	block.ToolArgumentsJSON = ""
+	return block
+}
+
+func (s *streamToolCallState) completedBlock(arguments string) gatewaycontract.ContentBlock {
+	block := s.Block
+	block.Type = gatewaycontract.ContentBlockToolCall
+	block.ToolArgumentsJSON = arguments
+	return block
+}
+
+func streamEventsHaveRenderableOutput(events []gatewaycontract.StreamEvent) bool {
 	for _, event := range events {
 		switch event.Type {
 		case gatewaycontract.StreamEventContentDelta, gatewaycontract.StreamEventReasoning, gatewaycontract.StreamEventToolResult:
-			delta := event.Delta.Text
-			if delta == "" {
-				continue
+			if event.Delta.Text != "" {
+				return true
 			}
-			text.WriteString(delta)
-			out = append(out, StreamEvent{
-				Event: "response.output_text.delta",
-				Data: map[string]any{
-					"type":          "response.output_text.delta",
-					"item_id":       itemID,
-					"output_index":  0,
-					"content_index": 0,
-					"delta":         delta,
-				},
-			})
+		case gatewaycontract.StreamEventToolCallDelta:
+			if event.Delta.ToolCallID != "" || event.Delta.ToolName != "" || event.Delta.ToolArgumentsJSON != "" {
+				return true
+			}
 		}
 	}
-	out = append(out,
-		StreamEvent{
-			Event: "response.output_text.done",
-			Data: map[string]any{
-				"type":          "response.output_text.done",
-				"item_id":       itemID,
-				"output_index":  0,
-				"content_index": 0,
-				"text":          text.String(),
-			},
-		},
-		StreamEvent{
-			Event: "response.completed",
-			Data: map[string]any{
-				"type":     "response.completed",
-				"response": s.RenderResponses(resp),
-			},
-		},
-	)
-	return out
+	return false
+}
+
+func streamEventsCanRenderGemini(events []gatewaycontract.StreamEvent) bool {
+	renderable := false
+	for _, event := range events {
+		switch event.Type {
+		case gatewaycontract.StreamEventContentDelta, gatewaycontract.StreamEventReasoning, gatewaycontract.StreamEventToolResult:
+			if event.Delta.Text != "" {
+				renderable = true
+			}
+		case gatewaycontract.StreamEventToolCallDelta:
+			if event.Delta.ToolArgumentsJSON != "" && len(parseJSONObject(event.Delta.ToolArgumentsJSON)) == 0 {
+				return false
+			}
+			if event.Delta.ToolCallID != "" || event.Delta.ToolName != "" || event.Delta.ToolArgumentsJSON != "" {
+				renderable = true
+			}
+		}
+	}
+	return renderable
 }
 
 func (s *Service) RenderResponsesStreamEvents(resp gatewaycontract.CanonicalResponse) []StreamEvent {
@@ -1170,7 +1412,7 @@ func (s *Service) RenderAnthropicMessagesStreamEvents(resp gatewaycontract.Canon
 
 func (s *Service) renderAnthropicCanonicalStreamEvents(resp gatewaycontract.CanonicalResponse) []StreamEvent {
 	events := normalizeStreamEvents(resp.StreamEvents)
-	if !streamEventsHaveTextDelta(events) {
+	if !streamEventsHaveRenderableOutput(events) {
 		return nil
 	}
 	out := []StreamEvent{{
@@ -1194,11 +1436,17 @@ func (s *Service) renderAnthropicCanonicalStreamEvents(resp gatewaycontract.Cano
 	}}
 	openBlocks := map[int]bool{}
 	openBlockOrder := make([]int, 0)
+	toolStates := newStreamToolCallStates(resp.OutputItems)
 	var pendingUsage *gatewaycontract.Usage
 	pendingStopReason := ""
 	for _, event := range events {
 		switch event.Type {
 		case gatewaycontract.StreamEventContentDelta, gatewaycontract.StreamEventReasoning, gatewaycontract.StreamEventToolCallDelta, gatewaycontract.StreamEventToolResult:
+			startBlock := anthropicStreamEventStartBlock(event)
+			if event.Type == gatewaycontract.StreamEventToolCallDelta {
+				state := toolStates.stateFor(event)
+				startBlock = state.startBlock()
+			}
 			if !openBlocks[event.ContentIndex] {
 				openBlocks[event.ContentIndex] = true
 				openBlockOrder = append(openBlockOrder, event.ContentIndex)
@@ -1207,7 +1455,7 @@ func (s *Service) renderAnthropicCanonicalStreamEvents(resp gatewaycontract.Cano
 					Data: map[string]any{
 						"type":          "content_block_start",
 						"index":         event.ContentIndex,
-						"content_block": anthropicStreamContentBlock(anthropicStreamEventStartBlock(event)),
+						"content_block": anthropicStreamContentBlock(startBlock),
 					},
 				})
 			}
@@ -1328,7 +1576,7 @@ func (s *Service) RenderGeminiGenerateContentStreamEvents(resp gatewaycontract.C
 
 func (s *Service) renderGeminiCanonicalStreamEvents(resp gatewaycontract.CanonicalResponse) []StreamEvent {
 	events := normalizeStreamEvents(resp.StreamEvents)
-	if !streamEventsHaveTextDelta(events) {
+	if !streamEventsCanRenderGemini(events) {
 		return nil
 	}
 	out := make([]StreamEvent, 0, len(events))
@@ -1395,18 +1643,6 @@ func outputGeminiStreamPart(block gatewaycontract.ContentBlock) (apiopenapi.Gemi
 		part.Text = &text
 	}
 	return part, true
-}
-
-func streamEventsHaveTextDelta(events []gatewaycontract.StreamEvent) bool {
-	for _, event := range events {
-		switch event.Type {
-		case gatewaycontract.StreamEventContentDelta, gatewaycontract.StreamEventReasoning, gatewaycontract.StreamEventToolResult:
-			if event.Delta.Text != "" {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 func CapabilityDescriptors(req gatewaycontract.CanonicalRequest) []capabilitiescontract.Descriptor {
