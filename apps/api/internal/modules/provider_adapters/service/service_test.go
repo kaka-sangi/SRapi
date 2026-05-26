@@ -3461,6 +3461,97 @@ func TestReverseProxyCodexCLIAdapterPreservesResponsesFunctionCallInputs(t *test
 	}
 }
 
+func TestReverseProxyCodexCLIAdapterPreservesResponsesContextInputItems(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/backend-api/codex/responses" {
+			t.Fatalf("unexpected codex upstream path %s", r.URL.Path)
+		}
+		var payload struct {
+			Input []map[string]any `json:"input"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode codex payload: %v", err)
+		}
+		if len(payload.Input) != 3 {
+			t.Fatalf("expected reasoning, item_reference, and message items, got %+v", payload.Input)
+		}
+		if payload.Input[0]["type"] != "reasoning" ||
+			payload.Input[0]["id"] != "rs_1" ||
+			payload.Input[0]["encrypted_content"] != "gAAA" {
+			t.Fatalf("expected raw reasoning item, got %+v", payload.Input[0])
+		}
+		if payload.Input[1]["type"] != "item_reference" ||
+			payload.Input[1]["id"] != "fc_1" {
+			t.Fatalf("expected raw item_reference item, got %+v", payload.Input[1])
+		}
+		content, _ := payload.Input[2]["content"].([]any)
+		part, _ := content[0].(map[string]any)
+		if payload.Input[2]["type"] != "message" ||
+			payload.Input[2]["role"] != "user" ||
+			part["type"] != "input_text" ||
+			part["text"] != "continue" {
+			t.Fatalf("expected user message item, got %+v", payload.Input[2])
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: {\"type\":\"response.output_text.delta\",\"delta\":\"ok\"}\n\ndata: [DONE]\n\n"))
+	}))
+	defer upstream.Close()
+
+	runtime, err := reverseproxyservice.New(nil)
+	if err != nil {
+		t.Fatalf("create reverse proxy runtime: %v", err)
+	}
+	svc, err := service.NewWithReverseProxy(nil, runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_codex_context_input_items",
+		Model:          "codex-local",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/responses",
+		Messages: []contract.ConversationMessage{{
+			Role: "assistant",
+			Parts: []contract.ContentPart{
+				{
+					Kind:           contract.ContentPartMetadata,
+					Metadata:       map[string]any{"responses_item_type": "reasoning"},
+					Raw:            json.RawMessage(`{"type":"reasoning","id":"rs_1","encrypted_content":"gAAA"}`),
+					OriginProtocol: "openai-compatible",
+				},
+				{
+					Kind:           contract.ContentPartMetadata,
+					Metadata:       map[string]any{"responses_item_type": "item_reference"},
+					Raw:            json.RawMessage(`{"type":"item_reference","id":"fc_1"}`),
+					OriginProtocol: "openai-compatible",
+				},
+			},
+		}, {
+			Role:  "user",
+			Parts: textParts("continue"),
+		}},
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": upstream.URL + "/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+		Credential: map[string]any{"cli_client_token": "codex-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke codex upstream: %v", err)
+	}
+	if conversationResponseText(resp) != "ok" {
+		t.Fatalf("unexpected codex response: %+v", resp)
+	}
+}
+
 func TestReverseProxyCodexCLIAdapterStreamsMultilineSSEData(t *testing.T) {
 	rawSSE := "data: {\"type\":\"response.output_text.delta\",\n" +
 		"data: \"delta\":\"codex\"}\n\n" +

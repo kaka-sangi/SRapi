@@ -32,6 +32,15 @@ type codexResponsesInputItem struct {
 	Name    string                       `json:"name,omitempty"`
 	Args    string                       `json:"arguments,omitempty"`
 	Output  string                       `json:"output,omitempty"`
+	Raw     map[string]any               `json:"-"`
+}
+
+func (item codexResponsesInputItem) MarshalJSON() ([]byte, error) {
+	if len(item.Raw) > 0 {
+		return json.Marshal(item.Raw)
+	}
+	type alias codexResponsesInputItem
+	return json.Marshal(alias(item))
 }
 
 type codexResponsesInputContent struct {
@@ -474,6 +483,13 @@ func codexResponsesInputItemsFromMessage(role string, parts []contract.ContentPa
 				CallID: callID,
 				Output: strings.TrimSpace(part.Text),
 			})
+		case contract.ContentPartMetadata:
+			item, ok := codexResponsesRawInputItem(part)
+			if !ok {
+				continue
+			}
+			flushMessage()
+			out = append(out, item)
 		default:
 			if content, ok := codexResponsesInputContentFromPart(role, part); ok {
 				messageContent = append(messageContent, content)
@@ -497,6 +513,25 @@ func codexResponsesFunctionCallItem(part contract.ContentPart) (codexResponsesIn
 		Name:   name,
 		Args:   arguments,
 	}, true
+}
+
+func codexResponsesRawInputItem(part contract.ContentPart) (codexResponsesInputItem, bool) {
+	if part.OriginProtocol != "openai-compatible" && part.OriginProtocol != "openai" {
+		return codexResponsesInputItem{}, false
+	}
+	var item map[string]any
+	if len(part.Raw) > 0 {
+		if err := json.Unmarshal(part.Raw, &item); err != nil {
+			return codexResponsesInputItem{}, false
+		}
+	} else {
+		item = cloneMap(part.Metadata)
+	}
+	itemType := strings.TrimSpace(codexStringValue(item["type"]))
+	if itemType == "" || itemType == "message" || itemType == "function_call" || itemType == "function_call_output" {
+		return codexResponsesInputItem{}, false
+	}
+	return codexResponsesInputItem{Raw: item}, true
 }
 
 func codexResponsesInputContentFromPart(role string, part contract.ContentPart) (codexResponsesInputContent, bool) {

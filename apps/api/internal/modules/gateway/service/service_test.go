@@ -175,6 +175,56 @@ func TestNormalizeResponsesPreservesRawFunctionItems(t *testing.T) {
 	}
 }
 
+func TestNormalizeResponsesPreservesRawContextItems(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	input := apiopenapi.ResponsesRequest_Input{}
+	if err := input.FromResponsesRequestInput1(nil); err != nil {
+		t.Fatalf("set empty input: %v", err)
+	}
+	req := apiopenapi.ResponsesRequest{
+		Model: "gpt-5.4",
+		Input: input,
+	}
+	rawBody := []byte(`{
+		"input":[
+			{"type":"reasoning","id":"rs_1","encrypted_content":"gAAA","summary":[{"type":"summary_text","text":"kept"}]},
+			{"type":"item_reference","id":"fc_1"},
+			{"type":"message","role":"user","content":[{"type":"input_text","text":"continue"}]}
+		]
+	}`)
+
+	canonical := svc.NormalizeResponses(req, RequestMeta{SourceEndpoint: "/v1/responses", RawBody: rawBody})
+
+	if len(canonical.InputItems) != 3 {
+		t.Fatalf("expected reasoning, item_reference, and message input items, got %+v", canonical.InputItems)
+	}
+	reasoning := canonical.InputItems[0]
+	if reasoning.Type != gatewaycontract.ContentBlockMetadata ||
+		reasoning.Role != "assistant" ||
+		reasoning.OriginProtocol != string(gatewaycontract.ProtocolOpenAICompatible) ||
+		reasoning.Metadata["responses_item_type"] != "reasoning" ||
+		string(reasoning.Raw) == "" {
+		t.Fatalf("expected raw reasoning item metadata, got %+v", reasoning)
+	}
+	reference := canonical.InputItems[1]
+	if reference.Type != gatewaycontract.ContentBlockMetadata ||
+		reference.Metadata["responses_item_type"] != "item_reference" ||
+		string(reference.Raw) == "" {
+		t.Fatalf("expected raw item_reference metadata, got %+v", reference)
+	}
+	if canonical.InputItems[2].Type != gatewaycontract.ContentBlockText ||
+		canonical.InputItems[2].Role != "user" ||
+		canonical.InputItems[2].Text != "continue" {
+		t.Fatalf("unexpected message item: %+v", canonical.InputItems[2])
+	}
+	if canonical.Prompt != "continue" {
+		t.Fatalf("unexpected prompt: %q", canonical.Prompt)
+	}
+}
+
 func TestNormalizeRealtimeWebSocketRequiresRealtimeCapability(t *testing.T) {
 	svc, err := New()
 	if err != nil {

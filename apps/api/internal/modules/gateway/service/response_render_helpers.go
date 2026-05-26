@@ -733,6 +733,13 @@ func rawResponsesInputObject(value map[string]any, defaultRole string) ([]gatewa
 			}
 			return []gatewaycontract.ContentBlock{block}, nil, nil
 		}
+	case "message":
+	default:
+		if rawType != "" {
+			if block, ok := rawResponsesContextBlock(value, role, rawType); ok {
+				return []gatewaycontract.ContentBlock{block}, nil, nil
+			}
+		}
 	}
 	role = firstNonEmpty(role, defaultRole)
 	if text := strings.TrimSpace(rawMapString(value, "text")); text != "" {
@@ -751,6 +758,25 @@ func rawResponsesInputObject(value map[string]any, defaultRole string) ([]gatewa
 		return nil, append(instructions, text), warnings
 	}
 	return blocks, instructions, warnings
+}
+
+func rawResponsesContextBlock(value map[string]any, role string, rawType string) (gatewaycontract.ContentBlock, bool) {
+	raw := marshalRawJSON(value)
+	if len(raw) == 0 {
+		return gatewaycontract.ContentBlock{}, false
+	}
+	if role == "" {
+		role = "assistant"
+	}
+	metadata := cloneMap(value)
+	metadata["responses_item_type"] = rawType
+	return gatewaycontract.ContentBlock{
+		Type:           gatewaycontract.ContentBlockMetadata,
+		Role:           role,
+		Metadata:       metadata,
+		Raw:            raw,
+		OriginProtocol: string(gatewaycontract.ProtocolOpenAICompatible),
+	}, true
 }
 
 func rawResponsesFunctionCallBlock(value map[string]any, role string) (gatewaycontract.ContentBlock, bool) {
