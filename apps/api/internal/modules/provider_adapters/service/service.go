@@ -269,44 +269,88 @@ func (s *Service) invokeGeminiCompatible(ctx context.Context, req contract.Conve
 	}
 	endpoint := geminiEndpoint(baseURL, req.Mapping.UpstreamModelName, req.Stream)
 	headers := geminiCompatibleHeaders(req, apiKey, &endpoint)
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(raw))
+	send := func(body []byte) ([]byte, int, error) {
+		httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+		if err != nil {
+			return nil, 0, err
+		}
+		httpReq.Header = headers
+
+		resp, err := s.client.Do(httpReq)
+		if err != nil {
+			if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				return nil, 0, contract.ProviderError{Class: "timeout", StatusCode: http.StatusGatewayTimeout, Message: "provider request timed out"}
+			}
+			return nil, 0, contract.ProviderError{Class: "network_error", StatusCode: http.StatusBadGateway, Message: "provider request failed"}
+		}
+		defer resp.Body.Close()
+
+		respBody, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
+		if err != nil {
+			if req.Stream {
+				return nil, resp.StatusCode, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream interrupted"}
+			}
+			return nil, resp.StatusCode, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response read failed"}
+		}
+		return respBody, resp.StatusCode, nil
+	}
+	body, statusCode, err := send(raw)
 	if err != nil {
 		return contract.ConversationResponse{}, err
 	}
-	httpReq.Header = headers
-
-	resp, err := s.client.Do(httpReq)
-	if err != nil {
-		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return contract.ConversationResponse{}, contract.ProviderError{Class: "timeout", StatusCode: http.StatusGatewayTimeout, Message: "provider request timed out"}
+	signatureDowngraded := false
+	if statusCode < 200 || statusCode >= 300 {
+		if retryReq, ok := geminiSignatureRetryRequest(req, statusCode, body, geminiSignatureRetryThinking); ok {
+			if retryRaw, err := geminiCompatibleRequestBody(retryReq); err != nil {
+				return contract.ConversationResponse{}, err
+			} else if retryBody, retryStatusCode, err := send(retryRaw); err != nil {
+				return contract.ConversationResponse{}, err
+			} else {
+				signatureDowngraded = true
+				body = retryBody
+				statusCode = retryStatusCode
+			}
 		}
-		return contract.ConversationResponse{}, contract.ProviderError{Class: "network_error", StatusCode: http.StatusBadGateway, Message: "provider request failed"}
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
-	if err != nil {
-		if req.Stream {
-			return contract.ConversationResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream interrupted"}
+		if statusCode < 200 || statusCode >= 300 {
+			if retryReq, ok := geminiSignatureRetryRequest(req, statusCode, body, geminiSignatureRetryTools); ok {
+				if retryRaw, err := geminiCompatibleRequestBody(retryReq); err != nil {
+					return contract.ConversationResponse{}, err
+				} else if retryBody, retryStatusCode, err := send(retryRaw); err != nil {
+					return contract.ConversationResponse{}, err
+				} else {
+					signatureDowngraded = true
+					body = retryBody
+					statusCode = retryStatusCode
+				}
+			}
 		}
-		return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response read failed"}
 	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return contract.ConversationResponse{}, classifyGeminiProviderHTTPError(resp.StatusCode, body)
+	if statusCode < 200 || statusCode >= 300 {
+		return contract.ConversationResponse{}, classifyGeminiProviderHTTPError(statusCode, body)
 	}
 	if req.Stream {
-		return parseGeminiCompatibleStream(body, resp.StatusCode)
+		parsed, err := parseGeminiCompatibleStream(body, statusCode)
+		if err != nil {
+			return contract.ConversationResponse{}, err
+		}
+		if signatureDowngraded {
+			parsed = appendGeminiSignatureDowngradeWarning(parsed)
+		}
+		return parsed, nil
 	}
 
 	var decoded geminiGenerateContentResponse
 	if err := json.Unmarshal(body, &decoded); err != nil {
 		return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider returned invalid json"}
 	}
-	parsed, err := decoded.ConversationResponse(resp.StatusCode)
+	parsed, err := decoded.ConversationResponse(statusCode)
 	if err != nil {
 		return contract.ConversationResponse{}, err
 	}
 	parsed.Raw = append(json.RawMessage(nil), body...)
+	if signatureDowngraded {
+		parsed = appendGeminiSignatureDowngradeWarning(parsed)
+	}
 	return parsed, nil
 }
 
@@ -405,29 +449,66 @@ func (s *Service) invokeReverseProxyGeminiCompatible(ctx context.Context, req co
 	}
 	endpoint := geminiEndpoint(baseURL, req.Mapping.UpstreamModelName, req.Stream)
 	headers := geminiCompatibleHeaders(req, "", &endpoint)
-	runtimeResp, err := s.reverseProxy.Do(ctx, reverseproxycontract.Request{
-		Account: reverseproxycontract.AccountRuntime{
-			AccountID:      req.Account.ID,
-			RuntimeClass:   string(req.Account.RuntimeClass),
-			UpstreamClient: req.Account.UpstreamClient,
-			ProxyID:        req.Account.ProxyID,
-			UserAgent:      mapString(req.Account.Metadata, "user_agent"),
-			Credential:     req.Credential,
-		},
-		Method:       http.MethodPost,
-		URL:          endpoint,
-		Headers:      headers,
-		Body:         raw,
-		ExpectStream: req.Stream,
-	})
+	send := func(body []byte) (reverseproxycontract.Response, error) {
+		return s.reverseProxy.Do(ctx, reverseproxycontract.Request{
+			Account: reverseproxycontract.AccountRuntime{
+				AccountID:      req.Account.ID,
+				RuntimeClass:   string(req.Account.RuntimeClass),
+				UpstreamClient: req.Account.UpstreamClient,
+				ProxyID:        req.Account.ProxyID,
+				UserAgent:      mapString(req.Account.Metadata, "user_agent"),
+				Credential:     req.Credential,
+			},
+			Method:       http.MethodPost,
+			URL:          endpoint,
+			Headers:      headers,
+			Body:         body,
+			ExpectStream: req.Stream,
+		})
+	}
+	runtimeResp, err := send(raw)
 	if err != nil {
 		return contract.ConversationResponse{}, providerErrorFromReverseProxy(err)
+	}
+	signatureDowngraded := false
+	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
+		if retryReq, ok := geminiSignatureRetryRequest(req, runtimeResp.StatusCode, runtimeResp.Body, geminiSignatureRetryThinking); ok {
+			if retryRaw, err := geminiCompatibleRequestBody(retryReq); err != nil {
+				return contract.ConversationResponse{}, err
+			} else {
+				runtimeResp, err = send(retryRaw)
+				if err != nil {
+					return contract.ConversationResponse{}, providerErrorFromReverseProxy(err)
+				}
+				signatureDowngraded = true
+			}
+		}
+		if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
+			if retryReq, ok := geminiSignatureRetryRequest(req, runtimeResp.StatusCode, runtimeResp.Body, geminiSignatureRetryTools); ok {
+				if retryRaw, err := geminiCompatibleRequestBody(retryReq); err != nil {
+					return contract.ConversationResponse{}, err
+				} else {
+					runtimeResp, err = send(retryRaw)
+					if err != nil {
+						return contract.ConversationResponse{}, providerErrorFromReverseProxy(err)
+					}
+					signatureDowngraded = true
+				}
+			}
+		}
 	}
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
 		return contract.ConversationResponse{}, classifyGeminiProviderHTTPError(runtimeResp.StatusCode, runtimeResp.Body)
 	}
 	if req.Stream {
-		return parseGeminiCompatibleStream(runtimeResp.Body, runtimeResp.StatusCode)
+		parsed, err := parseGeminiCompatibleStream(runtimeResp.Body, runtimeResp.StatusCode)
+		if err != nil {
+			return contract.ConversationResponse{}, err
+		}
+		if signatureDowngraded {
+			parsed = appendGeminiSignatureDowngradeWarning(parsed)
+		}
+		return parsed, nil
 	}
 	var decoded geminiGenerateContentResponse
 	if err := json.Unmarshal(runtimeResp.Body, &decoded); err != nil {
@@ -438,6 +519,9 @@ func (s *Service) invokeReverseProxyGeminiCompatible(ctx context.Context, req co
 		return contract.ConversationResponse{}, err
 	}
 	parsed.Raw = append(json.RawMessage(nil), runtimeResp.Body...)
+	if signatureDowngraded {
+		parsed = appendGeminiSignatureDowngradeWarning(parsed)
+	}
 	return parsed, nil
 }
 

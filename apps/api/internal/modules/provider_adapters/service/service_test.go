@@ -52,6 +52,15 @@ func conversationStreamEventsByType(events []contract.ConversationStreamEvent, e
 	return out
 }
 
+func stringSliceContains(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
+}
+
 func imageURLPart(url string) contract.ContentPart {
 	return contract.ContentPart{Kind: contract.ContentPartImage, MediaURL: url, MIMEType: "image/png"}
 }
@@ -1621,6 +1630,257 @@ func TestGeminiCompatibleAdapterAddsDummyThoughtSignatureForFunctionCallHistory(
 	}
 }
 
+func TestGeminiCompatibleAdapterPreservesTextThoughtSignature(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload struct {
+			Contents []struct {
+				Parts []struct {
+					Text             string `json:"text"`
+					ThoughtSignature string `json:"thoughtSignature"`
+				} `json:"parts"`
+			} `json:"contents"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		if len(payload.Contents) != 1 ||
+			len(payload.Contents[0].Parts) != 1 ||
+			payload.Contents[0].Parts[0].Text != "visible model thought" ||
+			payload.Contents[0].Parts[0].ThoughtSignature != "sig_gemini_text_1" {
+			t.Fatalf("expected Gemini text thoughtSignature to be preserved, got %+v", payload.Contents)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"candidates":[{"content":{"role":"model","parts":[{"text":"done"}]}}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":1}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID: "req_gemini_text_signature",
+		Model:     "gemini-local",
+		Messages: []contract.ConversationMessage{{
+			Role: "assistant",
+			Parts: []contract.ContentPart{{
+				Kind:           contract.ContentPartThinking,
+				Text:           "visible model thought",
+				OriginProtocol: "gemini",
+				Metadata:       map[string]any{"thoughtSignature": "sig_gemini_text_1"},
+			}},
+		}},
+		Provider:   providercontract.Provider{AdapterType: "gemini-compatible", Protocol: "gemini-compatible"},
+		Account:    accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1beta"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "models/gemini-pro"},
+		Credential: map[string]any{"api_key": "gemini-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke gemini upstream: %v", err)
+	}
+}
+
+func TestGeminiCompatibleAdapterDoesNotReuseAnthropicSignatureAsThoughtSignature(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload struct {
+			Contents []struct {
+				Parts []struct {
+					Text             string `json:"text"`
+					ThoughtSignature string `json:"thoughtSignature"`
+				} `json:"parts"`
+			} `json:"contents"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		if len(payload.Contents) != 1 ||
+			len(payload.Contents[0].Parts) != 1 ||
+			payload.Contents[0].Parts[0].Text != "anthropic thought" ||
+			payload.Contents[0].Parts[0].ThoughtSignature != "" {
+			t.Fatalf("expected Anthropic signature to stay out of Gemini thoughtSignature, got %+v", payload.Contents)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"candidates":[{"content":{"role":"model","parts":[{"text":"done"}]}}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":1}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID: "req_gemini_anthropic_signature",
+		Model:     "gemini-local",
+		Messages: []contract.ConversationMessage{{
+			Role: "assistant",
+			Parts: []contract.ContentPart{{
+				Kind:           contract.ContentPartThinking,
+				Text:           "anthropic thought",
+				OriginProtocol: "anthropic",
+				Metadata:       map[string]any{"signature": "sig_anthropic_1"},
+			}},
+		}},
+		Provider:   providercontract.Provider{AdapterType: "gemini-compatible", Protocol: "gemini-compatible"},
+		Account:    accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1beta"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "models/gemini-pro"},
+		Credential: map[string]any{"api_key": "gemini-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke gemini upstream: %v", err)
+	}
+}
+
+func TestGeminiCompatibleAdapterRetriesSignatureErrorWithDowngradedThinking(t *testing.T) {
+	var requests []struct {
+		Contents []struct {
+			Parts []struct {
+				Text             string         `json:"text"`
+				ThoughtSignature string         `json:"thoughtSignature"`
+				FunctionCall     map[string]any `json:"functionCall"`
+			} `json:"parts"`
+		} `json:"contents"`
+	}
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload struct {
+			Contents []struct {
+				Parts []struct {
+					Text             string         `json:"text"`
+					ThoughtSignature string         `json:"thoughtSignature"`
+					FunctionCall     map[string]any `json:"functionCall"`
+				} `json:"parts"`
+			} `json:"contents"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		requests = append(requests, payload)
+		if len(requests) == 1 {
+			http.Error(w, `{"error":{"status":"INVALID_ARGUMENT","message":"Corrupted thought signature."}}`, http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"candidates":[{"content":{"role":"model","parts":[{"text":"recovered"}]}}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":1}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID: "req_gemini_signature_retry",
+		Model:     "gemini-local",
+		Messages: []contract.ConversationMessage{{
+			Role: "assistant",
+			Parts: []contract.ContentPart{
+				{Kind: contract.ContentPartThinking, Text: "visible thought", OriginProtocol: "gemini", Metadata: map[string]any{"thoughtSignature": "stale_sig"}},
+				{Kind: contract.ContentPartThinking, Metadata: map[string]any{"type": "redacted_thinking", "data": "opaque"}},
+				{Kind: contract.ContentPartText, Text: "answer"},
+			},
+		}},
+		Provider:   providercontract.Provider{AdapterType: "gemini-compatible", Protocol: "gemini-compatible"},
+		Account:    accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1beta"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "models/gemini-pro"},
+		Credential: map[string]any{"api_key": "gemini-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke gemini upstream: %v", err)
+	}
+	if conversationResponseText(resp) != "recovered" || !stringSliceContains(resp.Warnings, "gemini_signature_sensitive_history_downgraded") {
+		t.Fatalf("expected recovered response with downgrade warning, got %+v", resp)
+	}
+	if len(requests) != 2 {
+		t.Fatalf("expected one retry, got %d requests", len(requests))
+	}
+	if requests[0].Contents[0].Parts[0].ThoughtSignature != "stale_sig" {
+		t.Fatalf("expected first request to preserve signature, got %+v", requests[0])
+	}
+	if len(requests[1].Contents[0].Parts) != 2 ||
+		requests[1].Contents[0].Parts[0].Text != "visible thought" ||
+		requests[1].Contents[0].Parts[0].ThoughtSignature != "" ||
+		requests[1].Contents[0].Parts[1].Text != "answer" {
+		t.Fatalf("expected retry to remove signatures and opaque thinking only, got %+v", requests[1])
+	}
+}
+
+func TestGeminiCompatibleAdapterRetriesSignatureErrorWithDowngradedTools(t *testing.T) {
+	requestBodies := make([][]byte, 0, 2)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("read request: %v", err)
+		}
+		requestBodies = append(requestBodies, body)
+		if len(requestBodies) == 1 {
+			http.Error(w, `{"error":{"status":"INVALID_ARGUMENT","message":"Expected thinking or function response with valid signature."}}`, http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"candidates":[{"content":{"role":"model","parts":[{"text":"tool recovered"}]}}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":1}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID: "req_gemini_tool_signature_retry",
+		Model:     "gemini-local",
+		Messages: []contract.ConversationMessage{{
+			Role: "assistant",
+			Parts: []contract.ContentPart{{
+				Kind:              contract.ContentPartToolUse,
+				ToolCallID:        "call_1",
+				ToolName:          "lookup",
+				ToolArgumentsJSON: `{"query":"weather"}`,
+				OriginProtocol:    "gemini",
+				Metadata:          map[string]any{"thoughtSignature": "bad_tool_sig"},
+			}},
+		}},
+		Provider:   providercontract.Provider{AdapterType: "gemini-compatible", Protocol: "gemini-compatible"},
+		Account:    accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1beta"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "models/gemini-pro"},
+		Credential: map[string]any{"api_key": "gemini-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke gemini upstream: %v", err)
+	}
+	if conversationResponseText(resp) != "tool recovered" || !stringSliceContains(resp.Warnings, "gemini_signature_sensitive_history_downgraded") {
+		t.Fatalf("expected recovered response with downgrade warning, got %+v", resp)
+	}
+	if len(requestBodies) != 2 {
+		t.Fatalf("expected one retry, got %d requests", len(requestBodies))
+	}
+	var firstPayload, secondPayload struct {
+		Contents []struct {
+			Parts []struct {
+				Text             string         `json:"text"`
+				ThoughtSignature string         `json:"thoughtSignature"`
+				FunctionCall     map[string]any `json:"functionCall"`
+			} `json:"parts"`
+		} `json:"contents"`
+	}
+	if err := json.Unmarshal(requestBodies[0], &firstPayload); err != nil {
+		t.Fatalf("decode first request: %v", err)
+	}
+	if err := json.Unmarshal(requestBodies[1], &secondPayload); err != nil {
+		t.Fatalf("decode second request: %v", err)
+	}
+	if len(firstPayload.Contents) != 1 ||
+		len(firstPayload.Contents[0].Parts) != 1 ||
+		firstPayload.Contents[0].Parts[0].FunctionCall["name"] != "lookup" ||
+		firstPayload.Contents[0].Parts[0].ThoughtSignature != "bad_tool_sig" {
+		t.Fatalf("expected first request to preserve tool signature, got %+v", firstPayload)
+	}
+	if len(secondPayload.Contents) != 1 ||
+		len(secondPayload.Contents[0].Parts) != 1 ||
+		secondPayload.Contents[0].Parts[0].FunctionCall != nil ||
+		!strings.Contains(secondPayload.Contents[0].Parts[0].Text, "[tool_call name=lookup id=call_1 arguments={\"query\":\"weather\"}]") {
+		t.Fatalf("expected retry to downgrade tool call to text, got %+v", secondPayload)
+	}
+}
+
 func TestGeminiCompatibleAdapterPreservesFunctionCallResponse(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -2090,6 +2350,80 @@ func TestReverseProxyGeminiAdapterPreservesSameProtocolRawBody(t *testing.T) {
 	}
 	if payload["cachedContent"] != "cachedContents/raw" || payload["model"] != nil {
 		t.Fatalf("expected reverse Gemini raw body to be preserved, got %+v", payload)
+	}
+}
+
+func TestReverseProxyGeminiAdapterRetriesSignatureErrorWithDowngradedThinking(t *testing.T) {
+	runtime := sequenceRuntime{
+		responses: []reverseproxycontract.Response{
+			{
+				StatusCode: http.StatusBadRequest,
+				Body:       []byte(`{"error":{"status":"INVALID_ARGUMENT","message":"Corrupted thought signature."}}`),
+			},
+			{
+				StatusCode: http.StatusOK,
+				Body:       []byte(`{"candidates":[{"content":{"parts":[{"text":"gemini runtime recovered"}]}}],"usageMetadata":{"promptTokenCount":2,"candidatesTokenCount":1}}`),
+			},
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID: "req_reverse_gemini_signature_retry",
+		Model:     "gemini-local",
+		Messages: []contract.ConversationMessage{{
+			Role: "assistant",
+			Parts: []contract.ContentPart{{
+				Kind:           contract.ContentPartThinking,
+				Text:           "runtime thought",
+				OriginProtocol: "gemini",
+				Metadata:       map[string]any{"thoughtSignature": "stale_runtime_sig"},
+			}},
+		}},
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-gemini-cli",
+			Protocol:    "gemini-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("gemini_cli"),
+			Metadata:       map[string]any{"base_url": "https://generativelanguage.googleapis.com/v1beta"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gemini-pro"},
+		Credential: map[string]any{"cli_client_token": "cli-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke reverse gemini adapter: %v", err)
+	}
+	if conversationResponseText(resp) != "gemini runtime recovered" || !stringSliceContains(resp.Warnings, "gemini_signature_sensitive_history_downgraded") {
+		t.Fatalf("expected recovered response with downgrade warning, got %+v", resp)
+	}
+	if len(runtime.requests) != 2 {
+		t.Fatalf("expected one reverse proxy retry, got %d requests", len(runtime.requests))
+	}
+	var firstPayload, secondPayload struct {
+		Contents []struct {
+			Parts []struct {
+				Text             string `json:"text"`
+				ThoughtSignature string `json:"thoughtSignature"`
+			} `json:"parts"`
+		} `json:"contents"`
+	}
+	if err := json.Unmarshal(runtime.requests[0].Body, &firstPayload); err != nil {
+		t.Fatalf("decode first request: %v", err)
+	}
+	if err := json.Unmarshal(runtime.requests[1].Body, &secondPayload); err != nil {
+		t.Fatalf("decode second request: %v", err)
+	}
+	if firstPayload.Contents[0].Parts[0].ThoughtSignature != "stale_runtime_sig" {
+		t.Fatalf("expected first reverse request to preserve signature, got %+v", firstPayload)
+	}
+	if secondPayload.Contents[0].Parts[0].Text != "runtime thought" ||
+		secondPayload.Contents[0].Parts[0].ThoughtSignature != "" {
+		t.Fatalf("expected reverse retry to downgrade thinking signature, got %+v", secondPayload)
 	}
 }
 
@@ -5053,6 +5387,24 @@ func (r *capturingRuntime) Do(_ context.Context, req reverseproxycontract.Reques
 		return reverseproxycontract.Response{}, r.err
 	}
 	return r.response, nil
+}
+
+type sequenceRuntime struct {
+	requests  []reverseproxycontract.Request
+	responses []reverseproxycontract.Response
+	errs      []error
+}
+
+func (r *sequenceRuntime) Do(_ context.Context, req reverseproxycontract.Request) (reverseproxycontract.Response, error) {
+	r.requests = append(r.requests, req)
+	idx := len(r.requests) - 1
+	if idx < len(r.errs) && r.errs[idx] != nil {
+		return reverseproxycontract.Response{}, r.errs[idx]
+	}
+	if idx < len(r.responses) {
+		return r.responses[idx], nil
+	}
+	return reverseproxycontract.Response{}, nil
 }
 
 func assertProviderError(t *testing.T, err error, class string, statusCode int) contract.ProviderError {
