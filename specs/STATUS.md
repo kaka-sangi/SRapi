@@ -131,8 +131,8 @@ last_gates:
 - `make code-quality-check`: pass; now runs `go test ./internal/codequality -count=1` so Node/script/doc hygiene checks are not hidden by Go test cache
 - `make diff-check`: pass
 - `make secret-scan`: pass
-- `make smoke-payment-stripe`: skipped, requires real Stripe test-mode secret key and webhook signing secret
-- `make smoke-payment-alipay`: skipped, requires real Alipay sandbox/test merchant app ID, merchant private key, and Alipay public key; optional local signed-notification mode also requires an explicit notification signing key
+- `make smoke-payment-stripe`: credential-gated as expected on this workstation; exits before running because `STRIPE_SMOKE_SECRET_KEY` / webhook signing secret are not configured
+- `make smoke-payment-alipay`: credential-gated as expected on this workstation; exits before running because real Alipay sandbox/test merchant app ID, merchant private key, and Alipay public key are not configured; optional local signed-notification mode also requires an explicit notification signing key
 - `cd apps/api && go test ./internal/httpserver -run 'TestTracingMiddleware' -count=1 -v`: pass; overhead guard skips unless `SRAPI_OTEL_P99_GUARD=1`
 - `make otel-overhead-bench`: pass; local p99 overhead 0s against 5ms budget with 2,000 samples / 200 warmup
 - `cd apps/api && go test ./internal/platform/otel -count=1 -v`: pass; Jaeger smoke skips unless `SRAPI_OTEL_JAEGER_SMOKE=1`
