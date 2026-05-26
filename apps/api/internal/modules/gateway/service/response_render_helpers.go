@@ -3,6 +3,7 @@ package service
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 
 	gatewaycontract "github.com/srapi/srapi/apps/api/internal/modules/gateway/contract"
@@ -285,6 +286,111 @@ func responseStreamOutputEvents(blocks []gatewaycontract.ContentBlock) []StreamE
 		)
 	}
 	return events
+}
+
+type responseStreamDoneEventGroup struct {
+	OutputIndex int
+	Events      []StreamEvent
+}
+
+func sortResponseStreamDoneEventGroups(groups []responseStreamDoneEventGroup) {
+	sort.SliceStable(groups, func(i, j int) bool {
+		return groups[i].OutputIndex < groups[j].OutputIndex
+	})
+}
+
+type responseStreamTextStates struct {
+	byKey map[responseStreamTextStateKey]*responseStreamTextState
+	order []*responseStreamTextState
+}
+
+type responseStreamTextStateKey struct {
+	ContentIndex int
+	BlockType    gatewaycontract.ContentBlockType
+}
+
+type responseStreamTextState struct {
+	ContentIndex int
+	OutputIndex  int
+	ItemID       string
+	BlockType    gatewaycontract.ContentBlockType
+	Text         strings.Builder
+}
+
+func newResponseStreamTextStates(blocks []gatewaycontract.ContentBlock) *responseStreamTextStates {
+	states := &responseStreamTextStates{
+		byKey: map[responseStreamTextStateKey]*responseStreamTextState{},
+		order: make([]*responseStreamTextState, 0),
+	}
+	for index, block := range normalizeOutputItems(blocks) {
+		if !responseStreamBlockHasTextPart(block.Type) {
+			continue
+		}
+		state := &responseStreamTextState{
+			ContentIndex: index,
+			OutputIndex:  -1,
+			ItemID:       responseStreamTextItemID(index, block.Type),
+			BlockType:    block.Type,
+		}
+		states.byKey[responseStreamTextStateKey{ContentIndex: index, BlockType: block.Type}] = state
+		states.order = append(states.order, state)
+	}
+	return states
+}
+
+func (s *responseStreamTextStates) stateFor(event gatewaycontract.StreamEvent, fallbackType gatewaycontract.ContentBlockType) *responseStreamTextState {
+	key := responseStreamTextStateKey{ContentIndex: event.ContentIndex, BlockType: fallbackType}
+	if state := s.byKey[key]; state != nil {
+		return state
+	}
+	state := &responseStreamTextState{
+		ContentIndex: event.ContentIndex,
+		OutputIndex:  -1,
+		ItemID:       responseStreamTextItemID(len(s.order), fallbackType),
+		BlockType:    fallbackType,
+	}
+	s.byKey[key] = state
+	s.order = append(s.order, state)
+	return state
+}
+
+func (s *responseStreamTextStates) openStates() []*responseStreamTextState {
+	out := make([]*responseStreamTextState, 0, len(s.order))
+	for _, state := range s.order {
+		if state.OutputIndex >= 0 {
+			out = append(out, state)
+		}
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		return out[i].OutputIndex < out[j].OutputIndex
+	})
+	return out
+}
+
+func responseStreamDeltaTextBlockType(event gatewaycontract.StreamEvent, fallback gatewaycontract.ContentBlockType) gatewaycontract.ContentBlockType {
+	if event.Type == gatewaycontract.StreamEventToolResult {
+		return gatewaycontract.ContentBlockToolResult
+	}
+	if responseStreamBlockHasTextPart(event.Delta.Type) {
+		return event.Delta.Type
+	}
+	return fallback
+}
+
+func responseStreamBlockHasTextPart(blockType gatewaycontract.ContentBlockType) bool {
+	switch blockType {
+	case gatewaycontract.ContentBlockText, gatewaycontract.ContentBlockReasoning, gatewaycontract.ContentBlockRefusal, gatewaycontract.ContentBlockToolResult:
+		return true
+	default:
+		return false
+	}
+}
+
+func responseStreamTextItemID(index int, blockType gatewaycontract.ContentBlockType) string {
+	if blockType == gatewaycontract.ContentBlockReasoning {
+		return fmt.Sprintf("rs_%d", index)
+	}
+	return fmt.Sprintf("msg_%d", index)
 }
 
 func responseStreamItemID(index int, block gatewaycontract.ContentBlock) string {

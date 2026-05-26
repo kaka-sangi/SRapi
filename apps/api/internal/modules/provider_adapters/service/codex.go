@@ -726,6 +726,7 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 				streamEvents = append(streamEvents, contract.ConversationStreamEvent{
 					Index:          eventIndex,
 					Type:           contract.ConversationStreamEventContentDelta,
+					ContentIndex:   codexOutputIndex(event),
 					Delta:          textContentDelta(event.Delta),
 					RawEventType:   strings.TrimSpace(event.Type),
 					Raw:            append(json.RawMessage(nil), data...),

@@ -518,6 +518,72 @@ func TestRenderCanonicalStreamEventsPreservesResponsesReasoningDeltas(t *testing
 	}
 }
 
+func TestRenderResponsesStreamEventsPreservesTextContentIndexes(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	resp := gatewaycontract.CanonicalResponse{
+		ID:         "resp_multi_text_stream",
+		Model:      "gpt-4o-mini",
+		StopReason: "end_turn",
+		OutputItems: []gatewaycontract.ContentBlock{
+			{Type: gatewaycontract.ContentBlockText, Role: "assistant", Text: "first block"},
+			{Type: gatewaycontract.ContentBlockText, Role: "assistant", Text: "second block"},
+		},
+		StreamEvents: []gatewaycontract.StreamEvent{
+			{
+				Index:        0,
+				Type:         gatewaycontract.StreamEventContentDelta,
+				ContentIndex: 0,
+				Delta:        gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockText, Role: "assistant", Text: "first "},
+			},
+			{
+				Index:        1,
+				Type:         gatewaycontract.StreamEventContentDelta,
+				ContentIndex: 1,
+				Delta:        gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockText, Role: "assistant", Text: "second "},
+			},
+			{
+				Index:        2,
+				Type:         gatewaycontract.StreamEventContentDelta,
+				ContentIndex: 0,
+				Delta:        gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockText, Role: "assistant", Text: "block"},
+			},
+			{
+				Index:        3,
+				Type:         gatewaycontract.StreamEventContentDelta,
+				ContentIndex: 1,
+				Delta:        gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockText, Role: "assistant", Text: "block"},
+			},
+			{
+				Index:      4,
+				Type:       gatewaycontract.StreamEventStop,
+				StopReason: "end_turn",
+			},
+		},
+		Usage: gatewaycontract.Usage{InputTokens: 4, OutputTokens: 4},
+	}
+
+	responsesEvents := svc.RenderResponsesStreamEvents(resp)
+	added := streamEventsByName(responsesEvents, "response.output_item.added")
+	if len(added) != 2 {
+		t.Fatalf("expected two responses output items, got %+v", responsesEvents)
+	}
+	firstDone := streamEventByOutputIndex(responsesEvents, "response.output_item.done", 0)
+	secondDone := streamEventByOutputIndex(responsesEvents, "response.output_item.done", 1)
+	if firstDone == nil || secondDone == nil {
+		t.Fatalf("expected output item done per content index, got %+v", responsesEvents)
+	}
+	if outputItemText(firstDone) != "first block" || outputItemText(secondDone) != "second block" {
+		t.Fatalf("expected separate completed text blocks, got %+v and %+v", firstDone, secondDone)
+	}
+	deltas := streamEventsByName(responsesEvents, "response.output_text.delta")
+	if len(deltas) != 4 || deltas[0].Data["output_index"] != 0 || deltas[1].Data["output_index"] != 1 || deltas[2].Data["output_index"] != 0 || deltas[3].Data["output_index"] != 1 {
+		t.Fatalf("expected deltas to preserve output indexes, got %+v", deltas)
+	}
+}
+
 func TestRenderResponsesStreamEventsFallbackPreservesReasoningPartLifecycle(t *testing.T) {
 	svc, err := New()
 	if err != nil {
@@ -735,6 +801,28 @@ func streamEventsByName(events []StreamEvent, name string) []StreamEvent {
 		}
 	}
 	return out
+}
+
+func streamEventByOutputIndex(events []StreamEvent, name string, outputIndex int) *StreamEvent {
+	for idx := range events {
+		if events[idx].Event == name && events[idx].Data["output_index"] == outputIndex {
+			return &events[idx]
+		}
+	}
+	return nil
+}
+
+func outputItemText(event *StreamEvent) string {
+	if event == nil {
+		return ""
+	}
+	item, _ := event.Data["item"].(map[string]any)
+	content, _ := item["content"].([]map[string]any)
+	if len(content) == 0 {
+		return ""
+	}
+	text, _ := content[0]["text"].(string)
+	return text
 }
 
 func chatStreamToolDelta(t *testing.T, chunk map[string]any) map[string]any {

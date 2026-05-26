@@ -1657,6 +1657,43 @@ func TestGeminiCompatibleAdapterStreamsUpstream(t *testing.T) {
 	}
 }
 
+func TestGeminiCompatibleAdapterStreamsPartIndexes(t *testing.T) {
+	rawSSE := "data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"first\"},{\"text\":\"second\"}]}}],\"usageMetadata\":{\"promptTokenCount\":5,\"candidatesTokenCount\":2}}\n\n"
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte(rawSSE))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_gemini_stream_parts",
+		Model:      "gemini-local",
+		InputParts: textParts("stream gemini parts"),
+		Stream:     true,
+		Provider: providercontract.Provider{
+			AdapterType: "native-gemini",
+			Protocol:    "gemini-compatible",
+		},
+		Account:    accountcontract.ProviderAccount{ID: 1, Metadata: map[string]any{"base_url": upstream.URL + "/v1beta"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gemini-pro"},
+		Credential: map[string]any{"api_key": "gemini-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke gemini stream: %v", err)
+	}
+	textEvents := conversationStreamEventsByType(resp.StreamEvents, contract.ConversationStreamEventContentDelta)
+	if len(textEvents) != 2 {
+		t.Fatalf("expected two Gemini text stream events, got %+v", resp.StreamEvents)
+	}
+	if textEvents[0].ContentIndex != 0 || textEvents[1].ContentIndex != 1 {
+		t.Fatalf("expected Gemini stream part indexes, got %+v", textEvents)
+	}
+}
+
 func TestGeminiCompatibleAdapterStreamsFunctionCall(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
@@ -3316,6 +3353,9 @@ func TestReverseProxyCodexCLIAdapterPreservesReasoningTextDeltas(t *testing.T) {
 	textEvents := conversationStreamEventsByType(resp.StreamEvents, contract.ConversationStreamEventContentDelta)
 	if len(textEvents) != 1 || textEvents[0].Delta.Text != "answer" {
 		t.Fatalf("expected Codex output text delta event, got %+v", resp.StreamEvents)
+	}
+	if textEvents[0].ContentIndex != 1 {
+		t.Fatalf("expected Codex output text delta to preserve output index, got %+v", textEvents[0])
 	}
 }
 

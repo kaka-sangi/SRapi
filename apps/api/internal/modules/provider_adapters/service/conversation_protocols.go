@@ -1610,7 +1610,7 @@ func parseGeminiCompatibleStream(body []byte, statusCode int) (contract.Conversa
 		seenChunk = true
 		chunkParts := chunk.ContentParts()
 		parts = appendStreamContentParts(parts, chunkParts)
-		for _, part := range chunkParts {
+		for contentIndex, part := range chunkParts {
 			eventType := contract.ConversationStreamEventContentDelta
 			switch part.Kind {
 			case contract.ContentPartToolUse:
@@ -1624,6 +1624,7 @@ func parseGeminiCompatibleStream(body []byte, statusCode int) (contract.Conversa
 			streamEvents = append(streamEvents, contract.ConversationStreamEvent{
 				Index:          eventIndex,
 				Type:           eventType,
+				ContentIndex:   contentIndex,
 				Delta:          part,
 				RawEventType:   "generateContentResponse",
 				Raw:            append(json.RawMessage(nil), data...),

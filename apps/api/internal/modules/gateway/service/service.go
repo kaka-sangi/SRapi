@@ -983,12 +983,7 @@ func (s *Service) renderResponsesCanonicalStreamEvents(resp gatewaycontract.Cano
 		},
 	}
 	nextOutputIndex := 0
-	textOutputIndex := -1
-	textItemID := ""
-	var text strings.Builder
-	reasoningOutputIndex := -1
-	reasoningItemID := ""
-	var reasoning strings.Builder
+	textStates := newResponseStreamTextStates(resp.OutputItems)
 	toolStates := newStreamToolCallStates(resp.OutputItems)
 	for _, event := range events {
 		switch event.Type {
@@ -997,27 +992,27 @@ func (s *Service) renderResponsesCanonicalStreamEvents(resp gatewaycontract.Cano
 			if delta == "" {
 				continue
 			}
-			if textOutputIndex < 0 {
-				textOutputIndex = nextOutputIndex
+			state := textStates.stateFor(event, responseStreamDeltaTextBlockType(event, gatewaycontract.ContentBlockText))
+			if state.OutputIndex < 0 {
+				state.OutputIndex = nextOutputIndex
 				nextOutputIndex++
-				textItemID = fmt.Sprintf("msg_%d", textOutputIndex)
-				out = append(out, responseStreamTextStartEvents(textItemID, textOutputIndex, gatewaycontract.ContentBlockText)...)
+				out = append(out, responseStreamTextStartEvents(state.ItemID, state.OutputIndex, state.BlockType)...)
 			}
-			text.WriteString(delta)
-			out = append(out, responseStreamTextDeltaEvent(textItemID, textOutputIndex, gatewaycontract.ContentBlockText, delta))
+			state.Text.WriteString(delta)
+			out = append(out, responseStreamTextDeltaEvent(state.ItemID, state.OutputIndex, state.BlockType, delta))
 		case gatewaycontract.StreamEventReasoning:
 			delta := event.Delta.Text
 			if delta == "" {
 				continue
 			}
-			if reasoningOutputIndex < 0 {
-				reasoningOutputIndex = nextOutputIndex
+			state := textStates.stateFor(event, gatewaycontract.ContentBlockReasoning)
+			if state.OutputIndex < 0 {
+				state.OutputIndex = nextOutputIndex
 				nextOutputIndex++
-				reasoningItemID = fmt.Sprintf("rs_%d", reasoningOutputIndex)
-				out = append(out, responseStreamTextStartEvents(reasoningItemID, reasoningOutputIndex, gatewaycontract.ContentBlockReasoning)...)
+				out = append(out, responseStreamTextStartEvents(state.ItemID, state.OutputIndex, state.BlockType)...)
 			}
-			reasoning.WriteString(delta)
-			out = append(out, responseStreamTextDeltaEvent(reasoningItemID, reasoningOutputIndex, gatewaycontract.ContentBlockReasoning, delta))
+			state.Text.WriteString(delta)
+			out = append(out, responseStreamTextDeltaEvent(state.ItemID, state.OutputIndex, state.BlockType, delta))
 		case gatewaycontract.StreamEventToolCallDelta:
 			state := toolStates.stateFor(event)
 			if state.OutputIndex < 0 {
@@ -1039,52 +1034,49 @@ func (s *Service) renderResponsesCanonicalStreamEvents(resp gatewaycontract.Cano
 			}
 		}
 	}
-	if textOutputIndex >= 0 {
-		if reasoningOutputIndex >= 0 && reasoningOutputIndex < textOutputIndex {
-			out = append(out,
-				responseStreamTextDoneEvent(reasoningItemID, reasoningOutputIndex, gatewaycontract.ContentBlockReasoning, reasoning.String()),
-				responseStreamContentPartDoneEvent(reasoningItemID, reasoningOutputIndex, gatewaycontract.ContentBlockReasoning, reasoning.String()),
-				responseStreamMessageDoneEvent(reasoningItemID, reasoningOutputIndex, gatewaycontract.ContentBlockReasoning, reasoning.String()),
-			)
-			reasoningOutputIndex = -1
-		}
-		out = append(out,
-			responseStreamTextDoneEvent(textItemID, textOutputIndex, gatewaycontract.ContentBlockText, text.String()),
-			responseStreamContentPartDoneEvent(textItemID, textOutputIndex, gatewaycontract.ContentBlockText, text.String()),
-			responseStreamMessageDoneEvent(textItemID, textOutputIndex, gatewaycontract.ContentBlockText, text.String()),
-		)
-	}
-	if reasoningOutputIndex >= 0 {
-		out = append(out,
-			responseStreamTextDoneEvent(reasoningItemID, reasoningOutputIndex, gatewaycontract.ContentBlockReasoning, reasoning.String()),
-			responseStreamContentPartDoneEvent(reasoningItemID, reasoningOutputIndex, gatewaycontract.ContentBlockReasoning, reasoning.String()),
-			responseStreamMessageDoneEvent(reasoningItemID, reasoningOutputIndex, gatewaycontract.ContentBlockReasoning, reasoning.String()),
-		)
+	doneGroups := make([]responseStreamDoneEventGroup, 0)
+	for _, state := range textStates.openStates() {
+		text := state.Text.String()
+		doneGroups = append(doneGroups, responseStreamDoneEventGroup{
+			OutputIndex: state.OutputIndex,
+			Events: []StreamEvent{
+				responseStreamTextDoneEvent(state.ItemID, state.OutputIndex, state.BlockType, text),
+				responseStreamContentPartDoneEvent(state.ItemID, state.OutputIndex, state.BlockType, text),
+				responseStreamMessageDoneEvent(state.ItemID, state.OutputIndex, state.BlockType, text),
+			},
+		})
 	}
 	for _, state := range toolStates.openStates() {
 		arguments := state.Arguments.String()
 		if arguments == "" {
 			arguments = state.Block.ToolArgumentsJSON
 		}
-		out = append(out,
-			StreamEvent{
-				Event: "response.function_call_arguments.done",
-				Data: map[string]any{
-					"type":         "response.function_call_arguments.done",
-					"item_id":      state.ItemID,
-					"output_index": state.OutputIndex,
-					"arguments":    arguments,
+		doneGroups = append(doneGroups, responseStreamDoneEventGroup{
+			OutputIndex: state.OutputIndex,
+			Events: []StreamEvent{
+				{
+					Event: "response.function_call_arguments.done",
+					Data: map[string]any{
+						"type":         "response.function_call_arguments.done",
+						"item_id":      state.ItemID,
+						"output_index": state.OutputIndex,
+						"arguments":    arguments,
+					},
+				},
+				{
+					Event: "response.output_item.done",
+					Data: map[string]any{
+						"type":         "response.output_item.done",
+						"output_index": state.OutputIndex,
+						"item":         responseStreamFunctionCallItem(state.ItemID, state.completedBlock(arguments)),
+					},
 				},
 			},
-			StreamEvent{
-				Event: "response.output_item.done",
-				Data: map[string]any{
-					"type":         "response.output_item.done",
-					"output_index": state.OutputIndex,
-					"item":         responseStreamFunctionCallItem(state.ItemID, state.completedBlock(arguments)),
-				},
-			},
-		)
+		})
+	}
+	sortResponseStreamDoneEventGroups(doneGroups)
+	for _, group := range doneGroups {
+		out = append(out, group.Events...)
 	}
 	out = append(out,
 		StreamEvent{
