@@ -1265,6 +1265,9 @@ func parseOpenAICompatibleStream(body []byte, statusCode int) (contract.Conversa
 			done = true
 			break
 		}
+		if providerErr, ok := providerErrorFromStreamFrame(frame, data, "openai-compatible"); ok {
+			return contract.ConversationResponse{}, providerErr
+		}
 		var chunk openAIChatCompletionStreamChunk
 		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
 			return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider returned invalid stream json"}
@@ -1588,6 +1591,9 @@ func parseGeminiCompatibleStream(body []byte, statusCode int) (contract.Conversa
 		if data == "[DONE]" {
 			break
 		}
+		if providerErr, ok := providerErrorFromStreamFrame(frame, data, "gemini-compatible"); ok {
+			return contract.ConversationResponse{}, providerErr
+		}
 		var chunk geminiGenerateContentResponse
 		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
 			return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider returned invalid stream json"}
@@ -1846,6 +1852,9 @@ func parseAnthropicCompatibleStream(body []byte, statusCode int) (contract.Conve
 		if data == "[DONE]" {
 			done = true
 			break
+		}
+		if providerErr, ok := providerErrorFromStreamFrame(frame, data, "anthropic-compatible"); ok {
+			return contract.ConversationResponse{}, providerErr
 		}
 		var chunk anthropicStreamChunk
 		if err := json.Unmarshal([]byte(data), &chunk); err != nil {

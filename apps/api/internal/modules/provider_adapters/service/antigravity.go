@@ -311,6 +311,9 @@ func parseAntigravityStream(body []byte, statusCode int) (contract.ConversationR
 		if data == "[DONE]" {
 			break
 		}
+		if providerErr, ok := providerErrorFromStreamFrame(frame, data, "gemini-compatible"); ok {
+			return contract.ConversationResponse{}, providerErr
+		}
 		chunk, err := parseAntigravityResponse([]byte(data))
 		if err != nil {
 			return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider returned invalid stream json"}

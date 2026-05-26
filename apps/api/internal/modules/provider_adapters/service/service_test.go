@@ -1231,6 +1231,32 @@ func TestOpenAICompatibleAdapterClassifiesInterruptedStream(t *testing.T) {
 	assertProviderError(t, err, "stream_interrupted", http.StatusBadGateway)
 }
 
+func TestOpenAICompatibleAdapterClassifiesStreamErrorFrame(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("event: error\ndata: {\"error\":{\"type\":\"rate_limit_error\",\"message\":\"slow down\",\"code\":429}}\n\n"))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_stream_error",
+		Model:      "gpt-local",
+		InputParts: textParts("hello"),
+		Stream:     true,
+		Account:    accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-upstream"},
+		Credential: map[string]any{"api_key": "upstream-secret"},
+	})
+	providerErr := assertProviderError(t, err, "rate_limit", http.StatusTooManyRequests)
+	if providerErr.Message != "slow down" {
+		t.Fatalf("expected stream error message to be preserved, got %+v", providerErr)
+	}
+}
+
 func TestAdapterFallsBackToLocalResponseWithoutBaseURL(t *testing.T) {
 	svc, err := service.New(nil)
 	if err != nil {
@@ -1883,6 +1909,33 @@ func TestGeminiCompatibleAdapterClassifiesGoogleError(t *testing.T) {
 	assertProviderError(t, err, "rate_limit", http.StatusTooManyRequests)
 }
 
+func TestGeminiCompatibleAdapterClassifiesStreamErrorFrame(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("event: error\ndata: {\"error\":{\"status\":\"RESOURCE_EXHAUSTED\",\"message\":\"quota exhausted\",\"code\":429}}\n\n"))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_gemini_stream_error",
+		Model:      "gemini-local",
+		InputParts: textParts("hello"),
+		Stream:     true,
+		Provider:   providercontract.Provider{AdapterType: "gemini-compatible", Protocol: "gemini-compatible"},
+		Account:    accountcontract.ProviderAccount{ID: 1, Metadata: map[string]any{"base_url": upstream.URL + "/v1beta"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gemini-pro"},
+		Credential: map[string]any{"api_key": "gemini-secret"},
+	})
+	providerErr := assertProviderError(t, err, "rate_limit", http.StatusTooManyRequests)
+	if providerErr.Message != "quota exhausted" {
+		t.Fatalf("expected Gemini stream error message to be preserved, got %+v", providerErr)
+	}
+}
+
 func TestReverseProxyGeminiAdapterDispatchesThroughRuntime(t *testing.T) {
 	runtime := capturingRuntime{
 		response: reverseproxycontract.Response{
@@ -2484,6 +2537,36 @@ func TestAnthropicCompatibleAdapterClassifiesRateLimitErrorObject(t *testing.T) 
 		Credential: map[string]any{"api_key": "anthropic-secret"},
 	})
 	assertProviderError(t, err, "rate_limit", http.StatusTooManyRequests)
+}
+
+func TestAnthropicCompatibleAdapterClassifiesStreamErrorFrame(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("event: error\ndata: {\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"slow anthropic\"}}\n\n"))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_anthropic_stream_error",
+		Model:      "claude-local",
+		InputParts: textParts("hello"),
+		Stream:     true,
+		Provider: providercontract.Provider{
+			AdapterType: "anthropic-compatible",
+			Protocol:    "anthropic-compatible",
+		},
+		Account:    accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "claude-upstream"},
+		Credential: map[string]any{"api_key": "anthropic-secret"},
+	})
+	providerErr := assertProviderError(t, err, "rate_limit", http.StatusTooManyRequests)
+	if providerErr.Message != "slow anthropic" {
+		t.Fatalf("expected Anthropic stream error message to be preserved, got %+v", providerErr)
+	}
 }
 
 func TestReverseProxyClaudeCodeCLIAdapterUsesOfficialClientMessagesShape(t *testing.T) {
@@ -4095,6 +4178,41 @@ func TestReverseProxyAntigravityAdapterStreamsMultilineSSEData(t *testing.T) {
 	}
 }
 
+func TestReverseProxyAntigravityAdapterClassifiesStreamErrorFrame(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body:       []byte("event: error\ndata: {\"error\":{\"status\":\"UNAVAILABLE\",\"message\":\"antigravity unavailable\",\"code\":503}}\n\n"),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_antigravity_stream_error",
+		Model:      "antigravity-local",
+		InputParts: textParts("hello"),
+		Stream:     true,
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-antigravity",
+			Protocol:    "gemini-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             16,
+			RuntimeClass:   accountcontract.RuntimeClassDesktopClientToken,
+			UpstreamClient: ptrString("antigravity_desktop"),
+			Metadata:       map[string]any{"base_url": "https://antigravity.example", "project_id": "project-1"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gemini-pro"},
+		Credential: map[string]any{"access_token": "desktop-token"},
+	})
+	providerErr := assertProviderError(t, err, "provider_5xx", http.StatusServiceUnavailable)
+	if providerErr.Message != "antigravity unavailable" {
+		t.Fatalf("expected Antigravity stream error message to be preserved, got %+v", providerErr)
+	}
+}
+
 func TestReverseProxyAntigravityCleansToolSchemas(t *testing.T) {
 	runtime := capturingRuntime{
 		response: reverseproxycontract.Response{
@@ -4424,7 +4542,7 @@ func (r *capturingRuntime) Do(_ context.Context, req reverseproxycontract.Reques
 	return r.response, nil
 }
 
-func assertProviderError(t *testing.T, err error, class string, statusCode int) {
+func assertProviderError(t *testing.T, err error, class string, statusCode int) contract.ProviderError {
 	t.Helper()
 	if err == nil {
 		t.Fatal("expected provider error")
@@ -4436,6 +4554,7 @@ func assertProviderError(t *testing.T, err error, class string, statusCode int) 
 	if providerErr.Class != class || providerErr.StatusCode != statusCode {
 		t.Fatalf("expected provider error %s/%d, got %+v", class, statusCode, providerErr)
 	}
+	return providerErr
 }
 
 func headerValue(headers http.Header, key string) string {
