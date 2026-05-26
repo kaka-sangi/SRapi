@@ -664,9 +664,9 @@ func (s *Server) relayCodexResponsesWebSocket(r *http.Request, conn *websocket.C
 	}()
 	clientToUpstream <- reverseproxycontract.WebSocketMessage{Type: reverseproxycontract.WebSocketMessageText, Data: session.InitialFrame}
 	close(clientToUpstream)
-	success, errorClass, statusCode, usage := s.bridgeResponsesWebSocketRelay(r.Context(), conn, upstreamToClient, relayDone)
+	success, errorClass, statusCode, usage, terminalForwarded := s.bridgeResponsesWebSocketRelay(r.Context(), conn, upstreamToClient, relayDone)
 	s.runtime.recordGatewayUsage(r.Context(), responsesWebSocketUsageRecord(authed, canonical, result, &result.Candidate, success, errorClass, statusCode, elapsedMillis(startedAt), admission, usage))
-	if !success && errorClass != "client_closed" {
+	if !success && errorClass != "client_closed" && !terminalForwarded {
 		return true, provideradaptercontract.ProviderError{Class: errorClass, StatusCode: statusCode, Message: providerGatewayMessage(errorClass)}
 	}
 	return true, nil
@@ -693,7 +693,7 @@ type providerRealtimeSession struct {
 	Account      reverseproxycontract.AccountRuntime
 }
 
-func (s *Server) bridgeResponsesWebSocketRelay(ctx context.Context, conn *websocket.Conn, upstreamToClient <-chan reverseproxycontract.WebSocketMessage, relayDone <-chan responsesWebSocketRelayResult) (bool, string, int, *gatewaycontract.Usage) {
+func (s *Server) bridgeResponsesWebSocketRelay(ctx context.Context, conn *websocket.Conn, upstreamToClient <-chan reverseproxycontract.WebSocketMessage, relayDone <-chan responsesWebSocketRelayResult) (bool, string, int, *gatewaycontract.Usage, bool) {
 	var usage *gatewaycontract.Usage
 	relayDoneCh := relayDone
 	var relayResult *responsesWebSocketRelayResult
@@ -706,13 +706,13 @@ func (s *Server) bridgeResponsesWebSocketRelay(ctx context.Context, conn *websoc
 					case result := <-relayDoneCh:
 						relayResult = &result
 					case <-ctx.Done():
-						return false, "client_closed", statusClientClosedRequest, usage
+						return false, "client_closed", statusClientClosedRequest, usage, false
 					}
 				}
 				if relayResult != nil && relayResult.err != nil {
-					return false, errorClassName(relayResult.err), providerStatusFromError(relayResult.err), usage
+					return false, errorClassName(relayResult.err), providerStatusFromError(relayResult.err), usage, false
 				}
-				return true, "", http.StatusOK, usage
+				return true, "", http.StatusOK, usage, false
 			}
 			if msg.Type != reverseproxycontract.WebSocketMessageText {
 				continue
@@ -721,16 +721,16 @@ func (s *Server) bridgeResponsesWebSocketRelay(ctx context.Context, conn *websoc
 				usage = &eventUsage
 			}
 			if err := conn.Write(ctx, websocket.MessageText, msg.Data); err != nil {
-				return false, "client_closed", statusClientClosedRequest, usage
+				return false, "client_closed", statusClientClosedRequest, usage, false
 			}
-			if responsesWebSocketTerminal(msg.Data) {
-				return true, "", http.StatusOK, usage
+			if terminal, success, errorClass, statusCode := responsesWebSocketTerminal(msg.Data); terminal {
+				return success, errorClass, statusCode, usage, true
 			}
 		case result := <-relayDoneCh:
 			relayResult = &result
 			relayDoneCh = nil
 		case <-ctx.Done():
-			return false, "client_closed", statusClientClosedRequest, usage
+			return false, "client_closed", statusClientClosedRequest, usage, false
 		}
 	}
 }
@@ -881,17 +881,43 @@ func responsesWebSocketUsage(payload []byte) (gatewaycontract.Usage, bool) {
 	return gatewaycontract.Usage{InputTokens: rawUsage.InputTokens, OutputTokens: rawUsage.OutputTokens, CachedTokens: cachedTokens}, true
 }
 
-func responsesWebSocketTerminal(payload []byte) bool {
+func responsesWebSocketTerminal(payload []byte) (bool, bool, string, int) {
 	var event map[string]json.RawMessage
 	if err := json.Unmarshal(bytes.TrimSpace(payload), &event); err != nil {
-		return false
+		return false, false, "", 0
 	}
 	switch rawString(event["type"]) {
-	case "response.completed", "response.done", "error":
-		return true
+	case "response.completed":
+		return true, true, "", http.StatusOK
+	case "response.done":
+		status := responsesWebSocketResponseStatus(event["response"])
+		if status == "failed" {
+			return true, false, "provider_5xx", http.StatusBadGateway
+		}
+		if status == "incomplete" || status == "cancelled" || status == "canceled" {
+			return true, true, "", http.StatusOK
+		}
+		return true, true, "", http.StatusOK
+	case "response.incomplete", "response.cancelled", "response.canceled":
+		return true, true, "", http.StatusOK
+	case "response.failed", "error":
+		return true, false, "provider_5xx", http.StatusBadGateway
 	default:
-		return false
+		return false, false, "", 0
 	}
+}
+
+func responsesWebSocketResponseStatus(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var response struct {
+		Status string `json:"status"`
+	}
+	if err := json.Unmarshal(raw, &response); err != nil {
+		return ""
+	}
+	return strings.ToLower(strings.TrimSpace(response.Status))
 }
 
 func providerStatusFromError(err error) int {

@@ -3,6 +3,7 @@ package httpserver
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -238,6 +239,56 @@ func TestResponsesWebSocketUsageAcceptsInputTokenDetailsCachedTokens(t *testing.
 	}
 }
 
+func TestResponsesWebSocketTerminalRecognizesNonCompletedResponsesEvents(t *testing.T) {
+	tests := []struct {
+		name        string
+		payload     string
+		wantTerm    bool
+		wantSuccess bool
+		wantClass   string
+		wantStatus  int
+	}{
+		{
+			name:        "incomplete",
+			payload:     `{"type":"response.incomplete","response":{"status":"incomplete"}}`,
+			wantTerm:    true,
+			wantSuccess: true,
+			wantStatus:  http.StatusOK,
+		},
+		{
+			name:        "cancelled",
+			payload:     `{"type":"response.cancelled","response":{"status":"cancelled"}}`,
+			wantTerm:    true,
+			wantSuccess: true,
+			wantStatus:  http.StatusOK,
+		},
+		{
+			name:        "failed",
+			payload:     `{"type":"response.failed","error":{"message":"upstream failed"}}`,
+			wantTerm:    true,
+			wantSuccess: false,
+			wantClass:   "provider_5xx",
+			wantStatus:  http.StatusBadGateway,
+		},
+		{
+			name:        "done failed status",
+			payload:     `{"type":"response.done","response":{"status":"failed","usage":{"input_tokens":1,"output_tokens":1}}}`,
+			wantTerm:    true,
+			wantSuccess: false,
+			wantClass:   "provider_5xx",
+			wantStatus:  http.StatusBadGateway,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			terminal, success, errorClass, statusCode := responsesWebSocketTerminal([]byte(tt.payload))
+			if terminal != tt.wantTerm || success != tt.wantSuccess || errorClass != tt.wantClass || statusCode != tt.wantStatus {
+				t.Fatalf("unexpected terminal classification: terminal=%v success=%v errorClass=%q status=%d", terminal, success, errorClass, statusCode)
+			}
+		})
+	}
+}
+
 func TestGatewayResponsesWebSocketRelaysCodexUpstreamWebSocket(t *testing.T) {
 	type upstreamObservation struct {
 		Path          string
@@ -376,6 +427,64 @@ func TestGatewayResponsesWebSocketRelaysCodexUpstreamWebSocket(t *testing.T) {
 		usageResp.Data[0].CachedTokens != 1 ||
 		usageResp.Data[0].UsageEstimated {
 		t.Fatalf("unexpected codex websocket usage record: %+v", usageResp.Data)
+	}
+}
+
+func TestGatewayResponsesWebSocketForwardsFailedTerminalWithoutSyntheticError(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{CompressionMode: websocket.CompressionDisabled})
+		if err != nil {
+			t.Errorf("accept codex upstream websocket: %v", err)
+			return
+		}
+		defer conn.Close(websocket.StatusNormalClosure, "")
+		if _, _, err := conn.Read(r.Context()); err != nil {
+			t.Errorf("read codex upstream frame: %v", err)
+			return
+		}
+		if err := conn.Write(r.Context(), websocket.MessageText, []byte(`{"type":"response.failed","error":{"message":"upstream failed"},"response":{"status":"failed","usage":{"input_tokens":3,"output_tokens":4,"input_tokens_details":{"cached_tokens":1}}}}`)); err != nil {
+			t.Errorf("write codex failed frame: %v", err)
+		}
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"wp411-codex-ws-provider","display_name":"WP411 Codex WS Provider","adapter_type":"reverse-proxy-codex-cli","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"wp411-codex-ws-model","display_name":"WP411 Codex WS Model","status":"active","capabilities":[{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"codex-upstream","status":"active","capability_override":[{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"wp411-codex-ws-account","runtime_class":"cli_client_token","upstream_client":"codex_cli","credential":{"cli_client_token":"codex-ws-token"},"metadata":{"base_url":"`+upstream.URL+`/backend-api/codex","codex_responses_websocket":true},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	conn := mustDialResponsesWebSocket(t, server.URL+"/v1/responses/ws?model=wp411-codex-ws-model&upstream_ws=true", apiKey)
+	defer conn.Close(websocket.StatusNormalClosure, "")
+
+	writeWebSocketJSON(t, conn, map[string]any{
+		"type": "response.create",
+		"response": map[string]any{
+			"input":  "hello failed websocket",
+			"stream": true,
+		},
+	})
+	failed := readWebSocketEvent(t, conn)
+	if failed["type"] != "response.failed" || !strings.Contains(mustMarshalString(t, failed), "upstream failed") {
+		t.Fatalf("expected upstream failed frame, got %+v", failed)
+	}
+	if event, ok := readOptionalWebSocketEvent(t, conn, 100*time.Millisecond); ok {
+		t.Fatalf("expected no synthetic error frame after upstream terminal failure, got %+v", event)
+	}
+
+	usageResp := waitForRealtimeUsageLog(t, handler, sessionCookie, "wp411-codex-ws-model")
+	if len(usageResp.Data) != 1 ||
+		usageResp.Data[0].Success ||
+		usageResp.Data[0].ErrorClass == nil ||
+		*usageResp.Data[0].ErrorClass != "provider_5xx" ||
+		usageResp.Data[0].TotalTokens != 8 ||
+		usageResp.Data[0].CachedTokens != 1 ||
+		usageResp.Data[0].UsageEstimated {
+		t.Fatalf("unexpected failed codex websocket usage record: %+v", usageResp.Data)
 	}
 }
 
@@ -792,6 +901,30 @@ func readWebSocketEvent(t *testing.T, conn *websocket.Conn) map[string]any {
 		t.Fatalf("decode websocket event %s: %v", payload, err)
 	}
 	return event
+}
+
+func readOptionalWebSocketEvent(t *testing.T, conn *websocket.Conn, timeout time.Duration) (map[string]any, bool) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(t.Context(), timeout)
+	defer cancel()
+	messageType, payload, err := conn.Read(ctx)
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return nil, false
+		}
+		if status := websocket.CloseStatus(err); status == websocket.StatusNormalClosure || status == websocket.StatusGoingAway {
+			return nil, false
+		}
+		t.Fatalf("read optional websocket event: %v", err)
+	}
+	if messageType != websocket.MessageText {
+		t.Fatalf("expected optional websocket text event, got %v", messageType)
+	}
+	var event map[string]any
+	if err := json.Unmarshal(payload, &event); err != nil {
+		t.Fatalf("decode optional websocket event %s: %v", payload, err)
+	}
+	return event, true
 }
 
 func readWebSocketEventsUntil(t *testing.T, conn *websocket.Conn, eventType string) []map[string]any {

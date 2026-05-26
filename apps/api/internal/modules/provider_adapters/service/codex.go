@@ -884,7 +884,7 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 			if strings.TrimSpace(event.Text) != "" {
 				completedReasoning = event.Text
 			}
-		case "response.completed", "response.done":
+		case "response.completed", "response.done", "response.incomplete", "response.cancelled", "response.canceled":
 			if text := codexEventText(event); strings.TrimSpace(text) != "" {
 				completedText = text
 			}
