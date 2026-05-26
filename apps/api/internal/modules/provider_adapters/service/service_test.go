@@ -4082,7 +4082,7 @@ func TestReverseProxyCodexCLIAdapterUsesResponsesOfficialClientShape(t *testing.
 		_, _ = w.Write([]byte(
 			"data: {\"type\":\"response.output_text.delta\",\"delta\":\"ignored \"}\n\n" +
 				"data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"type\":\"message\",\"content\":[{\"type\":\"output_text\",\"text\":\"codex response\"}]}}\n\n" +
-				"data: {\"type\":\"response.completed\",\"response\":{\"output\":[],\"usage\":{\"input_tokens\":4,\"output_tokens\":5,\"cached_tokens\":1}}}\n\n" +
+				"data: {\"type\":\"response.completed\",\"response\":{\"output\":[],\"usage\":{\"input_tokens\":4,\"output_tokens\":5,\"input_tokens_details\":{\"cached_tokens\":1}}}}\n\n" +
 				"data: [DONE]\n\n",
 		))
 	}))
@@ -4133,7 +4133,7 @@ func TestReverseProxyCodexCLIAdapterUsesResponsesOfficialClientShape(t *testing.
 	}
 	if string(resp.Raw) != "data: {\"type\":\"response.output_text.delta\",\"delta\":\"ignored \"}\n\n"+
 		"data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"type\":\"message\",\"content\":[{\"type\":\"output_text\",\"text\":\"codex response\"}]}}\n\n"+
-		"data: {\"type\":\"response.completed\",\"response\":{\"output\":[],\"usage\":{\"input_tokens\":4,\"output_tokens\":5,\"cached_tokens\":1}}}\n\n"+
+		"data: {\"type\":\"response.completed\",\"response\":{\"output\":[],\"usage\":{\"input_tokens\":4,\"output_tokens\":5,\"input_tokens_details\":{\"cached_tokens\":1}}}}\n\n"+
 		"data: [DONE]\n\n" {
 		t.Fatalf("expected raw Codex stream to be preserved, got %q", string(resp.Raw))
 	}
@@ -4143,7 +4143,7 @@ func TestReverseProxyCodexCLIAdapterUsesResponsesOfficialClientShape(t *testing.
 	if resp.StreamEvents[0].Type != contract.ConversationStreamEventContentDelta || resp.StreamEvents[0].Delta.Text != "ignored " {
 		t.Fatalf("expected Codex text delta event, got %+v", resp.StreamEvents[0])
 	}
-	if resp.StreamEvents[1].Type != contract.ConversationStreamEventUsage || resp.StreamEvents[1].Usage.InputTokens != 4 || resp.StreamEvents[1].Usage.OutputTokens != 5 {
+	if resp.StreamEvents[1].Type != contract.ConversationStreamEventUsage || resp.StreamEvents[1].Usage.InputTokens != 4 || resp.StreamEvents[1].Usage.OutputTokens != 5 || resp.StreamEvents[1].Usage.CachedTokens != 1 {
 		t.Fatalf("expected Codex usage event, got %+v", resp.StreamEvents[1])
 	}
 	if resp.StreamEvents[len(resp.StreamEvents)-1].Type != contract.ConversationStreamEventStop {
@@ -4426,7 +4426,7 @@ func TestReverseProxyCodexCLIAdapterPreservesResponsesContextInputItems(t *testi
 func TestReverseProxyCodexCLIAdapterStreamsMultilineSSEData(t *testing.T) {
 	rawSSE := "data: {\"type\":\"response.output_text.delta\",\n" +
 		"data: \"delta\":\"codex\"}\n\n" +
-		"data: {\"type\":\"response.completed\",\"response\":{\"output\":[],\"usage\":{\"input_tokens\":4,\"output_tokens\":5}}}\n\n" +
+		"data: {\"type\":\"response.completed\",\"response\":{\"output\":[],\"usage\":{\"input_tokens\":4,\"output_tokens\":5,\"input_tokens_details\":{\"cached_tokens\":2}}}}\n\n" +
 		"data: [DONE]\n\n"
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/backend-api/codex/responses" {
@@ -4466,7 +4466,7 @@ func TestReverseProxyCodexCLIAdapterStreamsMultilineSSEData(t *testing.T) {
 	if err != nil {
 		t.Fatalf("invoke codex reverse proxy adapter: %v", err)
 	}
-	if conversationResponseText(resp) != "codex" || resp.Usage.Estimated || resp.Usage.InputTokens != 4 || resp.Usage.OutputTokens != 5 {
+	if conversationResponseText(resp) != "codex" || resp.Usage.Estimated || resp.Usage.InputTokens != 4 || resp.Usage.OutputTokens != 5 || resp.Usage.CachedTokens != 2 {
 		t.Fatalf("unexpected codex multiline stream response: %+v", resp)
 	}
 	if string(resp.Raw) != rawSSE {

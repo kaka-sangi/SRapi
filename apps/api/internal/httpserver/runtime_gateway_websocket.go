@@ -850,19 +850,19 @@ func responsesWebSocketOpenAPIRequest(payload []byte) (apiopenapi.ResponsesReque
 }
 
 func responsesWebSocketUsage(payload []byte) (gatewaycontract.Usage, bool) {
+	type rawResponsesUsage struct {
+		InputTokens        int `json:"input_tokens"`
+		OutputTokens       int `json:"output_tokens"`
+		CachedTokens       int `json:"cached_tokens"`
+		InputTokensDetails *struct {
+			CachedTokens int `json:"cached_tokens"`
+		} `json:"input_tokens_details"`
+	}
 	var event struct {
 		Response *struct {
-			Usage *struct {
-				InputTokens  int `json:"input_tokens"`
-				OutputTokens int `json:"output_tokens"`
-				CachedTokens int `json:"cached_tokens"`
-			} `json:"usage"`
+			Usage *rawResponsesUsage `json:"usage"`
 		} `json:"response"`
-		Usage *struct {
-			InputTokens  int `json:"input_tokens"`
-			OutputTokens int `json:"output_tokens"`
-			CachedTokens int `json:"cached_tokens"`
-		} `json:"usage"`
+		Usage *rawResponsesUsage `json:"usage"`
 	}
 	if err := json.Unmarshal(bytes.TrimSpace(payload), &event); err != nil {
 		return gatewaycontract.Usage{}, false
@@ -874,7 +874,11 @@ func responsesWebSocketUsage(payload []byte) (gatewaycontract.Usage, bool) {
 	if rawUsage == nil {
 		return gatewaycontract.Usage{}, false
 	}
-	return gatewaycontract.Usage{InputTokens: rawUsage.InputTokens, OutputTokens: rawUsage.OutputTokens, CachedTokens: rawUsage.CachedTokens}, true
+	cachedTokens := rawUsage.CachedTokens
+	if cachedTokens == 0 && rawUsage.InputTokensDetails != nil {
+		cachedTokens = rawUsage.InputTokensDetails.CachedTokens
+	}
+	return gatewaycontract.Usage{InputTokens: rawUsage.InputTokens, OutputTokens: rawUsage.OutputTokens, CachedTokens: cachedTokens}, true
 }
 
 func responsesWebSocketTerminal(payload []byte) bool {

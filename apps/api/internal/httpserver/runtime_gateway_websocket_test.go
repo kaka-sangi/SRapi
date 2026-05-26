@@ -228,6 +228,16 @@ func TestGatewayResponsesWebSocketRejectsFunctionCallOutputWithoutCallID(t *test
 	}
 }
 
+func TestResponsesWebSocketUsageAcceptsInputTokenDetailsCachedTokens(t *testing.T) {
+	usage, ok := responsesWebSocketUsage([]byte(`{"type":"response.completed","response":{"usage":{"input_tokens":8,"output_tokens":9,"input_tokens_details":{"cached_tokens":3}}}}`))
+	if !ok {
+		t.Fatal("expected websocket usage to parse")
+	}
+	if usage.InputTokens != 8 || usage.OutputTokens != 9 || usage.CachedTokens != 3 {
+		t.Fatalf("unexpected websocket usage: %+v", usage)
+	}
+}
+
 func TestGatewayResponsesWebSocketRelaysCodexUpstreamWebSocket(t *testing.T) {
 	type upstreamObservation struct {
 		Path          string
@@ -275,7 +285,7 @@ func TestGatewayResponsesWebSocketRelaysCodexUpstreamWebSocket(t *testing.T) {
 			t.Errorf("write codex created frame: %v", err)
 			return
 		}
-		if err := conn.Write(r.Context(), websocket.MessageText, []byte(`{"type":"response.completed","response":{"id":"resp_ws","model":"codex-upstream","output":[{"type":"message","content":[{"type":"output_text","text":"codex websocket ok"}]}],"usage":{"input_tokens":8,"output_tokens":9,"cached_tokens":1}}}`)); err != nil {
+		if err := conn.Write(r.Context(), websocket.MessageText, []byte(`{"type":"response.completed","response":{"id":"resp_ws","model":"codex-upstream","output":[{"type":"message","content":[{"type":"output_text","text":"codex websocket ok"}]}],"usage":{"input_tokens":8,"output_tokens":9,"input_tokens_details":{"cached_tokens":1}}}}`)); err != nil {
 			t.Errorf("write codex completed frame: %v", err)
 			return
 		}
@@ -363,6 +373,7 @@ func TestGatewayResponsesWebSocketRelaysCodexUpstreamWebSocket(t *testing.T) {
 		!usageResp.Data[0].Success ||
 		usageResp.Data[0].SourceEndpoint != responsesWebSocketSourceEndpoint ||
 		usageResp.Data[0].TotalTokens != 18 ||
+		usageResp.Data[0].CachedTokens != 1 ||
 		usageResp.Data[0].UsageEstimated {
 		t.Fatalf("unexpected codex websocket usage record: %+v", usageResp.Data)
 	}

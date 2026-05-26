@@ -1044,12 +1044,15 @@ type openAIStreamToolCall struct {
 }
 
 type openAIUsage struct {
-	PromptTokens        *int `json:"prompt_tokens"`
-	CompletionTokens    *int `json:"completion_tokens"`
-	TotalTokens         *int `json:"total_tokens"`
-	InputTokens         *int `json:"input_tokens"`
-	OutputTokens        *int `json:"output_tokens"`
-	CachedTokens        *int `json:"cached_tokens"`
+	PromptTokens       *int `json:"prompt_tokens"`
+	CompletionTokens   *int `json:"completion_tokens"`
+	TotalTokens        *int `json:"total_tokens"`
+	InputTokens        *int `json:"input_tokens"`
+	OutputTokens       *int `json:"output_tokens"`
+	CachedTokens       *int `json:"cached_tokens"`
+	InputTokensDetails *struct {
+		CachedTokens *int `json:"cached_tokens"`
+	} `json:"input_tokens_details"`
 	PromptTokensDetails *struct {
 		CachedTokens *int `json:"cached_tokens"`
 	} `json:"prompt_tokens_details"`
@@ -1065,6 +1068,9 @@ func (u openAIUsage) ToUsage(text string) contract.Usage {
 		output = valueOrZero(u.CompletionTokens)
 	}
 	cached := valueOrZero(u.CachedTokens)
+	if cached == 0 && u.InputTokensDetails != nil {
+		cached = valueOrZero(u.InputTokensDetails.CachedTokens)
+	}
 	if cached == 0 && u.PromptTokensDetails != nil {
 		cached = valueOrZero(u.PromptTokensDetails.CachedTokens)
 	}
@@ -1113,6 +1119,7 @@ func (u openAIUsage) HasTokenUsage() bool {
 		u.InputTokens != nil ||
 		u.OutputTokens != nil ||
 		u.CachedTokens != nil ||
+		(u.InputTokensDetails != nil && u.InputTokensDetails.CachedTokens != nil) ||
 		(u.PromptTokensDetails != nil && u.PromptTokensDetails.CachedTokens != nil)
 }
 
