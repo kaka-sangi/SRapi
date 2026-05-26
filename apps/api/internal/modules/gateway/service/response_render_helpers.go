@@ -139,7 +139,7 @@ func responseOutputItems(blocks []gatewaycontract.ContentBlock) []apiopenapi.Res
 		})
 	}
 	if len(messageBlocks) > 0 {
-		content := outputOpenAIContentBlocks(messageBlocks)
+		content := outputResponsesContentBlocks(messageBlocks)
 		out = append([]apiopenapi.ResponsesOutputItem{{
 			Type:    "message",
 			Role:    &role,
@@ -147,8 +147,26 @@ func responseOutputItems(blocks []gatewaycontract.ContentBlock) []apiopenapi.Res
 		}}, out...)
 	}
 	if len(out) == 0 {
-		content := outputOpenAIContentBlocks(nil)
+		content := outputResponsesContentBlocks(nil)
 		out = append(out, apiopenapi.ResponsesOutputItem{Type: "message", Role: &role, Content: &content})
+	}
+	return out
+}
+
+func outputResponsesContentBlocks(blocks []gatewaycontract.ContentBlock) []apiopenapi.ContentBlock {
+	blocks = normalizeOutputItems(blocks)
+	out := make([]apiopenapi.ContentBlock, 0, len(blocks))
+	for _, block := range blocks {
+		item := apiopenapi.ContentBlock{
+			Type:                 apiopenapi.ContentBlockType(responseStreamContentPartType(block.Type)),
+			AdditionalProperties: outputBlockProperties(block),
+		}
+		if block.Type != gatewaycontract.ContentBlockToolCall {
+			if text := strings.TrimSpace(block.Text); text != "" {
+				item.Text = &text
+			}
+		}
+		out = append(out, item)
 	}
 	return out
 }

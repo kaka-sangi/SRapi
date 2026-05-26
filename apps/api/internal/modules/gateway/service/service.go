@@ -986,10 +986,13 @@ func (s *Service) renderResponsesCanonicalStreamEvents(resp gatewaycontract.Cano
 	textOutputIndex := -1
 	textItemID := ""
 	var text strings.Builder
+	reasoningOutputIndex := -1
+	reasoningItemID := ""
+	var reasoning strings.Builder
 	toolStates := newStreamToolCallStates(resp.OutputItems)
 	for _, event := range events {
 		switch event.Type {
-		case gatewaycontract.StreamEventContentDelta, gatewaycontract.StreamEventReasoning, gatewaycontract.StreamEventToolResult:
+		case gatewaycontract.StreamEventContentDelta, gatewaycontract.StreamEventToolResult:
 			delta := event.Delta.Text
 			if delta == "" {
 				continue
@@ -998,19 +1001,23 @@ func (s *Service) renderResponsesCanonicalStreamEvents(resp gatewaycontract.Cano
 				textOutputIndex = nextOutputIndex
 				nextOutputIndex++
 				textItemID = fmt.Sprintf("msg_%d", textOutputIndex)
-				out = append(out, responseStreamTextStartEvents(textItemID, textOutputIndex)...)
+				out = append(out, responseStreamTextStartEvents(textItemID, textOutputIndex, gatewaycontract.ContentBlockText)...)
 			}
 			text.WriteString(delta)
-			out = append(out, StreamEvent{
-				Event: "response.output_text.delta",
-				Data: map[string]any{
-					"type":          "response.output_text.delta",
-					"item_id":       textItemID,
-					"output_index":  textOutputIndex,
-					"content_index": 0,
-					"delta":         delta,
-				},
-			})
+			out = append(out, responseStreamTextDeltaEvent(textItemID, textOutputIndex, gatewaycontract.ContentBlockText, delta))
+		case gatewaycontract.StreamEventReasoning:
+			delta := event.Delta.Text
+			if delta == "" {
+				continue
+			}
+			if reasoningOutputIndex < 0 {
+				reasoningOutputIndex = nextOutputIndex
+				nextOutputIndex++
+				reasoningItemID = fmt.Sprintf("rs_%d", reasoningOutputIndex)
+				out = append(out, responseStreamTextStartEvents(reasoningItemID, reasoningOutputIndex, gatewaycontract.ContentBlockReasoning)...)
+			}
+			reasoning.WriteString(delta)
+			out = append(out, responseStreamTextDeltaEvent(reasoningItemID, reasoningOutputIndex, gatewaycontract.ContentBlockReasoning, delta))
 		case gatewaycontract.StreamEventToolCallDelta:
 			state := toolStates.stateFor(event)
 			if state.OutputIndex < 0 {
@@ -1033,30 +1040,22 @@ func (s *Service) renderResponsesCanonicalStreamEvents(resp gatewaycontract.Cano
 		}
 	}
 	if textOutputIndex >= 0 {
+		if reasoningOutputIndex >= 0 && reasoningOutputIndex < textOutputIndex {
+			out = append(out,
+				responseStreamTextDoneEvent(reasoningItemID, reasoningOutputIndex, gatewaycontract.ContentBlockReasoning, reasoning.String()),
+				responseStreamMessageDoneEvent(reasoningItemID, reasoningOutputIndex, gatewaycontract.ContentBlockReasoning, reasoning.String()),
+			)
+			reasoningOutputIndex = -1
+		}
 		out = append(out,
-			StreamEvent{
-				Event: "response.output_text.done",
-				Data: map[string]any{
-					"type":          "response.output_text.done",
-					"item_id":       textItemID,
-					"output_index":  textOutputIndex,
-					"content_index": 0,
-					"text":          text.String(),
-				},
-			},
-			StreamEvent{
-				Event: "response.output_item.done",
-				Data: map[string]any{
-					"type":         "response.output_item.done",
-					"output_index": textOutputIndex,
-					"item": map[string]any{
-						"id":      textItemID,
-						"type":    "message",
-						"role":    "assistant",
-						"content": []map[string]any{{"type": "output_text", "text": text.String()}},
-					},
-				},
-			},
+			responseStreamTextDoneEvent(textItemID, textOutputIndex, gatewaycontract.ContentBlockText, text.String()),
+			responseStreamMessageDoneEvent(textItemID, textOutputIndex, gatewaycontract.ContentBlockText, text.String()),
+		)
+	}
+	if reasoningOutputIndex >= 0 {
+		out = append(out,
+			responseStreamTextDoneEvent(reasoningItemID, reasoningOutputIndex, gatewaycontract.ContentBlockReasoning, reasoning.String()),
+			responseStreamMessageDoneEvent(reasoningItemID, reasoningOutputIndex, gatewaycontract.ContentBlockReasoning, reasoning.String()),
 		)
 	}
 	for _, state := range toolStates.openStates() {
@@ -1096,7 +1095,7 @@ func (s *Service) renderResponsesCanonicalStreamEvents(resp gatewaycontract.Cano
 	return out
 }
 
-func responseStreamTextStartEvents(itemID string, outputIndex int) []StreamEvent {
+func responseStreamTextStartEvents(itemID string, outputIndex int, blockType gatewaycontract.ContentBlockType) []StreamEvent {
 	return []StreamEvent{
 		{
 			Event: "response.output_item.added",
@@ -1119,12 +1118,63 @@ func responseStreamTextStartEvents(itemID string, outputIndex int) []StreamEvent
 				"output_index":  outputIndex,
 				"content_index": 0,
 				"part": map[string]any{
-					"type": "output_text",
+					"type": responseStreamContentPartType(blockType),
 					"text": "",
 				},
 			},
 		},
 	}
+}
+
+func responseStreamTextDeltaEvent(itemID string, outputIndex int, blockType gatewaycontract.ContentBlockType, delta string) StreamEvent {
+	eventName := responseStreamTextEventName(blockType, "delta")
+	return StreamEvent{
+		Event: eventName,
+		Data: map[string]any{
+			"type":          eventName,
+			"item_id":       itemID,
+			"output_index":  outputIndex,
+			"content_index": 0,
+			"delta":         delta,
+		},
+	}
+}
+
+func responseStreamTextDoneEvent(itemID string, outputIndex int, blockType gatewaycontract.ContentBlockType, text string) StreamEvent {
+	eventName := responseStreamTextEventName(blockType, "done")
+	return StreamEvent{
+		Event: eventName,
+		Data: map[string]any{
+			"type":          eventName,
+			"item_id":       itemID,
+			"output_index":  outputIndex,
+			"content_index": 0,
+			"text":          text,
+		},
+	}
+}
+
+func responseStreamMessageDoneEvent(itemID string, outputIndex int, blockType gatewaycontract.ContentBlockType, text string) StreamEvent {
+	return StreamEvent{
+		Event: "response.output_item.done",
+		Data: map[string]any{
+			"type":         "response.output_item.done",
+			"output_index": outputIndex,
+			"item": map[string]any{
+				"id":      itemID,
+				"type":    "message",
+				"role":    "assistant",
+				"content": []map[string]any{{"type": responseStreamContentPartType(blockType), "text": text}},
+			},
+		},
+	}
+}
+
+func responseStreamTextEventName(blockType gatewaycontract.ContentBlockType, suffix string) string {
+	if blockType == gatewaycontract.ContentBlockReasoning {
+		return "response.reasoning_text." + suffix
+	}
+	return "response.output_text." + suffix
 }
 
 func responseStreamToolCallStartEvent(state *streamToolCallState) StreamEvent {

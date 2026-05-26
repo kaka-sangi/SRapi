@@ -652,6 +652,8 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 	scanner.Buffer(make([]byte, 0, 64*1024), 4<<20)
 	var deltaBuilder strings.Builder
 	var completedText string
+	var reasoningBuilder strings.Builder
+	var completedReasoning string
 	var usage *openAIUsage
 	indexedItems := map[int]codexResponsesOutputItem{}
 	fallbackItems := []codexResponsesOutputItem{}
@@ -731,6 +733,24 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 				})
 				eventIndex++
 			}
+		case "response.reasoning_text.delta":
+			reasoningBuilder.WriteString(event.Delta)
+			if event.Delta != "" {
+				streamEvents = append(streamEvents, contract.ConversationStreamEvent{
+					Index:        eventIndex,
+					Type:         contract.ConversationStreamEventReasoning,
+					ContentIndex: codexOutputIndex(event),
+					Delta: contract.ContentPart{
+						Kind:           contract.ContentPartThinking,
+						Text:           event.Delta,
+						OriginProtocol: "openai-compatible",
+					},
+					RawEventType:   strings.TrimSpace(event.Type),
+					Raw:            append(json.RawMessage(nil), data...),
+					OriginProtocol: "openai-compatible",
+				})
+				eventIndex++
+			}
 		case "response.function_call_arguments.delta":
 			if event.Delta != "" {
 				streamEvents = append(streamEvents, functionStates.deltaEvent(event, eventIndex, data))
@@ -739,6 +759,10 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 		case "response.output_text.done":
 			if strings.TrimSpace(event.Text) != "" {
 				completedText = event.Text
+			}
+		case "response.reasoning_text.done":
+			if strings.TrimSpace(event.Text) != "" {
+				completedReasoning = event.Text
 			}
 		case "response.completed", "response.done":
 			if text := codexEventText(event); strings.TrimSpace(text) != "" {
@@ -786,6 +810,7 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 			parts = append(parts, textContentPart(text))
 		}
 	}
+	parts = prependCodexReasoningPart(parts, completedReasoning, reasoningBuilder.String())
 	if len(parts) == 0 {
 		return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider stream contained no content"}
 	}
@@ -811,6 +836,23 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 		Raw:          append(json.RawMessage(nil), body...),
 		StreamEvents: streamEvents,
 	}, nil
+}
+
+func prependCodexReasoningPart(parts []contract.ContentPart, completedReasoning string, streamedReasoning string) []contract.ContentPart {
+	reasoningText := strings.TrimSpace(completedReasoning)
+	if reasoningText == "" {
+		reasoningText = strings.TrimSpace(streamedReasoning)
+	}
+	if reasoningText == "" {
+		return parts
+	}
+	for _, part := range parts {
+		if part.Kind == contract.ContentPartThinking && strings.TrimSpace(part.Text) == reasoningText {
+			return parts
+		}
+	}
+	reasoningPart := contract.ContentPart{Kind: contract.ContentPartThinking, Text: reasoningText, OriginProtocol: "openai"}
+	return append([]contract.ContentPart{reasoningPart}, parts...)
 }
 
 func codexStreamUsageEvent(index int, usage openAIUsage, raw string, text string) contract.ConversationStreamEvent {

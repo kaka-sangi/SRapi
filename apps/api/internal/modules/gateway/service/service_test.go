@@ -433,6 +433,82 @@ func TestRenderCanonicalStreamEventsPreservesTextDeltas(t *testing.T) {
 	}
 }
 
+func TestRenderCanonicalStreamEventsPreservesResponsesReasoningDeltas(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	resp := gatewaycontract.CanonicalResponse{
+		ID:         "resp_reasoning_delta_stream",
+		Model:      "gpt-4o-mini",
+		StopReason: "end_turn",
+		OutputItems: []gatewaycontract.ContentBlock{
+			{Type: gatewaycontract.ContentBlockReasoning, Role: "assistant", Text: "think first"},
+			{Type: gatewaycontract.ContentBlockText, Role: "assistant", Text: "answer"},
+		},
+		StreamEvents: []gatewaycontract.StreamEvent{
+			{
+				Index:        0,
+				Type:         gatewaycontract.StreamEventReasoning,
+				ContentIndex: 0,
+				Delta:        gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockReasoning, Role: "assistant", Text: "think "},
+			},
+			{
+				Index:        1,
+				Type:         gatewaycontract.StreamEventReasoning,
+				ContentIndex: 0,
+				Delta:        gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockReasoning, Role: "assistant", Text: "first"},
+			},
+			{
+				Index:        2,
+				Type:         gatewaycontract.StreamEventContentDelta,
+				ContentIndex: 1,
+				Delta:        gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockText, Role: "assistant", Text: "answer"},
+			},
+			{
+				Index:      3,
+				Type:       gatewaycontract.StreamEventStop,
+				StopReason: "end_turn",
+			},
+		},
+		Usage: gatewaycontract.Usage{InputTokens: 3, OutputTokens: 4},
+	}
+
+	responsesEvents := svc.RenderResponsesStreamEvents(resp)
+	reasoningDeltas := streamEventsByName(responsesEvents, "response.reasoning_text.delta")
+	if len(reasoningDeltas) != 2 || reasoningDeltas[0].Data["delta"] != "think " || reasoningDeltas[1].Data["delta"] != "first" {
+		t.Fatalf("expected preserved responses reasoning deltas, got %+v", reasoningDeltas)
+	}
+	if outputTextDeltas := streamEventsByName(responsesEvents, "response.output_text.delta"); len(outputTextDeltas) != 1 || outputTextDeltas[0].Data["delta"] != "answer" {
+		t.Fatalf("expected reasoning to stay out of output_text deltas, got %+v", outputTextDeltas)
+	}
+	reasoningDone := streamEventByName(responsesEvents, "response.reasoning_text.done")
+	if reasoningDone == nil || reasoningDone.Data["text"] != "think first" {
+		t.Fatalf("expected completed responses reasoning text, got %+v", responsesEvents)
+	}
+	var reasoningPart map[string]any
+	for _, event := range responsesEvents {
+		if event.Event != "response.content_part.added" {
+			continue
+		}
+		part, _ := event.Data["part"].(map[string]any)
+		if part["type"] == "reasoning_text" {
+			reasoningPart = part
+			break
+		}
+	}
+	if reasoningPart == nil {
+		t.Fatalf("expected responses reasoning content part, got %+v", responsesEvents)
+	}
+	completed := svc.RenderResponses(resp)
+	if len(completed.Output) == 0 || completed.Output[0].Content == nil || len(*completed.Output[0].Content) == 0 {
+		t.Fatalf("expected completed responses content, got %+v", completed)
+	}
+	if (*completed.Output[0].Content)[0].Type != apiopenapi.ContentBlockType("reasoning_text") {
+		t.Fatalf("expected final responses output to preserve reasoning_text, got %+v", (*completed.Output[0].Content)[0])
+	}
+}
+
 func TestRenderCanonicalStreamEventsPreservesToolCallDeltas(t *testing.T) {
 	svc, err := New()
 	if err != nil {
