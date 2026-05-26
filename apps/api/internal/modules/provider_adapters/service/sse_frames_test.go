@@ -28,3 +28,13 @@ func TestParseSSEFramesFoldsMultilineData(t *testing.T) {
 		t.Fatalf("expected unterminated final frame to flush, got %+v", frames[1])
 	}
 }
+
+func TestSSEFrameEventTypeFallsBackToNamedEvent(t *testing.T) {
+	frame := sseFrame{Event: " response.completed "}
+	if got := frame.EventType(""); got != "response.completed" {
+		t.Fatalf("expected event type fallback, got %q", got)
+	}
+	if got := frame.EventType("response.done"); got != "response.done" {
+		t.Fatalf("expected payload type to win, got %q", got)
+	}
+}

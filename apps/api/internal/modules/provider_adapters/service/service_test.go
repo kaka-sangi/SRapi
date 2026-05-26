@@ -3213,6 +3213,64 @@ func TestAnthropicCompatibleAdapterStreamsUpstream(t *testing.T) {
 	}
 }
 
+func TestAnthropicCompatibleAdapterUsesNamedSSEEventType(t *testing.T) {
+	rawSSE := "event: message_start\n" +
+		"data: {\"message\":{\"usage\":{\"input_tokens\":5,\"output_tokens\":0}}}\n\n" +
+		"event: content_block_delta\n" +
+		"data: {\"delta\":{\"type\":\"text_delta\",\"text\":\"named\"}}\n\n" +
+		"event: message_delta\n" +
+		"data: {\"usage\":{\"output_tokens\":6,\"cache_read_input_tokens\":1}}\n\n" +
+		"event: message_stop\n" +
+		"data: {}\n\n"
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/messages" {
+			t.Fatalf("unexpected upstream path %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte(rawSSE))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_anthropic_named_stream",
+		Model:      "claude-local",
+		InputParts: textParts("hello stream"),
+		Stream:     true,
+		Provider: providercontract.Provider{
+			ID:          2,
+			AdapterType: "anthropic-compatible",
+			Protocol:    "anthropic-compatible",
+		},
+		Account:    accountcontract.ProviderAccount{ID: 2, Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "claude-upstream"},
+		Credential: map[string]any{"api_key": "anthropic-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke anthropic named stream upstream: %v", err)
+	}
+	if conversationResponseText(resp) != "named" || resp.Usage.Estimated || resp.Usage.InputTokens != 5 || resp.Usage.OutputTokens != 6 || resp.Usage.CachedTokens != 1 {
+		t.Fatalf("unexpected anthropic named stream response: %+v", resp)
+	}
+	if string(resp.Raw) != rawSSE {
+		t.Fatalf("expected raw Anthropic named stream to be preserved\nexpected:\n%s\nactual:\n%s", rawSSE, string(resp.Raw))
+	}
+	if len(resp.StreamEvents) < 4 ||
+		resp.StreamEvents[0].Type != contract.ConversationStreamEventUsage ||
+		resp.StreamEvents[0].RawEventType != "message_start" ||
+		resp.StreamEvents[1].Type != contract.ConversationStreamEventContentDelta ||
+		resp.StreamEvents[1].RawEventType != "content_block_delta" ||
+		string(resp.StreamEvents[1].Raw) != `{"delta":{"type":"text_delta","text":"named"}}` ||
+		resp.StreamEvents[2].Type != contract.ConversationStreamEventUsage ||
+		resp.StreamEvents[2].RawEventType != "message_delta" ||
+		resp.StreamEvents[len(resp.StreamEvents)-1].Type != contract.ConversationStreamEventStop {
+		t.Fatalf("expected Anthropic named stream events, got %+v", resp.StreamEvents)
+	}
+}
+
 func TestAnthropicCompatibleAdapterPreservesContextManagement(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/messages" {
@@ -4477,6 +4535,65 @@ func TestReverseProxyCodexCLIAdapterStreamsMultilineSSEData(t *testing.T) {
 	}
 	if want := "{\"type\":\"response.output_text.delta\",\n\"delta\":\"codex\"}"; string(resp.StreamEvents[0].Raw) != want {
 		t.Fatalf("expected first Codex raw event payload %q, got %q", want, string(resp.StreamEvents[0].Raw))
+	}
+}
+
+func TestReverseProxyCodexCLIAdapterUsesNamedSSEEventType(t *testing.T) {
+	rawSSE := "event: response.output_text.delta\n" +
+		"data: {\"delta\":\"named\"}\n\n" +
+		"event: response.completed\n" +
+		"data: {\"response\":{\"output\":[],\"usage\":{\"input_tokens\":4,\"output_tokens\":5,\"input_tokens_details\":{\"cached_tokens\":2}}}}\n\n"
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/backend-api/codex/responses" {
+			t.Fatalf("unexpected codex upstream path %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte(rawSSE))
+	}))
+	defer upstream.Close()
+
+	runtime, err := reverseproxyservice.New(nil)
+	if err != nil {
+		t.Fatalf("create reverse proxy runtime: %v", err)
+	}
+	svc, err := service.NewWithReverseProxy(nil, runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_codex_proxy_named_sse",
+		Model:      "codex-local",
+		InputParts: textParts("hello codex"),
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": upstream.URL + "/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+		Credential: map[string]any{"cli_client_token": "codex-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke codex reverse proxy adapter: %v", err)
+	}
+	if conversationResponseText(resp) != "named" || resp.Usage.Estimated || resp.Usage.InputTokens != 4 || resp.Usage.OutputTokens != 5 || resp.Usage.CachedTokens != 2 {
+		t.Fatalf("unexpected codex named stream response: %+v", resp)
+	}
+	if string(resp.Raw) != rawSSE {
+		t.Fatalf("expected raw Codex named stream to be preserved, got %q", string(resp.Raw))
+	}
+	if len(resp.StreamEvents) != 3 ||
+		resp.StreamEvents[0].Type != contract.ConversationStreamEventContentDelta ||
+		resp.StreamEvents[0].RawEventType != "response.output_text.delta" ||
+		string(resp.StreamEvents[0].Raw) != `{"delta":"named"}` ||
+		resp.StreamEvents[2].Type != contract.ConversationStreamEventStop ||
+		resp.StreamEvents[2].RawEventType != "response.completed" {
+		t.Fatalf("expected Codex named stream events, got %+v", resp.StreamEvents)
 	}
 }
 

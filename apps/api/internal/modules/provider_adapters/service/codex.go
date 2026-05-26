@@ -800,6 +800,8 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 		if err := json.Unmarshal([]byte(data), &event); err != nil {
 			return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider returned invalid stream json"}
 		}
+		eventType := frame.EventType(event.Type)
+		event.Type = eventType
 		seenEvent = true
 		if providerErr, ok := codexEventProviderError(event); ok {
 			return contract.ConversationResponse{}, providerErr
@@ -824,7 +826,7 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 				eventIndex++
 			}
 		}
-		switch event.Type {
+		switch eventType {
 		case "response.output_item.done":
 			if event.Item != nil {
 				if event.OutputIndex != nil {
@@ -847,7 +849,7 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 					Type:           contract.ConversationStreamEventContentDelta,
 					ContentIndex:   codexOutputIndex(event),
 					Delta:          textContentDelta(event.Delta),
-					RawEventType:   strings.TrimSpace(event.Type),
+					RawEventType:   eventType,
 					Raw:            append(json.RawMessage(nil), data...),
 					OriginProtocol: "openai-compatible",
 				})
@@ -865,7 +867,7 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 						Text:           event.Delta,
 						OriginProtocol: "openai-compatible",
 					},
-					RawEventType:   strings.TrimSpace(event.Type),
+					RawEventType:   eventType,
 					Raw:            append(json.RawMessage(nil), data...),
 					OriginProtocol: "openai-compatible",
 				})
@@ -873,7 +875,7 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 			}
 		case "response.function_call_arguments.delta":
 			if event.Delta != "" {
-				streamEvents = append(streamEvents, functionStates.deltaEvent(event, eventIndex, data))
+				streamEvents = append(streamEvents, functionStates.deltaEvent(event, eventType, eventIndex, data))
 				eventIndex++
 			}
 		case "response.output_text.done":
@@ -892,7 +894,7 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 				Index:          eventIndex,
 				Type:           contract.ConversationStreamEventStop,
 				StopReason:     codexEventStopReason(event),
-				RawEventType:   strings.TrimSpace(event.Type),
+				RawEventType:   eventType,
 				Raw:            append(json.RawMessage(nil), data...),
 				OriginProtocol: "openai-compatible",
 			})
@@ -1032,7 +1034,7 @@ func (s *codexFunctionCallStreamStates) hasArgumentDeltas(event codexResponsesEv
 	return state.ArgumentsLen > 0
 }
 
-func (s *codexFunctionCallStreamStates) deltaEvent(event codexResponsesEvent, index int, raw string) contract.ConversationStreamEvent {
+func (s *codexFunctionCallStreamStates) deltaEvent(event codexResponsesEvent, eventType string, index int, raw string) contract.ConversationStreamEvent {
 	state := s.stateFor(event)
 	state.ArgumentsLen += len(event.Delta)
 	return contract.ConversationStreamEvent{
@@ -1047,7 +1049,7 @@ func (s *codexFunctionCallStreamStates) deltaEvent(event codexResponsesEvent, in
 			Metadata:          map[string]any{"type": "function_call"},
 			OriginProtocol:    "openai-compatible",
 		},
-		RawEventType:   strings.TrimSpace(event.Type),
+		RawEventType:   eventType,
 		Raw:            append(json.RawMessage(nil), raw...),
 		OriginProtocol: "openai-compatible",
 	}

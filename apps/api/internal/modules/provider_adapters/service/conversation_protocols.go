@@ -1810,7 +1810,9 @@ func parseAnthropicCompatibleStream(body []byte, statusCode int) (contract.Conve
 		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
 			return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider returned invalid stream json"}
 		}
-		switch strings.TrimSpace(chunk.Type) {
+		chunkType := frame.EventType(chunk.Type)
+		chunk.Type = chunkType
+		switch chunkType {
 		case "content_block_start":
 			index := anthropicStreamIndex(chunk.Index, &lastIndex, len(order))
 			block := anthropicStreamBlockState(blocks, &order, index)
@@ -1831,7 +1833,7 @@ func parseAnthropicCompatibleStream(body []byte, statusCode int) (contract.Conve
 							Metadata:       map[string]any{"type": strings.TrimSpace(block.Type)},
 							OriginProtocol: "anthropic-compatible",
 						},
-						RawEventType:   strings.TrimSpace(chunk.Type),
+						RawEventType:   chunkType,
 						Raw:            append(json.RawMessage(nil), data...),
 						OriginProtocol: "anthropic-compatible",
 					})
@@ -1844,7 +1846,7 @@ func parseAnthropicCompatibleStream(body []byte, statusCode int) (contract.Conve
 						Type:           contract.ConversationStreamEventContentDelta,
 						ContentIndex:   index,
 						Delta:          textContentDelta(chunk.ContentBlock.Text),
-						RawEventType:   strings.TrimSpace(chunk.Type),
+						RawEventType:   chunkType,
 						Raw:            append(json.RawMessage(nil), data...),
 						OriginProtocol: "anthropic-compatible",
 					})
@@ -1873,7 +1875,7 @@ func parseAnthropicCompatibleStream(body []byte, statusCode int) (contract.Conve
 						Metadata:          map[string]any{"type": "tool_use"},
 						OriginProtocol:    "anthropic-compatible",
 					},
-					RawEventType:   strings.TrimSpace(chunk.Type),
+					RawEventType:   chunkType,
 					Raw:            append(json.RawMessage(nil), data...),
 					OriginProtocol: "anthropic-compatible",
 				})
@@ -1891,7 +1893,7 @@ func parseAnthropicCompatibleStream(body []byte, statusCode int) (contract.Conve
 						Type:           contract.ConversationStreamEventReasoning,
 						ContentIndex:   index,
 						Delta:          contract.ContentPart{Kind: contract.ContentPartThinking, Text: text, OriginProtocol: "anthropic-compatible"},
-						RawEventType:   strings.TrimSpace(chunk.Type),
+						RawEventType:   chunkType,
 						Raw:            append(json.RawMessage(nil), data...),
 						OriginProtocol: "anthropic-compatible",
 					})
@@ -1910,7 +1912,7 @@ func parseAnthropicCompatibleStream(body []byte, statusCode int) (contract.Conve
 							Metadata:       map[string]any{"signature_delta": chunk.Delta.Signature},
 							OriginProtocol: "anthropic-compatible",
 						},
-						RawEventType:   strings.TrimSpace(chunk.Type),
+						RawEventType:   chunkType,
 						Raw:            append(json.RawMessage(nil), data...),
 						OriginProtocol: "anthropic-compatible",
 					})
@@ -1928,7 +1930,7 @@ func parseAnthropicCompatibleStream(body []byte, statusCode int) (contract.Conve
 						Type:           contract.ConversationStreamEventContentDelta,
 						ContentIndex:   index,
 						Delta:          textContentDelta(chunk.Delta.Text),
-						RawEventType:   strings.TrimSpace(chunk.Type),
+						RawEventType:   chunkType,
 						Raw:            append(json.RawMessage(nil), data...),
 						OriginProtocol: "anthropic-compatible",
 					})
@@ -1942,7 +1944,7 @@ func parseAnthropicCompatibleStream(body []byte, statusCode int) (contract.Conve
 					Index:          eventIndex,
 					Type:           contract.ConversationStreamEventUsage,
 					Usage:          chunk.Message.Usage.ToUsage(builder.String()),
-					RawEventType:   strings.TrimSpace(chunk.Type),
+					RawEventType:   chunkType,
 					Raw:            append(json.RawMessage(nil), data...),
 					OriginProtocol: "anthropic-compatible",
 				})
@@ -1955,7 +1957,7 @@ func parseAnthropicCompatibleStream(body []byte, statusCode int) (contract.Conve
 					Index:          eventIndex,
 					Type:           contract.ConversationStreamEventStop,
 					StopReason:     stopReason,
-					RawEventType:   strings.TrimSpace(chunk.Type),
+					RawEventType:   chunkType,
 					Raw:            append(json.RawMessage(nil), data...),
 					OriginProtocol: "anthropic-compatible",
 				})
@@ -1967,7 +1969,7 @@ func parseAnthropicCompatibleStream(body []byte, statusCode int) (contract.Conve
 					Index:          eventIndex,
 					Type:           contract.ConversationStreamEventUsage,
 					Usage:          usage.ToUsage(builder.String()),
-					RawEventType:   strings.TrimSpace(chunk.Type),
+					RawEventType:   chunkType,
 					Raw:            append(json.RawMessage(nil), data...),
 					OriginProtocol: "anthropic-compatible",
 				})

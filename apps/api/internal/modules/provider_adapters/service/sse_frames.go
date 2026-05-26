@@ -11,6 +11,10 @@ type sseFrame struct {
 	Data  string
 }
 
+func (f sseFrame) EventType(payloadType string) string {
+	return firstNonEmpty(strings.TrimSpace(payloadType), strings.TrimSpace(f.Event))
+}
+
 // parseSSEFrames folds repeated data fields into one event payload. Comments
 // and event-only frames are metadata-only and do not produce payload frames.
 func parseSSEFrames(body []byte) ([]sseFrame, error) {
