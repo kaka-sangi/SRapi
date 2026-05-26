@@ -191,7 +191,9 @@ func anthropicContentFromParts(parts []contract.ContentPart) any {
 			plainTextOnly = false
 			block := map[string]any{"type": "tool_result"}
 			setMapString(block, "tool_use_id", firstNonEmpty(part.ToolResultForID, part.ToolCallID))
-			if text := strings.TrimSpace(part.Text); text != "" {
+			if content := anthropicToolResultNestedContent(part); len(content) > 0 {
+				block["content"] = content
+			} else if text := strings.TrimSpace(part.Text); text != "" {
 				block["content"] = text
 			}
 			if part.ToolResultIsError {
@@ -232,6 +234,53 @@ func anthropicImageBlock(part contract.ContentPart) map[string]any {
 		return nil
 	}
 	return anthropicBlockWithMetadata(map[string]any{"type": "image", "source": source}, part)
+}
+
+func anthropicToolResultNestedContent(part contract.ContentPart) []map[string]any {
+	values, ok := part.Metadata["content"].([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]map[string]any, 0, len(values))
+	for _, value := range values {
+		item, ok := value.(map[string]any)
+		if !ok {
+			continue
+		}
+		switch strings.TrimSpace(mapString(item, "type")) {
+		case "text":
+			text := strings.TrimSpace(mapString(item, "text"))
+			if text == "" {
+				continue
+			}
+			out = append(out, map[string]any{"type": "text", "text": text})
+		case "image":
+			if block := anthropicRawImageBlock(item); len(block) > 0 {
+				out = append(out, block)
+			}
+		}
+	}
+	return out
+}
+
+func anthropicRawImageBlock(item map[string]any) map[string]any {
+	source, _ := item["source"].(map[string]any)
+	imageSource := cloneMap(source)
+	if len(imageSource) == 0 {
+		imageSource = map[string]any{}
+		if url := mapString(item, "url"); url != "" {
+			imageSource["type"] = "url"
+			imageSource["url"] = url
+		} else if data := mapString(item, "data"); data != "" {
+			imageSource["type"] = "base64"
+			imageSource["media_type"] = firstNonEmpty(mapString(item, "media_type"), "image/png")
+			imageSource["data"] = data
+		}
+	}
+	if len(imageSource) == 0 {
+		return nil
+	}
+	return map[string]any{"type": "image", "source": imageSource}
 }
 
 func anthropicThinkingBlock(part contract.ContentPart) map[string]any {

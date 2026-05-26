@@ -2736,6 +2736,78 @@ func TestAnthropicCompatibleAdapterRendersBlockContentToUpstream(t *testing.T) {
 	}
 }
 
+func TestAnthropicCompatibleAdapterPreservesNestedToolResultContent(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload struct {
+			Messages []struct {
+				Role    string           `json:"role"`
+				Content []map[string]any `json:"content"`
+			} `json:"messages"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		if len(payload.Messages) != 1 || len(payload.Messages[0].Content) != 1 {
+			t.Fatalf("expected one tool result message, got %+v", payload.Messages)
+		}
+		result := payload.Messages[0].Content[0]
+		nested, _ := result["content"].([]any)
+		if result["type"] != "tool_result" || result["tool_use_id"] != "call_1" || len(nested) != 2 {
+			t.Fatalf("expected nested tool_result content, got %+v", result)
+		}
+		text, _ := nested[0].(map[string]any)
+		image, _ := nested[1].(map[string]any)
+		source, _ := image["source"].(map[string]any)
+		if text["type"] != "text" || text["text"] != "File metadata: 800x600 PNG" {
+			t.Fatalf("expected non-empty nested text, got %+v", nested)
+		}
+		if image["type"] != "image" || source["media_type"] != "image/png" || source["data"] != "iVBOR" {
+			t.Fatalf("expected nested image source, got %+v", nested)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"content":[{"type":"text","text":"done"}],"usage":{"input_tokens":5,"output_tokens":1}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID: "req_anthropic_nested_tool_result",
+		Model:     "claude-local",
+		Messages: []contract.ConversationMessage{{
+			Role: "tool",
+			Parts: []contract.ContentPart{{
+				Kind:            contract.ContentPartToolResult,
+				ToolResultForID: "call_1",
+				Text:            "File metadata: 800x600 PNG",
+				Metadata: map[string]any{
+					"content": []any{
+						map[string]any{"type": "text", "text": "File metadata: 800x600 PNG"},
+						map[string]any{"type": "text", "text": ""},
+						map[string]any{
+							"type": "image",
+							"source": map[string]any{
+								"type":       "base64",
+								"media_type": "image/png",
+								"data":       "iVBOR",
+							},
+						},
+					},
+				},
+			}},
+		}},
+		Provider:   providercontract.Provider{AdapterType: "anthropic-compatible", Protocol: "anthropic-compatible"},
+		Account:    accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "claude-upstream"},
+		Credential: map[string]any{"api_key": "anthropic-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke anthropic upstream: %v", err)
+	}
+}
+
 func TestAnthropicCompatibleAdapterPreservesBlockCacheControl(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var payload struct {
