@@ -486,6 +486,15 @@ func TestRenderCanonicalStreamEventsPreservesResponsesReasoningDeltas(t *testing
 	if reasoningDone == nil || reasoningDone.Data["text"] != "think first" {
 		t.Fatalf("expected completed responses reasoning text, got %+v", responsesEvents)
 	}
+	contentPartDone := streamEventsByName(responsesEvents, "response.content_part.done")
+	if len(contentPartDone) != 2 {
+		t.Fatalf("expected responses content part done events, got %+v", responsesEvents)
+	}
+	firstDonePart, _ := contentPartDone[0].Data["part"].(map[string]any)
+	secondDonePart, _ := contentPartDone[1].Data["part"].(map[string]any)
+	if firstDonePart["type"] != "reasoning_text" || secondDonePart["type"] != "output_text" {
+		t.Fatalf("expected content part done to preserve part types, got %+v and %+v", firstDonePart, secondDonePart)
+	}
 	var reasoningPart map[string]any
 	for _, event := range responsesEvents {
 		if event.Event != "response.content_part.added" {
@@ -506,6 +515,50 @@ func TestRenderCanonicalStreamEventsPreservesResponsesReasoningDeltas(t *testing
 	}
 	if (*completed.Output[0].Content)[0].Type != apiopenapi.ContentBlockType("reasoning_text") {
 		t.Fatalf("expected final responses output to preserve reasoning_text, got %+v", (*completed.Output[0].Content)[0])
+	}
+}
+
+func TestRenderResponsesStreamEventsFallbackPreservesReasoningPartLifecycle(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	resp := gatewaycontract.CanonicalResponse{
+		ID:         "resp_reasoning_fallback_stream",
+		Model:      "gpt-4o-mini",
+		StopReason: "end_turn",
+		OutputItems: []gatewaycontract.ContentBlock{{
+			Type: gatewaycontract.ContentBlockReasoning,
+			Role: "assistant",
+			Text: "fallback thinking",
+		}},
+		Usage: gatewaycontract.Usage{InputTokens: 3, OutputTokens: 4},
+	}
+
+	responsesEvents := svc.RenderResponsesStreamEvents(resp)
+	if outputDeltas := streamEventsByName(responsesEvents, "response.output_text.delta"); len(outputDeltas) != 0 {
+		t.Fatalf("did not expect reasoning fallback as output_text delta, got %+v", outputDeltas)
+	}
+	reasoningDeltas := streamEventsByName(responsesEvents, "response.reasoning_text.delta")
+	if len(reasoningDeltas) != 1 || reasoningDeltas[0].Data["delta"] != "fallback thinking" {
+		t.Fatalf("expected reasoning fallback delta, got %+v", responsesEvents)
+	}
+	contentPartDone := streamEventByName(responsesEvents, "response.content_part.done")
+	if contentPartDone == nil {
+		t.Fatalf("expected fallback content part done event, got %+v", responsesEvents)
+	}
+	part, _ := contentPartDone.Data["part"].(map[string]any)
+	if part["type"] != "reasoning_text" || part["text"] != "fallback thinking" {
+		t.Fatalf("expected reasoning content part done payload, got %+v", part)
+	}
+	itemDone := streamEventByName(responsesEvents, "response.output_item.done")
+	if itemDone == nil {
+		t.Fatalf("expected fallback output item done event, got %+v", responsesEvents)
+	}
+	item, _ := itemDone.Data["item"].(map[string]any)
+	content, _ := item["content"].([]map[string]any)
+	if len(content) != 1 || content[0]["type"] != "reasoning_text" {
+		t.Fatalf("expected fallback output item to preserve reasoning_text, got %+v", item)
 	}
 }
 

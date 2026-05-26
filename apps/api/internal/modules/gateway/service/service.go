@@ -1043,18 +1043,21 @@ func (s *Service) renderResponsesCanonicalStreamEvents(resp gatewaycontract.Cano
 		if reasoningOutputIndex >= 0 && reasoningOutputIndex < textOutputIndex {
 			out = append(out,
 				responseStreamTextDoneEvent(reasoningItemID, reasoningOutputIndex, gatewaycontract.ContentBlockReasoning, reasoning.String()),
+				responseStreamContentPartDoneEvent(reasoningItemID, reasoningOutputIndex, gatewaycontract.ContentBlockReasoning, reasoning.String()),
 				responseStreamMessageDoneEvent(reasoningItemID, reasoningOutputIndex, gatewaycontract.ContentBlockReasoning, reasoning.String()),
 			)
 			reasoningOutputIndex = -1
 		}
 		out = append(out,
 			responseStreamTextDoneEvent(textItemID, textOutputIndex, gatewaycontract.ContentBlockText, text.String()),
+			responseStreamContentPartDoneEvent(textItemID, textOutputIndex, gatewaycontract.ContentBlockText, text.String()),
 			responseStreamMessageDoneEvent(textItemID, textOutputIndex, gatewaycontract.ContentBlockText, text.String()),
 		)
 	}
 	if reasoningOutputIndex >= 0 {
 		out = append(out,
 			responseStreamTextDoneEvent(reasoningItemID, reasoningOutputIndex, gatewaycontract.ContentBlockReasoning, reasoning.String()),
+			responseStreamContentPartDoneEvent(reasoningItemID, reasoningOutputIndex, gatewaycontract.ContentBlockReasoning, reasoning.String()),
 			responseStreamMessageDoneEvent(reasoningItemID, reasoningOutputIndex, gatewaycontract.ContentBlockReasoning, reasoning.String()),
 		)
 	}
@@ -1150,6 +1153,22 @@ func responseStreamTextDoneEvent(itemID string, outputIndex int, blockType gatew
 			"output_index":  outputIndex,
 			"content_index": 0,
 			"text":          text,
+		},
+	}
+}
+
+func responseStreamContentPartDoneEvent(itemID string, outputIndex int, blockType gatewaycontract.ContentBlockType, text string) StreamEvent {
+	return StreamEvent{
+		Event: "response.content_part.done",
+		Data: map[string]any{
+			"type":          "response.content_part.done",
+			"item_id":       itemID,
+			"output_index":  outputIndex,
+			"content_index": 0,
+			"part": map[string]any{
+				"type": responseStreamContentPartType(blockType),
+				"text": text,
+			},
 		},
 	}
 }

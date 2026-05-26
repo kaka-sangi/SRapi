@@ -276,27 +276,13 @@ func responseStreamOutputEvents(blocks []gatewaycontract.ContentBlock) []StreamE
 			},
 		)
 		if text := strings.TrimSpace(block.Text); text != "" {
-			events = append(events, StreamEvent{
-				Event: "response.output_text.delta",
-				Data: map[string]any{
-					"type":          "response.output_text.delta",
-					"item_id":       itemID,
-					"output_index":  outputIndex,
-					"content_index": 0,
-					"delta":         text,
-				},
-			})
+			events = append(events, responseStreamTextDeltaEvent(itemID, outputIndex, block.Type, text))
 		}
-		events = append(events, StreamEvent{
-			Event: "response.output_text.done",
-			Data: map[string]any{
-				"type":          "response.output_text.done",
-				"item_id":       itemID,
-				"output_index":  outputIndex,
-				"content_index": 0,
-				"text":          strings.TrimSpace(block.Text),
-			},
-		})
+		events = append(events,
+			responseStreamTextDoneEvent(itemID, outputIndex, block.Type, strings.TrimSpace(block.Text)),
+			responseStreamContentPartDoneEvent(itemID, outputIndex, block.Type, strings.TrimSpace(block.Text)),
+			responseStreamMessageDoneEvent(itemID, outputIndex, block.Type, strings.TrimSpace(block.Text)),
+		)
 	}
 	return events
 }
