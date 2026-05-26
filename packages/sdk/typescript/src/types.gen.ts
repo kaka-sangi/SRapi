@@ -2688,6 +2688,10 @@ export type ResponsesOutputItem = {
     [key: string]: unknown;
 };
 
+export type ResponsesIncompleteDetails = {
+    reason: string;
+};
+
 export type ResponsesResponse = {
     id: string;
     object: 'response';
@@ -2696,6 +2700,7 @@ export type ResponsesResponse = {
     output: Array<ResponsesOutputItem>;
     usage?: TokenUsage;
     status?: string;
+    incomplete_details?: ResponsesIncompleteDetails;
     compatibility_warnings?: Array<string>;
 };
 

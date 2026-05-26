@@ -23,6 +23,33 @@ func outputTextFromBlocks(blocks []gatewaycontract.ContentBlock) string {
 	return strings.Join(parts, "\n")
 }
 
+func responsesStatus(stopReason string) string {
+	switch strings.TrimSpace(stopReason) {
+	case "max_tokens":
+		return "incomplete"
+	default:
+		return "completed"
+	}
+}
+
+func responsesIncompleteDetails(stopReason string) *apiopenapi.ResponsesIncompleteDetails {
+	switch strings.TrimSpace(stopReason) {
+	case "max_tokens":
+		return &apiopenapi.ResponsesIncompleteDetails{Reason: "max_output_tokens"}
+	default:
+		return nil
+	}
+}
+
+func responsesTerminalEventName(stopReason string) string {
+	switch responsesStatus(stopReason) {
+	case "incomplete":
+		return "response.incomplete"
+	default:
+		return "response.completed"
+	}
+}
+
 func normalizeOutputItems(blocks []gatewaycontract.ContentBlock) []gatewaycontract.ContentBlock {
 	out := make([]gatewaycontract.ContentBlock, 0, len(blocks))
 	for _, block := range blocks {

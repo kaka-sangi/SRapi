@@ -14028,6 +14028,14 @@ components:
             $ref: "#/components/schemas/ContentBlock"
       additionalProperties: true
 
+    ResponsesIncompleteDetails:
+      type: object
+      required:
+        - reason
+      properties:
+        reason:
+          type: string
+
     ResponsesResponse:
       type: object
       required:
@@ -14055,6 +14063,8 @@ components:
           $ref: "#/components/schemas/TokenUsage"
         status:
           type: string
+        incomplete_details:
+          $ref: "#/components/schemas/ResponsesIncompleteDetails"
         compatibility_warnings:
           type: array
           items:

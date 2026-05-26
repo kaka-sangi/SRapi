@@ -4600,6 +4600,11 @@ type RerankResult struct {
 // ResourceStatus defines model for ResourceStatus.
 type ResourceStatus string
 
+// ResponsesIncompleteDetails defines model for ResponsesIncompleteDetails.
+type ResponsesIncompleteDetails struct {
+	Reason string `json:"reason"`
+}
+
 // ResponsesOutputItem defines model for ResponsesOutputItem.
 type ResponsesOutputItem struct {
 	Content              *[]ContentBlock        `json:"content,omitempty"`
@@ -4636,14 +4641,15 @@ type ResponsesRequest_Input struct {
 
 // ResponsesResponse defines model for ResponsesResponse.
 type ResponsesResponse struct {
-	CompatibilityWarnings *[]string               `json:"compatibility_warnings,omitempty"`
-	CreatedAt             int                     `json:"created_at"`
-	Id                    string                  `json:"id"`
-	Model                 string                  `json:"model"`
-	Object                ResponsesResponseObject `json:"object"`
-	Output                []ResponsesOutputItem   `json:"output"`
-	Status                *string                 `json:"status,omitempty"`
-	Usage                 *TokenUsage             `json:"usage,omitempty"`
+	CompatibilityWarnings *[]string                   `json:"compatibility_warnings,omitempty"`
+	CreatedAt             int                         `json:"created_at"`
+	Id                    string                      `json:"id"`
+	IncompleteDetails     *ResponsesIncompleteDetails `json:"incomplete_details,omitempty"`
+	Model                 string                      `json:"model"`
+	Object                ResponsesResponseObject     `json:"object"`
+	Output                []ResponsesOutputItem       `json:"output"`
+	Status                *string                     `json:"status,omitempty"`
+	Usage                 *TokenUsage                 `json:"usage,omitempty"`
 }
 
 // ResponsesResponseObject defines model for ResponsesResponse.Object.

@@ -358,6 +358,10 @@ SRapi 返回 OpenAI Chat Completions 响应格式
 SRapi 返回 Gemini GenerateContent 响应格式
 ```
 
+Responses 渲染必须保留 Canonical 终态语义：`stopReason=max_tokens` 输出
+`status=incomplete` 和 `incomplete_details.reason=max_output_tokens`；流式 Responses
+终态输出 `response.incomplete`，而不是伪装成 `response.completed`。
+
 ## 8. 无损与有损转换策略
 
 SRapi 必须优先做无损转换。

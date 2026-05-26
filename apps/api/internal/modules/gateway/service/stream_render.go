@@ -43,15 +43,16 @@ func (s *Service) RenderChatCompletions(resp gatewaycontract.CanonicalResponse) 
 
 func (s *Service) RenderResponses(resp gatewaycontract.CanonicalResponse) apiopenapi.ResponsesResponse {
 	now := time.Now().UTC()
-	status := "completed"
+	status := responsesStatus(resp.StopReason)
 	rendered := apiopenapi.ResponsesResponse{
-		CreatedAt: int(now.Unix()),
-		Id:        "resp_" + responseID(resp),
-		Model:     resp.Model,
-		Object:    apiopenapi.Response,
-		Output:    responseOutputItems(resp.OutputItems),
-		Status:    &status,
-		Usage:     tokenUsage(resp.Usage),
+		CreatedAt:         int(now.Unix()),
+		Id:                "resp_" + responseID(resp),
+		IncompleteDetails: responsesIncompleteDetails(resp.StopReason),
+		Model:             resp.Model,
+		Object:            apiopenapi.Response,
+		Output:            responseOutputItems(resp.OutputItems),
+		Status:            &status,
+		Usage:             tokenUsage(resp.Usage),
 	}
 	if len(resp.CompatibilityWarnings) > 0 {
 		warnings := append([]string(nil), resp.CompatibilityWarnings...)
@@ -532,11 +533,12 @@ func (s *Service) renderResponsesCanonicalStreamEvents(resp gatewaycontract.Cano
 	for _, group := range doneGroups {
 		out = append(out, group.Events...)
 	}
+	terminalEventName := responsesTerminalEventName(resp.StopReason)
 	out = append(out,
 		StreamEvent{
-			Event: "response.completed",
+			Event: terminalEventName,
 			Data: map[string]any{
-				"type":     "response.completed",
+				"type":     terminalEventName,
 				"response": s.RenderResponses(resp),
 			},
 		},
@@ -859,11 +861,12 @@ func (s *Service) RenderResponsesStreamEvents(resp gatewaycontract.CanonicalResp
 		},
 	}
 	events = append(events, responseStreamOutputEvents(resp.OutputItems)...)
+	terminalEventName := responsesTerminalEventName(resp.StopReason)
 	events = append(events,
 		StreamEvent{
-			Event: "response.completed",
+			Event: terminalEventName,
 			Data: map[string]any{
-				"type":     "response.completed",
+				"type":     terminalEventName,
 				"response": completed,
 			},
 		},

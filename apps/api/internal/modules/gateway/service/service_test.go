@@ -539,6 +539,64 @@ func TestRenderProtocolResponses(t *testing.T) {
 	}
 }
 
+func TestRenderResponsesPreservesIncompleteMaxTokens(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	resp := gatewaycontract.CanonicalResponse{
+		ID:         "resp_incomplete",
+		Model:      "gpt-4o-mini",
+		StopReason: "max_tokens",
+		OutputItems: []gatewaycontract.ContentBlock{{
+			Type: gatewaycontract.ContentBlockText,
+			Role: "assistant",
+			Text: "partial",
+		}},
+		StreamEvents: []gatewaycontract.StreamEvent{
+			{
+				Index:        0,
+				Type:         gatewaycontract.StreamEventContentDelta,
+				ContentIndex: 0,
+				Delta: gatewaycontract.ContentBlock{
+					Type: gatewaycontract.ContentBlockText,
+					Role: "assistant",
+					Text: "partial",
+				},
+			},
+			{
+				Index:      1,
+				Type:       gatewaycontract.StreamEventStop,
+				StopReason: "max_tokens",
+			},
+		},
+		Usage: gatewaycontract.Usage{InputTokens: 3, OutputTokens: 4},
+	}
+
+	rendered := svc.RenderResponses(resp)
+	if rendered.Status == nil || *rendered.Status != "incomplete" {
+		t.Fatalf("expected incomplete responses status, got %+v", rendered.Status)
+	}
+	if rendered.IncompleteDetails == nil || rendered.IncompleteDetails.Reason != "max_output_tokens" {
+		t.Fatalf("expected max_output_tokens incomplete details, got %+v", rendered.IncompleteDetails)
+	}
+
+	events := svc.RenderResponsesStreamEvents(resp)
+	terminal := streamEventByName(events, "response.incomplete")
+	if terminal == nil {
+		t.Fatalf("expected response.incomplete terminal event, got %+v", events)
+	}
+	if completed := streamEventByName(events, "response.completed"); completed != nil {
+		t.Fatalf("did not expect response.completed terminal event, got %+v", completed)
+	}
+	response, _ := terminal.Data["response"].(apiopenapi.ResponsesResponse)
+	if response.Status == nil || *response.Status != "incomplete" ||
+		response.IncompleteDetails == nil ||
+		response.IncompleteDetails.Reason != "max_output_tokens" {
+		t.Fatalf("expected incomplete terminal response payload, got %+v", terminal.Data["response"])
+	}
+}
+
 func TestRenderChatCompletionsPreservesReasoningContent(t *testing.T) {
 	svc, err := New()
 	if err != nil {
