@@ -976,6 +976,7 @@ func (r *openAIImageGenerationResponse) UnmarshalJSON(body []byte) error {
 
 type openAIChatCompletionStreamChunk struct {
 	Choices []struct {
+		Index int `json:"index"`
 		Delta struct {
 			Content      string                  `json:"content"`
 			ToolCalls    []openAIStreamToolCall  `json:"tool_calls,omitempty"`
@@ -1114,6 +1115,7 @@ func parseOpenAICompatibleStream(body []byte, statusCode int) (contract.Conversa
 				streamEvents = append(streamEvents, contract.ConversationStreamEvent{
 					Index:          eventIndex,
 					Type:           contract.ConversationStreamEventContentDelta,
+					ContentIndex:   choice.Index,
 					Delta:          textContentDelta(choice.Delta.Content),
 					RawEventType:   "chat.completion.chunk",
 					Raw:            append(json.RawMessage(nil), data...),
@@ -1146,6 +1148,7 @@ func parseOpenAICompatibleStream(body []byte, statusCode int) (contract.Conversa
 					RawEventType:   "chat.completion.chunk",
 					Raw:            append(json.RawMessage(nil), data...),
 					OriginProtocol: "openai-compatible",
+					Metadata:       openAIStreamChoiceMetadata(choice.Index),
 				})
 				eventIndex++
 			}
@@ -1168,6 +1171,7 @@ func parseOpenAICompatibleStream(body []byte, statusCode int) (contract.Conversa
 					RawEventType:   "chat.completion.chunk",
 					Raw:            append(json.RawMessage(nil), data...),
 					OriginProtocol: "openai-compatible",
+					Metadata:       openAIStreamChoiceMetadata(choice.Index),
 				})
 				eventIndex++
 			}
@@ -1176,6 +1180,7 @@ func parseOpenAICompatibleStream(body []byte, statusCode int) (contract.Conversa
 				streamEvents = append(streamEvents, contract.ConversationStreamEvent{
 					Index:          eventIndex,
 					Type:           contract.ConversationStreamEventStop,
+					ContentIndex:   choice.Index,
 					StopReason:     stopReason,
 					RawEventType:   "chat.completion.chunk",
 					Raw:            append(json.RawMessage(nil), data...),
@@ -1225,6 +1230,13 @@ func parseOpenAICompatibleStream(body []byte, statusCode int) (contract.Conversa
 		Raw:          append(json.RawMessage(nil), body...),
 		StreamEvents: streamEvents,
 	}, nil
+}
+
+func openAIStreamChoiceMetadata(choiceIndex int) map[string]any {
+	if choiceIndex == 0 {
+		return nil
+	}
+	return map[string]any{"choice_index": choiceIndex}
 }
 
 func openAIStreamToolCallState(values map[int]*openAIToolCall, order *[]int, index int) *openAIToolCall {

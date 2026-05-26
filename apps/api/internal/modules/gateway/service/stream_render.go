@@ -269,12 +269,12 @@ func (s *Service) RenderChatStreamChunks(resp gatewaycontract.CanonicalResponse)
 		switch event.Type {
 		case gatewaycontract.StreamEventContentDelta, gatewaycontract.StreamEventReasoning, gatewaycontract.StreamEventToolResult:
 			if text := event.Delta.Text; text != "" {
-				chunks = append(chunks, chatStreamChunk(resp, map[string]any{"content": text}, nil, nil))
+				chunks = append(chunks, chatStreamChunkWithIndex(resp, event.ContentIndex, map[string]any{"content": text}, nil, nil))
 			}
 		case gatewaycontract.StreamEventToolCallDelta:
 			toolCall := chatStreamToolCallDelta(event)
 			if toolCall != nil {
-				chunks = append(chunks, chatStreamChunk(resp, map[string]any{"tool_calls": []map[string]any{toolCall}}, nil, nil))
+				chunks = append(chunks, chatStreamChunkWithIndex(resp, streamEventChoiceIndex(event), map[string]any{"tool_calls": []map[string]any{toolCall}}, nil, nil))
 			}
 		case gatewaycontract.StreamEventUsage:
 			chunk := chatStreamChunk(resp, nil, nil, tokenUsage(event.Usage))
@@ -282,7 +282,7 @@ func (s *Service) RenderChatStreamChunks(resp gatewaycontract.CanonicalResponse)
 			chunks = append(chunks, chunk)
 		case gatewaycontract.StreamEventStop:
 			reason := firstNonEmpty(event.StopReason, resp.StopReason)
-			chunks = append(chunks, chatStreamChunk(resp, map[string]any{}, openAIChatFinishReason(reason), nil))
+			chunks = append(chunks, chatStreamChunkWithIndex(resp, streamEventChoiceIndex(event), map[string]any{}, openAIChatFinishReason(reason), nil))
 		}
 	}
 	if len(chunks) == 0 {
@@ -292,6 +292,10 @@ func (s *Service) RenderChatStreamChunks(resp gatewaycontract.CanonicalResponse)
 }
 
 func chatStreamChunk(resp gatewaycontract.CanonicalResponse, delta map[string]any, finishReason any, usage *apiopenapi.TokenUsage) map[string]any {
+	return chatStreamChunkWithIndex(resp, 0, delta, finishReason, usage)
+}
+
+func chatStreamChunkWithIndex(resp gatewaycontract.CanonicalResponse, choiceIndex int, delta map[string]any, finishReason any, usage *apiopenapi.TokenUsage) map[string]any {
 	chunk := map[string]any{
 		"id":      "chatcmpl_" + responseID(resp),
 		"object":  "chat.completion.chunk",
@@ -299,7 +303,7 @@ func chatStreamChunk(resp gatewaycontract.CanonicalResponse, delta map[string]an
 		"model":   resp.Model,
 		"choices": []map[string]any{
 			{
-				"index":         0,
+				"index":         choiceIndex,
 				"delta":         delta,
 				"finish_reason": finishReason,
 			},
@@ -312,6 +316,26 @@ func chatStreamChunk(resp gatewaycontract.CanonicalResponse, delta map[string]an
 		chunk["compatibility_warnings"] = append([]string(nil), resp.CompatibilityWarnings...)
 	}
 	return chunk
+}
+
+func streamEventChoiceIndex(event gatewaycontract.StreamEvent) int {
+	if index := positiveIntFromAny(event.Metadata["choice_index"]); index >= 0 {
+		return index
+	}
+	return event.ContentIndex
+}
+
+func positiveIntFromAny(value any) int {
+	switch typed := value.(type) {
+	case int:
+		return typed
+	case int64:
+		return int(typed)
+	case float64:
+		return int(typed)
+	default:
+		return -1
+	}
 }
 
 func chatStreamToolCallDelta(event gatewaycontract.StreamEvent) map[string]any {

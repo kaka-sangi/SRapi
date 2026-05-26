@@ -1002,6 +1002,9 @@ func TestOpenAICompatibleAdapterStreamsUpstream(t *testing.T) {
 	if resp.StreamEvents[0].Type != contract.ConversationStreamEventContentDelta || resp.StreamEvents[0].Delta.Text != "hello" {
 		t.Fatalf("expected first OpenAI content delta, got %+v", resp.StreamEvents[0])
 	}
+	if resp.StreamEvents[0].ContentIndex != 0 {
+		t.Fatalf("expected default OpenAI choice index 0, got %+v", resp.StreamEvents[0])
+	}
 	if want := "{\"choices\":[{\"delta\":\n{\"content\":\"hello\"}}]}"; string(resp.StreamEvents[0].Raw) != want {
 		t.Fatalf("expected first OpenAI raw event payload %q, got %q", want, string(resp.StreamEvents[0].Raw))
 	}
@@ -1013,6 +1016,48 @@ func TestOpenAICompatibleAdapterStreamsUpstream(t *testing.T) {
 	}
 	if resp.StreamEvents[len(resp.StreamEvents)-1].Type != contract.ConversationStreamEventStop {
 		t.Fatalf("expected OpenAI terminal stop stream event, got %+v", resp.StreamEvents)
+	}
+}
+
+func TestOpenAICompatibleAdapterPreservesStreamChoiceIndex(t *testing.T) {
+	rawSSE := "data: {\"choices\":[{\"index\":1,\"delta\":{\"content\":\"second choice\"}}]}\n\n" +
+		"data: {\"choices\":[{\"index\":1,\"finish_reason\":\"stop\",\"delta\":{}}]}\n\n" +
+		"data: [DONE]\n\n"
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte(rawSSE))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_stream_choice_index",
+		Model:      "gpt-local",
+		InputParts: textParts("hello"),
+		Stream:     true,
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "openai-compatible",
+			Protocol:    "openai-compatible",
+		},
+		Account:    accountcontract.ProviderAccount{ID: 1, Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-upstream"},
+		Credential: map[string]any{"api_key": "upstream-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke stream upstream: %v", err)
+	}
+	if len(resp.StreamEvents) < 2 {
+		t.Fatalf("expected indexed OpenAI stream events, got %+v", resp.StreamEvents)
+	}
+	if resp.StreamEvents[0].Type != contract.ConversationStreamEventContentDelta || resp.StreamEvents[0].ContentIndex != 1 || resp.StreamEvents[0].Delta.Text != "second choice" {
+		t.Fatalf("expected indexed content delta, got %+v", resp.StreamEvents[0])
+	}
+	if resp.StreamEvents[1].Type != contract.ConversationStreamEventStop || resp.StreamEvents[1].ContentIndex != 1 {
+		t.Fatalf("expected indexed stop event, got %+v", resp.StreamEvents[1])
 	}
 }
 

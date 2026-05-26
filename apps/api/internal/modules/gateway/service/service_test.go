@@ -818,9 +818,10 @@ func TestRenderCanonicalStreamEventsPreservesTextDeltas(t *testing.T) {
 		}},
 		StreamEvents: []gatewaycontract.StreamEvent{
 			{
-				Index: 0,
-				Type:  gatewaycontract.StreamEventContentDelta,
-				Delta: gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockText, Role: "assistant", Text: "hello"},
+				Index:        0,
+				Type:         gatewaycontract.StreamEventContentDelta,
+				ContentIndex: 3,
+				Delta:        gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockText, Role: "assistant", Text: "hello"},
 			},
 			{
 				Index: 1,
@@ -849,6 +850,9 @@ func TestRenderCanonicalStreamEventsPreservesTextDeltas(t *testing.T) {
 	secondDelta := chatStreamContentDelta(t, chatChunks[1])
 	if firstDelta != "hello" || secondDelta != " stream" {
 		t.Fatalf("expected preserved chat deltas, got %q and %q", firstDelta, secondDelta)
+	}
+	if choiceIndex(t, chatChunks[0]) != 3 || choiceIndex(t, chatChunks[1]) != 0 {
+		t.Fatalf("expected chat choice indexes to follow stream events, got %+v and %+v", chatChunks[0], chatChunks[1])
 	}
 	if choices, _ := chatChunks[2]["choices"].([]map[string]any); len(choices) != 0 || chatChunks[2]["usage"] == nil {
 		t.Fatalf("expected usage-only chat stream chunk, got %+v", chatChunks[2])
@@ -1169,6 +1173,7 @@ func TestRenderCanonicalStreamEventsPreservesToolCallDeltas(t *testing.T) {
 				Index:        0,
 				Type:         gatewaycontract.StreamEventToolCallDelta,
 				ContentIndex: 0,
+				Metadata:     map[string]any{"choice_index": 2},
 				Delta: gatewaycontract.ContentBlock{
 					Type:              gatewaycontract.ContentBlockToolCall,
 					Role:              "assistant",
@@ -1208,6 +1213,9 @@ func TestRenderCanonicalStreamEventsPreservesToolCallDeltas(t *testing.T) {
 	secondFunction, _ := secondTool["function"].(map[string]any)
 	if firstTool["id"] != "call_1" || firstFunction["name"] != "lookup" || firstFunction["arguments"] != `{"query":` {
 		t.Fatalf("expected first chat tool delta, got %+v", firstTool)
+	}
+	if choiceIndex(t, chatChunks[0]) != 2 || choiceIndex(t, chatChunks[1]) != 0 {
+		t.Fatalf("expected chat tool choice indexes to be preserved, got %+v and %+v", chatChunks[0], chatChunks[1])
 	}
 	if secondFunction["arguments"] != `"weather"}` {
 		t.Fatalf("expected second chat tool arguments delta, got %+v", secondTool)
@@ -1368,6 +1376,19 @@ func chatStreamContentDelta(t *testing.T, chunk map[string]any) string {
 	delta, _ := choices[0]["delta"].(map[string]any)
 	text, _ := delta["content"].(string)
 	return text
+}
+
+func choiceIndex(t *testing.T, chunk map[string]any) int {
+	t.Helper()
+	choices, _ := chunk["choices"].([]map[string]any)
+	if len(choices) != 1 {
+		t.Fatalf("expected one chat choice, got %+v", chunk)
+	}
+	index, ok := choices[0]["index"].(int)
+	if !ok {
+		t.Fatalf("expected integer choice index, got %+v", choices[0])
+	}
+	return index
 }
 
 func geminiStreamText(t *testing.T, event StreamEvent) string {
