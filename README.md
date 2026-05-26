@@ -223,6 +223,19 @@ make smoke-payment-alipay
 
 该 smoke 需要已启动的 API 和可用支付宝沙箱或测试商户凭证。默认路径会创建临时 Alipay provider instance 并验证 Page Pay RSA2 checkout URL；`ALIPAY_SMOKE_LOCAL_WEBHOOK=1` 可额外用本地签名通知验证 SRapi webhook、`success` 应答、履约、幂等和余额入账，但不能替代支付宝沙箱真实回调。
 
+WeChat Pay APIv3 支付 smoke：
+
+```bash
+WECHAT_SMOKE_APP_ID=<wechat-app-id> \
+WECHAT_SMOKE_MCH_ID=<wechat-merchant-id> \
+WECHAT_SMOKE_API_V3_KEY=<32-byte-api-v3-key> \
+WECHAT_SMOKE_SERIAL_NO=<merchant-certificate-serial> \
+WECHAT_SMOKE_PRIVATE_KEY=<merchant-private-key-pem> \
+make smoke-payment-wechat
+```
+
+该 smoke 需要已启动的 API、可用微信支付商户凭证和微信预支付网络连通性。默认 Native 路径会创建临时 WeChat provider instance，调用用户下单 API 发起真实预支付并验证返回的支付 metadata；`WECHAT_SMOKE_LOCAL_WEBHOOK=1` 可额外用本地签名的 APIv3 加密通知验证 SRapi webhook、履约、幂等和余额入账，但不能替代微信支付平台真实通知演练。
+
 PostgreSQL 手动备份和恢复：
 
 ```bash

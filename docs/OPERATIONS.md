@@ -147,6 +147,19 @@ make smoke-payment-alipay
 
 该 smoke 需要已启动的 API、默认或显式配置的管理员账号，以及支付宝沙箱或测试商户凭证。默认路径会创建或更新名为 `ALIPAY_SMOKE_PROVIDER_NAME` 的临时 Alipay provider instance，调用用户下单 API 并验证 Page Pay checkout URL 包含 `alipay.trade.page.pay`、`sign_type=RSA2` 和签名参数，最后禁用临时 provider。若设置 `ALIPAY_SMOKE_LOCAL_WEBHOOK=1` 且提供 `ALIPAY_SMOKE_NOTIFY_PRIVATE_KEY`，脚本会提交本地签名的 `TRADE_SUCCESS` 通知，确认 SRapi 返回支付宝异步通知要求的纯文本 `success`、订单 fulfilled、余额按 `ALIPAY_SMOKE_AMOUNT` 增加，并用重复通知验证余额不二次入账。该本地签名模式只验证 SRapi webhook 链路，不能替代支付宝沙箱真实异步通知演练。
 
+WeChat Pay APIv3 支付 smoke 可单独执行：
+
+```bash
+WECHAT_SMOKE_APP_ID=... \
+WECHAT_SMOKE_MCH_ID=... \
+WECHAT_SMOKE_API_V3_KEY=... \
+WECHAT_SMOKE_SERIAL_NO=... \
+WECHAT_SMOKE_PRIVATE_KEY='-----BEGIN RSA PRIVATE KEY-----...' \
+make smoke-payment-wechat
+```
+
+该 smoke 需要已启动的 API、默认或显式配置的管理员账号、可用微信支付商户凭证和微信预支付网络连通性。默认路径会创建或更新名为 `WECHAT_SMOKE_PROVIDER_NAME` 的临时 WeChat provider instance，调用用户下单 API 发起真实预支付并校验 Native/H5/JSAPI checkout metadata，最后禁用临时 provider。若设置 `WECHAT_SMOKE_LOCAL_WEBHOOK=1` 且提供 `WECHAT_SMOKE_PLATFORM_PRIVATE_KEY`，脚本会提交本地签名且 AES-GCM 加密的 `TRANSACTION.SUCCESS` 通知，确认 SRapi webhook 验签解密、订单 fulfilled、余额按 `WECHAT_SMOKE_AMOUNT` 增加，并用重复通知验证余额不二次入账。该本地签名模式只验证 SRapi webhook 链路，不能替代微信支付平台真实通知演练。
+
 OpenTelemetry 到 Jaeger 的可视化链路可单独执行：
 
 ```bash

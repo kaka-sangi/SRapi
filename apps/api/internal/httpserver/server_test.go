@@ -3,8 +3,12 @@ package httpserver
 import (
 	"bytes"
 	"context"
+	"crypto"
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
@@ -32,6 +36,8 @@ import (
 	auditmemory "github.com/srapi/srapi/apps/api/internal/modules/audit/store/memory"
 	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
 	operationsmemory "github.com/srapi/srapi/apps/api/internal/modules/operations/store/memory"
+	paymentcontract "github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
+	paymentmemory "github.com/srapi/srapi/apps/api/internal/modules/payments/store/memory"
 	schedulermemory "github.com/srapi/srapi/apps/api/internal/modules/scheduler/store/memory"
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	subscriptionservice "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/service"
@@ -1366,6 +1372,107 @@ func TestAlipayPaymentWebhookRespondsWithChannelAck(t *testing.T) {
 	}
 	if got := webhookRec.Header().Get("Content-Type"); !strings.HasPrefix(got, "text/plain") {
 		t.Fatalf("expected alipay webhook text/plain content type, got %q", got)
+	}
+}
+
+func TestWechatPaymentWebhookAcceptsSignedNotification(t *testing.T) {
+	paymentStore := paymentmemory.New()
+	handler := New(config.Load(), nil, WithPaymentStore(paymentStore))
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	keys := newWechatWebhookHTTPTestKeys(t)
+	providerBody := mustMarshalJSON(t, map[string]any{
+		"provider": "wechat",
+		"name":     "wechat-http-primary",
+		"config": map[string]any{
+			"app_id":                  "wx_app_123",
+			"mch_id":                  "mch_123",
+			"api_v3_key":              keys.apiV3Key,
+			"serial_no":               "merchant_serial_123",
+			"private_key":             keys.merchantPrivateKey,
+			"notify_url":              "https://api.example/api/v1/webhooks/payments/wechat",
+			"wechatpay_public_key":    keys.platformPublicKey,
+			"wechatpay_public_key_id": keys.platformPublicKeyID,
+		},
+		"supported_methods": []string{"wechat_http_smoke"},
+		"limits":            map[string]any{"currency": "CNY"},
+	})
+	providerResp := mustCreatePaymentProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, providerBody)
+	providerID, err := strconv.Atoi(string(providerResp.Data.Id))
+	if err != nil {
+		t.Fatalf("parse wechat provider id: %v", err)
+	}
+	userID, err := strconv.Atoi(string(loginResp.Data.User.Id))
+	if err != nil {
+		t.Fatalf("parse login user id: %v", err)
+	}
+	order, err := paymentStore.CreateOrder(t.Context(), paymentcontract.CreateStoredOrder{
+		UserID:             userID,
+		OrderNo:            "pay_wechat_http_123",
+		ProviderInstanceID: providerID,
+		Amount:             "1.00000000",
+		Currency:           "CNY",
+		Status:             paymentcontract.OrderStatusPending,
+		ProductType:        paymentcontract.ProductTypeBalanceCredit,
+		ProviderSnapshot: map[string]any{
+			"provider":             "wechat",
+			"provider_instance_id": providerID,
+			"name":                 "wechat-http-primary",
+			"method":               "wechat_http_smoke",
+		},
+	})
+	if err != nil {
+		t.Fatalf("create stored wechat payment order: %v", err)
+	}
+
+	rawBody, headers := signedWechatHTTPNotification(t, keys, map[string]any{
+		"appid":          "wx_app_123",
+		"mchid":          "mch_123",
+		"out_trade_no":   order.OrderNo,
+		"transaction_id": "4200000000202605261234567890",
+		"trade_state":    "SUCCESS",
+		"trade_type":     "NATIVE",
+		"amount": map[string]any{
+			"total":    100,
+			"currency": "CNY",
+		},
+	})
+	webhookReq := httptest.NewRequest(http.MethodPost, "/api/v1/webhooks/payments/wechat", strings.NewReader(rawBody))
+	webhookReq.Header.Set("Content-Type", "application/json")
+	for key, value := range headers {
+		webhookReq.Header.Set(key, value)
+	}
+	webhookRec := httptest.NewRecorder()
+	handler.ServeHTTP(webhookRec, webhookReq)
+	if webhookRec.Code != http.StatusOK {
+		t.Fatalf("expected wechat payment webhook 200, got %d body=%s", webhookRec.Code, webhookRec.Body.String())
+	}
+	var webhookResp apiopenapi.PaymentWebhookResponse
+	if err := json.NewDecoder(webhookRec.Body).Decode(&webhookResp); err != nil {
+		t.Fatalf("decode wechat payment webhook response: %v", err)
+	}
+	if !webhookResp.Data.Handled || webhookResp.Data.Order.Status != apiopenapi.PaymentOrderStatusFulfilled {
+		t.Fatalf("expected fulfilled wechat payment webhook response, got %+v", webhookResp.Data)
+	}
+	if webhookResp.Data.Order.ProviderTransactionId == nil || *webhookResp.Data.Order.ProviderTransactionId != "4200000000202605261234567890" {
+		t.Fatalf("expected wechat transaction id to be preserved, got %+v", webhookResp.Data.Order.ProviderTransactionId)
+	}
+
+	duplicateReq := httptest.NewRequest(http.MethodPost, "/api/v1/webhooks/payments/wechat", strings.NewReader(rawBody))
+	duplicateReq.Header.Set("Content-Type", "application/json")
+	for key, value := range headers {
+		duplicateReq.Header.Set(key, value)
+	}
+	duplicateRec := httptest.NewRecorder()
+	handler.ServeHTTP(duplicateRec, duplicateReq)
+	if duplicateRec.Code != http.StatusOK {
+		t.Fatalf("expected duplicate wechat payment webhook 200, got %d body=%s", duplicateRec.Code, duplicateRec.Body.String())
+	}
+	var duplicateResp apiopenapi.PaymentWebhookResponse
+	if err := json.NewDecoder(duplicateRec.Body).Decode(&duplicateResp); err != nil {
+		t.Fatalf("decode duplicate wechat payment webhook response: %v", err)
+	}
+	if duplicateResp.Data.Handled {
+		t.Fatalf("expected duplicate wechat webhook to be idempotent, got %+v", duplicateResp.Data)
 	}
 }
 
@@ -7311,6 +7418,84 @@ func signedAlipayHTTPNotification(t *testing.T, keys alipayWebhookHTTPTestKeys, 
 		}
 	}
 	return payload
+}
+
+type wechatWebhookHTTPTestKeys struct {
+	apiV3Key            string
+	merchantPrivateKey  string
+	platformPrivateKey  *rsa.PrivateKey
+	platformPublicKey   string
+	platformPublicKeyID string
+}
+
+func newWechatWebhookHTTPTestKeys(t *testing.T) wechatWebhookHTTPTestKeys {
+	t.Helper()
+	merchantKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("generate wechat merchant key: %v", err)
+	}
+	platformKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("generate wechat platform key: %v", err)
+	}
+	return wechatWebhookHTTPTestKeys{
+		apiV3Key:            "0123456789abcdef0123456789abcdef",
+		merchantPrivateKey:  encodeRSAPrivateKeyForHTTPTest(merchantKey),
+		platformPrivateKey:  platformKey,
+		platformPublicKey:   encodeRSAPublicKeyForHTTPTest(t, &platformKey.PublicKey),
+		platformPublicKeyID: "PUB_KEY_ID_HTTP_TEST",
+	}
+}
+
+func signedWechatHTTPNotification(t *testing.T, keys wechatWebhookHTTPTestKeys, transaction map[string]any) (string, map[string]string) {
+	t.Helper()
+	plaintext, err := json.Marshal(transaction)
+	if err != nil {
+		t.Fatalf("marshal wechat transaction: %v", err)
+	}
+	block, err := aes.NewCipher([]byte(keys.apiV3Key))
+	if err != nil {
+		t.Fatalf("new wechat aes cipher: %v", err)
+	}
+	aead, err := cipher.NewGCM(block)
+	if err != nil {
+		t.Fatalf("new wechat gcm: %v", err)
+	}
+	associatedData := "transaction"
+	resourceNonce := "notify123456"
+	ciphertext := aead.Seal(nil, []byte(resourceNonce), plaintext, []byte(associatedData))
+	body := map[string]any{
+		"id":            "evt_wechat_http_paid",
+		"create_time":   time.Now().UTC().Format(time.RFC3339),
+		"event_type":    "TRANSACTION.SUCCESS",
+		"resource_type": "encrypt-resource",
+		"summary":       "transaction success",
+		"resource": map[string]any{
+			"algorithm":       "AEAD_AES_256_GCM",
+			"ciphertext":      base64.StdEncoding.EncodeToString(ciphertext),
+			"associated_data": associatedData,
+			"nonce":           resourceNonce,
+			"original_type":   "transaction",
+		},
+	}
+	raw, err := json.Marshal(body)
+	if err != nil {
+		t.Fatalf("marshal wechat notification: %v", err)
+	}
+	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
+	signNonce := "signnonce123"
+	message := timestamp + "\n" + signNonce + "\n" + string(raw) + "\n"
+	digest := sha256.Sum256([]byte(message))
+	signature, err := rsa.SignPKCS1v15(rand.Reader, keys.platformPrivateKey, crypto.SHA256, digest[:])
+	if err != nil {
+		t.Fatalf("sign wechat notification: %v", err)
+	}
+	return string(raw), map[string]string{
+		"Wechatpay-Nonce":     signNonce,
+		"Wechatpay-Serial":    keys.platformPublicKeyID,
+		"Wechatpay-Signature": base64.StdEncoding.EncodeToString(signature),
+		"Wechatpay-Timestamp": timestamp,
+	}
 }
 
 func encodeRSAPrivateKeyForHTTPTest(key *rsa.PrivateKey) string {

@@ -63,6 +63,15 @@ async function currentBalance(config, cookie) {
   return balance;
 }
 
+async function findPaymentOrder(config, { cookie, orderNo }) {
+  const response = await request(config, "GET", "/api/v1/payment/orders", { cookie });
+  const orders = response.body?.data;
+  if (!Array.isArray(orders)) {
+    throw new Error("GET /api/v1/payment/orders did not return data array");
+  }
+  return orders.find((order) => order?.order_no === orderNo) || null;
+}
+
 async function request(config, method, path, options = {}) {
   const headers = {
     Accept: "application/json",
@@ -176,6 +185,7 @@ export {
   assertHealth,
   baseSmokeConfig,
   currentBalance,
+  findPaymentOrder,
   findPaymentProvider,
   formatMoney,
   loginAdmin,

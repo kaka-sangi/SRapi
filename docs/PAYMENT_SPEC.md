@@ -101,7 +101,7 @@ metadata_json
 | LDCPay | Phase 3 | Linux DO Credit 或类似积分支付。 |
 | Custom Webhook | Phase 3 | 外部支付系统通过受控 API 入账。 |
 
-当前实现已超过最初 MVP 抽象：`payments/providers/checkout` 定义统一下单接口，`payments/providers/stripe` 使用 `stripe-go/v78` 创建 Stripe Checkout Session 并由 Stripe webhook SDK 验签，`payments/providers/easypay` 生成带签名的 EasyPay 跳转 URL，`payments/providers/alipay` 使用 `smartwalle/alipay/v3` 生成支付宝 Page/Wap Pay 支付 URL，并由 `payments/service` 使用支付宝公钥验签异步通知。`payments/providers/wechat` 使用 `wechatpay-apiv3/wechatpay-go` 创建微信 Native / H5 / JSAPI 预支付订单，并由 `payments/service` 使用微信 APIv3 通知签名验证和 AES-GCM 解密后复用现有幂等、金额校验和履约链路。管理员侧已支持 provider instance 的创建、更新和本地配置测试；测试接口只解密并校验必需配置，不发起外部扣款或网络请求。Stripe test-mode 充值闭环已有 `make smoke-payment-stripe` 入口；Alipay Page Pay checkout smoke 已有 `make smoke-payment-alipay` 入口，并可选用本地签名通知验证 SRapi webhook 链路；Alipay/WeChat 真实沙箱回调 smoke 仍需外部凭证。
+当前实现已超过最初 MVP 抽象：`payments/providers/checkout` 定义统一下单接口，`payments/providers/stripe` 使用 `stripe-go/v78` 创建 Stripe Checkout Session 并由 Stripe webhook SDK 验签，`payments/providers/easypay` 生成带签名的 EasyPay 跳转 URL，`payments/providers/alipay` 使用 `smartwalle/alipay/v3` 生成支付宝 Page/Wap Pay 支付 URL，并由 `payments/service` 使用支付宝公钥验签异步通知。`payments/providers/wechat` 使用 `wechatpay-apiv3/wechatpay-go` 创建微信 Native / H5 / JSAPI 预支付订单，并由 `payments/service` 使用微信 APIv3 通知签名验证和 AES-GCM 解密后复用现有幂等、金额校验和履约链路。管理员侧已支持 provider instance 的创建、更新和本地配置测试；测试接口只解密并校验必需配置，不发起外部扣款或网络请求。Stripe test-mode 充值闭环已有 `make smoke-payment-stripe` 入口；Alipay Page Pay checkout smoke 已有 `make smoke-payment-alipay` 入口，并可选用本地签名通知验证 SRapi webhook 链路；WeChat Pay APIv3 prepay smoke 已有 `make smoke-payment-wechat` 入口，并可选用本地签名加密通知验证 SRapi webhook 链路；真实沙箱/商户外部回调仍需对应渠道凭证和平台通知演练。
 
 Stripe provider config 至少包含：
 
@@ -164,6 +164,19 @@ WeChat Pay Official provider config 至少包含：
 ```
 
 可选字段包括 `mode`、`description`、`payer_client_ip`、`payer_openid`、`h5_type`、`h5_app_name`、`h5_app_url`、`h5_bundle_id`、`h5_package_name`、`wechatpay_public_key` 和 `wechatpay_public_key_id`。默认 `mode=native` 返回二维码 `code_url`；`mode=h5` 需要 `payer_client_ip` 并返回 H5 跳转链接；`mode=jsapi` 需要 `payer_openid` 并返回调起支付参数。若配置 `wechatpay_public_key` / `wechatpay_public_key_id`，通知验签使用微信支付公钥；否则使用 SDK 自动下载并轮换平台证书。
+
+WeChat Pay APIv3 smoke 运行方式：
+
+```bash
+WECHAT_SMOKE_APP_ID=<wechat-app-id> \
+WECHAT_SMOKE_MCH_ID=<wechat-merchant-id> \
+WECHAT_SMOKE_API_V3_KEY=<32-byte-api-v3-key> \
+WECHAT_SMOKE_SERIAL_NO=<merchant-certificate-serial> \
+WECHAT_SMOKE_PRIVATE_KEY=<merchant-private-key-pem> \
+make smoke-payment-wechat
+```
+
+该 smoke 要求 API 已启动，并使用 `BOOTSTRAP_ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_PASSWORD` 登录。脚本会创建或更新一个 `wechat-smoke` provider instance，发起一笔 `balance_credit` 微信预支付订单，校验 Native/H5/JSAPI checkout metadata，最后禁用临时 provider。`WECHAT_SMOKE_LOCAL_WEBHOOK=1` 时，脚本会从 `WECHAT_SMOKE_PLATFORM_PRIVATE_KEY` 派生临时微信支付公钥写入 provider config，再向 `/api/v1/webhooks/payments/wechat` 提交本地签名且 AES-GCM 加密的 `TRANSACTION.SUCCESS` 事件，确认订单 fulfilled、重复 webhook 幂等、余额增加。该本地通知只验证 SRapi 的 APIv3 验签、解密和履约路径；生产环境仍应配置微信支付平台通知并执行真实回调演练。
 
 这些配置通过 payment provider instance 的 `config_ciphertext` 加密保存；订单 metadata 只保存 checkout URL、session id、签名摘要等非密钥信息。
 
@@ -344,7 +357,7 @@ payment_provider_instances.config_ciphertext
 
 - Stripe：`make smoke-payment-stripe`，需要 Stripe test mode secret key 和 webhook signing secret，覆盖 Checkout Session 创建、SRapi webhook 验签/幂等/履约、余额入账和临时 provider 清理。
 - Alipay：`make smoke-payment-alipay`，需要支付宝沙箱或测试商户 `app_id`、应用私钥和支付宝公钥。默认覆盖 Page Pay RSA2 checkout URL 生成和临时 provider 清理；`ALIPAY_SMOKE_LOCAL_WEBHOOK=1` 可额外用本地签名通知覆盖 SRapi webhook 验签/`success` 应答/履约/余额入账/重复通知幂等。该本地签名模式不得替代支付宝沙箱真实回调结论。
-- WeChat：仍需商户沙箱或测试商户凭证后补等价 smoke，不得用本地伪签名替代真实渠道下单连通性结论。
+- WeChat：`make smoke-payment-wechat`，需要微信支付商户 `app_id`、`mch_id`、APIv3 key、商户证书序列号和商户私钥。默认覆盖真实预支付下单、Native/H5/JSAPI checkout metadata 和临时 provider 清理；`WECHAT_SMOKE_LOCAL_WEBHOOK=1` 可额外用本地 APIv3 签名加密通知覆盖 SRapi webhook 验签/解密/履约/余额入账/重复通知幂等。该本地签名模式不得替代微信支付平台真实通知结论。
 
 ## 14. 阶段规划
 

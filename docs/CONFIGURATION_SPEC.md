@@ -243,11 +243,38 @@ ALIPAY_SMOKE_NOTIFY_URL=
 ALIPAY_SMOKE_RETURN_URL=
 ALIPAY_SMOKE_LOCAL_WEBHOOK=0
 ALIPAY_SMOKE_NOTIFY_PRIVATE_KEY=
+
+WECHAT_SMOKE_APP_ID=
+WECHAT_SMOKE_MCH_ID=
+WECHAT_SMOKE_API_V3_KEY=
+WECHAT_SMOKE_SERIAL_NO=
+WECHAT_SMOKE_PRIVATE_KEY=
+WECHAT_SMOKE_AMOUNT=1.00
+WECHAT_SMOKE_CURRENCY=CNY
+WECHAT_SMOKE_PROVIDER_NAME=wechat-smoke
+WECHAT_SMOKE_METHOD=wechat_smoke
+WECHAT_SMOKE_MODE=native
+WECHAT_SMOKE_NOTIFY_URL=
+WECHAT_SMOKE_DESCRIPTION=SRapi WeChat Pay smoke
+WECHAT_SMOKE_PAYER_CLIENT_IP=
+WECHAT_SMOKE_PAYER_OPENID=
+WECHAT_SMOKE_H5_TYPE=
+WECHAT_SMOKE_H5_APP_NAME=
+WECHAT_SMOKE_H5_APP_URL=
+WECHAT_SMOKE_H5_BUNDLE_ID=
+WECHAT_SMOKE_H5_PACKAGE_NAME=
+WECHAT_SMOKE_LOCAL_WEBHOOK=0
+WECHAT_SMOKE_PLATFORM_PRIVATE_KEY=
+WECHAT_SMOKE_PLATFORM_PUBLIC_KEY_ID=
 ```
 
-这些变量只供 `make smoke-payment-stripe` 使用，不参与 API 进程启动配置。`STRIPE_SMOKE_SECRET_KEY` 和 `STRIPE_SMOKE_WEBHOOK_SECRET` 应来自 CI secret 或临时 shell 环境；不要把真实 Stripe test-mode secret 长期写入共享 `.env`。脚本会把密钥写入临时 payment provider instance 的加密 config，运行结束禁用该 provider。
+`*_SMOKE_*` 变量只供对应的支付 smoke Make target 使用，不参与 API 进程启动配置。
+
+`STRIPE_SMOKE_*` 只供 `make smoke-payment-stripe` 使用。`STRIPE_SMOKE_SECRET_KEY` 和 `STRIPE_SMOKE_WEBHOOK_SECRET` 应来自 CI secret 或临时 shell 环境；不要把真实 Stripe test-mode secret 长期写入共享 `.env`。脚本会把密钥写入临时 payment provider instance 的加密 config，运行结束禁用该 provider。
 
 `ALIPAY_SMOKE_*` 只供 `make smoke-payment-alipay` 使用，不参与 API 进程启动配置。脚本会创建或更新临时 Alipay provider instance，验证 Page Pay RSA2 checkout URL，并在退出前禁用该 provider。`ALIPAY_SMOKE_LOCAL_WEBHOOK=1` 时必须提供 `ALIPAY_SMOKE_NOTIFY_PRIVATE_KEY`；脚本会从该私钥派生临时验签公钥写入 provider config，再提交本地签名的 `TRADE_SUCCESS` 通知来验证 SRapi webhook 验签、`success` 应答、履约、余额入账和重复通知幂等。该模式不能替代支付宝沙箱真实回调演练。
+
+`WECHAT_SMOKE_*` 只供 `make smoke-payment-wechat` 使用，不参与 API 进程启动配置。脚本会创建或更新临时 WeChat provider instance，并通过用户下单 API 触发真实微信预支付，因此默认路径必须提供可用商户 `app_id`、`mch_id`、APIv3 key、商户证书序列号和商户私钥。`WECHAT_SMOKE_MODE=h5` 时必须提供 `WECHAT_SMOKE_PAYER_CLIENT_IP`，`WECHAT_SMOKE_MODE=jsapi` 时必须提供 `WECHAT_SMOKE_PAYER_OPENID`。`WECHAT_SMOKE_LOCAL_WEBHOOK=1` 时还必须提供 `WECHAT_SMOKE_PLATFORM_PRIVATE_KEY`；脚本会从该私钥派生临时微信支付公钥写入 provider config，再提交本地签名且 AES-GCM 加密的 `TRANSACTION.SUCCESS` 通知来验证 SRapi webhook 验签、解密、履约、余额入账和重复通知幂等。该模式不能替代微信支付平台真实通知演练。
 
 ## 12. Balance Charger
 
