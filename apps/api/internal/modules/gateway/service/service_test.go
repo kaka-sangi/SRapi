@@ -90,6 +90,38 @@ func TestNormalizeResponsesPreservesInstructionsAndReasoning(t *testing.T) {
 	}
 }
 
+func TestNormalizeResponsesRequiresWebSearchCapability(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	input := apiopenapi.ResponsesRequest_Input{}
+	if err := input.FromResponsesRequestInput0("search the latest release notes"); err != nil {
+		t.Fatalf("set input: %v", err)
+	}
+	tools := []apiopenapi.ToolDefinition{{
+		Type: "web_search",
+		AdditionalProperties: map[string]interface{}{
+			"search_context_size": "low",
+		},
+	}}
+	req := apiopenapi.ResponsesRequest{
+		Model: "gpt-5.5",
+		Input: input,
+		Tools: &tools,
+	}
+
+	canonical := svc.NormalizeResponses(req, RequestMeta{SourceEndpoint: "/v1/responses"})
+
+	if !requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyToolCalling) ||
+		!requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyWebSearch) {
+		t.Fatalf("expected tool calling and web search capabilities, got %+v", canonical.RequestCapabilities)
+	}
+	if len(canonical.Tools) != 1 || canonical.Tools[0]["type"] != "web_search" || canonical.Tools[0]["search_context_size"] != "low" {
+		t.Fatalf("expected Responses web_search tool to be preserved, got %+v", canonical.Tools)
+	}
+}
+
 func TestNormalizeRealtimeWebSocketRequiresRealtimeCapability(t *testing.T) {
 	svc, err := New()
 	if err != nil {
@@ -165,6 +197,77 @@ func TestNormalizeGeminiGenerateContentProducesCanonicalRequest(t *testing.T) {
 	}
 	if !requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyStreaming) || !requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyVisionInput) || !requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyStructuredOutput) {
 		t.Fatalf("expected request capabilities, got %+v", canonical.RequestCapabilities)
+	}
+}
+
+func TestNormalizeAnthropicMessagesPreservesWebSearchServerTool(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	content := apiopenapi.AnthropicMessage_Content{}
+	if err := content.FromAnthropicMessageContent0("search docs"); err != nil {
+		t.Fatalf("set message content: %v", err)
+	}
+	tools := []apiopenapi.JsonObject{{
+		"type": "web_search_20250305",
+		"name": "web_search",
+	}}
+	req := apiopenapi.AnthropicMessagesRequest{
+		Model:     "claude-sonnet",
+		MaxTokens: 32,
+		Messages: []apiopenapi.AnthropicMessage{{
+			Role:    apiopenapi.AnthropicMessageRoleUser,
+			Content: content,
+		}},
+		Tools: &tools,
+	}
+
+	canonical := svc.NormalizeAnthropicMessages(req, RequestMeta{SourceEndpoint: "/v1/messages"})
+
+	if !requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyToolCalling) ||
+		!requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyWebSearch) {
+		t.Fatalf("expected tool calling and web search capabilities, got %+v", canonical.RequestCapabilities)
+	}
+	if len(canonical.Tools) != 1 || canonical.Tools[0]["type"] != "web_search_20250305" || canonical.Tools[0]["name"] != "web_search" {
+		t.Fatalf("expected Anthropic web search server tool to be preserved, got %+v", canonical.Tools)
+	}
+	if _, ok := canonical.Tools[0]["function"]; ok {
+		t.Fatalf("did not expect hosted web search tool to be rewritten as a function, got %+v", canonical.Tools[0])
+	}
+}
+
+func TestNormalizeAnthropicMessagesDoesNotTreatFunctionNamedWebSearchAsHosted(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	content := apiopenapi.AnthropicMessage_Content{}
+	if err := content.FromAnthropicMessageContent0("call my local tool"); err != nil {
+		t.Fatalf("set message content: %v", err)
+	}
+	tools := []apiopenapi.JsonObject{{
+		"name":         "web_search",
+		"description":  "local project search",
+		"input_schema": map[string]any{"type": "object"},
+	}}
+	req := apiopenapi.AnthropicMessagesRequest{
+		Model:     "claude-sonnet",
+		MaxTokens: 32,
+		Messages: []apiopenapi.AnthropicMessage{{
+			Role:    apiopenapi.AnthropicMessageRoleUser,
+			Content: content,
+		}},
+		Tools: &tools,
+	}
+
+	canonical := svc.NormalizeAnthropicMessages(req, RequestMeta{SourceEndpoint: "/v1/messages"})
+
+	if requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyWebSearch) {
+		t.Fatalf("did not expect local function named web_search to require hosted web search, got %+v", canonical.RequestCapabilities)
+	}
+	if len(canonical.Tools) != 1 || canonical.Tools[0]["type"] != "function" {
+		t.Fatalf("expected local web_search tool to remain a function, got %+v", canonical.Tools)
 	}
 }
 
@@ -263,6 +366,40 @@ func TestRenderProtocolResponsesPreservesToolCallOutput(t *testing.T) {
 	}
 }
 
+func TestRenderResponsesPreservesHostedWebSearchCall(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	resp := gatewaycontract.CanonicalResponse{
+		ID:         "resp_web_search",
+		Model:      "gpt-5.5",
+		StopReason: "tool_use",
+		OutputItems: []gatewaycontract.ContentBlock{{
+			Type:              gatewaycontract.ContentBlockToolCall,
+			Role:              "assistant",
+			ToolCallID:        "ws_1",
+			ToolName:          "web_search",
+			ToolArgumentsJSON: `{"query":"latest OpenAI docs"}`,
+			Metadata:          map[string]any{"type": "web_search_call"},
+		}},
+		Usage: gatewaycontract.Usage{InputTokens: 5, OutputTokens: 1},
+	}
+
+	responses := svc.RenderResponses(resp)
+	if len(responses.Output) != 1 || responses.Output[0].Type != "web_search_call" {
+		t.Fatalf("expected Responses web_search_call item, got %+v", responses.Output)
+	}
+	if _, ok := responses.Output[0].Get("arguments"); ok {
+		t.Fatalf("did not expect web_search_call to expose function arguments, got %+v", responses.Output[0])
+	}
+	action, _ := responses.Output[0].Get("action")
+	actionMap, _ := action.(map[string]any)
+	if actionMap["type"] != "search" || actionMap["query"] != "latest OpenAI docs" {
+		t.Fatalf("expected search action, got %+v", responses.Output[0])
+	}
+}
+
 func TestRenderProtocolStreamEventsPreservesToolCallOutput(t *testing.T) {
 	svc, err := New()
 	if err != nil {
@@ -349,6 +486,70 @@ func TestRenderProtocolStreamEventsPreservesToolCallOutput(t *testing.T) {
 	geminiFunction := *candidates[0].Content.Parts[0].FunctionCall
 	if geminiFunction["name"] != "lookup" {
 		t.Fatalf("expected gemini stream function name, got %+v", geminiFunction)
+	}
+}
+
+func TestRenderResponsesStreamEventsPreservesHostedWebSearchCall(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	resp := gatewaycontract.CanonicalResponse{
+		ID:         "resp_web_search_stream",
+		Model:      "gpt-5.5",
+		StopReason: "tool_use",
+		OutputItems: []gatewaycontract.ContentBlock{{
+			Type:              gatewaycontract.ContentBlockToolCall,
+			Role:              "assistant",
+			ToolCallID:        "ws_1",
+			ToolName:          "web_search",
+			ToolArgumentsJSON: `{"query":"latest OpenAI docs"}`,
+			Metadata:          map[string]any{"type": "web_search_call"},
+		}},
+		StreamEvents: []gatewaycontract.StreamEvent{
+			{
+				Index:        0,
+				Type:         gatewaycontract.StreamEventToolCallDelta,
+				ContentIndex: 0,
+				Delta: gatewaycontract.ContentBlock{
+					Type:              gatewaycontract.ContentBlockToolCall,
+					Role:              "assistant",
+					ToolCallID:        "ws_1",
+					ToolName:          "web_search",
+					ToolArgumentsJSON: `{"query":"latest OpenAI docs"}`,
+					Metadata:          map[string]any{"type": "web_search_call"},
+				},
+				OriginProtocol: "openai-compatible",
+			},
+			{
+				Index:      1,
+				Type:       gatewaycontract.StreamEventStop,
+				StopReason: "tool_use",
+			},
+		},
+		Usage: gatewaycontract.Usage{InputTokens: 5, OutputTokens: 1},
+	}
+
+	responsesEvents := svc.RenderResponsesStreamEvents(resp)
+	added := streamEventByName(responsesEvents, "response.output_item.added")
+	if added == nil {
+		t.Fatalf("expected responses output item event, got %+v", responsesEvents)
+	}
+	item, _ := added.Data["item"].(map[string]any)
+	if item["type"] != "web_search_call" || item["status"] != "in_progress" {
+		t.Fatalf("expected in-progress web_search_call item, got %+v", item)
+	}
+	if argsEvents := streamEventsByName(responsesEvents, "response.function_call_arguments.delta"); len(argsEvents) != 0 {
+		t.Fatalf("did not expect function argument deltas for web_search_call, got %+v", argsEvents)
+	}
+	done := streamEventByName(responsesEvents, "response.output_item.done")
+	if done == nil {
+		t.Fatalf("expected done event, got %+v", responsesEvents)
+	}
+	doneItem, _ := done.Data["item"].(map[string]any)
+	action, _ := doneItem["action"].(map[string]any)
+	if doneItem["type"] != "web_search_call" || action["query"] != "latest OpenAI docs" {
+		t.Fatalf("expected completed web_search_call with action, got %+v", doneItem)
 	}
 }
 

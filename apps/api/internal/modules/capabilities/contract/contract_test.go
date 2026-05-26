@@ -24,8 +24,24 @@ func TestCanonicalKeyFromConvenienceMapsDTOKeys(t *testing.T) {
 	if !ok || got != KeyToolCalling {
 		t.Fatalf("expected supports_tools to map to %s, got %q ok=%v", KeyToolCalling, got, ok)
 	}
+	got, ok = CanonicalKeyFromConvenience("web_search_preview")
+	if !ok || got != KeyWebSearch {
+		t.Fatalf("expected web_search_preview to map to %s, got %q ok=%v", KeyWebSearch, got, ok)
+	}
 	got, ok = CanonicalKeyFromConvenience(KeyStructuredOutput)
 	if !ok || got != KeyStructuredOutput {
 		t.Fatalf("expected canonical key passthrough, got %q ok=%v", got, ok)
 	}
+}
+
+func TestDefaultDefinitionsIncludeWebSearch(t *testing.T) {
+	for _, def := range DefaultDefinitions() {
+		if def.Key == KeyWebSearch {
+			if def.Version != "v1" || def.Category != "interaction" || def.Status != DefinitionStatusStable {
+				t.Fatalf("unexpected web search definition: %+v", def)
+			}
+			return
+		}
+	}
+	t.Fatalf("expected default definitions to include %s", KeyWebSearch)
 }

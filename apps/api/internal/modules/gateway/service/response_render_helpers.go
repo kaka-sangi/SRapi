@@ -132,6 +132,14 @@ func responseOutputItems(blocks []gatewaycontract.ContentBlock) []apiopenapi.Res
 			messageBlocks = append(messageBlocks, block)
 			continue
 		}
+		if isHostedWebSearchBlock(block) {
+			props := hostedWebSearchOutputItem(block)
+			out = append(out, apiopenapi.ResponsesOutputItem{
+				Type:                 responsesWebSearchCallType,
+				AdditionalProperties: props,
+			})
+			continue
+		}
 		props := outputBlockProperties(block)
 		props["status"] = "completed"
 		out = append(out, apiopenapi.ResponsesOutputItem{
@@ -218,6 +226,29 @@ func responseStreamOutputEvents(blocks []gatewaycontract.ContentBlock) []StreamE
 	for outputIndex, block := range blocks {
 		itemID := responseStreamItemID(outputIndex, block)
 		if block.Type == gatewaycontract.ContentBlockToolCall {
+			if isHostedWebSearchBlock(block) {
+				item := hostedWebSearchOutputItem(block)
+				item["id"] = itemID
+				events = append(events,
+					StreamEvent{
+						Event: "response.output_item.added",
+						Data: map[string]any{
+							"type":         "response.output_item.added",
+							"output_index": outputIndex,
+							"item":         item,
+						},
+					},
+					StreamEvent{
+						Event: "response.output_item.done",
+						Data: map[string]any{
+							"type":         "response.output_item.done",
+							"output_index": outputIndex,
+							"item":         item,
+						},
+					},
+				)
+				continue
+			}
 			item := responseStreamFunctionCallItem(itemID, block)
 			events = append(events, StreamEvent{
 				Event: "response.output_item.added",

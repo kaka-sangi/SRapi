@@ -37,6 +37,7 @@ const (
 	KeyRealtimeWebSocket = "realtime_websocket"
 	KeyToolCalling       = "tool_calling"
 	KeyParallelToolCalls = "parallel_tool_calls"
+	KeyWebSearch         = "web_search"
 	KeyVisionInput       = "vision_input"
 	KeyJSONMode          = "json_mode"
 	KeyStructuredOutput  = "structured_output"
@@ -82,6 +83,7 @@ var defaultDefinitions = []Definition{
 	{Key: KeyRealtimeWebSocket, Version: "v1", Category: "interaction", Status: DefinitionStatusExperimental, Description: "Model or provider can support bidirectional realtime WebSocket sessions."},
 	{Key: KeyToolCalling, Version: "v1", Category: "interaction", Status: DefinitionStatusStable, Description: "Model or provider can accept tool definitions and produce tool calls."},
 	{Key: KeyParallelToolCalls, Version: "v1", Category: "interaction", Status: DefinitionStatusStable, Description: "Model or provider can produce parallel tool calls."},
+	{Key: KeyWebSearch, Version: "v1", Category: "interaction", Status: DefinitionStatusStable, Description: "Model or provider can run hosted web search tools and return cited search outputs."},
 	{Key: KeyVisionInput, Version: "v1", Category: "input", Status: DefinitionStatusStable, Description: "Model or provider can consume image inputs."},
 	{Key: KeyJSONMode, Version: "v1", Category: "control", Status: DefinitionStatusStable, Description: "Model or provider can follow JSON mode output constraints."},
 	{Key: KeyStructuredOutput, Version: "v1", Category: "output", Status: DefinitionStatusStable, Description: "Model or provider can follow structured output schemas."},
@@ -121,6 +123,10 @@ var convenienceKeys = map[string]string{
 	"supports_tools":                KeyToolCalling,
 	"tools":                         KeyToolCalling,
 	"supports_parallel_tool_calls":  KeyParallelToolCalls,
+	"supports_web_search":           KeyWebSearch,
+	"web_search":                    KeyWebSearch,
+	"web_search_preview":            KeyWebSearch,
+	"google_search":                 KeyWebSearch,
 	"supports_vision":               KeyVisionInput,
 	"vision":                        KeyVisionInput,
 	"supports_json":                 KeyJSONMode,

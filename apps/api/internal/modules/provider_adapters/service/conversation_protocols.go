@@ -2024,16 +2024,7 @@ func parseAnthropicCompatibleStream(body []byte, statusCode int) (contract.Conve
 	if !done {
 		return contract.ConversationResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream ended before done"}
 	}
-	if len(streamEvents) > 0 && streamEvents[len(streamEvents)-1].Type != contract.ConversationStreamEventStop {
-		streamEvents = append(streamEvents, contract.ConversationStreamEvent{
-			Index:          eventIndex,
-			Type:           contract.ConversationStreamEventStop,
-			StopReason:     stopReason,
-			RawEventType:   "message_stop",
-			OriginProtocol: "anthropic-compatible",
-		})
-		eventIndex++
-	}
+	streamEvents = appendAnthropicTerminalStopEvent(streamEvents, eventIndex, stopReason)
 	parts := make([]contract.ContentPart, 0, len(order))
 	for _, index := range order {
 		if block := blocks[index]; block != nil {
@@ -2054,6 +2045,19 @@ func parseAnthropicCompatibleStream(body []byte, statusCode int) (contract.Conve
 		Raw:          append(json.RawMessage(nil), body...),
 		StreamEvents: streamEvents,
 	}, nil
+}
+
+func appendAnthropicTerminalStopEvent(events []contract.ConversationStreamEvent, index int, stopReason contract.StopReason) []contract.ConversationStreamEvent {
+	if len(events) == 0 || events[len(events)-1].Type == contract.ConversationStreamEventStop {
+		return events
+	}
+	return append(events, contract.ConversationStreamEvent{
+		Index:          index,
+		Type:           contract.ConversationStreamEventStop,
+		StopReason:     stopReason,
+		RawEventType:   "message_stop",
+		OriginProtocol: "anthropic-compatible",
+	})
 }
 
 func anthropicStreamIndex(value *int, lastIndex *int, orderLen int) int {
