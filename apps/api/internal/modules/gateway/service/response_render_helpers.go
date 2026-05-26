@@ -144,6 +144,12 @@ func responseOutputItems(blocks []gatewaycontract.ContentBlock) []apiopenapi.Res
 	var messageBlocks []gatewaycontract.ContentBlock
 	out := make([]apiopenapi.ResponsesOutputItem, 0, len(blocks))
 	for _, block := range blocks {
+		if block.Type == gatewaycontract.ContentBlockToolResult {
+			if item, ok := responseFunctionCallOutputItem(block); ok {
+				out = append(out, item)
+			}
+			continue
+		}
 		if block.Type != gatewaycontract.ContentBlockToolCall {
 			messageBlocks = append(messageBlocks, block)
 			continue
@@ -176,6 +182,24 @@ func responseOutputItems(blocks []gatewaycontract.ContentBlock) []apiopenapi.Res
 		out = append(out, apiopenapi.ResponsesOutputItem{Type: "message", Role: &role, Content: &content})
 	}
 	return out
+}
+
+func responseFunctionCallOutputItem(block gatewaycontract.ContentBlock) (apiopenapi.ResponsesOutputItem, bool) {
+	callID := strings.TrimSpace(firstNonEmpty(block.ToolResultForID, block.ToolCallID))
+	if callID == "" {
+		return apiopenapi.ResponsesOutputItem{}, false
+	}
+	props := outputBlockProperties(block)
+	props["call_id"] = callID
+	props["output"] = strings.TrimSpace(block.Text)
+	delete(props, "tool_result_for_id")
+	if block.ToolResultIsError {
+		props["is_error"] = true
+	}
+	return apiopenapi.ResponsesOutputItem{
+		Type:                 "function_call_output",
+		AdditionalProperties: props,
+	}, true
 }
 
 func outputResponsesContentBlocks(blocks []gatewaycontract.ContentBlock) []apiopenapi.ContentBlock {

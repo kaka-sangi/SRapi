@@ -734,6 +734,58 @@ func TestRenderProtocolResponsesPreservesToolCallOutput(t *testing.T) {
 	}
 }
 
+func TestRenderResponsesPreservesFunctionCallOutputItems(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	resp := gatewaycontract.CanonicalResponse{
+		ID:         "resp_tool_result",
+		Model:      "gpt-4o-mini",
+		StopReason: "end_turn",
+		OutputItems: []gatewaycontract.ContentBlock{
+			{Type: gatewaycontract.ContentBlockText, Role: "assistant", Text: "I will check."},
+			{
+				Type:              gatewaycontract.ContentBlockToolCall,
+				Role:              "assistant",
+				ToolCallID:        "call_1",
+				ToolName:          "lookup_weather",
+				ToolArgumentsJSON: `{"city":"Boston"}`,
+			},
+			{
+				Type:            gatewaycontract.ContentBlockToolResult,
+				Role:            "user",
+				ToolResultForID: "call_1",
+				Text:            `{"forecast":"sunny"}`,
+			},
+		},
+		Usage: gatewaycontract.Usage{InputTokens: 5, OutputTokens: 3},
+	}
+
+	responses := svc.RenderResponses(resp)
+	if len(responses.Output) != 3 {
+		t.Fatalf("expected message, function_call, and function_call_output items, got %+v", responses.Output)
+	}
+	if responses.Output[0].Type != "message" || responses.Output[0].Content == nil || len(*responses.Output[0].Content) != 1 {
+		t.Fatalf("expected assistant message output item, got %+v", responses.Output[0])
+	}
+	if (*responses.Output[0].Content)[0].Type == apiopenapi.ContentBlockTypeToolResult {
+		t.Fatalf("did not expect tool_result inside Responses message content, got %+v", responses.Output[0])
+	}
+	if responses.Output[1].Type != "function_call" {
+		t.Fatalf("expected function_call output item, got %+v", responses.Output[1])
+	}
+	if responses.Output[2].Type != "function_call_output" {
+		t.Fatalf("expected function_call_output item, got %+v", responses.Output[2])
+	}
+	if callID, _ := responses.Output[2].Get("call_id"); callID != "call_1" {
+		t.Fatalf("expected function_call_output call_id, got %+v", responses.Output[2])
+	}
+	if output, _ := responses.Output[2].Get("output"); output != `{"forecast":"sunny"}` {
+		t.Fatalf("expected function_call_output payload, got %+v", responses.Output[2])
+	}
+}
+
 func TestRenderResponsesPreservesHostedWebSearchCall(t *testing.T) {
 	svc, err := New()
 	if err != nil {
