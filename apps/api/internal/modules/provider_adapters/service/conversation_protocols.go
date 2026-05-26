@@ -345,7 +345,7 @@ func anthropicCompatibleMessages(req contract.ConversationRequest) []anthropicMe
 	out := make([]anthropicMessage, 0, len(req.Messages)+1)
 	hasConversationMessage := false
 	for _, message := range req.Messages {
-		role := strings.TrimSpace(message.Role)
+		role := anthropicMessageRole(message.Role)
 		switch role {
 		case "":
 			role = "user"
@@ -367,6 +367,17 @@ func anthropicCompatibleMessages(req contract.ConversationRequest) []anthropicMe
 		out = append(out, anthropicMessage{Role: "user", Content: content})
 	}
 	return out
+}
+
+func anthropicMessageRole(role string) string {
+	switch strings.ToLower(strings.TrimSpace(role)) {
+	case "assistant":
+		return "assistant"
+	case "system":
+		return "system"
+	default:
+		return "user"
+	}
 }
 
 func anthropicContentFromParts(parts []contract.ContentPart) any {

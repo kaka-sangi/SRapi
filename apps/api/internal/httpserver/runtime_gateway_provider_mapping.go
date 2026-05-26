@@ -238,12 +238,63 @@ func providerConversationMessages(req gatewaycontract.CanonicalRequest) []provid
 		out = append(out, provideradaptercontract.ConversationMessage{Role: role, Parts: parts})
 	}
 	if len(out) == 0 {
-		parts := providerContentParts(req.InputItems)
-		if len(parts) > 0 {
-			out = append(out, provideradaptercontract.ConversationMessage{Role: "user", Parts: parts})
-		}
+		out = providerConversationMessagesFromInputItems(req.InputItems)
 	}
 	return out
+}
+
+func providerConversationMessagesFromInputItems(blocks []gatewaycontract.ContentBlock) []provideradaptercontract.ConversationMessage {
+	out := make([]provideradaptercontract.ConversationMessage, 0, len(blocks))
+	var currentRole string
+	currentBlocks := make([]gatewaycontract.ContentBlock, 0)
+	flush := func() {
+		if len(currentBlocks) == 0 {
+			return
+		}
+		parts := providerContentParts(currentBlocks)
+		currentBlocks = nil
+		if len(parts) == 0 {
+			return
+		}
+		out = append(out, provideradaptercontract.ConversationMessage{Role: currentRole, Parts: parts})
+	}
+	for _, block := range blocks {
+		role := providerInputItemRole(block)
+		if role == "" {
+			role = "user"
+		}
+		if currentRole != "" && role != currentRole {
+			flush()
+		}
+		currentRole = role
+		currentBlocks = append(currentBlocks, block)
+	}
+	flush()
+	return out
+}
+
+func providerInputItemRole(block gatewaycontract.ContentBlock) string {
+	role := strings.ToLower(strings.TrimSpace(block.Role))
+	switch role {
+	case "model":
+		role = "assistant"
+	case "function":
+		role = "tool"
+	}
+	switch block.Type {
+	case gatewaycontract.ContentBlockToolCall:
+		if role == "" || role == "user" || role == "tool" {
+			return "assistant"
+		}
+	case gatewaycontract.ContentBlockToolResult:
+		return "tool"
+	}
+	switch role {
+	case "system", "developer", "assistant", "tool", "user":
+		return role
+	default:
+		return "user"
+	}
 }
 
 func providerContentParts(blocks []gatewaycontract.ContentBlock) []provideradaptercontract.ContentPart {

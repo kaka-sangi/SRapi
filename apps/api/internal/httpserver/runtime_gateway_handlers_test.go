@@ -247,3 +247,58 @@ func TestProviderConversationRequestPreservesStructuredBlocks(t *testing.T) {
 		t.Fatalf("expected structured media and raw block to be preserved, got %+v", part)
 	}
 }
+
+func TestProviderConversationRequestGroupsInputItemsByRole(t *testing.T) {
+	req := gatewaycontract.CanonicalRequest{
+		RequestID:      "req_input_item_roles",
+		SourceProtocol: gatewaycontract.ProtocolOpenAICompatible,
+		SourceEndpoint: "/v1/responses",
+		InputItems: []gatewaycontract.ContentBlock{
+			{Type: gatewaycontract.ContentBlockText, Role: "user", Text: "What is the weather?"},
+			{
+				Type:              gatewaycontract.ContentBlockToolCall,
+				Role:              "assistant",
+				Text:              "[function_call]",
+				ToolCallID:        "call_1",
+				ToolName:          "lookup_weather",
+				ToolArgumentsJSON: `{"city":"Boston"}`,
+			},
+			{
+				Type:            gatewaycontract.ContentBlockToolResult,
+				Role:            "tool",
+				Text:            `{"forecast":"sunny"}`,
+				ToolCallID:      "call_1",
+				ToolResultForID: "call_1",
+			},
+		},
+	}
+
+	providerReq := providerConversationRequest(req, schedulercontract.Candidate{})
+
+	if len(providerReq.Messages) != 3 {
+		t.Fatalf("expected user, assistant tool call, and tool result messages, got %+v", providerReq.Messages)
+	}
+	if providerReq.Messages[0].Role != "user" ||
+		len(providerReq.Messages[0].Parts) != 1 ||
+		providerReq.Messages[0].Parts[0].Kind != "text" ||
+		providerReq.Messages[0].Parts[0].Text != "What is the weather?" {
+		t.Fatalf("unexpected user message: %+v", providerReq.Messages[0])
+	}
+	if providerReq.Messages[1].Role != "assistant" ||
+		len(providerReq.Messages[1].Parts) != 1 ||
+		providerReq.Messages[1].Parts[0].Kind != "tool_use" ||
+		providerReq.Messages[1].Parts[0].ToolCallID != "call_1" ||
+		providerReq.Messages[1].Parts[0].ToolName != "lookup_weather" {
+		t.Fatalf("unexpected assistant tool call message: %+v", providerReq.Messages[1])
+	}
+	if providerReq.Messages[2].Role != "tool" ||
+		len(providerReq.Messages[2].Parts) != 1 ||
+		providerReq.Messages[2].Parts[0].Kind != "tool_result" ||
+		providerReq.Messages[2].Parts[0].ToolResultForID != "call_1" ||
+		providerReq.Messages[2].Parts[0].Text != `{"forecast":"sunny"}` {
+		t.Fatalf("unexpected tool result message: %+v", providerReq.Messages[2])
+	}
+	if len(providerReq.InputParts) != 3 {
+		t.Fatalf("expected flat input parts to remain available, got %+v", providerReq.InputParts)
+	}
+}

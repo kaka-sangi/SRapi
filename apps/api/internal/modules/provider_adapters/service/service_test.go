@@ -2266,7 +2266,7 @@ func TestAnthropicCompatibleAdapterRendersBlockContentToUpstream(t *testing.T) {
 		if payload.Messages[0].Content[1]["type"] != "image" || source["url"] != "https://example.test/image.png" {
 			t.Fatalf("expected Anthropic image block, got %+v", payload.Messages[0].Content[1])
 		}
-		if payload.Messages[1].Role != "tool" || payload.Messages[1].Content[0]["type"] != "tool_result" || payload.Messages[1].Content[0]["tool_use_id"] != "call_1" {
+		if payload.Messages[1].Role != "user" || payload.Messages[1].Content[0]["type"] != "tool_result" || payload.Messages[1].Content[0]["tool_use_id"] != "call_1" {
 			t.Fatalf("unexpected Anthropic tool result content: %+v", payload.Messages[1])
 		}
 		w.Header().Set("Content-Type", "application/json")
