@@ -495,7 +495,7 @@ func geminiStatusForGatewayErrorClass(errorClass string, status int) string {
 		return "PERMISSION_DENIED"
 	case "model_not_found":
 		return "NOT_FOUND"
-	case "no_available_account", "model_unavailable", "provider_5xx", "timeout", "network_error", "stream_interrupted":
+	case "no_available_account", "model_unavailable", "provider_5xx", "timeout", "network_error", "stream_interrupted", "empty_completion":
 		return "UNAVAILABLE"
 	default:
 		return geminiStatusForHTTPStatus(status)

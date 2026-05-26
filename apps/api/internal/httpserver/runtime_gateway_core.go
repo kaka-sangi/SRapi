@@ -2045,6 +2045,8 @@ func providerGatewayMessage(errorClass string) string {
 		return "provider network error"
 	case "stream_interrupted":
 		return "provider stream interrupted"
+	case "empty_completion":
+		return "provider returned empty completion"
 	default:
 		return "provider request failed"
 	}

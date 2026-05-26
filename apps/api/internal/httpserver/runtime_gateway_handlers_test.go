@@ -23,6 +23,18 @@ func TestSameProtocolRawConversationResponseAllowsClaudeCodeMessages(t *testing.
 	}
 }
 
+func TestGatewayEmptyCompletionErrorClassIsRetryable(t *testing.T) {
+	if !gatewayShouldFailover("empty_completion", http.StatusBadGateway, 0, 2) {
+		t.Fatal("expected empty completion to be eligible for failover")
+	}
+	if got := providerGatewayMessage("empty_completion"); got != "provider returned empty completion" {
+		t.Fatalf("unexpected empty completion gateway message %q", got)
+	}
+	if got := geminiStatusForGatewayErrorClass("empty_completion", http.StatusBadGateway); got != "UNAVAILABLE" {
+		t.Fatalf("unexpected empty completion Gemini status %q", got)
+	}
+}
+
 func TestSameProtocolRawConversationStreamAllowsEndpointMatchedSSE(t *testing.T) {
 	raw := []byte(": keepalive\n\ndata: {\"choices\":[{\"delta\":{\"content\":\"hello\"}}]}\n\ndata: [DONE]\n\n")
 	req := gatewaycontract.CanonicalRequest{

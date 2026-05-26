@@ -1024,16 +1024,23 @@ func (r *openAIImageGenerationResponse) UnmarshalJSON(body []byte) error {
 }
 
 type openAIChatCompletionStreamChunk struct {
-	Choices []struct {
-		Index int `json:"index"`
-		Delta struct {
-			Content      string                  `json:"content"`
-			ToolCalls    []openAIStreamToolCall  `json:"tool_calls,omitempty"`
-			FunctionCall *openAIToolCallFunction `json:"function_call,omitempty"`
-		} `json:"delta"`
-		FinishReason string `json:"finish_reason"`
-	} `json:"choices"`
-	Usage *openAIUsage `json:"usage"`
+	Choices []openAIChatCompletionStreamChoice `json:"choices"`
+	Usage   *openAIUsage                       `json:"usage"`
+}
+
+type openAIChatCompletionStreamChoice struct {
+	Index        int                             `json:"index"`
+	Delta        openAIChatCompletionStreamDelta `json:"delta"`
+	FinishReason string                          `json:"finish_reason"`
+}
+
+type openAIChatCompletionStreamDelta struct {
+	Content          string                  `json:"content"`
+	Reasoning        json.RawMessage         `json:"reasoning,omitempty"`
+	ReasoningContent json.RawMessage         `json:"reasoning_content,omitempty"`
+	ReasoningSummary json.RawMessage         `json:"reasoning_summary,omitempty"`
+	ToolCalls        []openAIStreamToolCall  `json:"tool_calls,omitempty"`
+	FunctionCall     *openAIToolCallFunction `json:"function_call,omitempty"`
 }
 
 type openAIStreamToolCall struct {
@@ -1129,12 +1136,17 @@ func parseOpenAICompatibleStream(body []byte, statusCode int) (contract.Conversa
 		return contract.ConversationResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream interrupted"}
 	}
 	var builder strings.Builder
+	var reasoningBuilder strings.Builder
 	var usage *openAIUsage
 	toolCalls := map[int]*openAIToolCall{}
 	toolOrder := []int{}
 	streamEvents := make([]contract.ConversationStreamEvent, 0)
 	eventIndex := 0
 	stopReason := contract.StopReasonEndTurn
+	sawReasoning := false
+	sawFinish := false
+	sawToolCall := false
+	finishReason := ""
 	done := false
 	for _, frame := range frames {
 		data := strings.TrimSpace(frame.Data)
@@ -1179,7 +1191,29 @@ func parseOpenAICompatibleStream(body []byte, statusCode int) (contract.Conversa
 				})
 				eventIndex++
 			}
+			if reasoningText := openAIStreamReasoningText(choice.Delta); reasoningText != "" {
+				sawReasoning = true
+				reasoningBuilder.WriteString(reasoningText)
+				streamEvents = append(streamEvents, contract.ConversationStreamEvent{
+					Index:        eventIndex,
+					Type:         contract.ConversationStreamEventReasoning,
+					ContentIndex: choice.Index,
+					Delta: contract.ContentPart{
+						Kind:           contract.ContentPartThinking,
+						Text:           reasoningText,
+						OriginProtocol: "openai-compatible",
+					},
+					RawEventType:   "chat.completion.chunk",
+					Raw:            append(json.RawMessage(nil), data...),
+					OriginProtocol: "openai-compatible",
+					Metadata:       openAIStreamChoiceMetadata(choice.Index),
+				})
+				eventIndex++
+			} else if openAIStreamDeltaHasReasoning(choice.Delta) {
+				sawReasoning = true
+			}
 			for _, delta := range choice.Delta.ToolCalls {
+				sawToolCall = true
 				toolCall := openAIStreamToolCallState(toolCalls, &toolOrder, delta.Index)
 				if delta.ID != "" {
 					toolCall.ID = delta.ID
@@ -1209,6 +1243,7 @@ func parseOpenAICompatibleStream(body []byte, statusCode int) (contract.Conversa
 				eventIndex++
 			}
 			if choice.Delta.FunctionCall != nil {
+				sawToolCall = true
 				toolCall := openAIStreamToolCallState(toolCalls, &toolOrder, 0)
 				toolCall.Type = "function"
 				toolCall.Function.Name += choice.Delta.FunctionCall.Name
@@ -1232,6 +1267,8 @@ func parseOpenAICompatibleStream(body []byte, statusCode int) (contract.Conversa
 				eventIndex++
 			}
 			if choice.FinishReason != "" {
+				sawFinish = true
+				finishReason = choice.FinishReason
 				stopReason = openAIStopReason(choice.FinishReason)
 				streamEvents = append(streamEvents, contract.ConversationStreamEvent{
 					Index:          eventIndex,
@@ -1260,6 +1297,9 @@ func parseOpenAICompatibleStream(body []byte, statusCode int) (contract.Conversa
 		eventIndex++
 	}
 	parts := make([]contract.ContentPart, 0, 1+len(toolOrder))
+	if text := strings.TrimSpace(reasoningBuilder.String()); text != "" {
+		parts = append(parts, contract.ContentPart{Kind: contract.ContentPartThinking, Text: text, OriginProtocol: "openai-compatible"})
+	}
 	if text := strings.TrimSpace(builder.String()); text != "" {
 		parts = append(parts, textContentPart(text))
 	}
@@ -1271,6 +1311,9 @@ func parseOpenAICompatibleStream(body []byte, statusCode int) (contract.Conversa
 		}
 	}
 	if len(parts) == 0 {
+		if openAIStreamIsEmptyCompletion(sawFinish, finishReason, usage, sawReasoning, sawToolCall) {
+			return contract.ConversationResponse{}, contract.ProviderError{Class: "empty_completion", StatusCode: http.StatusBadGateway, Message: "provider returned empty completion stream"}
+		}
 		return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider stream contained no content"}
 	}
 	text := contentPartsText(parts)
@@ -1286,6 +1329,40 @@ func parseOpenAICompatibleStream(body []byte, statusCode int) (contract.Conversa
 		Raw:          append(json.RawMessage(nil), body...),
 		StreamEvents: streamEvents,
 	}, nil
+}
+
+func openAIStreamReasoningText(delta openAIChatCompletionStreamDelta) string {
+	for _, raw := range []json.RawMessage{delta.ReasoningContent, delta.Reasoning, delta.ReasoningSummary} {
+		if !jsonRawMessageHasValue(raw) {
+			continue
+		}
+		var text string
+		if err := json.Unmarshal(raw, &text); err == nil {
+			if text != "" {
+				return text
+			}
+		}
+	}
+	return ""
+}
+
+func openAIStreamDeltaHasReasoning(delta openAIChatCompletionStreamDelta) bool {
+	return jsonRawMessageHasValue(delta.ReasoningContent) ||
+		jsonRawMessageHasValue(delta.Reasoning) ||
+		jsonRawMessageHasValue(delta.ReasoningSummary)
+}
+
+func jsonRawMessageHasValue(raw json.RawMessage) bool {
+	trimmed := strings.TrimSpace(string(raw))
+	return trimmed != "" && trimmed != "null"
+}
+
+func openAIStreamIsEmptyCompletion(sawFinish bool, finishReason string, usage *openAIUsage, sawReasoning bool, sawToolCall bool) bool {
+	return sawFinish &&
+		strings.EqualFold(strings.TrimSpace(finishReason), "stop") &&
+		usage == nil &&
+		!sawReasoning &&
+		!sawToolCall
 }
 
 func openAIStreamChoiceMetadata(choiceIndex int) map[string]any {

@@ -1090,6 +1090,79 @@ func TestOpenAICompatibleAdapterEstimatesStreamUsageWhenMissing(t *testing.T) {
 	}
 }
 
+func TestOpenAICompatibleAdapterClassifiesEmptyStopStream(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: {\"choices\":[{\"finish_reason\":\"stop\",\"delta\":{}}]}\n\n"))
+		_, _ = w.Write([]byte("data: [DONE]\n\n"))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_empty_stop_stream",
+		Model:      "gpt-local",
+		InputParts: textParts("hello"),
+		Stream:     true,
+		Account:    accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-upstream"},
+		Credential: map[string]any{"api_key": "upstream-secret"},
+	})
+	providerErr := assertProviderError(t, err, "empty_completion", http.StatusBadGateway)
+	if providerErr.Message != "provider returned empty completion stream" {
+		t.Fatalf("expected empty completion message, got %+v", providerErr)
+	}
+}
+
+func TestOpenAICompatibleAdapterPreservesReasoningStreamDeltas(t *testing.T) {
+	rawSSE := "data: {\"choices\":[{\"index\":1,\"delta\":{\"reasoning_content\":\"think \"}}]}\n\n" +
+		"data: {\"choices\":[{\"index\":1,\"delta\":{\"reasoning_content\":\"first\"}}]}\n\n" +
+		"data: {\"choices\":[{\"index\":1,\"delta\":{\"content\":\"answer\"}}]}\n\n" +
+		"data: {\"choices\":[{\"index\":1,\"finish_reason\":\"stop\",\"delta\":{}}]}\n\n" +
+		"data: [DONE]\n\n"
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte(rawSSE))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_reasoning_stream",
+		Model:      "gpt-local",
+		InputParts: textParts("hello"),
+		Stream:     true,
+		Account:    accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-upstream"},
+		Credential: map[string]any{"api_key": "upstream-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke stream upstream: %v", err)
+	}
+	if len(resp.Parts) != 2 ||
+		resp.Parts[0].Kind != contract.ContentPartThinking ||
+		resp.Parts[0].Text != "think first" ||
+		resp.Parts[0].OriginProtocol != "openai-compatible" ||
+		resp.Parts[1].Kind != contract.ContentPartText ||
+		resp.Parts[1].Text != "answer" {
+		t.Fatalf("expected reasoning and text parts, got %+v", resp.Parts)
+	}
+	reasoningEvents := conversationStreamEventsByType(resp.StreamEvents, contract.ConversationStreamEventReasoning)
+	if len(reasoningEvents) != 2 ||
+		reasoningEvents[0].ContentIndex != 1 ||
+		reasoningEvents[0].Delta.Text != "think " ||
+		reasoningEvents[1].ContentIndex != 1 ||
+		reasoningEvents[1].Delta.Text != "first" {
+		t.Fatalf("expected indexed reasoning delta events, got %+v", reasoningEvents)
+	}
+}
+
 func TestGenericReverseProxyAdapterInvokesConfiguredChatUpstream(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v2/chat" {
