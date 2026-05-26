@@ -122,6 +122,59 @@ func TestNormalizeResponsesRequiresWebSearchCapability(t *testing.T) {
 	}
 }
 
+func TestNormalizeResponsesPreservesRawFunctionItems(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	input := apiopenapi.ResponsesRequest_Input{}
+	if err := input.FromResponsesRequestInput1(nil); err != nil {
+		t.Fatalf("set empty input: %v", err)
+	}
+	req := apiopenapi.ResponsesRequest{
+		Model: "gpt-5.4",
+		Input: input,
+	}
+	rawBody := []byte(`{
+		"input":[
+			{"type":"message","role":"user","content":[{"type":"input_text","text":"What is the weather?"}]},
+			{"type":"function_call","call_id":"call_1","name":"lookup_weather","arguments":{"city":"Boston"}},
+			{"type":"function_call_output","call_id":"call_1","output":{"forecast":"sunny"}}
+		]
+	}`)
+
+	canonical := svc.NormalizeResponses(req, RequestMeta{SourceEndpoint: "/v1/responses", RawBody: rawBody})
+
+	if len(canonical.InputItems) != 3 {
+		t.Fatalf("expected text, function_call, and function_call_output items, got %+v", canonical.InputItems)
+	}
+	if canonical.InputItems[0].Type != gatewaycontract.ContentBlockText ||
+		canonical.InputItems[0].Role != "user" ||
+		canonical.InputItems[0].Text != "What is the weather?" {
+		t.Fatalf("unexpected text item: %+v", canonical.InputItems[0])
+	}
+	call := canonical.InputItems[1]
+	if call.Type != gatewaycontract.ContentBlockToolCall ||
+		call.Role != "assistant" ||
+		call.ToolCallID != "call_1" ||
+		call.ToolName != "lookup_weather" ||
+		call.ToolArgumentsJSON != `{"city":"Boston"}` {
+		t.Fatalf("unexpected function_call item: %+v", call)
+	}
+	output := canonical.InputItems[2]
+	if output.Type != gatewaycontract.ContentBlockToolResult ||
+		output.ToolResultForID != "call_1" ||
+		output.Text != `{"forecast":"sunny"}` {
+		t.Fatalf("unexpected function_call_output item: %+v", output)
+	}
+	if !requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyToolCalling) {
+		t.Fatalf("expected tool calling capability, got %+v", canonical.RequestCapabilities)
+	}
+	if canonical.Prompt != "What is the weather?\n[function_call]\n{\"forecast\":\"sunny\"}" {
+		t.Fatalf("unexpected prompt: %q", canonical.Prompt)
+	}
+}
+
 func TestNormalizeRealtimeWebSocketRequiresRealtimeCapability(t *testing.T) {
 	svc, err := New()
 	if err != nil {

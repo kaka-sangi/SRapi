@@ -706,15 +706,35 @@ func rawResponsesInputValue(value any, defaultRole string) ([]gatewaycontract.Co
 
 func rawResponsesInputObject(value map[string]any, defaultRole string) ([]gatewaycontract.ContentBlock, []string, []string) {
 	role := strings.TrimSpace(rawMapString(value, "role"))
-	if role == "" {
-		role = defaultRole
-	}
-	if rawType := strings.TrimSpace(rawMapString(value, "type")); rawType == "input_image" || rawType == "image_url" {
+	switch rawType := strings.TrimSpace(rawMapString(value, "type")); rawType {
+	case "function_call":
+		role = firstNonEmpty(role, "assistant")
+		if block, ok := rawResponsesFunctionCallBlock(value, role); ok {
+			return []gatewaycontract.ContentBlock{block}, nil, nil
+		}
+		return nil, nil, nil
+	case "function_call_output":
+		role = firstNonEmpty(role, "tool")
+		if block, ok := rawResponsesFunctionCallOutputBlock(value, role); ok {
+			return []gatewaycontract.ContentBlock{block}, nil, nil
+		}
+		return nil, nil, nil
+	case "input_image", "image_url":
 		if block, ok := rawResponsesImageBlock(value, role); ok {
 			return []gatewaycontract.ContentBlock{block}, nil, nil
 		}
 		return nil, nil, nil
+	case "input_text", "output_text":
+		role = firstNonEmpty(role, defaultRole)
+		if text := strings.TrimSpace(rawMapString(value, "text")); text != "" {
+			block := gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockText, Role: role, Text: text, Metadata: cloneMap(value), OriginProtocol: string(gatewaycontract.ProtocolOpenAICompatible), Raw: marshalRawJSON(value)}
+			if role == "system" || role == "developer" {
+				return nil, []string{text}, nil
+			}
+			return []gatewaycontract.ContentBlock{block}, nil, nil
+		}
 	}
+	role = firstNonEmpty(role, defaultRole)
 	if text := strings.TrimSpace(rawMapString(value, "text")); text != "" {
 		block := gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockText, Role: role, Text: text}
 		if role == "system" || role == "developer" {
@@ -731,6 +751,50 @@ func rawResponsesInputObject(value map[string]any, defaultRole string) ([]gatewa
 		return nil, append(instructions, text), warnings
 	}
 	return blocks, instructions, warnings
+}
+
+func rawResponsesFunctionCallBlock(value map[string]any, role string) (gatewaycontract.ContentBlock, bool) {
+	callID := firstNonEmpty(rawMapString(value, "call_id"), rawMapString(value, "id"))
+	name := rawMapString(value, "name")
+	arguments := rawResponsesArguments(value["arguments"])
+	if callID == "" && name == "" && arguments == "" {
+		return gatewaycontract.ContentBlock{}, false
+	}
+	if role == "" {
+		role = "assistant"
+	}
+	return gatewaycontract.ContentBlock{
+		Type:              gatewaycontract.ContentBlockToolCall,
+		Role:              role,
+		Text:              "[function_call]",
+		ToolCallID:        callID,
+		ToolName:          name,
+		ToolArgumentsJSON: arguments,
+		Metadata:          cloneMap(value),
+		OriginProtocol:    string(gatewaycontract.ProtocolOpenAICompatible),
+		Raw:               marshalRawJSON(value),
+	}, true
+}
+
+func rawResponsesFunctionCallOutputBlock(value map[string]any, role string) (gatewaycontract.ContentBlock, bool) {
+	callID := firstNonEmpty(rawMapString(value, "call_id"), rawMapString(value, "id"))
+	output := rawResponsesOutputText(value["output"])
+	if callID == "" && output == "" {
+		return gatewaycontract.ContentBlock{}, false
+	}
+	if role == "" {
+		role = "tool"
+	}
+	return gatewaycontract.ContentBlock{
+		Type:            gatewaycontract.ContentBlockToolResult,
+		Role:            role,
+		Text:            output,
+		ToolCallID:      callID,
+		ToolResultForID: callID,
+		Metadata:        cloneMap(value),
+		OriginProtocol:  string(gatewaycontract.ProtocolOpenAICompatible),
+		Raw:             marshalRawJSON(value),
+	}, true
 }
 
 func rawResponsesImageBlock(value map[string]any, role string) (gatewaycontract.ContentBlock, bool) {
@@ -766,6 +830,28 @@ func rawResponsesImageBlock(value map[string]any, role string) (gatewaycontract.
 		OriginProtocol: string(gatewaycontract.ProtocolOpenAICompatible),
 		Raw:            marshalRawJSON(value),
 	}, true
+}
+
+func rawResponsesArguments(value any) string {
+	switch typed := value.(type) {
+	case nil:
+		return ""
+	case string:
+		return strings.TrimSpace(typed)
+	default:
+		return jsonStringOrMarshal(typed)
+	}
+}
+
+func rawResponsesOutputText(value any) string {
+	switch typed := value.(type) {
+	case nil:
+		return ""
+	case string:
+		return strings.TrimSpace(typed)
+	default:
+		return jsonStringOrMarshal(typed)
+	}
 }
 
 func rawMapString(value map[string]any, key string) string {
