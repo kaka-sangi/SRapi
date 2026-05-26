@@ -1,8 +1,6 @@
 package service
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -297,21 +295,16 @@ func geminiUsageMetadataPresent(usage geminiUsageMetadata) bool {
 }
 
 func parseAntigravityStream(body []byte, statusCode int) (contract.ConversationResponse, error) {
-	scanner := bufio.NewScanner(bytes.NewReader(body))
-	scanner.Buffer(make([]byte, 0, 64*1024), 4<<20)
+	frames, err := parseSSEFrames(body)
+	if err != nil {
+		return contract.ConversationResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream interrupted"}
+	}
 	var usage geminiUsageMetadata
 	var parts []contract.ContentPart
 	stopReason := contract.StopReasonEndTurn
 	seenChunk := false
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" || strings.HasPrefix(line, ":") || strings.HasPrefix(line, "event:") {
-			continue
-		}
-		if !strings.HasPrefix(line, "data:") {
-			continue
-		}
-		data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+	for _, frame := range frames {
+		data := strings.TrimSpace(frame.Data)
 		if data == "" {
 			continue
 		}
@@ -328,9 +321,6 @@ func parseAntigravityStream(body []byte, statusCode int) (contract.ConversationR
 			stopReason = reason
 		}
 		usage.Merge(chunk.UsageMetadata)
-	}
-	if err := scanner.Err(); err != nil {
-		return contract.ConversationResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream interrupted"}
 	}
 	if !seenChunk {
 		return contract.ConversationResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream ended before chunk"}

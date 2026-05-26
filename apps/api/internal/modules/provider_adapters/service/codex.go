@@ -1,7 +1,6 @@
 package service
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -648,8 +647,10 @@ func parseCodexResponsesBody(body []byte, statusCode int) (contract.Conversation
 }
 
 func parseCodexResponsesStream(body []byte, statusCode int) (contract.ConversationResponse, error) {
-	scanner := bufio.NewScanner(bytes.NewReader(body))
-	scanner.Buffer(make([]byte, 0, 64*1024), 4<<20)
+	frames, err := parseSSEFrames(body)
+	if err != nil {
+		return contract.ConversationResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream interrupted"}
+	}
 	var deltaBuilder strings.Builder
 	var completedText string
 	var reasoningBuilder strings.Builder
@@ -662,15 +663,8 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 	functionStates := newCodexFunctionCallStreamStates()
 	eventIndex := 0
 	seenEvent := false
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" || strings.HasPrefix(line, ":") || strings.HasPrefix(line, "event:") {
-			continue
-		}
-		if !strings.HasPrefix(line, "data:") {
-			continue
-		}
-		data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+	for _, frame := range frames {
+		data := strings.TrimSpace(frame.Data)
 		if data == "" {
 			continue
 		}
@@ -783,9 +777,6 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 				completedText = text
 			}
 		}
-	}
-	if err := scanner.Err(); err != nil {
-		return contract.ConversationResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream interrupted"}
 	}
 	if !seenEvent {
 		return contract.ConversationResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream ended before chunk"}

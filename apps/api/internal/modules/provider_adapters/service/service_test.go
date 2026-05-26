@@ -923,7 +923,9 @@ func TestOpenAICompatibleAdapterForwardsConversionFields(t *testing.T) {
 }
 
 func TestOpenAICompatibleAdapterStreamsUpstream(t *testing.T) {
-	rawSSE := "data: {\"choices\":[{\"delta\":{\"content\":\"hello\"}}]}\n\n" +
+	rawSSE := "event: chat.completion.chunk\n" +
+		"data: {\"choices\":[{\"delta\":\n" +
+		"data: {\"content\":\"hello\"}}]}\n\n" +
 		"data: {\"choices\":[{\"delta\":{\"content\":\" stream\"}}]}\n\n" +
 		"data: {\"choices\":[],\"usage\":{\"prompt_tokens\":5,\"completion_tokens\":6,\"total_tokens\":11,\"prompt_tokens_details\":{\"cached_tokens\":2}}}\n\n" +
 		"data: [DONE]\n\n"
@@ -990,6 +992,9 @@ func TestOpenAICompatibleAdapterStreamsUpstream(t *testing.T) {
 	}
 	if resp.StreamEvents[0].Type != contract.ConversationStreamEventContentDelta || resp.StreamEvents[0].Delta.Text != "hello" {
 		t.Fatalf("expected first OpenAI content delta, got %+v", resp.StreamEvents[0])
+	}
+	if want := "{\"choices\":[{\"delta\":\n{\"content\":\"hello\"}}]}"; string(resp.StreamEvents[0].Raw) != want {
+		t.Fatalf("expected first OpenAI raw event payload %q, got %q", want, string(resp.StreamEvents[0].Raw))
 	}
 	if resp.StreamEvents[1].Type != contract.ConversationStreamEventContentDelta || resp.StreamEvents[1].Delta.Text != " stream" {
 		t.Fatalf("expected second OpenAI content delta preserving leading space, got %+v", resp.StreamEvents[1])
@@ -1593,7 +1598,9 @@ func TestGeminiCompatibleAdapterPreservesFinishReason(t *testing.T) {
 }
 
 func TestGeminiCompatibleAdapterStreamsUpstream(t *testing.T) {
-	rawSSE := "data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"hello\"}]}}]}\n\n" +
+	rawSSE := ": keep-alive\n" +
+		"data: {\"candidates\":[{\"content\":\n" +
+		"data: {\"parts\":[{\"text\":\"hello\"}]}}]}\n\n" +
 		"data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\" stream\"}]}}],\"usageMetadata\":{\"promptTokenCount\":5,\"candidatesTokenCount\":6,\"totalTokenCount\":11}}\n\n"
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1beta/models/gemini-pro:streamGenerateContent" {
@@ -1648,6 +1655,9 @@ func TestGeminiCompatibleAdapterStreamsUpstream(t *testing.T) {
 	}
 	if resp.StreamEvents[0].Type != contract.ConversationStreamEventContentDelta || resp.StreamEvents[0].Delta.Text != "hello" {
 		t.Fatalf("expected first Gemini content delta, got %+v", resp.StreamEvents[0])
+	}
+	if want := "{\"candidates\":[{\"content\":\n{\"parts\":[{\"text\":\"hello\"}]}}]}"; string(resp.StreamEvents[0].Raw) != want {
+		t.Fatalf("expected first Gemini raw event payload %q, got %q", want, string(resp.StreamEvents[0].Raw))
 	}
 	if resp.StreamEvents[1].Type != contract.ConversationStreamEventContentDelta || resp.StreamEvents[1].Delta.Text != " stream" {
 		t.Fatalf("expected second Gemini content delta preserving leading space, got %+v", resp.StreamEvents[1])
@@ -2309,7 +2319,9 @@ func TestAnthropicCompatibleAdapterPreservesToolUseResponse(t *testing.T) {
 
 func TestAnthropicCompatibleAdapterStreamsUpstream(t *testing.T) {
 	rawSSE := "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":5,\"output_tokens\":0}}}\n\n" +
-		"event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"hello\"}}\n\n" +
+		"event: content_block_delta\n" +
+		"data: {\"type\":\"content_block_delta\",\n" +
+		"data: \"delta\":{\"type\":\"text_delta\",\"text\":\"hello\"}}\n\n" +
 		"event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\" stream\"}}\n\n" +
 		"event: message_delta\ndata: {\"type\":\"message_delta\",\"usage\":{\"output_tokens\":6,\"cache_creation_input_tokens\":1}}\n\n" +
 		"event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
@@ -2371,6 +2383,9 @@ func TestAnthropicCompatibleAdapterStreamsUpstream(t *testing.T) {
 	}
 	if resp.StreamEvents[1].Type != contract.ConversationStreamEventContentDelta || resp.StreamEvents[1].Delta.Text != "hello" {
 		t.Fatalf("expected first Anthropic content delta, got %+v", resp.StreamEvents[1])
+	}
+	if want := "{\"type\":\"content_block_delta\",\n\"delta\":{\"type\":\"text_delta\",\"text\":\"hello\"}}"; string(resp.StreamEvents[1].Raw) != want {
+		t.Fatalf("expected first Anthropic raw event payload %q, got %q", want, string(resp.StreamEvents[1].Raw))
 	}
 	if resp.StreamEvents[2].Type != contract.ConversationStreamEventContentDelta || resp.StreamEvents[2].Delta.Text != " stream" {
 		t.Fatalf("expected second Anthropic content delta preserving leading space, got %+v", resp.StreamEvents[2])
@@ -3188,6 +3203,63 @@ func TestReverseProxyCodexCLIAdapterUsesResponsesOfficialClientShape(t *testing.
 	}
 }
 
+func TestReverseProxyCodexCLIAdapterStreamsMultilineSSEData(t *testing.T) {
+	rawSSE := "data: {\"type\":\"response.output_text.delta\",\n" +
+		"data: \"delta\":\"codex\"}\n\n" +
+		"data: {\"type\":\"response.completed\",\"response\":{\"output\":[],\"usage\":{\"input_tokens\":4,\"output_tokens\":5}}}\n\n" +
+		"data: [DONE]\n\n"
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/backend-api/codex/responses" {
+			t.Fatalf("unexpected codex upstream path %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte(rawSSE))
+	}))
+	defer upstream.Close()
+
+	runtime, err := reverseproxyservice.New(nil)
+	if err != nil {
+		t.Fatalf("create reverse proxy runtime: %v", err)
+	}
+	svc, err := service.NewWithReverseProxy(nil, runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_codex_proxy_multiline_sse",
+		Model:      "codex-local",
+		InputParts: textParts("hello codex"),
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": upstream.URL + "/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+		Credential: map[string]any{"cli_client_token": "codex-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke codex reverse proxy adapter: %v", err)
+	}
+	if conversationResponseText(resp) != "codex" || resp.Usage.Estimated || resp.Usage.InputTokens != 4 || resp.Usage.OutputTokens != 5 {
+		t.Fatalf("unexpected codex multiline stream response: %+v", resp)
+	}
+	if string(resp.Raw) != rawSSE {
+		t.Fatalf("expected raw Codex multiline stream to be preserved, got %q", string(resp.Raw))
+	}
+	if len(resp.StreamEvents) < 2 || resp.StreamEvents[0].Type != contract.ConversationStreamEventContentDelta || resp.StreamEvents[0].Delta.Text != "codex" {
+		t.Fatalf("expected Codex multiline content delta event, got %+v", resp.StreamEvents)
+	}
+	if want := "{\"type\":\"response.output_text.delta\",\n\"delta\":\"codex\"}"; string(resp.StreamEvents[0].Raw) != want {
+		t.Fatalf("expected first Codex raw event payload %q, got %q", want, string(resp.StreamEvents[0].Raw))
+	}
+}
+
 func TestReverseProxyCodexCLIAdapterPreservesFunctionCallResponse(t *testing.T) {
 	runtime := capturingRuntime{
 		response: reverseproxycontract.Response{
@@ -3975,6 +4047,51 @@ func TestReverseProxyAntigravityGeminiAdapterDispatchesThroughRuntime(t *testing
 	}
 	if payload.Model != "gemini-pro" || len(payload.Request.Contents) != 1 || len(payload.Request.Contents[0].Parts) != 1 || payload.Request.Contents[0].Parts[0].Text != "hello gemini" {
 		t.Fatalf("unexpected antigravity gemini payload: %+v", payload)
+	}
+}
+
+func TestReverseProxyAntigravityAdapterStreamsMultilineSSEData(t *testing.T) {
+	rawSSE := "data: {\"response\":{\"candidates\":[{\"content\":\n" +
+		"data: {\"parts\":[{\"text\":\"antigravity\"}]}}],\"usageMetadata\":{\"promptTokenCount\":4,\"candidatesTokenCount\":5}}}\n\n"
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body:       []byte(rawSSE),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_antigravity_multiline_sse",
+		Model:      "antigravity-local",
+		InputParts: textParts("hello"),
+		Stream:     true,
+		Provider: providercontract.Provider{
+			AdapterType: "reverse-proxy-antigravity",
+			Protocol:    "gemini-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             16,
+			RuntimeClass:   accountcontract.RuntimeClassDesktopClientToken,
+			UpstreamClient: ptrString("antigravity_desktop"),
+			Metadata:       map[string]any{"base_url": "https://antigravity.example", "project_id": "project-1"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gemini-pro"},
+		Credential: map[string]any{"access_token": "desktop-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke antigravity stream adapter: %v", err)
+	}
+	if conversationResponseText(resp) != "antigravity" || resp.Usage.InputTokens != 4 || resp.Usage.OutputTokens != 5 {
+		t.Fatalf("unexpected antigravity multiline stream response: %+v", resp)
+	}
+	if runtime.request.URL != "https://antigravity.example/v1internal:streamGenerateContent?alt=sse" || !runtime.request.ExpectStream {
+		t.Fatalf("expected antigravity stream runtime request, got %+v", runtime.request)
+	}
+	if runtime.request.Headers.Get("Accept") != "text/event-stream" || runtime.request.Headers.Get("Accept-Encoding") != "identity" {
+		t.Fatalf("expected antigravity stream headers, got %+v", runtime.request.Headers)
 	}
 }
 

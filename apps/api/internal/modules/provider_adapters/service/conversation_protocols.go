@@ -1,8 +1,6 @@
 package service
 
 import (
-	"bufio"
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -1246,8 +1244,10 @@ func (u openAIUsage) HasTokenUsage() bool {
 }
 
 func parseOpenAICompatibleStream(body []byte, statusCode int) (contract.ConversationResponse, error) {
-	scanner := bufio.NewScanner(bytes.NewReader(body))
-	scanner.Buffer(make([]byte, 0, 64*1024), 4<<20)
+	frames, err := parseSSEFrames(body)
+	if err != nil {
+		return contract.ConversationResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream interrupted"}
+	}
 	var builder strings.Builder
 	var usage *openAIUsage
 	toolCalls := map[int]*openAIToolCall{}
@@ -1256,15 +1256,8 @@ func parseOpenAICompatibleStream(body []byte, statusCode int) (contract.Conversa
 	eventIndex := 0
 	stopReason := contract.StopReasonEndTurn
 	done := false
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" || strings.HasPrefix(line, ":") {
-			continue
-		}
-		if !strings.HasPrefix(line, "data:") {
-			continue
-		}
-		data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+	for _, frame := range frames {
+		data := strings.TrimSpace(frame.Data)
 		if data == "" {
 			continue
 		}
@@ -1365,9 +1358,6 @@ func parseOpenAICompatibleStream(body []byte, statusCode int) (contract.Conversa
 				eventIndex++
 			}
 		}
-	}
-	if err := scanner.Err(); err != nil {
-		return contract.ConversationResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream interrupted"}
 	}
 	if !done {
 		return contract.ConversationResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream ended before done"}
@@ -1580,23 +1570,18 @@ func (u geminiUsageMetadata) HasTokenUsage() bool {
 }
 
 func parseGeminiCompatibleStream(body []byte, statusCode int) (contract.ConversationResponse, error) {
-	scanner := bufio.NewScanner(bytes.NewReader(body))
-	scanner.Buffer(make([]byte, 0, 64*1024), 4<<20)
+	frames, err := parseSSEFrames(body)
+	if err != nil {
+		return contract.ConversationResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream interrupted"}
+	}
 	var usage geminiUsageMetadata
 	var parts []contract.ContentPart
 	streamEvents := make([]contract.ConversationStreamEvent, 0)
 	eventIndex := 0
 	stopReason := contract.StopReasonEndTurn
 	seenChunk := false
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" || strings.HasPrefix(line, ":") || strings.HasPrefix(line, "event:") {
-			continue
-		}
-		if !strings.HasPrefix(line, "data:") {
-			continue
-		}
-		data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+	for _, frame := range frames {
+		data := strings.TrimSpace(frame.Data)
 		if data == "" {
 			continue
 		}
@@ -1656,9 +1641,6 @@ func parseGeminiCompatibleStream(body []byte, statusCode int) (contract.Conversa
 			})
 			eventIndex++
 		}
-	}
-	if err := scanner.Err(); err != nil {
-		return contract.ConversationResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream interrupted"}
 	}
 	if !seenChunk {
 		return contract.ConversationResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream ended before chunk"}
@@ -1843,8 +1825,10 @@ func (u *anthropicUsage) Merge(next anthropicUsage) {
 }
 
 func parseAnthropicCompatibleStream(body []byte, statusCode int) (contract.ConversationResponse, error) {
-	scanner := bufio.NewScanner(bytes.NewReader(body))
-	scanner.Buffer(make([]byte, 0, 64*1024), 4<<20)
+	frames, err := parseSSEFrames(body)
+	if err != nil {
+		return contract.ConversationResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream interrupted"}
+	}
 	var builder strings.Builder
 	var usage anthropicUsage
 	blocks := map[int]*anthropicContentBlock{}
@@ -1854,15 +1838,8 @@ func parseAnthropicCompatibleStream(body []byte, statusCode int) (contract.Conve
 	eventIndex := 0
 	stopReason := contract.StopReasonEndTurn
 	done := false
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" || strings.HasPrefix(line, ":") || strings.HasPrefix(line, "event:") {
-			continue
-		}
-		if !strings.HasPrefix(line, "data:") {
-			continue
-		}
-		data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+	for _, frame := range frames {
+		data := strings.TrimSpace(frame.Data)
 		if data == "" {
 			continue
 		}
@@ -2017,9 +1994,6 @@ func parseAnthropicCompatibleStream(body []byte, statusCode int) (contract.Conve
 		case "message_stop":
 			done = true
 		}
-	}
-	if err := scanner.Err(); err != nil {
-		return contract.ConversationResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream interrupted"}
 	}
 	if !done {
 		return contract.ConversationResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream ended before done"}
