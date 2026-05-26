@@ -483,6 +483,17 @@ func anthropicImageBlock(part contract.ContentPart) map[string]any {
 }
 
 func anthropicThinkingBlock(part contract.ContentPart) map[string]any {
+	blockType := strings.TrimSpace(metadataString(part.Metadata, "type"))
+	if blockType == "redacted_thinking" {
+		data := strings.TrimSpace(metadataString(part.Metadata, "data"))
+		if data == "" {
+			data = strings.TrimSpace(part.Text)
+		}
+		if data == "" {
+			return nil
+		}
+		return anthropicBlockWithMetadata(map[string]any{"type": "redacted_thinking", "data": data}, part)
+	}
 	text := strings.TrimSpace(part.Text)
 	if text == "" {
 		return nil
@@ -1767,6 +1778,8 @@ type anthropicContentBlock struct {
 	Name      string          `json:"name"`
 	Input     json.RawMessage `json:"input"`
 	Text      string          `json:"text"`
+	Thinking  string          `json:"thinking"`
+	Data      string          `json:"data"`
 	Signature string          `json:"signature"`
 }
 
@@ -1777,7 +1790,9 @@ type anthropicStreamChunk struct {
 	Delta        struct {
 		Type        string `json:"type"`
 		Text        string `json:"text"`
+		Thinking    string `json:"thinking"`
 		PartialJSON string `json:"partial_json"`
+		Signature   string `json:"signature"`
 		StopReason  string `json:"stop_reason"`
 	} `json:"delta"`
 	Message *struct {
@@ -1848,7 +1863,11 @@ func anthropicContentPart(block anthropicContentBlock) (contract.ContentPart, bo
 			OriginProtocol:    "anthropic",
 		}, true
 	case "thinking":
-		if text := strings.TrimSpace(block.Text); text != "" {
+		text := block.Thinking
+		if text == "" {
+			text = block.Text
+		}
+		if text = strings.TrimSpace(text); text != "" {
 			metadata := map[string]any(nil)
 			if signature := strings.TrimSpace(block.Signature); signature != "" {
 				metadata = map[string]any{"signature": signature}
@@ -1856,9 +1875,35 @@ func anthropicContentPart(block anthropicContentBlock) (contract.ContentPart, bo
 			return contract.ContentPart{Kind: contract.ContentPartThinking, Text: text, Metadata: metadata, OriginProtocol: "anthropic"}, true
 		}
 	case "redacted_thinking":
-		return contract.ContentPart{Kind: contract.ContentPartThinking, Metadata: map[string]any{"type": blockType}, OriginProtocol: "anthropic"}, true
+		metadata := map[string]any{"type": blockType}
+		if data := strings.TrimSpace(block.Data); data != "" {
+			metadata["data"] = data
+		}
+		raw := anthropicBlockRaw(block)
+		return contract.ContentPart{Kind: contract.ContentPartThinking, Metadata: metadata, Raw: raw, OriginProtocol: "anthropic"}, true
 	}
 	return contract.ContentPart{}, false
+}
+
+func anthropicBlockRaw(block anthropicContentBlock) json.RawMessage {
+	payload := map[string]any{"type": strings.TrimSpace(block.Type)}
+	setMapString(payload, "id", block.ID)
+	setMapString(payload, "name", block.Name)
+	if len(block.Input) > 0 {
+		var input any
+		if err := json.Unmarshal(block.Input, &input); err == nil {
+			payload["input"] = input
+		}
+	}
+	setMapString(payload, "text", block.Text)
+	setMapString(payload, "thinking", block.Thinking)
+	setMapString(payload, "data", block.Data)
+	setMapString(payload, "signature", block.Signature)
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return nil
+	}
+	return append(json.RawMessage(nil), raw...)
 }
 
 func anthropicStopReason(reason string) contract.StopReason {
@@ -2015,13 +2060,36 @@ func parseAnthropicCompatibleStream(body []byte, statusCode int) (contract.Conve
 				eventIndex++
 			case "thinking_delta":
 				block.Type = "thinking"
-				block.Text += chunk.Delta.Text
-				if chunk.Delta.Text != "" {
+				text := chunk.Delta.Thinking
+				if text == "" {
+					text = chunk.Delta.Text
+				}
+				block.Text += text
+				if text != "" {
 					streamEvents = append(streamEvents, contract.ConversationStreamEvent{
 						Index:          eventIndex,
 						Type:           contract.ConversationStreamEventReasoning,
 						ContentIndex:   index,
-						Delta:          contract.ContentPart{Kind: contract.ContentPartThinking, Text: chunk.Delta.Text, OriginProtocol: "anthropic-compatible"},
+						Delta:          contract.ContentPart{Kind: contract.ContentPartThinking, Text: text, OriginProtocol: "anthropic-compatible"},
+						RawEventType:   strings.TrimSpace(chunk.Type),
+						Raw:            append(json.RawMessage(nil), data...),
+						OriginProtocol: "anthropic-compatible",
+					})
+					eventIndex++
+				}
+			case "signature_delta":
+				block.Type = "thinking"
+				block.Signature += chunk.Delta.Signature
+				if chunk.Delta.Signature != "" {
+					streamEvents = append(streamEvents, contract.ConversationStreamEvent{
+						Index:        eventIndex,
+						Type:         contract.ConversationStreamEventReasoning,
+						ContentIndex: index,
+						Delta: contract.ContentPart{
+							Kind:           contract.ContentPartThinking,
+							Metadata:       map[string]any{"signature_delta": chunk.Delta.Signature},
+							OriginProtocol: "anthropic-compatible",
+						},
 						RawEventType:   strings.TrimSpace(chunk.Type),
 						Raw:            append(json.RawMessage(nil), data...),
 						OriginProtocol: "anthropic-compatible",

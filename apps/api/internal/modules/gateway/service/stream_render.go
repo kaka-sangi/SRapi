@@ -884,11 +884,30 @@ func (s *Service) renderAnthropicCanonicalStreamEvents(resp gatewaycontract.Cano
 	openBlocks := map[int]bool{}
 	openBlockOrder := make([]int, 0)
 	toolStates := newStreamToolCallStates(resp.OutputItems)
+	textStates := newResponseStreamTextStates(resp.OutputItems)
 	var pendingUsage *gatewaycontract.Usage
 	pendingStopReason := ""
 	for _, event := range events {
 		switch event.Type {
 		case gatewaycontract.StreamEventContentDelta, gatewaycontract.StreamEventReasoning, gatewaycontract.StreamEventToolCallDelta, gatewaycontract.StreamEventToolResult:
+			if event.Type == gatewaycontract.StreamEventReasoning && mapStringAny(event.Delta.Metadata, "signature_delta") != "" {
+				signature := textStates.appendSignature(event)
+				out = append(out, StreamEvent{
+					Event: "content_block_delta",
+					Data: map[string]any{
+						"type":  "content_block_delta",
+						"index": event.ContentIndex,
+						"delta": map[string]any{
+							"type":      "signature_delta",
+							"signature": signature,
+						},
+					},
+				})
+				continue
+			}
+			if event.Type == gatewaycontract.StreamEventReasoning {
+				_ = textStates.stateFor(event, gatewaycontract.ContentBlockReasoning)
+			}
 			startBlock := anthropicStreamEventStartBlock(event)
 			if event.Type == gatewaycontract.StreamEventToolCallDelta {
 				state := toolStates.stateFor(event)

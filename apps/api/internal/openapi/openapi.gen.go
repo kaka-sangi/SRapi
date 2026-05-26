@@ -220,10 +220,12 @@ func (e AnnouncementStatus) Valid() bool {
 
 // Defines values for AnthropicContentBlockType.
 const (
-	AnthropicContentBlockTypeImage      AnthropicContentBlockType = "image"
-	AnthropicContentBlockTypeText       AnthropicContentBlockType = "text"
-	AnthropicContentBlockTypeToolResult AnthropicContentBlockType = "tool_result"
-	AnthropicContentBlockTypeToolUse    AnthropicContentBlockType = "tool_use"
+	AnthropicContentBlockTypeImage            AnthropicContentBlockType = "image"
+	AnthropicContentBlockTypeRedactedThinking AnthropicContentBlockType = "redacted_thinking"
+	AnthropicContentBlockTypeText             AnthropicContentBlockType = "text"
+	AnthropicContentBlockTypeThinking         AnthropicContentBlockType = "thinking"
+	AnthropicContentBlockTypeToolResult       AnthropicContentBlockType = "tool_result"
+	AnthropicContentBlockTypeToolUse          AnthropicContentBlockType = "tool_use"
 )
 
 // Valid indicates whether the value is a known member of the AnthropicContentBlockType enum.
@@ -231,7 +233,11 @@ func (e AnthropicContentBlockType) Valid() bool {
 	switch e {
 	case AnthropicContentBlockTypeImage:
 		return true
+	case AnthropicContentBlockTypeRedactedThinking:
+		return true
 	case AnthropicContentBlockTypeText:
+		return true
+	case AnthropicContentBlockTypeThinking:
 		return true
 	case AnthropicContentBlockTypeToolResult:
 		return true

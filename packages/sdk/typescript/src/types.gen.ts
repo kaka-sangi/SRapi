@@ -2696,7 +2696,7 @@ export type ResponsesResponse = {
 };
 
 export type AnthropicContentBlock = {
-    type: 'text' | 'image' | 'tool_use' | 'tool_result';
+    type: 'text' | 'image' | 'thinking' | 'redacted_thinking' | 'tool_use' | 'tool_result';
     text?: string;
     [key: string]: unknown;
 };

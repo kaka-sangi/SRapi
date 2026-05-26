@@ -346,6 +346,7 @@ type responseStreamTextState struct {
 	ItemID       string
 	BlockType    gatewaycontract.ContentBlockType
 	Text         strings.Builder
+	Signature    strings.Builder
 }
 
 func newResponseStreamTextStates(blocks []gatewaycontract.ContentBlock) *responseStreamTextStates {
@@ -396,6 +397,12 @@ func (s *responseStreamTextStates) openStates() []*responseStreamTextState {
 		return out[i].OutputIndex < out[j].OutputIndex
 	})
 	return out
+}
+
+func (s *responseStreamTextStates) appendSignature(event gatewaycontract.StreamEvent) string {
+	state := s.stateFor(event, gatewaycontract.ContentBlockReasoning)
+	state.Signature.WriteString(mapStringAny(event.Delta.Metadata, "signature_delta"))
+	return state.Signature.String()
 }
 
 func responseStreamDeltaTextBlockType(event gatewaycontract.StreamEvent, fallback gatewaycontract.ContentBlockType) gatewaycontract.ContentBlockType {
@@ -467,12 +474,16 @@ func outputAnthropicContentBlocks(blocks []gatewaycontract.ContentBlock) []apiop
 	out := make([]apiopenapi.AnthropicContentBlock, 0, len(blocks))
 	for _, block := range blocks {
 		item := apiopenapi.AnthropicContentBlock{
-			Type:                 anthropicContentBlockType(block.Type),
-			AdditionalProperties: outputBlockProperties(block),
+			Type:                 outputAnthropicBlockType(block),
+			AdditionalProperties: outputAnthropicBlockProperties(block),
 		}
 		if block.Type == gatewaycontract.ContentBlockToolCall {
 			if input := parseJSONObject(block.ToolArgumentsJSON); len(input) > 0 {
 				item.Set("input", input)
+			}
+		} else if block.Type == gatewaycontract.ContentBlockReasoning {
+			if text := strings.TrimSpace(block.Text); text != "" {
+				item.Set("thinking", text)
 			}
 		} else {
 			if text := strings.TrimSpace(block.Text); text != "" {
@@ -485,8 +496,8 @@ func outputAnthropicContentBlocks(blocks []gatewaycontract.ContentBlock) []apiop
 }
 
 func anthropicStreamContentBlock(block gatewaycontract.ContentBlock) map[string]any {
-	contentBlock := outputBlockProperties(block)
-	contentBlock["type"] = string(anthropicContentBlockType(block.Type))
+	contentBlock := outputAnthropicBlockProperties(block)
+	contentBlock["type"] = string(outputAnthropicBlockType(block))
 	switch block.Type {
 	case gatewaycontract.ContentBlockToolCall:
 		setStringProperty(contentBlock, "id", block.ToolCallID)
@@ -500,6 +511,10 @@ func anthropicStreamContentBlock(block gatewaycontract.ContentBlock) map[string]
 		setStringProperty(contentBlock, "tool_use_id", block.ToolResultForID)
 		if text := strings.TrimSpace(block.Text); text != "" {
 			contentBlock["content"] = text
+		}
+	case gatewaycontract.ContentBlockReasoning:
+		if anthropicReasoningBlockType(block) != "redacted_thinking" {
+			setStringProperty(contentBlock, "thinking", block.Text)
 		}
 	default:
 		setStringProperty(contentBlock, "text", block.Text)
@@ -517,6 +532,9 @@ func anthropicStreamContentDelta(block gatewaycontract.ContentBlock) map[string]
 			}
 		}
 	case gatewaycontract.ContentBlockReasoning:
+		if anthropicReasoningBlockType(block) == "redacted_thinking" {
+			return nil
+		}
 		if text := strings.TrimSpace(block.Text); text != "" {
 			return map[string]any{
 				"type": "thinking_delta",
@@ -538,10 +556,10 @@ func outputGeminiParts(blocks []gatewaycontract.ContentBlock) []apiopenapi.Gemin
 	blocks = normalizeOutputItems(blocks)
 	out := make([]apiopenapi.GeminiPart, 0, len(blocks))
 	for _, block := range blocks {
-		part := apiopenapi.GeminiPart{AdditionalProperties: outputBlockProperties(block)}
+		part := apiopenapi.GeminiPart{AdditionalProperties: outputGeminiPartProperties(block)}
 		switch block.Type {
 		case gatewaycontract.ContentBlockToolCall:
-			call := outputBlockProperties(block)
+			call := outputGeminiPartProperties(block)
 			if args := parseJSONObject(block.ToolArgumentsJSON); len(args) > 0 {
 				call["args"] = args
 			}
@@ -561,6 +579,14 @@ func outputGeminiParts(blocks []gatewaycontract.ContentBlock) []apiopenapi.Gemin
 		out = append(out, part)
 	}
 	return out
+}
+
+func outputGeminiPartProperties(block gatewaycontract.ContentBlock) map[string]any {
+	props := outputBlockProperties(block)
+	if signature := firstNonEmpty(mapStringAny(block.Metadata, "thoughtSignature"), mapStringAny(block.Metadata, "signature")); signature != "" {
+		props["thoughtSignature"] = signature
+	}
+	return props
 }
 
 func outputBlockProperties(block gatewaycontract.ContentBlock) map[string]any {
@@ -623,6 +649,8 @@ func anthropicContentBlockType(value gatewaycontract.ContentBlockType) apiopenap
 	switch value {
 	case gatewaycontract.ContentBlockImage:
 		return apiopenapi.AnthropicContentBlockTypeImage
+	case gatewaycontract.ContentBlockReasoning:
+		return apiopenapi.AnthropicContentBlockTypeThinking
 	case gatewaycontract.ContentBlockToolCall:
 		return apiopenapi.AnthropicContentBlockTypeToolUse
 	case gatewaycontract.ContentBlockToolResult:
@@ -630,6 +658,42 @@ func anthropicContentBlockType(value gatewaycontract.ContentBlockType) apiopenap
 	default:
 		return apiopenapi.AnthropicContentBlockTypeText
 	}
+}
+
+func outputAnthropicBlockType(block gatewaycontract.ContentBlock) apiopenapi.AnthropicContentBlockType {
+	if block.Type == gatewaycontract.ContentBlockReasoning && anthropicReasoningBlockType(block) == "redacted_thinking" {
+		return apiopenapi.AnthropicContentBlockTypeRedactedThinking
+	}
+	return anthropicContentBlockType(block.Type)
+}
+
+func outputAnthropicBlockProperties(block gatewaycontract.ContentBlock) map[string]any {
+	props := map[string]any{}
+	switch block.Type {
+	case gatewaycontract.ContentBlockReasoning:
+		switch anthropicReasoningBlockType(block) {
+		case "redacted_thinking":
+			setStringProperty(props, "data", firstNonEmpty(mapStringAny(block.Metadata, "data"), block.Text))
+		default:
+			setStringProperty(props, "signature", mapStringAny(block.Metadata, "signature"))
+		}
+	case gatewaycontract.ContentBlockText, gatewaycontract.ContentBlockImage, gatewaycontract.ContentBlockToolCall, gatewaycontract.ContentBlockToolResult:
+		if value, ok := block.Metadata["cache_control"]; ok && value != nil {
+			props["cache_control"] = cloneAny(value)
+		}
+		if value, ok := block.Metadata["citations"]; ok && value != nil {
+			props["citations"] = cloneAny(value)
+		}
+	}
+	return props
+}
+
+func anthropicReasoningBlockType(block gatewaycontract.ContentBlock) string {
+	blockType := strings.TrimSpace(mapStringAny(block.Metadata, "type"))
+	if blockType == "redacted_thinking" {
+		return "redacted_thinking"
+	}
+	return "thinking"
 }
 
 func openAIChatFinishReason(value string) string {

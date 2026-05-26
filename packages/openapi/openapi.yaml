@@ -14067,6 +14067,8 @@ components:
           enum:
             - text
             - image
+            - thinking
+            - redacted_thinking
             - tool_use
             - tool_result
         text:

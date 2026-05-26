@@ -2524,6 +2524,47 @@ func TestAnthropicCompatibleAdapterPreservesToolUseSignatureResponse(t *testing.
 	}
 }
 
+func TestAnthropicCompatibleAdapterPreservesThinkingBlocks(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"stop_reason":"end_turn","content":[{"type":"thinking","thinking":"private chain","signature":"sig_think_1"},{"type":"redacted_thinking","data":"enc_think_1"},{"type":"text","text":"final"}],"usage":{"input_tokens":6,"output_tokens":3}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_anthropic_thinking",
+		Model:      "claude-local",
+		InputParts: textParts("think"),
+		Provider: providercontract.Provider{
+			ID:          2,
+			AdapterType: "anthropic-compatible",
+			Protocol:    "anthropic-compatible",
+		},
+		Account:    accountcontract.ProviderAccount{ID: 2, Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "claude-upstream"},
+		Credential: map[string]any{"api_key": "anthropic-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke anthropic upstream: %v", err)
+	}
+	if len(resp.Parts) != 3 || resp.Parts[0].Kind != contract.ContentPartThinking || resp.Parts[0].Text != "private chain" {
+		t.Fatalf("expected thinking, redacted_thinking, and text parts, got %+v", resp.Parts)
+	}
+	if resp.Parts[0].Metadata["signature"] != "sig_think_1" {
+		t.Fatalf("expected thinking signature metadata, got %+v", resp.Parts[0])
+	}
+	if resp.Parts[1].Kind != contract.ContentPartThinking ||
+		resp.Parts[1].Metadata["type"] != "redacted_thinking" ||
+		resp.Parts[1].Metadata["data"] != "enc_think_1" ||
+		string(resp.Parts[1].Raw) == "" {
+		t.Fatalf("expected redacted_thinking data and raw payload, got %+v", resp.Parts[1])
+	}
+}
+
 func TestAnthropicCompatibleAdapterStreamsUpstream(t *testing.T) {
 	rawSSE := "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":5,\"output_tokens\":0}}}\n\n" +
 		"event: content_block_delta\n" +
@@ -2602,6 +2643,58 @@ func TestAnthropicCompatibleAdapterStreamsUpstream(t *testing.T) {
 	}
 	if resp.StreamEvents[len(resp.StreamEvents)-1].Type != contract.ConversationStreamEventStop {
 		t.Fatalf("expected Anthropic terminal stop stream event, got %+v", resp.StreamEvents)
+	}
+}
+
+func TestAnthropicCompatibleAdapterStreamsThinkingSignature(t *testing.T) {
+	rawSSE := "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":5,\"output_tokens\":0}}}\n\n" +
+		"event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"thinking\",\"thinking\":\"\"}}\n\n" +
+		"event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"private \"}}\n\n" +
+		"event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"chain\"}}\n\n" +
+		"event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"signature_delta\",\"signature\":\"sig_\"}}\n\n" +
+		"event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"signature_delta\",\"signature\":\"think\"}}\n\n" +
+		"event: message_delta\ndata: {\"type\":\"message_delta\",\"usage\":{\"output_tokens\":6}}\n\n" +
+		"event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte(rawSSE))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_anthropic_stream_thinking",
+		Model:      "claude-local",
+		InputParts: textParts("think"),
+		Stream:     true,
+		Provider: providercontract.Provider{
+			ID:          2,
+			AdapterType: "anthropic-compatible",
+			Protocol:    "anthropic-compatible",
+		},
+		Account:    accountcontract.ProviderAccount{ID: 2, Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "claude-upstream"},
+		Credential: map[string]any{"api_key": "anthropic-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke anthropic stream upstream: %v", err)
+	}
+	if len(resp.Parts) != 1 || resp.Parts[0].Kind != contract.ContentPartThinking || resp.Parts[0].Text != "private chain" {
+		t.Fatalf("expected streamed thinking part, got %+v", resp.Parts)
+	}
+	if resp.Parts[0].Metadata["signature"] != "sig_think" {
+		t.Fatalf("expected aggregated thinking signature, got %+v", resp.Parts[0])
+	}
+	reasoningEvents := conversationStreamEventsByType(resp.StreamEvents, contract.ConversationStreamEventReasoning)
+	if len(reasoningEvents) != 4 ||
+		reasoningEvents[0].Delta.Text != "private " ||
+		reasoningEvents[1].Delta.Text != "chain" ||
+		reasoningEvents[2].Delta.Metadata["signature_delta"] != "sig_" ||
+		reasoningEvents[3].Delta.Metadata["signature_delta"] != "think" {
+		t.Fatalf("expected thinking text and signature deltas, got %+v", reasoningEvents)
 	}
 }
 

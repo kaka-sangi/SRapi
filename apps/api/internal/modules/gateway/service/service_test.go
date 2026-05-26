@@ -461,6 +461,43 @@ func TestRenderProtocolResponses(t *testing.T) {
 	}
 }
 
+func TestRenderAnthropicMessagesPreservesThinkingBlocks(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	resp := gatewaycontract.CanonicalResponse{
+		ID:         "resp_anthropic_thinking",
+		Model:      "claude-local",
+		StopReason: "end_turn",
+		OutputItems: []gatewaycontract.ContentBlock{
+			{Type: gatewaycontract.ContentBlockReasoning, Role: "assistant", Text: "private chain", Metadata: map[string]any{"signature": "sig_think_1"}},
+			{Type: gatewaycontract.ContentBlockReasoning, Role: "assistant", Metadata: map[string]any{"type": "redacted_thinking", "data": "enc_think_1"}},
+		},
+		Usage: gatewaycontract.Usage{InputTokens: 3, OutputTokens: 4},
+	}
+
+	anthropic := svc.RenderAnthropicMessages(resp)
+	if len(anthropic.Content) != 2 {
+		t.Fatalf("expected thinking and redacted_thinking blocks, got %+v", anthropic.Content)
+	}
+	if anthropic.Content[0].Type != apiopenapi.AnthropicContentBlockTypeThinking {
+		t.Fatalf("expected thinking block type, got %+v", anthropic.Content[0])
+	}
+	if thinking, _ := anthropic.Content[0].Get("thinking"); thinking != "private chain" {
+		t.Fatalf("expected thinking payload, got %+v", anthropic.Content[0])
+	}
+	if signature, _ := anthropic.Content[0].Get("signature"); signature != "sig_think_1" {
+		t.Fatalf("expected thinking signature, got %+v", anthropic.Content[0])
+	}
+	if anthropic.Content[1].Type != apiopenapi.AnthropicContentBlockTypeRedactedThinking {
+		t.Fatalf("expected redacted_thinking block type, got %+v", anthropic.Content[1])
+	}
+	if data, _ := anthropic.Content[1].Get("data"); data != "enc_think_1" {
+		t.Fatalf("expected redacted_thinking data, got %+v", anthropic.Content[1])
+	}
+}
+
 func TestRenderProtocolResponsesPreservesToolCallOutput(t *testing.T) {
 	svc, err := New()
 	if err != nil {
@@ -988,6 +1025,76 @@ func TestRenderResponsesStreamEventsFallbackPreservesReasoningPartLifecycle(t *t
 	content, _ := item["content"].([]map[string]any)
 	if len(content) != 1 || content[0]["type"] != "reasoning_text" {
 		t.Fatalf("expected fallback output item to preserve reasoning_text, got %+v", item)
+	}
+}
+
+func TestRenderAnthropicStreamEventsPreservesThinkingSignatureDeltas(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	resp := gatewaycontract.CanonicalResponse{
+		ID:         "resp_anthropic_thinking_stream",
+		Model:      "claude-local",
+		StopReason: "end_turn",
+		OutputItems: []gatewaycontract.ContentBlock{{
+			Type: gatewaycontract.ContentBlockReasoning,
+			Role: "assistant",
+			Text: "private chain",
+		}},
+		StreamEvents: []gatewaycontract.StreamEvent{
+			{
+				Index:        0,
+				Type:         gatewaycontract.StreamEventReasoning,
+				ContentIndex: 0,
+				Delta:        gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockReasoning, Role: "assistant", Text: "private "},
+			},
+			{
+				Index:        1,
+				Type:         gatewaycontract.StreamEventReasoning,
+				ContentIndex: 0,
+				Delta:        gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockReasoning, Role: "assistant", Text: "chain"},
+			},
+			{
+				Index:        2,
+				Type:         gatewaycontract.StreamEventReasoning,
+				ContentIndex: 0,
+				Delta:        gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockReasoning, Role: "assistant", Metadata: map[string]any{"signature_delta": "sig_"}},
+			},
+			{
+				Index:        3,
+				Type:         gatewaycontract.StreamEventReasoning,
+				ContentIndex: 0,
+				Delta:        gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockReasoning, Role: "assistant", Metadata: map[string]any{"signature_delta": "think"}},
+			},
+		},
+		Usage: gatewaycontract.Usage{InputTokens: 3, OutputTokens: 4},
+	}
+
+	events := svc.RenderAnthropicMessagesStreamEvents(resp)
+	blockStart := streamEventByName(events, "content_block_start")
+	if blockStart == nil {
+		t.Fatalf("expected thinking block start, got %+v", events)
+	}
+	block, _ := blockStart.Data["content_block"].(map[string]any)
+	if block["type"] != "thinking" {
+		t.Fatalf("expected thinking block start, got %+v", block)
+	}
+	deltas := streamEventsByName(events, "content_block_delta")
+	if len(deltas) != 4 {
+		t.Fatalf("expected two thinking and two signature deltas, got %+v", deltas)
+	}
+	firstDelta, _ := deltas[0].Data["delta"].(map[string]any)
+	thirdDelta, _ := deltas[2].Data["delta"].(map[string]any)
+	fourthDelta, _ := deltas[3].Data["delta"].(map[string]any)
+	if firstDelta["type"] != "thinking_delta" || firstDelta["text"] != "private " {
+		t.Fatalf("expected thinking text delta, got %+v", firstDelta)
+	}
+	if thirdDelta["type"] != "signature_delta" || thirdDelta["signature"] != "sig_" {
+		t.Fatalf("expected first signature delta, got %+v", thirdDelta)
+	}
+	if fourthDelta["type"] != "signature_delta" || fourthDelta["signature"] != "sig_think" {
+		t.Fatalf("expected aggregated signature delta, got %+v", fourthDelta)
 	}
 }
 
