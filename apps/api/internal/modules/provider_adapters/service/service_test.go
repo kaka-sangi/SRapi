@@ -42,6 +42,16 @@ func assertToolUsePart(t *testing.T, part contract.ContentPart, id string, name 
 	}
 }
 
+func conversationStreamEventsByType(events []contract.ConversationStreamEvent, eventType contract.ConversationStreamEventType) []contract.ConversationStreamEvent {
+	out := make([]contract.ConversationStreamEvent, 0)
+	for _, event := range events {
+		if event.Type == eventType {
+			out = append(out, event)
+		}
+	}
+	return out
+}
+
 func imageURLPart(url string) contract.ContentPart {
 	return contract.ContentPart{Kind: contract.ContentPartImage, MediaURL: url, MIMEType: "image/png"}
 }
@@ -3196,6 +3206,64 @@ func TestReverseProxyCodexCLIAdapterPreservesFunctionCallResponse(t *testing.T) 
 	}
 	if resp.StreamEvents[len(resp.StreamEvents)-1].Type != contract.ConversationStreamEventStop {
 		t.Fatalf("expected Codex function call terminal stop event, got %+v", resp.StreamEvents)
+	}
+}
+
+func TestReverseProxyCodexCLIAdapterPreservesFunctionCallArgumentDeltas(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body: []byte(
+				"data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"id\":\"fc_1\",\"call_id\":\"call_1\",\"name\":\"lookup\"}}\n\n" +
+					"data: {\"type\":\"response.function_call_arguments.delta\",\"item_id\":\"fc_1\",\"output_index\":0,\"delta\":\"{\\\"query\\\":\"}\n\n" +
+					"data: {\"type\":\"response.function_call_arguments.delta\",\"item_id\":\"fc_1\",\"output_index\":0,\"delta\":\"\\\"weather\\\"}\"}\n\n" +
+					"data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"id\":\"fc_1\",\"call_id\":\"call_1\",\"name\":\"lookup\",\"arguments\":\"{\\\"query\\\":\\\"weather\\\"}\"}}\n\n" +
+					"data: {\"type\":\"response.completed\",\"response\":{\"output\":[],\"usage\":{\"input_tokens\":4,\"output_tokens\":2}}}\n\n" +
+					"data: [DONE]\n\n",
+			),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_codex_tool_delta",
+		Model:      "codex-local",
+		InputParts: textParts("call lookup"),
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": "https://codex.example.test/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+		Credential: map[string]any{"cli_client_token": "codex-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke codex reverse proxy adapter: %v", err)
+	}
+	if len(resp.Parts) != 1 || resp.StopReason != contract.StopReasonToolUse {
+		t.Fatalf("unexpected codex function call delta response: %+v", resp)
+	}
+	assertToolUsePart(t, resp.Parts[0], "call_1", "lookup", `{"query":"weather"}`)
+	toolEvents := conversationStreamEventsByType(resp.StreamEvents, contract.ConversationStreamEventToolCallDelta)
+	if len(toolEvents) != 2 {
+		t.Fatalf("expected two Codex function argument delta events, got %+v", resp.StreamEvents)
+	}
+	if toolEvents[0].Delta.ToolCallID != "call_1" || toolEvents[0].Delta.ToolName != "lookup" || toolEvents[0].Delta.ToolArgumentsJSON != `{"query":` {
+		t.Fatalf("expected first Codex argument delta, got %+v", toolEvents[0])
+	}
+	if toolEvents[1].Delta.ToolCallID != "call_1" || toolEvents[1].Delta.ToolName != "lookup" || toolEvents[1].Delta.ToolArgumentsJSON != `"weather"}` {
+		t.Fatalf("expected second Codex argument delta, got %+v", toolEvents[1])
+	}
+	if resp.StreamEvents[len(resp.StreamEvents)-1].Type != contract.ConversationStreamEventStop {
+		t.Fatalf("expected Codex terminal stop stream event, got %+v", resp.StreamEvents)
 	}
 }
 

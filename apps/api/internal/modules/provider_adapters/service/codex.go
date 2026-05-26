@@ -40,6 +40,7 @@ type codexResponsesEvent struct {
 	Type        string                    `json:"type"`
 	Delta       string                    `json:"delta"`
 	Text        string                    `json:"text"`
+	ItemID      string                    `json:"item_id"`
 	Item        *codexResponsesOutputItem `json:"item"`
 	OutputIndex *int                      `json:"output_index"`
 	Response    *codexResponsesResponse   `json:"response"`
@@ -656,6 +657,7 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 	fallbackItems := []codexResponsesOutputItem{}
 	var finalResponse *codexResponsesResponse
 	streamEvents := make([]contract.ConversationStreamEvent, 0)
+	functionStates := newCodexFunctionCallStreamStates()
 	eventIndex := 0
 	seenEvent := false
 	for scanner.Scan() {
@@ -687,19 +689,7 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 			streamEvents = append(streamEvents, codexStreamUsageEvent(eventIndex, copied, data, deltaBuilder.String()))
 			eventIndex++
 		}
-		if event.Type == "response.output_item.done" && event.Item != nil {
-			if event.OutputIndex != nil {
-				indexedItems[*event.OutputIndex] = *event.Item
-			} else {
-				fallbackItems = append(fallbackItems, *event.Item)
-			}
-			if codexOutputItemIsFunctionCall(*event.Item) {
-				if streamEvent, ok := codexFunctionCallStreamEvent(*event.Item, eventIndex, codexOutputIndex(event), data); ok {
-					streamEvents = append(streamEvents, streamEvent)
-					eventIndex++
-				}
-			}
-		}
+		functionStates.mergeEvent(event)
 		if event.Response != nil {
 			copiedResponse := *event.Response
 			if len(copiedResponse.Output) == 0 {
@@ -714,6 +704,20 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 			}
 		}
 		switch event.Type {
+		case "response.output_item.done":
+			if event.Item != nil {
+				if event.OutputIndex != nil {
+					indexedItems[*event.OutputIndex] = *event.Item
+				} else {
+					fallbackItems = append(fallbackItems, *event.Item)
+				}
+				if codexOutputItemIsFunctionCall(*event.Item) && !functionStates.hasArgumentDeltas(event) {
+					if streamEvent, ok := codexFunctionCallStreamEvent(*event.Item, eventIndex, codexOutputIndex(event), data); ok {
+						streamEvents = append(streamEvents, streamEvent)
+						eventIndex++
+					}
+				}
+			}
 		case "response.output_text.delta":
 			deltaBuilder.WriteString(event.Delta)
 			if event.Delta != "" {
@@ -725,6 +729,11 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 					Raw:            append(json.RawMessage(nil), data...),
 					OriginProtocol: "openai-compatible",
 				})
+				eventIndex++
+			}
+		case "response.function_call_arguments.delta":
+			if event.Delta != "" {
+				streamEvents = append(streamEvents, functionStates.deltaEvent(event, eventIndex, data))
 				eventIndex++
 			}
 		case "response.output_text.done":
@@ -820,6 +829,95 @@ func codexOutputIndex(event codexResponsesEvent) int {
 		return *event.OutputIndex
 	}
 	return 0
+}
+
+type codexFunctionCallStreamStates struct {
+	byOutputIndex map[int]*codexFunctionCallStreamState
+	byItemID      map[string]*codexFunctionCallStreamState
+}
+
+type codexFunctionCallStreamState struct {
+	OutputIndex  int
+	ItemID       string
+	CallID       string
+	Name         string
+	ArgumentsLen int
+}
+
+func newCodexFunctionCallStreamStates() *codexFunctionCallStreamStates {
+	return &codexFunctionCallStreamStates{
+		byOutputIndex: map[int]*codexFunctionCallStreamState{},
+		byItemID:      map[string]*codexFunctionCallStreamState{},
+	}
+}
+
+func (s *codexFunctionCallStreamStates) mergeEvent(event codexResponsesEvent) {
+	if event.Item == nil || !codexOutputItemIsFunctionCall(*event.Item) {
+		return
+	}
+	state := s.stateFor(event)
+	if id := strings.TrimSpace(event.Item.ID); id != "" {
+		state.ItemID = id
+		s.byItemID[id] = state
+	}
+	if callID := strings.TrimSpace(event.Item.CallID); callID != "" {
+		state.CallID = callID
+	}
+	if name := strings.TrimSpace(event.Item.Name); name != "" {
+		state.Name = name
+	}
+}
+
+func (s *codexFunctionCallStreamStates) hasArgumentDeltas(event codexResponsesEvent) bool {
+	state := s.stateFor(event)
+	return state.ArgumentsLen > 0
+}
+
+func (s *codexFunctionCallStreamStates) deltaEvent(event codexResponsesEvent, index int, raw string) contract.ConversationStreamEvent {
+	state := s.stateFor(event)
+	state.ArgumentsLen += len(event.Delta)
+	return contract.ConversationStreamEvent{
+		Index:        index,
+		Type:         contract.ConversationStreamEventToolCallDelta,
+		ContentIndex: state.OutputIndex,
+		Delta: contract.ContentPart{
+			Kind:              contract.ContentPartToolUse,
+			ToolCallID:        firstNonEmpty(state.CallID, state.ItemID),
+			ToolName:          state.Name,
+			ToolArgumentsJSON: event.Delta,
+			Metadata:          map[string]any{"type": "function_call"},
+			OriginProtocol:    "openai-compatible",
+		},
+		RawEventType:   strings.TrimSpace(event.Type),
+		Raw:            append(json.RawMessage(nil), raw...),
+		OriginProtocol: "openai-compatible",
+	}
+}
+
+func (s *codexFunctionCallStreamStates) stateFor(event codexResponsesEvent) *codexFunctionCallStreamState {
+	if itemID := strings.TrimSpace(event.ItemID); itemID != "" {
+		if state := s.byItemID[itemID]; state != nil {
+			return state
+		}
+	}
+	if event.Item != nil {
+		if itemID := strings.TrimSpace(event.Item.ID); itemID != "" {
+			if state := s.byItemID[itemID]; state != nil {
+				return state
+			}
+		}
+	}
+	outputIndex := codexOutputIndex(event)
+	if state := s.byOutputIndex[outputIndex]; state != nil {
+		return state
+	}
+	state := &codexFunctionCallStreamState{
+		OutputIndex: outputIndex,
+		ItemID:      firstNonEmpty(strings.TrimSpace(event.ItemID), fmt.Sprintf("fc_%d", outputIndex)),
+	}
+	s.byOutputIndex[outputIndex] = state
+	s.byItemID[state.ItemID] = state
+	return state
 }
 
 func codexFunctionCallStreamEvent(item codexResponsesOutputItem, eventIndex int, contentIndex int, raw string) (contract.ConversationStreamEvent, bool) {
