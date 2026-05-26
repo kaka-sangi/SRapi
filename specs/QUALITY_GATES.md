@@ -105,7 +105,10 @@ It covers:
 - `go vet ./...`.
 - `git diff --check` whitespace drift.
 - `make check` must include architecture, code-quality, API test, generated drift, migration, and secret-scan gates.
+- `make check` must include observability rule hygiene so deployable alert rules cannot drift outside low-cardinality/sensitive-data guardrails.
 - Secret scanning must cover generated OpenAPI/SDK artifacts and lockfiles.
+- `make bootstrap-env` must generate strong local secrets instead of copying weak placeholders, and `make env-check` must reject existing weak or over-permissive env files.
+- `make deploy-preflight` must reuse env and observability hygiene checks before Compose deployment and warn or fail on missing host deployment tools depending on strict mode.
 - Production Go file-size thresholds, excluding generated Ent/OpenAPI/SDK code.
 - Production Go function-size thresholds, excluding tests and generated Ent/OpenAPI/SDK code.
 - Repository text hygiene for tracked source/docs/config files.
@@ -150,6 +153,20 @@ QualityEval capture, judge worker, or Scheduler quality evidence changes must al
 ```bash
 make smoke-quality-eval
 ```
+
+Prometheus alert rules, Alertmanager routes, Grafana alerting guidance, or deployable observability rule files must also run:
+
+```bash
+make observability-rules-check
+```
+
+It covers:
+
+- Deployable SRapi alert rule files exist.
+- Alert expressions use approved low-cardinality metric labels.
+- Rule labels stay limited to fixed routing dimensions.
+- Alertmanager notification grouping stays limited to fixed low-cardinality routing dimensions.
+- API key, account id, user id, request id, fingerprint, rule id, prompt, credential, cookie, and similar sensitive or high-cardinality fields do not enter rule files.
 
 ## 6. Scheduler Gates
 

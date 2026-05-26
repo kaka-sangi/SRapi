@@ -49,6 +49,32 @@ GET /api/v1/health
 - 默认 `STORAGE_BACKEND=postgres` 要求启动时 PostgreSQL 可用；只有显式设置 `STORAGE_BACKEND=memory` 才会进入临时内存模式。
 - release 模式在启动前拒绝弱 `JWT_SECRET`、`SRAPI_MASTER_KEY`、`API_KEY_PEPPER`、`DATABASE_PASSWORD` 和默认 `BOOTSTRAP_ADMIN_PASSWORD`。
 
+## 3.1 本地环境 bootstrap
+
+本地或单机 Docker Compose 部署前先运行：
+
+```bash
+make bootstrap-env
+```
+
+该命令使用 `tools/bootstrap-env.mjs` 从 `.env.example` 创建 `.env`，并为 `DATABASE_PASSWORD`、`JWT_SECRET`、`SRAPI_MASTER_KEY`、`API_KEY_PEPPER` 和 `BOOTSTRAP_ADMIN_PASSWORD` 生成强随机本地值。已有 `.env` 会原样保留，避免覆盖部署者轮换后的 secret；生成值不会写入终端日志，`.env` 文件权限会设置为 owner-only。生产环境仍应把这些 secret 放入平台 secret manager，并独立备份 `SRAPI_MASTER_KEY` 或 KMS 引用。
+
+已有环境可以离线审计：
+
+```bash
+make env-check
+```
+
+该检查会拒绝缺失关键 secret、`.env.example` 弱占位值、长度过短的本地 secret，以及 group/other 可读的 `.env` 文件权限。可用 `SRAPI_ENV_CHECK_FILE=/path/to/env make env-check` 检查非默认 env 文件。
+
+启动 Compose 或交给运维接手前可以运行部署预检：
+
+```bash
+make deploy-preflight
+```
+
+该预检会复用 `make env-check` 和 `make observability-rules-check` 的核心约束，确认 `.env.example`、`deploy/docker-compose.yml`、Prometheus/Alertmanager 配置、备份/恢复 Make targets、release smoke 和 observability profile 仍在位，并检查本机是否能找到 Docker Compose、`pg_dump`、`pg_restore`、`sha256sum` 和 `curl`。默认情况下，缺失本机工具只输出 warning，方便在无 Docker 的 CI 或开发机上继续检查静态部署配置；发布流水线可以设置 `SRAPI_DEPLOY_PREFLIGHT_STRICT_TOOLS=1` 把这些 warning 提升为失败。可用 `SRAPI_DEPLOY_PREFLIGHT_ENV_FILE=/path/to/env make deploy-preflight` 检查非默认 env 文件。
+
 ## 4. 启动就绪门禁
 
 HTTP listener 可以启动，但 Gateway 流量不得在以下条件满足前进入主流程：
@@ -294,6 +320,24 @@ make otel-overhead-bench
 
 默认短窗口为长窗口的 1/12，且不低于 1 分钟；SLO 阈值显式配置 `short_window_seconds` / `long_window_seconds` 时优先生效。相关配置项为 `SLO_EVALUATOR_INTERVAL_SECONDS` 和 `SLO_EVALUATOR_TIMEOUT_SECONDS`。告警 details 只保存 SLO id/name、severity、窗口秒数、请求计数、bad request 计数和 burn-rate 数值，不保存 API key、credential、prompt、request body、cookies 或 provider secret。
 
+Prometheus alert rules 可以从 `deploy/prometheus-srapi-alerts.yaml` 加载。该文件基于 `srapi_ops_alert_events{severity,status}` 生成 critical 和 warning Ops posture 告警，labels 只保留低基数路由字段，排障说明和 runbook 放在 annotations。修改规则后运行：
+
+```bash
+make observability-rules-check
+```
+
+该检查会拒绝 API key、account id、user id、request id、fingerprint、rule id、prompt、credential、cookie 等高基数或敏感字段进入规则文件。
+
+本地单机部署可以显式启用 Prometheus profile：
+
+```bash
+COMPOSE_PROFILES=observability make dev-up
+```
+
+该 profile 会用 `deploy/prometheus.yml` 抓取 API `/metrics`、加载 `deploy/prometheus-srapi-alerts.yaml`，并把触发的告警转发给同 profile 内的 Alertmanager。Prometheus 监听端口默认为 `9090`，可通过 `PROMETHEUS_PORT` 覆盖。Alertmanager 监听端口默认为 `9093`，可通过 `ALERTMANAGER_PORT` 覆盖。该 profile 是 opt-in，不影响默认 API/PostgreSQL/Redis 启动路径。
+
+本地 Alertmanager notification route 位于 `deploy/alertmanager.yml`。默认 receiver `srapi-local-webhook` 会向宿主机 `http://host.docker.internal:19093/srapi/alerts` 发送 webhook，并设置 `send_resolved: true`，方便用本地调试接收器确认 firing 和 resolved 通知。生产部署应把 receiver 替换为实际的通知系统或中继，但 route grouping 只能保留 `service`、`severity`、`component` 这类固定低基数字段；不要把 alert id、fingerprint、rule id、API key、account id、user id、request id、prompt、credential、Authorization 或 cookie 放进 labels、grouping 或 webhook URL。
+
 ### QualityEval 在线评估
 
 `quality_eval` worker 仅在持久化 store 可用且 `QUALITY_EVAL_ENABLED=true` 时启动。Gateway 成功完成文本请求并写入 `scheduler_feedbacks` 后，会捕获 content-safety 后的脱敏 prompt/output 摘要到 `quality_eval_samples.sample_payload_ciphertext`；禁用时不会新增样本。
@@ -404,4 +448,4 @@ MVP 必须至少实现：
 
 Phase 2 起必须补齐 `/metrics`、备份恢复、发布 smoke、数据生命周期清理和 SLO 告警。
 
-当前 Phase 2 已补齐 `/metrics`、PostgreSQL 手动备份/恢复入口、release smoke、基础数据生命周期清理，以及 SLO/告警控制面 v1 和 SLO burn-rate evaluator。SLO 定义和告警事件落库到 `obs_slo_definitions`、`obs_alert_events`；告警通知、抑制规则和聚合 rollup 仍按 `OBSERVABILITY_SPEC.md` 后续展开。
+当前 Phase 2 已补齐 `/metrics`、PostgreSQL 手动备份/恢复入口、release smoke、基础数据生命周期清理、部署 preflight，以及 SLO/告警控制面 v1 和 SLO burn-rate evaluator。SLO 定义和告警事件落库到 `obs_slo_definitions`、`obs_alert_events`；告警通知、抑制规则和聚合 rollup 仍按 `OBSERVABILITY_SPEC.md` 后续展开。

@@ -111,6 +111,11 @@ last_completed:
 - C1.1.1: Added an opt-in OpenTelemetry HTTP tracing overhead gate (`make otel-overhead-bench`) that compares no-op tracer provider vs batch tracer provider `/livez` p99 latency, defaults to a 5ms overhead budget, and documents when to run it before release or after observability changes.
 - C1.1.2: Added an opt-in Jaeger visualization smoke (`make smoke-jaeger-trace`) that starts official Jaeger all-in-one locally, exports a span over OTLP/gRPC, and verifies the trace is visible through the Jaeger Query API before removing the temporary container.
 - C1.1.3: Added an opt-in Tempo visualization smoke (`make smoke-tempo-trace`) that starts official Tempo locally with `deploy/tempo-smoke.yaml`, exports a span over OTLP/gRPC, and verifies the trace is visible through the Tempo Query API before removing the temporary container.
+- C1.1.4: Ops alert posture is now visible in both Prometheus and AdminOps: `/metrics` exposes `srapi_ops_alert_events{severity,status}` as a low-cardinality gauge over current alert events, `deploy/prometheus-srapi-alerts.yaml` provides deployable critical/warning alert rules with a local hygiene check, `deploy/prometheus.yml` plus the opt-in compose `observability` profile wires local Prometheus to API `/metrics`, the AdminOps page summarizes firing/critical/acknowledged/resolved alert counts, and tests guard against leaking alert fingerprints or rule IDs through the metric surface.
+- C1.1.5: Local alert notification routing now adds `deploy/alertmanager.yml`, wires Prometheus alerting to the opt-in compose Alertmanager service, forwards firing/resolved notifications to a local webhook receiver, and extends `make observability-rules-check` so Alertmanager grouping and compose mounts stay low-cardinality, secret-free, pinned, and opt-in.
+- C1.1.6: Local deployment bootstrap now uses `tools/bootstrap-env.mjs` instead of copying weak placeholders: `make bootstrap-env` and the PowerShell dev entrypoint generate strong local `DATABASE_PASSWORD`, `JWT_SECRET`, `SRAPI_MASTER_KEY`, `API_KEY_PEPPER`, and bootstrap admin password values, leave existing `.env` files untouched, avoid printing generated secrets, and create owner-only env files.
+- C1.1.7: Existing local env files now have an offline hygiene gate: `tools/env-check.mjs`, `make env-check`, and `tools/dev.ps1 env-check` reject missing required secrets, known weak placeholders, short local secrets, and group/other-readable env files while supporting `SRAPI_ENV_CHECK_FILE` for non-default env paths.
+- C1.1.8: Local Compose deployments now have a non-destructive preflight gate: `tools/deploy-preflight.mjs`, `make deploy-preflight`, and `tools/dev.ps1 deploy-preflight` reuse env and observability hygiene checks, verify required deploy files and Make targets, confirm API/PostgreSQL/Redis/Prometheus/Alertmanager Compose wiring, and warn or fail on missing host tools depending on `SRAPI_DEPLOY_PREFLIGHT_STRICT_TOOLS`.
 - A4.3: Added a Chat Completions streaming failover regression proving primary 503 before downstream SSE write retries to the secondary provider, returns only the secondary stream, and preserves failed/successful usage attempts plus fallback scheduler decision evidence.
 - Quality gate: Fixed `tools/web-check.mjs` so Vitest no longer shares one Node `--localstorage-file` across parallel unit files; the web harness now uses each browser test environment's storage and `make check` is repeatable for language persistence assertions.
 - Spec governance: Reconciled stale A5.2 guidance in `specs/silly-stirring-turtle.md` with current provider preset evidence; the engineering plan now records the implemented preset registry, install API, default-disabled behavior, and representative provider test diagnostics instead of listing A5.2 as missing.
@@ -118,7 +123,7 @@ last_completed:
 current:
 
 - package: Phase 1 production smoke and observability hardening
-- status: API key/user rate limits, API key concurrency, scheduler account quota evidence, provider-account RPM/TPM Redis counters, provider-account ordinary HTTP concurrency Redis leases, local schema repair for multi-attempt usage evidence, non-streaming and streaming local failover attempt evidence, protocol-level OTLP trace export smoke, local Jaeger query visibility smoke, local Tempo query visibility smoke, the OTel HTTP p99 overhead guard, the balance_charger local 10k pending-usage drain guard, an opt-in PostgreSQL balance_charger pressure harness, opt-in Stripe/Alipay/WeChat payment smoke entries, and local payment webhook regressions are implemented and locally verified where credentials are not required; live external provider/payment smoke still depends on valid upstream or merchant credentials.
+- status: API key/user rate limits, API key concurrency, scheduler account quota evidence, provider-account RPM/TPM Redis counters, provider-account ordinary HTTP concurrency Redis leases, local schema repair for multi-attempt usage evidence, non-streaming and streaming local failover attempt evidence, protocol-level OTLP trace export smoke, local Jaeger query visibility smoke, local Tempo query visibility smoke, the OTel HTTP p99 overhead guard, Ops alert posture metric/AdminOps summary/deployable Prometheus rules/local Alertmanager notification routing/default hygiene gate/local Prometheus+Alertmanager profile, strong local `.env` bootstrap generation, env hygiene checks, deploy preflight, the balance_charger local 10k pending-usage drain guard, an opt-in PostgreSQL balance_charger pressure harness, opt-in Stripe/Alipay/WeChat payment smoke entries, and local payment webhook regressions are implemented and locally verified where credentials are not required; live external provider/payment smoke still depends on valid upstream or merchant credentials.
 - objective: continue closing production smoke, sandbox, collector-visualization, and pressure-test gaps without letting docs/specs drift.
 
 next_recommended: Run `make smoke-payment-stripe` with real Stripe test-mode credentials when available, run `make smoke-payment-alipay` with real Alipay sandbox/test merchant credentials and separately exercise externally delivered Alipay async notifications when available, run `make smoke-payment-wechat` with real WeChat Pay merchant credentials and separately exercise externally delivered WeChat platform notifications when available, run deployed collector trace visualization smoke against production topology, rerun `make balance-charger-pressure BALANCE_CHARGER_PRESSURE_DSN=...` against a production-adjacent PostgreSQL database if local dev-container IO is not representative enough, rerun `make otel-overhead-bench` after any OTel SDK/exporter or tracing middleware change, or continue the remaining Phase 1 production pressure-test tasks from `specs/silly-stirring-turtle.md`.
@@ -140,6 +145,30 @@ last_gates:
 - `cd apps/api && go test ./internal/platform/otel -count=1 -v`: pass; Jaeger smoke skips unless `SRAPI_OTEL_JAEGER_SMOKE=1`
 - `make smoke-jaeger-trace`: pass; local Jaeger all-in-one accepted OTLP/gRPC span and Query API returned the trace
 - `make smoke-tempo-trace`: pass; local Tempo accepted OTLP/gRPC span and Query API returned the trace
+- `cd apps/api && go test ./internal/modules/operations/...`: pass
+- `cd apps/web && npm run test -- admin-ops-alerts.test.ts`: pass
+- `cd apps/web && npm run typecheck`: pass
+- `cd apps/web && npx eslint src/lib/admin-ops-alerts.ts src/components/admin/admin-resource-pages.tsx tests/unit/admin-ops-alerts.test.ts`: pass
+- `cd apps/web && npx prettier --check src/lib/admin-ops-alerts.ts tests/unit/admin-ops-alerts.test.ts`: pass
+- `make observability-rules-check`: pass
+- `node --test tools/bootstrap-env.test.mjs`: pass
+- `node --check tools/bootstrap-env.mjs && node --check tools/bootstrap-env.test.mjs`: pass
+- `npx prettier --check tools/bootstrap-env.mjs tools/bootstrap-env.test.mjs`: pass
+- `SRAPI_BOOTSTRAP_ENV_FILE=$(mktemp -d)/.env make bootstrap-env`: pass; generated a private `.env` with no weak local placeholders
+- `node --test tools/env-check.test.mjs`: pass
+- `node --check tools/env-check.mjs && node --check tools/env-check.test.mjs`: pass
+- `npx prettier --check tools/env-check.mjs tools/env-check.test.mjs`: pass
+- `SRAPI_ENV_CHECK_FILE=$(mktemp -d)/.env make env-check`: pass against a bootstrap-generated env file
+- `SRAPI_ENV_CHECK_FILE=$(mktemp -d)/.env make env-check`: fails as expected against copied `.env.example` with weak placeholders and permissive permissions
+- `node --test tools/deploy-preflight.test.mjs`: pass
+- `node --check tools/deploy-preflight.mjs && node --check tools/deploy-preflight.test.mjs`: pass
+- `npx prettier --check tools/deploy-preflight.mjs tools/deploy-preflight.test.mjs`: pass
+- `SRAPI_DEPLOY_PREFLIGHT_ENV_FILE=$(mktemp -d)/.env make deploy-preflight`: pass against a bootstrap-generated env file; warns on this workstation because Docker Compose is unavailable
+- `node --test tools/observability-rules-check.test.mjs`: pass
+- `node --check tools/observability-rules-check.mjs && node --check tools/observability-rules-check.test.mjs`: pass
+- `npx prettier --check tools/observability-rules-check.mjs tools/observability-rules-check.test.mjs`: pass
+- `cd apps/api && go test ./internal/codequality -run 'Test(NodeScriptsParse|NodeUnitTestsPass|ContainerFilesUsePinnedNonRootDefaults|MakeCheckRunsMandatoryQualityGates)' -count=1`: pass
+- `cd apps/api && go test ./internal/codequality -count=1`: blocked by concurrent protocol/adapter-side growth in `apps/api/internal/modules/gateway/service/service.go` (2757 lines > 2180) and `apps/api/internal/modules/provider_adapters/service/conversation_protocols.go:1844` (`parseAnthropicCompatibleStream` 213 lines > 210); this turn did not edit those protected files.
 - `cd apps/api && go test ./internal/httpserver -run 'TestGatewayChatCompletion(FailoverRecordsAttemptEvidence|StreamFailoverBeforeDownstreamWrite)' -count=1 -v`: pass
 - `make check`: pass; includes OpenAPI lint/bundle/codegen checks, SDK typecheck, migration check, architecture/code-quality/API tests, examples check, secret scan, web typecheck/lint/unit/build, and bundle budget
 - `cd apps/api && go test ./internal/modules/providers/preset -run TestDefaultRegistrySeedsCompatiblePresets -count=1 -v`: pass

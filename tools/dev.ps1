@@ -1,5 +1,5 @@
 param(
-    [ValidateSet("check", "architecture-check", "api", "up", "down", "logs", "smoke-health", "smoke-gateway", "smoke-rate-limit", "smoke-failover", "smoke-release", "smoke-jaeger-trace", "openapi", "openapi-check")]
+    [ValidateSet("check", "architecture-check", "api", "up", "observability-up", "down", "logs", "smoke-health", "smoke-gateway", "smoke-rate-limit", "smoke-failover", "smoke-release", "smoke-jaeger-trace", "smoke-tempo-trace", "observability-rules-check", "env-check", "deploy-preflight", "openapi", "openapi-check")]
     [string]$Command = "check"
 )
 
@@ -108,7 +108,7 @@ function Get-ComposeCommand {
 $EnvFile = Join-Path $Root ".env"
 $ExampleEnvFile = Join-Path $Root ".env.example"
 if (-not (Test-Path $EnvFile) -and (Test-Path $ExampleEnvFile)) {
-    Copy-Item $ExampleEnvFile $EnvFile
+    Invoke-Step "node" @("tools/bootstrap-env.mjs")
 }
 
 switch ($Command) {
@@ -118,6 +118,7 @@ switch ($Command) {
         Invoke-OpenApiScript -Check
         Invoke-Step "npx" @("--yes", "-p", "typescript@5.9.3", "tsc", "-p", "packages/sdk/typescript/tsconfig.json", "--noEmit")
         Assert-EntGenerated
+        Invoke-Step "make" @("observability-rules-check")
         Invoke-Step "go" @("test", "./...") (Join-Path $Root "apps/api")
         Invoke-Step "npx" @("--yes", "-p", "secretlint@13.0.2", "-p", "@secretlint/secretlint-rule-preset-recommend@13.0.2", "secretlint", "**/*")
     }
@@ -130,6 +131,17 @@ switch ($Command) {
     "up" {
         $Compose = Get-ComposeCommand
         Invoke-Step $Compose[0] ($Compose[1] + @("--env-file", ".env", "-f", "deploy/docker-compose.yml", "up", "--build"))
+    }
+    "observability-up" {
+        $Compose = Get-ComposeCommand
+        $PreviousProfiles = $env:COMPOSE_PROFILES
+        try {
+            $env:COMPOSE_PROFILES = "observability"
+            Invoke-Step $Compose[0] ($Compose[1] + @("--env-file", ".env", "-f", "deploy/docker-compose.yml", "up", "--build"))
+        }
+        finally {
+            $env:COMPOSE_PROFILES = $PreviousProfiles
+        }
     }
     "down" {
         $Compose = Get-ComposeCommand
@@ -157,6 +169,18 @@ switch ($Command) {
     }
     "smoke-jaeger-trace" {
         Invoke-Step "make" @("smoke-jaeger-trace")
+    }
+    "smoke-tempo-trace" {
+        Invoke-Step "make" @("smoke-tempo-trace")
+    }
+    "observability-rules-check" {
+        Invoke-Step "make" @("observability-rules-check")
+    }
+    "env-check" {
+        Invoke-Step "make" @("env-check")
+    }
+    "deploy-preflight" {
+        Invoke-Step "make" @("deploy-preflight")
     }
     "openapi" {
         Invoke-OpenApiScript

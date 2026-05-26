@@ -9,6 +9,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
 	realtimecontract "github.com/srapi/srapi/apps/api/internal/modules/realtime/contract"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
@@ -48,6 +49,7 @@ type runtimeMetricDescs struct {
 	schedulerStrategyLatencyDelta *prometheus.Desc
 	schedulerStrategyErrorRate    *prometheus.Desc
 	schedulerStrategyRejectReason *prometheus.Desc
+	opsAlertEvents                *prometheus.Desc
 	providerErrors                *prometheus.Desc
 	providerProbeLatency          *prometheus.Desc
 	usageTokens                   *prometheus.Desc
@@ -168,6 +170,12 @@ func newRuntimeMetricsCollector(ctx context.Context, rt *runtimeState) *runtimeM
 				[]string{"strategy", "version", "reason"},
 				nil,
 			),
+			opsAlertEvents: prometheus.NewDesc(
+				"srapi_ops_alert_events",
+				"Current operational alert events by severity and status.",
+				[]string{"severity", "status"},
+				nil,
+			),
 			providerErrors: prometheus.NewDesc(
 				"srapi_provider_errors_total",
 				"Provider-facing errors recorded by protocol and error class.",
@@ -248,6 +256,7 @@ func (d runtimeMetricDescs) all() []*prometheus.Desc {
 		d.schedulerStrategyLatencyDelta,
 		d.schedulerStrategyErrorRate,
 		d.schedulerStrategyRejectReason,
+		d.opsAlertEvents,
 		d.providerErrors,
 		d.providerProbeLatency,
 		d.usageTokens,
@@ -268,6 +277,7 @@ func (c *runtimeMetricsCollector) Collect(ch chan<- prometheus.Metric) {
 	c.collectSchedulerMetrics(ch, emitted, usageLogs)
 	c.collectRealtimeMetrics(ch, emitted)
 	c.collectReverseProxyMetrics(ch, emitted)
+	c.collectOpsAlertMetrics(ch, emitted)
 	c.collectProviderProbeMetrics(ch, emitted)
 	c.collectBaselineMetrics(ch, emitted)
 }
@@ -397,6 +407,19 @@ func (c *runtimeMetricsCollector) collectReverseProxyMetrics(ch chan<- prometheu
 	}
 }
 
+func (c *runtimeMetricsCollector) collectOpsAlertMetrics(ch chan<- prometheus.Metric, emitted map[string]bool) {
+	alerts, err := c.rt.operations.ListAlerts(c.ctx)
+	if err != nil {
+		c.rt.logger.Warn("failed to collect ops alert metrics", "error", err)
+		return
+	}
+	counts := opsAlertCounts(alerts)
+	for _, key := range sortedKeys(counts) {
+		labels := strings.Split(key, "\xff")
+		emitConstMetric(ch, emitted, "srapi_ops_alert_events", c.descs.opsAlertEvents, prometheus.GaugeValue, float64(counts[key]), labels...)
+	}
+}
+
 func (c *runtimeMetricsCollector) collectProviderProbeMetrics(ch chan<- prometheus.Metric, emitted map[string]bool) {
 	accounts, err := c.rt.accounts.List(c.ctx)
 	if err != nil {
@@ -480,6 +503,9 @@ func (c *runtimeMetricsCollector) collectBaselineMetrics(ch chan<- prometheus.Me
 	}
 	if !emitted["scheduler_strategy_reject_reason_total"] {
 		emitConstMetric(ch, emitted, "scheduler_strategy_reject_reason_total", c.descs.schedulerStrategyRejectReason, prometheus.CounterValue, 0, "unknown", "unknown", "unknown")
+	}
+	if !emitted["srapi_ops_alert_events"] {
+		emitConstMetric(ch, emitted, "srapi_ops_alert_events", c.descs.opsAlertEvents, prometheus.GaugeValue, 0, "unknown", "unknown")
 	}
 	if !emitted["srapi_provider_errors_total"] {
 		emitConstMetric(ch, emitted, "srapi_provider_errors_total", c.descs.providerErrors, prometheus.CounterValue, 0, "unknown", "unknown")
@@ -615,6 +641,16 @@ func schedulerCostScoreAverages(decisions []schedulercontract.Decision) map[stri
 		out[strategy] = aggregate.sum / float64(aggregate.count)
 	}
 	return out
+}
+
+func opsAlertCounts(alerts []operationscontract.AlertEvent) map[string]int {
+	counts := map[string]int{}
+	for _, alert := range alerts {
+		severity := metricLabelValue(string(alert.Severity), "unknown")
+		status := metricLabelValue(string(alert.Status), "unknown")
+		counts[strings.Join([]string{severity, status}, "\xff")]++
+	}
+	return counts
 }
 
 type schedulerStrategyMetricSet struct {

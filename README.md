@@ -114,6 +114,22 @@ SRapi/
 make bootstrap-env
 ```
 
+`make bootstrap-env` 会从 `.env.example` 创建本地 `.env`，并为 `DATABASE_PASSWORD`、`JWT_SECRET`、`SRAPI_MASTER_KEY`、`API_KEY_PEPPER` 和初始管理员密码生成强随机值；已有 `.env` 不会被覆盖，生成的 secret 不会打印到终端。
+
+检查已有本地环境是否仍保留弱默认值或过宽文件权限：
+
+```bash
+make env-check
+```
+
+启动 Compose 前做本地部署预检：
+
+```bash
+make deploy-preflight
+```
+
+该预检会复用 env-check 和 observability rules check，确认 Compose、Prometheus/Alertmanager、备份/恢复入口仍存在，并提示本机缺失的 Docker Compose、`pg_dump`、`pg_restore`、`sha256sum` 或 `curl`。默认情况下宿主工具缺失只作为 warning；需要 CI 强制失败时可设置 `SRAPI_DEPLOY_PREFLIGHT_STRICT_TOOLS=1`。
+
 运行当前质量检查：
 
 ```bash

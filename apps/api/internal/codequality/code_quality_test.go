@@ -80,6 +80,7 @@ func TestMakeCheckRunsMandatoryQualityGates(t *testing.T) {
 		"openapi-ts-codegen-check",
 		"ent-generate-check",
 		"migration-check",
+		"observability-rules-check",
 	}
 	var missing []string
 	for _, target := range required {
@@ -89,6 +90,78 @@ func TestMakeCheckRunsMandatoryQualityGates(t *testing.T) {
 	}
 	if len(missing) > 0 {
 		t.Fatalf("make check is missing mandatory quality gates: %s", strings.Join(missing, ", "))
+	}
+}
+
+func TestBootstrapEnvGeneratesLocalSecrets(t *testing.T) {
+	root := repoRoot(t)
+	makefile, err := os.ReadFile(filepath.Join(root, "Makefile"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	devPs1, err := os.ReadFile(filepath.Join(root, "tools", "dev.ps1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	script, err := os.ReadFile(filepath.Join(root, "tools", "bootstrap-env.mjs"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	checks := []struct {
+		name    string
+		content string
+		want    string
+	}{
+		{"Makefile", string(makefile), "BOOTSTRAP_ENV ?= node tools/bootstrap-env.mjs"},
+		{"Makefile", string(makefile), "ENV_CHECK ?= node tools/env-check.mjs"},
+		{"Makefile", string(makefile), "$(BOOTSTRAP_ENV)"},
+		{"Makefile", string(makefile), "$(ENV_CHECK)"},
+		{"tools/dev.ps1", string(devPs1), "tools/bootstrap-env.mjs"},
+		{"tools/dev.ps1", string(devPs1), "\"env-check\""},
+		{"tools/dev.ps1", string(devPs1), "Invoke-Step \"make\" @(\"env-check\")"},
+		{"tools/bootstrap-env.mjs", string(script), "randomBytes(32)"},
+		{"tools/bootstrap-env.mjs", string(script), "writeFileSync(envPath, output, { mode: 0o600, flag: \"wx\" })"},
+	}
+	for _, check := range checks {
+		if !strings.Contains(check.content, check.want) {
+			t.Fatalf("%s missing %q", check.name, check.want)
+		}
+	}
+}
+
+func TestDeployPreflightIsExposed(t *testing.T) {
+	root := repoRoot(t)
+	makefile, err := os.ReadFile(filepath.Join(root, "Makefile"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	devPs1, err := os.ReadFile(filepath.Join(root, "tools", "dev.ps1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	script, err := os.ReadFile(filepath.Join(root, "tools", "deploy-preflight.mjs"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	checks := []struct {
+		name    string
+		content string
+		want    string
+	}{
+		{"Makefile", string(makefile), "DEPLOY_PREFLIGHT ?= node tools/deploy-preflight.mjs"},
+		{"Makefile", string(makefile), "deploy-preflight:"},
+		{"Makefile", string(makefile), "$(DEPLOY_PREFLIGHT)"},
+		{"tools/dev.ps1", string(devPs1), "\"deploy-preflight\""},
+		{"tools/dev.ps1", string(devPs1), "Invoke-Step \"make\" @(\"deploy-preflight\")"},
+		{"tools/deploy-preflight.mjs", string(script), "checkEnvFile"},
+		{"tools/deploy-preflight.mjs", string(script), "tools/observability-rules-check.mjs"},
+		{"tools/deploy-preflight.mjs", string(script), "Docker Compose command not found"},
+		{"tools/deploy-preflight.mjs", string(script), "SRAPI_DEPLOY_PREFLIGHT_STRICT_TOOLS"},
+	}
+	for _, check := range checks {
+		if !strings.Contains(check.content, check.want) {
+			t.Fatalf("%s missing %q", check.name, check.want)
+		}
 	}
 }
 

@@ -92,6 +92,7 @@ import {
   useAdminUserSubscriptions,
 } from "@/hooks/admin-queries";
 import { adminErrorMessage } from "@/lib/admin-api";
+import { opsAlertSummaryTone, summarizeOpsAlerts } from "@/lib/admin-ops-alerts";
 import {
   formatCompactNumber,
   formatDate,
@@ -581,6 +582,7 @@ export function AdminOpsProductionPage() {
   const firstError = opsQueries.find((query) => query.isError)?.error;
   const overview = ops.overview.data;
   const concurrency = ops.concurrency.data;
+  const alertSummary = summarizeOpsAlerts(ops.alerts.data?.data);
   const recentRequests = usageEvidence.data?.data ?? [];
   const openCreateSlo = () => {
     setEditingSlo(null);
@@ -657,6 +659,21 @@ export function AdminOpsProductionPage() {
             <AdminStatCard label="RPM / TPM" value={`${formatCompactNumber(overview.rpm)} / ${formatCompactNumber(overview.tpm)}`} detail={`${formatInteger(overview.active_users)} active users`} icon={<Zap size={16} />} />
           </div>
         ) : null}
+
+        <AdminSection title="Alert Posture" description="Current alert state from the Ops alert event stream.">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+            <AdminStatCard
+              label="Firing"
+              value={formatInteger(alertSummary.firing)}
+              detail={`${formatInteger(alertSummary.critical)} critical`}
+              icon={<AlertTriangle size={16} />}
+              tone={opsAlertSummaryTone(alertSummary)}
+            />
+            <AdminStatCard label="Acknowledged" value={formatInteger(alertSummary.acknowledged)} />
+            <AdminStatCard label="Resolved" value={formatInteger(alertSummary.resolved)} tone="success" />
+            <AdminStatCard label="Loaded Events" value={formatInteger(alertSummary.total)} detail="latest page" />
+          </div>
+        </AdminSection>
 
         {concurrency ? (
           <AdminSection title="Concurrency" description="Active gateway requests and realtime slots, without API-key labels in the UI.">

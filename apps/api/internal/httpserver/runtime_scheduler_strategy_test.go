@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"entgo.io/ent/dialect"
 	"github.com/srapi/srapi/apps/api/ent/enttest"
@@ -14,6 +15,8 @@ import (
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	capabilitiescontract "github.com/srapi/srapi/apps/api/internal/modules/capabilities/contract"
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
+	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
+	operationsmemory "github.com/srapi/srapi/apps/api/internal/modules/operations/store/memory"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 	schedulerservice "github.com/srapi/srapi/apps/api/internal/modules/scheduler/service"
@@ -321,6 +324,61 @@ func TestMetricsExposeSchedulerStrategyOperationalSignals(t *testing.T) {
 		if !strings.Contains(metrics, expected) {
 			t.Fatalf("expected metrics to contain %s, got:\n%s", expected, metrics)
 		}
+	}
+}
+
+func TestMetricsExposeOpsAlertEventCounts(t *testing.T) {
+	operationsStore := operationsmemory.New()
+	now := time.Now().UTC()
+	for _, alert := range []operationscontract.AlertEvent{
+		{
+			RuleID:      "slo.burn_rate.critical",
+			Severity:    operationscontract.AlertSeverityCritical,
+			Status:      operationscontract.AlertStatusFiring,
+			Fingerprint: "slo:secret-fingerprint-1",
+			Summary:     "critical gateway burn rate",
+			StartedAt:   now,
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		},
+		{
+			RuleID:      "slo.burn_rate.critical",
+			Severity:    operationscontract.AlertSeverityCritical,
+			Status:      operationscontract.AlertStatusFiring,
+			Fingerprint: "slo:secret-fingerprint-2",
+			Summary:     "critical gateway burn rate",
+			StartedAt:   now,
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		},
+		{
+			RuleID:      "slo.burn_rate.warning",
+			Severity:    operationscontract.AlertSeverityWarning,
+			Status:      operationscontract.AlertStatusAcknowledged,
+			Fingerprint: "slo:secret-fingerprint-3",
+			Summary:     "warning gateway burn rate",
+			StartedAt:   now,
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		},
+	} {
+		if _, err := operationsStore.CreateAlert(t.Context(), alert); err != nil {
+			t.Fatalf("create alert: %v", err)
+		}
+	}
+
+	handler := New(config.Load(), nil, WithOperationsStore(operationsStore))
+	metrics := metricsBody(t, handler)
+	for _, expected := range []string{
+		`srapi_ops_alert_events{severity="critical",status="firing"} 2`,
+		`srapi_ops_alert_events{severity="warning",status="acknowledged"} 1`,
+	} {
+		if !strings.Contains(metrics, expected) {
+			t.Fatalf("expected metrics to contain %s, got:\n%s", expected, metrics)
+		}
+	}
+	if strings.Contains(metrics, "secret-fingerprint") || strings.Contains(metrics, "slo.burn_rate.critical") {
+		t.Fatalf("ops alert metrics must not expose alert fingerprints or rule ids, got:\n%s", metrics)
 	}
 }
 

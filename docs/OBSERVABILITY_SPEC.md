@@ -125,6 +125,16 @@ scheduler_strategy_reject_reason_total{strategy, version, reason}
 
 这些指标只允许 strategy、strategy version、shadow strategy、current/shadow selection 和结构化 reject reason 这类低基数标签。`cost_delta` / `latency_delta` 表示选中账号分数相对同次候选集平均分数的平均差值；`error_rate` 来自同 request_id + attempt_no 的 usage 成败。不得加入 API key、account id、provider id、user id、request id、prompt、cookie 或 credential label；逐请求排查仍应读取 Scheduler decision、request snapshot 和 usage log。
 
+Ops alert 当前状态由已持久化的 `obs_alert_events` 在 scrape 时聚合：
+
+```txt
+srapi_ops_alert_events{severity, status}
+```
+
+该指标表示当前告警事件数量，只允许 `severity` 和 `status` 两个低基数标签。不得加入 alert id、rule id、fingerprint、SLO id、user id、API key、request id、prompt 或 credential label；逐条告警排查应读取 AdminOps alert API。
+
+默认 Prometheus 告警规则保存在 `deploy/prometheus-srapi-alerts.yaml`，覆盖 critical firing 和长期 warning firing 两类 Ops alert posture。`deploy/prometheus.yml` 是本地 compose Prometheus profile 的最小配置，会抓取 API `/metrics`、加载这些规则，并把告警发送到同 profile 内的 Alertmanager。`deploy/alertmanager.yml` 提供本地 webhook notification route，按 `service`、`severity`、`component` 聚合通知并发送 resolved 事件。规则 labels 和 Alertmanager grouping 只能使用 `severity`、`status`、`service`、`team` 和 `component` 这类固定低基数维度；排障入口、runbook 和人工动作必须放在 annotations 或接收端系统配置，不能把 alert id、fingerprint、rule id 或账号/API key/user/request 维度放进 labels 或 route grouping。
+
 ### 3.3.1 Trace and Log Correlation
 
 HTTP server 会创建 OpenTelemetry server span，并使用 W3C trace context 从请求头提取/传播 trace。日志 handler 从 context 注入 `request_id`、`trace_id`、`user_id` 和 `api_key_id`，用于把 Gateway request、scheduler decision、usage log、audit log 和 provider feedback 串联起来。

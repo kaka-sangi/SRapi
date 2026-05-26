@@ -11,6 +11,10 @@ SECRETLINT ?= npx --yes -p secretlint@13.0.2 -p @secretlint/secretlint-rule-pres
 ENT ?= go run entgo.io/ent/cmd/ent@v0.14.6
 ATLAS ?= npx --yes @ariga/atlas@1.2.0
 EXAMPLES_CHECK ?= node tools/examples-check.mjs
+OBSERVABILITY_RULES_CHECK ?= node tools/observability-rules-check.mjs
+BOOTSTRAP_ENV ?= node tools/bootstrap-env.mjs
+ENV_CHECK ?= node tools/env-check.mjs
+DEPLOY_PREFLIGHT ?= node tools/deploy-preflight.mjs
 API_DIR ?= apps/api
 MIGRATION_NAME ?=
 RATE_LIMIT_BENCH_REDIS_ADDR ?=
@@ -38,12 +42,14 @@ TEMPO_QUERY_PORT ?= 13201
 TEMPO_QUERY_TIMEOUT_SECONDS ?= 20
 TEMPO_SMOKE_TIMEOUT ?= 90s
 
-.PHONY: help bootstrap-env openapi-lint openapi-bundle openapi-codegen openapi-codegen-check openapi-ts-codegen openapi-ts-codegen-check sdk-ts-typecheck ent-generate ent-generate-check migration-diff migration-hash migration-check api-test api-run dev-up dev-down dev-logs smoke-health smoke-gateway smoke-rate-limit smoke-failover smoke-quality-eval smoke-payment-stripe smoke-payment-alipay smoke-payment-wechat smoke-release smoke-jaeger-trace smoke-tempo-trace rate-limit-bench balance-charger-pressure otel-overhead-bench backup-postgres restore-postgres examples-check secret-scan architecture-check code-quality-check diff-check web-install web-check web-check-e2e web-dev check
+.PHONY: help bootstrap-env env-check deploy-preflight openapi-lint openapi-bundle openapi-codegen openapi-codegen-check openapi-ts-codegen openapi-ts-codegen-check sdk-ts-typecheck ent-generate ent-generate-check migration-diff migration-hash migration-check api-test api-run dev-up dev-down dev-logs smoke-health smoke-gateway smoke-rate-limit smoke-failover smoke-quality-eval smoke-payment-stripe smoke-payment-alipay smoke-payment-wechat smoke-release smoke-jaeger-trace smoke-tempo-trace rate-limit-bench balance-charger-pressure otel-overhead-bench backup-postgres restore-postgres examples-check observability-rules-check secret-scan architecture-check code-quality-check diff-check web-install web-check web-check-e2e web-dev check
 
 help:
 	@printf '%s\n' \
 		'SRapi development targets:' \
 		'  make bootstrap-env   Create .env from .env.example if missing' \
+		'  make env-check       Verify .env has strong local secrets and private permissions' \
+		'  make deploy-preflight  Verify local env, deploy files, alerts, and host tooling before Compose' \
 		'  make openapi-lint    Validate OpenAPI contract with Redocly' \
 		'  make openapi-bundle  Bundle OpenAPI contract into build/openapi/' \
 		'  make openapi-codegen Generate Go OpenAPI types/server interfaces' \
@@ -77,6 +83,7 @@ help:
 		'  make backup-postgres BACKUP_FILE=...   Create a PostgreSQL custom-format backup' \
 		'  make restore-postgres BACKUP_FILE=...  Restore a PostgreSQL custom-format backup' \
 		'  make examples-check  Validate public examples and 2api migration guide' \
+		'  make observability-rules-check  Validate SRapi Prometheus alert rule hygiene' \
 		'  make architecture-check  Run architecture and startup harness tests' \
 		'  make code-quality-check  Run repository code-quality harness tests' \
 		'  make diff-check     Check staged and unstaged diff whitespace' \
@@ -88,7 +95,13 @@ help:
 		'  make check           Run current contract and API checks'
 
 bootstrap-env:
-	@test -f .env || cp .env.example .env
+	$(BOOTSTRAP_ENV)
+
+env-check:
+	$(ENV_CHECK)
+
+deploy-preflight:
+	$(DEPLOY_PREFLIGHT)
 
 openapi-lint:
 	npx --yes @redocly/cli lint $(OPENAPI)
@@ -323,6 +336,9 @@ secret-scan:
 examples-check:
 	$(EXAMPLES_CHECK)
 
+observability-rules-check:
+	$(OBSERVABILITY_RULES_CHECK)
+
 web-install:
 	cd apps/web && npm install --no-fund --no-audit
 
@@ -335,4 +351,4 @@ web-check-e2e:
 web-dev:
 	cd apps/web && npm run dev
 
-check: diff-check openapi-lint openapi-bundle openapi-codegen-check openapi-ts-codegen-check sdk-ts-typecheck ent-generate-check migration-check architecture-check code-quality-check examples-check api-test secret-scan web-check
+check: diff-check openapi-lint openapi-bundle openapi-codegen-check openapi-ts-codegen-check sdk-ts-typecheck ent-generate-check migration-check architecture-check code-quality-check examples-check observability-rules-check api-test secret-scan web-check
