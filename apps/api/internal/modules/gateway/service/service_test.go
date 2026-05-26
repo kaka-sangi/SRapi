@@ -1535,6 +1535,88 @@ func TestRenderCanonicalStreamEventsPreservesResponsesStyleToolCalls(t *testing.
 	}
 }
 
+func TestRenderChatStreamChunksMapsResponsesToolOutputIndexes(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	resp := gatewaycontract.CanonicalResponse{
+		ID:         "resp_tool_output_index_stream",
+		Model:      "gpt-4o-mini",
+		StopReason: "tool_use",
+		OutputItems: []gatewaycontract.ContentBlock{
+			{Type: gatewaycontract.ContentBlockText, Role: "assistant", Text: "calling tools"},
+			{Type: gatewaycontract.ContentBlockToolCall, Role: "assistant", ToolCallID: "call_1", ToolName: "lookup", ToolArgumentsJSON: `{"city":"Tokyo"}`},
+			{Type: gatewaycontract.ContentBlockToolCall, Role: "assistant", ToolCallID: "call_2", ToolName: "time", ToolArgumentsJSON: `{"tz":"UTC"}`},
+		},
+		StreamEvents: []gatewaycontract.StreamEvent{
+			{
+				Index:        0,
+				Type:         gatewaycontract.StreamEventToolCallDelta,
+				ContentIndex: 1,
+				Delta: gatewaycontract.ContentBlock{
+					Type:              gatewaycontract.ContentBlockToolCall,
+					Role:              "assistant",
+					ToolCallID:        "call_1",
+					ToolName:          "lookup",
+					ToolArgumentsJSON: `{"city":`,
+				},
+				RawEventType:   "response.function_call_arguments.delta",
+				OriginProtocol: "openai-compatible",
+			},
+			{
+				Index:        1,
+				Type:         gatewaycontract.StreamEventToolCallDelta,
+				ContentIndex: 2,
+				Delta: gatewaycontract.ContentBlock{
+					Type:              gatewaycontract.ContentBlockToolCall,
+					Role:              "assistant",
+					ToolCallID:        "call_2",
+					ToolName:          "time",
+					ToolArgumentsJSON: `{"tz":"UTC"}`,
+				},
+				RawEventType:   "response.function_call_arguments.delta",
+				OriginProtocol: "openai-compatible",
+			},
+			{
+				Index:        2,
+				Type:         gatewaycontract.StreamEventToolCallDelta,
+				ContentIndex: 1,
+				Delta: gatewaycontract.ContentBlock{
+					Type:              gatewaycontract.ContentBlockToolCall,
+					Role:              "assistant",
+					ToolArgumentsJSON: `"Tokyo"}`,
+				},
+				RawEventType:   "response.function_call_arguments.delta",
+				OriginProtocol: "openai-compatible",
+			},
+			{
+				Index:          3,
+				Type:           gatewaycontract.StreamEventStop,
+				ContentIndex:   1,
+				StopReason:     "tool_use",
+				RawEventType:   "response.completed",
+				OriginProtocol: "openai-compatible",
+			},
+		},
+		Usage: gatewaycontract.Usage{InputTokens: 3, OutputTokens: 2},
+	}
+
+	chatChunks := svc.RenderChatStreamChunks(resp)
+	if len(chatChunks) != 4 {
+		t.Fatalf("expected three tool chunks plus stop, got %+v", chatChunks)
+	}
+	firstTool := chatStreamToolDelta(t, chatChunks[0])
+	secondTool := chatStreamToolDelta(t, chatChunks[1])
+	thirdTool := chatStreamToolDelta(t, chatChunks[2])
+	if firstTool["index"] != 0 || secondTool["index"] != 1 || thirdTool["index"] != 0 {
+		t.Fatalf("expected responses output indexes to map to chat tool indexes 0,1,0, got %+v, %+v, %+v", firstTool, secondTool, thirdTool)
+	}
+	if choiceIndex(t, chatChunks[0]) != 0 || choiceIndex(t, chatChunks[1]) != 0 || choiceIndex(t, chatChunks[3]) != 0 {
+		t.Fatalf("expected responses-style stream chunks to use chat choice index 0, got %+v", chatChunks)
+	}
+}
+
 func streamEventByName(events []StreamEvent, name string) *StreamEvent {
 	for idx := range events {
 		if events[idx].Event == name {

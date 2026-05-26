@@ -271,18 +271,19 @@ func (s *Service) RenderChatStreamChunks(resp gatewaycontract.CanonicalResponse)
 		return []map[string]any{s.RenderChatStreamChunk(resp)}
 	}
 	chunks := make([]map[string]any, 0, len(events))
+	toolIndexes := newChatStreamToolCallIndexes()
 	for _, event := range events {
 		switch event.Type {
 		case gatewaycontract.StreamEventContentDelta, gatewaycontract.StreamEventToolResult:
 			if text := event.Delta.Text; text != "" {
-				chunks = append(chunks, chatStreamChunkWithIndex(resp, event.ContentIndex, map[string]any{"content": text}, nil, nil))
+				chunks = append(chunks, chatStreamChunkWithIndex(resp, streamEventChoiceIndex(event), map[string]any{"content": text}, nil, nil))
 			}
 		case gatewaycontract.StreamEventReasoning:
 			if text := event.Delta.Text; text != "" {
-				chunks = append(chunks, chatStreamChunkWithIndex(resp, event.ContentIndex, map[string]any{"reasoning_content": text}, nil, nil))
+				chunks = append(chunks, chatStreamChunkWithIndex(resp, streamEventChoiceIndex(event), map[string]any{"reasoning_content": text}, nil, nil))
 			}
 		case gatewaycontract.StreamEventToolCallDelta:
-			toolCall := chatStreamToolCallDelta(event)
+			toolCall := chatStreamToolCallDelta(event, toolIndexes.indexFor(event))
 			if toolCall != nil {
 				chunks = append(chunks, chatStreamChunkWithIndex(resp, streamEventChoiceIndex(event), map[string]any{"tool_calls": []map[string]any{toolCall}}, nil, nil))
 			}
@@ -332,6 +333,9 @@ func streamEventChoiceIndex(event gatewaycontract.StreamEvent) int {
 	if index := positiveIntFromAny(event.Metadata["choice_index"]); index >= 0 {
 		return index
 	}
+	if isResponsesStyleStreamEvent(event) {
+		return 0
+	}
 	return event.ContentIndex
 }
 
@@ -348,9 +352,12 @@ func positiveIntFromAny(value any) int {
 	}
 }
 
-func chatStreamToolCallDelta(event gatewaycontract.StreamEvent) map[string]any {
+func chatStreamToolCallDelta(event gatewaycontract.StreamEvent, toolCallIndex int) map[string]any {
+	if toolCallIndex < 0 {
+		toolCallIndex = 0
+	}
 	call := map[string]any{
-		"index": event.ContentIndex,
+		"index": toolCallIndex,
 		"type":  "function",
 	}
 	if id := strings.TrimSpace(event.Delta.ToolCallID); id != "" {
@@ -370,6 +377,36 @@ func chatStreamToolCallDelta(event gatewaycontract.StreamEvent) map[string]any {
 		return nil
 	}
 	return call
+}
+
+type chatStreamToolCallIndexes struct {
+	next                  int
+	byResponseOutputIndex map[int]int
+}
+
+func newChatStreamToolCallIndexes() *chatStreamToolCallIndexes {
+	return &chatStreamToolCallIndexes{byResponseOutputIndex: map[int]int{}}
+}
+
+func (s *chatStreamToolCallIndexes) indexFor(event gatewaycontract.StreamEvent) int {
+	if !isResponsesStyleStreamEvent(event) {
+		return event.ContentIndex
+	}
+	outputIndex := event.ContentIndex
+	if outputIndex < 0 {
+		outputIndex = 0
+	}
+	if index, ok := s.byResponseOutputIndex[outputIndex]; ok {
+		return index
+	}
+	index := s.next
+	s.byResponseOutputIndex[outputIndex] = index
+	s.next++
+	return index
+}
+
+func isResponsesStyleStreamEvent(event gatewaycontract.StreamEvent) bool {
+	return strings.HasPrefix(strings.TrimSpace(event.RawEventType), "response.")
 }
 
 func (s *Service) renderResponsesCanonicalStreamEvents(resp gatewaycontract.CanonicalResponse) []StreamEvent {
