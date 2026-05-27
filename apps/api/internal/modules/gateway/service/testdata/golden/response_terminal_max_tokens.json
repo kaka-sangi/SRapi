@@ -1,0 +1,56 @@
+{
+  "responses": {
+    "status": "incomplete",
+    "incomplete_details_reason": "max_output_tokens",
+    "usage": {
+      "input_tokens": 11,
+      "output_tokens": 7,
+      "cached_tokens": 3,
+      "total_tokens": 21
+    }
+  },
+  "responses_stream": {
+    "event": "response.incomplete",
+    "type": "response.incomplete",
+    "status": "incomplete",
+    "incomplete_details_reason": "max_output_tokens"
+  },
+  "chat": {
+    "finish_reason": "length",
+    "usage": {
+      "input_tokens": 11,
+      "output_tokens": 7,
+      "cached_tokens": 3,
+      "total_tokens": 21
+    }
+  },
+  "chat_stream": {
+    "finish_reason": "length",
+    "usage": {}
+  },
+  "anthropic": {
+    "stop_reason": "max_tokens",
+    "usage": {
+      "input_tokens": 11,
+      "output_tokens": 7,
+      "cached_tokens": 3
+    }
+  },
+  "anthropic_stream": {
+    "stop_reason": "max_tokens",
+    "usage": {}
+  },
+  "gemini": {
+    "finish_reason": "MAX_TOKENS",
+    "usage": {
+      "input_tokens": 11,
+      "output_tokens": 7,
+      "cached_tokens": 3,
+      "total_tokens": 21
+    }
+  },
+  "gemini_stream": {
+    "finish_reason": "MAX_TOKENS",
+    "usage": {}
+  }
+}
