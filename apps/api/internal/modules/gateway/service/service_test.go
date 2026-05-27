@@ -844,6 +844,49 @@ func TestRenderResponsesPreservesFunctionCallOutputItems(t *testing.T) {
 	}
 }
 
+func TestRenderAnthropicPreservesToolResultFields(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	resp := gatewaycontract.CanonicalResponse{
+		ID:         "resp_tool_result_anthropic",
+		Model:      "claude-sonnet",
+		StopReason: "end_turn",
+		OutputItems: []gatewaycontract.ContentBlock{{
+			Type:              gatewaycontract.ContentBlockToolResult,
+			Role:              "user",
+			ToolCallID:        "call_1",
+			Text:              `{"forecast":"rain"}`,
+			ToolResultIsError: true,
+		}},
+		Usage: gatewaycontract.Usage{InputTokens: 5, OutputTokens: 3},
+	}
+
+	anthropic := svc.RenderAnthropicMessages(resp)
+	if len(anthropic.Content) != 1 || anthropic.Content[0].Type != apiopenapi.AnthropicContentBlockTypeToolResult {
+		t.Fatalf("expected anthropic tool_result content, got %+v", anthropic)
+	}
+	block := anthropic.Content[0]
+	if block.AdditionalProperties["tool_use_id"] != "call_1" ||
+		block.AdditionalProperties["content"] != `{"forecast":"rain"}` ||
+		block.AdditionalProperties["is_error"] != true {
+		t.Fatalf("expected anthropic tool_result fields, got %+v", block)
+	}
+
+	events := svc.RenderAnthropicMessagesStreamEvents(resp)
+	start := streamEventByName(events, "content_block_start")
+	if start == nil {
+		t.Fatalf("expected anthropic tool_result stream start, got %+v", events)
+	}
+	streamBlock, _ := start.Data["content_block"].(map[string]any)
+	if streamBlock["tool_use_id"] != "call_1" ||
+		streamBlock["content"] != `{"forecast":"rain"}` ||
+		streamBlock["is_error"] != true {
+		t.Fatalf("expected anthropic stream tool_result fields, got %+v", streamBlock)
+	}
+}
+
 func TestRenderResponsesPreservesHostedWebSearchCall(t *testing.T) {
 	svc, err := New()
 	if err != nil {

@@ -559,6 +559,14 @@ func outputAnthropicContentBlocks(blocks []gatewaycontract.ContentBlock) []apiop
 			if input := parseJSONObject(block.ToolArgumentsJSON); len(input) > 0 {
 				item.Set("input", input)
 			}
+		} else if block.Type == gatewaycontract.ContentBlockToolResult {
+			setStringProperty(item.AdditionalProperties, "tool_use_id", firstNonEmpty(block.ToolResultForID, block.ToolCallID))
+			if text := strings.TrimSpace(block.Text); text != "" {
+				item.Set("content", text)
+			}
+			if block.ToolResultIsError {
+				item.Set("is_error", true)
+			}
 		} else if block.Type == gatewaycontract.ContentBlockReasoning {
 			if text := strings.TrimSpace(block.Text); text != "" {
 				item.Set("thinking", text)
@@ -586,9 +594,12 @@ func anthropicStreamContentBlock(block gatewaycontract.ContentBlock) map[string]
 			contentBlock["input"] = map[string]any{}
 		}
 	case gatewaycontract.ContentBlockToolResult:
-		setStringProperty(contentBlock, "tool_use_id", block.ToolResultForID)
+		setStringProperty(contentBlock, "tool_use_id", firstNonEmpty(block.ToolResultForID, block.ToolCallID))
 		if text := strings.TrimSpace(block.Text); text != "" {
 			contentBlock["content"] = text
+		}
+		if block.ToolResultIsError {
+			contentBlock["is_error"] = true
 		}
 	case gatewaycontract.ContentBlockReasoning:
 		if anthropicReasoningBlockType(block) != "redacted_thinking" {
