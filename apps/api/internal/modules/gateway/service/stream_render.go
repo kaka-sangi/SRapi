@@ -418,9 +418,11 @@ func (s *Service) renderResponsesCanonicalStreamEvents(resp gatewaycontract.Cano
 	if !summary.HasRenderableOutput && summary.RawTerminalEventName == "" {
 		return nil
 	}
+	responseIDValue := responseID(resp)
 	out := summary.LifecycleEvents
+	sequence := newResponsesStreamSequence(out)
 	if !summary.HasLifecycleStart {
-		out = append([]StreamEvent{responseCreatedStreamEvent(resp)}, out...)
+		out = append([]StreamEvent{sequence.apply(responseCreatedStreamEvent(resp, responseIDValue))}, out...)
 	}
 	nextOutputIndex := 0
 	textStates := newResponseStreamTextStates(resp.OutputItems)
@@ -434,10 +436,10 @@ func (s *Service) renderResponsesCanonicalStreamEvents(resp gatewaycontract.Cano
 				if state != nil && state.OutputIndex < 0 {
 					state.OutputIndex = nextOutputIndex
 					nextOutputIndex++
-					out = append(out, responseStreamImageGenerationStartEvent(state))
+					out = append(out, sequence.apply(responseStreamImageGenerationStartEvent(state)))
 				}
 				if partial, ok := responseImageGenerationPartialStreamEvent(event, state); ok {
-					out = append(out, partial)
+					out = append(out, sequence.apply(partial))
 				}
 				continue
 			}
@@ -450,13 +452,13 @@ func (s *Service) renderResponsesCanonicalStreamEvents(resp gatewaycontract.Cano
 			if state.OutputIndex < 0 {
 				state.OutputIndex = nextOutputIndex
 				nextOutputIndex++
-				out = append(out, responseStreamTextStartEvents(state.ItemID, state.OutputIndex, state.BlockType, state.Metadata)...)
+				out = append(out, sequence.applyAll(responseStreamTextStartEvents(state.ItemID, state.OutputIndex, state.BlockType, state.Metadata))...)
 			}
 			if delta == "" {
 				continue
 			}
 			state.Text.WriteString(delta)
-			out = append(out, responseStreamTextDeltaEvent(state.ItemID, state.OutputIndex, state.BlockType, delta, state.Metadata))
+			out = append(out, sequence.apply(responseStreamTextDeltaEvent(state.ItemID, state.OutputIndex, state.BlockType, delta, state.Metadata)))
 		case gatewaycontract.StreamEventReasoning:
 			delta := event.Delta.Text
 			state := textStates.stateFor(event, gatewaycontract.ContentBlockReasoning)
@@ -467,34 +469,35 @@ func (s *Service) renderResponsesCanonicalStreamEvents(resp gatewaycontract.Cano
 			if state.OutputIndex < 0 {
 				state.OutputIndex = nextOutputIndex
 				nextOutputIndex++
-				out = append(out, responseStreamTextStartEvents(state.ItemID, state.OutputIndex, state.BlockType, state.Metadata)...)
+				out = append(out, sequence.applyAll(responseStreamTextStartEvents(state.ItemID, state.OutputIndex, state.BlockType, state.Metadata))...)
 			}
 			if delta == "" {
 				continue
 			}
 			state.Text.WriteString(delta)
-			out = append(out, responseStreamTextDeltaEvent(state.ItemID, state.OutputIndex, state.BlockType, delta, state.Metadata))
+			out = append(out, sequence.apply(responseStreamTextDeltaEvent(state.ItemID, state.OutputIndex, state.BlockType, delta, state.Metadata)))
 		case gatewaycontract.StreamEventToolCallDelta:
 			state := toolStates.stateFor(event)
 			if state.OutputIndex < 0 {
 				state.OutputIndex = nextOutputIndex
 				nextOutputIndex++
-				out = append(out, responseStreamToolCallStartEvent(state))
+				out = append(out, sequence.apply(responseStreamToolCallStartEvent(state)))
 			}
 			if delta := event.Delta.ToolArgumentsJSON; delta != "" {
 				state.Arguments.WriteString(delta)
 				if shouldSuppressHostedWebSearchArgumentDelta(state, delta) {
 					continue
 				}
-				out = append(out, StreamEvent{
+				out = append(out, sequence.apply(StreamEvent{
 					Event: "response.function_call_arguments.delta",
 					Data: map[string]any{
 						"type":         "response.function_call_arguments.delta",
+						"response_id":  responseIDValue,
 						"item_id":      state.ItemID,
 						"output_index": state.OutputIndex,
 						"delta":        delta,
 					},
-				})
+				}))
 			}
 		}
 	}
@@ -526,6 +529,7 @@ func (s *Service) renderResponsesCanonicalStreamEvents(resp gatewaycontract.Cano
 					Event: "response.function_call_arguments.done",
 					Data: map[string]any{
 						"type":         "response.function_call_arguments.done",
+						"response_id":  responseIDValue,
 						"item_id":      state.ItemID,
 						"output_index": state.OutputIndex,
 						"arguments":    arguments,
@@ -550,7 +554,7 @@ func (s *Service) renderResponsesCanonicalStreamEvents(resp gatewaycontract.Cano
 	}
 	sortResponseStreamDoneEventGroups(doneGroups)
 	for _, group := range doneGroups {
-		out = append(out, group.Events...)
+		out = append(out, sequence.applyAll(group.Events)...)
 	}
 	terminalEventName := responsesTerminalEventName(resp.StopReason)
 	if summary.RawTerminalEventName != "" {
@@ -562,13 +566,13 @@ func (s *Service) renderResponsesCanonicalStreamEvents(resp gatewaycontract.Cano
 		terminalResponse.Status = &failedStatus
 	}
 	out = append(out,
-		StreamEvent{
+		sequence.apply(StreamEvent{
 			Event: terminalEventName,
 			Data: map[string]any{
 				"type":     terminalEventName,
 				"response": terminalResponse,
 			},
-		},
+		}),
 	)
 	return out
 }
@@ -603,13 +607,13 @@ func summarizeResponsesStreamEvents(events []gatewaycontract.StreamEvent) respon
 	return summary
 }
 
-func responseCreatedStreamEvent(resp gatewaycontract.CanonicalResponse) StreamEvent {
+func responseCreatedStreamEvent(resp gatewaycontract.CanonicalResponse, responseIDValue string) StreamEvent {
 	return StreamEvent{
 		Event: "response.created",
 		Data: map[string]any{
 			"type": "response.created",
 			"response": map[string]any{
-				"id":         "resp_" + responseID(resp),
+				"id":         "resp_" + responseIDValue,
 				"object":     "response",
 				"created_at": time.Now().Unix(),
 				"model":      resp.Model,
@@ -632,6 +636,66 @@ func responseMetadataRawStreamEvent(event gatewaycontract.StreamEvent) (StreamEv
 		return StreamEvent{Event: strings.TrimSpace(event.RawEventType), Data: data}, true
 	default:
 		return StreamEvent{}, false
+	}
+}
+
+type responsesStreamSequence struct {
+	next int64
+}
+
+func newResponsesStreamSequence(events []StreamEvent) *responsesStreamSequence {
+	sequence := &responsesStreamSequence{next: 1}
+	for _, event := range events {
+		value, ok := responseStreamSequenceNumber(event.Data)
+		if !ok {
+			continue
+		}
+		if value >= sequence.next {
+			sequence.next = value + 1
+		}
+	}
+	return sequence
+}
+
+func (s *responsesStreamSequence) apply(event StreamEvent) StreamEvent {
+	if event.Data == nil {
+		event.Data = map[string]any{}
+	}
+	if _, ok := responseStreamSequenceNumber(event.Data); ok {
+		return event
+	}
+	event.Data["sequence_number"] = s.next
+	s.next++
+	return event
+}
+
+func (s *responsesStreamSequence) applyAll(events []StreamEvent) []StreamEvent {
+	for idx := range events {
+		events[idx] = s.apply(events[idx])
+	}
+	return events
+}
+
+func responseStreamSequenceNumber(data map[string]any) (int64, bool) {
+	if data == nil {
+		return 0, false
+	}
+	value, ok := data["sequence_number"]
+	if !ok || value == nil {
+		return 0, false
+	}
+	switch typed := value.(type) {
+	case int:
+		return int64(typed), true
+	case int64:
+		return typed, true
+	case float64:
+		return int64(typed), true
+	case json.Number:
+		parsed, err := typed.Int64()
+		return parsed, err == nil
+	default:
+		return 0, false
 	}
 }
 

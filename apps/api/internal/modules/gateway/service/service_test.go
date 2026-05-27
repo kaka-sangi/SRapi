@@ -2419,9 +2419,22 @@ func TestRenderCanonicalStreamEventsPreservesToolCallDeltas(t *testing.T) {
 	if len(responsesDeltas) != 2 || responsesDeltas[0].Data["delta"] != `{"query":` || responsesDeltas[1].Data["delta"] != `"weather"}` {
 		t.Fatalf("expected preserved responses tool argument deltas, got %+v", responsesDeltas)
 	}
+	if !responsesStreamEventsHaveContiguousSequenceNumbers(responsesEvents) {
+		t.Fatalf("expected contiguous responses sequence numbers, got %+v", responsesEvents)
+	}
+	if responsesDeltas[0].Data["response_id"] != "resp_tool_delta_stream" ||
+		responsesDeltas[0].Data["item_id"] != "call_1" ||
+		responsesDeltas[0].Data["output_index"] != 0 {
+		t.Fatalf("expected complete response tool delta identity fields, got %+v", responsesDeltas[0])
+	}
 	responsesDone := streamEventByName(responsesEvents, "response.function_call_arguments.done")
 	if responsesDone == nil || responsesDone.Data["arguments"] != `{"query":"weather"}` {
 		t.Fatalf("expected completed responses arguments, got %+v", responsesEvents)
+	}
+	if responsesDone.Data["response_id"] != "resp_tool_delta_stream" ||
+		responsesDone.Data["item_id"] != "call_1" ||
+		responsesDone.Data["output_index"] != 0 {
+		t.Fatalf("expected complete response tool done identity fields, got %+v", responsesDone)
 	}
 
 	anthropicEvents := svc.RenderAnthropicMessagesStreamEvents(resp)
@@ -2743,6 +2756,33 @@ func streamEventsByName(events []StreamEvent, name string) []StreamEvent {
 		}
 	}
 	return out
+}
+
+func responsesStreamEventsHaveContiguousSequenceNumbers(events []StreamEvent) bool {
+	for idx, event := range events {
+		got, ok := streamEventSequenceNumber(event)
+		if !ok || got != int64(idx+1) {
+			return false
+		}
+	}
+	return true
+}
+
+func streamEventSequenceNumber(event StreamEvent) (int64, bool) {
+	value, ok := event.Data["sequence_number"]
+	if !ok || value == nil {
+		return 0, false
+	}
+	switch typed := value.(type) {
+	case int:
+		return int64(typed), true
+	case int64:
+		return typed, true
+	case float64:
+		return int64(typed), true
+	default:
+		return 0, false
+	}
 }
 
 func streamEventByOutputIndex(events []StreamEvent, name string, outputIndex int) *StreamEvent {
