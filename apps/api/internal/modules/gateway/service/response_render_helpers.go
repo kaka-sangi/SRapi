@@ -153,7 +153,7 @@ func outputOpenAIChatToolCalls(blocks []gatewaycontract.ContentBlock) []apiopena
 		if name := strings.TrimSpace(block.ToolName); name != "" {
 			function["name"] = name
 		}
-		function["arguments"] = strings.TrimSpace(block.ToolArgumentsJSON)
+		function["arguments"] = block.ToolArgumentsJSON
 		callType := "function"
 		if value, ok := block.Metadata["type"].(string); ok && strings.TrimSpace(value) != "" {
 			callType = strings.TrimSpace(value)
@@ -360,7 +360,7 @@ func chatStreamToolCalls(blocks []gatewaycontract.ContentBlock) []map[string]any
 			"type":  "function",
 			"function": map[string]any{
 				"name":      strings.TrimSpace(block.ToolName),
-				"arguments": strings.TrimSpace(block.ToolArgumentsJSON),
+				"arguments": block.ToolArgumentsJSON,
 			},
 		}
 		out = append(out, call)

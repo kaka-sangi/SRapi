@@ -1028,7 +1028,7 @@ func TestRenderProtocolResponsesPreservesToolCallOutput(t *testing.T) {
 			Role:              "assistant",
 			ToolCallID:        "call_1",
 			ToolName:          "lookup",
-			ToolArgumentsJSON: `{"query":"weather"}`,
+			ToolArgumentsJSON: " {\"query\":\"weather\"}\n",
 		}},
 		Usage: gatewaycontract.Usage{InputTokens: 3, OutputTokens: 1},
 	}
@@ -1041,7 +1041,7 @@ func TestRenderProtocolResponsesPreservesToolCallOutput(t *testing.T) {
 		t.Fatalf("expected chat tool_calls field, got %+v", chat.Choices[0].Message)
 	}
 	chatToolCall := (*chat.Choices[0].Message.ToolCalls)[0]
-	if chatToolCall.Id != "call_1" || chatToolCall.Function["name"] != "lookup" || chatToolCall.Function["arguments"] != `{"query":"weather"}` {
+	if chatToolCall.Id != "call_1" || chatToolCall.Function["name"] != "lookup" || chatToolCall.Function["arguments"] != " {\"query\":\"weather\"}\n" {
 		t.Fatalf("expected chat tool call payload, got %+v", chatToolCall)
 	}
 	chatContent, err := chat.Choices[0].Message.Content.AsChatMessageContent0()
@@ -1404,7 +1404,7 @@ func TestRenderProtocolStreamEventsPreservesToolCallOutput(t *testing.T) {
 			Role:              "assistant",
 			ToolCallID:        "call_1",
 			ToolName:          "lookup",
-			ToolArgumentsJSON: `{"query":"weather"}`,
+			ToolArgumentsJSON: " {\"query\":\"weather\"}\n",
 		}},
 		Usage: gatewaycontract.Usage{InputTokens: 3, OutputTokens: 1},
 	}
@@ -1420,7 +1420,7 @@ func TestRenderProtocolStreamEventsPreservesToolCallOutput(t *testing.T) {
 		t.Fatalf("expected chat stream tool call delta, got %+v", delta)
 	}
 	function, _ := toolCalls[0]["function"].(map[string]any)
-	if function["name"] != "lookup" || function["arguments"] != `{"query":"weather"}` {
+	if function["name"] != "lookup" || function["arguments"] != " {\"query\":\"weather\"}\n" {
 		t.Fatalf("expected chat stream function payload, got %+v", toolCalls[0])
 	}
 
@@ -1434,7 +1434,7 @@ func TestRenderProtocolStreamEventsPreservesToolCallOutput(t *testing.T) {
 		t.Fatalf("expected responses function_call item, got %+v", item)
 	}
 	argsDelta := streamEventByName(responsesEvents, "response.function_call_arguments.delta")
-	if argsDelta == nil || argsDelta.Data["delta"] != `{"query":"weather"}` {
+	if argsDelta == nil || argsDelta.Data["delta"] != " {\"query\":\"weather\"}\n" {
 		t.Fatalf("expected responses function arguments delta, got %+v", responsesEvents)
 	}
 
