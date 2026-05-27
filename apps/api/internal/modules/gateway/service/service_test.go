@@ -1127,6 +1127,67 @@ func TestRenderResponsesPreservesCustomAndMCPToolOutputItems(t *testing.T) {
 	}
 }
 
+func TestRenderResponsesPreservesHostedToolOutputItems(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	resp := gatewaycontract.CanonicalResponse{
+		ID:         "resp_hosted_tools",
+		Model:      "gpt-5-codex",
+		StopReason: "tool_use",
+		OutputItems: []gatewaycontract.ContentBlock{
+			{
+				Type:              gatewaycontract.ContentBlockToolCall,
+				Role:              "assistant",
+				ToolCallID:        "call_shell",
+				ToolName:          "shell",
+				ToolArgumentsJSON: " pwd\n",
+				Metadata:          map[string]any{"type": "local_shell_call"},
+			},
+			{
+				Type:              gatewaycontract.ContentBlockToolCall,
+				Role:              "assistant",
+				ToolCallID:        "call_search",
+				ToolName:          "search",
+				ToolArgumentsJSON: `{"query":"docs"}`,
+				Metadata:          map[string]any{"type": "tool_search_call"},
+			},
+			{
+				Type:            gatewaycontract.ContentBlockToolResult,
+				Role:            "tool",
+				ToolResultForID: "call_search",
+				Text:            " found docs\n",
+				Metadata:        map[string]any{"type": "tool_search_output"},
+			},
+		},
+		Usage: gatewaycontract.Usage{InputTokens: 5, OutputTokens: 3},
+	}
+
+	responses := svc.RenderResponses(resp)
+	if len(responses.Output) != 3 {
+		t.Fatalf("expected hosted tool call and output items, got %+v", responses.Output)
+	}
+	if responses.Output[0].Type != "local_shell_call" {
+		t.Fatalf("expected local_shell_call item, got %+v", responses.Output[0])
+	}
+	if args, _ := responses.Output[0].Get("arguments"); args != " pwd\n" {
+		t.Fatalf("expected local shell arguments to be preserved, got %+v", responses.Output[0])
+	}
+	if responses.Output[1].Type != "tool_search_call" {
+		t.Fatalf("expected tool_search_call item, got %+v", responses.Output[1])
+	}
+	if args, _ := responses.Output[1].Get("arguments"); args != `{"query":"docs"}` {
+		t.Fatalf("expected tool search arguments field, got %+v", responses.Output[1])
+	}
+	if responses.Output[2].Type != "tool_search_output" {
+		t.Fatalf("expected tool_search_output item, got %+v", responses.Output[2])
+	}
+	if output, _ := responses.Output[2].Get("output"); output != " found docs\n" {
+		t.Fatalf("expected tool search output to be preserved, got %+v", responses.Output[2])
+	}
+}
+
 func TestRenderResponsesPreservesImageGenerationOutputItems(t *testing.T) {
 	svc, err := New()
 	if err != nil {
@@ -2253,6 +2314,72 @@ func TestRenderCanonicalStreamEventsPreservesCustomToolCalls(t *testing.T) {
 	}
 	if _, found := doneItem["arguments_field"]; found {
 		t.Fatalf("did not expect internal arguments_field metadata, got %+v", doneItem)
+	}
+}
+
+func TestRenderCanonicalStreamEventsPreservesHostedToolCalls(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	resp := gatewaycontract.CanonicalResponse{
+		ID:         "resp_hosted_tool_stream",
+		Model:      "gpt-5-codex",
+		StopReason: "tool_use",
+		OutputItems: []gatewaycontract.ContentBlock{{
+			Type:              gatewaycontract.ContentBlockToolCall,
+			Role:              "assistant",
+			ToolCallID:        "call_shell",
+			ToolName:          "shell",
+			ToolArgumentsJSON: " pwd\n",
+			Metadata:          map[string]any{"type": "local_shell_call"},
+		}},
+		StreamEvents: []gatewaycontract.StreamEvent{
+			{
+				Index:        0,
+				Type:         gatewaycontract.StreamEventToolCallDelta,
+				ContentIndex: 0,
+				Delta: gatewaycontract.ContentBlock{
+					Type:              gatewaycontract.ContentBlockToolCall,
+					Role:              "assistant",
+					ToolCallID:        "call_shell",
+					ToolName:          "shell",
+					ToolArgumentsJSON: " pwd\n",
+					Metadata:          map[string]any{"type": "local_shell_call"},
+				},
+				OriginProtocol: "openai-compatible",
+				RawEventType:   "response.output_item.done",
+			},
+			{
+				Index:      1,
+				Type:       gatewaycontract.StreamEventStop,
+				StopReason: "tool_use",
+			},
+		},
+		Usage: gatewaycontract.Usage{InputTokens: 4, OutputTokens: 2},
+	}
+
+	responsesEvents := svc.RenderResponsesStreamEvents(resp)
+	added := streamEventByName(responsesEvents, "response.output_item.added")
+	argsDelta := streamEventByName(responsesEvents, "response.function_call_arguments.delta")
+	argsDone := streamEventByName(responsesEvents, "response.function_call_arguments.done")
+	done := streamEventByName(responsesEvents, "response.output_item.done")
+	if added == nil || argsDelta == nil || argsDone == nil || done == nil {
+		t.Fatalf("expected hosted tool stream events, got %+v", responsesEvents)
+	}
+	startItem, _ := added.Data["item"].(map[string]any)
+	if startItem["type"] != "local_shell_call" || startItem["call_id"] != "call_shell" || startItem["name"] != "shell" {
+		t.Fatalf("expected hosted tool start item, got %+v", startItem)
+	}
+	if _, found := startItem["arguments"]; found {
+		t.Fatalf("did not expect hosted tool start arguments field, got %+v", startItem)
+	}
+	if argsDelta.Data["delta"] != " pwd\n" || argsDone.Data["arguments"] != " pwd\n" {
+		t.Fatalf("expected hosted tool arguments to be preserved, got delta=%+v done=%+v", argsDelta, argsDone)
+	}
+	doneItem, _ := done.Data["item"].(map[string]any)
+	if doneItem["type"] != "local_shell_call" || doneItem["arguments"] != " pwd\n" {
+		t.Fatalf("expected hosted tool done item, got %+v", doneItem)
 	}
 }
 

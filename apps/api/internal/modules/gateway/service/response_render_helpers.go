@@ -59,7 +59,9 @@ func normalizeOutputItems(blocks []gatewaycontract.ContentBlock) []gatewaycontra
 		if strings.TrimSpace(block.Role) == "" {
 			block.Role = "assistant"
 		}
-		block.Text = strings.TrimSpace(block.Text)
+		if block.Type != gatewaycontract.ContentBlockToolResult {
+			block.Text = strings.TrimSpace(block.Text)
+		}
 		block.Metadata = cloneMap(block.Metadata)
 		block.Raw = append([]byte(nil), block.Raw...)
 		block.OriginProtocol = strings.TrimSpace(block.OriginProtocol)
@@ -219,7 +221,7 @@ func responseFunctionCallOutputItem(block gatewaycontract.ContentBlock) (apiopen
 	delete(props, "arguments_field")
 	itemType := responseFunctionCallOutputType(block)
 	props["call_id"] = callID
-	props["output"] = strings.TrimSpace(block.Text)
+	props["output"] = block.Text
 	delete(props, "tool_result_for_id")
 	if block.ToolResultIsError {
 		props["is_error"] = true
@@ -240,9 +242,9 @@ func responseFunctionCallItem(block gatewaycontract.ContentBlock, status string)
 	setStringProperty(props, "name", block.ToolName)
 	if responseFunctionCallArgumentsField(block) == "input" {
 		delete(props, "arguments")
-		setStringProperty(props, "input", block.ToolArgumentsJSON)
+		setRawStringProperty(props, "input", block.ToolArgumentsJSON)
 	} else {
-		setStringProperty(props, "arguments", block.ToolArgumentsJSON)
+		setRawStringProperty(props, "arguments", block.ToolArgumentsJSON)
 	}
 	return apiopenapi.ResponsesOutputItem{
 		Type:                 itemType,
@@ -253,7 +255,7 @@ func responseFunctionCallItem(block gatewaycontract.ContentBlock, status string)
 func responseFunctionCallType(block gatewaycontract.ContentBlock) string {
 	itemType := strings.TrimSpace(mapStringAny(block.Metadata, "type"))
 	switch itemType {
-	case "custom_tool_call", "mcp_tool_call":
+	case "custom_tool_call", "mcp_tool_call", "tool_call", "local_shell_call", "tool_search_call":
 		return itemType
 	default:
 		return "function_call"
@@ -263,7 +265,7 @@ func responseFunctionCallType(block gatewaycontract.ContentBlock) string {
 func responseFunctionCallOutputType(block gatewaycontract.ContentBlock) string {
 	itemType := strings.TrimSpace(mapStringAny(block.Metadata, "type"))
 	switch itemType {
-	case "custom_tool_call_output", "mcp_tool_call_output":
+	case "custom_tool_call_output", "mcp_tool_call_output", "tool_search_output":
 		return itemType
 	default:
 		return "function_call_output"
@@ -434,14 +436,14 @@ func responseStreamOutputEvents(blocks []gatewaycontract.ContentBlock) []StreamE
 					"item":         item,
 				},
 			})
-			if args := strings.TrimSpace(block.ToolArgumentsJSON); args != "" {
+			if strings.TrimSpace(block.ToolArgumentsJSON) != "" {
 				events = append(events, StreamEvent{
 					Event: "response.function_call_arguments.delta",
 					Data: map[string]any{
 						"type":         "response.function_call_arguments.delta",
 						"item_id":      itemID,
 						"output_index": outputIndex,
-						"delta":        args,
+						"delta":        block.ToolArgumentsJSON,
 					},
 				})
 			}
@@ -451,7 +453,7 @@ func responseStreamOutputEvents(blocks []gatewaycontract.ContentBlock) []StreamE
 					"type":         "response.function_call_arguments.done",
 					"item_id":      itemID,
 					"output_index": outputIndex,
-					"arguments":    strings.TrimSpace(block.ToolArgumentsJSON),
+					"arguments":    block.ToolArgumentsJSON,
 				},
 			})
 			continue
@@ -947,7 +949,7 @@ func outputBlockProperties(block gatewaycontract.ContentBlock) map[string]any {
 	setStringProperty(props, "id", block.ToolCallID)
 	setStringProperty(props, "call_id", block.ToolCallID)
 	setStringProperty(props, "name", block.ToolName)
-	setStringProperty(props, "arguments", block.ToolArgumentsJSON)
+	setRawStringProperty(props, "arguments", block.ToolArgumentsJSON)
 	setStringProperty(props, "tool_result_for_id", block.ToolResultForID)
 	if block.ToolResultIsError {
 		props["is_error"] = true
@@ -958,6 +960,13 @@ func outputBlockProperties(block gatewaycontract.ContentBlock) map[string]any {
 func setStringProperty(values map[string]any, key string, value string) {
 	value = strings.TrimSpace(value)
 	if value == "" {
+		return
+	}
+	values[key] = value
+}
+
+func setRawStringProperty(values map[string]any, key string, value string) {
+	if strings.TrimSpace(value) == "" {
 		return
 	}
 	values[key] = value
