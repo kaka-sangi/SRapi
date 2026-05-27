@@ -408,6 +408,9 @@ func (s *Service) invokeOpenAICompatible(ctx context.Context, req contract.Conve
 	if openAIResponsesCompactRequest(req) {
 		return s.invokeOpenAICompatibleResponsesCompact(ctx, req, baseURL, apiKey)
 	}
+	if openAIResponsesRequest(req) {
+		return s.invokeOpenAICompatibleResponses(ctx, req, baseURL, apiKey)
+	}
 	raw, err := openAICompatibleRequestBody(req)
 	if err != nil {
 		return contract.ConversationResponse{}, err
@@ -443,6 +446,41 @@ func (s *Service) invokeOpenAICompatible(ctx context.Context, req contract.Conve
 	}
 
 	return parseOpenAICompatibleJSON(body, resp.StatusCode)
+}
+
+func (s *Service) invokeOpenAICompatibleResponses(ctx context.Context, req contract.ConversationRequest, baseURL string, apiKey string) (contract.ConversationResponse, error) {
+	raw, err := openAIResponsesBody(req)
+	if err != nil {
+		return contract.ConversationResponse{}, err
+	}
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(baseURL, "/")+"/responses", bytes.NewReader(raw))
+	if err != nil {
+		return contract.ConversationResponse{}, err
+	}
+	httpReq.Header.Set("Accept", openAIResponsesAccept(req.Stream))
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+apiKey)
+
+	resp, err := s.client.Do(httpReq)
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return contract.ConversationResponse{}, contract.ProviderError{Class: "timeout", StatusCode: http.StatusGatewayTimeout, Message: "provider request timed out"}
+		}
+		return contract.ConversationResponse{}, contract.ProviderError{Class: "network_error", StatusCode: http.StatusBadGateway, Message: "provider request failed"}
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
+	if err != nil {
+		if req.Stream {
+			return contract.ConversationResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream interrupted"}
+		}
+		return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response read failed"}
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return contract.ConversationResponse{}, classifyProviderHTTPError(resp.StatusCode, body)
+	}
+	return parseOpenAIResponsesBody(body, resp.StatusCode)
 }
 
 func (s *Service) invokeReverseProxyGeminiCompatible(ctx context.Context, req contract.ConversationRequest, baseURL string) (contract.ConversationResponse, error) {
@@ -586,6 +624,9 @@ func (s *Service) invokeReverseProxyOpenAICompatible(ctx context.Context, req co
 	if isChatGPTWebReverseProxy(req) {
 		return s.invokeReverseProxyChatGPTWebConversation(ctx, req, baseURL)
 	}
+	if openAIResponsesRequest(req) {
+		return s.invokeReverseProxyOpenAICompatibleResponses(ctx, req, baseURL)
+	}
 	raw, err := openAICompatibleRequestBody(req)
 	if err != nil {
 		return contract.ConversationResponse{}, err
@@ -677,9 +718,140 @@ func (s *Service) invokeReverseProxyOpenAICompatibleResponsesCompact(ctx context
 	return parseOpenAIResponsesCompactJSON(runtimeResp.Body, runtimeResp.StatusCode)
 }
 
+func (s *Service) invokeReverseProxyOpenAICompatibleResponses(ctx context.Context, req contract.ConversationRequest, baseURL string) (contract.ConversationResponse, error) {
+	raw, err := openAIResponsesBody(req)
+	if err != nil {
+		return contract.ConversationResponse{}, err
+	}
+	runtimeResp, err := s.reverseProxy.Do(ctx, reverseproxycontract.Request{
+		Account: reverseproxycontract.AccountRuntime{
+			AccountID:      req.Account.ID,
+			RuntimeClass:   string(req.Account.RuntimeClass),
+			UpstreamClient: req.Account.UpstreamClient,
+			ProxyID:        req.Account.ProxyID,
+			UserAgent:      mapString(req.Account.Metadata, "user_agent"),
+			Credential:     req.Credential,
+		},
+		Method: http.MethodPost,
+		URL:    strings.TrimRight(baseURL, "/") + "/responses",
+		Headers: http.Header{
+			"Accept":       {openAIResponsesAccept(req.Stream)},
+			"Content-Type": {"application/json"},
+		},
+		Body:         raw,
+		ExpectStream: req.Stream,
+	})
+	if err != nil {
+		return contract.ConversationResponse{}, providerErrorFromReverseProxy(err)
+	}
+	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
+		return contract.ConversationResponse{}, classifyProviderHTTPError(runtimeResp.StatusCode, runtimeResp.Body)
+	}
+	return parseOpenAIResponsesBody(runtimeResp.Body, runtimeResp.StatusCode)
+}
+
 func openAIResponsesCompactRequest(req contract.ConversationRequest) bool {
 	return strings.EqualFold(strings.TrimSpace(req.SourceProtocol), "openai-compatible") &&
 		strings.HasSuffix(strings.ToLower(strings.TrimSpace(req.SourceEndpoint)), "/responses/compact")
+}
+
+func openAIResponsesRequest(req contract.ConversationRequest) bool {
+	sourceEndpoint := strings.ToLower(strings.TrimSpace(req.SourceEndpoint))
+	return strings.EqualFold(strings.TrimSpace(req.SourceProtocol), "openai-compatible") &&
+		strings.HasSuffix(sourceEndpoint, "/responses") &&
+		!strings.HasSuffix(sourceEndpoint, "/responses/compact") &&
+		openAIResponsesNativeEnabled(req)
+}
+
+func openAIResponsesNativeEnabled(req contract.ConversationRequest) bool {
+	adapterType := strings.ToLower(strings.TrimSpace(req.Provider.AdapterType))
+	if adapterType == "native-openai" {
+		return true
+	}
+	if strings.EqualFold(strings.TrimSpace(req.Provider.Name), "openai") {
+		return true
+	}
+	for _, values := range []map[string]any{req.Account.Metadata, req.Provider.ConfigSchema, req.Provider.Capabilities} {
+		if mapBool(values, "native_responses") ||
+			mapBool(values, "responses_native") ||
+			mapBool(values, "responses_passthrough") ||
+			mapBool(values, "openai_responses_passthrough") {
+			return true
+		}
+	}
+	return false
+}
+
+func openAIResponsesBody(req contract.ConversationRequest) ([]byte, error) {
+	raw := bytes.TrimSpace(req.RawBody)
+	if len(raw) > 0 {
+		var payload map[string]any
+		if err := json.Unmarshal(raw, &payload); err != nil {
+			return nil, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "invalid raw responses payload"}
+		}
+		openAIApplyResponsesPayloadDefaults(req, payload)
+		return json.Marshal(payload)
+	}
+	payload := openAICanonicalResponsesPayload(req)
+	openAIApplyResponsesPayloadDefaults(req, payload)
+	return json.Marshal(payload)
+}
+
+func openAICanonicalResponsesPayload(req contract.ConversationRequest) map[string]any {
+	payload := map[string]any{
+		"model":  req.Mapping.UpstreamModelName,
+		"input":  codexResponsesInput(req),
+		"stream": req.Stream,
+	}
+	if instructions := codexResponsesInstructions(req); instructions != "" {
+		payload["instructions"] = instructions
+	}
+	if req.MaxOutputTokens != nil {
+		payload["max_output_tokens"] = *req.MaxOutputTokens
+	}
+	if req.Temperature != nil {
+		payload["temperature"] = *req.Temperature
+	}
+	if req.TopP != nil {
+		payload["top_p"] = *req.TopP
+	}
+	if len(req.Stop) > 0 {
+		payload["stop"] = cloneStrings(req.Stop)
+	}
+	if len(req.Tools) > 0 {
+		payload["tools"] = cloneMapSlice(req.Tools)
+	}
+	if req.ToolChoice != nil {
+		payload["tool_choice"] = cloneAny(req.ToolChoice)
+	}
+	if len(req.ResponseFormat) > 0 {
+		payload["text"] = map[string]any{"format": cloneMap(req.ResponseFormat)}
+	}
+	if len(req.Reasoning) > 0 {
+		payload["reasoning"] = cloneMap(req.Reasoning)
+	}
+	return payload
+}
+
+func openAIApplyResponsesPayloadDefaults(req contract.ConversationRequest, payload map[string]any) {
+	if payload == nil {
+		return
+	}
+	if model := strings.TrimSpace(req.Mapping.UpstreamModelName); model != "" {
+		payload["model"] = model
+	}
+	payload["stream"] = req.Stream
+}
+
+func openAIResponsesAccept(stream bool) string {
+	if stream {
+		return "text/event-stream"
+	}
+	return "application/json"
+}
+
+func parseOpenAIResponsesBody(body []byte, statusCode int) (contract.ConversationResponse, error) {
+	return parseCodexResponsesBody(body, statusCode)
 }
 
 func openAIResponsesCompactBody(req contract.ConversationRequest) ([]byte, error) {
@@ -1243,6 +1415,29 @@ func mapString(values map[string]any, key string) string {
 		return strings.TrimSpace(value)
 	default:
 		return strings.TrimSpace(fmt.Sprint(value))
+	}
+}
+
+func mapBool(values map[string]any, key string) bool {
+	if values == nil {
+		return false
+	}
+	value, ok := values[key]
+	if !ok || value == nil {
+		return false
+	}
+	switch value := value.(type) {
+	case bool:
+		return value
+	case string:
+		switch strings.ToLower(strings.TrimSpace(value)) {
+		case "1", "true", "yes", "on", "enabled":
+			return true
+		default:
+			return false
+		}
+	default:
+		return false
 	}
 }
 

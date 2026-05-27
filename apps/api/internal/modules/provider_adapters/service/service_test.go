@@ -301,6 +301,9 @@ func TestOpenAICompatibleAdapterPreservesSameProtocolRawBody(t *testing.T) {
 
 func TestOpenAICompatibleAdapterDoesNotUseResponsesRawBodyForChatUpstream(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/chat/completions" {
+			t.Fatalf("expected fallback chat upstream path, got %s", r.URL.Path)
+		}
 		var payload map[string]any
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 			t.Fatalf("decode upstream request: %v", err)
@@ -335,6 +338,170 @@ func TestOpenAICompatibleAdapterDoesNotUseResponsesRawBodyForChatUpstream(t *tes
 	})
 	if err != nil {
 		t.Fatalf("invoke OpenAI fallback upstream: %v", err)
+	}
+}
+
+func TestNativeOpenAIAdapterUsesResponsesEndpoint(t *testing.T) {
+	rawResponse := `{"id":"resp_native","object":"response","status":"completed","model":"gpt-upstream","output":[{"id":"msg_1","type":"message","role":"assistant","content":[{"type":"output_text","text":"native responses ok"}]},{"id":"fc_1","type":"function_call","call_id":"call_1","name":"lookup","arguments":"{\"query\":\"weather\"}","status":"completed"}],"usage":{"input_tokens":3,"output_tokens":2,"input_tokens_details":{"cached_tokens":1}}}`
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/responses" {
+			t.Fatalf("expected native Responses upstream path, got %s", r.URL.Path)
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer upstream-secret" {
+			t.Fatalf("unexpected auth header %q", got)
+		}
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		if payload["model"] != "gpt-upstream" ||
+			payload["input"] != "raw responses input" ||
+			payload["parallel_tool_calls"] != true ||
+			payload["previous_response_id"] != "resp_previous" ||
+			payload["stream"] != false {
+			t.Fatalf("expected raw Responses fields to be preserved with mapped model, got %+v", payload)
+		}
+		metadata, _ := payload["metadata"].(map[string]any)
+		if metadata["trace_id"] != "trace-raw" {
+			t.Fatalf("expected raw metadata to be preserved, got %+v", payload["metadata"])
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(rawResponse))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_native_openai_responses",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/responses",
+		TargetProtocol: "openai-compatible",
+		Model:          "gpt-local",
+		InputParts:     textParts("canonical fallback"),
+		RawBody:        []byte(`{"model":"gpt-local","input":"raw responses input","parallel_tool_calls":true,"previous_response_id":"resp_previous","metadata":{"trace_id":"trace-raw"},"stream":false}`),
+		Provider:       providercontract.Provider{AdapterType: "native-openai", Protocol: "openai-compatible"},
+		Account:        accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:        modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-upstream"},
+		Credential:     map[string]any{"api_key": "upstream-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke native OpenAI Responses upstream: %v", err)
+	}
+	if conversationResponseText(resp) != "native responses ok" {
+		t.Fatalf("unexpected native Responses text: %+v", resp)
+	}
+	if len(resp.Parts) != 2 {
+		t.Fatalf("expected text and function call parts, got %+v", resp.Parts)
+	}
+	assertToolUsePart(t, resp.Parts[1], "call_1", "lookup", `{"query":"weather"}`)
+	if string(resp.Raw) != rawResponse {
+		t.Fatalf("expected raw native Responses JSON, got %q", string(resp.Raw))
+	}
+	if resp.Usage.InputTokens != 3 || resp.Usage.OutputTokens != 2 || resp.Usage.CachedTokens != 1 || resp.Usage.Estimated {
+		t.Fatalf("expected native Responses usage, got %+v", resp.Usage)
+	}
+}
+
+func TestOpenAIProviderNameUsesResponsesEndpoint(t *testing.T) {
+	var upstreamPath string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamPath = r.URL.Path
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		if payload["model"] != "gpt-upstream" || payload["input"] != "raw official input" {
+			t.Fatalf("expected official OpenAI raw Responses payload, got %+v", payload)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"resp_openai","object":"response","status":"completed","output_text":"official ok","usage":{"input_tokens":2,"output_tokens":1}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_official_openai_responses",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/responses",
+		TargetProtocol: "openai-compatible",
+		Model:          "gpt-local",
+		InputParts:     textParts("canonical fallback"),
+		RawBody:        []byte(`{"model":"gpt-local","input":"raw official input","stream":false}`),
+		Provider:       providercontract.Provider{Name: "openai", AdapterType: "openai-compatible", Protocol: "openai-compatible"},
+		Account:        accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:        modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-upstream"},
+		Credential:     map[string]any{"api_key": "upstream-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke official OpenAI Responses upstream: %v", err)
+	}
+	if upstreamPath != "/v1/responses" {
+		t.Fatalf("expected official OpenAI Responses path, got %q", upstreamPath)
+	}
+	if conversationResponseText(resp) != "official ok" {
+		t.Fatalf("unexpected official OpenAI response: %+v", resp)
+	}
+}
+
+func TestReverseProxyOpenAICompatibleAdapterUsesResponsesEndpointWhenOptedIn(t *testing.T) {
+	rawSSE := "data: {\"type\":\"response.output_text.delta\",\"delta\":\"native \"}\n\n" +
+		"data: {\"type\":\"response.output_text.delta\",\"delta\":\"responses\"}\n\n" +
+		"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_stream\",\"object\":\"response\",\"status\":\"completed\",\"output\":[],\"usage\":{\"input_tokens\":4,\"output_tokens\":2,\"input_tokens_details\":{\"cached_tokens\":1}}}}\n\n" +
+		"data: [DONE]\n\n"
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body:       []byte(rawSSE),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_reverse_openai_responses",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/responses",
+		TargetProtocol: "openai-compatible",
+		Model:          "gpt-local",
+		InputParts:     textParts("canonical fallback"),
+		RawBody:        []byte(`{"model":"gpt-local","input":"raw responses input","stream":true,"metadata":{"trace_id":"trace-stream"}}`),
+		Stream:         true,
+		Provider:       providercontract.Provider{AdapterType: "reverse-proxy-openai-compatible", Protocol: "openai-compatible", ConfigSchema: map[string]any{"native_responses": true}},
+		Account:        accountcontract.ProviderAccount{ID: 9, RuntimeClass: accountcontract.RuntimeClassOauthRefresh, Metadata: map[string]any{"base_url": "https://openai.example/v1"}},
+		Mapping:        modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-upstream"},
+		Credential:     map[string]any{"access_token": "oauth-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke reverse proxy native Responses upstream: %v", err)
+	}
+	if runtime.request.Method != http.MethodPost || runtime.request.URL != "https://openai.example/v1/responses" || !runtime.request.ExpectStream {
+		t.Fatalf("unexpected reverse proxy native Responses request: %+v", runtime.request)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(runtime.request.Body, &payload); err != nil {
+		t.Fatalf("decode reverse native Responses payload: %v", err)
+	}
+	if payload["model"] != "gpt-upstream" || payload["input"] != "raw responses input" || payload["stream"] != true {
+		t.Fatalf("expected mapped reverse native Responses payload, got %+v", payload)
+	}
+	if string(resp.Raw) != rawSSE {
+		t.Fatalf("expected raw native Responses SSE, got %q", string(resp.Raw))
+	}
+	if conversationResponseText(resp) != "native responses" {
+		t.Fatalf("unexpected native Responses stream text: %+v", resp)
+	}
+	if resp.Usage.InputTokens != 4 || resp.Usage.OutputTokens != 2 || resp.Usage.CachedTokens != 1 || resp.Usage.Estimated {
+		t.Fatalf("expected native Responses stream usage, got %+v", resp.Usage)
+	}
+	if len(resp.StreamEvents) != 4 {
+		t.Fatalf("expected content, content, usage, stop stream events, got %+v", resp.StreamEvents)
 	}
 }
 

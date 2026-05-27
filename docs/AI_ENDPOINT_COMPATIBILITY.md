@@ -391,7 +391,7 @@ Provider-hosted web search 是 built-in tool 的特例：Responses `web_search` 
 | Source endpoint | Target OpenAI Chat | Target OpenAI Responses | Target Anthropic Messages | Target Gemini GenerateContent |
 | --- | --- | --- | --- | --- |
 | `/v1/chat/completions` | native | convert | convert | convert |
-| `/v1/responses` | convert with warnings | native | convert | convert |
+| `/v1/responses` | convert with warnings by default; native `/responses` passthrough for `native-openai`, provider.name=openai, or explicit native Responses opt-in | native | convert | convert |
 | `/v1/responses/compact` | unsupported | native compact only | unsupported | unsupported |
 | `/v1/messages` | convert | convert | native | convert |
 | Gemini `generateContent` | convert | convert | convert | native |

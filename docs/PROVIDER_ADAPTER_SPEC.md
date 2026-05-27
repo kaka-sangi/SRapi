@@ -103,7 +103,7 @@ native-openai 或 openrouter
 已实现的文本上游 dispatch：
 
 ```txt
-openai-compatible       -> /chat/completions
+openai-compatible       -> /chat/completions；`native-openai`、provider.name=openai 或显式 native Responses opt-in 的 `/v1/responses` 同协议请求走 /responses
 generic-reverse-proxy   -> metadata-defined OpenAI-compatible chat / embeddings path, optional body / response path mapping
 anthropic-compatible    -> /messages
 gemini-compatible       -> /models/{model}:generateContent 或 :streamGenerateContent
@@ -226,6 +226,8 @@ quota_model
 ```
 
 WP-650 起，`supports_responses_compact` 映射到 canonical `responses_compact` endpoint capability。Gateway `/v1/responses/compact` 请求必须带 `responses_compact` request capability；OpenAI-compatible API-key、OpenAI reverse-proxy 和 Codex CLI reverse-proxy accounts 使用原生 `/responses/compact` 上游路径，并只按原始 `response.compaction` JSON 回放，不降级到 `/chat/completions` 或普通 `/responses` 伪转换。
+
+普通 `/v1/responses` 仍默认兼容历史 OpenAI-compatible provider：未显式启用原生 Responses 的第三方上游继续降级到 `/chat/completions`。只有 `adapter_type=native-openai`、`provider.name=openai`，或 provider/account metadata/config/capabilities 带 `native_responses`、`responses_native`、`responses_passthrough`、`openai_responses_passthrough` 时，Provider Adapter 才 POST 上游 `/responses`，保留 raw Responses request 字段并在同协议返回时允许 raw JSON/SSE 回放。
 
 WP-290 起，`supports_images` 映射到 canonical `images` endpoint capability。Gateway image generation 请求必须带 `images` request capability；OpenAI-compatible API-key 和 reverse-proxy accounts 使用 `/images/generations` 上游路径，并解析 `url` / `b64_json` image outputs。WP-480 起，Gateway image edit 请求也使用 `images` request capability；OpenAI-compatible API-key 和 reverse-proxy accounts 使用 multipart `/images/edits` 上游路径，转发 `image` / `image[]`、可选 `mask` 和输出选项，并解析同一 OpenAI-compatible image response。WP-510 起，下游 JSON image references 会在 HTTP/Gateway 层解码成同一个 canonical image edit request，Provider Adapter 仍只接收已归一化的 image bytes 并以上游 multipart `/images/edits` 发出；remote URL 和 `file_id` references 仍在 Gateway 层拒绝。WP-520 起，`stream=true` 的 image edit 请求仍经过同一 Provider Adapter 和 usage 证据链，但当前 v1 只把最终 image response 重新包装成 `image.generation.result` SSE；上游 progressive image SSE relay 留待后续包。WP-490 起，Gateway image variation 请求也使用 `images` request capability；OpenAI-compatible API-key 和 reverse-proxy accounts 使用 multipart `/images/variations` 上游路径，转发单个 source `image`、`n`、`size`、`response_format` 和 `user`，并解析同一 OpenAI-compatible image response。OpenAI 官方 upstream 当前仅支持 `dall-e-2`，SRapi 通过 model mapping 决定上游模型名。
 

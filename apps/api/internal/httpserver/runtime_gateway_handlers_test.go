@@ -18,7 +18,7 @@ func TestSameProtocolRawConversationResponseAllowsClaudeCodeMessages(t *testing.
 		SourceEndpoint: "/v1/messages",
 	}
 
-	if !sameProtocolRawConversationResponse(req, "anthropic-compatible", "reverse-proxy-claude-code-cli", []byte(`{"id":"msg_1"}`)) {
+	if !sameProtocolRawConversationResponse(req, "anthropic-compatible", "reverse-proxy-claude-code-cli", "", nil, nil, nil, []byte(`{"id":"msg_1"}`)) {
 		t.Fatal("expected Claude Code same-protocol messages response to be eligible for raw passthrough")
 	}
 }
@@ -43,7 +43,7 @@ func TestSameProtocolRawConversationStreamAllowsEndpointMatchedSSE(t *testing.T)
 		Stream:         true,
 	}
 
-	if !sameProtocolRawConversationStream(req, "openai-compatible", "openai-compatible", raw) {
+	if !sameProtocolRawConversationStream(req, "openai-compatible", "openai-compatible", "", nil, nil, nil, raw) {
 		t.Fatal("expected OpenAI same-protocol chat stream to be eligible for raw SSE replay")
 	}
 }
@@ -56,8 +56,34 @@ func TestSameProtocolRawConversationStreamAllowsCodexResponsesSSE(t *testing.T) 
 		Stream:         true,
 	}
 
-	if !sameProtocolRawConversationStream(req, "openai-compatible", "reverse-proxy-codex-cli", raw) {
+	if !sameProtocolRawConversationStream(req, "openai-compatible", "reverse-proxy-codex-cli", "", nil, nil, nil, raw) {
 		t.Fatal("expected Codex Responses stream to be eligible for raw SSE replay")
+	}
+}
+
+func TestSameProtocolRawConversationStreamAllowsNativeOpenAIResponsesSSE(t *testing.T) {
+	raw := []byte("event: response.output_text.delta\ndata: {\"type\":\"response.output_text.delta\",\"delta\":\"raw\"}\n\n")
+	req := gatewaycontract.CanonicalRequest{
+		SourceProtocol: gatewaycontract.ProtocolOpenAICompatible,
+		SourceEndpoint: "/v1/responses",
+		Stream:         true,
+	}
+
+	if !sameProtocolRawConversationStream(req, "openai-compatible", "native-openai", "", nil, nil, nil, raw) {
+		t.Fatal("expected native OpenAI Responses stream to be eligible for raw SSE replay")
+	}
+}
+
+func TestSameProtocolRawConversationStreamAllowsOptedInOpenAIResponsesSSE(t *testing.T) {
+	raw := []byte("event: response.output_text.delta\ndata: {\"type\":\"response.output_text.delta\",\"delta\":\"raw\"}\n\n")
+	req := gatewaycontract.CanonicalRequest{
+		SourceProtocol: gatewaycontract.ProtocolOpenAICompatible,
+		SourceEndpoint: "/v1/responses",
+		Stream:         true,
+	}
+
+	if !sameProtocolRawConversationStream(req, "openai-compatible", "reverse-proxy-openai-compatible", "", map[string]any{"native_responses": true}, nil, nil, raw) {
+		t.Fatal("expected opted-in reverse proxy OpenAI Responses stream to be eligible for raw SSE replay")
 	}
 }
 
@@ -67,8 +93,30 @@ func TestSameProtocolRawConversationResponseAllowsCodexResponsesCompact(t *testi
 		SourceEndpoint: "/v1/responses/compact",
 	}
 
-	if !sameProtocolRawConversationResponse(req, "openai-compatible", "reverse-proxy-codex-cli", []byte(`{"id":"cmp_1","object":"response.compaction"}`)) {
+	if !sameProtocolRawConversationResponse(req, "openai-compatible", "reverse-proxy-codex-cli", "", nil, nil, nil, []byte(`{"id":"cmp_1","object":"response.compaction"}`)) {
 		t.Fatal("expected Codex Responses compact JSON to be eligible for raw passthrough")
+	}
+}
+
+func TestSameProtocolRawConversationResponseAllowsNativeOpenAIResponses(t *testing.T) {
+	req := gatewaycontract.CanonicalRequest{
+		SourceProtocol: gatewaycontract.ProtocolOpenAICompatible,
+		SourceEndpoint: "/v1/responses",
+	}
+
+	if !sameProtocolRawConversationResponse(req, "openai-compatible", "native-openai", "", nil, nil, nil, []byte(`{"id":"resp_1","object":"response"}`)) {
+		t.Fatal("expected native OpenAI Responses JSON to be eligible for raw passthrough")
+	}
+}
+
+func TestSameProtocolRawConversationResponseAllowsOptedInOpenAIResponses(t *testing.T) {
+	req := gatewaycontract.CanonicalRequest{
+		SourceProtocol: gatewaycontract.ProtocolOpenAICompatible,
+		SourceEndpoint: "/v1/responses",
+	}
+
+	if !sameProtocolRawConversationResponse(req, "openai-compatible", "reverse-proxy-openai-compatible", "", nil, nil, map[string]any{"responses_passthrough": "true"}, []byte(`{"id":"resp_1","object":"response"}`)) {
+		t.Fatal("expected opted-in OpenAI Responses JSON to be eligible for raw passthrough")
 	}
 }
 
@@ -124,7 +172,7 @@ func TestSameProtocolRawConversationResponseRejectsUnsafeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if sameProtocolRawConversationResponse(tt.req, tt.targetProtocol, tt.adapterType, tt.raw) {
+			if sameProtocolRawConversationResponse(tt.req, tt.targetProtocol, tt.adapterType, "", nil, nil, nil, tt.raw) {
 				t.Fatal("expected raw passthrough to be rejected")
 			}
 		})
@@ -197,7 +245,7 @@ func TestSameProtocolRawConversationStreamRejectsUnsafeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if sameProtocolRawConversationStream(tt.req, tt.targetProtocol, tt.adapterType, tt.raw) {
+			if sameProtocolRawConversationStream(tt.req, tt.targetProtocol, tt.adapterType, "", nil, nil, nil, tt.raw) {
 				t.Fatal("expected raw SSE replay to be rejected")
 			}
 		})

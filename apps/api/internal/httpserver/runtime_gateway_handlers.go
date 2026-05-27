@@ -182,14 +182,14 @@ func (s *Server) handleCreateChatCompletion(w http.ResponseWriter, r *http.Reque
 		QualityOutput:         canonicalResp.Message,
 	})
 	if canonical.Stream {
-		if sameProtocolRawConversationStream(canonical, result.Candidate.Provider.Protocol, result.Candidate.Provider.AdapterType, canonicalResp.RawProviderMetadata) {
+		if sameProtocolRawConversationStream(canonical, result.Candidate.Provider.Protocol, result.Candidate.Provider.AdapterType, result.Candidate.Provider.Name, result.Candidate.Provider.ConfigSchema, result.Candidate.Provider.Capabilities, result.Candidate.Account.Metadata, canonicalResp.RawProviderMetadata) {
 			writeRawSSEResponse(w, canonicalResp.RawProviderMetadata)
 			return
 		}
 		writeSSEJSONChunks(w, s.runtime.gateway.RenderChatStreamChunks(canonicalResp))
 		return
 	}
-	if sameProtocolRawConversationResponse(canonical, result.Candidate.Provider.Protocol, result.Candidate.Provider.AdapterType, canonicalResp.RawProviderMetadata) {
+	if sameProtocolRawConversationResponse(canonical, result.Candidate.Provider.Protocol, result.Candidate.Provider.AdapterType, result.Candidate.Provider.Name, result.Candidate.Provider.ConfigSchema, result.Candidate.Provider.Capabilities, result.Candidate.Account.Metadata, canonicalResp.RawProviderMetadata) {
 		writeRawJSONResponse(w, http.StatusOK, canonicalResp.RawProviderMetadata)
 		return
 	}
@@ -360,14 +360,14 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 	})
 	response := s.runtime.gateway.RenderResponses(canonicalResp)
 	if canonical.Stream {
-		if sameProtocolRawConversationStream(canonical, result.Candidate.Provider.Protocol, result.Candidate.Provider.AdapterType, canonicalResp.RawProviderMetadata) {
+		if sameProtocolRawConversationStream(canonical, result.Candidate.Provider.Protocol, result.Candidate.Provider.AdapterType, result.Candidate.Provider.Name, result.Candidate.Provider.ConfigSchema, result.Candidate.Provider.Capabilities, result.Candidate.Account.Metadata, canonicalResp.RawProviderMetadata) {
 			writeRawSSEResponse(w, canonicalResp.RawProviderMetadata)
 			return
 		}
 		writeSSEEvents(w, s.runtime.gateway.RenderResponsesStreamEvents(canonicalResp))
 		return
 	}
-	if sameProtocolRawConversationResponse(canonical, result.Candidate.Provider.Protocol, result.Candidate.Provider.AdapterType, canonicalResp.RawProviderMetadata) {
+	if sameProtocolRawConversationResponse(canonical, result.Candidate.Provider.Protocol, result.Candidate.Provider.AdapterType, result.Candidate.Provider.Name, result.Candidate.Provider.ConfigSchema, result.Candidate.Provider.Capabilities, result.Candidate.Account.Metadata, canonicalResp.RawProviderMetadata) {
 		writeRawJSONResponse(w, http.StatusOK, canonicalResp.RawProviderMetadata)
 		return
 	}
@@ -523,14 +523,14 @@ func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
 	})
 	response := s.runtime.gateway.RenderAnthropicMessages(canonicalResp)
 	if canonical.Stream {
-		if sameProtocolRawConversationStream(canonical, result.Candidate.Provider.Protocol, result.Candidate.Provider.AdapterType, canonicalResp.RawProviderMetadata) {
+		if sameProtocolRawConversationStream(canonical, result.Candidate.Provider.Protocol, result.Candidate.Provider.AdapterType, result.Candidate.Provider.Name, result.Candidate.Provider.ConfigSchema, result.Candidate.Provider.Capabilities, result.Candidate.Account.Metadata, canonicalResp.RawProviderMetadata) {
 			writeRawSSEResponse(w, canonicalResp.RawProviderMetadata)
 			return
 		}
 		writeSSEEvents(w, s.runtime.gateway.RenderAnthropicMessagesStreamEvents(canonicalResp))
 		return
 	}
-	if sameProtocolRawConversationResponse(canonical, result.Candidate.Provider.Protocol, result.Candidate.Provider.AdapterType, canonicalResp.RawProviderMetadata) {
+	if sameProtocolRawConversationResponse(canonical, result.Candidate.Provider.Protocol, result.Candidate.Provider.AdapterType, result.Candidate.Provider.Name, result.Candidate.Provider.ConfigSchema, result.Candidate.Provider.Capabilities, result.Candidate.Account.Metadata, canonicalResp.RawProviderMetadata) {
 		writeRawJSONResponse(w, http.StatusOK, canonicalResp.RawProviderMetadata)
 		return
 	}
@@ -856,21 +856,21 @@ func (s *Server) handleGeminiModelAction(w http.ResponseWriter, r *http.Request)
 		QualityOutput:         canonicalResp.Message,
 	})
 	if canonical.Stream {
-		if sameProtocolRawConversationStream(canonical, result.Candidate.Provider.Protocol, result.Candidate.Provider.AdapterType, canonicalResp.RawProviderMetadata) {
+		if sameProtocolRawConversationStream(canonical, result.Candidate.Provider.Protocol, result.Candidate.Provider.AdapterType, result.Candidate.Provider.Name, result.Candidate.Provider.ConfigSchema, result.Candidate.Provider.Capabilities, result.Candidate.Account.Metadata, canonicalResp.RawProviderMetadata) {
 			writeRawSSEResponse(w, canonicalResp.RawProviderMetadata)
 			return
 		}
 		writeSSEEvents(w, s.runtime.gateway.RenderGeminiGenerateContentStreamEvents(canonicalResp))
 		return
 	}
-	if sameProtocolRawConversationResponse(canonical, result.Candidate.Provider.Protocol, result.Candidate.Provider.AdapterType, canonicalResp.RawProviderMetadata) {
+	if sameProtocolRawConversationResponse(canonical, result.Candidate.Provider.Protocol, result.Candidate.Provider.AdapterType, result.Candidate.Provider.Name, result.Candidate.Provider.ConfigSchema, result.Candidate.Provider.Capabilities, result.Candidate.Account.Metadata, canonicalResp.RawProviderMetadata) {
 		writeRawJSONResponse(w, http.StatusOK, canonicalResp.RawProviderMetadata)
 		return
 	}
 	writeJSONAny(w, http.StatusOK, s.runtime.gateway.RenderGeminiGenerateContent(canonicalResp))
 }
 
-func sameProtocolRawConversationResponse(req gatewaycontract.CanonicalRequest, targetProtocol, adapterType string, raw []byte) bool {
+func sameProtocolRawConversationResponse(req gatewaycontract.CanonicalRequest, targetProtocol, adapterType, providerName string, providerConfig, providerCapabilities, accountMetadata map[string]any, raw []byte) bool {
 	if len(bytes.TrimSpace(raw)) == 0 {
 		return false
 	}
@@ -880,6 +880,7 @@ func sameProtocolRawConversationResponse(req gatewaycontract.CanonicalRequest, t
 	sourceProtocol := strings.ToLower(strings.TrimSpace(string(req.SourceProtocol)))
 	targetProtocol = strings.ToLower(strings.TrimSpace(targetProtocol))
 	adapterType = strings.ToLower(strings.TrimSpace(adapterType))
+	providerName = strings.ToLower(strings.TrimSpace(providerName))
 	sourceEndpoint := strings.ToLower(strings.TrimSpace(req.SourceEndpoint))
 	if sourceProtocol == "" || sourceProtocol != targetProtocol {
 		return false
@@ -891,6 +892,9 @@ func sameProtocolRawConversationResponse(req gatewaycontract.CanonicalRequest, t
 				adapterType == "native-openai" ||
 				adapterType == "reverse-proxy-openai-compatible" ||
 				adapterType == "reverse-proxy-codex-cli"
+		}
+		if strings.HasSuffix(sourceEndpoint, "/responses") {
+			return openAIResponsesRawPassthroughEnabled(adapterType, providerName, providerConfig, providerCapabilities, accountMetadata)
 		}
 		return strings.HasSuffix(sourceEndpoint, "/chat/completions") &&
 			(adapterType == "openai-compatible" || adapterType == "reverse-proxy-openai-compatible")
@@ -905,21 +909,26 @@ func sameProtocolRawConversationResponse(req gatewaycontract.CanonicalRequest, t
 	}
 }
 
-func sameProtocolRawConversationStream(req gatewaycontract.CanonicalRequest, targetProtocol, adapterType string, raw []byte) bool {
+func sameProtocolRawConversationStream(req gatewaycontract.CanonicalRequest, targetProtocol, adapterType, providerName string, providerConfig, providerCapabilities, accountMetadata map[string]any, raw []byte) bool {
 	if !req.Stream || !looksLikeSSE(raw) {
 		return false
 	}
 	sourceProtocol := strings.ToLower(strings.TrimSpace(string(req.SourceProtocol)))
 	targetProtocol = strings.ToLower(strings.TrimSpace(targetProtocol))
 	adapterType = strings.ToLower(strings.TrimSpace(adapterType))
+	providerName = strings.ToLower(strings.TrimSpace(providerName))
 	sourceEndpoint := strings.ToLower(strings.TrimSpace(req.SourceEndpoint))
 	if sourceProtocol == "" || sourceProtocol != targetProtocol {
 		return false
 	}
 	switch sourceProtocol {
 	case string(gatewaycontract.ProtocolOpenAICompatible):
-		if strings.HasSuffix(sourceEndpoint, "/responses") || strings.HasSuffix(sourceEndpoint, "/responses/compact") {
+		if strings.HasSuffix(sourceEndpoint, "/responses/compact") {
 			return adapterType == "reverse-proxy-codex-cli"
+		}
+		if strings.HasSuffix(sourceEndpoint, "/responses") {
+			return adapterType == "reverse-proxy-codex-cli" ||
+				openAIResponsesRawPassthroughEnabled(adapterType, providerName, providerConfig, providerCapabilities, accountMetadata)
 		}
 		return strings.HasSuffix(sourceEndpoint, "/chat/completions") &&
 			(adapterType == "openai-compatible" || adapterType == "reverse-proxy-openai-compatible")
@@ -932,6 +941,21 @@ func sameProtocolRawConversationStream(req gatewaycontract.CanonicalRequest, tar
 	default:
 		return false
 	}
+}
+
+func openAIResponsesRawPassthroughEnabled(adapterType, providerName string, providerConfig, providerCapabilities, accountMetadata map[string]any) bool {
+	if adapterType == "native-openai" || providerName == "openai" {
+		return true
+	}
+	for _, values := range []map[string]any{accountMetadata, providerConfig, providerCapabilities} {
+		if metadataBool(values, "native_responses") ||
+			metadataBool(values, "responses_native") ||
+			metadataBool(values, "responses_passthrough") ||
+			metadataBool(values, "openai_responses_passthrough") {
+			return true
+		}
+	}
+	return false
 }
 
 func looksLikeSSE(raw []byte) bool {
