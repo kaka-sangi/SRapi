@@ -5232,6 +5232,70 @@ func TestReverseProxyCodexCLIAdapterPreservesOutputTextAnnotations(t *testing.T)
 	}
 }
 
+func TestReverseProxyCodexCLIAdapterPreservesOutputTextAnnotationEvents(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body: []byte(
+				"data: {\"type\":\"response.output_text.delta\",\"item_id\":\"msg_1\",\"output_index\":0,\"content_index\":0,\"delta\":\"search \"}\n\n" +
+					"data: {\"type\":\"response.output_text.annotation.added\",\"item_id\":\"msg_1\",\"output_index\":0,\"content_index\":0,\"annotation_index\":0,\"annotation\":{\"type\":\"url_citation\",\"start_index\":0,\"end_index\":6,\"url\":\"https://example.invalid/source\",\"title\":\"Source\"}}\n\n" +
+					"data: {\"type\":\"response.output_text.delta\",\"item_id\":\"msg_1\",\"output_index\":0,\"content_index\":0,\"delta\":\"result\"}\n\n" +
+					"data: {\"type\":\"response.output_text.done\",\"item_id\":\"msg_1\",\"output_index\":0,\"content_index\":0,\"text\":\"search result\"}\n\n" +
+					"data: {\"type\":\"response.completed\",\"response\":{\"output\":[],\"usage\":{\"input_tokens\":4,\"output_tokens\":2}}}\n\n" +
+					"data: [DONE]\n\n",
+			),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_codex_annotation_event",
+		Model:      "codex-local",
+		InputParts: textParts("search"),
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": "https://codex.example.test/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+		Credential: map[string]any{"cli_client_token": "codex-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke codex reverse proxy adapter: %v", err)
+	}
+	if len(resp.Parts) != 1 || resp.Parts[0].Kind != contract.ContentPartText || resp.Parts[0].Text != "search result" {
+		t.Fatalf("unexpected Codex annotated stream response: %+v", resp.Parts)
+	}
+	annotations, ok := resp.Parts[0].Metadata["annotations"].([]map[string]any)
+	if !ok || len(annotations) != 1 {
+		t.Fatalf("expected stream annotation metadata on final part, got %+v", resp.Parts[0].Metadata)
+	}
+	if annotations[0]["type"] != "url_citation" || annotations[0]["url"] != "https://example.invalid/source" {
+		t.Fatalf("unexpected stream annotation metadata: %+v", annotations[0])
+	}
+
+	textEvents := conversationStreamEventsByType(resp.StreamEvents, contract.ConversationStreamEventContentDelta)
+	if len(textEvents) != 3 {
+		t.Fatalf("expected two text deltas and one annotation metadata event, got %+v", textEvents)
+	}
+	annotationEvent := textEvents[1]
+	if annotationEvent.RawEventType != "response.output_text.annotation.added" || annotationEvent.Delta.Text != "" {
+		t.Fatalf("expected annotation metadata stream event, got %+v", annotationEvent)
+	}
+	eventAnnotations, ok := annotationEvent.Delta.Metadata["annotations"].([]map[string]any)
+	if !ok || len(eventAnnotations) != 1 || eventAnnotations[0]["url"] != "https://example.invalid/source" {
+		t.Fatalf("expected annotation metadata on stream event, got %+v", annotationEvent.Delta.Metadata)
+	}
+}
+
 func TestReverseProxyCodexCLIAdapterPreservesReasoningTextDeltas(t *testing.T) {
 	runtime := capturingRuntime{
 		response: reverseproxycontract.Response{

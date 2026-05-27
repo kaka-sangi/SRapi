@@ -51,18 +51,20 @@ type codexResponsesInputContent struct {
 }
 
 type codexResponsesEvent struct {
-	Type        string                    `json:"type"`
-	Delta       string                    `json:"delta"`
-	Text        string                    `json:"text"`
-	Refusal     string                    `json:"refusal"`
-	ItemID      string                    `json:"item_id"`
-	Item        *codexResponsesOutputItem `json:"item"`
-	OutputIndex *int                      `json:"output_index"`
-	Response    *codexResponsesResponse   `json:"response"`
-	Usage       *openAIUsage              `json:"usage"`
-	Error       *codexResponsesError      `json:"error"`
-	Message     string                    `json:"message"`
-	Code        string                    `json:"code"`
+	Type         string                    `json:"type"`
+	Delta        string                    `json:"delta"`
+	Text         string                    `json:"text"`
+	Refusal      string                    `json:"refusal"`
+	ItemID       string                    `json:"item_id"`
+	Item         *codexResponsesOutputItem `json:"item"`
+	OutputIndex  *int                      `json:"output_index"`
+	ContentIndex *int                      `json:"content_index"`
+	Annotation   map[string]any            `json:"annotation,omitempty"`
+	Response     *codexResponsesResponse   `json:"response"`
+	Usage        *openAIUsage              `json:"usage"`
+	Error        *codexResponsesError      `json:"error"`
+	Message      string                    `json:"message"`
+	Code         string                    `json:"code"`
 }
 
 type codexResponsesResponse struct {
@@ -77,15 +79,16 @@ type codexResponsesResponse struct {
 }
 
 type codexResponsesOutputItem struct {
-	ID        string                        `json:"id"`
-	Type      string                        `json:"type"`
-	CallID    string                        `json:"call_id"`
-	Name      string                        `json:"name"`
-	Arguments string                        `json:"arguments"`
-	Status    string                        `json:"status"`
-	Text      string                        `json:"text"`
-	Refusal   string                        `json:"refusal"`
-	Content   []codexResponsesOutputContent `json:"content"`
+	ID          string                        `json:"id"`
+	Type        string                        `json:"type"`
+	CallID      string                        `json:"call_id"`
+	Name        string                        `json:"name"`
+	Arguments   string                        `json:"arguments"`
+	Status      string                        `json:"status"`
+	Text        string                        `json:"text"`
+	Refusal     string                        `json:"refusal"`
+	Content     []codexResponsesOutputContent `json:"content"`
+	Annotations []map[string]any              `json:"-"`
 }
 
 type codexResponsesOutputContent struct {
@@ -789,6 +792,7 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 	var usage *openAIUsage
 	indexedItems := map[int]codexResponsesOutputItem{}
 	fallbackItems := []codexResponsesOutputItem{}
+	textAnnotationsByIndex := map[codexTextAnnotationKey][]map[string]any{}
 	var finalResponse *codexResponsesResponse
 	streamEvents := make([]contract.ConversationStreamEvent, 0)
 	functionStates := newCodexFunctionCallStreamStates()
@@ -828,6 +832,7 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 			if len(copiedResponse.Output) == 0 {
 				copiedResponse.Output = codexCollectedOutputItems(indexedItems, fallbackItems)
 			}
+			copiedResponse = codexResponseWithStreamAnnotations(copiedResponse, textAnnotationsByIndex)
 			finalResponse = &copiedResponse
 			if copiedResponse.Usage.HasTokenUsage() {
 				copiedUsage := copiedResponse.Usage
@@ -842,13 +847,14 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 			}
 		case "response.output_item.done":
 			if event.Item != nil {
+				item := codexOutputItemWithStreamAnnotations(*event.Item, codexOutputIndex(event), textAnnotationsByIndex)
 				if event.OutputIndex != nil {
-					indexedItems[*event.OutputIndex] = *event.Item
+					indexedItems[*event.OutputIndex] = item
 				} else {
-					fallbackItems = append(fallbackItems, *event.Item)
+					fallbackItems = append(fallbackItems, item)
 				}
-				if codexOutputItemIsFunctionCall(*event.Item) && !functionStates.hasArgumentDeltas(event) {
-					if streamEvent, ok := codexFunctionCallStreamEvent(*event.Item, codexOutputIndex(event), data); ok {
+				if codexOutputItemIsFunctionCall(item) && !functionStates.hasArgumentDeltas(event) {
+					if streamEvent, ok := codexFunctionCallStreamEvent(item, codexOutputIndex(event), data); ok {
 						appendStreamEvent(streamEvent)
 					}
 				}
@@ -857,6 +863,13 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 			deltaBuilder.WriteString(event.Delta)
 			if event.Delta != "" {
 				appendStreamEvent(codexContentStreamEvent(event, eventType, data, textContentDelta(event.Delta)))
+			}
+		case "response.output_text.annotation.added":
+			if len(event.Annotation) > 0 {
+				key := codexTextAnnotationKeyForEvent(event)
+				annotation := cloneMap(event.Annotation)
+				textAnnotationsByIndex[key] = append(textAnnotationsByIndex[key], annotation)
+				appendStreamEvent(codexContentStreamEvent(event, eventType, data, codexAnnotationContentDelta(annotation)))
 			}
 		case "response.refusal.delta":
 			refusalBuilder.WriteString(event.Delta)
@@ -929,7 +942,9 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 			text = strings.TrimSpace(deltaBuilder.String())
 		}
 		if text != "" {
-			parts = append(parts, textContentPart(text))
+			part := textContentPart(text)
+			part.Metadata = codexCombinedStreamAnnotationsMetadata(textAnnotationsByIndex)
+			parts = append(parts, part)
 		}
 	}
 	if len(parts) == 0 {
@@ -996,6 +1011,111 @@ func codexContentStreamEvent(event codexResponsesEvent, eventType string, raw st
 		Raw:            append(json.RawMessage(nil), raw...),
 		OriginProtocol: "openai-compatible",
 	}
+}
+
+func codexAnnotationContentDelta(annotation map[string]any) contract.ContentPart {
+	return contract.ContentPart{
+		Kind:           contract.ContentPartText,
+		Metadata:       map[string]any{"annotations": []map[string]any{cloneMap(annotation)}},
+		OriginProtocol: "openai-compatible",
+	}
+}
+
+type codexTextAnnotationKey struct {
+	OutputIndex  int
+	ContentIndex int
+}
+
+func codexTextAnnotationKeyForEvent(event codexResponsesEvent) codexTextAnnotationKey {
+	key := codexTextAnnotationKey{OutputIndex: codexOutputIndex(event)}
+	if event.ContentIndex != nil {
+		key.ContentIndex = *event.ContentIndex
+	}
+	return key
+}
+
+func codexCombinedStreamAnnotationsMetadata(values map[codexTextAnnotationKey][]map[string]any) map[string]any {
+	annotations := make([]map[string]any, 0)
+	for _, key := range sortedCodexAnnotationKeys(values) {
+		annotations = append(annotations, cloneMapSlice(values[key])...)
+	}
+	if len(annotations) == 0 {
+		return nil
+	}
+	return map[string]any{"annotations": annotations}
+}
+
+func sortedCodexAnnotationKeys(values map[codexTextAnnotationKey][]map[string]any) []codexTextAnnotationKey {
+	keys := make([]codexTextAnnotationKey, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		if keys[i].OutputIndex != keys[j].OutputIndex {
+			return keys[i].OutputIndex < keys[j].OutputIndex
+		}
+		return keys[i].ContentIndex < keys[j].ContentIndex
+	})
+	return keys
+}
+
+func codexResponseWithStreamAnnotations(response codexResponsesResponse, annotations map[codexTextAnnotationKey][]map[string]any) codexResponsesResponse {
+	if len(response.Output) == 0 || len(annotations) == 0 {
+		return response
+	}
+	for idx := range response.Output {
+		response.Output[idx] = codexOutputItemWithStreamAnnotations(response.Output[idx], idx, annotations)
+	}
+	return response
+}
+
+func codexOutputItemWithStreamAnnotations(item codexResponsesOutputItem, outputIndex int, annotations map[codexTextAnnotationKey][]map[string]any) codexResponsesOutputItem {
+	if len(annotations) == 0 {
+		return item
+	}
+	if len(item.Content) == 0 {
+		item.Annotations = appendCodexAnnotations(item.Annotations, annotations[codexTextAnnotationKey{OutputIndex: outputIndex}])
+		return item
+	}
+	for contentIndex := range item.Content {
+		key := codexTextAnnotationKey{OutputIndex: outputIndex, ContentIndex: contentIndex}
+		item.Content[contentIndex].Annotations = appendCodexAnnotations(item.Content[contentIndex].Annotations, annotations[key])
+	}
+	return item
+}
+
+func appendCodexAnnotations(dst []map[string]any, src []map[string]any) []map[string]any {
+	if len(src) == 0 {
+		return dst
+	}
+	out := cloneMapSlice(dst)
+	for _, annotation := range src {
+		if codexAnnotationExists(out, annotation) {
+			continue
+		}
+		out = append(out, cloneMap(annotation))
+	}
+	return out
+}
+
+func codexAnnotationExists(values []map[string]any, candidate map[string]any) bool {
+	candidateKey := codexAnnotationDedupeKey(candidate)
+	for _, value := range values {
+		if codexAnnotationDedupeKey(value) == candidateKey {
+			return true
+		}
+	}
+	return false
+}
+
+func codexAnnotationDedupeKey(annotation map[string]any) string {
+	return strings.Join([]string{
+		strings.TrimSpace(mapStringAny(annotation, "type")),
+		strings.TrimSpace(mapStringAny(annotation, "url")),
+		strings.TrimSpace(fmt.Sprint(annotation["start_index"])),
+		strings.TrimSpace(fmt.Sprint(annotation["end_index"])),
+		strings.TrimSpace(mapStringAny(annotation, "title")),
+	}, "\x00")
 }
 
 func codexReasoningStreamEvent(event codexResponsesEvent, eventType string, raw string) contract.ConversationStreamEvent {
@@ -1352,7 +1472,11 @@ func codexResponsesOutputItemParts(item codexResponsesOutputItem) []contract.Con
 		if itemType == "reasoning" {
 			kind = contract.ContentPartThinking
 		}
-		parts = append(parts, contract.ContentPart{Kind: kind, Text: text, OriginProtocol: "openai"})
+		part := contract.ContentPart{Kind: kind, Text: text, OriginProtocol: "openai"}
+		if kind == contract.ContentPartText {
+			part.Metadata = codexOutputItemTextMetadata(item)
+		}
+		parts = append(parts, part)
 	}
 	for _, content := range item.Content {
 		contentType := strings.ToLower(strings.TrimSpace(content.Type))
@@ -1381,6 +1505,17 @@ func codexResponsesOutputContentMetadata(content codexResponsesOutputContent) ma
 			values[idx] = cloneMap(annotation)
 		}
 		metadata["annotations"] = values
+	}
+	if len(metadata) == 0 {
+		return nil
+	}
+	return metadata
+}
+
+func codexOutputItemTextMetadata(item codexResponsesOutputItem) map[string]any {
+	metadata := map[string]any{}
+	if len(item.Annotations) > 0 {
+		metadata["annotations"] = cloneMapSlice(item.Annotations)
 	}
 	if len(metadata) == 0 {
 		return nil

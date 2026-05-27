@@ -625,6 +625,92 @@ func TestRenderResponsesPreservesTextAnnotations(t *testing.T) {
 	}
 }
 
+func TestRenderResponsesStreamEventsPreservesTextAnnotations(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	annotation := map[string]any{
+		"type":        "url_citation",
+		"start_index": 0,
+		"end_index":   6,
+		"url":         "https://example.invalid/source",
+		"title":       "Source",
+	}
+	resp := gatewaycontract.CanonicalResponse{
+		ID:         "resp_stream_annotations",
+		Model:      "gpt-5.5",
+		StopReason: "end_turn",
+		OutputItems: []gatewaycontract.ContentBlock{{
+			Type:     gatewaycontract.ContentBlockText,
+			Role:     "assistant",
+			Text:     "search result",
+			Metadata: map[string]any{"annotations": []any{annotation}},
+		}},
+		StreamEvents: []gatewaycontract.StreamEvent{
+			{
+				Index:        0,
+				Type:         gatewaycontract.StreamEventContentDelta,
+				ContentIndex: 0,
+				Delta:        gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockText, Role: "assistant", Text: "search "},
+			},
+			{
+				Index:        1,
+				Type:         gatewaycontract.StreamEventContentDelta,
+				ContentIndex: 0,
+				Delta: gatewaycontract.ContentBlock{
+					Type:     gatewaycontract.ContentBlockText,
+					Role:     "assistant",
+					Metadata: map[string]any{"annotations": []any{annotation}},
+				},
+			},
+			{
+				Index:        2,
+				Type:         gatewaycontract.StreamEventContentDelta,
+				ContentIndex: 0,
+				Delta:        gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockText, Role: "assistant", Text: "result"},
+			},
+			{
+				Index:      3,
+				Type:       gatewaycontract.StreamEventStop,
+				StopReason: "end_turn",
+			},
+		},
+		Usage: gatewaycontract.Usage{InputTokens: 5, OutputTokens: 3},
+	}
+
+	events := svc.RenderResponsesStreamEvents(resp)
+	added := streamEventByName(events, "response.content_part.added")
+	if added == nil {
+		t.Fatalf("expected content_part.added event, got %+v", events)
+	}
+	addedPart, _ := added.Data["part"].(map[string]any)
+	if !responseStreamPartHasAnnotation(addedPart, "https://example.invalid/source") {
+		t.Fatalf("expected content_part.added annotations, got %+v", addedPart)
+	}
+	done := streamEventByName(events, "response.content_part.done")
+	if done == nil {
+		t.Fatalf("expected content_part.done event, got %+v", events)
+	}
+	donePart, _ := done.Data["part"].(map[string]any)
+	if donePart["text"] != "search result" || !responseStreamPartHasAnnotation(donePart, "https://example.invalid/source") {
+		t.Fatalf("expected content_part.done text and annotations, got %+v", donePart)
+	}
+	itemDone := streamEventByName(events, "response.output_item.done")
+	if itemDone == nil || outputItemText(itemDone) != "search result" {
+		t.Fatalf("expected output_item.done text, got %+v", itemDone)
+	}
+	item, _ := itemDone.Data["item"].(map[string]any)
+	content, _ := item["content"].([]map[string]any)
+	if len(content) != 1 || !responseStreamPartHasAnnotation(content[0], "https://example.invalid/source") {
+		t.Fatalf("expected output_item.done annotations, got %+v", itemDone)
+	}
+	deltas := streamEventsByName(events, "response.output_text.delta")
+	if len(deltas) != 2 || deltas[0].Data["delta"] != "search " || deltas[1].Data["delta"] != "result" {
+		t.Fatalf("expected metadata-only annotation event not to render text delta, got %+v", deltas)
+	}
+}
+
 func TestRenderResponsesPreservesIncompleteMaxTokens(t *testing.T) {
 	svc, err := New()
 	if err != nil {
@@ -1895,6 +1981,25 @@ func outputItemText(event *StreamEvent) string {
 	}
 	text, _ := content[0]["text"].(string)
 	return text
+}
+
+func responseStreamPartHasAnnotation(part map[string]any, url string) bool {
+	switch annotations := part["annotations"].(type) {
+	case []any:
+		for _, value := range annotations {
+			annotation, _ := value.(map[string]any)
+			if annotation["url"] == url {
+				return true
+			}
+		}
+	case []map[string]any:
+		for _, annotation := range annotations {
+			if annotation["url"] == url {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func chatStreamToolDelta(t *testing.T, chunk map[string]any) map[string]any {

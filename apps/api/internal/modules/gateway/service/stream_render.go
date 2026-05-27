@@ -437,27 +437,35 @@ func (s *Service) renderResponsesCanonicalStreamEvents(resp gatewaycontract.Cano
 		switch event.Type {
 		case gatewaycontract.StreamEventContentDelta, gatewaycontract.StreamEventToolResult:
 			delta := event.Delta.Text
-			if delta == "" {
+			state := textStates.stateFor(event, responseStreamDeltaTextBlockType(event, gatewaycontract.ContentBlockText))
+			state.mergeMetadata(event.Delta.Metadata)
+			if delta == "" && len(event.Delta.Metadata) == 0 {
 				continue
 			}
-			state := textStates.stateFor(event, responseStreamDeltaTextBlockType(event, gatewaycontract.ContentBlockText))
 			if state.OutputIndex < 0 {
 				state.OutputIndex = nextOutputIndex
 				nextOutputIndex++
-				out = append(out, responseStreamTextStartEvents(state.ItemID, state.OutputIndex, state.BlockType)...)
+				out = append(out, responseStreamTextStartEvents(state.ItemID, state.OutputIndex, state.BlockType, state.Metadata)...)
+			}
+			if delta == "" {
+				continue
 			}
 			state.Text.WriteString(delta)
 			out = append(out, responseStreamTextDeltaEvent(state.ItemID, state.OutputIndex, state.BlockType, delta))
 		case gatewaycontract.StreamEventReasoning:
 			delta := event.Delta.Text
-			if delta == "" {
+			state := textStates.stateFor(event, gatewaycontract.ContentBlockReasoning)
+			state.mergeMetadata(event.Delta.Metadata)
+			if delta == "" && len(event.Delta.Metadata) == 0 {
 				continue
 			}
-			state := textStates.stateFor(event, gatewaycontract.ContentBlockReasoning)
 			if state.OutputIndex < 0 {
 				state.OutputIndex = nextOutputIndex
 				nextOutputIndex++
-				out = append(out, responseStreamTextStartEvents(state.ItemID, state.OutputIndex, state.BlockType)...)
+				out = append(out, responseStreamTextStartEvents(state.ItemID, state.OutputIndex, state.BlockType, state.Metadata)...)
+			}
+			if delta == "" {
+				continue
 			}
 			state.Text.WriteString(delta)
 			out = append(out, responseStreamTextDeltaEvent(state.ItemID, state.OutputIndex, state.BlockType, delta))
@@ -492,8 +500,8 @@ func (s *Service) renderResponsesCanonicalStreamEvents(resp gatewaycontract.Cano
 			OutputIndex: state.OutputIndex,
 			Events: []StreamEvent{
 				responseStreamTextDoneEvent(state.ItemID, state.OutputIndex, state.BlockType, text),
-				responseStreamContentPartDoneEvent(state.ItemID, state.OutputIndex, state.BlockType, text),
-				responseStreamMessageDoneEvent(state.ItemID, state.OutputIndex, state.BlockType, text),
+				responseStreamContentPartDoneEvent(state.ItemID, state.OutputIndex, state.BlockType, text, state.Metadata),
+				responseStreamMessageDoneEvent(state.ItemID, state.OutputIndex, state.BlockType, text, state.Metadata),
 			},
 		})
 	}
@@ -546,13 +554,8 @@ func (s *Service) renderResponsesCanonicalStreamEvents(resp gatewaycontract.Cano
 	return out
 }
 
-func responseStreamTextStartEvents(itemID string, outputIndex int, blockType gatewaycontract.ContentBlockType) []StreamEvent {
-	part := map[string]any{"type": responseStreamContentPartType(blockType)}
-	if blockType == gatewaycontract.ContentBlockRefusal {
-		part["refusal"] = ""
-	} else {
-		part["text"] = ""
-	}
+func responseStreamTextStartEvents(itemID string, outputIndex int, blockType gatewaycontract.ContentBlockType, metadata map[string]any) []StreamEvent {
+	part := responseStreamTextPart(blockType, "", metadata)
 	return []StreamEvent{
 		{
 			Event: "response.output_item.added",
@@ -578,6 +581,20 @@ func responseStreamTextStartEvents(itemID string, outputIndex int, blockType gat
 			},
 		},
 	}
+}
+
+func responseStreamTextPart(blockType gatewaycontract.ContentBlockType, text string, metadata map[string]any) map[string]any {
+	part := cloneMap(metadata)
+	if part == nil {
+		part = map[string]any{}
+	}
+	part["type"] = responseStreamContentPartType(blockType)
+	if blockType == gatewaycontract.ContentBlockRefusal {
+		part["refusal"] = text
+	} else {
+		part["text"] = text
+	}
+	return part
 }
 
 func responseStreamTextDeltaEvent(itemID string, outputIndex int, blockType gatewaycontract.ContentBlockType, delta string) StreamEvent {
@@ -613,13 +630,8 @@ func responseStreamTextDoneEvent(itemID string, outputIndex int, blockType gatew
 	}
 }
 
-func responseStreamContentPartDoneEvent(itemID string, outputIndex int, blockType gatewaycontract.ContentBlockType, text string) StreamEvent {
-	part := map[string]any{"type": responseStreamContentPartType(blockType)}
-	if blockType == gatewaycontract.ContentBlockRefusal {
-		part["refusal"] = text
-	} else {
-		part["text"] = text
-	}
+func responseStreamContentPartDoneEvent(itemID string, outputIndex int, blockType gatewaycontract.ContentBlockType, text string, metadata map[string]any) StreamEvent {
+	part := responseStreamTextPart(blockType, text, metadata)
 	return StreamEvent{
 		Event: "response.content_part.done",
 		Data: map[string]any{
@@ -632,13 +644,8 @@ func responseStreamContentPartDoneEvent(itemID string, outputIndex int, blockTyp
 	}
 }
 
-func responseStreamMessageDoneEvent(itemID string, outputIndex int, blockType gatewaycontract.ContentBlockType, text string) StreamEvent {
-	content := map[string]any{"type": responseStreamContentPartType(blockType)}
-	if blockType == gatewaycontract.ContentBlockRefusal {
-		content["refusal"] = text
-	} else {
-		content["text"] = text
-	}
+func responseStreamMessageDoneEvent(itemID string, outputIndex int, blockType gatewaycontract.ContentBlockType, text string, metadata map[string]any) StreamEvent {
+	content := responseStreamTextPart(blockType, text, metadata)
 	return StreamEvent{
 		Event: "response.output_item.done",
 		Data: map[string]any{

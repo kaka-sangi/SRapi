@@ -384,8 +384,8 @@ func responseStreamOutputEvents(blocks []gatewaycontract.ContentBlock) []StreamE
 		}
 		events = append(events,
 			responseStreamTextDoneEvent(itemID, outputIndex, block.Type, strings.TrimSpace(block.Text)),
-			responseStreamContentPartDoneEvent(itemID, outputIndex, block.Type, strings.TrimSpace(block.Text)),
-			responseStreamMessageDoneEvent(itemID, outputIndex, block.Type, strings.TrimSpace(block.Text)),
+			responseStreamContentPartDoneEvent(itemID, outputIndex, block.Type, strings.TrimSpace(block.Text), block.Metadata),
+			responseStreamMessageDoneEvent(itemID, outputIndex, block.Type, strings.TrimSpace(block.Text), block.Metadata),
 		)
 	}
 	return events
@@ -419,6 +419,7 @@ type responseStreamTextState struct {
 	BlockType    gatewaycontract.ContentBlockType
 	Text         strings.Builder
 	Signature    strings.Builder
+	Metadata     map[string]any
 }
 
 func newResponseStreamTextStates(blocks []gatewaycontract.ContentBlock) *responseStreamTextStates {
@@ -435,6 +436,7 @@ func newResponseStreamTextStates(blocks []gatewaycontract.ContentBlock) *respons
 			OutputIndex:  -1,
 			ItemID:       responseStreamTextItemID(index, block.Type),
 			BlockType:    block.Type,
+			Metadata:     cloneMap(block.Metadata),
 		}
 		states.byKey[responseStreamTextStateKey{ContentIndex: index, BlockType: block.Type}] = state
 		states.order = append(states.order, state)
@@ -452,10 +454,96 @@ func (s *responseStreamTextStates) stateFor(event gatewaycontract.StreamEvent, f
 		OutputIndex:  -1,
 		ItemID:       responseStreamTextItemID(len(s.order), fallbackType),
 		BlockType:    fallbackType,
+		Metadata:     map[string]any{},
 	}
 	s.byKey[key] = state
 	s.order = append(s.order, state)
 	return state
+}
+
+func (s *responseStreamTextState) mergeMetadata(metadata map[string]any) {
+	s.Metadata = mergeResponseStreamTextMetadata(s.Metadata, metadata)
+}
+
+func mergeResponseStreamTextMetadata(dst map[string]any, src map[string]any) map[string]any {
+	if len(src) == 0 {
+		return dst
+	}
+	if dst == nil {
+		dst = map[string]any{}
+	}
+	for key, value := range src {
+		if key == "annotations" {
+			dst = appendResponseStreamTextAnnotations(dst, value)
+			continue
+		}
+		dst[key] = cloneAny(value)
+	}
+	return dst
+}
+
+func appendResponseStreamTextAnnotations(metadata map[string]any, value any) map[string]any {
+	annotations := responseStreamTextAnnotationValues(value)
+	if len(annotations) == 0 {
+		return metadata
+	}
+	merged := responseStreamTextAnnotationValues(metadata["annotations"])
+	for _, annotation := range annotations {
+		if responseStreamTextAnnotationExists(merged, annotation) {
+			continue
+		}
+		merged = append(merged, annotation)
+	}
+	metadata["annotations"] = merged
+	return metadata
+}
+
+func annotationDedupeKey(annotation map[string]any) string {
+	return strings.Join([]string{
+		strings.TrimSpace(mapStringAny(annotation, "type")),
+		strings.TrimSpace(mapStringAny(annotation, "url")),
+		strings.TrimSpace(fmt.Sprint(annotation["start_index"])),
+		strings.TrimSpace(fmt.Sprint(annotation["end_index"])),
+		strings.TrimSpace(mapStringAny(annotation, "title")),
+	}, "\x00")
+}
+
+func responseStreamTextAnnotationValues(value any) []any {
+	switch typed := value.(type) {
+	case nil:
+		return nil
+	case []any:
+		out := make([]any, len(typed))
+		for idx, item := range typed {
+			out[idx] = cloneAny(item)
+		}
+		return out
+	case []map[string]any:
+		out := make([]any, len(typed))
+		for idx, item := range typed {
+			out[idx] = cloneMap(item)
+		}
+		return out
+	case map[string]any:
+		return []any{cloneMap(typed)}
+	default:
+		return []any{cloneAny(typed)}
+	}
+}
+
+func responseStreamTextAnnotationExists(values []any, candidate any) bool {
+	candidateMap, ok := candidate.(map[string]any)
+	if !ok {
+		return false
+	}
+	candidateKey := annotationDedupeKey(candidateMap)
+	for _, value := range values {
+		annotation, ok := value.(map[string]any)
+		if ok && annotationDedupeKey(annotation) == candidateKey {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *responseStreamTextStates) openStates() []*responseStreamTextState {
