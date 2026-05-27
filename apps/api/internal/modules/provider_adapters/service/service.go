@@ -480,7 +480,7 @@ func (s *Service) invokeOpenAICompatibleResponses(ctx context.Context, req contr
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return contract.ConversationResponse{}, classifyProviderHTTPError(resp.StatusCode, body)
 	}
-	return parseOpenAIResponsesBody(body, resp.StatusCode)
+	return parseOpenAIResponsesBodyWithOptions(body, resp.StatusCode, openAIResponsesRequireTerminalEvent(req))
 }
 
 func (s *Service) invokeReverseProxyGeminiCompatible(ctx context.Context, req contract.ConversationRequest, baseURL string) (contract.ConversationResponse, error) {
@@ -747,7 +747,7 @@ func (s *Service) invokeReverseProxyOpenAICompatibleResponses(ctx context.Contex
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
 		return contract.ConversationResponse{}, classifyProviderHTTPError(runtimeResp.StatusCode, runtimeResp.Body)
 	}
-	return parseOpenAIResponsesBody(runtimeResp.Body, runtimeResp.StatusCode)
+	return parseOpenAIResponsesBodyWithOptions(runtimeResp.Body, runtimeResp.StatusCode, openAIResponsesRequireTerminalEvent(req))
 }
 
 func openAIResponsesCompactRequest(req contract.ConversationRequest) bool {
@@ -776,6 +776,21 @@ func openAIResponsesNativeEnabled(req contract.ConversationRequest) bool {
 			mapBool(values, "responses_native") ||
 			mapBool(values, "responses_passthrough") ||
 			mapBool(values, "openai_responses_passthrough") {
+			return true
+		}
+	}
+	return false
+}
+
+func openAIResponsesRequireTerminalEvent(req contract.ConversationRequest) bool {
+	if strings.EqualFold(strings.TrimSpace(req.Provider.AdapterType), "native-openai") ||
+		strings.EqualFold(strings.TrimSpace(req.Provider.Name), "openai") {
+		return true
+	}
+	for _, values := range []map[string]any{req.Account.Metadata, req.Provider.ConfigSchema, req.Provider.Capabilities} {
+		if mapBool(values, "responses_require_terminal_event") ||
+			mapBool(values, "openai_responses_require_terminal_event") ||
+			mapBool(values, "strict_responses_stream_terminal") {
 			return true
 		}
 	}
@@ -981,7 +996,11 @@ func openAIResponsesAccept(stream bool) string {
 }
 
 func parseOpenAIResponsesBody(body []byte, statusCode int) (contract.ConversationResponse, error) {
-	return parseCodexResponsesBody(body, statusCode)
+	return parseOpenAIResponsesBodyWithOptions(body, statusCode, false)
+}
+
+func parseOpenAIResponsesBodyWithOptions(body []byte, statusCode int, requireTerminalEvent bool) (contract.ConversationResponse, error) {
+	return parseCodexResponsesBodyWithOptions(body, statusCode, codexResponsesParseOptions{RequireTerminalEvent: requireTerminalEvent})
 }
 
 func openAIResponsesCompactBody(req contract.ConversationRequest) ([]byte, error) {

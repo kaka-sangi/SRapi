@@ -837,17 +837,25 @@ func realtimeSetting(req contract.RealtimeRequest, keys ...string) string {
 }
 
 func parseCodexResponsesBody(body []byte, statusCode int) (contract.ConversationResponse, error) {
+	return parseCodexResponsesBodyWithOptions(body, statusCode, codexResponsesParseOptions{})
+}
+
+type codexResponsesParseOptions struct {
+	RequireTerminalEvent bool
+}
+
+func parseCodexResponsesBodyWithOptions(body []byte, statusCode int, options codexResponsesParseOptions) (contract.ConversationResponse, error) {
 	trimmed := bytes.TrimSpace(body)
 	if len(trimmed) == 0 {
 		return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response contained no text"}
 	}
 	if bytes.HasPrefix(trimmed, []byte("data:")) || bytes.Contains(trimmed, []byte("\ndata:")) {
-		return parseCodexResponsesStream(body, statusCode)
+		return parseCodexResponsesStream(body, statusCode, options)
 	}
 	return parseCodexResponsesJSON(trimmed, statusCode)
 }
 
-func parseCodexResponsesStream(body []byte, statusCode int) (contract.ConversationResponse, error) {
+func parseCodexResponsesStream(body []byte, statusCode int, options codexResponsesParseOptions) (contract.ConversationResponse, error) {
 	frames, err := parseSSEFrames(body)
 	if err != nil {
 		return contract.ConversationResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream interrupted"}
@@ -867,6 +875,7 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 	functionStates := newCodexFunctionCallStreamStates()
 	eventIndex := 0
 	seenEvent := false
+	seenTerminalEvent := false
 	appendStreamEvent := func(event contract.ConversationStreamEvent) {
 		event.Index = eventIndex
 		streamEvents = append(streamEvents, event)
@@ -975,6 +984,7 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 				completedReasoning = event.Text
 			}
 		case "response.completed", "response.done", "response.incomplete", "response.cancelled", "response.canceled", "response.failed":
+			seenTerminalEvent = true
 			if eventType != "response.failed" {
 				if providerErr, ok := codexEventProviderError(event); ok {
 					return contract.ConversationResponse{}, providerErr
@@ -992,6 +1002,9 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 	}
 	if !seenEvent {
 		return contract.ConversationResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream ended before chunk"}
+	}
+	if options.RequireTerminalEvent && !seenTerminalEvent {
+		return contract.ConversationResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream ended before terminal event"}
 	}
 	parts, stopReason, err := codexResponsesStreamPartsAndStopReason(
 		finalResponse,

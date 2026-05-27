@@ -631,6 +631,106 @@ func TestOpenAIProviderNameUsesResponsesEndpoint(t *testing.T) {
 	}
 }
 
+func TestNativeOpenAIResponsesRejectsStreamWithoutTerminalEvent(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: {\"type\":\"response.output_text.delta\",\"delta\":\"partial\"}\n\ndata: [DONE]\n\n"))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_native_openai_missing_terminal",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/responses",
+		TargetProtocol: "openai-compatible",
+		Model:          "gpt-local",
+		InputParts:     textParts("hello"),
+		Stream:         true,
+		Provider:       providercontract.Provider{AdapterType: "native-openai", Protocol: "openai-compatible"},
+		Account:        accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:        modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-upstream"},
+		Credential:     map[string]any{"api_key": "upstream-secret"},
+	})
+	providerErr := assertProviderError(t, err, "stream_interrupted", http.StatusBadGateway)
+	if !strings.Contains(providerErr.Message, "terminal event") {
+		t.Fatalf("expected missing terminal event error, got %+v", providerErr)
+	}
+}
+
+func TestOpenAIResponsesRejectsStreamWithoutTerminalEventWhenConfigured(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: {\"type\":\"response.output_text.delta\",\"delta\":\"partial\"}\n\ndata: [DONE]\n\n"))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_openai_optin_missing_terminal",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/responses",
+		TargetProtocol: "openai-compatible",
+		Model:          "gpt-local",
+		InputParts:     textParts("hello"),
+		Stream:         true,
+		Provider: providercontract.Provider{
+			AdapterType:  "openai-compatible",
+			Protocol:     "openai-compatible",
+			ConfigSchema: map[string]any{"native_responses": true, "responses_require_terminal_event": true},
+		},
+		Account:    accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-upstream"},
+		Credential: map[string]any{"api_key": "upstream-secret"},
+	})
+	providerErr := assertProviderError(t, err, "stream_interrupted", http.StatusBadGateway)
+	if !strings.Contains(providerErr.Message, "terminal event") {
+		t.Fatalf("expected missing terminal event error, got %+v", providerErr)
+	}
+}
+
+func TestOpenAIResponsesAllowsStreamWithoutTerminalEventByDefaultForCompatibility(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: {\"type\":\"response.output_text.delta\",\"delta\":\"compat\"}\n\ndata: [DONE]\n\n"))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_openai_compat_missing_terminal",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/responses",
+		TargetProtocol: "openai-compatible",
+		Model:          "gpt-local",
+		InputParts:     textParts("hello"),
+		Stream:         true,
+		Provider: providercontract.Provider{
+			AdapterType:  "openai-compatible",
+			Protocol:     "openai-compatible",
+			ConfigSchema: map[string]any{"native_responses": true},
+		},
+		Account:    accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-upstream"},
+		Credential: map[string]any{"api_key": "upstream-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke compatible OpenAI Responses stream: %v", err)
+	}
+	if conversationResponseText(resp) != "compat" || len(resp.StreamEvents) == 0 {
+		t.Fatalf("expected compatible synthetic terminal response, got %+v", resp)
+	}
+}
+
 func TestReverseProxyOpenAICompatibleAdapterUsesResponsesEndpointWhenOptedIn(t *testing.T) {
 	rawSSE := "data: {\"type\":\"response.output_text.delta\",\"delta\":\"native \"}\n\n" +
 		"data: {\"type\":\"response.output_text.delta\",\"delta\":\"responses\"}\n\n" +
