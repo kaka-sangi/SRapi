@@ -3194,7 +3194,7 @@ func TestAnthropicCompatibleAdapterDoesNotSendOpenAIReasoningAsThinking(t *testi
 func TestAnthropicCompatibleAdapterPreservesToolUseResponse(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"stop_reason":"tool_use","content":[{"type":"tool_use","id":"toolu_1","name":"lookup","input":{"query":"weather"}}],"usage":{"input_tokens":6,"output_tokens":2}}`))
+		_, _ = w.Write([]byte("{\"stop_reason\":\"tool_use\",\"content\":[{\"type\":\"tool_use\",\"id\":\"toolu_1\",\"name\":\"lookup\",\"input\": { \"query\":\"weather\" }\n}],\"usage\":{\"input_tokens\":6,\"output_tokens\":2}}"))
 	}))
 	defer upstream.Close()
 
@@ -3221,7 +3221,7 @@ func TestAnthropicCompatibleAdapterPreservesToolUseResponse(t *testing.T) {
 	if len(resp.Parts) != 1 || resp.StopReason != contract.StopReasonToolUse || resp.Usage.OutputTokens != 2 {
 		t.Fatalf("unexpected anthropic tool use response: %+v", resp)
 	}
-	assertToolUsePart(t, resp.Parts[0], "toolu_1", "lookup", `{"query":"weather"}`)
+	assertToolUsePart(t, resp.Parts[0], "toolu_1", "lookup", `{ "query":"weather" }`)
 }
 
 func TestAnthropicCompatibleAdapterPreservesToolUseSignatureResponse(t *testing.T) {

@@ -1780,8 +1780,8 @@ func anthropicContentPart(block anthropicContentBlock) (contract.ContentPart, bo
 			return textContentPart(text), true
 		}
 	case "tool_use", "server_tool_use":
-		arguments := strings.TrimSpace(string(block.Input))
-		if strings.TrimSpace(block.ID) == "" && strings.TrimSpace(block.Name) == "" && arguments == "" {
+		arguments := string(block.Input)
+		if strings.TrimSpace(block.ID) == "" && strings.TrimSpace(block.Name) == "" && strings.TrimSpace(arguments) == "" {
 			return contract.ContentPart{}, false
 		}
 		metadata := map[string]any{"type": blockType}
