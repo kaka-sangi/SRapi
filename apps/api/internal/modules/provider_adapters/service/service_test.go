@@ -4772,6 +4772,85 @@ func TestReverseProxyCodexCLIAdapterStreamsIncompleteTerminalUsage(t *testing.T)
 	}
 }
 
+func TestReverseProxyCodexCLIAdapterRejectsFailedDoneStatus(t *testing.T) {
+	rawSSE := "data: {\"type\":\"response.output_text.delta\",\"delta\":\"partial\"}\n\n" +
+		"data: {\"type\":\"response.done\",\"response\":{\"status\":\"failed\",\"output\":[],\"usage\":{\"input_tokens\":4,\"output_tokens\":5}}}\n\n"
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/backend-api/codex/responses" {
+			t.Fatalf("unexpected codex upstream path %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte(rawSSE))
+	}))
+	defer upstream.Close()
+
+	runtime, err := reverseproxyservice.New(nil)
+	if err != nil {
+		t.Fatalf("create reverse proxy runtime: %v", err)
+	}
+	svc, err := service.NewWithReverseProxy(nil, runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_codex_proxy_failed_done_sse",
+		Model:      "codex-local",
+		InputParts: textParts("hello codex"),
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": upstream.URL + "/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+		Credential: map[string]any{"cli_client_token": "codex-token"},
+	})
+	providerErr := assertProviderError(t, err, "provider_5xx", http.StatusBadGateway)
+	if !strings.Contains(providerErr.Message, "failed response") {
+		t.Fatalf("expected failed response provider error, got %+v", providerErr)
+	}
+}
+
+func TestReverseProxyCodexCLIAdapterRejectsFailedJSONStatus(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body:       []byte(`{"status":"failed","output":[{"type":"message","content":[{"type":"output_text","text":"partial"}]}],"usage":{"input_tokens":4,"output_tokens":5}}`),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_codex_proxy_failed_json",
+		Model:      "codex-local",
+		InputParts: textParts("hello codex"),
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": "https://codex.example.test/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+		Credential: map[string]any{"cli_client_token": "codex-token"},
+	})
+	providerErr := assertProviderError(t, err, "provider_5xx", http.StatusBadGateway)
+	if !strings.Contains(providerErr.Message, "failed response") {
+		t.Fatalf("expected failed response provider error, got %+v", providerErr)
+	}
+}
+
 func TestReverseProxyCodexCLIAdapterPreservesFunctionCallResponse(t *testing.T) {
 	runtime := capturingRuntime{
 		response: reverseproxycontract.Response{

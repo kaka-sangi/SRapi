@@ -1179,8 +1179,8 @@ func parseCodexResponsesJSON(body []byte, statusCode int) (contract.Conversation
 	if err := json.Unmarshal(body, &response); err != nil {
 		return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider returned invalid json"}
 	}
-	if response.Error != nil {
-		return contract.ConversationResponse{}, codexProviderError(*response.Error)
+	if providerErr, ok := codexResponseProviderError(response); ok {
+		return contract.ConversationResponse{}, providerErr
 	}
 	resp, err := response.ConversationResponse(statusCode)
 	if err != nil {
@@ -1450,8 +1450,10 @@ func codexOutputItemIsRefusal(item codexResponsesOutputItem) bool {
 }
 
 func codexEventProviderError(event codexResponsesEvent) (contract.ProviderError, bool) {
-	if event.Response != nil && event.Response.Error != nil {
-		return codexProviderError(*event.Response.Error), true
+	if event.Response != nil {
+		if providerErr, ok := codexResponseProviderError(*event.Response); ok {
+			return providerErr, true
+		}
 	}
 	if event.Error != nil {
 		return codexProviderError(*event.Error), true
@@ -1464,6 +1466,16 @@ func codexEventProviderError(event codexResponsesEvent) (contract.ProviderError,
 		err.Message = "codex upstream returned terminal error event"
 	}
 	return codexProviderError(err), true
+}
+
+func codexResponseProviderError(response codexResponsesResponse) (contract.ProviderError, bool) {
+	if response.Error != nil {
+		return codexProviderError(*response.Error), true
+	}
+	if strings.EqualFold(strings.TrimSpace(response.Status), "failed") {
+		return codexProviderError(codexResponsesError{Message: "codex upstream returned failed response"}), true
+	}
+	return contract.ProviderError{}, false
 }
 
 func codexProviderError(err codexResponsesError) contract.ProviderError {
