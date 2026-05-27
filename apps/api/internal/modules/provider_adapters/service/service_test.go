@@ -4647,6 +4647,108 @@ func TestReverseProxyCodexCLIAdapterPreservesResponsesCustomToolInputField(t *te
 	}
 }
 
+func TestReverseProxyCodexCLIAdapterPreservesHostedToolInputItems(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/backend-api/codex/responses" {
+			t.Fatalf("unexpected codex upstream path %s", r.URL.Path)
+		}
+		var payload struct {
+			Input []struct {
+				Type      string `json:"type"`
+				CallID    string `json:"call_id"`
+				Name      string `json:"name"`
+				Arguments string `json:"arguments"`
+				Output    string `json:"output"`
+			} `json:"input"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode codex payload: %v", err)
+		}
+		if len(payload.Input) != 3 {
+			t.Fatalf("expected hosted tool call and output items, got %+v", payload.Input)
+		}
+		if payload.Input[0].Type != "local_shell_call" ||
+			payload.Input[0].CallID != "call_shell" ||
+			payload.Input[0].Name != "shell" ||
+			payload.Input[0].Arguments != " pwd\n" {
+			t.Fatalf("expected local_shell_call item, got %+v", payload.Input[0])
+		}
+		if payload.Input[1].Type != "tool_search_call" ||
+			payload.Input[1].CallID != "call_search" ||
+			payload.Input[1].Name != "search" ||
+			payload.Input[1].Arguments != `{"query":"docs"}` {
+			t.Fatalf("expected tool_search_call item, got %+v", payload.Input[1])
+		}
+		if payload.Input[2].Type != "tool_search_output" ||
+			payload.Input[2].CallID != "call_search" ||
+			payload.Input[2].Output != " found docs\n" {
+			t.Fatalf("expected tool_search_output item, got %+v", payload.Input[2])
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: {\"type\":\"response.output_text.delta\",\"delta\":\"ok\"}\n\ndata: [DONE]\n\n"))
+	}))
+	defer upstream.Close()
+
+	runtime, err := reverseproxyservice.New(nil)
+	if err != nil {
+		t.Fatalf("create reverse proxy runtime: %v", err)
+	}
+	svc, err := service.NewWithReverseProxy(nil, runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_codex_hosted_tool_input",
+		Model:          "codex-local",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/responses",
+		Messages: []contract.ConversationMessage{{
+			Role: "assistant",
+			Parts: []contract.ContentPart{
+				{
+					Kind:              contract.ContentPartToolUse,
+					ToolCallID:        "call_shell",
+					ToolName:          "shell",
+					ToolArgumentsJSON: " pwd\n",
+					Metadata:          map[string]any{"type": "local_shell_call"},
+				},
+				{
+					Kind:              contract.ContentPartToolUse,
+					ToolCallID:        "call_search",
+					ToolName:          "search",
+					ToolArgumentsJSON: `{"query":"docs"}`,
+					Metadata:          map[string]any{"type": "tool_search_call"},
+				},
+				{
+					Kind:            contract.ContentPartToolResult,
+					ToolResultForID: "call_search",
+					Text:            " found docs\n",
+					Metadata:        map[string]any{"type": "tool_search_output"},
+				},
+			},
+		}},
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": upstream.URL + "/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+		Credential: map[string]any{"cli_client_token": "codex-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke codex upstream: %v", err)
+	}
+	if conversationResponseText(resp) != "ok" {
+		t.Fatalf("unexpected codex response: %+v", resp)
+	}
+}
+
 func TestReverseProxyCodexCLIAdapterPreservesResponsesContextInputItems(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/backend-api/codex/responses" {
@@ -5159,6 +5261,59 @@ func TestReverseProxyCodexCLIAdapterPreservesCustomAndMCPToolCalls(t *testing.T)
 	assertToolUsePart(t, resp.Parts[1], "call_mcp", "remote_tool", `{"path":"/tmp"}`)
 	if resp.Parts[1].Metadata["type"] != "mcp_tool_call" {
 		t.Fatalf("expected mcp tool metadata, got %+v", resp.Parts[1].Metadata)
+	}
+}
+
+func TestReverseProxyCodexCLIAdapterPreservesHostedToolCalls(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body: []byte(
+				`{"output":[{"type":"local_shell_call","id":"shell_1","call_id":"call_shell","name":"shell","arguments":" pwd\n"},{"type":"tool_search_call","id":"search_1","call_id":"call_search","name":"search","arguments":"{\"query\":\"docs\"}"},{"type":"tool_search_output","call_id":"call_search","output":" found docs\n"}],"usage":{"input_tokens":4,"output_tokens":2}}`,
+			),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_codex_hosted_tools",
+		Model:      "codex-local",
+		InputParts: textParts("call hosted tools"),
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": "https://codex.example.test/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+		Credential: map[string]any{"cli_client_token": "codex-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke codex reverse proxy adapter: %v", err)
+	}
+	if len(resp.Parts) != 3 || resp.StopReason != contract.StopReasonToolUse {
+		t.Fatalf("unexpected hosted tool response: %+v", resp)
+	}
+	assertToolUsePart(t, resp.Parts[0], "call_shell", "shell", " pwd\n")
+	if resp.Parts[0].Metadata["type"] != "local_shell_call" {
+		t.Fatalf("expected local shell metadata, got %+v", resp.Parts[0].Metadata)
+	}
+	assertToolUsePart(t, resp.Parts[1], "call_search", "search", `{"query":"docs"}`)
+	if resp.Parts[1].Metadata["type"] != "tool_search_call" {
+		t.Fatalf("expected tool search metadata, got %+v", resp.Parts[1].Metadata)
+	}
+	if resp.Parts[2].Kind != contract.ContentPartToolResult ||
+		resp.Parts[2].ToolResultForID != "call_search" ||
+		resp.Parts[2].Text != " found docs\n" ||
+		resp.Parts[2].Metadata["type"] != "tool_search_output" {
+		t.Fatalf("expected tool search output part, got %+v", resp.Parts[2])
 	}
 }
 

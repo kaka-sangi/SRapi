@@ -90,6 +90,7 @@ type codexResponsesOutputItem struct {
 	Name         string                        `json:"name"`
 	Arguments    string                        `json:"arguments"`
 	Input        string                        `json:"input"`
+	Output       *string                       `json:"output"`
 	Status       string                        `json:"status"`
 	Text         string                        `json:"text"`
 	Refusal      string                        `json:"refusal"`
@@ -497,7 +498,7 @@ func codexResponsesInputItemsFromMessage(role string, parts []contract.ContentPa
 			out = append(out, codexResponsesInputItem{
 				Type:   itemType,
 				CallID: callID,
-				Output: strings.TrimSpace(part.Text),
+				Output: part.Text,
 			})
 		case contract.ContentPartMetadata:
 			item, ok := codexResponsesRawInputItem(part)
@@ -519,8 +520,8 @@ func codexResponsesInputItemsFromMessage(role string, parts []contract.ContentPa
 func codexResponsesFunctionCallItem(part contract.ContentPart) (codexResponsesInputItem, bool) {
 	callID := strings.TrimSpace(part.ToolCallID)
 	name := strings.TrimSpace(part.ToolName)
-	arguments := strings.TrimSpace(part.ToolArgumentsJSON)
-	if callID == "" && name == "" && arguments == "" {
+	arguments := part.ToolArgumentsJSON
+	if callID == "" && name == "" && strings.TrimSpace(arguments) == "" {
 		return codexResponsesInputItem{}, false
 	}
 	item := codexResponsesInputItem{
@@ -547,7 +548,7 @@ func codexResponsesToolCallType(part contract.ContentPart) string {
 func codexResponsesToolResultType(part contract.ContentPart) string {
 	itemType := strings.TrimSpace(metadataString(part.Metadata, "type"))
 	switch itemType {
-	case "custom_tool_call_output", "mcp_tool_call_output":
+	case "custom_tool_call_output", "mcp_tool_call_output", "tool_search_output":
 		return itemType
 	default:
 		return "function_call_output"
@@ -564,7 +565,7 @@ func codexResponsesToolCallArgumentsField(part contract.ContentPart) string {
 
 func codexResponsesToolCallTypeIsSupported(itemType string) bool {
 	switch itemType {
-	case "function_call", "custom_tool_call", "mcp_tool_call":
+	case "function_call", "custom_tool_call", "mcp_tool_call", "tool_call", "local_shell_call", "tool_search_call":
 		return true
 	default:
 		return false
@@ -1625,6 +1626,12 @@ func codexResponsesOutputItemsParts(items []codexResponsesOutputItem) []contract
 func codexResponsesOutputItemParts(item codexResponsesOutputItem) []contract.ContentPart {
 	parts := []contract.ContentPart(nil)
 	itemType := strings.ToLower(strings.TrimSpace(item.Type))
+	if codexResponsesToolResultTypeIsSupported(itemType) {
+		if part, ok := codexFunctionCallOutputPart(item); ok {
+			parts = append(parts, part)
+		}
+		return parts
+	}
 	if codexResponsesToolCallTypeIsSupported(itemType) {
 		if part, ok := codexFunctionCallPart(item); ok {
 			parts = append(parts, part)
@@ -1671,6 +1678,37 @@ func codexResponsesOutputItemParts(item codexResponsesOutputItem) []contract.Con
 		}
 	}
 	return parts
+}
+
+func codexResponsesToolResultTypeIsSupported(itemType string) bool {
+	switch itemType {
+	case "function_call_output", "custom_tool_call_output", "mcp_tool_call_output", "tool_search_output":
+		return true
+	default:
+		return false
+	}
+}
+
+func codexFunctionCallOutputPart(item codexResponsesOutputItem) (contract.ContentPart, bool) {
+	callID := strings.TrimSpace(firstNonEmpty(item.CallID, item.ID))
+	output := item.Text
+	if item.Output != nil {
+		output = *item.Output
+	}
+	if callID == "" && strings.TrimSpace(output) == "" {
+		return contract.ContentPart{}, false
+	}
+	metadata := map[string]any{"type": strings.TrimSpace(item.Type)}
+	if status := strings.TrimSpace(item.Status); status != "" {
+		metadata["status"] = status
+	}
+	return contract.ContentPart{
+		Kind:            contract.ContentPartToolResult,
+		ToolResultForID: callID,
+		Text:            output,
+		Metadata:        metadata,
+		OriginProtocol:  "openai",
+	}, true
 }
 
 func codexResponsesOutputContentMetadata(content codexResponsesOutputContent) map[string]any {
@@ -1728,8 +1766,11 @@ func codexFunctionCallPart(item codexResponsesOutputItem) (contract.ContentPart,
 		id = strings.TrimSpace(item.ID)
 	}
 	name := strings.TrimSpace(item.Name)
-	arguments := strings.TrimSpace(firstNonEmpty(item.Arguments, item.Input))
-	if id == "" && name == "" && arguments == "" {
+	arguments := item.Arguments
+	if arguments == "" {
+		arguments = item.Input
+	}
+	if id == "" && name == "" && strings.TrimSpace(arguments) == "" {
 		return contract.ContentPart{}, false
 	}
 	metadata := map[string]any{"type": strings.TrimSpace(item.Type)}
