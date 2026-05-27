@@ -79,16 +79,18 @@ type codexResponsesResponse struct {
 }
 
 type codexResponsesOutputItem struct {
-	ID          string                        `json:"id"`
-	Type        string                        `json:"type"`
-	CallID      string                        `json:"call_id"`
-	Name        string                        `json:"name"`
-	Arguments   string                        `json:"arguments"`
-	Status      string                        `json:"status"`
-	Text        string                        `json:"text"`
-	Refusal     string                        `json:"refusal"`
-	Content     []codexResponsesOutputContent `json:"content"`
-	Annotations []map[string]any              `json:"-"`
+	ID           string                        `json:"id"`
+	Type         string                        `json:"type"`
+	CallID       string                        `json:"call_id"`
+	Name         string                        `json:"name"`
+	Arguments    string                        `json:"arguments"`
+	Status       string                        `json:"status"`
+	Text         string                        `json:"text"`
+	Refusal      string                        `json:"refusal"`
+	Result       string                        `json:"result"`
+	OutputFormat string                        `json:"output_format"`
+	Content      []codexResponsesOutputContent `json:"content"`
+	Annotations  []map[string]any              `json:"-"`
 }
 
 type codexResponsesOutputContent struct {
@@ -1461,6 +1463,12 @@ func codexResponsesOutputItemParts(item codexResponsesOutputItem) []contract.Con
 		}
 		return parts
 	}
+	if itemType == "image_generation_call" {
+		if part, ok := codexImageGenerationPart(item); ok {
+			parts = append(parts, part)
+		}
+		return parts
+	}
 	if itemType == "refusal" {
 		if text := strings.TrimSpace(firstNonEmpty(item.Refusal, item.Text)); text != "" {
 			parts = append(parts, contract.ContentPart{Kind: contract.ContentPartRefusal, Text: text, OriginProtocol: "openai"})
@@ -1521,6 +1529,29 @@ func codexOutputItemTextMetadata(item codexResponsesOutputItem) map[string]any {
 		return nil
 	}
 	return metadata
+}
+
+func codexImageGenerationPart(item codexResponsesOutputItem) (contract.ContentPart, bool) {
+	result := strings.TrimSpace(item.Result)
+	if result == "" {
+		return contract.ContentPart{}, false
+	}
+	metadata := map[string]any{"type": strings.TrimSpace(item.Type)}
+	if id := strings.TrimSpace(item.ID); id != "" {
+		metadata["id"] = id
+	}
+	if status := strings.TrimSpace(item.Status); status != "" {
+		metadata["status"] = status
+	}
+	if format := strings.TrimSpace(item.OutputFormat); format != "" {
+		metadata["output_format"] = format
+	}
+	return contract.ContentPart{
+		Kind:           contract.ContentPartImage,
+		MediaBase64:    result,
+		Metadata:       metadata,
+		OriginProtocol: "openai",
+	}, true
 }
 
 func codexFunctionCallPart(item codexResponsesOutputItem) (contract.ContentPart, bool) {

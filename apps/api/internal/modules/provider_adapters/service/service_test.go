@@ -5296,6 +5296,99 @@ func TestReverseProxyCodexCLIAdapterPreservesOutputTextAnnotationEvents(t *testi
 	}
 }
 
+func TestReverseProxyCodexCLIAdapterPreservesImageGenerationOutput(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body: []byte(
+				`{"output":[{"type":"image_generation_call","id":"ig_1","status":"completed","output_format":"png","result":"aW1hZ2U="}],"usage":{"input_tokens":4,"output_tokens":2}}`,
+			),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_codex_image_generation",
+		Model:      "codex-local",
+		InputParts: textParts("draw image"),
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": "https://codex.example.test/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+		Credential: map[string]any{"cli_client_token": "codex-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke codex reverse proxy adapter: %v", err)
+	}
+	if len(resp.Parts) != 1 || resp.Parts[0].Kind != contract.ContentPartImage || resp.Parts[0].MediaBase64 != "aW1hZ2U=" {
+		t.Fatalf("unexpected Codex image generation response: %+v", resp.Parts)
+	}
+	if resp.Parts[0].Metadata["type"] != "image_generation_call" ||
+		resp.Parts[0].Metadata["id"] != "ig_1" ||
+		resp.Parts[0].Metadata["output_format"] != "png" {
+		t.Fatalf("expected image generation metadata, got %+v", resp.Parts[0].Metadata)
+	}
+}
+
+func TestReverseProxyCodexCLIAdapterPreservesStreamImageGenerationOutput(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body: []byte(
+				"data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"type\":\"image_generation_call\",\"id\":\"ig_1\",\"status\":\"completed\",\"output_format\":\"png\",\"result\":\"aW1hZ2U=\"}}\n\n" +
+					"data: {\"type\":\"response.completed\",\"response\":{\"output\":[],\"usage\":{\"input_tokens\":4,\"output_tokens\":2}}}\n\n" +
+					"data: [DONE]\n\n",
+			),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_codex_stream_image_generation",
+		Model:      "codex-local",
+		InputParts: textParts("draw image"),
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": "https://codex.example.test/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+		Credential: map[string]any{"cli_client_token": "codex-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke codex reverse proxy adapter: %v", err)
+	}
+	if len(resp.Parts) != 1 || resp.Parts[0].Kind != contract.ContentPartImage || resp.Parts[0].MediaBase64 != "aW1hZ2U=" {
+		t.Fatalf("unexpected Codex stream image generation response: %+v", resp.Parts)
+	}
+	if resp.Parts[0].Metadata["type"] != "image_generation_call" ||
+		resp.Parts[0].Metadata["id"] != "ig_1" ||
+		resp.Parts[0].Metadata["output_format"] != "png" {
+		t.Fatalf("expected stream image generation metadata, got %+v", resp.Parts[0].Metadata)
+	}
+	if string(resp.Raw) == "" || len(resp.StreamEvents) == 0 {
+		t.Fatalf("expected raw SSE and stream events to be preserved, got raw=%q events=%+v", string(resp.Raw), resp.StreamEvents)
+	}
+}
+
 func TestReverseProxyCodexCLIAdapterPreservesReasoningTextDeltas(t *testing.T) {
 	runtime := capturingRuntime{
 		response: reverseproxycontract.Response{

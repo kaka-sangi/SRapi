@@ -177,6 +177,10 @@ func responseOutputItems(blocks []gatewaycontract.ContentBlock) []apiopenapi.Res
 			}
 			continue
 		}
+		if block.Type == gatewaycontract.ContentBlockImage && responseBlockIsImageGenerationCall(block) {
+			out = append(out, responseImageGenerationOutputItem(block))
+			continue
+		}
 		if block.Type != gatewaycontract.ContentBlockToolCall {
 			messageBlocks = append(messageBlocks, block)
 			continue
@@ -227,6 +231,30 @@ func responseFunctionCallOutputItem(block gatewaycontract.ContentBlock) (apiopen
 		Type:                 "function_call_output",
 		AdditionalProperties: props,
 	}, true
+}
+
+func responseBlockIsImageGenerationCall(block gatewaycontract.ContentBlock) bool {
+	return strings.EqualFold(strings.TrimSpace(mapStringAny(block.Metadata, "type")), "image_generation_call")
+}
+
+func responseImageGenerationOutputItem(block gatewaycontract.ContentBlock) apiopenapi.ResponsesOutputItem {
+	props := outputBlockProperties(block)
+	props["type"] = "image_generation_call"
+	if result := strings.TrimSpace(block.MediaBase64); result != "" {
+		props["result"] = result
+	}
+	if status := strings.TrimSpace(mapStringAny(block.Metadata, "status")); status != "" {
+		props["status"] = status
+	} else {
+		props["status"] = "completed"
+	}
+	delete(props, "srapi_type")
+	delete(props, "media_base64")
+	delete(props, "mime_type")
+	return apiopenapi.ResponsesOutputItem{
+		Type:                 "image_generation_call",
+		AdditionalProperties: props,
+	}
 }
 
 func outputResponsesContentBlocks(blocks []gatewaycontract.ContentBlock) []apiopenapi.ContentBlock {
@@ -297,6 +325,35 @@ func responseStreamOutputEvents(blocks []gatewaycontract.ContentBlock) []StreamE
 	events := make([]StreamEvent, 0, len(blocks)*4)
 	for outputIndex, block := range blocks {
 		itemID := responseStreamItemID(outputIndex, block)
+		if block.Type == gatewaycontract.ContentBlockImage && responseBlockIsImageGenerationCall(block) {
+			item := responseImageGenerationOutputItem(block).AdditionalProperties
+			if item == nil {
+				item = map[string]any{}
+			}
+			if strings.TrimSpace(mapStringAny(item, "id")) == "" {
+				item["id"] = itemID
+			}
+			item["type"] = "image_generation_call"
+			events = append(events,
+				StreamEvent{
+					Event: "response.output_item.added",
+					Data: map[string]any{
+						"type":         "response.output_item.added",
+						"output_index": outputIndex,
+						"item":         item,
+					},
+				},
+				StreamEvent{
+					Event: "response.output_item.done",
+					Data: map[string]any{
+						"type":         "response.output_item.done",
+						"output_index": outputIndex,
+						"item":         item,
+					},
+				},
+			)
+			continue
+		}
 		if block.Type == gatewaycontract.ContentBlockToolCall {
 			if isHostedWebSearchBlock(block) {
 				item := hostedWebSearchOutputItem(block)

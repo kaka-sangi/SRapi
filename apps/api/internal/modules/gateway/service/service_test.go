@@ -1016,6 +1016,55 @@ func TestRenderResponsesPreservesFunctionCallOutputItems(t *testing.T) {
 	}
 }
 
+func TestRenderResponsesPreservesImageGenerationOutputItems(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	resp := gatewaycontract.CanonicalResponse{
+		ID:         "resp_image_generation",
+		Model:      "gpt-image",
+		StopReason: "end_turn",
+		OutputItems: []gatewaycontract.ContentBlock{{
+			Type:        gatewaycontract.ContentBlockImage,
+			Role:        "assistant",
+			MediaBase64: "aW1hZ2U=",
+			MIMEType:    "image/png",
+			Metadata: map[string]any{
+				"type":          "image_generation_call",
+				"id":            "ig_1",
+				"status":        "completed",
+				"output_format": "png",
+			},
+		}},
+		Usage: gatewaycontract.Usage{InputTokens: 5, OutputTokens: 3},
+	}
+
+	responses := svc.RenderResponses(resp)
+	if len(responses.Output) != 1 || responses.Output[0].Type != "image_generation_call" {
+		t.Fatalf("expected image_generation_call output item, got %+v", responses.Output)
+	}
+	if result, _ := responses.Output[0].Get("result"); result != "aW1hZ2U=" {
+		t.Fatalf("expected image result to be preserved, got %+v", responses.Output[0])
+	}
+	if format, _ := responses.Output[0].Get("output_format"); format != "png" {
+		t.Fatalf("expected image output format to be preserved, got %+v", responses.Output[0])
+	}
+	if id, _ := responses.Output[0].Get("id"); id != "ig_1" {
+		t.Fatalf("expected image generation id to be preserved, got %+v", responses.Output[0])
+	}
+
+	events := svc.RenderResponsesStreamEvents(resp)
+	itemDone := streamEventByName(events, "response.output_item.done")
+	if itemDone == nil {
+		t.Fatalf("expected image output_item.done event, got %+v", events)
+	}
+	item, _ := itemDone.Data["item"].(map[string]any)
+	if item["type"] != "image_generation_call" || item["id"] != "ig_1" || item["result"] != "aW1hZ2U=" || item["output_format"] != "png" {
+		t.Fatalf("expected stream image output item, got %+v", item)
+	}
+}
+
 func TestRenderAnthropicPreservesToolResultFields(t *testing.T) {
 	svc, err := New()
 	if err != nil {
