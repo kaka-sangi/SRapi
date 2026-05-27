@@ -1,6 +1,8 @@
 package service
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -412,23 +414,13 @@ func isResponsesStyleStreamEvent(event gatewaycontract.StreamEvent) bool {
 
 func (s *Service) renderResponsesCanonicalStreamEvents(resp gatewaycontract.CanonicalResponse) []StreamEvent {
 	events := normalizeStreamEvents(resp.StreamEvents)
-	if !streamEventsHaveRenderableOutput(events) && !streamEventsHaveResponsesTerminal(events) {
+	summary := summarizeResponsesStreamEvents(events)
+	if !summary.HasRenderableOutput && summary.RawTerminalEventName == "" {
 		return nil
 	}
-	out := []StreamEvent{
-		{
-			Event: "response.created",
-			Data: map[string]any{
-				"type": "response.created",
-				"response": map[string]any{
-					"id":         "resp_" + responseID(resp),
-					"object":     "response",
-					"created_at": time.Now().Unix(),
-					"model":      resp.Model,
-					"status":     "in_progress",
-				},
-			},
-		},
+	out := summary.LifecycleEvents
+	if !summary.HasLifecycleStart {
+		out = append([]StreamEvent{responseCreatedStreamEvent(resp)}, out...)
 	}
 	nextOutputIndex := 0
 	textStates := newResponseStreamTextStates(resp.OutputItems)
@@ -561,8 +553,8 @@ func (s *Service) renderResponsesCanonicalStreamEvents(resp gatewaycontract.Cano
 		out = append(out, group.Events...)
 	}
 	terminalEventName := responsesTerminalEventName(resp.StopReason)
-	if rawTerminalEventName := responsesRawTerminalEventName(events); rawTerminalEventName != "" {
-		terminalEventName = rawTerminalEventName
+	if summary.RawTerminalEventName != "" {
+		terminalEventName = summary.RawTerminalEventName
 	}
 	terminalResponse := s.RenderResponses(resp)
 	if terminalEventName == "response.failed" {
@@ -581,22 +573,75 @@ func (s *Service) renderResponsesCanonicalStreamEvents(resp gatewaycontract.Cano
 	return out
 }
 
-func streamEventsHaveResponsesTerminal(events []gatewaycontract.StreamEvent) bool {
-	return responsesRawTerminalEventName(events) != ""
+type responsesStreamEventsSummary struct {
+	HasRenderableOutput  bool
+	RawTerminalEventName string
+	LifecycleEvents      []StreamEvent
+	HasLifecycleStart    bool
 }
 
-func responsesRawTerminalEventName(events []gatewaycontract.StreamEvent) string {
-	for idx := len(events) - 1; idx >= 0; idx-- {
-		event := events[idx]
-		if event.Type != gatewaycontract.StreamEventStop {
+func summarizeResponsesStreamEvents(events []gatewaycontract.StreamEvent) responsesStreamEventsSummary {
+	summary := responsesStreamEventsSummary{LifecycleEvents: make([]StreamEvent, 0)}
+	for _, event := range events {
+		if responsesStreamEventHasRenderableOutput(event) {
+			summary.HasRenderableOutput = true
+		}
+		if event.Type == gatewaycontract.StreamEventStop {
+			if rawTerminalEventName := responsesRawTerminalEventName(event.RawEventType); rawTerminalEventName != "" {
+				summary.RawTerminalEventName = rawTerminalEventName
+			}
+		}
+		streamEvent, ok := responseMetadataRawStreamEvent(event)
+		if !ok {
 			continue
 		}
-		switch strings.TrimSpace(event.RawEventType) {
-		case "response.completed", "response.done", "response.incomplete", "response.cancelled", "response.canceled", "response.failed":
-			return strings.TrimSpace(event.RawEventType)
+		if streamEvent.Event == "response.created" {
+			summary.HasLifecycleStart = true
 		}
+		summary.LifecycleEvents = append(summary.LifecycleEvents, streamEvent)
 	}
-	return ""
+	return summary
+}
+
+func responseCreatedStreamEvent(resp gatewaycontract.CanonicalResponse) StreamEvent {
+	return StreamEvent{
+		Event: "response.created",
+		Data: map[string]any{
+			"type": "response.created",
+			"response": map[string]any{
+				"id":         "resp_" + responseID(resp),
+				"object":     "response",
+				"created_at": time.Now().Unix(),
+				"model":      resp.Model,
+				"status":     "in_progress",
+			},
+		},
+	}
+}
+
+func responseMetadataRawStreamEvent(event gatewaycontract.StreamEvent) (StreamEvent, bool) {
+	if event.Type != gatewaycontract.StreamEventMetadata || len(bytes.TrimSpace(event.Raw)) == 0 {
+		return StreamEvent{}, false
+	}
+	switch strings.TrimSpace(event.RawEventType) {
+	case "response.created", "response.in_progress", "response.queued":
+		var data map[string]any
+		if err := json.Unmarshal(event.Raw, &data); err != nil || len(data) == 0 {
+			return StreamEvent{}, false
+		}
+		return StreamEvent{Event: strings.TrimSpace(event.RawEventType), Data: data}, true
+	default:
+		return StreamEvent{}, false
+	}
+}
+
+func responsesRawTerminalEventName(rawEventType string) string {
+	switch strings.TrimSpace(rawEventType) {
+	case "response.completed", "response.done", "response.incomplete", "response.cancelled", "response.canceled", "response.failed":
+		return strings.TrimSpace(rawEventType)
+	default:
+		return ""
+	}
 }
 
 func responseStreamTextStartEvents(itemID string, outputIndex int, blockType gatewaycontract.ContentBlockType, metadata map[string]any) []StreamEvent {
@@ -944,18 +989,22 @@ func (s *streamToolCallState) completedBlock(arguments string) gatewaycontract.C
 
 func streamEventsHaveRenderableOutput(events []gatewaycontract.StreamEvent) bool {
 	for _, event := range events {
-		switch event.Type {
-		case gatewaycontract.StreamEventContentDelta, gatewaycontract.StreamEventReasoning, gatewaycontract.StreamEventToolResult:
-			if event.Delta.Text != "" || isResponsesImageGenerationPartialEvent(event) {
-				return true
-			}
-		case gatewaycontract.StreamEventToolCallDelta:
-			if event.Delta.ToolCallID != "" || event.Delta.ToolName != "" || event.Delta.ToolArgumentsJSON != "" || isHostedWebSearchBlock(event.Delta) {
-				return true
-			}
+		if responsesStreamEventHasRenderableOutput(event) {
+			return true
 		}
 	}
 	return false
+}
+
+func responsesStreamEventHasRenderableOutput(event gatewaycontract.StreamEvent) bool {
+	switch event.Type {
+	case gatewaycontract.StreamEventContentDelta, gatewaycontract.StreamEventReasoning, gatewaycontract.StreamEventToolResult:
+		return event.Delta.Text != "" || isResponsesImageGenerationPartialEvent(event)
+	case gatewaycontract.StreamEventToolCallDelta:
+		return event.Delta.ToolCallID != "" || event.Delta.ToolName != "" || event.Delta.ToolArgumentsJSON != "" || isHostedWebSearchBlock(event.Delta)
+	default:
+		return false
+	}
 }
 
 func isResponsesImageGenerationPartialEvent(event gatewaycontract.StreamEvent) bool {

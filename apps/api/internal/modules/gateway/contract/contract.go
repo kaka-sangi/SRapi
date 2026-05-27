@@ -174,6 +174,7 @@ const (
 	StreamEventToolCallDelta StreamEventType = "tool_call_delta"
 	StreamEventToolResult    StreamEventType = "tool_result_delta"
 	StreamEventReasoning     StreamEventType = "reasoning_delta"
+	StreamEventMetadata      StreamEventType = "metadata"
 	StreamEventUsage         StreamEventType = "usage"
 	StreamEventStop          StreamEventType = "stop"
 )

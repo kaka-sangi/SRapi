@@ -1719,6 +1719,8 @@ func gatewayStreamEventTypeFromProvider(eventType provideradaptercontract.Conver
 		return gatewaycontract.StreamEventToolResult
 	case provideradaptercontract.ConversationStreamEventReasoning:
 		return gatewaycontract.StreamEventReasoning
+	case provideradaptercontract.ConversationStreamEventMetadata:
+		return gatewaycontract.StreamEventMetadata
 	case provideradaptercontract.ConversationStreamEventUsage:
 		return gatewaycontract.StreamEventUsage
 	case provideradaptercontract.ConversationStreamEventStop:

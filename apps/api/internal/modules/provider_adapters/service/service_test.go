@@ -5519,6 +5519,81 @@ func TestReverseProxyCodexCLIAdapterUsesNamedSSEEventType(t *testing.T) {
 	}
 }
 
+func TestReverseProxyCodexCLIAdapterPreservesLifecycleStreamEvents(t *testing.T) {
+	rawSSE := "data: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_lifecycle\",\"status\":\"in_progress\",\"output\":[]}}\n\n" +
+		"data: {\"type\":\"response.in_progress\",\"response\":{\"id\":\"resp_lifecycle\",\"status\":\"in_progress\",\"output\":[]}}\n\n" +
+		"data: {\"type\":\"response.output_text.delta\",\"delta\":\"ok\"}\n\n" +
+		"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_lifecycle\",\"status\":\"completed\",\"output\":[],\"usage\":{\"input_tokens\":4,\"output_tokens\":2}}}\n\n" +
+		"data: [DONE]\n\n"
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/backend-api/codex/responses" {
+			t.Fatalf("unexpected codex upstream path %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte(rawSSE))
+	}))
+	defer upstream.Close()
+
+	runtime, err := reverseproxyservice.New(nil)
+	if err != nil {
+		t.Fatalf("create reverse proxy runtime: %v", err)
+	}
+	svc, err := service.NewWithReverseProxy(nil, runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_codex_proxy_lifecycle_sse",
+		Model:      "codex-local",
+		InputParts: textParts("hello codex"),
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": upstream.URL + "/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+		Credential: map[string]any{"cli_client_token": "codex-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke codex reverse proxy adapter: %v", err)
+	}
+	if conversationResponseText(resp) != "ok" || resp.Usage.Estimated || resp.Usage.InputTokens != 4 || resp.Usage.OutputTokens != 2 {
+		t.Fatalf("unexpected codex lifecycle stream response: %+v", resp)
+	}
+	if string(resp.Raw) != rawSSE {
+		t.Fatalf("expected raw Codex lifecycle stream to be preserved, got %q", string(resp.Raw))
+	}
+	if len(resp.StreamEvents) != 5 {
+		t.Fatalf("expected lifecycle, content, usage, and stop stream events, got %+v", resp.StreamEvents)
+	}
+	lifecycleEvents := conversationStreamEventsByType(resp.StreamEvents, contract.ConversationStreamEventMetadata)
+	if len(lifecycleEvents) != 2 {
+		t.Fatalf("expected two lifecycle metadata stream events, got %+v", resp.StreamEvents)
+	}
+	if lifecycleEvents[0].RawEventType != "response.created" ||
+		string(lifecycleEvents[0].Raw) != `{"type":"response.created","response":{"id":"resp_lifecycle","status":"in_progress","output":[]}}` ||
+		lifecycleEvents[0].Metadata["response_id"] != "resp_lifecycle" ||
+		lifecycleEvents[0].Metadata["status"] != "in_progress" {
+		t.Fatalf("unexpected response.created metadata event: %+v", lifecycleEvents[0])
+	}
+	if lifecycleEvents[1].RawEventType != "response.in_progress" ||
+		string(lifecycleEvents[1].Raw) != `{"type":"response.in_progress","response":{"id":"resp_lifecycle","status":"in_progress","output":[]}}` {
+		t.Fatalf("unexpected response.in_progress metadata event: %+v", lifecycleEvents[1])
+	}
+	if resp.StreamEvents[2].Type != contract.ConversationStreamEventContentDelta || resp.StreamEvents[2].Delta.Text != "ok" {
+		t.Fatalf("expected content delta after lifecycle events, got %+v", resp.StreamEvents)
+	}
+	if resp.StreamEvents[4].Type != contract.ConversationStreamEventStop || resp.StreamEvents[4].RawEventType != "response.completed" {
+		t.Fatalf("expected terminal event after lifecycle stream, got %+v", resp.StreamEvents)
+	}
+}
+
 func TestReverseProxyCodexCLIAdapterStreamsIncompleteTerminalUsage(t *testing.T) {
 	rawSSE := "data: {\"type\":\"response.output_text.delta\",\"delta\":\"partial\"}\n\n" +
 		"data: {\"type\":\"response.incomplete\",\"response\":{\"status\":\"incomplete\",\"incomplete_details\":{\"reason\":\"max_output_tokens\"},\"output\":[],\"usage\":{\"input_tokens\":4,\"output_tokens\":5,\"input_tokens_details\":{\"cached_tokens\":2}}}}\n\n"

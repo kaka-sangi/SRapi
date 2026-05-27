@@ -904,6 +904,75 @@ func TestRenderResponsesStreamEventsPreservesTextAnnotations(t *testing.T) {
 	}
 }
 
+func TestRenderResponsesStreamEventsPreservesLifecycleMetadataFrames(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	resp := gatewaycontract.CanonicalResponse{
+		ID:         "resp_lifecycle",
+		Model:      "gpt-5.5",
+		StopReason: "end_turn",
+		OutputItems: []gatewaycontract.ContentBlock{{
+			Type: gatewaycontract.ContentBlockText,
+			Role: "assistant",
+			Text: "ok",
+		}},
+		StreamEvents: []gatewaycontract.StreamEvent{
+			{
+				Index:        0,
+				Type:         gatewaycontract.StreamEventMetadata,
+				RawEventType: "response.created",
+				Raw:          json.RawMessage(`{"type":"response.created","response":{"id":"resp_upstream","status":"in_progress","output":[]}}`),
+			},
+			{
+				Index:        1,
+				Type:         gatewaycontract.StreamEventMetadata,
+				RawEventType: "response.in_progress",
+				Raw:          json.RawMessage(`{"type":"response.in_progress","response":{"id":"resp_upstream","status":"in_progress","output":[]}}`),
+			},
+			{
+				Index:        2,
+				Type:         gatewaycontract.StreamEventContentDelta,
+				ContentIndex: 0,
+				Delta:        gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockText, Role: "assistant", Text: "ok"},
+			},
+			{
+				Index:        3,
+				Type:         gatewaycontract.StreamEventStop,
+				StopReason:   "end_turn",
+				RawEventType: "response.completed",
+			},
+		},
+		Usage: gatewaycontract.Usage{InputTokens: 1, OutputTokens: 1},
+	}
+
+	events := svc.RenderResponsesStreamEvents(resp)
+	created := streamEventsByName(events, "response.created")
+	if len(created) != 1 {
+		t.Fatalf("expected one upstream response.created event, got %+v", created)
+	}
+	createdResponse, _ := created[0].Data["response"].(map[string]any)
+	if createdResponse["id"] != "resp_upstream" {
+		t.Fatalf("expected upstream response.created payload, got %+v", created[0])
+	}
+	inProgress := streamEventByName(events, "response.in_progress")
+	if inProgress == nil {
+		t.Fatalf("expected upstream response.in_progress event, got %+v", events)
+	}
+	inProgressResponse, _ := inProgress.Data["response"].(map[string]any)
+	if inProgressResponse["id"] != "resp_upstream" {
+		t.Fatalf("expected upstream response.in_progress payload, got %+v", inProgress)
+	}
+	deltas := streamEventsByName(events, "response.output_text.delta")
+	if len(deltas) != 1 || deltas[0].Data["delta"] != "ok" {
+		t.Fatalf("expected content delta after lifecycle metadata, got %+v", deltas)
+	}
+	if terminal := streamEventByName(events, "response.completed"); terminal == nil {
+		t.Fatalf("expected completed terminal event, got %+v", events)
+	}
+}
+
 func TestRenderResponsesPreservesIncompleteMaxTokens(t *testing.T) {
 	svc, err := New()
 	if err != nil {

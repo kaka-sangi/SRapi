@@ -75,6 +75,7 @@ type codexResponsesEvent struct {
 type codexResponsesResponse struct {
 	ID                string                     `json:"id"`
 	Object            string                     `json:"object"`
+	Model             string                     `json:"model"`
 	Output            []codexResponsesOutputItem `json:"output"`
 	OutputText        string                     `json:"output_text"`
 	InputTokens       *int                       `json:"input_tokens"`
@@ -876,6 +877,7 @@ func parseCodexResponsesStream(body []byte, statusCode int, options codexRespons
 	eventIndex := 0
 	seenEvent := false
 	seenTerminalEvent := false
+	seenRenderableEvent := false
 	appendStreamEvent := func(event contract.ConversationStreamEvent) {
 		event.Index = eventIndex
 		streamEvents = append(streamEvents, event)
@@ -919,11 +921,17 @@ func parseCodexResponsesStream(body []byte, statusCode int, options codexRespons
 			}
 		}
 		switch eventType {
+		case "response.created", "response.in_progress", "response.queued":
+			if !seenRenderableEvent {
+				appendStreamEvent(codexMetadataStreamEvent(event, eventType, data))
+			}
 		case "response.output_item.added":
+			seenRenderableEvent = true
 			if streamEvent, ok := functionStates.startEvent(event, eventType, data); ok {
 				appendStreamEvent(streamEvent)
 			}
 		case "response.output_item.done":
+			seenRenderableEvent = true
 			if event.Item != nil {
 				item := codexOutputItemWithStreamAnnotations(*event.Item, codexOutputIndex(event), textAnnotationsByIndex)
 				if event.OutputIndex != nil {
@@ -938,15 +946,18 @@ func parseCodexResponsesStream(body []byte, statusCode int, options codexRespons
 				}
 			}
 		case "response.image_generation_call.partial_image":
+			seenRenderableEvent = true
 			if streamEvent, ok := codexImageGenerationPartialStreamEvent(event, eventType, data); ok {
 				appendStreamEvent(streamEvent)
 			}
 		case "response.output_text.delta":
+			seenRenderableEvent = true
 			deltaBuilder.WriteString(event.Delta)
 			if event.Delta != "" {
 				appendStreamEvent(codexContentStreamEvent(event, eventType, data, textContentDelta(event.Delta)))
 			}
 		case "response.output_text.annotation.added":
+			seenRenderableEvent = true
 			if len(event.Annotation) > 0 {
 				key := codexTextAnnotationKeyForEvent(event)
 				annotation := cloneMap(event.Annotation)
@@ -954,6 +965,7 @@ func parseCodexResponsesStream(body []byte, statusCode int, options codexRespons
 				appendStreamEvent(codexContentStreamEvent(event, eventType, data, codexAnnotationContentDelta(annotation)))
 			}
 		case "response.refusal.delta":
+			seenRenderableEvent = true
 			refusalBuilder.WriteString(event.Delta)
 			if event.Delta != "" {
 				appendStreamEvent(codexContentStreamEvent(event, eventType, data, contract.ContentPart{
@@ -963,11 +975,13 @@ func parseCodexResponsesStream(body []byte, statusCode int, options codexRespons
 				}))
 			}
 		case "response.reasoning_text.delta", "response.reasoning_summary_text.delta":
+			seenRenderableEvent = true
 			reasoningBuilder.WriteString(event.Delta)
 			if event.Delta != "" {
 				appendStreamEvent(codexReasoningStreamEvent(event, eventType, data))
 			}
 		case "response.function_call_arguments.delta":
+			seenRenderableEvent = true
 			if event.Delta != "" {
 				appendStreamEvent(functionStates.deltaEvent(event, eventType, data))
 			}
@@ -1124,6 +1138,28 @@ func codexContentStreamEvent(event codexResponsesEvent, eventType string, raw st
 		RawEventType:   eventType,
 		Raw:            append(json.RawMessage(nil), raw...),
 		OriginProtocol: "openai-compatible",
+	}
+}
+
+func codexMetadataStreamEvent(event codexResponsesEvent, eventType string, raw string) contract.ConversationStreamEvent {
+	metadata := map[string]any{"type": eventType}
+	if event.Response != nil {
+		if id := strings.TrimSpace(event.Response.ID); id != "" {
+			metadata["response_id"] = id
+		}
+		if model := strings.TrimSpace(event.Response.Model); model != "" {
+			metadata["model"] = model
+		}
+		if status := strings.TrimSpace(event.Response.Status); status != "" {
+			metadata["status"] = status
+		}
+	}
+	return contract.ConversationStreamEvent{
+		Type:           contract.ConversationStreamEventMetadata,
+		RawEventType:   eventType,
+		Raw:            append(json.RawMessage(nil), raw...),
+		OriginProtocol: "openai-compatible",
+		Metadata:       metadata,
 	}
 }
 

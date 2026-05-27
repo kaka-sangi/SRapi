@@ -382,6 +382,7 @@ const (
 	ConversationStreamEventToolCallDelta ConversationStreamEventType = "tool_call_delta"
 	ConversationStreamEventToolResult    ConversationStreamEventType = "tool_result_delta"
 	ConversationStreamEventReasoning     ConversationStreamEventType = "reasoning_delta"
+	ConversationStreamEventMetadata      ConversationStreamEventType = "metadata"
 	ConversationStreamEventUsage         ConversationStreamEventType = "usage"
 	ConversationStreamEventStop          ConversationStreamEventType = "stop"
 )
