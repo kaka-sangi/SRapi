@@ -1111,8 +1111,9 @@ func validateRawResponsesInputValue(value any) error {
 			}
 		}
 	case map[string]any:
-		if strings.TrimSpace(rawMapString(typed, "type")) == "function_call_output" && strings.TrimSpace(rawMapString(typed, "call_id")) == "" {
-			return fmt.Errorf("Responses function_call_output input item requires call_id")
+		itemType := strings.TrimSpace(rawMapString(typed, "type"))
+		if rawResponsesToolOutputTypeIsSupported(itemType) && strings.TrimSpace(rawMapString(typed, "call_id")) == "" {
+			return fmt.Errorf("Responses %s input item requires call_id", itemType)
 		}
 		return validateRawResponsesInputValue(typed["content"])
 	}
@@ -1148,13 +1149,13 @@ func rawResponsesInputValue(value any, defaultRole string) ([]gatewaycontract.Co
 func rawResponsesInputObject(value map[string]any, defaultRole string) ([]gatewaycontract.ContentBlock, []string, []string) {
 	role := strings.TrimSpace(rawMapString(value, "role"))
 	switch rawType := strings.TrimSpace(rawMapString(value, "type")); rawType {
-	case "function_call":
+	case "function_call", "tool_call", "local_shell_call", "tool_search_call", "custom_tool_call", "mcp_tool_call":
 		role = firstNonEmpty(role, "assistant")
 		if block, ok := rawResponsesFunctionCallBlock(value, role); ok {
 			return []gatewaycontract.ContentBlock{block}, nil, nil
 		}
 		return nil, nil, nil
-	case "function_call_output":
+	case "function_call_output", "tool_search_output", "custom_tool_call_output", "mcp_tool_call_output":
 		role = firstNonEmpty(role, "tool")
 		if block, ok := rawResponsesFunctionCallOutputBlock(value, role); ok {
 			return []gatewaycontract.ContentBlock{block}, nil, nil
@@ -1201,6 +1202,15 @@ func rawResponsesInputObject(value map[string]any, defaultRole string) ([]gatewa
 	return blocks, instructions, warnings
 }
 
+func rawResponsesToolOutputTypeIsSupported(itemType string) bool {
+	switch itemType {
+	case "function_call_output", "tool_search_output", "custom_tool_call_output", "mcp_tool_call_output":
+		return true
+	default:
+		return false
+	}
+}
+
 func rawResponsesContextBlock(value map[string]any, role string, rawType string) (gatewaycontract.ContentBlock, bool) {
 	raw := marshalRawJSON(value)
 	if len(raw) == 0 {
@@ -1224,6 +1234,9 @@ func rawResponsesFunctionCallBlock(value map[string]any, role string) (gatewayco
 	callID := firstNonEmpty(rawMapString(value, "call_id"), rawMapString(value, "id"))
 	name := rawMapString(value, "name")
 	arguments := rawResponsesArguments(value["arguments"])
+	if arguments == "" {
+		arguments = rawResponsesArguments(value["input"])
+	}
 	if callID == "" && name == "" && arguments == "" {
 		return gatewaycontract.ContentBlock{}, false
 	}
@@ -1304,7 +1317,10 @@ func rawResponsesArguments(value any) string {
 	case nil:
 		return ""
 	case string:
-		return strings.TrimSpace(typed)
+		if strings.TrimSpace(typed) == "" {
+			return ""
+		}
+		return typed
 	default:
 		return jsonStringOrMarshal(typed)
 	}
@@ -1315,7 +1331,10 @@ func rawResponsesOutputText(value any) string {
 	case nil:
 		return ""
 	case string:
-		return strings.TrimSpace(typed)
+		if strings.TrimSpace(typed) == "" {
+			return ""
+		}
+		return typed
 	default:
 		return jsonStringOrMarshal(typed)
 	}

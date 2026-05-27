@@ -220,6 +220,67 @@ func TestNormalizeResponsesPreservesRawFunctionItems(t *testing.T) {
 	}
 }
 
+func TestNormalizeResponsesPreservesRawHostedToolItems(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	input := apiopenapi.ResponsesRequest_Input{}
+	if err := input.FromResponsesRequestInput1(nil); err != nil {
+		t.Fatalf("set empty input: %v", err)
+	}
+	req := apiopenapi.ResponsesRequest{
+		Model: "gpt-5.4",
+		Input: input,
+	}
+	rawBody := []byte(`{
+		"input":[
+			{"type":"local_shell_call","call_id":"call_shell","name":"shell","arguments":" pwd\n"},
+			{"type":"custom_tool_call","call_id":"call_custom","name":"shell","input":" echo ok\n"},
+			{"type":"tool_search_call","call_id":"call_search","name":"search","arguments":{"query":"docs"}},
+			{"type":"tool_search_output","call_id":"call_search","output":" found docs\n"}
+		]
+	}`)
+
+	canonical := svc.NormalizeResponses(req, RequestMeta{SourceEndpoint: "/v1/responses", RawBody: rawBody})
+
+	if len(canonical.InputItems) != 4 {
+		t.Fatalf("expected hosted tool input items, got %+v", canonical.InputItems)
+	}
+	shell := canonical.InputItems[0]
+	if shell.Type != gatewaycontract.ContentBlockToolCall ||
+		shell.ToolCallID != "call_shell" ||
+		shell.ToolName != "shell" ||
+		shell.ToolArgumentsJSON != " pwd\n" ||
+		shell.Metadata["type"] != "local_shell_call" {
+		t.Fatalf("unexpected local shell item: %+v", shell)
+	}
+	custom := canonical.InputItems[1]
+	if custom.Type != gatewaycontract.ContentBlockToolCall ||
+		custom.ToolCallID != "call_custom" ||
+		custom.ToolArgumentsJSON != " echo ok\n" ||
+		custom.Metadata["type"] != "custom_tool_call" {
+		t.Fatalf("unexpected custom tool input item: %+v", custom)
+	}
+	search := canonical.InputItems[2]
+	if search.Type != gatewaycontract.ContentBlockToolCall ||
+		search.ToolCallID != "call_search" ||
+		search.ToolArgumentsJSON != `{"query":"docs"}` ||
+		search.Metadata["type"] != "tool_search_call" {
+		t.Fatalf("unexpected tool search call item: %+v", search)
+	}
+	output := canonical.InputItems[3]
+	if output.Type != gatewaycontract.ContentBlockToolResult ||
+		output.ToolResultForID != "call_search" ||
+		output.Text != " found docs\n" ||
+		output.Metadata["type"] != "tool_search_output" {
+		t.Fatalf("unexpected tool search output item: %+v", output)
+	}
+	if !requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyToolCalling) {
+		t.Fatalf("expected tool calling capability, got %+v", canonical.RequestCapabilities)
+	}
+}
+
 func TestValidateResponsesRequestRequiresFunctionCallOutputCallID(t *testing.T) {
 	svc, err := New()
 	if err != nil {
@@ -231,6 +292,21 @@ func TestValidateResponsesRequestRequiresFunctionCallOutputCallID(t *testing.T) 
 	}`))
 
 	if err == nil || err.Error() != "Responses function_call_output input item requires call_id" {
+		t.Fatalf("expected missing call_id error, got %v", err)
+	}
+}
+
+func TestValidateResponsesRequestRequiresHostedToolOutputCallID(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	err = svc.ValidateResponsesRequest([]byte(`{
+		"model":"gpt-5.4",
+		"input":[{"type":"tool_search_output","output":"{}"}]
+	}`))
+
+	if err == nil || err.Error() != "Responses tool_search_output input item requires call_id" {
 		t.Fatalf("expected missing call_id error, got %v", err)
 	}
 }
