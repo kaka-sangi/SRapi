@@ -560,11 +560,7 @@ func (s *Service) renderResponsesCanonicalStreamEvents(resp gatewaycontract.Cano
 	if summary.RawTerminalEventName != "" {
 		terminalEventName = summary.RawTerminalEventName
 	}
-	terminalResponse := s.RenderResponses(resp)
-	if terminalEventName == "response.failed" {
-		failedStatus := "failed"
-		terminalResponse.Status = &failedStatus
-	}
+	terminalResponse := responseStreamTerminalResponsePayload(s.RenderResponses(resp), terminalEventName, summary.TerminalMetadata)
 	out = append(out,
 		sequence.apply(StreamEvent{
 			Event: terminalEventName,
@@ -580,6 +576,7 @@ func (s *Service) renderResponsesCanonicalStreamEvents(resp gatewaycontract.Cano
 type responsesStreamEventsSummary struct {
 	HasRenderableOutput  bool
 	RawTerminalEventName string
+	TerminalMetadata     map[string]any
 	LifecycleEvents      []StreamEvent
 	HasLifecycleStart    bool
 }
@@ -593,6 +590,7 @@ func summarizeResponsesStreamEvents(events []gatewaycontract.StreamEvent) respon
 		if event.Type == gatewaycontract.StreamEventStop {
 			if rawTerminalEventName := responsesRawTerminalEventName(event.RawEventType); rawTerminalEventName != "" {
 				summary.RawTerminalEventName = rawTerminalEventName
+				summary.TerminalMetadata = cloneMap(event.Metadata)
 			}
 		}
 		streamEvent, ok := responseMetadataRawStreamEvent(event)
@@ -605,6 +603,41 @@ func summarizeResponsesStreamEvents(events []gatewaycontract.StreamEvent) respon
 		summary.LifecycleEvents = append(summary.LifecycleEvents, streamEvent)
 	}
 	return summary
+}
+
+func responseStreamTerminalResponsePayload(resp apiopenapi.ResponsesResponse, eventName string, metadata map[string]any) any {
+	if eventName != "response.failed" {
+		return resp
+	}
+	failed := map[string]any{
+		"id":         resp.Id,
+		"object":     resp.Object,
+		"created_at": resp.CreatedAt,
+		"model":      resp.Model,
+		"status":     "failed",
+		"output":     resp.Output,
+	}
+	if resp.Usage != nil {
+		failed["usage"] = resp.Usage
+	}
+	if errorPayload := responseStreamTerminalErrorPayload(metadata); len(errorPayload) > 0 {
+		failed["error"] = errorPayload
+	}
+	return failed
+}
+
+func responseStreamTerminalErrorPayload(metadata map[string]any) map[string]any {
+	errorPayload := map[string]any{}
+	if value := strings.TrimSpace(mapStringAny(metadata, "error_type")); value != "" {
+		errorPayload["type"] = value
+	}
+	if value := strings.TrimSpace(mapStringAny(metadata, "error_code")); value != "" {
+		errorPayload["code"] = value
+	}
+	if value := strings.TrimSpace(mapStringAny(metadata, "error_message")); value != "" {
+		errorPayload["message"] = value
+	}
+	return errorPayload
 }
 
 func responseCreatedStreamEvent(resp gatewaycontract.CanonicalResponse, responseIDValue string) StreamEvent {

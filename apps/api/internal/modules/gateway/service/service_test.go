@@ -1067,7 +1067,7 @@ func TestRenderResponsesStreamEventsPreservesFailedTerminal(t *testing.T) {
 			RawEventType:   "response.failed",
 			Raw:            json.RawMessage(`{"type":"response.failed","error":{"message":"upstream overloaded"}}`),
 			OriginProtocol: "openai-compatible",
-			Metadata:       map[string]any{"error_message": "upstream overloaded"},
+			Metadata:       map[string]any{"error_type": "server_error", "error_code": "overloaded", "error_message": "upstream overloaded"},
 		}},
 		Usage: gatewaycontract.Usage{InputTokens: 3, OutputTokens: 4},
 	}
@@ -1080,9 +1080,15 @@ func TestRenderResponsesStreamEventsPreservesFailedTerminal(t *testing.T) {
 	if completed := streamEventByName(events, "response.completed"); completed != nil {
 		t.Fatalf("did not expect response.completed terminal event, got %+v", completed)
 	}
-	response, _ := terminal.Data["response"].(apiopenapi.ResponsesResponse)
-	if response.Status == nil || *response.Status != "failed" {
+	response, _ := terminal.Data["response"].(map[string]any)
+	if response["status"] != "failed" {
 		t.Fatalf("expected failed terminal response payload, got %+v", terminal.Data["response"])
+	}
+	errorPayload, _ := response["error"].(map[string]any)
+	if errorPayload["type"] != "server_error" ||
+		errorPayload["code"] != "overloaded" ||
+		errorPayload["message"] != "upstream overloaded" {
+		t.Fatalf("expected failed terminal error payload, got %+v", response)
 	}
 }
 
