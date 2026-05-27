@@ -1456,7 +1456,7 @@ func TestRenderProtocolStreamEventsPreservesToolCallOutput(t *testing.T) {
 		t.Fatalf("expected anthropic tool delta, got %+v", anthropicEvents)
 	}
 	deltaPayload, _ := blockDelta.Data["delta"].(map[string]any)
-	if deltaPayload["type"] != "input_json_delta" || deltaPayload["partial_json"] != `{"query":"weather"}` {
+	if deltaPayload["type"] != "input_json_delta" || deltaPayload["partial_json"] != " {\"query\":\"weather\"}\n" {
 		t.Fatalf("expected anthropic input json delta, got %+v", deltaPayload)
 	}
 	messageDelta := streamEventByName(anthropicEvents, "message_delta")

@@ -436,7 +436,7 @@ func responseStreamOutputEvents(blocks []gatewaycontract.ContentBlock) []StreamE
 					"item":         item,
 				},
 			})
-			if strings.TrimSpace(block.ToolArgumentsJSON) != "" {
+			if block.ToolArgumentsJSON != "" {
 				events = append(events, StreamEvent{
 					Event: "response.function_call_arguments.delta",
 					Data: map[string]any{
@@ -870,10 +870,10 @@ func anthropicStreamContentBlock(block gatewaycontract.ContentBlock) map[string]
 func anthropicStreamContentDelta(block gatewaycontract.ContentBlock) map[string]any {
 	switch block.Type {
 	case gatewaycontract.ContentBlockToolCall:
-		if args := strings.TrimSpace(block.ToolArgumentsJSON); args != "" {
+		if block.ToolArgumentsJSON != "" {
 			return map[string]any{
 				"type":         "input_json_delta",
-				"partial_json": args,
+				"partial_json": block.ToolArgumentsJSON,
 			}
 		}
 	case gatewaycontract.ContentBlockReasoning:
