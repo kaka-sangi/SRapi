@@ -367,6 +367,10 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 		writeSSEEvents(w, s.runtime.gateway.RenderResponsesStreamEvents(canonicalResp))
 		return
 	}
+	if sameProtocolRawConversationResponse(canonical, result.Candidate.Provider.Protocol, result.Candidate.Provider.AdapterType, canonicalResp.RawProviderMetadata) {
+		writeRawJSONResponse(w, http.StatusOK, canonicalResp.RawProviderMetadata)
+		return
+	}
 	writeJSONAny(w, http.StatusOK, response)
 }
 
@@ -882,6 +886,9 @@ func sameProtocolRawConversationResponse(req gatewaycontract.CanonicalRequest, t
 	}
 	switch sourceProtocol {
 	case string(gatewaycontract.ProtocolOpenAICompatible):
+		if strings.HasSuffix(sourceEndpoint, "/responses/compact") {
+			return adapterType == "reverse-proxy-codex-cli"
+		}
 		return strings.HasSuffix(sourceEndpoint, "/chat/completions") &&
 			(adapterType == "openai-compatible" || adapterType == "reverse-proxy-openai-compatible")
 	case string(gatewaycontract.ProtocolAnthropicCompatible):
@@ -908,7 +915,7 @@ func sameProtocolRawConversationStream(req gatewaycontract.CanonicalRequest, tar
 	}
 	switch sourceProtocol {
 	case string(gatewaycontract.ProtocolOpenAICompatible):
-		if strings.HasSuffix(sourceEndpoint, "/responses") {
+		if strings.HasSuffix(sourceEndpoint, "/responses") || strings.HasSuffix(sourceEndpoint, "/responses/compact") {
 			return adapterType == "reverse-proxy-codex-cli"
 		}
 		return strings.HasSuffix(sourceEndpoint, "/chat/completions") &&

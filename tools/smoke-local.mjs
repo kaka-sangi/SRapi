@@ -66,6 +66,7 @@ export const FAILOVER_GATEWAY_SMOKE_TARGETS = Object.freeze([
 
 export const RELEASE_GATEWAY_SMOKE_ENDPOINTS = Object.freeze([
   ...CORE_GATEWAY_SMOKE_ENDPOINTS,
+  { name: "responses_compact", method: "POST", path: "/v1/responses/compact" },
   { name: "anthropic_count_tokens", method: "POST", path: "/v1/messages/count_tokens" },
   { name: "embeddings", method: "POST", path: "/v1/embeddings" },
   { name: "image_generations", method: "POST", path: "/v1/images/generations" },

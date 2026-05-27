@@ -1550,6 +1550,21 @@ func (e ResourceStatus) Valid() bool {
 	}
 }
 
+// Defines values for ResponsesCompactResponseObject.
+const (
+	ResponseCompaction ResponsesCompactResponseObject = "response.compaction"
+)
+
+// Valid indicates whether the value is a known member of the ResponsesCompactResponseObject enum.
+func (e ResponsesCompactResponseObject) Valid() bool {
+	switch e {
+	case ResponseCompaction:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ResponsesResponseObject.
 const (
 	Response ResponsesResponseObject = "response"
@@ -4600,6 +4615,19 @@ type RerankResult struct {
 // ResourceStatus defines model for ResourceStatus.
 type ResourceStatus string
 
+// ResponsesCompactResponse defines model for ResponsesCompactResponse.
+type ResponsesCompactResponse struct {
+	Id                   string                         `json:"id"`
+	InputTokens          *int                           `json:"input_tokens,omitempty"`
+	Object               ResponsesCompactResponseObject `json:"object"`
+	OutputTokens         *int                           `json:"output_tokens,omitempty"`
+	Usage                *TokenUsage                    `json:"usage,omitempty"`
+	AdditionalProperties map[string]interface{}         `json:"-"`
+}
+
+// ResponsesCompactResponseObject defines model for ResponsesCompactResponse.Object.
+type ResponsesCompactResponseObject string
+
 // ResponsesIncompleteDetails defines model for ResponsesIncompleteDetails.
 type ResponsesIncompleteDetails struct {
 	Reason string `json:"reason"`
@@ -5938,6 +5966,9 @@ type CreateOpenAICompatibleModerationAliasJSONRequestBody = ModerationRequest
 // CreateOpenAICompatibleResponseAliasJSONRequestBody defines body for CreateOpenAICompatibleResponseAlias for application/json ContentType.
 type CreateOpenAICompatibleResponseAliasJSONRequestBody = ResponsesRequest
 
+// CreateOpenAICompatibleResponseCompactAliasJSONRequestBody defines body for CreateOpenAICompatibleResponseCompactAlias for application/json ContentType.
+type CreateOpenAICompatibleResponseCompactAliasJSONRequestBody = ResponsesRequest
+
 // CreateRerankCompatibleRerankAliasJSONRequestBody defines body for CreateRerankCompatibleRerankAlias for application/json ContentType.
 type CreateRerankCompatibleRerankAliasJSONRequestBody = RerankRequest
 
@@ -6126,6 +6157,9 @@ type CreateRerankJSONRequestBody = RerankRequest
 
 // CreateResponseJSONRequestBody defines body for CreateResponse for application/json ContentType.
 type CreateResponseJSONRequestBody = ResponsesRequest
+
+// CreateResponseCompactJSONRequestBody defines body for CreateResponseCompact for application/json ContentType.
+type CreateResponseCompactJSONRequestBody = ResponsesRequest
 
 // CountGeminiTokensJSONRequestBody defines body for CountGeminiTokens for application/json ContentType.
 type CountGeminiTokensJSONRequestBody = GeminiCountTokensRequest
@@ -10833,6 +10867,130 @@ func (a RerankResult) MarshalJSON() ([]byte, error) {
 	return json.Marshal(object)
 }
 
+// Getter for additional properties for ResponsesCompactResponse. Returns the specified
+// element and whether it was found
+func (a ResponsesCompactResponse) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for ResponsesCompactResponse
+func (a *ResponsesCompactResponse) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for ResponsesCompactResponse to handle AdditionalProperties
+func (a *ResponsesCompactResponse) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["id"]; found {
+		err = json.Unmarshal(raw, &a.Id)
+		if err != nil {
+			return fmt.Errorf("error reading 'id': %w", err)
+		}
+		delete(object, "id")
+	}
+
+	if raw, found := object["input_tokens"]; found {
+		err = json.Unmarshal(raw, &a.InputTokens)
+		if err != nil {
+			return fmt.Errorf("error reading 'input_tokens': %w", err)
+		}
+		delete(object, "input_tokens")
+	}
+
+	if raw, found := object["object"]; found {
+		err = json.Unmarshal(raw, &a.Object)
+		if err != nil {
+			return fmt.Errorf("error reading 'object': %w", err)
+		}
+		delete(object, "object")
+	}
+
+	if raw, found := object["output_tokens"]; found {
+		err = json.Unmarshal(raw, &a.OutputTokens)
+		if err != nil {
+			return fmt.Errorf("error reading 'output_tokens': %w", err)
+		}
+		delete(object, "output_tokens")
+	}
+
+	if raw, found := object["usage"]; found {
+		err = json.Unmarshal(raw, &a.Usage)
+		if err != nil {
+			return fmt.Errorf("error reading 'usage': %w", err)
+		}
+		delete(object, "usage")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for ResponsesCompactResponse to handle AdditionalProperties
+func (a ResponsesCompactResponse) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	object["id"], err = json.Marshal(a.Id)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'id': %w", err)
+	}
+
+	if a.InputTokens != nil {
+		object["input_tokens"], err = json.Marshal(a.InputTokens)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'input_tokens': %w", err)
+		}
+	}
+
+	object["object"], err = json.Marshal(a.Object)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'object': %w", err)
+	}
+
+	if a.OutputTokens != nil {
+		object["output_tokens"], err = json.Marshal(a.OutputTokens)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'output_tokens': %w", err)
+		}
+	}
+
+	if a.Usage != nil {
+		object["usage"], err = json.Marshal(a.Usage)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'usage': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
 // Getter for additional properties for ResponsesOutputItem. Returns the specified
 // element and whether it was found
 func (a ResponsesOutputItem) Get(fieldName string) (value interface{}, found bool) {
@@ -12127,6 +12285,9 @@ type ServerInterface interface {
 	// Create an OpenAI Responses-compatible response with openai-compatible provider context.
 	// (POST /api/provider/openai-compatible/v1/responses)
 	CreateOpenAICompatibleResponseAlias(w http.ResponseWriter, r *http.Request)
+	// Compact an OpenAI Responses-compatible conversation context with openai-compatible provider context.
+	// (POST /api/provider/openai-compatible/v1/responses/compact)
+	CreateOpenAICompatibleResponseCompactAlias(w http.ResponseWriter, r *http.Request)
 	// Rerank documents with rerank-compatible provider context.
 	// (POST /api/provider/rerank-compatible/v1/rerank)
 	CreateRerankCompatibleRerankAlias(w http.ResponseWriter, r *http.Request)
@@ -12571,6 +12732,9 @@ type ServerInterface interface {
 	// Create an OpenAI Responses-compatible response.
 	// (POST /v1/responses)
 	CreateResponse(w http.ResponseWriter, r *http.Request)
+	// Compact an OpenAI Responses-compatible conversation context.
+	// (POST /v1/responses/compact)
+	CreateResponseCompact(w http.ResponseWriter, r *http.Request)
 	// Connect to the Responses WebSocket gateway.
 	// (GET /v1/responses/ws)
 	ConnectResponsesWebSocket(w http.ResponseWriter, r *http.Request, params ConnectResponsesWebSocketParams)
@@ -12932,6 +13096,26 @@ func (siw *ServerInterfaceWrapper) CreateOpenAICompatibleResponseAlias(w http.Re
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateOpenAICompatibleResponseAlias(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateOpenAICompatibleResponseCompactAlias operation middleware
+func (siw *ServerInterfaceWrapper) CreateOpenAICompatibleResponseCompactAlias(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateOpenAICompatibleResponseCompactAlias(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -18600,6 +18784,26 @@ func (siw *ServerInterfaceWrapper) CreateResponse(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// CreateResponseCompact operation middleware
+func (siw *ServerInterfaceWrapper) CreateResponseCompact(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateResponseCompact(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ConnectResponsesWebSocket operation middleware
 func (siw *ServerInterfaceWrapper) ConnectResponsesWebSocket(w http.ResponseWriter, r *http.Request) {
 
@@ -18962,6 +19166,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/messages", wrapper.CreateOpenAICompatibleMessageAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/moderations", wrapper.CreateOpenAICompatibleModerationAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/responses", wrapper.CreateOpenAICompatibleResponseAlias)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/openai-compatible/v1/responses/compact", wrapper.CreateOpenAICompatibleResponseCompactAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/provider/rerank-compatible/v1/rerank", wrapper.CreateRerankCompatibleRerankAlias)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/account-groups", wrapper.ListAdminAccountGroups)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/account-groups", wrapper.CreateAdminAccountGroup)
@@ -19110,6 +19315,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/realtime", wrapper.ConnectRealtimeWebSocket)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/rerank", wrapper.CreateRerank)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/responses", wrapper.CreateResponse)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/responses/compact", wrapper.CreateResponseCompact)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/responses/ws", wrapper.ConnectResponsesWebSocket)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1beta/models", wrapper.ListGeminiModels)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1beta/models/{model}:countTokens", wrapper.CountGeminiTokens)

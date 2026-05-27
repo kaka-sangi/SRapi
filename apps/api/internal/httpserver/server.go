@@ -26,6 +26,7 @@ import (
 	billingcontract "github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
 	capabilitiescontract "github.com/srapi/srapi/apps/api/internal/modules/capabilities/contract"
 	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
+	gatewaycontract "github.com/srapi/srapi/apps/api/internal/modules/gateway/contract"
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
 	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
 	paymentcontract "github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
@@ -387,6 +388,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("GET /v1beta/models", server.handleListGeminiModels)
 	mux.HandleFunc("POST /v1/chat/completions", server.handleCreateChatCompletion)
 	mux.HandleFunc("POST /v1/responses", server.handleCreateResponse)
+	mux.HandleFunc("POST /v1/responses/compact", server.withGatewaySourceEndpoint(string(gatewaycontract.EndpointResponsesCompact), server.handleCreateResponse))
 	mux.HandleFunc("GET /v1/responses/ws", server.handleResponsesWebSocket)
 	mux.HandleFunc("GET /v1/realtime", server.handleRealtimeWebSocket)
 	mux.HandleFunc("POST /v1/messages", server.handleCreateMessage)
@@ -667,6 +669,13 @@ func (s *Server) withGatewayProviderAlias(providerKey string, next http.HandlerF
 	}
 }
 
+func (s *Server) withGatewaySourceEndpoint(sourceEndpoint string, next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		route := gatewayRouteContext{SourceEndpoint: strings.TrimSpace(sourceEndpoint)}
+		next(w, r.WithContext(context.WithValue(r.Context(), gatewayRouteContextKey{}, route)))
+	}
+}
+
 func (s *Server) registerGatewayProviderAliases(mux *http.ServeMux) {
 	seen := map[string]struct{}{}
 	for _, preset := range providerpreset.Default().List() {
@@ -677,6 +686,7 @@ func (s *Server) registerGatewayProviderAliases(mux *http.ServeMux) {
 			}
 			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "chat/completions", s.handleCreateChatCompletion, presetSupports(preset, capabilitiescontract.KeyChatCompletions))
 			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "responses", s.handleCreateResponse, presetSupports(preset, capabilitiescontract.KeyResponses))
+			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "responses/compact", s.handleCreateResponse, presetSupports(preset, capabilitiescontract.KeyResponses))
 			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "messages", s.handleCreateMessage, presetSupports(preset, capabilitiescontract.KeyMessages))
 			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "messages/count_tokens", s.handleAnthropicCountTokens, presetSupports(preset, capabilitiescontract.KeyTokenCounting))
 			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "embeddings", s.handleCreateEmbedding, presetSupports(preset, capabilitiescontract.KeyEmbeddings))

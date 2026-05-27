@@ -73,8 +73,12 @@ type codexResponsesEvent struct {
 }
 
 type codexResponsesResponse struct {
+	ID                string                     `json:"id"`
+	Object            string                     `json:"object"`
 	Output            []codexResponsesOutputItem `json:"output"`
 	OutputText        string                     `json:"output_text"`
+	InputTokens       *int                       `json:"input_tokens"`
+	OutputTokens      *int                       `json:"output_tokens"`
 	Status            string                     `json:"status"`
 	IncompleteDetails *struct {
 		Reason string `json:"reason"`
@@ -131,7 +135,7 @@ func (s *Service) invokeReverseProxyCodexResponses(ctx context.Context, req cont
 	runtimeResp, err := s.reverseProxy.Do(ctx, reverseproxycontract.Request{
 		Account:      codexReverseProxyAccount(req),
 		Method:       http.MethodPost,
-		URL:          strings.TrimRight(baseURL, "/") + "/responses",
+		URL:          codexResponsesEndpoint(baseURL, req),
 		Headers:      codexResponsesHeaders(req, stream),
 		Body:         raw,
 		ExpectStream: stream,
@@ -195,7 +199,20 @@ func codexShouldUseRawResponsesPayload(req contract.ConversationRequest) bool {
 	if !strings.EqualFold(strings.TrimSpace(req.SourceProtocol), "openai-compatible") {
 		return false
 	}
-	return strings.HasSuffix(strings.ToLower(strings.TrimSpace(req.SourceEndpoint)), "/responses")
+	sourceEndpoint := strings.ToLower(strings.TrimSpace(req.SourceEndpoint))
+	return strings.HasSuffix(sourceEndpoint, "/responses") || strings.HasSuffix(sourceEndpoint, "/responses/compact")
+}
+
+func codexResponsesEndpoint(baseURL string, req contract.ConversationRequest) string {
+	endpoint := "/responses"
+	if codexResponsesCompactRequest(req) {
+		endpoint = "/responses/compact"
+	}
+	return strings.TrimRight(baseURL, "/") + endpoint
+}
+
+func codexResponsesCompactRequest(req contract.ConversationRequest) bool {
+	return strings.HasSuffix(strings.ToLower(strings.TrimSpace(req.SourceEndpoint)), "/responses/compact")
 }
 
 func codexCanonicalResponsesPayload(req contract.ConversationRequest) map[string]any {
@@ -239,8 +256,10 @@ func codexApplyResponsesPayloadDefaults(req contract.ConversationRequest, payloa
 	codexLiftInstructionInputItems(payload)
 	codexNormalizeResponsesText(payload)
 	codexNormalizeServiceTier(req, payload)
-	payload["stream"] = true
-	payload["store"] = codexResponsesDefaultInternalStoreValue
+	if !codexResponsesCompactRequest(req) {
+		payload["stream"] = true
+		payload["store"] = codexResponsesDefaultInternalStoreValue
+	}
 	for _, field := range codexUnsupportedResponsesFields() {
 		delete(payload, field)
 	}
@@ -1421,12 +1440,38 @@ func parseCodexResponsesJSON(body []byte, statusCode int) (contract.Conversation
 	if providerErr, ok := codexResponseProviderError(response); ok {
 		return contract.ConversationResponse{}, providerErr
 	}
+	if codexResponseIsCompaction(response) {
+		return contract.ConversationResponse{
+			StopReason: contract.StopReasonEndTurn,
+			StatusCode: statusCode,
+			Usage:      codexCompactionUsage(response),
+			Raw:        append(json.RawMessage(nil), body...),
+		}, nil
+	}
 	resp, err := response.ConversationResponse(statusCode)
 	if err != nil {
 		return contract.ConversationResponse{}, err
 	}
 	resp.Raw = append(json.RawMessage(nil), body...)
 	return resp, nil
+}
+
+func codexResponseIsCompaction(response codexResponsesResponse) bool {
+	return strings.EqualFold(strings.TrimSpace(response.Object), "response.compaction")
+}
+
+func codexCompactionUsage(response codexResponsesResponse) contract.Usage {
+	usage := response.Usage
+	if usage.InputTokens == nil && response.InputTokens != nil {
+		usage.InputTokens = response.InputTokens
+	}
+	if usage.OutputTokens == nil && response.OutputTokens != nil {
+		usage.OutputTokens = response.OutputTokens
+	}
+	if usage.HasTokenUsage() {
+		return usage.ToUsage("")
+	}
+	return contract.Usage{}
 }
 
 func codexEventText(event codexResponsesEvent) string {

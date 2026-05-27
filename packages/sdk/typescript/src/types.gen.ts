@@ -2704,6 +2704,15 @@ export type ResponsesResponse = {
     compatibility_warnings?: Array<string>;
 };
 
+export type ResponsesCompactResponse = {
+    id: string;
+    object: 'response.compaction';
+    input_tokens?: number;
+    output_tokens?: number;
+    usage?: TokenUsage;
+    [key: string]: unknown;
+};
+
 export type AnthropicContentBlock = {
     type: 'text' | 'image' | 'thinking' | 'redacted_thinking' | 'tool_use' | 'tool_result';
     text?: string;
@@ -8270,6 +8279,51 @@ export type CreateResponseResponses = {
 
 export type CreateResponseResponse = CreateResponseResponses[keyof CreateResponseResponses];
 
+export type CreateResponseCompactData = {
+    body: ResponsesRequest;
+    path?: never;
+    query?: never;
+    url: '/v1/responses/compact';
+};
+
+export type CreateResponseCompactErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateResponseCompactError = CreateResponseCompactErrors[keyof CreateResponseCompactErrors];
+
+export type CreateResponseCompactResponses = {
+    /**
+     * Responses compact result, or SSE stream when stream is true.
+     */
+    200: ResponsesCompactResponse;
+};
+
+export type CreateResponseCompactResponse = CreateResponseCompactResponses[keyof CreateResponseCompactResponses];
+
 export type ConnectResponsesWebSocketData = {
     body?: never;
     path?: never;
@@ -9145,6 +9199,51 @@ export type CreateOpenAiCompatibleResponseAliasResponses = {
 };
 
 export type CreateOpenAiCompatibleResponseAliasResponse = CreateOpenAiCompatibleResponseAliasResponses[keyof CreateOpenAiCompatibleResponseAliasResponses];
+
+export type CreateOpenAiCompatibleResponseCompactAliasData = {
+    body: ResponsesRequest;
+    path?: never;
+    query?: never;
+    url: '/api/provider/openai-compatible/v1/responses/compact';
+};
+
+export type CreateOpenAiCompatibleResponseCompactAliasErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateOpenAiCompatibleResponseCompactAliasError = CreateOpenAiCompatibleResponseCompactAliasErrors[keyof CreateOpenAiCompatibleResponseCompactAliasErrors];
+
+export type CreateOpenAiCompatibleResponseCompactAliasResponses = {
+    /**
+     * Responses compact result, or SSE stream when stream is true.
+     */
+    200: ResponsesCompactResponse;
+};
+
+export type CreateOpenAiCompatibleResponseCompactAliasResponse = CreateOpenAiCompatibleResponseCompactAliasResponses[keyof CreateOpenAiCompatibleResponseCompactAliasResponses];
 
 export type CreateOpenAiCompatibleMessageAliasData = {
     body: AnthropicMessagesRequest;

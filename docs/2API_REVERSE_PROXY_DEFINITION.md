@@ -99,7 +99,7 @@ SRapi 2api 反代不是：
 
 Implementation status:
 
-- WP-400 implements the HTTP Codex CLI 2api path for text requests: `reverse-proxy-codex-cli` builds a Codex Responses request and sends `base_url + "/responses"` through Reverse Proxy Runtime.
+- WP-400 implements the HTTP Codex CLI 2api path for text requests: `reverse-proxy-codex-cli` builds a Codex Responses request and sends `base_url + "/responses"` through Reverse Proxy Runtime. The same runtime boundary handles `/v1/responses/compact` by sending `base_url + "/responses/compact"` and replaying the raw `response.compaction` JSON.
 - WP-410 implements the Codex CLI 2api Responses WebSocket upstream relay for explicitly requested `/v1/responses/ws` calls: SRapi schedules an eligible Codex reverse-proxy account, derives Codex `ws/wss` `/responses`, sends Codex official-client headers plus a `response.create` frame with the mapped upstream model, and uses the selected account OAuth/session/CLI credential through Reverse Proxy Runtime.
 - WP-600 implements Codex refresh-token-only onboarding for `reverse-proxy-codex-cli`: admin create/import/update may receive only an OAuth `refresh_token`, Reverse Proxy Runtime exchanges it at the Codex OAuth token endpoint using the Codex CLI client ID/scope, persists the resulting encrypted access-token state, and Gateway requests can immediately call Codex `/responses` with selected-account OAuth identity.
 - WP-420 implements the Claude Code CLI 2api Messages HTTP path: `reverse-proxy-claude-code-cli` builds `/messages?beta=true`, Claude Code OAuth/beta/version/stainless/session headers, and Claude Code system/billing blocks, while Reverse Proxy Runtime injects the selected OAuth/CLI token.

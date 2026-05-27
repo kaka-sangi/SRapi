@@ -5949,6 +5949,64 @@ func TestReverseProxyCodexCLIAdapterPreservesReasoningSummaryTextDeltas(t *testi
 	}
 }
 
+func TestReverseProxyCodexCLIAdapterUsesResponsesCompactEndpoint(t *testing.T) {
+	var upstreamPath string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamPath = r.URL.Path
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode codex compact payload: %v", err)
+		}
+		if payload["model"] != "codex-upstream" ||
+			payload["previous_response_id"] != "resp_previous" ||
+			payload["stream"] != false {
+			t.Fatalf("expected compact raw responses payload with mapped model, got %+v", payload)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"cmp_1","object":"response.compaction","input_tokens":12,"output_tokens":3}`))
+	}))
+	defer upstream.Close()
+
+	runtime, err := reverseproxyservice.New(nil)
+	if err != nil {
+		t.Fatalf("create reverse proxy runtime: %v", err)
+	}
+	svc, err := service.NewWithReverseProxy(nil, runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_codex_compact",
+		Model:          "codex-local",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/responses/compact",
+		InputParts:     textParts("compact me"),
+		RawBody:        []byte(`{"model":"codex-local","input":"compact me","previous_response_id":"resp_previous","stream":false}`),
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": upstream.URL + "/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+		Credential: map[string]any{"cli_client_token": "codex-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke codex compact upstream: %v", err)
+	}
+	if upstreamPath != "/backend-api/codex/responses/compact" {
+		t.Fatalf("expected compact upstream path, got %q", upstreamPath)
+	}
+	if string(resp.Raw) != `{"id":"cmp_1","object":"response.compaction","input_tokens":12,"output_tokens":3}` {
+		t.Fatalf("expected raw compact response, got %q", string(resp.Raw))
+	}
+}
+
 func TestReverseProxyCodexCLIAdapterPassesCliRuntimeContext(t *testing.T) {
 	runtime := capturingRuntime{
 		response: reverseproxycontract.Response{

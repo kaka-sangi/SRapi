@@ -145,6 +145,45 @@ func TestGatewayCodexResponsesStreamReplaysRawSSE(t *testing.T) {
 	}
 }
 
+func TestGatewayCodexResponsesCompactReplaysRawJSON(t *testing.T) {
+	var upstreamPath string
+	var upstreamPayload map[string]any
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamPath = r.URL.Path
+		if err := json.NewDecoder(r.Body).Decode(&upstreamPayload); err != nil {
+			t.Fatalf("decode compact payload: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"id":"cmp_gateway","object":"response.compaction","input_tokens":12,"output_tokens":3,"raw_only_marker":"compact-upstream"}`)
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"codex-compact-provider","display_name":"Codex Compact","adapter_type":"reverse-proxy-codex-cli","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"codex-compact-model","display_name":"Codex Compact Model","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"codex-compact-upstream","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"codex-compact-account","runtime_class":"cli_client_token","upstream_client":"codex_cli","credential":{"cli_client_token":"codex-compact-token"},"metadata":{"base_url":"`+upstream.URL+`/backend-api/codex"},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/responses/compact", `{"model":"codex-compact-model","input":"compact this","previous_response_id":"resp_prev","stream":false}`)
+	if upstreamPath != "/backend-api/codex/responses/compact" {
+		t.Fatalf("expected compact upstream path, got %q", upstreamPath)
+	}
+	if upstreamPayload["model"] != "codex-compact-upstream" ||
+		upstreamPayload["previous_response_id"] != "resp_prev" ||
+		upstreamPayload["stream"] != false {
+		t.Fatalf("expected mapped compact payload, got %+v", upstreamPayload)
+	}
+	var response map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
+		t.Fatalf("decode compact response: %v", err)
+	}
+	if response["object"] != "response.compaction" || response["raw_only_marker"] != "compact-upstream" {
+		t.Fatalf("expected raw compact JSON response, got %+v", response)
+	}
+}
+
 func TestGatewayCodexConvertsTextEndpointsToResponsesUpstream(t *testing.T) {
 	var calls []codexUpstreamObservation
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -61,6 +61,17 @@ func TestSameProtocolRawConversationStreamAllowsCodexResponsesSSE(t *testing.T) 
 	}
 }
 
+func TestSameProtocolRawConversationResponseAllowsCodexResponsesCompact(t *testing.T) {
+	req := gatewaycontract.CanonicalRequest{
+		SourceProtocol: gatewaycontract.ProtocolOpenAICompatible,
+		SourceEndpoint: "/v1/responses/compact",
+	}
+
+	if !sameProtocolRawConversationResponse(req, "openai-compatible", "reverse-proxy-codex-cli", []byte(`{"id":"cmp_1","object":"response.compaction"}`)) {
+		t.Fatal("expected Codex Responses compact JSON to be eligible for raw passthrough")
+	}
+}
+
 func TestSameProtocolRawConversationResponseRejectsUnsafeCases(t *testing.T) {
 	tests := []struct {
 		name           string

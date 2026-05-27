@@ -5005,6 +5005,53 @@ paths:
         default:
           $ref: "#/components/responses/GatewayError"
 
+  /v1/responses/compact:
+    post:
+      tags:
+        - Gateway
+      operationId: createResponseCompact
+      summary: Compact an OpenAI Responses-compatible conversation context.
+      description: >
+        OpenAI Responses compact subresource. The request body reuses
+        ResponsesRequest and executes through the standard Gateway auth,
+        model policy, Scheduler, Provider Adapter, usage, and decision evidence
+        chain. Same-protocol Codex/OpenAI compact responses are replayed as raw
+        upstream JSON to preserve the `response.compaction` shape.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResponsesRequest"
+      responses:
+        "200":
+          description: Responses compact result, or SSE stream when stream is true.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResponsesCompactResponse"
+            text/event-stream:
+              schema:
+                type: string
+                description: Responses-compatible compact SSE events.
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
   /v1/responses/ws:
     get:
       tags:
@@ -5854,6 +5901,48 @@ paths:
               schema:
                 type: string
                 description: Responses-compatible SSE events.
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /api/provider/openai-compatible/v1/responses/compact:
+    post:
+      tags:
+        - Gateway
+      operationId: createOpenAICompatibleResponseCompactAlias
+      summary: Compact an OpenAI Responses-compatible conversation context with openai-compatible provider context.
+      description: Provider alias route. It reuses the standard Responses compact runtime and forces the `openai-compatible` provider context.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResponsesRequest"
+      responses:
+        "200":
+          description: Responses compact result, or SSE stream when stream is true.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResponsesCompactResponse"
+            text/event-stream:
+              schema:
+                type: string
+                description: Responses-compatible compact SSE events.
         "400":
           $ref: "#/components/responses/GatewayBadRequest"
         "401":
@@ -14069,6 +14158,26 @@ components:
           type: array
           items:
             type: string
+
+    ResponsesCompactResponse:
+      type: object
+      required:
+        - id
+        - object
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+          enum:
+            - response.compaction
+        input_tokens:
+          type: integer
+        output_tokens:
+          type: integer
+        usage:
+          $ref: "#/components/schemas/TokenUsage"
+      additionalProperties: true
 
     AnthropicContentBlock:
       type: object
