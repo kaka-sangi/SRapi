@@ -1099,14 +1099,39 @@ func validateRawResponsesInput(rawBody []byte) error {
 	if err := json.Unmarshal(rawBody, &payload); err != nil {
 		return nil
 	}
-	return validateRawResponsesInputValue(payload["input"])
+	state := rawResponsesInputValidationState{
+		hasPreviousResponseID: strings.TrimSpace(rawMapString(payload, "previous_response_id")) != "",
+	}
+	if err := validateRawResponsesInputValue(payload["input"], &state); err != nil {
+		return err
+	}
+	if len(state.functionCallOutputIDs) == 0 || state.hasPreviousResponseID {
+		return nil
+	}
+	for callID := range state.functionCallOutputIDs {
+		if _, ok := state.toolCallIDs[callID]; ok {
+			continue
+		}
+		if _, ok := state.itemReferenceIDs[callID]; ok {
+			continue
+		}
+		return fmt.Errorf("Responses function_call_output input item requires matching function_call, item_reference, or previous_response_id")
+	}
+	return nil
 }
 
-func validateRawResponsesInputValue(value any) error {
+type rawResponsesInputValidationState struct {
+	hasPreviousResponseID bool
+	toolCallIDs           map[string]struct{}
+	functionCallOutputIDs map[string]struct{}
+	itemReferenceIDs      map[string]struct{}
+}
+
+func validateRawResponsesInputValue(value any, state *rawResponsesInputValidationState) error {
 	switch typed := value.(type) {
 	case []any:
 		for _, item := range typed {
-			if err := validateRawResponsesInputValue(item); err != nil {
+			if err := validateRawResponsesInputValue(item, state); err != nil {
 				return err
 			}
 		}
@@ -1115,9 +1140,42 @@ func validateRawResponsesInputValue(value any) error {
 		if rawResponsesToolOutputTypeIsSupported(itemType) && strings.TrimSpace(rawMapString(typed, "call_id")) == "" {
 			return fmt.Errorf("Responses %s input item requires call_id", itemType)
 		}
-		return validateRawResponsesInputValue(typed["content"])
+		recordRawResponsesInputValidationItem(typed, itemType, state)
+		return validateRawResponsesInputValue(typed["content"], state)
 	}
 	return nil
+}
+
+func recordRawResponsesInputValidationItem(item map[string]any, itemType string, state *rawResponsesInputValidationState) {
+	if state == nil {
+		return
+	}
+	switch itemType {
+	case "function_call", "tool_call", "local_shell_call", "tool_search_call", "custom_tool_call", "mcp_tool_call":
+		callID := firstNonEmpty(rawMapString(item, "call_id"), rawMapString(item, "id"))
+		if callID != "" {
+			if state.toolCallIDs == nil {
+				state.toolCallIDs = map[string]struct{}{}
+			}
+			state.toolCallIDs[callID] = struct{}{}
+		}
+	case "function_call_output":
+		callID := rawMapString(item, "call_id")
+		if callID != "" {
+			if state.functionCallOutputIDs == nil {
+				state.functionCallOutputIDs = map[string]struct{}{}
+			}
+			state.functionCallOutputIDs[callID] = struct{}{}
+		}
+	case "item_reference":
+		id := rawMapString(item, "id")
+		if id != "" {
+			if state.itemReferenceIDs == nil {
+				state.itemReferenceIDs = map[string]struct{}{}
+			}
+			state.itemReferenceIDs[id] = struct{}{}
+		}
+	}
 }
 
 func rawResponsesInputValue(value any, defaultRole string) ([]gatewaycontract.ContentBlock, []string, []string) {

@@ -331,16 +331,82 @@ func TestValidateResponsesRequestRequiresHostedToolOutputCallID(t *testing.T) {
 	}
 }
 
-func TestValidateResponsesRequestAllowsFunctionCallOutputCallID(t *testing.T) {
+func TestValidateResponsesRequestAllowsFunctionCallOutputWithPreviousResponseID(t *testing.T) {
 	svc, err := New()
 	if err != nil {
 		t.Fatalf("new service: %v", err)
 	}
 	if err := svc.ValidateResponsesRequest([]byte(`{
 		"model":"gpt-5.4",
+		"previous_response_id":"resp_previous",
 		"input":[{"type":"function_call_output","call_id":"call_1","output":"{}"}]
 	}`)); err != nil {
-		t.Fatalf("expected valid function_call_output, got %v", err)
+		t.Fatalf("expected valid function_call_output continuation, got %v", err)
+	}
+}
+
+func TestValidateResponsesRequestRequiresFunctionCallOutputContext(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	err = svc.ValidateResponsesRequest([]byte(`{
+		"model":"gpt-5.4",
+		"input":[{"type":"function_call_output","call_id":"call_1","output":"{}"}]
+	}`))
+
+	if err == nil || err.Error() != "Responses function_call_output input item requires matching function_call, item_reference, or previous_response_id" {
+		t.Fatalf("expected missing function_call_output context error, got %v", err)
+	}
+}
+
+func TestValidateResponsesRequestAllowsFunctionCallOutputWithItemReference(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	if err := svc.ValidateResponsesRequest([]byte(`{
+		"model":"gpt-5.4",
+		"input":[
+			{"type":"item_reference","id":"call_1"},
+			{"type":"function_call_output","call_id":"call_1","output":"{}"}
+		]
+	}`)); err != nil {
+		t.Fatalf("expected valid function_call_output item_reference context, got %v", err)
+	}
+}
+
+func TestValidateResponsesRequestAllowsFunctionCallOutputWithInlineToolCall(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	if err := svc.ValidateResponsesRequest([]byte(`{
+		"model":"gpt-5.4",
+		"input":[
+			{"type":"function_call","call_id":"call_1","name":"lookup","arguments":"{}"},
+			{"type":"function_call_output","call_id":"call_1","output":"{}"}
+		]
+	}`)); err != nil {
+		t.Fatalf("expected valid function_call_output inline tool context, got %v", err)
+	}
+}
+
+func TestValidateResponsesRequestRejectsFunctionCallOutputWithMismatchedInlineToolCall(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	err = svc.ValidateResponsesRequest([]byte(`{
+		"model":"gpt-5.4",
+		"input":[
+			{"type":"function_call","call_id":"call_other","name":"lookup","arguments":"{}"},
+			{"type":"function_call_output","call_id":"call_1","output":"{}"}
+		]
+	}`))
+
+	if err == nil || err.Error() != "Responses function_call_output input item requires matching function_call, item_reference, or previous_response_id" {
+		t.Fatalf("expected mismatched function_call_output context error, got %v", err)
 	}
 }
 
