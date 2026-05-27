@@ -24,6 +24,10 @@ func TestCanonicalKeyFromConvenienceMapsDTOKeys(t *testing.T) {
 	if !ok || got != KeyToolCalling {
 		t.Fatalf("expected supports_tools to map to %s, got %q ok=%v", KeyToolCalling, got, ok)
 	}
+	got, ok = CanonicalKeyFromConvenience("supports_responses_compact")
+	if !ok || got != KeyResponsesCompact {
+		t.Fatalf("expected supports_responses_compact to map to %s, got %q ok=%v", KeyResponsesCompact, got, ok)
+	}
 	got, ok = CanonicalKeyFromConvenience("web_search_preview")
 	if !ok || got != KeyWebSearch {
 		t.Fatalf("expected web_search_preview to map to %s, got %q ok=%v", KeyWebSearch, got, ok)
@@ -44,4 +48,16 @@ func TestDefaultDefinitionsIncludeWebSearch(t *testing.T) {
 		}
 	}
 	t.Fatalf("expected default definitions to include %s", KeyWebSearch)
+}
+
+func TestDefaultDefinitionsIncludeResponsesCompact(t *testing.T) {
+	for _, def := range DefaultDefinitions() {
+		if def.Key == KeyResponsesCompact {
+			if def.Version != "v1" || def.Category != "endpoint" || def.Status != DefinitionStatusExperimental {
+				t.Fatalf("unexpected responses compact definition: %+v", def)
+			}
+			return
+		}
+	}
+	t.Fatalf("expected default definitions to include %s", KeyResponsesCompact)
 }

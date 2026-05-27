@@ -233,6 +233,7 @@ Provider Adapter 根据 preset 派生：
 ```txt
 chat_completions_url = base_url + /chat/completions
 responses_url        = base_url + /responses
+responses_compact_url = base_url + /responses/compact
 messages_url         = base_url + /messages
 models_url           = base_url + /models
 embeddings_url       = base_url + /embeddings
@@ -255,6 +256,7 @@ account override > model_provider_mapping override > provider preset > family de
 ```txt
 chat_completions
 responses
+responses_compact
 messages
 generate_content
 embeddings

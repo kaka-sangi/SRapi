@@ -1128,6 +1128,7 @@ func providerScopedCapabilityKeys() []string {
 		capabilitiescontract.KeyModerations,
 		capabilitiescontract.KeyRerank,
 		capabilitiescontract.KeyRealtimeWebSocket,
+		capabilitiescontract.KeyResponsesCompact,
 		capabilitiescontract.KeyTokenCounting,
 	}
 }

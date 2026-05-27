@@ -163,7 +163,7 @@ func TestGatewayCodexResponsesCompactReplaysRawJSON(t *testing.T) {
 	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"codex-compact-provider","display_name":"Codex Compact","adapter_type":"reverse-proxy-codex-cli","protocol":"openai-compatible","status":"active"}`)
 	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"codex-compact-model","display_name":"Codex Compact Model","status":"active"}`)
 	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"codex-compact-upstream","status":"active"}`)
-	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"codex-compact-account","runtime_class":"cli_client_token","upstream_client":"codex_cli","credential":{"cli_client_token":"codex-compact-token"},"metadata":{"base_url":"`+upstream.URL+`/backend-api/codex"},"status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"codex-compact-account","runtime_class":"cli_client_token","upstream_client":"codex_cli","credential":{"cli_client_token":"codex-compact-token"},"metadata":{"base_url":"`+upstream.URL+`/backend-api/codex","capability_responses_compact":true},"status":"active"}`)
 	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
 
 	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/responses/compact", `{"model":"codex-compact-model","input":"compact this","previous_response_id":"resp_prev","stream":false}`)

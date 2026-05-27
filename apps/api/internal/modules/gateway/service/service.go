@@ -1307,6 +1307,9 @@ func requestCapabilities(req gatewaycontract.CanonicalRequest) []gatewaycontract
 	if req.Stream {
 		out = append(out, gatewaycontract.RequestCapability{Key: capabilitiescontract.KeyStreaming, Version: "v1"})
 	}
+	if responsesCompactEndpoint(req.SourceEndpoint) {
+		out = append(out, gatewaycontract.RequestCapability{Key: capabilitiescontract.KeyResponsesCompact, Version: "v1"})
+	}
 	if len(req.Tools) > 0 || req.ToolChoice != nil {
 		out = append(out, gatewaycontract.RequestCapability{Key: capabilitiescontract.KeyToolCalling, Version: "v1"})
 	}
@@ -1372,9 +1375,14 @@ func isConversationEndpoint(endpoint string) bool {
 	endpoint = strings.ToLower(strings.TrimSpace(endpoint))
 	return strings.HasSuffix(endpoint, "/chat/completions") ||
 		strings.HasSuffix(endpoint, "/responses") ||
+		responsesCompactEndpoint(endpoint) ||
 		strings.HasSuffix(endpoint, "/messages") ||
 		strings.Contains(endpoint, ":generatecontent") ||
 		strings.Contains(endpoint, ":streamgeneratecontent")
+}
+
+func responsesCompactEndpoint(endpoint string) bool {
+	return strings.HasSuffix(strings.ToLower(strings.TrimSpace(endpoint)), "/responses/compact")
 }
 
 func chatStopStrings(value *apiopenapi.ChatCompletionRequest_Stop) []string {

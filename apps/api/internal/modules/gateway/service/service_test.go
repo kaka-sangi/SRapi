@@ -123,6 +123,26 @@ func TestNormalizeResponsesRequiresWebSearchCapability(t *testing.T) {
 	}
 }
 
+func TestNormalizeResponsesCompactRequiresCompactCapability(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	input := apiopenapi.ResponsesRequest_Input{}
+	if err := input.FromResponsesRequestInput0("compact this"); err != nil {
+		t.Fatalf("set input: %v", err)
+	}
+
+	canonical := svc.NormalizeResponses(apiopenapi.ResponsesRequest{
+		Model: "gpt-5",
+		Input: input,
+	}, RequestMeta{SourceEndpoint: "/v1/responses/compact"})
+
+	if !requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyResponsesCompact) {
+		t.Fatalf("expected responses_compact capability, got %+v", canonical.RequestCapabilities)
+	}
+}
+
 func TestNormalizeResponsesPreservesTextAnnotations(t *testing.T) {
 	svc, err := New()
 	if err != nil {

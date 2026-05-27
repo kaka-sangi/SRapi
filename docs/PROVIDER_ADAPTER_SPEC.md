@@ -201,6 +201,7 @@ provider_name
 protocol
 supports_chat_completions
 supports_responses
+supports_responses_compact
 supports_messages
 supports_generate_content
 supports_embeddings
@@ -223,6 +224,8 @@ supports_oauth_refresh
 rate_limit_model
 quota_model
 ```
+
+WP-650 起，`supports_responses_compact` 映射到 canonical `responses_compact` endpoint capability。Gateway `/v1/responses/compact` 请求必须带 `responses_compact` request capability；OpenAI-compatible API-key、OpenAI reverse-proxy 和 Codex CLI reverse-proxy accounts 使用原生 `/responses/compact` 上游路径，并只按原始 `response.compaction` JSON 回放，不降级到 `/chat/completions` 或普通 `/responses` 伪转换。
 
 WP-290 起，`supports_images` 映射到 canonical `images` endpoint capability。Gateway image generation 请求必须带 `images` request capability；OpenAI-compatible API-key 和 reverse-proxy accounts 使用 `/images/generations` 上游路径，并解析 `url` / `b64_json` image outputs。WP-480 起，Gateway image edit 请求也使用 `images` request capability；OpenAI-compatible API-key 和 reverse-proxy accounts 使用 multipart `/images/edits` 上游路径，转发 `image` / `image[]`、可选 `mask` 和输出选项，并解析同一 OpenAI-compatible image response。WP-510 起，下游 JSON image references 会在 HTTP/Gateway 层解码成同一个 canonical image edit request，Provider Adapter 仍只接收已归一化的 image bytes 并以上游 multipart `/images/edits` 发出；remote URL 和 `file_id` references 仍在 Gateway 层拒绝。WP-520 起，`stream=true` 的 image edit 请求仍经过同一 Provider Adapter 和 usage 证据链，但当前 v1 只把最终 image response 重新包装成 `image.generation.result` SSE；上游 progressive image SSE relay 留待后续包。WP-490 起，Gateway image variation 请求也使用 `images` request capability；OpenAI-compatible API-key 和 reverse-proxy accounts 使用 multipart `/images/variations` 上游路径，转发单个 source `image`、`n`、`size`、`response_format` 和 `user`，并解析同一 OpenAI-compatible image response。OpenAI 官方 upstream 当前仅支持 `dall-e-2`，SRapi 通过 model mapping 决定上游模型名。
 
@@ -667,7 +670,7 @@ Audio speech dispatch must send JSON with mapped upstream `model`, `input`, `voi
 
 - “反代 / 2api”的权威定义见 `2API_REVERSE_PROXY_DEFINITION.md`：Adapter 必须按本地 `sub2api` / `CLIProxyAPI` / `chatgpt2api` 风格构造目标官方客户端形态的上游请求，例如 ChatGPT Web、Codex CLI、Claude Code CLI、Gemini CLI 或 Antigravity Desktop / IDE，而不是把下游请求简单透传到兼容 API，也不是启动或接入本地客户端进程。
 - `reverse-proxy-chatgpt-web` 文本请求必须构造 ChatGPT Web Conversation / official-client 形态，POST 到 ChatGPT Web origin 下的 `/backend-api/conversation`，并通过 Reverse Proxy Runtime 注入选中账号 OAuth/session token 身份；不得退化为 OpenAI-compatible `/chat/completions`，也不得接受 `runtime_class = api_key` 作为 2api 身份。
-- `reverse-proxy-codex-cli` 文本请求必须构造 Codex Responses / official-client 形态，POST 到配置的 Codex base URL 下的 `/responses`；`/v1/responses/compact` 请求必须 POST 到 `/responses/compact` 并保留 `response.compaction` 原始 JSON。两者都通过 Reverse Proxy Runtime 注入选中账号 OAuth/session/CLI token 身份；不得退化为 OpenAI-compatible `/chat/completions`，也不得接受 `runtime_class = api_key` 作为 2api 身份。
+- `reverse-proxy-codex-cli` 文本请求必须构造 Codex Responses / official-client 形态，POST 到配置的 Codex base URL 下的 `/responses`；`/v1/responses/compact` 请求必须要求 `responses_compact` effective capability，POST 到 `/responses/compact` 并保留 `response.compaction` 原始 JSON。两者都通过 Reverse Proxy Runtime 注入选中账号 OAuth/session/CLI token 身份；不得退化为 OpenAI-compatible `/chat/completions`，也不得接受 `runtime_class = api_key` 作为 2api 身份。
 - `reverse-proxy-codex-cli` realtime 请求必须通过 `PrepareRealtime` 构造 Codex Responses WebSocket session：从 Codex base URL 派生 `ws/wss` `/responses`，设置 Codex official-client headers，生成带 `type: response.create` 和 mapped upstream model 的首帧，并继续拒绝 `runtime_class = api_key`。
 - OpenAI-compatible Realtime 请求必须通过 `PrepareRealtime` 构造上游 Realtime WebSocket session：从 OpenAI-compatible base URL 派生 `ws/wss` `/realtime?model=<mapped_upstream_model>`，只转发显式允许的 Realtime handshake headers（当前为 `OpenAI-Safety-Identifier`）。`runtime_class = api_key` 的官方 API-key Realtime 由 Gateway 用选中账号 `api_key`/`openai_api_key` 直连上游；`runtime_class != api_key` 的 OpenAI-compatible Realtime 通过 Reverse Proxy Runtime 使用选中账号 OAuth/session/client-token credential 注入上游身份。SRapi 2api Realtime 路径继续拒绝 `runtime_class = api_key`。
 - `reverse-proxy-*` 和 `runtime_class != api_key` 上游请求必须通过 Reverse Proxy Runtime 发起，不得使用裸 `net/http` 默认客户端；官方 API-key Adapter 路径可使用普通 upstream client，但认证材料仍只能来自选中账号 credential。

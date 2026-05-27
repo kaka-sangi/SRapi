@@ -66,6 +66,9 @@ func (s *Service) InvokeConversation(ctx context.Context, req contract.Conversat
 	if isReverseProxyRuntime(req) {
 		return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "reverse proxy upstream base url missing"}
 	}
+	if openAIResponsesCompactRequest(req) {
+		return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "responses compact upstream base url missing"}
+	}
 	text := synthesizeLocalText(req.Model, conversationPrompt(req))
 	return conversationTextResponse(text, http.StatusOK, estimatedUsage(text)), nil
 }
@@ -402,6 +405,9 @@ func (s *Service) invokeOpenAICompatible(ctx context.Context, req contract.Conve
 	if apiKey == "" {
 		return contract.ConversationResponse{}, contract.ProviderError{Class: "auth_failed", StatusCode: http.StatusUnauthorized, Message: "provider api key missing"}
 	}
+	if openAIResponsesCompactRequest(req) {
+		return s.invokeOpenAICompatibleResponsesCompact(ctx, req, baseURL, apiKey)
+	}
 	raw, err := openAICompatibleRequestBody(req)
 	if err != nil {
 		return contract.ConversationResponse{}, err
@@ -574,6 +580,9 @@ func (s *Service) invokeReverseProxyOpenAICompatible(ctx context.Context, req co
 	if s.reverseProxy == nil {
 		return contract.ConversationResponse{}, contract.ProviderError{Class: "network_error", StatusCode: http.StatusBadGateway, Message: "reverse proxy runtime unavailable"}
 	}
+	if openAIResponsesCompactRequest(req) {
+		return s.invokeReverseProxyOpenAICompatibleResponsesCompact(ctx, req, baseURL)
+	}
 	if isChatGPTWebReverseProxy(req) {
 		return s.invokeReverseProxyChatGPTWebConversation(ctx, req, baseURL)
 	}
@@ -605,6 +614,128 @@ func (s *Service) invokeReverseProxyOpenAICompatible(ctx context.Context, req co
 		return parseOpenAICompatibleStream(runtimeResp.Body, runtimeResp.StatusCode)
 	}
 	return parseOpenAICompatibleJSON(runtimeResp.Body, runtimeResp.StatusCode)
+}
+
+func (s *Service) invokeOpenAICompatibleResponsesCompact(ctx context.Context, req contract.ConversationRequest, baseURL string, apiKey string) (contract.ConversationResponse, error) {
+	raw, err := openAIResponsesCompactBody(req)
+	if err != nil {
+		return contract.ConversationResponse{}, err
+	}
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(baseURL, "/")+"/responses/compact", bytes.NewReader(raw))
+	if err != nil {
+		return contract.ConversationResponse{}, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+apiKey)
+
+	resp, err := s.client.Do(httpReq)
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return contract.ConversationResponse{}, contract.ProviderError{Class: "timeout", StatusCode: http.StatusGatewayTimeout, Message: "provider request timed out"}
+		}
+		return contract.ConversationResponse{}, contract.ProviderError{Class: "network_error", StatusCode: http.StatusBadGateway, Message: "provider request failed"}
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
+	if err != nil {
+		return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response read failed"}
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return contract.ConversationResponse{}, classifyProviderHTTPError(resp.StatusCode, body)
+	}
+	return parseOpenAIResponsesCompactJSON(body, resp.StatusCode)
+}
+
+func (s *Service) invokeReverseProxyOpenAICompatibleResponsesCompact(ctx context.Context, req contract.ConversationRequest, baseURL string) (contract.ConversationResponse, error) {
+	raw, err := openAIResponsesCompactBody(req)
+	if err != nil {
+		return contract.ConversationResponse{}, err
+	}
+	runtimeResp, err := s.reverseProxy.Do(ctx, reverseproxycontract.Request{
+		Account: reverseproxycontract.AccountRuntime{
+			AccountID:      req.Account.ID,
+			RuntimeClass:   string(req.Account.RuntimeClass),
+			UpstreamClient: req.Account.UpstreamClient,
+			ProxyID:        req.Account.ProxyID,
+			UserAgent:      mapString(req.Account.Metadata, "user_agent"),
+			Credential:     req.Credential,
+		},
+		Method: http.MethodPost,
+		URL:    strings.TrimRight(baseURL, "/") + "/responses/compact",
+		Headers: http.Header{
+			"Content-Type": {"application/json"},
+		},
+		Body: raw,
+	})
+	if err != nil {
+		return contract.ConversationResponse{}, providerErrorFromReverseProxy(err)
+	}
+	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
+		return contract.ConversationResponse{}, classifyProviderHTTPError(runtimeResp.StatusCode, runtimeResp.Body)
+	}
+	return parseOpenAIResponsesCompactJSON(runtimeResp.Body, runtimeResp.StatusCode)
+}
+
+func openAIResponsesCompactRequest(req contract.ConversationRequest) bool {
+	return strings.EqualFold(strings.TrimSpace(req.SourceProtocol), "openai-compatible") &&
+		strings.HasSuffix(strings.ToLower(strings.TrimSpace(req.SourceEndpoint)), "/responses/compact")
+}
+
+func openAIResponsesCompactBody(req contract.ConversationRequest) ([]byte, error) {
+	raw := bytes.TrimSpace(req.RawBody)
+	if len(raw) > 0 {
+		var payload map[string]any
+		if err := json.Unmarshal(raw, &payload); err != nil {
+			return nil, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "invalid raw responses compact payload"}
+		}
+		if model := strings.TrimSpace(req.Mapping.UpstreamModelName); model != "" {
+			payload["model"] = model
+		}
+		return json.Marshal(payload)
+	}
+	prompt := strings.TrimSpace(conversationPrompt(req))
+	if prompt == "" {
+		return nil, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "responses compact request body missing"}
+	}
+	return json.Marshal(map[string]any{
+		"model": req.Mapping.UpstreamModelName,
+		"input": prompt,
+	})
+}
+
+type openAIResponsesCompactResponse struct {
+	Object       string      `json:"object"`
+	InputTokens  *int        `json:"input_tokens"`
+	OutputTokens *int        `json:"output_tokens"`
+	Usage        openAIUsage `json:"usage"`
+}
+
+func parseOpenAIResponsesCompactJSON(body []byte, statusCode int) (contract.ConversationResponse, error) {
+	var decoded openAIResponsesCompactResponse
+	if err := json.Unmarshal(body, &decoded); err != nil {
+		return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider returned invalid json"}
+	}
+	if !strings.EqualFold(strings.TrimSpace(decoded.Object), "response.compaction") {
+		return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider returned non-compact response"}
+	}
+	usage := decoded.Usage
+	if usage.InputTokens == nil && decoded.InputTokens != nil {
+		usage.InputTokens = decoded.InputTokens
+	}
+	if usage.OutputTokens == nil && decoded.OutputTokens != nil {
+		usage.OutputTokens = decoded.OutputTokens
+	}
+	respUsage := contract.Usage{}
+	if usage.HasTokenUsage() {
+		respUsage = usage.ToUsage("")
+	}
+	return contract.ConversationResponse{
+		StopReason: contract.StopReasonEndTurn,
+		StatusCode: statusCode,
+		Usage:      respUsage,
+		Raw:        append(json.RawMessage(nil), bytes.TrimSpace(body)...),
+	}, nil
 }
 
 func upstreamBaseURL(req contract.ConversationRequest) string {

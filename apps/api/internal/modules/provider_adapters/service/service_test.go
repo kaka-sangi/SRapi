@@ -338,6 +338,120 @@ func TestOpenAICompatibleAdapterDoesNotUseResponsesRawBodyForChatUpstream(t *tes
 	}
 }
 
+func TestOpenAICompatibleAdapterUsesResponsesCompactEndpoint(t *testing.T) {
+	var upstreamPath string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamPath = r.URL.Path
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode compact upstream request: %v", err)
+		}
+		if payload["model"] != "gpt-upstream" ||
+			payload["previous_response_id"] != "resp_previous" ||
+			payload["stream"] != false {
+			t.Fatalf("expected mapped raw compact payload, got %+v", payload)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"cmp_openai","object":"response.compaction","input_tokens":9,"output_tokens":2}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_openai_compact",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/responses/compact",
+		TargetProtocol: "openai-compatible",
+		Model:          "gpt-local",
+		InputParts:     textParts("compact me"),
+		RawBody:        []byte(`{"model":"gpt-local","input":"compact me","previous_response_id":"resp_previous","stream":false}`),
+		Provider:       providercontract.Provider{AdapterType: "openai-compatible", Protocol: "openai-compatible"},
+		Account:        accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:        modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-upstream"},
+		Credential:     map[string]any{"api_key": "upstream-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke OpenAI compact upstream: %v", err)
+	}
+	if upstreamPath != "/v1/responses/compact" {
+		t.Fatalf("expected compact upstream path, got %q", upstreamPath)
+	}
+	if string(resp.Raw) != `{"id":"cmp_openai","object":"response.compaction","input_tokens":9,"output_tokens":2}` {
+		t.Fatalf("expected raw compact response, got %q", string(resp.Raw))
+	}
+	if resp.Usage.InputTokens != 9 || resp.Usage.OutputTokens != 2 || resp.Usage.Estimated {
+		t.Fatalf("expected compact usage from raw response, got %+v", resp.Usage)
+	}
+}
+
+func TestOpenAICompatibleAdapterRejectsLocalResponsesCompactSynthesis(t *testing.T) {
+	svc, err := service.New(nil)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_openai_compact_no_base_url",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/responses/compact",
+		TargetProtocol: "openai-compatible",
+		Model:          "gpt-local",
+		InputParts:     textParts("compact me"),
+		Provider:       providercontract.Provider{AdapterType: "openai-compatible", Protocol: "openai-compatible"},
+		Account:        accountcontract.ProviderAccount{},
+		Mapping:        modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-upstream"},
+		Credential:     map[string]any{"api_key": "upstream-secret"},
+	})
+	assertProviderError(t, err, "invalid_request", http.StatusBadRequest)
+}
+
+func TestReverseProxyOpenAICompatibleAdapterUsesResponsesCompactEndpoint(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body:       []byte(`{"id":"cmp_reverse","object":"response.compaction","input_tokens":7,"output_tokens":1}`),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_reverse_openai_compact",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/responses/compact",
+		TargetProtocol: "openai-compatible",
+		Model:          "gpt-local",
+		InputParts:     textParts("compact me"),
+		RawBody:        []byte(`{"model":"gpt-local","input":"compact me","stream":false}`),
+		Provider:       providercontract.Provider{AdapterType: "reverse-proxy-openai-compatible", Protocol: "openai-compatible"},
+		Account:        accountcontract.ProviderAccount{ID: 9, RuntimeClass: accountcontract.RuntimeClassOauthRefresh, Metadata: map[string]any{"base_url": "https://openai.example/v1"}},
+		Mapping:        modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-upstream"},
+		Credential:     map[string]any{"access_token": "oauth-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke reverse proxy OpenAI compact upstream: %v", err)
+	}
+	if runtime.request.Method != http.MethodPost || runtime.request.URL != "https://openai.example/v1/responses/compact" || runtime.request.ExpectStream {
+		t.Fatalf("unexpected reverse proxy compact request: %+v", runtime.request)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(runtime.request.Body, &payload); err != nil {
+		t.Fatalf("decode reverse compact payload: %v", err)
+	}
+	if payload["model"] != "gpt-upstream" || payload["stream"] != false {
+		t.Fatalf("expected mapped reverse compact payload, got %+v", payload)
+	}
+	if string(resp.Raw) != `{"id":"cmp_reverse","object":"response.compaction","input_tokens":7,"output_tokens":1}` {
+		t.Fatalf("expected raw reverse compact response, got %q", string(resp.Raw))
+	}
+	if resp.Usage.InputTokens != 7 || resp.Usage.OutputTokens != 1 || resp.Usage.Estimated {
+		t.Fatalf("expected compact usage from usage object, got %+v", resp.Usage)
+	}
+}
+
 func TestOpenAICompatibleAdapterRendersContentPartsToUpstream(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var payload struct {

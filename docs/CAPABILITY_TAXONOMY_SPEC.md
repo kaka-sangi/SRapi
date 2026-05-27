@@ -102,6 +102,7 @@ Endpoint capability 用于调度路由族，不替代输入/输出能力：
 ```txt
 chat_completions
 responses
+responses_compact
 messages
 embeddings
 images
@@ -121,6 +122,8 @@ token_counting
 `rerank` 表示 Provider Account 能处理 `/v1/rerank` 兼容端点；`rerank_output` 表示模型/Provider 能产出排序评分。Gateway rerank 请求必须要求 `rerank.v1`，避免 generation-only 或 embedding-only provider 被误选。
 
 `token_counting` 表示 Provider Account 能处理原生 token counting 端点，例如 Gemini `models/{model}:countTokens` 或 Anthropic `/v1/messages/count_tokens`。Gateway countTokens / count_tokens 请求必须要求 `token_counting.v1`，避免只具备生成能力但没有计数端点的候选账号被误选；计数结果不代表生成用量。
+
+`responses_compact` 表示 Provider Account 能处理 OpenAI Responses compact 子资源并返回原生 `response.compaction`。Gateway `/v1/responses/compact` 请求必须要求 `responses_compact.v1`，避免只具备普通 Responses 或 Chat Completions 生成能力的候选账号被误选并伪造压缩语义。
 
 ### 4.3 交互能力
 

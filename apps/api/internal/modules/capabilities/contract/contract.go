@@ -48,6 +48,7 @@ const (
 
 	KeyChatCompletions     = "chat_completions"
 	KeyResponses           = "responses"
+	KeyResponsesCompact    = "responses_compact"
 	KeyMessages            = "messages"
 	KeyEmbeddings          = "embeddings"
 	KeyImages              = "images"
@@ -93,6 +94,7 @@ var defaultDefinitions = []Definition{
 	{Key: KeyUsageInStream, Version: "v1", Category: "usage", Status: DefinitionStatusStable, Description: "Provider can emit usage in streaming responses."},
 	{Key: KeyChatCompletions, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports Chat Completions-compatible generation."},
 	{Key: KeyResponses, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports Responses-compatible generation."},
+	{Key: KeyResponsesCompact, Version: "v1", Category: "endpoint", Status: DefinitionStatusExperimental, Description: "Provider supports native Responses compaction without cross-protocol synthesis."},
 	{Key: KeyMessages, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports Messages-compatible generation."},
 	{Key: KeyEmbeddings, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports embeddings."},
 	{Key: KeyImages, Version: "v1", Category: "endpoint", Status: DefinitionStatusStable, Description: "Provider supports image generation."},
@@ -141,6 +143,8 @@ var convenienceKeys = map[string]string{
 	"supports_usage_in_stream":      KeyUsageInStream,
 	"supports_chat_completions":     KeyChatCompletions,
 	"supports_responses":            KeyResponses,
+	"supports_responses_compact":    KeyResponsesCompact,
+	"responses_compact":             KeyResponsesCompact,
 	"supports_messages":             KeyMessages,
 	"supports_embeddings":           KeyEmbeddings,
 	"supports_images":               KeyImages,

@@ -3648,6 +3648,40 @@ func TestGatewayAnthropicCountTokensRequiresProviderScopedCapability(t *testing.
 	}
 }
 
+func TestGatewayResponsesCompactRequiresProviderScopedCapability(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"compact-missing-cap-provider","display_name":"Compact Missing Capability","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active","capabilities":{"responses":true}}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"compact-missing-cap-model","display_name":"Compact Missing Capability Model","status":"active","capabilities":[{"key":"responses_compact","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"compact-upstream","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"compact-missing-cap-account","runtime_class":"api_key","credential":{"api_key":"compact-secret"},"metadata":{"base_url":"https://api.openai.com/v1"},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/responses/compact", strings.NewReader(`{"model":"compact-missing-cap-model","input":"compact"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected no available account when provider lacks responses_compact, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=compact-missing-cap-model", nil)
+	decisionsReq.AddCookie(sessionCookie)
+	decisionsRec := httptest.NewRecorder()
+	handler.ServeHTTP(decisionsRec, decisionsReq)
+	if decisionsRec.Code != http.StatusOK {
+		t.Fatalf("expected scheduler decisions 200, got %d body=%s", decisionsRec.Code, decisionsRec.Body.String())
+	}
+	var decisionsResp apiopenapi.SchedulerDecisionListResponse
+	if err := json.NewDecoder(decisionsRec.Body).Decode(&decisionsResp); err != nil {
+		t.Fatalf("decode scheduler decisions: %v", err)
+	}
+	if len(decisionsResp.Data) != 1 || decisionsResp.Data[0].SelectedAccountId != nil || !rejectionReasonsContain(decisionsResp.Data[0].RejectReasons, "capability_mismatch") {
+		t.Fatalf("expected compact capability_mismatch decision, got %+v", decisionsResp.Data)
+	}
+}
+
 func TestGatewayGeminiStreamGenerateContentEmitsGeminiSSE(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")

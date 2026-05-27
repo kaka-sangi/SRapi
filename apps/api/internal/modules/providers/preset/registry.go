@@ -96,7 +96,11 @@ func Default() *Registry {
 }
 
 func openAIPreset(providerKey string, displayName string, defaultBaseURL string, routeAliases []string) Preset {
-	return compatiblePreset(providerKey, PlatformFamilyOpenAICompatible, displayName, defaultBaseURL, routeAliases, openAICapabilities())
+	capabilities := openAICapabilities()
+	if openAIPresetSupportsResponsesCompact(providerKey) {
+		capabilities[capabilitiescontract.KeyResponsesCompact] = true
+	}
+	return compatiblePreset(providerKey, PlatformFamilyOpenAICompatible, displayName, defaultBaseURL, routeAliases, capabilities)
 }
 
 func anthropicPreset(providerKey string, displayName string, defaultBaseURL string, routeAliases []string) Preset {
@@ -167,6 +171,15 @@ func openAICapabilities() map[string]bool {
 		capabilitiescontract.KeyStructuredOutput:    true,
 		capabilitiescontract.KeyVisionInput:         true,
 		capabilitiescontract.KeyReasoningControl:    true,
+	}
+}
+
+func openAIPresetSupportsResponsesCompact(providerKey string) bool {
+	switch strings.TrimSpace(providerKey) {
+	case "openai", "openai-compatible":
+		return true
+	default:
+		return false
 	}
 }
 

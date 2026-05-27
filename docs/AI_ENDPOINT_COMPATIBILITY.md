@@ -392,6 +392,7 @@ Provider-hosted web search 是 built-in tool 的特例：Responses `web_search` 
 | --- | --- | --- | --- | --- |
 | `/v1/chat/completions` | native | convert | convert | convert |
 | `/v1/responses` | convert with warnings | native | convert | convert |
+| `/v1/responses/compact` | unsupported | native compact only | unsupported | unsupported |
 | `/v1/messages` | convert | convert | native | convert |
 | Gemini `generateContent` | convert | convert | convert | native |
 
@@ -408,6 +409,7 @@ supported_client_protocols
 supported_upstream_protocols
 supports_chat_completions
 supports_responses
+supports_responses_compact
 supports_messages
 supports_generate_content
 supports_embeddings
