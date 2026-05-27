@@ -1606,17 +1606,27 @@ func codexTerminalStreamEvent(event codexResponsesEvent, eventType string, raw s
 
 func codexFailedStreamEventMetadata(event codexResponsesEvent) map[string]any {
 	metadata := map[string]any{"type": "response.failed"}
-	if event.Error != nil {
-		if value := strings.TrimSpace(event.Error.Message); value != "" {
-			metadata["error_message"] = value
+	mergeError := func(err *codexResponsesError) {
+		if err == nil {
+			return
 		}
-		if value := strings.TrimSpace(event.Error.Code); value != "" {
-			metadata["error_code"] = value
+		if value := strings.TrimSpace(err.Message); value != "" {
+			if _, ok := metadata["error_message"]; !ok {
+				metadata["error_message"] = value
+			}
 		}
-		if value := strings.TrimSpace(event.Error.Type); value != "" {
-			metadata["error_type"] = value
+		if value := strings.TrimSpace(err.Code); value != "" {
+			if _, ok := metadata["error_code"]; !ok {
+				metadata["error_code"] = value
+			}
+		}
+		if value := strings.TrimSpace(err.Type); value != "" {
+			if _, ok := metadata["error_type"]; !ok {
+				metadata["error_type"] = value
+			}
 		}
 	}
+	mergeError(event.Error)
 	if value := strings.TrimSpace(event.Message); value != "" {
 		metadata["message"] = value
 	}
@@ -1627,6 +1637,7 @@ func codexFailedStreamEventMetadata(event codexResponsesEvent) map[string]any {
 		if status := strings.TrimSpace(event.Response.Status); status != "" {
 			metadata["status"] = status
 		}
+		mergeError(event.Response.Error)
 	}
 	return metadata
 }
