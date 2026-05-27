@@ -502,6 +502,91 @@ func TestNativeOpenAIAdapterNormalizesCanonicalResponsesImageGenerationToolAlias
 	}
 }
 
+func TestNativeOpenAIAdapterNormalizesResponsesImageOnlyModelWhenMainModelConfigured(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		if payload["model"] != "gpt-5.4-mini" {
+			t.Fatalf("expected configured Responses main model, got %+v", payload)
+		}
+		if payload["prompt"] != nil || payload["size"] != nil || payload["quality"] != nil || payload["partial_images"] != nil ||
+			payload["format"] != nil || payload["compression"] != nil {
+			t.Fatalf("expected top-level image fields to move into image_generation tool, got %+v", payload)
+		}
+		if payload["input"] != "draw a cat" {
+			t.Fatalf("expected prompt to become Responses input, got %+v", payload)
+		}
+		choice, _ := payload["tool_choice"].(map[string]any)
+		if choice["type"] != "image_generation" {
+			t.Fatalf("expected image_generation tool_choice, got %+v", payload["tool_choice"])
+		}
+		tools, _ := payload["tools"].([]any)
+		if len(tools) != 1 {
+			t.Fatalf("expected one image_generation tool, got %+v", payload["tools"])
+		}
+		tool, _ := tools[0].(map[string]any)
+		if tool["type"] != "image_generation" ||
+			tool["model"] != "gpt-image-2" ||
+			tool["size"] != "1024x1024" ||
+			tool["quality"] != "high" ||
+			tool["partial_images"] != float64(2) ||
+			tool["output_format"] != "webp" ||
+			tool["output_compression"] != float64(72) {
+			t.Fatalf("expected image-only model fields to move into tool, got %+v", tool)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"resp_image_only","object":"response","status":"completed","output":[{"type":"image_generation_call","result":"aW1hZ2U="}],"usage":{"input_tokens":2,"output_tokens":1}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_native_openai_image_only_model",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/responses",
+		TargetProtocol: "openai-compatible",
+		Model:          "gpt-image-local",
+		InputParts:     textParts("canonical fallback"),
+		RawBody:        []byte(`{"model":"gpt-image-local","prompt":"draw a cat","stream":false,"size":"1024x1024","quality":"high","partial_images":2,"format":"webp","compression":72}`),
+		Provider:       providercontract.Provider{AdapterType: "native-openai", Protocol: "openai-compatible", ConfigSchema: map[string]any{"responses_main_model": "gpt-5.4-mini"}},
+		Account:        accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:        modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-image-2"},
+		Credential:     map[string]any{"api_key": "upstream-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke native OpenAI image-only Responses upstream: %v", err)
+	}
+	if len(resp.Parts) != 1 || resp.Parts[0].Kind != contract.ContentPartImage || resp.Parts[0].MediaBase64 != "aW1hZ2U=" {
+		t.Fatalf("expected image_generation_call response part, got %+v", resp.Parts)
+	}
+}
+
+func TestNativeOpenAIAdapterRejectsResponsesImageOnlyModelWithoutMainModel(t *testing.T) {
+	svc, err := service.New(nil)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_native_openai_image_only_model_missing_main",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/responses",
+		TargetProtocol: "openai-compatible",
+		Model:          "gpt-image-local",
+		InputParts:     textParts("draw a cat"),
+		RawBody:        []byte(`{"model":"gpt-image-local","input":"draw a cat","stream":false}`),
+		Provider:       providercontract.Provider{AdapterType: "native-openai", Protocol: "openai-compatible"},
+		Account:        accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": "https://openai.example/v1"}},
+		Mapping:        modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-image-2"},
+		Credential:     map[string]any{"api_key": "upstream-secret"},
+	})
+	assertProviderError(t, err, "invalid_request", http.StatusBadRequest)
+}
+
 func TestOpenAIProviderNameUsesResponsesEndpoint(t *testing.T) {
 	var upstreamPath string
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

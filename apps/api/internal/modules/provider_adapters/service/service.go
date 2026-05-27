@@ -790,11 +790,17 @@ func openAIResponsesBody(req contract.ConversationRequest) ([]byte, error) {
 			return nil, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "invalid raw responses payload"}
 		}
 		openAIApplyResponsesPayloadDefaults(req, payload)
+		if err := normalizeOpenAIResponsesImageOnlyModel(req, payload); err != nil {
+			return nil, err
+		}
 		normalizeOpenAIResponsesImageGenerationTools(payload)
 		return json.Marshal(payload)
 	}
 	payload := openAICanonicalResponsesPayload(req)
 	openAIApplyResponsesPayloadDefaults(req, payload)
+	if err := normalizeOpenAIResponsesImageOnlyModel(req, payload); err != nil {
+		return nil, err
+	}
 	normalizeOpenAIResponsesImageGenerationTools(payload)
 	return json.Marshal(payload)
 }
@@ -880,6 +886,91 @@ func normalizeOpenAIResponsesImageGenerationTool(tool map[string]any) {
 	}
 	delete(tool, "format")
 	delete(tool, "compression")
+}
+
+func normalizeOpenAIResponsesImageOnlyModel(req contract.ConversationRequest, payload map[string]any) error {
+	imageModel := strings.TrimSpace(mapString(payload, "model"))
+	if !openAIResponsesImageGenerationModel(imageModel) {
+		return nil
+	}
+	mainModel := openAIResponsesMainModel(req)
+	if mainModel == "" {
+		return contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "responses image_generation requests require a configured responses main model"}
+	}
+	tool := ensureOpenAIResponsesImageGenerationTool(payload)
+	if strings.TrimSpace(mapString(tool, "model")) == "" {
+		tool["model"] = imageModel
+	}
+	for _, key := range []string{"size", "quality", "background", "output_format", "output_compression", "moderation", "style", "partial_images"} {
+		moveOpenAIResponsesImageToolField(payload, tool, key, key)
+	}
+	moveOpenAIResponsesImageToolField(payload, tool, "format", "output_format")
+	moveOpenAIResponsesImageToolField(payload, tool, "compression", "output_compression")
+	if prompt := strings.TrimSpace(mapString(payload, "prompt")); prompt != "" {
+		if _, exists := payload["input"]; !exists {
+			payload["input"] = prompt
+		}
+		delete(payload, "prompt")
+	}
+	if _, exists := payload["tool_choice"]; !exists {
+		payload["tool_choice"] = map[string]any{"type": "image_generation"}
+	}
+	payload["model"] = mainModel
+	return nil
+}
+
+func moveOpenAIResponsesImageToolField(payload map[string]any, tool map[string]any, fromKey string, toKey string) {
+	value, ok := payload[fromKey]
+	if !ok || value == nil {
+		return
+	}
+	if _, exists := tool[toKey]; !exists {
+		tool[toKey] = cloneAny(value)
+	}
+	delete(payload, fromKey)
+}
+
+func ensureOpenAIResponsesImageGenerationTool(payload map[string]any) map[string]any {
+	switch tools := payload["tools"].(type) {
+	case []any:
+		for _, rawTool := range tools {
+			tool, ok := rawTool.(map[string]any)
+			if ok && strings.TrimSpace(mapString(tool, "type")) == "image_generation" {
+				return tool
+			}
+		}
+		tool := map[string]any{"type": "image_generation"}
+		payload["tools"] = append(tools, tool)
+		return tool
+	case []map[string]any:
+		for _, tool := range tools {
+			if strings.TrimSpace(mapString(tool, "type")) == "image_generation" {
+				return tool
+			}
+		}
+		tool := map[string]any{"type": "image_generation"}
+		payload["tools"] = append(tools, tool)
+		return tool
+	default:
+		tool := map[string]any{"type": "image_generation"}
+		payload["tools"] = []any{tool}
+		return tool
+	}
+}
+
+func openAIResponsesImageGenerationModel(model string) bool {
+	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(model)), "gpt-image-")
+}
+
+func openAIResponsesMainModel(req contract.ConversationRequest) string {
+	for _, values := range []map[string]any{req.Account.Metadata, req.Provider.ConfigSchema, req.Provider.Capabilities} {
+		for _, key := range []string{"responses_main_model", "openai_responses_main_model", "image_generation_responses_model"} {
+			if value := mapString(values, key); value != "" {
+				return value
+			}
+		}
+	}
+	return ""
 }
 
 func openAIResponsesAccept(stream bool) string {
