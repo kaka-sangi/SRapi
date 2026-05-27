@@ -412,7 +412,7 @@ func isResponsesStyleStreamEvent(event gatewaycontract.StreamEvent) bool {
 
 func (s *Service) renderResponsesCanonicalStreamEvents(resp gatewaycontract.CanonicalResponse) []StreamEvent {
 	events := normalizeStreamEvents(resp.StreamEvents)
-	if !streamEventsHaveRenderableOutput(events) {
+	if !streamEventsHaveRenderableOutput(events) && !streamEventsHaveResponsesTerminal(events) {
 		return nil
 	}
 	out := []StreamEvent{
@@ -561,16 +561,42 @@ func (s *Service) renderResponsesCanonicalStreamEvents(resp gatewaycontract.Cano
 		out = append(out, group.Events...)
 	}
 	terminalEventName := responsesTerminalEventName(resp.StopReason)
+	if rawTerminalEventName := responsesRawTerminalEventName(events); rawTerminalEventName != "" {
+		terminalEventName = rawTerminalEventName
+	}
+	terminalResponse := s.RenderResponses(resp)
+	if terminalEventName == "response.failed" {
+		failedStatus := "failed"
+		terminalResponse.Status = &failedStatus
+	}
 	out = append(out,
 		StreamEvent{
 			Event: terminalEventName,
 			Data: map[string]any{
 				"type":     terminalEventName,
-				"response": s.RenderResponses(resp),
+				"response": terminalResponse,
 			},
 		},
 	)
 	return out
+}
+
+func streamEventsHaveResponsesTerminal(events []gatewaycontract.StreamEvent) bool {
+	return responsesRawTerminalEventName(events) != ""
+}
+
+func responsesRawTerminalEventName(events []gatewaycontract.StreamEvent) string {
+	for idx := len(events) - 1; idx >= 0; idx-- {
+		event := events[idx]
+		if event.Type != gatewaycontract.StreamEventStop {
+			continue
+		}
+		switch strings.TrimSpace(event.RawEventType) {
+		case "response.completed", "response.done", "response.incomplete", "response.cancelled", "response.canceled", "response.failed":
+			return strings.TrimSpace(event.RawEventType)
+		}
+	}
+	return ""
 }
 
 func responseStreamTextStartEvents(itemID string, outputIndex int, blockType gatewaycontract.ContentBlockType, metadata map[string]any) []StreamEvent {

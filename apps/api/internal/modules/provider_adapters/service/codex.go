@@ -867,7 +867,7 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 		eventType := frame.EventType(event.Type)
 		event.Type = eventType
 		seenEvent = true
-		if providerErr, ok := codexEventProviderError(event); ok {
+		if providerErr, ok := codexEventProviderError(event); ok && eventType != "response.failed" {
 			return contract.ConversationResponse{}, providerErr
 		}
 		if event.Usage != nil && event.Usage.HasTokenUsage() {
@@ -954,17 +954,16 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 			if strings.TrimSpace(event.Text) != "" {
 				completedReasoning = event.Text
 			}
-		case "response.completed", "response.done", "response.incomplete", "response.cancelled", "response.canceled":
+		case "response.completed", "response.done", "response.incomplete", "response.cancelled", "response.canceled", "response.failed":
+			if eventType != "response.failed" {
+				if providerErr, ok := codexEventProviderError(event); ok {
+					return contract.ConversationResponse{}, providerErr
+				}
+			}
 			if text := codexEventText(event); strings.TrimSpace(text) != "" {
 				completedText = text
 			}
-			appendStreamEvent(contract.ConversationStreamEvent{
-				Type:           contract.ConversationStreamEventStop,
-				StopReason:     codexStreamStopReason(event, completedRefusal, refusalBuilder.String()),
-				RawEventType:   eventType,
-				Raw:            append(json.RawMessage(nil), data...),
-				OriginProtocol: "openai-compatible",
-			})
+			appendStreamEvent(codexTerminalStreamEvent(event, eventType, data, completedRefusal, refusalBuilder.String()))
 		default:
 			if text := codexEventText(event); strings.TrimSpace(text) != "" && strings.TrimSpace(completedText) == "" {
 				completedText = text
@@ -974,45 +973,21 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 	if !seenEvent {
 		return contract.ConversationResponse{}, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream ended before chunk"}
 	}
-	parts := []contract.ContentPart(nil)
-	stopReason := contract.StopReasonEndTurn
-	if finalResponse != nil {
-		parts = finalResponse.Parts()
-		stopReason = codexStopReason(*finalResponse)
-	}
-	if len(parts) == 0 {
-		collectedItems := codexCollectedOutputItems(indexedItems, fallbackItems)
-		parts = codexResponsesOutputItemsParts(collectedItems)
-		if codexOutputItemsIncludeFunctionCall(collectedItems) {
-			stopReason = contract.StopReasonToolUse
-		} else if codexOutputItemsIncludeRefusal(collectedItems) {
-			stopReason = contract.StopReasonRefusal
-		}
-	}
-	if len(parts) == 0 {
-		text := strings.TrimSpace(completedText)
-		if text == "" {
-			text = strings.TrimSpace(deltaBuilder.String())
-		}
-		if text != "" {
-			part := textContentPart(text)
-			part.Metadata = codexCombinedStreamAnnotationsMetadata(textAnnotationsByIndex)
-			parts = append(parts, part)
-		}
-	}
-	if len(parts) == 0 {
-		refusalText := strings.TrimSpace(completedRefusal)
-		if refusalText == "" {
-			refusalText = strings.TrimSpace(refusalBuilder.String())
-		}
-		if refusalText != "" {
-			parts = append(parts, contract.ContentPart{Kind: contract.ContentPartRefusal, Text: refusalText, OriginProtocol: "openai"})
-			stopReason = contract.StopReasonRefusal
-		}
-	}
-	parts = prependCodexReasoningPart(parts, completedReasoning, reasoningBuilder.String())
-	if len(parts) == 0 {
-		return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider stream contained no content"}
+	parts, stopReason, err := codexResponsesStreamPartsAndStopReason(
+		finalResponse,
+		indexedItems,
+		fallbackItems,
+		completedText,
+		deltaBuilder.String(),
+		completedRefusal,
+		refusalBuilder.String(),
+		completedReasoning,
+		reasoningBuilder.String(),
+		textAnnotationsByIndex,
+		streamEvents,
+	)
+	if err != nil {
+		return contract.ConversationResponse{}, err
 	}
 	text := contentPartsText(parts)
 	parsedUsage := estimatedUsage(text)
@@ -1036,6 +1011,59 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 		Raw:          append(json.RawMessage(nil), body...),
 		StreamEvents: streamEvents,
 	}, nil
+}
+
+func codexResponsesStreamPartsAndStopReason(
+	finalResponse *codexResponsesResponse,
+	indexedItems map[int]codexResponsesOutputItem,
+	fallbackItems []codexResponsesOutputItem,
+	completedText string,
+	streamedText string,
+	completedRefusal string,
+	streamedRefusal string,
+	completedReasoning string,
+	streamedReasoning string,
+	textAnnotationsByIndex map[codexTextAnnotationKey][]map[string]any,
+	streamEvents []contract.ConversationStreamEvent,
+) ([]contract.ContentPart, contract.StopReason, error) {
+	parts := []contract.ContentPart(nil)
+	stopReason := contract.StopReasonEndTurn
+	if finalResponse != nil {
+		parts = finalResponse.Parts()
+		stopReason = codexStopReason(*finalResponse)
+	}
+	if len(parts) == 0 {
+		collectedItems := codexCollectedOutputItems(indexedItems, fallbackItems)
+		parts = codexResponsesOutputItemsParts(collectedItems)
+		if codexOutputItemsIncludeFunctionCall(collectedItems) {
+			stopReason = contract.StopReasonToolUse
+		} else if codexOutputItemsIncludeRefusal(collectedItems) {
+			stopReason = contract.StopReasonRefusal
+		}
+	}
+	if len(parts) == 0 {
+		text := strings.TrimSpace(firstNonEmpty(completedText, streamedText))
+		if text != "" {
+			part := textContentPart(text)
+			part.Metadata = codexCombinedStreamAnnotationsMetadata(textAnnotationsByIndex)
+			parts = append(parts, part)
+		}
+	}
+	if len(parts) == 0 {
+		refusalText := strings.TrimSpace(firstNonEmpty(completedRefusal, streamedRefusal))
+		if refusalText != "" {
+			parts = append(parts, contract.ContentPart{Kind: contract.ContentPartRefusal, Text: refusalText, OriginProtocol: "openai"})
+			stopReason = contract.StopReasonRefusal
+		}
+	}
+	parts = prependCodexReasoningPart(parts, completedReasoning, streamedReasoning)
+	if len(parts) == 0 && codexStreamEventsEndWithFailed(streamEvents) {
+		return []contract.ContentPart{{Kind: contract.ContentPartMetadata, Metadata: map[string]any{"type": "response.failed"}, OriginProtocol: "openai-compatible"}}, contract.StopReasonContentFilter, nil
+	}
+	if len(parts) == 0 {
+		return nil, "", contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider stream contained no content"}
+	}
+	return parts, stopReason, nil
 }
 
 func prependCodexReasoningPart(parts []contract.ContentPart, completedReasoning string, streamedReasoning string) []contract.ContentPart {
@@ -1457,6 +1485,59 @@ func codexStreamStopReason(event codexResponsesEvent, completedRefusal string, s
 		return contract.StopReasonRefusal
 	}
 	return stopReason
+}
+
+func codexTerminalStreamEvent(event codexResponsesEvent, eventType string, raw string, completedRefusal string, streamedRefusal string) contract.ConversationStreamEvent {
+	stopReason := codexStreamStopReason(event, completedRefusal, streamedRefusal)
+	metadata := map[string]any(nil)
+	if eventType == "response.failed" {
+		stopReason = contract.StopReasonContentFilter
+		metadata = codexFailedStreamEventMetadata(event)
+	}
+	return contract.ConversationStreamEvent{
+		Type:           contract.ConversationStreamEventStop,
+		StopReason:     stopReason,
+		RawEventType:   eventType,
+		Raw:            append(json.RawMessage(nil), raw...),
+		OriginProtocol: "openai-compatible",
+		Metadata:       metadata,
+	}
+}
+
+func codexFailedStreamEventMetadata(event codexResponsesEvent) map[string]any {
+	metadata := map[string]any{"type": "response.failed"}
+	if event.Error != nil {
+		if value := strings.TrimSpace(event.Error.Message); value != "" {
+			metadata["error_message"] = value
+		}
+		if value := strings.TrimSpace(event.Error.Code); value != "" {
+			metadata["error_code"] = value
+		}
+		if value := strings.TrimSpace(event.Error.Type); value != "" {
+			metadata["error_type"] = value
+		}
+	}
+	if value := strings.TrimSpace(event.Message); value != "" {
+		metadata["message"] = value
+	}
+	if value := strings.TrimSpace(event.Code); value != "" {
+		metadata["code"] = value
+	}
+	if event.Response != nil {
+		if status := strings.TrimSpace(event.Response.Status); status != "" {
+			metadata["status"] = status
+		}
+	}
+	return metadata
+}
+
+func codexStreamEventsEndWithFailed(events []contract.ConversationStreamEvent) bool {
+	if len(events) == 0 {
+		return false
+	}
+	last := events[len(events)-1]
+	return last.Type == contract.ConversationStreamEventStop &&
+		strings.TrimSpace(last.RawEventType) == "response.failed"
 }
 
 func codexCollectedOutputItems(indexed map[int]codexResponsesOutputItem, fallback []codexResponsesOutputItem) []codexResponsesOutputItem {

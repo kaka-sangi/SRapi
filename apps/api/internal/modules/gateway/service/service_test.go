@@ -1,6 +1,7 @@
 package service
 
 import (
+	"encoding/json"
 	"testing"
 
 	capabilitiescontract "github.com/srapi/srapi/apps/api/internal/modules/capabilities/contract"
@@ -766,6 +767,46 @@ func TestRenderResponsesPreservesIncompleteMaxTokens(t *testing.T) {
 		response.IncompleteDetails == nil ||
 		response.IncompleteDetails.Reason != "max_output_tokens" {
 		t.Fatalf("expected incomplete terminal response payload, got %+v", terminal.Data["response"])
+	}
+}
+
+func TestRenderResponsesStreamEventsPreservesFailedTerminal(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	resp := gatewaycontract.CanonicalResponse{
+		ID:         "resp_failed_terminal",
+		Model:      "gpt-4o-mini",
+		StopReason: "content_filter",
+		OutputItems: []gatewaycontract.ContentBlock{{
+			Type:     gatewaycontract.ContentBlockMetadata,
+			Role:     "assistant",
+			Metadata: map[string]any{"type": "response.failed"},
+		}},
+		StreamEvents: []gatewaycontract.StreamEvent{{
+			Index:          0,
+			Type:           gatewaycontract.StreamEventStop,
+			StopReason:     "content_filter",
+			RawEventType:   "response.failed",
+			Raw:            json.RawMessage(`{"type":"response.failed","error":{"message":"upstream overloaded"}}`),
+			OriginProtocol: "openai-compatible",
+			Metadata:       map[string]any{"error_message": "upstream overloaded"},
+		}},
+		Usage: gatewaycontract.Usage{InputTokens: 3, OutputTokens: 4},
+	}
+
+	events := svc.RenderResponsesStreamEvents(resp)
+	terminal := streamEventByName(events, "response.failed")
+	if terminal == nil {
+		t.Fatalf("expected response.failed terminal event, got %+v", events)
+	}
+	if completed := streamEventByName(events, "response.completed"); completed != nil {
+		t.Fatalf("did not expect response.completed terminal event, got %+v", completed)
+	}
+	response, _ := terminal.Data["response"].(apiopenapi.ResponsesResponse)
+	if response.Status == nil || *response.Status != "failed" {
+		t.Fatalf("expected failed terminal response payload, got %+v", terminal.Data["response"])
 	}
 }
 

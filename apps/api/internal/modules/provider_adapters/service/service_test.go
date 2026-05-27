@@ -4916,6 +4916,68 @@ func TestReverseProxyCodexCLIAdapterStreamsIncompleteTerminalUsage(t *testing.T)
 	}
 }
 
+func TestReverseProxyCodexCLIAdapterPreservesFailedTerminalStream(t *testing.T) {
+	rawSSE := "data: {\"type\":\"response.failed\",\"error\":{\"type\":\"server_error\",\"code\":\"overloaded\",\"message\":\"upstream overloaded\"},\"response\":{\"status\":\"failed\",\"output\":[],\"usage\":{\"input_tokens\":4,\"output_tokens\":5,\"input_tokens_details\":{\"cached_tokens\":2}}}}\n\n"
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/backend-api/codex/responses" {
+			t.Fatalf("unexpected codex upstream path %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte(rawSSE))
+	}))
+	defer upstream.Close()
+
+	runtime, err := reverseproxyservice.New(nil)
+	if err != nil {
+		t.Fatalf("create reverse proxy runtime: %v", err)
+	}
+	svc, err := service.NewWithReverseProxy(nil, runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_codex_proxy_failed_terminal_sse",
+		Model:      "codex-local",
+		InputParts: textParts("hello codex"),
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": upstream.URL + "/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+		Credential: map[string]any{"cli_client_token": "codex-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke codex reverse proxy adapter: %v", err)
+	}
+	if string(resp.Raw) != rawSSE {
+		t.Fatalf("expected raw Codex failed stream to be preserved, got %q", string(resp.Raw))
+	}
+	if resp.StopReason != contract.StopReasonContentFilter ||
+		resp.Usage.Estimated ||
+		resp.Usage.InputTokens != 4 ||
+		resp.Usage.OutputTokens != 5 ||
+		resp.Usage.CachedTokens != 2 {
+		t.Fatalf("unexpected codex failed stream response: %+v", resp)
+	}
+	if len(resp.StreamEvents) != 2 ||
+		resp.StreamEvents[0].Type != contract.ConversationStreamEventUsage ||
+		resp.StreamEvents[1].Type != contract.ConversationStreamEventStop ||
+		resp.StreamEvents[1].RawEventType != "response.failed" ||
+		resp.StreamEvents[1].StopReason != contract.StopReasonContentFilter ||
+		resp.StreamEvents[1].Metadata["error_message"] != "upstream overloaded" ||
+		resp.StreamEvents[1].Metadata["error_code"] != "overloaded" ||
+		resp.StreamEvents[1].Metadata["error_type"] != "server_error" {
+		t.Fatalf("expected Codex failed terminal events, got %+v", resp.StreamEvents)
+	}
+}
+
 func TestReverseProxyCodexCLIAdapterRejectsFailedDoneStatus(t *testing.T) {
 	rawSSE := "data: {\"type\":\"response.output_text.delta\",\"delta\":\"partial\"}\n\n" +
 		"data: {\"type\":\"response.done\",\"response\":{\"status\":\"failed\",\"output\":[],\"usage\":{\"input_tokens\":4,\"output_tokens\":5}}}\n\n"
