@@ -131,6 +131,71 @@ func TestGoldenResponseTerminalConversions(t *testing.T) {
 	assertGoldenJSON(t, expected, actual)
 }
 
+func TestGoldenToolCallConversions(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	toolCall := gatewaycontract.ContentBlock{
+		Type:              gatewaycontract.ContentBlockToolCall,
+		Role:              "assistant",
+		ToolCallID:        "call_weather",
+		ToolName:          "lookup_weather",
+		ToolArgumentsJSON: `{"city":"Boston","unit":"c"}`,
+	}
+	resp := gatewaycontract.CanonicalResponse{
+		ID:         "resp_golden_tool",
+		RequestID:  "req_golden_tool",
+		Model:      "canonical-tool-model",
+		StopReason: "tool_use",
+		OutputItems: []gatewaycontract.ContentBlock{
+			toolCall,
+		},
+		StreamEvents: []gatewaycontract.StreamEvent{
+			{
+				Index:        0,
+				Type:         gatewaycontract.StreamEventToolCallDelta,
+				ContentIndex: 0,
+				Delta: gatewaycontract.ContentBlock{
+					Type:              gatewaycontract.ContentBlockToolCall,
+					ToolCallID:        toolCall.ToolCallID,
+					ToolName:          toolCall.ToolName,
+					ToolArgumentsJSON: `{"city":"Boston"`,
+				},
+			},
+			{
+				Index:        1,
+				Type:         gatewaycontract.StreamEventToolCallDelta,
+				ContentIndex: 0,
+				Delta: gatewaycontract.ContentBlock{
+					Type:              gatewaycontract.ContentBlockToolCall,
+					ToolArgumentsJSON: `,"unit":"c"}`,
+				},
+			},
+			{
+				Index:      2,
+				Type:       gatewaycontract.StreamEventStop,
+				StopReason: "tool_use",
+			},
+		},
+		Usage: gatewaycontract.Usage{InputTokens: 13, OutputTokens: 4, CachedTokens: 2},
+	}
+
+	actual := mustMarshalToolCallGolden(t, toolCallConversionGolden{
+		Responses:       projectResponsesToolCall(svc.RenderResponses(resp)),
+		ResponsesStream: projectResponsesStreamToolCall(svc.RenderResponsesStreamEvents(resp)),
+		Chat:            projectChatToolCall(svc.RenderChatCompletions(resp)),
+		ChatStream:      projectChatStreamToolCall(svc.RenderChatStreamChunks(resp)),
+		Anthropic:       projectAnthropicToolCall(svc.RenderAnthropicMessages(resp)),
+		AnthropicStream: projectAnthropicStreamToolCall(svc.RenderAnthropicMessagesStreamEvents(resp)),
+		Gemini:          projectGeminiToolCall(svc.RenderGeminiGenerateContent(resp)),
+		GeminiStream:    projectGeminiStreamToolCall(svc.RenderGeminiGenerateContentStreamEvents(resp)),
+	})
+	expected := readTestdata(t, "response_tool_call.json")
+	assertGoldenJSON(t, expected, actual)
+}
+
 func goldenMeta(sourceEndpoint string) RequestMeta {
 	return RequestMeta{
 		RequestID:      "req_golden_001",
@@ -186,6 +251,15 @@ func mustMarshalTerminalGolden(t *testing.T, projected terminalConversionGolden)
 	raw, err := json.MarshalIndent(projected, "", "  ")
 	if err != nil {
 		t.Fatalf("marshal terminal conversion golden: %v", err)
+	}
+	return append(raw, '\n')
+}
+
+func mustMarshalToolCallGolden(t *testing.T, projected toolCallConversionGolden) []byte {
+	t.Helper()
+	raw, err := json.MarshalIndent(projected, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal tool call conversion golden: %v", err)
 	}
 	return append(raw, '\n')
 }
@@ -249,6 +323,27 @@ type terminalConversionGolden struct {
 	AnthropicStream anthropicTerminalGold `json:"anthropic_stream"`
 	Gemini          geminiTerminalGold    `json:"gemini"`
 	GeminiStream    geminiTerminalGold    `json:"gemini_stream"`
+}
+
+type toolCallConversionGolden struct {
+	Responses       protocolToolCallGold `json:"responses"`
+	ResponsesStream protocolToolCallGold `json:"responses_stream"`
+	Chat            protocolToolCallGold `json:"chat"`
+	ChatStream      protocolToolCallGold `json:"chat_stream"`
+	Anthropic       protocolToolCallGold `json:"anthropic"`
+	AnthropicStream protocolToolCallGold `json:"anthropic_stream"`
+	Gemini          protocolToolCallGold `json:"gemini"`
+	GeminiStream    protocolToolCallGold `json:"gemini_stream"`
+}
+
+type protocolToolCallGold struct {
+	FinishReason string `json:"finish_reason,omitempty"`
+	StopReason   string `json:"stop_reason,omitempty"`
+	Event        string `json:"event,omitempty"`
+	Type         string `json:"type,omitempty"`
+	CallID       string `json:"call_id,omitempty"`
+	Name         string `json:"name,omitempty"`
+	Arguments    string `json:"arguments,omitempty"`
 }
 
 type responseTerminalGold struct {
@@ -431,6 +526,186 @@ func projectGeminiStreamTerminal(events []StreamEvent) geminiTerminalGold {
 	return geminiTerminalGold{}
 }
 
+func projectResponsesToolCall(resp apiopenapi.ResponsesResponse) protocolToolCallGold {
+	for _, item := range resp.Output {
+		if item.Type != "function_call" {
+			continue
+		}
+		return protocolToolCallGold{
+			Type:      item.Type,
+			CallID:    stringFromAny(item.AdditionalProperties["call_id"]),
+			Name:      stringFromAny(item.AdditionalProperties["name"]),
+			Arguments: stringFromAny(item.AdditionalProperties["arguments"]),
+		}
+	}
+	return protocolToolCallGold{}
+}
+
+func projectResponsesStreamToolCall(events []StreamEvent) protocolToolCallGold {
+	out := protocolToolCallGold{}
+	for _, event := range events {
+		eventType := stringFromAny(event.Data["type"])
+		switch eventType {
+		case "response.function_call_arguments.done":
+			out.Event = event.Event
+			out.Type = eventType
+			out.CallID = stringFromAny(event.Data["item_id"])
+			out.Arguments = stringFromAny(event.Data["arguments"])
+		case "response.output_item.done":
+			item, _ := event.Data["item"].(map[string]any)
+			if stringFromAny(item["type"]) != "function_call" {
+				continue
+			}
+			out.CallID = stringFromAny(item["call_id"])
+			out.Name = stringFromAny(item["name"])
+			if out.Arguments == "" {
+				out.Arguments = stringFromAny(item["arguments"])
+			}
+		}
+	}
+	return out
+}
+
+func projectChatToolCall(resp apiopenapi.ChatCompletionResponse) protocolToolCallGold {
+	if len(resp.Choices) == 0 {
+		return protocolToolCallGold{}
+	}
+	out := protocolToolCallGold{}
+	if resp.Choices[0].FinishReason != nil {
+		out.FinishReason = *resp.Choices[0].FinishReason
+	}
+	if resp.Choices[0].Message.ToolCalls == nil || len(*resp.Choices[0].Message.ToolCalls) == 0 {
+		return out
+	}
+	toolCall := (*resp.Choices[0].Message.ToolCalls)[0]
+	out.Type = toolCall.Type
+	out.CallID = toolCall.Id
+	out.Name = stringFromAny(toolCall.Function["name"])
+	out.Arguments = stringFromAny(toolCall.Function["arguments"])
+	return out
+}
+
+func projectChatStreamToolCall(chunks []map[string]any) protocolToolCallGold {
+	out := protocolToolCallGold{}
+	for _, chunk := range chunks {
+		choices, ok := chunk["choices"].([]map[string]any)
+		if !ok || len(choices) == 0 {
+			continue
+		}
+		if finishReason := stringFromAny(choices[0]["finish_reason"]); finishReason != "" {
+			out.FinishReason = finishReason
+		}
+		delta, _ := choices[0]["delta"].(map[string]any)
+		toolCalls, _ := delta["tool_calls"].([]map[string]any)
+		if len(toolCalls) == 0 {
+			continue
+		}
+		toolCall := toolCalls[0]
+		out.Type = stringFromAny(toolCall["type"])
+		if id := stringFromAny(toolCall["id"]); id != "" {
+			out.CallID = id
+		}
+		function, _ := toolCall["function"].(map[string]any)
+		if name := stringFromAny(function["name"]); name != "" {
+			out.Name = name
+		}
+		out.Arguments += stringFromAny(function["arguments"])
+	}
+	return out
+}
+
+func projectAnthropicToolCall(resp apiopenapi.AnthropicMessagesResponse) protocolToolCallGold {
+	out := protocolToolCallGold{}
+	if resp.StopReason != nil {
+		out.StopReason = *resp.StopReason
+	}
+	for _, block := range resp.Content {
+		if block.Type != apiopenapi.AnthropicContentBlockTypeToolUse {
+			continue
+		}
+		out.Type = string(block.Type)
+		out.CallID = stringFromAny(block.AdditionalProperties["id"])
+		out.Name = stringFromAny(block.AdditionalProperties["name"])
+		out.Arguments = stableJSONString(block.AdditionalProperties["input"])
+		return out
+	}
+	return out
+}
+
+func projectAnthropicStreamToolCall(events []StreamEvent) protocolToolCallGold {
+	out := protocolToolCallGold{}
+	for _, event := range events {
+		switch event.Event {
+		case "content_block_start":
+			block, _ := event.Data["content_block"].(map[string]any)
+			if stringFromAny(block["type"]) != "tool_use" {
+				continue
+			}
+			out.Event = event.Event
+			out.Type = stringFromAny(block["type"])
+			out.CallID = stringFromAny(block["id"])
+			out.Name = stringFromAny(block["name"])
+		case "content_block_delta":
+			delta, _ := event.Data["delta"].(map[string]any)
+			out.Arguments += stringFromAny(delta["partial_json"])
+		case "message_delta":
+			delta, _ := event.Data["delta"].(map[string]any)
+			if stopReason := stringFromAny(delta["stop_reason"]); stopReason != "" {
+				out.StopReason = stopReason
+			}
+		}
+	}
+	return out
+}
+
+func projectGeminiToolCall(resp apiopenapi.GeminiGenerateContentResponse) protocolToolCallGold {
+	out := protocolToolCallGold{}
+	if len(resp.Candidates) == 0 {
+		return out
+	}
+	out.FinishReason = resp.Candidates[0].FinishReason
+	for _, part := range resp.Candidates[0].Content.Parts {
+		if part.FunctionCall == nil {
+			continue
+		}
+		call := map[string]any(*part.FunctionCall)
+		out.Type = "function_call"
+		out.CallID = stringFromAny(call["call_id"])
+		out.Name = stringFromAny(call["name"])
+		out.Arguments = stableJSONString(call["args"])
+		return out
+	}
+	return out
+}
+
+func projectGeminiStreamToolCall(events []StreamEvent) protocolToolCallGold {
+	out := protocolToolCallGold{}
+	for _, event := range events {
+		candidates, ok := event.Data["candidates"].([]apiopenapi.GeminiCandidate)
+		if !ok || len(candidates) == 0 {
+			continue
+		}
+		if candidates[0].FinishReason != "" {
+			out.FinishReason = candidates[0].FinishReason
+		}
+		for _, part := range candidates[0].Content.Parts {
+			if part.FunctionCall == nil {
+				continue
+			}
+			call := map[string]any(*part.FunctionCall)
+			out.Type = "function_call"
+			if callID := stringFromAny(call["call_id"]); callID != "" {
+				out.CallID = callID
+			}
+			if name := stringFromAny(call["name"]); name != "" {
+				out.Name = name
+			}
+			out.Arguments += stableJSONString(call["args"])
+		}
+	}
+	return out
+}
+
 func projectTokenUsage(usage *apiopenapi.TokenUsage) terminalUsage {
 	if usage == nil {
 		return terminalUsage{}
@@ -493,4 +768,15 @@ func stringFromAny(value any) string {
 		return text
 	}
 	return ""
+}
+
+func stableJSONString(value any) string {
+	if value == nil {
+		return ""
+	}
+	raw, err := json.Marshal(value)
+	if err != nil {
+		return ""
+	}
+	return string(raw)
 }

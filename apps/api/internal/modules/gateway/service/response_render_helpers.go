@@ -554,6 +554,8 @@ func outputAnthropicContentBlocks(blocks []gatewaycontract.ContentBlock) []apiop
 			AdditionalProperties: outputAnthropicBlockProperties(block),
 		}
 		if block.Type == gatewaycontract.ContentBlockToolCall {
+			setStringProperty(item.AdditionalProperties, "id", block.ToolCallID)
+			setStringProperty(item.AdditionalProperties, "name", block.ToolName)
 			if input := parseJSONObject(block.ToolArgumentsJSON); len(input) > 0 {
 				item.Set("input", input)
 			}

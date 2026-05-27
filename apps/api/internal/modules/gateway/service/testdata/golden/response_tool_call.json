@@ -1,0 +1,58 @@
+{
+  "responses": {
+    "type": "function_call",
+    "call_id": "call_weather",
+    "name": "lookup_weather",
+    "arguments": "{\"city\":\"Boston\",\"unit\":\"c\"}"
+  },
+  "responses_stream": {
+    "event": "response.function_call_arguments.done",
+    "type": "response.function_call_arguments.done",
+    "call_id": "call_weather",
+    "name": "lookup_weather",
+    "arguments": "{\"city\":\"Boston\",\"unit\":\"c\"}"
+  },
+  "chat": {
+    "finish_reason": "tool_calls",
+    "type": "function",
+    "call_id": "call_weather",
+    "name": "lookup_weather",
+    "arguments": "{\"city\":\"Boston\",\"unit\":\"c\"}"
+  },
+  "chat_stream": {
+    "finish_reason": "tool_calls",
+    "type": "function",
+    "call_id": "call_weather",
+    "name": "lookup_weather",
+    "arguments": "{\"city\":\"Boston\",\"unit\":\"c\"}"
+  },
+  "anthropic": {
+    "stop_reason": "tool_use",
+    "type": "tool_use",
+    "call_id": "call_weather",
+    "name": "lookup_weather",
+    "arguments": "{\"city\":\"Boston\",\"unit\":\"c\"}"
+  },
+  "anthropic_stream": {
+    "stop_reason": "tool_use",
+    "event": "content_block_start",
+    "type": "tool_use",
+    "call_id": "call_weather",
+    "name": "lookup_weather",
+    "arguments": "{\"city\":\"Boston\",\"unit\":\"c\"}"
+  },
+  "gemini": {
+    "finish_reason": "STOP",
+    "type": "function_call",
+    "call_id": "call_weather",
+    "name": "lookup_weather",
+    "arguments": "{\"city\":\"Boston\",\"unit\":\"c\"}"
+  },
+  "gemini_stream": {
+    "finish_reason": "STOP",
+    "type": "function_call",
+    "call_id": "call_weather",
+    "name": "lookup_weather",
+    "arguments": "{\"city\":\"Boston\",\"unit\":\"c\"}"
+  }
+}
