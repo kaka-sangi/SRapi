@@ -790,10 +790,12 @@ func openAIResponsesBody(req contract.ConversationRequest) ([]byte, error) {
 			return nil, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "invalid raw responses payload"}
 		}
 		openAIApplyResponsesPayloadDefaults(req, payload)
+		normalizeOpenAIResponsesImageGenerationTools(payload)
 		return json.Marshal(payload)
 	}
 	payload := openAICanonicalResponsesPayload(req)
 	openAIApplyResponsesPayloadDefaults(req, payload)
+	normalizeOpenAIResponsesImageGenerationTools(payload)
 	return json.Marshal(payload)
 }
 
@@ -841,6 +843,43 @@ func openAIApplyResponsesPayloadDefaults(req contract.ConversationRequest, paylo
 		payload["model"] = model
 	}
 	payload["stream"] = req.Stream
+}
+
+func normalizeOpenAIResponsesImageGenerationTools(payload map[string]any) {
+	rawTools, ok := payload["tools"]
+	if !ok || rawTools == nil {
+		return
+	}
+	switch tools := rawTools.(type) {
+	case []any:
+		for _, rawTool := range tools {
+			if tool, ok := rawTool.(map[string]any); ok {
+				normalizeOpenAIResponsesImageGenerationTool(tool)
+			}
+		}
+	case []map[string]any:
+		for _, tool := range tools {
+			normalizeOpenAIResponsesImageGenerationTool(tool)
+		}
+	}
+}
+
+func normalizeOpenAIResponsesImageGenerationTool(tool map[string]any) {
+	if strings.TrimSpace(mapString(tool, "type")) != "image_generation" {
+		return
+	}
+	if _, exists := tool["output_format"]; !exists {
+		if value := strings.TrimSpace(mapString(tool, "format")); value != "" {
+			tool["output_format"] = value
+		}
+	}
+	if _, exists := tool["output_compression"]; !exists {
+		if value, ok := tool["compression"]; ok && value != nil {
+			tool["output_compression"] = cloneAny(value)
+		}
+	}
+	delete(tool, "format")
+	delete(tool, "compression")
 }
 
 func openAIResponsesAccept(stream bool) string {

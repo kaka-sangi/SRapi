@@ -405,6 +405,103 @@ func TestNativeOpenAIAdapterUsesResponsesEndpoint(t *testing.T) {
 	}
 }
 
+func TestNativeOpenAIAdapterNormalizesResponsesImageGenerationToolAliases(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/responses" {
+			t.Fatalf("expected native Responses upstream path, got %s", r.URL.Path)
+		}
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		tools, _ := payload["tools"].([]any)
+		if len(tools) != 1 {
+			t.Fatalf("expected one image_generation tool, got %+v", payload["tools"])
+		}
+		tool, _ := tools[0].(map[string]any)
+		if tool["type"] != "image_generation" ||
+			tool["output_format"] != "webp" ||
+			tool["output_compression"] != float64(72) ||
+			tool["partial_images"] != float64(2) {
+			t.Fatalf("expected normalized image_generation tool, got %+v", tool)
+		}
+		if _, hasFormat := tool["format"]; hasFormat {
+			t.Fatalf("expected legacy format field to be removed, got %+v", tool)
+		}
+		if _, hasCompression := tool["compression"]; hasCompression {
+			t.Fatalf("expected legacy compression field to be removed, got %+v", tool)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"resp_image","object":"response","status":"completed","output":[{"type":"image_generation_call","result":"aW1hZ2U=","output_format":"webp"}],"usage":{"input_tokens":2,"output_tokens":1}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_native_openai_image_tool_aliases",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/responses",
+		TargetProtocol: "openai-compatible",
+		Model:          "gpt-local",
+		InputParts:     textParts("draw image"),
+		RawBody:        []byte(`{"model":"gpt-local","input":"draw image","stream":false,"tools":[{"type":"image_generation","format":"webp","compression":72,"partial_images":2}]}`),
+		Provider:       providercontract.Provider{AdapterType: "native-openai", Protocol: "openai-compatible"},
+		Account:        accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:        modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-upstream"},
+		Credential:     map[string]any{"api_key": "upstream-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke native OpenAI Responses upstream: %v", err)
+	}
+	if len(resp.Parts) != 1 || resp.Parts[0].Kind != contract.ContentPartImage || resp.Parts[0].MediaBase64 != "aW1hZ2U=" {
+		t.Fatalf("expected image_generation_call response part, got %+v", resp.Parts)
+	}
+}
+
+func TestNativeOpenAIAdapterNormalizesCanonicalResponsesImageGenerationToolAliases(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		tools, _ := payload["tools"].([]any)
+		if len(tools) != 1 {
+			t.Fatalf("expected one canonical image_generation tool, got %+v", payload["tools"])
+		}
+		tool, _ := tools[0].(map[string]any)
+		if tool["output_format"] != "png" || tool["output_compression"] != float64(88) || tool["format"] != nil || tool["compression"] != nil {
+			t.Fatalf("expected normalized canonical image_generation tool, got %+v", tool)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"resp_image","object":"response","status":"completed","output_text":"ok","usage":{"input_tokens":2,"output_tokens":1}}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_native_openai_canonical_image_tool_aliases",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/responses",
+		TargetProtocol: "openai-compatible",
+		Model:          "gpt-local",
+		InputParts:     textParts("draw image"),
+		Tools:          []map[string]any{{"type": "image_generation", "format": "png", "compression": 88}},
+		Provider:       providercontract.Provider{AdapterType: "native-openai", Protocol: "openai-compatible"},
+		Account:        accountcontract.ProviderAccount{Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:        modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-upstream"},
+		Credential:     map[string]any{"api_key": "upstream-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke canonical native OpenAI Responses upstream: %v", err)
+	}
+}
+
 func TestOpenAIProviderNameUsesResponsesEndpoint(t *testing.T) {
 	var upstreamPath string
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
