@@ -776,12 +776,14 @@ func responseStreamToolCallStartEvent(state *streamToolCallState) StreamEvent {
 }
 
 func responseStreamFunctionCallStartItem(state *streamToolCallState) map[string]any {
-	item := outputBlockProperties(state.startBlock())
+	item := responseFunctionCallItem(state.startBlock(), "in_progress").AdditionalProperties
+	if item == nil {
+		item = map[string]any{}
+	}
 	item["id"] = state.ItemID
-	item["type"] = "function_call"
 	item["status"] = "in_progress"
-	setStringProperty(item, "call_id", state.Block.ToolCallID)
-	setStringProperty(item, "name", state.Block.ToolName)
+	delete(item, "arguments")
+	delete(item, "input")
 	return item
 }
 

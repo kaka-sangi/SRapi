@@ -4556,6 +4556,97 @@ func TestReverseProxyCodexCLIAdapterPreservesResponsesFunctionCallInputs(t *test
 	}
 }
 
+func TestReverseProxyCodexCLIAdapterPreservesResponsesCustomToolInputField(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/backend-api/codex/responses" {
+			t.Fatalf("unexpected codex upstream path %s", r.URL.Path)
+		}
+		var payload struct {
+			Input []struct {
+				Type      string `json:"type"`
+				CallID    string `json:"call_id"`
+				Name      string `json:"name"`
+				Arguments string `json:"arguments"`
+				Input     string `json:"input"`
+				Output    string `json:"output"`
+			} `json:"input"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode codex payload: %v", err)
+		}
+		if len(payload.Input) != 2 {
+			t.Fatalf("expected custom tool call and output items, got %+v", payload.Input)
+		}
+		if payload.Input[0].Type != "custom_tool_call" ||
+			payload.Input[0].CallID != "call_custom" ||
+			payload.Input[0].Name != "shell" ||
+			payload.Input[0].Input != "pwd" ||
+			payload.Input[0].Arguments != "" {
+			t.Fatalf("expected custom_tool_call input field, got %+v", payload.Input[0])
+		}
+		if payload.Input[1].Type != "custom_tool_call_output" ||
+			payload.Input[1].CallID != "call_custom" ||
+			payload.Input[1].Output != "ok" {
+			t.Fatalf("expected custom_tool_call_output item, got %+v", payload.Input[1])
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: {\"type\":\"response.output_text.delta\",\"delta\":\"ok\"}\n\ndata: [DONE]\n\n"))
+	}))
+	defer upstream.Close()
+
+	runtime, err := reverseproxyservice.New(nil)
+	if err != nil {
+		t.Fatalf("create reverse proxy runtime: %v", err)
+	}
+	svc, err := service.NewWithReverseProxy(nil, runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:      "req_codex_custom_tool_input",
+		Model:          "codex-local",
+		SourceProtocol: "openai-compatible",
+		SourceEndpoint: "/v1/responses",
+		Messages: []contract.ConversationMessage{{
+			Role: "assistant",
+			Parts: []contract.ContentPart{
+				{
+					Kind:              contract.ContentPartToolUse,
+					ToolCallID:        "call_custom",
+					ToolName:          "shell",
+					ToolArgumentsJSON: "pwd",
+					Metadata:          map[string]any{"type": "custom_tool_call", "arguments_field": "input"},
+				},
+				{
+					Kind:            contract.ContentPartToolResult,
+					ToolResultForID: "call_custom",
+					Text:            "ok",
+					Metadata:        map[string]any{"type": "custom_tool_call_output"},
+				},
+			},
+		}},
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": upstream.URL + "/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+		Credential: map[string]any{"cli_client_token": "codex-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke codex upstream: %v", err)
+	}
+	if conversationResponseText(resp) != "ok" {
+		t.Fatalf("unexpected codex response: %+v", resp)
+	}
+}
+
 func TestReverseProxyCodexCLIAdapterPreservesResponsesContextInputItems(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/backend-api/codex/responses" {
@@ -4962,6 +5053,53 @@ func TestReverseProxyCodexCLIAdapterPreservesFunctionCallResponse(t *testing.T) 
 	}
 }
 
+func TestReverseProxyCodexCLIAdapterPreservesCustomAndMCPToolCalls(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body: []byte(
+				`{"output":[{"type":"custom_tool_call","id":"ct_1","call_id":"call_custom","name":"shell","input":"pwd"},{"type":"mcp_tool_call","id":"mcp_1","call_id":"call_mcp","name":"remote_tool","arguments":"{\"path\":\"/tmp\"}"}],"usage":{"input_tokens":4,"output_tokens":2}}`,
+			),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_codex_custom_mcp_tools",
+		Model:      "codex-local",
+		InputParts: textParts("call tools"),
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": "https://codex.example.test/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+		Credential: map[string]any{"cli_client_token": "codex-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke codex reverse proxy adapter: %v", err)
+	}
+	if len(resp.Parts) != 2 || resp.StopReason != contract.StopReasonToolUse {
+		t.Fatalf("unexpected custom/mcp tool response: %+v", resp)
+	}
+	assertToolUsePart(t, resp.Parts[0], "call_custom", "shell", "pwd")
+	if resp.Parts[0].Metadata["type"] != "custom_tool_call" || resp.Parts[0].Metadata["arguments_field"] != "input" {
+		t.Fatalf("expected custom tool metadata, got %+v", resp.Parts[0].Metadata)
+	}
+	assertToolUsePart(t, resp.Parts[1], "call_mcp", "remote_tool", `{"path":"/tmp"}`)
+	if resp.Parts[1].Metadata["type"] != "mcp_tool_call" {
+		t.Fatalf("expected mcp tool metadata, got %+v", resp.Parts[1].Metadata)
+	}
+}
+
 func TestReverseProxyCodexCLIAdapterPreservesFunctionCallArgumentDeltas(t *testing.T) {
 	runtime := capturingRuntime{
 		response: reverseproxycontract.Response{
@@ -5074,6 +5212,54 @@ func TestReverseProxyCodexCLIAdapterPreservesFunctionCallStartEvent(t *testing.T
 		t.Fatalf("expected Codex argument deltas after start, got %+v", toolEvents)
 	}
 	assertToolUsePart(t, resp.Parts[0], "call_1", "lookup", `{"city":"Tokyo"}`)
+}
+
+func TestReverseProxyCodexCLIAdapterPreservesStreamCustomToolCall(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body: []byte(
+				"data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"type\":\"custom_tool_call\",\"id\":\"ct_1\",\"call_id\":\"call_custom\",\"name\":\"shell\",\"input\":\"pwd\"}}\n\n" +
+					"data: {\"type\":\"response.completed\",\"response\":{\"output\":[],\"usage\":{\"input_tokens\":4,\"output_tokens\":2}}}\n\n" +
+					"data: [DONE]\n\n",
+			),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_codex_stream_custom_tool",
+		Model:      "codex-local",
+		InputParts: textParts("call shell"),
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": "https://codex.example.test/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+		Credential: map[string]any{"cli_client_token": "codex-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke codex reverse proxy adapter: %v", err)
+	}
+	assertToolUsePart(t, resp.Parts[0], "call_custom", "shell", "pwd")
+	if resp.Parts[0].Metadata["type"] != "custom_tool_call" ||
+		resp.Parts[0].Metadata["arguments_field"] != "input" {
+		t.Fatalf("expected stream custom tool metadata, got %+v", resp.Parts[0].Metadata)
+	}
+	toolEvents := conversationStreamEventsByType(resp.StreamEvents, contract.ConversationStreamEventToolCallDelta)
+	if len(toolEvents) == 0 || toolEvents[0].Delta.Metadata["type"] != "custom_tool_call" ||
+		toolEvents[0].Delta.Metadata["arguments_field"] != "input" {
+		t.Fatalf("expected custom tool stream event metadata, got %+v", toolEvents)
+	}
 }
 
 func TestReverseProxyCodexCLIAdapterPreservesRefusalDeltas(t *testing.T) {

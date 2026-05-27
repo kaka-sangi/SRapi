@@ -31,6 +31,7 @@ type codexResponsesInputItem struct {
 	CallID  string                       `json:"call_id,omitempty"`
 	Name    string                       `json:"name,omitempty"`
 	Args    string                       `json:"arguments,omitempty"`
+	Input   string                       `json:"input,omitempty"`
 	Output  string                       `json:"output,omitempty"`
 	Raw     map[string]any               `json:"-"`
 }
@@ -88,6 +89,7 @@ type codexResponsesOutputItem struct {
 	CallID       string                        `json:"call_id"`
 	Name         string                        `json:"name"`
 	Arguments    string                        `json:"arguments"`
+	Input        string                        `json:"input"`
 	Status       string                        `json:"status"`
 	Text         string                        `json:"text"`
 	Refusal      string                        `json:"refusal"`
@@ -490,9 +492,10 @@ func codexResponsesInputItemsFromMessage(role string, parts []contract.ContentPa
 			if callID == "" {
 				continue
 			}
+			itemType := codexResponsesToolResultType(part)
 			flushMessage()
 			out = append(out, codexResponsesInputItem{
-				Type:   "function_call_output",
+				Type:   itemType,
 				CallID: callID,
 				Output: strings.TrimSpace(part.Text),
 			})
@@ -520,12 +523,52 @@ func codexResponsesFunctionCallItem(part contract.ContentPart) (codexResponsesIn
 	if callID == "" && name == "" && arguments == "" {
 		return codexResponsesInputItem{}, false
 	}
-	return codexResponsesInputItem{
-		Type:   "function_call",
+	item := codexResponsesInputItem{
+		Type:   codexResponsesToolCallType(part),
 		CallID: callID,
 		Name:   name,
-		Args:   arguments,
-	}, true
+	}
+	if codexResponsesToolCallArgumentsField(part) == "input" {
+		item.Input = arguments
+	} else {
+		item.Args = arguments
+	}
+	return item, true
+}
+
+func codexResponsesToolCallType(part contract.ContentPart) string {
+	itemType := strings.TrimSpace(metadataString(part.Metadata, "type"))
+	if codexResponsesToolCallTypeIsSupported(itemType) {
+		return itemType
+	}
+	return "function_call"
+}
+
+func codexResponsesToolResultType(part contract.ContentPart) string {
+	itemType := strings.TrimSpace(metadataString(part.Metadata, "type"))
+	switch itemType {
+	case "custom_tool_call_output", "mcp_tool_call_output":
+		return itemType
+	default:
+		return "function_call_output"
+	}
+}
+
+func codexResponsesToolCallArgumentsField(part contract.ContentPart) string {
+	if strings.TrimSpace(metadataString(part.Metadata, "arguments_field")) == "input" ||
+		codexResponsesToolCallType(part) == "custom_tool_call" {
+		return "input"
+	}
+	return "arguments"
+}
+
+func codexResponsesToolCallTypeIsSupported(itemType string) bool {
+	switch itemType {
+	case "function_call", "custom_tool_call", "mcp_tool_call":
+		return true
+	default:
+		return false
+	}
 }
 
 func codexResponsesRawInputItem(part contract.ContentPart) (codexResponsesInputItem, bool) {
@@ -1496,7 +1539,7 @@ func codexResponsesOutputItemsParts(items []codexResponsesOutputItem) []contract
 func codexResponsesOutputItemParts(item codexResponsesOutputItem) []contract.ContentPart {
 	parts := []contract.ContentPart(nil)
 	itemType := strings.ToLower(strings.TrimSpace(item.Type))
-	if itemType == "function_call" {
+	if codexResponsesToolCallTypeIsSupported(itemType) {
 		if part, ok := codexFunctionCallPart(item); ok {
 			parts = append(parts, part)
 		}
@@ -1599,13 +1642,16 @@ func codexFunctionCallPart(item codexResponsesOutputItem) (contract.ContentPart,
 		id = strings.TrimSpace(item.ID)
 	}
 	name := strings.TrimSpace(item.Name)
-	arguments := strings.TrimSpace(item.Arguments)
+	arguments := strings.TrimSpace(firstNonEmpty(item.Arguments, item.Input))
 	if id == "" && name == "" && arguments == "" {
 		return contract.ContentPart{}, false
 	}
 	metadata := map[string]any{"type": strings.TrimSpace(item.Type)}
 	if status := strings.TrimSpace(item.Status); status != "" {
 		metadata["status"] = status
+	}
+	if item.Input != "" && item.Arguments == "" {
+		metadata["arguments_field"] = "input"
 	}
 	return contract.ContentPart{
 		Kind:              contract.ContentPartToolUse,
@@ -1649,7 +1695,7 @@ func codexOutputItemsIncludeFunctionCall(items []codexResponsesOutputItem) bool 
 }
 
 func codexOutputItemIsFunctionCall(item codexResponsesOutputItem) bool {
-	return strings.EqualFold(strings.TrimSpace(item.Type), "function_call")
+	return codexResponsesToolCallTypeIsSupported(strings.TrimSpace(item.Type))
 }
 
 func codexOutputItemsIncludeRefusal(items []codexResponsesOutputItem) bool {

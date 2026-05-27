@@ -193,12 +193,7 @@ func responseOutputItems(blocks []gatewaycontract.ContentBlock) []apiopenapi.Res
 			})
 			continue
 		}
-		props := outputBlockProperties(block)
-		props["status"] = "completed"
-		out = append(out, apiopenapi.ResponsesOutputItem{
-			Type:                 "function_call",
-			AdditionalProperties: props,
-		})
+		out = append(out, responseFunctionCallItem(block, "completed"))
 	}
 	if len(messageBlocks) > 0 {
 		content := outputResponsesContentBlocks(messageBlocks)
@@ -221,6 +216,8 @@ func responseFunctionCallOutputItem(block gatewaycontract.ContentBlock) (apiopen
 		return apiopenapi.ResponsesOutputItem{}, false
 	}
 	props := outputBlockProperties(block)
+	delete(props, "arguments_field")
+	itemType := responseFunctionCallOutputType(block)
 	props["call_id"] = callID
 	props["output"] = strings.TrimSpace(block.Text)
 	delete(props, "tool_result_for_id")
@@ -228,9 +225,57 @@ func responseFunctionCallOutputItem(block gatewaycontract.ContentBlock) (apiopen
 		props["is_error"] = true
 	}
 	return apiopenapi.ResponsesOutputItem{
-		Type:                 "function_call_output",
+		Type:                 itemType,
 		AdditionalProperties: props,
 	}, true
+}
+
+func responseFunctionCallItem(block gatewaycontract.ContentBlock, status string) apiopenapi.ResponsesOutputItem {
+	itemType := responseFunctionCallType(block)
+	props := outputBlockProperties(block)
+	delete(props, "arguments_field")
+	props["type"] = itemType
+	props["status"] = status
+	setStringProperty(props, "call_id", block.ToolCallID)
+	setStringProperty(props, "name", block.ToolName)
+	if responseFunctionCallArgumentsField(block) == "input" {
+		delete(props, "arguments")
+		setStringProperty(props, "input", block.ToolArgumentsJSON)
+	} else {
+		setStringProperty(props, "arguments", block.ToolArgumentsJSON)
+	}
+	return apiopenapi.ResponsesOutputItem{
+		Type:                 itemType,
+		AdditionalProperties: props,
+	}
+}
+
+func responseFunctionCallType(block gatewaycontract.ContentBlock) string {
+	itemType := strings.TrimSpace(mapStringAny(block.Metadata, "type"))
+	switch itemType {
+	case "custom_tool_call", "mcp_tool_call":
+		return itemType
+	default:
+		return "function_call"
+	}
+}
+
+func responseFunctionCallOutputType(block gatewaycontract.ContentBlock) string {
+	itemType := strings.TrimSpace(mapStringAny(block.Metadata, "type"))
+	switch itemType {
+	case "custom_tool_call_output", "mcp_tool_call_output":
+		return itemType
+	default:
+		return "function_call_output"
+	}
+}
+
+func responseFunctionCallArgumentsField(block gatewaycontract.ContentBlock) string {
+	if strings.TrimSpace(mapStringAny(block.Metadata, "arguments_field")) == "input" ||
+		responseFunctionCallType(block) == "custom_tool_call" {
+		return "input"
+	}
+	return "arguments"
 }
 
 func responseBlockIsImageGenerationCall(block gatewaycontract.ContentBlock) bool {
@@ -718,13 +763,12 @@ func responseStreamItemID(index int, block gatewaycontract.ContentBlock) string 
 }
 
 func responseStreamFunctionCallItem(itemID string, block gatewaycontract.ContentBlock) map[string]any {
-	item := outputBlockProperties(block)
+	item := responseFunctionCallItem(block, "completed").AdditionalProperties
+	if item == nil {
+		item = map[string]any{}
+	}
 	item["id"] = itemID
-	item["type"] = "function_call"
 	item["status"] = "completed"
-	setStringProperty(item, "call_id", block.ToolCallID)
-	setStringProperty(item, "name", block.ToolName)
-	setStringProperty(item, "arguments", block.ToolArgumentsJSON)
 	return item
 }
 

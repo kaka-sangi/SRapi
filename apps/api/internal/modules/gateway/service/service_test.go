@@ -1016,6 +1016,76 @@ func TestRenderResponsesPreservesFunctionCallOutputItems(t *testing.T) {
 	}
 }
 
+func TestRenderResponsesPreservesCustomAndMCPToolOutputItems(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	resp := gatewaycontract.CanonicalResponse{
+		ID:         "resp_custom_mcp_tools",
+		Model:      "gpt-5-codex",
+		StopReason: "tool_use",
+		OutputItems: []gatewaycontract.ContentBlock{
+			{
+				Type:              gatewaycontract.ContentBlockToolCall,
+				Role:              "assistant",
+				ToolCallID:        "call_custom",
+				ToolName:          "shell",
+				ToolArgumentsJSON: "pwd",
+				Metadata:          map[string]any{"type": "custom_tool_call", "arguments_field": "input"},
+			},
+			{
+				Type:            gatewaycontract.ContentBlockToolResult,
+				Role:            "tool",
+				ToolResultForID: "call_custom",
+				Text:            "ok",
+				Metadata:        map[string]any{"type": "custom_tool_call_output"},
+			},
+			{
+				Type:              gatewaycontract.ContentBlockToolCall,
+				Role:              "assistant",
+				ToolCallID:        "call_mcp",
+				ToolName:          "remote_tool",
+				ToolArgumentsJSON: `{"path":"/tmp"}`,
+				Metadata:          map[string]any{"type": "mcp_tool_call"},
+			},
+		},
+		Usage: gatewaycontract.Usage{InputTokens: 5, OutputTokens: 3},
+	}
+
+	responses := svc.RenderResponses(resp)
+	if len(responses.Output) != 3 {
+		t.Fatalf("expected custom call, output, and mcp call items, got %+v", responses.Output)
+	}
+	if responses.Output[0].Type != "custom_tool_call" {
+		t.Fatalf("expected custom_tool_call item, got %+v", responses.Output[0])
+	}
+	if input, _ := responses.Output[0].Get("input"); input != "pwd" {
+		t.Fatalf("expected custom tool input field, got %+v", responses.Output[0])
+	}
+	if _, found := responses.Output[0].Get("arguments"); found {
+		t.Fatalf("did not expect custom tool arguments field, got %+v", responses.Output[0])
+	}
+	if _, found := responses.Output[0].Get("arguments_field"); found {
+		t.Fatalf("did not expect internal arguments_field metadata, got %+v", responses.Output[0])
+	}
+	if responses.Output[1].Type != "custom_tool_call_output" {
+		t.Fatalf("expected custom_tool_call_output item, got %+v", responses.Output[1])
+	}
+	if output, _ := responses.Output[1].Get("output"); output != "ok" {
+		t.Fatalf("expected custom tool output field, got %+v", responses.Output[1])
+	}
+	if _, found := responses.Output[1].Get("arguments_field"); found {
+		t.Fatalf("did not expect internal arguments_field metadata, got %+v", responses.Output[1])
+	}
+	if responses.Output[2].Type != "mcp_tool_call" {
+		t.Fatalf("expected mcp_tool_call item, got %+v", responses.Output[2])
+	}
+	if args, _ := responses.Output[2].Get("arguments"); args != `{"path":"/tmp"}` {
+		t.Fatalf("expected mcp tool arguments field, got %+v", responses.Output[2])
+	}
+}
+
 func TestRenderResponsesPreservesImageGenerationOutputItems(t *testing.T) {
 	svc, err := New()
 	if err != nil {
@@ -1975,6 +2045,79 @@ func TestRenderCanonicalStreamEventsPreservesResponsesStyleToolCalls(t *testing.
 	}
 	if argsDelta.Data["delta"] != `{"query":"weather"}` || argsDone.Data["arguments"] != `{"query":"weather"}` {
 		t.Fatalf("expected responses function call arguments, got delta=%+v done=%+v", argsDelta, argsDone)
+	}
+}
+
+func TestRenderCanonicalStreamEventsPreservesCustomToolCalls(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	resp := gatewaycontract.CanonicalResponse{
+		ID:         "resp_custom_tool_stream",
+		Model:      "gpt-5-codex",
+		StopReason: "tool_use",
+		OutputItems: []gatewaycontract.ContentBlock{{
+			Type:              gatewaycontract.ContentBlockToolCall,
+			Role:              "assistant",
+			ToolCallID:        "call_custom",
+			ToolName:          "shell",
+			ToolArgumentsJSON: "pwd",
+			Metadata:          map[string]any{"type": "custom_tool_call", "arguments_field": "input"},
+		}},
+		StreamEvents: []gatewaycontract.StreamEvent{
+			{
+				Index:        0,
+				Type:         gatewaycontract.StreamEventToolCallDelta,
+				ContentIndex: 0,
+				Delta: gatewaycontract.ContentBlock{
+					Type:              gatewaycontract.ContentBlockToolCall,
+					Role:              "assistant",
+					ToolCallID:        "call_custom",
+					ToolName:          "shell",
+					ToolArgumentsJSON: "pwd",
+					Metadata:          map[string]any{"type": "custom_tool_call", "arguments_field": "input"},
+				},
+				OriginProtocol: "openai-compatible",
+				RawEventType:   "response.output_item.done",
+			},
+			{
+				Index:      1,
+				Type:       gatewaycontract.StreamEventStop,
+				StopReason: "tool_use",
+			},
+		},
+		Usage: gatewaycontract.Usage{InputTokens: 4, OutputTokens: 2},
+	}
+
+	responsesEvents := svc.RenderResponsesStreamEvents(resp)
+	added := streamEventByName(responsesEvents, "response.output_item.added")
+	if added == nil {
+		t.Fatalf("expected custom tool output_item.added, got %+v", responsesEvents)
+	}
+	startItem, _ := added.Data["item"].(map[string]any)
+	if startItem["type"] != "custom_tool_call" || startItem["call_id"] != "call_custom" || startItem["name"] != "shell" {
+		t.Fatalf("expected custom tool start item, got %+v", startItem)
+	}
+	if _, found := startItem["arguments"]; found {
+		t.Fatalf("did not expect custom tool start arguments field, got %+v", startItem)
+	}
+	if _, found := startItem["arguments_field"]; found {
+		t.Fatalf("did not expect internal arguments_field metadata, got %+v", startItem)
+	}
+	done := streamEventByName(responsesEvents, "response.output_item.done")
+	if done == nil {
+		t.Fatalf("expected custom tool output_item.done, got %+v", responsesEvents)
+	}
+	doneItem, _ := done.Data["item"].(map[string]any)
+	if doneItem["type"] != "custom_tool_call" || doneItem["input"] != "pwd" {
+		t.Fatalf("expected custom tool done input field, got %+v", doneItem)
+	}
+	if _, found := doneItem["arguments"]; found {
+		t.Fatalf("did not expect custom tool done arguments field, got %+v", doneItem)
+	}
+	if _, found := doneItem["arguments_field"]; found {
+		t.Fatalf("did not expect internal arguments_field metadata, got %+v", doneItem)
 	}
 }
 
