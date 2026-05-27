@@ -369,7 +369,7 @@ func chatStreamToolCalls(blocks []gatewaycontract.ContentBlock) []map[string]any
 	return out
 }
 
-func responseStreamOutputEvents(blocks []gatewaycontract.ContentBlock) []StreamEvent {
+func responseStreamOutputEvents(responseIDValue string, blocks []gatewaycontract.ContentBlock) []StreamEvent {
 	blocks = normalizeOutputItems(blocks)
 	events := make([]StreamEvent, 0, len(blocks)*4)
 	for outputIndex, block := range blocks {
@@ -441,6 +441,7 @@ func responseStreamOutputEvents(blocks []gatewaycontract.ContentBlock) []StreamE
 					Event: "response.function_call_arguments.delta",
 					Data: map[string]any{
 						"type":         "response.function_call_arguments.delta",
+						"response_id":  responseIDValue,
 						"item_id":      itemID,
 						"output_index": outputIndex,
 						"delta":        block.ToolArgumentsJSON,
@@ -451,6 +452,7 @@ func responseStreamOutputEvents(blocks []gatewaycontract.ContentBlock) []StreamE
 				Event: "response.function_call_arguments.done",
 				Data: map[string]any{
 					"type":         "response.function_call_arguments.done",
+					"response_id":  responseIDValue,
 					"item_id":      itemID,
 					"output_index": outputIndex,
 					"arguments":    block.ToolArgumentsJSON,
@@ -478,6 +480,7 @@ func responseStreamOutputEvents(blocks []gatewaycontract.ContentBlock) []StreamE
 				Event: "response.content_part.added",
 				Data: map[string]any{
 					"type":          "response.content_part.added",
+					"response_id":   responseIDValue,
 					"item_id":       itemID,
 					"output_index":  outputIndex,
 					"content_index": 0,
@@ -486,11 +489,11 @@ func responseStreamOutputEvents(blocks []gatewaycontract.ContentBlock) []StreamE
 			},
 		)
 		if text := strings.TrimSpace(block.Text); text != "" {
-			events = append(events, responseStreamTextDeltaEvent(itemID, outputIndex, block.Type, text, block.Metadata))
+			events = append(events, responseStreamTextDeltaEvent(responseIDValue, itemID, outputIndex, block.Type, text, block.Metadata))
 		}
 		events = append(events,
-			responseStreamTextDoneEvent(itemID, outputIndex, block.Type, strings.TrimSpace(block.Text), block.Metadata),
-			responseStreamContentPartDoneEvent(itemID, outputIndex, block.Type, strings.TrimSpace(block.Text), block.Metadata),
+			responseStreamTextDoneEvent(responseIDValue, itemID, outputIndex, block.Type, strings.TrimSpace(block.Text), block.Metadata),
+			responseStreamContentPartDoneEvent(responseIDValue, itemID, outputIndex, block.Type, strings.TrimSpace(block.Text), block.Metadata),
 			responseStreamMessageDoneEvent(itemID, outputIndex, block.Type, strings.TrimSpace(block.Text), block.Metadata),
 		)
 	}

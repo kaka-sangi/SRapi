@@ -902,6 +902,21 @@ func TestRenderResponsesStreamEventsPreservesTextAnnotations(t *testing.T) {
 	if len(deltas) != 2 || deltas[0].Data["delta"] != "search " || deltas[1].Data["delta"] != "result" {
 		t.Fatalf("expected metadata-only annotation event not to render text delta, got %+v", deltas)
 	}
+	if !responsesStreamEventsHaveContiguousSequenceNumbers(events) {
+		t.Fatalf("expected contiguous responses sequence numbers, got %+v", events)
+	}
+	if deltas[0].Data["response_id"] != "resp_stream_annotations" ||
+		deltas[0].Data["item_id"] == "" ||
+		deltas[0].Data["output_index"] != 0 ||
+		deltas[0].Data["content_index"] != 0 {
+		t.Fatalf("expected complete output_text delta identity fields, got %+v", deltas[0])
+	}
+	if done.Data["response_id"] != "resp_stream_annotations" ||
+		done.Data["item_id"] == "" ||
+		done.Data["output_index"] != 0 ||
+		done.Data["content_index"] != 0 {
+		t.Fatalf("expected complete content_part.done identity fields, got %+v", done)
+	}
 }
 
 func TestRenderResponsesStreamEventsPreservesLifecycleMetadataFrames(t *testing.T) {
@@ -1945,12 +1960,22 @@ func TestRenderCanonicalStreamEventsPreservesResponsesReasoningDeltas(t *testing
 	if len(reasoningDeltas) != 2 || reasoningDeltas[0].Data["delta"] != "think " || reasoningDeltas[1].Data["delta"] != "first" {
 		t.Fatalf("expected preserved responses reasoning deltas, got %+v", reasoningDeltas)
 	}
+	if reasoningDeltas[0].Data["response_id"] != "resp_reasoning_delta_stream" ||
+		reasoningDeltas[0].Data["item_id"] == "" ||
+		reasoningDeltas[0].Data["output_index"] != 0 ||
+		reasoningDeltas[0].Data["content_index"] != 0 {
+		t.Fatalf("expected complete reasoning_text delta identity fields, got %+v", reasoningDeltas[0])
+	}
 	if outputTextDeltas := streamEventsByName(responsesEvents, "response.output_text.delta"); len(outputTextDeltas) != 1 || outputTextDeltas[0].Data["delta"] != "answer" {
 		t.Fatalf("expected reasoning to stay out of output_text deltas, got %+v", outputTextDeltas)
 	}
 	reasoningDone := streamEventByName(responsesEvents, "response.reasoning_text.done")
 	if reasoningDone == nil || reasoningDone.Data["text"] != "think first" {
 		t.Fatalf("expected completed responses reasoning text, got %+v", responsesEvents)
+	}
+	if reasoningDone.Data["response_id"] != "resp_reasoning_delta_stream" ||
+		reasoningDone.Data["content_index"] != 0 {
+		t.Fatalf("expected complete reasoning_text done identity fields, got %+v", reasoningDone)
 	}
 	contentPartDone := streamEventsByName(responsesEvents, "response.content_part.done")
 	if len(contentPartDone) != 2 {
@@ -2047,12 +2072,24 @@ func TestRenderCanonicalStreamEventsPreservesResponsesReasoningSummaryDeltas(t *
 	if len(summaryDeltas) != 2 || summaryDeltas[0].Data["delta"] != "summary " || summaryDeltas[1].Data["delta"] != "only" {
 		t.Fatalf("expected preserved responses reasoning summary deltas, got %+v", summaryDeltas)
 	}
+	if summaryDeltas[0].Data["response_id"] != "resp_reasoning_summary_delta_stream" ||
+		summaryDeltas[0].Data["item_id"] == "" ||
+		summaryDeltas[0].Data["output_index"] != 0 ||
+		summaryDeltas[0].Data["summary_index"] != 0 ||
+		summaryDeltas[0].Data["content_index"] != nil {
+		t.Fatalf("expected complete reasoning summary delta identity fields, got %+v", summaryDeltas[0])
+	}
 	if reasoningDeltas := streamEventsByName(responsesEvents, "response.reasoning_text.delta"); len(reasoningDeltas) != 0 {
 		t.Fatalf("did not expect reasoning summary as reasoning_text deltas, got %+v", reasoningDeltas)
 	}
 	summaryDone := streamEventByName(responsesEvents, "response.reasoning_summary_text.done")
 	if summaryDone == nil || summaryDone.Data["text"] != "summary only" {
 		t.Fatalf("expected completed responses reasoning summary text, got %+v", responsesEvents)
+	}
+	if summaryDone.Data["response_id"] != "resp_reasoning_summary_delta_stream" ||
+		summaryDone.Data["summary_index"] != 0 ||
+		summaryDone.Data["content_index"] != nil {
+		t.Fatalf("expected complete reasoning summary done identity fields, got %+v", summaryDone)
 	}
 	contentPartDone := streamEventsByName(responsesEvents, "response.content_part.done")
 	if len(contentPartDone) < 1 {
@@ -2231,12 +2268,22 @@ func TestRenderResponsesStreamEventsPreservesRefusalPartLifecycle(t *testing.T) 
 		refusalDeltas[1].Data["delta"] != "help" {
 		t.Fatalf("expected responses refusal deltas, got %+v", responsesEvents)
 	}
+	if refusalDeltas[0].Data["response_id"] != "resp_refusal_stream" ||
+		refusalDeltas[0].Data["item_id"] == "" ||
+		refusalDeltas[0].Data["output_index"] != 0 ||
+		refusalDeltas[0].Data["content_index"] != 0 {
+		t.Fatalf("expected complete refusal delta identity fields, got %+v", refusalDeltas[0])
+	}
 	if outputTextDeltas := streamEventsByName(responsesEvents, "response.output_text.delta"); len(outputTextDeltas) != 0 {
 		t.Fatalf("did not expect refusal as output_text delta, got %+v", outputTextDeltas)
 	}
 	refusalDone := streamEventByName(responsesEvents, "response.refusal.done")
 	if refusalDone == nil || refusalDone.Data["refusal"] != "I can't help" || refusalDone.Data["text"] != nil {
 		t.Fatalf("expected completed responses refusal text, got %+v", refusalDone)
+	}
+	if refusalDone.Data["response_id"] != "resp_refusal_stream" ||
+		refusalDone.Data["content_index"] != 0 {
+		t.Fatalf("expected complete refusal done identity fields, got %+v", refusalDone)
 	}
 	contentPartAdded := streamEventByName(responsesEvents, "response.content_part.added")
 	if contentPartAdded == nil {
