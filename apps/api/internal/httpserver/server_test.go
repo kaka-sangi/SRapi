@@ -4029,6 +4029,25 @@ func TestGatewayResponsesRejectsFunctionCallOutputWithoutContinuationContext(t *
 	}
 }
 
+func TestGatewayResponsesRejectsMessagePreviousResponseID(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(`{"model":"message-previous-response-id-model","previous_response_id":"msg_123456","input":"continue"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "previous_response_id must reference a response id") {
+		t.Fatalf("expected previous_response_id message-id error, got %s", rec.Body.String())
+	}
+}
+
 func TestGatewayProviderAliasForcesProviderContext(t *testing.T) {
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)

@@ -1099,6 +1099,9 @@ func validateRawResponsesInput(rawBody []byte) error {
 	if err := json.Unmarshal(rawBody, &payload); err != nil {
 		return nil
 	}
+	if rawResponsesPreviousResponseIDLooksLikeMessageID(rawMapString(payload, "previous_response_id")) {
+		return fmt.Errorf("Responses previous_response_id must reference a response id, not a message id")
+	}
 	state := rawResponsesInputValidationState{
 		hasPreviousResponseID: strings.TrimSpace(rawMapString(payload, "previous_response_id")) != "",
 	}
@@ -1118,6 +1121,10 @@ func validateRawResponsesInput(rawBody []byte) error {
 		return fmt.Errorf("Responses function_call_output input item requires matching function_call, item_reference, or previous_response_id")
 	}
 	return nil
+}
+
+func rawResponsesPreviousResponseIDLooksLikeMessageID(value string) bool {
+	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(value)), "msg_")
 }
 
 type rawResponsesInputValidationState struct {

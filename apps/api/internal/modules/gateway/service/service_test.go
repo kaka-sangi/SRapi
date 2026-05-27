@@ -345,6 +345,36 @@ func TestValidateResponsesRequestAllowsFunctionCallOutputWithPreviousResponseID(
 	}
 }
 
+func TestValidateResponsesRequestRejectsMessagePreviousResponseID(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	err = svc.ValidateResponsesRequest([]byte(`{
+		"model":"gpt-5.4",
+		"previous_response_id":"msg_123456",
+		"input":"continue"
+	}`))
+
+	if err == nil || err.Error() != "Responses previous_response_id must reference a response id, not a message id" {
+		t.Fatalf("expected previous_response_id message-id error, got %v", err)
+	}
+}
+
+func TestValidateResponsesRequestAllowsResponsePreviousResponseID(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	if err := svc.ValidateResponsesRequest([]byte(`{
+		"model":"gpt-5.4",
+		"previous_response_id":"resp_123456",
+		"input":"continue"
+	}`)); err != nil {
+		t.Fatalf("expected response previous_response_id to pass, got %v", err)
+	}
+}
+
 func TestValidateResponsesRequestRequiresFunctionCallOutputContext(t *testing.T) {
 	svc, err := New()
 	if err != nil {
