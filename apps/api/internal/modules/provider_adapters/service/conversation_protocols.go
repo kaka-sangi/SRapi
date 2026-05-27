@@ -764,8 +764,8 @@ func openAIFileContentBlock(part contract.ContentPart) map[string]any {
 func openAIToolCallFromPart(part contract.ContentPart) (openAIToolCall, bool) {
 	id := strings.TrimSpace(part.ToolCallID)
 	name := strings.TrimSpace(part.ToolName)
-	arguments := strings.TrimSpace(part.ToolArgumentsJSON)
-	if id == "" && name == "" && arguments == "" {
+	arguments := part.ToolArgumentsJSON
+	if id == "" && name == "" && strings.TrimSpace(arguments) == "" {
 		return openAIToolCall{}, false
 	}
 	callType := metadataString(part.Metadata, "type")
@@ -909,8 +909,8 @@ func openAIMessageParts(message openAIChatMessage) []contract.ContentPart {
 func openAIToolCallPart(toolCall openAIToolCall) (contract.ContentPart, bool) {
 	id := strings.TrimSpace(toolCall.ID)
 	name := strings.TrimSpace(toolCall.Function.Name)
-	arguments := strings.TrimSpace(toolCall.Function.Arguments)
-	if id == "" && name == "" && arguments == "" {
+	arguments := toolCall.Function.Arguments
+	if id == "" && name == "" && strings.TrimSpace(arguments) == "" {
 		return contract.ContentPart{}, false
 	}
 	metadata := map[string]any{}

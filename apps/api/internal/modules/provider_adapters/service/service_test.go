@@ -144,7 +144,7 @@ func TestOpenAICompatibleAdapterInvokesUpstream(t *testing.T) {
 func TestOpenAICompatibleAdapterPreservesToolCallResponse(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"choices":[{"finish_reason":"tool_calls","message":{"role":"assistant","content":"","tool_calls":[{"id":"call_1","type":"function","function":{"name":"lookup","arguments":"{\"query\":\"weather\"}"}}]}}],"usage":{"prompt_tokens":3,"completion_tokens":1,"total_tokens":4}}`))
+		_, _ = w.Write([]byte(`{"choices":[{"finish_reason":"tool_calls","message":{"role":"assistant","content":"","tool_calls":[{"id":"call_1","type":"function","function":{"name":"lookup","arguments":" {\"query\":\"weather\"}\n"}}]}}],"usage":{"prompt_tokens":3,"completion_tokens":1,"total_tokens":4}}`))
 	}))
 	defer upstream.Close()
 
@@ -171,7 +171,7 @@ func TestOpenAICompatibleAdapterPreservesToolCallResponse(t *testing.T) {
 	if len(resp.Parts) != 1 || resp.StopReason != contract.StopReasonToolUse || resp.Usage.OutputTokens != 1 {
 		t.Fatalf("unexpected tool call response: %+v", resp)
 	}
-	assertToolUsePart(t, resp.Parts[0], "call_1", "lookup", `{"query":"weather"}`)
+	assertToolUsePart(t, resp.Parts[0], "call_1", "lookup", " {\"query\":\"weather\"}\n")
 }
 
 func TestOpenAICompatibleAdapterPreservesTextAnnotations(t *testing.T) {
@@ -377,7 +377,7 @@ func TestOpenAICompatibleAdapterRendersContentPartsToUpstream(t *testing.T) {
 			t.Fatalf("expected assistant tool call message, got %+v", payload.Messages[1])
 		}
 		function, _ := payload.Messages[1].ToolCalls[0]["function"].(map[string]any)
-		if payload.Messages[1].ToolCalls[0]["id"] != "call_1" || function["name"] != "lookup" || function["arguments"] != `{"query":"weather"}` {
+		if payload.Messages[1].ToolCalls[0]["id"] != "call_1" || function["name"] != "lookup" || function["arguments"] != " {\"query\":\"weather\"}\n" {
 			t.Fatalf("unexpected OpenAI tool call: %+v", payload.Messages[1].ToolCalls[0])
 		}
 		var toolContent string
@@ -406,7 +406,7 @@ func TestOpenAICompatibleAdapterRendersContentPartsToUpstream(t *testing.T) {
 				}},
 				imageURLPart("https://example.test/image.png"),
 			}},
-			{Role: "assistant", Parts: []contract.ContentPart{toolUsePart("call_1", "lookup", `{"query":"weather"}`)}},
+			{Role: "assistant", Parts: []contract.ContentPart{toolUsePart("call_1", "lookup", " {\"query\":\"weather\"}\n")}},
 			{Role: "tool", Parts: []contract.ContentPart{toolResultPart("call_1", "sunny")}},
 		},
 		Provider: providercontract.Provider{AdapterType: "openai-compatible", Protocol: "openai-compatible"},
