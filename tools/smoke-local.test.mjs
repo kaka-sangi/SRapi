@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import {
   CORE_GATEWAY_SMOKE_ENDPOINTS,
+  CORE_GATEWAY_SMOKE_TARGETS,
   FAILOVER_GATEWAY_SMOKE_TARGETS,
   FAILOVER_SMOKE_ENDPOINT,
   RATE_LIMIT_SMOKE_ENDPOINT,
@@ -22,6 +23,21 @@ test("core gateway smoke keeps the MVP route family explicit", () => {
       "POST /v1/messages",
     ],
   );
+});
+
+test("core gateway smoke includes DB-backed raw Responses streaming", () => {
+  assert.deepEqual(
+    CORE_GATEWAY_SMOKE_TARGETS.map((target) => target.name),
+    ["local-smoke-responses-stream"],
+  );
+  const target = CORE_GATEWAY_SMOKE_TARGETS[0];
+  assert.equal(target.adapterType, "native-openai");
+  assert.equal(target.protocol, "openai-compatible");
+  assert.equal(target.providerCapabilities.streaming, true);
+  assert.equal(target.providerCapabilities.responses, true);
+  assert.equal(target.providerConfigSchema.native_responses, true);
+  assert.equal(target.accountMetadata.responses_require_terminal_event, true);
+  assert.equal(target.mappingCapabilityOverride.some((capability) => capability.key === "responses"), true);
 });
 
 test("release gateway smoke covers every non-websocket public gateway route in OpenAPI", () => {
@@ -81,6 +97,20 @@ test("release gateway smoke uses stable reusable admin targets", () => {
     assert.equal(target.name.includes("random"), false);
     assert.match(`${target.name}-model`, /^local-smoke-[a-z-]+-model$/);
   }
+});
+
+test("core smoke creates and cleans fixed raw stream gateway target", () => {
+  const script = readFileSync("tools/smoke-local.mjs", "utf8");
+
+  assert.match(script, /const CORE_GATEWAY_SMOKE_TARGET_NAMES = new Set/);
+  assert.match(script, /if \(!rateLimitSmoke && !failoverSmoke\) {\s*await disableFixedSmokeGatewayTargets/s);
+  assert.match(script, /smokeResponsesRawStreamEndpoint/);
+  assert.match(script, /RESPONSES_RAW_STREAM_SMOKE_SSE/);
+  assert.match(script, /response\.output_text\.delta/);
+  assert.match(script, /sequence_number/);
+  assert.match(script, /response_id/);
+  assert.match(script, /item_id/);
+  assert.match(script, /stream\.text !== RESPONSES_RAW_STREAM_SMOKE_SSE/);
 });
 
 test("local smoke disables its temporary gateway api key", () => {

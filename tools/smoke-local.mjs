@@ -27,6 +27,31 @@ export const FAILOVER_SMOKE_ENDPOINT = Object.freeze({
   path: "/v1/chat/completions",
 });
 
+export const CORE_GATEWAY_SMOKE_TARGETS = Object.freeze([
+  {
+    name: "local-smoke-responses-stream",
+    displayName: "Local Smoke Responses Stream",
+    adapterType: "native-openai",
+    protocol: "openai-compatible",
+    providerCapabilities: { streaming: true, responses: true },
+    providerConfigSchema: { native_responses: true },
+    modelCapabilities: [
+      { key: "text_input", level: "required", status: "stable", version: "v1" },
+      { key: "text_output", level: "required", status: "stable", version: "v1" },
+      { key: "streaming", level: "required", status: "stable", version: "v1" },
+      { key: "responses", level: "required", status: "stable", version: "v1" },
+    ],
+    mappingCapabilityOverride: [
+      { key: "streaming", level: "required", status: "stable", version: "v1" },
+      { key: "responses", level: "required", status: "stable", version: "v1" },
+    ],
+    upstreamModelName: "responses-stream-smoke-upstream",
+    accountCredential: { api_key: "responses-stream-smoke-secret" },
+    accountBasePath: "/v1",
+    accountMetadata: { native_responses: true, responses_require_terminal_event: true },
+  },
+]);
+
 export const FAILOVER_GATEWAY_SMOKE_TARGETS = Object.freeze([
   {
     name: "local-smoke-failover-primary",
@@ -125,6 +150,11 @@ export const RELEASE_GATEWAY_SMOKE_TARGETS = Object.freeze([
   },
 ]);
 
+const CORE_GATEWAY_SMOKE_TARGET_NAMES = new Set(CORE_GATEWAY_SMOKE_TARGETS.map((target) => target.name));
+const CORE_GATEWAY_SMOKE_MODEL_NAMES = new Set(CORE_GATEWAY_SMOKE_TARGETS.map((target) => `${target.name}-model`));
+const CORE_GATEWAY_SMOKE_ACCOUNT_NAMES = new Set(
+  CORE_GATEWAY_SMOKE_TARGETS.map((target) => `${target.name}-account`),
+);
 const RELEASE_GATEWAY_SMOKE_TARGET_NAMES = new Set(RELEASE_GATEWAY_SMOKE_TARGETS.map((target) => target.name));
 const RELEASE_GATEWAY_SMOKE_MODEL_NAMES = new Set(RELEASE_GATEWAY_SMOKE_TARGETS.map((target) => `${target.name}-model`));
 const RELEASE_GATEWAY_SMOKE_ACCOUNT_NAMES = new Set(
@@ -165,6 +195,15 @@ async function main() {
   }
 
   await disableActiveSmokeApiKeys({ cookie, csrfToken });
+  if (!rateLimitSmoke && !failoverSmoke) {
+    await disableFixedSmokeGatewayTargets({
+      cookie,
+      csrfToken,
+      targetNames: CORE_GATEWAY_SMOKE_TARGET_NAMES,
+      modelNames: CORE_GATEWAY_SMOKE_MODEL_NAMES,
+      accountNames: CORE_GATEWAY_SMOKE_ACCOUNT_NAMES,
+    });
+  }
   if (releaseSmoke) {
     await disableLegacySmokeGatewayTargets({ cookie, csrfToken });
   }
@@ -193,7 +232,11 @@ async function main() {
         csrfToken,
       });
     } else {
-      models = await smokeCoreGatewayEndpoints(plaintextKey);
+      models = await smokeCoreGatewayEndpoints({
+        bearer: plaintextKey,
+        cookie,
+        csrfToken,
+      });
     }
     if (releaseSmoke) {
       await smokeReleaseGatewayEndpoints({
@@ -206,6 +249,15 @@ async function main() {
     await disableSmokeApiKey({ cookie, csrfToken, apiKeyID: apiKey.id });
     if (releaseSmoke) {
       await disableFixedSmokeGatewayTargets({ cookie, csrfToken });
+    }
+    if (!rateLimitSmoke && !failoverSmoke) {
+      await disableFixedSmokeGatewayTargets({
+        cookie,
+        csrfToken,
+        targetNames: CORE_GATEWAY_SMOKE_TARGET_NAMES,
+        modelNames: CORE_GATEWAY_SMOKE_MODEL_NAMES,
+        accountNames: CORE_GATEWAY_SMOKE_ACCOUNT_NAMES,
+      });
     }
     if (failoverSmoke) {
       await disableFixedSmokeGatewayTargets({
@@ -472,7 +524,7 @@ async function smokeReleasePlatformEndpoints() {
   }
 }
 
-async function smokeCoreGatewayEndpoints(bearer) {
+async function smokeCoreGatewayEndpoints({ bearer, cookie, csrfToken }) {
   const models = await request("GET", "/v1/models", {
     bearer,
   });
@@ -517,7 +569,35 @@ async function smokeCoreGatewayEndpoints(bearer) {
     throw new Error("mock gateway Messages response did not include echoed prompt");
   }
 
+  await smokeResponsesRawStreamEndpoint({ bearer, cookie, csrfToken });
+
   return models;
+}
+
+async function smokeResponsesRawStreamEndpoint({ bearer, cookie, csrfToken }) {
+  await withSmokeUpstream(async (upstreamURL) => {
+    const target = withUpstreamMetadata(CORE_GATEWAY_SMOKE_TARGETS[0], upstreamURL);
+    const model = await ensureGatewayTarget({
+      cookie,
+      csrfToken,
+      target,
+    });
+    const stream = await request("POST", "/v1/responses", {
+      bearer,
+      body: {
+        model,
+        input: "local smoke responses stream call",
+        stream: true,
+      },
+      responseType: "text",
+    });
+    if (!stream.headers.get("content-type")?.startsWith("text/event-stream")) {
+      throw new Error(`/v1/responses stream returned invalid content type ${stream.headers.get("content-type")}`);
+    }
+    if (stream.text !== RESPONSES_RAW_STREAM_SMOKE_SSE) {
+      throw new Error(`/v1/responses stream did not raw replay upstream SSE: ${JSON.stringify(stream.text)}`);
+    }
+  });
 }
 
 async function smokeRateLimitEndpoint(bearer) {
@@ -800,6 +880,7 @@ async function ensureProvider({ cookie, csrfToken, target }) {
     protocol: target.protocol,
     status: "active",
     capabilities: target.providerCapabilities,
+    config_schema: target.providerConfigSchema,
   };
   const existing = await findAdminResource("/api/v1/admin/providers", "name", target.name, { cookie });
   if (existing) {
@@ -851,6 +932,7 @@ async function ensureModelMapping({ cookie, csrfToken, model, provider, target }
       provider_id: String(provider.id),
       upstream_model_name: target.upstreamModelName,
       status: "active",
+      capability_override: target.mappingCapabilityOverride,
     },
     expectedStatus: [201, 409],
   });
@@ -1030,6 +1112,17 @@ function geminiContentBody(text) {
   };
 }
 
+const RESPONSES_RAW_STREAM_SMOKE_SSE = [
+  'event: response.created\n' +
+    'data: {"type":"response.created","sequence_number":0,"response":{"id":"resp_smoke","object":"response","status":"in_progress","output":[]}}\n\n',
+  'event: response.output_text.delta\n' +
+    'data: {"type":"response.output_text.delta","sequence_number":1,"response_id":"resp_smoke","item_id":"msg_smoke","output_index":0,"content_index":0,"delta":"local smoke"}\n\n',
+  'event: response.output_text.delta\n' +
+    'data: {"type":"response.output_text.delta","sequence_number":2,"response_id":"resp_smoke","item_id":"msg_smoke","output_index":0,"content_index":0,"delta":" responses stream"}\n\n',
+  'event: response.completed\n' +
+    'data: {"type":"response.completed","sequence_number":3,"response":{"id":"resp_smoke","object":"response","status":"completed","output":[{"id":"msg_smoke","type":"message","status":"completed","content":[{"type":"output_text","text":"local smoke responses stream"}]}],"usage":{"input_tokens":4,"output_tokens":5,"total_tokens":9}}}\n\n',
+].join("");
+
 async function withSmokeUpstream(fn) {
   const server = http.createServer(async (req, res) => {
     try {
@@ -1091,6 +1184,15 @@ async function withFailoverSmokeUpstreams(fn) {
 
 async function handleSmokeUpstreamRequest(req, res) {
   const url = new URL(req.url, "http://127.0.0.1");
+  if (req.method === "POST" && url.pathname === "/v1/responses") {
+    if (req.headers.authorization !== "Bearer responses-stream-smoke-secret") {
+      writeJSON(res, { error: { message: "unexpected responses stream auth header" } }, 401);
+      return;
+    }
+    res.writeHead(200, { "Content-Type": "text/event-stream" });
+    res.end(RESPONSES_RAW_STREAM_SMOKE_SSE);
+    return;
+  }
   if (req.method === "POST" && url.pathname === "/v1/rerank") {
     const payload = await readJSON(req);
     const docs = Array.isArray(payload.documents) ? payload.documents : [];
