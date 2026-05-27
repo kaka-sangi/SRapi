@@ -1295,6 +1295,75 @@ func TestRenderResponsesStreamEventsPreservesHostedWebSearchCall(t *testing.T) {
 	}
 }
 
+func TestRenderResponsesStreamEventsPreservesImageGenerationPartialImages(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	resp := gatewaycontract.CanonicalResponse{
+		ID:         "resp_image_partial_stream",
+		Model:      "gpt-image",
+		StopReason: "end_turn",
+		OutputItems: []gatewaycontract.ContentBlock{{
+			Type:        gatewaycontract.ContentBlockImage,
+			Role:        "assistant",
+			MediaBase64: "ZmluYWw=",
+			Metadata: map[string]any{
+				"type":          "image_generation_call",
+				"id":            "ig_1",
+				"status":        "completed",
+				"output_format": "png",
+			},
+		}},
+		StreamEvents: []gatewaycontract.StreamEvent{
+			{
+				Index:        0,
+				Type:         gatewaycontract.StreamEventContentDelta,
+				ContentIndex: 0,
+				Delta: gatewaycontract.ContentBlock{
+					Type: gatewaycontract.ContentBlockImage,
+					Metadata: map[string]any{
+						"type":                "response.image_generation_call.partial_image",
+						"item_id":             "ig_1",
+						"partial_image_index": float64(1),
+						"partial_image_b64":   "cGFydGlhbA==",
+						"output_format":       "png",
+					},
+				},
+				RawEventType:   "response.image_generation_call.partial_image",
+				OriginProtocol: "openai-compatible",
+			},
+			{
+				Index:      1,
+				Type:       gatewaycontract.StreamEventStop,
+				StopReason: "end_turn",
+			},
+		},
+		Usage: gatewaycontract.Usage{InputTokens: 5, OutputTokens: 3},
+	}
+
+	events := svc.RenderResponsesStreamEvents(resp)
+	partial := streamEventByName(events, "response.image_generation_call.partial_image")
+	if partial == nil {
+		t.Fatalf("expected partial image event, got %+v", events)
+	}
+	if partial.Data["item_id"] != "ig_1" ||
+		partial.Data["output_index"] != 0 ||
+		partial.Data["partial_image_index"] != float64(1) ||
+		partial.Data["partial_image_b64"] != "cGFydGlhbA==" ||
+		partial.Data["output_format"] != "png" {
+		t.Fatalf("unexpected partial image event data: %+v", partial.Data)
+	}
+	done := streamEventByName(events, "response.output_item.done")
+	if done == nil {
+		t.Fatalf("expected final image generation item after partial, got %+v", events)
+	}
+	doneItem, _ := done.Data["item"].(map[string]any)
+	if doneItem["type"] != "image_generation_call" || doneItem["result"] != "ZmluYWw=" {
+		t.Fatalf("expected final image generation item after partial, got %+v", events)
+	}
+}
+
 func TestRenderCanonicalStreamEventsPreservesTextDeltas(t *testing.T) {
 	svc, err := New()
 	if err != nil {

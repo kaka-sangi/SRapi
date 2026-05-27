@@ -432,10 +432,23 @@ func (s *Service) renderResponsesCanonicalStreamEvents(resp gatewaycontract.Cano
 	}
 	nextOutputIndex := 0
 	textStates := newResponseStreamTextStates(resp.OutputItems)
+	imageStates := newResponseStreamImageStates(resp.OutputItems)
 	toolStates := newStreamToolCallStates(resp.OutputItems)
 	for _, event := range events {
 		switch event.Type {
 		case gatewaycontract.StreamEventContentDelta, gatewaycontract.StreamEventToolResult:
+			if isResponsesImageGenerationPartialEvent(event) {
+				state := imageStates.stateFor(event)
+				if state != nil && state.OutputIndex < 0 {
+					state.OutputIndex = nextOutputIndex
+					nextOutputIndex++
+					out = append(out, responseStreamImageGenerationStartEvent(state))
+				}
+				if partial, ok := responseImageGenerationPartialStreamEvent(event, state); ok {
+					out = append(out, partial)
+				}
+				continue
+			}
 			delta := event.Delta.Text
 			state := textStates.stateFor(event, responseStreamDeltaTextBlockType(event, gatewaycontract.ContentBlockText))
 			state.mergeMetadata(event.Delta.Metadata)
@@ -537,6 +550,12 @@ func (s *Service) renderResponsesCanonicalStreamEvents(resp gatewaycontract.Cano
 			},
 		})
 	}
+	for _, state := range imageStates.openStates() {
+		doneGroups = append(doneGroups, responseStreamDoneEventGroup{
+			OutputIndex: state.OutputIndex,
+			Events:      []StreamEvent{responseStreamImageGenerationDoneEvent(state)},
+		})
+	}
 	sortResponseStreamDoneEventGroups(doneGroups)
 	for _, group := range doneGroups {
 		out = append(out, group.Events...)
@@ -579,6 +598,77 @@ func responseStreamTextStartEvents(itemID string, outputIndex int, blockType gat
 				"content_index": 0,
 				"part":          part,
 			},
+		},
+	}
+}
+
+func responseImageGenerationPartialStreamEvent(event gatewaycontract.StreamEvent, state *responseStreamImageState) (StreamEvent, bool) {
+	if !isResponsesImageGenerationPartialEvent(event) {
+		return StreamEvent{}, false
+	}
+	outputIndex := event.ContentIndex
+	itemID := firstNonEmpty(mapStringAny(event.Delta.Metadata, "item_id"), mapStringAny(event.Delta.Metadata, "id"))
+	if state != nil {
+		outputIndex = state.OutputIndex
+		itemID = firstNonEmpty(itemID, mapStringAny(state.Block.Metadata, "id"))
+	}
+	data := map[string]any{
+		"type":              "response.image_generation_call.partial_image",
+		"partial_image_b64": mapStringAny(event.Delta.Metadata, "partial_image_b64"),
+	}
+	if outputIndex >= 0 {
+		data["output_index"] = outputIndex
+	}
+	if itemID != "" {
+		data["item_id"] = itemID
+	}
+	if format := mapStringAny(event.Delta.Metadata, "output_format"); format != "" {
+		data["output_format"] = format
+	}
+	if background := mapStringAny(event.Delta.Metadata, "background"); background != "" {
+		data["background"] = background
+	}
+	if index, ok := event.Delta.Metadata["partial_image_index"]; ok && index != nil {
+		data["partial_image_index"] = index
+	}
+	return StreamEvent{Event: "response.image_generation_call.partial_image", Data: data}, true
+}
+
+func responseStreamImageGenerationStartEvent(state *responseStreamImageState) StreamEvent {
+	item := responseImageGenerationOutputItem(state.Block).AdditionalProperties
+	if item == nil {
+		item = map[string]any{}
+	}
+	if id := firstNonEmpty(mapStringAny(item, "id"), state.ItemID); id != "" {
+		item["id"] = id
+	}
+	item["type"] = "image_generation_call"
+	delete(item, "result")
+	return StreamEvent{
+		Event: "response.output_item.added",
+		Data: map[string]any{
+			"type":         "response.output_item.added",
+			"output_index": state.OutputIndex,
+			"item":         item,
+		},
+	}
+}
+
+func responseStreamImageGenerationDoneEvent(state *responseStreamImageState) StreamEvent {
+	item := responseImageGenerationOutputItem(state.Block).AdditionalProperties
+	if item == nil {
+		item = map[string]any{}
+	}
+	if id := firstNonEmpty(mapStringAny(item, "id"), state.ItemID); id != "" {
+		item["id"] = id
+	}
+	item["type"] = "image_generation_call"
+	return StreamEvent{
+		Event: "response.output_item.done",
+		Data: map[string]any{
+			"type":         "response.output_item.done",
+			"output_index": state.OutputIndex,
+			"item":         item,
 		},
 	}
 }
@@ -809,7 +899,7 @@ func streamEventsHaveRenderableOutput(events []gatewaycontract.StreamEvent) bool
 	for _, event := range events {
 		switch event.Type {
 		case gatewaycontract.StreamEventContentDelta, gatewaycontract.StreamEventReasoning, gatewaycontract.StreamEventToolResult:
-			if event.Delta.Text != "" {
+			if event.Delta.Text != "" || isResponsesImageGenerationPartialEvent(event) {
 				return true
 			}
 		case gatewaycontract.StreamEventToolCallDelta:
@@ -819,6 +909,11 @@ func streamEventsHaveRenderableOutput(events []gatewaycontract.StreamEvent) bool
 		}
 	}
 	return false
+}
+
+func isResponsesImageGenerationPartialEvent(event gatewaycontract.StreamEvent) bool {
+	return strings.TrimSpace(event.RawEventType) == "response.image_generation_call.partial_image" &&
+		strings.TrimSpace(mapStringAny(event.Delta.Metadata, "partial_image_b64")) != ""
 }
 
 func streamEventsCanRenderGemini(events []gatewaycontract.StreamEvent) bool {

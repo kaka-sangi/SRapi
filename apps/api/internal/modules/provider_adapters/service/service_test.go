@@ -5389,6 +5389,57 @@ func TestReverseProxyCodexCLIAdapterPreservesStreamImageGenerationOutput(t *test
 	}
 }
 
+func TestReverseProxyCodexCLIAdapterPreservesImageGenerationPartialImageEvents(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body: []byte(
+				"data: {\"type\":\"response.image_generation_call.partial_image\",\"item_id\":\"ig_1\",\"output_index\":0,\"partial_image_index\":1,\"partial_image_b64\":\"cGFydGlhbA==\",\"output_format\":\"png\"}\n\n" +
+					"data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"type\":\"image_generation_call\",\"id\":\"ig_1\",\"status\":\"completed\",\"output_format\":\"png\",\"result\":\"ZmluYWw=\"}}\n\n" +
+					"data: {\"type\":\"response.completed\",\"response\":{\"output\":[],\"usage\":{\"input_tokens\":4,\"output_tokens\":2}}}\n\n" +
+					"data: [DONE]\n\n",
+			),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_codex_stream_image_partial",
+		Model:      "codex-local",
+		InputParts: textParts("draw image"),
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": "https://codex.example.test/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+		Credential: map[string]any{"cli_client_token": "codex-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke codex reverse proxy adapter: %v", err)
+	}
+	partialEvents := conversationStreamEventsByType(resp.StreamEvents, contract.ConversationStreamEventContentDelta)
+	if len(partialEvents) == 0 {
+		t.Fatalf("expected partial image stream event, got %+v", resp.StreamEvents)
+	}
+	partial := partialEvents[0]
+	if partial.RawEventType != "response.image_generation_call.partial_image" ||
+		partial.Delta.Kind != contract.ContentPartImage ||
+		partial.Delta.Metadata["partial_image_b64"] != "cGFydGlhbA==" ||
+		partial.Delta.Metadata["partial_image_index"] != float64(1) ||
+		partial.Delta.Metadata["output_format"] != "png" {
+		t.Fatalf("unexpected partial image stream event: %+v", partial)
+	}
+}
+
 func TestReverseProxyCodexCLIAdapterPreservesReasoningTextDeltas(t *testing.T) {
 	runtime := capturingRuntime{
 		response: reverseproxycontract.Response{

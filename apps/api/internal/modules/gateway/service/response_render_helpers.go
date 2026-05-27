@@ -479,6 +479,18 @@ type responseStreamTextState struct {
 	Metadata     map[string]any
 }
 
+type responseStreamImageStates struct {
+	byContentIndex map[int]*responseStreamImageState
+	order          []*responseStreamImageState
+}
+
+type responseStreamImageState struct {
+	ContentIndex int
+	OutputIndex  int
+	ItemID       string
+	Block        gatewaycontract.ContentBlock
+}
+
 func newResponseStreamTextStates(blocks []gatewaycontract.ContentBlock) *responseStreamTextStates {
 	states := &responseStreamTextStates{
 		byKey: map[responseStreamTextStateKey]*responseStreamTextState{},
@@ -499,6 +511,56 @@ func newResponseStreamTextStates(blocks []gatewaycontract.ContentBlock) *respons
 		states.order = append(states.order, state)
 	}
 	return states
+}
+
+func newResponseStreamImageStates(blocks []gatewaycontract.ContentBlock) *responseStreamImageStates {
+	states := &responseStreamImageStates{
+		byContentIndex: map[int]*responseStreamImageState{},
+		order:          make([]*responseStreamImageState, 0),
+	}
+	for index, block := range normalizeOutputItems(blocks) {
+		if block.Type != gatewaycontract.ContentBlockImage || !responseBlockIsImageGenerationCall(block) {
+			continue
+		}
+		state := &responseStreamImageState{
+			ContentIndex: index,
+			OutputIndex:  -1,
+			ItemID:       firstNonEmpty(mapStringAny(block.Metadata, "id"), responseStreamItemID(index, block)),
+			Block:        block,
+		}
+		states.byContentIndex[index] = state
+		states.order = append(states.order, state)
+	}
+	return states
+}
+
+func (s *responseStreamImageStates) stateFor(event gatewaycontract.StreamEvent) *responseStreamImageState {
+	if s == nil {
+		return nil
+	}
+	if state := s.byContentIndex[event.ContentIndex]; state != nil {
+		return state
+	}
+	if event.ContentIndex >= 0 && event.ContentIndex < len(s.order) {
+		return s.order[event.ContentIndex]
+	}
+	return nil
+}
+
+func (s *responseStreamImageStates) openStates() []*responseStreamImageState {
+	if s == nil {
+		return nil
+	}
+	out := make([]*responseStreamImageState, 0, len(s.order))
+	for _, state := range s.order {
+		if state.OutputIndex >= 0 {
+			out = append(out, state)
+		}
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		return out[i].OutputIndex < out[j].OutputIndex
+	})
+	return out
 }
 
 func (s *responseStreamTextStates) stateFor(event gatewaycontract.StreamEvent, fallbackType gatewaycontract.ContentBlockType) *responseStreamTextState {

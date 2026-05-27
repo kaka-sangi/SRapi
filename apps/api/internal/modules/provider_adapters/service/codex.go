@@ -56,9 +56,13 @@ type codexResponsesEvent struct {
 	Text         string                    `json:"text"`
 	Refusal      string                    `json:"refusal"`
 	ItemID       string                    `json:"item_id"`
+	PartialImage string                    `json:"partial_image_b64"`
+	OutputFormat string                    `json:"output_format"`
+	Background   string                    `json:"background"`
 	Item         *codexResponsesOutputItem `json:"item"`
 	OutputIndex  *int                      `json:"output_index"`
 	ContentIndex *int                      `json:"content_index"`
+	PartialIndex any                       `json:"partial_image_index"`
 	Annotation   map[string]any            `json:"annotation,omitempty"`
 	Response     *codexResponsesResponse   `json:"response"`
 	Usage        *openAIUsage              `json:"usage"`
@@ -861,6 +865,10 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 					}
 				}
 			}
+		case "response.image_generation_call.partial_image":
+			if streamEvent, ok := codexImageGenerationPartialStreamEvent(event, eventType, data); ok {
+				appendStreamEvent(streamEvent)
+			}
 		case "response.output_text.delta":
 			deltaBuilder.WriteString(event.Delta)
 			if event.Delta != "" {
@@ -1021,6 +1029,37 @@ func codexAnnotationContentDelta(annotation map[string]any) contract.ContentPart
 		Metadata:       map[string]any{"annotations": []map[string]any{cloneMap(annotation)}},
 		OriginProtocol: "openai-compatible",
 	}
+}
+
+func codexImageGenerationPartialStreamEvent(event codexResponsesEvent, eventType string, raw string) (contract.ConversationStreamEvent, bool) {
+	partial := strings.TrimSpace(event.PartialImage)
+	if partial == "" {
+		return contract.ConversationStreamEvent{}, false
+	}
+	metadata := map[string]any{
+		"type":              eventType,
+		"partial_image_b64": partial,
+	}
+	if itemID := strings.TrimSpace(event.ItemID); itemID != "" {
+		metadata["item_id"] = itemID
+	}
+	if format := strings.TrimSpace(event.OutputFormat); format != "" {
+		metadata["output_format"] = format
+	}
+	if background := strings.TrimSpace(event.Background); background != "" {
+		metadata["background"] = background
+	}
+	if event.PartialIndex != nil {
+		metadata["partial_image_index"] = event.PartialIndex
+	}
+	return contract.ConversationStreamEvent{
+		Type:           contract.ConversationStreamEventContentDelta,
+		ContentIndex:   codexOutputIndex(event),
+		Delta:          contract.ContentPart{Kind: contract.ContentPartImage, Metadata: metadata, OriginProtocol: "openai-compatible"},
+		RawEventType:   eventType,
+		Raw:            append(json.RawMessage(nil), raw...),
+		OriginProtocol: "openai-compatible",
+	}, true
 }
 
 type codexTextAnnotationKey struct {
