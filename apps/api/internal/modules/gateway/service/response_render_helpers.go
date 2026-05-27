@@ -306,9 +306,11 @@ func outputResponsesContentBlocks(blocks []gatewaycontract.ContentBlock) []apiop
 	blocks = normalizeOutputItems(blocks)
 	out := make([]apiopenapi.ContentBlock, 0, len(blocks))
 	for _, block := range blocks {
+		props := outputBlockProperties(block)
+		delete(props, "reasoning_event_type")
 		item := apiopenapi.ContentBlock{
-			Type:                 apiopenapi.ContentBlockType(responseStreamContentPartType(block.Type)),
-			AdditionalProperties: outputBlockProperties(block),
+			Type:                 apiopenapi.ContentBlockType(responseStreamContentPartTypeForMetadata(block.Type, block.Metadata)),
+			AdditionalProperties: props,
 		}
 		if block.Type == gatewaycontract.ContentBlockRefusal {
 			setStringProperty(item.AdditionalProperties, "refusal", block.Text)
@@ -482,10 +484,10 @@ func responseStreamOutputEvents(blocks []gatewaycontract.ContentBlock) []StreamE
 			},
 		)
 		if text := strings.TrimSpace(block.Text); text != "" {
-			events = append(events, responseStreamTextDeltaEvent(itemID, outputIndex, block.Type, text))
+			events = append(events, responseStreamTextDeltaEvent(itemID, outputIndex, block.Type, text, block.Metadata))
 		}
 		events = append(events,
-			responseStreamTextDoneEvent(itemID, outputIndex, block.Type, strings.TrimSpace(block.Text)),
+			responseStreamTextDoneEvent(itemID, outputIndex, block.Type, strings.TrimSpace(block.Text), block.Metadata),
 			responseStreamContentPartDoneEvent(itemID, outputIndex, block.Type, strings.TrimSpace(block.Text), block.Metadata),
 			responseStreamMessageDoneEvent(itemID, outputIndex, block.Type, strings.TrimSpace(block.Text), block.Metadata),
 		)
@@ -774,7 +776,8 @@ func responseStreamFunctionCallItem(itemID string, block gatewaycontract.Content
 
 func responseStreamContentPart(block gatewaycontract.ContentBlock) map[string]any {
 	part := outputBlockProperties(block)
-	part["type"] = responseStreamContentPartType(block.Type)
+	delete(part, "reasoning_event_type")
+	part["type"] = responseStreamContentPartTypeForMetadata(block.Type, block.Metadata)
 	if block.Type == gatewaycontract.ContentBlockRefusal {
 		setStringProperty(part, "refusal", block.Text)
 	} else {

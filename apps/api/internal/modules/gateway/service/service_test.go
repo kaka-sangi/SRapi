@@ -1662,6 +1662,100 @@ func TestRenderCanonicalStreamEventsPreservesResponsesReasoningDeltas(t *testing
 	}
 }
 
+func TestRenderCanonicalStreamEventsPreservesResponsesReasoningSummaryDeltas(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	resp := gatewaycontract.CanonicalResponse{
+		ID:         "resp_reasoning_summary_delta_stream",
+		Model:      "gpt-4o-mini",
+		StopReason: "end_turn",
+		OutputItems: []gatewaycontract.ContentBlock{
+			{
+				Type:     gatewaycontract.ContentBlockReasoning,
+				Role:     "assistant",
+				Text:     "summary only",
+				Metadata: map[string]any{"reasoning_event_type": "summary_text"},
+			},
+			{Type: gatewaycontract.ContentBlockText, Role: "assistant", Text: "answer"},
+		},
+		StreamEvents: []gatewaycontract.StreamEvent{
+			{
+				Index:        0,
+				Type:         gatewaycontract.StreamEventReasoning,
+				ContentIndex: 0,
+				Delta: gatewaycontract.ContentBlock{
+					Type:     gatewaycontract.ContentBlockReasoning,
+					Role:     "assistant",
+					Text:     "summary ",
+					Metadata: map[string]any{"reasoning_event_type": "summary_text"},
+				},
+				RawEventType: "response.reasoning_summary_text.delta",
+			},
+			{
+				Index:        1,
+				Type:         gatewaycontract.StreamEventReasoning,
+				ContentIndex: 0,
+				Delta: gatewaycontract.ContentBlock{
+					Type:     gatewaycontract.ContentBlockReasoning,
+					Role:     "assistant",
+					Text:     "only",
+					Metadata: map[string]any{"reasoning_event_type": "summary_text"},
+				},
+				RawEventType: "response.reasoning_summary_text.delta",
+			},
+			{
+				Index:        2,
+				Type:         gatewaycontract.StreamEventContentDelta,
+				ContentIndex: 1,
+				Delta:        gatewaycontract.ContentBlock{Type: gatewaycontract.ContentBlockText, Role: "assistant", Text: "answer"},
+			},
+			{
+				Index:      3,
+				Type:       gatewaycontract.StreamEventStop,
+				StopReason: "end_turn",
+			},
+		},
+		Usage: gatewaycontract.Usage{InputTokens: 3, OutputTokens: 4},
+	}
+
+	responsesEvents := svc.RenderResponsesStreamEvents(resp)
+	summaryDeltas := streamEventsByName(responsesEvents, "response.reasoning_summary_text.delta")
+	if len(summaryDeltas) != 2 || summaryDeltas[0].Data["delta"] != "summary " || summaryDeltas[1].Data["delta"] != "only" {
+		t.Fatalf("expected preserved responses reasoning summary deltas, got %+v", summaryDeltas)
+	}
+	if reasoningDeltas := streamEventsByName(responsesEvents, "response.reasoning_text.delta"); len(reasoningDeltas) != 0 {
+		t.Fatalf("did not expect reasoning summary as reasoning_text deltas, got %+v", reasoningDeltas)
+	}
+	summaryDone := streamEventByName(responsesEvents, "response.reasoning_summary_text.done")
+	if summaryDone == nil || summaryDone.Data["text"] != "summary only" {
+		t.Fatalf("expected completed responses reasoning summary text, got %+v", responsesEvents)
+	}
+	contentPartDone := streamEventsByName(responsesEvents, "response.content_part.done")
+	if len(contentPartDone) < 1 {
+		t.Fatalf("expected responses content part done events, got %+v", responsesEvents)
+	}
+	firstDonePart, _ := contentPartDone[0].Data["part"].(map[string]any)
+	if firstDonePart["type"] != "summary_text" {
+		t.Fatalf("expected content part done to preserve summary_text, got %+v", firstDonePart)
+	}
+	if _, found := firstDonePart["reasoning_event_type"]; found {
+		t.Fatalf("did not expect internal reasoning marker in output part, got %+v", firstDonePart)
+	}
+	completed := svc.RenderResponses(resp)
+	if len(completed.Output) == 0 || completed.Output[0].Content == nil || len(*completed.Output[0].Content) == 0 {
+		t.Fatalf("expected completed responses content, got %+v", completed)
+	}
+	firstContent := (*completed.Output[0].Content)[0]
+	if firstContent.Type != apiopenapi.ContentBlockType("summary_text") {
+		t.Fatalf("expected final responses output to preserve summary_text, got %+v", firstContent)
+	}
+	if _, found := firstContent.Get("reasoning_event_type"); found {
+		t.Fatalf("did not expect internal reasoning marker in final output, got %+v", firstContent)
+	}
+}
+
 func TestRenderResponsesStreamEventsPreservesTextContentIndexes(t *testing.T) {
 	svc, err := New()
 	if err != nil {

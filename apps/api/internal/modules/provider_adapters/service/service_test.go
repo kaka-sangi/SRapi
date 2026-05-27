@@ -5743,6 +5743,57 @@ func TestReverseProxyCodexCLIAdapterPreservesReasoningTextDeltas(t *testing.T) {
 	}
 }
 
+func TestReverseProxyCodexCLIAdapterPreservesReasoningSummaryTextDeltas(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body: []byte(
+				"data: {\"type\":\"response.reasoning_summary_text.delta\",\"item_id\":\"rs_1\",\"output_index\":0,\"content_index\":0,\"delta\":\"summary \"}\n\n" +
+					"data: {\"type\":\"response.reasoning_summary_text.delta\",\"item_id\":\"rs_1\",\"output_index\":0,\"content_index\":0,\"delta\":\"only\"}\n\n" +
+					"data: {\"type\":\"response.reasoning_summary_text.done\",\"item_id\":\"rs_1\",\"output_index\":0,\"content_index\":0,\"text\":\"summary only\"}\n\n" +
+					"data: {\"type\":\"response.output_text.delta\",\"item_id\":\"msg_1\",\"output_index\":1,\"content_index\":0,\"delta\":\"answer\"}\n\n" +
+					"data: [DONE]\n\n",
+			),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_codex_reasoning_summary_delta",
+		Model:      "codex-local",
+		InputParts: textParts("reason then answer"),
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": "https://codex.example.test/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+		Credential: map[string]any{"cli_client_token": "codex-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke codex reverse proxy adapter: %v", err)
+	}
+	if len(resp.Parts) != 2 || resp.Parts[0].Kind != contract.ContentPartThinking || resp.Parts[0].Text != "summary only" || resp.Parts[1].Text != "answer" {
+		t.Fatalf("expected Codex reasoning summary and text parts, got %+v", resp.Parts)
+	}
+	reasoningEvents := conversationStreamEventsByType(resp.StreamEvents, contract.ConversationStreamEventReasoning)
+	if len(reasoningEvents) != 2 ||
+		reasoningEvents[0].RawEventType != "response.reasoning_summary_text.delta" ||
+		reasoningEvents[0].Delta.Metadata["reasoning_event_type"] != "summary_text" ||
+		reasoningEvents[0].Delta.Text != "summary " ||
+		reasoningEvents[1].Delta.Text != "only" {
+		t.Fatalf("expected Codex reasoning summary delta events, got %+v", resp.StreamEvents)
+	}
+}
+
 func TestReverseProxyCodexCLIAdapterPassesCliRuntimeContext(t *testing.T) {
 	runtime := capturingRuntime{
 		response: reverseproxycontract.Response{

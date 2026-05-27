@@ -933,7 +933,7 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 					OriginProtocol: "openai-compatible",
 				}))
 			}
-		case "response.reasoning_text.delta":
+		case "response.reasoning_text.delta", "response.reasoning_summary_text.delta":
 			reasoningBuilder.WriteString(event.Delta)
 			if event.Delta != "" {
 				appendStreamEvent(codexReasoningStreamEvent(event, eventType, data))
@@ -950,7 +950,7 @@ func parseCodexResponsesStream(body []byte, statusCode int) (contract.Conversati
 			if strings.TrimSpace(event.Refusal) != "" {
 				completedRefusal = event.Refusal
 			}
-		case "response.reasoning_text.done":
+		case "response.reasoning_text.done", "response.reasoning_summary_text.done":
 			if strings.TrimSpace(event.Text) != "" {
 				completedReasoning = event.Text
 			}
@@ -1231,12 +1231,17 @@ func codexAnnotationDedupeKey(annotation map[string]any) string {
 }
 
 func codexReasoningStreamEvent(event codexResponsesEvent, eventType string, raw string) contract.ConversationStreamEvent {
+	metadata := map[string]any(nil)
+	if strings.HasPrefix(eventType, "response.reasoning_summary_text.") {
+		metadata = map[string]any{"reasoning_event_type": "summary_text"}
+	}
 	return contract.ConversationStreamEvent{
 		Type:         contract.ConversationStreamEventReasoning,
 		ContentIndex: codexOutputIndex(event),
 		Delta: contract.ContentPart{
 			Kind:           contract.ContentPartThinking,
 			Text:           event.Delta,
+			Metadata:       metadata,
 			OriginProtocol: "openai-compatible",
 		},
 		RawEventType:   eventType,

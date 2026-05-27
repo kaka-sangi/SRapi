@@ -464,7 +464,7 @@ func (s *Service) renderResponsesCanonicalStreamEvents(resp gatewaycontract.Cano
 				continue
 			}
 			state.Text.WriteString(delta)
-			out = append(out, responseStreamTextDeltaEvent(state.ItemID, state.OutputIndex, state.BlockType, delta))
+			out = append(out, responseStreamTextDeltaEvent(state.ItemID, state.OutputIndex, state.BlockType, delta, state.Metadata))
 		case gatewaycontract.StreamEventReasoning:
 			delta := event.Delta.Text
 			state := textStates.stateFor(event, gatewaycontract.ContentBlockReasoning)
@@ -481,7 +481,7 @@ func (s *Service) renderResponsesCanonicalStreamEvents(resp gatewaycontract.Cano
 				continue
 			}
 			state.Text.WriteString(delta)
-			out = append(out, responseStreamTextDeltaEvent(state.ItemID, state.OutputIndex, state.BlockType, delta))
+			out = append(out, responseStreamTextDeltaEvent(state.ItemID, state.OutputIndex, state.BlockType, delta, state.Metadata))
 		case gatewaycontract.StreamEventToolCallDelta:
 			state := toolStates.stateFor(event)
 			if state.OutputIndex < 0 {
@@ -512,7 +512,7 @@ func (s *Service) renderResponsesCanonicalStreamEvents(resp gatewaycontract.Cano
 		doneGroups = append(doneGroups, responseStreamDoneEventGroup{
 			OutputIndex: state.OutputIndex,
 			Events: []StreamEvent{
-				responseStreamTextDoneEvent(state.ItemID, state.OutputIndex, state.BlockType, text),
+				responseStreamTextDoneEvent(state.ItemID, state.OutputIndex, state.BlockType, text, state.Metadata),
 				responseStreamContentPartDoneEvent(state.ItemID, state.OutputIndex, state.BlockType, text, state.Metadata),
 				responseStreamMessageDoneEvent(state.ItemID, state.OutputIndex, state.BlockType, text, state.Metadata),
 			},
@@ -704,7 +704,8 @@ func responseStreamTextPart(blockType gatewaycontract.ContentBlockType, text str
 	if part == nil {
 		part = map[string]any{}
 	}
-	part["type"] = responseStreamContentPartType(blockType)
+	delete(part, "reasoning_event_type")
+	part["type"] = responseStreamContentPartTypeForMetadata(blockType, metadata)
 	if blockType == gatewaycontract.ContentBlockRefusal {
 		part["refusal"] = text
 	} else {
@@ -713,8 +714,15 @@ func responseStreamTextPart(blockType gatewaycontract.ContentBlockType, text str
 	return part
 }
 
-func responseStreamTextDeltaEvent(itemID string, outputIndex int, blockType gatewaycontract.ContentBlockType, delta string) StreamEvent {
-	eventName := responseStreamTextEventName(blockType, "delta")
+func responseStreamContentPartTypeForMetadata(blockType gatewaycontract.ContentBlockType, metadata map[string]any) string {
+	if blockType == gatewaycontract.ContentBlockReasoning && responseReasoningIsSummary(metadata) {
+		return "summary_text"
+	}
+	return responseStreamContentPartType(blockType)
+}
+
+func responseStreamTextDeltaEvent(itemID string, outputIndex int, blockType gatewaycontract.ContentBlockType, delta string, metadata map[string]any) StreamEvent {
+	eventName := responseStreamTextEventName(blockType, "delta", metadata)
 	return StreamEvent{
 		Event: eventName,
 		Data: map[string]any{
@@ -727,8 +735,8 @@ func responseStreamTextDeltaEvent(itemID string, outputIndex int, blockType gate
 	}
 }
 
-func responseStreamTextDoneEvent(itemID string, outputIndex int, blockType gatewaycontract.ContentBlockType, text string) StreamEvent {
-	eventName := responseStreamTextEventName(blockType, "done")
+func responseStreamTextDoneEvent(itemID string, outputIndex int, blockType gatewaycontract.ContentBlockType, text string, metadata map[string]any) StreamEvent {
+	eventName := responseStreamTextEventName(blockType, "done", metadata)
 	data := map[string]any{
 		"type":          eventName,
 		"item_id":       itemID,
@@ -777,14 +785,25 @@ func responseStreamMessageDoneEvent(itemID string, outputIndex int, blockType ga
 	}
 }
 
-func responseStreamTextEventName(blockType gatewaycontract.ContentBlockType, suffix string) string {
+func responseStreamTextEventName(blockType gatewaycontract.ContentBlockType, suffix string, metadata map[string]any) string {
 	if blockType == gatewaycontract.ContentBlockReasoning {
+		if responseReasoningIsSummary(metadata) {
+			return "response.reasoning_summary_text." + suffix
+		}
 		return "response.reasoning_text." + suffix
 	}
 	if blockType == gatewaycontract.ContentBlockRefusal {
 		return "response.refusal." + suffix
 	}
 	return "response.output_text." + suffix
+}
+
+func responseReasoningIsSummary(metadata map[string]any) bool {
+	value := strings.TrimSpace(mapStringAny(metadata, "reasoning_event_type"))
+	if value == "" {
+		value = strings.TrimSpace(mapStringAny(metadata, "type"))
+	}
+	return value == "reasoning_summary_text" || value == "summary_text"
 }
 
 func responseStreamToolCallStartEvent(state *streamToolCallState) StreamEvent {
