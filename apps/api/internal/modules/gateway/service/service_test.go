@@ -122,6 +122,50 @@ func TestNormalizeResponsesRequiresWebSearchCapability(t *testing.T) {
 	}
 }
 
+func TestNormalizeResponsesPreservesTextAnnotations(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	text := "search result"
+	input := apiopenapi.ResponsesRequest_Input{}
+	if err := input.FromResponsesRequestInput1([]apiopenapi.ContentBlock{{
+		Type: apiopenapi.ContentBlockTypeInputText,
+		Text: &text,
+		AdditionalProperties: map[string]any{
+			"annotations": []any{
+				map[string]any{
+					"type":        "url_citation",
+					"start_index": float64(0),
+					"end_index":   float64(6),
+					"url":         "https://example.invalid/source",
+					"title":       "Source",
+				},
+			},
+		},
+	}}); err != nil {
+		t.Fatalf("set input: %v", err)
+	}
+	req := apiopenapi.ResponsesRequest{
+		Model: "gpt-5.5",
+		Input: input,
+	}
+
+	canonical := svc.NormalizeResponses(req, RequestMeta{SourceEndpoint: "/v1/responses"})
+
+	if len(canonical.InputItems) != 1 {
+		t.Fatalf("expected one input item, got %+v", canonical.InputItems)
+	}
+	annotations, ok := canonical.InputItems[0].Metadata["annotations"].([]any)
+	if !ok || len(annotations) != 1 {
+		t.Fatalf("expected annotations metadata, got %+v", canonical.InputItems[0].Metadata)
+	}
+	citation, ok := annotations[0].(map[string]any)
+	if !ok || citation["type"] != "url_citation" || citation["url"] != "https://example.invalid/source" {
+		t.Fatalf("unexpected annotation metadata: %+v", annotations[0])
+	}
+}
+
 func TestNormalizeResponsesPreservesRawFunctionItems(t *testing.T) {
 	svc, err := New()
 	if err != nil {
@@ -536,6 +580,48 @@ func TestRenderProtocolResponses(t *testing.T) {
 	}
 	if gemini.UsageMetadata == nil || gemini.UsageMetadata.TotalTokenCount == nil || *gemini.UsageMetadata.TotalTokenCount == 0 {
 		t.Fatalf("expected gemini usage metadata, got %+v", gemini.UsageMetadata)
+	}
+}
+
+func TestRenderResponsesPreservesTextAnnotations(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	annotations := []any{
+		map[string]any{
+			"type":        "url_citation",
+			"start_index": 0,
+			"end_index":   6,
+			"url":         "https://example.invalid/source",
+			"title":       "Source",
+		},
+	}
+	resp := gatewaycontract.CanonicalResponse{
+		ID:         "resp_annotations",
+		Model:      "gpt-5.5",
+		StopReason: "end_turn",
+		OutputItems: []gatewaycontract.ContentBlock{{
+			Type:     gatewaycontract.ContentBlockText,
+			Role:     "assistant",
+			Text:     "search result",
+			Metadata: map[string]any{"annotations": annotations},
+		}},
+		Usage: gatewaycontract.Usage{InputTokens: 5, OutputTokens: 3},
+	}
+
+	rendered := svc.RenderResponses(resp)
+	if len(rendered.Output) != 1 || rendered.Output[0].Content == nil || len(*rendered.Output[0].Content) != 1 {
+		t.Fatalf("expected one response output text part, got %+v", rendered.Output)
+	}
+	content := *rendered.Output[0].Content
+	renderedAnnotations, ok := content[0].AdditionalProperties["annotations"].([]any)
+	if !ok || len(renderedAnnotations) != 1 {
+		t.Fatalf("expected rendered annotations, got %+v", content[0].AdditionalProperties)
+	}
+	citation, ok := renderedAnnotations[0].(map[string]any)
+	if !ok || citation["type"] != "url_citation" || citation["url"] != "https://example.invalid/source" {
+		t.Fatalf("unexpected rendered annotation: %+v", renderedAnnotations[0])
 	}
 }
 

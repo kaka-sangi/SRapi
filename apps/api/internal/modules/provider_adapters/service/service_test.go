@@ -174,6 +174,49 @@ func TestOpenAICompatibleAdapterPreservesToolCallResponse(t *testing.T) {
 	assertToolUsePart(t, resp.Parts[0], "call_1", "lookup", `{"query":"weather"}`)
 }
 
+func TestOpenAICompatibleAdapterPreservesTextAnnotations(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":[{"type":"output_text","text":"search result","annotations":[{"type":"url_citation","start_index":0,"end_index":6,"url":"https://example.invalid/source","title":"Source"}]}]}}],
+			"usage":{"prompt_tokens":3,"completion_tokens":2}
+		}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := service.New(upstream.Client())
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_annotations",
+		Model:      "gpt-local",
+		InputParts: textParts("search"),
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "openai-compatible",
+			Protocol:    "openai-compatible",
+		},
+		Account:    accountcontract.ProviderAccount{ID: 1, Metadata: map[string]any{"base_url": upstream.URL + "/v1"}},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-upstream"},
+		Credential: map[string]any{"api_key": "upstream-secret"},
+	})
+	if err != nil {
+		t.Fatalf("invoke openai-compatible upstream: %v", err)
+	}
+	if len(resp.Parts) != 1 || resp.Parts[0].Kind != contract.ContentPartText || resp.Parts[0].Text != "search result" {
+		t.Fatalf("unexpected annotated text response: %+v", resp.Parts)
+	}
+	annotations, ok := resp.Parts[0].Metadata["annotations"].([]any)
+	if !ok || len(annotations) != 1 {
+		t.Fatalf("expected annotations metadata, got %+v", resp.Parts[0].Metadata)
+	}
+	citation, ok := annotations[0].(map[string]any)
+	if !ok || citation["type"] != "url_citation" || citation["url"] != "https://example.invalid/source" {
+		t.Fatalf("unexpected annotation metadata: %+v", annotations[0])
+	}
+}
+
 func TestOpenAICompatibleAdapterPreservesReasoningContentResponse(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -318,6 +361,14 @@ func TestOpenAICompatibleAdapterRendersContentPartsToUpstream(t *testing.T) {
 		if payload.Messages[0].Role != "user" || len(userContent) != 2 || userContent[0]["text"] != "look at this" {
 			t.Fatalf("unexpected OpenAI user content: role=%s content=%+v", payload.Messages[0].Role, userContent)
 		}
+		annotations, ok := userContent[0]["annotations"].([]any)
+		if !ok || len(annotations) != 1 {
+			t.Fatalf("expected annotations on text block, got %+v", userContent[0])
+		}
+		citation, ok := annotations[0].(map[string]any)
+		if !ok || citation["type"] != "url_citation" || citation["url"] != "https://example.invalid/source" {
+			t.Fatalf("unexpected text annotation: %+v", annotations[0])
+		}
 		imageURL, _ := userContent[1]["image_url"].(map[string]any)
 		if userContent[1]["type"] != "image_url" || imageURL["url"] != "https://example.test/image.png" {
 			t.Fatalf("expected image_url block, got %+v", userContent[1])
@@ -350,7 +401,9 @@ func TestOpenAICompatibleAdapterRendersContentPartsToUpstream(t *testing.T) {
 		Model:     "gpt-local",
 		Messages: []contract.ConversationMessage{
 			{Role: "user", Parts: []contract.ContentPart{
-				{Kind: contract.ContentPartText, Text: "look at this"},
+				{Kind: contract.ContentPartText, Text: "look at this", Metadata: map[string]any{
+					"annotations": []any{map[string]any{"type": "url_citation", "url": "https://example.invalid/source"}},
+				}},
 				imageURLPart("https://example.test/image.png"),
 			}},
 			{Role: "assistant", Parts: []contract.ContentPart{toolUsePart("call_1", "lookup", `{"query":"weather"}`)}},
@@ -5130,6 +5183,52 @@ func TestReverseProxyCodexCLIAdapterParsesRefusalOutputContent(t *testing.T) {
 		resp.StopReason != contract.StopReasonRefusal ||
 		resp.Usage.OutputTokens != 2 {
 		t.Fatalf("unexpected Codex refusal content response: %+v", resp)
+	}
+}
+
+func TestReverseProxyCodexCLIAdapterPreservesOutputTextAnnotations(t *testing.T) {
+	runtime := capturingRuntime{
+		response: reverseproxycontract.Response{
+			StatusCode: http.StatusOK,
+			Body: []byte(
+				`{"output":[{"type":"message","content":[{"type":"output_text","text":"search result","annotations":[{"type":"url_citation","start_index":0,"end_index":6,"url":"https://example.invalid/source","title":"Source"}]}]}],"usage":{"input_tokens":4,"output_tokens":2}}`,
+			),
+		},
+	}
+	svc, err := service.NewWithReverseProxy(nil, &runtime)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	resp, err := svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_codex_annotations",
+		Model:      "codex-local",
+		InputParts: textParts("search"),
+		Provider: providercontract.Provider{
+			ID:          1,
+			AdapterType: "reverse-proxy-codex-cli",
+			Protocol:    "openai-compatible",
+		},
+		Account: accountcontract.ProviderAccount{
+			ID:             9,
+			RuntimeClass:   accountcontract.RuntimeClassCliClientToken,
+			UpstreamClient: ptrString("codex_cli"),
+			Metadata:       map[string]any{"base_url": "https://codex.example.test/backend-api/codex"},
+		},
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "codex-upstream"},
+		Credential: map[string]any{"cli_client_token": "codex-token"},
+	})
+	if err != nil {
+		t.Fatalf("invoke codex reverse proxy adapter: %v", err)
+	}
+	if len(resp.Parts) != 1 || resp.Parts[0].Kind != contract.ContentPartText || resp.Parts[0].Text != "search result" {
+		t.Fatalf("unexpected Codex annotated text response: %+v", resp.Parts)
+	}
+	annotations, ok := resp.Parts[0].Metadata["annotations"].([]map[string]any)
+	if !ok || len(annotations) != 1 {
+		t.Fatalf("expected Codex annotations metadata, got %+v", resp.Parts[0].Metadata)
+	}
+	if annotations[0]["type"] != "url_citation" || annotations[0]["url"] != "https://example.invalid/source" {
+		t.Fatalf("unexpected Codex annotation metadata: %+v", annotations[0])
 	}
 }
 

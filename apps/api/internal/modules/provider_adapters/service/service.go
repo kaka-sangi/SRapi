@@ -1009,7 +1009,10 @@ func openAIContentPart(value any) (contract.ContentPart, bool) {
 		if text == "" {
 			return contract.ContentPart{}, false
 		}
-		return textContentPart(text), true
+		part := textContentPart(text)
+		part.Metadata = openAIContentPartMetadata(item, "type", "text")
+		part.OriginProtocol = "openai"
+		return part, true
 	case "image_url":
 		imageURL, _ := item["image_url"].(map[string]any)
 		url := mapString(imageURL, "url")
@@ -1041,6 +1044,17 @@ func openAIContentPart(value any) (contract.ContentPart, bool) {
 		return contract.ContentPart{Kind: contract.ContentPartFile, FileID: fileID, MediaURL: fileData}, true
 	}
 	return contract.ContentPart{}, false
+}
+
+func openAIContentPartMetadata(item map[string]any, knownFields ...string) map[string]any {
+	metadata := cloneMap(item)
+	for _, field := range knownFields {
+		delete(metadata, field)
+	}
+	if len(metadata) == 0 {
+		return nil
+	}
+	return metadata
 }
 
 func jsonObjectValue(value string) map[string]any {

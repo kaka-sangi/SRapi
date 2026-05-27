@@ -645,8 +645,11 @@ func openAIContentFromParts(parts []contract.ContentPart) any {
 		switch part.Kind {
 		case "", contract.ContentPartText, contract.ContentPartThinking, contract.ContentPartRefusal:
 			if text := strings.TrimSpace(part.Text); text != "" {
+				if openAITextPartHasMetadata(part) {
+					plainTextOnly = false
+				}
 				textParts = append(textParts, text)
-				blocks = append(blocks, map[string]any{"type": "text", "text": text})
+				blocks = append(blocks, openAITextContentBlock(text, part))
 			}
 		case contract.ContentPartImage:
 			plainTextOnly = false
@@ -655,7 +658,7 @@ func openAIContentFromParts(parts []contract.ContentPart) any {
 				continue
 			}
 			if text := strings.TrimSpace(part.Text); text != "" {
-				blocks = append(blocks, map[string]any{"type": "text", "text": text})
+				blocks = append(blocks, openAITextContentBlock(text, part))
 			}
 		case contract.ContentPartAudio:
 			plainTextOnly = false
@@ -669,12 +672,15 @@ func openAIContentFromParts(parts []contract.ContentPart) any {
 				continue
 			}
 			if text := strings.TrimSpace(part.Text); text != "" {
-				blocks = append(blocks, map[string]any{"type": "text", "text": text})
+				blocks = append(blocks, openAITextContentBlock(text, part))
 			}
 		default:
 			if text := strings.TrimSpace(part.Text); text != "" {
+				if openAITextPartHasMetadata(part) {
+					plainTextOnly = false
+				}
 				textParts = append(textParts, text)
-				blocks = append(blocks, map[string]any{"type": "text", "text": text})
+				blocks = append(blocks, openAITextContentBlock(text, part))
 			}
 		}
 	}
@@ -685,6 +691,33 @@ func openAIContentFromParts(parts []contract.ContentPart) any {
 		return strings.Join(textParts, "\n")
 	}
 	return blocks
+}
+
+func openAITextPartHasMetadata(part contract.ContentPart) bool {
+	for _, key := range openAITextMetadataFields() {
+		if value, ok := part.Metadata[key]; ok && value != nil {
+			return true
+		}
+	}
+	return false
+}
+
+func openAITextContentBlock(text string, part contract.ContentPart) map[string]any {
+	block := map[string]any{}
+	for _, key := range openAITextMetadataFields() {
+		value, ok := part.Metadata[key]
+		if !ok || value == nil {
+			continue
+		}
+		block[key] = cloneAny(value)
+	}
+	block["type"] = "text"
+	block["text"] = text
+	return block
+}
+
+func openAITextMetadataFields() []string {
+	return []string{"annotations"}
 }
 
 func openAIImageContentBlock(part contract.ContentPart) map[string]any {

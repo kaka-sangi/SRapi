@@ -32,6 +32,7 @@ func openAIContentBlock(block apiopenapi.ContentBlock, role string) (gatewaycont
 		}
 		base.Type = gatewaycontract.ContentBlockText
 		base.Text = text
+		base.Metadata = cloneMap(block.AdditionalProperties)
 		return base, true
 	}
 }

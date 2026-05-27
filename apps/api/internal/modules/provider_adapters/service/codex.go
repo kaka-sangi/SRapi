@@ -89,9 +89,10 @@ type codexResponsesOutputItem struct {
 }
 
 type codexResponsesOutputContent struct {
-	Type    string `json:"type"`
-	Text    string `json:"text"`
-	Refusal string `json:"refusal"`
+	Type        string           `json:"type"`
+	Text        string           `json:"text"`
+	Refusal     string           `json:"refusal"`
+	Annotations []map[string]any `json:"annotations,omitempty"`
 }
 
 type codexResponsesError struct {
@@ -1363,10 +1364,28 @@ func codexResponsesOutputItemParts(item codexResponsesOutputItem) []contract.Con
 		}
 		text := strings.TrimSpace(content.Text)
 		if text != "" && (contentType == "" || strings.Contains(contentType, "text")) {
-			parts = append(parts, textContentPart(text))
+			part := textContentPart(text)
+			part.Metadata = codexResponsesOutputContentMetadata(content)
+			part.OriginProtocol = "openai"
+			parts = append(parts, part)
 		}
 	}
 	return parts
+}
+
+func codexResponsesOutputContentMetadata(content codexResponsesOutputContent) map[string]any {
+	metadata := map[string]any{}
+	if len(content.Annotations) > 0 {
+		values := make([]map[string]any, len(content.Annotations))
+		for idx, annotation := range content.Annotations {
+			values[idx] = cloneMap(annotation)
+		}
+		metadata["annotations"] = values
+	}
+	if len(metadata) == 0 {
+		return nil
+	}
+	return metadata
 }
 
 func codexFunctionCallPart(item codexResponsesOutputItem) (contract.ContentPart, bool) {
