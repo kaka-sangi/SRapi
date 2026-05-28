@@ -143,6 +143,19 @@ func TestNormalizeResponsesCompactRequiresCompactCapability(t *testing.T) {
 	}
 }
 
+func TestNormalizeResponseInputItemsRequiresResponsesCapability(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	canonical := svc.NormalizeResponseInputItems("gpt-5", RequestMeta{SourceEndpoint: "/v1/responses/resp_123/input_items"})
+
+	if !requestCapabilityContains(canonical.RequestCapabilities, capabilitiescontract.KeyResponses) {
+		t.Fatalf("expected responses capability, got %+v", canonical.RequestCapabilities)
+	}
+}
+
 func TestNormalizeResponsesPreservesTextAnnotations(t *testing.T) {
 	svc, err := New()
 	if err != nil {
@@ -350,14 +363,18 @@ func TestValidateResponsesRequestRejectsMessagePreviousResponseID(t *testing.T) 
 	if err != nil {
 		t.Fatalf("new service: %v", err)
 	}
-	err = svc.ValidateResponsesRequest([]byte(`{
-		"model":"gpt-5.4",
-		"previous_response_id":"msg_123456",
-		"input":"continue"
-	}`))
-
-	if err == nil || err.Error() != "Responses previous_response_id must reference a response id, not a message id" {
-		t.Fatalf("expected previous_response_id message-id error, got %v", err)
+	for _, previousID := range []string{"msg_123456", "message_123456", "item_123456", "call_123456", "fc_123456", "rs_123456", "cmp_123456", "chatcmpl-123456"} {
+		t.Run(previousID, func(t *testing.T) {
+			err = svc.ValidateResponsesRequest([]byte(`{
+				"model":"gpt-5.4",
+				"previous_response_id":"` + previousID + `",
+				"input":"continue"
+			}`))
+			want := "Responses previous_response_id must reference a response id, not a message, item, tool call, or compaction id"
+			if err == nil || err.Error() != want {
+				t.Fatalf("expected previous_response_id non-response-id error, got %v", err)
+			}
+		})
 	}
 }
 
@@ -372,6 +389,20 @@ func TestValidateResponsesRequestAllowsResponsePreviousResponseID(t *testing.T) 
 		"input":"continue"
 	}`)); err != nil {
 		t.Fatalf("expected response previous_response_id to pass, got %v", err)
+	}
+}
+
+func TestValidateResponsesRequestAllowsOpaquePreviousResponseID(t *testing.T) {
+	svc, err := New()
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	if err := svc.ValidateResponsesRequest([]byte(`{
+		"model":"gpt-5.4",
+		"previous_response_id":"provider-custom-response-123456",
+		"input":"continue"
+	}`)); err != nil {
+		t.Fatalf("expected opaque previous_response_id to pass, got %v", err)
 	}
 }
 

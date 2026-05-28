@@ -17,6 +17,7 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 		"anthropic-compatible",
 		"antigravity",
 		"anyrouter",
+		"bedrock",
 		"cerebras",
 		"deepseek",
 		"deepseek-anthropic",
@@ -64,6 +65,14 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 		t.Fatalf("expected realtime_websocket to require explicit provider/account capability opt-in")
 	}
 
+	rootOpenAIPreset, ok := registry.Lookup("openai")
+	if !ok {
+		t.Fatalf("missing openai preset")
+	}
+	if !rootOpenAIPreset.MatchesPath("/openai/v1/chat/completions") {
+		t.Fatalf("expected root OpenAI legacy route alias to match path")
+	}
+
 	anthropicPreset, ok := registry.Lookup("anthropic-compatible")
 	if !ok {
 		t.Fatalf("missing anthropic-compatible preset")
@@ -76,6 +85,14 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	}
 	if !containsAuthMode(anthropicPreset.AuthModes, AuthModeCustomHeader) {
 		t.Fatalf("expected anthropic-compatible auth modes to include custom_header")
+	}
+
+	rootAnthropicPreset, ok := registry.Lookup("anthropic")
+	if !ok {
+		t.Fatalf("missing anthropic preset")
+	}
+	if !rootAnthropicPreset.MatchesPath("/anthropic/v1/messages") {
+		t.Fatalf("expected root Anthropic legacy route alias to match path")
 	}
 
 	antigravityPreset, ok := registry.Lookup("antigravity")
@@ -99,6 +116,23 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	}
 	if !antigravityPreset.Capabilities["chat_completions"] || !antigravityPreset.Capabilities["messages"] || antigravityPreset.Capabilities["embeddings"] {
 		t.Fatalf("unexpected antigravity capabilities: %+v", antigravityPreset.Capabilities)
+	}
+
+	bedrockPreset, ok := registry.Lookup("bedrock")
+	if !ok {
+		t.Fatalf("missing bedrock preset")
+	}
+	if bedrockPreset.PlatformFamily != PlatformFamilyBedrockAnthropic {
+		t.Fatalf("expected bedrock platform family, got %s", bedrockPreset.PlatformFamily)
+	}
+	if bedrockPreset.DefaultBaseURL != "https://bedrock-runtime.us-east-1.amazonaws.com" {
+		t.Fatalf("unexpected bedrock base url: %s", bedrockPreset.DefaultBaseURL)
+	}
+	if !bedrockPreset.MatchesPath("/api/provider/bedrock/v1/messages") || !containsAuthMode(bedrockPreset.AuthModes, AuthModeCustomHeader) {
+		t.Fatalf("unexpected bedrock routing/auth preset: %+v", bedrockPreset)
+	}
+	if !containsAccountType(bedrockPreset.AccountTypeAllowlist, AccountTypeAPIKey) || !bedrockPreset.Capabilities["messages"] || !bedrockPreset.Capabilities["streaming"] {
+		t.Fatalf("unexpected bedrock capabilities: %+v", bedrockPreset)
 	}
 
 	deepseekPreset, ok := registry.Lookup("deepseek")

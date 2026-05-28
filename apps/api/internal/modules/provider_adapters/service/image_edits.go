@@ -86,6 +86,7 @@ func (s *Service) invokeReverseProxyOpenAICompatibleImageEdit(ctx context.Contex
 			UpstreamClient: req.Account.UpstreamClient,
 			ProxyID:        req.Account.ProxyID,
 			UserAgent:      mapString(req.Account.Metadata, "user_agent"),
+			Metadata:       req.Account.Metadata,
 			Credential:     req.Credential,
 		},
 		Method: http.MethodPost,

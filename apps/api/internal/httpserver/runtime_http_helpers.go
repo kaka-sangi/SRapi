@@ -30,7 +30,10 @@ import (
 	"github.com/srapi/srapi/apps/api/internal/platform/ratelimit"
 )
 
-var errGatewayConcurrencyLimited = errors.New("gateway concurrency limit exceeded")
+var (
+	errGatewayConcurrencyLimited   = errors.New("gateway concurrency limit exceeded")
+	errGeminiDeprecatedAPIKeyQuery = errors.New("gemini api_key query parameter is deprecated")
+)
 
 type gatewayConcurrencyLimitError struct {
 	decision ratelimit.Decision
@@ -293,15 +296,52 @@ func (s *Server) requireAdminPermission(r *http.Request, permission string) (aut
 }
 
 func (s *Server) requireGatewayKey(r *http.Request) (apikeycontract.AuthResult, error) {
+	apiKey, ok := bearerGatewayAPIKey(r)
+	if !ok {
+		return apikeycontract.AuthResult{}, apikeyservice.ErrInvalidKey
+	}
+	return s.requireGatewayKeyPlaintext(r, apiKey)
+}
+
+func (s *Server) requireGeminiGatewayKey(r *http.Request) (apikeycontract.AuthResult, error) {
+	if strings.TrimSpace(r.URL.Query().Get("api_key")) != "" {
+		return apikeycontract.AuthResult{}, errGeminiDeprecatedAPIKeyQuery
+	}
+	if apiKey := strings.TrimSpace(r.Header.Get("x-goog-api-key")); apiKey != "" {
+		return s.requireGatewayKeyPlaintext(r, apiKey)
+	}
+	if apiKey, ok := bearerGatewayAPIKey(r); ok {
+		return s.requireGatewayKeyPlaintext(r, apiKey)
+	}
+	if apiKey := strings.TrimSpace(r.Header.Get("x-api-key")); apiKey != "" {
+		return s.requireGatewayKeyPlaintext(r, apiKey)
+	}
+	if allowsGeminiQueryAPIKey(r.URL.Path) {
+		if apiKey := strings.TrimSpace(r.URL.Query().Get("key")); apiKey != "" {
+			return s.requireGatewayKeyPlaintext(r, apiKey)
+		}
+	}
+	return apikeycontract.AuthResult{}, apikeyservice.ErrInvalidKey
+}
+
+func bearerGatewayAPIKey(r *http.Request) (string, bool) {
 	header := strings.TrimSpace(r.Header.Get("Authorization"))
 	if header == "" {
-		return apikeycontract.AuthResult{}, apikeyservice.ErrInvalidKey
+		return "", false
 	}
 	parts := strings.Fields(header)
 	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
-		return apikeycontract.AuthResult{}, apikeyservice.ErrInvalidKey
+		return "", false
 	}
-	authed, err := s.runtime.apiKeys.Authenticate(r.Context(), parts[1])
+	return parts[1], true
+}
+
+func allowsGeminiQueryAPIKey(path string) bool {
+	return path == "/v1beta/models" || strings.HasPrefix(path, "/v1beta/models/")
+}
+
+func (s *Server) requireGatewayKeyPlaintext(r *http.Request, apiKey string) (apikeycontract.AuthResult, error) {
+	authed, err := s.runtime.apiKeys.Authenticate(r.Context(), strings.TrimSpace(apiKey))
 	if err != nil {
 		return apikeycontract.AuthResult{}, err
 	}
@@ -393,6 +433,18 @@ func jsonDecodeStatus(err error) int {
 	return http.StatusBadRequest
 }
 
+func gatewayUsageDays(r *http.Request) (int, bool) {
+	raw := strings.TrimSpace(r.URL.Query().Get("days"))
+	if raw == "" {
+		return 30, true
+	}
+	days, err := strconv.Atoi(raw)
+	if err != nil || days < 1 || days > 90 {
+		return 0, false
+	}
+	return days, true
+}
+
 func writeJSONAny(w http.ResponseWriter, status int, body any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -476,6 +528,8 @@ func writeGeminiGatewayAuthError(w http.ResponseWriter, err error) {
 	case errors.As(err, &concurrencyErr):
 		setRetryAfterFromDecision(w, concurrencyErr.decision)
 		writeGeminiGatewayError(w, http.StatusTooManyRequests, "RESOURCE_EXHAUSTED", "API key concurrency limit exceeded")
+	case errors.Is(err, errGeminiDeprecatedAPIKeyQuery):
+		writeGeminiGatewayError(w, http.StatusBadRequest, "INVALID_ARGUMENT", "Query parameter api_key is deprecated. Use x-goog-api-key, Authorization Bearer, or key instead.")
 	case errors.Is(err, apikeyservice.ErrInvalidKey), errors.Is(err, apikeyservice.ErrInvalidInput):
 		writeGeminiGatewayError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "invalid API key")
 	case errors.Is(err, apikeyservice.ErrKeyDisabled), errors.Is(err, apikeyservice.ErrKeyExpired):

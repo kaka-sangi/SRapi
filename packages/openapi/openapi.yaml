@@ -4915,6 +4915,44 @@ paths:
         default:
           $ref: "#/components/responses/GatewayError"
 
+  /v1/usage:
+    get:
+      tags:
+        - Gateway
+      operationId: getGatewayUsage
+      summary: Get usage and quota summary for the current gateway API key.
+      description: Returns a key-scoped usage snapshot for client integrations. The response is intentionally limited to the authenticated API key and its owner balance; it does not expose other keys for the same user.
+      security:
+        - gatewayBearerAuth: []
+      parameters:
+        - name: days
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 90
+            default: 30
+          description: Number of UTC days to include in usage summaries.
+      responses:
+        "200":
+          description: Gateway API key usage summary.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GatewayUsageResponse"
+        "400":
+          $ref: "#/components/responses/GatewayError"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
   /v1/chat/completions:
     post:
       tags:
@@ -4992,6 +5030,79 @@ paths:
               schema:
                 type: string
                 description: Responses-compatible SSE events.
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /v1/responses/{response_id}/input_items:
+    get:
+      tags:
+        - Gateway
+      operationId: listResponseInputItems
+      summary: List input items for an OpenAI Responses-compatible response.
+      description: >
+        Responses input_items subresource. SRapi uses the required `model`
+        query parameter for API key model policy and Provider Account
+        scheduling, then calls the selected upstream
+        `/responses/{response_id}/input_items` and replays the upstream JSON
+        list. The `model` query parameter is not forwarded upstream.
+      security:
+        - gatewayBearerAuth: []
+      parameters:
+        - name: response_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: model
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Canonical model or model alias used for SRapi policy and scheduling.
+        - name: after
+          in: query
+          schema:
+            type: string
+        - name: include
+          in: query
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+      responses:
+        "200":
+          description: Raw Responses input_items list from the selected upstream provider.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResponsesInputItemsList"
         "400":
           $ref: "#/components/responses/GatewayBadRequest"
         "401":
@@ -5749,6 +5860,1333 @@ paths:
         default:
           $ref: "#/components/responses/GeminiGatewayError"
 
+  /v1beta/models/{model}:
+    get:
+      tags:
+        - Gateway
+      operationId: getGeminiModel
+      summary: Get Gemini-compatible model metadata available to the gateway API key.
+      description: Gemini-compatible models.get route. SRapi authenticates the gateway API key, applies model visibility policy, and renders a single active SRapi registry model in Google Model shape. This endpoint does not schedule a Provider Account or touch provider credentials.
+      security:
+        - gatewayBearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GeminiModel"
+      responses:
+        "200":
+          description: Gemini-compatible model metadata.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeminiModelInfo"
+        "400":
+          $ref: "#/components/responses/GeminiGatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GeminiGatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GeminiGatewayForbidden"
+        "404":
+          $ref: "#/components/responses/GeminiGatewayError"
+        default:
+          $ref: "#/components/responses/GeminiGatewayError"
+
+  /openai/v1/chat/completions:
+    post:
+      tags:
+        - Gateway
+      operationId: createOpenAIChatCompletionAlias
+      summary: Create an OpenAI-compatible chat completion with OpenAI provider context.
+      description: Root legacy provider alias. It reuses the standard chat completion runtime and forces the `openai` provider context while preserving the root alias path as source evidence.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatCompletionRequest"
+      responses:
+        "200":
+          description: Chat completion response, or SSE stream when stream is true.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatCompletionResponse"
+            text/event-stream:
+              schema:
+                type: string
+                description: OpenAI-compatible SSE chunks.
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /openai/v1/responses:
+    post:
+      tags:
+        - Gateway
+      operationId: createOpenAIResponseAlias
+      summary: Create an OpenAI Responses-compatible response with OpenAI provider context.
+      description: Root legacy provider alias. It reuses the standard Responses runtime and forces the `openai` provider context while preserving the root alias path as source evidence.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResponsesRequest"
+      responses:
+        "200":
+          description: Responses-compatible response, or SSE stream when stream is true.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResponsesResponse"
+            text/event-stream:
+              schema:
+                type: string
+                description: Responses-compatible SSE events.
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /openai/v1/responses/{response_id}/input_items:
+    get:
+      tags:
+        - Gateway
+      operationId: listOpenAIResponseInputItemsAlias
+      summary: List Responses input items with OpenAI provider context.
+      description: Root legacy provider alias. It reuses the standard Responses input_items runtime, forces the `openai` provider context, and preserves the root alias path as source evidence.
+      security:
+        - gatewayBearerAuth: []
+      parameters:
+        - name: response_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: model
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Canonical model or model alias used for SRapi policy and scheduling.
+        - name: after
+          in: query
+          schema:
+            type: string
+        - name: include
+          in: query
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+      responses:
+        "200":
+          description: Raw Responses input_items list from the selected upstream provider.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResponsesInputItemsList"
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /openai/v1/responses/compact:
+    post:
+      tags:
+        - Gateway
+      operationId: createOpenAIResponseCompactAlias
+      summary: Compact an OpenAI Responses-compatible conversation context with OpenAI provider context.
+      description: Root legacy provider alias. It reuses the standard Responses compact runtime and forces the `openai` provider context while preserving the root alias path as source evidence.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResponsesRequest"
+      responses:
+        "200":
+          description: Responses compact result, or SSE stream when stream is true.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResponsesCompactResponse"
+            text/event-stream:
+              schema:
+                type: string
+                description: Responses-compatible compact SSE events.
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /openai/v1/messages:
+    post:
+      tags:
+        - Gateway
+      operationId: createOpenAIMessageAlias
+      summary: Create an Anthropic Messages-compatible message with OpenAI provider context.
+      description: Root legacy provider alias. It reuses the standard Messages runtime and forces the `openai` provider context while preserving the root alias path as source evidence.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnthropicMessagesRequest"
+      responses:
+        "200":
+          description: Anthropic-compatible response, or SSE stream when stream is true.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnthropicMessagesResponse"
+            text/event-stream:
+              schema:
+                type: string
+                description: Anthropic-compatible SSE events.
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /openai/v1/embeddings:
+    post:
+      tags:
+        - Gateway
+      operationId: createOpenAIEmbeddingAlias
+      summary: Create OpenAI-compatible embeddings with OpenAI provider context.
+      description: Root legacy provider alias. It reuses the standard embeddings runtime and forces the `openai` provider context while preserving the root alias path as source evidence.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmbeddingRequest"
+      responses:
+        "200":
+          description: OpenAI-compatible embeddings response.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmbeddingResponse"
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /openai/v1/images/generations:
+    post:
+      tags:
+        - Gateway
+      operationId: createOpenAIImageGenerationAlias
+      summary: Create OpenAI-compatible image generations with OpenAI provider context.
+      description: Root legacy provider alias. It reuses the standard image generation runtime and forces the `openai` provider context while preserving the root alias path as source evidence.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImageGenerationRequest"
+      responses:
+        "200":
+          description: OpenAI-compatible image generation response.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImageGenerationResponse"
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /openai/v1/images/edits:
+    post:
+      tags:
+        - Gateway
+      operationId: createOpenAIImageEditAlias
+      summary: Create OpenAI-compatible image edits with OpenAI provider context.
+      description: Root legacy provider alias. It reuses the standard image edit runtime and forces the `openai` provider context while preserving the root alias path as source evidence. JSON bodies may use local data URL or base64 image references; remote URLs and file IDs are rejected until a dedicated secure fetch/files boundary exists.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/ImageEditRequest"
+            encoding:
+              image:
+                contentType: image/*
+              mask:
+                contentType: image/*
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImageEditJsonRequest"
+      responses:
+        "200":
+          description: OpenAI-compatible image edit response, or SSE stream when stream is true.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImageGenerationResponse"
+            text/event-stream:
+              schema:
+                $ref: "#/components/schemas/ImageGenerationStreamEvent"
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /openai/v1/images/variations:
+    post:
+      tags:
+        - Gateway
+      operationId: createOpenAIImageVariationAlias
+      summary: Create OpenAI-compatible image variations with OpenAI provider context.
+      description: Root legacy provider alias. It reuses the standard image variation runtime and forces the `openai` provider context while preserving the root alias path as source evidence.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/ImageVariationRequest"
+            encoding:
+              image:
+                contentType: image/*
+      responses:
+        "200":
+          description: OpenAI-compatible image variation response.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImageGenerationResponse"
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /openai/v1/audio/transcriptions:
+    post:
+      tags:
+        - Gateway
+      operationId: createOpenAIAudioTranscriptionAlias
+      summary: Create an audio transcription with OpenAI provider context.
+      description: Root legacy provider alias. It reuses the standard audio transcription runtime and forces the `openai` provider context while preserving the root alias path as source evidence.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/AudioTranscriptionRequest"
+            encoding:
+              file:
+                contentType: audio/*
+      responses:
+        "200":
+          description: Audio transcription response.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AudioTranscriptionResponse"
+            text/plain:
+              schema:
+                type: string
+            text/vtt:
+              schema:
+                type: string
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /openai/v1/audio/speech:
+    post:
+      tags:
+        - Gateway
+      operationId: createOpenAIAudioSpeechAlias
+      summary: Create speech audio with OpenAI provider context.
+      description: Root legacy provider alias. It reuses the standard audio speech runtime and forces the `openai` provider context while preserving the root alias path as source evidence.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AudioSpeechRequest"
+      responses:
+        "200":
+          description: Binary audio content.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+            audio/mpeg:
+              schema:
+                type: string
+                format: binary
+            audio/wav:
+              schema:
+                type: string
+                format: binary
+            audio/ogg:
+              schema:
+                type: string
+                format: binary
+            audio/flac:
+              schema:
+                type: string
+                format: binary
+            audio/aac:
+              schema:
+                type: string
+                format: binary
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /openai/v1/moderations:
+    post:
+      tags:
+        - Gateway
+      operationId: createOpenAIModerationAlias
+      summary: Create OpenAI-compatible moderation classifications with OpenAI provider context.
+      description: Root legacy provider alias. It reuses the standard moderation runtime and forces the `openai` provider context while preserving the root alias path as source evidence.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModerationRequest"
+      responses:
+        "200":
+          description: OpenAI-compatible moderation response.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModerationResponse"
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /anthropic/v1/messages:
+    post:
+      tags:
+        - Gateway
+      operationId: createAnthropicMessageAlias
+      summary: Create an Anthropic Messages-compatible message with Anthropic provider context.
+      description: Root legacy provider alias. It reuses the standard Messages runtime and forces the `anthropic` provider context while preserving the root alias path as source evidence.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnthropicMessagesRequest"
+      responses:
+        "200":
+          description: Anthropic-compatible response, or SSE stream when stream is true.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnthropicMessagesResponse"
+            text/event-stream:
+              schema:
+                type: string
+                description: Anthropic-compatible SSE events.
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /anthropic/v1/messages/count_tokens:
+    post:
+      tags:
+        - Gateway
+      operationId: countAnthropicMessageTokensAlias
+      summary: Count Anthropic Messages-compatible input tokens with Anthropic provider context.
+      description: Root legacy provider alias. It reuses the standard Anthropic count_tokens runtime and forces the `anthropic` provider context while preserving the root alias path as source evidence.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnthropicCountTokensRequest"
+      responses:
+        "200":
+          description: Anthropic-compatible count_tokens response.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnthropicCountTokensResponse"
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /grok/v1/chat/completions:
+    post:
+      tags:
+        - Gateway
+      operationId: createGrokChatCompletionAlias
+      summary: Create an OpenAI-compatible chat completion with Grok provider context.
+      description: Root legacy provider alias. It reuses the standard chat completion runtime and forces the `grok` provider context while preserving the root alias path as source evidence.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatCompletionRequest"
+      responses:
+        "200":
+          description: Chat completion response, or SSE stream when stream is true.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatCompletionResponse"
+            text/event-stream:
+              schema:
+                type: string
+                description: OpenAI-compatible SSE chunks.
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /grok/v1/responses:
+    post:
+      tags:
+        - Gateway
+      operationId: createGrokResponseAlias
+      summary: Create an OpenAI Responses-compatible response with Grok provider context.
+      description: Root legacy provider alias. It reuses the standard Responses runtime and forces the `grok` provider context while preserving the root alias path as source evidence.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResponsesRequest"
+      responses:
+        "200":
+          description: Responses-compatible response, or SSE stream when stream is true.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResponsesResponse"
+            text/event-stream:
+              schema:
+                type: string
+                description: Responses-compatible SSE events.
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /grok/v1/responses/{response_id}/input_items:
+    get:
+      tags:
+        - Gateway
+      operationId: listGrokResponseInputItemsAlias
+      summary: List Responses input items with Grok provider context.
+      description: Root legacy provider alias. It reuses the standard Responses input_items runtime, forces the `grok` provider context, and preserves the root alias path as source evidence.
+      security:
+        - gatewayBearerAuth: []
+      parameters:
+        - name: response_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: model
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Canonical model or model alias used for SRapi policy and scheduling.
+        - name: after
+          in: query
+          schema:
+            type: string
+        - name: include
+          in: query
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+      responses:
+        "200":
+          description: Raw Responses input_items list from the selected upstream provider.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResponsesInputItemsList"
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /grok/v1/messages:
+    post:
+      tags:
+        - Gateway
+      operationId: createGrokMessageAlias
+      summary: Create an Anthropic Messages-compatible message with Grok provider context.
+      description: Root legacy provider alias. It reuses the standard Messages runtime and forces the `grok` provider context while preserving the root alias path as source evidence.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnthropicMessagesRequest"
+      responses:
+        "200":
+          description: Anthropic-compatible response, or SSE stream when stream is true.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnthropicMessagesResponse"
+            text/event-stream:
+              schema:
+                type: string
+                description: Anthropic-compatible SSE events.
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /grok/v1/embeddings:
+    post:
+      tags:
+        - Gateway
+      operationId: createGrokEmbeddingAlias
+      summary: Create OpenAI-compatible embeddings with Grok provider context.
+      description: Root legacy provider alias. It reuses the standard embeddings runtime and forces the `grok` provider context while preserving the root alias path as source evidence.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmbeddingRequest"
+      responses:
+        "200":
+          description: OpenAI-compatible embeddings response.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmbeddingResponse"
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /grok/v1/images/generations:
+    post:
+      tags:
+        - Gateway
+      operationId: createGrokImageGenerationAlias
+      summary: Create OpenAI-compatible image generations with Grok provider context.
+      description: Root legacy provider alias. It reuses the standard image generation runtime and forces the `grok` provider context while preserving the root alias path as source evidence.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImageGenerationRequest"
+      responses:
+        "200":
+          description: OpenAI-compatible image generation response.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImageGenerationResponse"
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /grok/v1/images/edits:
+    post:
+      tags:
+        - Gateway
+      operationId: createGrokImageEditAlias
+      summary: Create OpenAI-compatible image edits with Grok provider context.
+      description: Root legacy provider alias. It reuses the standard image edit runtime and forces the `grok` provider context while preserving the root alias path as source evidence. JSON bodies may use local data URL or base64 image references; remote URLs and file IDs are rejected until a dedicated secure fetch/files boundary exists.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/ImageEditRequest"
+            encoding:
+              image:
+                contentType: image/*
+              mask:
+                contentType: image/*
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImageEditJsonRequest"
+      responses:
+        "200":
+          description: OpenAI-compatible image edit response, or SSE stream when stream is true.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImageGenerationResponse"
+            text/event-stream:
+              schema:
+                $ref: "#/components/schemas/ImageGenerationStreamEvent"
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /grok/v1/images/variations:
+    post:
+      tags:
+        - Gateway
+      operationId: createGrokImageVariationAlias
+      summary: Create OpenAI-compatible image variations with Grok provider context.
+      description: Root legacy provider alias. It reuses the standard image variation runtime and forces the `grok` provider context while preserving the root alias path as source evidence.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/ImageVariationRequest"
+            encoding:
+              image:
+                contentType: image/*
+      responses:
+        "200":
+          description: OpenAI-compatible image variation response.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImageGenerationResponse"
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /grok/v1/audio/transcriptions:
+    post:
+      tags:
+        - Gateway
+      operationId: createGrokAudioTranscriptionAlias
+      summary: Create an audio transcription with Grok provider context.
+      description: Root legacy provider alias. It reuses the standard audio transcription runtime and forces the `grok` provider context while preserving the root alias path as source evidence.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/AudioTranscriptionRequest"
+            encoding:
+              file:
+                contentType: audio/*
+      responses:
+        "200":
+          description: Audio transcription response.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AudioTranscriptionResponse"
+            text/plain:
+              schema:
+                type: string
+            text/vtt:
+              schema:
+                type: string
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /grok/v1/audio/speech:
+    post:
+      tags:
+        - Gateway
+      operationId: createGrokAudioSpeechAlias
+      summary: Create speech audio with Grok provider context.
+      description: Root legacy provider alias. It reuses the standard audio speech runtime and forces the `grok` provider context while preserving the root alias path as source evidence.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AudioSpeechRequest"
+      responses:
+        "200":
+          description: Binary audio content.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+            audio/mpeg:
+              schema:
+                type: string
+                format: binary
+            audio/wav:
+              schema:
+                type: string
+                format: binary
+            audio/ogg:
+              schema:
+                type: string
+                format: binary
+            audio/flac:
+              schema:
+                type: string
+                format: binary
+            audio/aac:
+              schema:
+                type: string
+                format: binary
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /grok/v1/moderations:
+    post:
+      tags:
+        - Gateway
+      operationId: createGrokModerationAlias
+      summary: Create OpenAI-compatible moderation classifications with Grok provider context.
+      description: Root legacy provider alias. It reuses the standard moderation runtime and forces the `grok` provider context while preserving the root alias path as source evidence.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModerationRequest"
+      responses:
+        "200":
+          description: OpenAI-compatible moderation response.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModerationResponse"
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /antigravity/v1/chat/completions:
+    post:
+      tags:
+        - Gateway
+      operationId: createAntigravityRootChatCompletionAlias
+      summary: Create an OpenAI-compatible chat completion with Antigravity provider context.
+      description: Root legacy provider alias. It reuses the standard chat completion runtime and forces the `antigravity` provider context while preserving the root alias path as source evidence.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatCompletionRequest"
+      responses:
+        "200":
+          description: Chat completion response, or SSE stream when stream is true.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatCompletionResponse"
+            text/event-stream:
+              schema:
+                type: string
+                description: OpenAI-compatible SSE chunks.
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /antigravity/v1/messages:
+    post:
+      tags:
+        - Gateway
+      operationId: createAntigravityRootMessageAlias
+      summary: Create an Anthropic Messages-compatible message with Antigravity provider context.
+      description: Root legacy provider alias. It reuses the standard Messages runtime and forces the `antigravity` provider context while preserving the root alias path as source evidence.
+      security:
+        - gatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnthropicMessagesRequest"
+      responses:
+        "200":
+          description: Anthropic-compatible response, or SSE stream when stream is true.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnthropicMessagesResponse"
+            text/event-stream:
+              schema:
+                type: string
+                description: Anthropic-compatible SSE events.
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /antigravity/v1beta/models/{model}:generateContent:
+    post:
+      tags:
+        - Gateway
+      operationId: generateAntigravityRootGeminiContentAlias
+      summary: Generate Gemini-compatible content with Antigravity provider context.
+      description: Root legacy provider alias. It reuses the standard Gemini-compatible runtime and forces the `antigravity` provider context while preserving the root alias path as source evidence.
+      security:
+        - gatewayBearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GeminiModel"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GeminiGenerateContentRequest"
+      responses:
+        "200":
+          description: Gemini-compatible generateContent response.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeminiGenerateContentResponse"
+        "400":
+          $ref: "#/components/responses/GeminiGatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GeminiGatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GeminiGatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GeminiGatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GeminiGatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GeminiGatewayError"
+
+  /antigravity/v1beta/models/{model}:streamGenerateContent:
+    post:
+      tags:
+        - Gateway
+      operationId: streamAntigravityRootGeminiContentAlias
+      summary: Stream Gemini-compatible content with Antigravity provider context.
+      description: Root legacy provider alias. It reuses the standard Gemini-compatible streaming runtime and forces the `antigravity` provider context while preserving the root alias path as source evidence.
+      security:
+        - gatewayBearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GeminiModel"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GeminiGenerateContentRequest"
+      responses:
+        "200":
+          description: Gemini-compatible SSE stream.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: SSE stream of Gemini-compatible GenerateContentResponse chunks.
+        "400":
+          $ref: "#/components/responses/GeminiGatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GeminiGatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GeminiGatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GeminiGatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GeminiGatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GeminiGatewayError"
+
   /api/provider/antigravity/v1beta/models/{model}:generateContent:
     post:
       tags:
@@ -5901,6 +7339,74 @@ paths:
               schema:
                 type: string
                 description: Responses-compatible SSE events.
+        "400":
+          $ref: "#/components/responses/GatewayBadRequest"
+        "401":
+          $ref: "#/components/responses/GatewayUnauthorized"
+        "403":
+          $ref: "#/components/responses/GatewayForbidden"
+        "422":
+          $ref: "#/components/responses/GatewayValidationError"
+        "503":
+          $ref: "#/components/responses/GatewayUnavailable"
+        default:
+          $ref: "#/components/responses/GatewayError"
+
+  /api/provider/openai-compatible/v1/responses/{response_id}/input_items:
+    get:
+      tags:
+        - Gateway
+      operationId: listOpenAICompatibleResponseInputItemsAlias
+      summary: List Responses input items with openai-compatible provider context.
+      description: Provider alias route. It reuses the standard Responses input_items runtime and forces the `openai-compatible` provider context.
+      security:
+        - gatewayBearerAuth: []
+      parameters:
+        - name: response_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: model
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Canonical model or model alias used for SRapi policy and scheduling.
+        - name: after
+          in: query
+          schema:
+            type: string
+        - name: include
+          in: query
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+      responses:
+        "200":
+          description: Raw Responses input_items list from the selected upstream provider.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResponsesInputItemsList"
         "400":
           $ref: "#/components/responses/GatewayBadRequest"
         "401":
@@ -13206,6 +14712,207 @@ components:
           items:
             $ref: "#/components/schemas/OpenAIModel"
 
+    GatewayUsageResponse:
+      type: object
+      required:
+        - object
+        - mode
+        - isValid
+        - status
+        - remaining
+        - unit
+        - balance
+        - api_key_id
+        - api_key_name
+        - generated_at
+        - window_days
+        - usage
+        - today
+        - daily_usage
+        - model_stats
+        - recent_requests
+      properties:
+        object:
+          type: string
+          enum:
+            - usage
+        mode:
+          type: string
+          enum:
+            - unrestricted
+            - quota_limited
+        isValid:
+          type: boolean
+        status:
+          type: string
+        planName:
+          type: string
+        remaining:
+          type: string
+        unit:
+          type: string
+        balance:
+          type: string
+        api_key_id:
+          $ref: "#/components/schemas/Id"
+        api_key_name:
+          type: string
+        generated_at:
+          $ref: "#/components/schemas/Timestamp"
+        window_days:
+          type: integer
+          minimum: 1
+          maximum: 90
+        expires_at:
+          $ref: "#/components/schemas/Timestamp"
+        days_until_expiry:
+          type: integer
+          minimum: 0
+        limits:
+          type: object
+          additionalProperties: true
+        allowed_models:
+          type: array
+          items:
+            type: string
+        usage:
+          $ref: "#/components/schemas/GatewayUsageTotals"
+        today:
+          $ref: "#/components/schemas/GatewayUsageWindow"
+        daily_usage:
+          type: array
+          items:
+            $ref: "#/components/schemas/GatewayUsageWindow"
+        model_stats:
+          type: array
+          items:
+            $ref: "#/components/schemas/GatewayUsageModel"
+        recent_requests:
+          type: array
+          items:
+            $ref: "#/components/schemas/GatewayUsageRequest"
+
+    GatewayUsageTotals:
+      type: object
+      required:
+        - requests
+        - success_count
+        - error_count
+        - input_tokens
+        - output_tokens
+        - cached_tokens
+        - total_tokens
+        - cost
+        - currency
+      properties:
+        requests:
+          type: integer
+          minimum: 0
+        success_count:
+          type: integer
+          minimum: 0
+        error_count:
+          type: integer
+          minimum: 0
+        input_tokens:
+          type: integer
+          minimum: 0
+        output_tokens:
+          type: integer
+          minimum: 0
+        cached_tokens:
+          type: integer
+          minimum: 0
+        total_tokens:
+          type: integer
+          minimum: 0
+        cost:
+          type: string
+        currency:
+          type: string
+
+    GatewayUsageWindow:
+      allOf:
+        - $ref: "#/components/schemas/GatewayUsageTotals"
+        - type: object
+          required:
+            - date
+          properties:
+            date:
+              type: string
+              format: date
+
+    GatewayUsageModel:
+      allOf:
+        - $ref: "#/components/schemas/GatewayUsageTotals"
+        - type: object
+          required:
+            - model
+          properties:
+            model:
+              type: string
+
+    GatewayUsageRequest:
+      type: object
+      required:
+        - request_id
+        - attempt_no
+        - source_protocol
+        - source_endpoint
+        - model
+        - input_tokens
+        - output_tokens
+        - cached_tokens
+        - total_tokens
+        - usage_estimated
+        - latency_ms
+        - success
+        - cost
+        - currency
+        - created_at
+      properties:
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+        attempt_no:
+          type: integer
+          minimum: 1
+        source_protocol:
+          type: string
+        source_endpoint:
+          type: string
+        target_protocol:
+          type: string
+        model:
+          type: string
+        input_tokens:
+          type: integer
+          minimum: 0
+        output_tokens:
+          type: integer
+          minimum: 0
+        cached_tokens:
+          type: integer
+          minimum: 0
+        total_tokens:
+          type: integer
+          minimum: 0
+        usage_estimated:
+          type: boolean
+        latency_ms:
+          type: integer
+          minimum: 0
+        success:
+          type: boolean
+        error_class:
+          type: string
+          nullable: true
+        cost:
+          type: string
+        currency:
+          type: string
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+
     TokenUsage:
       type: object
       properties:
@@ -14158,6 +15865,30 @@ components:
           type: array
           items:
             type: string
+
+    ResponsesInputItemsList:
+      type: object
+      required:
+        - object
+        - data
+      properties:
+        object:
+          type: string
+          enum:
+            - list
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ResponsesOutputItem"
+        first_id:
+          type: string
+          nullable: true
+        last_id:
+          type: string
+          nullable: true
+        has_more:
+          type: boolean
+      additionalProperties: true
 
     ResponsesCompactResponse:
       type: object

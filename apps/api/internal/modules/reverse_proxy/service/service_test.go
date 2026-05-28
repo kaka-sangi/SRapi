@@ -3,9 +3,11 @@ package service
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -179,6 +181,289 @@ func TestRuntimeInjectsAntigravityDesktopTokenAndDefaultUserAgent(t *testing.T) 
 	}
 	if gotHeader.Get("User-Agent") != "Antigravity/1.0" {
 		t.Fatalf("expected antigravity user agent, got %q", gotHeader.Get("User-Agent"))
+	}
+}
+
+func TestRuntimeAppliesMetadataEgressProfileHeadersAndUserAgent(t *testing.T) {
+	var gotHeader http.Header
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotHeader = r.Header.Clone()
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer upstream.Close()
+
+	svc, err := New(nil)
+	if err != nil {
+		t.Fatalf("create runtime: %v", err)
+	}
+	_, err = svc.Do(context.Background(), contract.Request{
+		Account: contract.AccountRuntime{
+			AccountID:    12,
+			RuntimeClass: "oauth_refresh",
+			Metadata: map[string]any{
+				"egress_profile": map[string]any{
+					"user_agent":           "ProfileClient/2.0",
+					"accept_language":      "en-US,en;q=0.9",
+					"forbidden_headers":    []any{"X-Caller-Leak"},
+					"extra_static_headers": map[string]any{"X-Egress-Client": "profile-1"},
+				},
+			},
+			Credential: map[string]any{"access_token": "profile-token"},
+		},
+		Method: http.MethodPost,
+		URL:    upstream.URL,
+		Headers: http.Header{
+			"Authorization":  {"Bearer leaked"},
+			"Cookie":         {"session=leaked"},
+			"User-Agent":     {"SRapi/test"},
+			"X-Caller-Leak":  {"leaked"},
+			"X-Egress-Input": {"kept"},
+		},
+		Body: []byte(`{"model":"profile-model"}`),
+	})
+	if err != nil {
+		t.Fatalf("runtime request: %v", err)
+	}
+	if gotHeader.Get("Authorization") != "Bearer profile-token" || gotHeader.Get("Cookie") != "" {
+		t.Fatalf("expected runtime auth only, got %+v", gotHeader)
+	}
+	if gotHeader.Get("User-Agent") != "ProfileClient/2.0" {
+		t.Fatalf("expected profile user agent, got %q", gotHeader.Get("User-Agent"))
+	}
+	if gotHeader.Get("Accept-Language") != "en-US,en;q=0.9" || gotHeader.Get("X-Egress-Client") != "profile-1" {
+		t.Fatalf("expected egress profile headers, got %+v", gotHeader)
+	}
+	if gotHeader.Get("X-Caller-Leak") != "" || gotHeader.Get("X-Egress-Input") != "kept" {
+		t.Fatalf("expected configured caller header filtering, got %+v", gotHeader)
+	}
+}
+
+func TestRuntimeRejectsUnsafeEgressProfileStaticHeader(t *testing.T) {
+	upstreamCalled := false
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamCalled = true
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer upstream.Close()
+
+	svc, err := New(nil)
+	if err != nil {
+		t.Fatalf("create runtime: %v", err)
+	}
+	_, err = svc.Do(context.Background(), contract.Request{
+		Account: contract.AccountRuntime{
+			AccountID:    13,
+			RuntimeClass: "oauth_refresh",
+			Metadata: map[string]any{
+				"egress_profile": map[string]any{
+					"extra_static_headers": map[string]any{"Authorization": "Bearer static"},
+				},
+			},
+			Credential: map[string]any{"access_token": "runtime-token"},
+		},
+		Method: http.MethodGet,
+		URL:    upstream.URL,
+	})
+	var runtimeErr contract.RuntimeError
+	if !errors.As(err, &runtimeErr) || runtimeErr.Class != "unsupported_egress_profile" {
+		t.Fatalf("expected unsupported egress profile error, got %T %v", err, err)
+	}
+	if upstreamCalled {
+		t.Fatal("unsafe egress profile should not call upstream")
+	}
+	if metrics := svc.Metrics(); metrics.RequestErrorTotal["unsupported_egress_profile"] != 1 {
+		t.Fatalf("expected unsupported egress profile metric, got %+v", metrics)
+	}
+}
+
+func TestRuntimeRejectsUnsupportedEgressProfileFeature(t *testing.T) {
+	svc, err := New(nil)
+	if err != nil {
+		t.Fatalf("create runtime: %v", err)
+	}
+	_, err = svc.Do(context.Background(), contract.Request{
+		Account: contract.AccountRuntime{
+			AccountID:    14,
+			RuntimeClass: "oauth_refresh",
+			Metadata: map[string]any{
+				"egress_profile": map[string]any{"tls_template": "openai_python_sdk"},
+			},
+			Credential: map[string]any{"access_token": "runtime-token"},
+		},
+		Method: http.MethodGet,
+		URL:    "https://upstream.example.test/v1/models",
+	})
+	var runtimeErr contract.RuntimeError
+	if !errors.As(err, &runtimeErr) || runtimeErr.Class != "unsupported_egress_profile" {
+		t.Fatalf("expected unsupported egress profile error, got %T %v", err, err)
+	}
+}
+
+func TestRuntimeBuildsUTLSTransportForSupportedEgressProfile(t *testing.T) {
+	client, err := newIsolatedClient(contract.AccountRuntime{
+		AccountID:    15,
+		RuntimeClass: "oauth_refresh",
+		Metadata: map[string]any{
+			"egress_profile": map[string]any{"tls_template": "chrome_120"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("create isolated client: %v", err)
+	}
+	transport, ok := client.Transport.(*http.Transport)
+	if !ok {
+		t.Fatalf("expected http transport, got %T", client.Transport)
+	}
+	if transport.DialTLSContext == nil {
+		t.Fatal("expected custom uTLS DialTLSContext")
+	}
+	if transport.TLSNextProto == nil || transport.ForceAttemptHTTP2 {
+		t.Fatalf("expected HTTP/2 disabled for uTLS transport")
+	}
+	if transport.Proxy != nil {
+		t.Fatal("expected direct uTLS transport to avoid standard proxy TLS fallback")
+	}
+	key, err := clientCacheKey(contract.AccountRuntime{
+		AccountID: 15,
+		Metadata: map[string]any{"egress_profile": map[string]any{
+			"tls_template":        "chrome_120",
+			"http_version_policy": "require_h1",
+		}},
+	})
+	if err != nil {
+		t.Fatalf("build client cache key: %v", err)
+	}
+	if !strings.Contains(key, "tls=chrome_120") || !strings.Contains(key, "http=require_h1") {
+		t.Fatalf("expected transport settings in client cache key, got %q", key)
+	}
+}
+
+func TestRuntimeRejectsTLSEgressProfileWithProxy(t *testing.T) {
+	_, err := newIsolatedClient(contract.AccountRuntime{
+		AccountID:    16,
+		RuntimeClass: "oauth_refresh",
+		ProxyID:      ptrString("socks5://127.0.0.1:1080"),
+		Metadata: map[string]any{
+			"egress_profile": map[string]any{"tls_template": "chrome_120"},
+		},
+	})
+	var runtimeErr contract.RuntimeError
+	if !errors.As(err, &runtimeErr) || runtimeErr.Class != "unsupported_egress_profile" {
+		t.Fatalf("expected unsupported egress profile error, got %T %v", err, err)
+	}
+}
+
+func TestRuntimeSupportsTLSEgressProfileThroughHTTPConnectProxy(t *testing.T) {
+	var (
+		upstreamHeader http.Header
+		connectHost    string
+		proxyAuth      string
+	)
+	upstream := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamHeader = r.Header.Clone()
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer upstream.Close()
+
+	upstreamURL, err := url.Parse(upstream.URL)
+	if err != nil {
+		t.Fatalf("parse upstream url: %v", err)
+	}
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodConnect {
+			t.Errorf("expected CONNECT, got %s", r.Method)
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		connectHost = r.Host
+		proxyAuth = r.Header.Get("Proxy-Authorization")
+		target, err := net.Dial("tcp", r.Host)
+		if err != nil {
+			t.Errorf("dial target: %v", err)
+			w.WriteHeader(http.StatusBadGateway)
+			return
+		}
+		defer target.Close()
+		hijacker, ok := w.(http.Hijacker)
+		if !ok {
+			t.Error("proxy response writer does not support hijack")
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		clientConn, _, err := hijacker.Hijack()
+		if err != nil {
+			t.Errorf("hijack client: %v", err)
+			return
+		}
+		defer clientConn.Close()
+		if _, err := clientConn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n")); err != nil {
+			t.Errorf("write CONNECT response: %v", err)
+			return
+		}
+		done := make(chan struct{}, 2)
+		go func() {
+			_, _ = io.Copy(target, clientConn)
+			done <- struct{}{}
+		}()
+		go func() {
+			_, _ = io.Copy(clientConn, target)
+			done <- struct{}{}
+		}()
+		<-done
+	}))
+	defer proxy.Close()
+
+	proxyURL, err := url.Parse(proxy.URL)
+	if err != nil {
+		t.Fatalf("parse proxy url: %v", err)
+	}
+	proxyURL.User = url.UserPassword("proxy-user", "proxy-pass")
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig = &tls.Config{RootCAs: upstream.Client().Transport.(*http.Transport).TLSClientConfig.RootCAs}
+	if err := configureTransportForEgress(transport, contract.AccountRuntime{
+		AccountID: 17,
+		ProxyID:   ptrString(proxyURL.String()),
+		Metadata:  map[string]any{"egress_profile": map[string]any{"tls_template": "chrome_120"}},
+	}, egressProfile{TLSTemplate: "chrome_120"}); err != nil {
+		t.Fatalf("configure egress transport: %v", err)
+	}
+	client := &http.Client{Transport: transport, Timeout: 3 * time.Second}
+	req, err := http.NewRequest(http.MethodGet, upstream.URL, nil)
+	if err != nil {
+		t.Fatalf("build request: %v", err)
+	}
+	req.Header.Set("User-Agent", "ProfileProxyTest/1.0")
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("proxy uTLS request: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected upstream 200, got %d", resp.StatusCode)
+	}
+	if connectHost != upstreamURL.Host {
+		t.Fatalf("expected CONNECT to %s, got %q", upstreamURL.Host, connectHost)
+	}
+	if proxyAuth != "Basic cHJveHktdXNlcjpwcm94eS1wYXNz" {
+		t.Fatalf("expected proxy auth header, got %q", proxyAuth)
+	}
+	if upstreamHeader.Get("User-Agent") != "ProfileProxyTest/1.0" {
+		t.Fatalf("expected upstream request through proxy, got %+v", upstreamHeader)
+	}
+}
+
+func TestRuntimeRejectsTLSEgressProfileWithHTTPSProxy(t *testing.T) {
+	_, err := newIsolatedClient(contract.AccountRuntime{
+		AccountID:    18,
+		RuntimeClass: "oauth_refresh",
+		ProxyID:      ptrString("https://127.0.0.1:8443"),
+		Metadata: map[string]any{
+			"egress_profile": map[string]any{"tls_template": "chrome_120"},
+		},
+	})
+	var runtimeErr contract.RuntimeError
+	if !errors.As(err, &runtimeErr) || runtimeErr.Class != "unsupported_egress_profile" {
+		t.Fatalf("expected unsupported egress profile error, got %T %v", err, err)
 	}
 }
 

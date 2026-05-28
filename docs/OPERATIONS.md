@@ -314,6 +314,18 @@ make otel-overhead-bench
 
 `health_probe` worker 由 `internal/app` 在持久化 account/provider store 可用时启动。它默认每 5 分钟遍历活跃 API-key provider account，调用上游 `/models` 类轻量端点，写入 `account_health_snapshots`，并在连续失败或错误率过高时给账号写入 cooldown / circuit metadata。相关配置项为 `ACCOUNT_HEALTH_PROBE_INTERVAL_SECONDS`、`ACCOUNT_HEALTH_PROBE_TIMEOUT_SECONDS`、`ACCOUNT_HEALTH_PROBE_MAX_CONCURRENT`、`ACCOUNT_HEALTH_PROBE_FAILURE_THRESHOLD`、`ACCOUNT_HEALTH_PROBE_ERROR_RATE_THRESHOLD_PERCENT`、`ACCOUNT_HEALTH_PROBE_MIN_SAMPLES_FOR_ERROR_RATE` 和 `ACCOUNT_HEALTH_PROBE_COOLDOWN_SECONDS`。
 
+Provider Account metadata 或 Provider config/capabilities 可以把默认 `/models` 探测提升为合成请求探测：
+
+- `health_probe_url` / `probe_url` 指定完整探测 URL；未指定时仍使用 `{base_url}/models`。
+- `health_probe_method` / `probe_method` 支持 `GET`、`HEAD`、`POST`；默认 `GET`。
+- `health_probe_body` / `probe_body` 提供 JSON body；有 body 时自动补 `Content-Type: application/json`。
+- `health_probe_headers` / `probe_headers` 可以添加低敏业务 header；`Authorization`、API-key、cookie、host、hop-by-hop header 会被忽略，凭证仍只来自账号 credential。
+- `health_probe_expected_status_codes` / `probe_expected_status_codes` 限制成功 HTTP status；未配置时只接受 2xx。
+- `health_probe_response_path` / `probe_response_path` 要求 JSON path 存在且非空；数组索引用数字段，例如 `data.0.id`。
+- `health_probe_response_contains` / `probe_response_contains` 要求响应体包含指定文本。
+
+该机制用于覆盖 sub2api channel-monitor / scheduled-test 里的“用真实请求形态做健康验证”诉求，但仍复用 SRapi 的 Provider Account、credential materialization、account health snapshot、cooldown/circuit 和 Scheduler 证据链，不新增平行监控数据面。
+
 ### SLO 告警评估
 
 `slo_evaluator` worker 由 `internal/app` 在持久化 operations store 可用时启动。它默认每 1 分钟读取 `obs_slo_definitions`、`usage_logs` 和当前 active `obs_alert_events`，对 active availability SLO 执行多窗口 burn-rate 判断：长窗口和短窗口都超过阈值才创建或更新告警，恢复时只自动 resolve `slo.burn_rate.*` 规则生成的 active/acknowledged 告警，不会修改人工或其他规则告警。

@@ -1102,8 +1102,8 @@ func validateRawResponsesInput(rawBody []byte) error {
 	if err := json.Unmarshal(rawBody, &payload); err != nil {
 		return nil
 	}
-	if rawResponsesPreviousResponseIDLooksLikeMessageID(rawMapString(payload, "previous_response_id")) {
-		return fmt.Errorf("Responses previous_response_id must reference a response id, not a message id")
+	if rawResponsesPreviousResponseIDLooksLikeNonResponseID(rawMapString(payload, "previous_response_id")) {
+		return fmt.Errorf("Responses previous_response_id must reference a response id, not a message, item, tool call, or compaction id")
 	}
 	state := rawResponsesInputValidationState{
 		hasPreviousResponseID: strings.TrimSpace(rawMapString(payload, "previous_response_id")) != "",
@@ -1126,8 +1126,17 @@ func validateRawResponsesInput(rawBody []byte) error {
 	return nil
 }
 
-func rawResponsesPreviousResponseIDLooksLikeMessageID(value string) bool {
-	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(value)), "msg_")
+func rawResponsesPreviousResponseIDLooksLikeNonResponseID(value string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	if normalized == "" || strings.HasPrefix(normalized, "resp_") {
+		return false
+	}
+	for _, prefix := range []string{"msg_", "message_", "item_", "call_", "fc_", "rs_", "cmp_", "chatcmpl-"} {
+		if strings.HasPrefix(normalized, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 type rawResponsesInputValidationState struct {

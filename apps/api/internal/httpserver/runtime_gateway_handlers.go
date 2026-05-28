@@ -34,6 +34,31 @@ func (s *Server) handleListModels(w http.ResponseWriter, r *http.Request) {
 	_ = requestID
 }
 
+func (s *Server) handleGatewayUsage(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	authed, err := s.requireGatewayKey(r)
+	if err != nil {
+		writeGatewayAuthError(w, err, requestID)
+		return
+	}
+	days, ok := gatewayUsageDays(r)
+	if !ok {
+		writeGatewayError(w, http.StatusBadRequest, apiopenapi.InvalidRequestError, "days must be an integer between 1 and 90", "invalid_request")
+		return
+	}
+	summary, err := s.runtime.usage.SummarizeAPIKey(r.Context(), authed.Key.ID, days)
+	if err != nil {
+		writeGatewayError(w, http.StatusInternalServerError, apiopenapi.InternalError, "failed to load usage", "internal_error")
+		return
+	}
+	user, err := s.runtime.users.FindByID(r.Context(), authed.UserID)
+	if err != nil {
+		writeGatewayError(w, http.StatusInternalServerError, apiopenapi.InternalError, "failed to load usage", "internal_error")
+		return
+	}
+	writeJSONAny(w, http.StatusOK, gatewayUsageResponse(authed.Key, user.User, summary))
+}
+
 func (s *Server) handleCreateChatCompletion(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	sourceEndpoint := gatewaySourceEndpoint(r.Context(), "/v1/chat/completions")
@@ -145,13 +170,7 @@ func (s *Server) handleCreateChatCompletion(w http.ResponseWriter, r *http.Reque
 	failover := s.invokeProviderConversationWithFailover(r.Context(), r, authed, canonical, scheduleReq, model.ID, forcedProviderKey, admission, startedAt)
 	result := failover.ScheduleResult
 	if failover.Err != nil {
-		if !failover.FailureRecorded {
-			s.recordGatewayNoAvailableAccount(r, authed, canonical, result, admission, startedAt)
-			writeGatewayError(w, http.StatusServiceUnavailable, apiopenapi.ServiceUnavailableError, "no available account", "no_available_account")
-			return
-		}
-		errorClass, upstreamStatus, errorType := providerGatewayError(failover.Err)
-		writeGatewayError(w, providerGatewayHTTPStatus(upstreamStatus), errorType, providerGatewayMessage(errorClass), errorClass)
+		s.writeGatewayFailoverFailure(w, r, authed, canonical, result, failover.FailureRecorded, failover.Err, admission, startedAt)
 		return
 	}
 	providerResp := failover.Response
@@ -178,6 +197,7 @@ func (s *Server) handleCreateChatCompletion(w http.ResponseWriter, r *http.Reque
 		UsageEstimated:        canonicalResp.Usage.Estimated,
 		Pricing:               pricing,
 		CompatibilityWarnings: canonicalResp.CompatibilityWarnings,
+		ProviderQuotaSignals:  providerResp.QuotaSignals,
 		QualityPrompt:         gatewayTextForQuality(canonical),
 		QualityOutput:         canonicalResp.Message,
 	})
@@ -322,13 +342,7 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 	failover := s.invokeProviderConversationWithFailover(r.Context(), r, authed, canonical, scheduleReq, model.ID, forcedProviderKey, admission, startedAt)
 	result := failover.ScheduleResult
 	if failover.Err != nil {
-		if !failover.FailureRecorded {
-			s.recordGatewayNoAvailableAccount(r, authed, canonical, result, admission, startedAt)
-			writeGatewayError(w, http.StatusServiceUnavailable, apiopenapi.ServiceUnavailableError, "no available account", "no_available_account")
-			return
-		}
-		errorClass, upstreamStatus, errorType := providerGatewayError(failover.Err)
-		writeGatewayError(w, providerGatewayHTTPStatus(upstreamStatus), errorType, providerGatewayMessage(errorClass), errorClass)
+		s.writeGatewayFailoverFailure(w, r, authed, canonical, result, failover.FailureRecorded, failover.Err, admission, startedAt)
 		return
 	}
 	providerResp := failover.Response
@@ -355,6 +369,7 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 		UsageEstimated:        canonicalResp.Usage.Estimated,
 		Pricing:               pricing,
 		CompatibilityWarnings: canonicalResp.CompatibilityWarnings,
+		ProviderQuotaSignals:  providerResp.QuotaSignals,
 		QualityPrompt:         gatewayTextForQuality(canonical),
 		QualityOutput:         canonicalResp.Message,
 	})
@@ -372,6 +387,141 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSONAny(w, http.StatusOK, response)
+}
+
+func (s *Server) handleListResponseInputItems(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	sourceEndpoint := gatewaySourceEndpoint(r.Context(), string(gatewaycontract.EndpointResponseInputItems))
+	forcedProviderKey := gatewayForcedProviderKey(r.Context())
+	startedAt := time.Now()
+	authed, err := s.requireGatewayKey(r)
+	if err != nil {
+		writeGatewayAuthError(w, err, requestID)
+		return
+	}
+	responseID := strings.TrimSpace(r.PathValue("response_id"))
+	modelName := strings.TrimSpace(r.URL.Query().Get("model"))
+	if responseID == "" || modelName == "" {
+		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
+			RequestID:      requestID,
+			Authed:         authed,
+			SourceProtocol: string(gatewaycontract.ProtocolOpenAICompatible),
+			SourceEndpoint: sourceEndpoint,
+			Model:          fallbackModelName(modelName),
+			Success:        false,
+			ErrorClass:     ptrStringValue("invalid_request"),
+			LatencyMS:      elapsedMillis(startedAt),
+			UsageEstimated: true,
+		})
+		writeGatewayError(w, http.StatusBadRequest, apiopenapi.InvalidRequestError, "response input_items requests require response_id and model", "invalid_request")
+		return
+	}
+	modelResolution, err := s.runtime.models.ResolveModelReference(r.Context(), modelName)
+	if err != nil {
+		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
+			RequestID:      requestID,
+			Authed:         authed,
+			SourceProtocol: string(gatewaycontract.ProtocolOpenAICompatible),
+			SourceEndpoint: sourceEndpoint,
+			Model:          fallbackModelName(modelName),
+			Success:        false,
+			ErrorClass:     ptrStringValue("model_not_found"),
+			LatencyMS:      elapsedMillis(startedAt),
+			UsageEstimated: true,
+		})
+		writeGatewayError(w, http.StatusNotFound, apiopenapi.InvalidRequestError, "model not found", "model_not_found")
+		return
+	}
+	model := modelResolution.Model
+	if !apiKeyAllowsModelReference(authed.Key.AllowedModels, modelResolution) {
+		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
+			RequestID:      requestID,
+			Authed:         authed,
+			SourceProtocol: string(gatewaycontract.ProtocolOpenAICompatible),
+			SourceEndpoint: sourceEndpoint,
+			Model:          model.CanonicalName,
+			Success:        false,
+			ErrorClass:     ptrStringValue("model_not_allowed"),
+			LatencyMS:      elapsedMillis(startedAt),
+			UsageEstimated: true,
+		})
+		writeGatewayError(w, http.StatusForbidden, apiopenapi.PermissionError, "model not allowed for this api key", "model_not_allowed")
+		return
+	}
+	canonical := s.runtime.gateway.NormalizeResponseInputItems(modelName, gatewayservice.RequestMeta{
+		RequestID:      requestID,
+		SourceEndpoint: sourceEndpoint,
+		UserID:         authed.UserID,
+		APIKeyID:       authed.Key.ID,
+		CanonicalModel: model.CanonicalName,
+	})
+	admission, err := s.runtime.prepareGatewayAdmissionWithoutContentSafety(r.Context(), &canonical, modelResolution, model.ID)
+	if err != nil {
+		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
+			RequestID:             canonical.RequestID,
+			Authed:                authed,
+			SourceProtocol:        string(canonical.SourceProtocol),
+			SourceEndpoint:        canonical.SourceEndpoint,
+			Model:                 canonical.CanonicalModel,
+			Success:               false,
+			ErrorClass:            ptrStringValue("entitlement_check_failed"),
+			LatencyMS:             elapsedMillis(startedAt),
+			UsageEstimated:        true,
+			Pricing:               admission.Pricing,
+			CompatibilityWarnings: canonical.CompatibilityWarnings,
+		})
+		writeGatewayError(w, http.StatusInternalServerError, apiopenapi.InternalError, "failed to check gateway entitlement", "entitlement_check_failed")
+		return
+	}
+	if !admission.Entitlement.Allowed {
+		errorClass := gatewayEntitlementErrorClass(admission.Entitlement)
+		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
+			RequestID:             canonical.RequestID,
+			Authed:                authed,
+			SourceProtocol:        string(canonical.SourceProtocol),
+			SourceEndpoint:        canonical.SourceEndpoint,
+			Model:                 canonical.CanonicalModel,
+			Success:               false,
+			ErrorClass:            ptrStringValue(errorClass),
+			LatencyMS:             elapsedMillis(startedAt),
+			UsageEstimated:        true,
+			Pricing:               admission.Pricing,
+			CompatibilityWarnings: canonical.CompatibilityWarnings,
+		})
+		writeGatewayError(w, gatewayEntitlementHTTPStatus(errorClass), gatewayEntitlementErrorType(errorClass), gatewayEntitlementMessage(errorClass), errorClass)
+		return
+	}
+	admission.EstimatedUsage = gatewaycontract.Usage{}
+	admission.Pricing = zeroGatewayPricing()
+	scheduleReq := gatewayScheduleRequest(r, canonical, modelResolution)
+	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
+	failover := s.invokeProviderResponseInputItemsWithFailover(r.Context(), r, authed, canonical, responseID, r.URL.Query(), scheduleReq, model.ID, forcedProviderKey, admission, startedAt)
+	result := failover.ScheduleResult
+	if failover.Err != nil {
+		s.writeGatewayFailoverFailure(w, r, authed, canonical, result, failover.FailureRecorded, failover.Err, admission, startedAt)
+		return
+	}
+	providerResp := failover.Response
+	s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
+		RequestID:             canonical.RequestID,
+		Authed:                authed,
+		DecisionID:            result.Decision.ID,
+		AttemptNo:             result.Decision.AttemptNo,
+		ProviderID:            ptrInt(result.Candidate.Provider.ID),
+		AccountID:             ptrInt(result.Candidate.Account.ID),
+		SourceProtocol:        string(canonical.SourceProtocol),
+		SourceEndpoint:        canonical.SourceEndpoint,
+		TargetProtocol:        result.Candidate.Provider.Protocol,
+		Model:                 canonical.CanonicalModel,
+		Success:               true,
+		StatusCode:            ptrInt(http.StatusOK),
+		LatencyMS:             elapsedMillis(startedAt),
+		UsageEstimated:        false,
+		Pricing:               zeroGatewayPricing(),
+		CompatibilityWarnings: canonical.CompatibilityWarnings,
+		ProviderQuotaSignals:  providerResp.QuotaSignals,
+	})
+	writeRawJSONResponse(w, providerResp.StatusCode, providerResp.Raw)
 }
 
 func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
@@ -485,13 +635,7 @@ func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
 	failover := s.invokeProviderConversationWithFailover(r.Context(), r, authed, canonical, scheduleReq, model.ID, forcedProviderKey, admission, startedAt)
 	result := failover.ScheduleResult
 	if failover.Err != nil {
-		if !failover.FailureRecorded {
-			s.recordGatewayNoAvailableAccount(r, authed, canonical, result, admission, startedAt)
-			writeGatewayError(w, http.StatusServiceUnavailable, apiopenapi.ServiceUnavailableError, "no available account", "no_available_account")
-			return
-		}
-		errorClass, upstreamStatus, errorType := providerGatewayError(failover.Err)
-		writeGatewayError(w, providerGatewayHTTPStatus(upstreamStatus), errorType, providerGatewayMessage(errorClass), errorClass)
+		s.writeGatewayFailoverFailure(w, r, authed, canonical, result, failover.FailureRecorded, failover.Err, admission, startedAt)
 		return
 	}
 	providerResp := failover.Response
@@ -518,6 +662,7 @@ func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
 		UsageEstimated:        canonicalResp.Usage.Estimated,
 		Pricing:               pricing,
 		CompatibilityWarnings: canonicalResp.CompatibilityWarnings,
+		ProviderQuotaSignals:  providerResp.QuotaSignals,
 		QualityPrompt:         gatewayTextForQuality(canonical),
 		QualityOutput:         canonicalResp.Message,
 	})
@@ -661,13 +806,7 @@ func (s *Server) handleCreateEmbedding(w http.ResponseWriter, r *http.Request) {
 	failover := s.invokeProviderEmbeddingsWithFailover(r.Context(), r, authed, canonical, scheduleReq, model.ID, forcedProviderKey, admission, startedAt)
 	result := failover.ScheduleResult
 	if failover.Err != nil {
-		if !failover.FailureRecorded {
-			s.recordGatewayNoAvailableAccount(r, authed, canonical, result, admission, startedAt)
-			writeGatewayError(w, http.StatusServiceUnavailable, apiopenapi.ServiceUnavailableError, "no available account", "no_available_account")
-			return
-		}
-		errorClass, upstreamStatus, errorType := providerGatewayError(failover.Err)
-		writeGatewayError(w, providerGatewayHTTPStatus(upstreamStatus), errorType, providerGatewayMessage(errorClass), errorClass)
+		s.writeGatewayFailoverFailure(w, r, authed, canonical, result, failover.FailureRecorded, failover.Err, admission, startedAt)
 		return
 	}
 	providerResp := failover.Response
@@ -712,7 +851,7 @@ func (s *Server) handleGeminiModelAction(w http.ResponseWriter, r *http.Request)
 	sourceEndpoint := gatewaySourceEndpoint(r.Context(), r.URL.Path)
 	forcedProviderKey := gatewayForcedProviderKey(r.Context())
 	startedAt := time.Now()
-	authed, err := s.requireGatewayKey(r)
+	authed, err := s.requireGeminiGatewayKey(r)
 	if err != nil {
 		writeGeminiGatewayAuthError(w, err)
 		return
@@ -818,14 +957,7 @@ func (s *Server) handleGeminiModelAction(w http.ResponseWriter, r *http.Request)
 	failover := s.invokeProviderConversationWithFailover(r.Context(), r, authed, canonical, scheduleReq, model.ID, forcedProviderKey, admission, startedAt)
 	result := failover.ScheduleResult
 	if failover.Err != nil {
-		if !failover.FailureRecorded {
-			s.recordGatewayNoAvailableAccount(r, authed, canonical, result, admission, startedAt)
-			writeGeminiGatewayError(w, http.StatusServiceUnavailable, "UNAVAILABLE", "no available account")
-			return
-		}
-		errorClass, upstreamStatus, _ := providerGatewayError(failover.Err)
-		status := providerGatewayHTTPStatus(upstreamStatus)
-		writeGeminiGatewayError(w, status, geminiStatusForGatewayErrorClass(errorClass, status), providerGatewayMessage(errorClass))
+		s.writeGeminiGatewayFailoverFailure(w, r, authed, canonical, result, failover.FailureRecorded, failover.Err, admission, startedAt)
 		return
 	}
 	providerResp := failover.Response
@@ -852,6 +984,7 @@ func (s *Server) handleGeminiModelAction(w http.ResponseWriter, r *http.Request)
 		UsageEstimated:        canonicalResp.Usage.Estimated,
 		Pricing:               pricing,
 		CompatibilityWarnings: canonicalResp.CompatibilityWarnings,
+		ProviderQuotaSignals:  providerResp.QuotaSignals,
 		QualityPrompt:         gatewayTextForQuality(canonical),
 		QualityOutput:         canonicalResp.Message,
 	})
@@ -983,7 +1116,7 @@ func (s *Server) handleGeminiCountTokens(w http.ResponseWriter, r *http.Request)
 	sourceEndpoint := gatewaySourceEndpoint(r.Context(), r.URL.Path)
 	forcedProviderKey := gatewayForcedProviderKey(r.Context())
 	startedAt := time.Now()
-	authed, err := s.requireGatewayKey(r)
+	authed, err := s.requireGeminiGatewayKey(r)
 	if err != nil {
 		writeGeminiGatewayAuthError(w, err)
 		return
@@ -1038,24 +1171,13 @@ func (s *Server) handleGeminiCountTokens(w http.ResponseWriter, r *http.Request)
 	}
 	scheduleReq := gatewayScheduleRequest(r, canonical, modelResolution)
 	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
-	result, err := s.runtime.scheduleGatewayRequest(r.Context(), scheduleReq, model.ID, forcedProviderKey, authed.Key)
-	if err != nil {
-		s.recordTokenCountScheduled(r, authed, canonical, result, nil, "no_available_account", http.StatusServiceUnavailable, elapsedMillis(startedAt), admission)
-		writeGeminiGatewayError(w, http.StatusServiceUnavailable, "UNAVAILABLE", "no available account")
+	failover := s.invokeProviderTokenCountWithFailover(r.Context(), r, authed, canonical, rawBody, scheduleReq, model.ID, forcedProviderKey, admission, startedAt)
+	result := failover.ScheduleResult
+	if failover.Err != nil {
+		s.writeGeminiGatewayFailoverFailure(w, r, authed, canonical, result, failover.FailureRecorded, failover.Err, admission, startedAt)
 		return
 	}
-	if err := s.reserveGatewayAccountQuotaForScheduledRequest(r.Context(), r, authed, canonical, result, admission, startedAt); err != nil {
-		writeGeminiProviderGatewayError(w, err)
-		return
-	}
-	providerResp, err := s.runtime.invokeProviderTokenCount(r.Context(), providerTokenCountRequest(canonical, rawBody, result.Candidate))
-	if err != nil {
-		errorClass, upstreamStatus, _ := providerGatewayError(err)
-		status := providerGatewayHTTPStatus(upstreamStatus)
-		s.recordTokenCountScheduled(r, authed, canonical, result, &result.Candidate, errorClass, upstreamStatus, elapsedMillis(startedAt), admission)
-		writeGeminiGatewayError(w, status, geminiStatusForGatewayErrorClass(errorClass, status), providerGatewayMessage(errorClass))
-		return
-	}
+	providerResp := failover.Response
 	tokenCount := gatewayTokenCountFromProvider(providerResp)
 	canonicalResp := s.runtime.gateway.BuildCanonicalTokenCountResponse(canonical, tokenCount.TotalTokens, tokenCount.CachedContentTokenCount, tokenCount.PromptTokensDetails, tokenCount.CacheTokensDetails, tokenCount.Metadata)
 	s.recordTokenCountSuccess(r, authed, canonical, result, canonicalResp, elapsedMillis(startedAt))

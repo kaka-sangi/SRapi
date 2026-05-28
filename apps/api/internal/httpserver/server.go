@@ -385,9 +385,12 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("POST /api/v1/admin/scheduler/simulate", server.handleSimulateSchedulerStrategy)
 	mux.HandleFunc("POST /api/v1/admin/scheduler/replay", server.handleReplaySchedulerStrategy)
 	mux.HandleFunc("GET /v1/models", server.handleListModels)
+	mux.HandleFunc("GET /v1/usage", server.handleGatewayUsage)
 	mux.HandleFunc("GET /v1beta/models", server.handleListGeminiModels)
+	mux.HandleFunc("GET /v1beta/models/", server.handleGetGeminiModel)
 	mux.HandleFunc("POST /v1/chat/completions", server.handleCreateChatCompletion)
 	mux.HandleFunc("POST /v1/responses", server.handleCreateResponse)
+	mux.HandleFunc("GET /v1/responses/{response_id}/input_items", server.handleListResponseInputItems)
 	mux.HandleFunc("POST /v1/responses/compact", server.withGatewaySourceEndpoint(string(gatewaycontract.EndpointResponsesCompact), server.handleCreateResponse))
 	mux.HandleFunc("GET /v1/responses/ws", server.handleResponsesWebSocket)
 	mux.HandleFunc("GET /v1/realtime", server.handleRealtimeWebSocket)
@@ -686,6 +689,7 @@ func (s *Server) registerGatewayProviderAliases(mux *http.ServeMux) {
 			}
 			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "chat/completions", s.handleCreateChatCompletion, presetSupports(preset, capabilitiescontract.KeyChatCompletions))
 			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "responses", s.handleCreateResponse, presetSupports(preset, capabilitiescontract.KeyResponses))
+			s.registerGatewayAliasRouteForMethod(mux, seen, http.MethodGet, preset.ProviderKey, prefix, "responses/{response_id}/input_items", s.handleListResponseInputItems, presetSupports(preset, capabilitiescontract.KeyResponses))
 			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "responses/compact", s.handleCreateResponse, presetSupports(preset, capabilitiescontract.KeyResponsesCompact))
 			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "messages", s.handleCreateMessage, presetSupports(preset, capabilitiescontract.KeyMessages))
 			s.registerGatewayAliasRoute(mux, seen, preset.ProviderKey, prefix, "messages/count_tokens", s.handleAnthropicCountTokens, presetSupports(preset, capabilitiescontract.KeyTokenCounting))
@@ -713,6 +717,10 @@ func presetSupports(preset providerpreset.Preset, capabilityKey string) bool {
 }
 
 func (s *Server) registerGatewayAliasRoute(mux *http.ServeMux, seen map[string]struct{}, providerKey, prefix, endpoint string, handler http.HandlerFunc, enabled bool) {
+	s.registerGatewayAliasRouteForMethod(mux, seen, http.MethodPost, providerKey, prefix, endpoint, handler, enabled)
+}
+
+func (s *Server) registerGatewayAliasRouteForMethod(mux *http.ServeMux, seen map[string]struct{}, method, providerKey, prefix, endpoint string, handler http.HandlerFunc, enabled bool) {
 	if !enabled {
 		return
 	}
@@ -720,7 +728,7 @@ func (s *Server) registerGatewayAliasRoute(mux *http.ServeMux, seen map[string]s
 	if strings.HasSuffix(prefix, "/v1") {
 		path = prefix + "/" + endpoint
 	}
-	pattern := "POST " + path
+	pattern := strings.ToUpper(strings.TrimSpace(method)) + " " + path
 	if _, ok := seen[pattern]; ok {
 		return
 	}

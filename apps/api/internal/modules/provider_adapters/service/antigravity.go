@@ -83,7 +83,7 @@ func (s *Service) invokeReverseProxyAntigravity(ctx context.Context, req contrac
 		return contract.ConversationResponse{}, providerErrorFromReverseProxy(err)
 	}
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
-		return contract.ConversationResponse{}, classifyGeminiProviderHTTPError(runtimeResp.StatusCode, runtimeResp.Body)
+		return contract.ConversationResponse{}, classifyGeminiProviderHTTPErrorWithHeaders(runtimeResp.StatusCode, runtimeResp.Headers, runtimeResp.Body)
 	}
 	if req.Stream {
 		return parseAntigravityStream(runtimeResp.Body, runtimeResp.StatusCode)
@@ -352,6 +352,7 @@ func antigravityReverseProxyAccount(req contract.ConversationRequest) reversepro
 		UpstreamClient: upstreamClient,
 		ProxyID:        req.Account.ProxyID,
 		UserAgent:      mapString(req.Account.Metadata, "user_agent"),
+		Metadata:       req.Account.Metadata,
 		Credential:     req.Credential,
 	}
 }

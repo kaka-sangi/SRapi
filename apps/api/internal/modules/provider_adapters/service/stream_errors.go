@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
 )
@@ -42,7 +43,9 @@ func providerErrorFromStreamFrame(frame sseFrame, data string, protocol string) 
 		status := firstNonEmpty(payload.Error.Status, payload.Status)
 		code := streamErrorCode(payload.Error.Code)
 		message := firstPresent(payload.Error.Message, payload.Message, code, errorType, status)
-		return streamProviderError(protocol, firstNonEmpty(errorType, code), status, message, statusCode), true
+		providerErr := streamProviderError(protocol, firstNonEmpty(errorType, code), status, message, statusCode)
+		providerErr.RetryAfter = providerRetryAfter(nil, []byte(data), time.Now())
+		return providerErr, true
 	}
 	if !strings.EqualFold(strings.TrimSpace(frame.Event), "error") && !strings.EqualFold(strings.TrimSpace(payload.Type), "error") {
 		return contract.ProviderError{}, false
@@ -50,7 +53,9 @@ func providerErrorFromStreamFrame(frame sseFrame, data string, protocol string) 
 	statusCode := streamErrorStatusCode(payload.Code)
 	code := streamErrorCode(payload.Code)
 	message := firstPresent(payload.Message, code, payload.Type, "provider stream returned error event")
-	return streamProviderError(protocol, firstNonEmpty(payload.Type, code), payload.Status, message, statusCode), true
+	providerErr := streamProviderError(protocol, firstNonEmpty(payload.Type, code), payload.Status, message, statusCode)
+	providerErr.RetryAfter = providerRetryAfter(nil, []byte(data), time.Now())
+	return providerErr, true
 }
 
 func streamProviderError(protocol string, errorType string, status string, message string, statusCode int) contract.ProviderError {
@@ -113,6 +118,8 @@ func providerStatusCodeForClass(class string) int {
 		return http.StatusTooManyRequests
 	case "timeout":
 		return http.StatusGatewayTimeout
+	case "overloaded":
+		return 529
 	default:
 		return http.StatusBadGateway
 	}

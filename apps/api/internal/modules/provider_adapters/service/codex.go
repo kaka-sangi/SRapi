@@ -18,6 +18,7 @@ const (
 	codexOriginator                         = "codex_cli_rs"
 	codexDefaultVersion                     = "0.125.0"
 	codexDefaultUserAgent                   = codexOriginator + "/" + codexDefaultVersion
+	codexDefaultInstructions                = "You are a concise assistant."
 	codexResponsesBetaHeaderValue           = "responses=experimental"
 	codexResponsesWebsocketBetaHeaderValue  = "responses_websockets=2026-02-06"
 	codexDefaultAccountSessionIDPrefix      = "srapi-codex-account-"
@@ -145,9 +146,60 @@ func (s *Service) invokeReverseProxyCodexResponses(ctx context.Context, req cont
 		return contract.ConversationResponse{}, providerErrorFromReverseProxy(err)
 	}
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
-		return contract.ConversationResponse{}, classifyProviderHTTPError(runtimeResp.StatusCode, runtimeResp.Body)
+		if retryPayload, ok := codexResponsesPreviousResponseRecoveryPayload(req, payload, runtimeResp.Body); ok {
+			retryRaw, marshalErr := json.Marshal(retryPayload)
+			if marshalErr != nil {
+				return contract.ConversationResponse{}, marshalErr
+			}
+			retryResp, retryErr := s.reverseProxy.Do(ctx, reverseproxycontract.Request{
+				Account:      codexReverseProxyAccount(req),
+				Method:       http.MethodPost,
+				URL:          codexResponsesEndpoint(baseURL, req),
+				Headers:      codexResponsesHeaders(req, stream),
+				Body:         retryRaw,
+				ExpectStream: stream,
+			})
+			if retryErr != nil {
+				return contract.ConversationResponse{}, providerErrorFromReverseProxy(retryErr)
+			}
+			if retryResp.StatusCode >= 200 && retryResp.StatusCode < 300 {
+				parsed, parseErr := parseCodexResponsesBody(retryResp.Body, retryResp.StatusCode)
+				if parseErr != nil {
+					return contract.ConversationResponse{}, parseErr
+				}
+				return withCodexQuotaSignals(parsed, retryResp.Headers), nil
+			}
+			return contract.ConversationResponse{}, classifyProviderHTTPErrorWithHeaders(retryResp.StatusCode, retryResp.Headers, retryResp.Body)
+		}
+		return contract.ConversationResponse{}, classifyProviderHTTPErrorWithHeaders(runtimeResp.StatusCode, runtimeResp.Headers, runtimeResp.Body)
 	}
-	return parseCodexResponsesBody(runtimeResp.Body, runtimeResp.StatusCode)
+	parsed, err := parseCodexResponsesBody(runtimeResp.Body, runtimeResp.StatusCode)
+	if err != nil {
+		return contract.ConversationResponse{}, err
+	}
+	return withCodexQuotaSignals(parsed, runtimeResp.Headers), nil
+}
+
+func (s *Service) invokeReverseProxyCodexResponseInputItems(ctx context.Context, req contract.ResponseInputItemsRequest, baseURL string) (contract.ResponseInputItemsResponse, error) {
+	if s.reverseProxy == nil {
+		return contract.ResponseInputItemsResponse{}, contract.ProviderError{Class: "network_error", StatusCode: http.StatusBadGateway, Message: "reverse proxy runtime unavailable"}
+	}
+	if codexResponseInputItemsRuntimeIsAPIKey(req) {
+		return contract.ResponseInputItemsResponse{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "codex reverse proxy requires OAuth/session/client-token runtime credentials"}
+	}
+	runtimeResp, err := s.reverseProxy.Do(ctx, reverseproxycontract.Request{
+		Account: responseInputItemsReverseProxyAccount(req),
+		Method:  http.MethodGet,
+		URL:     responseInputItemsEndpoint(baseURL, req.ResponseID, req.Query),
+		Headers: codexResponseInputItemsHeaders(req),
+	})
+	if err != nil {
+		return contract.ResponseInputItemsResponse{}, providerErrorFromReverseProxy(err)
+	}
+	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
+		return contract.ResponseInputItemsResponse{}, classifyProviderHTTPErrorWithHeaders(runtimeResp.StatusCode, runtimeResp.Headers, runtimeResp.Body)
+	}
+	return withCodexInputItemsQuotaSignals(contract.ResponseInputItemsResponse{Raw: append([]byte(nil), bytes.TrimSpace(runtimeResp.Body)...), StatusCode: runtimeResp.StatusCode}, runtimeResp.Headers), nil
 }
 
 func (s *Service) prepareCodexRealtime(_ context.Context, req contract.RealtimeRequest, baseURL string) (contract.RealtimeSession, error) {
@@ -165,516 +217,8 @@ func (s *Service) prepareCodexRealtime(_ context.Context, req contract.RealtimeR
 	return contract.RealtimeSession{
 		URL:          wsURL,
 		Headers:      headers,
-		InitialFrame: codexRealtimeInitialFrame(req.RequestPayload, req.Mapping.UpstreamModelName),
+		InitialFrame: codexRealtimeInitialFrame(req),
 	}, nil
-}
-
-func codexResponsesPayload(req contract.ConversationRequest) (map[string]any, bool, error) {
-	payload, err := codexRawResponsesPayload(req)
-	if err != nil {
-		return nil, false, err
-	}
-	if payload == nil {
-		payload = codexCanonicalResponsesPayload(req)
-	}
-	codexApplyResponsesPayloadDefaults(req, payload)
-	return payload, codexResponsesPayloadStream(payload), nil
-}
-
-func codexRawResponsesPayload(req contract.ConversationRequest) (map[string]any, error) {
-	if !codexShouldUseRawResponsesPayload(req) {
-		return nil, nil
-	}
-	raw := bytes.TrimSpace(req.RawBody)
-	if len(raw) == 0 {
-		return nil, nil
-	}
-	var payload map[string]any
-	if err := json.Unmarshal(raw, &payload); err != nil {
-		return nil, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "invalid raw responses payload"}
-	}
-	return payload, nil
-}
-
-func codexShouldUseRawResponsesPayload(req contract.ConversationRequest) bool {
-	if !strings.EqualFold(strings.TrimSpace(req.SourceProtocol), "openai-compatible") {
-		return false
-	}
-	sourceEndpoint := strings.ToLower(strings.TrimSpace(req.SourceEndpoint))
-	return strings.HasSuffix(sourceEndpoint, "/responses") || strings.HasSuffix(sourceEndpoint, "/responses/compact")
-}
-
-func codexResponsesEndpoint(baseURL string, req contract.ConversationRequest) string {
-	endpoint := "/responses"
-	if codexResponsesCompactRequest(req) {
-		endpoint = "/responses/compact"
-	}
-	return strings.TrimRight(baseURL, "/") + endpoint
-}
-
-func codexResponsesCompactRequest(req contract.ConversationRequest) bool {
-	return strings.HasSuffix(strings.ToLower(strings.TrimSpace(req.SourceEndpoint)), "/responses/compact")
-}
-
-func codexCanonicalResponsesPayload(req contract.ConversationRequest) map[string]any {
-	payload := map[string]any{
-		"model":  req.Mapping.UpstreamModelName,
-		"input":  codexResponsesInput(req),
-		"stream": true,
-	}
-	if instructions := codexResponsesInstructions(req); instructions != "" {
-		payload["instructions"] = instructions
-	}
-	if len(req.Stop) > 0 {
-		payload["stop"] = cloneStrings(req.Stop)
-	}
-	if len(req.Tools) > 0 {
-		payload["tools"] = cloneMapSlice(req.Tools)
-	}
-	if req.ToolChoice != nil {
-		payload["tool_choice"] = cloneAny(req.ToolChoice)
-	}
-	if len(req.ResponseFormat) > 0 {
-		payload["text"] = map[string]any{"format": cloneMap(req.ResponseFormat)}
-	}
-	if len(req.Reasoning) > 0 {
-		payload["reasoning"] = cloneMap(req.Reasoning)
-	}
-	if promptCacheKey := requestSetting(req, "codex_prompt_cache_key", "prompt_cache_key"); promptCacheKey != "" {
-		payload["prompt_cache_key"] = promptCacheKey
-	}
-	return payload
-}
-
-func codexApplyResponsesPayloadDefaults(req contract.ConversationRequest, payload map[string]any) {
-	if payload == nil {
-		return
-	}
-	if model := strings.TrimSpace(req.Mapping.UpstreamModelName); model != "" {
-		payload["model"] = model
-	}
-	codexNormalizeResponsesInput(payload)
-	codexLiftInstructionInputItems(payload)
-	codexNormalizeResponsesText(payload)
-	codexNormalizeServiceTier(req, payload)
-	if !codexResponsesCompactRequest(req) {
-		payload["stream"] = true
-		payload["store"] = codexResponsesDefaultInternalStoreValue
-	}
-	for _, field := range codexUnsupportedResponsesFields() {
-		delete(payload, field)
-	}
-}
-
-func codexUnsupportedResponsesFields() []string {
-	return []string{
-		"frequency_penalty",
-		"max_completion_tokens",
-		"max_output_tokens",
-		"metadata",
-		"presence_penalty",
-		"prompt_cache_retention",
-		"response_format",
-		"safety_identifier",
-		"stream_options",
-		"temperature",
-		"top_p",
-		"user",
-	}
-}
-
-func codexResponsesPayloadStream(payload map[string]any) bool {
-	value, ok := payload["stream"].(bool)
-	return !ok || value
-}
-
-func codexNormalizeResponsesText(payload map[string]any) {
-	responseFormat, ok := payload["response_format"]
-	if !ok {
-		return
-	}
-	if _, hasText := payload["text"]; !hasText {
-		payload["text"] = map[string]any{"format": cloneAny(responseFormat)}
-	}
-}
-
-func codexNormalizeServiceTier(req contract.ConversationRequest, payload map[string]any) {
-	if value, ok := payload["service_tier"].(string); ok {
-		if strings.EqualFold(strings.TrimSpace(value), "fast") {
-			payload["service_tier"] = "priority"
-		}
-		return
-	}
-	if serviceTier := requestSetting(req, "codex_service_tier", "service_tier"); serviceTier != "" {
-		if strings.EqualFold(serviceTier, "fast") {
-			serviceTier = "priority"
-		}
-		payload["service_tier"] = serviceTier
-	}
-}
-
-func codexNormalizeResponsesInput(payload map[string]any) {
-	input, ok := payload["input"]
-	if !ok || input == nil {
-		payload["input"] = []any{}
-		return
-	}
-	switch typed := input.(type) {
-	case string:
-		payload["input"] = codexStringInputMessage(typed)
-	case []any:
-		out := make([]any, 0, len(typed))
-		for _, item := range typed {
-			out = append(out, codexNormalizeResponsesInputItem(item))
-		}
-		payload["input"] = out
-	}
-}
-
-func codexStringInputMessage(text string) []any {
-	text = strings.TrimSpace(text)
-	if text == "" {
-		return []any{}
-	}
-	return []any{map[string]any{
-		"type": "message",
-		"role": "user",
-		"content": []any{map[string]any{
-			"type": "input_text",
-			"text": text,
-		}},
-	}}
-}
-
-func codexNormalizeResponsesInputItem(item any) any {
-	object, ok := item.(map[string]any)
-	if !ok {
-		return item
-	}
-	out := cloneMap(object)
-	role := codexResponsesRole(codexStringValue(out["role"]))
-	if _, hasType := out["type"]; !hasType && codexStringValue(out["role"]) != "" {
-		out["type"] = "message"
-	}
-	if _, hasContent := out["content"]; hasContent {
-		out["content"] = codexNormalizeMessageContent(out["content"], role)
-	}
-	return out
-}
-
-func codexNormalizeMessageContent(content any, role string) any {
-	switch typed := content.(type) {
-	case string:
-		text := strings.TrimSpace(typed)
-		if text == "" {
-			return []any{}
-		}
-		return []any{map[string]any{
-			"type": codexMessageContentType(role),
-			"text": text,
-		}}
-	case []any:
-		out := make([]any, 0, len(typed))
-		for _, item := range typed {
-			part, ok := item.(map[string]any)
-			if !ok {
-				out = append(out, item)
-				continue
-			}
-			normalized := cloneMap(part)
-			if text, ok := normalized["text"]; ok {
-				normalized["text"] = codexInputItemText(text)
-			}
-			out = append(out, normalized)
-		}
-		return out
-	default:
-		return content
-	}
-}
-
-func codexMessageContentType(role string) string {
-	if codexResponsesRole(role) == "assistant" {
-		return "output_text"
-	}
-	return "input_text"
-}
-
-func codexLiftInstructionInputItems(payload map[string]any) {
-	input, ok := payload["input"].([]any)
-	if !ok {
-		return
-	}
-	instructions := []string{codexStringValue(payload["instructions"])}
-	kept := make([]any, 0, len(input))
-	for _, item := range input {
-		object, ok := item.(map[string]any)
-		if !ok {
-			kept = append(kept, item)
-			continue
-		}
-		role := codexResponsesRole(codexStringValue(object["role"]))
-		if role != "system" && role != "developer" {
-			kept = append(kept, item)
-			continue
-		}
-		if text := codexInputItemText(object["content"]); text != "" {
-			instructions = append(instructions, text)
-		}
-	}
-	payload["input"] = kept
-	if joined := strings.Join(uniqueTrimmedStrings(instructions), "\n"); joined != "" {
-		payload["instructions"] = joined
-	}
-}
-
-func codexInputItemText(value any) string {
-	switch typed := value.(type) {
-	case string:
-		return strings.TrimSpace(typed)
-	case []any:
-		parts := make([]string, 0, len(typed))
-		for _, item := range typed {
-			if text := codexInputItemText(item); text != "" {
-				parts = append(parts, text)
-			}
-		}
-		return strings.Join(parts, "\n")
-	case map[string]any:
-		if text := codexStringValue(typed["text"]); text != "" {
-			return text
-		}
-		return codexInputItemText(typed["content"])
-	default:
-		return ""
-	}
-}
-
-func codexStringValue(value any) string {
-	text, ok := value.(string)
-	if !ok {
-		return ""
-	}
-	return strings.TrimSpace(text)
-}
-
-func codexResponsesInput(req contract.ConversationRequest) []codexResponsesInputItem {
-	out := make([]codexResponsesInputItem, 0, len(req.Messages)+1)
-	for _, message := range req.Messages {
-		role := codexResponsesRole(message.Role)
-		if role == "system" || role == "developer" {
-			continue
-		}
-		items := codexResponsesInputItemsFromMessage(role, message.Parts)
-		if len(items) == 0 {
-			continue
-		}
-		out = append(out, items...)
-	}
-	if len(out) == 0 {
-		prompt := conversationPrompt(req)
-		if prompt == "" {
-			prompt = strings.TrimSpace(req.Instructions)
-		}
-		out = append(out, codexResponsesInputItem{
-			Type:    "message",
-			Role:    "user",
-			Content: []codexResponsesInputContent{{Type: "input_text", Text: prompt}},
-		})
-	}
-	return out
-}
-
-func codexResponsesInputItemsFromMessage(role string, parts []contract.ContentPart) []codexResponsesInputItem {
-	out := make([]codexResponsesInputItem, 0, 1)
-	messageContent := make([]codexResponsesInputContent, 0, len(parts))
-	flushMessage := func() {
-		if len(messageContent) == 0 {
-			return
-		}
-		out = append(out, codexResponsesInputItem{
-			Type:    "message",
-			Role:    role,
-			Content: messageContent,
-		})
-		messageContent = nil
-	}
-	for _, part := range parts {
-		switch part.Kind {
-		case contract.ContentPartToolUse:
-			item, ok := codexResponsesFunctionCallItem(part)
-			if !ok {
-				continue
-			}
-			flushMessage()
-			out = append(out, item)
-		case contract.ContentPartToolResult:
-			callID := strings.TrimSpace(firstNonEmpty(part.ToolResultForID, part.ToolCallID))
-			if callID == "" {
-				continue
-			}
-			itemType := codexResponsesToolResultType(part)
-			flushMessage()
-			out = append(out, codexResponsesInputItem{
-				Type:   itemType,
-				CallID: callID,
-				Output: part.Text,
-			})
-		case contract.ContentPartMetadata:
-			item, ok := codexResponsesRawInputItem(part)
-			if !ok {
-				continue
-			}
-			flushMessage()
-			out = append(out, item)
-		default:
-			if content, ok := codexResponsesInputContentFromPart(role, part); ok {
-				messageContent = append(messageContent, content)
-			}
-		}
-	}
-	flushMessage()
-	return out
-}
-
-func codexResponsesFunctionCallItem(part contract.ContentPart) (codexResponsesInputItem, bool) {
-	callID := strings.TrimSpace(part.ToolCallID)
-	name := strings.TrimSpace(part.ToolName)
-	arguments := part.ToolArgumentsJSON
-	if callID == "" && name == "" && strings.TrimSpace(arguments) == "" {
-		return codexResponsesInputItem{}, false
-	}
-	item := codexResponsesInputItem{
-		Type:   codexResponsesToolCallType(part),
-		CallID: callID,
-		Name:   name,
-	}
-	if codexResponsesToolCallArgumentsField(part) == "input" {
-		item.Input = arguments
-	} else {
-		item.Args = arguments
-	}
-	return item, true
-}
-
-func codexResponsesToolCallType(part contract.ContentPart) string {
-	itemType := strings.TrimSpace(metadataString(part.Metadata, "type"))
-	if codexResponsesToolCallTypeIsSupported(itemType) {
-		return itemType
-	}
-	return "function_call"
-}
-
-func codexResponsesToolResultType(part contract.ContentPart) string {
-	itemType := strings.TrimSpace(metadataString(part.Metadata, "type"))
-	switch itemType {
-	case "custom_tool_call_output", "mcp_tool_call_output", "tool_search_output":
-		return itemType
-	default:
-		return "function_call_output"
-	}
-}
-
-func codexResponsesToolCallArgumentsField(part contract.ContentPart) string {
-	if strings.TrimSpace(metadataString(part.Metadata, "arguments_field")) == "input" ||
-		codexResponsesToolCallType(part) == "custom_tool_call" {
-		return "input"
-	}
-	return "arguments"
-}
-
-func codexResponsesToolCallTypeIsSupported(itemType string) bool {
-	switch itemType {
-	case "function_call", "custom_tool_call", "mcp_tool_call", "tool_call", "local_shell_call", "tool_search_call":
-		return true
-	default:
-		return false
-	}
-}
-
-func codexResponsesRawInputItem(part contract.ContentPart) (codexResponsesInputItem, bool) {
-	if part.OriginProtocol != "openai-compatible" && part.OriginProtocol != "openai" {
-		return codexResponsesInputItem{}, false
-	}
-	var item map[string]any
-	if len(part.Raw) > 0 {
-		if err := json.Unmarshal(part.Raw, &item); err != nil {
-			return codexResponsesInputItem{}, false
-		}
-	} else {
-		item = cloneMap(part.Metadata)
-	}
-	itemType := strings.TrimSpace(codexStringValue(item["type"]))
-	if itemType == "" || itemType == "message" || itemType == "function_call" || itemType == "function_call_output" {
-		return codexResponsesInputItem{}, false
-	}
-	return codexResponsesInputItem{Raw: item}, true
-}
-
-func codexResponsesInputContentFromPart(role string, part contract.ContentPart) (codexResponsesInputContent, bool) {
-	switch part.Kind {
-	case "", contract.ContentPartText, contract.ContentPartThinking, contract.ContentPartRefusal:
-		if text := strings.TrimSpace(part.Text); text != "" {
-			return codexResponsesTextContent(role, text), true
-		}
-	case contract.ContentPartImage:
-		if url := mediaURLValue(part); url != "" {
-			return codexResponsesInputContent{Type: "input_image", ImageURL: url}, true
-		}
-		if fileID := strings.TrimSpace(part.FileID); fileID != "" {
-			return codexResponsesInputContent{Type: "input_image", FileID: fileID}, true
-		}
-		if text := strings.TrimSpace(part.Text); text != "" {
-			return codexResponsesTextContent(role, text), true
-		}
-	case contract.ContentPartFile:
-		if text := strings.TrimSpace(part.Text); text != "" {
-			return codexResponsesTextContent(role, text), true
-		}
-	default:
-		if text := strings.TrimSpace(part.Text); text != "" {
-			return codexResponsesTextContent(role, text), true
-		}
-	}
-	return codexResponsesInputContent{}, false
-}
-
-func codexResponsesTextContent(role string, text string) codexResponsesInputContent {
-	contentType := "input_text"
-	if role == "assistant" {
-		contentType = "output_text"
-	}
-	return codexResponsesInputContent{Type: contentType, Text: strings.TrimSpace(text)}
-}
-
-func codexResponsesRole(role string) string {
-	switch strings.ToLower(strings.TrimSpace(role)) {
-	case "assistant":
-		return "assistant"
-	case "system":
-		return "system"
-	case "developer":
-		return "developer"
-	default:
-		return "user"
-	}
-}
-
-func codexResponsesInstructions(req contract.ConversationRequest) string {
-	parts := make([]string, 0, len(req.Messages)+1)
-	if instructions := strings.TrimSpace(req.Instructions); instructions != "" {
-		parts = append(parts, instructions)
-	}
-	for _, message := range req.Messages {
-		role := codexResponsesRole(message.Role)
-		if role != "system" && role != "developer" {
-			continue
-		}
-		if content := conversationMessageText(message); content != "" {
-			parts = append(parts, content)
-		}
-	}
-	return strings.Join(uniqueTrimmedStrings(parts), "\n")
 }
 
 func codexResponsesHeaders(req contract.ConversationRequest, stream bool) http.Header {
@@ -687,7 +231,7 @@ func codexResponsesHeaders(req contract.ConversationRequest, stream bool) http.H
 		"Content-Type": {"application/json"},
 	}
 	headers.Set("OpenAI-Beta", codexResponsesBetaHeaderValue)
-	headers.Set("Originator", codexOriginator)
+	headers.Set("Originator", codexResponsesOriginator(req))
 	headers.Set("User-Agent", codexUserAgent(req))
 	if accountID := requestSetting(req, "chatgpt_account_id", "account_id"); accountID != "" {
 		headers.Set("ChatGPT-Account-ID", accountID)
@@ -716,11 +260,63 @@ func codexResponsesHeaders(req contract.ConversationRequest, stream bool) http.H
 	return headers
 }
 
+func codexResponseInputItemsHeaders(req contract.ResponseInputItemsRequest) http.Header {
+	headers := http.Header{
+		"Accept": {"application/json"},
+	}
+	headers.Set("OpenAI-Beta", codexResponsesBetaHeaderValue)
+	headers.Set("Originator", codexResponseInputItemsOriginator(req))
+	headers.Set("User-Agent", codexResponseInputItemsUserAgent(req))
+	if accountID := responseInputItemsSetting(req, "chatgpt_account_id", "account_id"); accountID != "" {
+		headers.Set("ChatGPT-Account-ID", accountID)
+	}
+	if betaFeatures := responseInputItemsSetting(req, "codex_beta_features", "x_codex_beta_features", "X-Codex-Beta-Features"); betaFeatures != "" {
+		headers.Set("X-Codex-Beta-Features", betaFeatures)
+	}
+	if version := responseInputItemsSetting(req, "codex_version", "version", "Version"); version != "" {
+		headers.Set("Version", version)
+	} else {
+		headers.Set("Version", codexDefaultVersion)
+	}
+	if requestID := responseInputItemsSetting(req, "codex_client_request_id", "x_client_request_id", "X-Client-Request-Id"); requestID != "" {
+		headers.Set("X-Client-Request-Id", requestID)
+	} else if strings.TrimSpace(req.RequestID) != "" {
+		headers.Set("X-Client-Request-Id", strings.TrimSpace(req.RequestID))
+	}
+	if sessionID := responseInputItemsSetting(req, "codex_session_id", "session_id", "Session_id"); sessionID != "" {
+		headers.Set("Session_id", sessionID)
+	} else if req.Account.ID > 0 {
+		headers.Set("Session_id", codexDefaultAccountSessionID(req.Account.ID))
+	}
+	return headers
+}
+
 func codexUserAgent(req contract.ConversationRequest) string {
 	if userAgent := requestSetting(req, "user_agent"); userAgent != "" {
 		return userAgent
 	}
 	return codexDefaultUserAgent
+}
+
+func codexResponseInputItemsUserAgent(req contract.ResponseInputItemsRequest) string {
+	if userAgent := responseInputItemsSetting(req, "user_agent"); userAgent != "" {
+		return userAgent
+	}
+	return codexDefaultUserAgent
+}
+
+func codexResponsesOriginator(req contract.ConversationRequest) string {
+	if originator := requestSetting(req, "codex_originator", "originator"); originator != "" {
+		return originator
+	}
+	return codexOriginator
+}
+
+func codexResponseInputItemsOriginator(req contract.ResponseInputItemsRequest) string {
+	if originator := responseInputItemsSetting(req, "codex_originator", "originator"); originator != "" {
+		return originator
+	}
+	return codexOriginator
 }
 
 func codexDefaultAccountSessionID(accountID int) string {
@@ -738,6 +334,10 @@ func codexRealtimeRuntimeIsAPIKey(req contract.RealtimeRequest) bool {
 	return strings.EqualFold(strings.TrimSpace(string(req.Account.RuntimeClass)), "api_key")
 }
 
+func codexResponseInputItemsRuntimeIsAPIKey(req contract.ResponseInputItemsRequest) bool {
+	return strings.EqualFold(strings.TrimSpace(string(req.Account.RuntimeClass)), "api_key")
+}
+
 func codexReverseProxyAccount(req contract.ConversationRequest) reverseproxycontract.AccountRuntime {
 	return reverseproxycontract.AccountRuntime{
 		AccountID:      req.Account.ID,
@@ -750,11 +350,22 @@ func codexReverseProxyAccount(req contract.ConversationRequest) reverseproxycont
 	}
 }
 
+func responseInputItemsSetting(req contract.ResponseInputItemsRequest, keys ...string) string {
+	for _, values := range []map[string]any{req.Credential, req.Account.Metadata, req.Provider.ConfigSchema, req.Provider.Capabilities} {
+		for _, key := range keys {
+			if value := mapString(values, key); value != "" {
+				return value
+			}
+		}
+	}
+	return ""
+}
+
 func codexRealtimeHeaders(req contract.RealtimeRequest) http.Header {
 	headers := http.Header{
 		"OpenAI-Beta": {codexResponsesWebsocketBetaHeaderValue},
 	}
-	headers.Set("Originator", codexOriginator)
+	headers.Set("Originator", codexRealtimeOriginator(req))
 	if accountID := realtimeSetting(req, "chatgpt_account_id", "account_id"); accountID != "" {
 		headers.Set("ChatGPT-Account-ID", accountID)
 	}
@@ -783,28 +394,40 @@ func codexRealtimeHeaders(req contract.RealtimeRequest) http.Header {
 	return headers
 }
 
-func codexRealtimeInitialFrame(payload []byte, upstreamModel string) []byte {
-	var object map[string]json.RawMessage
-	if err := json.Unmarshal(bytes.TrimSpace(payload), &object); err != nil {
-		return append([]byte(nil), payload...)
+func codexRealtimeOriginator(req contract.RealtimeRequest) string {
+	if originator := realtimeSetting(req, "codex_originator", "originator"); originator != "" {
+		return originator
 	}
-	encodedType, err := json.Marshal("response.create")
+	return codexOriginator
+}
+
+func codexRealtimeInitialFrame(req contract.RealtimeRequest) []byte {
+	var payload map[string]any
+	if err := json.Unmarshal(bytes.TrimSpace(req.RequestPayload), &payload); err != nil {
+		return append([]byte(nil), req.RequestPayload...)
+	}
+	codexApplyResponsesPayloadDefaults(codexRealtimeConversationRequest(req), payload)
+	delete(payload, "background")
+	payload["type"] = "response.create"
+	encoded, err := json.Marshal(payload)
 	if err != nil {
-		return append([]byte(nil), payload...)
-	}
-	object["type"] = encodedType
-	if model := strings.TrimSpace(upstreamModel); model != "" {
-		encodedModel, err := json.Marshal(model)
-		if err != nil {
-			return append([]byte(nil), payload...)
-		}
-		object["model"] = encodedModel
-	}
-	encoded, err := json.Marshal(object)
-	if err != nil {
-		return append([]byte(nil), payload...)
+		return append([]byte(nil), req.RequestPayload...)
 	}
 	return encoded
+}
+
+func codexRealtimeConversationRequest(req contract.RealtimeRequest) contract.ConversationRequest {
+	return contract.ConversationRequest{
+		RequestID:      req.RequestID,
+		SourceProtocol: req.SourceProtocol,
+		SourceEndpoint: req.SourceEndpoint,
+		Model:          req.Model,
+		RawBody:        append([]byte(nil), req.RequestPayload...),
+		Provider:       req.Provider,
+		Account:        req.Account,
+		Mapping:        req.Mapping,
+		Credential:     req.Credential,
+	}
 }
 
 func codexResponsesWebSocketURL(rawURL string) (string, error) {

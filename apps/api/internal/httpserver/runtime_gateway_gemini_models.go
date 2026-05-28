@@ -3,6 +3,7 @@ package httpserver
 import (
 	"errors"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -12,7 +13,7 @@ import (
 )
 
 func (s *Server) handleListGeminiModels(w http.ResponseWriter, r *http.Request) {
-	authed, err := s.requireGatewayKey(r)
+	authed, err := s.requireGeminiGatewayKey(r)
 	if err != nil {
 		writeGeminiGatewayAuthError(w, err)
 		return
@@ -35,6 +36,41 @@ func (s *Server) handleListGeminiModels(w http.ResponseWriter, r *http.Request) 
 		resp.NextPageToken = &nextToken
 	}
 	writeJSONAny(w, http.StatusOK, resp)
+}
+
+func (s *Server) handleGetGeminiModel(w http.ResponseWriter, r *http.Request) {
+	authed, err := s.requireGeminiGatewayKey(r)
+	if err != nil {
+		writeGeminiGatewayAuthError(w, err)
+		return
+	}
+	modelRef, err := geminiModelNameFromPath(r.URL.EscapedPath())
+	if err != nil {
+		writeGeminiGatewayError(w, http.StatusBadRequest, "INVALID_ARGUMENT", err.Error())
+		return
+	}
+	modelResolution, err := s.runtime.models.ResolveModelReference(r.Context(), modelRef)
+	if err != nil || modelResolution.Model.Status != modelcontract.StatusActive {
+		writeGeminiGatewayError(w, http.StatusNotFound, "NOT_FOUND", "model not found")
+		return
+	}
+	if !apiKeyAllowsModelReference(authed.Key.AllowedModels, modelResolution) {
+		writeGeminiGatewayError(w, http.StatusForbidden, "PERMISSION_DENIED", "model not allowed for this api key")
+		return
+	}
+	writeJSONAny(w, http.StatusOK, geminiModelInfo(modelResolution.Model))
+}
+
+func geminiModelNameFromPath(escapedPath string) (string, error) {
+	raw := strings.TrimPrefix(escapedPath, "/v1beta/models/")
+	if raw == escapedPath || strings.TrimSpace(raw) == "" {
+		return "", errors.New("model is required")
+	}
+	name, err := url.PathUnescape(raw)
+	if err != nil || strings.TrimSpace(name) == "" {
+		return "", errors.New("model is invalid")
+	}
+	return strings.TrimPrefix(strings.TrimSpace(name), "models/"), nil
 }
 
 func geminiModelListPagination(r *http.Request) (int, int, error) {

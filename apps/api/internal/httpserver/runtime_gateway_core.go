@@ -51,6 +51,9 @@ type gatewayUsageRecord struct {
 	UsageEstimated        bool
 	Pricing               gatewayPricingEvidence
 	CompatibilityWarnings []string
+	ProviderQuotaSignals  []provideradaptercontract.QuotaSignal
+	ProviderRetryAfter    *time.Time
+	ProviderErrorMessage  string
 	QualityPrompt         string
 	QualityOutput         string
 	FeedbackID            int
@@ -1370,6 +1373,21 @@ func (rt *runtimeState) invokeProviderTokenCount(ctx context.Context, req provid
 	return resp, nil
 }
 
+func (rt *runtimeState) invokeProviderResponseInputItems(ctx context.Context, req provideradaptercontract.ResponseInputItemsRequest) (provideradaptercontract.ResponseInputItemsResponse, error) {
+	dispatch, err := rt.prepareProviderDispatch(ctx, &req.Account)
+	if err != nil {
+		return provideradaptercontract.ResponseInputItemsResponse{}, err
+	}
+	defer rt.releaseProviderAccountConcurrency(dispatch.concurrencyLease)
+	req.Credential = dispatch.credential
+	resp, err := rt.adapters.InvokeResponseInputItems(ctx, req)
+	if err != nil {
+		rt.applyProviderAccountProtection(ctx, req.Account, err)
+		return provideradaptercontract.ResponseInputItemsResponse{}, err
+	}
+	return resp, nil
+}
+
 func (rt *runtimeState) invokeProviderEmbeddings(ctx context.Context, req provideradaptercontract.EmbeddingRequest) (provideradaptercontract.EmbeddingResponse, error) {
 	dispatch, err := rt.prepareProviderDispatch(ctx, &req.Account)
 	if err != nil {
@@ -1579,6 +1597,9 @@ func (rt *runtimeState) applyProviderAccountProtection(ctx context.Context, acco
 	}
 	var providerErr provideradaptercontract.ProviderError
 	if !errors.As(err, &providerErr) {
+		return
+	}
+	if !gatewayAccountFailureStatusHandled(account.Metadata, &providerErr.StatusCode) {
 		return
 	}
 	nextStatus, ok := reverseProxyAccountFailureStatus(providerErr.Class)
@@ -1983,7 +2004,7 @@ func gatewayErrorTypeForProviderClass(errorClass string) apiopenapi.GatewayError
 		return apiopenapi.RateLimitError
 	case "auth_failed", "auth_error", "permission_denied", "session_invalid", "account_locked", "account_banned", "abuse_detected", "device_unrecognized":
 		return apiopenapi.PermissionError
-	case "timeout", "network_error", "stream_interrupted", "no_available_account":
+	case "timeout", "network_error", "configuration_error", "stream_interrupted", "no_available_account", "overloaded":
 		return apiopenapi.ServiceUnavailableError
 	default:
 		return apiopenapi.UpstreamError
@@ -1994,6 +2015,8 @@ func providerGatewayHTTPStatus(upstreamStatus int) int {
 	switch upstreamStatus {
 	case http.StatusTooManyRequests:
 		return http.StatusTooManyRequests
+	case 529:
+		return http.StatusServiceUnavailable
 	case http.StatusUnauthorized, http.StatusForbidden:
 		return http.StatusBadGateway
 	case http.StatusBadRequest:
@@ -2020,12 +2043,16 @@ func providerGatewayMessage(errorClass string) string {
 		return "provider account concurrency limit exceeded"
 	case "auth_failed", "auth_error", "credential_error":
 		return "provider authentication failed"
+	case "configuration_error":
+		return "provider configuration unavailable"
 	case "invalid_request":
 		return "provider rejected request"
 	case "model_unavailable":
 		return "provider model unavailable"
 	case "provider_5xx":
 		return "provider service error"
+	case "overloaded":
+		return "provider overloaded"
 	case "session_invalid":
 		return "provider session invalid"
 	case "account_locked":

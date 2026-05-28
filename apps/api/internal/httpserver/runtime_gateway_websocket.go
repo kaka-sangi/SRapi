@@ -99,6 +99,7 @@ func (s *Server) handleResponsesWebSocket(w http.ResponseWriter, r *http.Request
 		conn.SetReadLimit(s.cfg.Gateway.MaxBodySize)
 	}
 
+	var lastTurn responsesWebSocketTurnState
 	for {
 		messageType, payload, err := conn.Read(r.Context())
 		if err != nil {
@@ -130,6 +131,13 @@ func (s *Server) handleResponsesWebSocket(w http.ResponseWriter, r *http.Request
 			}
 			continue
 		}
+		requestPayload, err = responsesWebSocketInferPreviousResponseID(requestPayload, lastTurn)
+		if err != nil {
+			if err := writeResponsesWebSocketError(r.Context(), conn, http.StatusBadRequest, "invalid_request", err.Error(), nil); err != nil {
+				return
+			}
+			continue
+		}
 		if err := s.runtime.gateway.ValidateResponsesRequest(requestPayload); err != nil {
 			if err := writeResponsesWebSocketError(r.Context(), conn, http.StatusBadRequest, "invalid_request", err.Error(), nil); err != nil {
 				return
@@ -137,7 +145,7 @@ func (s *Server) handleResponsesWebSocket(w http.ResponseWriter, r *http.Request
 			continue
 		}
 		if s.shouldUseCodexWebSocketRelay(r, requestPayload) {
-			relayed, err := s.relayCodexResponsesWebSocket(r, conn, requestPayload, authed)
+			relayed, turnState, err := s.relayCodexResponsesWebSocket(r, conn, requestPayload, authed)
 			if err != nil {
 				status, code, message := responsesWebSocketRelayError(err)
 				if err := writeResponsesWebSocketError(r.Context(), conn, status, code, message, nil); err != nil {
@@ -146,7 +154,10 @@ func (s *Server) handleResponsesWebSocket(w http.ResponseWriter, r *http.Request
 				continue
 			}
 			if relayed {
-				return
+				if turnState.ResponseID != "" {
+					lastTurn = turnState
+				}
+				continue
 			}
 		}
 
@@ -157,8 +168,12 @@ func (s *Server) handleResponsesWebSocket(w http.ResponseWriter, r *http.Request
 			}
 			continue
 		}
-		if err := writeCapturedResponsesWebSocket(r.Context(), conn, captured); err != nil {
+		turnState, err := writeCapturedResponsesWebSocket(r.Context(), conn, captured)
+		if err != nil {
 			return
+		}
+		if turnState.ResponseID != "" {
+			lastTurn = turnState
 		}
 	}
 }
@@ -244,7 +259,7 @@ func (s *Server) handleRealtimeWebSocket(w http.ResponseWriter, r *http.Request)
 	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
 	result, err := s.runtime.scheduleGatewayRequest(r.Context(), scheduleReq, modelResolution.Model.ID, gatewayForcedProviderKey(r.Context()), authed.Key)
 	if err != nil {
-		s.runtime.recordGatewayUsage(r.Context(), responsesWebSocketUsageRecord(authed, canonical, result, nil, false, "no_available_account", http.StatusServiceUnavailable, elapsedMillis(startedAt), admission, nil))
+		s.runtime.recordGatewayUsage(r.Context(), responsesWebSocketUsageRecord(authed, canonical, result, nil, false, "no_available_account", http.StatusServiceUnavailable, elapsedMillis(startedAt), admission, nil, ""))
 		writeGatewayError(w, http.StatusServiceUnavailable, apiopenapi.ServiceUnavailableError, "no available provider account", "no_available_account")
 		return
 	}
@@ -255,7 +270,7 @@ func (s *Server) handleRealtimeWebSocket(w http.ResponseWriter, r *http.Request)
 	session, credential, err := s.runtime.prepareProviderRealtime(r.Context(), providerRealtimeRequest(canonical, result.Candidate, nil, realtimeWebSocketHeaders(r)))
 	if err != nil {
 		errorClass, upstreamStatus, _ := providerGatewayError(err)
-		s.runtime.recordGatewayUsage(r.Context(), responsesWebSocketUsageRecord(authed, canonical, result, &result.Candidate, false, errorClass, upstreamStatus, elapsedMillis(startedAt), admission, nil))
+		s.runtime.recordGatewayUsage(r.Context(), responsesWebSocketUsageRecord(authed, canonical, result, &result.Candidate, false, errorClass, upstreamStatus, elapsedMillis(startedAt), admission, nil, providerErrorMessage(err)))
 		writeGatewayError(w, providerStatusFromError(err), gatewayErrorTypeForProviderClass(errorClass), providerGatewayMessage(errorClass), errorClass)
 		return
 	}
@@ -273,7 +288,7 @@ func (s *Server) handleRealtimeWebSocket(w http.ResponseWriter, r *http.Request)
 		conn.SetReadLimit(s.cfg.Gateway.MaxBodySize)
 	}
 	success, errorClass, statusCode := s.relayRealtimeWebSocket(r.Context(), conn, session)
-	s.runtime.recordGatewayUsage(r.Context(), responsesWebSocketUsageRecord(authed, canonical, result, &result.Candidate, success, errorClass, statusCode, elapsedMillis(startedAt), admission, nil))
+	s.runtime.recordGatewayUsage(r.Context(), responsesWebSocketUsageRecord(authed, canonical, result, &result.Candidate, success, errorClass, statusCode, elapsedMillis(startedAt), admission, nil, ""))
 }
 
 func (s *Server) acquireRealtimeWebSocketSlot(ctx context.Context, r *http.Request, authed apikeycontract.AuthResult) (realtimecontract.Slot, error) {
@@ -333,10 +348,16 @@ func (s *Server) relayRealtimeWebSocket(ctx context.Context, conn *websocket.Con
 					case result := <-relayDoneCh:
 						relayResult = &result
 					case <-ctx.Done():
+						if forwardedUpstreamMessage {
+							return true, "", http.StatusOK
+						}
 						return false, "client_closed", statusClientClosedRequest
 					}
 				}
 				if relayResult != nil && relayResult.err != nil {
+					if forwardedUpstreamMessage {
+						return true, "", http.StatusOK
+					}
 					return false, errorClassName(relayResult.err), providerStatusFromError(relayResult.err)
 				}
 				return true, "", http.StatusOK
@@ -347,6 +368,9 @@ func (s *Server) relayRealtimeWebSocket(ctx context.Context, conn *websocket.Con
 			}
 			if err := conn.Write(ctx, messageType, msg.Data); err != nil {
 				cancelRelay()
+				if forwardedUpstreamMessage {
+					return true, "", http.StatusOK
+				}
 				return false, "client_closed", statusClientClosedRequest
 			}
 			forwardedUpstreamMessage = true
@@ -367,6 +391,9 @@ func (s *Server) relayRealtimeWebSocket(ctx context.Context, conn *websocket.Con
 				}
 			}
 			if relayResult != nil && relayResult.err != nil {
+				if forwardedUpstreamMessage {
+					return true, "", http.StatusOK
+				}
 				return false, errorClassName(relayResult.err), providerStatusFromError(relayResult.err)
 			}
 			return true, "", http.StatusOK
@@ -375,10 +402,16 @@ func (s *Server) relayRealtimeWebSocket(ctx context.Context, conn *websocket.Con
 			relayDoneCh = nil
 			if relayResult.err != nil {
 				cancelRelay()
+				if forwardedUpstreamMessage {
+					return true, "", http.StatusOK
+				}
 				return false, errorClassName(relayResult.err), providerStatusFromError(relayResult.err)
 			}
 		case <-ctx.Done():
 			cancelRelay()
+			if forwardedUpstreamMessage {
+				return true, "", http.StatusOK
+			}
 			return false, "client_closed", statusClientClosedRequest
 		}
 	}
@@ -420,13 +453,20 @@ func (s *Server) relayOfficialAPIKeyRealtimeWebSocket(ctx context.Context, conn 
 
 	clientDone := make(chan error, 1)
 	upstreamDone := make(chan realtimeDirectRelayResult, 1)
+	upstreamForwarded := make(chan struct{}, 1)
+	forwardedUpstreamMessage := false
 	go relayWebSocketClientToUpstream(ctx, conn, upstream, clientDone)
-	go relayWebSocketUpstreamToClient(ctx, upstream, conn, upstreamDone)
+	go relayWebSocketUpstreamToClient(ctx, upstream, conn, upstreamDone, upstreamForwarded)
 	for {
 		select {
+		case <-upstreamForwarded:
+			forwardedUpstreamMessage = true
 		case result := <-upstreamDone:
+			if result.forwarded {
+				forwardedUpstreamMessage = true
+			}
 			if result.err != nil {
-				if result.forwarded {
+				if forwardedUpstreamMessage {
 					return true, "", http.StatusOK
 				}
 				return false, realtimeWebSocketRelayErrorClass(ctx, result.err), realtimeWebSocketRelayStatus(ctx, result.err)
@@ -435,11 +475,17 @@ func (s *Server) relayOfficialAPIKeyRealtimeWebSocket(ctx context.Context, conn 
 		case err := <-clientDone:
 			upstream.Close(websocket.StatusNormalClosure, "")
 			if err != nil {
+				if forwardedUpstreamMessage {
+					return true, "", http.StatusOK
+				}
 				return false, "client_closed", statusClientClosedRequest
 			}
 			return true, "", http.StatusOK
 		case <-ctx.Done():
 			upstream.Close(websocket.StatusNormalClosure, "")
+			if forwardedUpstreamMessage {
+				return true, "", http.StatusOK
+			}
 			return false, "client_closed", statusClientClosedRequest
 		}
 	}
@@ -472,7 +518,7 @@ func relayWebSocketClientToUpstream(ctx context.Context, client *websocket.Conn,
 	}
 }
 
-func relayWebSocketUpstreamToClient(ctx context.Context, upstream *websocket.Conn, client *websocket.Conn, done chan<- realtimeDirectRelayResult) {
+func relayWebSocketUpstreamToClient(ctx context.Context, upstream *websocket.Conn, client *websocket.Conn, done chan<- realtimeDirectRelayResult, forwardedOnce chan<- struct{}) {
 	forwarded := false
 	for {
 		messageType, payload, err := upstream.Read(ctx)
@@ -491,6 +537,12 @@ func relayWebSocketUpstreamToClient(ctx context.Context, upstream *websocket.Con
 		if err := client.Write(ctx, messageType, payload); err != nil {
 			done <- realtimeDirectRelayResult{err: err, forwarded: forwarded}
 			return
+		}
+		if !forwarded {
+			select {
+			case forwardedOnce <- struct{}{}:
+			default:
+			}
 		}
 		forwarded = true
 	}
@@ -592,22 +644,22 @@ func responsesWebSocketRelayRequested(r *http.Request) bool {
 	))
 }
 
-func (s *Server) relayCodexResponsesWebSocket(r *http.Request, conn *websocket.Conn, payload []byte, authed apikeycontract.AuthResult) (bool, error) {
+func (s *Server) relayCodexResponsesWebSocket(r *http.Request, conn *websocket.Conn, payload []byte, authed apikeycontract.AuthResult) (bool, responsesWebSocketTurnState, error) {
 	startedAt := time.Now()
 	requestID := requestIDFromContext(r.Context())
 	sourceEndpoint := responsesWebSocketSourceEndpoint
 	modelName := responsesWebSocketPayloadModel(payload, r.URL.Query().Get("model"))
 	modelResolution, err := s.runtime.models.ResolveModelReference(r.Context(), modelName)
 	if err != nil {
-		return false, err
+		return false, responsesWebSocketTurnState{}, err
 	}
 	model := modelResolution.Model
 	if !apiKeyAllowsModelReference(authed.Key.AllowedModels, modelResolution) {
-		return false, errors.New("model not allowed for this api key")
+		return false, responsesWebSocketTurnState{}, errors.New("model not allowed for this api key")
 	}
 	body, err := responsesWebSocketOpenAPIRequest(payload)
 	if err != nil {
-		return false, err
+		return false, responsesWebSocketTurnState{}, err
 	}
 	if strings.TrimSpace(body.Model) == "" {
 		body.Model = modelName
@@ -621,30 +673,30 @@ func (s *Server) relayCodexResponsesWebSocket(r *http.Request, conn *websocket.C
 	})
 	admission, err := s.runtime.prepareGatewayAdmission(r.Context(), &canonical, modelResolution, model.ID)
 	if err != nil {
-		return false, err
+		return false, responsesWebSocketTurnState{}, err
 	}
 	if !admission.Entitlement.Allowed {
-		return false, errors.New(gatewayEntitlementMessage(gatewayEntitlementErrorClass(admission.Entitlement)))
+		return false, responsesWebSocketTurnState{}, errors.New(gatewayEntitlementMessage(gatewayEntitlementErrorClass(admission.Entitlement)))
 	}
 	scheduleReq := gatewayScheduleRequest(r, canonical, modelResolution)
 	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
 	result, err := s.runtime.scheduleGatewayRequest(r.Context(), scheduleReq, model.ID, gatewayForcedProviderKey(r.Context()), authed.Key)
 	if err != nil {
-		s.runtime.recordGatewayUsage(r.Context(), responsesWebSocketUsageRecord(authed, canonical, result, nil, false, "no_available_account", http.StatusServiceUnavailable, elapsedMillis(startedAt), admission, nil))
-		return false, err
+		s.runtime.recordGatewayUsage(r.Context(), responsesWebSocketUsageRecord(authed, canonical, result, nil, false, "no_available_account", http.StatusServiceUnavailable, elapsedMillis(startedAt), admission, nil, ""))
+		return false, responsesWebSocketTurnState{}, err
 	}
 	if !strings.EqualFold(strings.TrimSpace(result.Candidate.Provider.AdapterType), "reverse-proxy-codex-cli") || !accountCodexWebSocketEnabled(result.Candidate.Account.Metadata) {
-		s.runtime.recordGatewayUsage(r.Context(), responsesWebSocketUsageRecord(authed, canonical, result, &result.Candidate, false, "invalid_request", http.StatusBadRequest, elapsedMillis(startedAt), admission, nil))
-		return true, errors.New("selected account does not support Codex Responses WebSocket reverse proxy")
+		s.runtime.recordGatewayUsage(r.Context(), responsesWebSocketUsageRecord(authed, canonical, result, &result.Candidate, false, "invalid_request", http.StatusBadRequest, elapsedMillis(startedAt), admission, nil, ""))
+		return true, responsesWebSocketTurnState{}, errors.New("selected account does not support Codex Responses WebSocket reverse proxy")
 	}
 	if err := s.reserveGatewayAccountQuotaForScheduledRequest(r.Context(), r, authed, canonical, result, admission, startedAt); err != nil {
-		return true, err
+		return true, responsesWebSocketTurnState{}, err
 	}
 	session, credential, err := s.runtime.prepareProviderRealtime(r.Context(), providerRealtimeRequest(canonical, result.Candidate, payload))
 	if err != nil {
 		errorClass, upstreamStatus, _ := providerGatewayError(err)
-		s.runtime.recordGatewayUsage(r.Context(), responsesWebSocketUsageRecord(authed, canonical, result, &result.Candidate, false, errorClass, upstreamStatus, elapsedMillis(startedAt), admission, nil))
-		return true, err
+		s.runtime.recordGatewayUsage(r.Context(), responsesWebSocketUsageRecord(authed, canonical, result, &result.Candidate, false, errorClass, upstreamStatus, elapsedMillis(startedAt), admission, nil, providerErrorMessage(err)))
+		return true, responsesWebSocketTurnState{}, err
 	}
 	session.Account.Credential = credential
 	clientToUpstream := make(chan reverseproxycontract.WebSocketMessage, 32)
@@ -664,12 +716,12 @@ func (s *Server) relayCodexResponsesWebSocket(r *http.Request, conn *websocket.C
 	}()
 	clientToUpstream <- reverseproxycontract.WebSocketMessage{Type: reverseproxycontract.WebSocketMessageText, Data: session.InitialFrame}
 	close(clientToUpstream)
-	success, errorClass, statusCode, usage, terminalForwarded := s.bridgeResponsesWebSocketRelay(r.Context(), conn, upstreamToClient, relayDone)
-	s.runtime.recordGatewayUsage(r.Context(), responsesWebSocketUsageRecord(authed, canonical, result, &result.Candidate, success, errorClass, statusCode, elapsedMillis(startedAt), admission, usage))
+	success, errorClass, statusCode, usage, terminalForwarded, turnState := s.bridgeResponsesWebSocketRelay(r.Context(), conn, upstreamToClient, relayDone)
+	s.runtime.recordGatewayUsage(r.Context(), responsesWebSocketUsageRecord(authed, canonical, result, &result.Candidate, success, errorClass, statusCode, elapsedMillis(startedAt), admission, usage, ""))
 	if !success && errorClass != "client_closed" && !terminalForwarded {
-		return true, provideradaptercontract.ProviderError{Class: errorClass, StatusCode: statusCode, Message: providerGatewayMessage(errorClass)}
+		return true, turnState, provideradaptercontract.ProviderError{Class: errorClass, StatusCode: statusCode, Message: providerGatewayMessage(errorClass)}
 	}
-	return true, nil
+	return true, turnState, nil
 }
 
 func responsesWebSocketRelayError(err error) (int, string, string) {
@@ -693,8 +745,9 @@ type providerRealtimeSession struct {
 	Account      reverseproxycontract.AccountRuntime
 }
 
-func (s *Server) bridgeResponsesWebSocketRelay(ctx context.Context, conn *websocket.Conn, upstreamToClient <-chan reverseproxycontract.WebSocketMessage, relayDone <-chan responsesWebSocketRelayResult) (bool, string, int, *gatewaycontract.Usage, bool) {
+func (s *Server) bridgeResponsesWebSocketRelay(ctx context.Context, conn *websocket.Conn, upstreamToClient <-chan reverseproxycontract.WebSocketMessage, relayDone <-chan responsesWebSocketRelayResult) (bool, string, int, *gatewaycontract.Usage, bool, responsesWebSocketTurnState) {
 	var usage *gatewaycontract.Usage
+	var turnState responsesWebSocketTurnState
 	relayDoneCh := relayDone
 	var relayResult *responsesWebSocketRelayResult
 	for {
@@ -706,36 +759,37 @@ func (s *Server) bridgeResponsesWebSocketRelay(ctx context.Context, conn *websoc
 					case result := <-relayDoneCh:
 						relayResult = &result
 					case <-ctx.Done():
-						return false, "client_closed", statusClientClosedRequest, usage, false
+						return false, "client_closed", statusClientClosedRequest, usage, false, turnState
 					}
 				}
 				if relayResult != nil && relayResult.err != nil {
-					return false, errorClassName(relayResult.err), providerStatusFromError(relayResult.err), usage, false
+					return false, errorClassName(relayResult.err), providerStatusFromError(relayResult.err), usage, false, turnState
 				}
-				return true, "", http.StatusOK, usage, false
+				return true, "", http.StatusOK, usage, false, turnState
 			}
 			if msg.Type != reverseproxycontract.WebSocketMessageText {
 				continue
 			}
+			turnState.merge(responsesWebSocketTurnStateFromEvent(msg.Data))
 			if eventUsage, ok := responsesWebSocketUsage(msg.Data); ok {
 				usage = &eventUsage
 			}
 			if err := conn.Write(ctx, websocket.MessageText, msg.Data); err != nil {
-				return false, "client_closed", statusClientClosedRequest, usage, false
+				return false, "client_closed", statusClientClosedRequest, usage, false, turnState
 			}
 			if terminal, success, errorClass, statusCode := responsesWebSocketTerminal(msg.Data); terminal {
-				return success, errorClass, statusCode, usage, true
+				return success, errorClass, statusCode, usage, true, turnState
 			}
 		case result := <-relayDoneCh:
 			relayResult = &result
 			relayDoneCh = nil
 		case <-ctx.Done():
-			return false, "client_closed", statusClientClosedRequest, usage, false
+			return false, "client_closed", statusClientClosedRequest, usage, false, turnState
 		}
 	}
 }
 
-func responsesWebSocketUsageRecord(authed apikeycontract.AuthResult, canonical gatewaycontract.CanonicalRequest, result schedulercontract.ScheduleResult, candidate *schedulercontract.Candidate, success bool, errorClass string, statusCode int, latencyMS int, admission gatewayAdmission, usage *gatewaycontract.Usage) gatewayUsageRecord {
+func responsesWebSocketUsageRecord(authed apikeycontract.AuthResult, canonical gatewaycontract.CanonicalRequest, result schedulercontract.ScheduleResult, candidate *schedulercontract.Candidate, success bool, errorClass string, statusCode int, latencyMS int, admission gatewayAdmission, usage *gatewaycontract.Usage, providerMessage string) gatewayUsageRecord {
 	recordUsage := admission.EstimatedUsage
 	estimated := true
 	if usage != nil {
@@ -759,6 +813,7 @@ func responsesWebSocketUsageRecord(authed apikeycontract.AuthResult, canonical g
 		UsageEstimated:        estimated,
 		Pricing:               admission.Pricing,
 		CompatibilityWarnings: canonical.CompatibilityWarnings,
+		ProviderErrorMessage:  providerMessage,
 	}
 	if errorClass != "" {
 		rec.ErrorClass = ptrStringValue(errorClass)
@@ -1012,10 +1067,17 @@ func responsesWebSocketRequestPayload(payload []byte, fallbackModel string) ([]b
 		if len(bytes.TrimSpace(raw)) == 0 {
 			raw = object["request"]
 		}
-		if len(bytes.TrimSpace(raw)) == 0 {
-			return nil, errors.New("response.create event must include a response request")
+		if len(bytes.TrimSpace(raw)) > 0 {
+			requestPayload = raw
+		} else {
+			delete(object, "type")
+			delete(object, "event_id")
+			flatPayload, err := json.Marshal(object)
+			if err != nil {
+				return nil, err
+			}
+			requestPayload = flatPayload
 		}
-		requestPayload = raw
 	}
 	return injectResponsesWebSocketModel(requestPayload, fallbackModel)
 }
@@ -1040,11 +1102,150 @@ func injectResponsesWebSocketModel(payload []byte, fallbackModel string) ([]byte
 	return json.Marshal(request)
 }
 
-func writeCapturedResponsesWebSocket(ctx context.Context, conn *websocket.Conn, captured *gatewayCaptureResponse) error {
+func responsesWebSocketInferPreviousResponseID(payload []byte, lastTurn responsesWebSocketTurnState) ([]byte, error) {
+	if strings.TrimSpace(lastTurn.ResponseID) == "" || len(lastTurn.ToolCallIDs) == 0 {
+		return payload, nil
+	}
+	var request map[string]any
+	if err := json.Unmarshal(bytes.TrimSpace(payload), &request); err != nil {
+		return payload, nil
+	}
+	if strings.TrimSpace(anyString(request["previous_response_id"])) != "" {
+		return payload, nil
+	}
+	callIDs := responsesWebSocketToolOutputCallIDs(request["input"])
+	if len(callIDs) == 0 {
+		return payload, nil
+	}
+	for _, callID := range callIDs {
+		if _, ok := lastTurn.ToolCallIDs[callID]; !ok {
+			return payload, nil
+		}
+	}
+	request["previous_response_id"] = lastTurn.ResponseID
+	return json.Marshal(request)
+}
+
+func responsesWebSocketToolOutputCallIDs(value any) []string {
+	switch typed := value.(type) {
+	case []any:
+		var out []string
+		for _, item := range typed {
+			out = append(out, responsesWebSocketToolOutputCallIDs(item)...)
+		}
+		return out
+	case map[string]any:
+		itemType := strings.TrimSpace(anyString(typed["type"]))
+		if responsesWebSocketToolOutputType(itemType) {
+			if callID := strings.TrimSpace(anyString(typed["call_id"])); callID != "" {
+				return []string{callID}
+			}
+		}
+		return responsesWebSocketToolOutputCallIDs(typed["content"])
+	default:
+		return nil
+	}
+}
+
+func responsesWebSocketToolOutputType(itemType string) bool {
+	switch strings.TrimSpace(itemType) {
+	case "function_call_output", "tool_search_output", "custom_tool_call_output", "mcp_tool_call_output":
+		return true
+	default:
+		return false
+	}
+}
+
+type responsesWebSocketTurnState struct {
+	ResponseID  string
+	ToolCallIDs map[string]struct{}
+}
+
+func (state *responsesWebSocketTurnState) merge(next responsesWebSocketTurnState) {
+	if next.ResponseID != "" {
+		state.ResponseID = next.ResponseID
+	}
+	if len(next.ToolCallIDs) == 0 {
+		return
+	}
+	if state.ToolCallIDs == nil {
+		state.ToolCallIDs = map[string]struct{}{}
+	}
+	for callID := range next.ToolCallIDs {
+		state.ToolCallIDs[callID] = struct{}{}
+	}
+}
+
+func responsesWebSocketTurnStateFromEvent(payload []byte) responsesWebSocketTurnState {
+	var event map[string]any
+	if err := json.Unmarshal(bytes.TrimSpace(payload), &event); err != nil {
+		return responsesWebSocketTurnState{}
+	}
+	state := responsesWebSocketTurnState{
+		ResponseID:  responsesWebSocketEventResponseID(event),
+		ToolCallIDs: map[string]struct{}{},
+	}
+	responsesWebSocketCollectToolCallIDs(event["response"], state.ToolCallIDs)
+	responsesWebSocketCollectToolCallIDs(event["item"], state.ToolCallIDs)
+	responsesWebSocketCollectToolCallIDs(event["output_item"], state.ToolCallIDs)
+	responsesWebSocketCollectToolCallIDs(event["output"], state.ToolCallIDs)
+	if len(state.ToolCallIDs) == 0 {
+		state.ToolCallIDs = nil
+	}
+	return state
+}
+
+func responsesWebSocketEventResponseID(event map[string]any) string {
+	if response, ok := event["response"].(map[string]any); ok {
+		if id := strings.TrimSpace(anyString(response["id"])); id != "" {
+			return id
+		}
+	}
+	return strings.TrimSpace(firstNonEmpty(anyString(event["response_id"]), anyString(event["id"])))
+}
+
+func responsesWebSocketCollectToolCallIDs(value any, out map[string]struct{}) {
+	switch typed := value.(type) {
+	case []any:
+		for _, item := range typed {
+			responsesWebSocketCollectToolCallIDs(item, out)
+		}
+	case map[string]any:
+		itemType := strings.TrimSpace(anyString(typed["type"]))
+		if responsesWebSocketToolCallType(itemType) {
+			if callID := strings.TrimSpace(firstNonEmpty(anyString(typed["call_id"]), anyString(typed["id"]))); callID != "" {
+				out[callID] = struct{}{}
+			}
+		}
+		responsesWebSocketCollectToolCallIDs(typed["output"], out)
+		responsesWebSocketCollectToolCallIDs(typed["content"], out)
+	}
+}
+
+func responsesWebSocketToolCallType(itemType string) bool {
+	switch strings.TrimSpace(itemType) {
+	case "function_call", "tool_call", "local_shell_call", "tool_search_call", "custom_tool_call", "mcp_tool_call":
+		return true
+	default:
+		return false
+	}
+}
+
+func anyString(value any) string {
+	switch typed := value.(type) {
+	case string:
+		return strings.TrimSpace(typed)
+	default:
+		return ""
+	}
+}
+
+func writeCapturedResponsesWebSocket(ctx context.Context, conn *websocket.Conn, captured *gatewayCaptureResponse) (responsesWebSocketTurnState, error) {
 	body := bytes.TrimSpace(captured.body.Bytes())
 	if captured.Status() >= http.StatusBadRequest {
-		return writeResponsesWebSocketError(ctx, conn, captured.Status(), "", "", body)
+		return responsesWebSocketTurnState{}, writeResponsesWebSocketError(ctx, conn, captured.Status(), "", "", body)
 	}
+	var turnState responsesWebSocketTurnState
 	if strings.Contains(captured.Header().Get("Content-Type"), "text/event-stream") {
 		events := parseResponsesServerSentEvents(body)
 		for _, event := range events {
@@ -1053,8 +1254,9 @@ func writeCapturedResponsesWebSocket(ctx context.Context, conn *websocket.Conn, 
 				continue
 			}
 			if jsonObjectHasType(data) {
+				turnState.merge(responsesWebSocketTurnStateFromEvent(data))
 				if err := conn.Write(ctx, websocket.MessageText, data); err != nil {
-					return err
+					return turnState, err
 				}
 				continue
 			}
@@ -1066,15 +1268,16 @@ func writeCapturedResponsesWebSocket(ctx context.Context, conn *websocket.Conn, 
 				wrapped["event"] = event.Event
 			}
 			if err := writeResponsesWebSocketJSON(ctx, conn, wrapped); err != nil {
-				return err
+				return turnState, err
 			}
 		}
-		return nil
+		return turnState, nil
 	}
 	if len(body) == 0 {
-		return writeResponsesWebSocketError(ctx, conn, http.StatusInternalServerError, "internal_error", "empty responses gateway result", nil)
+		return responsesWebSocketTurnState{}, writeResponsesWebSocketError(ctx, conn, http.StatusInternalServerError, "internal_error", "empty responses gateway result", nil)
 	}
-	return writeResponsesWebSocketJSON(ctx, conn, map[string]any{
+	turnState = responsesWebSocketTurnStateFromEvent(body)
+	return turnState, writeResponsesWebSocketJSON(ctx, conn, map[string]any{
 		"type":     "response.completed",
 		"response": json.RawMessage(body),
 	})

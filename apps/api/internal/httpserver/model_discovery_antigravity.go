@@ -217,6 +217,7 @@ func antigravityModelDiscoveryRuntime(account accountcontract.ProviderAccount, c
 		UpstreamClient: upstreamClient,
 		ProxyID:        account.ProxyID,
 		UserAgent:      mapString(account.Metadata, "user_agent"),
+		Metadata:       account.Metadata,
 		Credential:     credential,
 	}
 }

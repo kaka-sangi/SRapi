@@ -102,6 +102,12 @@ func (s *Service) NormalizeResponses(req apiopenapi.ResponsesRequest, meta Reque
 	return canonical
 }
 
+func (s *Service) NormalizeResponseInputItems(model string, meta RequestMeta) gatewaycontract.CanonicalRequest {
+	canonical := canonical(meta, gatewaycontract.ProtocolOpenAICompatible, gatewaycontract.ProtocolOpenAICompatible, model, "", false, "", nil, nil, "", nil)
+	canonical.RequestCapabilities = []gatewaycontract.RequestCapability{{Key: capabilitiescontract.KeyResponses, Version: "v1"}}
+	return canonical
+}
+
 // ValidateResponsesRequest checks raw Responses input invariants that the
 // generated OpenAPI union cannot represent without losing item-specific fields.
 func (s *Service) ValidateResponsesRequest(rawBody []byte) error {

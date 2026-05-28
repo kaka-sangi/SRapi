@@ -6,9 +6,13 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/config"
+	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	gatewaycontract "github.com/srapi/srapi/apps/api/internal/modules/gateway/contract"
+	provideradaptercontract "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
+	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 )
 
@@ -32,6 +36,115 @@ func TestGatewayEmptyCompletionErrorClassIsRetryable(t *testing.T) {
 	}
 	if got := geminiStatusForGatewayErrorClass("empty_completion", http.StatusBadGateway); got != "UNAVAILABLE" {
 		t.Fatalf("unexpected empty completion Gemini status %q", got)
+	}
+}
+
+func TestGatewayProviderPublicMessageRequiresMetadataOptIn(t *testing.T) {
+	err := provideradaptercontract.ProviderError{
+		Class:      "invalid_request",
+		StatusCode: http.StatusBadRequest,
+		Message:    `{"error":{"message":"schema mismatch: field temperature is unsupported"}}`,
+	}
+	candidate := schedulercontract.Candidate{
+		Account: accountcontract.ProviderAccount{Metadata: map[string]any{
+			"expose_provider_error_messages":          true,
+			"provider_error_passthrough_status_codes": []any{http.StatusBadRequest},
+			"provider_error_passthrough_classes":      []any{"invalid_request"},
+			"provider_error_passthrough_keywords":     []any{"temperature"},
+		}},
+	}
+
+	got := gatewayProviderPublicMessage(err, "invalid_request", http.StatusBadRequest, &candidate)
+	if got != "schema mismatch: field temperature is unsupported" {
+		t.Fatalf("expected sanitized provider message, got %q", got)
+	}
+	if got := gatewayProviderPublicMessage(err, "invalid_request", http.StatusBadRequest, nil); got != "provider rejected request" {
+		t.Fatalf("expected default message without candidate policy, got %q", got)
+	}
+	candidate.Account.Metadata["provider_error_passthrough_keywords"] = []any{"quota"}
+	if got := gatewayProviderPublicMessage(err, "invalid_request", http.StatusBadRequest, &candidate); got != "provider rejected request" {
+		t.Fatalf("expected default message when keyword filter misses, got %q", got)
+	}
+}
+
+func TestGatewayProviderPublicMessageRejectsSensitiveText(t *testing.T) {
+	err := provideradaptercontract.ProviderError{
+		Class:      "auth_failed",
+		StatusCode: http.StatusUnauthorized,
+		Message:    `{"error":{"message":"Authorization Bearer sk-live-secret was rejected"}}`,
+	}
+	candidate := schedulercontract.Candidate{
+		Account: accountcontract.ProviderAccount{Metadata: map[string]any{
+			"expose_provider_error_messages": true,
+		}},
+	}
+
+	if got := gatewayProviderPublicMessage(err, "auth_failed", http.StatusUnauthorized, &candidate); got != "provider authentication failed" {
+		t.Fatalf("expected sensitive provider message to stay generic, got %q", got)
+	}
+}
+
+func TestGatewayProviderPublicMessageDoesNotExposeUnknownJSONBodies(t *testing.T) {
+	err := provideradaptercontract.ProviderError{
+		Class:      "provider_5xx",
+		StatusCode: http.StatusInternalServerError,
+		Message:    `{"trace_id":"upstream-1","diagnostic":{"reason":"internal failure"}}`,
+	}
+	candidate := schedulercontract.Candidate{
+		Account: accountcontract.ProviderAccount{Metadata: map[string]any{
+			"expose_provider_error_messages": true,
+		}},
+	}
+
+	if got := gatewayProviderPublicMessage(err, "provider_5xx", http.StatusInternalServerError, &candidate); got != "provider service error" {
+		t.Fatalf("expected unknown JSON body to stay generic, got %q", got)
+	}
+}
+
+func TestGatewaySameCandidateRetryPolicyForPoolMode(t *testing.T) {
+	policy := gatewaySameCandidateRetryPolicyFor(schedulercontract.Candidate{
+		Account: accountcontract.ProviderAccount{
+			Metadata: map[string]any{
+				"pool_mode":                     true,
+				"pool_mode_retry_count":         "4",
+				"pool_mode_retry_base_delay_ms": float64(0),
+				"pool_mode_retry_max_delay_ms":  float64(1),
+			},
+		},
+	})
+
+	if !policy.Enabled || policy.MaxRetries != 4 || !policy.RetryAuthFailures {
+		t.Fatalf("unexpected pool mode retry policy: %+v", policy)
+	}
+	if !gatewayShouldRetrySameCandidate(policy, "auth_failed", http.StatusUnauthorized, 0) {
+		t.Fatal("expected pool mode to retry transient auth failures")
+	}
+	if gatewayShouldRetrySameCandidate(policy, "auth_failed", http.StatusUnauthorized, 4) {
+		t.Fatal("expected retry budget to cap pool mode retries")
+	}
+}
+
+func TestGatewaySameCandidateRetryPolicyExplicitOptIn(t *testing.T) {
+	policy := gatewaySameCandidateRetryPolicyFor(schedulercontract.Candidate{
+		Account: accountcontract.ProviderAccount{
+			Metadata: map[string]any{
+				"same_candidate_retry_enabled":       true,
+				"same_candidate_retry_count":         float64(2),
+				"same_candidate_retry_base_delay_ms": float64(5),
+				"same_candidate_retry_max_delay_ms":  float64(8),
+			},
+		},
+		Provider: providercontract.Provider{Protocol: "openai-compatible"},
+	})
+
+	if !policy.Enabled || policy.MaxRetries != 2 || policy.BaseDelay != 5*time.Millisecond || policy.MaxDelay != 8*time.Millisecond {
+		t.Fatalf("unexpected explicit retry policy: %+v", policy)
+	}
+	if !gatewayShouldRetrySameCandidate(policy, "provider_5xx", http.StatusServiceUnavailable, 1) {
+		t.Fatal("expected transient provider error to retry")
+	}
+	if gatewayShouldRetrySameCandidate(policy, "invalid_request", http.StatusBadRequest, 0) {
+		t.Fatal("did not expect invalid requests to retry")
 	}
 }
 

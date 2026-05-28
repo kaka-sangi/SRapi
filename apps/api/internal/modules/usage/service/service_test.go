@@ -149,6 +149,95 @@ func TestAggregateAndExportUsage(t *testing.T) {
 	}
 }
 
+func TestSummarizeAPIKeyIsScopedAndAggregated(t *testing.T) {
+	clock := fixedClock{now: time.Date(2026, 5, 22, 12, 0, 0, 0, time.UTC)}
+	store := usagememory.New()
+	svc, err := service.New(store, clock)
+	if err != nil {
+		t.Fatalf("new usage service: %v", err)
+	}
+	oldCreatedAt := clock.now.AddDate(0, 0, -91)
+	for _, log := range []contract.UsageLog{
+		{
+			RequestID:      "req_key_2_today",
+			UserID:         1,
+			APIKeyID:       2,
+			SourceEndpoint: "/v1/chat/completions",
+			Model:          "gpt-4o-mini",
+			InputTokens:    3,
+			OutputTokens:   4,
+			CachedTokens:   1,
+			Success:        true,
+			Cost:           "0.10000000",
+			Currency:       "USD",
+			CreatedAt:      clock.now,
+		},
+		{
+			RequestID:      "req_key_2_other_model",
+			UserID:         1,
+			APIKeyID:       2,
+			SourceEndpoint: "/v1/responses",
+			Model:          "gpt-4o",
+			InputTokens:    5,
+			OutputTokens:   6,
+			Success:        false,
+			Cost:           "0.25000000",
+			Currency:       "USD",
+			CreatedAt:      clock.now,
+		},
+		{
+			RequestID:      "req_other_key",
+			UserID:         1,
+			APIKeyID:       3,
+			SourceEndpoint: "/v1/chat/completions",
+			Model:          "gpt-4o-mini",
+			InputTokens:    100,
+			OutputTokens:   100,
+			TotalTokens:    200,
+			Success:        true,
+			Cost:           "0.00000000",
+			Currency:       "USD",
+			CreatedAt:      clock.now,
+		},
+		{
+			RequestID:      "req_key_2_old",
+			UserID:         1,
+			APIKeyID:       2,
+			SourceEndpoint: "/v1/chat/completions",
+			Model:          "old-model",
+			InputTokens:    100,
+			OutputTokens:   100,
+			TotalTokens:    200,
+			Success:        true,
+			Cost:           "0.00000000",
+			Currency:       "USD",
+			CreatedAt:      oldCreatedAt,
+		},
+	} {
+		log.TotalTokens = log.InputTokens + log.OutputTokens + log.CachedTokens
+		if _, err := store.Create(t.Context(), log); err != nil {
+			t.Fatalf("seed usage log: %v", err)
+		}
+	}
+
+	summary, err := svc.SummarizeAPIKey(t.Context(), 2, 30)
+	if err != nil {
+		t.Fatalf("summarize api key: %v", err)
+	}
+	if summary.APIKeyID != 2 || summary.RequestCount != 2 || summary.SuccessCount != 1 || summary.ErrorCount != 1 || summary.TotalTokens != 19 || summary.TotalCost != "0.35000000" {
+		t.Fatalf("unexpected summary totals: %+v", summary)
+	}
+	if summary.Today.RequestCount != 2 || summary.Today.TotalTokens != 19 {
+		t.Fatalf("unexpected today summary: %+v", summary.Today)
+	}
+	if len(summary.ModelStats) != 2 || summary.ModelStats[0].Model != "gpt-4o" || summary.ModelStats[0].TotalTokens != 11 {
+		t.Fatalf("unexpected model stats: %+v", summary.ModelStats)
+	}
+	if len(summary.RecentLogs) != 2 || summary.RecentLogs[0].RequestID != "req_key_2_other_model" || summary.RecentLogs[1].RequestID != "req_key_2_today" {
+		t.Fatalf("unexpected recent logs: %+v", summary.RecentLogs)
+	}
+}
+
 type fixedClock struct {
 	now time.Time
 }

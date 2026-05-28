@@ -64,7 +64,7 @@ func (s *Service) invokeGeminiTokenCount(ctx context.Context, req contract.Token
 		return contract.TokenCountResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response read failed"}
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return contract.TokenCountResponse{}, classifyGeminiProviderHTTPError(resp.StatusCode, body)
+		return contract.TokenCountResponse{}, classifyGeminiProviderHTTPErrorWithHeaders(resp.StatusCode, resp.Header, body)
 	}
 	return parseGeminiTokenCountResponse(body, resp.StatusCode)
 }
@@ -80,6 +80,7 @@ func (s *Service) invokeReverseProxyGeminiTokenCount(ctx context.Context, req co
 			UpstreamClient: req.Account.UpstreamClient,
 			ProxyID:        req.Account.ProxyID,
 			UserAgent:      mapString(req.Account.Metadata, "user_agent"),
+			Metadata:       req.Account.Metadata,
 			Credential:     req.Credential,
 		},
 		Method: http.MethodPost,
@@ -93,7 +94,7 @@ func (s *Service) invokeReverseProxyGeminiTokenCount(ctx context.Context, req co
 		return contract.TokenCountResponse{}, providerErrorFromReverseProxy(err)
 	}
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
-		return contract.TokenCountResponse{}, classifyGeminiProviderHTTPError(runtimeResp.StatusCode, runtimeResp.Body)
+		return contract.TokenCountResponse{}, classifyGeminiProviderHTTPErrorWithHeaders(runtimeResp.StatusCode, runtimeResp.Headers, runtimeResp.Body)
 	}
 	return parseGeminiTokenCountResponse(runtimeResp.Body, runtimeResp.StatusCode)
 }
@@ -164,6 +165,7 @@ func (s *Service) invokeReverseProxyAnthropicTokenCount(ctx context.Context, req
 			UpstreamClient: req.Account.UpstreamClient,
 			ProxyID:        req.Account.ProxyID,
 			UserAgent:      mapString(req.Account.Metadata, "user_agent"),
+			Metadata:       req.Account.Metadata,
 			Credential:     req.Credential,
 		},
 		Method:  http.MethodPost,

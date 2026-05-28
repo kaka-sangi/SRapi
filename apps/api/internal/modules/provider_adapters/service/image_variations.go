@@ -80,6 +80,7 @@ func (s *Service) invokeReverseProxyOpenAICompatibleImageVariation(ctx context.C
 			UpstreamClient: req.Account.UpstreamClient,
 			ProxyID:        req.Account.ProxyID,
 			UserAgent:      mapString(req.Account.Metadata, "user_agent"),
+			Metadata:       req.Account.Metadata,
 			Credential:     req.Credential,
 		},
 		Method: http.MethodPost,

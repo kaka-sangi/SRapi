@@ -135,61 +135,13 @@ func (s *Server) handleCreateAudioTranscription(w http.ResponseWriter, r *http.R
 	}
 	scheduleReq := gatewayScheduleRequest(r, canonical, modelResolution)
 	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
-	result, err := s.runtime.scheduleGatewayRequest(r.Context(), scheduleReq, model.ID, forcedProviderKey, authed.Key)
-	if err != nil {
-		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
-			RequestID:             canonical.RequestID,
-			Authed:                authed,
-			DecisionID:            result.Decision.ID,
-			AttemptNo:             result.Decision.AttemptNo,
-			SourceProtocol:        string(canonical.SourceProtocol),
-			SourceEndpoint:        canonical.SourceEndpoint,
-			Model:                 canonical.CanonicalModel,
-			Success:               false,
-			ErrorClass:            ptrStringValue("no_available_account"),
-			LatencyMS:             elapsedMillis(startedAt),
-			InputTokens:           admission.EstimatedUsage.InputTokens,
-			OutputTokens:          admission.EstimatedUsage.OutputTokens,
-			CachedTokens:          admission.EstimatedUsage.CachedTokens,
-			UsageEstimated:        true,
-			Pricing:               admission.Pricing,
-			CompatibilityWarnings: canonical.CompatibilityWarnings,
-		})
-		writeGatewayError(w, http.StatusServiceUnavailable, apiopenapi.ServiceUnavailableError, "no available account", "no_available_account")
+	failover := s.invokeProviderAudioTranscriptionWithFailover(r.Context(), r, authed, canonical, scheduleReq, model.ID, forcedProviderKey, admission, startedAt)
+	result := failover.ScheduleResult
+	if failover.Err != nil {
+		s.writeGatewayFailoverFailure(w, r, authed, canonical, result, failover.FailureRecorded, failover.Err, admission, startedAt)
 		return
 	}
-	if err := s.reserveGatewayAccountQuotaForScheduledRequest(r.Context(), r, authed, canonical, result, admission, startedAt); err != nil {
-		writeProviderGatewayError(w, err)
-		return
-	}
-	providerResp, err := s.runtime.invokeProviderAudioTranscription(r.Context(), providerAudioTranscriptionRequest(canonical, result.Candidate))
-	if err != nil {
-		errorClass, upstreamStatus, errorType := providerGatewayError(err)
-		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
-			RequestID:             canonical.RequestID,
-			Authed:                authed,
-			DecisionID:            result.Decision.ID,
-			AttemptNo:             result.Decision.AttemptNo,
-			ProviderID:            ptrInt(result.Candidate.Provider.ID),
-			AccountID:             ptrInt(result.Candidate.Account.ID),
-			SourceProtocol:        string(canonical.SourceProtocol),
-			SourceEndpoint:        canonical.SourceEndpoint,
-			TargetProtocol:        result.Candidate.Provider.Protocol,
-			Model:                 canonical.CanonicalModel,
-			Success:               false,
-			ErrorClass:            ptrStringValue(errorClass),
-			StatusCode:            ptrInt(upstreamStatus),
-			LatencyMS:             elapsedMillis(startedAt),
-			InputTokens:           admission.EstimatedUsage.InputTokens,
-			OutputTokens:          admission.EstimatedUsage.OutputTokens,
-			CachedTokens:          admission.EstimatedUsage.CachedTokens,
-			UsageEstimated:        true,
-			Pricing:               admission.Pricing,
-			CompatibilityWarnings: canonical.CompatibilityWarnings,
-		})
-		writeGatewayError(w, providerGatewayHTTPStatus(upstreamStatus), errorType, providerGatewayMessage(errorClass), errorClass)
-		return
-	}
+	providerResp := failover.Response
 	usage := gatewayUsageFromAudioTranscriptionProvider(providerResp)
 	canonicalResp := s.runtime.gateway.BuildCanonicalAudioTranscriptionResponse(canonical, providerResp.ID, providerResp.Text, providerResp.Task, providerResp.Language, providerResp.Duration, gatewayAudioTranscriptionSegmentsFromProvider(providerResp), usage)
 	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequest(model.ID, result.Candidate, canonicalResp.Usage), canonicalResp.Usage.Estimated)
@@ -451,61 +403,13 @@ func (s *Server) handleCreateAudioSpeech(w http.ResponseWriter, r *http.Request)
 	}
 	scheduleReq := gatewayScheduleRequest(r, canonical, modelResolution)
 	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
-	result, err := s.runtime.scheduleGatewayRequest(r.Context(), scheduleReq, model.ID, forcedProviderKey, authed.Key)
-	if err != nil {
-		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
-			RequestID:             canonical.RequestID,
-			Authed:                authed,
-			DecisionID:            result.Decision.ID,
-			AttemptNo:             result.Decision.AttemptNo,
-			SourceProtocol:        string(canonical.SourceProtocol),
-			SourceEndpoint:        canonical.SourceEndpoint,
-			Model:                 canonical.CanonicalModel,
-			Success:               false,
-			ErrorClass:            ptrStringValue("no_available_account"),
-			LatencyMS:             elapsedMillis(startedAt),
-			InputTokens:           admission.EstimatedUsage.InputTokens,
-			OutputTokens:          admission.EstimatedUsage.OutputTokens,
-			CachedTokens:          admission.EstimatedUsage.CachedTokens,
-			UsageEstimated:        true,
-			Pricing:               admission.Pricing,
-			CompatibilityWarnings: canonical.CompatibilityWarnings,
-		})
-		writeGatewayError(w, http.StatusServiceUnavailable, apiopenapi.ServiceUnavailableError, "no available account", "no_available_account")
+	failover := s.invokeProviderAudioSpeechWithFailover(r.Context(), r, authed, canonical, scheduleReq, model.ID, forcedProviderKey, admission, startedAt)
+	result := failover.ScheduleResult
+	if failover.Err != nil {
+		s.writeGatewayFailoverFailure(w, r, authed, canonical, result, failover.FailureRecorded, failover.Err, admission, startedAt)
 		return
 	}
-	if err := s.reserveGatewayAccountQuotaForScheduledRequest(r.Context(), r, authed, canonical, result, admission, startedAt); err != nil {
-		writeProviderGatewayError(w, err)
-		return
-	}
-	providerResp, err := s.runtime.invokeProviderAudioSpeech(r.Context(), providerAudioSpeechRequest(canonical, result.Candidate))
-	if err != nil {
-		errorClass, upstreamStatus, errorType := providerGatewayError(err)
-		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{
-			RequestID:             canonical.RequestID,
-			Authed:                authed,
-			DecisionID:            result.Decision.ID,
-			AttemptNo:             result.Decision.AttemptNo,
-			ProviderID:            ptrInt(result.Candidate.Provider.ID),
-			AccountID:             ptrInt(result.Candidate.Account.ID),
-			SourceProtocol:        string(canonical.SourceProtocol),
-			SourceEndpoint:        canonical.SourceEndpoint,
-			TargetProtocol:        result.Candidate.Provider.Protocol,
-			Model:                 canonical.CanonicalModel,
-			Success:               false,
-			ErrorClass:            ptrStringValue(errorClass),
-			StatusCode:            ptrInt(upstreamStatus),
-			LatencyMS:             elapsedMillis(startedAt),
-			InputTokens:           admission.EstimatedUsage.InputTokens,
-			OutputTokens:          admission.EstimatedUsage.OutputTokens,
-			CachedTokens:          admission.EstimatedUsage.CachedTokens,
-			UsageEstimated:        true,
-			Pricing:               admission.Pricing,
-			CompatibilityWarnings: canonical.CompatibilityWarnings,
-		})
-		writeGatewayError(w, providerGatewayHTTPStatus(upstreamStatus), errorType, providerGatewayMessage(errorClass), errorClass)
-		return
-	}
+	providerResp := failover.Response
 	usage := gatewayUsageFromAudioSpeechProvider(providerResp)
 	canonicalResp := s.runtime.gateway.BuildCanonicalAudioSpeechResponse(canonical, providerResp.ID, providerResp.Audio, providerResp.ContentType, usage)
 	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequest(model.ID, result.Candidate, canonicalResp.Usage), canonicalResp.Usage.Estimated)

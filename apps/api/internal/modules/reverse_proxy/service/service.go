@@ -45,7 +45,7 @@ type ClientFactory func(account contract.AccountRuntime) (*http.Client, error)
 
 type Service struct {
 	mu             sync.Mutex
-	clients        map[int]*http.Client
+	clients        map[string]*http.Client
 	factory        ClientFactory
 	defaultClient  *http.Client
 	refreshLocks   map[int]*sync.Mutex
@@ -72,7 +72,7 @@ func New(factory ClientFactory) (*Service, error) {
 		factory = newIsolatedClient
 	}
 	return &Service{
-		clients:        map[int]*http.Client{},
+		clients:        map[string]*http.Client{},
 		factory:        factory,
 		defaultClient:  defaultClient,
 		refreshLocks:   map[int]*sync.Mutex{},
@@ -90,23 +90,33 @@ func (s *Service) Do(ctx context.Context, req contract.Request) (contract.Respon
 		s.recordError(errorClass(err))
 		return contract.Response{}, err
 	}
+	profile, err := resolveEgressProfile(req.Account)
+	if err != nil {
+		s.recordError(errorClass(err))
+		return contract.Response{}, err
+	}
+	if err := validateEgressTargetURL(req.URL, profile); err != nil {
+		s.recordError(errorClass(err))
+		return contract.Response{}, err
+	}
 	httpReq, err := http.NewRequestWithContext(ctx, req.Method, req.URL, bytes.NewReader(req.Body))
 	if err != nil {
 		s.recordError("invalid_request")
 		return contract.Response{}, err
 	}
-	httpReq.Header = sanitizeHeaders(req.Headers)
+	httpReq.Header = sanitizeHeadersForProfile(req.Headers, profile)
+	applyEgressStaticHeaders(httpReq.Header, profile)
 	if len(req.Body) > 0 && httpReq.Header.Get("Content-Type") == "" {
 		httpReq.Header.Set("Content-Type", "application/json")
 	}
 	injectAuth(httpReq.Header, req.Account)
 	if httpReq.Header.Get("User-Agent") == "" {
-		httpReq.Header.Set("User-Agent", userAgent(req.Account))
+		httpReq.Header.Set("User-Agent", userAgentForProfile(req.Account, profile))
 	}
 
 	client, err := s.clientFor(req.Account)
 	if err != nil {
-		s.recordError("network_error")
+		s.recordError(errorClass(err))
 		return contract.Response{}, err
 	}
 	s.recordRequest()
@@ -145,14 +155,24 @@ func (s *Service) RelayWebSocket(ctx context.Context, req contract.WebSocketRela
 	if req.Account.AccountID <= 0 || strings.TrimSpace(req.URL) == "" || req.ClientToUpstream == nil || req.UpstreamToClient == nil {
 		return contract.WebSocketRelayResult{}, ErrInvalidInput
 	}
-	headers := sanitizeHeaders(req.Headers)
+	profile, err := resolveEgressProfile(req.Account)
+	if err != nil {
+		s.recordError(errorClass(err))
+		return contract.WebSocketRelayResult{}, err
+	}
+	if err := validateEgressTargetURL(req.URL, profile); err != nil {
+		s.recordError(errorClass(err))
+		return contract.WebSocketRelayResult{}, err
+	}
+	headers := sanitizeHeadersForProfile(req.Headers, profile)
+	applyEgressStaticHeaders(headers, profile)
 	injectAuth(headers, req.Account)
 	if headers.Get("User-Agent") == "" {
-		headers.Set("User-Agent", userAgent(req.Account))
+		headers.Set("User-Agent", userAgentForProfile(req.Account, profile))
 	}
 	client, err := s.clientFor(req.Account)
 	if err != nil {
-		s.recordError("network_error")
+		s.recordError(errorClass(err))
 		return contract.WebSocketRelayResult{}, err
 	}
 	startedAt := time.Now().UTC()
@@ -241,12 +261,21 @@ func (s *Service) refreshOAuthCredential(ctx context.Context, req contract.Refre
 		s.recordRefresh("invalid_request")
 		return contract.RefreshResponse{}, err
 	}
-	if ua := userAgent(req.Account); ua != "" {
+	profile, err := resolveEgressProfile(req.Account)
+	if err != nil {
+		s.recordRefresh(errorClass(err))
+		return contract.RefreshResponse{}, err
+	}
+	if err := validateEgressTargetURL(config.TokenEndpoint, profile); err != nil {
+		s.recordRefresh(errorClass(err))
+		return contract.RefreshResponse{}, err
+	}
+	if ua := userAgentForProfile(req.Account, profile); ua != "" {
 		httpReq.Header.Set("User-Agent", ua)
 	}
 	client, err := s.clientFor(req.Account)
 	if err != nil {
-		s.recordRefresh("network_error")
+		s.recordRefresh(errorClass(err))
 		return contract.RefreshResponse{}, err
 	}
 	resp, err := client.Do(httpReq)
@@ -434,22 +463,26 @@ func (s *Service) Metrics() contract.MetricsSnapshot {
 }
 
 func (s *Service) clientFor(account contract.AccountRuntime) (*http.Client, error) {
+	cacheKey, err := clientCacheKey(account)
+	if err != nil {
+		return nil, err
+	}
 	if account.AccountID <= 0 {
-		if account.ProxyID != nil && strings.TrimSpace(*account.ProxyID) != "" {
+		if cacheKey != defaultClientCacheKey {
 			return s.factory(account)
 		}
 		return s.defaultClient, nil
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if client, ok := s.clients[account.AccountID]; ok {
+	if client, ok := s.clients[cacheKey]; ok {
 		return client, nil
 	}
 	client, err := s.factory(account)
 	if err != nil {
 		return nil, err
 	}
-	s.clients[account.AccountID] = client
+	s.clients[cacheKey] = client
 	return client, nil
 }
 
@@ -472,6 +505,13 @@ func newIsolatedClient(account contract.AccountRuntime) (*http.Client, error) {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.Proxy = proxyFunc(account.ProxyID)
 	transport.DisableCompression = true
+	profile, err := resolveEgressProfile(account)
+	if err != nil {
+		return nil, err
+	}
+	if err := configureTransportForEgress(transport, account, profile); err != nil {
+		return nil, err
+	}
 	return &http.Client{
 		Transport: transport,
 		Jar:       jar,
@@ -493,9 +533,13 @@ func proxyFunc(proxyID *string) func(*http.Request) (*url.URL, error) {
 }
 
 func sanitizeHeaders(headers http.Header) http.Header {
+	return sanitizeHeadersForProfile(headers, egressProfile{})
+}
+
+func sanitizeHeadersForProfile(headers http.Header, profile egressProfile) http.Header {
 	out := http.Header{}
 	for key, values := range headers {
-		if forbiddenHeader(key, values) {
+		if forbiddenHeader(key, values) || profile.forbidsHeader(key) {
 			continue
 		}
 		for _, value := range values {
@@ -558,11 +602,19 @@ func injectAuth(headers http.Header, account contract.AccountRuntime) {
 }
 
 func userAgent(account contract.AccountRuntime) string {
+	profile, _ := resolveEgressProfile(account)
+	return userAgentForProfile(account, profile)
+}
+
+func userAgentForProfile(account contract.AccountRuntime, profile egressProfile) string {
 	if strings.TrimSpace(account.UserAgent) != "" {
 		return strings.TrimSpace(account.UserAgent)
 	}
 	if value := credentialString(account.Credential, "user_agent"); value != "" && !strings.HasPrefix(strings.ToLower(value), "srapi/") {
 		return value
+	}
+	if profile.UserAgent != "" {
+		return profile.UserAgent
 	}
 	if value := credentialString(account.Metadata, "user_agent"); value != "" && !strings.HasPrefix(strings.ToLower(value), "srapi/") {
 		return value

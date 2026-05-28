@@ -2319,6 +2319,72 @@ export type OpenAiModelList = {
     data: Array<OpenAiModel>;
 };
 
+export type GatewayUsageResponse = {
+    object: 'usage';
+    mode: 'unrestricted' | 'quota_limited';
+    isValid: boolean;
+    status: string;
+    planName?: string;
+    remaining: string;
+    unit: string;
+    balance: string;
+    api_key_id: Id;
+    api_key_name: string;
+    generated_at: Timestamp;
+    window_days: number;
+    expires_at?: Timestamp;
+    days_until_expiry?: number;
+    limits?: {
+        [key: string]: unknown;
+    };
+    allowed_models?: Array<string>;
+    usage: GatewayUsageTotals;
+    today: GatewayUsageWindow;
+    daily_usage: Array<GatewayUsageWindow>;
+    model_stats: Array<GatewayUsageModel>;
+    recent_requests: Array<GatewayUsageRequest>;
+};
+
+export type GatewayUsageTotals = {
+    requests: number;
+    success_count: number;
+    error_count: number;
+    input_tokens: number;
+    output_tokens: number;
+    cached_tokens: number;
+    total_tokens: number;
+    cost: string;
+    currency: string;
+};
+
+export type GatewayUsageWindow = GatewayUsageTotals & {
+    date: string;
+};
+
+export type GatewayUsageModel = GatewayUsageTotals & {
+    model: string;
+};
+
+export type GatewayUsageRequest = {
+    request_id: RequestId;
+    attempt_no: number;
+    source_protocol: string;
+    source_endpoint: string;
+    target_protocol?: string;
+    model: string;
+    input_tokens: number;
+    output_tokens: number;
+    cached_tokens: number;
+    total_tokens: number;
+    usage_estimated: boolean;
+    latency_ms: number;
+    success: boolean;
+    error_class?: string | null;
+    cost: string;
+    currency: string;
+    created_at: Timestamp;
+};
+
 export type TokenUsage = {
     prompt_tokens?: number;
     completion_tokens?: number;
@@ -2702,6 +2768,15 @@ export type ResponsesResponse = {
     status?: string;
     incomplete_details?: ResponsesIncompleteDetails;
     compatibility_warnings?: Array<string>;
+};
+
+export type ResponsesInputItemsList = {
+    object: 'list';
+    data: Array<ResponsesOutputItem>;
+    first_id?: string | null;
+    last_id?: string | null;
+    has_more?: boolean;
+    [key: string]: unknown;
 };
 
 export type ResponsesCompactResponse = {
@@ -8189,6 +8264,48 @@ export type ListModelsResponses = {
 
 export type ListModelsResponse = ListModelsResponses[keyof ListModelsResponses];
 
+export type GetGatewayUsageData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Number of UTC days to include in usage summaries.
+         */
+        days?: number;
+    };
+    url: '/v1/usage';
+};
+
+export type GetGatewayUsageErrors = {
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type GetGatewayUsageError = GetGatewayUsageErrors[keyof GetGatewayUsageErrors];
+
+export type GetGatewayUsageResponses = {
+    /**
+     * Gateway API key usage summary.
+     */
+    200: GatewayUsageResponse;
+};
+
+export type GetGatewayUsageResponse = GetGatewayUsageResponses[keyof GetGatewayUsageResponses];
+
 export type CreateChatCompletionData = {
     body: ChatCompletionRequest;
     path?: never;
@@ -8278,6 +8395,62 @@ export type CreateResponseResponses = {
 };
 
 export type CreateResponseResponse = CreateResponseResponses[keyof CreateResponseResponses];
+
+export type ListResponseInputItemsData = {
+    body?: never;
+    path: {
+        response_id: string;
+    };
+    query: {
+        /**
+         * Canonical model or model alias used for SRapi policy and scheduling.
+         */
+        model: string;
+        after?: string;
+        include?: Array<string>;
+        limit?: number;
+        order?: 'asc' | 'desc';
+    };
+    url: '/v1/responses/{response_id}/input_items';
+};
+
+export type ListResponseInputItemsErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type ListResponseInputItemsError = ListResponseInputItemsErrors[keyof ListResponseInputItemsErrors];
+
+export type ListResponseInputItemsResponses = {
+    /**
+     * Raw Responses input_items list from the selected upstream provider.
+     */
+    200: ResponsesInputItemsList;
+};
+
+export type ListResponseInputItemsResponse = ListResponseInputItemsResponses[keyof ListResponseInputItemsResponses];
 
 export type CreateResponseCompactData = {
     body: ResponsesRequest;
@@ -9010,6 +9183,1389 @@ export type ListGeminiModelsResponses = {
 
 export type ListGeminiModelsResponse = ListGeminiModelsResponses[keyof ListGeminiModelsResponses];
 
+export type GetGeminiModelData = {
+    body?: never;
+    path: {
+        /**
+         * Gemini model id from the path. SRapi runtime accepts slash-qualified ids when the HTTP router passes them through.
+         */
+        model: string;
+    };
+    query?: never;
+    url: '/v1beta/models/{model}';
+};
+
+export type GetGeminiModelErrors = {
+    /**
+     * Invalid Gemini gateway request.
+     */
+    400: GeminiErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GeminiErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GeminiErrorResponse;
+    /**
+     * Google-style Gemini gateway error.
+     */
+    404: GeminiErrorResponse;
+    /**
+     * Google-style Gemini gateway error.
+     */
+    default: GeminiErrorResponse;
+};
+
+export type GetGeminiModelError = GetGeminiModelErrors[keyof GetGeminiModelErrors];
+
+export type GetGeminiModelResponses = {
+    /**
+     * Gemini-compatible model metadata.
+     */
+    200: GeminiModelInfo;
+};
+
+export type GetGeminiModelResponse = GetGeminiModelResponses[keyof GetGeminiModelResponses];
+
+export type CreateOpenAiChatCompletionAliasData = {
+    body: ChatCompletionRequest;
+    path?: never;
+    query?: never;
+    url: '/openai/v1/chat/completions';
+};
+
+export type CreateOpenAiChatCompletionAliasErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateOpenAiChatCompletionAliasError = CreateOpenAiChatCompletionAliasErrors[keyof CreateOpenAiChatCompletionAliasErrors];
+
+export type CreateOpenAiChatCompletionAliasResponses = {
+    /**
+     * Chat completion response, or SSE stream when stream is true.
+     */
+    200: ChatCompletionResponse;
+};
+
+export type CreateOpenAiChatCompletionAliasResponse = CreateOpenAiChatCompletionAliasResponses[keyof CreateOpenAiChatCompletionAliasResponses];
+
+export type CreateOpenAiResponseAliasData = {
+    body: ResponsesRequest;
+    path?: never;
+    query?: never;
+    url: '/openai/v1/responses';
+};
+
+export type CreateOpenAiResponseAliasErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateOpenAiResponseAliasError = CreateOpenAiResponseAliasErrors[keyof CreateOpenAiResponseAliasErrors];
+
+export type CreateOpenAiResponseAliasResponses = {
+    /**
+     * Responses-compatible response, or SSE stream when stream is true.
+     */
+    200: ResponsesResponse;
+};
+
+export type CreateOpenAiResponseAliasResponse = CreateOpenAiResponseAliasResponses[keyof CreateOpenAiResponseAliasResponses];
+
+export type ListOpenAiResponseInputItemsAliasData = {
+    body?: never;
+    path: {
+        response_id: string;
+    };
+    query: {
+        /**
+         * Canonical model or model alias used for SRapi policy and scheduling.
+         */
+        model: string;
+        after?: string;
+        include?: Array<string>;
+        limit?: number;
+        order?: 'asc' | 'desc';
+    };
+    url: '/openai/v1/responses/{response_id}/input_items';
+};
+
+export type ListOpenAiResponseInputItemsAliasErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type ListOpenAiResponseInputItemsAliasError = ListOpenAiResponseInputItemsAliasErrors[keyof ListOpenAiResponseInputItemsAliasErrors];
+
+export type ListOpenAiResponseInputItemsAliasResponses = {
+    /**
+     * Raw Responses input_items list from the selected upstream provider.
+     */
+    200: ResponsesInputItemsList;
+};
+
+export type ListOpenAiResponseInputItemsAliasResponse = ListOpenAiResponseInputItemsAliasResponses[keyof ListOpenAiResponseInputItemsAliasResponses];
+
+export type CreateOpenAiResponseCompactAliasData = {
+    body: ResponsesRequest;
+    path?: never;
+    query?: never;
+    url: '/openai/v1/responses/compact';
+};
+
+export type CreateOpenAiResponseCompactAliasErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateOpenAiResponseCompactAliasError = CreateOpenAiResponseCompactAliasErrors[keyof CreateOpenAiResponseCompactAliasErrors];
+
+export type CreateOpenAiResponseCompactAliasResponses = {
+    /**
+     * Responses compact result, or SSE stream when stream is true.
+     */
+    200: ResponsesCompactResponse;
+};
+
+export type CreateOpenAiResponseCompactAliasResponse = CreateOpenAiResponseCompactAliasResponses[keyof CreateOpenAiResponseCompactAliasResponses];
+
+export type CreateOpenAiMessageAliasData = {
+    body: AnthropicMessagesRequest;
+    path?: never;
+    query?: never;
+    url: '/openai/v1/messages';
+};
+
+export type CreateOpenAiMessageAliasErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateOpenAiMessageAliasError = CreateOpenAiMessageAliasErrors[keyof CreateOpenAiMessageAliasErrors];
+
+export type CreateOpenAiMessageAliasResponses = {
+    /**
+     * Anthropic-compatible response, or SSE stream when stream is true.
+     */
+    200: AnthropicMessagesResponse;
+};
+
+export type CreateOpenAiMessageAliasResponse = CreateOpenAiMessageAliasResponses[keyof CreateOpenAiMessageAliasResponses];
+
+export type CreateOpenAiEmbeddingAliasData = {
+    body: EmbeddingRequest;
+    path?: never;
+    query?: never;
+    url: '/openai/v1/embeddings';
+};
+
+export type CreateOpenAiEmbeddingAliasErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateOpenAiEmbeddingAliasError = CreateOpenAiEmbeddingAliasErrors[keyof CreateOpenAiEmbeddingAliasErrors];
+
+export type CreateOpenAiEmbeddingAliasResponses = {
+    /**
+     * OpenAI-compatible embeddings response.
+     */
+    200: EmbeddingResponse;
+};
+
+export type CreateOpenAiEmbeddingAliasResponse = CreateOpenAiEmbeddingAliasResponses[keyof CreateOpenAiEmbeddingAliasResponses];
+
+export type CreateOpenAiImageGenerationAliasData = {
+    body: ImageGenerationRequest;
+    path?: never;
+    query?: never;
+    url: '/openai/v1/images/generations';
+};
+
+export type CreateOpenAiImageGenerationAliasErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateOpenAiImageGenerationAliasError = CreateOpenAiImageGenerationAliasErrors[keyof CreateOpenAiImageGenerationAliasErrors];
+
+export type CreateOpenAiImageGenerationAliasResponses = {
+    /**
+     * OpenAI-compatible image generation response.
+     */
+    200: ImageGenerationResponse;
+};
+
+export type CreateOpenAiImageGenerationAliasResponse = CreateOpenAiImageGenerationAliasResponses[keyof CreateOpenAiImageGenerationAliasResponses];
+
+export type CreateOpenAiImageEditAliasData = {
+    body: ImageEditJsonRequest;
+    path?: never;
+    query?: never;
+    url: '/openai/v1/images/edits';
+};
+
+export type CreateOpenAiImageEditAliasErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateOpenAiImageEditAliasError = CreateOpenAiImageEditAliasErrors[keyof CreateOpenAiImageEditAliasErrors];
+
+export type CreateOpenAiImageEditAliasResponses = {
+    /**
+     * OpenAI-compatible image edit response, or SSE stream when stream is true.
+     */
+    200: ImageGenerationResponse;
+};
+
+export type CreateOpenAiImageEditAliasResponse = CreateOpenAiImageEditAliasResponses[keyof CreateOpenAiImageEditAliasResponses];
+
+export type CreateOpenAiImageVariationAliasData = {
+    body: ImageVariationRequest;
+    path?: never;
+    query?: never;
+    url: '/openai/v1/images/variations';
+};
+
+export type CreateOpenAiImageVariationAliasErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateOpenAiImageVariationAliasError = CreateOpenAiImageVariationAliasErrors[keyof CreateOpenAiImageVariationAliasErrors];
+
+export type CreateOpenAiImageVariationAliasResponses = {
+    /**
+     * OpenAI-compatible image variation response.
+     */
+    200: ImageGenerationResponse;
+};
+
+export type CreateOpenAiImageVariationAliasResponse = CreateOpenAiImageVariationAliasResponses[keyof CreateOpenAiImageVariationAliasResponses];
+
+export type CreateOpenAiAudioTranscriptionAliasData = {
+    body: AudioTranscriptionRequest;
+    path?: never;
+    query?: never;
+    url: '/openai/v1/audio/transcriptions';
+};
+
+export type CreateOpenAiAudioTranscriptionAliasErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateOpenAiAudioTranscriptionAliasError = CreateOpenAiAudioTranscriptionAliasErrors[keyof CreateOpenAiAudioTranscriptionAliasErrors];
+
+export type CreateOpenAiAudioTranscriptionAliasResponses = {
+    /**
+     * Audio transcription response.
+     */
+    200: AudioTranscriptionResponse;
+};
+
+export type CreateOpenAiAudioTranscriptionAliasResponse = CreateOpenAiAudioTranscriptionAliasResponses[keyof CreateOpenAiAudioTranscriptionAliasResponses];
+
+export type CreateOpenAiAudioSpeechAliasData = {
+    body: AudioSpeechRequest;
+    path?: never;
+    query?: never;
+    url: '/openai/v1/audio/speech';
+};
+
+export type CreateOpenAiAudioSpeechAliasErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateOpenAiAudioSpeechAliasError = CreateOpenAiAudioSpeechAliasErrors[keyof CreateOpenAiAudioSpeechAliasErrors];
+
+export type CreateOpenAiAudioSpeechAliasResponses = {
+    /**
+     * Binary audio content.
+     */
+    200: Blob | File;
+};
+
+export type CreateOpenAiAudioSpeechAliasResponse = CreateOpenAiAudioSpeechAliasResponses[keyof CreateOpenAiAudioSpeechAliasResponses];
+
+export type CreateOpenAiModerationAliasData = {
+    body: ModerationRequest;
+    path?: never;
+    query?: never;
+    url: '/openai/v1/moderations';
+};
+
+export type CreateOpenAiModerationAliasErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateOpenAiModerationAliasError = CreateOpenAiModerationAliasErrors[keyof CreateOpenAiModerationAliasErrors];
+
+export type CreateOpenAiModerationAliasResponses = {
+    /**
+     * OpenAI-compatible moderation response.
+     */
+    200: ModerationResponse;
+};
+
+export type CreateOpenAiModerationAliasResponse = CreateOpenAiModerationAliasResponses[keyof CreateOpenAiModerationAliasResponses];
+
+export type CreateAnthropicMessageAliasData = {
+    body: AnthropicMessagesRequest;
+    path?: never;
+    query?: never;
+    url: '/anthropic/v1/messages';
+};
+
+export type CreateAnthropicMessageAliasErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateAnthropicMessageAliasError = CreateAnthropicMessageAliasErrors[keyof CreateAnthropicMessageAliasErrors];
+
+export type CreateAnthropicMessageAliasResponses = {
+    /**
+     * Anthropic-compatible response, or SSE stream when stream is true.
+     */
+    200: AnthropicMessagesResponse;
+};
+
+export type CreateAnthropicMessageAliasResponse = CreateAnthropicMessageAliasResponses[keyof CreateAnthropicMessageAliasResponses];
+
+export type CountAnthropicMessageTokensAliasData = {
+    body: AnthropicCountTokensRequest;
+    path?: never;
+    query?: never;
+    url: '/anthropic/v1/messages/count_tokens';
+};
+
+export type CountAnthropicMessageTokensAliasErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CountAnthropicMessageTokensAliasError = CountAnthropicMessageTokensAliasErrors[keyof CountAnthropicMessageTokensAliasErrors];
+
+export type CountAnthropicMessageTokensAliasResponses = {
+    /**
+     * Anthropic-compatible count_tokens response.
+     */
+    200: AnthropicCountTokensResponse;
+};
+
+export type CountAnthropicMessageTokensAliasResponse = CountAnthropicMessageTokensAliasResponses[keyof CountAnthropicMessageTokensAliasResponses];
+
+export type CreateGrokChatCompletionAliasData = {
+    body: ChatCompletionRequest;
+    path?: never;
+    query?: never;
+    url: '/grok/v1/chat/completions';
+};
+
+export type CreateGrokChatCompletionAliasErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateGrokChatCompletionAliasError = CreateGrokChatCompletionAliasErrors[keyof CreateGrokChatCompletionAliasErrors];
+
+export type CreateGrokChatCompletionAliasResponses = {
+    /**
+     * Chat completion response, or SSE stream when stream is true.
+     */
+    200: ChatCompletionResponse;
+};
+
+export type CreateGrokChatCompletionAliasResponse = CreateGrokChatCompletionAliasResponses[keyof CreateGrokChatCompletionAliasResponses];
+
+export type CreateGrokResponseAliasData = {
+    body: ResponsesRequest;
+    path?: never;
+    query?: never;
+    url: '/grok/v1/responses';
+};
+
+export type CreateGrokResponseAliasErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateGrokResponseAliasError = CreateGrokResponseAliasErrors[keyof CreateGrokResponseAliasErrors];
+
+export type CreateGrokResponseAliasResponses = {
+    /**
+     * Responses-compatible response, or SSE stream when stream is true.
+     */
+    200: ResponsesResponse;
+};
+
+export type CreateGrokResponseAliasResponse = CreateGrokResponseAliasResponses[keyof CreateGrokResponseAliasResponses];
+
+export type ListGrokResponseInputItemsAliasData = {
+    body?: never;
+    path: {
+        response_id: string;
+    };
+    query: {
+        /**
+         * Canonical model or model alias used for SRapi policy and scheduling.
+         */
+        model: string;
+        after?: string;
+        include?: Array<string>;
+        limit?: number;
+        order?: 'asc' | 'desc';
+    };
+    url: '/grok/v1/responses/{response_id}/input_items';
+};
+
+export type ListGrokResponseInputItemsAliasErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type ListGrokResponseInputItemsAliasError = ListGrokResponseInputItemsAliasErrors[keyof ListGrokResponseInputItemsAliasErrors];
+
+export type ListGrokResponseInputItemsAliasResponses = {
+    /**
+     * Raw Responses input_items list from the selected upstream provider.
+     */
+    200: ResponsesInputItemsList;
+};
+
+export type ListGrokResponseInputItemsAliasResponse = ListGrokResponseInputItemsAliasResponses[keyof ListGrokResponseInputItemsAliasResponses];
+
+export type CreateGrokMessageAliasData = {
+    body: AnthropicMessagesRequest;
+    path?: never;
+    query?: never;
+    url: '/grok/v1/messages';
+};
+
+export type CreateGrokMessageAliasErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateGrokMessageAliasError = CreateGrokMessageAliasErrors[keyof CreateGrokMessageAliasErrors];
+
+export type CreateGrokMessageAliasResponses = {
+    /**
+     * Anthropic-compatible response, or SSE stream when stream is true.
+     */
+    200: AnthropicMessagesResponse;
+};
+
+export type CreateGrokMessageAliasResponse = CreateGrokMessageAliasResponses[keyof CreateGrokMessageAliasResponses];
+
+export type CreateGrokEmbeddingAliasData = {
+    body: EmbeddingRequest;
+    path?: never;
+    query?: never;
+    url: '/grok/v1/embeddings';
+};
+
+export type CreateGrokEmbeddingAliasErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateGrokEmbeddingAliasError = CreateGrokEmbeddingAliasErrors[keyof CreateGrokEmbeddingAliasErrors];
+
+export type CreateGrokEmbeddingAliasResponses = {
+    /**
+     * OpenAI-compatible embeddings response.
+     */
+    200: EmbeddingResponse;
+};
+
+export type CreateGrokEmbeddingAliasResponse = CreateGrokEmbeddingAliasResponses[keyof CreateGrokEmbeddingAliasResponses];
+
+export type CreateGrokImageGenerationAliasData = {
+    body: ImageGenerationRequest;
+    path?: never;
+    query?: never;
+    url: '/grok/v1/images/generations';
+};
+
+export type CreateGrokImageGenerationAliasErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateGrokImageGenerationAliasError = CreateGrokImageGenerationAliasErrors[keyof CreateGrokImageGenerationAliasErrors];
+
+export type CreateGrokImageGenerationAliasResponses = {
+    /**
+     * OpenAI-compatible image generation response.
+     */
+    200: ImageGenerationResponse;
+};
+
+export type CreateGrokImageGenerationAliasResponse = CreateGrokImageGenerationAliasResponses[keyof CreateGrokImageGenerationAliasResponses];
+
+export type CreateGrokImageEditAliasData = {
+    body: ImageEditJsonRequest;
+    path?: never;
+    query?: never;
+    url: '/grok/v1/images/edits';
+};
+
+export type CreateGrokImageEditAliasErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateGrokImageEditAliasError = CreateGrokImageEditAliasErrors[keyof CreateGrokImageEditAliasErrors];
+
+export type CreateGrokImageEditAliasResponses = {
+    /**
+     * OpenAI-compatible image edit response, or SSE stream when stream is true.
+     */
+    200: ImageGenerationResponse;
+};
+
+export type CreateGrokImageEditAliasResponse = CreateGrokImageEditAliasResponses[keyof CreateGrokImageEditAliasResponses];
+
+export type CreateGrokImageVariationAliasData = {
+    body: ImageVariationRequest;
+    path?: never;
+    query?: never;
+    url: '/grok/v1/images/variations';
+};
+
+export type CreateGrokImageVariationAliasErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateGrokImageVariationAliasError = CreateGrokImageVariationAliasErrors[keyof CreateGrokImageVariationAliasErrors];
+
+export type CreateGrokImageVariationAliasResponses = {
+    /**
+     * OpenAI-compatible image variation response.
+     */
+    200: ImageGenerationResponse;
+};
+
+export type CreateGrokImageVariationAliasResponse = CreateGrokImageVariationAliasResponses[keyof CreateGrokImageVariationAliasResponses];
+
+export type CreateGrokAudioTranscriptionAliasData = {
+    body: AudioTranscriptionRequest;
+    path?: never;
+    query?: never;
+    url: '/grok/v1/audio/transcriptions';
+};
+
+export type CreateGrokAudioTranscriptionAliasErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateGrokAudioTranscriptionAliasError = CreateGrokAudioTranscriptionAliasErrors[keyof CreateGrokAudioTranscriptionAliasErrors];
+
+export type CreateGrokAudioTranscriptionAliasResponses = {
+    /**
+     * Audio transcription response.
+     */
+    200: AudioTranscriptionResponse;
+};
+
+export type CreateGrokAudioTranscriptionAliasResponse = CreateGrokAudioTranscriptionAliasResponses[keyof CreateGrokAudioTranscriptionAliasResponses];
+
+export type CreateGrokAudioSpeechAliasData = {
+    body: AudioSpeechRequest;
+    path?: never;
+    query?: never;
+    url: '/grok/v1/audio/speech';
+};
+
+export type CreateGrokAudioSpeechAliasErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateGrokAudioSpeechAliasError = CreateGrokAudioSpeechAliasErrors[keyof CreateGrokAudioSpeechAliasErrors];
+
+export type CreateGrokAudioSpeechAliasResponses = {
+    /**
+     * Binary audio content.
+     */
+    200: Blob | File;
+};
+
+export type CreateGrokAudioSpeechAliasResponse = CreateGrokAudioSpeechAliasResponses[keyof CreateGrokAudioSpeechAliasResponses];
+
+export type CreateGrokModerationAliasData = {
+    body: ModerationRequest;
+    path?: never;
+    query?: never;
+    url: '/grok/v1/moderations';
+};
+
+export type CreateGrokModerationAliasErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateGrokModerationAliasError = CreateGrokModerationAliasErrors[keyof CreateGrokModerationAliasErrors];
+
+export type CreateGrokModerationAliasResponses = {
+    /**
+     * OpenAI-compatible moderation response.
+     */
+    200: ModerationResponse;
+};
+
+export type CreateGrokModerationAliasResponse = CreateGrokModerationAliasResponses[keyof CreateGrokModerationAliasResponses];
+
+export type CreateAntigravityRootChatCompletionAliasData = {
+    body: ChatCompletionRequest;
+    path?: never;
+    query?: never;
+    url: '/antigravity/v1/chat/completions';
+};
+
+export type CreateAntigravityRootChatCompletionAliasErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateAntigravityRootChatCompletionAliasError = CreateAntigravityRootChatCompletionAliasErrors[keyof CreateAntigravityRootChatCompletionAliasErrors];
+
+export type CreateAntigravityRootChatCompletionAliasResponses = {
+    /**
+     * Chat completion response, or SSE stream when stream is true.
+     */
+    200: ChatCompletionResponse;
+};
+
+export type CreateAntigravityRootChatCompletionAliasResponse = CreateAntigravityRootChatCompletionAliasResponses[keyof CreateAntigravityRootChatCompletionAliasResponses];
+
+export type CreateAntigravityRootMessageAliasData = {
+    body: AnthropicMessagesRequest;
+    path?: never;
+    query?: never;
+    url: '/antigravity/v1/messages';
+};
+
+export type CreateAntigravityRootMessageAliasErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type CreateAntigravityRootMessageAliasError = CreateAntigravityRootMessageAliasErrors[keyof CreateAntigravityRootMessageAliasErrors];
+
+export type CreateAntigravityRootMessageAliasResponses = {
+    /**
+     * Anthropic-compatible response, or SSE stream when stream is true.
+     */
+    200: AnthropicMessagesResponse;
+};
+
+export type CreateAntigravityRootMessageAliasResponse = CreateAntigravityRootMessageAliasResponses[keyof CreateAntigravityRootMessageAliasResponses];
+
+export type GenerateAntigravityRootGeminiContentAliasData = {
+    body: GeminiGenerateContentRequest;
+    path: {
+        /**
+         * Gemini model id from the path. SRapi runtime accepts slash-qualified ids when the HTTP router passes them through.
+         */
+        model: string;
+    };
+    query?: never;
+    url: '/antigravity/v1beta/models/{model}:generateContent';
+};
+
+export type GenerateAntigravityRootGeminiContentAliasErrors = {
+    /**
+     * Invalid Gemini gateway request.
+     */
+    400: GeminiErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GeminiErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GeminiErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GeminiErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GeminiErrorResponse;
+    /**
+     * Google-style Gemini gateway error.
+     */
+    default: GeminiErrorResponse;
+};
+
+export type GenerateAntigravityRootGeminiContentAliasError = GenerateAntigravityRootGeminiContentAliasErrors[keyof GenerateAntigravityRootGeminiContentAliasErrors];
+
+export type GenerateAntigravityRootGeminiContentAliasResponses = {
+    /**
+     * Gemini-compatible generateContent response.
+     */
+    200: GeminiGenerateContentResponse;
+};
+
+export type GenerateAntigravityRootGeminiContentAliasResponse = GenerateAntigravityRootGeminiContentAliasResponses[keyof GenerateAntigravityRootGeminiContentAliasResponses];
+
+export type StreamAntigravityRootGeminiContentAliasData = {
+    body: GeminiGenerateContentRequest;
+    path: {
+        /**
+         * Gemini model id from the path. SRapi runtime accepts slash-qualified ids when the HTTP router passes them through.
+         */
+        model: string;
+    };
+    query?: never;
+    url: '/antigravity/v1beta/models/{model}:streamGenerateContent';
+};
+
+export type StreamAntigravityRootGeminiContentAliasErrors = {
+    /**
+     * Invalid Gemini gateway request.
+     */
+    400: GeminiErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GeminiErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GeminiErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GeminiErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GeminiErrorResponse;
+    /**
+     * Google-style Gemini gateway error.
+     */
+    default: GeminiErrorResponse;
+};
+
+export type StreamAntigravityRootGeminiContentAliasError = StreamAntigravityRootGeminiContentAliasErrors[keyof StreamAntigravityRootGeminiContentAliasErrors];
+
+export type StreamAntigravityRootGeminiContentAliasResponses = {
+    /**
+     * SSE stream of Gemini-compatible GenerateContentResponse chunks.
+     */
+    200: string;
+};
+
+export type StreamAntigravityRootGeminiContentAliasResponse = StreamAntigravityRootGeminiContentAliasResponses[keyof StreamAntigravityRootGeminiContentAliasResponses];
+
 export type GenerateAntigravityGeminiContentAliasData = {
     body: GeminiGenerateContentRequest;
     path: {
@@ -9199,6 +10755,62 @@ export type CreateOpenAiCompatibleResponseAliasResponses = {
 };
 
 export type CreateOpenAiCompatibleResponseAliasResponse = CreateOpenAiCompatibleResponseAliasResponses[keyof CreateOpenAiCompatibleResponseAliasResponses];
+
+export type ListOpenAiCompatibleResponseInputItemsAliasData = {
+    body?: never;
+    path: {
+        response_id: string;
+    };
+    query: {
+        /**
+         * Canonical model or model alias used for SRapi policy and scheduling.
+         */
+        model: string;
+        after?: string;
+        include?: Array<string>;
+        limit?: number;
+        order?: 'asc' | 'desc';
+    };
+    url: '/api/provider/openai-compatible/v1/responses/{response_id}/input_items';
+};
+
+export type ListOpenAiCompatibleResponseInputItemsAliasErrors = {
+    /**
+     * Invalid gateway request.
+     */
+    400: GatewayErrorResponse;
+    /**
+     * Missing or invalid gateway API key.
+     */
+    401: GatewayErrorResponse;
+    /**
+     * Gateway API key or user policy forbids this operation.
+     */
+    403: GatewayErrorResponse;
+    /**
+     * Request cannot be converted without semantic loss.
+     */
+    422: GatewayErrorResponse;
+    /**
+     * No schedulable account is available.
+     */
+    503: GatewayErrorResponse;
+    /**
+     * OpenAI-compatible gateway error.
+     */
+    default: GatewayErrorResponse;
+};
+
+export type ListOpenAiCompatibleResponseInputItemsAliasError = ListOpenAiCompatibleResponseInputItemsAliasErrors[keyof ListOpenAiCompatibleResponseInputItemsAliasErrors];
+
+export type ListOpenAiCompatibleResponseInputItemsAliasResponses = {
+    /**
+     * Raw Responses input_items list from the selected upstream provider.
+     */
+    200: ResponsesInputItemsList;
+};
+
+export type ListOpenAiCompatibleResponseInputItemsAliasResponse = ListOpenAiCompatibleResponseInputItemsAliasResponses[keyof ListOpenAiCompatibleResponseInputItemsAliasResponses];
 
 export type CreateOpenAiCompatibleResponseCompactAliasData = {
     body: ResponsesRequest;

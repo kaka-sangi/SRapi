@@ -760,6 +760,7 @@ func (s *Server) handleCreateAdminAccount(w http.ResponseWriter, r *http.Request
 	}
 	credential := derefMap(body.Credential)
 	metadata := jsonObjectToMap(body.Metadata)
+	metadata, _ = normalizeAccountErrorPolicyMetadata(metadata, credential)
 	credential, err = s.refreshImportCredential(r.Context(), accountcontract.RuntimeClass(body.RuntimeClass), body.UpstreamClient, metadata, body.ProxyId, credential)
 	if err != nil {
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "oauth refresh failed", requestID)
@@ -1008,7 +1009,11 @@ func (s *Server) handleUpdateAdminAccount(w http.ResponseWriter, r *http.Request
 	}
 	if credential != nil {
 		effectiveMetadata := mergeAccountMetadata(before.Metadata, metadata)
-		refreshed, err := s.refreshImportCredential(r.Context(), runtimeClass, upstreamClient, effectiveMetadata, proxyID, *credential)
+		normalizedMetadata, changed := normalizeAccountErrorPolicyMetadata(effectiveMetadata, *credential)
+		if changed {
+			metadata = &normalizedMetadata
+		}
+		refreshed, err := s.refreshImportCredential(r.Context(), runtimeClass, upstreamClient, normalizedMetadata, proxyID, *credential)
 		if err != nil {
 			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "oauth refresh failed", requestID)
 			return
@@ -1085,17 +1090,41 @@ func supportsRefreshTokenOnlyImport(upstreamClient *string) bool {
 }
 
 func mergeAccountMetadata(existing map[string]any, incoming *map[string]any) map[string]any {
-	if incoming == nil {
-		return existing
+	if incoming == nil && existing == nil {
+		return nil
 	}
-	merged := make(map[string]any, len(existing)+len(*incoming))
+	merged := make(map[string]any, len(existing))
 	for key, value := range existing {
 		merged[key] = value
+	}
+	if incoming == nil {
+		return merged
 	}
 	for key, value := range *incoming {
 		merged[key] = value
 	}
 	return merged
+}
+
+func normalizeAccountErrorPolicyMetadata(metadata map[string]any, credential map[string]any) (map[string]any, bool) {
+	if credential == nil {
+		return metadata, false
+	}
+	var changed bool
+	for _, key := range []string{"pool_mode", "custom_error_codes_enabled", "custom_error_codes"} {
+		if _, exists := metadata[key]; exists {
+			continue
+		}
+		value, ok := credential[key]
+		if ok {
+			if metadata == nil {
+				metadata = map[string]any{}
+			}
+			metadata[key] = value
+			changed = true
+		}
+	}
+	return metadata, changed
 }
 
 func (s *Server) handleBindAdminAccountProxy(w http.ResponseWriter, r *http.Request) {
@@ -1236,7 +1265,7 @@ func (s *Server) handleTestAdminAccount(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	startedAt := time.Now()
-	result := s.runtime.testAccount(r.Context(), provider, account, startedAt)
+	result := s.runtime.testAccount(r.Context(), provider, account, startedAt, adminAccountTestOptions{})
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "provider_account.test", "provider_account", strconv.Itoa(account.ID), nil, map[string]any{
 		"ok":     result.Ok,
 		"status": result.Status,

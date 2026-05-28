@@ -64,10 +64,9 @@ func TestGatewayResponsesWebSocketTargetsResponsesRuntime(t *testing.T) {
 	defer conn.Close(websocket.StatusNormalClosure, "")
 
 	writeWebSocketJSON(t, conn, map[string]any{
-		"type": "response.create",
-		"response": map[string]any{
-			"input": "hello over websocket",
-		},
+		"type":     "response.create",
+		"event_id": "evt_flat_create",
+		"input":    "hello over websocket",
 	})
 	event := readWebSocketEvent(t, conn)
 	if event["type"] != "response.completed" {
@@ -229,6 +228,127 @@ func TestGatewayResponsesWebSocketRejectsFunctionCallOutputWithoutCallID(t *test
 	}
 }
 
+func TestGatewayResponsesWebSocketRejectsNonResponsePreviousResponseID(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	conn := mustDialResponsesWebSocket(t, server.URL+"/v1/responses/ws", apiKey)
+	defer conn.Close(websocket.StatusNormalClosure, "")
+
+	writeWebSocketJSON(t, conn, map[string]any{
+		"type": "response.create",
+		"response": map[string]any{
+			"model":                "bad-previous-response-id-model",
+			"previous_response_id": "chatcmpl-123456",
+			"input":                "continue",
+		},
+	})
+
+	event := readWebSocketEvent(t, conn)
+	if event["type"] != "error" || event["status"] != float64(http.StatusBadRequest) {
+		t.Fatalf("expected bad request error event, got %+v", event)
+	}
+	errorBody, _ := event["error"].(map[string]any)
+	message, _ := errorBody["message"].(string)
+	if errorBody["code"] != "invalid_request" || !strings.Contains(message, "previous_response_id must reference a response id") {
+		t.Fatalf("expected previous_response_id error body, got %+v", event)
+	}
+}
+
+func TestResponsesWebSocketRequestPayloadAcceptsFlatResponseCreateEvent(t *testing.T) {
+	payload, err := responsesWebSocketRequestPayload([]byte(`{
+		"type":"response.create",
+		"event_id":"evt_flat",
+		"input":"hello flat websocket"
+	}`), "fallback-model")
+	if err != nil {
+		t.Fatalf("normalize flat response.create payload: %v", err)
+	}
+	var request map[string]any
+	if err := json.Unmarshal(payload, &request); err != nil {
+		t.Fatalf("decode normalized flat payload: %v", err)
+	}
+	if request["type"] != nil || request["event_id"] != nil {
+		t.Fatalf("event fields should not be forwarded as Responses request fields: %+v", request)
+	}
+	if request["model"] != "fallback-model" || request["input"] != "hello flat websocket" {
+		t.Fatalf("unexpected normalized flat response.create payload: %+v", request)
+	}
+}
+
+func TestResponsesWebSocketTurnStateFromRawResponsesBody(t *testing.T) {
+	state := responsesWebSocketTurnStateFromEvent([]byte(`{
+		"id":"resp_raw",
+		"object":"response",
+		"output":[{"type":"function_call","call_id":"call_1","name":"lookup","arguments":"{}"}]
+	}`))
+
+	if state.ResponseID != "resp_raw" {
+		t.Fatalf("expected top-level raw response id, got %+v", state)
+	}
+	if _, ok := state.ToolCallIDs["call_1"]; !ok || len(state.ToolCallIDs) != 1 {
+		t.Fatalf("expected top-level output tool call id, got %+v", state.ToolCallIDs)
+	}
+}
+
+func TestResponsesWebSocketInferPreviousResponseIDRequiresAllToolOutputsToMatch(t *testing.T) {
+	lastTurn := responsesWebSocketTurnState{
+		ResponseID:  "resp_previous",
+		ToolCallIDs: map[string]struct{}{"call_1": {}},
+	}
+	payload := []byte(`{
+		"model":"gpt-5.4",
+		"input":[
+			{"type":"function_call_output","call_id":"call_1","output":"ok"},
+			{"type":"function_call_output","call_id":"call_other","output":"wrong turn"}
+		]
+	}`)
+
+	inferred, err := responsesWebSocketInferPreviousResponseID(payload, lastTurn)
+	if err != nil {
+		t.Fatalf("infer previous_response_id: %v", err)
+	}
+	var request map[string]any
+	if err := json.Unmarshal(inferred, &request); err != nil {
+		t.Fatalf("decode inferred payload: %v", err)
+	}
+	if request["previous_response_id"] != nil {
+		t.Fatalf("mixed tool outputs should not infer previous_response_id, got %+v", request)
+	}
+}
+
+func TestResponsesWebSocketInferPreviousResponseIDWhenAllToolOutputsMatch(t *testing.T) {
+	lastTurn := responsesWebSocketTurnState{
+		ResponseID: "resp_previous",
+		ToolCallIDs: map[string]struct{}{
+			"call_1": {},
+			"call_2": {},
+		},
+	}
+	payload := []byte(`{
+		"model":"gpt-5.4",
+		"input":[
+			{"type":"function_call_output","call_id":"call_1","output":"one"},
+			{"type":"function_call_output","call_id":"call_2","output":"two"}
+		]
+	}`)
+
+	inferred, err := responsesWebSocketInferPreviousResponseID(payload, lastTurn)
+	if err != nil {
+		t.Fatalf("infer previous_response_id: %v", err)
+	}
+	var request map[string]any
+	if err := json.Unmarshal(inferred, &request); err != nil {
+		t.Fatalf("decode inferred payload: %v", err)
+	}
+	if request["previous_response_id"] != "resp_previous" {
+		t.Fatalf("expected inferred previous_response_id, got %+v", request)
+	}
+}
+
 func TestResponsesWebSocketUsageAcceptsInputTokenDetailsCachedTokens(t *testing.T) {
 	usage, ok := responsesWebSocketUsage([]byte(`{"type":"response.completed","response":{"usage":{"input_tokens":8,"output_tokens":9,"input_tokens_details":{"cached_tokens":3}}}}`))
 	if !ok {
@@ -359,8 +479,11 @@ func TestGatewayResponsesWebSocketRelaysCodexUpstreamWebSocket(t *testing.T) {
 	writeWebSocketJSON(t, conn, map[string]any{
 		"type": "response.create",
 		"response": map[string]any{
-			"input":  "hello codex websocket",
-			"stream": true,
+			"input":        "hello codex websocket",
+			"stream":       false,
+			"store":        true,
+			"background":   true,
+			"service_tier": "fast",
 		},
 	})
 	created := readWebSocketEvent(t, conn)
@@ -395,9 +518,24 @@ func TestGatewayResponsesWebSocketRelaysCodexUpstreamWebSocket(t *testing.T) {
 	}
 	if initialFrame["type"] != "response.create" ||
 		initialFrame["model"] != "codex-upstream" ||
-		initialFrame["input"] != "hello codex websocket" ||
-		initialFrame["stream"] != true {
+		initialFrame["stream"] != true ||
+		initialFrame["store"] != false ||
+		initialFrame["service_tier"] != "priority" ||
+		initialFrame["instructions"] != "You are a concise assistant." {
 		t.Fatalf("unexpected codex initial frame: %+v", initialFrame)
+	}
+	if _, ok := initialFrame["background"]; ok {
+		t.Fatalf("background should not be forwarded to codex websocket upstream: %+v", initialFrame)
+	}
+	input, ok := initialFrame["input"].([]any)
+	if !ok || len(input) != 1 {
+		t.Fatalf("expected normalized codex websocket input, got %+v", initialFrame["input"])
+	}
+	item, _ := input[0].(map[string]any)
+	content, _ := item["content"].([]any)
+	part, _ := content[0].(map[string]any)
+	if item["type"] != "message" || item["role"] != "user" || part["type"] != "input_text" || part["text"] != "hello codex websocket" {
+		t.Fatalf("unexpected normalized codex websocket input item: %+v", item)
 	}
 
 	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=wp410-codex-ws-model", nil)
@@ -427,6 +565,211 @@ func TestGatewayResponsesWebSocketRelaysCodexUpstreamWebSocket(t *testing.T) {
 		usageResp.Data[0].CachedTokens != 1 ||
 		usageResp.Data[0].UsageEstimated {
 		t.Fatalf("unexpected codex websocket usage record: %+v", usageResp.Data)
+	}
+}
+
+func TestGatewayResponsesWebSocketRelaysCodexMultipleTurnsOnSameConnection(t *testing.T) {
+	type upstreamObservation struct {
+		Path          string
+		Authorization string
+		InitialFrame  []byte
+	}
+	observations := make(chan upstreamObservation, 2)
+	var (
+		mu        sync.Mutex
+		turnNo    int
+		respIDs   = []string{"resp_ws_turn_1", "resp_ws_turn_2"}
+		texts     = []string{"turn 1 ok", "turn 2 ok"}
+		usagesIn  = []int{5, 6}
+		usagesOut = []int{7, 8}
+		cached    = []int{1, 2}
+	)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{CompressionMode: websocket.CompressionDisabled})
+		if err != nil {
+			t.Errorf("accept codex upstream websocket: %v", err)
+			return
+		}
+		defer conn.Close(websocket.StatusNormalClosure, "")
+
+		msgType, payload, err := conn.Read(r.Context())
+		if err != nil {
+			t.Errorf("read codex upstream frame: %v", err)
+			return
+		}
+		if msgType != websocket.MessageText {
+			t.Errorf("expected codex upstream text frame, got %v", msgType)
+			return
+		}
+
+		mu.Lock()
+		idx := turnNo
+		turnNo++
+		mu.Unlock()
+		if idx >= len(respIDs) {
+			t.Errorf("unexpected codex upstream turn %d", idx+1)
+			return
+		}
+		observations <- upstreamObservation{
+			Path:          r.URL.Path,
+			Authorization: r.Header.Get("Authorization"),
+			InitialFrame:  append([]byte(nil), payload...),
+		}
+
+		if err := conn.Write(r.Context(), websocket.MessageText, []byte(`{"type":"response.created","response":{"id":"`+respIDs[idx]+`","model":"codex-upstream"}}`)); err != nil {
+			t.Errorf("write codex created frame: %v", err)
+			return
+		}
+		completed := map[string]any{
+			"type": "response.completed",
+			"response": map[string]any{
+				"id":    respIDs[idx],
+				"model": "codex-upstream",
+				"output": []map[string]any{{
+					"type": "message",
+					"content": []map[string]any{{
+						"type": "output_text",
+						"text": texts[idx],
+					}},
+				}},
+				"usage": map[string]any{
+					"input_tokens":  usagesIn[idx],
+					"output_tokens": usagesOut[idx],
+					"input_tokens_details": map[string]any{
+						"cached_tokens": cached[idx],
+					},
+				},
+			},
+		}
+		encoded, err := json.Marshal(completed)
+		if err != nil {
+			t.Errorf("marshal codex completed frame: %v", err)
+			return
+		}
+		if err := conn.Write(r.Context(), websocket.MessageText, encoded); err != nil {
+			t.Errorf("write codex completed frame: %v", err)
+		}
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"wp412-codex-ws-provider","display_name":"WP412 Codex WS Provider","adapter_type":"reverse-proxy-codex-cli","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"wp412-codex-ws-model","display_name":"WP412 Codex WS Model","status":"active","capabilities":[{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"codex-upstream","status":"active","capability_override":[{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"wp412-codex-ws-account","runtime_class":"cli_client_token","upstream_client":"codex_cli","credential":{"cli_client_token":"codex-ws-token"},"metadata":{"base_url":"`+upstream.URL+`/backend-api/codex","codex_responses_websocket":true},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	conn := mustDialResponsesWebSocket(t, server.URL+"/v1/responses/ws?model=wp412-codex-ws-model&upstream_ws=true", apiKey)
+	defer conn.Close(websocket.StatusNormalClosure, "")
+
+	writeWebSocketJSON(t, conn, map[string]any{
+		"type": "response.create",
+		"response": map[string]any{
+			"input": "turn one",
+		},
+	})
+	firstCreated := readWebSocketEvent(t, conn)
+	firstCompleted := readWebSocketEvent(t, conn)
+	if firstCreated["type"] != "response.created" ||
+		firstCompleted["type"] != "response.completed" ||
+		!strings.Contains(mustMarshalString(t, firstCompleted), "turn 1 ok") {
+		t.Fatalf("unexpected first codex turn events: created=%+v completed=%+v", firstCreated, firstCompleted)
+	}
+
+	writeWebSocketJSON(t, conn, map[string]any{
+		"type": "response.create",
+		"response": map[string]any{
+			"previous_response_id": "resp_ws_turn_1",
+			"input":                "turn two",
+		},
+	})
+	secondCreated := readWebSocketEvent(t, conn)
+	secondCompleted := readWebSocketEvent(t, conn)
+	if secondCreated["type"] != "response.created" ||
+		secondCompleted["type"] != "response.completed" ||
+		!strings.Contains(mustMarshalString(t, secondCompleted), "turn 2 ok") {
+		t.Fatalf("unexpected second codex turn events: created=%+v completed=%+v", secondCreated, secondCompleted)
+	}
+
+	obs := make([]upstreamObservation, 0, 2)
+	for len(obs) < 2 {
+		select {
+		case item := <-observations:
+			obs = append(obs, item)
+		case <-time.After(3 * time.Second):
+			t.Fatalf("timed out waiting for codex upstream observations, got %d", len(obs))
+		}
+	}
+	for idx, item := range obs {
+		if item.Path != "/backend-api/codex/responses" || item.Authorization != "Bearer codex-ws-token" {
+			t.Fatalf("unexpected codex upstream request %d: %+v", idx+1, item)
+		}
+		var frame map[string]any
+		if err := json.Unmarshal(item.InitialFrame, &frame); err != nil {
+			t.Fatalf("decode codex initial frame %d: %v", idx+1, err)
+		}
+		if frame["type"] != "response.create" || frame["model"] != "codex-upstream" || frame["stream"] != true || frame["store"] != false {
+			t.Fatalf("unexpected codex initial frame %d: %+v", idx+1, frame)
+		}
+		wantText := "turn one"
+		if idx == 1 {
+			wantText = "turn two"
+			if frame["previous_response_id"] != "resp_ws_turn_1" {
+				t.Fatalf("second codex turn should preserve previous_response_id, got %+v", frame)
+			}
+		}
+		input, ok := frame["input"].([]any)
+		if !ok || len(input) != 1 {
+			t.Fatalf("expected normalized codex websocket input %d, got %+v", idx+1, frame["input"])
+		}
+		inputItem, _ := input[0].(map[string]any)
+		content, _ := inputItem["content"].([]any)
+		part, _ := content[0].(map[string]any)
+		if part["text"] != wantText {
+			t.Fatalf("unexpected codex websocket input text for turn %d: %+v", idx+1, inputItem)
+		}
+	}
+
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=wp412-codex-ws-model", nil)
+	decisionsReq.AddCookie(sessionCookie)
+	decisionsRec := httptest.NewRecorder()
+	handler.ServeHTTP(decisionsRec, decisionsReq)
+	if decisionsRec.Code != http.StatusOK {
+		t.Fatalf("expected scheduler decisions 200, got %d body=%s", decisionsRec.Code, decisionsRec.Body.String())
+	}
+	var decisionsResp apiopenapi.SchedulerDecisionListResponse
+	if err := json.NewDecoder(decisionsRec.Body).Decode(&decisionsResp); err != nil {
+		t.Fatalf("decode decisions: %v", err)
+	}
+	if len(decisionsResp.Data) != 2 {
+		t.Fatalf("expected two scheduler decisions for two websocket turns, got %+v", decisionsResp.Data)
+	}
+	for _, decision := range decisionsResp.Data {
+		if decision.SourceEndpoint != responsesWebSocketSourceEndpoint ||
+			decision.SelectedAccountId == nil ||
+			*decision.SelectedAccountId != string(accountResp.Data.Id) {
+			t.Fatalf("expected codex websocket scheduler evidence, got %+v", decision)
+		}
+	}
+
+	usageResp := waitForRealtimeUsageLogCount(t, handler, sessionCookie, "wp412-codex-ws-model", 2)
+	if len(usageResp.Data) != 2 {
+		t.Fatalf("expected two usage records for two websocket turns, got %+v", usageResp.Data)
+	}
+	totalTokens := 0
+	cachedTokens := 0
+	for _, item := range usageResp.Data {
+		if !item.Success || item.SourceEndpoint != responsesWebSocketSourceEndpoint || item.UsageEstimated {
+			t.Fatalf("unexpected codex websocket usage record: %+v", item)
+		}
+		totalTokens += item.TotalTokens
+		cachedTokens += item.CachedTokens
+	}
+	if totalTokens != 29 || cachedTokens != 3 {
+		t.Fatalf("unexpected codex websocket usage totals: total=%d cached=%d records=%+v", totalTokens, cachedTokens, usageResp.Data)
 	}
 }
 
@@ -836,6 +1179,11 @@ func mustDialRealtimeWebSocket(t *testing.T, rawURL, apiKey string, extra http.H
 
 func waitForRealtimeUsageLog(t *testing.T, handler http.Handler, sessionCookie *http.Cookie, model string) apiopenapi.UsageLogListResponse {
 	t.Helper()
+	return waitForRealtimeUsageLogCount(t, handler, sessionCookie, model, 1)
+}
+
+func waitForRealtimeUsageLogCount(t *testing.T, handler http.Handler, sessionCookie *http.Cookie, model string, count int) apiopenapi.UsageLogListResponse {
+	t.Helper()
 	deadline := time.Now().Add(3 * time.Second)
 	var last apiopenapi.UsageLogListResponse
 	for time.Now().Before(deadline) {
@@ -850,7 +1198,7 @@ func waitForRealtimeUsageLog(t *testing.T, handler http.Handler, sessionCookie *
 		if err := json.NewDecoder(usageRec.Body).Decode(&usageResp); err != nil {
 			t.Fatalf("decode usage logs: %v", err)
 		}
-		if len(usageResp.Data) > 0 {
+		if len(usageResp.Data) >= count {
 			return usageResp
 		}
 		last = usageResp

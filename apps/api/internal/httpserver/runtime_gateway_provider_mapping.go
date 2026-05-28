@@ -64,6 +64,20 @@ func providerTokenCountRequest(req gatewaycontract.CanonicalRequest, rawBody []b
 	}
 }
 
+func providerResponseInputItemsRequest(req gatewaycontract.CanonicalRequest, responseID string, query map[string][]string, candidate schedulercontract.Candidate) provideradaptercontract.ResponseInputItemsRequest {
+	return provideradaptercontract.ResponseInputItemsRequest{
+		RequestID:      req.RequestID,
+		SourceProtocol: string(req.SourceProtocol),
+		SourceEndpoint: req.SourceEndpoint,
+		Model:          req.CanonicalModel,
+		ResponseID:     responseID,
+		Query:          query,
+		Provider:       candidate.Provider,
+		Account:        candidate.Account,
+		Mapping:        candidate.Mapping,
+	}
+}
+
 func providerEmbeddingRequest(req gatewaycontract.CanonicalRequest, candidate schedulercontract.Candidate) provideradaptercontract.EmbeddingRequest {
 	return provideradaptercontract.EmbeddingRequest{
 		RequestID:      req.RequestID,

@@ -46,6 +46,7 @@ Provider Adapter 不负责：
 openai-compatible
 generic-reverse-proxy
 anthropic-compatible
+bedrock
 gemini-compatible
 native-openai
 native-anthropic
@@ -106,12 +107,23 @@ native-openai 或 openrouter
 openai-compatible       -> /chat/completions；`native-openai`、provider.name=openai 或显式 native Responses opt-in 的 `/v1/responses` 同协议请求走 /responses
 generic-reverse-proxy   -> metadata-defined OpenAI-compatible chat / embeddings path, optional body / response path mapping
 anthropic-compatible    -> /messages
+bedrock                 -> AWS Bedrock Runtime InvokeModel / InvokeModelWithResponseStream with Anthropic Messages body
 gemini-compatible       -> /models/{model}:generateContent 或 :streamGenerateContent
 native-gemini           -> /models/{model}:generateContent 或 :streamGenerateContent
 reverse-proxy-chatgpt-web -> Reverse Proxy Runtime + ChatGPT Web /backend-api/conversation payload
 reverse-proxy-gemini-cli -> Reverse Proxy Runtime + Gemini GenerateContent payload
 reverse-proxy-antigravity -> Reverse Proxy Runtime + Antigravity / Google Cloud Code v1internal payload
 ```
+
+Amazon Bedrock boundary:
+
+- `adapter_type = bedrock` is an API-key / AWS-credential Provider Adapter, not a `reverse-proxy-*` official-client simulation path.
+- It accepts Anthropic Messages-shaped canonical requests and dispatches to AWS Bedrock Runtime `POST /model/{modelId}/invoke` or `POST /model/{modelId}/invoke-with-response-stream`.
+- Credentials must come from the selected Provider Account materialized credential map: `aws_access_key_id`, `aws_secret_access_key`, optional `aws_session_token`, and optional `aws_region` / `bedrock_region`. Caller `Authorization` and Anthropic `x-api-key` never define the AWS identity.
+- The adapter signs each upstream request with AWS SigV4 for service `bedrock` and the selected region. It uses the AWS SDK signer rather than hand-rolled canonical request code.
+- Request body normalization is adapter-owned: inject `anthropic_version = bedrock-2023-05-31`, move optional configured Anthropic beta tokens into `anthropic_beta`, remove `model` / `stream` / unsupported output config fields, remove tool `custom`, and strip Bedrock-incompatible prompt-cache fields such as cache `scope` and unsupported `ttl`.
+- Regional Bedrock model IDs such as `us.anthropic...` are adjusted to the account region's Bedrock cross-region prefix by default; operators can disable that with `bedrock_disable_region_prefix_adjustment`.
+- Streaming responses decode AWS event stream chunks into Anthropic-compatible SSE events before parsing usage/content, including Bedrock invocation metrics normalization. This keeps Gateway, Scheduler, billing, and usage contracts provider-neutral.
 
 WP-430 ChatGPT Web 2api boundary:
 
@@ -465,6 +477,9 @@ account_level
 - `auth_failed` 通常标记账号需要处理。
 - `rate_limit` 通常进入短冷却。
 - `provider_5xx` 同时影响 Provider 健康。
+- Gateway 默认只向客户端返回 SRapi generic provider error message。Provider Account / Provider metadata 只有显式设置 `expose_provider_error_messages`（兼容 `provider_error_passthrough_enabled`、`upstream_error_message_passthrough`、`passthrough_provider_error_message`）时，才允许把安全清洗后的 `ProviderError.message` 作为客户端错误 message。
+- Provider error message passthrough 可以用 `provider_error_passthrough_status_codes`、`provider_error_passthrough_classes`、`provider_error_passthrough_keywords` 进一步限制；兼容别名为 `exposed_provider_error_*` 和 `provider_error_message_*`。Gateway 只抽取常见 JSON `error.message` / `message` / `detail` 文本，折叠控制字符，限制长度，且遇到 authorization、bearer、api key、token、cookie、secret、password 等敏感标记时回退 generic message。不得透传原始上游错误体、headers、账号 ID 或凭证。
+- Provider Account / Provider metadata 可以声明合成健康探测 profile：`health_probe_url`、`health_probe_method`、`health_probe_body`、`health_probe_headers`、`health_probe_expected_status_codes`、`health_probe_response_path`、`health_probe_response_contains`（均有 `probe_*` 简写兼容）。Adapter 必须只允许 `GET` / `HEAD` / `POST`，只接受 JSON body，拒绝覆盖鉴权、cookie、host、hop-by-hop header，并把结果写回统一 `AccountHealthSnapshot` / cooldown / circuit 机制，而不是新增 provider-specific monitor 状态。
 
 ## 12. Usage 解析
 
@@ -676,11 +691,24 @@ Audio speech dispatch must send JSON with mapped upstream `model`, `input`, `voi
 
 - “反代 / 2api”的权威定义见 `2API_REVERSE_PROXY_DEFINITION.md`：Adapter 必须按本地 `sub2api` / `CLIProxyAPI` / `chatgpt2api` 风格构造目标官方客户端形态的上游请求，例如 ChatGPT Web、Codex CLI、Claude Code CLI、Gemini CLI 或 Antigravity Desktop / IDE，而不是把下游请求简单透传到兼容 API，也不是启动或接入本地客户端进程。
 - `reverse-proxy-chatgpt-web` 文本请求必须构造 ChatGPT Web Conversation / official-client 形态，POST 到 ChatGPT Web origin 下的 `/backend-api/conversation`，并通过 Reverse Proxy Runtime 注入选中账号 OAuth/session token 身份；不得退化为 OpenAI-compatible `/chat/completions`，也不得接受 `runtime_class = api_key` 作为 2api 身份。
-- `reverse-proxy-codex-cli` 文本请求必须构造 Codex Responses / official-client 形态，POST 到配置的 Codex base URL 下的 `/responses`；`/v1/responses/compact` 请求必须要求 `responses_compact` effective capability，POST 到 `/responses/compact` 并保留 `response.compaction` 原始 JSON。两者都通过 Reverse Proxy Runtime 注入选中账号 OAuth/session/CLI token 身份；不得退化为 OpenAI-compatible `/chat/completions`，也不得接受 `runtime_class = api_key` 作为 2api 身份。
-- `reverse-proxy-codex-cli` realtime 请求必须通过 `PrepareRealtime` 构造 Codex Responses WebSocket session：从 Codex base URL 派生 `ws/wss` `/responses`，设置 Codex official-client headers，生成带 `type: response.create` 和 mapped upstream model 的首帧，并继续拒绝 `runtime_class = api_key`。
+- `reverse-proxy-codex-cli` 文本请求必须构造 Codex Responses / official-client 形态，POST 到配置的 Codex base URL 下的 `/responses`；`/v1/responses/compact` 请求必须要求 `responses_compact` effective capability，POST 到 `/responses/compact` 并保留 `response.compaction` 原始 JSON。`GET /v1/responses/{response_id}/input_items` 必须通过选中账号调用上游 `/responses/{response_id}/input_items` 并原样回放 JSON list，SRapi query `model` 只用于调度不得转发上游。以上请求都通过 Reverse Proxy Runtime 注入选中账号 OAuth/session/CLI token 身份；不得退化为 OpenAI-compatible `/chat/completions`，也不得接受 `runtime_class = api_key` 作为 2api 身份。
+- Codex official-client headers 默认使用 `Originator: codex_cli_rs`；账号 metadata 可以用 `codex_originator`（兼容 `originator`）显式覆盖，以适配 Codex Desktop、VS Code、Atlas、SDK 等官方客户端家族形态。默认 instructions 只在普通 `/responses` 缺省时注入，账号 metadata 可用 `codex_default_instructions`（兼容 `default_instructions`）覆盖；`/responses/compact` 不注入默认 instructions。
+- Codex `/responses` 遇到上游 `previous_response_not_found` 时，Adapter 只允许做一次保守恢复重试：请求必须携带可重放的普通 input，且不得包含 `function_call_output`、`item_reference`、reasoning 或历史 tool-call 上下文；重试 payload 删除 `previous_response_id` 后重新发送。`/responses/compact` 和工具续链请求不得自动删除 `previous_response_id`。
+- Codex raw Responses payload 必须在 Adapter 边界规范化旧式 Chat Completions 工具字段：`functions` 迁移为 Responses `tools`，`function_call` 迁移为 `tool_choice`，嵌套 `function` schema 展平为 Responses function tool；无效或不存在目标工具的 `tool_choice` 回退为 `auto`。Raw input 中的 `role: "tool"` message 必须转为 Responses `function_call_output`，message content part 的 `text` 必须是字符串；避免把上游不接受的遗留字段或非法 input item 直接发送到 Codex。
+- Codex `image_generation` tool 使用与 native OpenAI Responses 相同的参数规范化：`format` 迁移为 `output_format`，`compression` 迁移为 `output_compression`，并移除遗留别名；不得通过 prompt 注入方式伪造图片能力。
+- Codex `/responses` 与 `/responses/{response_id}/input_items` 上游返回的 `x-codex-primary-*` / `x-codex-secondary-*` quota headers 必须在 Adapter 边界解析为安全的 `QuotaSignal`，按 `window-minutes` 归一化为 `codex_5h_percent` / `codex_7d_percent`，并由 Gateway 写入 `account_quota_snapshots`。不得把原始 quota headers、token、cookie 或账号凭证写入日志、事件 payload 或对外 API 响应。
+- 上游 429 / quota exhaustion 错误若带 `Retry-After`、OpenAI-style `error.resets_at`、Google/Gemini structured retry delay (`RetryInfo.retryDelay` 或 `QuotaFailure.metadata.quotaResetDelay`) 或 Codex quota reset headers，Adapter 必须把它们转换为安全的 `ProviderError.RetryAfter`。Gateway 只把该时间用于选中账号 cooldown metadata 和后续调度过滤，不把原始错误体、header、账号 ID 或凭证暴露到事件 payload、日志或客户端响应。
+- 上游 `529` / `overloaded_error` 必须分类为 provider overload，而不是普通 provider_5xx。Gateway 对客户端返回 503，并把选中账号写入短期 `cooldown_reason=overloaded` / `last_error_class=overloaded` metadata，让 Scheduler 在冷却窗口内拒绝该账号；不得引入 provider-specific 调度字段或把原始上游错误体透出给客户端。
+- API-key 上游 `401/403` 归类为 `auth_failed` 时，Gateway 不自动禁用账号；必须写入短期 `cooldown_reason=auth_failed` / `last_error_class=auth_failed` metadata，避免连续调度同一失效或被拒账号。只有 Reverse Proxy Runtime 明确返回 `session_invalid`、`account_locked`、`account_banned`、`abuse_detected` 等账号状态信号时，才允许自动切换账号状态。
+- Provider Account metadata 可以声明 `error_cooldown_rules`（或迁移兼容的 `temporary_cooldown_rules` / `temp_unschedulable_enabled` + `temp_unschedulable_rules`），按上游 status、SRapi `error_class`、安全 ProviderError message 关键词匹配后写入选中账号 cooldown。规则只允许配置 reason 和 cooldown duration；Gateway 不持久化原始上游错误体或匹配内容，不增加 provider-specific scheduler 状态。
+- Provider Account metadata 可以声明 `handled_error_status_codes`（兼容 `account_error_status_codes`，迁移兼容 `custom_error_codes_enabled` + `custom_error_codes`），限制哪些上游 HTTP status 允许触发账号 cooldown 或 Reverse Proxy hard protection。迁移兼容的 `pool_mode=true` 默认跳过本地账号状态副作用，除非显式配置 custom/handled status code 列表；Admin create/update 会把旧 2api credential 中的 `pool_mode` / `custom_error_codes*` 复制到 metadata，避免运行时从加密凭证读取健康策略。该过滤只影响账号状态副作用，不改变 Gateway 对客户端的错误响应、failover、usage 或 scheduler feedback 语义；空列表按未配置处理，避免误关保护。
+- Provider Account metadata 可以声明 `same_candidate_retry_enabled` / `same_candidate_retry_count` / `same_candidate_retry_base_delay_ms` / `same_candidate_retry_max_delay_ms`（兼容 `same_account_*`、`transient_retry_count`、`pool_mode_retry_count`）。Gateway 在同一 Scheduler decision 内对 transient 429、529、5xx、timeout、network、stream interruption、empty completion 做有界同候选 retry；`pool_mode=true` 默认启用并允许对 401/403 做同候选 retry。retry 过程只记录低敏日志，最终成功或最终失败才写 usage / scheduler feedback；失败后仍进入现有 ranked-candidate failover，不新增 provider-specific scheduler 状态。
+- 该同候选 retry / ranked-candidate failover 语义适用于文本、Responses、Messages、Embeddings、Responses input_items，以及 direct-dispatch 的 images、audio、moderations、rerank、Anthropic count_tokens 和 Gemini countTokens；各端点仍保留自己的响应渲染和成功 usage/price 规则。
+- `reverse-proxy-codex-cli` realtime 请求必须通过 `PrepareRealtime` 构造 Codex Responses WebSocket session：从 Codex base URL 派生 `ws/wss` `/responses`，设置 Codex official-client headers，并继续拒绝 `runtime_class = api_key`。首帧必须是 SRapi 规范化后的 Codex Responses `response.create`：强制 mapped upstream model、`stream=true`、OAuth/session 默认 `store=false`，补齐默认 instructions，复用普通 `/responses` 的 input/tool/service_tier/image_generation 规范化，并移除 live WebSocket 不适用的 `background`。
 - OpenAI-compatible Realtime 请求必须通过 `PrepareRealtime` 构造上游 Realtime WebSocket session：从 OpenAI-compatible base URL 派生 `ws/wss` `/realtime?model=<mapped_upstream_model>`，只转发显式允许的 Realtime handshake headers（当前为 `OpenAI-Safety-Identifier`）。`runtime_class = api_key` 的官方 API-key Realtime 由 Gateway 用选中账号 `api_key`/`openai_api_key` 直连上游；`runtime_class != api_key` 的 OpenAI-compatible Realtime 通过 Reverse Proxy Runtime 使用选中账号 OAuth/session/client-token credential 注入上游身份。SRapi 2api Realtime 路径继续拒绝 `runtime_class = api_key`。
 - `reverse-proxy-*` 和 `runtime_class != api_key` 上游请求必须通过 Reverse Proxy Runtime 发起，不得使用裸 `net/http` 默认客户端；官方 API-key Adapter 路径可使用普通 upstream client，但认证材料仍只能来自选中账号 credential。
 - TLS / HTTP/2 / Header / cookie / User-Agent / 出口 IP 必须由 Egress Profile 决定，不得在 Adapter 内硬编码。
+- Adapter 构造 `reverseproxycontract.AccountRuntime` 时必须透传 Provider Account metadata，让 Reverse Proxy Runtime 能统一解析 metadata-defined `egress_profile`；Adapter 只能构造上游业务 payload/endpoint，不得自行执行 TLS 指纹或 header 模拟。
 - 不得向上游泄漏 SRapi 内部标识（`X-Request-ID`、`X-Forwarded-*`、`Via`、`X-SRapi-*` 等）。
 - 必须处理 `challenge_required`、`session_invalid`、`account_locked`、`account_banned`、`abuse_detected`、`geo_blocked`、`device_unrecognized`、`upstream_client_outdated` 等反代特有错误，并按规范触发账号状态变更。
 - 必须每账号独立 cookie jar、HTTP client、proxy、UA，不得跨账号共享。

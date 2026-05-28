@@ -12,6 +12,7 @@ type PlatformFamily string
 const (
 	PlatformFamilyOpenAICompatible        PlatformFamily = "openai_compatible"
 	PlatformFamilyAnthropicCompatible     PlatformFamily = "anthropic_compatible"
+	PlatformFamilyBedrockAnthropic        PlatformFamily = "bedrock_anthropic"
 	PlatformFamilyReverseProxyAntigravity PlatformFamily = "reverse_proxy_antigravity"
 	PlatformFamilyRerankCompatible        PlatformFamily = "rerank_compatible"
 )
@@ -72,6 +73,7 @@ func Default() *Registry {
 		anthropicPreset("anthropic", "Anthropic", "https://api.anthropic.com/v1", []string{"/anthropic/v1", "/api/provider/anthropic", "/api/provider/anthropic/v1"}),
 		anthropicPreset("anthropic-compatible", "Anthropic Compatible", "https://api.anthropic.com/v1", []string{"/api/provider/anthropic-compatible", "/api/provider/anthropic-compatible/v1", "/api/provider/claude-compatible", "/api/provider/claude-compatible/v1"}),
 		antigravityPreset(),
+		bedrockPreset(),
 		anthropicPreset("deepseek-anthropic", "DeepSeek Anthropic Compatible", "https://api.deepseek.com/anthropic", providerAliases("deepseek-anthropic")),
 		anthropicPreset("moonshot-anthropic", "Moonshot Anthropic Compatible", "https://api.moonshot.ai/anthropic", providerAliases("moonshot-anthropic")),
 		anthropicPreset("zai-anthropic", "Z.AI Anthropic Compatible", "https://api.z.ai/api/anthropic", providerAliases("zai-anthropic")),
@@ -128,6 +130,20 @@ func antigravityPreset() Preset {
 		AccountTypeCustomReverseProxy,
 	}
 	return preset
+}
+
+func bedrockPreset() Preset {
+	return Preset{
+		ProviderKey:          "bedrock",
+		PlatformFamily:       PlatformFamilyBedrockAnthropic,
+		DisplayName:          "Amazon Bedrock",
+		RouteAliases:         []string{"/bedrock/v1", "/api/provider/bedrock", "/api/provider/bedrock/v1"},
+		DefaultBaseURL:       "https://bedrock-runtime.us-east-1.amazonaws.com",
+		AuthModes:            []AuthMode{AuthModeCustomHeader},
+		ModelCatalogOwner:    "bedrock",
+		AccountTypeAllowlist: []AccountType{AccountTypeAPIKey, AccountTypeUpstream},
+		Capabilities:         anthropicCapabilities(),
+	}
 }
 
 func compatiblePreset(providerKey string, platformFamily PlatformFamily, displayName string, defaultBaseURL string, routeAliases []string, capabilities map[string]bool) Preset {

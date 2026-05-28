@@ -3260,6 +3260,86 @@ func TestGatewayUsageLogPersistsPricingRuleCost(t *testing.T) {
 	}
 }
 
+func TestGatewayUsageReturnsCurrentAPIKeySnapshot(t *testing.T) {
+	usageStore := usagememory.New()
+	handler := New(config.Load(), nil, WithUsageStore(usageStore))
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	keyResp := mustCreateAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"usage-key","scopes":["gateway:invoke"],"allowed_models":["usage-model"],"rpm_limit":60,"tpm_limit":1000,"concurrency_limit":2}`)
+	otherKeyResp := mustCreateAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"other-usage-key","scopes":["gateway:invoke"]}`)
+
+	apiKeyID, err := strconv.Atoi(string(keyResp.Data.ApiKey.Id))
+	if err != nil {
+		t.Fatalf("parse api key id: %v", err)
+	}
+	otherAPIKeyID, err := strconv.Atoi(string(otherKeyResp.Data.ApiKey.Id))
+	if err != nil {
+		t.Fatalf("parse other api key id: %v", err)
+	}
+	createdAt := time.Now().UTC().Add(-time.Hour)
+	seedUsageLog(t, usageStore, usagecontract.UsageLog{
+		RequestID:      "req_gateway_usage_key",
+		UserID:         1,
+		APIKeyID:       apiKeyID,
+		SourceEndpoint: "/v1/chat/completions",
+		Model:          "usage-model",
+		InputTokens:    3,
+		OutputTokens:   4,
+		CachedTokens:   1,
+		TotalTokens:    8,
+		Success:        true,
+		Cost:           "0.10000000",
+		CreatedAt:      createdAt,
+	})
+	seedUsageLog(t, usageStore, usagecontract.UsageLog{
+		RequestID:      "req_gateway_usage_other_key",
+		UserID:         1,
+		APIKeyID:       otherAPIKeyID,
+		SourceEndpoint: "/v1/chat/completions",
+		Model:          "usage-model",
+		InputTokens:    100,
+		OutputTokens:   100,
+		TotalTokens:    200,
+		Success:        true,
+		Cost:           "9.00000000",
+		CreatedAt:      createdAt,
+	})
+
+	usageReq := httptest.NewRequest(http.MethodGet, "/v1/usage?days=30", nil)
+	usageReq.Header.Set("Authorization", "Bearer "+keyResp.Data.PlaintextKey)
+	usageRec := httptest.NewRecorder()
+	handler.ServeHTTP(usageRec, usageReq)
+	if usageRec.Code != http.StatusOK {
+		t.Fatalf("expected gateway usage 200, got %d body=%s", usageRec.Code, usageRec.Body.String())
+	}
+	var usageResp apiopenapi.GatewayUsageResponse
+	if err := json.NewDecoder(usageRec.Body).Decode(&usageResp); err != nil {
+		t.Fatalf("decode gateway usage: %v", err)
+	}
+	if usageResp.Object != apiopenapi.Usage || usageResp.ApiKeyId != keyResp.Data.ApiKey.Id || usageResp.Mode != apiopenapi.QuotaLimited || !usageResp.IsValid {
+		t.Fatalf("unexpected gateway usage identity fields: %+v", usageResp)
+	}
+	if usageResp.Usage.Requests != 1 || usageResp.Usage.TotalTokens != 8 || usageResp.Usage.Cost != "0.10000000" {
+		t.Fatalf("expected key-scoped usage totals, got %+v", usageResp.Usage)
+	}
+	if usageResp.Limits == nil || (*usageResp.Limits)["rpm"] != float64(60) || (*usageResp.Limits)["tpm"] != float64(1000) || (*usageResp.Limits)["concurrency"] != float64(2) {
+		t.Fatalf("expected key limits in usage response, got %+v", usageResp.Limits)
+	}
+	if usageResp.AllowedModels == nil || len(*usageResp.AllowedModels) != 1 || (*usageResp.AllowedModels)[0] != "usage-model" {
+		t.Fatalf("expected allowed model policy, got %+v", usageResp.AllowedModels)
+	}
+	if len(usageResp.RecentRequests) != 1 || usageResp.RecentRequests[0].RequestId != "req_gateway_usage_key" {
+		t.Fatalf("expected scoped recent request, got %+v", usageResp.RecentRequests)
+	}
+
+	invalidReq := httptest.NewRequest(http.MethodGet, "/v1/usage?days=0", nil)
+	invalidReq.Header.Set("Authorization", "Bearer "+keyResp.Data.PlaintextKey)
+	invalidRec := httptest.NewRecorder()
+	handler.ServeHTTP(invalidRec, invalidReq)
+	if invalidRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected invalid days 400, got %d body=%s", invalidRec.Code, invalidRec.Body.String())
+	}
+}
+
 func TestGatewayGeminiGenerateContentUsesCanonicalPipeline(t *testing.T) {
 	var (
 		mu    sync.Mutex
@@ -3742,6 +3822,70 @@ func TestGatewayGeminiProviderErrorsUseGoogleStyleEnvelope(t *testing.T) {
 	}
 }
 
+func TestGatewayProviderErrorMessagePassthroughMetadata(t *testing.T) {
+	cases := []struct {
+		name           string
+		slug           string
+		metadataSuffix string
+		wantMessage    string
+	}{
+		{
+			name:        "default generic message",
+			slug:        "default",
+			wantMessage: "provider rejected request",
+		},
+		{
+			name:           "metadata exposes sanitized upstream message",
+			slug:           "exposed",
+			metadataSuffix: `,"expose_provider_error_messages":true,"provider_error_passthrough_status_codes":[400],"provider_error_passthrough_classes":["invalid_request"],"provider_error_passthrough_keywords":["schema"]`,
+			wantMessage:    "invalid schema from upstream",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != "/v1/chat/completions" {
+					t.Fatalf("unexpected upstream path %s", r.URL.Path)
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write([]byte(`{"error":{"message":"invalid schema from upstream","type":"invalid_request_error"}}`))
+			}))
+			defer upstream.Close()
+
+			handler := New(config.Load(), nil)
+			loginResp, sessionCookie := mustLoginAdmin(t, handler)
+			providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"provider-error-message-`+tc.slug+`","display_name":"Provider Error Message `+tc.slug+`","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+			modelName := "provider-error-message-model-" + tc.slug
+			modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"`+modelName+`","display_name":"Provider Error Message Model `+tc.slug+`","status":"active"}`)
+			mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"provider-error-message-upstream","status":"active"}`)
+			metadata := `"base_url":` + strconv.Quote(upstream.URL+"/v1") + tc.metadataSuffix
+			mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"provider-error-message-`+tc.slug+`-account","runtime_class":"api_key","credential":{"api_key":"upstream-secret"},"metadata":{`+metadata+`},"status":"active"}`)
+			_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+			req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"`+modelName+`","messages":[{"role":"user","content":"trigger upstream validation"}]}`))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer "+apiKey)
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("expected provider rejection 400, got %d body=%s", rec.Code, rec.Body.String())
+			}
+			var errResp apiopenapi.GatewayErrorResponse
+			if err := json.NewDecoder(rec.Body).Decode(&errResp); err != nil {
+				t.Fatalf("decode gateway error: %v", err)
+			}
+			if errResp.Error.Message != tc.wantMessage {
+				t.Fatalf("expected gateway message %q, got %+v", tc.wantMessage, errResp.Error)
+			}
+			if errResp.Error.Code == nil || *errResp.Error.Code != "invalid_request" {
+				t.Fatalf("expected invalid_request code, got %+v", errResp.Error)
+			}
+		})
+	}
+}
+
 func TestGatewayGeminiListModels(t *testing.T) {
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
@@ -3790,6 +3934,72 @@ func TestGatewayGeminiListModels(t *testing.T) {
 	}
 }
 
+func TestGatewayGeminiGetModel(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	activeModel := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"gemini-get-visible","display_name":"Gemini Get Visible","family":"gemini","context_window":131072,"max_output_tokens":8192,"status":"active","capabilities":[{"key":"streaming","level":"required","status":"stable","version":"v1"},{"key":"token_counting","level":"required","status":"stable","version":"v1"}]}`)
+	hiddenModel := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"gemini-get-hidden","display_name":"Gemini Get Hidden","status":"active"}`)
+	_ = hiddenModel
+	_ = mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"gemini-get-disabled","display_name":"Gemini Get Disabled","status":"disabled"}`)
+	keyResp := mustCreateAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"gemini-get-key","scopes":["gateway:invoke"],"allowed_models":["`+string(activeModel.Data.CanonicalName)+`"]}`)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1beta/models/gemini-get-visible", nil)
+	req.Header.Set("Authorization", "Bearer "+keyResp.Data.PlaintextKey)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 Gemini model get, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var resp apiopenapi.GeminiModelInfo
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode Gemini model get: %v", err)
+	}
+	if resp.Name != "models/gemini-get-visible" || resp.BaseModelId != "gemini-get-visible" || resp.Version != "gemini" || resp.InputTokenLimit != 131072 || resp.OutputTokenLimit != 8192 {
+		t.Fatalf("unexpected Gemini model get response: %+v", resp)
+	}
+	if !geminiModelMethodsContain(resp.SupportedGenerationMethods, apiopenapi.GenerateContent) || !geminiModelMethodsContain(resp.SupportedGenerationMethods, apiopenapi.StreamGenerateContent) || !geminiModelMethodsContain(resp.SupportedGenerationMethods, apiopenapi.CountTokens) {
+		t.Fatalf("expected generateContent, streamGenerateContent, and countTokens methods, got %+v", resp.SupportedGenerationMethods)
+	}
+
+	prefixedReq := httptest.NewRequest(http.MethodGet, "/v1beta/models/models%2Fgemini-get-visible", nil)
+	prefixedReq.Header.Set("Authorization", "Bearer "+keyResp.Data.PlaintextKey)
+	prefixedRec := httptest.NewRecorder()
+	handler.ServeHTTP(prefixedRec, prefixedReq)
+	if prefixedRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 Gemini prefixed model get, got %d body=%s", prefixedRec.Code, prefixedRec.Body.String())
+	}
+
+	hiddenReq := httptest.NewRequest(http.MethodGet, "/v1beta/models/gemini-get-hidden", nil)
+	hiddenReq.Header.Set("Authorization", "Bearer "+keyResp.Data.PlaintextKey)
+	hiddenRec := httptest.NewRecorder()
+	handler.ServeHTTP(hiddenRec, hiddenReq)
+	if hiddenRec.Code != http.StatusForbidden {
+		t.Fatalf("expected hidden Gemini model get 403, got %d body=%s", hiddenRec.Code, hiddenRec.Body.String())
+	}
+	var hiddenResp apiopenapi.GeminiErrorResponse
+	if err := json.NewDecoder(hiddenRec.Body).Decode(&hiddenResp); err != nil {
+		t.Fatalf("decode hidden Gemini model get response: %v", err)
+	}
+	if hiddenResp.Error.Status != "PERMISSION_DENIED" {
+		t.Fatalf("expected Gemini PERMISSION_DENIED, got %+v", hiddenResp.Error)
+	}
+
+	missingReq := httptest.NewRequest(http.MethodGet, "/v1beta/models/gemini-get-missing", nil)
+	missingReq.Header.Set("Authorization", "Bearer "+keyResp.Data.PlaintextKey)
+	missingRec := httptest.NewRecorder()
+	handler.ServeHTTP(missingRec, missingReq)
+	if missingRec.Code != http.StatusNotFound {
+		t.Fatalf("expected missing Gemini model get 404, got %d body=%s", missingRec.Code, missingRec.Body.String())
+	}
+	var missingResp apiopenapi.GeminiErrorResponse
+	if err := json.NewDecoder(missingRec.Body).Decode(&missingResp); err != nil {
+		t.Fatalf("decode missing Gemini model get response: %v", err)
+	}
+	if missingResp.Error.Status != "NOT_FOUND" {
+		t.Fatalf("expected Gemini NOT_FOUND, got %+v", missingResp.Error)
+	}
+}
+
 func TestGatewayGeminiListModelsRejectsInvalidPaginationAndDisabledKey(t *testing.T) {
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
@@ -3833,6 +4043,84 @@ func TestGatewayGeminiListModelsRejectsInvalidPaginationAndDisabledKey(t *testin
 	}
 	if disabledResp.Error.Status != "PERMISSION_DENIED" {
 		t.Fatalf("expected Gemini PERMISSION_DENIED, got %+v", disabledResp.Error)
+	}
+}
+
+func TestGatewayGeminiAuthAcceptsGoogleAPIKeyForms(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"gemini-auth-visible","display_name":"Gemini Auth Visible","status":"active"}`)
+	keyResp := mustCreateAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"gemini-auth-key","scopes":["gateway:invoke"],"allowed_models":["`+string(modelResp.Data.CanonicalName)+`"]}`)
+	apiKey := keyResp.Data.PlaintextKey
+
+	tests := []struct {
+		name      string
+		path      string
+		headerKey string
+		headerVal string
+	}{
+		{name: "x goog header", path: "/v1beta/models/gemini-auth-visible", headerKey: "x-goog-api-key", headerVal: apiKey},
+		{name: "x api key header", path: "/v1beta/models/gemini-auth-visible", headerKey: "x-api-key", headerVal: apiKey},
+		{name: "authorization bearer fallback", path: "/v1beta/models/gemini-auth-visible", headerKey: "Authorization", headerVal: "Bearer " + apiKey},
+		{name: "query key", path: "/v1beta/models/gemini-auth-visible?key=" + apiKey},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, tc.path, nil)
+			if tc.headerKey != "" {
+				req.Header.Set(tc.headerKey, tc.headerVal)
+			}
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("expected Gemini auth form %q to return 200, got %d body=%s", tc.name, rec.Code, rec.Body.String())
+			}
+			var resp apiopenapi.GeminiModelInfo
+			if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+				t.Fatalf("decode Gemini model response: %v", err)
+			}
+			if resp.Name != "models/gemini-auth-visible" {
+				t.Fatalf("unexpected Gemini model response: %+v", resp)
+			}
+		})
+	}
+}
+
+func TestGatewayGeminiAuthRejectsDeprecatedAPIKeyQuery(t *testing.T) {
+	handler := New(config.Load(), nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1beta/models?api_key=deprecated", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected deprecated api_key query to return 400, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var resp apiopenapi.GeminiErrorResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode Gemini error response: %v", err)
+	}
+	if resp.Error.Status != "INVALID_ARGUMENT" || !strings.Contains(resp.Error.Message, "api_key is deprecated") {
+		t.Fatalf("unexpected deprecated api_key error: %+v", resp.Error)
+	}
+}
+
+func TestGatewayOpenAIAuthRejectsGoogleAPIKeyHeader(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	keyResp := mustCreateAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"openai-auth-boundary-key","scopes":["gateway:invoke"]}`)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	req.Header.Set("x-goog-api-key", keyResp.Data.PlaintextKey)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected OpenAI models route to reject Google key header, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var resp apiopenapi.GatewayErrorResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode OpenAI auth error response: %v", err)
+	}
+	if resp.Error.Code == nil || *resp.Error.Code != "invalid_api_key" {
+		t.Fatalf("expected invalid_api_key OpenAI auth error, got %+v", resp.Error)
 	}
 }
 
@@ -4109,6 +4397,212 @@ func TestGatewayProviderAliasForcesProviderContext(t *testing.T) {
 	}
 }
 
+func TestGatewayRootLegacyOpenAIAliasForcesProviderContext(t *testing.T) {
+	var upstreamCalls int
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamCalls++
+		if r.Method != http.MethodPost || r.URL.Path != "/v1/chat/completions" {
+			t.Fatalf("unexpected upstream request %s %s", r.Method, r.URL.Path)
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer root-openai-secret" {
+			t.Fatalf("unexpected upstream authorization %q", got)
+		}
+		var payload struct {
+			Model string `json:"model"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream payload: %v", err)
+		}
+		if payload.Model != "root-openai-upstream" {
+			t.Fatalf("expected mapped upstream model, got %q", payload.Model)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"chatcmpl-root-alias","object":"chat.completion","model":"root-openai-upstream","choices":[{"index":0,"message":{"role":"assistant","content":"root alias ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":3,"completion_tokens":4,"total_tokens":7}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	openaiProvider := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"openai","display_name":"OpenAI","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	fallbackProvider := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"root-openai-fallback","display_name":"Root OpenAI Fallback","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"root-openai-alias-model","display_name":"Root OpenAI Alias Model","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","upstream_model_name":"fallback-upstream","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(fallbackProvider.Data.Id)+`","name":"root-openai-fallback-account","runtime_class":"api_key","credential":{"api_key":"fallback-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active","priority":100}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(openaiProvider.Data.Id)+`","upstream_model_name":"root-openai-upstream","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(openaiProvider.Data.Id)+`","name":"root-openai-account","runtime_class":"api_key","credential":{"api_key":"root-openai-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active","priority":10}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/openai/v1/chat/completions", `{"model":"root-openai-alias-model","messages":[{"role":"user","content":"root alias"}]}`)
+	var chatResp apiopenapi.ChatCompletionResponse
+	if err := json.NewDecoder(rec.Body).Decode(&chatResp); err != nil {
+		t.Fatalf("decode root alias chat response: %v", err)
+	}
+	if len(chatResp.Choices) != 1 || decodeChatMessageText(t, chatResp.Choices[0].Message.Content) != "root alias ok" {
+		t.Fatalf("unexpected root alias chat response: %+v", chatResp)
+	}
+	if upstreamCalls != 1 {
+		t.Fatalf("expected one root alias upstream call, got %d", upstreamCalls)
+	}
+
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=root-openai-alias-model", nil)
+	decisionsReq.AddCookie(sessionCookie)
+	decisionsRec := httptest.NewRecorder()
+	handler.ServeHTTP(decisionsRec, decisionsReq)
+	if decisionsRec.Code != http.StatusOK {
+		t.Fatalf("expected decisions 200, got %d body=%s", decisionsRec.Code, decisionsRec.Body.String())
+	}
+	var decisionsResp apiopenapi.SchedulerDecisionListResponse
+	if err := json.NewDecoder(decisionsRec.Body).Decode(&decisionsResp); err != nil {
+		t.Fatalf("decode decisions: %v", err)
+	}
+	if len(decisionsResp.Data) != 1 {
+		t.Fatalf("expected one root alias decision, got %+v", decisionsResp.Data)
+	}
+	decision := decisionsResp.Data[0]
+	if decision.SelectedProviderId == nil || *decision.SelectedProviderId != string(openaiProvider.Data.Id) || decision.CandidateCount != 1 || decision.SourceEndpoint != "/openai/v1/chat/completions" {
+		t.Fatalf("expected root alias to force openai provider and record source endpoint, got %+v", decision)
+	}
+
+	usageReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/usage-logs?model=root-openai-alias-model", nil)
+	usageReq.AddCookie(sessionCookie)
+	usageRec := httptest.NewRecorder()
+	handler.ServeHTTP(usageRec, usageReq)
+	if usageRec.Code != http.StatusOK {
+		t.Fatalf("expected usage logs 200, got %d body=%s", usageRec.Code, usageRec.Body.String())
+	}
+	var usageResp apiopenapi.UsageLogListResponse
+	if err := json.NewDecoder(usageRec.Body).Decode(&usageResp); err != nil {
+		t.Fatalf("decode usage logs: %v", err)
+	}
+	if len(usageResp.Data) != 1 ||
+		!usageResp.Data[0].Success ||
+		usageResp.Data[0].ProviderId == nil ||
+		*usageResp.Data[0].ProviderId != string(openaiProvider.Data.Id) ||
+		usageResp.Data[0].AccountId == nil ||
+		*usageResp.Data[0].AccountId != string(accountResp.Data.Id) ||
+		usageResp.Data[0].SourceEndpoint != "/openai/v1/chat/completions" ||
+		usageResp.Data[0].TargetProtocol == nil ||
+		*usageResp.Data[0].TargetProtocol != "openai-compatible" ||
+		usageResp.Data[0].TotalTokens != 7 {
+		t.Fatalf("expected root alias usage evidence, got %+v", usageResp.Data)
+	}
+}
+
+func TestGatewayResponsesInputItemsAliasReplaysRawUpstreamJSON(t *testing.T) {
+	var upstreamCalls int
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamCalls++
+		if r.Method != http.MethodGet || r.URL.Path != "/v1/responses/resp_input_items/input_items" {
+			t.Fatalf("unexpected upstream request %s %s", r.Method, r.URL.Path)
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer input-items-secret" {
+			t.Fatalf("unexpected upstream authorization %q", got)
+		}
+		if r.URL.Query().Get("model") != "" || r.URL.Query().Get("before") != "" {
+			t.Fatalf("internal or unsupported query params leaked upstream: %s", r.URL.RawQuery)
+		}
+		if r.URL.Query().Get("after") != "item_1" || r.URL.Query().Get("limit") != "2" || r.URL.Query().Get("order") != "asc" {
+			t.Fatalf("expected input_items pagination query, got %s", r.URL.RawQuery)
+		}
+		if got := r.URL.Query()["include"]; len(got) != 2 || got[0] != "file_search_call.results" || got[1] != "reasoning.encrypted_content" {
+			t.Fatalf("expected repeated include query params, got %q", r.URL.RawQuery)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"object":"list","data":[{"id":"item_1","type":"message","role":"user","content":[{"type":"input_text","text":"kept raw"}]}],"first_id":"item_1","last_id":"item_1","has_more":false,"raw_marker":"input-items-upstream"}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	openaiProvider := mustFindProviderByName(t, handler, sessionCookie, "openai-compatible")
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"input-items-alias-model","display_name":"Input Items Alias Model","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(openaiProvider.Id)+`","upstream_model_name":"input-items-upstream-model","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(openaiProvider.Id)+`","name":"input-items-alias-account","runtime_class":"api_key","credential":{"api_key":"input-items-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	rec := mustGatewayRequest(t, handler, apiKey, http.MethodGet, "/api/provider/openai-compatible/v1/responses/resp_input_items/input_items?model=input-items-alias-model&after=item_1&limit=2&order=asc&include=file_search_call.results&include=reasoning.encrypted_content&before=drop", "")
+	if upstreamCalls != 1 {
+		t.Fatalf("expected one upstream input_items call, got %d", upstreamCalls)
+	}
+	response := map[string]any{}
+	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
+		t.Fatalf("decode raw input_items response: %v", err)
+	}
+	if response["object"] != "list" || response["raw_marker"] != "input-items-upstream" {
+		t.Fatalf("expected raw input_items JSON replay, got %+v", response)
+	}
+
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=input-items-alias-model", nil)
+	decisionsReq.AddCookie(sessionCookie)
+	decisionsRec := httptest.NewRecorder()
+	handler.ServeHTTP(decisionsRec, decisionsReq)
+	if decisionsRec.Code != http.StatusOK {
+		t.Fatalf("expected decisions 200, got %d body=%s", decisionsRec.Code, decisionsRec.Body.String())
+	}
+	var decisionsResp apiopenapi.SchedulerDecisionListResponse
+	if err := json.NewDecoder(decisionsRec.Body).Decode(&decisionsResp); err != nil {
+		t.Fatalf("decode decisions: %v", err)
+	}
+	if len(decisionsResp.Data) != 2 {
+		t.Fatalf("expected input_items alias scheduler evidence, got %+v", decisionsResp.Data)
+	}
+	firstDecision := decisionsResp.Data[0]
+	secondDecision := decisionsResp.Data[1]
+	if firstDecision.AttemptNo != 1 ||
+		firstDecision.SelectedAccountId == nil ||
+		*firstDecision.SelectedAccountId == string(accountResp.Data.Id) ||
+		firstDecision.SourceEndpoint != "/api/provider/openai-compatible/v1/responses/resp_input_items/input_items" {
+		t.Fatalf("unexpected first input_items scheduler decision: %+v", firstDecision)
+	}
+	if secondDecision.AttemptNo != 2 ||
+		secondDecision.SelectedAccountId == nil ||
+		*secondDecision.SelectedAccountId != string(accountResp.Data.Id) ||
+		secondDecision.FallbackFromDecisionId == nil ||
+		*secondDecision.FallbackFromDecisionId != string(firstDecision.Id) ||
+		secondDecision.SourceEndpoint != "/api/provider/openai-compatible/v1/responses/resp_input_items/input_items" {
+		t.Fatalf("unexpected input_items failover scheduler decision: first=%+v second=%+v", firstDecision, secondDecision)
+	}
+	if got := secondDecision.RejectReasons["account_"+*firstDecision.SelectedAccountId]; got != "fallback_excluded" {
+		t.Fatalf("expected input_items failover exclusion evidence, got %+v", secondDecision.RejectReasons)
+	}
+
+	usageReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/usage-logs?model=input-items-alias-model", nil)
+	usageReq.AddCookie(sessionCookie)
+	usageRec := httptest.NewRecorder()
+	handler.ServeHTTP(usageRec, usageReq)
+	if usageRec.Code != http.StatusOK {
+		t.Fatalf("expected usage logs 200, got %d body=%s", usageRec.Code, usageRec.Body.String())
+	}
+	var usageResp apiopenapi.UsageLogListResponse
+	if err := json.NewDecoder(usageRec.Body).Decode(&usageResp); err != nil {
+		t.Fatalf("decode usage logs: %v", err)
+	}
+	if len(usageResp.Data) != 2 {
+		t.Fatalf("expected zero-usage input_items evidence, got %+v", usageResp.Data)
+	}
+	firstUsage := usageResp.Data[0]
+	secondUsage := usageResp.Data[1]
+	if firstUsage.AttemptNo != 1 ||
+		firstUsage.Success ||
+		firstUsage.ErrorClass == nil ||
+		*firstUsage.ErrorClass != "configuration_error" ||
+		firstUsage.SourceEndpoint != "/api/provider/openai-compatible/v1/responses/resp_input_items/input_items" {
+		t.Fatalf("unexpected first input_items usage attempt: %+v", firstUsage)
+	}
+	if secondUsage.AttemptNo != 2 ||
+		!secondUsage.Success ||
+		secondUsage.AccountId == nil ||
+		*secondUsage.AccountId != string(accountResp.Data.Id) ||
+		secondUsage.SourceEndpoint != "/api/provider/openai-compatible/v1/responses/resp_input_items/input_items" ||
+		secondUsage.TotalTokens != 0 ||
+		secondUsage.Cost != "0.00000000" {
+		t.Fatalf("unexpected successful input_items usage attempt: %+v", secondUsage)
+	}
+	if firstUsage.RequestId != secondUsage.RequestId {
+		t.Fatalf("expected input_items failover attempts to share request id, got %q and %q", firstUsage.RequestId, secondUsage.RequestId)
+	}
+}
+
 func TestGatewayChatCompletionFailoverRecordsAttemptEvidence(t *testing.T) {
 	var (
 		mu             sync.Mutex
@@ -4237,6 +4731,88 @@ func TestGatewayChatCompletionFailoverRecordsAttemptEvidence(t *testing.T) {
 	metrics := metricsBody(t, handler)
 	if !strings.Contains(metrics, `srapi_gateway_failover_total{endpoint_family="chat_completions",model="failover-attempt-model",provider_protocol="openai-compatible",result="success"} 1`) {
 		t.Fatalf("expected failover metric, got:\n%s", metrics)
+	}
+}
+
+func TestGatewayChatCompletionPoolModeRetriesSameCandidateBeforeFailover(t *testing.T) {
+	var upstreamCalls int
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/chat/completions" {
+			t.Fatalf("unexpected upstream path %s", r.URL.Path)
+		}
+		upstreamCalls++
+		if upstreamCalls == 1 {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = w.Write([]byte(`{"error":{"message":"try again","type":"rate_limit"}}`))
+			return
+		}
+		var payload struct {
+			Model string `json:"model"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		if payload.Model != "pool-retry-upstream" {
+			t.Fatalf("expected mapped upstream model, got %q", payload.Model)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"retry ok"}}],"usage":{"prompt_tokens":4,"completion_tokens":2,"total_tokens":6}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"pool-retry-provider","display_name":"Pool Retry Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"pool-retry-model","display_name":"Pool Retry Model","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"pool-retry-upstream","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"pool-retry-account","runtime_class":"api_key","credential":{"api_key":"pool-retry-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1","pool_mode":true,"pool_mode_retry_count":1,"pool_mode_retry_base_delay_ms":0,"pool_mode_retry_max_delay_ms":0},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/chat/completions", `{"model":"pool-retry-model","messages":[{"role":"user","content":"retry"}]}`)
+	var chatResp apiopenapi.ChatCompletionResponse
+	if err := json.NewDecoder(rec.Body).Decode(&chatResp); err != nil {
+		t.Fatalf("decode retry chat response: %v", err)
+	}
+	if len(chatResp.Choices) != 1 || decodeChatMessageText(t, chatResp.Choices[0].Message.Content) != "retry ok" {
+		t.Fatalf("expected retry response, got %+v", chatResp)
+	}
+	if upstreamCalls != 2 {
+		t.Fatalf("expected same-candidate retry to call upstream twice, got %d", upstreamCalls)
+	}
+
+	usageReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/usage-logs?model=pool-retry-model", nil)
+	usageReq.AddCookie(sessionCookie)
+	usageRec := httptest.NewRecorder()
+	handler.ServeHTTP(usageRec, usageReq)
+	if usageRec.Code != http.StatusOK {
+		t.Fatalf("expected usage logs 200, got %d body=%s", usageRec.Code, usageRec.Body.String())
+	}
+	var usageResp apiopenapi.UsageLogListResponse
+	if err := json.NewDecoder(usageRec.Body).Decode(&usageResp); err != nil {
+		t.Fatalf("decode usage logs: %v", err)
+	}
+	if len(usageResp.Data) != 1 {
+		t.Fatalf("expected one successful usage row for same-candidate retry, got %+v", usageResp.Data)
+	}
+	usage := usageResp.Data[0]
+	if usage.AttemptNo != 1 || !usage.Success || usage.AccountId == nil || *usage.AccountId != string(accountResp.Data.Id) || usage.TotalTokens != 6 {
+		t.Fatalf("unexpected retry usage evidence: %+v", usage)
+	}
+
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?request_id="+string(usage.RequestId), nil)
+	decisionsReq.AddCookie(sessionCookie)
+	decisionsRec := httptest.NewRecorder()
+	handler.ServeHTTP(decisionsRec, decisionsReq)
+	if decisionsRec.Code != http.StatusOK {
+		t.Fatalf("expected decisions 200, got %d body=%s", decisionsRec.Code, decisionsRec.Body.String())
+	}
+	var decisionsResp apiopenapi.SchedulerDecisionListResponse
+	if err := json.NewDecoder(decisionsRec.Body).Decode(&decisionsResp); err != nil {
+		t.Fatalf("decode scheduler decisions: %v", err)
+	}
+	if len(decisionsResp.Data) != 1 || decisionsResp.Data[0].AttemptNo != 1 || decisionsResp.Data[0].FallbackFromDecisionId != nil {
+		t.Fatalf("expected one scheduler decision for same-candidate retry, got %+v", decisionsResp.Data)
 	}
 }
 
@@ -5021,6 +5597,140 @@ func TestGatewayImageGenerationRouteTargetsOpenAICompatibleUpstream(t *testing.T
 	}
 	if len(decisionsResp.Data) != 1 || decisionsResp.Data[0].SourceEndpoint != "/v1/images/generations" || decisionsResp.Data[0].CandidateCount != 1 {
 		t.Fatalf("unexpected image decision evidence: %+v", decisionsResp.Data)
+	}
+}
+
+func TestGatewayImageGenerationPoolModeRetriesThenFailsOver(t *testing.T) {
+	var (
+		mu             sync.Mutex
+		primaryCalls   int
+		secondaryCalls int
+	)
+	primaryUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/images/generations" {
+			t.Fatalf("unexpected primary upstream path %s", r.URL.Path)
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer image-primary-secret" {
+			t.Fatalf("expected primary upstream auth, got %q", got)
+		}
+		mu.Lock()
+		primaryCalls++
+		callNo := primaryCalls
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		if callNo == 1 {
+			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = w.Write([]byte(`{"error":{"message":"try again","type":"rate_limit"}}`))
+			return
+		}
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = w.Write([]byte(`{"error":{"message":"primary unavailable","type":"server_error"}}`))
+	}))
+	defer primaryUpstream.Close()
+
+	secondaryUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/images/generations" {
+			t.Fatalf("unexpected secondary upstream path %s", r.URL.Path)
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer image-secondary-secret" {
+			t.Fatalf("expected secondary upstream auth, got %q", got)
+		}
+		var payload struct {
+			Model  string `json:"model"`
+			Prompt string `json:"prompt"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode secondary upstream request: %v", err)
+		}
+		if payload.Model != "image-failover-secondary-upstream" || payload.Prompt != "retry then fallback" {
+			t.Fatalf("unexpected secondary payload: %+v", payload)
+		}
+		mu.Lock()
+		secondaryCalls++
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"created":1710000002,"data":[{"url":"https://example.test/fallback-image.png"}],"model":"image-failover-secondary-upstream","usage":{"prompt_tokens":5,"completion_tokens":2,"total_tokens":7}}`))
+	}))
+	defer secondaryUpstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"image-direct-failover-model","display_name":"Image Direct Failover Model","status":"active","capabilities":[{"key":"images","level":"required","status":"stable","version":"v1"}]}`)
+	primaryProvider := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"image-direct-primary-provider","display_name":"Image Direct Primary","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active","capabilities":{"images":true}}`)
+	secondaryProvider := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"image-direct-secondary-provider","display_name":"Image Direct Secondary","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active","capabilities":{"images":true}}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(primaryProvider.Data.Id)+`","upstream_model_name":"image-failover-primary-upstream","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(secondaryProvider.Data.Id)+`","upstream_model_name":"image-failover-secondary-upstream","status":"active"}`)
+	primaryAccount := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(primaryProvider.Data.Id)+`","name":"image-direct-primary-account","runtime_class":"api_key","credential":{"api_key":"image-primary-secret"},"metadata":{"base_url":"`+primaryUpstream.URL+`/v1","pool_mode":true,"pool_mode_retry_count":1,"pool_mode_retry_base_delay_ms":0,"pool_mode_retry_max_delay_ms":0,"health_score":0.99,"latency_p95_ms":50,"quality_score":0.99},"status":"active"}`)
+	secondaryAccount := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(secondaryProvider.Data.Id)+`","name":"image-direct-secondary-account","runtime_class":"api_key","credential":{"api_key":"image-secondary-secret"},"metadata":{"base_url":"`+secondaryUpstream.URL+`/v1","health_score":0.80,"latency_p95_ms":1000,"quality_score":0.50},"status":"active"}`)
+
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+	rec := mustGatewayRequest(t, handler, apiKey, http.MethodPost, "/v1/images/generations", `{"model":"image-direct-failover-model","prompt":"retry then fallback","n":1}`)
+	var imageResp apiopenapi.ImageGenerationResponse
+	if err := json.NewDecoder(rec.Body).Decode(&imageResp); err != nil {
+		t.Fatalf("decode image failover response: %v", err)
+	}
+	if imageResp.Created != 1710000002 || len(imageResp.Data) != 1 || imageResp.Data[0].Url == nil || *imageResp.Data[0].Url != "https://example.test/fallback-image.png" {
+		t.Fatalf("unexpected image failover response: %+v", imageResp)
+	}
+
+	mu.Lock()
+	gotPrimaryCalls := primaryCalls
+	gotSecondaryCalls := secondaryCalls
+	mu.Unlock()
+	if gotPrimaryCalls != 2 || gotSecondaryCalls != 1 {
+		t.Fatalf("expected primary retry then fallback, got primary=%d secondary=%d", gotPrimaryCalls, gotSecondaryCalls)
+	}
+
+	usageReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/usage-logs?model=image-direct-failover-model", nil)
+	usageReq.AddCookie(sessionCookie)
+	usageRec := httptest.NewRecorder()
+	handler.ServeHTTP(usageRec, usageReq)
+	if usageRec.Code != http.StatusOK {
+		t.Fatalf("expected usage logs 200, got %d body=%s", usageRec.Code, usageRec.Body.String())
+	}
+	var usageResp apiopenapi.UsageLogListResponse
+	if err := json.NewDecoder(usageRec.Body).Decode(&usageResp); err != nil {
+		t.Fatalf("decode image failover usage logs: %v", err)
+	}
+	if len(usageResp.Data) != 2 {
+		t.Fatalf("expected failed and successful image usage attempts, got %+v", usageResp.Data)
+	}
+	firstUsage := usageResp.Data[0]
+	secondUsage := usageResp.Data[1]
+	if firstUsage.AttemptNo != 1 || firstUsage.Success || firstUsage.AccountId == nil || *firstUsage.AccountId != string(primaryAccount.Data.Id) || firstUsage.ErrorClass == nil || *firstUsage.ErrorClass != "provider_5xx" {
+		t.Fatalf("unexpected first image usage attempt: %+v", firstUsage)
+	}
+	if secondUsage.AttemptNo != 2 || !secondUsage.Success || secondUsage.AccountId == nil || *secondUsage.AccountId != string(secondaryAccount.Data.Id) || secondUsage.TotalTokens != 7 {
+		t.Fatalf("unexpected second image usage attempt: %+v", secondUsage)
+	}
+	if firstUsage.RequestId != secondUsage.RequestId {
+		t.Fatalf("expected image failover attempts to share request id, got %q and %q", firstUsage.RequestId, secondUsage.RequestId)
+	}
+
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?request_id="+string(firstUsage.RequestId), nil)
+	decisionsReq.AddCookie(sessionCookie)
+	decisionsRec := httptest.NewRecorder()
+	handler.ServeHTTP(decisionsRec, decisionsReq)
+	if decisionsRec.Code != http.StatusOK {
+		t.Fatalf("expected decisions 200, got %d body=%s", decisionsRec.Code, decisionsRec.Body.String())
+	}
+	var decisionsResp apiopenapi.SchedulerDecisionListResponse
+	if err := json.NewDecoder(decisionsRec.Body).Decode(&decisionsResp); err != nil {
+		t.Fatalf("decode image failover decisions: %v", err)
+	}
+	if len(decisionsResp.Data) != 2 {
+		t.Fatalf("expected two image scheduler decisions, got %+v", decisionsResp.Data)
+	}
+	firstDecision := decisionsResp.Data[0]
+	secondDecision := decisionsResp.Data[1]
+	if firstDecision.AttemptNo != 1 || firstDecision.SelectedAccountId == nil || *firstDecision.SelectedAccountId != string(primaryAccount.Data.Id) {
+		t.Fatalf("unexpected first image decision: %+v", firstDecision)
+	}
+	if secondDecision.AttemptNo != 2 || secondDecision.SelectedAccountId == nil || *secondDecision.SelectedAccountId != string(secondaryAccount.Data.Id) || secondDecision.FallbackFromDecisionId == nil || *secondDecision.FallbackFromDecisionId != string(firstDecision.Id) {
+		t.Fatalf("unexpected second image decision: first=%+v second=%+v", firstDecision, secondDecision)
+	}
+	if got := secondDecision.RejectReasons["account_"+string(primaryAccount.Data.Id)]; got != "fallback_excluded" {
+		t.Fatalf("expected fallback exclusion evidence for primary account, got %+v", secondDecision.RejectReasons)
 	}
 }
 
@@ -6387,11 +7097,12 @@ func TestGatewayAdminSettingsApplySchedulerStrategyRollout(t *testing.T) {
 
 func TestGatewayRateLimitFeedbackAppliesAccountCooldown(t *testing.T) {
 	var upstreamCalls int
+	resetAt := time.Now().UTC().Add(2 * time.Hour).Truncate(time.Second)
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		upstreamCalls++
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusTooManyRequests)
-		_, _ = w.Write([]byte(`{"error":{"type":"rate_limit","message":"slow down"}}`))
+		_, _ = w.Write([]byte(`{"error":{"type":"usage_limit_reached","message":"slow down","resets_at":` + strconv.FormatInt(resetAt.Unix(), 10) + `}}`))
 	}))
 	defer upstream.Close()
 
@@ -6477,6 +7188,13 @@ func TestGatewayRateLimitFeedbackAppliesAccountCooldown(t *testing.T) {
 	if cooldownAccount == nil || cooldownAccount.Metadata == nil || (*cooldownAccount.Metadata)["cooldown_active"] != true || (*cooldownAccount.Metadata)["cooldown_reason"] != "rate_limit" {
 		t.Fatalf("expected account cooldown metadata, got %+v", cooldownAccount)
 	}
+	cooldownUntil, err := time.Parse(time.RFC3339, strings.TrimSpace(fmt.Sprint((*cooldownAccount.Metadata)["cooldown_until"])))
+	if err != nil {
+		t.Fatalf("expected RFC3339 cooldown_until, got %+v", (*cooldownAccount.Metadata)["cooldown_until"])
+	}
+	if !cooldownUntil.Equal(resetAt) {
+		t.Fatalf("expected cooldown_until from upstream reset %v, got %v", resetAt, cooldownUntil)
+	}
 
 	healthReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts/"+string(accountResp.Data.Id)+"/health", nil)
 	healthReq.AddCookie(sessionCookie)
@@ -6540,6 +7258,378 @@ func TestGatewayRateLimitFeedbackAppliesAccountCooldown(t *testing.T) {
 	}
 	if len(usageResp.Data) != 2 || usageResp.Data[0].ErrorClass == nil || *usageResp.Data[0].ErrorClass != "rate_limit" {
 		t.Fatalf("expected rate_limit usage followed by cooldown failure, got %+v", usageResp.Data)
+	}
+}
+
+func TestGatewayOverloadedFeedbackAppliesAccountCooldown(t *testing.T) {
+	var upstreamCalls int
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamCalls++
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(529)
+		_, _ = w.Write([]byte(`{"error":{"type":"overloaded_error","message":"overloaded"}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"overload-provider","display_name":"Overload Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"overload-model","display_name":"Overload Model","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, modelResp.Data.Id, `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"overload-upstream","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"overload-account","runtime_class":"api_key","credential":{"api_key":"upstream-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	firstReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"overload-model","messages":[{"role":"user","content":"first"}]}`))
+	firstReq.Header.Set("Content-Type", "application/json")
+	firstReq.Header.Set("Authorization", "Bearer "+apiKey)
+	firstRec := httptest.NewRecorder()
+	handler.ServeHTTP(firstRec, firstReq)
+	if firstRec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected first overloaded response 503, got %d body=%s", firstRec.Code, firstRec.Body.String())
+	}
+
+	accountsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts", nil)
+	accountsReq.AddCookie(sessionCookie)
+	accountsRec := httptest.NewRecorder()
+	handler.ServeHTTP(accountsRec, accountsReq)
+	if accountsRec.Code != http.StatusOK {
+		t.Fatalf("expected accounts list 200, got %d", accountsRec.Code)
+	}
+	var accountsResp apiopenapi.ProviderAccountListResponse
+	if err := json.NewDecoder(accountsRec.Body).Decode(&accountsResp); err != nil {
+		t.Fatalf("decode accounts: %v", err)
+	}
+	cooldownAccount := findProviderAccountByID(accountsResp.Data, accountResp.Data.Id)
+	if cooldownAccount == nil || cooldownAccount.Metadata == nil || (*cooldownAccount.Metadata)["cooldown_active"] != true || (*cooldownAccount.Metadata)["cooldown_reason"] != "overloaded" || (*cooldownAccount.Metadata)["last_error_class"] != "overloaded" {
+		t.Fatalf("expected overloaded account cooldown metadata, got %+v", cooldownAccount)
+	}
+	cooldownUntil, err := time.Parse(time.RFC3339, strings.TrimSpace(fmt.Sprint((*cooldownAccount.Metadata)["cooldown_until"])))
+	if err != nil {
+		t.Fatalf("expected RFC3339 cooldown_until, got %+v", (*cooldownAccount.Metadata)["cooldown_until"])
+	}
+	if cooldownUntil.Before(time.Now().UTC().Add(9 * time.Minute)) {
+		t.Fatalf("expected overloaded cooldown near 10 minutes, got %v", cooldownUntil)
+	}
+
+	secondReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"overload-model","messages":[{"role":"user","content":"second"}]}`))
+	secondReq.Header.Set("Content-Type", "application/json")
+	secondReq.Header.Set("Authorization", "Bearer "+apiKey)
+	secondRec := httptest.NewRecorder()
+	handler.ServeHTTP(secondRec, secondReq)
+	if secondRec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected second request blocked by overload cooldown 503, got %d body=%s", secondRec.Code, secondRec.Body.String())
+	}
+	if upstreamCalls != 1 {
+		t.Fatalf("expected overloaded cooldown to prevent second upstream call, got %d upstream calls", upstreamCalls)
+	}
+
+	decisionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/scheduler/decisions?model=overload-model", nil)
+	decisionsReq.AddCookie(sessionCookie)
+	decisionsRec := httptest.NewRecorder()
+	handler.ServeHTTP(decisionsRec, decisionsReq)
+	if decisionsRec.Code != http.StatusOK {
+		t.Fatalf("expected decisions 200, got %d", decisionsRec.Code)
+	}
+	var decisionsResp apiopenapi.SchedulerDecisionListResponse
+	if err := json.NewDecoder(decisionsRec.Body).Decode(&decisionsResp); err != nil {
+		t.Fatalf("decode decisions: %v", err)
+	}
+	if len(decisionsResp.Data) != 2 || !jsonObjectContainsString(decisionsResp.Data[1].RejectReasons, "cooldown_active") {
+		t.Fatalf("expected second decision cooldown_active, got %+v", decisionsResp.Data)
+	}
+}
+
+func TestGatewayAuthFailureFeedbackAppliesAccountCooldown(t *testing.T) {
+	var upstreamCalls int
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamCalls++
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"error":{"type":"permission_error","message":"account forbidden"}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"auth-fail-provider","display_name":"Auth Fail Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"auth-fail-model","display_name":"Auth Fail Model","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, modelResp.Data.Id, `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"auth-fail-upstream","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"auth-fail-account","runtime_class":"api_key","credential":{"api_key":"upstream-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	firstReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"auth-fail-model","messages":[{"role":"user","content":"first"}]}`))
+	firstReq.Header.Set("Content-Type", "application/json")
+	firstReq.Header.Set("Authorization", "Bearer "+apiKey)
+	firstRec := httptest.NewRecorder()
+	handler.ServeHTTP(firstRec, firstReq)
+	if firstRec.Code != http.StatusBadGateway {
+		t.Fatalf("expected first auth failure response 502, got %d body=%s", firstRec.Code, firstRec.Body.String())
+	}
+
+	accountsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts", nil)
+	accountsReq.AddCookie(sessionCookie)
+	accountsRec := httptest.NewRecorder()
+	handler.ServeHTTP(accountsRec, accountsReq)
+	if accountsRec.Code != http.StatusOK {
+		t.Fatalf("expected accounts list 200, got %d", accountsRec.Code)
+	}
+	var accountsResp apiopenapi.ProviderAccountListResponse
+	if err := json.NewDecoder(accountsRec.Body).Decode(&accountsResp); err != nil {
+		t.Fatalf("decode accounts: %v", err)
+	}
+	cooldownAccount := findProviderAccountByID(accountsResp.Data, accountResp.Data.Id)
+	if cooldownAccount == nil || cooldownAccount.Metadata == nil || (*cooldownAccount.Metadata)["cooldown_active"] != true || (*cooldownAccount.Metadata)["cooldown_reason"] != "auth_failed" || (*cooldownAccount.Metadata)["last_error_class"] != "auth_failed" || cooldownAccount.Status != apiopenapi.ProviderAccountStatusActive {
+		t.Fatalf("expected active account with auth_failed cooldown metadata, got %+v", cooldownAccount)
+	}
+	cooldownUntil, err := time.Parse(time.RFC3339, strings.TrimSpace(fmt.Sprint((*cooldownAccount.Metadata)["cooldown_until"])))
+	if err != nil {
+		t.Fatalf("expected RFC3339 cooldown_until, got %+v", (*cooldownAccount.Metadata)["cooldown_until"])
+	}
+	if cooldownUntil.Before(time.Now().UTC().Add(9 * time.Minute)) {
+		t.Fatalf("expected auth failure cooldown near 10 minutes, got %v", cooldownUntil)
+	}
+
+	secondReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"auth-fail-model","messages":[{"role":"user","content":"second"}]}`))
+	secondReq.Header.Set("Content-Type", "application/json")
+	secondReq.Header.Set("Authorization", "Bearer "+apiKey)
+	secondRec := httptest.NewRecorder()
+	handler.ServeHTTP(secondRec, secondReq)
+	if secondRec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected second request blocked by auth cooldown 503, got %d body=%s", secondRec.Code, secondRec.Body.String())
+	}
+	if upstreamCalls != 1 {
+		t.Fatalf("expected auth cooldown to prevent second upstream call, got %d upstream calls", upstreamCalls)
+	}
+}
+
+func TestGatewayConfiguredErrorCooldownRuleAppliesAccountCooldown(t *testing.T) {
+	var upstreamCalls int
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamCalls++
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = w.Write([]byte(`{"error":{"type":"capacity_unavailable","message":"capacity unavailable"}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"configured-cooldown-provider","display_name":"Configured Cooldown Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"configured-cooldown-model","display_name":"Configured Cooldown Model","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, modelResp.Data.Id, `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"configured-cooldown-upstream","status":"active"}`)
+	accountBody := `{"provider_id":"` + string(providerResp.Data.Id) + `","name":"configured-cooldown-account","runtime_class":"api_key","credential":{"api_key":"upstream-secret"},"metadata":{"base_url":"` + upstream.URL + `/v1","error_cooldown_rules":[{"status_code":503,"error_class":"provider_5xx","keywords":["capacity"],"cooldown_seconds":120,"reason":"provider_capacity"}]},"status":"active"}`
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, accountBody)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	firstReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"configured-cooldown-model","messages":[{"role":"user","content":"first"}]}`))
+	firstReq.Header.Set("Content-Type", "application/json")
+	firstReq.Header.Set("Authorization", "Bearer "+apiKey)
+	firstRec := httptest.NewRecorder()
+	handler.ServeHTTP(firstRec, firstReq)
+	if firstRec.Code != http.StatusBadGateway {
+		t.Fatalf("expected first configured cooldown response 502, got %d body=%s", firstRec.Code, firstRec.Body.String())
+	}
+
+	accountsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts", nil)
+	accountsReq.AddCookie(sessionCookie)
+	accountsRec := httptest.NewRecorder()
+	handler.ServeHTTP(accountsRec, accountsReq)
+	if accountsRec.Code != http.StatusOK {
+		t.Fatalf("expected accounts list 200, got %d", accountsRec.Code)
+	}
+	var accountsResp apiopenapi.ProviderAccountListResponse
+	if err := json.NewDecoder(accountsRec.Body).Decode(&accountsResp); err != nil {
+		t.Fatalf("decode accounts: %v", err)
+	}
+	cooldownAccount := findProviderAccountByID(accountsResp.Data, accountResp.Data.Id)
+	if cooldownAccount == nil || cooldownAccount.Metadata == nil || (*cooldownAccount.Metadata)["cooldown_active"] != true || (*cooldownAccount.Metadata)["cooldown_reason"] != "provider_capacity" || (*cooldownAccount.Metadata)["last_error_class"] != "provider_5xx" {
+		t.Fatalf("expected configured account cooldown metadata, got %+v", cooldownAccount)
+	}
+	cooldownUntil, err := time.Parse(time.RFC3339, strings.TrimSpace(fmt.Sprint((*cooldownAccount.Metadata)["cooldown_until"])))
+	if err != nil {
+		t.Fatalf("expected RFC3339 cooldown_until, got %+v", (*cooldownAccount.Metadata)["cooldown_until"])
+	}
+	if cooldownUntil.Before(time.Now().UTC().Add(110 * time.Second)) {
+		t.Fatalf("expected configured cooldown near 120 seconds, got %v", cooldownUntil)
+	}
+
+	secondReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"configured-cooldown-model","messages":[{"role":"user","content":"second"}]}`))
+	secondReq.Header.Set("Content-Type", "application/json")
+	secondReq.Header.Set("Authorization", "Bearer "+apiKey)
+	secondRec := httptest.NewRecorder()
+	handler.ServeHTTP(secondRec, secondReq)
+	if secondRec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected second request blocked by configured cooldown 503, got %d body=%s", secondRec.Code, secondRec.Body.String())
+	}
+	if upstreamCalls != 1 {
+		t.Fatalf("expected configured cooldown to prevent second upstream call, got %d upstream calls", upstreamCalls)
+	}
+}
+
+func TestGatewayHandledErrorStatusCodesSkipConfiguredCooldown(t *testing.T) {
+	var upstreamCalls int
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamCalls++
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = w.Write([]byte(`{"error":{"type":"capacity_unavailable","message":"capacity unavailable"}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"handled-error-provider","display_name":"Handled Error Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"handled-error-model","display_name":"Handled Error Model","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, modelResp.Data.Id, `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"handled-error-upstream","status":"active"}`)
+	accountBody := `{"provider_id":"` + string(providerResp.Data.Id) + `","name":"handled-error-account","runtime_class":"api_key","credential":{"api_key":"upstream-secret"},"metadata":{"base_url":"` + upstream.URL + `/v1","handled_error_status_codes":[429],"error_cooldown_rules":[{"status_code":503,"error_class":"provider_5xx","keywords":["capacity"],"cooldown_seconds":120,"reason":"provider_capacity"}]},"status":"active"}`
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, accountBody)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	firstReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"handled-error-model","messages":[{"role":"user","content":"first"}]}`))
+	firstReq.Header.Set("Content-Type", "application/json")
+	firstReq.Header.Set("Authorization", "Bearer "+apiKey)
+	firstRec := httptest.NewRecorder()
+	handler.ServeHTTP(firstRec, firstReq)
+	if firstRec.Code != http.StatusBadGateway {
+		t.Fatalf("expected first configured cooldown response 502, got %d body=%s", firstRec.Code, firstRec.Body.String())
+	}
+
+	accountsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts", nil)
+	accountsReq.AddCookie(sessionCookie)
+	accountsRec := httptest.NewRecorder()
+	handler.ServeHTTP(accountsRec, accountsReq)
+	if accountsRec.Code != http.StatusOK {
+		t.Fatalf("expected accounts list 200, got %d", accountsRec.Code)
+	}
+	var accountsResp apiopenapi.ProviderAccountListResponse
+	if err := json.NewDecoder(accountsRec.Body).Decode(&accountsResp); err != nil {
+		t.Fatalf("decode accounts: %v", err)
+	}
+	account := findProviderAccountByID(accountsResp.Data, accountResp.Data.Id)
+	if account == nil || account.Metadata == nil {
+		t.Fatalf("expected account metadata, got %+v", account)
+	}
+	if (*account.Metadata)["cooldown_active"] == true || (*account.Metadata)["cooldown_reason"] != nil {
+		t.Fatalf("expected handled status gate to skip cooldown metadata, got %+v", *account.Metadata)
+	}
+
+	secondReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"handled-error-model","messages":[{"role":"user","content":"second"}]}`))
+	secondReq.Header.Set("Content-Type", "application/json")
+	secondReq.Header.Set("Authorization", "Bearer "+apiKey)
+	secondRec := httptest.NewRecorder()
+	handler.ServeHTTP(secondRec, secondReq)
+	if secondRec.Code != http.StatusBadGateway {
+		t.Fatalf("expected second configured cooldown response 502, got %d body=%s", secondRec.Code, secondRec.Body.String())
+	}
+	if upstreamCalls != 2 {
+		t.Fatalf("expected skipped cooldown to allow second upstream call, got %d upstream calls", upstreamCalls)
+	}
+}
+
+func TestGatewayPoolModeSkipsAccountCooldownWithoutCustomCodes(t *testing.T) {
+	var upstreamCalls int
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamCalls++
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`{"error":{"type":"rate_limit","message":"rate limited"}}`))
+	}))
+	defer upstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"pool-mode-provider","display_name":"Pool Mode Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"pool-mode-model","display_name":"Pool Mode Model","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, modelResp.Data.Id, `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"pool-mode-upstream","status":"active"}`)
+	accountBody := `{"provider_id":"` + string(providerResp.Data.Id) + `","name":"pool-mode-account","runtime_class":"api_key","credential":{"api_key":"upstream-secret"},"metadata":{"base_url":"` + upstream.URL + `/v1","pool_mode":true,"pool_mode_retry_count":0},"status":"active"}`
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, accountBody)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	firstReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"pool-mode-model","messages":[{"role":"user","content":"first"}]}`))
+	firstReq.Header.Set("Content-Type", "application/json")
+	firstReq.Header.Set("Authorization", "Bearer "+apiKey)
+	firstRec := httptest.NewRecorder()
+	handler.ServeHTTP(firstRec, firstReq)
+	if firstRec.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected first pool-mode response 429, got %d body=%s", firstRec.Code, firstRec.Body.String())
+	}
+
+	accountsReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts", nil)
+	accountsReq.AddCookie(sessionCookie)
+	accountsRec := httptest.NewRecorder()
+	handler.ServeHTTP(accountsRec, accountsReq)
+	if accountsRec.Code != http.StatusOK {
+		t.Fatalf("expected accounts list 200, got %d", accountsRec.Code)
+	}
+	var accountsResp apiopenapi.ProviderAccountListResponse
+	if err := json.NewDecoder(accountsRec.Body).Decode(&accountsResp); err != nil {
+		t.Fatalf("decode accounts: %v", err)
+	}
+	account := findProviderAccountByID(accountsResp.Data, accountResp.Data.Id)
+	if account == nil || account.Metadata == nil {
+		t.Fatalf("expected account metadata, got %+v", account)
+	}
+	if (*account.Metadata)["cooldown_active"] == true || (*account.Metadata)["cooldown_reason"] != nil {
+		t.Fatalf("expected pool mode to skip cooldown metadata, got %+v", *account.Metadata)
+	}
+
+	secondReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"pool-mode-model","messages":[{"role":"user","content":"second"}]}`))
+	secondReq.Header.Set("Content-Type", "application/json")
+	secondReq.Header.Set("Authorization", "Bearer "+apiKey)
+	secondRec := httptest.NewRecorder()
+	handler.ServeHTTP(secondRec, secondReq)
+	if secondRec.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected second pool-mode response 429, got %d body=%s", secondRec.Code, secondRec.Body.String())
+	}
+	if upstreamCalls != 2 {
+		t.Fatalf("expected skipped pool-mode cooldown to allow second upstream call, got %d upstream calls", upstreamCalls)
+	}
+}
+
+func TestCreateAccountNormalizesLegacyErrorPolicyCredentialMetadata(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"legacy-policy-provider","display_name":"Legacy Policy Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"legacy-policy-account","runtime_class":"api_key","credential":{"api_key":"upstream-secret","pool_mode":true,"custom_error_codes_enabled":true,"custom_error_codes":[401,429]},"status":"active"}`)
+	if accountResp.Data.Metadata == nil {
+		t.Fatalf("expected normalized metadata, got nil")
+	}
+	metadata := *accountResp.Data.Metadata
+	if metadata["pool_mode"] != true || metadata["custom_error_codes_enabled"] != true {
+		t.Fatalf("expected legacy policy booleans normalized into metadata, got %+v", metadata)
+	}
+	codes, ok := metadata["custom_error_codes"].([]any)
+	if !ok || len(codes) != 2 {
+		t.Fatalf("expected custom_error_codes normalized into metadata, got %+v", metadata["custom_error_codes"])
+	}
+}
+
+func TestUpdateAccountNormalizesLegacyErrorPolicyCredentialMetadata(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"legacy-update-policy-provider","display_name":"Legacy Update Policy Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"legacy-update-policy-account","runtime_class":"api_key","credential":{"api_key":"upstream-secret"},"metadata":{"base_url":"https://example.invalid/v1"},"status":"active"}`)
+
+	updateReq := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/accounts/"+string(accountResp.Data.Id), strings.NewReader(`{"credential":{"api_key":"upstream-secret-2","pool_mode":true}}`))
+	updateReq.Header.Set("Content-Type", "application/json")
+	updateReq.AddCookie(sessionCookie)
+	updateReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	updateRec := httptest.NewRecorder()
+	handler.ServeHTTP(updateRec, updateReq)
+	if updateRec.Code != http.StatusOK {
+		t.Fatalf("expected account update 200, got %d body=%s", updateRec.Code, updateRec.Body.String())
+	}
+	var updateResp apiopenapi.ProviderAccountResponse
+	if err := json.NewDecoder(updateRec.Body).Decode(&updateResp); err != nil {
+		t.Fatalf("decode account update: %v", err)
+	}
+	if updateResp.Data.Metadata == nil {
+		t.Fatalf("expected normalized metadata, got nil")
+	}
+	metadata := *updateResp.Data.Metadata
+	if metadata["base_url"] != "https://example.invalid/v1" || metadata["pool_mode"] != true {
+		t.Fatalf("expected merged normalized metadata, got %+v", metadata)
 	}
 }
 

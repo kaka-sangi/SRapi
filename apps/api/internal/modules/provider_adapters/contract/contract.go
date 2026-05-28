@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/url"
+	"time"
 
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
@@ -43,6 +45,19 @@ type TokenCountRequest struct {
 	SourceEndpoint string
 	Model          string
 	RawBody        []byte
+	Provider       providercontract.Provider
+	Account        accountcontract.ProviderAccount
+	Mapping        modelcontract.ModelProviderMapping
+	Credential     map[string]any
+}
+
+type ResponseInputItemsRequest struct {
+	RequestID      string
+	SourceProtocol string
+	SourceEndpoint string
+	Model          string
+	ResponseID     string
+	Query          url.Values
 	Provider       providercontract.Provider
 	Account        accountcontract.ProviderAccount
 	Mapping        modelcontract.ModelProviderMapping
@@ -354,6 +369,23 @@ type TokenCountResponse struct {
 	Metadata                map[string]any
 }
 
+// QuotaSignal carries sanitized provider quota observations from upstream response headers.
+type QuotaSignal struct {
+	QuotaType      string
+	Remaining      string
+	Used           string
+	QuotaLimit     string
+	RemainingRatio float32
+	ResetAt        *time.Time
+	SnapshotAt     time.Time
+}
+
+type ResponseInputItemsResponse struct {
+	Raw          []byte
+	StatusCode   int
+	QuotaSignals []QuotaSignal
+}
+
 type ModalityTokenCount struct {
 	Modality   string
 	TokenCount int
@@ -396,6 +428,7 @@ type ConversationResponse struct {
 	Raw          json.RawMessage
 	Warnings     []string
 	StreamEvents []ConversationStreamEvent
+	QuotaSignals []QuotaSignal
 }
 
 // ProbeRequest contains the provider, account, and credential used for a health probe.
@@ -437,6 +470,7 @@ type ProviderError struct {
 	Class      string
 	StatusCode int
 	Message    string
+	RetryAfter *time.Time
 }
 
 func (e ProviderError) Error() string {
@@ -449,6 +483,7 @@ func (e ProviderError) Error() string {
 	return "provider adapter error"
 }
 
+// ConversationAdapter invokes a provider-backed text or multimodal conversation request.
 type ConversationAdapter interface {
 	InvokeConversation(ctx context.Context, req ConversationRequest) (ConversationResponse, error)
 }
@@ -458,38 +493,52 @@ type ProbeAdapter interface {
 	ProbeAccount(ctx context.Context, req ProbeRequest) (ProbeResponse, error)
 }
 
+// RealtimeAdapter prepares a provider realtime session for WebSocket relay.
 type RealtimeAdapter interface {
 	PrepareRealtime(ctx context.Context, req RealtimeRequest) (RealtimeSession, error)
 }
 
+// EmbeddingAdapter invokes provider embedding generation.
 type EmbeddingAdapter interface {
 	InvokeEmbeddings(ctx context.Context, req EmbeddingRequest) (EmbeddingResponse, error)
 }
 
+// ImageGenerationAdapter invokes provider image generation.
 type ImageGenerationAdapter interface {
 	InvokeImageGeneration(ctx context.Context, req ImageGenerationRequest) (ImageGenerationResponse, error)
 }
 
+// ImageEditAdapter invokes provider image editing.
 type ImageEditAdapter interface {
 	InvokeImageEdit(ctx context.Context, req ImageEditRequest) (ImageGenerationResponse, error)
 }
 
+// ImageVariationAdapter invokes provider image variation generation.
 type ImageVariationAdapter interface {
 	InvokeImageVariation(ctx context.Context, req ImageVariationRequest) (ImageGenerationResponse, error)
 }
 
+// AudioTranscriptionAdapter invokes provider audio transcription.
 type AudioTranscriptionAdapter interface {
 	InvokeAudioTranscription(ctx context.Context, req AudioTranscriptionRequest) (AudioTranscriptionResponse, error)
 }
 
+// AudioSpeechAdapter invokes provider text-to-speech generation.
 type AudioSpeechAdapter interface {
 	InvokeAudioSpeech(ctx context.Context, req AudioSpeechRequest) (AudioSpeechResponse, error)
 }
 
+// ModerationAdapter invokes provider moderation checks.
 type ModerationAdapter interface {
 	InvokeModerations(ctx context.Context, req ModerationRequest) (ModerationResponse, error)
 }
 
+// RerankAdapter invokes provider reranking.
 type RerankAdapter interface {
 	InvokeRerank(ctx context.Context, req RerankRequest) (RerankResponse, error)
+}
+
+// ResponseInputItemsAdapter fetches provider response input items.
+type ResponseInputItemsAdapter interface {
+	InvokeResponseInputItems(ctx context.Context, req ResponseInputItemsRequest) (ResponseInputItemsResponse, error)
 }

@@ -74,23 +74,13 @@ func (s *Server) handleAnthropicCountTokens(w http.ResponseWriter, r *http.Reque
 	}
 	scheduleReq := gatewayScheduleRequest(r, canonical, modelResolution)
 	s.runtime.applyGatewayAdmission(&scheduleReq, admission)
-	result, err := s.runtime.scheduleGatewayRequest(r.Context(), scheduleReq, model.ID, forcedProviderKey, authed.Key)
-	if err != nil {
-		s.recordTokenCountScheduled(r, authed, canonical, result, nil, "no_available_account", http.StatusServiceUnavailable, elapsedMillis(startedAt), admission)
-		writeGatewayError(w, http.StatusServiceUnavailable, apiopenapi.ServiceUnavailableError, "no available account", "no_available_account")
+	failover := s.invokeProviderTokenCountWithFailover(r.Context(), r, authed, canonical, rawBody, scheduleReq, model.ID, forcedProviderKey, admission, startedAt)
+	result := failover.ScheduleResult
+	if failover.Err != nil {
+		s.writeGatewayFailoverFailure(w, r, authed, canonical, result, failover.FailureRecorded, failover.Err, admission, startedAt)
 		return
 	}
-	if err := s.reserveGatewayAccountQuotaForScheduledRequest(r.Context(), r, authed, canonical, result, admission, startedAt); err != nil {
-		writeProviderGatewayError(w, err)
-		return
-	}
-	providerResp, err := s.runtime.invokeProviderTokenCount(r.Context(), providerTokenCountRequest(canonical, rawBody, result.Candidate))
-	if err != nil {
-		errorClass, upstreamStatus, errorType := providerGatewayError(err)
-		s.recordTokenCountScheduled(r, authed, canonical, result, &result.Candidate, errorClass, upstreamStatus, elapsedMillis(startedAt), admission)
-		writeGatewayError(w, providerGatewayHTTPStatus(upstreamStatus), errorType, providerGatewayMessage(errorClass), errorClass)
-		return
-	}
+	providerResp := failover.Response
 	tokenCount := gatewayTokenCountFromProvider(providerResp)
 	canonicalResp := s.runtime.gateway.BuildCanonicalTokenCountResponse(canonical, tokenCount.TotalTokens, tokenCount.CachedContentTokenCount, tokenCount.PromptTokensDetails, tokenCount.CacheTokensDetails, tokenCount.Metadata)
 	s.recordTokenCountSuccess(r, authed, canonical, result, canonicalResp, elapsedMillis(startedAt))
@@ -122,34 +112,6 @@ func (s *Server) recordTokenCountFailure(r *http.Request, authed apikeycontract.
 		rec.OutputTokens = admission.EstimatedUsage.OutputTokens
 		rec.CachedTokens = admission.EstimatedUsage.CachedTokens
 		rec.CompatibilityWarnings = canonical.CompatibilityWarnings
-	}
-	s.runtime.recordGatewayUsage(r.Context(), rec)
-}
-
-func (s *Server) recordTokenCountScheduled(r *http.Request, authed apikeycontract.AuthResult, canonical gatewaycontract.CanonicalRequest, result schedulercontract.ScheduleResult, candidate *schedulercontract.Candidate, errorClass string, statusCode int, latencyMS int, admission gatewayAdmission) {
-	rec := gatewayUsageRecord{
-		RequestID:             canonical.RequestID,
-		Authed:                authed,
-		DecisionID:            result.Decision.ID,
-		AttemptNo:             result.Decision.AttemptNo,
-		SourceProtocol:        string(canonical.SourceProtocol),
-		SourceEndpoint:        canonical.SourceEndpoint,
-		Model:                 canonical.CanonicalModel,
-		Success:               false,
-		ErrorClass:            ptrStringValue(errorClass),
-		StatusCode:            ptrInt(statusCode),
-		LatencyMS:             latencyMS,
-		InputTokens:           admission.EstimatedUsage.InputTokens,
-		OutputTokens:          admission.EstimatedUsage.OutputTokens,
-		CachedTokens:          admission.EstimatedUsage.CachedTokens,
-		UsageEstimated:        true,
-		Pricing:               admission.Pricing,
-		CompatibilityWarnings: canonical.CompatibilityWarnings,
-	}
-	if candidate != nil {
-		rec.ProviderID = ptrInt(candidate.Provider.ID)
-		rec.AccountID = ptrInt(candidate.Account.ID)
-		rec.TargetProtocol = candidate.Provider.Protocol
 	}
 	s.runtime.recordGatewayUsage(r.Context(), rec)
 }

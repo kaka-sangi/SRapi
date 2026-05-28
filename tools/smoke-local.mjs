@@ -91,6 +91,8 @@ export const FAILOVER_GATEWAY_SMOKE_TARGETS = Object.freeze([
 
 export const RELEASE_GATEWAY_SMOKE_ENDPOINTS = Object.freeze([
   ...CORE_GATEWAY_SMOKE_ENDPOINTS,
+  { name: "usage", method: "GET", path: "/v1/usage" },
+  { name: "responses_input_items", method: "GET", path: "/v1/responses/{response_id}/input_items" },
   { name: "responses_compact", method: "POST", path: "/v1/responses/compact" },
   { name: "anthropic_count_tokens", method: "POST", path: "/v1/messages/count_tokens" },
   { name: "embeddings", method: "POST", path: "/v1/embeddings" },
@@ -102,6 +104,7 @@ export const RELEASE_GATEWAY_SMOKE_ENDPOINTS = Object.freeze([
   { name: "moderations", method: "POST", path: "/v1/moderations" },
   { name: "rerank", method: "POST", path: "/v1/rerank" },
   { name: "gemini_models", method: "GET", path: "/v1beta/models" },
+  { name: "gemini_model", method: "GET", path: "/v1beta/models/{model}" },
   { name: "gemini_generate_content", method: "POST", path: "/v1beta/models/{model}:generateContent" },
   {
     name: "gemini_stream_generate_content",
@@ -660,9 +663,17 @@ async function smokeFailoverEndpoint({ bearer, cookie, csrfToken }) {
 }
 
 async function smokeReleaseGatewayEndpoints({ bearer, cookie, csrfToken }) {
+  await smokeGatewayUsageEndpoint(bearer);
   await smokeOpenAICompatiblePassThroughEndpoints(bearer);
   await smokeGeminiTextEndpoints(bearer);
   await withSmokeUpstream(async (upstreamURL) => {
+    const responsesModel = await ensureGatewayTarget({
+      cookie,
+      csrfToken,
+      target: withUpstreamMetadata(CORE_GATEWAY_SMOKE_TARGETS[0], upstreamURL),
+    });
+    await smokeResponsesInputItemsEndpoint(bearer, responsesModel);
+
     const rerankModel = await ensureGatewayTarget({
       cookie,
       csrfToken,
@@ -684,6 +695,16 @@ async function smokeReleaseGatewayEndpoints({ bearer, cookie, csrfToken }) {
     });
     await smokeGeminiCountTokensEndpoint(bearer, geminiCountModel);
   });
+}
+
+async function smokeGatewayUsageEndpoint(bearer) {
+  const usage = await request("GET", "/v1/usage?days=30", { bearer });
+  if (usage.body?.object !== "usage" || usage.body?.isValid !== true || usage.body?.api_key_id === undefined) {
+    throw new Error("/v1/usage returned invalid API key snapshot");
+  }
+  if (!usage.body?.usage || !Array.isArray(usage.body?.recent_requests)) {
+    throw new Error("/v1/usage returned invalid usage totals");
+  }
 }
 
 async function ensureFailoverGatewayTargets({ cookie, csrfToken, primaryURL, secondaryURL }) {
@@ -791,6 +812,11 @@ async function smokeGeminiTextEndpoints(bearer) {
     throw new Error("/v1beta/models returned no models");
   }
 
+  const model = await request("GET", "/v1beta/models/gpt-4o-mini", { bearer });
+  if (model.body?.name !== "models/gpt-4o-mini" || !Array.isArray(model.body?.supportedGenerationMethods)) {
+    throw new Error("/v1beta/models/{model} returned invalid model metadata");
+  }
+
   const generate = await request("POST", "/v1beta/models/gpt-4o-mini:generateContent", {
     bearer,
     body: geminiContentBody("local smoke gemini call"),
@@ -827,6 +853,18 @@ async function smokeRerankEndpoint(bearer, model) {
   const first = rerank.body?.results?.[0];
   if (rerank.body?.model !== model || first?.index !== 1 || first?.document?.source !== "docs") {
     throw new Error("/v1/rerank returned invalid rerank results");
+  }
+}
+
+async function smokeResponsesInputItemsEndpoint(bearer, model) {
+  const response = await request(
+    "GET",
+    `/v1/responses/resp_smoke/input_items?model=${encodeURIComponent(model)}&limit=1&order=asc`,
+    { bearer },
+  );
+  const first = response.body?.data?.[0];
+  if (response.body?.object !== "list" || first?.id !== "msg_smoke" || first?.content?.[0]?.text !== "local smoke input item") {
+    throw new Error("/v1/responses/{response_id}/input_items returned invalid input items");
   }
 }
 
@@ -1191,6 +1229,31 @@ async function handleSmokeUpstreamRequest(req, res) {
     }
     res.writeHead(200, { "Content-Type": "text/event-stream" });
     res.end(RESPONSES_RAW_STREAM_SMOKE_SSE);
+    return;
+  }
+  if (req.method === "GET" && url.pathname === "/v1/responses/resp_smoke/input_items") {
+    if (req.headers.authorization !== "Bearer responses-stream-smoke-secret") {
+      writeJSON(res, { error: { message: "unexpected responses input_items auth header" } }, 401);
+      return;
+    }
+    if (url.searchParams.get("limit") !== "1" || url.searchParams.get("order") !== "asc") {
+      writeJSON(res, { error: { message: `unexpected responses input_items query ${url.search}` } }, 400);
+      return;
+    }
+    writeJSON(res, {
+      object: "list",
+      data: [
+        {
+          id: "msg_smoke",
+          type: "message",
+          role: "user",
+          content: [{ type: "input_text", text: "local smoke input item" }],
+        },
+      ],
+      first_id: "msg_smoke",
+      last_id: "msg_smoke",
+      has_more: false,
+    });
     return;
   }
   if (req.method === "POST" && url.pathname === "/v1/rerank") {

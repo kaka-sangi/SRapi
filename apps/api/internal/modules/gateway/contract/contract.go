@@ -15,6 +15,7 @@ type SourceEndpoint string
 const (
 	EndpointChatCompletions       SourceEndpoint = "/v1/chat/completions"
 	EndpointResponses             SourceEndpoint = "/v1/responses"
+	EndpointResponseInputItems    SourceEndpoint = "/v1/responses/{response_id}/input_items"
 	EndpointResponsesCompact      SourceEndpoint = "/v1/responses/compact"
 	EndpointMessages              SourceEndpoint = "/v1/messages"
 	EndpointEmbeddings            SourceEndpoint = "/v1/embeddings"

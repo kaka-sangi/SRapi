@@ -37,6 +37,9 @@ func (s *Service) InvokeConversation(ctx context.Context, req contract.Conversat
 		return contract.ConversationResponse{}, ErrInvalidInput
 	}
 	if baseURL := upstreamBaseURL(req); baseURL != "" {
+		if isBedrockCompatible(req) {
+			return s.invokeBedrockAnthropic(ctx, req)
+		}
 		if isGenericReverseProxy(req) {
 			return s.invokeGenericReverseProxyText(ctx, req, baseURL)
 		}
@@ -71,6 +74,23 @@ func (s *Service) InvokeConversation(ctx context.Context, req contract.Conversat
 	}
 	text := synthesizeLocalText(req.Model, conversationPrompt(req))
 	return conversationTextResponse(text, http.StatusOK, estimatedUsage(text)), nil
+}
+
+func (s *Service) InvokeResponseInputItems(ctx context.Context, req contract.ResponseInputItemsRequest) (contract.ResponseInputItemsResponse, error) {
+	if strings.TrimSpace(req.RequestID) == "" || strings.TrimSpace(req.Model) == "" || strings.TrimSpace(req.ResponseID) == "" || strings.TrimSpace(req.Mapping.UpstreamModelName) == "" {
+		return contract.ResponseInputItemsResponse{}, ErrInvalidInput
+	}
+	baseURL := upstreamBaseURLResponseInputItems(req)
+	if baseURL == "" {
+		return contract.ResponseInputItemsResponse{}, contract.ProviderError{Class: "configuration_error", StatusCode: http.StatusBadGateway, Message: "responses input items upstream base url missing"}
+	}
+	if isCodexResponseInputItemsReverseProxy(req) {
+		return s.invokeReverseProxyCodexResponseInputItems(ctx, req, baseURL)
+	}
+	if isReverseProxyResponseInputItemsRuntime(req) {
+		return s.invokeReverseProxyOpenAIResponseInputItems(ctx, req, baseURL)
+	}
+	return s.invokeOpenAIResponseInputItems(ctx, req, baseURL)
 }
 
 func (s *Service) PrepareRealtime(ctx context.Context, req contract.RealtimeRequest) (contract.RealtimeSession, error) {
@@ -175,6 +195,7 @@ func (s *Service) invokeReverseProxyOpenAICompatibleEmbeddings(ctx context.Conte
 			UpstreamClient: req.Account.UpstreamClient,
 			ProxyID:        req.Account.ProxyID,
 			UserAgent:      mapString(req.Account.Metadata, "user_agent"),
+			Metadata:       req.Account.Metadata,
 			Credential:     req.Credential,
 		},
 		Method: http.MethodPost,
@@ -243,6 +264,7 @@ func (s *Service) invokeReverseProxyOpenAICompatibleImages(ctx context.Context, 
 			UpstreamClient: req.Account.UpstreamClient,
 			ProxyID:        req.Account.ProxyID,
 			UserAgent:      mapString(req.Account.Metadata, "user_agent"),
+			Metadata:       req.Account.Metadata,
 			Credential:     req.Credential,
 		},
 		Method: http.MethodPost,
@@ -272,32 +294,32 @@ func (s *Service) invokeGeminiCompatible(ctx context.Context, req contract.Conve
 	}
 	endpoint := geminiEndpoint(baseURL, req.Mapping.UpstreamModelName, req.Stream)
 	headers := geminiCompatibleHeaders(req, apiKey, &endpoint)
-	send := func(body []byte) ([]byte, int, error) {
+	send := func(body []byte) ([]byte, int, http.Header, error) {
 		httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 		if err != nil {
-			return nil, 0, err
+			return nil, 0, nil, err
 		}
 		httpReq.Header = headers
 
 		resp, err := s.client.Do(httpReq)
 		if err != nil {
 			if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
-				return nil, 0, contract.ProviderError{Class: "timeout", StatusCode: http.StatusGatewayTimeout, Message: "provider request timed out"}
+				return nil, 0, nil, contract.ProviderError{Class: "timeout", StatusCode: http.StatusGatewayTimeout, Message: "provider request timed out"}
 			}
-			return nil, 0, contract.ProviderError{Class: "network_error", StatusCode: http.StatusBadGateway, Message: "provider request failed"}
+			return nil, 0, nil, contract.ProviderError{Class: "network_error", StatusCode: http.StatusBadGateway, Message: "provider request failed"}
 		}
 		defer resp.Body.Close()
 
 		respBody, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
 		if err != nil {
 			if req.Stream {
-				return nil, resp.StatusCode, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream interrupted"}
+				return nil, resp.StatusCode, resp.Header, contract.ProviderError{Class: "stream_interrupted", StatusCode: http.StatusBadGateway, Message: "provider stream interrupted"}
 			}
-			return nil, resp.StatusCode, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response read failed"}
+			return nil, resp.StatusCode, resp.Header, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response read failed"}
 		}
-		return respBody, resp.StatusCode, nil
+		return respBody, resp.StatusCode, resp.Header, nil
 	}
-	body, statusCode, err := send(raw)
+	body, statusCode, respHeaders, err := send(raw)
 	if err != nil {
 		return contract.ConversationResponse{}, err
 	}
@@ -306,30 +328,32 @@ func (s *Service) invokeGeminiCompatible(ctx context.Context, req contract.Conve
 		if retryReq, ok := geminiSignatureRetryRequest(req, statusCode, body, geminiSignatureRetryThinking); ok {
 			if retryRaw, err := geminiCompatibleRequestBody(retryReq); err != nil {
 				return contract.ConversationResponse{}, err
-			} else if retryBody, retryStatusCode, err := send(retryRaw); err != nil {
+			} else if retryBody, retryStatusCode, retryHeaders, err := send(retryRaw); err != nil {
 				return contract.ConversationResponse{}, err
 			} else {
 				signatureDowngraded = true
 				body = retryBody
 				statusCode = retryStatusCode
+				respHeaders = retryHeaders
 			}
 		}
 		if statusCode < 200 || statusCode >= 300 {
 			if retryReq, ok := geminiSignatureRetryRequest(req, statusCode, body, geminiSignatureRetryTools); ok {
 				if retryRaw, err := geminiCompatibleRequestBody(retryReq); err != nil {
 					return contract.ConversationResponse{}, err
-				} else if retryBody, retryStatusCode, err := send(retryRaw); err != nil {
+				} else if retryBody, retryStatusCode, retryHeaders, err := send(retryRaw); err != nil {
 					return contract.ConversationResponse{}, err
 				} else {
 					signatureDowngraded = true
 					body = retryBody
 					statusCode = retryStatusCode
+					respHeaders = retryHeaders
 				}
 			}
 		}
 	}
 	if statusCode < 200 || statusCode >= 300 {
-		return contract.ConversationResponse{}, classifyGeminiProviderHTTPError(statusCode, body)
+		return contract.ConversationResponse{}, classifyGeminiProviderHTTPErrorWithHeaders(statusCode, respHeaders, body)
 	}
 	if req.Stream {
 		parsed, err := parseGeminiCompatibleStream(body, statusCode)
@@ -439,7 +463,7 @@ func (s *Service) invokeOpenAICompatible(ctx context.Context, req contract.Conve
 		return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response read failed"}
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return contract.ConversationResponse{}, classifyProviderHTTPError(resp.StatusCode, body)
+		return contract.ConversationResponse{}, classifyProviderHTTPErrorWithHeaders(resp.StatusCode, resp.Header, body)
 	}
 	if req.Stream {
 		return parseOpenAICompatibleStream(body, resp.StatusCode)
@@ -478,9 +502,61 @@ func (s *Service) invokeOpenAICompatibleResponses(ctx context.Context, req contr
 		return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response read failed"}
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return contract.ConversationResponse{}, classifyProviderHTTPError(resp.StatusCode, body)
+		return contract.ConversationResponse{}, classifyProviderHTTPErrorWithHeaders(resp.StatusCode, resp.Header, body)
 	}
 	return parseOpenAIResponsesBodyWithOptions(body, resp.StatusCode, openAIResponsesRequireTerminalEvent(req))
+}
+
+func (s *Service) invokeOpenAIResponseInputItems(ctx context.Context, req contract.ResponseInputItemsRequest, baseURL string) (contract.ResponseInputItemsResponse, error) {
+	apiKey := responseInputItemsAPIKey(req)
+	if apiKey == "" {
+		return contract.ResponseInputItemsResponse{}, contract.ProviderError{Class: "auth_failed", StatusCode: http.StatusUnauthorized, Message: "provider api key missing"}
+	}
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, responseInputItemsEndpoint(baseURL, req.ResponseID, req.Query), nil)
+	if err != nil {
+		return contract.ResponseInputItemsResponse{}, err
+	}
+	httpReq.Header.Set("Accept", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+apiKey)
+
+	resp, err := s.client.Do(httpReq)
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return contract.ResponseInputItemsResponse{}, contract.ProviderError{Class: "timeout", StatusCode: http.StatusGatewayTimeout, Message: "provider request timed out"}
+		}
+		return contract.ResponseInputItemsResponse{}, contract.ProviderError{Class: "network_error", StatusCode: http.StatusBadGateway, Message: "provider request failed"}
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
+	if err != nil {
+		return contract.ResponseInputItemsResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response read failed"}
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return contract.ResponseInputItemsResponse{}, classifyProviderHTTPErrorWithHeaders(resp.StatusCode, resp.Header, body)
+	}
+	return contract.ResponseInputItemsResponse{Raw: append([]byte(nil), bytes.TrimSpace(body)...), StatusCode: resp.StatusCode}, nil
+}
+
+func (s *Service) invokeReverseProxyOpenAIResponseInputItems(ctx context.Context, req contract.ResponseInputItemsRequest, baseURL string) (contract.ResponseInputItemsResponse, error) {
+	if s.reverseProxy == nil {
+		return contract.ResponseInputItemsResponse{}, contract.ProviderError{Class: "network_error", StatusCode: http.StatusBadGateway, Message: "reverse proxy runtime unavailable"}
+	}
+	runtimeResp, err := s.reverseProxy.Do(ctx, reverseproxycontract.Request{
+		Account: responseInputItemsReverseProxyAccount(req),
+		Method:  http.MethodGet,
+		URL:     responseInputItemsEndpoint(baseURL, req.ResponseID, req.Query),
+		Headers: http.Header{
+			"Accept": {"application/json"},
+		},
+	})
+	if err != nil {
+		return contract.ResponseInputItemsResponse{}, providerErrorFromReverseProxy(err)
+	}
+	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
+		return contract.ResponseInputItemsResponse{}, classifyProviderHTTPError(runtimeResp.StatusCode, runtimeResp.Body)
+	}
+	return contract.ResponseInputItemsResponse{Raw: append([]byte(nil), bytes.TrimSpace(runtimeResp.Body)...), StatusCode: runtimeResp.StatusCode}, nil
 }
 
 func (s *Service) invokeReverseProxyGeminiCompatible(ctx context.Context, req contract.ConversationRequest, baseURL string) (contract.ConversationResponse, error) {
@@ -501,6 +577,7 @@ func (s *Service) invokeReverseProxyGeminiCompatible(ctx context.Context, req co
 				UpstreamClient: req.Account.UpstreamClient,
 				ProxyID:        req.Account.ProxyID,
 				UserAgent:      mapString(req.Account.Metadata, "user_agent"),
+				Metadata:       req.Account.Metadata,
 				Credential:     req.Credential,
 			},
 			Method:       http.MethodPost,
@@ -542,7 +619,7 @@ func (s *Service) invokeReverseProxyGeminiCompatible(ctx context.Context, req co
 		}
 	}
 	if runtimeResp.StatusCode < 200 || runtimeResp.StatusCode >= 300 {
-		return contract.ConversationResponse{}, classifyGeminiProviderHTTPError(runtimeResp.StatusCode, runtimeResp.Body)
+		return contract.ConversationResponse{}, classifyGeminiProviderHTTPErrorWithHeaders(runtimeResp.StatusCode, runtimeResp.Headers, runtimeResp.Body)
 	}
 	if req.Stream {
 		parsed, err := parseGeminiCompatibleStream(runtimeResp.Body, runtimeResp.StatusCode)
@@ -597,6 +674,7 @@ func (s *Service) invokeReverseProxyAnthropicCompatible(ctx context.Context, req
 			UpstreamClient: req.Account.UpstreamClient,
 			ProxyID:        req.Account.ProxyID,
 			UserAgent:      mapString(req.Account.Metadata, "user_agent"),
+			Metadata:       req.Account.Metadata,
 			Credential:     req.Credential,
 		},
 		Method:       http.MethodPost,
@@ -638,6 +716,7 @@ func (s *Service) invokeReverseProxyOpenAICompatible(ctx context.Context, req co
 			UpstreamClient: req.Account.UpstreamClient,
 			ProxyID:        req.Account.ProxyID,
 			UserAgent:      mapString(req.Account.Metadata, "user_agent"),
+			Metadata:       req.Account.Metadata,
 			Credential:     req.Credential,
 		},
 		Method: http.MethodPost,
@@ -683,7 +762,7 @@ func (s *Service) invokeOpenAICompatibleResponsesCompact(ctx context.Context, re
 		return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_response", StatusCode: http.StatusBadGateway, Message: "provider response read failed"}
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return contract.ConversationResponse{}, classifyProviderHTTPError(resp.StatusCode, body)
+		return contract.ConversationResponse{}, classifyProviderHTTPErrorWithHeaders(resp.StatusCode, resp.Header, body)
 	}
 	return parseOpenAIResponsesCompactJSON(body, resp.StatusCode)
 }
@@ -700,6 +779,7 @@ func (s *Service) invokeReverseProxyOpenAICompatibleResponsesCompact(ctx context
 			UpstreamClient: req.Account.UpstreamClient,
 			ProxyID:        req.Account.ProxyID,
 			UserAgent:      mapString(req.Account.Metadata, "user_agent"),
+			Metadata:       req.Account.Metadata,
 			Credential:     req.Credential,
 		},
 		Method: http.MethodPost,
@@ -730,6 +810,7 @@ func (s *Service) invokeReverseProxyOpenAICompatibleResponses(ctx context.Contex
 			UpstreamClient: req.Account.UpstreamClient,
 			ProxyID:        req.Account.ProxyID,
 			UserAgent:      mapString(req.Account.Metadata, "user_agent"),
+			Metadata:       req.Account.Metadata,
 			Credential:     req.Credential,
 		},
 		Method: http.MethodPost,
@@ -1061,7 +1142,18 @@ func parseOpenAIResponsesCompactJSON(body []byte, statusCode int) (contract.Conv
 
 func upstreamBaseURL(req contract.ConversationRequest) string {
 	for _, values := range []map[string]any{req.Account.Metadata, req.Provider.ConfigSchema, req.Provider.Capabilities} {
-		for _, key := range []string{"base_url", "upstream_base_url", "openai_base_url", "anthropic_base_url", "gemini_base_url"} {
+		for _, key := range []string{"base_url", "upstream_base_url", "openai_base_url", "anthropic_base_url", "gemini_base_url", "bedrock_base_url"} {
+			if value := mapString(values, key); value != "" {
+				return strings.TrimRight(value, "/")
+			}
+		}
+	}
+	return ""
+}
+
+func upstreamBaseURLResponseInputItems(req contract.ResponseInputItemsRequest) string {
+	for _, values := range []map[string]any{req.Account.Metadata, req.Provider.ConfigSchema, req.Provider.Capabilities} {
+		for _, key := range []string{"base_url", "upstream_base_url", "openai_base_url"} {
 			if value := mapString(values, key); value != "" {
 				return strings.TrimRight(value, "/")
 			}
@@ -1116,7 +1208,17 @@ func isGeminiCompatible(req contract.ConversationRequest) bool {
 func isAnthropicCompatible(req contract.ConversationRequest) bool {
 	for _, value := range []string{req.Provider.Protocol, req.Provider.AdapterType} {
 		switch strings.ToLower(strings.TrimSpace(value)) {
-		case "anthropic-compatible", "reverse-proxy-claude-code-cli":
+		case "anthropic-compatible", "bedrock", "aws-bedrock", "bedrock-anthropic", "reverse-proxy-claude-code-cli":
+			return true
+		}
+	}
+	return false
+}
+
+func isBedrockCompatible(req contract.ConversationRequest) bool {
+	for _, value := range []string{req.Provider.AdapterType, req.Provider.Protocol, req.Provider.Name} {
+		switch strings.ToLower(strings.TrimSpace(value)) {
+		case "bedrock", "aws-bedrock", "bedrock-anthropic":
 			return true
 		}
 	}
@@ -1124,6 +1226,10 @@ func isAnthropicCompatible(req contract.ConversationRequest) bool {
 }
 
 func isCodexReverseProxy(req contract.ConversationRequest) bool {
+	return strings.EqualFold(strings.TrimSpace(req.Provider.AdapterType), "reverse-proxy-codex-cli")
+}
+
+func isCodexResponseInputItemsReverseProxy(req contract.ResponseInputItemsRequest) bool {
 	return strings.EqualFold(strings.TrimSpace(req.Provider.AdapterType), "reverse-proxy-codex-cli")
 }
 
@@ -1148,6 +1254,14 @@ func isReverseProxyEmbeddingRuntime(req contract.EmbeddingRequest) bool {
 }
 
 func isReverseProxyImageRuntime(req contract.ImageGenerationRequest) bool {
+	runtimeClass := strings.TrimSpace(string(req.Account.RuntimeClass))
+	if runtimeClass != "" && runtimeClass != "api_key" {
+		return true
+	}
+	return strings.HasPrefix(strings.TrimSpace(req.Provider.AdapterType), "reverse-proxy-")
+}
+
+func isReverseProxyResponseInputItemsRuntime(req contract.ResponseInputItemsRequest) bool {
 	runtimeClass := strings.TrimSpace(string(req.Account.RuntimeClass))
 	if runtimeClass != "" && runtimeClass != "api_key" {
 		return true
@@ -1272,6 +1386,41 @@ func appendAPIKeyQuery(rawURL string, apiKey string, queryParam string) string {
 	query.Set(queryParam, apiKey)
 	parsed.RawQuery = query.Encode()
 	return parsed.String()
+}
+
+func responseInputItemsEndpoint(baseURL string, responseID string, query url.Values) string {
+	endpoint := strings.TrimRight(baseURL, "/") + "/responses/" + url.PathEscape(strings.TrimSpace(responseID)) + "/input_items"
+	filtered := url.Values{}
+	for _, key := range []string{"after", "include", "limit", "order"} {
+		for _, value := range query[key] {
+			filtered.Add(key, value)
+		}
+	}
+	if encoded := filtered.Encode(); encoded != "" {
+		endpoint += "?" + encoded
+	}
+	return endpoint
+}
+
+func responseInputItemsAPIKey(req contract.ResponseInputItemsRequest) string {
+	for _, key := range []string{"api_key", "openai_api_key", "access_token"} {
+		if value := credentialString(req.Credential, key); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func responseInputItemsReverseProxyAccount(req contract.ResponseInputItemsRequest) reverseproxycontract.AccountRuntime {
+	return reverseproxycontract.AccountRuntime{
+		AccountID:      req.Account.ID,
+		RuntimeClass:   string(req.Account.RuntimeClass),
+		UpstreamClient: req.Account.UpstreamClient,
+		ProxyID:        req.Account.ProxyID,
+		UserAgent:      mapString(req.Account.Metadata, "user_agent"),
+		Metadata:       req.Account.Metadata,
+		Credential:     req.Credential,
+	}
 }
 
 func requestSetting(req contract.ConversationRequest, keys ...string) string {
@@ -1591,11 +1740,15 @@ func mapBool(values map[string]any, key string) bool {
 }
 
 func classifyProviderHTTPError(statusCode int, body []byte) contract.ProviderError {
+	return classifyProviderHTTPErrorWithHeaders(statusCode, nil, body)
+}
+
+func classifyProviderHTTPErrorWithHeaders(statusCode int, headers http.Header, body []byte) contract.ProviderError {
 	message := strings.TrimSpace(string(body))
 	if message == "" {
 		message = http.StatusText(statusCode)
 	}
-	return contract.ProviderError{Class: providerClassForHTTPStatus(statusCode), StatusCode: statusCode, Message: message}
+	return contract.ProviderError{Class: providerClassForHTTPStatus(statusCode), StatusCode: statusCode, Message: message, RetryAfter: providerRetryAfter(headers, body, time.Now())}
 }
 
 func classifyAnthropicProviderHTTPError(statusCode int, body []byte) contract.ProviderError {
@@ -1622,6 +1775,10 @@ func classifyAnthropicProviderHTTPError(statusCode int, body []byte) contract.Pr
 }
 
 func classifyGeminiProviderHTTPError(statusCode int, body []byte) contract.ProviderError {
+	return classifyGeminiProviderHTTPErrorWithHeaders(statusCode, nil, body)
+}
+
+func classifyGeminiProviderHTTPErrorWithHeaders(statusCode int, headers http.Header, body []byte) contract.ProviderError {
 	var decoded struct {
 		Error struct {
 			Status  string `json:"status"`
@@ -1641,7 +1798,7 @@ func classifyGeminiProviderHTTPError(statusCode int, body []byte) contract.Provi
 	if message == "" {
 		message = http.StatusText(statusCode)
 	}
-	return contract.ProviderError{Class: class, StatusCode: statusCode, Message: message}
+	return contract.ProviderError{Class: class, StatusCode: statusCode, Message: message, RetryAfter: providerRetryAfter(headers, body, time.Now())}
 }
 
 func providerClassForGeminiStatus(status string, statusCode int) string {
@@ -1688,6 +1845,8 @@ func providerClassForHTTPStatus(statusCode int) string {
 		return "model_unavailable"
 	case http.StatusTooManyRequests:
 		return "rate_limit"
+	case 529:
+		return "overloaded"
 	case http.StatusRequestTimeout, http.StatusGatewayTimeout:
 		return "timeout"
 	default:

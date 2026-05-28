@@ -70,6 +70,68 @@ type QueryFilter struct {
 	End   *time.Time
 }
 
+// APIKeyUsageSummary contains key-scoped usage aggregates for client-facing Gateway usage snapshots.
+type APIKeyUsageSummary struct {
+	APIKeyID     int
+	WindowDays   int
+	RequestCount int
+	SuccessCount int
+	ErrorCount   int
+	InputTokens  int
+	OutputTokens int
+	CachedTokens int
+	TotalTokens  int
+	TotalCost    string
+	Currency     string
+	Today        UsageWindowSummary
+	ModelStats   []UsageModelSummary
+	DailyUsage   []UsageDailySummary
+	RecentLogs   []UsageLog
+	GeneratedAt  time.Time
+}
+
+// UsageWindowSummary contains usage totals for one UTC date window.
+type UsageWindowSummary struct {
+	Date         string
+	RequestCount int
+	SuccessCount int
+	ErrorCount   int
+	InputTokens  int
+	OutputTokens int
+	CachedTokens int
+	TotalTokens  int
+	TotalCost    string
+	Currency     string
+}
+
+// UsageModelSummary contains usage totals grouped by canonical model name.
+type UsageModelSummary struct {
+	Model        string
+	RequestCount int
+	SuccessCount int
+	ErrorCount   int
+	InputTokens  int
+	OutputTokens int
+	CachedTokens int
+	TotalTokens  int
+	TotalCost    string
+	Currency     string
+}
+
+// UsageDailySummary contains usage totals grouped by UTC date.
+type UsageDailySummary struct {
+	Date         string
+	RequestCount int
+	SuccessCount int
+	ErrorCount   int
+	InputTokens  int
+	OutputTokens int
+	CachedTokens int
+	TotalTokens  int
+	TotalCost    string
+	Currency     string
+}
+
 type UsageAggregate struct {
 	AggregateID   string
 	AggregateType AggregateDimension

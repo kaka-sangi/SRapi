@@ -27,6 +27,7 @@ SRapi 必须优先支持：
 
 ```txt
 GET  /v1/models
+GET  /v1/usage
 POST /v1/chat/completions
 POST /v1/responses
 POST /v1/responses/compact
@@ -65,6 +66,14 @@ GET  /v1/models
 
 WP-560 起，`POST /v1/messages/count_tokens` 接受 Anthropic Messages-style count body，包括 `model`、`messages`、`system`、`tools`、`tool_choice`、`thinking` 和兼容扩展字段。Gateway normalization 只用于 policy / entitlement / Scheduler / evidence，不在 Gateway service 构造 Provider-local DTO；Provider Adapter 保留 Anthropic count_tokens body shape，只把 `model` 替换成调度后 mapping 的 upstream model，再调用选中上游 `/messages/count_tokens`。API-key Anthropic 账号按 Anthropic auth mode 注入凭证；`runtime_class != api_key` 的 Claude Code / Anthropic 反代账号通过 Reverse Proxy Runtime 使用选中账号 OAuth/session/CLI credential，并构造 Claude Code count_tokens official-client path/header/body。成功 count_tokens 请求记录 Scheduler decision/feedback 和 request evidence，但不进入生成用量，usage tokens 与 cost 记 0。
 
+`adapter_type=bedrock` 复用 Anthropic Messages 入口和 Canonical AI Request，但上游不是 Anthropic `/messages`。Provider Adapter 会把请求转换为 Amazon Bedrock Runtime InvokeModel / InvokeModelWithResponseStream：
+
+- `provider.protocol` 仍可保持 `anthropic-compatible`，下游客户端继续走 `/v1/messages`。
+- 账号凭证使用 `aws_access_key_id` / `aws_secret_access_key` / 可选 `aws_session_token` 与 `aws_region`，由 SRapi 凭证加密边界 materialize 后在 Adapter 内签名。
+- 上游 URL 形态为 `/model/{modelId}/invoke` 或 `/model/{modelId}/invoke-with-response-stream`，请求由 AWS SigV4 `bedrock` service 签名。
+- Bedrock 请求体强制使用 `anthropic_version: bedrock-2023-05-31`，并移除 Bedrock 不接收的 `model`、`stream` 等字段。
+- 流式 Bedrock event stream 会在 Adapter 内解码为 Anthropic-compatible stream events，再进入统一响应和 usage 解析。
+
 ### 2.3 Gemini-compatible
 
 SRapi 必须在 Provider Adapter 层支持 Gemini 原生请求模型：
@@ -85,7 +94,7 @@ POST /v1beta/models/{model}:streamGenerateContent
 POST /v1beta/models/{model}:countTokens
 ```
 
-这些路由完成客户端侧 Gemini GenerateContent 与 Canonical AI Request / Response 的转换，并复用 Gateway API Key、模型策略、Scheduler、Provider Adapter、usage 和 decision 记录。WP-240 起，目标 Provider 为 `gemini-compatible` / `native-gemini` / `reverse-proxy-gemini-cli` 时，Provider Adapter 会调用 Gemini `generateContent` 或 `streamGenerateContent` 上游。
+这些路由完成客户端侧 Gemini GenerateContent 与 Canonical AI Request / Response 的转换，并复用 Gateway API Key、模型策略、Scheduler、Provider Adapter、usage 和 decision 记录。Gemini-shaped 下游入口接受 Google SDK / REST 常用的 `x-goog-api-key`、`Authorization: Bearer`、`x-api-key` 和 `key` query 参数；废弃的 `api_key` query 参数返回 Google-style `INVALID_ARGUMENT`。该兼容只作用于 `/v1beta/models*` 及其 Gemini alias 路由，不改变 OpenAI / Anthropic 入口只用 Bearer API key 的语义。WP-240 起，目标 Provider 为 `gemini-compatible` / `native-gemini` / `reverse-proxy-gemini-cli` 时，Provider Adapter 会调用 Gemini `generateContent` 或 `streamGenerateContent` 上游。
 
 WP-540 起，`GET /v1beta/models` 返回 Gemini `models.list` 兼容的 `{models,nextPageToken}`，只基于 SRapi model registry 和 Gateway API Key 可见性渲染 active models。响应 model name 使用 `models/{canonical_name}`，并包含 `baseModelId`、`version`、`displayName`、`inputTokenLimit`、`outputTokenLimit` 和 `supportedGenerationMethods`；`supportedGenerationMethods` 至少包含 `generateContent`，并按模型能力追加 `streamGenerateContent` 与 `countTokens`。`pageSize` / `pageToken` 非法时返回 Google-style `INVALID_ARGUMENT`。该目录路由不进入 Scheduler、不读取 Provider Account 凭证、也不做上游模型发现。
 
@@ -306,6 +315,11 @@ store                 -> provider option or SRapi state policy
 stream                -> stream
 ```
 
+`previous_response_id` 必须引用 Responses response id。Gateway 为兼容第三方
+Responses 实现保留 opaque custom id，但会拒绝明显属于 message、item、
+tool call、reasoning、compaction 或 Chat Completions 的对象 id，避免把
+`msg_*` / `chatcmpl-*` / `call_*` 等误用继续传入上游。
+
 ### 6.3 Anthropic Messages -> Canonical
 
 ```txt
@@ -475,6 +489,7 @@ MVP 必须实现：
 /v1/models
 /v1/chat/completions
 /v1/responses
+/v1/responses/{response_id}/input_items
 /v1/responses/compact
 /v1/messages
 ```
@@ -488,6 +503,21 @@ Anthropic Messages <-> Canonical AI Request
 Canonical AI Request -> OpenAI-compatible upstream
 Canonical AI Response -> OpenAI Chat / Responses / Anthropic Messages response
 ```
+
+`GET /v1/responses/{response_id}/input_items` is an OpenAI Responses
+subresource rather than a new conversation runtime. SRapi requires query
+`model` so API key model visibility, entitlement, Scheduler, Provider Adapter,
+usage evidence, and scheduler decision records still apply. The selected
+adapter calls upstream `/responses/{response_id}/input_items` with supported
+pagination query parameters (`after`, repeated `include`, `limit`, `order`) and
+replays the raw JSON list. The SRapi-only `model` query parameter is not
+forwarded upstream, and successful requests record zero generation tokens/cost.
+
+`GET /v1/usage` is a client integration endpoint, not an admin usage export.
+It authenticates the Gateway Bearer key and returns only that key's usage
+window, today summary, model distribution, recent request evidence, key limits,
+allowed models, expiry metadata, and owner wallet balance. It intentionally does
+not reveal other API keys for the same user.
 
 WP-270 已实现：
 
@@ -619,11 +649,12 @@ Responses WebSocket transport
 边界：
 
 - `GET /v1/responses/ws` 建立 WebSocket 连接，客户端发送 JSON text frame。
-- 支持 raw `ResponsesRequest`，也支持 `{"type":"response.create","response":{...}}` event envelope；`model` query 可作为 payload 未携带 model 时的 fallback。
+- 支持 raw `ResponsesRequest`，也支持 `{"type":"response.create","response":{...}}` / `{"type":"response.create","request":{...}}` event envelope。为兼容 Codex / OpenAI Responses WS Mode 客户端，也接受 flat `{"type":"response.create","model":...,"input":...}` frame；Gateway 会剥离 `type` / `event_id` 后把剩余字段作为 Responses request 进入同一验证链。`model` query 可作为 payload 未携带 model 时的 fallback。
 - 每个 `response.create` payload 都转交给现有 `/v1/responses` Gateway runtime，因此仍进入 API Key auth、模型可见性、entitlement、Scheduler、Provider Adapter、usage、billing 和 feedback 证据链。
 - `stream:true` 的 Responses SSE 事件会转成同名 JSON WebSocket frame；非流式响应返回 `response.completed` frame。
 - `session_affinity_key`、`sticky_strength`、`sticky_account_id` query/header 继续作为 Scheduler sticky routing hint；Gateway 不直接选择账号。
-- WP-410 进一步实现 Codex CLI 2api Responses WebSocket upstream relay：当请求显式带 `upstream_ws` 或 `codex_responses_websocket`，且调度出的 `reverse-proxy-codex-cli` 账号 metadata 启用 Codex Responses WebSocket 时，SRapi 通过 Reverse Proxy Runtime 连接 Codex `ws/wss` `/responses`，使用选中账号 OAuth/session/CLI token 凭证、Codex official-client headers，以及包含 mapped upstream model 的 `response.create` 首帧。
+- WP-410 进一步实现 Codex CLI 2api Responses WebSocket upstream relay：当请求显式带 `upstream_ws` 或 `codex_responses_websocket`，且调度出的 `reverse-proxy-codex-cli` 账号 metadata 启用 Codex Responses WebSocket 时，SRapi 通过 Reverse Proxy Runtime 连接 Codex `ws/wss` `/responses`，使用选中账号 OAuth/session/CLI token 凭证、Codex official-client headers，以及经过 Codex Responses normalizer 的 `response.create` 首帧。该首帧会强制 mapped upstream model、`stream=true`、默认 `store=false`，补齐 instructions，规范化 input/tools/service_tier/image_generation，并移除 `background`。
+- Codex upstream relay 按 turn 处理：一个客户端 `/v1/responses/ws` 连接可以连续发送多个 `response.create` frame。每个 turn 独立进入 Gateway admission、Scheduler、Provider Adapter、Reverse Proxy Runtime 和 usage 记录；上游 Codex WebSocket relay 收到 terminal event 后释放该次上游连接，但不会关闭客户端 WebSocket。
 - WP-460 起，`/v1/responses/ws` 在 WebSocket upgrade 前获得 provider-neutral realtime slot，并在连接关闭、上游 relay 完成、客户端断开或 handler error 时释放；slot 只保存 request/user/API key/source endpoint/sticky metadata 和 session affinity hash，不保存原始 affinity key。
 - WP-570 起，`GET /api/v1/admin/ops/realtime/slots` 可查询 active realtime slot 摘要和聚合计数；WP-590 起 Redis 可用时该视图和 slot 限额跨 API 节点生效，本地降级模式只覆盖当前节点内存。这是运维诊断面，不是持久 upstream session pool，也不引入 provider-specific realtime DTO。
 - 复杂 persistent upstream session reuse、local Codex CLI client ingress，以及 Claude Code / Antigravity provider-native realtime 协议仍是后续包。
