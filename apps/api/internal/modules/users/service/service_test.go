@@ -1,9 +1,16 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"image"
+	"image/color"
+	"image/jpeg"
+	"io"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/users/contract"
 )
@@ -56,6 +63,318 @@ func TestAuthenticatePasswordAcceptsValidPassword(t *testing.T) {
 	}
 	if authed.ID != created.ID {
 		t.Fatalf("expected user id %d, got %d", created.ID, authed.ID)
+	}
+}
+
+func TestVerifyEmailSetsVerifiedAt(t *testing.T) {
+	store := newMemoryStore()
+	svc, err := New(store, nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	created, err := svc.Create(context.Background(), CreateRequest{
+		Email:    "verify@srapi.local",
+		Name:     "Verify",
+		Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	verifiedAt := time.Date(2026, 5, 29, 18, 30, 0, 0, time.UTC)
+
+	updated, err := svc.VerifyEmail(context.Background(), created.ID, verifiedAt)
+	if err != nil {
+		t.Fatalf("verify email: %v", err)
+	}
+	if updated.EmailVerifiedAt == nil || !updated.EmailVerifiedAt.Equal(verifiedAt) {
+		t.Fatalf("expected stored email verified at %s, got %v", verifiedAt, updated.EmailVerifiedAt)
+	}
+	if updated.User.EmailVerifiedAt == nil || !updated.User.EmailVerifiedAt.Equal(verifiedAt) {
+		t.Fatalf("expected public user email verified at %s, got %v", verifiedAt, updated.User.EmailVerifiedAt)
+	}
+}
+
+func TestDeleteRemovesUserAndAllowsEmailReuse(t *testing.T) {
+	store := newMemoryStore()
+	svc, err := New(store, nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	created, err := svc.Create(context.Background(), CreateRequest{
+		Email:    "delete@srapi.local",
+		Name:     "Delete",
+		Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	if err := svc.Delete(context.Background(), created.ID); err != nil {
+		t.Fatalf("delete user: %v", err)
+	}
+	if _, err := svc.FindByID(context.Background(), created.ID); !errors.Is(err, ErrUserNotFound) {
+		t.Fatalf("expected deleted user not found, got %v", err)
+	}
+	recreated, err := svc.Create(context.Background(), CreateRequest{
+		Email:    "delete@srapi.local",
+		Name:     "Recreated",
+		Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("reuse email after delete: %v", err)
+	}
+	if recreated.ID == created.ID {
+		t.Fatalf("expected a new user id after delete")
+	}
+}
+
+func TestListAuthIdentitiesIncludesEmailAndExternalIdentities(t *testing.T) {
+	store := newMemoryStore()
+	svc, err := New(store, nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	created, err := svc.Create(context.Background(), CreateRequest{
+		Email:    "identity@srapi.local",
+		Name:     "Identity User",
+		Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	verifiedAt := time.Date(2026, 5, 30, 10, 0, 0, 0, time.UTC)
+	if _, err := svc.VerifyEmail(context.Background(), created.ID, verifiedAt); err != nil {
+		t.Fatalf("verify email: %v", err)
+	}
+	externalVerifiedAt := time.Date(2026, 5, 30, 11, 0, 0, 0, time.UTC)
+	if _, err := store.UpsertAuthIdentity(context.Background(), contract.CreateUserAuthIdentity{
+		UserID:              created.ID,
+		Provider:            contract.AuthIdentityProviderOIDC,
+		ProviderKey:         "https://issuer.example",
+		ProviderSubjectHash: "sha256:subject",
+		SubjectHint:         "subj...1234",
+		DisplayName:         "External Identity",
+		Email:               "external@srapi.local",
+		EmailVerified:       true,
+		VerifiedAt:          &externalVerifiedAt,
+	}); err != nil {
+		t.Fatalf("upsert identity: %v", err)
+	}
+
+	identities, err := svc.ListAuthIdentities(context.Background(), created.ID)
+	if err != nil {
+		t.Fatalf("list identities: %v", err)
+	}
+	if len(identities) != 2 {
+		t.Fatalf("expected email plus external identity, got %+v", identities)
+	}
+	if identities[0].Provider != contract.AuthIdentityProviderEmail || identities[0].External || identities[0].CanUnbind {
+		t.Fatalf("unexpected email identity: %+v", identities[0])
+	}
+	if !identities[0].EmailVerified || identities[0].VerifiedAt == nil || !identities[0].VerifiedAt.Equal(verifiedAt) {
+		t.Fatalf("expected verified email identity, got %+v", identities[0])
+	}
+	if identities[1].Provider != contract.AuthIdentityProviderOIDC || !identities[1].External || !identities[1].CanUnbind {
+		t.Fatalf("unexpected external identity: %+v", identities[1])
+	}
+	if identities[1].SubjectHint != "subj...1234" || identities[1].VerifiedAt == nil || !identities[1].VerifiedAt.Equal(externalVerifiedAt) {
+		t.Fatalf("expected external metadata, got %+v", identities[1])
+	}
+}
+
+func TestBindAuthIdentityIsIdempotentAndRejectsDifferentOwner(t *testing.T) {
+	store := newMemoryStore()
+	svc, err := New(store, nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	first, err := svc.Create(context.Background(), CreateRequest{
+		Email:    "first-bind@srapi.local",
+		Name:     "First Bind",
+		Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("create first user: %v", err)
+	}
+	second, err := svc.Create(context.Background(), CreateRequest{
+		Email:    "second-bind@srapi.local",
+		Name:     "Second Bind",
+		Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("create second user: %v", err)
+	}
+
+	identities, err := svc.BindAuthIdentity(context.Background(), BindAuthIdentityRequest{
+		UserID:              first.ID,
+		Provider:            contract.AuthIdentityProviderOIDC,
+		ProviderKey:         "issuer-main",
+		ProviderSubjectHash: "sha256:oauth-subject",
+		SubjectHint:         "oidc:subject",
+		DisplayName:         "OAuth User",
+		Email:               "OAuth@Example.COM",
+		EmailVerified:       true,
+		AvatarURL:           "https://cdn.example/avatar.png",
+	})
+	if err != nil {
+		t.Fatalf("bind identity: %v", err)
+	}
+	if len(identities) != 2 || identities[1].UserID != first.ID || identities[1].Email != "oauth@example.com" {
+		t.Fatalf("unexpected bound identities: %+v", identities)
+	}
+
+	updated, err := svc.BindAuthIdentity(context.Background(), BindAuthIdentityRequest{
+		UserID:              first.ID,
+		Provider:            contract.AuthIdentityProviderOIDC,
+		ProviderKey:         "issuer-main",
+		ProviderSubjectHash: "sha256:oauth-subject",
+		SubjectHint:         "oidc:subject",
+		DisplayName:         "Updated OAuth User",
+		Email:               "updated@example.com",
+		EmailVerified:       true,
+	})
+	if err != nil {
+		t.Fatalf("rebind same identity to same user: %v", err)
+	}
+	if len(updated) != 2 || updated[1].DisplayName != "Updated OAuth User" || updated[1].ID != identities[1].ID {
+		t.Fatalf("expected idempotent metadata update, got %+v", updated)
+	}
+
+	if _, err := svc.BindAuthIdentity(context.Background(), BindAuthIdentityRequest{
+		UserID:              second.ID,
+		Provider:            contract.AuthIdentityProviderOIDC,
+		ProviderKey:         "issuer-main",
+		ProviderSubjectHash: "sha256:oauth-subject",
+		SubjectHint:         "oidc:subject",
+	}); !errors.Is(err, ErrIdentityAlreadyBound) {
+		t.Fatalf("expected identity already bound error, got %v", err)
+	}
+	found, err := store.FindAuthIdentityByProviderSubject(context.Background(), contract.AuthIdentityProviderOIDC, "issuer-main", "sha256:oauth-subject")
+	if err != nil {
+		t.Fatalf("find identity: %v", err)
+	}
+	if found.UserID != first.ID {
+		t.Fatalf("expected original owner %d, got %+v", first.ID, found)
+	}
+}
+
+func TestUnbindAuthIdentityRemovesExternalIdentity(t *testing.T) {
+	store := newMemoryStore()
+	svc, err := New(store, nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	created, err := svc.Create(context.Background(), CreateRequest{
+		Email:    "unbind@srapi.local",
+		Name:     "Unbind User",
+		Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	identity, err := store.UpsertAuthIdentity(context.Background(), contract.CreateUserAuthIdentity{
+		UserID:              created.ID,
+		Provider:            contract.AuthIdentityProviderLinuxDo,
+		ProviderKey:         "linuxdo",
+		ProviderSubjectHash: "sha256:linuxdo-subject",
+		SubjectHint:         "linuxdo-user",
+	})
+	if err != nil {
+		t.Fatalf("upsert identity: %v", err)
+	}
+
+	identities, err := svc.UnbindAuthIdentity(context.Background(), created.ID, identity.ID)
+	if err != nil {
+		t.Fatalf("unbind identity: %v", err)
+	}
+	if len(identities) != 1 || identities[0].Provider != contract.AuthIdentityProviderEmail {
+		t.Fatalf("expected only local email identity after unbind, got %+v", identities)
+	}
+}
+
+func TestUnbindAuthIdentityRejectsDerivedEmailIdentity(t *testing.T) {
+	store := newMemoryStore()
+	svc, err := New(store, nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	created, err := svc.Create(context.Background(), CreateRequest{
+		Email:    "email-only@srapi.local",
+		Name:     "Email Only",
+		Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	if _, err := svc.UnbindAuthIdentity(context.Background(), created.ID, 1); !errors.Is(err, ErrIdentityNotFound) {
+		t.Fatalf("expected derived email identity to be unaddressable, got %v", err)
+	}
+}
+
+func TestUnbindAuthIdentityRejectsLastSignInMethod(t *testing.T) {
+	store := newMemoryStore()
+	svc, err := New(store, nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	user, err := store.Create(context.Background(), contract.CreateStoredUser{
+		Email:        "",
+		Name:         "External Only",
+		PasswordHash: "external-only",
+		Status:       contract.StatusActive,
+		Roles:        []contract.Role{contract.RoleUser},
+		Balance:      "0.00000000",
+		Currency:     "USD",
+	})
+	if err != nil {
+		t.Fatalf("create stored user: %v", err)
+	}
+	identity, err := store.UpsertAuthIdentity(context.Background(), contract.CreateUserAuthIdentity{
+		UserID:              user.ID,
+		Provider:            contract.AuthIdentityProviderOIDC,
+		ProviderKey:         "https://issuer.example",
+		ProviderSubjectHash: "sha256:only-subject",
+		SubjectHint:         "only-user",
+	})
+	if err != nil {
+		t.Fatalf("upsert identity: %v", err)
+	}
+
+	if _, err := svc.UnbindAuthIdentity(context.Background(), user.ID, identity.ID); !errors.Is(err, ErrIdentityUnbindBlocked) {
+		t.Fatalf("expected last sign-in method unbind to be blocked, got %v", err)
+	}
+}
+
+func TestUpdateEmailClearsVerifiedAt(t *testing.T) {
+	store := newMemoryStore()
+	svc, err := New(store, nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	created, err := svc.Create(context.Background(), CreateRequest{
+		Email:    "old-email@srapi.local",
+		Name:     "Email Change",
+		Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	verifiedAt := time.Date(2026, 5, 29, 19, 0, 0, 0, time.UTC)
+	if _, err := svc.VerifyEmail(context.Background(), created.ID, verifiedAt); err != nil {
+		t.Fatalf("verify email: %v", err)
+	}
+	newEmail := "new-email@srapi.local"
+
+	updated, err := svc.Update(context.Background(), created.ID, UpdateRequest{Email: &newEmail})
+	if err != nil {
+		t.Fatalf("update email: %v", err)
+	}
+	if updated.Email != newEmail {
+		t.Fatalf("expected email update, got %q", updated.Email)
+	}
+	if updated.EmailVerifiedAt != nil || updated.User.EmailVerifiedAt != nil {
+		t.Fatalf("expected email change to clear verified timestamp, got %+v", updated)
 	}
 }
 
@@ -133,6 +452,132 @@ func TestAuthenticatePasswordRejectsDisabledUser(t *testing.T) {
 	}
 }
 
+func TestChangePasswordRequiresCurrentPasswordAndUpdatesHash(t *testing.T) {
+	store := newMemoryStore()
+	svc, err := New(store, nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	created, err := svc.Create(context.Background(), CreateRequest{
+		Email:    "change-password@srapi.local",
+		Name:     "Change Password",
+		Password: "oldpassword123",
+	})
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	if _, err := svc.ChangePassword(context.Background(), created.ID, ChangePasswordRequest{
+		CurrentPassword: "wrongpassword",
+		NewPassword:     "newpassword123",
+	}); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials, got %v", err)
+	}
+
+	updated, err := svc.ChangePassword(context.Background(), created.ID, ChangePasswordRequest{
+		CurrentPassword: "oldpassword123",
+		NewPassword:     "newpassword123",
+	})
+	if err != nil {
+		t.Fatalf("change password: %v", err)
+	}
+	if updated.PasswordHash == created.PasswordHash {
+		t.Fatal("expected password hash to change")
+	}
+	if _, err := svc.AuthenticatePassword(context.Background(), created.Email, "oldpassword123"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("expected old password to fail, got %v", err)
+	}
+	if _, err := svc.AuthenticatePassword(context.Background(), created.Email, "newpassword123"); err != nil {
+		t.Fatalf("expected new password to authenticate: %v", err)
+	}
+}
+
+func TestUpdateProfileOnlyChangesDisplayName(t *testing.T) {
+	store := newMemoryStore()
+	svc, err := New(store, nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	created, err := svc.Create(context.Background(), CreateRequest{
+		Email:    "profile@srapi.local",
+		Name:     "Original Name",
+		Password: "password123",
+		Roles:    []contract.Role{contract.RoleUser},
+	})
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	updated, err := svc.UpdateProfile(context.Background(), created.ID, UpdateProfileRequest{Name: "  Updated Name  "})
+	if err != nil {
+		t.Fatalf("update profile: %v", err)
+	}
+	if updated.Name != "Updated Name" {
+		t.Fatalf("expected trimmed updated name, got %q", updated.Name)
+	}
+	if updated.Email != created.Email || updated.Status != created.Status || len(updated.Roles) != 1 || updated.Roles[0] != contract.RoleUser {
+		t.Fatalf("profile update changed protected fields: %+v", updated)
+	}
+	if _, err := svc.UpdateProfile(context.Background(), created.ID, UpdateProfileRequest{Name: ""}); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected invalid empty name, got %v", err)
+	}
+}
+
+func TestAvatarServiceNormalizesUploadAndDecoratesUser(t *testing.T) {
+	store := newAvatarMemoryStore()
+	svc, err := NewAvatarService(store, nil)
+	if err != nil {
+		t.Fatalf("new avatar service: %v", err)
+	}
+	userID := 7
+	actorID := 3
+
+	uploaded, err := svc.Upsert(context.Background(), userID, bytes.NewReader(testAvatarJPEG(t)), &actorID)
+	if err != nil {
+		t.Fatalf("upsert avatar: %v", err)
+	}
+	if uploaded.ContentType != "image/png" || uploaded.ByteSize <= 0 || uploaded.SHA256 == "" || uploaded.Width != 2 || uploaded.Height != 2 {
+		t.Fatalf("unexpected uploaded avatar: %+v", uploaded)
+	}
+	if _, _, err := image.Decode(bytes.NewReader(uploaded.Content)); err != nil {
+		t.Fatalf("expected normalized image to decode: %v", err)
+	}
+
+	loaded, err := svc.Get(context.Background(), userID)
+	if err != nil {
+		t.Fatalf("get avatar: %v", err)
+	}
+	if loaded.SHA256 != uploaded.SHA256 || !bytes.Equal(loaded.Content, uploaded.Content) {
+		t.Fatalf("loaded avatar mismatch: got %+v want %+v", loaded, uploaded)
+	}
+
+	decorated := svc.DecorateUser(context.Background(), contract.User{ID: userID, Email: "avatar@srapi.local"}, "/api/v1/users/7/avatar")
+	if decorated.AvatarURL != "/api/v1/users/7/avatar" || decorated.AvatarMIME != "image/png" || decorated.AvatarSHA256 != uploaded.SHA256 || decorated.AvatarByteSize != uploaded.ByteSize || decorated.AvatarUpdatedAt == nil {
+		t.Fatalf("expected decorated user avatar metadata, got %+v", decorated)
+	}
+
+	if err := svc.Delete(context.Background(), userID, &actorID); err != nil {
+		t.Fatalf("delete avatar: %v", err)
+	}
+	if _, err := svc.Get(context.Background(), userID); !errors.Is(err, ErrAvatarNotFound) {
+		t.Fatalf("expected avatar not found after delete, got %v", err)
+	}
+}
+
+func TestAvatarServiceRejectsInvalidAndTooLargeUploads(t *testing.T) {
+	store := newAvatarMemoryStore()
+	svc, err := NewAvatarService(store, nil)
+	if err != nil {
+		t.Fatalf("new avatar service: %v", err)
+	}
+	if _, err := svc.Upsert(context.Background(), 1, strings.NewReader("not an image"), nil); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected invalid input for non-image, got %v", err)
+	}
+	if _, err := svc.Upsert(context.Background(), 1, io.LimitReader(zeroReader{}, MaxAvatarUploadBytes+1), nil); !errors.Is(err, ErrAvatarTooLarge) {
+		t.Fatalf("expected too large upload, got %v", err)
+	}
+}
+
 func TestUpdateBalanceUsesDecimalMath(t *testing.T) {
 	store := newMemoryStore()
 	svc, err := New(store, nil)
@@ -170,6 +615,58 @@ func TestUpdateBalanceUsesDecimalMath(t *testing.T) {
 	if updated.Balance != "1.00000000" {
 		t.Fatalf("expected exact decimal balance, got %s", updated.Balance)
 	}
+}
+
+func testAvatarJPEG(t *testing.T) []byte {
+	t.Helper()
+	img := image.NewRGBA(image.Rect(0, 0, 2, 2))
+	img.Set(0, 0, color.RGBA{R: 24, G: 80, B: 210, A: 255})
+	img.Set(1, 0, color.RGBA{R: 210, G: 80, B: 24, A: 255})
+	img.Set(0, 1, color.RGBA{R: 24, G: 160, B: 80, A: 255})
+	img.Set(1, 1, color.RGBA{R: 255, G: 255, B: 255, A: 255})
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: 90}); err != nil {
+		t.Fatalf("encode jpeg: %v", err)
+	}
+	return buf.Bytes()
+}
+
+type zeroReader struct{}
+
+func (zeroReader) Read(p []byte) (int, error) {
+	for i := range p {
+		p[i] = 0
+	}
+	return len(p), nil
+}
+
+type avatarMemoryStore struct {
+	values map[string]map[string]any
+}
+
+func newAvatarMemoryStore() *avatarMemoryStore {
+	return &avatarMemoryStore{values: map[string]map[string]any{}}
+}
+
+func (s *avatarMemoryStore) Get(_ context.Context, key string) (map[string]any, bool, error) {
+	value, ok := s.values[key]
+	if !ok {
+		return nil, false, nil
+	}
+	return cloneAnyMap(value), true, nil
+}
+
+func (s *avatarMemoryStore) Set(_ context.Context, key string, value map[string]any, _ *int) error {
+	s.values[key] = cloneAnyMap(value)
+	return nil
+}
+
+func cloneAnyMap(in map[string]any) map[string]any {
+	out := make(map[string]any, len(in))
+	for key, value := range in {
+		out[key] = value
+	}
+	return out
 }
 
 func TestListUpdateAndBatchUsers(t *testing.T) {

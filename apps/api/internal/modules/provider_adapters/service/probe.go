@@ -69,7 +69,7 @@ func (s *Service) doProbe(ctx context.Context, account accountcontract.ProviderA
 	if len(req.Body) > 0 && httpReq.Header.Get("Content-Type") == "" {
 		httpReq.Header.Set("Content-Type", "application/json")
 	}
-	resp, err := s.client.Do(httpReq)
+	resp, err := s.egressHTTPClient(account, nil).Do(httpReq)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return probeHTTPResponse{}, contract.ProviderError{Class: "timeout", StatusCode: http.StatusGatewayTimeout, Message: "provider probe timed out"}

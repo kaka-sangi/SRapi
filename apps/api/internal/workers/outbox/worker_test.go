@@ -14,6 +14,7 @@ import (
 	"github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	eventsservice "github.com/srapi/srapi/apps/api/internal/modules/events/service"
 	eventsmemory "github.com/srapi/srapi/apps/api/internal/modules/events/store/memory"
+	notificationscontract "github.com/srapi/srapi/apps/api/internal/modules/notifications/contract"
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	subscriptionservice "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/service"
 	subscriptionmemory "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/store/memory"
@@ -118,6 +119,47 @@ func TestWorkerRunOnceMarksFailureForRetry(t *testing.T) {
 	}
 	if *inboxRows[0].LastError != "temporary handler failure" {
 		t.Fatalf("last_error = %q, want temporary handler failure", *inboxRows[0].LastError)
+	}
+}
+
+func TestWorkerRetriesAuthEmailWhenEmailDeliveryNotConfigured(t *testing.T) {
+	store := eventsmemory.New()
+	clock := &fixedClock{now: time.Date(2026, 5, 29, 10, 0, 0, 0, time.UTC)}
+	events, err := eventsservice.New(store, clock)
+	if err != nil {
+		t.Fatalf("new events service: %v", err)
+	}
+	if _, err := events.Enqueue(t.Context(), contract.EnqueueRequest{
+		EventType:      notificationscontract.EventAuthPasswordResetRequested,
+		ProducerModule: "auth",
+		IdempotencyKey: "auth.password_reset:test",
+		Payload: map[string]any{
+			"recipient_user_id": 1,
+		},
+	}); err != nil {
+		t.Fatalf("enqueue auth email event: %v", err)
+	}
+
+	worker, err := outbox.New(store, discardLogger(), outbox.Config{
+		RetryBackoff:  time.Minute,
+		DispatchClock: clock,
+	})
+	if err != nil {
+		t.Fatalf("new worker: %v", err)
+	}
+	result, err := worker.RunOnce(t.Context())
+	if err != nil {
+		t.Fatalf("run worker once: %v", err)
+	}
+	if result.Selected != 1 || result.Published != 0 || result.Failed != 1 {
+		t.Fatalf("unexpected dispatch result: %+v", result)
+	}
+	outboxRows, err := events.ListOutbox(t.Context())
+	if err != nil {
+		t.Fatalf("list outbox: %v", err)
+	}
+	if len(outboxRows) != 1 || outboxRows[0].Status != contract.OutboxStatusFailed || outboxRows[0].LastError == nil {
+		t.Fatalf("expected failed auth email outbox, got %+v", outboxRows)
 	}
 }
 

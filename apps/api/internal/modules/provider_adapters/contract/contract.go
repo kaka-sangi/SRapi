@@ -380,6 +380,28 @@ type QuotaSignal struct {
 	SnapshotAt     time.Time
 }
 
+// QuotaReport is a normalized, per-provider view of an account's subscription
+// and credit standing, produced by an active out-of-band quota/subscription
+// fetch. Supported is false when the provider exposes no quota endpoint.
+type QuotaReport struct {
+	Provider         string
+	Supported        bool
+	Source           string // "endpoint" | "headers" | "none"
+	Plan             string
+	CreditsRemaining string
+	CreditsUsed      string
+	CreditsLimit     string
+	Currency         string
+	QuotaSignals     []QuotaSignal
+	StatusCode       int
+	FetchedAt        time.Time
+}
+
+// AccountQuotaFetcher performs an active per-account quota/subscription fetch.
+type AccountQuotaFetcher interface {
+	FetchAccountQuota(ctx context.Context, req ProbeRequest) (QuotaReport, error)
+}
+
 type ResponseInputItemsResponse struct {
 	Raw          []byte
 	StatusCode   int

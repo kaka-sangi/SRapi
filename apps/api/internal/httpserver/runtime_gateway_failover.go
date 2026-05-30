@@ -10,6 +10,7 @@ import (
 	"time"
 
 	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
+	errorpassthroughcontract "github.com/srapi/srapi/apps/api/internal/modules/error_passthrough/contract"
 	gatewaycontract "github.com/srapi/srapi/apps/api/internal/modules/gateway/contract"
 	provideradaptercontract "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
@@ -46,23 +47,40 @@ func (s *Server) reserveGatewayAccountQuotaForScheduledRequest(
 	return nil
 }
 
-func writeProviderGatewayError(w http.ResponseWriter, err error) {
-	writeProviderGatewayErrorForCandidate(w, err, nil)
+func (s *Server) writeProviderGatewayError(w http.ResponseWriter, err error) {
+	s.writeProviderGatewayErrorForCandidate(w, err, nil)
 }
 
-func writeProviderGatewayErrorForCandidate(w http.ResponseWriter, err error, candidate *schedulercontract.Candidate) {
+func (s *Server) writeProviderGatewayErrorForCandidate(w http.ResponseWriter, err error, candidate *schedulercontract.Candidate) {
 	errorClass, upstreamStatus, errorType := providerGatewayError(err)
-	writeGatewayError(w, providerGatewayHTTPStatus(upstreamStatus), errorType, gatewayProviderPublicMessage(err, errorClass, upstreamStatus, candidate), errorClass)
+	writeGatewayError(w, providerGatewayHTTPStatus(upstreamStatus), errorType, s.gatewayPublicMessage(err, errorClass, upstreamStatus, candidate), errorClass)
 }
 
-func writeGeminiProviderGatewayError(w http.ResponseWriter, err error) {
-	writeGeminiProviderGatewayErrorForCandidate(w, err, nil)
+func (s *Server) writeGeminiProviderGatewayError(w http.ResponseWriter, err error) {
+	s.writeGeminiProviderGatewayErrorForCandidate(w, err, nil)
 }
 
-func writeGeminiProviderGatewayErrorForCandidate(w http.ResponseWriter, err error, candidate *schedulercontract.Candidate) {
+func (s *Server) writeGeminiProviderGatewayErrorForCandidate(w http.ResponseWriter, err error, candidate *schedulercontract.Candidate) {
 	errorClass, upstreamStatus, _ := providerGatewayError(err)
 	status := providerGatewayHTTPStatus(upstreamStatus)
-	writeGeminiGatewayError(w, status, geminiStatusForGatewayErrorClass(errorClass, status), gatewayProviderPublicMessage(err, errorClass, upstreamStatus, candidate))
+	writeGeminiGatewayError(w, status, geminiStatusForGatewayErrorClass(errorClass, status), s.gatewayPublicMessage(err, errorClass, upstreamStatus, candidate))
+}
+
+// gatewayPublicMessage decides the caller-facing message. Global admin-managed
+// error-passthrough rules take precedence; when no rule matches it falls back to
+// the per-account / per-provider metadata behavior in gatewayProviderPublicMessage.
+func (s *Server) gatewayPublicMessage(err error, errorClass string, upstreamStatus int, candidate *schedulercontract.Candidate) string {
+	if s.runtime != nil && s.runtime.errorPassthrough != nil {
+		if raw := gatewayProviderErrorMessage(err); raw != "" {
+			if action, matched := s.runtime.errorPassthrough.Resolve(context.Background(), errorClass, upstreamStatus, raw); matched {
+				if action == errorpassthroughcontract.ActionExpose {
+					return raw
+				}
+				return providerGatewayMessage(errorClass)
+			}
+		}
+	}
+	return gatewayProviderPublicMessage(err, errorClass, upstreamStatus, candidate)
 }
 
 func (s *Server) writeGatewayFailoverFailure(
@@ -81,7 +99,7 @@ func (s *Server) writeGatewayFailoverFailure(
 		writeGatewayError(w, http.StatusServiceUnavailable, apiopenapi.ServiceUnavailableError, "no available account", "no_available_account")
 		return
 	}
-	writeProviderGatewayErrorForCandidate(w, err, gatewayFailureCandidate(result))
+	s.writeProviderGatewayErrorForCandidate(w, err, gatewayFailureCandidate(result))
 }
 
 func (s *Server) writeGeminiGatewayFailoverFailure(
@@ -100,7 +118,7 @@ func (s *Server) writeGeminiGatewayFailoverFailure(
 		writeGeminiGatewayError(w, http.StatusServiceUnavailable, "UNAVAILABLE", "no available account")
 		return
 	}
-	writeGeminiProviderGatewayErrorForCandidate(w, err, gatewayFailureCandidate(result))
+	s.writeGeminiProviderGatewayErrorForCandidate(w, err, gatewayFailureCandidate(result))
 }
 
 func gatewayFailureCandidate(result schedulercontract.ScheduleResult) *schedulercontract.Candidate {

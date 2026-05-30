@@ -213,6 +213,30 @@ func (s *Store) ListExpiredActiveUserSubscriptions(_ context.Context, now time.T
 	return out, nil
 }
 
+func (s *Store) ListActiveUserSubscriptionsExpiringBetween(_ context.Context, from time.Time, until time.Time) ([]contract.UserSubscription, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	from = from.UTC()
+	until = until.UTC()
+	out := make([]contract.UserSubscription, 0)
+	for _, subscription := range s.subscriptions {
+		if subscription.Status != contract.SubscriptionStatusActive {
+			continue
+		}
+		if subscription.ExpiresAt.Before(from) || subscription.ExpiresAt.After(until) {
+			continue
+		}
+		out = append(out, cloneSubscription(subscription))
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].ExpiresAt.Equal(out[j].ExpiresAt) {
+			return out[i].ID < out[j].ID
+		}
+		return out[i].ExpiresAt.Before(out[j].ExpiresAt)
+	})
+	return out, nil
+}
+
 func (s *Store) ExpireUserSubscription(_ context.Context, id int, now time.Time) (contract.UserSubscription, bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	"github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
 	reverseproxycontract "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/contract"
 )
@@ -145,6 +146,34 @@ func (s *Service) InvokeImageGeneration(ctx context.Context, req contract.ImageG
 	return synthesizeLocalImages(req), nil
 }
 
+// egressHTTPClient returns the client native api_key traffic should use: the
+// account's managed egress client (proxy + TLS fingerprint + SSRF guard) when the
+// account is configured for managed egress, otherwise the shared default client so
+// accounts with no egress config stay byte-for-byte unchanged. Credential is not
+// used for client selection and may be nil (e.g. for health probes).
+func (s *Service) egressHTTPClient(account accountcontract.ProviderAccount, credential map[string]any) *http.Client {
+	if s.reverseProxy == nil {
+		return s.client
+	}
+	client, managed, err := s.reverseProxy.ManagedEgressClient(egressAccountRuntime(account, credential))
+	if managed && err == nil && client != nil {
+		return client
+	}
+	return s.client
+}
+
+func egressAccountRuntime(account accountcontract.ProviderAccount, credential map[string]any) reverseproxycontract.AccountRuntime {
+	return reverseproxycontract.AccountRuntime{
+		AccountID:      account.ID,
+		RuntimeClass:   string(account.RuntimeClass),
+		UpstreamClient: account.UpstreamClient,
+		ProxyID:        account.ProxyID,
+		UserAgent:      mapString(account.Metadata, "user_agent"),
+		Metadata:       account.Metadata,
+		Credential:     credential,
+	}
+}
+
 func (s *Service) invokeOpenAICompatibleEmbeddings(ctx context.Context, req contract.EmbeddingRequest, baseURL string) (contract.EmbeddingResponse, error) {
 	apiKey := credentialString(req.Credential, "api_key")
 	if apiKey == "" {
@@ -161,7 +190,7 @@ func (s *Service) invokeOpenAICompatibleEmbeddings(ctx context.Context, req cont
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+apiKey)
 
-	resp, err := s.client.Do(httpReq)
+	resp, err := s.egressHTTPClient(req.Account, req.Credential).Do(httpReq)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return contract.EmbeddingResponse{}, contract.ProviderError{Class: "timeout", StatusCode: http.StatusGatewayTimeout, Message: "provider request timed out"}
@@ -230,7 +259,7 @@ func (s *Service) invokeOpenAICompatibleImages(ctx context.Context, req contract
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+apiKey)
 
-	resp, err := s.client.Do(httpReq)
+	resp, err := s.egressHTTPClient(req.Account, req.Credential).Do(httpReq)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return contract.ImageGenerationResponse{}, contract.ProviderError{Class: "timeout", StatusCode: http.StatusGatewayTimeout, Message: "provider request timed out"}
@@ -301,7 +330,7 @@ func (s *Service) invokeGeminiCompatible(ctx context.Context, req contract.Conve
 		}
 		httpReq.Header = headers
 
-		resp, err := s.client.Do(httpReq)
+		resp, err := s.egressHTTPClient(req.Account, req.Credential).Do(httpReq)
 		if err != nil {
 			if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
 				return nil, 0, nil, contract.ProviderError{Class: "timeout", StatusCode: http.StatusGatewayTimeout, Message: "provider request timed out"}
@@ -398,7 +427,7 @@ func (s *Service) invokeAnthropicCompatible(ctx context.Context, req contract.Co
 	}
 	httpReq.Header = headers
 
-	resp, err := s.client.Do(httpReq)
+	resp, err := s.egressHTTPClient(req.Account, req.Credential).Do(httpReq)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return contract.ConversationResponse{}, contract.ProviderError{Class: "timeout", StatusCode: http.StatusGatewayTimeout, Message: "provider request timed out"}
@@ -446,7 +475,7 @@ func (s *Service) invokeOpenAICompatible(ctx context.Context, req contract.Conve
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+apiKey)
 
-	resp, err := s.client.Do(httpReq)
+	resp, err := s.egressHTTPClient(req.Account, req.Credential).Do(httpReq)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return contract.ConversationResponse{}, contract.ProviderError{Class: "timeout", StatusCode: http.StatusGatewayTimeout, Message: "provider request timed out"}
@@ -485,7 +514,7 @@ func (s *Service) invokeOpenAICompatibleResponses(ctx context.Context, req contr
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+apiKey)
 
-	resp, err := s.client.Do(httpReq)
+	resp, err := s.egressHTTPClient(req.Account, req.Credential).Do(httpReq)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return contract.ConversationResponse{}, contract.ProviderError{Class: "timeout", StatusCode: http.StatusGatewayTimeout, Message: "provider request timed out"}
@@ -519,7 +548,7 @@ func (s *Service) invokeOpenAIResponseInputItems(ctx context.Context, req contra
 	httpReq.Header.Set("Accept", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+apiKey)
 
-	resp, err := s.client.Do(httpReq)
+	resp, err := s.egressHTTPClient(req.Account, req.Credential).Do(httpReq)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return contract.ResponseInputItemsResponse{}, contract.ProviderError{Class: "timeout", StatusCode: http.StatusGatewayTimeout, Message: "provider request timed out"}
@@ -748,7 +777,7 @@ func (s *Service) invokeOpenAICompatibleResponsesCompact(ctx context.Context, re
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+apiKey)
 
-	resp, err := s.client.Do(httpReq)
+	resp, err := s.egressHTTPClient(req.Account, req.Credential).Do(httpReq)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return contract.ConversationResponse{}, contract.ProviderError{Class: "timeout", StatusCode: http.StatusGatewayTimeout, Message: "provider request timed out"}

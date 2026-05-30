@@ -15,6 +15,11 @@ var (
 type Store interface {
 	Get(ctx context.Context, key string) (map[string]any, bool, error)
 	Set(ctx context.Context, key string, value map[string]any, updatedBy *int) error
+	ListAnnouncementReads(ctx context.Context, userID int, announcementIDs []int) ([]AnnouncementRead, error)
+	MarkAnnouncementRead(ctx context.Context, userID int, announcementID int, at time.Time) (AnnouncementRead, error)
+	RedeemCode(ctx context.Context, input RedeemCodeRedemptionInput) (RedeemCodeRedemptionResult, error)
+	PreviewPromoCode(ctx context.Context, input PromoCodePreviewInput) (PromoCodeApplication, error)
+	FinalizePromoCode(ctx context.Context, input PromoCodeFinalizeInput) (PromoCodeApplication, error)
 }
 
 type ListOptions struct {
@@ -55,10 +60,25 @@ type AdminSettingsFeatures struct {
 	PaymentsEnabled          bool     `json:"payments_enabled"`
 }
 type AdminSettingsSecurity struct {
-	AdminAPIKey         SecretConfigured `json:"admin_api_key"`
-	RegistrationEnabled bool             `json:"registration_enabled"`
-	OAuthEnabled        bool             `json:"oauth_enabled"`
-	OAuthProviders      []string         `json:"oauth_providers"`
+	AdminAPIKey                      SecretConfigured      `json:"admin_api_key"`
+	RegistrationEnabled              bool                  `json:"registration_enabled"`
+	RegistrationEmailSuffixAllowlist []string              `json:"registration_email_suffix_allowlist"`
+	OAuthEnabled                     bool                  `json:"oauth_enabled"`
+	OAuthProviders                   []string              `json:"oauth_providers"`
+	OAuthProviderConfigs             []OAuthProviderConfig `json:"oauth_provider_configs"`
+}
+
+type OAuthProviderConfig struct {
+	Provider        string   `json:"provider"`
+	ProviderKey     string   `json:"provider_key"`
+	DisplayName     string   `json:"display_name"`
+	ClientID        string   `json:"client_id"`
+	AuthorizeURL    string   `json:"authorize_url"`
+	TokenURL        string   `json:"token_url"`
+	UserInfoURL     string   `json:"userinfo_url"`
+	TokenAuthMethod string   `json:"token_auth_method"`
+	RedirectURI     string   `json:"redirect_uri"`
+	Scopes          []string `json:"scopes"`
 }
 type AdminSettingsUsers struct {
 	DefaultBalance        string `json:"default_balance"`
@@ -84,8 +104,21 @@ type AdminSettingsPayment struct {
 	SubscriptionPlansEnabled bool     `json:"subscription_plans_enabled"`
 }
 type AdminSettingsEmail struct {
-	SMTPConfigured bool              `json:"smtp_configured"`
-	Templates      map[string]string `json:"templates"`
+	SMTPConfigured                   bool              `json:"smtp_configured"`
+	SMTPHost                         string            `json:"smtp_host"`
+	SMTPPort                         int               `json:"smtp_port"`
+	SMTPUsername                     string            `json:"smtp_username"`
+	SMTPFrom                         string            `json:"smtp_from"`
+	SMTPFromName                     string            `json:"smtp_from_name"`
+	SMTPUseTLS                       bool              `json:"smtp_use_tls"`
+	PublicBaseURL                    string            `json:"public_base_url"`
+	Templates                        map[string]string `json:"templates"`
+	BalanceLowNotifyEnabled          *bool             `json:"balance_low_notify_enabled,omitempty"`
+	BalanceLowNotifyThreshold        string            `json:"balance_low_notify_threshold,omitempty"`
+	BalanceLowNotifyRechargeURL      string            `json:"balance_low_notify_recharge_url,omitempty"`
+	SubscriptionExpiryNotifyEnabled  *bool             `json:"subscription_expiry_notify_enabled,omitempty"`
+	AccountQuotaNotifyEnabled        *bool             `json:"account_quota_notify_enabled,omitempty"`
+	AccountQuotaNotifyRemainingRatio string            `json:"account_quota_notify_remaining_ratio,omitempty"`
 }
 type AdminSettingsBackup struct {
 	Enabled       bool       `json:"enabled"`
@@ -162,6 +195,24 @@ type AnnouncementList struct {
 	Items []Announcement
 	Total int
 }
+type UserAnnouncement struct {
+	Announcement
+	Read   bool       `json:"read"`
+	ReadAt *time.Time `json:"read_at,omitempty"`
+}
+type UserAnnouncementList struct {
+	Items  []UserAnnouncement
+	Total  int
+	Unread int
+}
+type AnnouncementRead struct {
+	ID             int
+	UserID         int
+	AnnouncementID int
+	ReadAt         time.Time
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+}
 
 type RedeemCodeStatus string
 
@@ -195,6 +246,34 @@ type RedeemCode struct {
 	ExpiresAt      *time.Time       `json:"expires_at,omitempty"`
 	CreatedAt      time.Time        `json:"created_at"`
 	UpdatedAt      time.Time        `json:"updated_at"`
+}
+type RedeemCodeRedemptionRequest struct {
+	Code string
+}
+type RedeemCodeRedemptionInput struct {
+	UserID     int
+	Code       string
+	RedeemedAt time.Time
+}
+type RedeemCodeRedemption struct {
+	ID                 int            `json:"id"`
+	UserID             int            `json:"user_id"`
+	RedeemCodeID       int            `json:"redeem_code_id"`
+	Type               RedeemCodeType `json:"type"`
+	Amount             string         `json:"amount"`
+	Currency           string         `json:"currency"`
+	BalanceBefore      string         `json:"balance_before"`
+	BalanceAfter       string         `json:"balance_after"`
+	BillingLedgerID    *int           `json:"billing_ledger_id,omitempty"`
+	UserSubscriptionID *int           `json:"user_subscription_id,omitempty"`
+	RedeemedAt         time.Time      `json:"redeemed_at"`
+	CreatedAt          time.Time      `json:"created_at"`
+	UpdatedAt          time.Time      `json:"updated_at"`
+}
+type RedeemCodeRedemptionResult struct {
+	Redemption      RedeemCodeRedemption `json:"redemption"`
+	RedeemCode      RedeemCode           `json:"redeem_code"`
+	AlreadyRedeemed bool                 `json:"already_redeemed"`
 }
 type CreateRedeemCodeRequest struct {
 	Code           string
@@ -282,6 +361,38 @@ type PromoCodeList struct {
 	Items []PromoCode
 	Total int
 }
+type PromoCodePreviewInput struct {
+	UserID   int
+	Code     string
+	Amount   string
+	Currency string
+	Now      time.Time
+}
+type PromoCodeFinalizeInput struct {
+	UserID         int
+	Code           string
+	PaymentOrderID int
+	OrderNo        string
+	OriginalAmount string
+	FinalAmount    string
+	Currency       string
+	AppliedAt      time.Time
+}
+type PromoCodeApplication struct {
+	ID             int               `json:"id"`
+	UserID         int               `json:"user_id"`
+	PromoCodeID    int               `json:"promo_code_id"`
+	PaymentOrderID int               `json:"payment_order_id"`
+	OrderNo        string            `json:"order_no"`
+	OriginalAmount string            `json:"original_amount"`
+	DiscountAmount string            `json:"discount_amount"`
+	FinalAmount    string            `json:"final_amount"`
+	Currency       string            `json:"currency"`
+	DiscountType   PromoDiscountType `json:"discount_type"`
+	AppliedAt      time.Time         `json:"applied_at"`
+	CreatedAt      time.Time         `json:"created_at"`
+	UpdatedAt      time.Time         `json:"updated_at"`
+}
 
 type RiskControlMode string
 
@@ -341,15 +452,65 @@ const (
 	OpsSystemLogLevelError OpsSystemLogLevel = "error"
 )
 
+func (l OpsSystemLogLevel) Valid() bool {
+	return l == OpsSystemLogLevelDebug || l == OpsSystemLogLevelInfo || l == OpsSystemLogLevelWarn || l == OpsSystemLogLevelError
+}
+
 type OpsSystemLog struct {
 	ID        int               `json:"id"`
 	Level     OpsSystemLogLevel `json:"level"`
 	Message   string            `json:"message"`
 	Source    string            `json:"source"`
+	RequestID string            `json:"request_id,omitempty"`
+	TraceID   string            `json:"trace_id,omitempty"`
 	Metadata  map[string]any    `json:"metadata,omitempty"`
 	CreatedAt time.Time         `json:"created_at"`
 }
 type SystemLogList struct {
 	Items []OpsSystemLog
 	Total int
+}
+
+type SystemLogListOptions struct {
+	Page     int
+	PageSize int
+	Level    OpsSystemLogLevel
+	Source   string
+	Query    string
+	Start    *time.Time
+	End      *time.Time
+}
+
+type RecordSystemLogRequest struct {
+	Level     OpsSystemLogLevel
+	Message   string
+	Source    string
+	RequestID string
+	TraceID   string
+	Metadata  map[string]any
+	CreatedAt time.Time
+}
+
+type SystemLogCleanupFilter struct {
+	Level     OpsSystemLogLevel
+	Source    string
+	Query     string
+	Start     *time.Time
+	End       *time.Time
+	DryRun    bool
+	MaxDelete int
+}
+
+type SystemLogCleanupResult struct {
+	Matched   int  `json:"matched"`
+	Deleted   int  `json:"deleted"`
+	DryRun    bool `json:"dry_run"`
+	MaxDelete int  `json:"max_delete"`
+	Limited   bool `json:"limited"`
+}
+
+type SystemLogStore interface {
+	CreateSystemLog(ctx context.Context, input OpsSystemLog) (OpsSystemLog, error)
+	ListSystemLogs(ctx context.Context, opts SystemLogListOptions) (SystemLogList, error)
+	CleanupSystemLogs(ctx context.Context, filter SystemLogCleanupFilter) (SystemLogCleanupResult, error)
 }

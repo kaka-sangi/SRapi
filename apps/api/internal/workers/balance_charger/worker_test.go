@@ -2,13 +2,21 @@ package balancecharger
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"io"
 	"log/slog"
+	"strings"
 	"testing"
 	"time"
 
+	admincontrolservice "github.com/srapi/srapi/apps/api/internal/modules/admin_control/service"
+	admincontrolmemory "github.com/srapi/srapi/apps/api/internal/modules/admin_control/store/memory"
 	auditmemory "github.com/srapi/srapi/apps/api/internal/modules/audit/store/memory"
 	billingcontract "github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
+	eventsservice "github.com/srapi/srapi/apps/api/internal/modules/events/service"
+	eventsmemory "github.com/srapi/srapi/apps/api/internal/modules/events/store/memory"
+	notificationscontract "github.com/srapi/srapi/apps/api/internal/modules/notifications/contract"
 	userscontract "github.com/srapi/srapi/apps/api/internal/modules/users/contract"
 	usersmemory "github.com/srapi/srapi/apps/api/internal/modules/users/store/memory"
 )
@@ -116,6 +124,113 @@ func TestRunOnceDrainsConfiguredBatches(t *testing.T) {
 	}
 }
 
+func TestRunOnceEnqueuesBalanceLowNotificationOnThresholdCrossing(t *testing.T) {
+	users := usersmemory.New()
+	user, err := users.Create(t.Context(), userscontract.CreateStoredUser{
+		Email:        "low-balance@srapi.local",
+		Name:         "Low Balance",
+		PasswordHash: "hash",
+		Status:       userscontract.StatusActive,
+		Roles:        []userscontract.Role{userscontract.RoleUser},
+		Balance:      "4.75000000",
+		Currency:     "USD",
+	})
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	adminStore := admincontrolmemory.New()
+	adminSvc, err := admincontrolservice.New(adminStore, nil)
+	if err != nil {
+		t.Fatalf("new admin service: %v", err)
+	}
+	settings, err := adminSvc.GetAdminSettings(t.Context())
+	if err != nil {
+		t.Fatalf("get admin settings: %v", err)
+	}
+	enabled := true
+	settings.Email.BalanceLowNotifyEnabled = &enabled
+	settings.Email.BalanceLowNotifyThreshold = "5.00000000"
+	settings.Email.BalanceLowNotifyRechargeURL = "https://console.srapi.local/billing"
+	if _, err := adminSvc.UpdateAdminSettings(t.Context(), settings, 1); err != nil {
+		t.Fatalf("update admin settings: %v", err)
+	}
+	events := eventsmemory.New()
+	clock := fixedClock{now: time.Date(2026, 5, 29, 12, 0, 0, 0, time.UTC)}
+	store := &fakeUsageChargeStore{
+		pending: []billingcontract.PendingUsageCharge{{
+			UsageLogID: 77,
+			RequestID:  "req_balance_low",
+			UserID:     user.ID,
+			Cost:       "1.25000000",
+			Currency:   "USD",
+		}},
+		result: billingcontract.ChargeUsageResult{
+			UserID:             user.ID,
+			ChargedUsageLogIDs: []int{77},
+			BalanceBefore:      "6.00000000",
+			BalanceAfter:       "4.75000000",
+			LedgerEntry: billingcontract.LedgerEntry{
+				ID:            10,
+				Type:          billingcontract.LedgerTypeUsageCharge,
+				Amount:        "1.25000000",
+				Currency:      "USD",
+				ReferenceType: "usage_log_batch",
+				ReferenceID:   "77",
+				CreatedAt:     clock.now,
+			},
+		},
+	}
+	worker, err := New(store, discardLogger(), Config{
+		Users:        users,
+		Events:       events,
+		AdminControl: adminStore,
+		Clock:        clock,
+	})
+	if err != nil {
+		t.Fatalf("new worker: %v", err)
+	}
+
+	result, err := worker.RunOnce(t.Context())
+	if err != nil {
+		t.Fatalf("run worker once: %v", err)
+	}
+	if result.Charged != 1 {
+		t.Fatalf("expected one charged usage, got %+v", result)
+	}
+	eventsSvc, err := eventsservice.New(events, clock)
+	if err != nil {
+		t.Fatalf("new events service: %v", err)
+	}
+	outbox, err := eventsSvc.ListOutbox(t.Context())
+	if err != nil {
+		t.Fatalf("list outbox: %v", err)
+	}
+	if len(outbox) != 1 || outbox[0].EventType != notificationscontract.EventBalanceLowTriggered {
+		t.Fatalf("expected one balance low event, got %+v", outbox)
+	}
+	payload := outbox[0].Payload
+	if payload["recipient_user_id"] != float64(user.ID) || payload["recipient_email_hash"] != testEmailHash(user.Email) {
+		t.Fatalf("unexpected payload identity: %+v", payload)
+	}
+	if strings.Contains(strings.ToLower(outbox[0].IdempotencyKey), user.Email) || strings.Contains(strings.ToLower(toString(payload["recipient_email_hash"])), user.Email) {
+		t.Fatalf("balance low event leaked plaintext email: %+v", outbox[0])
+	}
+	if payload["balance_before"] != "6.00000000" || payload["balance_after"] != "4.75000000" || payload["threshold"] != "5.00000000" {
+		t.Fatalf("unexpected balance threshold payload: %+v", payload)
+	}
+
+	if err := worker.enqueueBalanceLowNotifications(t.Context(), result.Batches); err != nil {
+		t.Fatalf("enqueue duplicate balance low notification: %v", err)
+	}
+	outbox, err = eventsSvc.ListOutbox(t.Context())
+	if err != nil {
+		t.Fatalf("list outbox after duplicate: %v", err)
+	}
+	if len(outbox) != 1 {
+		t.Fatalf("expected idempotent duplicate notification enqueue, got %+v", outbox)
+	}
+}
+
 type fakeUsageChargeStore struct {
 	pending     []billingcontract.PendingUsageCharge
 	result      billingcontract.ChargeUsageResult
@@ -180,4 +295,18 @@ type fixedClock struct {
 
 func (c fixedClock) Now() time.Time {
 	return c.now
+}
+
+func discardLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(io.Discard, nil))
+}
+
+func testEmailHash(email string) string {
+	sum := sha256.Sum256([]byte(strings.ToLower(strings.TrimSpace(email))))
+	return hex.EncodeToString(sum[:])
+}
+
+func toString(value any) string {
+	typed, _ := value.(string)
+	return strings.TrimSpace(typed)
 }

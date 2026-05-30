@@ -24,6 +24,7 @@ import (
 	operationsservice "github.com/srapi/srapi/apps/api/internal/modules/operations/service"
 	paymentcontract "github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
 	paymentservice "github.com/srapi/srapi/apps/api/internal/modules/payments/service"
+	totpservice "github.com/srapi/srapi/apps/api/internal/modules/totp/service"
 	userscontract "github.com/srapi/srapi/apps/api/internal/modules/users/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 	platformlogger "github.com/srapi/srapi/apps/api/internal/platform/logger"
@@ -607,6 +608,23 @@ func writeAffiliateServiceError(w http.ResponseWriter, err error, requestID stri
 		writeStandardError(w, http.StatusConflict, apiopenapi.RESOURCECONFLICT, "affiliate resource conflict", requestID)
 	default:
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "affiliate service error", requestID)
+	}
+}
+
+func writeTOTPServiceError(w http.ResponseWriter, err error, requestID string) {
+	switch {
+	case errors.Is(err, totpservice.ErrInvalidInput):
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid totp request", requestID)
+	case errors.Is(err, totpservice.ErrInvalidCode):
+		writeStandardError(w, http.StatusUnauthorized, apiopenapi.UNAUTHORIZED, "invalid totp code", requestID)
+	case errors.Is(err, totpservice.ErrSecretNotFound):
+		writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "totp setup not found", requestID)
+	case errors.Is(err, totpservice.ErrSecretDisabled):
+		writeStandardError(w, http.StatusConflict, apiopenapi.RESOURCECONFLICT, "totp is not enabled", requestID)
+	case errors.Is(err, totpservice.ErrSecretAlreadyEnabled):
+		writeStandardError(w, http.StatusConflict, apiopenapi.RESOURCECONFLICT, "totp is already enabled", requestID)
+	default:
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "totp service error", requestID)
 	}
 }
 

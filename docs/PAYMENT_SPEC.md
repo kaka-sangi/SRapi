@@ -75,6 +75,9 @@ deleted_at
 order_no
 user_id
 provider_instance_id
+original_amount
+discount_amount
+promo_code_id nullable
 amount
 currency
 status
@@ -89,6 +92,9 @@ metadata_json
 ```
 
 `provider_snapshot_json` 保存下单时非敏感展示信息，避免渠道配置变更后历史订单显示漂移。
+`amount` 是实际提交给支付渠道的最终应付金额；`original_amount` 保存用户提交的
+原始金额；`discount_amount` 保存服务端计算后的优惠金额；`promo_code_id` 只保存
+settings-backed promo code 的稳定 id，不保存优惠码明文。
 
 ## 4. 支持渠道规划
 
@@ -180,7 +186,7 @@ make smoke-payment-wechat
 
 这些配置通过 payment provider instance 的 `config_ciphertext` 加密保存；订单 metadata 只保存 checkout URL、session id、签名摘要等非密钥信息。
 
-管理员更新 provider instance 时，`provider` 类型保持不可变，`name/status/supported_methods/limits/sort_order/metadata/config` 可更新。若重命名或替换配置，服务端会用新的 AAD 重新加密 config；响应和 audit 只暴露 `config_configured` / `config_version`，不回显密钥字段。
+管理员更新 provider instance 时，`provider` 类型保持不可变，`name/status/supported_methods/limits/sort_order/metadata/config` 可更新。若重命名或替换配置，服务端会用新的 AAD 重新加密 config；响应和 audit 只暴露 `config_configured` / `config_version`，不回显密钥字段。有未关闭订单（`pending` 或 `paid`）绑定到该实例时，管理员仍可更新展示名、排序和非敏感 metadata，但不得禁用/归档实例、移除已有 `supported_methods`，或替换加密 config；这些变更必须等订单进入 `fulfilled`、`refunded`、`canceled`、`expired` 或 `failed` 后再执行，避免 checkout、webhook 和退款归属漂移。
 
 ## 5. 前台可见支付方式
 
@@ -325,6 +331,12 @@ POST /api/v1/admin/payment-integrations/orders/{order_no}/confirm
 
 外部集成必须使用独立权限和审计日志，不得复用普通用户 API Key。
 
+`POST /api/v1/payment/orders` 可接受可选 `promo_code`。服务端必须在创建第三方
+checkout 前校验优惠码 active 状态、`starts_at`、`expires_at`、`max_uses`、币种、
+金额折扣或比例折扣规则，并把折扣后的最终 `amount` 提交给支付渠道。持久化实现
+必须在同一事务里写 `payment_orders` 折扣字段、`user_promo_code_applications`
+回执和 `admin_control.promo_codes` 的 `used_count` 更新；失败时不得留下半创建订单。
+
 ## 12. 安全要求
 
 支付配置密钥必须加密保存：
@@ -349,6 +361,7 @@ payment_provider_instances.config_ciphertext
 - Webhook 签名验证。
 - Webhook 幂等。
 - 金额和币种不匹配拒绝。
+- 优惠码校验、折扣金额、用量耗尽、错误币种和事务回滚。
 - 退款反向 ledger。
 - 支付配置脱敏。
 - 多实例限额和负载均衡。

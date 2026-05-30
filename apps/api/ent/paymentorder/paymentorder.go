@@ -23,6 +23,12 @@ const (
 	FieldOrderNo = "order_no"
 	// FieldProviderInstanceID holds the string denoting the provider_instance_id field in the database.
 	FieldProviderInstanceID = "provider_instance_id"
+	// FieldOriginalAmount holds the string denoting the original_amount field in the database.
+	FieldOriginalAmount = "original_amount"
+	// FieldDiscountAmount holds the string denoting the discount_amount field in the database.
+	FieldDiscountAmount = "discount_amount"
+	// FieldPromoCodeID holds the string denoting the promo_code_id field in the database.
+	FieldPromoCodeID = "promo_code_id"
 	// FieldAmount holds the string denoting the amount field in the database.
 	FieldAmount = "amount"
 	// FieldCurrency holds the string denoting the currency field in the database.
@@ -57,6 +63,9 @@ var Columns = []string{
 	FieldUserID,
 	FieldOrderNo,
 	FieldProviderInstanceID,
+	FieldOriginalAmount,
+	FieldDiscountAmount,
+	FieldPromoCodeID,
 	FieldAmount,
 	FieldCurrency,
 	FieldStatus,
@@ -89,6 +98,10 @@ var (
 	UpdateDefaultUpdatedAt func() time.Time
 	// OrderNoValidator is a validator for the "order_no" field. It is called by the builders before save.
 	OrderNoValidator func(string) error
+	// DefaultOriginalAmount holds the default value on creation for the "original_amount" field.
+	DefaultOriginalAmount string
+	// DefaultDiscountAmount holds the default value on creation for the "discount_amount" field.
+	DefaultDiscountAmount string
 	// DefaultAmount holds the default value on creation for the "amount" field.
 	DefaultAmount string
 	// DefaultCurrency holds the default value on creation for the "currency" field.
@@ -132,6 +145,21 @@ func ByOrderNo(opts ...sql.OrderTermOption) OrderOption {
 // ByProviderInstanceID orders the results by the provider_instance_id field.
 func ByProviderInstanceID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldProviderInstanceID, opts...).ToFunc()
+}
+
+// ByOriginalAmount orders the results by the original_amount field.
+func ByOriginalAmount(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldOriginalAmount, opts...).ToFunc()
+}
+
+// ByDiscountAmount orders the results by the discount_amount field.
+func ByDiscountAmount(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDiscountAmount, opts...).ToFunc()
+}
+
+// ByPromoCodeID orders the results by the promo_code_id field.
+func ByPromoCodeID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPromoCodeID, opts...).ToFunc()
 }
 
 // ByAmount orders the results by the amount field.

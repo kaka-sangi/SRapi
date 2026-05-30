@@ -193,6 +193,21 @@ func userAuditSnapshot(user userscontract.StoredUser) map[string]any {
 	}
 }
 
+func userAuditSnapshotFromUser(user userscontract.User) map[string]any {
+	return map[string]any{
+		"email":       user.Email,
+		"name":        user.Name,
+		"status":      user.Status,
+		"roles":       append([]userscontract.Role(nil), user.Roles...),
+		"balance":     user.Balance,
+		"currency":    user.Currency,
+		"rpm_limit":   user.RPMLimit,
+		"last_login":  user.LastLoginAt,
+		"created_at":  user.CreatedAt,
+		"verified_at": user.EmailVerifiedAt,
+	}
+}
+
 func apiKeyAuditSnapshot(key apikeycontract.APIKey) map[string]any {
 	return map[string]any{
 		"name":           key.Name,

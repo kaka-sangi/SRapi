@@ -29,6 +29,9 @@ test("env check rejects weak placeholders and permissive permissions", () => {
   assert(findings.some((finding) => finding.includes("DATABASE_PASSWORD")));
   assert(findings.some((finding) => finding.includes("JWT_SECRET")));
   assert(
+    findings.some((finding) => finding.includes("TOTP_ENCRYPTION_KEY")),
+  );
+  assert(
     findings.some((finding) => finding.includes("BOOTSTRAP_ADMIN_PASSWORD")),
   );
 });

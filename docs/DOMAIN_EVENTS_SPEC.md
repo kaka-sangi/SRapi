@@ -41,6 +41,8 @@ AffiliateRebateAccrued
 AffiliateRebateCompensated
 ProviderAccountHealthChanged
 ProviderAccountQuotaChanged
+AccountQuotaAlertTriggered
+NotificationContactVerificationRequested
 SchedulerDecisionRecorded
 GatewayRequestCompleted
 AlertTriggered
@@ -291,7 +293,101 @@ source_id
 - Audit。
 - Notification，可选。
 
-### 8.4 PaymentOrderPaid
+### 8.4 BalanceLowTriggered
+
+生产者：Billing balance charger。
+
+触发：成功扣费后，用户余额从大于等于低余额提醒阈值降到阈值以下。
+
+关键 payload：
+
+```txt
+recipient_user_id
+recipient_email_hash
+balance_before
+balance_after
+threshold
+currency
+ledger_entry_id
+usage_log_ids
+charged_at
+recharge_url
+```
+
+安全规则：
+
+- payload 不得包含明文邮箱、unsubscribe token、session cookie、CSRF token、SMTP secret、API key、provider credential 或 prompt。
+- 事件通过 `billing:balance_low:<user_id>:<ledger_reference>` 幂等键去重。
+- Outbox 通知消费者必须重新读取当前用户并校验邮箱 hash；邮箱变更、用户停用或用户已退订 `balance.low` 时跳过投递。
+- 邮件投递失败保持 outbox retry，而不回滚扣费结果。
+
+消费者：
+
+- Notification。
+
+### 8.5 SubscriptionExpiryReminderTriggered
+
+生产者：Subscriptions expiry worker。
+
+触发：活跃订阅距离过期还有 7、3 或 1 天时，由订阅过期 worker 扫描并入队。
+
+关键 payload：
+
+```txt
+subscription_id
+recipient_user_id
+plan_id
+subscription_name
+days_remaining
+reminder_key
+expires_at
+triggered_at
+subscription_url
+```
+
+安全规则：
+
+- payload 不得包含明文邮箱、recipient email hash、unsubscribe token、session cookie、CSRF token、SMTP secret、API key、provider credential 或 prompt。
+- 事件通过 `subscriptions:subscription_expiry_reminder:<subscription_id>:<reminder_key>` 幂等键去重。
+- Outbox 通知消费者必须重新读取当前用户；用户停用或用户已退订 `subscription.expiry_reminder` 时跳过投递。
+- 邮件投递失败保持 outbox retry，而不改变订阅状态。
+
+消费者：
+
+- Notification。
+
+### 8.6 NotificationContactVerificationRequested
+
+生产者：Notifications current-user contact API。
+
+触发：当前用户添加或重新请求验证额外通知邮箱。
+
+关键 payload：
+
+```txt
+recipient_user_id
+recipient_email_hash
+contact_id
+contact_email_ciphertext
+verification_token_ciphertext
+verification_token_version
+verification_url_path
+expires_at
+```
+
+安全规则：
+
+- payload 不得包含明文 contact email、unsubscribe token、session cookie、CSRF token、SMTP secret、API key、provider credential 或 prompt。
+- contact email 和 verification token 只能以 deployment master key 派生密钥加密后进入 outbox。
+- 事件通过 `notifications.contact_verification:<user_id>:<contact_id>:<token_hash_prefix>` 幂等键去重。
+- Outbox 通知消费者必须重新读取当前用户，跳过 inactive user，并校验解密后的 contact email hash 与 payload hash 一致。
+- contact verification mail 是 transactional mail，不受 optional unsubscribe preference 压制，也不携带 one-click unsubscribe headers。
+
+消费者：
+
+- Notification。
+
+### 8.7 PaymentOrderPaid
 
 生产者：Payments。
 
@@ -320,7 +416,7 @@ provider_transaction_id
 
 支付模块只负责支付事实，不直接写返利账本。
 
-### 8.5 PaymentOrderRefunded
+### 8.8 PaymentOrderRefunded
 
 生产者：Payments。
 
@@ -344,7 +440,7 @@ refunded_at
 - Affiliate rebate compensation。
 - Audit。
 
-### 8.6 SubscriptionActivated
+### 8.9 SubscriptionActivated
 
 生产者：Subscriptions。
 
@@ -367,7 +463,7 @@ entitlement_snapshot
 - Audit。
 - Observability。
 
-### 8.7 AffiliateRebateAccrued
+### 8.10 AffiliateRebateAccrued
 
 生产者：Affiliate。
 
@@ -392,7 +488,7 @@ status
 - Audit。
 - Observability。
 
-### 8.8 AffiliateRebateCompensated
+### 8.11 AffiliateRebateCompensated
 
 生产者：Affiliate。
 
@@ -414,7 +510,7 @@ reason
 - Billing。
 - Audit。
 
-### 8.9 ProviderAccountHealthChanged
+### 8.12 ProviderAccountHealthChanged
 
 生产者：Scheduler / Provider Adapter / Account Health Worker。
 
@@ -438,7 +534,7 @@ reason
 - Alerting。
 - Audit，高风险变更。
 
-### 8.10 SchedulerDecisionRecorded
+### 8.13 SchedulerDecisionRecorded
 
 生产者：Scheduler。
 

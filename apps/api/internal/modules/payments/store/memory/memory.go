@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -15,11 +16,14 @@ type Store struct {
 	nextProviderID       int
 	nextOrderID          int
 	nextAuditID          int
+	nextPromoUsageID     int
 	providers            map[int]contract.PaymentProviderInstance
 	orders               map[int]contract.PaymentOrder
 	orderIDByNo          map[string]int
 	auditLogs            map[int]contract.PaymentAuditLog
 	auditIDByIdempotency map[string]int
+	promoUsages          map[int]contract.PromoCodeApplication
+	promoUsageByOrderNo  map[string]int
 }
 
 func New() *Store {
@@ -27,11 +31,14 @@ func New() *Store {
 		nextProviderID:       1,
 		nextOrderID:          1,
 		nextAuditID:          1,
+		nextPromoUsageID:     1,
 		providers:            map[int]contract.PaymentProviderInstance{},
 		orders:               map[int]contract.PaymentOrder{},
 		orderIDByNo:          map[string]int{},
 		auditLogs:            map[int]contract.PaymentAuditLog{},
 		auditIDByIdempotency: map[string]int{},
+		promoUsages:          map[int]contract.PromoCodeApplication{},
+		promoUsageByOrderNo:  map[string]int{},
 	}
 }
 
@@ -105,6 +112,10 @@ func (s *Store) UpdateProviderInstance(_ context.Context, input contract.Payment
 	return cloneProvider(provider), nil
 }
 
+func (s *Store) PreviewPromoCode(_ context.Context, _ contract.PromoCodePreviewInput) (contract.PromoCodeApplication, error) {
+	return contract.PromoCodeApplication{}, contract.ErrNotFound
+}
+
 func (s *Store) CreateOrder(_ context.Context, input contract.CreateStoredOrder) (contract.PaymentOrder, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -120,6 +131,9 @@ func (s *Store) CreateOrder(_ context.Context, input contract.CreateStoredOrder)
 		UserID:             input.UserID,
 		OrderNo:            input.OrderNo,
 		ProviderInstanceID: input.ProviderInstanceID,
+		OriginalAmount:     defaultMoney(input.OriginalAmount, input.Amount),
+		DiscountAmount:     defaultMoney(input.DiscountAmount, "0.00000000"),
+		PromoCodeID:        cloneInt(input.PromoCodeID),
 		Amount:             input.Amount,
 		Currency:           input.Currency,
 		Status:             input.Status,
@@ -134,6 +148,25 @@ func (s *Store) CreateOrder(_ context.Context, input contract.CreateStoredOrder)
 	s.orders[order.ID] = order
 	s.orderIDByNo[order.OrderNo] = order.ID
 	s.nextOrderID++
+	if input.PromoCodeID != nil {
+		usage := contract.PromoCodeApplication{
+			ID:             s.nextPromoUsageID,
+			UserID:         input.UserID,
+			PromoCodeID:    *input.PromoCodeID,
+			PaymentOrderID: order.ID,
+			OrderNo:        order.OrderNo,
+			OriginalAmount: order.OriginalAmount,
+			DiscountAmount: order.DiscountAmount,
+			FinalAmount:    order.Amount,
+			Currency:       order.Currency,
+			AppliedAt:      now,
+			CreatedAt:      now,
+			UpdatedAt:      now,
+		}
+		s.promoUsages[usage.ID] = usage
+		s.promoUsageByOrderNo[order.OrderNo] = usage.ID
+		s.nextPromoUsageID++
+	}
 	return cloneOrder(order), nil
 }
 
@@ -211,6 +244,18 @@ func (s *Store) ListOrdersByUser(_ context.Context, userID int) ([]contract.Paym
 	return out, nil
 }
 
+func (s *Store) CountInProgressOrdersByProviderInstance(_ context.Context, providerInstanceID int) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	count := 0
+	for _, order := range s.orders {
+		if order.ProviderInstanceID == providerInstanceID && inProgressOrderStatus(order.Status) {
+			count++
+		}
+	}
+	return count, nil
+}
+
 func (s *Store) ExpireOrder(_ context.Context, orderID int, now time.Time) (contract.PaymentOrder, bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -227,6 +272,15 @@ func (s *Store) ExpireOrder(_ context.Context, orderID int, now time.Time) (cont
 	order.UpdatedAt = now
 	s.orders[order.ID] = order
 	return cloneOrder(order), true, nil
+}
+
+func inProgressOrderStatus(status contract.OrderStatus) bool {
+	switch status {
+	case contract.OrderStatusPending, contract.OrderStatusPaid:
+		return true
+	default:
+		return false
+	}
 }
 
 func (s *Store) CreateAuditLog(_ context.Context, input contract.PaymentAuditLog) (contract.PaymentAuditLog, bool, error) {
@@ -269,6 +323,7 @@ func cloneProvider(value contract.PaymentProviderInstance) contract.PaymentProvi
 }
 
 func cloneOrder(value contract.PaymentOrder) contract.PaymentOrder {
+	value.PromoCodeID = cloneInt(value.PromoCodeID)
 	value.ProviderTransactionID = cloneString(value.ProviderTransactionID)
 	value.ProviderSnapshot = cloneMap(value.ProviderSnapshot)
 	value.ExpiresAt = cloneTime(value.ExpiresAt)
@@ -321,4 +376,20 @@ func cloneString(value *string) *string {
 	}
 	cloned := *value
 	return &cloned
+}
+
+func cloneInt(value *int) *int {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
+}
+
+func defaultMoney(value string, fallback string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return fallback
+	}
+	return value
 }

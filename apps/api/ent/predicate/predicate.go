@@ -12,6 +12,9 @@ type APIKey func(*sql.Selector)
 // APIKeyGroup is the predicate function for apikeygroup builders.
 type APIKeyGroup func(*sql.Selector)
 
+// AccountAvailabilityRollup is the predicate function for accountavailabilityrollup builders.
+type AccountAvailabilityRollup func(*sql.Selector)
+
 // AccountGroup is the predicate function for accountgroup builders.
 type AccountGroup func(*sql.Selector)
 
@@ -48,8 +51,14 @@ type DomainEventsInbox func(*sql.Selector)
 // DomainEventsOutbox is the predicate function for domaineventsoutbox builders.
 type DomainEventsOutbox func(*sql.Selector)
 
+// EmailVerificationToken is the predicate function for emailverificationtoken builders.
+type EmailVerificationToken func(*sql.Selector)
+
 // Entitlement is the predicate function for entitlement builders.
 type Entitlement func(*sql.Selector)
+
+// ErrorPassthroughRule is the predicate function for errorpassthroughrule builders.
+type ErrorPassthroughRule func(*sql.Selector)
 
 // IdempotencyRecord is the predicate function for idempotencyrecord builders.
 type IdempotencyRecord func(*sql.Selector)
@@ -75,6 +84,12 @@ type ObsAlertEvent func(*sql.Selector)
 // ObsSLODefinition is the predicate function for obsslodefinition builders.
 type ObsSLODefinition func(*sql.Selector)
 
+// OpsSystemLog is the predicate function for opssystemlog builders.
+type OpsSystemLog func(*sql.Selector)
+
+// PasswordResetToken is the predicate function for passwordresettoken builders.
+type PasswordResetToken func(*sql.Selector)
+
 // PaymentAuditLog is the predicate function for paymentauditlog builders.
 type PaymentAuditLog func(*sql.Selector)
 
@@ -83,6 +98,9 @@ type PaymentOrder func(*sql.Selector)
 
 // PaymentProviderInstance is the predicate function for paymentproviderinstance builders.
 type PaymentProviderInstance func(*sql.Selector)
+
+// PendingOAuthSession is the predicate function for pendingoauthsession builders.
+type PendingOAuthSession func(*sql.Selector)
 
 // PricingRule is the predicate function for pricingrule builders.
 type PricingRule func(*sql.Selector)
@@ -123,17 +141,41 @@ type Setting func(*sql.Selector)
 // SubscriptionPlan is the predicate function for subscriptionplan builders.
 type SubscriptionPlan func(*sql.Selector)
 
+// TLSFingerprintProfile is the predicate function for tlsfingerprintprofile builders.
+type TLSFingerprintProfile func(*sql.Selector)
+
 // UsageLog is the predicate function for usagelog builders.
 type UsageLog func(*sql.Selector)
 
 // User is the predicate function for user builders.
 type User func(*sql.Selector)
 
+// UserAnnouncementRead is the predicate function for userannouncementread builders.
+type UserAnnouncementRead func(*sql.Selector)
+
+// UserAttributeDefinition is the predicate function for userattributedefinition builders.
+type UserAttributeDefinition func(*sql.Selector)
+
+// UserAttributeValue is the predicate function for userattributevalue builders.
+type UserAttributeValue func(*sql.Selector)
+
+// UserAuthIdentity is the predicate function for userauthidentity builders.
+type UserAuthIdentity func(*sql.Selector)
+
+// UserPromoCodeApplication is the predicate function for userpromocodeapplication builders.
+type UserPromoCodeApplication func(*sql.Selector)
+
+// UserRedeemCodeRedemption is the predicate function for userredeemcoderedemption builders.
+type UserRedeemCodeRedemption func(*sql.Selector)
+
 // UserRole is the predicate function for userrole builders.
 type UserRole func(*sql.Selector)
 
 // UserSubscription is the predicate function for usersubscription builders.
 type UserSubscription func(*sql.Selector)
+
+// UserTOTPSecret is the predicate function for usertotpsecret builders.
+type UserTOTPSecret func(*sql.Selector)
 
 // Workspace is the predicate function for workspace builders.
 type Workspace func(*sql.Selector)

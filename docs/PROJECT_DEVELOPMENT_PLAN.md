@@ -344,7 +344,7 @@ packages/openapi/
 - 登出
 - Refresh Token
 - 邮箱验证
-- TOTP，可选
+- TOTP，可选；WP-770 起支持当前用户设置、启用、停用、恢复码和登录二次验证
 - 管理员登录
 - CSRF 防护
 - Session 管理

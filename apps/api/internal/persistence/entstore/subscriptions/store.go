@@ -258,6 +258,25 @@ func (s *Store) ListExpiredActiveUserSubscriptions(ctx context.Context, now time
 	return out, nil
 }
 
+func (s *Store) ListActiveUserSubscriptionsExpiringBetween(ctx context.Context, from time.Time, until time.Time) ([]contract.UserSubscription, error) {
+	rows, err := s.client.UserSubscription.Query().
+		Where(
+			entusersubscription.StatusEQ(string(contract.SubscriptionStatusActive)),
+			entusersubscription.ExpiresAtGTE(from.UTC()),
+			entusersubscription.ExpiresAtLTE(until.UTC()),
+		).
+		Order(entusersubscription.ByExpiresAt(), entusersubscription.ByID()).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]contract.UserSubscription, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toSubscription(row))
+	}
+	return out, nil
+}
+
 func (s *Store) ExpireUserSubscription(ctx context.Context, id int, now time.Time) (contract.UserSubscription, bool, error) {
 	now = now.UTC()
 	updated, err := s.client.UserSubscription.UpdateOneID(id).

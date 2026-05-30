@@ -86,11 +86,21 @@ amount_minor bigint + currency
 
 Admin Control Plane v1 可以先用 `settings.value_json` 承载低频管理资源集合，避免在控制台首版中引入过多表。以下能力一旦进入用户高频路径或需要独立约束，应提升为一等 Ent schema 和迁移：
 
-- 用户侧兑换码核销。
-- 优惠码订单应用和使用记录。
-- 公告用户投递与阅读回执。
 - 高吞吐风控事件。
-- 高吞吐系统日志。
+
+AdminOps 系统日志已经提升为 `ops_system_logs` 一等表，不能再放回
+`settings.value_json`。
+公告内容仍由 `settings.value_json` 的 `admin_control.announcements` 承载；
+用户侧阅读回执已经提升为 `user_announcement_reads` 一等表。
+兑换码配置仍由 `settings.value_json` 的 `admin_control.redeem_codes` 承载；
+用户侧核销回执已经提升为 `user_redeem_code_redemptions` 一等表。
+优惠码配置仍由 `settings.value_json` 的 `admin_control.promo_codes` 承载；
+用户侧下单应用回执已经提升为 `user_promo_code_applications` 一等表。
+用户头像 v1 使用 per-user `settings.value_json` key
+`users.avatar:v1:user:{user_id}` 承载低频、小体积、SRapi 重编码后的 PNG
+对象和元数据（content type、byte size、sha256、width、height、updated_at）。
+若头像成为高频查询、需要对象存储生命周期管理、CDN、公网匿名读取或独立约束，
+必须提升为 objectstore-backed 一等 avatar 存储，而不是继续扩大 settings JSON。
 
 能力类 JSON 必须遵守 `CAPABILITY_TAXONOMY_SPEC.md` 的 key、version、status、level 和 metadata schema 规则。
 
@@ -152,6 +162,11 @@ index(workspace_id)
 index(status)
 ```
 
+规则：
+
+- `email_verified_at` 只由 email verification flow 或可信外部身份绑定流程设置；
+  普通 profile update、注册请求和密码找回不得直接写入该字段。
+
 ### 6.3 auth_sessions
 
 控制台登录 Session 持久化表。
@@ -185,6 +200,301 @@ index(expires_at)
 - 不存 CSRF token 原文。
 - `session_id_hash` 和 `csrf_token_hash` 使用 SHA-256 派生值；登录响应只返回本次新建 Session 的明文 CSRF token。
 - 过期 session 由后台 worker 从 `active` 标记为 `expired` 并设置 `deleted_at`；用户登出产生的 `revoked` 状态不被过期清理覆盖。
+
+### 6.4 user_auth_identities
+
+`user_auth_identities` 是当前用户外部登录身份目录。它承载未来 OAuth/OIDC
+callback 完成后的绑定结果；本地 email 登录身份由 `users.email` 和
+`users.email_verified_at` 派生，不在此表重复存储。
+外部身份解绑按 `id + user_id` 精确删除一条记录，而不是按 provider 批量删除，
+以便未来同一 provider 类型存在多个 issuer / tenant / app 实例时仍能安全管理。
+
+```txt
+id
+user_id
+provider
+provider_key
+provider_subject_hash
+subject_hint
+display_name
+email
+email_verified
+avatar_url
+verified_at
+last_used_at
+created_at
+updated_at
+deleted_at
+```
+
+索引：
+
+```txt
+unique(provider, provider_key, provider_subject_hash)
+index(user_id, provider)
+index(user_id)
+index(last_used_at)
+```
+
+规则：
+
+- `provider` 使用小而稳定的枚举：`oidc`、`github`、`google`、`linuxdo`、
+  `wechat`、`dingtalk`。`email` 是派生身份，不写入本表。
+- `provider_key` 是 provider instance key，例如 OIDC issuer 或内置 provider key。
+- `provider_subject_hash` 保存归一化外部 subject 的不可逆 hash，不保存原始
+  upstream subject、access token、refresh token、session cookie 或 provider secret。
+- `subject_hint` 只用于 UI 显示，必须是不可用于登录或 API 调用的安全摘要。
+- `avatar_url` 只表示可信外部身份建议的资料 URL；SRapi-hosted 当前用户头像仍由
+  avatar storage flow 管理。
+
+### 6.5 user_totp_secrets
+
+当前用户 TOTP 二次验证密钥表。
+
+```txt
+id
+user_id
+secret_ciphertext
+secret_version
+enabled
+recovery_code_hashes_json
+last_used_at
+created_at
+updated_at
+```
+
+索引：
+
+```txt
+unique(user_id)
+index(enabled, user_id)
+```
+
+规则：
+
+- `secret_ciphertext` 使用 `TOTP_ENCRYPTION_KEY` 派生 AES-GCM key 加密。
+- `recovery_code_hashes_json` 只保存恢复码 HMAC hash，不保存明文。
+- `enabled=false` 表示 setup 尚未完成；disable 删除该行，避免保留可重新启用的旧 secret。
+
+### 6.6 pending_oauth_sessions
+
+`pending_oauth_sessions` 是 OAuth/OIDC callback 完成后、用户最终选择登录/
+绑定/建号动作之前的短期决策会话。它只保存服务端 HMAC hash 和安全摘要，
+不保存 authorization code、access token、refresh token、raw upstream subject、
+state、nonce、PKCE verifier 或 provider secret。
+
+```txt
+id
+session_token_hash
+intent
+provider
+provider_key
+provider_subject_hash
+subject_hint
+target_user_id nullable
+redirect_to
+resolved_email
+display_name
+email_verified
+avatar_url
+expires_at
+consumed_at nullable
+created_at
+updated_at
+```
+
+索引：
+
+```txt
+unique(session_token_hash)
+index(target_user_id)
+index(expires_at)
+index(consumed_at)
+index(provider, provider_key, provider_subject_hash)
+```
+
+规则：
+
+- `session_token_hash` 必须由服务端密钥 HMAC 派生；明文 pending token 只返回给
+  本次浏览器流程。
+- `provider_subject_hash` 是上游 subject 的服务端派生 hash，不能保存 raw subject。
+- `consumed_at` 一旦写入表示 pending session 已完成；消费必须通过
+  `consumed_at IS NULL` 和 `expires_at > now` 原子更新保证单次使用。
+- `redirect_to` 只保存站内路径；空值或跨站路径归一为 `/`。
+
+### 6.7 password_reset_tokens
+
+公开密码找回 token 的持久 receipt。
+
+```txt
+id
+user_id
+token_hash
+token_version
+expires_at
+used_at nullable
+created_at
+updated_at
+```
+
+索引：
+
+```txt
+unique(token_hash)
+index(user_id, created_at)
+index(expires_at)
+index(used_at)
+```
+
+### 6.8 email_verification_tokens
+
+公开邮箱验证 token 的持久 receipt。
+
+```txt
+id
+user_id
+token_hash
+token_version
+expires_at
+used_at nullable
+created_at
+updated_at
+```
+
+索引：
+
+```txt
+unique(token_hash)
+index(user_id, created_at)
+index(expires_at)
+index(used_at)
+```
+
+规则：
+
+- `token_hash` 是由服务端密钥计算的 HMAC / keyed hash，不保存明文 verification token。
+- `used_at` 一旦写入表示 token 已消费；confirm 必须通过 `used_at IS NULL` 和 `expires_at > now`
+  原子更新实现单次消费。
+- 邮件投递使用 `domain_events_outbox`，payload 只能包含加密 token 和邮箱 hash。
+
+### 6.4B user_announcement_reads
+
+当前用户公告阅读回执表。公告内容仍来自 Admin Control Plane 的
+`admin_control.announcements` typed collection；该表只保存 per-user receipt，
+避免把用户高频状态写回全局 settings JSON。
+
+```txt
+id
+user_id
+announcement_id
+read_at
+created_at
+updated_at
+```
+
+索引：
+
+```txt
+unique(user_id, announcement_id)
+index(announcement_id)
+index(user_id, read_at)
+```
+
+规则：
+
+- 同一用户同一公告最多一条回执。
+- 如果公告内容被管理员更新且 `updated_at > read_at`，用户侧列表重新视为未读。
+- 该表不保存公告正文、用户邮箱、角色快照或投递 payload。
+
+### 6.4C user_redeem_code_redemptions
+
+当前用户兑换码核销回执表。兑换码配置仍来自 Admin Control Plane 的
+`admin_control.redeem_codes` typed collection；该表保存每次成功核销的
+per-user receipt、财务/订阅引用和幂等证据，避免把用户高频状态只写回全局
+settings JSON。
+
+```txt
+id
+user_id
+redeem_code_id
+code_digest
+type
+amount
+currency
+balance_before
+balance_after
+billing_ledger_id
+user_subscription_id
+redeemed_at
+metadata_json
+created_at
+updated_at
+```
+
+索引：
+
+```txt
+unique(user_id, redeem_code_id)
+index(redeem_code_id)
+index(user_id, redeemed_at)
+index(code_digest)
+```
+
+规则：
+
+- 同一用户同一兑换码最多一条核销回执；重复提交返回既有结果，不重复入账。
+- `balance` 兑换必须同事务更新 `users.balance` 并写
+  `billing_ledger(type=redeem_code_credit)`。
+- `subscription` 兑换必须同事务创建 `user_subscriptions` 和对应
+  `entitlements` 缓存行，来源为 `source_type=redeem_code`。
+- 该表不保存兑换码明文；只保存规范化 code 的 digest、redeem code id 和低敏
+  metadata。
+
+### 6.4D user_promo_code_applications
+
+当前用户支付订单优惠码应用回执表。优惠码配置仍来自 Admin Control Plane 的
+`admin_control.promo_codes` typed collection；该表保存每笔成功下单优惠的
+per-order receipt、折扣金额和幂等证据，避免把用户侧使用历史只写回全局
+settings JSON。
+
+```txt
+id
+user_id
+promo_code_id
+code_digest
+payment_order_id
+order_no
+original_amount
+discount_amount
+final_amount
+currency
+discount_type
+applied_at
+metadata_json
+created_at
+updated_at
+```
+
+索引：
+
+```txt
+unique(payment_order_id)
+unique(order_no)
+index(promo_code_id)
+index(user_id, applied_at)
+index(code_digest)
+```
+
+规则：
+
+- 同一支付订单最多一条优惠码应用回执；已提交订单的重复 finalize 不重复递增
+  `used_count`。
+- 优惠码在创建支付订单前按 active/starts_at/expires_at/max_uses、币种、金额折扣
+  或比例折扣规则校验。
+- 持久化支付订单时，同一事务写 `payment_orders` 折扣字段、创建应用回执并递增
+  `admin_control.promo_codes` 中对应 `used_count`。
+- 该表不保存优惠码明文；只保存规范化 code 的 digest、promo code id 和低敏
+  metadata。
 
 ### 6.4 roles
 
@@ -1082,6 +1392,9 @@ id
 user_id
 order_no
 provider_instance_id
+original_amount
+discount_amount
+promo_code_id nullable
 amount
 currency
 status
@@ -1102,7 +1415,17 @@ unique(order_no)
 index(user_id, created_at)
 index(status, created_at)
 index(provider_transaction_id)
+index(provider_instance_id, created_at)
+index(promo_code_id)
+index(expires_at)
 ```
+
+规则：
+
+- `amount` 是实际提交给支付渠道的最终应付金额。
+- `original_amount` 是用户提交的原始订单金额；未使用优惠码时等于 `amount`。
+- `discount_amount` 是服务端计算后的优惠金额；未使用优惠码时为 `0.00000000`。
+- `promo_code_id` 指向 settings-backed promo code 的稳定 id，不保存优惠码明文。
 
 ### 13.3 payment_audit_logs
 
@@ -1360,6 +1683,15 @@ index(consumer_name, status, created_at)
 
 - 事件 envelope、Outbox 状态、Inbox 幂等和死信处理以 `DOMAIN_EVENTS_SPEC.md` 为准。
 - 事件 payload 不得包含明文 API Key、Provider 凭证、cookie、OAuth token 或原始 prompt。
+- Auth transactional email 事件只能携带加密 reset/verification token、recipient user id、
+  recipient email hash、模板名、相对 action path 和 expiry。Outbox worker 投递前必须用当前
+  用户邮箱 hash 校验事件未过期于邮箱变更；SMTP password 只来自部署环境，不进入 outbox、
+  settings JSON 或 audit snapshot。
+- Optional notification unsubscribe preferences may be settings-backed while
+  they are low-volume and event-scoped. Keys and values must use event names and
+  email hashes only; plaintext recipient emails and SMTP secrets are forbidden.
+  If preferences become a user-facing high-volume collection, promote them to a
+  dedicated Ent schema with unique `(event, email_hash)` constraints.
 
 ## 15B. 运维观测
 
@@ -1425,6 +1757,41 @@ index(slo_id, started_at)
 - `details_json` 只能保存计算证据、低基数标签和聚合数值，不得保存 prompt、请求体、Authorization header、Cookie、API Key、OAuth token 或 Provider 凭证。
 - ack 操作只更新 `status`、`acknowledged_at` 和 `acknowledged_by`；audit 中不得复制 `details_json`。
 
+### 15B.3 ops_system_logs
+
+AdminOps 结构化系统日志表，只保存 SRapi 已脱敏的运维事件，不读取或镜像
+本机 stdout/stderr 文件。
+
+```txt
+id
+level
+source
+message
+request_id
+trace_id
+metadata_json
+created_at
+updated_at
+```
+
+索引：
+
+```txt
+index(created_at)
+index(level, created_at)
+index(source, created_at)
+index(request_id)
+index(trace_id)
+```
+
+规则：
+
+- `level` 使用 `debug`、`info`、`warn`、`error`。
+- `source` 是稳定低基数来源，例如 `ops.dashboard` 或 `ops.worker`。
+- `message` 必须是安全摘要，不得保存 prompt、请求体、Authorization header、Cookie、API Key、OAuth token 或 Provider 凭证。
+- `metadata_json` 只保存低敏诊断字段；高基数明细应通过 `request_id` / `trace_id` 跳转到对应证据链。
+- Admin cleanup 必须要求至少一个过滤条件，支持 dry-run，限制 `max_delete`，并写入不包含原始搜索字符串或日志正文的 audit 摘要。
+
 ## 16. 系统配置
 
 ### 16.1 settings
@@ -1465,6 +1832,7 @@ domain_events_outbox
 domain_events_inbox
 obs_slo_definitions
 obs_alert_events
+ops_system_logs
 ```
 
 建议：
@@ -1505,6 +1873,7 @@ proxies.url_ciphertext
 payment_provider_instances.config_ciphertext
 settings.value_ciphertext when is_secret = true
 quality_eval_samples.sample_payload_ciphertext
+user_totp_secrets.secret_ciphertext
 ```
 
 加密建议：
@@ -1545,6 +1914,11 @@ domain_events_outbox
 domain_events_inbox
 obs_slo_definitions
 obs_alert_events
+ops_system_logs
+user_announcement_reads
+user_promo_code_applications
+user_redeem_code_redemptions
+user_totp_secrets
 settings
 audit_logs
 idempotency_records

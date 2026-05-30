@@ -33,6 +33,11 @@ type Response struct {
 
 type Runtime interface {
 	Do(ctx context.Context, req Request) (Response, error)
+	// ManagedEgressClient returns the per-account egress HTTP client (proxy + TLS
+	// fingerprint + SSRF guard) and true only when the account is configured for
+	// managed egress; otherwise (nil, false, nil) so the caller keeps its default
+	// client.
+	ManagedEgressClient(account AccountRuntime) (*http.Client, bool, error)
 }
 
 type WebSocketMessageType string

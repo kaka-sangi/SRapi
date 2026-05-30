@@ -420,6 +420,82 @@ func TestGatewayCodexRefreshTokenOnlyUpdateCanRequestResponses(t *testing.T) {
 	}
 }
 
+func TestGatewayCodexServeTimeRefreshFailureProtectsAccount(t *testing.T) {
+	cases := []struct {
+		name        string
+		serveStatus int
+		serveBody   string
+		wantStatus  string
+	}{
+		{"permanent invalid_grant parks needs_reauth", http.StatusBadRequest, `{"error":"invalid_grant","error_description":"refresh token revoked"}`, "needs_reauth"},
+		{"transient upstream error keeps active", http.StatusInternalServerError, `{"error":"server_error"}`, "active"},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			var tokenCalls int
+			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != "/oauth/token" {
+					t.Fatalf("unexpected upstream path %s", r.URL.Path)
+				}
+				tokenCalls++
+				w.Header().Set("Content-Type", "application/json")
+				if tokenCalls == 1 {
+					// Import-time mint: succeed but expire within the refresh skew so the
+					// next gateway request performs a serve-time refresh.
+					_, _ = io.WriteString(w, `{"access_token":"mint-access","refresh_token":"mint-rotated","expires_in":1}`)
+					return
+				}
+				// Serve-time refresh outcome under test.
+				w.WriteHeader(tc.serveStatus)
+				_, _ = io.WriteString(w, tc.serveBody)
+			}))
+			defer upstream.Close()
+
+			handler := New(config.Load(), nil)
+			loginResp, sessionCookie := mustLoginAdmin(t, handler)
+			providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"codex-serve-refresh-provider","display_name":"Codex Serve Refresh","adapter_type":"reverse-proxy-codex-cli","protocol":"openai-compatible","status":"active"}`)
+			modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"codex-serve-refresh-model","display_name":"Codex Serve Refresh Model","status":"active"}`)
+			mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"codex-upstream","status":"active"}`)
+			accountResp, _ := mustCreateAdminAccountRaw(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"codex-serve-refresh-account","runtime_class":"oauth_refresh","upstream_client":"codex_cli","credential":{"refresh_token":"mint-refresh"},"metadata":{"base_url":"`+upstream.URL+`/backend-api/codex","oauth_token_url":"`+upstream.URL+`/oauth/token","user_agent":"codex-cli/test"},"status":"active"}`)
+			if string(accountResp.Data.Status) != "active" {
+				t.Fatalf("expected account active after import mint, got %q", accountResp.Data.Status)
+			}
+
+			_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+			gwReq := httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(`{"model":"codex-serve-refresh-model","input":"hello"}`))
+			gwReq.Header.Set("Content-Type", "application/json")
+			gwReq.Header.Set("Authorization", "Bearer "+apiKey)
+			gwRec := httptest.NewRecorder()
+			handler.ServeHTTP(gwRec, gwReq)
+			if gwRec.Code == http.StatusOK {
+				t.Fatalf("expected gateway failure when serve-time refresh fails, got 200 body=%s", gwRec.Body.String())
+			}
+			if tokenCalls < 2 {
+				t.Fatalf("expected a serve-time refresh attempt after import, token calls=%d", tokenCalls)
+			}
+			if strings.Contains(gwRec.Body.String(), "mint-refresh") || strings.Contains(gwRec.Body.String(), "mint-access") {
+				t.Fatalf("gateway error leaked credential material: %s", gwRec.Body.String())
+			}
+
+			getReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts/"+string(accountResp.Data.Id), nil)
+			getReq.AddCookie(sessionCookie)
+			getRec := httptest.NewRecorder()
+			handler.ServeHTTP(getRec, getReq)
+			if getRec.Code != http.StatusOK {
+				t.Fatalf("expected account inspect 200, got %d body=%s", getRec.Code, getRec.Body.String())
+			}
+			var getResp apiopenapi.ProviderAccountResponse
+			if err := json.NewDecoder(getRec.Body).Decode(&getResp); err != nil {
+				t.Fatalf("decode account inspect: %v", err)
+			}
+			if string(getResp.Data.Status) != tc.wantStatus {
+				t.Fatalf("expected account status %q after serve-time refresh failure, got %q", tc.wantStatus, getResp.Data.Status)
+			}
+		})
+	}
+}
+
 func mustCreateAdminAccountRaw(t *testing.T, handler http.Handler, sessionCookie *http.Cookie, csrfToken, body string) (apiopenapi.ProviderAccountResponse, string) {
 	t.Helper()
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts", strings.NewReader(body))

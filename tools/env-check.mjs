@@ -7,6 +7,7 @@ const requiredKeys = [
   "DATABASE_PASSWORD",
   "JWT_SECRET",
   "SRAPI_MASTER_KEY",
+  "TOTP_ENCRYPTION_KEY",
   "API_KEY_PEPPER",
   "BOOTSTRAP_ADMIN_PASSWORD",
 ];
@@ -22,6 +23,10 @@ const weakValues = new Map([
   [
     "SRAPI_MASTER_KEY",
     new Set(["", "local_dev_master_key_32_bytes_minimum_change_me"]),
+  ],
+  [
+    "TOTP_ENCRYPTION_KEY",
+    new Set(["", "local_dev_totp_key_32_bytes_minimum_change_me"]),
   ],
   ["API_KEY_PEPPER", new Set(["", "local_dev_api_key_pepper_change_me_32+"])],
   [

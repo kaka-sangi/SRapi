@@ -186,10 +186,11 @@ func TestRealtimeSlotStoreRequiresRedisInRelease(t *testing.T) {
 
 func TestDomainEventsWorkerRequiresPersistentEventStore(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	if worker, err := domainEventsWorker(nil, logger); err != nil || worker != nil {
+	cfg := config.Load()
+	if worker, err := domainEventsWorker(cfg, nil, logger); err != nil || worker != nil {
 		t.Fatalf("expected nil worker without persistent stores, worker=%v err=%v", worker, err)
 	}
-	if worker, err := domainEventsWorker(&entstore.Stores{}, logger); err != nil || worker != nil {
+	if worker, err := domainEventsWorker(cfg, &entstore.Stores{}, logger); err != nil || worker != nil {
 		t.Fatalf("expected nil worker without event store, worker=%v err=%v", worker, err)
 	}
 }
@@ -209,7 +210,7 @@ func TestDomainEventsWorkerDispatchesPersistentOutbox(t *testing.T) {
 		t.Fatalf("enqueue event: %v", err)
 	}
 
-	worker, err := domainEventsWorker(&entstore.Stores{Events: eventsStore}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	worker, err := domainEventsWorker(config.Load(), &entstore.Stores{Events: eventsStore}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
 		t.Fatalf("create domain events worker: %v", err)
 	}

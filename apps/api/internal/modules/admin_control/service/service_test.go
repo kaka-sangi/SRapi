@@ -1,0 +1,541 @@
+package service_test
+
+import (
+	"context"
+	"errors"
+	"testing"
+	"time"
+
+	admincontrol "github.com/srapi/srapi/apps/api/internal/modules/admin_control/contract"
+	admincontrolservice "github.com/srapi/srapi/apps/api/internal/modules/admin_control/service"
+	admincontrolmemory "github.com/srapi/srapi/apps/api/internal/modules/admin_control/store/memory"
+	billingmemory "github.com/srapi/srapi/apps/api/internal/modules/billing/store/memory"
+	userscontract "github.com/srapi/srapi/apps/api/internal/modules/users/contract"
+	usermemory "github.com/srapi/srapi/apps/api/internal/modules/users/store/memory"
+)
+
+type fixedClock struct {
+	now time.Time
+}
+
+func (c fixedClock) Now() time.Time { return c.now }
+
+func TestUpdateAdminSettingsNormalizesRegistrationEmailSuffixAllowlist(t *testing.T) {
+	store := admincontrolmemory.New()
+	svc, err := admincontrolservice.New(store, fixedClock{now: time.Date(2026, time.May, 29, 10, 0, 0, 0, time.UTC)})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	settings, err := svc.GetAdminSettings(context.Background())
+	if err != nil {
+		t.Fatalf("get admin settings: %v", err)
+	}
+	settings.Security.RegistrationEmailSuffixAllowlist = []string{
+		"Example.COM",
+		" @company.test ",
+		"@example.com",
+		"",
+	}
+
+	updated, err := svc.UpdateAdminSettings(context.Background(), settings, 1)
+	if err != nil {
+		t.Fatalf("update admin settings: %v", err)
+	}
+	want := []string{"@example.com", "@company.test"}
+	if len(updated.Security.RegistrationEmailSuffixAllowlist) != len(want) {
+		t.Fatalf("suffix allowlist len = %d, want %d: %+v", len(updated.Security.RegistrationEmailSuffixAllowlist), len(want), updated.Security.RegistrationEmailSuffixAllowlist)
+	}
+	for idx, value := range want {
+		if updated.Security.RegistrationEmailSuffixAllowlist[idx] != value {
+			t.Fatalf("suffix allowlist[%d] = %q, want %q: %+v", idx, updated.Security.RegistrationEmailSuffixAllowlist[idx], value, updated.Security.RegistrationEmailSuffixAllowlist)
+		}
+	}
+}
+
+func TestUpdateAdminSettingsRejectsInvalidRegistrationEmailSuffixAllowlist(t *testing.T) {
+	store := admincontrolmemory.New()
+	svc, err := admincontrolservice.New(store, fixedClock{now: time.Date(2026, time.May, 29, 10, 0, 0, 0, time.UTC)})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	settings, err := svc.GetAdminSettings(context.Background())
+	if err != nil {
+		t.Fatalf("get admin settings: %v", err)
+	}
+	settings.Security.RegistrationEmailSuffixAllowlist = []string{"@invalid_domain"}
+
+	_, err = svc.UpdateAdminSettings(context.Background(), settings, 1)
+	if !errors.Is(err, admincontrol.ErrInvalidInput) {
+		t.Fatalf("expected invalid input, got %v", err)
+	}
+}
+
+func TestUpdateAdminSettingsNormalizesOAuthProviderConfigs(t *testing.T) {
+	store := admincontrolmemory.New()
+	svc, err := admincontrolservice.New(store, fixedClock{now: time.Date(2026, time.May, 30, 12, 0, 0, 0, time.UTC)})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	settings, err := svc.GetAdminSettings(context.Background())
+	if err != nil {
+		t.Fatalf("get admin settings: %v", err)
+	}
+	settings.Security.OAuthEnabled = true
+	settings.Security.OAuthProviders = []string{" OIDC ", "oidc", "github"}
+	settings.Security.OAuthProviderConfigs = []admincontrol.OAuthProviderConfig{
+		{
+			Provider:        " OIDC ",
+			ProviderKey:     " issuer-main ",
+			ClientID:        " client-123 ",
+			AuthorizeURL:    "https://idp.example/authorize",
+			TokenURL:        "http://localhost:8081/token",
+			UserInfoURL:     "http://localhost:8081/userinfo",
+			TokenAuthMethod: " none ",
+			RedirectURI:     "http://localhost:8080/api/v1/auth/oauth/oidc/callback",
+			Scopes:          []string{"openid email", "profile", "email"},
+		},
+	}
+
+	updated, err := svc.UpdateAdminSettings(context.Background(), settings, 1)
+	if err != nil {
+		t.Fatalf("update admin settings: %v", err)
+	}
+	if got := updated.Security.OAuthProviders; len(got) != 2 || got[0] != "OIDC" || got[1] != "github" {
+		t.Fatalf("unexpected oauth providers: %+v", got)
+	}
+	if len(updated.Security.OAuthProviderConfigs) != 1 {
+		t.Fatalf("expected one oauth provider config, got %+v", updated.Security.OAuthProviderConfigs)
+	}
+	config := updated.Security.OAuthProviderConfigs[0]
+	if config.Provider != "oidc" || config.ProviderKey != "issuer-main" || config.DisplayName != "issuer-main" || config.ClientID != "client-123" {
+		t.Fatalf("unexpected normalized config: %+v", config)
+	}
+	if config.TokenURL != "http://localhost:8081/token" || config.UserInfoURL != "http://localhost:8081/userinfo" || config.TokenAuthMethod != "none" {
+		t.Fatalf("unexpected oauth callback config: %+v", config)
+	}
+	wantScopes := []string{"openid", "email", "profile"}
+	for idx, want := range wantScopes {
+		if config.Scopes[idx] != want {
+			t.Fatalf("scope[%d] = %q, want %q in %+v", idx, config.Scopes[idx], want, config.Scopes)
+		}
+	}
+}
+
+func TestUpdateAdminSettingsRejectsInvalidOAuthProviderConfig(t *testing.T) {
+	store := admincontrolmemory.New()
+	svc, err := admincontrolservice.New(store, fixedClock{now: time.Date(2026, time.May, 30, 12, 30, 0, 0, time.UTC)})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	settings, err := svc.GetAdminSettings(context.Background())
+	if err != nil {
+		t.Fatalf("get admin settings: %v", err)
+	}
+	settings.Security.OAuthProviderConfigs = []admincontrol.OAuthProviderConfig{
+		{
+			Provider:     "oidc",
+			ProviderKey:  "issuer-main",
+			ClientID:     "client-123",
+			AuthorizeURL: "http://idp.example/authorize",
+			RedirectURI:  "http://localhost:8080/api/v1/auth/oauth/oidc/callback",
+		},
+	}
+
+	_, err = svc.UpdateAdminSettings(context.Background(), settings, 1)
+	if !errors.Is(err, admincontrol.ErrInvalidInput) {
+		t.Fatalf("expected invalid input, got %v", err)
+	}
+}
+
+func TestUpdateAdminSettingsRejectsPartialOAuthCallbackConfig(t *testing.T) {
+	store := admincontrolmemory.New()
+	svc, err := admincontrolservice.New(store, fixedClock{now: time.Date(2026, time.May, 30, 12, 45, 0, 0, time.UTC)})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	settings, err := svc.GetAdminSettings(context.Background())
+	if err != nil {
+		t.Fatalf("get admin settings: %v", err)
+	}
+	settings.Security.OAuthProviderConfigs = []admincontrol.OAuthProviderConfig{
+		{
+			Provider:     "oidc",
+			ProviderKey:  "issuer-main",
+			ClientID:     "client-123",
+			AuthorizeURL: "https://idp.example/authorize",
+			TokenURL:     "https://idp.example/token",
+			RedirectURI:  "http://localhost:8080/api/v1/auth/oauth/oidc/callback",
+		},
+	}
+
+	_, err = svc.UpdateAdminSettings(context.Background(), settings, 1)
+	if !errors.Is(err, admincontrol.ErrInvalidInput) {
+		t.Fatalf("expected invalid input, got %v", err)
+	}
+}
+
+func TestUpdateAdminSettingsNormalizesEmailConfigWithoutSMTPSecret(t *testing.T) {
+	store := admincontrolmemory.New()
+	svc, err := admincontrolservice.New(store, fixedClock{now: time.Date(2026, time.May, 29, 10, 0, 0, 0, time.UTC)})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	settings, err := svc.GetAdminSettings(context.Background())
+	if err != nil {
+		t.Fatalf("get admin settings: %v", err)
+	}
+	settings.Email.SMTPHost = " smtp.example.com "
+	settings.Email.SMTPPort = 2525
+	settings.Email.SMTPUsername = " sender "
+	settings.Email.SMTPFrom = " noreply@example.com "
+	settings.Email.SMTPFromName = " SRapi "
+	settings.Email.SMTPUseTLS = true
+	settings.Email.PublicBaseURL = " https://console.example.com/ "
+
+	updated, err := svc.UpdateAdminSettings(context.Background(), settings, 1)
+	if err != nil {
+		t.Fatalf("update admin settings: %v", err)
+	}
+	if !updated.Email.SMTPConfigured {
+		t.Fatalf("expected configured SMTP flag, got %+v", updated.Email)
+	}
+	if updated.Email.SMTPHost != "smtp.example.com" || updated.Email.SMTPUsername != "sender" || updated.Email.PublicBaseURL != "https://console.example.com" {
+		t.Fatalf("email config was not normalized: %+v", updated.Email)
+	}
+}
+
+func TestUpdateAdminSettingsRejectsInvalidEmailPublicBaseURL(t *testing.T) {
+	store := admincontrolmemory.New()
+	svc, err := admincontrolservice.New(store, fixedClock{now: time.Date(2026, time.May, 29, 10, 0, 0, 0, time.UTC)})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	settings, err := svc.GetAdminSettings(context.Background())
+	if err != nil {
+		t.Fatalf("get admin settings: %v", err)
+	}
+	settings.Email.PublicBaseURL = "javascript:alert(1)"
+
+	_, err = svc.UpdateAdminSettings(context.Background(), settings, 1)
+	if !errors.Is(err, admincontrol.ErrInvalidInput) {
+		t.Fatalf("expected invalid input, got %v", err)
+	}
+}
+
+func TestUpdateAdminSettingsValidatesAccountQuotaNotifyRatio(t *testing.T) {
+	store := admincontrolmemory.New()
+	svc, err := admincontrolservice.New(store, fixedClock{now: time.Date(2026, time.May, 29, 10, 0, 0, 0, time.UTC)})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	settings, err := svc.GetAdminSettings(context.Background())
+	if err != nil {
+		t.Fatalf("get admin settings: %v", err)
+	}
+	if settings.Email.AccountQuotaNotifyRemainingRatio != "0.20000000" {
+		t.Fatalf("default account quota ratio = %q", settings.Email.AccountQuotaNotifyRemainingRatio)
+	}
+	settings.Email.AccountQuotaNotifyRemainingRatio = " 0.15000000 "
+
+	updated, err := svc.UpdateAdminSettings(context.Background(), settings, 1)
+	if err != nil {
+		t.Fatalf("update admin settings: %v", err)
+	}
+	if updated.Email.AccountQuotaNotifyRemainingRatio != "0.15000000" {
+		t.Fatalf("account quota ratio was not normalized: %+v", updated.Email)
+	}
+
+	settings.Email.AccountQuotaNotifyRemainingRatio = "1.5"
+	_, err = svc.UpdateAdminSettings(context.Background(), settings, 1)
+	if !errors.Is(err, admincontrol.ErrInvalidInput) {
+		t.Fatalf("expected invalid ratio input, got %v", err)
+	}
+}
+
+func TestRedeemCodeCreditsBalanceOnce(t *testing.T) {
+	now := time.Date(2026, time.May, 29, 10, 0, 0, 0, time.UTC)
+	users := usermemory.New()
+	billing := billingmemory.New()
+	store := admincontrolmemory.NewWithFulfillment(users, billing, nil)
+	svc, err := admincontrolservice.New(store, fixedClock{now: now})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	user, err := users.Create(context.Background(), userscontract.CreateStoredUser{
+		Email:        "redeem@example.com",
+		Name:         "Redeem User",
+		PasswordHash: "hash",
+		Status:       userscontract.StatusActive,
+		Roles:        []userscontract.Role{userscontract.RoleUser},
+		Balance:      "1.00000000",
+		Currency:     "USD",
+	})
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	code, err := svc.CreateRedeemCode(context.Background(), admincontrol.CreateRedeemCodeRequest{
+		Code:           "WELCOME10",
+		Type:           admincontrol.RedeemCodeTypeBalance,
+		Value:          "10",
+		Currency:       "USD",
+		MaxRedemptions: 1,
+	}, 1)
+	if err != nil {
+		t.Fatalf("create redeem code: %v", err)
+	}
+
+	result, err := svc.RedeemCode(context.Background(), user.User, admincontrol.RedeemCodeRedemptionRequest{Code: " welcome10 "})
+	if err != nil {
+		t.Fatalf("redeem code: %v", err)
+	}
+	if result.AlreadyRedeemed || result.RedeemCode.ID != code.ID || result.Redemption.Amount != "10.00000000" || result.Redemption.BalanceAfter != "11.00000000" {
+		t.Fatalf("unexpected redemption result: %+v", result)
+	}
+	updated, err := users.FindByID(context.Background(), user.ID)
+	if err != nil {
+		t.Fatalf("find updated user: %v", err)
+	}
+	if updated.Balance != "11.00000000" {
+		t.Fatalf("balance = %s, want 11.00000000", updated.Balance)
+	}
+	ledger, err := billing.List(context.Background())
+	if err != nil {
+		t.Fatalf("list billing ledger: %v", err)
+	}
+	if len(ledger) != 1 || ledger[0].ReferenceType != "redeem_code" || ledger[0].Amount != "10.00000000" {
+		t.Fatalf("unexpected billing ledger: %+v", ledger)
+	}
+
+	repeated, err := svc.RedeemCode(context.Background(), user.User, admincontrol.RedeemCodeRedemptionRequest{Code: "WELCOME10"})
+	if err != nil {
+		t.Fatalf("redeem same code again: %v", err)
+	}
+	if !repeated.AlreadyRedeemed || repeated.Redemption.ID != result.Redemption.ID {
+		t.Fatalf("expected idempotent already redeemed result, got %+v", repeated)
+	}
+	ledger, _ = billing.List(context.Background())
+	updated, _ = users.FindByID(context.Background(), user.ID)
+	if len(ledger) != 1 || updated.Balance != "11.00000000" {
+		t.Fatalf("repeat redemption changed side effects: ledger=%+v user=%+v", ledger, updated)
+	}
+}
+
+func TestUserAnnouncementsFilterVisibleAndTrackReadState(t *testing.T) {
+	now := time.Date(2026, time.May, 28, 15, 0, 0, 0, time.UTC)
+	store := admincontrolmemory.New()
+	svc, err := admincontrolservice.New(store, fixedClock{now: now})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	adminUser := userscontract.User{ID: 1, Roles: []userscontract.Role{userscontract.RoleAdmin}}
+	regularUser := userscontract.User{ID: 2, Roles: []userscontract.Role{userscontract.RoleUser}}
+	future := now.Add(time.Hour)
+	past := now.Add(-time.Hour)
+
+	if _, err := svc.CreateAnnouncement(context.Background(), admincontrol.AnnouncementRequest{
+		Title:    "all",
+		Content:  "visible to all",
+		Status:   admincontrol.AnnouncementStatusPublished,
+		Severity: admincontrol.AnnouncementSeverityInfo,
+		Audience: admincontrol.AnnouncementAudienceAll,
+	}, adminUser.ID); err != nil {
+		t.Fatalf("create all announcement: %v", err)
+	}
+	usersOnly, err := svc.CreateAnnouncement(context.Background(), admincontrol.AnnouncementRequest{
+		Title:    "users",
+		Content:  "visible to users",
+		Status:   admincontrol.AnnouncementStatusPublished,
+		Severity: admincontrol.AnnouncementSeverityWarning,
+		Audience: admincontrol.AnnouncementAudienceUsers,
+	}, adminUser.ID)
+	if err != nil {
+		t.Fatalf("create users announcement: %v", err)
+	}
+	if _, err := svc.CreateAnnouncement(context.Background(), admincontrol.AnnouncementRequest{
+		Title:    "admins",
+		Content:  "visible to admins",
+		Status:   admincontrol.AnnouncementStatusPublished,
+		Severity: admincontrol.AnnouncementSeverityCritical,
+		Audience: admincontrol.AnnouncementAudienceAdmins,
+	}, adminUser.ID); err != nil {
+		t.Fatalf("create admins announcement: %v", err)
+	}
+	if _, err := svc.CreateAnnouncement(context.Background(), admincontrol.AnnouncementRequest{
+		Title:    "draft",
+		Content:  "hidden draft",
+		Status:   admincontrol.AnnouncementStatusDraft,
+		Severity: admincontrol.AnnouncementSeverityInfo,
+		Audience: admincontrol.AnnouncementAudienceAll,
+	}, adminUser.ID); err != nil {
+		t.Fatalf("create draft announcement: %v", err)
+	}
+	if _, err := svc.CreateAnnouncement(context.Background(), admincontrol.AnnouncementRequest{
+		Title:    "future",
+		Content:  "hidden future",
+		Status:   admincontrol.AnnouncementStatusPublished,
+		Severity: admincontrol.AnnouncementSeverityInfo,
+		Audience: admincontrol.AnnouncementAudienceAll,
+		StartsAt: &future,
+	}, adminUser.ID); err != nil {
+		t.Fatalf("create future announcement: %v", err)
+	}
+	if _, err := svc.CreateAnnouncement(context.Background(), admincontrol.AnnouncementRequest{
+		Title:    "expired",
+		Content:  "hidden expired",
+		Status:   admincontrol.AnnouncementStatusPublished,
+		Severity: admincontrol.AnnouncementSeverityInfo,
+		Audience: admincontrol.AnnouncementAudienceAll,
+		EndsAt:   &past,
+	}, adminUser.ID); err != nil {
+		t.Fatalf("create expired announcement: %v", err)
+	}
+
+	userList, err := svc.ListUserAnnouncements(context.Background(), regularUser, admincontrol.ListOptions{})
+	if err != nil {
+		t.Fatalf("list user announcements: %v", err)
+	}
+	if userList.Total != 2 || userList.Unread != 2 {
+		t.Fatalf("expected regular user to see two unread announcements, got %+v", userList)
+	}
+	for _, item := range userList.Items {
+		if item.Audience == admincontrol.AnnouncementAudienceAdmins || item.Status != admincontrol.AnnouncementStatusPublished {
+			t.Fatalf("regular user saw hidden announcement: %+v", item)
+		}
+	}
+
+	read, err := svc.MarkUserAnnouncementRead(context.Background(), regularUser, usersOnly.ID)
+	if err != nil {
+		t.Fatalf("mark announcement read: %v", err)
+	}
+	if !read.Read || read.ReadAt == nil {
+		t.Fatalf("expected read state, got %+v", read)
+	}
+	readAgain, err := svc.MarkUserAnnouncementRead(context.Background(), regularUser, usersOnly.ID)
+	if err != nil {
+		t.Fatalf("mark announcement read again: %v", err)
+	}
+	if !readAgain.ReadAt.Equal(*read.ReadAt) {
+		t.Fatalf("mark read should be idempotent, first=%v second=%v", read.ReadAt, readAgain.ReadAt)
+	}
+
+	userList, err = svc.ListUserAnnouncements(context.Background(), regularUser, admincontrol.ListOptions{})
+	if err != nil {
+		t.Fatalf("list user announcements after read: %v", err)
+	}
+	if userList.Unread != 1 {
+		t.Fatalf("expected one unread announcement, got %+v", userList)
+	}
+	laterSvc, err := admincontrolservice.New(store, fixedClock{now: now.Add(time.Minute)})
+	if err != nil {
+		t.Fatalf("new later service: %v", err)
+	}
+	if _, err := laterSvc.UpdateAnnouncement(context.Background(), usersOnly.ID, admincontrol.AnnouncementRequest{
+		Title:    "users updated",
+		Content:  "new content",
+		Status:   admincontrol.AnnouncementStatusPublished,
+		Severity: admincontrol.AnnouncementSeverityWarning,
+		Audience: admincontrol.AnnouncementAudienceUsers,
+	}, adminUser.ID); err != nil {
+		t.Fatalf("update users announcement: %v", err)
+	}
+	userList, err = laterSvc.ListUserAnnouncements(context.Background(), regularUser, admincontrol.ListOptions{})
+	if err != nil {
+		t.Fatalf("list user announcements after update: %v", err)
+	}
+	if userList.Unread != 2 {
+		t.Fatalf("updated announcement should become unread again, got %+v", userList)
+	}
+
+	adminList, err := svc.ListUserAnnouncements(context.Background(), adminUser, admincontrol.ListOptions{})
+	if err != nil {
+		t.Fatalf("list admin announcements: %v", err)
+	}
+	if adminList.Total != 2 {
+		t.Fatalf("expected admin to see all+admin announcements, got %+v", adminList)
+	}
+	if _, err := svc.MarkUserAnnouncementRead(context.Background(), regularUser, 3); err != admincontrol.ErrNotFound {
+		t.Fatalf("expected user-only visibility to hide admin announcement, got %v", err)
+	}
+}
+
+func TestSystemLogsRecordListAndCleanup(t *testing.T) {
+	store := admincontrolmemory.New()
+	svc, err := admincontrolservice.New(store, fixedClock{now: time.Date(2026, time.May, 28, 15, 0, 0, 0, time.UTC)})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	first, err := svc.RecordSystemLog(context.Background(), admincontrol.RecordSystemLogRequest{
+		Level:     admincontrol.OpsSystemLogLevelWarn,
+		Source:    "ops.dashboard",
+		Message:   "rotate log volume",
+		RequestID: "req_1",
+		TraceID:   "trace_1",
+		Metadata:  map[string]any{"safe": true},
+	})
+	if err != nil {
+		t.Fatalf("record first system log: %v", err)
+	}
+	second, err := svc.RecordSystemLog(context.Background(), admincontrol.RecordSystemLogRequest{
+		Level:   admincontrol.OpsSystemLogLevelError,
+		Source:  "ops.worker",
+		Message: "worker failed",
+	})
+	if err != nil {
+		t.Fatalf("record second system log: %v", err)
+	}
+
+	list, err := svc.ListSystemLogs(context.Background(), admincontrol.SystemLogListOptions{Level: admincontrol.OpsSystemLogLevelWarn, Query: "rotate"})
+	if err != nil {
+		t.Fatalf("list system logs: %v", err)
+	}
+	if list.Total != 1 || len(list.Items) != 1 {
+		t.Fatalf("expected one matching log, got total=%d items=%d", list.Total, len(list.Items))
+	}
+	if list.Items[0].RequestID != first.RequestID || list.Items[0].TraceID != first.TraceID {
+		t.Fatalf("expected request/trace ids in list item, got %+v", list.Items[0])
+	}
+
+	dryRun, err := svc.CleanupSystemLogs(context.Background(), admincontrol.SystemLogCleanupFilter{
+		Source:    "ops.dashboard",
+		DryRun:    true,
+		MaxDelete: 1,
+	})
+	if err != nil {
+		t.Fatalf("cleanup dry-run: %v", err)
+	}
+	if dryRun.Matched != 1 || dryRun.Deleted != 0 || !dryRun.DryRun {
+		t.Fatalf("unexpected dry-run cleanup result: %+v", dryRun)
+	}
+
+	afterDryRun, err := svc.ListSystemLogs(context.Background(), admincontrol.SystemLogListOptions{})
+	if err != nil {
+		t.Fatalf("list after dry-run: %v", err)
+	}
+	if afterDryRun.Total != 2 {
+		t.Fatalf("dry-run should not delete rows, got total=%d", afterDryRun.Total)
+	}
+
+	cleanup, err := svc.CleanupSystemLogs(context.Background(), admincontrol.SystemLogCleanupFilter{
+		Source:    "ops.dashboard",
+		MaxDelete: 10,
+	})
+	if err != nil {
+		t.Fatalf("cleanup: %v", err)
+	}
+	if cleanup.Matched != 1 || cleanup.Deleted != 1 || cleanup.Limited {
+		t.Fatalf("unexpected cleanup result: %+v", cleanup)
+	}
+
+	remaining, err := svc.ListSystemLogs(context.Background(), admincontrol.SystemLogListOptions{})
+	if err != nil {
+		t.Fatalf("list after cleanup: %v", err)
+	}
+	if remaining.Total != 1 || len(remaining.Items) != 1 || remaining.Items[0].ID != second.ID {
+		t.Fatalf("expected only second log to remain, got %+v", remaining)
+	}
+
+	if _, err := svc.CleanupSystemLogs(context.Background(), admincontrol.SystemLogCleanupFilter{}); err == nil {
+		t.Fatal("expected cleanup without filters to fail")
+	}
+}

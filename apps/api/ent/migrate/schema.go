@@ -82,6 +82,38 @@ var (
 			},
 		},
 	}
+	// AccountAvailabilityRollupsColumns holds the columns for the "account_availability_rollups" table.
+	AccountAvailabilityRollupsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "account_id", Type: field.TypeInt},
+		{Name: "provider_id", Type: field.TypeInt, Default: 0},
+		{Name: "bucket_date", Type: field.TypeString},
+		{Name: "total_samples", Type: field.TypeInt, Default: 0},
+		{Name: "healthy_samples", Type: field.TypeInt, Default: 0},
+		{Name: "availability_ratio", Type: field.TypeFloat64, Default: 0},
+		{Name: "avg_success_rate", Type: field.TypeFloat64, Default: 0},
+		{Name: "computed_at", Type: field.TypeTime},
+	}
+	// AccountAvailabilityRollupsTable holds the schema information for the "account_availability_rollups" table.
+	AccountAvailabilityRollupsTable = &schema.Table{
+		Name:       "account_availability_rollups",
+		Columns:    AccountAvailabilityRollupsColumns,
+		PrimaryKey: []*schema.Column{AccountAvailabilityRollupsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "accountavailabilityrollup_account_id_bucket_date",
+				Unique:  true,
+				Columns: []*schema.Column{AccountAvailabilityRollupsColumns[3], AccountAvailabilityRollupsColumns[5]},
+			},
+			{
+				Name:    "accountavailabilityrollup_account_id",
+				Unique:  false,
+				Columns: []*schema.Column{AccountAvailabilityRollupsColumns[3]},
+			},
+		},
+	}
 	// AccountGroupsColumns holds the columns for the "account_groups" table.
 	AccountGroupsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -523,6 +555,45 @@ var (
 			},
 		},
 	}
+	// EmailVerificationTokensColumns holds the columns for the "email_verification_tokens" table.
+	EmailVerificationTokensColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "user_id", Type: field.TypeInt},
+		{Name: "token_hash", Type: field.TypeString},
+		{Name: "token_version", Type: field.TypeString, Default: "v1"},
+		{Name: "expires_at", Type: field.TypeTime},
+		{Name: "used_at", Type: field.TypeTime, Nullable: true},
+	}
+	// EmailVerificationTokensTable holds the schema information for the "email_verification_tokens" table.
+	EmailVerificationTokensTable = &schema.Table{
+		Name:       "email_verification_tokens",
+		Columns:    EmailVerificationTokensColumns,
+		PrimaryKey: []*schema.Column{EmailVerificationTokensColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "emailverificationtoken_token_hash",
+				Unique:  true,
+				Columns: []*schema.Column{EmailVerificationTokensColumns[4]},
+			},
+			{
+				Name:    "emailverificationtoken_user_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{EmailVerificationTokensColumns[3], EmailVerificationTokensColumns[1]},
+			},
+			{
+				Name:    "emailverificationtoken_expires_at",
+				Unique:  false,
+				Columns: []*schema.Column{EmailVerificationTokensColumns[6]},
+			},
+			{
+				Name:    "emailverificationtoken_used_at",
+				Unique:  false,
+				Columns: []*schema.Column{EmailVerificationTokensColumns[7]},
+			},
+		},
+	}
 	// EntitlementsColumns holds the columns for the "entitlements" table.
 	EntitlementsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -557,6 +628,32 @@ var (
 				Name:    "entitlement_scope_type_scope_id_feature_key",
 				Unique:  false,
 				Columns: []*schema.Column{EntitlementsColumns[4], EntitlementsColumns[5], EntitlementsColumns[6]},
+			},
+		},
+	}
+	// ErrorPassthroughRulesColumns holds the columns for the "error_passthrough_rules" table.
+	ErrorPassthroughRulesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "name", Type: field.TypeString},
+		{Name: "enabled", Type: field.TypeBool, Default: true},
+		{Name: "priority", Type: field.TypeInt, Default: 0},
+		{Name: "action", Type: field.TypeString, Default: "expose"},
+		{Name: "match_status_codes", Type: field.TypeJSON, Nullable: true},
+		{Name: "match_classes", Type: field.TypeJSON, Nullable: true},
+		{Name: "match_keywords", Type: field.TypeJSON, Nullable: true},
+	}
+	// ErrorPassthroughRulesTable holds the schema information for the "error_passthrough_rules" table.
+	ErrorPassthroughRulesTable = &schema.Table{
+		Name:       "error_passthrough_rules",
+		Columns:    ErrorPassthroughRulesColumns,
+		PrimaryKey: []*schema.Column{ErrorPassthroughRulesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "errorpassthroughrule_enabled_priority",
+				Unique:  false,
+				Columns: []*schema.Column{ErrorPassthroughRulesColumns[4], ErrorPassthroughRulesColumns[5]},
 			},
 		},
 	}
@@ -838,6 +935,90 @@ var (
 			},
 		},
 	}
+	// OpsSystemLogsColumns holds the columns for the "ops_system_logs" table.
+	OpsSystemLogsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "level", Type: field.TypeString, Default: "info"},
+		{Name: "source", Type: field.TypeString},
+		{Name: "message", Type: field.TypeString},
+		{Name: "request_id", Type: field.TypeString, Default: ""},
+		{Name: "trace_id", Type: field.TypeString, Default: ""},
+		{Name: "metadata_json", Type: field.TypeJSON, Nullable: true},
+	}
+	// OpsSystemLogsTable holds the schema information for the "ops_system_logs" table.
+	OpsSystemLogsTable = &schema.Table{
+		Name:       "ops_system_logs",
+		Columns:    OpsSystemLogsColumns,
+		PrimaryKey: []*schema.Column{OpsSystemLogsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "opssystemlog_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{OpsSystemLogsColumns[1]},
+			},
+			{
+				Name:    "opssystemlog_level_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{OpsSystemLogsColumns[3], OpsSystemLogsColumns[1]},
+			},
+			{
+				Name:    "opssystemlog_source_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{OpsSystemLogsColumns[4], OpsSystemLogsColumns[1]},
+			},
+			{
+				Name:    "opssystemlog_request_id",
+				Unique:  false,
+				Columns: []*schema.Column{OpsSystemLogsColumns[6]},
+			},
+			{
+				Name:    "opssystemlog_trace_id",
+				Unique:  false,
+				Columns: []*schema.Column{OpsSystemLogsColumns[7]},
+			},
+		},
+	}
+	// PasswordResetTokensColumns holds the columns for the "password_reset_tokens" table.
+	PasswordResetTokensColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "user_id", Type: field.TypeInt},
+		{Name: "token_hash", Type: field.TypeString},
+		{Name: "token_version", Type: field.TypeString, Default: "v1"},
+		{Name: "expires_at", Type: field.TypeTime},
+		{Name: "used_at", Type: field.TypeTime, Nullable: true},
+	}
+	// PasswordResetTokensTable holds the schema information for the "password_reset_tokens" table.
+	PasswordResetTokensTable = &schema.Table{
+		Name:       "password_reset_tokens",
+		Columns:    PasswordResetTokensColumns,
+		PrimaryKey: []*schema.Column{PasswordResetTokensColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "passwordresettoken_token_hash",
+				Unique:  true,
+				Columns: []*schema.Column{PasswordResetTokensColumns[4]},
+			},
+			{
+				Name:    "passwordresettoken_user_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{PasswordResetTokensColumns[3], PasswordResetTokensColumns[1]},
+			},
+			{
+				Name:    "passwordresettoken_expires_at",
+				Unique:  false,
+				Columns: []*schema.Column{PasswordResetTokensColumns[6]},
+			},
+			{
+				Name:    "passwordresettoken_used_at",
+				Unique:  false,
+				Columns: []*schema.Column{PasswordResetTokensColumns[7]},
+			},
+		},
+	}
 	// PaymentAuditLogsColumns holds the columns for the "payment_audit_logs" table.
 	PaymentAuditLogsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -886,6 +1067,9 @@ var (
 		{Name: "user_id", Type: field.TypeInt},
 		{Name: "order_no", Type: field.TypeString},
 		{Name: "provider_instance_id", Type: field.TypeInt},
+		{Name: "original_amount", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "discount_amount", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "promo_code_id", Type: field.TypeInt, Nullable: true},
 		{Name: "amount", Type: field.TypeString, Default: "0.00000000"},
 		{Name: "currency", Type: field.TypeString, Default: "USD"},
 		{Name: "status", Type: field.TypeString, Default: "pending"},
@@ -917,12 +1101,12 @@ var (
 			{
 				Name:    "paymentorder_status_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{PaymentOrdersColumns[8], PaymentOrdersColumns[1]},
+				Columns: []*schema.Column{PaymentOrdersColumns[11], PaymentOrdersColumns[1]},
 			},
 			{
 				Name:    "paymentorder_provider_transaction_id",
 				Unique:  false,
-				Columns: []*schema.Column{PaymentOrdersColumns[11]},
+				Columns: []*schema.Column{PaymentOrdersColumns[14]},
 			},
 			{
 				Name:    "paymentorder_provider_instance_id_created_at",
@@ -930,9 +1114,14 @@ var (
 				Columns: []*schema.Column{PaymentOrdersColumns[5], PaymentOrdersColumns[1]},
 			},
 			{
+				Name:    "paymentorder_promo_code_id",
+				Unique:  false,
+				Columns: []*schema.Column{PaymentOrdersColumns[8]},
+			},
+			{
 				Name:    "paymentorder_expires_at",
 				Unique:  false,
-				Columns: []*schema.Column{PaymentOrdersColumns[13]},
+				Columns: []*schema.Column{PaymentOrdersColumns[16]},
 			},
 		},
 	}
@@ -972,6 +1161,59 @@ var (
 				Name:    "paymentproviderinstance_status_sort_order",
 				Unique:  false,
 				Columns: []*schema.Column{PaymentProviderInstancesColumns[6], PaymentProviderInstancesColumns[11]},
+			},
+		},
+	}
+	// PendingOauthSessionsColumns holds the columns for the "pending_oauth_sessions" table.
+	PendingOauthSessionsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "session_token_hash", Type: field.TypeString},
+		{Name: "intent", Type: field.TypeString},
+		{Name: "provider", Type: field.TypeString},
+		{Name: "provider_key", Type: field.TypeString},
+		{Name: "provider_subject_hash", Type: field.TypeString},
+		{Name: "subject_hint", Type: field.TypeString, Default: ""},
+		{Name: "target_user_id", Type: field.TypeInt, Nullable: true},
+		{Name: "redirect_to", Type: field.TypeString, Default: "/"},
+		{Name: "resolved_email", Type: field.TypeString, Default: ""},
+		{Name: "display_name", Type: field.TypeString, Default: ""},
+		{Name: "email_verified", Type: field.TypeBool, Default: false},
+		{Name: "avatar_url", Type: field.TypeString, Default: ""},
+		{Name: "expires_at", Type: field.TypeTime},
+		{Name: "consumed_at", Type: field.TypeTime, Nullable: true},
+	}
+	// PendingOauthSessionsTable holds the schema information for the "pending_oauth_sessions" table.
+	PendingOauthSessionsTable = &schema.Table{
+		Name:       "pending_oauth_sessions",
+		Columns:    PendingOauthSessionsColumns,
+		PrimaryKey: []*schema.Column{PendingOauthSessionsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "pendingoauthsession_session_token_hash",
+				Unique:  true,
+				Columns: []*schema.Column{PendingOauthSessionsColumns[3]},
+			},
+			{
+				Name:    "pendingoauthsession_target_user_id",
+				Unique:  false,
+				Columns: []*schema.Column{PendingOauthSessionsColumns[9]},
+			},
+			{
+				Name:    "pendingoauthsession_expires_at",
+				Unique:  false,
+				Columns: []*schema.Column{PendingOauthSessionsColumns[15]},
+			},
+			{
+				Name:    "pendingoauthsession_consumed_at",
+				Unique:  false,
+				Columns: []*schema.Column{PendingOauthSessionsColumns[16]},
+			},
+			{
+				Name:    "pendingoauthsession_provider_provider_key_provider_subject_hash",
+				Unique:  false,
+				Columns: []*schema.Column{PendingOauthSessionsColumns[5], PendingOauthSessionsColumns[6], PendingOauthSessionsColumns[7]},
 			},
 		},
 	}
@@ -1504,6 +1746,36 @@ var (
 			},
 		},
 	}
+	// TLSFingerprintProfilesColumns holds the columns for the "tls_fingerprint_profiles" table.
+	TLSFingerprintProfilesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "name", Type: field.TypeString},
+		{Name: "tls_template", Type: field.TypeString, Default: ""},
+		{Name: "http_version_policy", Type: field.TypeString, Default: "prefer_h2"},
+		{Name: "user_agent", Type: field.TypeString, Default: ""},
+		{Name: "extra_headers", Type: field.TypeJSON, Nullable: true},
+		{Name: "enabled", Type: field.TypeBool, Default: true},
+	}
+	// TLSFingerprintProfilesTable holds the schema information for the "tls_fingerprint_profiles" table.
+	TLSFingerprintProfilesTable = &schema.Table{
+		Name:       "tls_fingerprint_profiles",
+		Columns:    TLSFingerprintProfilesColumns,
+		PrimaryKey: []*schema.Column{TLSFingerprintProfilesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "tlsfingerprintprofile_name",
+				Unique:  true,
+				Columns: []*schema.Column{TLSFingerprintProfilesColumns[3]},
+			},
+			{
+				Name:    "tlsfingerprintprofile_enabled",
+				Unique:  false,
+				Columns: []*schema.Column{TLSFingerprintProfilesColumns[8]},
+			},
+		},
+	}
 	// UsageLogsColumns holds the columns for the "usage_logs" table.
 	UsageLogsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -1620,6 +1892,239 @@ var (
 			},
 		},
 	}
+	// UserAnnouncementReadsColumns holds the columns for the "user_announcement_reads" table.
+	UserAnnouncementReadsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "user_id", Type: field.TypeInt},
+		{Name: "announcement_id", Type: field.TypeInt},
+		{Name: "read_at", Type: field.TypeTime},
+	}
+	// UserAnnouncementReadsTable holds the schema information for the "user_announcement_reads" table.
+	UserAnnouncementReadsTable = &schema.Table{
+		Name:       "user_announcement_reads",
+		Columns:    UserAnnouncementReadsColumns,
+		PrimaryKey: []*schema.Column{UserAnnouncementReadsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "userannouncementread_user_id_announcement_id",
+				Unique:  true,
+				Columns: []*schema.Column{UserAnnouncementReadsColumns[3], UserAnnouncementReadsColumns[4]},
+			},
+			{
+				Name:    "userannouncementread_announcement_id",
+				Unique:  false,
+				Columns: []*schema.Column{UserAnnouncementReadsColumns[4]},
+			},
+			{
+				Name:    "userannouncementread_user_id_read_at",
+				Unique:  false,
+				Columns: []*schema.Column{UserAnnouncementReadsColumns[3], UserAnnouncementReadsColumns[5]},
+			},
+		},
+	}
+	// UserAttributeDefinitionsColumns holds the columns for the "user_attribute_definitions" table.
+	UserAttributeDefinitionsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "key", Type: field.TypeString},
+		{Name: "name", Type: field.TypeString},
+		{Name: "data_type", Type: field.TypeString, Default: "string"},
+		{Name: "options_json", Type: field.TypeJSON, Nullable: true},
+		{Name: "required", Type: field.TypeBool, Default: false},
+		{Name: "display_order", Type: field.TypeInt, Default: 0},
+		{Name: "enabled", Type: field.TypeBool, Default: true},
+	}
+	// UserAttributeDefinitionsTable holds the schema information for the "user_attribute_definitions" table.
+	UserAttributeDefinitionsTable = &schema.Table{
+		Name:       "user_attribute_definitions",
+		Columns:    UserAttributeDefinitionsColumns,
+		PrimaryKey: []*schema.Column{UserAttributeDefinitionsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "userattributedefinition_key",
+				Unique:  true,
+				Columns: []*schema.Column{UserAttributeDefinitionsColumns[3]},
+			},
+			{
+				Name:    "userattributedefinition_enabled_display_order",
+				Unique:  false,
+				Columns: []*schema.Column{UserAttributeDefinitionsColumns[9], UserAttributeDefinitionsColumns[8]},
+			},
+		},
+	}
+	// UserAttributeValuesColumns holds the columns for the "user_attribute_values" table.
+	UserAttributeValuesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "user_id", Type: field.TypeInt},
+		{Name: "definition_id", Type: field.TypeInt},
+		{Name: "value", Type: field.TypeString, Default: ""},
+	}
+	// UserAttributeValuesTable holds the schema information for the "user_attribute_values" table.
+	UserAttributeValuesTable = &schema.Table{
+		Name:       "user_attribute_values",
+		Columns:    UserAttributeValuesColumns,
+		PrimaryKey: []*schema.Column{UserAttributeValuesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "userattributevalue_user_id_definition_id",
+				Unique:  true,
+				Columns: []*schema.Column{UserAttributeValuesColumns[3], UserAttributeValuesColumns[4]},
+			},
+			{
+				Name:    "userattributevalue_definition_id",
+				Unique:  false,
+				Columns: []*schema.Column{UserAttributeValuesColumns[4]},
+			},
+		},
+	}
+	// UserAuthIdentitiesColumns holds the columns for the "user_auth_identities" table.
+	UserAuthIdentitiesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "deleted_at", Type: field.TypeTime, Nullable: true},
+		{Name: "user_id", Type: field.TypeInt},
+		{Name: "provider", Type: field.TypeString},
+		{Name: "provider_key", Type: field.TypeString},
+		{Name: "provider_subject_hash", Type: field.TypeString},
+		{Name: "subject_hint", Type: field.TypeString, Default: ""},
+		{Name: "display_name", Type: field.TypeString, Default: ""},
+		{Name: "email", Type: field.TypeString, Default: ""},
+		{Name: "email_verified", Type: field.TypeBool, Default: false},
+		{Name: "avatar_url", Type: field.TypeString, Default: ""},
+		{Name: "verified_at", Type: field.TypeTime, Nullable: true},
+		{Name: "last_used_at", Type: field.TypeTime, Nullable: true},
+	}
+	// UserAuthIdentitiesTable holds the schema information for the "user_auth_identities" table.
+	UserAuthIdentitiesTable = &schema.Table{
+		Name:       "user_auth_identities",
+		Columns:    UserAuthIdentitiesColumns,
+		PrimaryKey: []*schema.Column{UserAuthIdentitiesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "userauthidentity_provider_provider_key_provider_subject_hash",
+				Unique:  true,
+				Columns: []*schema.Column{UserAuthIdentitiesColumns[5], UserAuthIdentitiesColumns[6], UserAuthIdentitiesColumns[7]},
+			},
+			{
+				Name:    "userauthidentity_user_id_provider",
+				Unique:  false,
+				Columns: []*schema.Column{UserAuthIdentitiesColumns[4], UserAuthIdentitiesColumns[5]},
+			},
+			{
+				Name:    "userauthidentity_user_id",
+				Unique:  false,
+				Columns: []*schema.Column{UserAuthIdentitiesColumns[4]},
+			},
+			{
+				Name:    "userauthidentity_last_used_at",
+				Unique:  false,
+				Columns: []*schema.Column{UserAuthIdentitiesColumns[14]},
+			},
+		},
+	}
+	// UserPromoCodeApplicationsColumns holds the columns for the "user_promo_code_applications" table.
+	UserPromoCodeApplicationsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "user_id", Type: field.TypeInt},
+		{Name: "promo_code_id", Type: field.TypeInt},
+		{Name: "code_digest", Type: field.TypeString},
+		{Name: "payment_order_id", Type: field.TypeInt},
+		{Name: "order_no", Type: field.TypeString},
+		{Name: "original_amount", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "discount_amount", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "final_amount", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "currency", Type: field.TypeString, Default: "USD"},
+		{Name: "discount_type", Type: field.TypeString},
+		{Name: "applied_at", Type: field.TypeTime},
+		{Name: "metadata_json", Type: field.TypeJSON, Nullable: true},
+	}
+	// UserPromoCodeApplicationsTable holds the schema information for the "user_promo_code_applications" table.
+	UserPromoCodeApplicationsTable = &schema.Table{
+		Name:       "user_promo_code_applications",
+		Columns:    UserPromoCodeApplicationsColumns,
+		PrimaryKey: []*schema.Column{UserPromoCodeApplicationsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "userpromocodeapplication_payment_order_id",
+				Unique:  true,
+				Columns: []*schema.Column{UserPromoCodeApplicationsColumns[6]},
+			},
+			{
+				Name:    "userpromocodeapplication_order_no",
+				Unique:  true,
+				Columns: []*schema.Column{UserPromoCodeApplicationsColumns[7]},
+			},
+			{
+				Name:    "userpromocodeapplication_promo_code_id",
+				Unique:  false,
+				Columns: []*schema.Column{UserPromoCodeApplicationsColumns[4]},
+			},
+			{
+				Name:    "userpromocodeapplication_user_id_applied_at",
+				Unique:  false,
+				Columns: []*schema.Column{UserPromoCodeApplicationsColumns[3], UserPromoCodeApplicationsColumns[13]},
+			},
+			{
+				Name:    "userpromocodeapplication_code_digest",
+				Unique:  false,
+				Columns: []*schema.Column{UserPromoCodeApplicationsColumns[5]},
+			},
+		},
+	}
+	// UserRedeemCodeRedemptionsColumns holds the columns for the "user_redeem_code_redemptions" table.
+	UserRedeemCodeRedemptionsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "user_id", Type: field.TypeInt},
+		{Name: "redeem_code_id", Type: field.TypeInt},
+		{Name: "code_digest", Type: field.TypeString},
+		{Name: "type", Type: field.TypeString},
+		{Name: "amount", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "currency", Type: field.TypeString, Default: "USD"},
+		{Name: "balance_before", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "balance_after", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "billing_ledger_id", Type: field.TypeInt, Nullable: true},
+		{Name: "user_subscription_id", Type: field.TypeInt, Nullable: true},
+		{Name: "redeemed_at", Type: field.TypeTime},
+		{Name: "metadata_json", Type: field.TypeJSON, Nullable: true},
+	}
+	// UserRedeemCodeRedemptionsTable holds the schema information for the "user_redeem_code_redemptions" table.
+	UserRedeemCodeRedemptionsTable = &schema.Table{
+		Name:       "user_redeem_code_redemptions",
+		Columns:    UserRedeemCodeRedemptionsColumns,
+		PrimaryKey: []*schema.Column{UserRedeemCodeRedemptionsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "userredeemcoderedemption_user_id_redeem_code_id",
+				Unique:  true,
+				Columns: []*schema.Column{UserRedeemCodeRedemptionsColumns[3], UserRedeemCodeRedemptionsColumns[4]},
+			},
+			{
+				Name:    "userredeemcoderedemption_redeem_code_id",
+				Unique:  false,
+				Columns: []*schema.Column{UserRedeemCodeRedemptionsColumns[4]},
+			},
+			{
+				Name:    "userredeemcoderedemption_user_id_redeemed_at",
+				Unique:  false,
+				Columns: []*schema.Column{UserRedeemCodeRedemptionsColumns[3], UserRedeemCodeRedemptionsColumns[13]},
+			},
+			{
+				Name:    "userredeemcoderedemption_code_digest",
+				Unique:  false,
+				Columns: []*schema.Column{UserRedeemCodeRedemptionsColumns[5]},
+			},
+		},
+	}
 	// UserRolesColumns holds the columns for the "user_roles" table.
 	UserRolesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -1683,6 +2188,36 @@ var (
 			},
 		},
 	}
+	// UserTotpSecretsColumns holds the columns for the "user_totp_secrets" table.
+	UserTotpSecretsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "user_id", Type: field.TypeInt},
+		{Name: "secret_ciphertext", Type: field.TypeBytes},
+		{Name: "secret_version", Type: field.TypeString, Default: "v1"},
+		{Name: "enabled", Type: field.TypeBool, Default: false},
+		{Name: "recovery_code_hashes_json", Type: field.TypeJSON, Nullable: true},
+		{Name: "last_used_at", Type: field.TypeTime, Nullable: true},
+	}
+	// UserTotpSecretsTable holds the schema information for the "user_totp_secrets" table.
+	UserTotpSecretsTable = &schema.Table{
+		Name:       "user_totp_secrets",
+		Columns:    UserTotpSecretsColumns,
+		PrimaryKey: []*schema.Column{UserTotpSecretsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "usertotpsecret_user_id",
+				Unique:  true,
+				Columns: []*schema.Column{UserTotpSecretsColumns[3]},
+			},
+			{
+				Name:    "usertotpsecret_enabled_user_id",
+				Unique:  false,
+				Columns: []*schema.Column{UserTotpSecretsColumns[6], UserTotpSecretsColumns[3]},
+			},
+		},
+	}
 	// WorkspacesColumns holds the columns for the "workspaces" table.
 	WorkspacesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -1723,6 +2258,7 @@ var (
 	Tables = []*schema.Table{
 		APIKeysTable,
 		APIKeyGroupsTable,
+		AccountAvailabilityRollupsTable,
 		AccountGroupsTable,
 		AccountGroupMembersTable,
 		AccountHealthSnapshotsTable,
@@ -1735,7 +2271,9 @@ var (
 		CapabilityDefinitionsTable,
 		DomainEventsInboxesTable,
 		DomainEventsOutboxesTable,
+		EmailVerificationTokensTable,
 		EntitlementsTable,
+		ErrorPassthroughRulesTable,
 		IdempotencyRecordsTable,
 		InviteCodesTable,
 		InviteRelationshipsTable,
@@ -1744,9 +2282,12 @@ var (
 		ModelRegistriesTable,
 		ObsAlertEventsTable,
 		ObsSloDefinitionsTable,
+		OpsSystemLogsTable,
+		PasswordResetTokensTable,
 		PaymentAuditLogsTable,
 		PaymentOrdersTable,
 		PaymentProviderInstancesTable,
+		PendingOauthSessionsTable,
 		PricingRulesTable,
 		ProvidersTable,
 		ProviderAccountsTable,
@@ -1760,10 +2301,18 @@ var (
 		SchedulerStrategiesTable,
 		SettingsTable,
 		SubscriptionPlansTable,
+		TLSFingerprintProfilesTable,
 		UsageLogsTable,
 		UsersTable,
+		UserAnnouncementReadsTable,
+		UserAttributeDefinitionsTable,
+		UserAttributeValuesTable,
+		UserAuthIdentitiesTable,
+		UserPromoCodeApplicationsTable,
+		UserRedeemCodeRedemptionsTable,
 		UserRolesTable,
 		UserSubscriptionsTable,
+		UserTotpSecretsTable,
 		WorkspacesTable,
 	}
 )

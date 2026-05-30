@@ -12,6 +12,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/predicate"
 	entrole "github.com/srapi/srapi/apps/api/ent/role"
 	entuser "github.com/srapi/srapi/apps/api/ent/user"
+	entuserauthidentity "github.com/srapi/srapi/apps/api/ent/userauthidentity"
 	entuserrole "github.com/srapi/srapi/apps/api/ent/userrole"
 	"github.com/srapi/srapi/apps/api/internal/modules/users/contract"
 )
@@ -49,6 +50,9 @@ func (s *Store) Create(ctx context.Context, input contract.CreateStoredUser) (co
 		Save(ctx)
 	if err != nil {
 		_ = tx.Rollback()
+		if ent.IsConstraintError(err) {
+			return contract.StoredUser{}, contract.ErrAlreadyExists
+		}
 		return contract.StoredUser{}, err
 	}
 
@@ -97,6 +101,9 @@ func (s *Store) FindByID(ctx context.Context, id int) (contract.StoredUser, erro
 		Where(entuser.IDEQ(id), entuser.DeletedAtIsNil()).
 		Only(ctx)
 	if err != nil {
+		if ent.IsNotFound(err) {
+			return contract.StoredUser{}, contract.ErrNotFound
+		}
 		return contract.StoredUser{}, err
 	}
 	return s.toStoredUser(ctx, found)
@@ -107,6 +114,9 @@ func (s *Store) FindByEmail(ctx context.Context, email string) (contract.StoredU
 		Where(entuser.EmailEQ(strings.ToLower(strings.TrimSpace(email))), entuser.DeletedAtIsNil()).
 		Only(ctx)
 	if err != nil {
+		if ent.IsNotFound(err) {
+			return contract.StoredUser{}, contract.ErrNotFound
+		}
 		return contract.StoredUser{}, err
 	}
 	return s.toStoredUser(ctx, found)
@@ -185,6 +195,13 @@ func (s *Store) Update(ctx context.Context, id int, input contract.UpdateStoredU
 			update.SetRpmLimit(**input.RPMLimit)
 		}
 	}
+	if input.EmailVerifiedAt != nil {
+		if *input.EmailVerifiedAt == nil {
+			update.ClearEmailVerifiedAt()
+		} else {
+			update.SetEmailVerifiedAt(**input.EmailVerifiedAt)
+		}
+	}
 	if input.WorkspaceID != nil {
 		if *input.WorkspaceID == nil {
 			update.ClearWorkspaceID()
@@ -195,6 +212,12 @@ func (s *Store) Update(ctx context.Context, id int, input contract.UpdateStoredU
 	updated, err := update.Save(ctx)
 	if err != nil {
 		_ = tx.Rollback()
+		if ent.IsNotFound(err) {
+			return contract.StoredUser{}, contract.ErrNotFound
+		}
+		if ent.IsConstraintError(err) {
+			return contract.StoredUser{}, contract.ErrAlreadyExists
+		}
 		return contract.StoredUser{}, err
 	}
 	if input.Roles != nil {
@@ -220,11 +243,51 @@ func (s *Store) Update(ctx context.Context, id int, input contract.UpdateStoredU
 	return s.toStoredUser(ctx, updated)
 }
 
+func (s *Store) Delete(ctx context.Context, id int) error {
+	now := time.Now().UTC()
+	tx, err := s.client.Tx(ctx)
+	if err != nil {
+		return err
+	}
+	updated, err := tx.User.UpdateOneID(id).
+		Where(entuser.DeletedAtIsNil()).
+		SetDeletedAt(now).
+		SetEmail(fmt.Sprintf("deleted+%d+%d@deleted.local", id, now.UnixNano())).
+		SetStatus(string(contract.StatusDisabled)).
+		Save(ctx)
+	if err != nil {
+		_ = tx.Rollback()
+		if ent.IsNotFound(err) {
+			return contract.ErrNotFound
+		}
+		return err
+	}
+	if _, err := tx.UserAuthIdentity.Delete().Where(entuserauthidentity.UserIDEQ(id)).Exec(ctx); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	if updated.WorkspaceID != nil {
+		_, err := tx.Workspace.UpdateOneID(*updated.WorkspaceID).
+			SetDeletedAt(now).
+			SetSlug(fmt.Sprintf("deleted-%d-%d", *updated.WorkspaceID, now.UnixNano())).
+			SetStatus("disabled").
+			Save(ctx)
+		if err != nil && !ent.IsNotFound(err) {
+			_ = tx.Rollback()
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
 func (s *Store) UpdateLastLogin(ctx context.Context, id int, at time.Time) error {
 	_, err := s.client.User.UpdateOneID(id).
 		Where(entuser.DeletedAtIsNil()).
 		SetLastLoginAt(at).
 		Save(ctx)
+	if ent.IsNotFound(err) {
+		return contract.ErrNotFound
+	}
 	return err
 }
 
@@ -235,6 +298,9 @@ func (s *Store) CreateRole(ctx context.Context, input contract.CreateStoredRole)
 		SetPermissionsJSON(append([]string(nil), input.Permissions...)).
 		Save(ctx)
 	if err != nil {
+		if ent.IsConstraintError(err) {
+			return contract.RoleDefinition{}, contract.ErrAlreadyExists
+		}
 		return contract.RoleDefinition{}, err
 	}
 	return toRoleDefinition(created), nil
@@ -252,6 +318,137 @@ func (s *Store) ListRoles(ctx context.Context) ([]contract.RoleDefinition, error
 	return out, nil
 }
 
+func (s *Store) ListAuthIdentities(ctx context.Context, userID int) ([]contract.UserAuthIdentity, error) {
+	exists, err := s.client.User.Query().
+		Where(entuser.IDEQ(userID), entuser.DeletedAtIsNil()).
+		Exist(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, contract.ErrNotFound
+	}
+	rows, err := s.client.UserAuthIdentity.Query().
+		Where(entuserauthidentity.UserIDEQ(userID), entuserauthidentity.DeletedAtIsNil()).
+		Order(entuserauthidentity.ByProvider(), entuserauthidentity.ByID()).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]contract.UserAuthIdentity, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toUserAuthIdentity(row))
+	}
+	return out, nil
+}
+
+func (s *Store) FindAuthIdentityByProviderSubject(ctx context.Context, provider contract.AuthIdentityProvider, providerKey string, providerSubjectHash string) (contract.UserAuthIdentity, error) {
+	providerValue := strings.ToLower(strings.TrimSpace(string(provider)))
+	providerKey = strings.TrimSpace(providerKey)
+	providerSubjectHash = strings.TrimSpace(providerSubjectHash)
+	if providerValue == "" || providerKey == "" || providerSubjectHash == "" {
+		return contract.UserAuthIdentity{}, contract.ErrNotFound
+	}
+	row, err := s.client.UserAuthIdentity.Query().
+		Where(
+			entuserauthidentity.ProviderEQ(providerValue),
+			entuserauthidentity.ProviderKeyEQ(providerKey),
+			entuserauthidentity.ProviderSubjectHashEQ(providerSubjectHash),
+			entuserauthidentity.DeletedAtIsNil(),
+		).
+		Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return contract.UserAuthIdentity{}, contract.ErrNotFound
+		}
+		return contract.UserAuthIdentity{}, err
+	}
+	return toUserAuthIdentity(row), nil
+}
+
+func (s *Store) UpsertAuthIdentity(ctx context.Context, input contract.CreateUserAuthIdentity) (contract.UserAuthIdentity, error) {
+	provider := strings.ToLower(strings.TrimSpace(string(input.Provider)))
+	providerKey := strings.TrimSpace(input.ProviderKey)
+	subjectHash := strings.TrimSpace(input.ProviderSubjectHash)
+	if input.UserID <= 0 || provider == "" || providerKey == "" || subjectHash == "" {
+		return contract.UserAuthIdentity{}, contract.ErrNotFound
+	}
+	existing, err := s.client.UserAuthIdentity.Query().
+		Where(
+			entuserauthidentity.ProviderEQ(provider),
+			entuserauthidentity.ProviderKeyEQ(providerKey),
+			entuserauthidentity.ProviderSubjectHashEQ(subjectHash),
+		).
+		Only(ctx)
+	if err != nil && !ent.IsNotFound(err) {
+		return contract.UserAuthIdentity{}, err
+	}
+	if existing != nil && existing.DeletedAt == nil {
+		if existing.UserID != input.UserID {
+			return contract.UserAuthIdentity{}, contract.ErrAlreadyExists
+		}
+	}
+	if existing != nil {
+		update := s.client.UserAuthIdentity.UpdateOneID(existing.ID).
+			SetUserID(input.UserID).
+			SetProvider(provider).
+			SetProviderKey(providerKey).
+			SetProviderSubjectHash(subjectHash).
+			SetSubjectHint(strings.TrimSpace(input.SubjectHint)).
+			SetDisplayName(strings.TrimSpace(input.DisplayName)).
+			SetEmail(strings.ToLower(strings.TrimSpace(input.Email))).
+			SetEmailVerified(input.EmailVerified).
+			SetAvatarURL(strings.TrimSpace(input.AvatarURL)).
+			ClearDeletedAt().
+			SetNillableVerifiedAt(input.VerifiedAt).
+			SetNillableLastUsedAt(input.LastUsedAt)
+		row, err := update.Save(ctx)
+		if err != nil {
+			if ent.IsNotFound(err) {
+				return contract.UserAuthIdentity{}, contract.ErrNotFound
+			}
+			if ent.IsConstraintError(err) {
+				return contract.UserAuthIdentity{}, contract.ErrAlreadyExists
+			}
+			return contract.UserAuthIdentity{}, err
+		}
+		return toUserAuthIdentity(row), nil
+	}
+	row, err := s.client.UserAuthIdentity.Create().
+		SetUserID(input.UserID).
+		SetProvider(provider).
+		SetProviderKey(providerKey).
+		SetProviderSubjectHash(subjectHash).
+		SetSubjectHint(strings.TrimSpace(input.SubjectHint)).
+		SetDisplayName(strings.TrimSpace(input.DisplayName)).
+		SetEmail(strings.ToLower(strings.TrimSpace(input.Email))).
+		SetEmailVerified(input.EmailVerified).
+		SetAvatarURL(strings.TrimSpace(input.AvatarURL)).
+		SetNillableVerifiedAt(input.VerifiedAt).
+		SetNillableLastUsedAt(input.LastUsedAt).
+		Save(ctx)
+	if err != nil {
+		if ent.IsConstraintError(err) {
+			return contract.UserAuthIdentity{}, contract.ErrAlreadyExists
+		}
+		return contract.UserAuthIdentity{}, err
+	}
+	return toUserAuthIdentity(row), nil
+}
+
+func (s *Store) DeleteAuthIdentity(ctx context.Context, userID int, identityID int) error {
+	affected, err := s.client.UserAuthIdentity.Delete().
+		Where(entuserauthidentity.IDEQ(identityID), entuserauthidentity.UserIDEQ(userID)).
+		Exec(ctx)
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return contract.ErrNotFound
+	}
+	return nil
+}
+
 func (s *Store) toStoredUser(ctx context.Context, user *ent.User) (contract.StoredUser, error) {
 	roles, permissions, err := s.rolesForUser(ctx, user.ID)
 	if err != nil {
@@ -259,18 +456,19 @@ func (s *Store) toStoredUser(ctx context.Context, user *ent.User) (contract.Stor
 	}
 	return contract.StoredUser{
 		User: contract.User{
-			ID:          user.ID,
-			Email:       user.Email,
-			Name:        user.Name,
-			Status:      contract.Status(user.Status),
-			WorkspaceID: cloneInt(user.WorkspaceID),
-			Roles:       roles,
-			Permissions: permissions,
-			Balance:     user.Balance,
-			Currency:    user.Currency,
-			RPMLimit:    cloneInt(user.RpmLimit),
-			CreatedAt:   user.CreatedAt,
-			LastLoginAt: user.LastLoginAt,
+			ID:              user.ID,
+			Email:           user.Email,
+			Name:            user.Name,
+			Status:          contract.Status(user.Status),
+			WorkspaceID:     cloneInt(user.WorkspaceID),
+			Roles:           roles,
+			Permissions:     permissions,
+			Balance:         user.Balance,
+			Currency:        user.Currency,
+			RPMLimit:        cloneInt(user.RpmLimit),
+			CreatedAt:       user.CreatedAt,
+			LastLoginAt:     user.LastLoginAt,
+			EmailVerifiedAt: user.EmailVerifiedAt,
 		},
 		PasswordHash:    user.PasswordHash,
 		EmailVerifiedAt: user.EmailVerifiedAt,
@@ -351,6 +549,25 @@ func toRoleDefinition(row *ent.Role) contract.RoleDefinition {
 	}
 }
 
+func toUserAuthIdentity(row *ent.UserAuthIdentity) contract.UserAuthIdentity {
+	return contract.UserAuthIdentity{
+		ID:            row.ID,
+		UserID:        row.UserID,
+		Provider:      contract.AuthIdentityProvider(row.Provider),
+		ProviderKey:   row.ProviderKey,
+		SubjectHint:   row.SubjectHint,
+		DisplayName:   row.DisplayName,
+		Email:         row.Email,
+		EmailVerified: row.EmailVerified,
+		AvatarURL:     row.AvatarURL,
+		External:      true,
+		VerifiedAt:    cloneTime(row.VerifiedAt),
+		LastUsedAt:    cloneTime(row.LastUsedAt),
+		CreatedAt:     row.CreatedAt,
+		UpdatedAt:     row.UpdatedAt,
+	}
+}
+
 func normalizeRoles(roles []contract.Role) []contract.Role {
 	out := make([]contract.Role, 0, len(roles))
 	seen := map[contract.Role]bool{}
@@ -374,6 +591,14 @@ func personalWorkspaceName(name string) string {
 }
 
 func cloneInt(value *int) *int {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
+}
+
+func cloneTime(value *time.Time) *time.Time {
 	if value == nil {
 		return nil
 	}

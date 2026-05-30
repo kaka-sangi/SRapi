@@ -1,0 +1,201 @@
+package service
+
+import (
+	"context"
+	"errors"
+	"sort"
+	"strings"
+
+	"github.com/srapi/srapi/apps/api/internal/modules/error_passthrough/contract"
+)
+
+// ErrInvalidInput is returned for malformed rules.
+var ErrInvalidInput = errors.New("invalid error passthrough rule")
+
+type Service struct {
+	store contract.Store
+}
+
+func New(store contract.Store) (*Service, error) {
+	if store == nil {
+		return nil, ErrInvalidInput
+	}
+	return &Service{store: store}, nil
+}
+
+func (s *Service) ListRules(ctx context.Context) ([]contract.Rule, error) {
+	return s.store.ListRules(ctx)
+}
+
+func (s *Service) CreateRule(ctx context.Context, input contract.CreateRule) (contract.Rule, error) {
+	input.Name = strings.TrimSpace(input.Name)
+	if input.Name == "" {
+		return contract.Rule{}, ErrInvalidInput
+	}
+	input.Action = normalizeAction(input.Action)
+	if input.Action == "" {
+		return contract.Rule{}, ErrInvalidInput
+	}
+	input.Classes = cleanStrings(input.Classes)
+	input.Keywords = cleanStrings(input.Keywords)
+	input.StatusCodes = cleanStatusCodes(input.StatusCodes)
+	return s.store.CreateRule(ctx, input)
+}
+
+func (s *Service) UpdateRule(ctx context.Context, id int, input contract.UpdateRule) (contract.Rule, error) {
+	if id <= 0 {
+		return contract.Rule{}, ErrInvalidInput
+	}
+	if input.Name != nil {
+		name := strings.TrimSpace(*input.Name)
+		if name == "" {
+			return contract.Rule{}, ErrInvalidInput
+		}
+		input.Name = &name
+	}
+	if input.Action != nil {
+		action := normalizeAction(*input.Action)
+		if action == "" {
+			return contract.Rule{}, ErrInvalidInput
+		}
+		input.Action = &action
+	}
+	if input.Classes != nil {
+		classes := cleanStrings(*input.Classes)
+		input.Classes = &classes
+	}
+	if input.Keywords != nil {
+		keywords := cleanStrings(*input.Keywords)
+		input.Keywords = &keywords
+	}
+	if input.StatusCodes != nil {
+		codes := cleanStatusCodes(*input.StatusCodes)
+		input.StatusCodes = &codes
+	}
+	return s.store.UpdateRule(ctx, id, input)
+}
+
+func (s *Service) DeleteRule(ctx context.Context, id int) error {
+	if id <= 0 {
+		return ErrInvalidInput
+	}
+	return s.store.DeleteRule(ctx, id)
+}
+
+// Resolve evaluates enabled rules in priority order and returns the action of
+// the first rule that matches the given error class, upstream status, and raw
+// message. matched is false when no rule applies, in which case the caller
+// should fall back to its existing per-account behavior.
+func (s *Service) Resolve(ctx context.Context, errorClass string, upstreamStatus int, message string) (contract.Action, bool) {
+	rules, err := s.store.ListRules(ctx)
+	if err != nil {
+		return "", false
+	}
+	enabled := make([]contract.Rule, 0, len(rules))
+	for _, rule := range rules {
+		if rule.Enabled {
+			enabled = append(enabled, rule)
+		}
+	}
+	sort.SliceStable(enabled, func(i, j int) bool {
+		if enabled[i].Priority != enabled[j].Priority {
+			return enabled[i].Priority < enabled[j].Priority
+		}
+		return enabled[i].ID < enabled[j].ID
+	})
+	lowerMessage := strings.ToLower(message)
+	for _, rule := range enabled {
+		if !statusMatches(rule.StatusCodes, upstreamStatus) {
+			continue
+		}
+		if !classMatches(rule.Classes, errorClass) {
+			continue
+		}
+		if !keywordMatches(rule.Keywords, lowerMessage) {
+			continue
+		}
+		return rule.Action, true
+	}
+	return "", false
+}
+
+func statusMatches(codes []int, status int) bool {
+	if len(codes) == 0 {
+		return true
+	}
+	for _, code := range codes {
+		if code == status {
+			return true
+		}
+	}
+	return false
+}
+
+func classMatches(classes []string, errorClass string) bool {
+	if len(classes) == 0 {
+		return true
+	}
+	for _, class := range classes {
+		if strings.EqualFold(class, errorClass) {
+			return true
+		}
+	}
+	return false
+}
+
+func keywordMatches(keywords []string, lowerMessage string) bool {
+	if len(keywords) == 0 {
+		return true
+	}
+	for _, keyword := range keywords {
+		if strings.Contains(lowerMessage, strings.ToLower(keyword)) {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizeAction(action contract.Action) contract.Action {
+	switch contract.Action(strings.ToLower(strings.TrimSpace(string(action)))) {
+	case contract.ActionExpose:
+		return contract.ActionExpose
+	case contract.ActionMask:
+		return contract.ActionMask
+	default:
+		return ""
+	}
+}
+
+func cleanStrings(values []string) []string {
+	out := make([]string, 0, len(values))
+	seen := map[string]struct{}{}
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		key := strings.ToLower(value)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, value)
+	}
+	return out
+}
+
+func cleanStatusCodes(codes []int) []int {
+	out := make([]int, 0, len(codes))
+	seen := map[int]struct{}{}
+	for _, code := range codes {
+		if code < 100 || code > 599 {
+			continue
+		}
+		if _, ok := seen[code]; ok {
+			continue
+		}
+		seen[code] = struct{}{}
+		out = append(out, code)
+	}
+	return out
+}

@@ -32,7 +32,9 @@ type Config struct {
 	HealthProbe    HealthProbeConfig
 	QualityEval    QualityEvalConfig
 	SLOEvaluator   SLOEvaluatorConfig
+	Email          EmailConfig
 	Observability  ObservabilityConfig
+	Captcha        CaptchaConfig
 }
 
 type ServerConfig struct {
@@ -65,15 +67,25 @@ type GatewayConfig struct {
 }
 
 type SecurityConfig struct {
-	JWTSecret    string
-	MasterKey    string
-	APIKeyPepper string
+	JWTSecret         string
+	MasterKey         string
+	TOTPEncryptionKey string
+	APIKeyPepper      string
 }
 
 type BootstrapConfig struct {
 	AdminEmail    string
 	AdminPassword string
 	AdminName     string
+}
+
+// CaptchaConfig controls human-verification (Cloudflare Turnstile by default) on
+// auth endpoints. When Enabled is false the verifier is a no-op.
+type CaptchaConfig struct {
+	Enabled   bool
+	Provider  string // turnstile | hcaptcha | recaptcha
+	SecretKey string
+	VerifyURL string // optional override of the provider's siteverify endpoint
 }
 
 type RetentionConfig struct {
@@ -126,6 +138,18 @@ type SLOEvaluatorConfig struct {
 	Timeout  time.Duration
 }
 
+// EmailConfig controls outbound transactional email delivery.
+type EmailConfig struct {
+	PublicBaseURL string
+	SMTPHost      string
+	SMTPPort      int
+	SMTPUsername  string
+	SMTPPassword  string
+	SMTPFrom      string
+	SMTPFromName  string
+	SMTPUseTLS    bool
+}
+
 // ObservabilityConfig controls process-wide tracing and structured diagnostics.
 type ObservabilityConfig struct {
 	ServiceName      string
@@ -171,11 +195,7 @@ func Load() Config {
 			RealtimeMaxOpenSlots:       getIntEnv("GATEWAY_REALTIME_MAX_OPEN_SLOTS", 0),
 			RealtimeMaxOpenSlotsPerKey: getIntEnv("GATEWAY_REALTIME_MAX_OPEN_SLOTS_PER_API_KEY", 0),
 		},
-		Security: SecurityConfig{
-			JWTSecret:    getEnv("JWT_SECRET", ""),
-			MasterKey:    getEnv("SRAPI_MASTER_KEY", "local_dev_master_key_32_bytes_minimum_change_me"),
-			APIKeyPepper: getEnv("API_KEY_PEPPER", "local_dev_api_key_pepper_change_me_32+"),
-		},
+		Security: securityConfigFromEnv(),
 		Bootstrap: BootstrapConfig{
 			AdminEmail:    getEnv("BOOTSTRAP_ADMIN_EMAIL", "admin@srapi.local"),
 			AdminPassword: getEnv("BOOTSTRAP_ADMIN_PASSWORD", "password123"),
@@ -220,6 +240,16 @@ func Load() Config {
 			Interval: time.Duration(getIntEnv("SLO_EVALUATOR_INTERVAL_SECONDS", 60)) * time.Second,
 			Timeout:  time.Duration(getIntEnv("SLO_EVALUATOR_TIMEOUT_SECONDS", 30)) * time.Second,
 		},
+		Email: EmailConfig{
+			PublicBaseURL: strings.TrimRight(getEnv("EMAIL_PUBLIC_BASE_URL", ""), "/"),
+			SMTPHost:      getEnv("EMAIL_SMTP_HOST", ""),
+			SMTPPort:      getIntEnv("EMAIL_SMTP_PORT", 587),
+			SMTPUsername:  getEnv("EMAIL_SMTP_USERNAME", ""),
+			SMTPPassword:  getEnv("EMAIL_SMTP_PASSWORD", ""),
+			SMTPFrom:      getEnv("EMAIL_SMTP_FROM", ""),
+			SMTPFromName:  getEnv("EMAIL_SMTP_FROM_NAME", ""),
+			SMTPUseTLS:    getBoolEnv("EMAIL_SMTP_USE_TLS", false),
+		},
 		Observability: ObservabilityConfig{
 			ServiceName:      getEnv("OTEL_SERVICE_NAME", getEnv("LOG_SERVICE_NAME", "srapi")),
 			ServiceVersion:   getEnv("OTEL_SERVICE_VERSION", getEnv("SRAPI_VERSION", defaultVersion)),
@@ -229,6 +259,12 @@ func Load() Config {
 			OTLPInsecure:     getBoolEnv("OTEL_EXPORTER_OTLP_INSECURE", true),
 			TraceSampleRatio: getFloatEnv("OTEL_TRACES_SAMPLE_RATIO", 1),
 			BatchTimeout:     time.Duration(getIntEnv("OTEL_BATCH_TIMEOUT_SECONDS", 5)) * time.Second,
+		},
+		Captcha: CaptchaConfig{
+			Enabled:   getBoolEnv("CAPTCHA_ENABLED", false),
+			Provider:  getEnv("CAPTCHA_PROVIDER", "turnstile"),
+			SecretKey: getEnv("CAPTCHA_SECRET_KEY", ""),
+			VerifyURL: getEnv("CAPTCHA_VERIFY_URL", ""),
 		},
 	}
 }
@@ -340,6 +376,12 @@ func (c Config) Validate() error {
 	if c.SLOEvaluator.Timeout <= 0 {
 		return fmt.Errorf("SLO_EVALUATOR_TIMEOUT_SECONDS must be positive")
 	}
+	if c.Email.SMTPPort <= 0 || c.Email.SMTPPort > 65535 {
+		return fmt.Errorf("EMAIL_SMTP_PORT must be between 1 and 65535")
+	}
+	if strings.TrimSpace(c.Email.PublicBaseURL) != "" && !validHTTPBaseURL(c.Email.PublicBaseURL) {
+		return fmt.Errorf("EMAIL_PUBLIC_BASE_URL must be an absolute http or https URL without query or fragment")
+	}
 	if strings.TrimSpace(c.Observability.ServiceName) == "" {
 		return fmt.Errorf("OTEL_SERVICE_NAME must not be empty")
 	}
@@ -364,6 +406,9 @@ func (c Config) Validate() error {
 		}
 		if weakSecret(c.Security.MasterKey) {
 			return fmt.Errorf("SRAPI_MASTER_KEY must be strong and at least 32 bytes in release mode")
+		}
+		if weakSecret(c.Security.TOTPEncryptionKey) {
+			return fmt.Errorf("TOTP_ENCRYPTION_KEY must be strong and at least 32 bytes in release mode")
 		}
 		if weakSecret(c.Security.APIKeyPepper) {
 			return fmt.Errorf("API_KEY_PEPPER must be strong and at least 32 bytes in release mode")
@@ -396,6 +441,16 @@ func getEnv(key, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func securityConfigFromEnv() SecurityConfig {
+	masterKey := getEnv("SRAPI_MASTER_KEY", "local_dev_master_key_32_bytes_minimum_change_me")
+	return SecurityConfig{
+		JWTSecret:         getEnv("JWT_SECRET", ""),
+		MasterKey:         masterKey,
+		TOTPEncryptionKey: getEnv("TOTP_ENCRYPTION_KEY", masterKey),
+		APIKeyPepper:      getEnv("API_KEY_PEPPER", "local_dev_api_key_pepper_change_me_32+"),
+	}
 }
 
 func normalizeStorageBackend(value string) string {
@@ -473,4 +528,16 @@ func weakBootstrapPassword(value string) bool {
 	default:
 		return false
 	}
+}
+
+func validHTTPBaseURL(value string) bool {
+	normalized := strings.TrimSpace(value)
+	if normalized == "" || strings.ContainsAny(normalized, "\r\n\t ") {
+		return false
+	}
+	if strings.Contains(normalized, "?") || strings.Contains(normalized, "#") {
+		return false
+	}
+	lower := strings.ToLower(normalized)
+	return strings.HasPrefix(lower, "https://") || strings.HasPrefix(lower, "http://")
 }

@@ -17,9 +17,11 @@ import (
 	platformdb "github.com/srapi/srapi/apps/api/internal/platform/db"
 	platformotel "github.com/srapi/srapi/apps/api/internal/platform/otel"
 	platformredis "github.com/srapi/srapi/apps/api/internal/platform/redis"
+	accountquotaalertworker "github.com/srapi/srapi/apps/api/internal/workers/account_quota_alert"
 	authcleanupworker "github.com/srapi/srapi/apps/api/internal/workers/auth_session_cleanup"
 	balancechargerworker "github.com/srapi/srapi/apps/api/internal/workers/balance_charger"
 	healthprobeworker "github.com/srapi/srapi/apps/api/internal/workers/health_probe"
+	idempotencycleanupworker "github.com/srapi/srapi/apps/api/internal/workers/idempotency_cleanup"
 	orderexpirerworker "github.com/srapi/srapi/apps/api/internal/workers/order_expirer"
 	outboxworker "github.com/srapi/srapi/apps/api/internal/workers/outbox"
 	qualityevalworker "github.com/srapi/srapi/apps/api/internal/workers/quality_eval"
@@ -40,8 +42,10 @@ type App struct {
 	outbox    *outboxworker.Worker
 	retention *retentionworker.Worker
 	authClean *authcleanupworker.Worker
+	idemClean *idempotencycleanupworker.Worker
 	expirer   *orderexpirerworker.Worker
 	subExpiry *subscriptionexpirerworker.Worker
+	quota     *accountquotaalertworker.Worker
 	balance   *balancechargerworker.Worker
 	health    *healthprobeworker.Worker
 	quality   *qualityevalworker.Worker
@@ -70,7 +74,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		return nil, err
 	}
 
-	handler, outbox, retention, authClean, expirer, subExpiry, balance, health, quality, sloEval, err := newHandler(cfg, logger, dbClient, redisClient)
+	handler, outbox, retention, authClean, expirer, subExpiry, quota, balance, health, quality, sloEval, idemClean, err := newHandler(cfg, logger, dbClient, redisClient)
 	if err != nil {
 		_ = dbClient.Close()
 		_ = redisClient.Close()
@@ -93,8 +97,10 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		outbox:    outbox,
 		retention: retention,
 		authClean: authClean,
+		idemClean: idemClean,
 		expirer:   expirer,
 		subExpiry: subExpiry,
+		quota:     quota,
 		balance:   balance,
 		health:    health,
 		quality:   quality,
@@ -148,7 +154,7 @@ func Healthcheck(ctx context.Context, cfg config.Config) error {
 	return httpserver.Healthcheck(ctx, cfg.HealthcheckAddress())
 }
 
-func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Client, redisClient *platformredis.Client) (http.Handler, *outboxworker.Worker, *retentionworker.Worker, *authcleanupworker.Worker, *orderexpirerworker.Worker, *subscriptionexpirerworker.Worker, *balancechargerworker.Worker, *healthprobeworker.Worker, *qualityevalworker.Worker, *sloevaluatorworker.Worker, error) {
+func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Client, redisClient *platformredis.Client) (http.Handler, *outboxworker.Worker, *retentionworker.Worker, *authcleanupworker.Worker, *orderexpirerworker.Worker, *subscriptionexpirerworker.Worker, *accountquotaalertworker.Worker, *balancechargerworker.Worker, *healthprobeworker.Worker, *qualityevalworker.Worker, *sloevaluatorworker.Worker, *idempotencycleanupworker.Worker, error) {
 	var (
 		handler http.Handler
 		err     error
@@ -162,57 +168,65 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 	}
 	realtimeStore, err := realtimeSlotStore(context.Background(), cfg, logger, redisClient)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	if realtimeStore != nil {
 		options = append(options, httpserver.WithRealtimeStore(realtimeStore))
 	}
 	rateLimiterOption, err := gatewayRateLimiterOption(context.Background(), cfg, logger, redisClient)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	if rateLimiterOption != nil {
 		options = append(options, rateLimiterOption)
 	}
 	stores, err := persistentStores(context.Background(), cfg, logger, dbClient, redisClient)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
-	outbox, err := domainEventsWorker(stores, logger)
+	outbox, err := domainEventsWorker(cfg, stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	retention, err := retentionCleanupWorker(cfg, stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	authClean, err := authSessionCleanupWorker(cfg, stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+	}
+	idemClean, err := idempotencyCleanupWorker(stores, logger)
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	expirer, err := paymentOrderExpirerWorker(cfg, stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	subExpiry, err := subscriptionExpirerWorker(stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+	}
+	quota, err := accountQuotaAlertWorker(cfg, stores, logger)
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	balance, err := balanceChargerWorker(cfg, stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	health, err := accountHealthProbeWorker(cfg, stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	quality, err := qualityEvalWorker(cfg, stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	sloEval, err := sloEvaluatorWorker(cfg, stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	if stores != nil {
 		options = append(options,
@@ -228,11 +242,17 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 			httpserver.WithEventStore(stores.Events),
 			httpserver.WithAffiliateStore(stores.Affiliate),
 			httpserver.WithOperationsStore(stores.Operations),
+			httpserver.WithIdempotencyStore(stores.Idempotency),
 			httpserver.WithPaymentStore(stores.Payments),
 			httpserver.WithQualityEvalStore(stores.QualityEval),
 			httpserver.WithSchedulerStore(stores.Scheduler),
 			httpserver.WithSubscriptionStore(stores.Subscriptions),
+			httpserver.WithTOTPStore(stores.TOTP),
 			httpserver.WithUsageStore(stores.Usage),
+			httpserver.WithUserAttributesStore(stores.UserAttributes),
+			httpserver.WithErrorPassthroughStore(stores.ErrorPassthrough),
+			httpserver.WithTLSProfilesStore(stores.TLSProfiles),
+			httpserver.WithHealthRollupsStore(stores.HealthRollups),
 		)
 	}
 
@@ -245,7 +265,7 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 		handler = httpserver.New(cfg, logger, options...)
 	}()
 
-	return handler, outbox, retention, authClean, expirer, subExpiry, balance, health, quality, sloEval, err
+	return handler, outbox, retention, authClean, expirer, subExpiry, quota, balance, health, quality, sloEval, idemClean, err
 }
 
 func persistentStores(ctx context.Context, cfg config.Config, logger *slog.Logger, dbClient *platformdb.Client, redisClient *platformredis.Client) (*entstore.Stores, error) {
@@ -342,14 +362,25 @@ func gatewayRateLimiterOption(ctx context.Context, cfg config.Config, logger *sl
 	return httpserver.WithRateLimitRedis(redisClient.Raw()), nil
 }
 
-func domainEventsWorker(stores *entstore.Stores, logger *slog.Logger) (*outboxworker.Worker, error) {
+func domainEventsWorker(cfg config.Config, stores *entstore.Stores, logger *slog.Logger) (*outboxworker.Worker, error) {
 	if stores == nil || stores.Events == nil {
 		return nil, nil
 	}
 	return outboxworker.New(stores.Events, logger, outboxworker.Config{
-		AffiliateStore:    stores.Affiliate,
-		AuditStore:        stores.Audit,
-		SubscriptionStore: stores.Subscriptions,
+		AffiliateStore:     stores.Affiliate,
+		AdminControlStore:  stores.AdminControl,
+		AuditStore:         stores.Audit,
+		UserStore:          stores.Users,
+		EmailPublicBaseURL: cfg.Email.PublicBaseURL,
+		EmailSMTPHost:      cfg.Email.SMTPHost,
+		EmailSMTPPort:      cfg.Email.SMTPPort,
+		EmailSMTPUsername:  cfg.Email.SMTPUsername,
+		EmailSMTPPassword:  cfg.Email.SMTPPassword,
+		EmailSMTPFrom:      cfg.Email.SMTPFrom,
+		EmailSMTPFromName:  cfg.Email.SMTPFromName,
+		EmailSMTPUseTLS:    cfg.Email.SMTPUseTLS,
+		MasterKey:          cfg.Security.MasterKey,
+		SubscriptionStore:  stores.Subscriptions,
 	})
 }
 
@@ -364,6 +395,13 @@ func retentionCleanupWorker(cfg config.Config, stores *entstore.Stores, logger *
 		AuditLogsDays:              cfg.Retention.AuditLogsDays,
 		AccountHealthSnapshotsDays: cfg.Retention.AccountHealthSnapshotsDays,
 	})
+}
+
+func idempotencyCleanupWorker(stores *entstore.Stores, logger *slog.Logger) (*idempotencycleanupworker.Worker, error) {
+	if stores == nil || stores.Idempotency == nil {
+		return nil, nil
+	}
+	return idempotencycleanupworker.New(stores.Idempotency, logger, idempotencycleanupworker.Config{})
 }
 
 func authSessionCleanupWorker(cfg config.Config, stores *entstore.Stores, logger *slog.Logger) (*authcleanupworker.Worker, error) {
@@ -389,7 +427,19 @@ func subscriptionExpirerWorker(stores *entstore.Stores, logger *slog.Logger) (*s
 		return nil, nil
 	}
 	return subscriptionexpirerworker.New(stores.Subscriptions, subscriptionexpirerworker.Dependencies{}, logger, subscriptionexpirerworker.Config{
-		Events: stores.Events,
+		Events:       stores.Events,
+		AdminControl: stores.AdminControl,
+	})
+}
+
+func accountQuotaAlertWorker(cfg config.Config, stores *entstore.Stores, logger *slog.Logger) (*accountquotaalertworker.Worker, error) {
+	if stores == nil || stores.Accounts == nil || stores.Events == nil {
+		return nil, nil
+	}
+	return accountquotaalertworker.New(stores.Accounts, logger, accountquotaalertworker.Config{
+		MasterKey:    cfg.Security.MasterKey,
+		Events:       stores.Events,
+		AdminControl: stores.AdminControl,
 	})
 }
 
@@ -403,6 +453,8 @@ func balanceChargerWorker(cfg config.Config, stores *entstore.Stores, logger *sl
 		MaxBatchesPerRun: cfg.BalanceCharger.MaxBatchesPerRun,
 		Users:            stores.Users,
 		Audit:            stores.Audit,
+		Events:           stores.Events,
+		AdminControl:     stores.AdminControl,
 	})
 }
 
@@ -462,11 +514,17 @@ func (a *App) startWorkers() {
 	if a.authClean != nil {
 		a.authClean.Start(context.Background())
 	}
+	if a.idemClean != nil {
+		a.idemClean.Start(context.Background())
+	}
 	if a.expirer != nil {
 		a.expirer.Start(context.Background())
 	}
 	if a.subExpiry != nil {
 		a.subExpiry.Start(context.Background())
+	}
+	if a.quota != nil {
+		a.quota.Start(context.Background())
 	}
 	if a.balance != nil {
 		a.balance.Start(context.Background())
@@ -496,11 +554,17 @@ func (a *App) stopWorkers(ctx context.Context) error {
 	if a.authClean != nil {
 		errs = append(errs, a.authClean.Shutdown(ctx))
 	}
+	if a.idemClean != nil {
+		errs = append(errs, a.idemClean.Shutdown(ctx))
+	}
 	if a.expirer != nil {
 		errs = append(errs, a.expirer.Shutdown(ctx))
 	}
 	if a.subExpiry != nil {
 		errs = append(errs, a.subExpiry.Shutdown(ctx))
+	}
+	if a.quota != nil {
+		errs = append(errs, a.quota.Shutdown(ctx))
 	}
 	if a.balance != nil {
 		errs = append(errs, a.balance.Shutdown(ctx))

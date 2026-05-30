@@ -29,16 +29,35 @@ type egressProfile struct {
 	ForbiddenHeaders  map[string]struct{}
 }
 
+// namedProfileExpander, when installed, expands a named TLS fingerprint profile
+// reference in account metadata into concrete egress_profile fields. It is wired
+// once at startup from the admin-managed TLS profile catalog; when nil, egress
+// behavior is unchanged. The expander fills only keys the account left unset, so
+// account-provided egress values always win over the named profile's defaults.
+var namedProfileExpander func(metadata map[string]any) (map[string]any, bool)
+
+// SetNamedProfileExpander installs the TLS fingerprint profile expander. Call
+// once during startup before serving traffic.
+func SetNamedProfileExpander(expander func(metadata map[string]any) (map[string]any, bool)) {
+	namedProfileExpander = expander
+}
+
 func resolveEgressProfile(account contract.AccountRuntime) (egressProfile, error) {
-	nested := mapValue(account.Metadata["egress_profile"])
-	tlsTemplate := normalizeEgressToken(egressString(nested, account.Metadata, "tls_template", "egress_tls_template"))
+	metadata := account.Metadata
+	if namedProfileExpander != nil {
+		if expanded, ok := namedProfileExpander(metadata); ok && expanded != nil {
+			metadata = expanded
+		}
+	}
+	nested := mapValue(metadata["egress_profile"])
+	tlsTemplate := normalizeEgressToken(egressString(nested, metadata, "tls_template", "egress_tls_template"))
 	if tlsTemplate == "none" || tlsTemplate == "default" {
 		tlsTemplate = ""
 	}
 	profile := egressProfile{
 		TLSTemplate:       tlsTemplate,
-		HTTPVersionPolicy: normalizeEgressToken(egressString(nested, account.Metadata, "http_version_policy", "egress_http_version_policy")),
-		UserAgent:         cleanEgressUserAgent(egressString(nested, account.Metadata, "user_agent", "egress_user_agent")),
+		HTTPVersionPolicy: normalizeEgressToken(egressString(nested, metadata, "http_version_policy", "egress_http_version_policy")),
+		UserAgent:         cleanEgressUserAgent(egressString(nested, metadata, "user_agent", "egress_user_agent")),
 	}
 	if profile.HTTPVersionPolicy == "" {
 		profile.HTTPVersionPolicy = "prefer_h2"
@@ -49,17 +68,17 @@ func resolveEgressProfile(account contract.AccountRuntime) (egressProfile, error
 	if err := validateHTTPVersionPolicy(profile); err != nil {
 		return egressProfile{}, err
 	}
-	headers, err := resolveEgressStaticHeaders(nested, account.Metadata)
+	headers, err := resolveEgressStaticHeaders(nested, metadata)
 	if err != nil {
 		return egressProfile{}, err
 	}
 	profile.ExtraHeaders = headers
-	forbidden, err := resolveForbiddenEgressHeaders(nested, account.Metadata)
+	forbidden, err := resolveForbiddenEgressHeaders(nested, metadata)
 	if err != nil {
 		return egressProfile{}, err
 	}
 	profile.ForbiddenHeaders = forbidden
-	if err := rejectUnsupportedEgressFields(nested, account.Metadata); err != nil {
+	if err := rejectUnsupportedEgressFields(nested, metadata); err != nil {
 		return egressProfile{}, err
 	}
 	return profile, nil
@@ -92,7 +111,7 @@ func validateEgressTargetURL(rawURL string, profile egressProfile) error {
 	}
 }
 
-func configureTransportForEgress(transport *http.Transport, account contract.AccountRuntime, profile egressProfile) error {
+func configureTransportForEgress(transport *http.Transport, account contract.AccountRuntime, profile egressProfile, blockPrivateEgress bool) error {
 	if profile.requiresHTTP1() {
 		disableHTTP2(transport)
 	}
@@ -117,7 +136,7 @@ func configureTransportForEgress(transport *http.Transport, account contract.Acc
 		if proxyURL != nil {
 			return dialUTLSHTTP1ViaHTTPProxy(ctx, network, addr, proxyURL, clientHelloID, tlsConfig)
 		}
-		return dialUTLSHTTP1(ctx, network, addr, clientHelloID, tlsConfig)
+		return dialUTLSHTTP1(ctx, network, addr, clientHelloID, tlsConfig, blockPrivateEgress)
 	}
 	return nil
 }
@@ -127,8 +146,8 @@ func disableHTTP2(transport *http.Transport) {
 	transport.TLSNextProto = map[string]func(string, *stdtls.Conn) http.RoundTripper{}
 }
 
-func dialUTLSHTTP1(ctx context.Context, network string, addr string, clientHelloID utls.ClientHelloID, tlsConfig *stdtls.Config) (net.Conn, error) {
-	dialer := &net.Dialer{Timeout: 30 * time.Second}
+func dialUTLSHTTP1(ctx context.Context, network string, addr string, clientHelloID utls.ClientHelloID, tlsConfig *stdtls.Config, blockPrivateEgress bool) (net.Conn, error) {
+	dialer := egressDialer(blockPrivateEgress)
 	rawConn, err := dialer.DialContext(ctx, network, addr)
 	if err != nil {
 		return nil, err

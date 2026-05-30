@@ -34,6 +34,12 @@ func TestValidateRejectsReleaseWeakSecrets(t *testing.T) {
 	}
 
 	cfg = validReleaseConfig()
+	cfg.Security.TOTPEncryptionKey = "local_dev_master_key_32_bytes_minimum_change_me"
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "TOTP_ENCRYPTION_KEY") {
+		t.Fatalf("expected weak TOTP encryption key rejection, got %v", err)
+	}
+
+	cfg = validReleaseConfig()
 	cfg.Database.Password = "srapi_dev_password_change_me"
 	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "DATABASE_PASSWORD") {
 		t.Fatalf("expected weak database password rejection, got %v", err)
@@ -75,6 +81,69 @@ func TestValidateAcceptsReleaseStrongSecrets(t *testing.T) {
 	cfg := validReleaseConfig()
 	if err := cfg.Validate(); err != nil {
 		t.Fatalf("expected release config to validate, got %v", err)
+	}
+}
+
+func TestEmailConfigDefaultsOverridesAndValidation(t *testing.T) {
+	t.Setenv("EMAIL_PUBLIC_BASE_URL", "")
+	t.Setenv("EMAIL_SMTP_HOST", "")
+	t.Setenv("EMAIL_SMTP_PORT", "")
+	t.Setenv("EMAIL_SMTP_USERNAME", "")
+	t.Setenv("EMAIL_SMTP_PASSWORD", "")
+	t.Setenv("EMAIL_SMTP_FROM", "")
+	t.Setenv("EMAIL_SMTP_FROM_NAME", "")
+	t.Setenv("EMAIL_SMTP_USE_TLS", "")
+	cfg := Load()
+	if cfg.Email.SMTPPort != 587 || cfg.Email.PublicBaseURL != "" || cfg.Email.SMTPHost != "" || cfg.Email.SMTPUseTLS {
+		t.Fatalf("unexpected email defaults: %+v", cfg.Email)
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("expected default email config to validate, got %v", err)
+	}
+
+	t.Setenv("EMAIL_PUBLIC_BASE_URL", "https://console.example.com/")
+	t.Setenv("EMAIL_SMTP_HOST", "smtp.example.com")
+	t.Setenv("EMAIL_SMTP_PORT", "2525")
+	t.Setenv("EMAIL_SMTP_USERNAME", "sender")
+	t.Setenv("EMAIL_SMTP_PASSWORD", "secret")
+	t.Setenv("EMAIL_SMTP_FROM", "noreply@example.com")
+	t.Setenv("EMAIL_SMTP_FROM_NAME", "SRapi")
+	t.Setenv("EMAIL_SMTP_USE_TLS", "true")
+	cfg = Load()
+	if cfg.Email.PublicBaseURL != "https://console.example.com" ||
+		cfg.Email.SMTPHost != "smtp.example.com" ||
+		cfg.Email.SMTPPort != 2525 ||
+		cfg.Email.SMTPUsername != "sender" ||
+		cfg.Email.SMTPPassword != "secret" ||
+		cfg.Email.SMTPFrom != "noreply@example.com" ||
+		cfg.Email.SMTPFromName != "SRapi" ||
+		!cfg.Email.SMTPUseTLS {
+		t.Fatalf("unexpected email overrides: %+v", cfg.Email)
+	}
+
+	cfg.Email.SMTPPort = 0
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "EMAIL_SMTP_PORT") {
+		t.Fatalf("expected SMTP port validation failure, got %v", err)
+	}
+	cfg = Load()
+	cfg.Email.PublicBaseURL = "javascript:alert(1)"
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "EMAIL_PUBLIC_BASE_URL") {
+		t.Fatalf("expected public base URL validation failure, got %v", err)
+	}
+}
+
+func TestTOTPEncryptionKeyDefaultsToMasterKey(t *testing.T) {
+	t.Setenv("SRAPI_MASTER_KEY", "master_key_for_totp_default_32_bytes")
+	t.Setenv("TOTP_ENCRYPTION_KEY", "")
+	cfg := Load()
+	if cfg.Security.TOTPEncryptionKey != cfg.Security.MasterKey {
+		t.Fatalf("expected TOTP key to default to master key")
+	}
+
+	t.Setenv("TOTP_ENCRYPTION_KEY", "dedicated_totp_key_32_bytes_minimum")
+	cfg = Load()
+	if cfg.Security.TOTPEncryptionKey != "dedicated_totp_key_32_bytes_minimum" {
+		t.Fatalf("expected dedicated TOTP key, got %q", cfg.Security.TOTPEncryptionKey)
 	}
 }
 
@@ -438,6 +507,7 @@ func validReleaseConfig() Config {
 	cfg.Server.Mode = "release"
 	cfg.Security.JWTSecret = "jwt_secret_release_value_32_bytes_minimum"
 	cfg.Security.MasterKey = "master_key_release_value_32_bytes_min"
+	cfg.Security.TOTPEncryptionKey = "totp_key_release_value_32_bytes_min"
 	cfg.Security.APIKeyPepper = "api_key_pepper_release_value_32_bytes_min"
 	cfg.Database.Password = "postgres_release_password_32_bytes_min"
 	cfg.Storage.Backend = StorageBackendPostgres

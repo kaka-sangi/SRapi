@@ -10,6 +10,7 @@ const replacements = new Map([
   ["DATABASE_PASSWORD", () => randomSecret("db")],
   ["JWT_SECRET", () => randomSecret("jwt")],
   ["SRAPI_MASTER_KEY", () => randomSecret("master")],
+  ["TOTP_ENCRYPTION_KEY", () => randomSecret("totp")],
   ["API_KEY_PEPPER", () => randomSecret("pepper")],
   ["BOOTSTRAP_ADMIN_PASSWORD", () => randomPassword()],
 ]);

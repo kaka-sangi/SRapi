@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	openapi_types "github.com/oapi-codegen/runtime/types"
 	admincontrol "github.com/srapi/srapi/apps/api/internal/modules/admin_control/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
@@ -20,7 +21,7 @@ func (s *Server) handleGetAdminSettings(w http.ResponseWriter, r *http.Request) 
 		writeAdminControlError(w, err, requestID)
 		return
 	}
-	writeJSONAny(w, http.StatusOK, apiopenapi.AdminSettingsResponse{Data: toAPIAdminSettings(settings), RequestId: requestID})
+	writeJSONAny(w, http.StatusOK, apiopenapi.AdminSettingsResponse{Data: s.toAPIAdminSettings(settings), RequestId: requestID})
 }
 
 func (s *Server) handleUpdateAdminSettings(w http.ResponseWriter, r *http.Request) {
@@ -50,7 +51,7 @@ func (s *Server) handleUpdateAdminSettings(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "admin_settings.update", "admin_settings", "system", adminControlAuditSnapshot(before), adminControlAuditSnapshot(updated)))
-	writeJSONAny(w, http.StatusOK, apiopenapi.AdminSettingsResponse{Data: toAPIAdminSettings(updated), RequestId: requestID})
+	writeJSONAny(w, http.StatusOK, apiopenapi.AdminSettingsResponse{Data: s.toAPIAdminSettings(updated), RequestId: requestID})
 }
 
 func (s *Server) handleUpdateAdminOpsSettings(w http.ResponseWriter, r *http.Request) {
@@ -508,8 +509,22 @@ func toAPIAdminSettings(in admincontrol.AdminSettings) apiopenapi.AdminSettings 
 			RetentionDays: in.Backup.RetentionDays,
 		},
 		Email: apiopenapi.AdminSettingsEmail{
-			SmtpConfigured: in.Email.SMTPConfigured,
-			Templates:      in.Email.Templates,
+			AccountQuotaNotifyEnabled:        boolPtrFromOptional(in.Email.AccountQuotaNotifyEnabled),
+			AccountQuotaNotifyRemainingRatio: stringPtrValueForAPI(in.Email.AccountQuotaNotifyRemainingRatio),
+			BalanceLowNotifyEnabled:          boolPtrFromOptional(in.Email.BalanceLowNotifyEnabled),
+			BalanceLowNotifyRechargeUrl:      stringPtrValueForAPI(in.Email.BalanceLowNotifyRechargeURL),
+			BalanceLowNotifyThreshold:        stringPtrValueForAPI(in.Email.BalanceLowNotifyThreshold),
+			PublicBaseUrl:                    stringPtrValueForAPI(in.Email.PublicBaseURL),
+			SmtpConfigured:                   in.Email.SMTPConfigured,
+			SmtpFrom:                         emailPtrValueForAPI(in.Email.SMTPFrom),
+			SmtpFromName:                     stringPtrValueForAPI(in.Email.SMTPFromName),
+			SmtpHost:                         stringPtrValueForAPI(in.Email.SMTPHost),
+			SmtpPasswordConfigured:           boolPtrValueForAPI(false),
+			SmtpPort:                         intPtrValueForAPI(in.Email.SMTPPort),
+			SmtpUsername:                     stringPtrValueForAPI(in.Email.SMTPUsername),
+			SmtpUseTls:                       boolPtrValueForAPI(in.Email.SMTPUseTLS),
+			SubscriptionExpiryNotifyEnabled:  boolPtrFromOptional(in.Email.SubscriptionExpiryNotifyEnabled),
+			Templates:                        in.Email.Templates,
 		},
 		Features: apiopenapi.AdminSettingsFeatures{
 			ChannelMonitoringEnabled: in.Features.ChannelMonitoringEnabled,
@@ -541,10 +556,12 @@ func toAPIAdminSettings(in admincontrol.AdminSettings) apiopenapi.AdminSettings 
 			SubscriptionPlansEnabled: in.Payment.SubscriptionPlansEnabled,
 		},
 		Security: apiopenapi.AdminSettingsSecurity{
-			AdminApiKey:         apiopenapi.SecretConfigured{Configured: in.Security.AdminAPIKey.Configured},
-			OauthEnabled:        in.Security.OAuthEnabled,
-			OauthProviders:      append([]string(nil), in.Security.OAuthProviders...),
-			RegistrationEnabled: in.Security.RegistrationEnabled,
+			AdminApiKey:                      apiopenapi.SecretConfigured{Configured: in.Security.AdminAPIKey.Configured},
+			OauthEnabled:                     in.Security.OAuthEnabled,
+			OauthProviderConfigs:             toAPIOAuthProviderConfigs(in.Security.OAuthProviderConfigs),
+			OauthProviders:                   append([]string(nil), in.Security.OAuthProviders...),
+			RegistrationEmailSuffixAllowlist: append([]string(nil), in.Security.RegistrationEmailSuffixAllowlist...),
+			RegistrationEnabled:              in.Security.RegistrationEnabled,
 		},
 		Users: apiopenapi.AdminSettingsUsers{
 			DefaultBalance:        in.Users.DefaultBalance,
@@ -553,6 +570,12 @@ func toAPIAdminSettings(in admincontrol.AdminSettings) apiopenapi.AdminSettings 
 			UserSelfDeleteEnabled: in.Users.UserSelfDeleteEnabled,
 		},
 	}
+}
+
+func (s *Server) toAPIAdminSettings(in admincontrol.AdminSettings) apiopenapi.AdminSettings {
+	settings := toAPIAdminSettings(in)
+	settings.Email.SmtpPasswordConfigured = boolPtrValueForAPI(strings.TrimSpace(s.cfg.Email.SMTPPassword) != "")
+	return settings
 }
 
 func adminSettingsFromAPI(in apiopenapi.AdminSettings) admincontrol.AdminSettings {
@@ -567,8 +590,21 @@ func adminSettingsFromAPI(in apiopenapi.AdminSettings) admincontrol.AdminSetting
 			RetentionDays: in.Backup.RetentionDays,
 		},
 		Email: admincontrol.AdminSettingsEmail{
-			SMTPConfigured: in.Email.SmtpConfigured,
-			Templates:      in.Email.Templates,
+			SMTPConfigured:                   in.Email.SmtpConfigured,
+			SMTPHost:                         stringFromPtr(in.Email.SmtpHost),
+			SMTPPort:                         intFromPtr(in.Email.SmtpPort),
+			SMTPUsername:                     stringFromPtr(in.Email.SmtpUsername),
+			SMTPFrom:                         emailFromPtr(in.Email.SmtpFrom),
+			SMTPFromName:                     stringFromPtr(in.Email.SmtpFromName),
+			SMTPUseTLS:                       boolFromPtr(in.Email.SmtpUseTls),
+			PublicBaseURL:                    stringFromPtr(in.Email.PublicBaseUrl),
+			Templates:                        in.Email.Templates,
+			BalanceLowNotifyEnabled:          boolOptionalFromPtr(in.Email.BalanceLowNotifyEnabled),
+			BalanceLowNotifyThreshold:        stringFromPtr(in.Email.BalanceLowNotifyThreshold),
+			BalanceLowNotifyRechargeURL:      stringFromPtr(in.Email.BalanceLowNotifyRechargeUrl),
+			SubscriptionExpiryNotifyEnabled:  boolOptionalFromPtr(in.Email.SubscriptionExpiryNotifyEnabled),
+			AccountQuotaNotifyEnabled:        boolOptionalFromPtr(in.Email.AccountQuotaNotifyEnabled),
+			AccountQuotaNotifyRemainingRatio: stringFromPtr(in.Email.AccountQuotaNotifyRemainingRatio),
 		},
 		Features: admincontrol.AdminSettingsFeatures{
 			ChannelMonitoringEnabled: in.Features.ChannelMonitoringEnabled,
@@ -600,10 +636,12 @@ func adminSettingsFromAPI(in apiopenapi.AdminSettings) admincontrol.AdminSetting
 			SubscriptionPlansEnabled: in.Payment.SubscriptionPlansEnabled,
 		},
 		Security: admincontrol.AdminSettingsSecurity{
-			AdminAPIKey:         admincontrol.SecretConfigured{Configured: in.Security.AdminApiKey.Configured},
-			OAuthEnabled:        in.Security.OauthEnabled,
-			OAuthProviders:      append([]string(nil), in.Security.OauthProviders...),
-			RegistrationEnabled: in.Security.RegistrationEnabled,
+			AdminAPIKey:                      admincontrol.SecretConfigured{Configured: in.Security.AdminApiKey.Configured},
+			OAuthEnabled:                     in.Security.OauthEnabled,
+			OAuthProviderConfigs:             oauthProviderConfigsFromAPI(in.Security.OauthProviderConfigs),
+			OAuthProviders:                   append([]string(nil), in.Security.OauthProviders...),
+			RegistrationEmailSuffixAllowlist: append([]string(nil), in.Security.RegistrationEmailSuffixAllowlist...),
+			RegistrationEnabled:              in.Security.RegistrationEnabled,
 		},
 		Users: admincontrol.AdminSettingsUsers{
 			DefaultBalance:        in.Users.DefaultBalance,
@@ -612,6 +650,59 @@ func adminSettingsFromAPI(in apiopenapi.AdminSettings) admincontrol.AdminSetting
 			UserSelfDeleteEnabled: in.Users.UserSelfDeleteEnabled,
 		},
 	}
+}
+
+func toAPIOAuthProviderConfigs(values []admincontrol.OAuthProviderConfig) []apiopenapi.OAuthProviderConfig {
+	out := make([]apiopenapi.OAuthProviderConfig, 0, len(values))
+	for _, value := range values {
+		out = append(out, apiopenapi.OAuthProviderConfig{
+			AuthorizeUrl:    value.AuthorizeURL,
+			ClientId:        value.ClientID,
+			DisplayName:     value.DisplayName,
+			Provider:        apiopenapi.AuthIdentityProvider(value.Provider),
+			ProviderKey:     value.ProviderKey,
+			RedirectUri:     value.RedirectURI,
+			Scopes:          append([]string(nil), value.Scopes...),
+			TokenAuthMethod: oauthTokenAuthMethodPtrValueForAPI(value.TokenAuthMethod),
+			TokenUrl:        stringPtrValueForAPI(value.TokenURL),
+			UserinfoUrl:     stringPtrValueForAPI(value.UserInfoURL),
+		})
+	}
+	return out
+}
+
+func oauthProviderConfigsFromAPI(values []apiopenapi.OAuthProviderConfig) []admincontrol.OAuthProviderConfig {
+	out := make([]admincontrol.OAuthProviderConfig, 0, len(values))
+	for _, value := range values {
+		out = append(out, admincontrol.OAuthProviderConfig{
+			Provider:        string(value.Provider),
+			ProviderKey:     value.ProviderKey,
+			DisplayName:     value.DisplayName,
+			ClientID:        value.ClientId,
+			AuthorizeURL:    value.AuthorizeUrl,
+			TokenURL:        stringFromPtr(value.TokenUrl),
+			UserInfoURL:     stringFromPtr(value.UserinfoUrl),
+			TokenAuthMethod: oauthTokenAuthMethodString(value.TokenAuthMethod),
+			RedirectURI:     value.RedirectUri,
+			Scopes:          append([]string(nil), value.Scopes...),
+		})
+	}
+	return out
+}
+
+func oauthTokenAuthMethodPtrValueForAPI(value string) *apiopenapi.OAuthProviderConfigTokenAuthMethod {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	method := apiopenapi.OAuthProviderConfigTokenAuthMethod(value)
+	return &method
+}
+
+func oauthTokenAuthMethodString(value *apiopenapi.OAuthProviderConfigTokenAuthMethod) string {
+	if value == nil {
+		return ""
+	}
+	return string(*value)
 }
 
 func stringSlicePtr(values []string) *[]string {
@@ -630,8 +721,61 @@ func boolFromPtr(value *bool) bool {
 	return value != nil && *value
 }
 
+func boolOptionalFromPtr(value *bool) *bool {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
+}
+
+func boolPtrFromOptional(value *bool) *bool {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
+}
+
 func boolPtrValueForAPI(value bool) *bool {
 	return &value
+}
+
+func stringPtrValueForAPI(value string) *string {
+	return &value
+}
+
+func emailPtrValueForAPI(value string) *openapi_types.Email {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	email := openapi_types.Email(value)
+	return &email
+}
+
+func intPtrValueForAPI(value int) *int {
+	return &value
+}
+
+func stringFromPtr(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
+}
+
+func emailFromPtr(value *openapi_types.Email) string {
+	if value == nil {
+		return ""
+	}
+	return string(*value)
+}
+
+func intFromPtr(value *int) int {
+	if value == nil {
+		return 0
+	}
+	return *value
 }
 
 func float32Ptr(value float32) *float32 {
@@ -704,6 +848,25 @@ func toAPIAnnouncement(in admincontrol.Announcement) apiopenapi.Announcement {
 	}
 }
 
+func toAPIUserAnnouncements(items []admincontrol.UserAnnouncement) []apiopenapi.UserAnnouncement {
+	out := make([]apiopenapi.UserAnnouncement, 0, len(items))
+	for _, item := range items {
+		out = append(out, toAPIUserAnnouncement(item))
+	}
+	return out
+}
+
+func toAPIUserAnnouncement(in admincontrol.UserAnnouncement) apiopenapi.UserAnnouncement {
+	item := apiopenapi.UserAnnouncement{
+		Announcement: toAPIAnnouncement(in.Announcement),
+		Read:         in.Read,
+	}
+	if in.ReadAt != nil {
+		item.ReadAt = in.ReadAt
+	}
+	return item
+}
+
 func announcementRequestFromAPI(in apiopenapi.CreateAnnouncementRequest) admincontrol.AnnouncementRequest {
 	req := admincontrol.AnnouncementRequest{
 		Title:    in.Title,
@@ -744,6 +907,32 @@ func toAPIRedeemCode(in admincontrol.RedeemCode) apiopenapi.RedeemCode {
 		Type:           apiopenapi.RedeemCodeType(in.Type),
 		UpdatedAt:      in.UpdatedAt,
 		Value:          in.Value,
+	}
+}
+
+func toAPIRedeemCodeRedemptionResult(in admincontrol.RedeemCodeRedemptionResult) apiopenapi.RedeemCodeRedemptionResult {
+	return apiopenapi.RedeemCodeRedemptionResult{
+		AlreadyRedeemed: in.AlreadyRedeemed,
+		RedeemCode:      toAPIRedeemCode(in.RedeemCode),
+		Redemption:      toAPIRedeemCodeRedemption(in.Redemption),
+	}
+}
+
+func toAPIRedeemCodeRedemption(in admincontrol.RedeemCodeRedemption) apiopenapi.RedeemCodeRedemption {
+	return apiopenapi.RedeemCodeRedemption{
+		Amount:             in.Amount,
+		BalanceAfter:       in.BalanceAfter,
+		BalanceBefore:      in.BalanceBefore,
+		BillingLedgerId:    optionalAPIID(in.BillingLedgerID),
+		CreatedAt:          in.CreatedAt,
+		Currency:           in.Currency,
+		Id:                 apiopenapi.Id(strconv.Itoa(in.ID)),
+		RedeemCodeId:       apiopenapi.Id(strconv.Itoa(in.RedeemCodeID)),
+		RedeemedAt:         in.RedeemedAt,
+		Type:               apiopenapi.RedeemCodeType(in.Type),
+		UpdatedAt:          in.UpdatedAt,
+		UserId:             apiopenapi.Id(strconv.Itoa(in.UserID)),
+		UserSubscriptionId: optionalAPIID(in.UserSubscriptionID),
 	}
 }
 
@@ -898,14 +1087,17 @@ func toAPIRiskControlLogs(items []admincontrol.RiskControlLog) []apiopenapi.Risk
 func toAPIOpsSystemLogs(items []admincontrol.OpsSystemLog) []apiopenapi.OpsSystemLog {
 	out := make([]apiopenapi.OpsSystemLog, 0, len(items))
 	for _, item := range items {
-		out = append(out, apiopenapi.OpsSystemLog{
+		log := apiopenapi.OpsSystemLog{
 			CreatedAt: item.CreatedAt,
 			Id:        apiopenapi.Id(strconv.Itoa(item.ID)),
 			Level:     apiopenapi.OpsSystemLogLevel(item.Level),
 			Message:   item.Message,
 			Metadata:  mapToJsonObjectPtr(item.Metadata),
 			Source:    item.Source,
-		})
+		}
+		log.RequestId = optionalString(item.RequestID)
+		log.TraceId = optionalString(item.TraceID)
+		out = append(out, log)
 	}
 	return out
 }

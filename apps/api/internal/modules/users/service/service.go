@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"math/big"
 	"regexp"
 	"strings"
@@ -35,14 +36,15 @@ type Service struct {
 }
 
 type CreateRequest struct {
-	Email    string
-	Name     string
-	Password string
-	Roles    []contract.Role
-	Status   *contract.Status
-	Balance  string
-	Currency string
-	RPMLimit *int
+	Email           string
+	Name            string
+	Password        string
+	Roles           []contract.Role
+	Status          *contract.Status
+	Balance         string
+	Currency        string
+	RPMLimit        *int
+	EmailVerifiedAt *time.Time
 }
 
 type UpdateRequest struct {
@@ -88,6 +90,29 @@ type BatchUpdateResult struct {
 	Errors  []string
 }
 
+type ChangePasswordRequest struct {
+	CurrentPassword string
+	NewPassword     string
+}
+
+type UpdateProfileRequest struct {
+	Name string
+}
+
+// BindAuthIdentityRequest binds a verified external sign-in identity to a user.
+type BindAuthIdentityRequest struct {
+	UserID              int
+	Provider            contract.AuthIdentityProvider
+	ProviderKey         string
+	ProviderSubjectHash string
+	SubjectHint         string
+	DisplayName         string
+	Email               string
+	EmailVerified       bool
+	AvatarURL           string
+	VerifiedAt          time.Time
+}
+
 func New(store contract.Store, clock Clock) (*Service, error) {
 	if store == nil {
 		return nil, ErrInvalidInput
@@ -131,16 +156,20 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (contract.Store
 		balance = normalized
 	}
 	stored, err := s.store.Create(ctx, contract.CreateStoredUser{
-		Email:        email,
-		Name:         name,
-		PasswordHash: passwordHash,
-		Status:       status,
-		Roles:        roles,
-		Balance:      balance,
-		Currency:     normalizeCurrency(req.Currency),
-		RPMLimit:     cloneInt(req.RPMLimit),
+		Email:           email,
+		Name:            name,
+		PasswordHash:    passwordHash,
+		Status:          status,
+		Roles:           roles,
+		Balance:         balance,
+		Currency:        normalizeCurrency(req.Currency),
+		RPMLimit:        cloneInt(req.RPMLimit),
+		EmailVerifiedAt: cloneAuthIdentityTime(req.EmailVerifiedAt),
 	})
 	if err != nil {
+		if errors.Is(err, contract.ErrAlreadyExists) {
+			return contract.StoredUser{}, ErrUserAlreadyExists
+		}
 		return contract.StoredUser{}, err
 	}
 	return stored, nil
@@ -168,7 +197,60 @@ func (s *Service) FindByID(ctx context.Context, id int) (contract.StoredUser, er
 	if id <= 0 {
 		return contract.StoredUser{}, ErrInvalidInput
 	}
-	return s.store.FindByID(ctx, id)
+	user, err := s.store.FindByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, contract.ErrNotFound) {
+			return contract.StoredUser{}, ErrUserNotFound
+		}
+		return contract.StoredUser{}, err
+	}
+	return user, nil
+}
+
+func (s *Service) FindByEmail(ctx context.Context, email string) (contract.StoredUser, error) {
+	email = strings.ToLower(strings.TrimSpace(email))
+	if email == "" || !strings.Contains(email, "@") {
+		return contract.StoredUser{}, ErrInvalidInput
+	}
+	user, err := s.store.FindByEmail(ctx, email)
+	if err != nil {
+		if errors.Is(err, contract.ErrNotFound) {
+			return contract.StoredUser{}, ErrUserNotFound
+		}
+		return contract.StoredUser{}, err
+	}
+	return user, nil
+}
+
+// VerifyEmail marks a user's primary email address as verified.
+func (s *Service) VerifyEmail(ctx context.Context, id int, verifiedAt time.Time) (contract.StoredUser, error) {
+	if id <= 0 || verifiedAt.IsZero() {
+		return contract.StoredUser{}, ErrInvalidInput
+	}
+	at := verifiedAt.UTC()
+	atPtr := &at
+	updated, err := s.store.Update(ctx, id, contract.UpdateStoredUser{EmailVerifiedAt: &atPtr})
+	if err != nil {
+		if errors.Is(err, contract.ErrNotFound) {
+			return contract.StoredUser{}, ErrUserNotFound
+		}
+		return contract.StoredUser{}, err
+	}
+	return updated, nil
+}
+
+// Delete removes a user that should not remain visible or sign-in capable.
+func (s *Service) Delete(ctx context.Context, id int) error {
+	if id <= 0 {
+		return ErrInvalidInput
+	}
+	if err := s.store.Delete(ctx, id); err != nil {
+		if errors.Is(err, contract.ErrNotFound) {
+			return ErrUserNotFound
+		}
+		return err
+	}
+	return nil
 }
 
 func (s *Service) List(ctx context.Context, req ListRequest) ([]contract.StoredUser, error) {
@@ -194,11 +276,18 @@ func (s *Service) CreateRole(ctx context.Context, req CreateRoleRequest) (contra
 	if err != nil {
 		return contract.RoleDefinition{}, err
 	}
-	return s.store.CreateRole(ctx, contract.CreateStoredRole{
+	role, err := s.store.CreateRole(ctx, contract.CreateStoredRole{
 		Name:        name,
 		Description: strings.TrimSpace(req.Description),
 		Permissions: permissions,
 	})
+	if err != nil {
+		if errors.Is(err, contract.ErrAlreadyExists) {
+			return contract.RoleDefinition{}, ErrUserAlreadyExists
+		}
+		return contract.RoleDefinition{}, err
+	}
+	return role, nil
 }
 
 // ListRoles returns persisted role definitions.
@@ -217,6 +306,17 @@ func (s *Service) Update(ctx context.Context, id int, req UpdateRequest) (contra
 			return contract.StoredUser{}, ErrInvalidInput
 		}
 		input.Email = &email
+		current, err := s.store.FindByID(ctx, id)
+		if err != nil {
+			if errors.Is(err, contract.ErrNotFound) {
+				return contract.StoredUser{}, ErrUserNotFound
+			}
+			return contract.StoredUser{}, err
+		}
+		if current.Email != email {
+			var unverifiedAt *time.Time
+			input.EmailVerifiedAt = &unverifiedAt
+		}
 	}
 	if req.Name != nil {
 		name := strings.TrimSpace(*req.Name)
@@ -251,7 +351,17 @@ func (s *Service) Update(ctx context.Context, id int, req UpdateRequest) (contra
 	if req.RPMLimit != nil {
 		input.RPMLimit = cloneIntPtr(req.RPMLimit)
 	}
-	return s.store.Update(ctx, id, input)
+	updated, err := s.store.Update(ctx, id, input)
+	if err != nil {
+		if errors.Is(err, contract.ErrNotFound) {
+			return contract.StoredUser{}, ErrUserNotFound
+		}
+		if errors.Is(err, contract.ErrAlreadyExists) {
+			return contract.StoredUser{}, ErrUserAlreadyExists
+		}
+		return contract.StoredUser{}, err
+	}
+	return updated, nil
 }
 
 func (s *Service) SetStatus(ctx context.Context, id int, status contract.Status) (contract.StoredUser, error) {
@@ -260,6 +370,83 @@ func (s *Service) SetStatus(ctx context.Context, id int, status contract.Status)
 
 func (s *Service) UpdateRPMLimit(ctx context.Context, id int, rpmLimit *int) (contract.StoredUser, error) {
 	return s.Update(ctx, id, UpdateRequest{RPMLimit: &rpmLimit})
+}
+
+// UpdateProfile updates the small set of fields current users can edit themselves.
+func (s *Service) UpdateProfile(ctx context.Context, id int, req UpdateProfileRequest) (contract.StoredUser, error) {
+	name := strings.TrimSpace(req.Name)
+	if id <= 0 || name == "" || len(name) > 120 {
+		return contract.StoredUser{}, ErrInvalidInput
+	}
+	updated, err := s.store.Update(ctx, id, contract.UpdateStoredUser{Name: &name})
+	if err != nil {
+		if errors.Is(err, contract.ErrNotFound) {
+			return contract.StoredUser{}, ErrUserNotFound
+		}
+		return contract.StoredUser{}, err
+	}
+	return updated, nil
+}
+
+// ResetPassword replaces a user's password after an out-of-band recovery flow has verified the caller.
+func (s *Service) ResetPassword(ctx context.Context, id int, newPassword string) (contract.StoredUser, error) {
+	if id <= 0 || strings.TrimSpace(newPassword) == "" {
+		return contract.StoredUser{}, ErrInvalidInput
+	}
+	user, err := s.store.FindByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, contract.ErrNotFound) {
+			return contract.StoredUser{}, ErrUserNotFound
+		}
+		return contract.StoredUser{}, err
+	}
+	if user.Status == contract.StatusDisabled {
+		return contract.StoredUser{}, ErrUserDisabled
+	}
+	passwordHash, err := HashPassword(newPassword)
+	if err != nil {
+		return contract.StoredUser{}, err
+	}
+	updated, err := s.store.Update(ctx, id, contract.UpdateStoredUser{PasswordHash: &passwordHash})
+	if err != nil {
+		if errors.Is(err, contract.ErrNotFound) {
+			return contract.StoredUser{}, ErrUserNotFound
+		}
+		return contract.StoredUser{}, err
+	}
+	return updated, nil
+}
+
+// ChangePassword verifies the current password before replacing the stored password hash.
+func (s *Service) ChangePassword(ctx context.Context, id int, req ChangePasswordRequest) (contract.StoredUser, error) {
+	if id <= 0 || strings.TrimSpace(req.CurrentPassword) == "" || strings.TrimSpace(req.NewPassword) == "" {
+		return contract.StoredUser{}, ErrInvalidInput
+	}
+	user, err := s.store.FindByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, contract.ErrNotFound) {
+			return contract.StoredUser{}, ErrUserNotFound
+		}
+		return contract.StoredUser{}, err
+	}
+	if user.Status == contract.StatusDisabled {
+		return contract.StoredUser{}, ErrUserDisabled
+	}
+	if err := ComparePassword(user.PasswordHash, req.CurrentPassword); err != nil {
+		return contract.StoredUser{}, ErrInvalidCredentials
+	}
+	passwordHash, err := HashPassword(req.NewPassword)
+	if err != nil {
+		return contract.StoredUser{}, err
+	}
+	updated, err := s.store.Update(ctx, id, contract.UpdateStoredUser{PasswordHash: &passwordHash})
+	if err != nil {
+		if errors.Is(err, contract.ErrNotFound) {
+			return contract.StoredUser{}, ErrUserNotFound
+		}
+		return contract.StoredUser{}, err
+	}
+	return updated, nil
 }
 
 func (s *Service) UpdateBalance(ctx context.Context, id int, req BalanceUpdateRequest) (contract.StoredUser, error) {
@@ -272,6 +459,9 @@ func (s *Service) UpdateBalance(ctx context.Context, id int, req BalanceUpdateRe
 	}
 	user, err := s.store.FindByID(ctx, id)
 	if err != nil {
+		if errors.Is(err, contract.ErrNotFound) {
+			return contract.StoredUser{}, ErrUserNotFound
+		}
 		return contract.StoredUser{}, err
 	}
 	balance, ok := decimalRat(user.Balance)
@@ -296,10 +486,17 @@ func (s *Service) UpdateBalance(ctx context.Context, id int, req BalanceUpdateRe
 	if strings.TrimSpace(req.Currency) != "" {
 		currency = normalizeCurrency(req.Currency)
 	}
-	return s.store.Update(ctx, id, contract.UpdateStoredUser{
+	updated, err := s.store.Update(ctx, id, contract.UpdateStoredUser{
 		Balance:  &normalizedBalance,
 		Currency: &currency,
 	})
+	if err != nil {
+		if errors.Is(err, contract.ErrNotFound) {
+			return contract.StoredUser{}, ErrUserNotFound
+		}
+		return contract.StoredUser{}, err
+	}
+	return updated, nil
 }
 
 func (s *Service) BatchUpdate(ctx context.Context, req BatchUpdateRequest) BatchUpdateResult {
@@ -346,7 +543,140 @@ func (s *Service) TouchLastLogin(ctx context.Context, id int) error {
 	if id <= 0 {
 		return ErrInvalidInput
 	}
-	return s.store.UpdateLastLogin(ctx, id, s.clock.Now())
+	if err := s.store.UpdateLastLogin(ctx, id, s.clock.Now()); err != nil {
+		if errors.Is(err, contract.ErrNotFound) {
+			return ErrUserNotFound
+		}
+		return err
+	}
+	return nil
+}
+
+// ListAuthIdentities returns the current sign-in identities for a user.
+func (s *Service) ListAuthIdentities(ctx context.Context, userID int) ([]contract.UserAuthIdentity, error) {
+	if userID <= 0 {
+		return nil, ErrInvalidInput
+	}
+	user, err := s.FindByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	external, err := s.store.ListAuthIdentities(ctx, userID)
+	if err != nil {
+		if errors.Is(err, contract.ErrNotFound) {
+			return nil, ErrUserNotFound
+		}
+		return nil, err
+	}
+	identities := make([]contract.UserAuthIdentity, 0, len(external)+1)
+	identities = append(identities, emailAuthIdentity(user.User))
+	externalCount := len(external)
+	for _, identity := range external {
+		identity.Provider = normalizeAuthIdentityProvider(identity.Provider)
+		identity.ProviderKey = strings.TrimSpace(identity.ProviderKey)
+		identity.SubjectHint = strings.TrimSpace(identity.SubjectHint)
+		identity.DisplayName = strings.TrimSpace(identity.DisplayName)
+		identity.Email = strings.ToLower(strings.TrimSpace(identity.Email))
+		identity.AvatarURL = strings.TrimSpace(identity.AvatarURL)
+		identity.External = true
+		identity.UserID = userID
+		identity.CanUnbind = canUnbindExternalIdentity(user.User, externalCount)
+		if !identity.CanUnbind {
+			identity.UnbindBlockedBy = "last_sign_in_method"
+		}
+		identities = append(identities, identity)
+	}
+	return identities, nil
+}
+
+// BindAuthIdentity attaches a verified external sign-in identity to the user.
+func (s *Service) BindAuthIdentity(ctx context.Context, req BindAuthIdentityRequest) ([]contract.UserAuthIdentity, error) {
+	if req.UserID <= 0 {
+		return nil, ErrInvalidInput
+	}
+	user, err := s.FindByID(ctx, req.UserID)
+	if err != nil {
+		return nil, err
+	}
+	if user.Status == contract.StatusDisabled {
+		return nil, ErrUserDisabled
+	}
+	provider := normalizeAuthIdentityProvider(req.Provider)
+	providerKey := strings.TrimSpace(req.ProviderKey)
+	subjectHash := strings.TrimSpace(req.ProviderSubjectHash)
+	if provider == "" || provider == contract.AuthIdentityProviderEmail || providerKey == "" || subjectHash == "" {
+		return nil, ErrInvalidInput
+	}
+	existing, err := s.store.FindAuthIdentityByProviderSubject(ctx, provider, providerKey, subjectHash)
+	if err == nil && existing.UserID != req.UserID {
+		return nil, ErrIdentityAlreadyBound
+	}
+	if err != nil && !errors.Is(err, contract.ErrNotFound) {
+		return nil, err
+	}
+	now := s.clock.Now().UTC()
+	verifiedAt := req.VerifiedAt.UTC()
+	if verifiedAt.IsZero() {
+		verifiedAt = now
+	}
+	lastUsedAt := now
+	_, err = s.store.UpsertAuthIdentity(ctx, contract.CreateUserAuthIdentity{
+		UserID:              req.UserID,
+		Provider:            provider,
+		ProviderKey:         providerKey,
+		ProviderSubjectHash: subjectHash,
+		SubjectHint:         strings.TrimSpace(req.SubjectHint),
+		DisplayName:         strings.TrimSpace(req.DisplayName),
+		Email:               strings.ToLower(strings.TrimSpace(req.Email)),
+		EmailVerified:       req.EmailVerified,
+		AvatarURL:           strings.TrimSpace(req.AvatarURL),
+		VerifiedAt:          &verifiedAt,
+		LastUsedAt:          &lastUsedAt,
+	})
+	if err != nil {
+		if errors.Is(err, contract.ErrNotFound) {
+			return nil, ErrUserNotFound
+		}
+		if errors.Is(err, contract.ErrAlreadyExists) {
+			return nil, ErrIdentityAlreadyBound
+		}
+		return nil, err
+	}
+	return s.ListAuthIdentities(ctx, req.UserID)
+}
+
+// UnbindAuthIdentity removes one external sign-in identity from the user.
+func (s *Service) UnbindAuthIdentity(ctx context.Context, userID int, identityID int) ([]contract.UserAuthIdentity, error) {
+	if userID <= 0 || identityID <= 0 {
+		return nil, ErrInvalidInput
+	}
+	identities, err := s.ListAuthIdentities(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	var target contract.UserAuthIdentity
+	for _, identity := range identities {
+		if identity.ID == identityID {
+			target = identity
+			break
+		}
+	}
+	if target.ID == 0 {
+		return nil, ErrIdentityNotFound
+	}
+	if !target.External {
+		return nil, ErrInvalidInput
+	}
+	if !target.CanUnbind {
+		return nil, ErrIdentityUnbindBlocked
+	}
+	if err := s.store.DeleteAuthIdentity(ctx, userID, identityID); err != nil {
+		if errors.Is(err, contract.ErrNotFound) {
+			return nil, ErrIdentityNotFound
+		}
+		return nil, err
+	}
+	return s.ListAuthIdentities(ctx, userID)
 }
 
 func PublicUser(user contract.StoredUser) contract.User {
@@ -456,6 +786,56 @@ func validStatus(status contract.Status) bool {
 	}
 }
 
+func normalizeAuthIdentityProvider(provider contract.AuthIdentityProvider) contract.AuthIdentityProvider {
+	switch contract.AuthIdentityProvider(strings.ToLower(strings.TrimSpace(string(provider)))) {
+	case contract.AuthIdentityProviderEmail:
+		return contract.AuthIdentityProviderEmail
+	case contract.AuthIdentityProviderOIDC:
+		return contract.AuthIdentityProviderOIDC
+	case contract.AuthIdentityProviderGitHub:
+		return contract.AuthIdentityProviderGitHub
+	case contract.AuthIdentityProviderGoogle:
+		return contract.AuthIdentityProviderGoogle
+	case contract.AuthIdentityProviderLinuxDo:
+		return contract.AuthIdentityProviderLinuxDo
+	case contract.AuthIdentityProviderWeChat:
+		return contract.AuthIdentityProviderWeChat
+	case contract.AuthIdentityProviderDingTalk:
+		return contract.AuthIdentityProviderDingTalk
+	default:
+		return ""
+	}
+}
+
+func emailAuthIdentity(user contract.User) contract.UserAuthIdentity {
+	email := strings.ToLower(strings.TrimSpace(user.Email))
+	displayName := strings.TrimSpace(user.Name)
+	if displayName == "" {
+		displayName = email
+	}
+	return contract.UserAuthIdentity{
+		UserID:        user.ID,
+		Provider:      contract.AuthIdentityProviderEmail,
+		ProviderKey:   "local",
+		SubjectHint:   email,
+		DisplayName:   displayName,
+		Email:         email,
+		EmailVerified: user.EmailVerifiedAt != nil,
+		External:      false,
+		VerifiedAt:    cloneAuthIdentityTime(user.EmailVerifiedAt),
+		CreatedAt:     user.CreatedAt,
+		UpdatedAt:     user.CreatedAt,
+		CanUnbind:     false,
+	}
+}
+
+func canUnbindExternalIdentity(user contract.User, externalCount int) bool {
+	if externalCount > 1 {
+		return true
+	}
+	return strings.TrimSpace(user.Email) != ""
+}
+
 func normalizeCurrency(value string) string {
 	value = strings.ToUpper(strings.TrimSpace(value))
 	if value == "" {
@@ -501,5 +881,13 @@ func cloneIntPtr(value **int) **int {
 		return nil
 	}
 	cloned := cloneInt(*value)
+	return &cloned
+}
+
+func cloneAuthIdentityTime(value *time.Time) *time.Time {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
 	return &cloned
 }

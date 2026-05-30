@@ -139,11 +139,55 @@ AUTH_SESSION_CLEANUP_INTERVAL_SECONDS=86400
 
 - HS256 时 `JWT_SECRET` 至少 32 字节。
 - RS256 时必须设置 RSA private key，并暴露 `/.well-known/jwks.json`。
-- TOTP secret 必须用固定 AES-256 key 加密。
-- 多副本部署不得使用随机临时 TOTP key。
+- `TOTP_ENCRYPTION_KEY` 默认可回退到 `SRAPI_MASTER_KEY`，生产建议单独设置并至少 32 字节。
+- TOTP secret 使用该 key 派生 AES-256-GCM key 加密，恢复码只保存 HMAC-SHA256 hash。
+- 多副本部署不得使用随机临时 TOTP key；所有副本必须共享同一个 `SRAPI_MASTER_KEY` 和 `TOTP_ENCRYPTION_KEY`。
 - Gateway API Key HMAC pepper 必须固定且至少 32 字节。
 - release 模式必须拒绝默认管理员密码和开发占位密码。
 - 过期控制台 session 由 `auth_session_cleanup` worker 周期性标记为 `expired` 并软删除；该 worker 只在持久化 AuthSession store 可用时启动，默认每 24 小时运行一次。
+
+## 7.1 OAuth/OIDC Console Login
+
+Admin Settings exposes only non-secret OAuth/OIDC authorization config:
+
+```json
+{
+  "security": {
+    "oauth_enabled": true,
+    "oauth_providers": ["oidc"],
+    "oauth_provider_configs": [
+      {
+        "provider": "oidc",
+        "provider_key": "issuer-main",
+        "display_name": "Example IdP",
+        "client_id": "public-client-id",
+        "authorize_url": "https://idp.example/authorize",
+        "token_url": "https://idp.example/token",
+        "userinfo_url": "https://idp.example/userinfo",
+        "token_auth_method": "none",
+        "redirect_uri": "https://api.example/api/v1/auth/oauth/oidc/callback",
+        "scopes": ["openid", "email", "profile"]
+      }
+    ]
+  }
+}
+```
+
+Rules:
+
+- `authorize_url` must be HTTPS and must not include query or fragment.
+- `token_url` and `userinfo_url` are optional as a pair. When provided, they
+  must be HTTPS, except `http://localhost`, `http://127.0.0.1`, and
+  `http://[::1]` are accepted for local development.
+- `token_auth_method` defaults to `none`. Callback v1 supports public clients
+  with PKCE and does not accept client secrets through Admin Settings.
+- `redirect_uri` must be HTTPS, except `http://localhost`, `http://127.0.0.1`,
+  and `http://[::1]` are accepted for local development.
+- `scopes` are normalized from comma/space separated input into a de-duplicated
+  list. Empty scopes fall back to provider defaults during authorization start.
+- OAuth client secrets and provider token material are not part of Admin
+  Settings responses; confidential-client callback support must load secrets
+  from a deployment secret source or encrypted secret store.
 
 ## 8. Crypto
 
@@ -349,7 +393,39 @@ PAYMENT_DAILY_AMOUNT_LIMIT=
 
 支付服务商密钥不得通过 env 明文长期管理，优先使用后台加密 settings 或 secret manager。
 
-## 16. Security / URL Allowlist
+## 16. Transactional Email
+
+```txt
+EMAIL_PUBLIC_BASE_URL=https://console.example.com
+EMAIL_SMTP_HOST=smtp.example.com
+EMAIL_SMTP_PORT=587
+EMAIL_SMTP_USERNAME=
+EMAIL_SMTP_PASSWORD=
+EMAIL_SMTP_FROM=noreply@example.com
+EMAIL_SMTP_FROM_NAME=SRapi
+EMAIL_SMTP_USE_TLS=false
+```
+
+这些配置用于 outbox worker 投递 password reset 和 email verification 邮件。
+`EMAIL_PUBLIC_BASE_URL` 必须是绝对 `http` / `https` URL，不能带 query 或 fragment；
+发送 action link 时只能使用该配置，不能使用请求 `Host` header。缺少
+`EMAIL_PUBLIC_BASE_URL`、`EMAIL_SMTP_HOST` 或 `EMAIL_SMTP_FROM` 时，auth 邮件事件保留
+retry/fail 状态，不会静默标记成功。
+
+可选通知邮件也使用 `EMAIL_PUBLIC_BASE_URL` 生成一键退订链接。退订链接只携带签名
+token，token 内部是 event、邮箱 hash 和 expiry，不包含明文邮箱。Transactional auth
+mail 不会生成 `List-Unsubscribe` header。
+
+Admin notification template APIs manage event-level subject/HTML overrides in
+Admin Settings `email.templates` using `<event>.subject` and `<event>.html`
+keys. Template preview does not send mail and does not require SMTP credentials;
+actual delivery still requires the runtime SMTP settings above.
+
+`EMAIL_SMTP_PASSWORD` 是部署 secret，只允许通过环境变量或 secret manager 注入；当前
+Admin Settings API 只暴露由运行时配置计算出的 `smtp_password_configured` 状态，不接收、
+不保存、不审计明文密码。本地无认证 SMTP 可以留空 username/password。
+
+## 17. Security / URL Allowlist
 
 ```txt
 SECURITY_URL_ALLOWLIST_ENABLED=false
@@ -362,7 +438,7 @@ SECURITY_URL_ALLOWLIST_CRS_HOSTS=
 
 所有自定义 upstream、pricing、CRS URL 必须经过 SSRF 防护。
 
-## 17. OAuth Client Credentials
+## 18. OAuth Client Credentials
 
 ```txt
 GEMINI_CLI_OAUTH_CLIENT_ID=
@@ -375,7 +451,7 @@ ANTIGRAVITY_OAUTH_CLIENT_SECRET=
 
 SRapi 不得在代码仓库中内置第三方 OAuth client_secret。
 
-## 18. Update / External Fetch
+## 19. Update / External Fetch
 
 ```txt
 UPDATE_PROXY_URL=
@@ -385,7 +461,7 @@ PRICING_UPDATE_PROXY_URL=
 
 外部 fetch 必须遵守 URL allowlist / SSRF 规则。
 
-## 19. 配置变更审计
+## 20. 配置变更审计
 
 以下配置变更必须写 audit log：
 
@@ -396,8 +472,9 @@ PRICING_UPDATE_PROXY_URL=
 - Scheduler strategy。
 - Reverse Proxy Egress Profile。
 - Observability notification channel。
+- Transactional email non-secret settings；SMTP password 本身不进入 settings audit。
 
-## 20. MVP 最小要求
+## 21. MVP 最小要求
 
 MVP 至少提供：
 

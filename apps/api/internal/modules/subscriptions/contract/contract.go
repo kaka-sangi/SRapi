@@ -185,6 +185,12 @@ type ExpireSubscriptionsResult struct {
 	Expired  int
 }
 
+// ReminderSubscriptionsResult reports the outcome of a subscription reminder pass.
+type ReminderSubscriptionsResult struct {
+	Selected int
+	Enqueued int
+}
+
 type Store interface {
 	CreatePlan(ctx context.Context, input CreateStoredPlan) (SubscriptionPlan, error)
 	FindPlanByID(ctx context.Context, id int) (SubscriptionPlan, error)
@@ -196,6 +202,7 @@ type Store interface {
 	ListActiveUserSubscriptions(ctx context.Context, userID int, at time.Time) ([]UserSubscription, error)
 	ListActiveEntitlements(ctx context.Context, userID int, at time.Time) ([]Entitlement, error)
 	ListExpiredActiveUserSubscriptions(ctx context.Context, now time.Time) ([]UserSubscription, error)
+	ListActiveUserSubscriptionsExpiringBetween(ctx context.Context, from time.Time, until time.Time) ([]UserSubscription, error)
 	ExpireUserSubscription(ctx context.Context, id int, now time.Time) (UserSubscription, bool, error)
 	CreatePricingRule(ctx context.Context, input PricingRule) (PricingRule, error)
 	ListPricingRules(ctx context.Context) ([]PricingRule, error)

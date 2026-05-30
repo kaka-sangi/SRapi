@@ -108,6 +108,142 @@ export type RoleListResponse = {
 
 export type UserStatus = 'active' | 'disabled' | 'pending';
 
+export type AuthIdentityProvider = 'email' | 'oidc' | 'github' | 'google' | 'linuxdo' | 'wechat' | 'dingtalk';
+
+export type PendingOAuthIntent = 'login' | 'bind_current_user';
+
+export type OAuthPendingNextStep = 'email_completion_required' | 'bind_existing_login_required' | 'create_account_required' | 'ready_for_login' | 'bind_current_user_required';
+
+export type OAuthPendingProfile = {
+    /**
+     * Normalized email claim retained from the provider when present and syntactically safe.
+     */
+    resolved_email: string;
+    /**
+     * Display-safe provider profile name.
+     */
+    display_name: string;
+    email_verified: boolean;
+    /**
+     * Display-safe provider profile image URL.
+     */
+    avatar_url: string;
+};
+
+export type PendingOAuthAction = {
+    /**
+     * Short-lived signed action token bound to the current pending OAuth cookie. It is not a session token and cannot be reused with another pending cookie.
+     */
+    token: string;
+    expires_at: Timestamp;
+};
+
+export type OAuthPendingSession = {
+    intent: PendingOAuthIntent;
+    provider: AuthIdentityProvider;
+    /**
+     * Stable provider instance key used for this pending flow.
+     */
+    provider_key: string;
+    /**
+     * Display-safe provider subject hint. Raw provider subjects and hashes are never returned.
+     */
+    subject_hint: string;
+    /**
+     * Bound local console continuation path.
+     */
+    redirect: string;
+    profile: OAuthPendingProfile;
+    next_step: OAuthPendingNextStep;
+    /**
+     * True when the retained provider email matches an active local account that can continue through the bind-existing-login flow.
+     */
+    existing_account_bindable: boolean;
+    create_account_action?: PendingOAuthAction;
+    expires_at: Timestamp;
+};
+
+export type OAuthPendingSessionResponse = {
+    data: OAuthPendingSession;
+    request_id: RequestId;
+};
+
+export type CurrentUserAuthIdentity = {
+    id?: Id;
+    user_id: Id;
+    provider: AuthIdentityProvider;
+    /**
+     * Stable provider instance key, such as `local` or an OIDC issuer.
+     */
+    provider_key: string;
+    /**
+     * Display-safe subject hint. The raw upstream subject is never returned.
+     */
+    subject_hint?: string;
+    display_name?: string;
+    email?: string;
+    email_verified: boolean;
+    /**
+     * Upstream profile avatar URL suggested by a verified external identity, when retained for display.
+     */
+    avatar_url?: string;
+    external: boolean;
+    verified_at?: string | null;
+    last_used_at?: string | null;
+    can_unbind: boolean;
+    /**
+     * Machine-readable reason when unbinding this identity is blocked.
+     */
+    unbind_blocked_by?: string;
+    created_at: Timestamp;
+    updated_at: Timestamp;
+};
+
+export type CurrentUserAuthIdentityListResponse = {
+    data: Array<CurrentUserAuthIdentity>;
+    request_id: RequestId;
+};
+
+export type OAuthProviderConfig = {
+    provider: AuthIdentityProvider;
+    /**
+     * Stable provider instance key. Defaults to provider name for single-instance providers.
+     */
+    provider_key: string;
+    /**
+     * Non-secret label shown in console settings.
+     */
+    display_name: string;
+    /**
+     * Public OAuth client id. Client secrets are not exposed in admin settings.
+     */
+    client_id: string;
+    /**
+     * HTTPS provider authorization endpoint without query or fragment.
+     */
+    authorize_url: string;
+    /**
+     * Optional provider token endpoint for callback completion. HTTPS is required except localhost development. v1 supports public clients with token_auth_method=none.
+     */
+    token_url?: string;
+    /**
+     * Optional provider UserInfo/profile endpoint for callback completion. HTTPS is required except localhost development.
+     */
+    userinfo_url?: string;
+    /**
+     * Token endpoint client authentication method. v1 accepts none so client secrets stay outside Admin Settings.
+     */
+    token_auth_method?: 'none';
+    /**
+     * Registered callback URI. HTTP is accepted only for localhost development.
+     */
+    redirect_uri: string;
+    /**
+     * Provider scopes sent as a space-delimited authorization request parameter.
+     */
+    scopes: Array<string>;
+};
+
 export type User = {
     id: Id;
     email: string;
@@ -121,7 +257,38 @@ export type User = {
     currency: string;
     rpm_limit?: number | null;
     last_login_at?: string | null;
+    email_verified_at?: string | null;
+    /**
+     * Relative URL for the user's SRapi-hosted avatar image, when configured.
+     */
+    avatar_url?: string;
+    /**
+     * Normalized avatar MIME type.
+     */
+    avatar_mime?: 'image/png';
+    avatar_byte_size?: number;
+    avatar_sha256?: string;
+    avatar_updated_at?: string | null;
     created_at: Timestamp;
+};
+
+export type UserAvatar = {
+    user_id: Id;
+    /**
+     * Relative URL that serves the normalized avatar image.
+     */
+    url: string;
+    content_type: 'image/png';
+    byte_size: number;
+    sha256: string;
+    width: number;
+    height: number;
+    updated_at: Timestamp;
+};
+
+export type UserAvatarResponse = {
+    data: UserAvatar;
+    request_id: RequestId;
 };
 
 export type CreateAdminUserRequest = {
@@ -168,6 +335,13 @@ export type UserBalanceResponse = {
     request_id: RequestId;
 };
 
+export type UpdateCurrentUserProfileRequest = {
+    /**
+     * Current user's display name.
+     */
+    name: string;
+};
+
 export type UpdateUserRpmLimitRequest = {
     rpm_limit: number | null;
 };
@@ -201,6 +375,234 @@ export type LoginRequest = {
     password: string;
 };
 
+/**
+ * Optional preferences applied while binding a pending external identity to the current console user. Omitting the body is equivalent to all preferences disabled.
+ */
+export type PendingOAuthBindCurrentUserRequest = {
+    /**
+     * When true, adopt the provider-returned display name as the account display name if the provider supplied a present, valid name. Provider avatar URLs are never adopted automatically because SRapi avatars use a controlled upload/storage model.
+     */
+    adopt_display_name?: boolean;
+};
+
+export type PendingOAuthBindLoginRequest = {
+    /**
+     * Existing console account email to authenticate before binding the pending external identity.
+     */
+    email: string;
+    password: string;
+    /**
+     * When true, adopt the provider-returned display name onto the authenticated account after a successful bind, if the provider supplied a present, valid name. Provider avatar URLs are never adopted automatically because SRapi avatars use a controlled upload/storage model.
+     */
+    adopt_display_name?: boolean;
+};
+
+export type PendingOAuthBindLoginTwoFactorRequest = {
+    /**
+     * Pending OAuth bind-login two-factor challenge returned by `bindPendingOAuthLogin`.
+     */
+    challenge_id: string;
+    /**
+     * Six-digit TOTP code or one recovery code.
+     */
+    code: string;
+};
+
+export type PendingOAuthEmailCompletionRequest = {
+    /**
+     * Email address the user wants to prove for an OAuth pending session that lacks a provider email.
+     */
+    email: string;
+};
+
+export type ConfirmPendingOAuthEmailCompletionRequest = {
+    /**
+     * High-entropy pending OAuth email-completion token delivered by email. It must be submitted with the same pending OAuth cookie.
+     */
+    token: string;
+};
+
+export type PendingOAuthEmailCompletionAccepted = {
+    accepted: boolean;
+    expires_at: Timestamp;
+};
+
+export type PendingOAuthEmailCompletionAcceptedResponse = {
+    data: PendingOAuthEmailCompletionAccepted;
+    request_id: RequestId;
+};
+
+export type PendingOAuthCreateAccountRequest = {
+    /**
+     * New console account email. For v1 this must match the verified email retained in the pending OAuth session.
+     */
+    email: string;
+    /**
+     * Optional local display name. Defaults to the provider display name or email.
+     */
+    name?: string;
+    password: string;
+    /**
+     * Pending OAuth create-account action token returned by `getPendingOAuthSession`.
+     */
+    action_token: string;
+};
+
+export type RegisterRequest = {
+    email: string;
+    name: string;
+    password: string;
+};
+
+export type RequestPasswordResetRequest = {
+    email: string;
+};
+
+export type ConfirmPasswordResetRequest = {
+    token: string;
+    new_password: string;
+};
+
+export type PasswordResetAccepted = {
+    accepted: boolean;
+};
+
+export type PasswordResetAcceptedResponse = {
+    data: PasswordResetAccepted;
+    request_id: RequestId;
+};
+
+export type RequestEmailVerificationRequest = {
+    email: string;
+};
+
+export type ConfirmEmailVerificationRequest = {
+    token: string;
+};
+
+export type EmailVerificationAccepted = {
+    accepted: boolean;
+};
+
+export type EmailVerificationAcceptedResponse = {
+    data: EmailVerificationAccepted;
+    request_id: RequestId;
+};
+
+export type NotificationUnsubscribeRequest = {
+    token: string;
+};
+
+export type NotificationUnsubscribe = {
+    event: 'balance.low' | 'subscription.expiry_reminder' | 'account.quota_alert';
+    done: boolean;
+};
+
+export type NotificationUnsubscribeResponse = {
+    data: NotificationUnsubscribe;
+    request_id: RequestId;
+};
+
+export type NotificationPreferenceEventName = 'balance.low' | 'subscription.expiry_reminder' | 'account.quota_alert';
+
+export type NotificationPreference = {
+    event: NotificationPreferenceEventName;
+    label: string;
+    description: string;
+    category: string;
+    /**
+     * True when the current user is subscribed to this optional notification event.
+     */
+    subscribed: boolean;
+    updated_at?: Timestamp;
+};
+
+export type NotificationPreferenceUpdate = {
+    event: NotificationPreferenceEventName;
+    subscribed: boolean;
+};
+
+export type UpdateNotificationPreferencesRequest = {
+    preferences: Array<NotificationPreferenceUpdate>;
+};
+
+export type NotificationPreferenceListResponse = {
+    data: Array<NotificationPreference>;
+    request_id: RequestId;
+};
+
+export type NotificationContact = {
+    id: string;
+    email: string;
+    /**
+     * SHA-256 hash of the normalized contact email.
+     */
+    email_hash: string;
+    verified: boolean;
+    disabled: boolean;
+    created_at: Timestamp;
+    updated_at: Timestamp;
+    verified_at?: Timestamp;
+};
+
+export type NotificationContactListResponse = {
+    data: Array<NotificationContact>;
+    request_id: RequestId;
+};
+
+export type NotificationContactVerificationRequest = {
+    email: string;
+};
+
+export type NotificationContactVerificationAccepted = {
+    accepted: boolean;
+    contact: NotificationContact;
+    verification_sent: boolean;
+    expires_at?: Timestamp;
+};
+
+export type NotificationContactVerificationResponse = {
+    data: NotificationContactVerificationAccepted;
+    request_id: RequestId;
+};
+
+export type NotificationContactConfirmRequest = {
+    token: string;
+};
+
+export type UpdateNotificationContactRequest = {
+    disabled: boolean;
+};
+
+export type NotificationContactResponse = {
+    data: NotificationContact;
+    request_id: RequestId;
+};
+
+export type ChangeCurrentUserPasswordRequest = {
+    current_password: string;
+    new_password: string;
+};
+
+export type LoginTwoFactorRequest = {
+    challenge_id: string;
+    /**
+     * Six-digit TOTP code or one recovery code.
+     */
+    code: string;
+};
+
+export type LoginTwoFactorRequired = {
+    required: true;
+    challenge_id: string;
+    expires_at: Timestamp;
+};
+
+export type LoginTwoFactorRequiredResponse = {
+    data: LoginTwoFactorRequired;
+    request_id: RequestId;
+};
+
 export type SessionData = {
     user: User;
     /**
@@ -212,6 +614,47 @@ export type SessionData = {
 
 export type LoginResponse = {
     data: SessionData;
+    request_id: RequestId;
+};
+
+export type TotpStatus = {
+    enabled: boolean;
+    pending_setup: boolean;
+};
+
+export type TotpStatusResponse = {
+    data: TotpStatus;
+    request_id: RequestId;
+};
+
+export type TotpSetup = {
+    enabled: boolean;
+    /**
+     * Base32 TOTP secret returned once for enrollment.
+     */
+    secret: string;
+    otp_auth_url: string;
+};
+
+export type TotpSetupResponse = {
+    data: TotpSetup;
+    request_id: RequestId;
+};
+
+export type TotpVerifyRequest = {
+    /**
+     * Six-digit TOTP code or one recovery code.
+     */
+    code: string;
+};
+
+export type TotpEnableResult = {
+    enabled: boolean;
+    recovery_codes: Array<string>;
+};
+
+export type TotpEnableResponse = {
+    data: TotpEnableResult;
     request_id: RequestId;
 };
 
@@ -357,6 +800,9 @@ export type PaymentOrder = {
     user_id: Id;
     order_no: string;
     provider_instance_id: Id;
+    original_amount: string;
+    discount_amount: string;
+    promo_code_id?: Id;
     amount: string;
     currency: string;
     status: PaymentOrderStatus;
@@ -378,6 +824,7 @@ export type CreatePaymentOrderRequest = {
     currency?: string;
     product_type: PaymentProductType;
     product_id?: string;
+    promo_code?: string;
     expires_at?: string;
     metadata?: JsonObject;
 };
@@ -1261,11 +1708,15 @@ export type OpsConcurrencyResponse = {
     request_id: RequestId;
 };
 
+export type OpsSystemLogLevel = 'debug' | 'info' | 'warn' | 'error';
+
 export type OpsSystemLog = {
     id: Id;
-    level: 'debug' | 'info' | 'warn' | 'error';
+    level: OpsSystemLogLevel;
     message: string;
     source: string;
+    request_id?: string;
+    trace_id?: string;
     metadata?: JsonObject;
     created_at: Timestamp;
 };
@@ -1273,6 +1724,29 @@ export type OpsSystemLog = {
 export type OpsSystemLogListResponse = {
     data: Array<OpsSystemLog>;
     pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type OpsSystemLogCleanupRequest = {
+    level?: OpsSystemLogLevel;
+    source?: string;
+    q?: string;
+    start?: Timestamp;
+    end?: Timestamp;
+    dry_run?: boolean;
+    max_delete?: number;
+};
+
+export type OpsSystemLogCleanupResult = {
+    matched: number;
+    deleted: number;
+    dry_run: boolean;
+    max_delete: number;
+    limited: boolean;
+};
+
+export type OpsSystemLogCleanupResponse = {
+    data: OpsSystemLogCleanupResult;
     request_id: RequestId;
 };
 
@@ -1315,8 +1789,16 @@ export type AdminSettingsFeatures = {
 export type AdminSettingsSecurity = {
     admin_api_key: SecretConfigured;
     registration_enabled: boolean;
+    /**
+     * Normalized allowed email suffixes for public registration. Empty means all valid email domains are allowed.
+     */
+    registration_email_suffix_allowlist: Array<string>;
     oauth_enabled: boolean;
     oauth_providers: Array<string>;
+    /**
+     * Non-secret OAuth/OIDC provider authorization settings. Secrets for token exchange are configured outside this response.
+     */
+    oauth_provider_configs: Array<OAuthProviderConfig>;
 };
 
 export type AdminSettingsUsers = {
@@ -1355,10 +1837,51 @@ export type AdminSettingsPayment = {
 };
 
 export type AdminSettingsEmail = {
+    /**
+     * True when host and sender are configured. Password state is exposed separately.
+     */
     smtp_configured: boolean;
+    smtp_host?: string;
+    smtp_port?: number;
+    smtp_username?: string;
+    /**
+     * True when an SMTP password is configured by deployment environment.
+     */
+    smtp_password_configured?: boolean;
+    smtp_from?: string;
+    smtp_from_name?: string;
+    smtp_use_tls?: boolean;
+    /**
+     * Absolute public console base URL used to build auth email links.
+     */
+    public_base_url?: string;
     templates: {
         [key: string]: string;
     };
+    /**
+     * Enables optional low-balance notification trigger after usage charges cross the threshold.
+     */
+    balance_low_notify_enabled?: boolean;
+    /**
+     * Default wallet balance threshold used for low-balance notifications.
+     */
+    balance_low_notify_threshold?: string;
+    /**
+     * Optional absolute recharge URL used by low-balance notification templates.
+     */
+    balance_low_notify_recharge_url?: string;
+    /**
+     * Enables optional subscription expiry reminder trigger for active subscriptions before they expire.
+     */
+    subscription_expiry_notify_enabled?: boolean;
+    /**
+     * Enables optional provider-account quota alert trigger when quota snapshots cross the remaining-ratio threshold.
+     */
+    account_quota_notify_enabled?: boolean;
+    /**
+     * Remaining quota ratio threshold for account quota alerts. For example, 0.20 alerts when remaining quota crosses 20%.
+     */
+    account_quota_notify_remaining_ratio?: string;
 };
 
 export type AdminSettingsBackup = {
@@ -1381,6 +1904,74 @@ export type AdminSettings = {
 
 export type AdminSettingsResponse = {
     data: AdminSettings;
+    request_id: RequestId;
+};
+
+export type NotificationEmailTemplateEventName = 'auth.password_reset' | 'auth.email_verification' | 'auth.oauth_pending_email_completion' | 'notification.contact_verification' | 'balance.low' | 'subscription.expiry_reminder' | 'account.quota_alert';
+
+export type NotificationEmailTemplateEvent = {
+    event: NotificationEmailTemplateEventName;
+    label: string;
+    description: string;
+    category: string;
+    /**
+     * True when recipients may unsubscribe from this event.
+     */
+    optional: boolean;
+    placeholders: Array<string>;
+};
+
+export type NotificationEmailTemplate = {
+    event: NotificationEmailTemplateEventName;
+    subject: string;
+    html: string;
+    is_custom: boolean;
+    placeholders: Array<string>;
+};
+
+export type NotificationEmailTemplateList = {
+    events: Array<NotificationEmailTemplateEvent>;
+    templates: Array<NotificationEmailTemplate>;
+    placeholders: Array<string>;
+};
+
+export type NotificationEmailTemplateResponse = {
+    data: NotificationEmailTemplate;
+    request_id: RequestId;
+};
+
+export type NotificationEmailTemplateListResponse = {
+    data: NotificationEmailTemplateList;
+    request_id: RequestId;
+};
+
+export type UpdateNotificationEmailTemplateRequest = {
+    subject: string;
+    html: string;
+};
+
+export type PreviewNotificationEmailTemplateRequest = {
+    event: NotificationEmailTemplateEventName;
+    /**
+     * Template subject to preview. Empty string uses the saved or built-in subject.
+     */
+    subject: string;
+    /**
+     * Template HTML to preview. Empty string uses the saved or built-in HTML.
+     */
+    html: string;
+    variables?: {
+        [key: string]: string;
+    };
+};
+
+export type NotificationEmailTemplatePreview = {
+    subject: string;
+    html: string;
+};
+
+export type NotificationEmailTemplatePreviewResponse = {
+    data: NotificationEmailTemplatePreview;
     request_id: RequestId;
 };
 
@@ -1426,6 +2017,24 @@ export type AnnouncementListResponse = {
     request_id: RequestId;
 };
 
+export type UserAnnouncement = {
+    announcement: Announcement;
+    read: boolean;
+    read_at?: Timestamp;
+};
+
+export type UserAnnouncementResponse = {
+    data: UserAnnouncement;
+    request_id: RequestId;
+};
+
+export type UserAnnouncementListResponse = {
+    data: Array<UserAnnouncement>;
+    pagination: Pagination;
+    unread: number;
+    request_id: RequestId;
+};
+
 export type RedeemCodeStatus = 'active' | 'redeemed' | 'disabled' | 'expired';
 
 export type RedeemCodeType = 'balance' | 'subscription';
@@ -1435,6 +2044,9 @@ export type RedeemCode = {
     code: string;
     type: RedeemCodeType;
     status: RedeemCodeStatus;
+    /**
+     * Balance amount for balance codes, or subscription plan id for subscription codes.
+     */
     value: string;
     currency: string;
     max_redemptions: number;
@@ -1447,16 +2059,53 @@ export type RedeemCode = {
 export type CreateRedeemCodeRequest = {
     code: string;
     type: RedeemCodeType;
+    /**
+     * Balance amount for balance codes, or subscription plan id for subscription codes.
+     */
     value: string;
     currency?: string;
     max_redemptions?: number;
     expires_at?: Timestamp;
 };
 
+export type RedeemCodeRedemptionRequest = {
+    code: string;
+};
+
+export type RedeemCodeRedemption = {
+    id: Id;
+    user_id: Id;
+    redeem_code_id: Id;
+    type: RedeemCodeType;
+    amount: string;
+    currency: string;
+    balance_before: string;
+    balance_after: string;
+    billing_ledger_id?: Id;
+    user_subscription_id?: Id;
+    redeemed_at: Timestamp;
+    created_at: Timestamp;
+    updated_at: Timestamp;
+};
+
+export type RedeemCodeRedemptionResult = {
+    redemption: RedeemCodeRedemption;
+    redeem_code: RedeemCode;
+    already_redeemed: boolean;
+};
+
+export type RedeemCodeRedemptionResponse = {
+    data: RedeemCodeRedemptionResult;
+    request_id: RequestId;
+};
+
 export type BatchGenerateRedeemCodesRequest = {
     prefix?: string;
     count: number;
     type: RedeemCodeType;
+    /**
+     * Balance amount for balance codes, or subscription plan id for subscription codes.
+     */
     value: string;
     currency?: string;
     max_redemptions?: number;
@@ -1714,7 +2363,7 @@ export type AuditLogListResponse = {
 export type BillingLedgerEntry = {
     id: Id;
     user_id: Id;
-    type: 'usage_charge' | 'payment_credit' | 'refund' | 'adjustment' | 'compensation';
+    type: 'usage_charge' | 'payment_credit' | 'refund' | 'adjustment' | 'compensation' | 'affiliate_transfer' | 'redeem_code_credit';
     amount: string;
     currency: string;
     balance_before: string;
@@ -3100,6 +3749,11 @@ export type PageSize = number;
  */
 export type IdempotencyKey = string;
 
+/**
+ * Optional opt-in idempotency key. A retried non-streaming request that repeats the same key and body replays the original response instead of re-executing (and re-billing). Streaming requests are not replayed.
+ */
+export type GatewayIdempotencyKey = string;
+
 export type Status = string;
 
 export type SearchQuery = string;
@@ -3182,9 +3836,594 @@ export type LoginResponses = {
      * Login succeeded and session cookie was set.
      */
     200: LoginResponse;
+    /**
+     * Password accepted but two-factor verification is required.
+     */
+    202: LoginTwoFactorRequiredResponse;
 };
 
 export type LoginResponse2 = LoginResponses[keyof LoginResponses];
+
+export type RegisterData = {
+    body: RegisterRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/register';
+};
+
+export type RegisterErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type RegisterError = RegisterErrors[keyof RegisterErrors];
+
+export type RegisterResponses = {
+    /**
+     * Registration succeeded and session cookie was set.
+     */
+    201: LoginResponse;
+};
+
+export type RegisterResponse = RegisterResponses[keyof RegisterResponses];
+
+export type StartOAuthAuthorizationData = {
+    body?: never;
+    path: {
+        provider: AuthIdentityProvider;
+    };
+    query?: {
+        /**
+         * Local console path to continue to after callback handling. Cross-site values are normalized by the server.
+         */
+        redirect?: string;
+        /**
+         * Flow intent. v1 public start accepts only login; bind-current-user will use a CSRF-protected follow-up route.
+         */
+        intent?: 'login' | 'bind_current_user';
+        /**
+         * Optional provider instance key when multiple configs exist for the same provider.
+         */
+        provider_key?: string;
+    };
+    url: '/api/v1/auth/oauth/{provider}/start';
+};
+
+export type StartOAuthAuthorizationErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type StartOAuthAuthorizationError = StartOAuthAuthorizationErrors[keyof StartOAuthAuthorizationErrors];
+
+export type StartOAuthAuthorizationResponses = {
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type StartOAuthAuthorizationResponse = StartOAuthAuthorizationResponses[keyof StartOAuthAuthorizationResponses];
+
+export type CompleteOAuthAuthorizationData = {
+    body?: never;
+    path: {
+        provider: AuthIdentityProvider;
+    };
+    query?: {
+        /**
+         * Authorization code returned by the upstream provider.
+         */
+        code?: string;
+        /**
+         * State returned by the upstream provider. Must match the encrypted flow cookie.
+         */
+        state?: string;
+        /**
+         * Upstream OAuth error value. When present the server rejects and clears the flow cookie.
+         */
+        error?: string;
+        /**
+         * Upstream OAuth error description. It is not reflected verbatim in the error response.
+         */
+        error_description?: string;
+    };
+    url: '/api/v1/auth/oauth/{provider}/callback';
+};
+
+export type CompleteOAuthAuthorizationErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    502: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type CompleteOAuthAuthorizationError = CompleteOAuthAuthorizationErrors[keyof CompleteOAuthAuthorizationErrors];
+
+export type CompleteOAuthAuthorizationResponses = {
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type CompleteOAuthAuthorizationResponse = CompleteOAuthAuthorizationResponses[keyof CompleteOAuthAuthorizationResponses];
+
+export type GetPendingOAuthSessionData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/oauth/pending';
+};
+
+export type GetPendingOAuthSessionErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetPendingOAuthSessionError = GetPendingOAuthSessionErrors[keyof GetPendingOAuthSessionErrors];
+
+export type GetPendingOAuthSessionResponses = {
+    /**
+     * Pending OAuth decision session preview.
+     */
+    200: OAuthPendingSessionResponse;
+};
+
+export type GetPendingOAuthSessionResponse = GetPendingOAuthSessionResponses[keyof GetPendingOAuthSessionResponses];
+
+export type BindPendingOAuthCurrentUserData = {
+    body?: PendingOAuthBindCurrentUserRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/oauth/pending/bind-current-user';
+};
+
+export type BindPendingOAuthCurrentUserErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource conflict.
+     */
+    409: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type BindPendingOAuthCurrentUserError = BindPendingOAuthCurrentUserErrors[keyof BindPendingOAuthCurrentUserErrors];
+
+export type BindPendingOAuthCurrentUserResponses = {
+    /**
+     * Current user sign-in identities after binding.
+     */
+    200: CurrentUserAuthIdentityListResponse;
+};
+
+export type BindPendingOAuthCurrentUserResponse = BindPendingOAuthCurrentUserResponses[keyof BindPendingOAuthCurrentUserResponses];
+
+export type SendPendingOAuthEmailCompletionData = {
+    body: PendingOAuthEmailCompletionRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/oauth/pending/send-verify-code';
+};
+
+export type SendPendingOAuthEmailCompletionErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type SendPendingOAuthEmailCompletionError = SendPendingOAuthEmailCompletionErrors[keyof SendPendingOAuthEmailCompletionErrors];
+
+export type SendPendingOAuthEmailCompletionResponses = {
+    /**
+     * Email-completion request accepted for asynchronous delivery when the pending session is eligible.
+     */
+    202: PendingOAuthEmailCompletionAcceptedResponse;
+};
+
+export type SendPendingOAuthEmailCompletionResponse = SendPendingOAuthEmailCompletionResponses[keyof SendPendingOAuthEmailCompletionResponses];
+
+export type ConfirmPendingOAuthEmailCompletionData = {
+    body: ConfirmPendingOAuthEmailCompletionRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/oauth/pending/email-completion/confirm';
+};
+
+export type ConfirmPendingOAuthEmailCompletionErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ConfirmPendingOAuthEmailCompletionError = ConfirmPendingOAuthEmailCompletionErrors[keyof ConfirmPendingOAuthEmailCompletionErrors];
+
+export type ConfirmPendingOAuthEmailCompletionResponses = {
+    /**
+     * Pending OAuth email completion confirmed; inspect `next_step` to continue.
+     */
+    200: OAuthPendingSessionResponse;
+};
+
+export type ConfirmPendingOAuthEmailCompletionResponse = ConfirmPendingOAuthEmailCompletionResponses[keyof ConfirmPendingOAuthEmailCompletionResponses];
+
+export type CreatePendingOAuthAccountData = {
+    body: PendingOAuthCreateAccountRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/oauth/pending/create-account';
+};
+
+export type CreatePendingOAuthAccountErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource conflict.
+     */
+    409: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type CreatePendingOAuthAccountError = CreatePendingOAuthAccountErrors[keyof CreatePendingOAuthAccountErrors];
+
+export type CreatePendingOAuthAccountResponses = {
+    /**
+     * Account created, identity bound, pending cookie cleared, and session cookie set.
+     */
+    201: LoginResponse;
+};
+
+export type CreatePendingOAuthAccountResponse = CreatePendingOAuthAccountResponses[keyof CreatePendingOAuthAccountResponses];
+
+export type BindPendingOAuthLoginData = {
+    body: PendingOAuthBindLoginRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/oauth/pending/bind-login';
+};
+
+export type BindPendingOAuthLoginErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource conflict.
+     */
+    409: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type BindPendingOAuthLoginError = BindPendingOAuthLoginErrors[keyof BindPendingOAuthLoginErrors];
+
+export type BindPendingOAuthLoginResponses = {
+    /**
+     * Existing account authenticated, identity bound, pending cookie cleared, and session cookie set.
+     */
+    200: LoginResponse;
+    /**
+     * Password accepted but two-factor verification is required before binding and login.
+     */
+    202: LoginTwoFactorRequiredResponse;
+};
+
+export type BindPendingOAuthLoginResponse = BindPendingOAuthLoginResponses[keyof BindPendingOAuthLoginResponses];
+
+export type CompletePendingOAuthBindLoginTwoFactorData = {
+    body: PendingOAuthBindLoginTwoFactorRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/oauth/pending/bind-login/2fa';
+};
+
+export type CompletePendingOAuthBindLoginTwoFactorErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource conflict.
+     */
+    409: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type CompletePendingOAuthBindLoginTwoFactorError = CompletePendingOAuthBindLoginTwoFactorErrors[keyof CompletePendingOAuthBindLoginTwoFactorErrors];
+
+export type CompletePendingOAuthBindLoginTwoFactorResponses = {
+    /**
+     * Two-factor verification succeeded, identity bound, pending cookie cleared, and session cookie set.
+     */
+    200: LoginResponse;
+};
+
+export type CompletePendingOAuthBindLoginTwoFactorResponse = CompletePendingOAuthBindLoginTwoFactorResponses[keyof CompletePendingOAuthBindLoginTwoFactorResponses];
+
+export type RequestPasswordResetData = {
+    body: RequestPasswordResetRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/password-reset/request';
+};
+
+export type RequestPasswordResetErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type RequestPasswordResetError = RequestPasswordResetErrors[keyof RequestPasswordResetErrors];
+
+export type RequestPasswordResetResponses = {
+    /**
+     * Password reset request accepted without revealing whether the email exists.
+     */
+    202: PasswordResetAcceptedResponse;
+};
+
+export type RequestPasswordResetResponse = RequestPasswordResetResponses[keyof RequestPasswordResetResponses];
+
+export type ConfirmPasswordResetData = {
+    body: ConfirmPasswordResetRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/password-reset/confirm';
+};
+
+export type ConfirmPasswordResetErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ConfirmPasswordResetError = ConfirmPasswordResetErrors[keyof ConfirmPasswordResetErrors];
+
+export type ConfirmPasswordResetResponses = {
+    /**
+     * Password reset succeeded.
+     */
+    200: PasswordResetAcceptedResponse;
+};
+
+export type ConfirmPasswordResetResponse = ConfirmPasswordResetResponses[keyof ConfirmPasswordResetResponses];
+
+export type RequestEmailVerificationData = {
+    body: RequestEmailVerificationRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/email-verification/request';
+};
+
+export type RequestEmailVerificationErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type RequestEmailVerificationError = RequestEmailVerificationErrors[keyof RequestEmailVerificationErrors];
+
+export type RequestEmailVerificationResponses = {
+    /**
+     * Email verification request accepted without revealing whether the email exists or is already verified.
+     */
+    202: EmailVerificationAcceptedResponse;
+};
+
+export type RequestEmailVerificationResponse = RequestEmailVerificationResponses[keyof RequestEmailVerificationResponses];
+
+export type ConfirmEmailVerificationData = {
+    body: ConfirmEmailVerificationRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/email-verification/confirm';
+};
+
+export type ConfirmEmailVerificationErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ConfirmEmailVerificationError = ConfirmEmailVerificationErrors[keyof ConfirmEmailVerificationErrors];
+
+export type ConfirmEmailVerificationResponses = {
+    /**
+     * Email verification succeeded.
+     */
+    200: EmailVerificationAcceptedResponse;
+};
+
+export type ConfirmEmailVerificationResponse = ConfirmEmailVerificationResponses[keyof ConfirmEmailVerificationResponses];
+
+export type LoginTwoFactorData = {
+    body: LoginTwoFactorRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/login/2fa';
+};
+
+export type LoginTwoFactorErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type LoginTwoFactorError = LoginTwoFactorErrors[keyof LoginTwoFactorErrors];
+
+export type LoginTwoFactorResponses = {
+    /**
+     * Two-factor login succeeded and session cookie was set.
+     */
+    200: LoginResponse;
+};
+
+export type LoginTwoFactorResponse = LoginTwoFactorResponses[keyof LoginTwoFactorResponses];
 
 export type LogoutData = {
     body?: never;
@@ -3215,6 +4454,68 @@ export type LogoutResponses = {
 
 export type LogoutResponse = LogoutResponses[keyof LogoutResponses];
 
+export type PreviewNotificationUnsubscribeData = {
+    body?: never;
+    path?: never;
+    query: {
+        token: string;
+    };
+    url: '/api/v1/notifications/unsubscribe';
+};
+
+export type PreviewNotificationUnsubscribeErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type PreviewNotificationUnsubscribeError = PreviewNotificationUnsubscribeErrors[keyof PreviewNotificationUnsubscribeErrors];
+
+export type PreviewNotificationUnsubscribeResponses = {
+    /**
+     * Unsubscribe token is valid.
+     */
+    200: NotificationUnsubscribeResponse;
+};
+
+export type PreviewNotificationUnsubscribeResponse = PreviewNotificationUnsubscribeResponses[keyof PreviewNotificationUnsubscribeResponses];
+
+export type UnsubscribeNotificationEmailData = {
+    body?: NotificationUnsubscribeRequest;
+    path?: never;
+    query?: {
+        token?: string;
+    };
+    url: '/api/v1/notifications/unsubscribe';
+};
+
+export type UnsubscribeNotificationEmailErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UnsubscribeNotificationEmailError = UnsubscribeNotificationEmailErrors[keyof UnsubscribeNotificationEmailErrors];
+
+export type UnsubscribeNotificationEmailResponses = {
+    /**
+     * Optional notification preference updated.
+     */
+    200: NotificationUnsubscribeResponse;
+};
+
+export type UnsubscribeNotificationEmailResponse = UnsubscribeNotificationEmailResponses[keyof UnsubscribeNotificationEmailResponses];
+
 export type GetCurrentUserData = {
     body?: never;
     path?: never;
@@ -3244,6 +4545,732 @@ export type GetCurrentUserResponses = {
 
 export type GetCurrentUserResponse = GetCurrentUserResponses[keyof GetCurrentUserResponses];
 
+export type UpdateCurrentUserProfileData = {
+    body: UpdateCurrentUserProfileRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/me';
+};
+
+export type UpdateCurrentUserProfileErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UpdateCurrentUserProfileError = UpdateCurrentUserProfileErrors[keyof UpdateCurrentUserProfileErrors];
+
+export type UpdateCurrentUserProfileResponses = {
+    /**
+     * Current user profile updated.
+     */
+    200: UserResponse;
+};
+
+export type UpdateCurrentUserProfileResponse = UpdateCurrentUserProfileResponses[keyof UpdateCurrentUserProfileResponses];
+
+export type ListCurrentUserAuthIdentitiesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/me/auth-identities';
+};
+
+export type ListCurrentUserAuthIdentitiesErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListCurrentUserAuthIdentitiesError = ListCurrentUserAuthIdentitiesErrors[keyof ListCurrentUserAuthIdentitiesErrors];
+
+export type ListCurrentUserAuthIdentitiesResponses = {
+    /**
+     * Current user sign-in identities.
+     */
+    200: CurrentUserAuthIdentityListResponse;
+};
+
+export type ListCurrentUserAuthIdentitiesResponse = ListCurrentUserAuthIdentitiesResponses[keyof ListCurrentUserAuthIdentitiesResponses];
+
+export type UnbindCurrentUserAuthIdentityData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/me/auth-identities/{id}';
+};
+
+export type UnbindCurrentUserAuthIdentityErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict.
+     */
+    409: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UnbindCurrentUserAuthIdentityError = UnbindCurrentUserAuthIdentityErrors[keyof UnbindCurrentUserAuthIdentityErrors];
+
+export type UnbindCurrentUserAuthIdentityResponses = {
+    /**
+     * Current user sign-in identities after unbinding.
+     */
+    200: CurrentUserAuthIdentityListResponse;
+};
+
+export type UnbindCurrentUserAuthIdentityResponse = UnbindCurrentUserAuthIdentityResponses[keyof UnbindCurrentUserAuthIdentityResponses];
+
+export type DeleteCurrentUserAvatarData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/me/avatar';
+};
+
+export type DeleteCurrentUserAvatarErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DeleteCurrentUserAvatarError = DeleteCurrentUserAvatarErrors[keyof DeleteCurrentUserAvatarErrors];
+
+export type DeleteCurrentUserAvatarResponses = {
+    /**
+     * Avatar deleted.
+     */
+    200: DeleteResponse;
+};
+
+export type DeleteCurrentUserAvatarResponse = DeleteCurrentUserAvatarResponses[keyof DeleteCurrentUserAvatarResponses];
+
+export type UploadCurrentUserAvatarData = {
+    body: {
+        /**
+         * PNG or JPEG avatar image. The upload limit is 1 MiB and dimensions must not exceed 1024x1024.
+         */
+        avatar: Blob | File;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/me/avatar';
+};
+
+export type UploadCurrentUserAvatarErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UploadCurrentUserAvatarError = UploadCurrentUserAvatarErrors[keyof UploadCurrentUserAvatarErrors];
+
+export type UploadCurrentUserAvatarResponses = {
+    /**
+     * Avatar uploaded.
+     */
+    200: UserAvatarResponse;
+};
+
+export type UploadCurrentUserAvatarResponse = UploadCurrentUserAvatarResponses[keyof UploadCurrentUserAvatarResponses];
+
+export type GetUserAvatarData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/users/{id}/avatar';
+};
+
+export type GetUserAvatarErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetUserAvatarError = GetUserAvatarErrors[keyof GetUserAvatarErrors];
+
+export type GetUserAvatarResponses = {
+    /**
+     * Avatar image.
+     */
+    200: Blob | File;
+};
+
+export type GetUserAvatarResponse = GetUserAvatarResponses[keyof GetUserAvatarResponses];
+
+export type ChangeCurrentUserPasswordData = {
+    body: ChangeCurrentUserPasswordRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/me/password';
+};
+
+export type ChangeCurrentUserPasswordErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ChangeCurrentUserPasswordError = ChangeCurrentUserPasswordErrors[keyof ChangeCurrentUserPasswordErrors];
+
+export type ChangeCurrentUserPasswordResponses = {
+    /**
+     * Password changed and active sessions were revoked.
+     */
+    204: void;
+};
+
+export type ChangeCurrentUserPasswordResponse = ChangeCurrentUserPasswordResponses[keyof ChangeCurrentUserPasswordResponses];
+
+export type GetCurrentUserNotificationPreferencesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/me/notification-preferences';
+};
+
+export type GetCurrentUserNotificationPreferencesErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetCurrentUserNotificationPreferencesError = GetCurrentUserNotificationPreferencesErrors[keyof GetCurrentUserNotificationPreferencesErrors];
+
+export type GetCurrentUserNotificationPreferencesResponses = {
+    /**
+     * Current user notification preferences.
+     */
+    200: NotificationPreferenceListResponse;
+};
+
+export type GetCurrentUserNotificationPreferencesResponse = GetCurrentUserNotificationPreferencesResponses[keyof GetCurrentUserNotificationPreferencesResponses];
+
+export type UpdateCurrentUserNotificationPreferencesData = {
+    body: UpdateNotificationPreferencesRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/me/notification-preferences';
+};
+
+export type UpdateCurrentUserNotificationPreferencesErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UpdateCurrentUserNotificationPreferencesError = UpdateCurrentUserNotificationPreferencesErrors[keyof UpdateCurrentUserNotificationPreferencesErrors];
+
+export type UpdateCurrentUserNotificationPreferencesResponses = {
+    /**
+     * Current user notification preferences updated.
+     */
+    200: NotificationPreferenceListResponse;
+};
+
+export type UpdateCurrentUserNotificationPreferencesResponse = UpdateCurrentUserNotificationPreferencesResponses[keyof UpdateCurrentUserNotificationPreferencesResponses];
+
+export type ListCurrentUserNotificationContactsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/me/notification-contacts';
+};
+
+export type ListCurrentUserNotificationContactsErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListCurrentUserNotificationContactsError = ListCurrentUserNotificationContactsErrors[keyof ListCurrentUserNotificationContactsErrors];
+
+export type ListCurrentUserNotificationContactsResponses = {
+    /**
+     * Current user notification contacts.
+     */
+    200: NotificationContactListResponse;
+};
+
+export type ListCurrentUserNotificationContactsResponse = ListCurrentUserNotificationContactsResponses[keyof ListCurrentUserNotificationContactsResponses];
+
+export type RequestCurrentUserNotificationContactVerificationData = {
+    body: NotificationContactVerificationRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/me/notification-contacts';
+};
+
+export type RequestCurrentUserNotificationContactVerificationErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource conflict.
+     */
+    409: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type RequestCurrentUserNotificationContactVerificationError = RequestCurrentUserNotificationContactVerificationErrors[keyof RequestCurrentUserNotificationContactVerificationErrors];
+
+export type RequestCurrentUserNotificationContactVerificationResponses = {
+    /**
+     * Notification contact verification accepted.
+     */
+    202: NotificationContactVerificationResponse;
+};
+
+export type RequestCurrentUserNotificationContactVerificationResponse = RequestCurrentUserNotificationContactVerificationResponses[keyof RequestCurrentUserNotificationContactVerificationResponses];
+
+export type ConfirmCurrentUserNotificationContactVerificationData = {
+    body: NotificationContactConfirmRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/me/notification-contacts/verify';
+};
+
+export type ConfirmCurrentUserNotificationContactVerificationErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ConfirmCurrentUserNotificationContactVerificationError = ConfirmCurrentUserNotificationContactVerificationErrors[keyof ConfirmCurrentUserNotificationContactVerificationErrors];
+
+export type ConfirmCurrentUserNotificationContactVerificationResponses = {
+    /**
+     * Notification contact verified.
+     */
+    200: NotificationContactResponse;
+};
+
+export type ConfirmCurrentUserNotificationContactVerificationResponse = ConfirmCurrentUserNotificationContactVerificationResponses[keyof ConfirmCurrentUserNotificationContactVerificationResponses];
+
+export type DeleteCurrentUserNotificationContactData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/me/notification-contacts/{id}';
+};
+
+export type DeleteCurrentUserNotificationContactErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DeleteCurrentUserNotificationContactError = DeleteCurrentUserNotificationContactErrors[keyof DeleteCurrentUserNotificationContactErrors];
+
+export type DeleteCurrentUserNotificationContactResponses = {
+    /**
+     * Notification contact deleted.
+     */
+    204: void;
+};
+
+export type DeleteCurrentUserNotificationContactResponse = DeleteCurrentUserNotificationContactResponses[keyof DeleteCurrentUserNotificationContactResponses];
+
+export type UpdateCurrentUserNotificationContactData = {
+    body: UpdateNotificationContactRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/me/notification-contacts/{id}';
+};
+
+export type UpdateCurrentUserNotificationContactErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UpdateCurrentUserNotificationContactError = UpdateCurrentUserNotificationContactErrors[keyof UpdateCurrentUserNotificationContactErrors];
+
+export type UpdateCurrentUserNotificationContactResponses = {
+    /**
+     * Notification contact updated.
+     */
+    200: NotificationContactResponse;
+};
+
+export type UpdateCurrentUserNotificationContactResponse = UpdateCurrentUserNotificationContactResponses[keyof UpdateCurrentUserNotificationContactResponses];
+
+export type ListCurrentUserAnnouncementsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        page_size?: number;
+    };
+    url: '/api/v1/me/announcements';
+};
+
+export type ListCurrentUserAnnouncementsErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListCurrentUserAnnouncementsError = ListCurrentUserAnnouncementsErrors[keyof ListCurrentUserAnnouncementsErrors];
+
+export type ListCurrentUserAnnouncementsResponses = {
+    /**
+     * Current user visible announcements with read state.
+     */
+    200: UserAnnouncementListResponse;
+};
+
+export type ListCurrentUserAnnouncementsResponse = ListCurrentUserAnnouncementsResponses[keyof ListCurrentUserAnnouncementsResponses];
+
+export type MarkCurrentUserAnnouncementReadData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/me/announcements/{id}/read';
+};
+
+export type MarkCurrentUserAnnouncementReadErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type MarkCurrentUserAnnouncementReadError = MarkCurrentUserAnnouncementReadErrors[keyof MarkCurrentUserAnnouncementReadErrors];
+
+export type MarkCurrentUserAnnouncementReadResponses = {
+    /**
+     * Announcement read state.
+     */
+    200: UserAnnouncementResponse;
+};
+
+export type MarkCurrentUserAnnouncementReadResponse = MarkCurrentUserAnnouncementReadResponses[keyof MarkCurrentUserAnnouncementReadResponses];
+
+export type GetCurrentUserTotpStatusData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/me/totp/status';
+};
+
+export type GetCurrentUserTotpStatusErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetCurrentUserTotpStatusError = GetCurrentUserTotpStatusErrors[keyof GetCurrentUserTotpStatusErrors];
+
+export type GetCurrentUserTotpStatusResponses = {
+    /**
+     * Current user TOTP status.
+     */
+    200: TotpStatusResponse;
+};
+
+export type GetCurrentUserTotpStatusResponse = GetCurrentUserTotpStatusResponses[keyof GetCurrentUserTotpStatusResponses];
+
+export type SetupCurrentUserTotpData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/me/totp/setup';
+};
+
+export type SetupCurrentUserTotpErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type SetupCurrentUserTotpError = SetupCurrentUserTotpErrors[keyof SetupCurrentUserTotpErrors];
+
+export type SetupCurrentUserTotpResponses = {
+    /**
+     * TOTP setup secret and otpauth URI.
+     */
+    200: TotpSetupResponse;
+};
+
+export type SetupCurrentUserTotpResponse = SetupCurrentUserTotpResponses[keyof SetupCurrentUserTotpResponses];
+
+export type EnableCurrentUserTotpData = {
+    body: TotpVerifyRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/me/totp/enable';
+};
+
+export type EnableCurrentUserTotpErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type EnableCurrentUserTotpError = EnableCurrentUserTotpErrors[keyof EnableCurrentUserTotpErrors];
+
+export type EnableCurrentUserTotpResponses = {
+    /**
+     * TOTP enabled with one-time recovery codes.
+     */
+    200: TotpEnableResponse;
+};
+
+export type EnableCurrentUserTotpResponse = EnableCurrentUserTotpResponses[keyof EnableCurrentUserTotpResponses];
+
+export type DisableCurrentUserTotpData = {
+    body: TotpVerifyRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/me/totp/disable';
+};
+
+export type DisableCurrentUserTotpErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DisableCurrentUserTotpError = DisableCurrentUserTotpErrors[keyof DisableCurrentUserTotpErrors];
+
+export type DisableCurrentUserTotpResponses = {
+    /**
+     * TOTP disabled.
+     */
+    200: TotpStatusResponse;
+};
+
+export type DisableCurrentUserTotpResponse = DisableCurrentUserTotpResponses[keyof DisableCurrentUserTotpResponses];
+
 export type GetCurrentUserBalanceData = {
     body?: never;
     path?: never;
@@ -3272,6 +5299,51 @@ export type GetCurrentUserBalanceResponses = {
 };
 
 export type GetCurrentUserBalanceResponse = GetCurrentUserBalanceResponses[keyof GetCurrentUserBalanceResponses];
+
+export type RedeemCurrentUserRedeemCodeData = {
+    body: RedeemCodeRedemptionRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/me/redeem-codes/redeem';
+};
+
+export type RedeemCurrentUserRedeemCodeErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict.
+     */
+    409: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type RedeemCurrentUserRedeemCodeError = RedeemCurrentUserRedeemCodeErrors[keyof RedeemCurrentUserRedeemCodeErrors];
+
+export type RedeemCurrentUserRedeemCodeResponses = {
+    /**
+     * Code redeemed or previously redeemed by the same user.
+     */
+    200: RedeemCodeRedemptionResponse;
+};
+
+export type RedeemCurrentUserRedeemCodeResponse = RedeemCurrentUserRedeemCodeResponses[keyof RedeemCurrentUserRedeemCodeResponses];
 
 export type GetCurrentUserAffiliateData = {
     body?: never;
@@ -6972,7 +9044,11 @@ export type ListAdminOpsSystemLogsData = {
     query?: {
         page?: number;
         page_size?: number;
-        level?: string;
+        level?: OpsSystemLogLevel;
+        source?: string;
+        q?: string;
+        start?: Timestamp;
+        end?: Timestamp;
     };
     url: '/api/v1/admin/ops/system-logs';
 };
@@ -7002,6 +9078,43 @@ export type ListAdminOpsSystemLogsResponses = {
 };
 
 export type ListAdminOpsSystemLogsResponse = ListAdminOpsSystemLogsResponses[keyof ListAdminOpsSystemLogsResponses];
+
+export type CleanupAdminOpsSystemLogsData = {
+    body: OpsSystemLogCleanupRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/ops/system-logs/cleanup';
+};
+
+export type CleanupAdminOpsSystemLogsErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type CleanupAdminOpsSystemLogsError = CleanupAdminOpsSystemLogsErrors[keyof CleanupAdminOpsSystemLogsErrors];
+
+export type CleanupAdminOpsSystemLogsResponses = {
+    /**
+     * System log cleanup result.
+     */
+    200: OpsSystemLogCleanupResponse;
+};
+
+export type CleanupAdminOpsSystemLogsResponse = CleanupAdminOpsSystemLogsResponses[keyof CleanupAdminOpsSystemLogsResponses];
 
 export type ListAdminOpsAlertEventsData = {
     body?: never;
@@ -7376,6 +9489,201 @@ export type UpdateAdminSettingsResponses = {
 };
 
 export type UpdateAdminSettingsResponse = UpdateAdminSettingsResponses[keyof UpdateAdminSettingsResponses];
+
+export type ListAdminNotificationEmailTemplatesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/notifications/email-templates';
+};
+
+export type ListAdminNotificationEmailTemplatesErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminNotificationEmailTemplatesError = ListAdminNotificationEmailTemplatesErrors[keyof ListAdminNotificationEmailTemplatesErrors];
+
+export type ListAdminNotificationEmailTemplatesResponses = {
+    /**
+     * Notification email templates and placeholder metadata.
+     */
+    200: NotificationEmailTemplateListResponse;
+};
+
+export type ListAdminNotificationEmailTemplatesResponse = ListAdminNotificationEmailTemplatesResponses[keyof ListAdminNotificationEmailTemplatesResponses];
+
+export type PreviewAdminNotificationEmailTemplateData = {
+    body: PreviewNotificationEmailTemplateRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/notifications/email-template-preview';
+};
+
+export type PreviewAdminNotificationEmailTemplateErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type PreviewAdminNotificationEmailTemplateError = PreviewAdminNotificationEmailTemplateErrors[keyof PreviewAdminNotificationEmailTemplateErrors];
+
+export type PreviewAdminNotificationEmailTemplateResponses = {
+    /**
+     * Rendered template preview.
+     */
+    200: NotificationEmailTemplatePreviewResponse;
+};
+
+export type PreviewAdminNotificationEmailTemplateResponse = PreviewAdminNotificationEmailTemplateResponses[keyof PreviewAdminNotificationEmailTemplateResponses];
+
+export type GetAdminNotificationEmailTemplateData = {
+    body?: never;
+    path: {
+        event: NotificationEmailTemplateEventName;
+    };
+    query?: never;
+    url: '/api/v1/admin/notifications/email-templates/{event}';
+};
+
+export type GetAdminNotificationEmailTemplateErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminNotificationEmailTemplateError = GetAdminNotificationEmailTemplateErrors[keyof GetAdminNotificationEmailTemplateErrors];
+
+export type GetAdminNotificationEmailTemplateResponses = {
+    /**
+     * Notification email template.
+     */
+    200: NotificationEmailTemplateResponse;
+};
+
+export type GetAdminNotificationEmailTemplateResponse = GetAdminNotificationEmailTemplateResponses[keyof GetAdminNotificationEmailTemplateResponses];
+
+export type UpdateAdminNotificationEmailTemplateData = {
+    body: UpdateNotificationEmailTemplateRequest;
+    path: {
+        event: NotificationEmailTemplateEventName;
+    };
+    query?: never;
+    url: '/api/v1/admin/notifications/email-templates/{event}';
+};
+
+export type UpdateAdminNotificationEmailTemplateErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UpdateAdminNotificationEmailTemplateError = UpdateAdminNotificationEmailTemplateErrors[keyof UpdateAdminNotificationEmailTemplateErrors];
+
+export type UpdateAdminNotificationEmailTemplateResponses = {
+    /**
+     * Notification email template updated.
+     */
+    200: NotificationEmailTemplateResponse;
+};
+
+export type UpdateAdminNotificationEmailTemplateResponse = UpdateAdminNotificationEmailTemplateResponses[keyof UpdateAdminNotificationEmailTemplateResponses];
+
+export type RestoreAdminNotificationEmailTemplateData = {
+    body?: never;
+    path: {
+        event: NotificationEmailTemplateEventName;
+    };
+    query?: never;
+    url: '/api/v1/admin/notifications/email-templates/{event}/restore';
+};
+
+export type RestoreAdminNotificationEmailTemplateErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type RestoreAdminNotificationEmailTemplateError = RestoreAdminNotificationEmailTemplateErrors[keyof RestoreAdminNotificationEmailTemplateErrors];
+
+export type RestoreAdminNotificationEmailTemplateResponses = {
+    /**
+     * Notification email template restored.
+     */
+    200: NotificationEmailTemplateResponse;
+};
+
+export type RestoreAdminNotificationEmailTemplateResponse = RestoreAdminNotificationEmailTemplateResponses[keyof RestoreAdminNotificationEmailTemplateResponses];
 
 export type ListAdminAnnouncementsData = {
     body?: never;
@@ -8308,6 +10616,12 @@ export type GetGatewayUsageResponse = GetGatewayUsageResponses[keyof GetGatewayU
 
 export type CreateChatCompletionData = {
     body: ChatCompletionRequest;
+    headers?: {
+        /**
+         * Optional opt-in idempotency key. A retried non-streaming request that repeats the same key and body replays the original response instead of re-executing (and re-billing). Streaming requests are not replayed.
+         */
+        'Idempotency-Key'?: string;
+    };
     path?: never;
     query?: never;
     url: '/v1/chat/completions';
@@ -8326,6 +10640,10 @@ export type CreateChatCompletionErrors = {
      * Gateway API key or user policy forbids this operation.
      */
     403: GatewayErrorResponse;
+    /**
+     * A request with this Idempotency-Key is already being processed or already completed without a replayable response.
+     */
+    409: GatewayErrorResponse;
     /**
      * Request cannot be converted without semantic loss.
      */
@@ -8353,6 +10671,12 @@ export type CreateChatCompletionResponse = CreateChatCompletionResponses[keyof C
 
 export type CreateResponseData = {
     body: ResponsesRequest;
+    headers?: {
+        /**
+         * Optional opt-in idempotency key. A retried non-streaming request that repeats the same key and body replays the original response instead of re-executing (and re-billing). Streaming requests are not replayed.
+         */
+        'Idempotency-Key'?: string;
+    };
     path?: never;
     query?: never;
     url: '/v1/responses';
@@ -8371,6 +10695,10 @@ export type CreateResponseErrors = {
      * Gateway API key or user policy forbids this operation.
      */
     403: GatewayErrorResponse;
+    /**
+     * A request with this Idempotency-Key is already being processed or already completed without a replayable response.
+     */
+    409: GatewayErrorResponse;
     /**
      * Request cannot be converted without semantic loss.
      */
@@ -8629,6 +10957,12 @@ export type ConnectRealtimeWebSocketResponse = ConnectRealtimeWebSocketResponses
 
 export type CreateMessageData = {
     body: AnthropicMessagesRequest;
+    headers?: {
+        /**
+         * Optional opt-in idempotency key. A retried non-streaming request that repeats the same key and body replays the original response instead of re-executing (and re-billing). Streaming requests are not replayed.
+         */
+        'Idempotency-Key'?: string;
+    };
     path?: never;
     query?: never;
     url: '/v1/messages';
@@ -8647,6 +10981,10 @@ export type CreateMessageErrors = {
      * Gateway API key or user policy forbids this operation.
      */
     403: GatewayErrorResponse;
+    /**
+     * A request with this Idempotency-Key is already being processed or already completed without a replayable response.
+     */
+    409: GatewayErrorResponse;
     /**
      * Request cannot be converted without semantic loss.
      */
@@ -8719,6 +11057,12 @@ export type CountAnthropicMessageTokensResponse = CountAnthropicMessageTokensRes
 
 export type CreateEmbeddingData = {
     body: EmbeddingRequest;
+    headers?: {
+        /**
+         * Optional opt-in idempotency key. A retried non-streaming request that repeats the same key and body replays the original response instead of re-executing (and re-billing). Streaming requests are not replayed.
+         */
+        'Idempotency-Key'?: string;
+    };
     path?: never;
     query?: never;
     url: '/v1/embeddings';
@@ -8737,6 +11081,10 @@ export type CreateEmbeddingErrors = {
      * Gateway API key or user policy forbids this operation.
      */
     403: GatewayErrorResponse;
+    /**
+     * A request with this Idempotency-Key is already being processed or already completed without a replayable response.
+     */
+    409: GatewayErrorResponse;
     /**
      * Request cannot be converted without semantic loss.
      */

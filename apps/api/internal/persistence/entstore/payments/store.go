@@ -2,15 +2,19 @@ package payments
 
 import (
 	"context"
+	stdsql "database/sql"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/srapi/srapi/apps/api/ent"
 	entpaymentauditlog "github.com/srapi/srapi/apps/api/ent/paymentauditlog"
 	entpaymentorder "github.com/srapi/srapi/apps/api/ent/paymentorder"
 	entpaymentproviderinstance "github.com/srapi/srapi/apps/api/ent/paymentproviderinstance"
+	admincontrolcontract "github.com/srapi/srapi/apps/api/internal/modules/admin_control/contract"
 	"github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
+	admincontrolstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/admincontrol"
 )
 
 var ErrInvalidStore = errors.New("invalid payments ent store")
@@ -103,11 +107,63 @@ func (s *Store) UpdateProviderInstance(ctx context.Context, input contract.Payme
 	return toProvider(updated), nil
 }
 
+func (s *Store) PreviewPromoCode(ctx context.Context, input contract.PromoCodePreviewInput) (contract.PromoCodeApplication, error) {
+	application, err := admincontrolstore.PreviewPromoCodeWithClient(ctx, s.client, admincontrolcontract.PromoCodePreviewInput{
+		UserID:   input.UserID,
+		Code:     input.Code,
+		Amount:   input.Amount,
+		Currency: input.Currency,
+		Now:      input.Now,
+	})
+	if err != nil {
+		return contract.PromoCodeApplication{}, paymentPromoError(err)
+	}
+	return toPaymentPromoCodeApplication(application), nil
+}
+
 func (s *Store) CreateOrder(ctx context.Context, input contract.CreateStoredOrder) (contract.PaymentOrder, error) {
-	create := s.client.PaymentOrder.Create().
+	if strings.TrimSpace(input.PromoCode) == "" || input.PromoCodeID == nil {
+		return s.createOrder(ctx, s.client, input)
+	}
+	tx, err := s.client.BeginTx(ctx, &stdsql.TxOptions{Isolation: stdsql.LevelSerializable})
+	if err != nil {
+		return contract.PaymentOrder{}, err
+	}
+	order, err := s.createOrder(ctx, tx.Client(), input)
+	if err != nil {
+		_ = tx.Rollback()
+		return contract.PaymentOrder{}, err
+	}
+	_, err = admincontrolstore.FinalizePromoCodeWithClient(ctx, tx.Client(), admincontrolcontract.PromoCodeFinalizeInput{
+		UserID:         input.UserID,
+		Code:           input.PromoCode,
+		PaymentOrderID: order.ID,
+		OrderNo:        order.OrderNo,
+		OriginalAmount: order.OriginalAmount,
+		FinalAmount:    order.Amount,
+		Currency:       order.Currency,
+		AppliedAt:      order.CreatedAt,
+	})
+	if err != nil {
+		_ = tx.Rollback()
+		return contract.PaymentOrder{}, paymentPromoError(err)
+	}
+	if err := tx.Commit(); err != nil {
+		return contract.PaymentOrder{}, err
+	}
+	return order, nil
+}
+
+func (s *Store) createOrder(ctx context.Context, client *ent.Client, input contract.CreateStoredOrder) (contract.PaymentOrder, error) {
+	originalAmount := defaultString(input.OriginalAmount, input.Amount)
+	discountAmount := defaultString(input.DiscountAmount, "0.00000000")
+	create := client.PaymentOrder.Create().
 		SetUserID(input.UserID).
 		SetOrderNo(input.OrderNo).
 		SetProviderInstanceID(input.ProviderInstanceID).
+		SetOriginalAmount(originalAmount).
+		SetDiscountAmount(discountAmount).
+		SetNillablePromoCodeID(input.PromoCodeID).
 		SetAmount(input.Amount).
 		SetCurrency(input.Currency).
 		SetStatus(string(input.Status)).
@@ -128,6 +184,9 @@ func (s *Store) UpdateOrder(ctx context.Context, input contract.PaymentOrder) (c
 		SetUserID(input.UserID).
 		SetOrderNo(input.OrderNo).
 		SetProviderInstanceID(input.ProviderInstanceID).
+		SetOriginalAmount(defaultString(input.OriginalAmount, input.Amount)).
+		SetDiscountAmount(defaultString(input.DiscountAmount, "0.00000000")).
+		SetNillablePromoCodeID(input.PromoCodeID).
 		SetAmount(input.Amount).
 		SetCurrency(input.Currency).
 		SetStatus(string(input.Status)).
@@ -226,6 +285,15 @@ func (s *Store) ListOrdersByUser(ctx context.Context, userID int) ([]contract.Pa
 	return out, nil
 }
 
+func (s *Store) CountInProgressOrdersByProviderInstance(ctx context.Context, providerInstanceID int) (int, error) {
+	return s.client.PaymentOrder.Query().
+		Where(
+			entpaymentorder.ProviderInstanceIDEQ(providerInstanceID),
+			entpaymentorder.StatusIn(inProgressOrderStatuses()...),
+		).
+		Count(ctx)
+}
+
 func (s *Store) ExpireOrder(ctx context.Context, orderID int, now time.Time) (contract.PaymentOrder, bool, error) {
 	now = now.UTC()
 	updated, err := s.client.PaymentOrder.UpdateOneID(orderID).
@@ -249,6 +317,13 @@ func (s *Store) ExpireOrder(ctx context.Context, orderID int, now time.Time) (co
 		return contract.PaymentOrder{}, false, findErr
 	}
 	return order, false, nil
+}
+
+func inProgressOrderStatuses() []string {
+	return []string{
+		string(contract.OrderStatusPending),
+		string(contract.OrderStatusPaid),
+	}
 }
 
 func (s *Store) CreateAuditLog(ctx context.Context, input contract.PaymentAuditLog) (contract.PaymentAuditLog, bool, error) {
@@ -328,6 +403,9 @@ func toOrder(row *ent.PaymentOrder) contract.PaymentOrder {
 		UserID:                row.UserID,
 		OrderNo:               row.OrderNo,
 		ProviderInstanceID:    row.ProviderInstanceID,
+		OriginalAmount:        defaultString(row.OriginalAmount, row.Amount),
+		DiscountAmount:        defaultString(row.DiscountAmount, "0.00000000"),
+		PromoCodeID:           cloneInt(row.PromoCodeID),
 		Amount:                row.Amount,
 		Currency:              row.Currency,
 		Status:                contract.OrderStatus(row.Status),
@@ -395,4 +473,50 @@ func cloneString(value *string) *string {
 	}
 	cloned := *value
 	return &cloned
+}
+
+func cloneInt(value *int) *int {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
+}
+
+func defaultString(value string, fallback string) string {
+	if strings.TrimSpace(value) == "" {
+		return fallback
+	}
+	return value
+}
+
+func toPaymentPromoCodeApplication(application admincontrolcontract.PromoCodeApplication) contract.PromoCodeApplication {
+	return contract.PromoCodeApplication{
+		ID:             application.ID,
+		UserID:         application.UserID,
+		PromoCodeID:    application.PromoCodeID,
+		PaymentOrderID: application.PaymentOrderID,
+		OrderNo:        application.OrderNo,
+		OriginalAmount: application.OriginalAmount,
+		DiscountAmount: application.DiscountAmount,
+		FinalAmount:    application.FinalAmount,
+		Currency:       application.Currency,
+		DiscountType:   string(application.DiscountType),
+		AppliedAt:      application.AppliedAt,
+		CreatedAt:      application.CreatedAt,
+		UpdatedAt:      application.UpdatedAt,
+	}
+}
+
+func paymentPromoError(err error) error {
+	switch {
+	case errors.Is(err, admincontrolcontract.ErrInvalidInput):
+		return contract.ErrInvalidInput
+	case errors.Is(err, admincontrolcontract.ErrNotFound):
+		return contract.ErrNotFound
+	case errors.Is(err, admincontrolcontract.ErrConflict):
+		return contract.ErrConflict
+	default:
+		return err
+	}
 }

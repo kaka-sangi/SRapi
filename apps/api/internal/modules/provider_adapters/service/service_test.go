@@ -8933,10 +8933,18 @@ func (failingRuntime) Do(context.Context, reverseproxycontract.Request) (reverse
 	return reverseproxycontract.Response{}, reverseproxycontract.RuntimeError{Class: "session_invalid", StatusCode: http.StatusForbidden, Message: "session invalid"}
 }
 
+func (failingRuntime) ManagedEgressClient(reverseproxycontract.AccountRuntime) (*http.Client, bool, error) {
+	return nil, false, nil
+}
+
 type legacyUpstreamErrorRuntime struct{}
 
 func (legacyUpstreamErrorRuntime) Do(context.Context, reverseproxycontract.Request) (reverseproxycontract.Response, error) {
 	return reverseproxycontract.Response{}, reverseproxycontract.RuntimeError{Class: "upstream_error", StatusCode: http.StatusBadGateway, Message: "upstream failed"}
+}
+
+func (legacyUpstreamErrorRuntime) ManagedEgressClient(reverseproxycontract.AccountRuntime) (*http.Client, bool, error) {
+	return nil, false, nil
 }
 
 type capturingRuntime struct {
@@ -8951,6 +8959,10 @@ func (r *capturingRuntime) Do(_ context.Context, req reverseproxycontract.Reques
 		return reverseproxycontract.Response{}, r.err
 	}
 	return r.response, nil
+}
+
+func (r *capturingRuntime) ManagedEgressClient(reverseproxycontract.AccountRuntime) (*http.Client, bool, error) {
+	return nil, false, nil
 }
 
 type sequenceRuntime struct {
@@ -8969,6 +8981,10 @@ func (r *sequenceRuntime) Do(_ context.Context, req reverseproxycontract.Request
 		return r.responses[idx], nil
 	}
 	return reverseproxycontract.Response{}, nil
+}
+
+func (r *sequenceRuntime) ManagedEgressClient(reverseproxycontract.AccountRuntime) (*http.Client, bool, error) {
+	return nil, false, nil
 }
 
 func assertProviderError(t *testing.T, err error, class string, statusCode int) contract.ProviderError {

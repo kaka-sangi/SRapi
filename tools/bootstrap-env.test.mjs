@@ -18,12 +18,17 @@ test("bootstrap env rewrites weak local placeholders", () => {
     output,
     /local_dev_master_key_32_bytes_minimum_change_me/,
   );
+  assert.doesNotMatch(
+    output,
+    /local_dev_totp_key_32_bytes_minimum_change_me/,
+  );
   assert.doesNotMatch(output, /local_dev_api_key_pepper_change_me_32\+/);
   assert.doesNotMatch(output, /BOOTSTRAP_ADMIN_PASSWORD=password123/);
   for (const key of [
     "DATABASE_PASSWORD",
     "JWT_SECRET",
     "SRAPI_MASTER_KEY",
+    "TOTP_ENCRYPTION_KEY",
     "API_KEY_PEPPER",
     "BOOTSTRAP_ADMIN_PASSWORD",
   ]) {
@@ -52,7 +57,7 @@ test("bootstrap env creates private .env without printing generated secrets", ()
   assert.match(result.stdout, /created with generated local secrets/);
   assert.doesNotMatch(
     result.stdout,
-    /srapi_admin_|srapi_jwt_|srapi_master_|srapi_pepper_|srapi_db_/,
+    /srapi_admin_|srapi_jwt_|srapi_master_|srapi_totp_|srapi_pepper_|srapi_db_/,
   );
   assert.equal(statSync(envPath).mode & 0o777, 0o600);
   assert.equal(

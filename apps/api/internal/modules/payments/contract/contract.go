@@ -7,8 +7,9 @@ import (
 )
 
 var (
-	ErrNotFound = errors.New("payment resource not found")
-	ErrConflict = errors.New("payment resource conflict")
+	ErrNotFound     = errors.New("payment resource not found")
+	ErrConflict     = errors.New("payment resource conflict")
+	ErrInvalidInput = errors.New("invalid payment input")
 )
 
 type ProviderStatus string
@@ -68,6 +69,9 @@ type PaymentOrder struct {
 	UserID                int
 	OrderNo               string
 	ProviderInstanceID    int
+	OriginalAmount        string
+	DiscountAmount        string
+	PromoCodeID           *int
 	Amount                string
 	Currency              string
 	Status                OrderStatus
@@ -144,6 +148,7 @@ type CreateOrderRequest struct {
 	Currency    string
 	ProductType ProductType
 	ProductID   string
+	PromoCode   string
 	ExpiresAt   *time.Time
 	Metadata    map[string]any
 }
@@ -152,6 +157,10 @@ type CreateStoredOrder struct {
 	UserID             int
 	OrderNo            string
 	ProviderInstanceID int
+	OriginalAmount     string
+	DiscountAmount     string
+	PromoCodeID        *int
+	PromoCode          string
 	Amount             string
 	Currency           string
 	Status             OrderStatus
@@ -160,6 +169,30 @@ type CreateStoredOrder struct {
 	ProviderSnapshot   map[string]any
 	ExpiresAt          *time.Time
 	Metadata           map[string]any
+}
+
+type PromoCodePreviewInput struct {
+	UserID   int
+	Code     string
+	Amount   string
+	Currency string
+	Now      time.Time
+}
+
+type PromoCodeApplication struct {
+	ID             int
+	UserID         int
+	PromoCodeID    int
+	PaymentOrderID int
+	OrderNo        string
+	OriginalAmount string
+	DiscountAmount string
+	FinalAmount    string
+	Currency       string
+	DiscountType   string
+	AppliedAt      time.Time
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
 
 type WebhookRequest struct {
@@ -191,6 +224,7 @@ type Store interface {
 	ListProviderInstances(ctx context.Context) ([]PaymentProviderInstance, error)
 	FindProviderInstanceByID(ctx context.Context, id int) (PaymentProviderInstance, error)
 	UpdateProviderInstance(ctx context.Context, input PaymentProviderInstance) (PaymentProviderInstance, error)
+	PreviewPromoCode(ctx context.Context, input PromoCodePreviewInput) (PromoCodeApplication, error)
 	CreateOrder(ctx context.Context, input CreateStoredOrder) (PaymentOrder, error)
 	UpdateOrder(ctx context.Context, input PaymentOrder) (PaymentOrder, error)
 	FindOrderByID(ctx context.Context, id int) (PaymentOrder, error)
@@ -198,6 +232,7 @@ type Store interface {
 	ListOrders(ctx context.Context) ([]PaymentOrder, error)
 	ListExpiredPendingOrders(ctx context.Context, now time.Time) ([]PaymentOrder, error)
 	ListOrdersByUser(ctx context.Context, userID int) ([]PaymentOrder, error)
+	CountInProgressOrdersByProviderInstance(ctx context.Context, providerInstanceID int) (int, error)
 	ExpireOrder(ctx context.Context, orderID int, now time.Time) (PaymentOrder, bool, error)
 	CreateAuditLog(ctx context.Context, input PaymentAuditLog) (PaymentAuditLog, bool, error)
 	ListAuditLogsByOrder(ctx context.Context, orderID int) ([]PaymentAuditLog, error)

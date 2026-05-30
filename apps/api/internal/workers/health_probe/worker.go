@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"math/rand/v2"
 	"net/http"
 	"sync"
 	"time"
@@ -31,6 +32,7 @@ const (
 // Config controls health probe worker scheduling, concurrency, and state thresholds.
 type Config struct {
 	Interval               time.Duration
+	Jitter                 time.Duration
 	Timeout                time.Duration
 	MaxConcurrent          int
 	MasterKey              string
@@ -59,9 +61,11 @@ type Worker struct {
 	adapter       provideradaptercontract.ProbeAdapter
 	logger        *slog.Logger
 	interval      time.Duration
+	jitter        time.Duration
 	timeout       time.Duration
 	maxConcurrent int
 	policy        accountcontract.AccountProbePolicy
+	randN         func(int64) int64
 
 	mu     sync.Mutex
 	cancel context.CancelFunc
@@ -92,15 +96,25 @@ func New(accounts accountcontract.Store, providers providercontract.Store, logge
 			return nil, err
 		}
 	}
+	interval := durationOrDefault(cfg.Interval, defaultInterval)
+	jitter := cfg.Jitter
+	if jitter <= 0 {
+		jitter = interval
+	}
+	if jitter > interval {
+		jitter = interval
+	}
 	return &Worker{
 		accounts:      accountsSvc,
 		providers:     providersSvc,
 		adapter:       adapter,
 		logger:        logger,
-		interval:      durationOrDefault(cfg.Interval, defaultInterval),
+		interval:      interval,
+		jitter:        jitter,
 		timeout:       durationOrDefault(cfg.Timeout, defaultTimeout),
 		maxConcurrent: positiveOrDefault(cfg.MaxConcurrent, defaultMaxConcurrent),
 		policy:        normalizePolicy(cfg),
+		randN:         func(n int64) int64 { return rand.Int64N(n) },
 	}, nil
 }
 
@@ -165,11 +179,17 @@ func (w *Worker) Shutdown(ctx context.Context) error {
 	}
 }
 
-// RunOnce executes one probe pass.
+// RunOnce executes one probe pass immediately, without desync jitter. The
+// background loop uses jitter; RunOnce is the deterministic single-pass entry
+// for callers and tests.
 func (w *Worker) RunOnce(ctx context.Context) (Result, error) {
 	if w == nil {
 		return Result{}, nil
 	}
+	return w.probePass(ctx, false)
+}
+
+func (w *Worker) probePass(ctx context.Context, applyJitter bool) (Result, error) {
 	accounts, err := w.accounts.List(ctx)
 	if err != nil {
 		return Result{}, err
@@ -195,23 +215,48 @@ func (w *Worker) RunOnce(ctx context.Context) (Result, error) {
 			mu.Unlock()
 			continue
 		}
-		select {
-		case <-ctx.Done():
-			mu.Lock()
-			firstErr = errors.Join(firstErr, ctx.Err())
-			mu.Unlock()
-			continue
-		case sem <- struct{}{}:
-		}
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			// Desynchronize probes: each eligible account waits a bounded random
+			// delay so many accounts never hit their upstreams as one synchronized
+			// burst (which, on a shared egress, is itself a correlation signal).
+			if applyJitter {
+				sleepWithContext(ctx, jitterDuration(w.jitter, w.randN))
+			}
+			select {
+			case <-ctx.Done():
+				mu.Lock()
+				firstErr = errors.Join(firstErr, ctx.Err())
+				mu.Unlock()
+				return
+			case sem <- struct{}{}:
+			}
 			defer func() { <-sem }()
 			w.probeOne(ctx, account, provider, &mu, &result, &firstErr)
 		}()
 	}
 	wg.Wait()
 	return result, firstErr
+}
+
+func jitterDuration(max time.Duration, randN func(int64) int64) time.Duration {
+	if max <= 0 || randN == nil {
+		return 0
+	}
+	return time.Duration(randN(int64(max)))
+}
+
+func sleepWithContext(ctx context.Context, d time.Duration) {
+	if d <= 0 {
+		return
+	}
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+	case <-timer.C:
+	}
 }
 
 func (w *Worker) run(ctx context.Context) {
@@ -229,7 +274,7 @@ func (w *Worker) run(ctx context.Context) {
 }
 
 func (w *Worker) probeAndLog(ctx context.Context) {
-	result, err := w.RunOnce(ctx)
+	result, err := w.probePass(ctx, true)
 	if err != nil && !errors.Is(err, context.Canceled) {
 		w.logger.Warn("account health probe failed", "error", err)
 	}

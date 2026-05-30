@@ -1541,6 +1541,11 @@ func (rt *runtimeState) refreshReverseProxyCredential(ctx context.Context, accou
 			After:        map[string]any{"refresh_status": "failed", "error_class": errorClassName(err)},
 			TraceID:      requestIDFromContext(ctx),
 		})
+		// A permanently rejected refresh token (session_invalid) parks the account
+		// for re-auth so the scheduler stops selecting it and we stop replaying a
+		// dead refresh token; transient classes (rate_limit/timeout/upstream_error)
+		// map to no status and leave the account untouched for the next attempt.
+		rt.protectProviderAccountForClass(ctx, account, errorClassName(err))
 		return credential, false, err
 	}
 	refreshed := response.Credential
@@ -1602,7 +1607,17 @@ func (rt *runtimeState) applyProviderAccountProtection(ctx context.Context, acco
 	if !gatewayAccountFailureStatusHandled(account.Metadata, &providerErr.StatusCode) {
 		return
 	}
-	nextStatus, ok := reverseProxyAccountFailureStatus(providerErr.Class)
+	rt.protectProviderAccountForClass(ctx, account, providerErr.Class)
+}
+
+// protectProviderAccountForClass transitions a non-api_key account to the
+// protective status implied by an upstream failure class (e.g. session_invalid
+// -> needs_reauth) and records an auto_protect audit. It is a no-op when the
+// class maps to no protective status or the account already holds it. Shared by
+// adapter-invoke failures and serve-time OAuth refresh failures so a permanently
+// rejected refresh token parks the account instead of being retried forever.
+func (rt *runtimeState) protectProviderAccountForClass(ctx context.Context, account accountcontract.ProviderAccount, class string) {
+	nextStatus, ok := reverseProxyAccountFailureStatus(class)
 	if !ok || account.Status == nextStatus {
 		return
 	}

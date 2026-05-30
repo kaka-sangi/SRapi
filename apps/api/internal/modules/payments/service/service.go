@@ -159,6 +159,7 @@ func (s *Service) UpdateProviderInstance(ctx context.Context, id int, req contra
 	if provider.DeletedAt != nil {
 		return contract.PaymentProviderInstance{}, contract.ErrNotFound
 	}
+	originalProvider := provider
 
 	config := map[string]any(nil)
 	needsEncrypt := req.Config != nil
@@ -206,6 +207,9 @@ func (s *Service) UpdateProviderInstance(ctx context.Context, id int, req contra
 		}
 		config = cloneMap(*req.Config)
 	}
+	if err := s.validateProviderUpdateInProgressOrderSafety(ctx, originalProvider, provider, req.Config != nil); err != nil {
+		return contract.PaymentProviderInstance{}, err
+	}
 	if needsEncrypt {
 		ciphertext, err := s.encryptConfig(provider.Provider, provider.Name, config)
 		if err != nil {
@@ -216,6 +220,43 @@ func (s *Service) UpdateProviderInstance(ctx context.Context, id int, req contra
 	}
 	provider.UpdatedAt = s.clock.Now()
 	return s.store.UpdateProviderInstance(ctx, provider)
+}
+
+func (s *Service) validateProviderUpdateInProgressOrderSafety(ctx context.Context, current contract.PaymentProviderInstance, next contract.PaymentProviderInstance, configReplaced bool) error {
+	if !providerUpdateNeedsInProgressOrderGuard(current, next, configReplaced) {
+		return nil
+	}
+	count, err := s.store.CountInProgressOrdersByProviderInstance(ctx, current.ID)
+	if err != nil {
+		return err
+	}
+	if count > 0 {
+		return contract.ErrConflict
+	}
+	return nil
+}
+
+func providerUpdateNeedsInProgressOrderGuard(current contract.PaymentProviderInstance, next contract.PaymentProviderInstance, configReplaced bool) bool {
+	if configReplaced {
+		return true
+	}
+	if current.Status != next.Status && next.Status != contract.ProviderStatusActive {
+		return true
+	}
+	return removesSupportedMethods(current.SupportedMethods, next.SupportedMethods)
+}
+
+func removesSupportedMethods(current []string, next []string) bool {
+	nextSet := map[string]struct{}{}
+	for _, method := range normalizeMethods(next) {
+		nextSet[method] = struct{}{}
+	}
+	for _, method := range normalizeMethods(current) {
+		if _, ok := nextSet[method]; !ok {
+			return true
+		}
+	}
+	return false
 }
 
 // TestProviderInstance validates locally stored payment provider configuration without calling upstream payment APIs.
@@ -312,6 +353,36 @@ func (s *Service) CreateOrder(ctx context.Context, req contract.CreateOrderReque
 		return contract.PaymentOrder{}, ErrInvalidInput
 	}
 	currency := normalizeCurrency(req.Currency)
+	originalAmount := amount
+	discountAmount := "0.00000000"
+	var promoCodeID *int
+	promoCode := normalizePromoCode(req.PromoCode)
+	if promoCode != "" {
+		preview, err := s.store.PreviewPromoCode(ctx, contract.PromoCodePreviewInput{
+			UserID:   req.UserID,
+			Code:     promoCode,
+			Amount:   amount,
+			Currency: currency,
+			Now:      s.clock.Now(),
+		})
+		if err != nil {
+			return contract.PaymentOrder{}, err
+		}
+		if preview.PromoCodeID <= 0 || compareMoney(preview.FinalAmount, "0.00000000") <= 0 || compareMoney(preview.OriginalAmount, amount) != 0 {
+			return contract.PaymentOrder{}, ErrInvalidInput
+		}
+		previewFinal, ok := normalizeMoney(preview.FinalAmount)
+		if !ok {
+			return contract.PaymentOrder{}, ErrInvalidInput
+		}
+		previewDiscount, ok := normalizeMoney(preview.DiscountAmount)
+		if !ok {
+			return contract.PaymentOrder{}, ErrInvalidInput
+		}
+		amount = previewFinal
+		discountAmount = previewDiscount
+		promoCodeID = &preview.PromoCodeID
+	}
 	if !validProduct(req.ProductType, req.ProductID) {
 		return contract.PaymentOrder{}, ErrInvalidInput
 	}
@@ -331,6 +402,10 @@ func (s *Service) CreateOrder(ctx context.Context, req contract.CreateOrderReque
 		UserID:             req.UserID,
 		OrderNo:            orderNo,
 		ProviderInstanceID: instance.ID,
+		OriginalAmount:     originalAmount,
+		DiscountAmount:     discountAmount,
+		PromoCodeID:        cloneInt(promoCodeID),
+		PromoCode:          promoCode,
 		Amount:             amount,
 		Currency:           currency,
 		Status:             contract.OrderStatusPending,
@@ -1124,12 +1199,24 @@ func normalizeMoney(value string) (string, bool) {
 	return formatRatFixed(rat, 8), true
 }
 
+func normalizePromoCode(value string) string {
+	return strings.ToUpper(strings.TrimSpace(value))
+}
+
 func defaultMoney(value string) string {
 	normalized, ok := normalizeMoney(value)
 	if !ok {
 		return "0.00000000"
 	}
 	return normalized
+}
+
+func cloneInt(value *int) *int {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
 }
 
 func decimalRat(value string) (*big.Rat, bool) {

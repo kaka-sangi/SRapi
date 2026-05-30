@@ -63,13 +63,34 @@ var (
 	_ contract.WebSocketRuntime = (*Service)(nil)
 )
 
-func New(factory ClientFactory) (*Service, error) {
-	defaultClient, err := newIsolatedClient(contract.AccountRuntime{})
+// Option configures a reverse-proxy Service.
+type Option func(*serviceConfig)
+
+type serviceConfig struct {
+	blockPrivateEgress bool
+}
+
+// WithBlockedPrivateEgress blocks direct (non-proxied) upstream dials whose
+// resolved IP is in a private/loopback/link-local/metadata range. Enable it
+// outside local mode; the zero value (and a plain New(nil)) leaves egress
+// unscreened for local/dev/test against loopback servers.
+func WithBlockedPrivateEgress(blocked bool) Option {
+	return func(c *serviceConfig) { c.blockPrivateEgress = blocked }
+}
+
+func New(factory ClientFactory, opts ...Option) (*Service, error) {
+	cfg := serviceConfig{}
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+	defaultClient, err := newIsolatedClient(contract.AccountRuntime{}, cfg.blockPrivateEgress)
 	if err != nil {
 		return nil, err
 	}
 	if factory == nil {
-		factory = newIsolatedClient
+		factory = func(account contract.AccountRuntime) (*http.Client, error) {
+			return newIsolatedClient(account, cfg.blockPrivateEgress)
+		}
 	}
 	return &Service{
 		clients:        map[string]*http.Client{},
@@ -486,6 +507,36 @@ func (s *Service) clientFor(account contract.AccountRuntime) (*http.Client, erro
 	return client, nil
 }
 
+// ManagedEgressClient returns the per-account egress client (proxy + uTLS
+// fingerprint + SSRF guard) when the account is configured for managed egress,
+// reusing the same cached client as live reverse-proxy traffic. It reports false
+// for accounts with no egress configuration so the caller keeps its own client.
+func (s *Service) ManagedEgressClient(account contract.AccountRuntime) (*http.Client, bool, error) {
+	if !accountHasManagedEgress(account) {
+		return nil, false, nil
+	}
+	client, err := s.clientFor(account)
+	if err != nil {
+		return nil, false, err
+	}
+	return client, true, nil
+}
+
+// accountHasManagedEgress reports whether the account configures transport-level
+// egress (an explicit proxy or a uTLS/HTTP-version egress profile). Static header
+// or user-agent overrides are applied by Do, not by the client, so they do not
+// imply a managed transport here.
+func accountHasManagedEgress(account contract.AccountRuntime) bool {
+	if accountHasProxy(account) {
+		return true
+	}
+	profile, err := resolveEgressProfile(account)
+	if err != nil {
+		return false
+	}
+	return profile.TLSTemplate != "" || profile.requiresHTTP1()
+}
+
 func (s *Service) refreshLock(accountID int) *sync.Mutex {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -497,7 +548,7 @@ func (s *Service) refreshLock(accountID int) *sync.Mutex {
 	return lock
 }
 
-func newIsolatedClient(account contract.AccountRuntime) (*http.Client, error) {
+func newIsolatedClient(account contract.AccountRuntime, blockPrivateEgress bool) (*http.Client, error) {
 	jar, err := cookiejar.New(nil)
 	if err != nil {
 		return nil, err
@@ -505,11 +556,17 @@ func newIsolatedClient(account contract.AccountRuntime) (*http.Client, error) {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.Proxy = proxyFunc(account.ProxyID)
 	transport.DisableCompression = true
+	// Screen direct (non-proxied) dials against private networks. A configured
+	// egress proxy is operator-trusted and routed without screening.
+	guardPrivateEgress := blockPrivateEgress && !accountHasProxy(account)
+	if guardPrivateEgress {
+		transport.DialContext = egressDialer(true).DialContext
+	}
 	profile, err := resolveEgressProfile(account)
 	if err != nil {
 		return nil, err
 	}
-	if err := configureTransportForEgress(transport, account, profile); err != nil {
+	if err := configureTransportForEgress(transport, account, profile, guardPrivateEgress); err != nil {
 		return nil, err
 	}
 	return &http.Client{

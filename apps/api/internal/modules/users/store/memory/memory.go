@@ -2,7 +2,6 @@ package memory
 
 import (
 	"context"
-	"errors"
 	"sort"
 	"strconv"
 	"strings"
@@ -13,21 +12,27 @@ import (
 )
 
 type Store struct {
-	mu         sync.Mutex
-	nextID     int
-	nextRoleID int
-	byID       map[int]contract.StoredUser
-	byEmail    map[string]int
-	roles      map[contract.Role]contract.RoleDefinition
+	mu             sync.Mutex
+	nextID         int
+	nextRoleID     int
+	nextIdentityID int
+	byID           map[int]contract.StoredUser
+	byEmail        map[string]int
+	roles          map[contract.Role]contract.RoleDefinition
+	identities     map[int]contract.UserAuthIdentity
+	identityByKey  map[string]int
 }
 
 func New() *Store {
 	store := &Store{
-		nextID:     1,
-		nextRoleID: 1,
-		byID:       map[int]contract.StoredUser{},
-		byEmail:    map[string]int{},
-		roles:      map[contract.Role]contract.RoleDefinition{},
+		nextID:         1,
+		nextRoleID:     1,
+		nextIdentityID: 1,
+		byID:           map[int]contract.StoredUser{},
+		byEmail:        map[string]int{},
+		roles:          map[contract.Role]contract.RoleDefinition{},
+		identities:     map[int]contract.UserAuthIdentity{},
+		identityByKey:  map[string]int{},
 	}
 	store.seedBuiltInRoles()
 	return store
@@ -38,24 +43,25 @@ func (s *Store) Create(_ context.Context, input contract.CreateStoredUser) (cont
 	defer s.mu.Unlock()
 	email := strings.ToLower(strings.TrimSpace(input.Email))
 	if _, ok := s.byEmail[email]; ok {
-		return contract.StoredUser{}, errors.New("user already exists")
+		return contract.StoredUser{}, contract.ErrAlreadyExists
 	}
 	now := time.Now().UTC()
 	user := contract.StoredUser{
 		User: contract.User{
-			ID:          s.nextID,
-			Email:       email,
-			Name:        input.Name,
-			Status:      input.Status,
-			WorkspaceID: cloneInt(input.WorkspaceID),
-			Roles:       append([]contract.Role(nil), input.Roles...),
-			Balance:     input.Balance,
-			Currency:    input.Currency,
-			RPMLimit:    cloneInt(input.RPMLimit),
-			CreatedAt:   now,
+			ID:              s.nextID,
+			Email:           email,
+			Name:            input.Name,
+			Status:          input.Status,
+			WorkspaceID:     cloneInt(input.WorkspaceID),
+			Roles:           append([]contract.Role(nil), input.Roles...),
+			Balance:         input.Balance,
+			Currency:        input.Currency,
+			RPMLimit:        cloneInt(input.RPMLimit),
+			CreatedAt:       now,
+			EmailVerifiedAt: cloneTime(input.EmailVerifiedAt),
 		},
 		PasswordHash:    input.PasswordHash,
-		EmailVerifiedAt: input.EmailVerifiedAt,
+		EmailVerifiedAt: cloneTime(input.EmailVerifiedAt),
 	}
 	user = s.withRolePermissions(user)
 	s.byID[user.ID] = user
@@ -69,7 +75,7 @@ func (s *Store) FindByID(_ context.Context, id int) (contract.StoredUser, error)
 	defer s.mu.Unlock()
 	user, ok := s.byID[id]
 	if !ok {
-		return contract.StoredUser{}, errors.New("user not found")
+		return contract.StoredUser{}, contract.ErrNotFound
 	}
 	return cloneUser(s.withRolePermissions(user)), nil
 }
@@ -79,7 +85,7 @@ func (s *Store) FindByEmail(_ context.Context, email string) (contract.StoredUse
 	defer s.mu.Unlock()
 	id, ok := s.byEmail[strings.ToLower(strings.TrimSpace(email))]
 	if !ok {
-		return contract.StoredUser{}, errors.New("user not found")
+		return contract.StoredUser{}, contract.ErrNotFound
 	}
 	return cloneUser(s.withRolePermissions(s.byID[id])), nil
 }
@@ -112,7 +118,7 @@ func (s *Store) ListByIDs(_ context.Context, ids []int) ([]contract.StoredUser, 
 	for _, id := range ids {
 		user, ok := s.byID[id]
 		if !ok {
-			return nil, errors.New("user not found")
+			return nil, contract.ErrNotFound
 		}
 		users = append(users, cloneUser(s.withRolePermissions(user)))
 	}
@@ -124,12 +130,12 @@ func (s *Store) Update(_ context.Context, id int, input contract.UpdateStoredUse
 	defer s.mu.Unlock()
 	user, ok := s.byID[id]
 	if !ok {
-		return contract.StoredUser{}, errors.New("user not found")
+		return contract.StoredUser{}, contract.ErrNotFound
 	}
 	if input.Email != nil {
 		email := strings.ToLower(strings.TrimSpace(*input.Email))
 		if existingID, exists := s.byEmail[email]; exists && existingID != id {
-			return contract.StoredUser{}, errors.New("user already exists")
+			return contract.StoredUser{}, contract.ErrAlreadyExists
 		}
 		delete(s.byEmail, strings.ToLower(user.Email))
 		user.Email = email
@@ -159,9 +165,43 @@ func (s *Store) Update(_ context.Context, id int, input contract.UpdateStoredUse
 	if input.RPMLimit != nil {
 		user.RPMLimit = cloneInt(*input.RPMLimit)
 	}
+	if input.EmailVerifiedAt != nil {
+		if *input.EmailVerifiedAt == nil {
+			user.EmailVerifiedAt = nil
+			user.User.EmailVerifiedAt = nil
+		} else {
+			emailVerifiedAt := **input.EmailVerifiedAt
+			user.EmailVerifiedAt = &emailVerifiedAt
+			user.User.EmailVerifiedAt = &emailVerifiedAt
+		}
+	}
 	user = s.withRolePermissions(user)
 	s.byID[id] = user
 	return cloneUser(user), nil
+}
+
+func (s *Store) Delete(_ context.Context, id int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	user, ok := s.byID[id]
+	if !ok {
+		return contract.ErrNotFound
+	}
+	delete(s.byID, id)
+	delete(s.byEmail, strings.ToLower(user.Email))
+	for identityID, identity := range s.identities {
+		if identity.UserID != id {
+			continue
+		}
+		for key, id := range s.identityByKey {
+			if id == identityID {
+				delete(s.identityByKey, key)
+				break
+			}
+		}
+		delete(s.identities, identityID)
+	}
+	return nil
 }
 
 func (s *Store) UpdateLastLogin(_ context.Context, id int, at time.Time) error {
@@ -169,7 +209,7 @@ func (s *Store) UpdateLastLogin(_ context.Context, id int, at time.Time) error {
 	defer s.mu.Unlock()
 	user, ok := s.byID[id]
 	if !ok {
-		return errors.New("user not found")
+		return contract.ErrNotFound
 	}
 	user.LastLoginAt = &at
 	s.byID[id] = user
@@ -181,7 +221,7 @@ func (s *Store) CreateRole(_ context.Context, input contract.CreateStoredRole) (
 	defer s.mu.Unlock()
 	name := contract.Role(strings.TrimSpace(string(input.Name)))
 	if _, ok := s.roles[name]; ok {
-		return contract.RoleDefinition{}, errors.New("role already exists")
+		return contract.RoleDefinition{}, contract.ErrAlreadyExists
 	}
 	now := time.Now().UTC()
 	role := contract.RoleDefinition{
@@ -206,6 +246,105 @@ func (s *Store) ListRoles(_ context.Context) ([]contract.RoleDefinition, error) 
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out, nil
+}
+
+func (s *Store) ListAuthIdentities(_ context.Context, userID int) ([]contract.UserAuthIdentity, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.byID[userID]; !ok {
+		return nil, contract.ErrNotFound
+	}
+	out := make([]contract.UserAuthIdentity, 0)
+	for _, identity := range s.identities {
+		if identity.UserID != userID {
+			continue
+		}
+		out = append(out, cloneIdentity(identity))
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Provider == out[j].Provider {
+			return out[i].ID < out[j].ID
+		}
+		return out[i].Provider < out[j].Provider
+	})
+	return out, nil
+}
+
+func (s *Store) FindAuthIdentityByProviderSubject(_ context.Context, provider contract.AuthIdentityProvider, providerKey string, providerSubjectHash string) (contract.UserAuthIdentity, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key := identityKey(provider, providerKey, providerSubjectHash)
+	if key == "" {
+		return contract.UserAuthIdentity{}, contract.ErrNotFound
+	}
+	id, ok := s.identityByKey[key]
+	if !ok {
+		return contract.UserAuthIdentity{}, contract.ErrNotFound
+	}
+	identity, ok := s.identities[id]
+	if !ok {
+		return contract.UserAuthIdentity{}, contract.ErrNotFound
+	}
+	return cloneIdentity(identity), nil
+}
+
+func (s *Store) UpsertAuthIdentity(_ context.Context, input contract.CreateUserAuthIdentity) (contract.UserAuthIdentity, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.byID[input.UserID]; !ok {
+		return contract.UserAuthIdentity{}, contract.ErrNotFound
+	}
+	key := identityKey(input.Provider, input.ProviderKey, input.ProviderSubjectHash)
+	if key == "" {
+		return contract.UserAuthIdentity{}, contract.ErrNotFound
+	}
+	now := time.Now().UTC()
+	identity := contract.UserAuthIdentity{
+		UserID:        input.UserID,
+		Provider:      input.Provider,
+		ProviderKey:   strings.TrimSpace(input.ProviderKey),
+		SubjectHint:   strings.TrimSpace(input.SubjectHint),
+		DisplayName:   strings.TrimSpace(input.DisplayName),
+		Email:         strings.ToLower(strings.TrimSpace(input.Email)),
+		EmailVerified: input.EmailVerified,
+		AvatarURL:     strings.TrimSpace(input.AvatarURL),
+		External:      true,
+		VerifiedAt:    cloneTime(input.VerifiedAt),
+		LastUsedAt:    cloneTime(input.LastUsedAt),
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}
+	if existingID, ok := s.identityByKey[key]; ok {
+		identity.ID = existingID
+		existing := s.identities[existingID]
+		if existing.UserID != input.UserID {
+			return contract.UserAuthIdentity{}, contract.ErrAlreadyExists
+		}
+		identity.CreatedAt = existing.CreatedAt
+	} else {
+		identity.ID = s.nextIdentityID
+		s.nextIdentityID++
+		s.identityByKey[key] = identity.ID
+	}
+	s.identities[identity.ID] = identity
+	return cloneIdentity(identity), nil
+}
+
+func (s *Store) DeleteAuthIdentity(_ context.Context, userID int, identityID int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	identity, ok := s.identities[identityID]
+	if !ok || identity.UserID != userID {
+		return contract.ErrNotFound
+	}
+	for key, id := range s.identityByKey {
+		if id == identityID {
+			delete(s.identityByKey, key)
+			break
+		}
+	}
+	delete(s.identities, identityID)
+	return nil
 }
 
 func (s *Store) seedBuiltInRoles() {
@@ -246,14 +385,9 @@ func cloneUser(user contract.StoredUser) contract.StoredUser {
 	user.Permissions = append([]string(nil), user.Permissions...)
 	user.WorkspaceID = cloneInt(user.WorkspaceID)
 	user.RPMLimit = cloneInt(user.RPMLimit)
-	if user.LastLoginAt != nil {
-		lastLoginAt := *user.LastLoginAt
-		user.LastLoginAt = &lastLoginAt
-	}
-	if user.EmailVerifiedAt != nil {
-		emailVerifiedAt := *user.EmailVerifiedAt
-		user.EmailVerifiedAt = &emailVerifiedAt
-	}
+	user.LastLoginAt = cloneTime(user.LastLoginAt)
+	user.EmailVerifiedAt = cloneTime(user.EmailVerifiedAt)
+	user.User.EmailVerifiedAt = cloneTime(user.User.EmailVerifiedAt)
 	return user
 }
 
@@ -262,7 +396,31 @@ func cloneRole(role contract.RoleDefinition) contract.RoleDefinition {
 	return role
 }
 
+func cloneIdentity(identity contract.UserAuthIdentity) contract.UserAuthIdentity {
+	identity.VerifiedAt = cloneTime(identity.VerifiedAt)
+	identity.LastUsedAt = cloneTime(identity.LastUsedAt)
+	return identity
+}
+
 func cloneInt(value *int) *int {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
+}
+
+func identityKey(provider contract.AuthIdentityProvider, providerKey string, subjectHash string) string {
+	provider = contract.AuthIdentityProvider(strings.ToLower(strings.TrimSpace(string(provider))))
+	providerKey = strings.TrimSpace(providerKey)
+	subjectHash = strings.TrimSpace(subjectHash)
+	if provider == "" || providerKey == "" || subjectHash == "" {
+		return ""
+	}
+	return string(provider) + "\x00" + providerKey + "\x00" + subjectHash
+}
+
+func cloneTime(value *time.Time) *time.Time {
 	if value == nil {
 		return nil
 	}

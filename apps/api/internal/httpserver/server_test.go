@@ -45,6 +45,7 @@ import (
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
 	usagememory "github.com/srapi/srapi/apps/api/internal/modules/usage/store/memory"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
+	platformcrypto "github.com/srapi/srapi/apps/api/internal/platform/crypto"
 	"github.com/srapi/srapi/apps/api/internal/platform/ratelimit"
 )
 
@@ -138,6 +139,583 @@ func TestGatewayMaxBodySizeRejectsOversizedJSON(t *testing.T) {
 
 	if response.Code != http.StatusRequestEntityTooLarge {
 		t.Fatalf("expected 413 for oversized request, got %d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestRegisterCreatesSessionWhenEnabled(t *testing.T) {
+	handler := New(config.Load(), nil)
+	registerReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", strings.NewReader(`{"email":"new-user@srapi.local","name":"New User","password":"password123"}`))
+	registerReq.Header.Set("Content-Type", "application/json")
+	registerRec := httptest.NewRecorder()
+	handler.ServeHTTP(registerRec, registerReq)
+
+	if registerRec.Code != http.StatusCreated {
+		t.Fatalf("expected register 201, got %d body=%s", registerRec.Code, registerRec.Body.String())
+	}
+	cookies := registerRec.Result().Cookies()
+	if len(cookies) == 0 {
+		t.Fatal("expected session cookie")
+	}
+	var registerResp apiopenapi.LoginResponse
+	if err := json.NewDecoder(registerRec.Body).Decode(&registerResp); err != nil {
+		t.Fatalf("decode register response: %v", err)
+	}
+	if registerResp.Data.CsrfToken == "" {
+		t.Fatal("expected csrf token in register response")
+	}
+	if registerResp.Data.User.Email != "new-user@srapi.local" || registerResp.Data.User.Name != "New User" {
+		t.Fatalf("unexpected registered user: %+v", registerResp.Data.User)
+	}
+	if len(registerResp.Data.User.Roles) != 1 || registerResp.Data.User.Roles[0] != "user" {
+		t.Fatalf("expected default user role, got %+v", registerResp.Data.User.Roles)
+	}
+
+	meReq := httptest.NewRequest(http.MethodGet, "/api/v1/me", nil)
+	meReq.AddCookie(cookies[0])
+	meRec := httptest.NewRecorder()
+	handler.ServeHTTP(meRec, meReq)
+	if meRec.Code != http.StatusOK {
+		t.Fatalf("expected me 200 after register, got %d body=%s", meRec.Code, meRec.Body.String())
+	}
+	var meResp apiopenapi.UserResponse
+	if err := json.NewDecoder(meRec.Body).Decode(&meResp); err != nil {
+		t.Fatalf("decode me response: %v", err)
+	}
+	if meResp.Data.Email != registerResp.Data.User.Email {
+		t.Fatalf("expected registered session user email, got %s", meResp.Data.Email)
+	}
+}
+
+func TestRegisterRejectsDuplicateWithoutLeakingUserState(t *testing.T) {
+	handler := New(config.Load(), nil)
+	body := `{"email":"duplicate-user@srapi.local","name":"Duplicate User","password":"password123"}`
+	firstReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", strings.NewReader(body))
+	firstReq.Header.Set("Content-Type", "application/json")
+	firstRec := httptest.NewRecorder()
+	handler.ServeHTTP(firstRec, firstReq)
+	if firstRec.Code != http.StatusCreated {
+		t.Fatalf("expected first register 201, got %d body=%s", firstRec.Code, firstRec.Body.String())
+	}
+
+	secondReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", strings.NewReader(body))
+	secondReq.Header.Set("Content-Type", "application/json")
+	secondRec := httptest.NewRecorder()
+	handler.ServeHTTP(secondRec, secondReq)
+	if secondRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected duplicate register 400, got %d body=%s", secondRec.Code, secondRec.Body.String())
+	}
+	if strings.Contains(secondRec.Body.String(), "already exists") || strings.Contains(secondRec.Body.String(), "duplicate") {
+		t.Fatalf("duplicate register leaked user state: %s", secondRec.Body.String())
+	}
+}
+
+func TestRegisterRespectsRegistrationSetting(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+
+	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/settings", nil)
+	getReq.AddCookie(sessionCookie)
+	getRec := httptest.NewRecorder()
+	handler.ServeHTTP(getRec, getReq)
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("expected settings get 200, got %d body=%s", getRec.Code, getRec.Body.String())
+	}
+	var settingsResp apiopenapi.AdminSettingsResponse
+	if err := json.NewDecoder(getRec.Body).Decode(&settingsResp); err != nil {
+		t.Fatalf("decode settings response: %v", err)
+	}
+	settingsResp.Data.Security.RegistrationEnabled = false
+	settingsBody, err := json.Marshal(settingsResp.Data)
+	if err != nil {
+		t.Fatalf("marshal settings request: %v", err)
+	}
+	updateReq := httptest.NewRequest(http.MethodPut, "/api/v1/admin/settings", bytes.NewReader(settingsBody))
+	updateReq.Header.Set("Content-Type", "application/json")
+	updateReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	updateReq.AddCookie(sessionCookie)
+	updateRec := httptest.NewRecorder()
+	handler.ServeHTTP(updateRec, updateReq)
+	if updateRec.Code != http.StatusOK {
+		t.Fatalf("expected settings update 200, got %d body=%s", updateRec.Code, updateRec.Body.String())
+	}
+
+	registerReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", strings.NewReader(`{"email":"closed@srapi.local","name":"Closed","password":"password123"}`))
+	registerReq.Header.Set("Content-Type", "application/json")
+	registerRec := httptest.NewRecorder()
+	handler.ServeHTTP(registerRec, registerReq)
+	if registerRec.Code != http.StatusForbidden {
+		t.Fatalf("expected disabled register 403, got %d body=%s", registerRec.Code, registerRec.Body.String())
+	}
+}
+
+func TestUpdateAdminSettingsEmailDoesNotAcceptSMTPPassword(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	settingsResp := mustGetAdminSettings(t, handler, sessionCookie)
+	raw, err := json.Marshal(settingsResp.Data)
+	if err != nil {
+		t.Fatalf("marshal settings: %v", err)
+	}
+	var settings map[string]any
+	if err := json.Unmarshal(raw, &settings); err != nil {
+		t.Fatalf("unmarshal settings map: %v", err)
+	}
+	email, ok := settings["email"].(map[string]any)
+	if !ok {
+		t.Fatalf("missing email settings: %+v", settings)
+	}
+	email["smtp_host"] = "smtp.example.com"
+	email["smtp_from"] = "noreply@example.com"
+	email["smtp_password"] = "should_not_be_accepted"
+	settingsBody, err := json.Marshal(settings)
+	if err != nil {
+		t.Fatalf("marshal settings request: %v", err)
+	}
+
+	updateReq := httptest.NewRequest(http.MethodPut, "/api/v1/admin/settings", bytes.NewReader(settingsBody))
+	updateReq.Header.Set("Content-Type", "application/json")
+	updateReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	updateReq.AddCookie(sessionCookie)
+	updateRec := httptest.NewRecorder()
+	handler.ServeHTTP(updateRec, updateReq)
+	if updateRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected unknown SMTP password field to be rejected, got %d body=%s", updateRec.Code, updateRec.Body.String())
+	}
+}
+
+func TestAdminSettingsEmailPasswordConfiguredComesFromRuntimeConfig(t *testing.T) {
+	cfg := config.Load()
+	cfg.Email.SMTPPassword = "runtime-secret"
+	handler := New(cfg, nil)
+	_, sessionCookie := mustLoginAdmin(t, handler)
+	settingsResp := mustGetAdminSettings(t, handler, sessionCookie)
+	if settingsResp.Data.Email.SmtpPasswordConfigured == nil || !*settingsResp.Data.Email.SmtpPasswordConfigured {
+		t.Fatalf("expected runtime SMTP password flag, got %+v", settingsResp.Data.Email)
+	}
+}
+
+func TestRegisterRespectsEmailSuffixAllowlist(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	settingsResp := mustGetAdminSettings(t, handler, sessionCookie)
+	settingsResp.Data.Security.RegistrationEmailSuffixAllowlist = []string{"Example.COM", " @company.test "}
+	settingsBody, err := json.Marshal(settingsResp.Data)
+	if err != nil {
+		t.Fatalf("marshal settings request: %v", err)
+	}
+	updateReq := httptest.NewRequest(http.MethodPut, "/api/v1/admin/settings", bytes.NewReader(settingsBody))
+	updateReq.Header.Set("Content-Type", "application/json")
+	updateReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	updateReq.AddCookie(sessionCookie)
+	updateRec := httptest.NewRecorder()
+	handler.ServeHTTP(updateRec, updateReq)
+	if updateRec.Code != http.StatusOK {
+		t.Fatalf("expected settings update 200, got %d body=%s", updateRec.Code, updateRec.Body.String())
+	}
+	var updatedSettings apiopenapi.AdminSettingsResponse
+	if err := json.NewDecoder(updateRec.Body).Decode(&updatedSettings); err != nil {
+		t.Fatalf("decode settings response: %v", err)
+	}
+	if len(updatedSettings.Data.Security.RegistrationEmailSuffixAllowlist) != 2 ||
+		updatedSettings.Data.Security.RegistrationEmailSuffixAllowlist[0] != "@example.com" ||
+		updatedSettings.Data.Security.RegistrationEmailSuffixAllowlist[1] != "@company.test" {
+		t.Fatalf("expected normalized suffix allowlist, got %+v", updatedSettings.Data.Security.RegistrationEmailSuffixAllowlist)
+	}
+
+	allowedReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", strings.NewReader(`{"email":"member@example.com","name":"Member","password":"password123"}`))
+	allowedReq.Header.Set("Content-Type", "application/json")
+	allowedRec := httptest.NewRecorder()
+	handler.ServeHTTP(allowedRec, allowedReq)
+	if allowedRec.Code != http.StatusCreated {
+		t.Fatalf("expected allowed register 201, got %d body=%s", allowedRec.Code, allowedRec.Body.String())
+	}
+
+	blockedReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", strings.NewReader(`{"email":"outsider@other.test","name":"Outsider","password":"password123"}`))
+	blockedReq.Header.Set("Content-Type", "application/json")
+	blockedRec := httptest.NewRecorder()
+	handler.ServeHTTP(blockedRec, blockedReq)
+	if blockedRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected blocked register 400, got %d body=%s", blockedRec.Code, blockedRec.Body.String())
+	}
+	if strings.Contains(blockedRec.Body.String(), "suffix") || strings.Contains(blockedRec.Body.String(), "allow") {
+		t.Fatalf("blocked register leaked registration policy: %s", blockedRec.Body.String())
+	}
+}
+
+func TestUpdateAdminSettingsRejectsInvalidRegistrationEmailSuffixAllowlist(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	settingsResp := mustGetAdminSettings(t, handler, sessionCookie)
+	settingsResp.Data.Security.RegistrationEmailSuffixAllowlist = []string{"@invalid_domain"}
+	settingsBody, err := json.Marshal(settingsResp.Data)
+	if err != nil {
+		t.Fatalf("marshal settings request: %v", err)
+	}
+	updateReq := httptest.NewRequest(http.MethodPut, "/api/v1/admin/settings", bytes.NewReader(settingsBody))
+	updateReq.Header.Set("Content-Type", "application/json")
+	updateReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	updateReq.AddCookie(sessionCookie)
+	updateRec := httptest.NewRecorder()
+	handler.ServeHTTP(updateRec, updateReq)
+	if updateRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected invalid suffix settings 400, got %d body=%s", updateRec.Code, updateRec.Body.String())
+	}
+}
+
+func TestChangeCurrentUserPasswordRevokesSessionAndAllowsNewPassword(t *testing.T) {
+	handler := New(config.Load(), nil)
+	registerReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", strings.NewReader(`{"email":"password-change@srapi.local","name":"Password Change","password":"oldpassword123"}`))
+	registerReq.Header.Set("Content-Type", "application/json")
+	registerRec := httptest.NewRecorder()
+	handler.ServeHTTP(registerRec, registerReq)
+	if registerRec.Code != http.StatusCreated {
+		t.Fatalf("expected register 201, got %d body=%s", registerRec.Code, registerRec.Body.String())
+	}
+	var registerResp apiopenapi.LoginResponse
+	if err := json.NewDecoder(registerRec.Body).Decode(&registerResp); err != nil {
+		t.Fatalf("decode register response: %v", err)
+	}
+	cookies := registerRec.Result().Cookies()
+	if len(cookies) == 0 {
+		t.Fatal("expected register session cookie")
+	}
+	sessionCookie := cookies[0]
+
+	changeReq := httptest.NewRequest(http.MethodPost, "/api/v1/me/password", strings.NewReader(`{"current_password":"oldpassword123","new_password":"newpassword123"}`))
+	changeReq.Header.Set("Content-Type", "application/json")
+	changeReq.Header.Set("X-CSRF-Token", registerResp.Data.CsrfToken)
+	changeReq.AddCookie(sessionCookie)
+	changeRec := httptest.NewRecorder()
+	handler.ServeHTTP(changeRec, changeReq)
+	if changeRec.Code != http.StatusNoContent {
+		t.Fatalf("expected password change 204, got %d body=%s", changeRec.Code, changeRec.Body.String())
+	}
+	if len(changeRec.Result().Cookies()) == 0 || changeRec.Result().Cookies()[0].MaxAge != -1 {
+		t.Fatalf("expected expired session cookie, got %+v", changeRec.Result().Cookies())
+	}
+
+	meReq := httptest.NewRequest(http.MethodGet, "/api/v1/me", nil)
+	meReq.AddCookie(sessionCookie)
+	meRec := httptest.NewRecorder()
+	handler.ServeHTTP(meRec, meReq)
+	if meRec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected old session to be revoked, got %d body=%s", meRec.Code, meRec.Body.String())
+	}
+
+	oldLoginReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader(`{"email":"password-change@srapi.local","password":"oldpassword123"}`))
+	oldLoginReq.Header.Set("Content-Type", "application/json")
+	oldLoginRec := httptest.NewRecorder()
+	handler.ServeHTTP(oldLoginRec, oldLoginReq)
+	if oldLoginRec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected old password login 401, got %d body=%s", oldLoginRec.Code, oldLoginRec.Body.String())
+	}
+
+	newLoginReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader(`{"email":"password-change@srapi.local","password":"newpassword123"}`))
+	newLoginReq.Header.Set("Content-Type", "application/json")
+	newLoginRec := httptest.NewRecorder()
+	handler.ServeHTTP(newLoginRec, newLoginReq)
+	if newLoginRec.Code != http.StatusOK {
+		t.Fatalf("expected new password login 200, got %d body=%s", newLoginRec.Code, newLoginRec.Body.String())
+	}
+}
+
+func TestChangeCurrentUserPasswordRejectsWrongCurrentPassword(t *testing.T) {
+	handler := New(config.Load(), nil)
+	registerReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", strings.NewReader(`{"email":"password-wrong@srapi.local","name":"Password Wrong","password":"oldpassword123"}`))
+	registerReq.Header.Set("Content-Type", "application/json")
+	registerRec := httptest.NewRecorder()
+	handler.ServeHTTP(registerRec, registerReq)
+	if registerRec.Code != http.StatusCreated {
+		t.Fatalf("expected register 201, got %d body=%s", registerRec.Code, registerRec.Body.String())
+	}
+	var registerResp apiopenapi.LoginResponse
+	if err := json.NewDecoder(registerRec.Body).Decode(&registerResp); err != nil {
+		t.Fatalf("decode register response: %v", err)
+	}
+	cookies := registerRec.Result().Cookies()
+	if len(cookies) == 0 {
+		t.Fatal("expected register session cookie")
+	}
+	sessionCookie := cookies[0]
+
+	changeReq := httptest.NewRequest(http.MethodPost, "/api/v1/me/password", strings.NewReader(`{"current_password":"wrongpassword","new_password":"newpassword123"}`))
+	changeReq.Header.Set("Content-Type", "application/json")
+	changeReq.Header.Set("X-CSRF-Token", registerResp.Data.CsrfToken)
+	changeReq.AddCookie(sessionCookie)
+	changeRec := httptest.NewRecorder()
+	handler.ServeHTTP(changeRec, changeReq)
+	if changeRec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected wrong current password 401, got %d body=%s", changeRec.Code, changeRec.Body.String())
+	}
+
+	meReq := httptest.NewRequest(http.MethodGet, "/api/v1/me", nil)
+	meReq.AddCookie(sessionCookie)
+	meRec := httptest.NewRecorder()
+	handler.ServeHTTP(meRec, meReq)
+	if meRec.Code != http.StatusOK {
+		t.Fatalf("expected session to remain active, got %d body=%s", meRec.Code, meRec.Body.String())
+	}
+}
+
+func TestPasswordResetRequestAndConfirmAreSingleUseAndNonEnumerating(t *testing.T) {
+	handler := New(config.Load(), nil)
+	registerReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", strings.NewReader(`{"email":"reset-flow@srapi.local","name":"Reset Flow","password":"oldpassword123"}`))
+	registerReq.Header.Set("Content-Type", "application/json")
+	registerRec := httptest.NewRecorder()
+	handler.ServeHTTP(registerRec, registerReq)
+	if registerRec.Code != http.StatusCreated {
+		t.Fatalf("expected register 201, got %d body=%s", registerRec.Code, registerRec.Body.String())
+	}
+	cookies := registerRec.Result().Cookies()
+	if len(cookies) == 0 {
+		t.Fatal("expected register session cookie")
+	}
+	sessionCookie := cookies[0]
+
+	missingReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/password-reset/request", strings.NewReader(`{"email":"missing-reset@srapi.local"}`))
+	missingReq.Header.Set("Content-Type", "application/json")
+	missingRec := httptest.NewRecorder()
+	handler.ServeHTTP(missingRec, missingReq)
+	if missingRec.Code != http.StatusAccepted {
+		t.Fatalf("expected missing reset request 202, got %d body=%s", missingRec.Code, missingRec.Body.String())
+	}
+	var missingResp apiopenapi.PasswordResetAcceptedResponse
+	if err := json.NewDecoder(missingRec.Body).Decode(&missingResp); err != nil {
+		t.Fatalf("decode missing reset response: %v", err)
+	}
+	if !missingResp.Data.Accepted || strings.Contains(missingRec.Body.String(), "missing-reset") {
+		t.Fatalf("missing reset response leaked user state: %s", missingRec.Body.String())
+	}
+
+	resetReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/password-reset/request", strings.NewReader(`{"email":"reset-flow@srapi.local"}`))
+	resetReq.Header.Set("Content-Type", "application/json")
+	resetRec := httptest.NewRecorder()
+	handler.ServeHTTP(resetRec, resetReq)
+	if resetRec.Code != http.StatusAccepted {
+		t.Fatalf("expected reset request 202, got %d body=%s", resetRec.Code, resetRec.Body.String())
+	}
+
+	outboxReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/ops/events/outbox?event_type=AuthPasswordResetRequested", nil)
+	adminLogin, adminCookie := mustLoginAdmin(t, handler)
+	_ = adminLogin
+	outboxReq.AddCookie(adminCookie)
+	outboxRec := httptest.NewRecorder()
+	handler.ServeHTTP(outboxRec, outboxReq)
+	if outboxRec.Code != http.StatusOK {
+		t.Fatalf("expected outbox list 200, got %d body=%s", outboxRec.Code, outboxRec.Body.String())
+	}
+	var outboxResp apiopenapi.DomainEventOutboxListResponse
+	if err := json.NewDecoder(outboxRec.Body).Decode(&outboxResp); err != nil {
+		t.Fatalf("decode outbox response: %v", err)
+	}
+	if len(outboxResp.Data) != 1 {
+		t.Fatalf("expected one reset outbox event, got %+v", outboxResp.Data)
+	}
+	payload := outboxResp.Data[0].Payload
+	tokenValue, ok := payload["reset_token_ciphertext"].(string)
+	if !ok || tokenValue == "" || strings.Contains(tokenValue, "pwreset") {
+		t.Fatalf("expected encrypted reset token payload, got %+v", payload)
+	}
+	if fmt.Sprint(payload["recipient_email_hash"]) == "reset-flow@srapi.local" || strings.Contains(fmt.Sprint(payload), "oldpassword123") {
+		t.Fatalf("outbox reset payload leaked sensitive data: %+v", payload)
+	}
+	rawToken := decryptPasswordResetTokenForTest(t, tokenValue)
+
+	confirmReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/password-reset/confirm", strings.NewReader(`{"token":"`+rawToken+`","new_password":"newpassword123"}`))
+	confirmReq.Header.Set("Content-Type", "application/json")
+	confirmRec := httptest.NewRecorder()
+	handler.ServeHTTP(confirmRec, confirmReq)
+	if confirmRec.Code != http.StatusOK {
+		t.Fatalf("expected reset confirm 200, got %d body=%s", confirmRec.Code, confirmRec.Body.String())
+	}
+
+	meReq := httptest.NewRequest(http.MethodGet, "/api/v1/me", nil)
+	meReq.AddCookie(sessionCookie)
+	meRec := httptest.NewRecorder()
+	handler.ServeHTTP(meRec, meReq)
+	if meRec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected password reset to revoke old session, got %d body=%s", meRec.Code, meRec.Body.String())
+	}
+
+	oldLoginReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader(`{"email":"reset-flow@srapi.local","password":"oldpassword123"}`))
+	oldLoginReq.Header.Set("Content-Type", "application/json")
+	oldLoginRec := httptest.NewRecorder()
+	handler.ServeHTTP(oldLoginRec, oldLoginReq)
+	if oldLoginRec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected old password 401, got %d body=%s", oldLoginRec.Code, oldLoginRec.Body.String())
+	}
+
+	newLoginReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader(`{"email":"reset-flow@srapi.local","password":"newpassword123"}`))
+	newLoginReq.Header.Set("Content-Type", "application/json")
+	newLoginRec := httptest.NewRecorder()
+	handler.ServeHTTP(newLoginRec, newLoginReq)
+	if newLoginRec.Code != http.StatusOK {
+		t.Fatalf("expected new password login 200, got %d body=%s", newLoginRec.Code, newLoginRec.Body.String())
+	}
+
+	reuseReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/password-reset/confirm", strings.NewReader(`{"token":"`+rawToken+`","new_password":"anotherpassword123"}`))
+	reuseReq.Header.Set("Content-Type", "application/json")
+	reuseRec := httptest.NewRecorder()
+	handler.ServeHTTP(reuseRec, reuseReq)
+	if reuseRec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected reset token reuse 401, got %d body=%s", reuseRec.Code, reuseRec.Body.String())
+	}
+}
+
+func TestEmailVerificationRequestAndConfirmAreSingleUseAndNonEnumerating(t *testing.T) {
+	handler := New(config.Load(), nil)
+	registerReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", strings.NewReader(`{"email":"verify-flow@srapi.local","name":"Verify Flow","password":"password123"}`))
+	registerReq.Header.Set("Content-Type", "application/json")
+	registerRec := httptest.NewRecorder()
+	handler.ServeHTTP(registerRec, registerReq)
+	if registerRec.Code != http.StatusCreated {
+		t.Fatalf("expected register 201, got %d body=%s", registerRec.Code, registerRec.Body.String())
+	}
+	var registerResp apiopenapi.LoginResponse
+	if err := json.NewDecoder(registerRec.Body).Decode(&registerResp); err != nil {
+		t.Fatalf("decode register response: %v", err)
+	}
+	if registerResp.Data.User.EmailVerifiedAt != nil {
+		t.Fatalf("newly registered user should start unverified, got %+v", registerResp.Data.User)
+	}
+
+	missingReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/email-verification/request", strings.NewReader(`{"email":"missing-verify@srapi.local"}`))
+	missingReq.Header.Set("Content-Type", "application/json")
+	missingRec := httptest.NewRecorder()
+	handler.ServeHTTP(missingRec, missingReq)
+	if missingRec.Code != http.StatusAccepted {
+		t.Fatalf("expected missing verification request 202, got %d body=%s", missingRec.Code, missingRec.Body.String())
+	}
+	var missingResp apiopenapi.EmailVerificationAcceptedResponse
+	if err := json.NewDecoder(missingRec.Body).Decode(&missingResp); err != nil {
+		t.Fatalf("decode missing verification response: %v", err)
+	}
+	if !missingResp.Data.Accepted || strings.Contains(missingRec.Body.String(), "missing-verify") {
+		t.Fatalf("missing verification response leaked user state: %s", missingRec.Body.String())
+	}
+
+	verifyReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/email-verification/request", strings.NewReader(`{"email":"verify-flow@srapi.local"}`))
+	verifyReq.Header.Set("Content-Type", "application/json")
+	verifyRec := httptest.NewRecorder()
+	handler.ServeHTTP(verifyRec, verifyReq)
+	if verifyRec.Code != http.StatusAccepted {
+		t.Fatalf("expected verification request 202, got %d body=%s", verifyRec.Code, verifyRec.Body.String())
+	}
+
+	outboxReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/ops/events/outbox?event_type=AuthEmailVerificationRequested", nil)
+	adminLogin, adminCookie := mustLoginAdmin(t, handler)
+	_ = adminLogin
+	outboxReq.AddCookie(adminCookie)
+	outboxRec := httptest.NewRecorder()
+	handler.ServeHTTP(outboxRec, outboxReq)
+	if outboxRec.Code != http.StatusOK {
+		t.Fatalf("expected outbox list 200, got %d body=%s", outboxRec.Code, outboxRec.Body.String())
+	}
+	var outboxResp apiopenapi.DomainEventOutboxListResponse
+	if err := json.NewDecoder(outboxRec.Body).Decode(&outboxResp); err != nil {
+		t.Fatalf("decode outbox response: %v", err)
+	}
+	if len(outboxResp.Data) != 1 {
+		t.Fatalf("expected one email verification outbox event, got %+v", outboxResp.Data)
+	}
+	payload := outboxResp.Data[0].Payload
+	tokenValue, ok := payload["verification_token_ciphertext"].(string)
+	if !ok || tokenValue == "" || strings.Contains(tokenValue, "emailverify") {
+		t.Fatalf("expected encrypted email verification token payload, got %+v", payload)
+	}
+	if fmt.Sprint(payload["recipient_email_hash"]) == "verify-flow@srapi.local" || strings.Contains(fmt.Sprint(payload), "password123") {
+		t.Fatalf("outbox verification payload leaked sensitive data: %+v", payload)
+	}
+	rawToken := decryptEmailVerificationTokenForTest(t, tokenValue)
+
+	confirmReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/email-verification/confirm", strings.NewReader(`{"token":"`+rawToken+`"}`))
+	confirmReq.Header.Set("Content-Type", "application/json")
+	confirmRec := httptest.NewRecorder()
+	handler.ServeHTTP(confirmRec, confirmReq)
+	if confirmRec.Code != http.StatusOK {
+		t.Fatalf("expected verification confirm 200, got %d body=%s", confirmRec.Code, confirmRec.Body.String())
+	}
+
+	meReq := httptest.NewRequest(http.MethodGet, "/api/v1/me", nil)
+	meReq.AddCookie(registerRec.Result().Cookies()[0])
+	meRec := httptest.NewRecorder()
+	handler.ServeHTTP(meRec, meReq)
+	if meRec.Code != http.StatusOK {
+		t.Fatalf("expected session to remain valid after email verification, got %d body=%s", meRec.Code, meRec.Body.String())
+	}
+	var meResp apiopenapi.UserResponse
+	if err := json.NewDecoder(meRec.Body).Decode(&meResp); err != nil {
+		t.Fatalf("decode current user response: %v", err)
+	}
+	if meResp.Data.EmailVerifiedAt == nil {
+		t.Fatalf("expected current user email_verified_at after confirmation, got %+v", meResp.Data)
+	}
+
+	reuseReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/email-verification/confirm", strings.NewReader(`{"token":"`+rawToken+`"}`))
+	reuseReq.Header.Set("Content-Type", "application/json")
+	reuseRec := httptest.NewRecorder()
+	handler.ServeHTTP(reuseRec, reuseReq)
+	if reuseRec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected verification token reuse 401, got %d body=%s", reuseRec.Code, reuseRec.Body.String())
+	}
+}
+
+func TestUpdateCurrentUserProfileRequiresCSRFAndAllowlistsFields(t *testing.T) {
+	handler := New(config.Load(), nil)
+	registerReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", strings.NewReader(`{"email":"profile-update@srapi.local","name":"Original Name","password":"password123"}`))
+	registerReq.Header.Set("Content-Type", "application/json")
+	registerRec := httptest.NewRecorder()
+	handler.ServeHTTP(registerRec, registerReq)
+	if registerRec.Code != http.StatusCreated {
+		t.Fatalf("expected register 201, got %d body=%s", registerRec.Code, registerRec.Body.String())
+	}
+	var registerResp apiopenapi.LoginResponse
+	if err := json.NewDecoder(registerRec.Body).Decode(&registerResp); err != nil {
+		t.Fatalf("decode register response: %v", err)
+	}
+	cookies := registerRec.Result().Cookies()
+	if len(cookies) == 0 {
+		t.Fatal("expected register session cookie")
+	}
+	sessionCookie := cookies[0]
+
+	noCSRFReq := httptest.NewRequest(http.MethodPatch, "/api/v1/me", strings.NewReader(`{"name":"No CSRF"}`))
+	noCSRFReq.Header.Set("Content-Type", "application/json")
+	noCSRFReq.AddCookie(sessionCookie)
+	noCSRFRec := httptest.NewRecorder()
+	handler.ServeHTTP(noCSRFRec, noCSRFReq)
+	if noCSRFRec.Code != http.StatusForbidden {
+		t.Fatalf("expected missing csrf 403, got %d body=%s", noCSRFRec.Code, noCSRFRec.Body.String())
+	}
+
+	massAssignmentReq := httptest.NewRequest(http.MethodPatch, "/api/v1/me", strings.NewReader(`{"name":"Updated Name","email":"attacker@srapi.local","roles":["admin"],"status":"disabled"}`))
+	massAssignmentReq.Header.Set("Content-Type", "application/json")
+	massAssignmentReq.Header.Set("X-CSRF-Token", registerResp.Data.CsrfToken)
+	massAssignmentReq.AddCookie(sessionCookie)
+	massAssignmentRec := httptest.NewRecorder()
+	handler.ServeHTTP(massAssignmentRec, massAssignmentReq)
+	if massAssignmentRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected mass-assignment payload 400, got %d body=%s", massAssignmentRec.Code, massAssignmentRec.Body.String())
+	}
+
+	updateReq := httptest.NewRequest(http.MethodPatch, "/api/v1/me", strings.NewReader(`{"name":"Updated Name"}`))
+	updateReq.Header.Set("Content-Type", "application/json")
+	updateReq.Header.Set("X-CSRF-Token", registerResp.Data.CsrfToken)
+	updateReq.AddCookie(sessionCookie)
+	updateRec := httptest.NewRecorder()
+	handler.ServeHTTP(updateRec, updateReq)
+	if updateRec.Code != http.StatusOK {
+		t.Fatalf("expected profile update 200, got %d body=%s", updateRec.Code, updateRec.Body.String())
+	}
+	var updateResp apiopenapi.UserResponse
+	if err := json.NewDecoder(updateRec.Body).Decode(&updateResp); err != nil {
+		t.Fatalf("decode update response: %v", err)
+	}
+	if updateResp.Data.Name != "Updated Name" {
+		t.Fatalf("expected updated name, got %+v", updateResp.Data)
+	}
+	if updateResp.Data.Email != "profile-update@srapi.local" || updateResp.Data.Status != apiopenapi.UserStatusActive || len(updateResp.Data.Roles) != 1 || updateResp.Data.Roles[0] != "user" {
+		t.Fatalf("profile update changed protected fields: %+v", updateResp.Data)
 	}
 }
 
@@ -761,6 +1339,11 @@ func TestConsoleWriteRoutesRequireCSRF(t *testing.T) {
 		body   string
 	}{
 		{http.MethodPost, "/api/v1/auth/logout", `{}`},
+		{http.MethodDelete, "/api/v1/me/auth-identities/1", `{}`},
+		{http.MethodPost, "/api/v1/me/announcements/1/read", `{}`},
+		{http.MethodPost, "/api/v1/me/totp/setup", `{}`},
+		{http.MethodPost, "/api/v1/me/totp/enable", `{"code":"123456"}`},
+		{http.MethodPost, "/api/v1/me/totp/disable", `{"code":"123456"}`},
 		{http.MethodPost, "/api/v1/api-keys", `{"name":"blocked"}`},
 		{http.MethodPatch, "/api/v1/api-keys/" + string(apiKeyResp.Data.ApiKey.Id), `{"name":"blocked"}`},
 		{http.MethodPost, "/api/v1/admin/providers", `{"name":"blocked","display_name":"Blocked","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`},
@@ -793,6 +1376,7 @@ func TestConsoleWriteRoutesRequireCSRF(t *testing.T) {
 		{http.MethodPut, "/api/v1/admin/risk-control/config", `{"enabled":true,"mode":"monitor","max_failed_requests_per_minute":10,"max_cost_per_day":"100","cooldown_seconds":60,"blocked_countries":[],"blocked_ips":[]}`},
 		{http.MethodPost, "/api/v1/admin/ops/slo", `{"name":"blocked-slo","objective":99}`},
 		{http.MethodPatch, "/api/v1/admin/ops/slo/1", `{"status":"disabled"}`},
+		{http.MethodPost, "/api/v1/admin/ops/system-logs/cleanup", `{"source":"blocked"}`},
 		{http.MethodPost, "/api/v1/admin/ops/alerts/1/ack", `{}`},
 	}
 
@@ -8613,6 +9197,22 @@ func mustLoginAdmin(t *testing.T, handler http.Handler) (apiopenapi.LoginRespons
 	return loginResp, cookies[0]
 }
 
+func mustGetAdminSettings(t *testing.T, handler http.Handler, sessionCookie *http.Cookie) apiopenapi.AdminSettingsResponse {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/settings", nil)
+	req.AddCookie(sessionCookie)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected settings get 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var resp apiopenapi.AdminSettingsResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode settings response: %v", err)
+	}
+	return resp
+}
+
 func mustCreateGatewayAPIKey(t *testing.T, handler http.Handler, sessionCookie *http.Cookie, csrfToken string) (apiopenapi.CreateApiKeyResponse, string) {
 	t.Helper()
 	resp := mustCreateAPIKey(t, handler, sessionCookie, csrfToken, `{"name":"gateway","scopes":["gateway:invoke"]}`)
@@ -9283,6 +9883,72 @@ func stringSliceContains(values []string, target string) bool {
 		}
 	}
 	return false
+}
+
+func decryptPasswordResetTokenForTest(t *testing.T, ciphertext string) string {
+	t.Helper()
+	parts := strings.Split(ciphertext, ":")
+	if len(parts) != 3 || parts[0] != "v1" {
+		t.Fatalf("unexpected password reset ciphertext shape: %q", ciphertext)
+	}
+	key, err := platformcrypto.DeriveAESKey(config.Load().Security.MasterKey)
+	if err != nil {
+		t.Fatalf("derive reset key: %v", err)
+	}
+	nonce, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		t.Fatalf("decode reset nonce: %v", err)
+	}
+	rawCiphertext, err := base64.RawURLEncoding.DecodeString(parts[2])
+	if err != nil {
+		t.Fatalf("decode reset ciphertext: %v", err)
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		t.Fatalf("new aes: %v", err)
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		t.Fatalf("new gcm: %v", err)
+	}
+	plaintext, err := gcm.Open(nil, nonce, rawCiphertext, []byte("auth.password_reset:v1"))
+	if err != nil {
+		t.Fatalf("decrypt reset token: %v", err)
+	}
+	return string(plaintext)
+}
+
+func decryptEmailVerificationTokenForTest(t *testing.T, ciphertext string) string {
+	t.Helper()
+	parts := strings.Split(ciphertext, ":")
+	if len(parts) != 3 || parts[0] != "v1" {
+		t.Fatalf("unexpected email verification ciphertext shape: %q", ciphertext)
+	}
+	key, err := platformcrypto.DeriveAESKey(config.Load().Security.MasterKey)
+	if err != nil {
+		t.Fatalf("derive email verification key: %v", err)
+	}
+	nonce, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		t.Fatalf("decode email verification nonce: %v", err)
+	}
+	rawCiphertext, err := base64.RawURLEncoding.DecodeString(parts[2])
+	if err != nil {
+		t.Fatalf("decode email verification ciphertext: %v", err)
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		t.Fatalf("new aes: %v", err)
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		t.Fatalf("new gcm: %v", err)
+	}
+	plaintext, err := gcm.Open(nil, nonce, rawCiphertext, []byte("auth.email_verification:v1"))
+	if err != nil {
+		t.Fatalf("decrypt email verification token: %v", err)
+	}
+	return string(plaintext)
 }
 
 func jsonObjectContainsString(value apiopenapi.JsonObject, target string) bool {

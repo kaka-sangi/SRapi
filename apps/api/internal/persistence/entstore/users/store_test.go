@@ -2,6 +2,7 @@ package users
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"strconv"
 	"testing"
@@ -144,6 +145,65 @@ func TestStoreListByIDsPreservesOrder(t *testing.T) {
 	}
 	if len(users) != 2 || users[0].ID != second.ID || users[1].ID != first.ID {
 		t.Fatalf("unexpected order: %+v", users)
+	}
+}
+
+func TestStoreFindsAuthIdentityAndRejectsOwnershipTransfer(t *testing.T) {
+	client := enttest.Open(t, dialect.SQLite, sqliteDSN(t))
+	defer client.Close()
+
+	store, err := New(client)
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+
+	ctx := context.Background()
+	first, err := store.Create(ctx, newUser("first-identity@srapi.local"))
+	if err != nil {
+		t.Fatalf("create first user: %v", err)
+	}
+	second, err := store.Create(ctx, newUser("second-identity@srapi.local"))
+	if err != nil {
+		t.Fatalf("create second user: %v", err)
+	}
+	verifiedAt := time.Date(2026, 5, 30, 9, 0, 0, 0, time.UTC)
+	created, err := store.UpsertAuthIdentity(ctx, contract.CreateUserAuthIdentity{
+		UserID:              first.ID,
+		Provider:            contract.AuthIdentityProviderOIDC,
+		ProviderKey:         "issuer-main",
+		ProviderSubjectHash: "sha256:subject",
+		SubjectHint:         "oidc:subject",
+		DisplayName:         "OIDC User",
+		Email:               "OIDC@Example.COM",
+		EmailVerified:       true,
+		VerifiedAt:          &verifiedAt,
+	})
+	if err != nil {
+		t.Fatalf("upsert identity: %v", err)
+	}
+	found, err := store.FindAuthIdentityByProviderSubject(ctx, contract.AuthIdentityProviderOIDC, "issuer-main", "sha256:subject")
+	if err != nil {
+		t.Fatalf("find identity: %v", err)
+	}
+	if found.ID != created.ID || found.UserID != first.ID || found.Email != "oidc@example.com" {
+		t.Fatalf("unexpected found identity: %+v", found)
+	}
+
+	if _, err := store.UpsertAuthIdentity(ctx, contract.CreateUserAuthIdentity{
+		UserID:              second.ID,
+		Provider:            contract.AuthIdentityProviderOIDC,
+		ProviderKey:         "issuer-main",
+		ProviderSubjectHash: "sha256:subject",
+		SubjectHint:         "oidc:subject",
+	}); !errors.Is(err, contract.ErrAlreadyExists) {
+		t.Fatalf("expected ownership transfer to be rejected, got %v", err)
+	}
+	found, err = store.FindAuthIdentityByProviderSubject(ctx, contract.AuthIdentityProviderOIDC, "issuer-main", "sha256:subject")
+	if err != nil {
+		t.Fatalf("find identity after rejected transfer: %v", err)
+	}
+	if found.UserID != first.ID {
+		t.Fatalf("expected original owner %d, got %+v", first.ID, found)
 	}
 }
 

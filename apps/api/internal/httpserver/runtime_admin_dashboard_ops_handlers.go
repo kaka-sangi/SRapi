@@ -168,7 +168,7 @@ func (s *Server) handleListAdminOpsSystemLogs(w http.ResponseWriter, r *http.Req
 		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
 		return
 	}
-	list, err := s.runtime.adminControl.ListSystemLogs(r.Context(), listOptionsFromRequest(r))
+	list, err := s.runtime.adminControl.ListSystemLogs(r.Context(), systemLogListOptionsFromRequest(r))
 	if err != nil {
 		writeAdminControlError(w, err, requestID)
 		return
@@ -178,6 +178,100 @@ func (s *Server) handleListAdminOpsSystemLogs(w http.ResponseWriter, r *http.Req
 		Pagination: paginationWithRequest(r, list.Total),
 		RequestId:  requestID,
 	})
+}
+
+func (s *Server) handleCleanupAdminOpsSystemLogs(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	var body apiopenapi.OpsSystemLogCleanupRequest
+	if err := s.decodeJSONBody(w, r, &body); err != nil {
+		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid system log cleanup request", requestID)
+		return
+	}
+	result, err := s.runtime.adminControl.CleanupSystemLogs(r.Context(), systemLogCleanupFilterFromAPI(body))
+	if err != nil {
+		writeAdminControlError(w, err, requestID)
+		return
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "ops_system_log.cleanup", "ops_system_log", "bulk", nil, systemLogCleanupAuditSnapshot(body, result)))
+	writeJSONAny(w, http.StatusOK, apiopenapi.OpsSystemLogCleanupResponse{
+		Data:      toAPISystemLogCleanupResult(result),
+		RequestId: requestID,
+	})
+}
+
+func systemLogCleanupFilterFromAPI(body apiopenapi.OpsSystemLogCleanupRequest) admincontrol.SystemLogCleanupFilter {
+	var level admincontrol.OpsSystemLogLevel
+	if body.Level != nil {
+		level = admincontrol.OpsSystemLogLevel(*body.Level)
+	}
+	var start, end *time.Time
+	if body.Start != nil {
+		startValue := (*body.Start).UTC()
+		start = &startValue
+	}
+	if body.End != nil {
+		endValue := (*body.End).UTC()
+		end = &endValue
+	}
+	var maxDelete int
+	if body.MaxDelete != nil {
+		maxDelete = *body.MaxDelete
+	}
+	var dryRun bool
+	if body.DryRun != nil {
+		dryRun = *body.DryRun
+	}
+	return admincontrol.SystemLogCleanupFilter{
+		Level:     level,
+		Source:    optionalStringValue(body.Source),
+		Query:     optionalStringValue(body.Q),
+		Start:     start,
+		End:       end,
+		DryRun:    dryRun,
+		MaxDelete: maxDelete,
+	}
+}
+
+func toAPISystemLogCleanupResult(result admincontrol.SystemLogCleanupResult) apiopenapi.OpsSystemLogCleanupResult {
+	return apiopenapi.OpsSystemLogCleanupResult{
+		Deleted:   result.Deleted,
+		DryRun:    result.DryRun,
+		Limited:   result.Limited,
+		Matched:   result.Matched,
+		MaxDelete: result.MaxDelete,
+	}
+}
+
+func systemLogCleanupAuditSnapshot(body apiopenapi.OpsSystemLogCleanupRequest, result admincontrol.SystemLogCleanupResult) map[string]any {
+	snapshot := map[string]any{
+		"dry_run":    result.DryRun,
+		"limited":    result.Limited,
+		"matched":    result.Matched,
+		"deleted":    result.Deleted,
+		"max_delete": result.MaxDelete,
+	}
+	if body.Level != nil {
+		snapshot["level"] = string(*body.Level)
+	}
+	if source := strings.TrimSpace(optionalStringValue(body.Source)); source != "" {
+		snapshot["source"] = source
+	}
+	if body.Start != nil {
+		snapshot["start"] = (*body.Start).UTC()
+	}
+	if body.End != nil {
+		snapshot["end"] = (*body.End).UTC()
+	}
+	return snapshot
 }
 
 func (s *Server) adminDashboardSnapshot(r *http.Request, window apiopenapi.TimeWindow) (apiopenapi.AdminDashboardSnapshot, error) {
@@ -716,6 +810,41 @@ func listOptionsFromRequest(r *http.Request) admincontrol.ListOptions {
 		Status:   strings.TrimSpace(r.URL.Query().Get("status")),
 		Level:    strings.TrimSpace(r.URL.Query().Get("level")),
 	}
+}
+
+func systemLogListOptionsFromRequest(r *http.Request) admincontrol.SystemLogListOptions {
+	opts := listOptionsFromRequest(r)
+	query := r.URL.Query()
+	var start, end *time.Time
+	if parsed, ok := parseOptionalRFC3339(query.Get("start")); ok {
+		start = &parsed
+	}
+	if parsed, ok := parseOptionalRFC3339(query.Get("end")); ok {
+		end = &parsed
+	}
+	return admincontrol.SystemLogListOptions{
+		Page:     opts.Page,
+		PageSize: opts.PageSize,
+		Level:    admincontrol.OpsSystemLogLevel(strings.TrimSpace(query.Get("level"))),
+		Source:   strings.TrimSpace(query.Get("source")),
+		Query:    strings.TrimSpace(query.Get("q")),
+		Start:    start,
+		End:      end,
+	}
+}
+
+func parseOptionalRFC3339(raw string) (time.Time, bool) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return time.Time{}, false
+	}
+	if parsed, err := time.Parse(time.RFC3339Nano, raw); err == nil {
+		return parsed.UTC(), true
+	}
+	if parsed, err := time.Parse(time.RFC3339, raw); err == nil {
+		return parsed.UTC(), true
+	}
+	return time.Time{}, false
 }
 
 func paginationWithRequest(r *http.Request, total int) apiopenapi.Pagination {

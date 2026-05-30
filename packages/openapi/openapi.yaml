@@ -18,6 +18,8 @@ tags:
     description: Process and dependency health endpoints.
   - name: Auth
     description: Console authentication endpoints.
+  - name: Notifications
+    description: Public notification preference endpoints.
   - name: CurrentUser
     description: Current console user endpoints.
   - name: ApiKeys
@@ -54,6 +56,8 @@ tags:
     description: Operational event administration endpoints.
   - name: AdminSettings
     description: System settings administration endpoints.
+  - name: AdminNotifications
+    description: Notification template and preference administration endpoints.
   - name: AdminAnnouncements
     description: Announcement administration endpoints.
   - name: AdminPromotions
@@ -136,6 +140,583 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/LoginResponse"
+        "202":
+          description: Password accepted but two-factor verification is required.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginTwoFactorRequiredResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/auth/register:
+    post:
+      tags:
+        - Auth
+      operationId: register
+      summary: Register a console user account.
+      description: Creates a regular user account when public registration is enabled and sets the console session cookie.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Registration succeeded and session cookie was set.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+            Set-Cookie:
+              description: HttpOnly console session cookie.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/auth/oauth/{provider}/start:
+    get:
+      tags:
+        - Auth
+      operationId: startOAuthAuthorization
+      summary: Start an OAuth/OIDC authorization-code flow.
+      description: Redirects to the configured provider authorize URL after issuing an encrypted HttpOnly flow cookie that binds state, PKCE verifier, nonce, provider, intent, and local redirect metadata. Callback token exchange creates a short-lived pending OAuth session; final account adoption is handled by follow-up routes.
+      security: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/AuthIdentityProvider"
+        - name: redirect
+          in: query
+          required: false
+          description: Local console path to continue to after callback handling. Cross-site values are normalized by the server.
+          schema:
+            type: string
+        - name: intent
+          in: query
+          required: false
+          description: Flow intent. v1 public start accepts only login; bind-current-user will use a CSRF-protected follow-up route.
+          schema:
+            type: string
+            enum:
+              - login
+              - bind_current_user
+            default: login
+        - name: provider_key
+          in: query
+          required: false
+          description: Optional provider instance key when multiple configs exist for the same provider.
+          schema:
+            type: string
+      responses:
+        "302":
+          description: Redirect to the upstream provider authorization endpoint.
+          headers:
+            Location:
+              description: Upstream provider authorization URL with state, PKCE challenge, and optional nonce.
+              schema:
+                type: string
+                format: uri
+            Set-Cookie:
+              description: Encrypted HttpOnly OAuth flow cookie.
+              schema:
+                type: string
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/auth/oauth/{provider}/callback:
+    get:
+      tags:
+        - Auth
+      operationId: completeOAuthAuthorization
+      summary: Complete an OAuth/OIDC authorization-code callback.
+      description: Validates the encrypted flow cookie and state, exchanges the authorization code at the configured token endpoint using PKCE public-client auth, fetches UserInfo with a bearer access token, creates a short-lived pending OAuth session with a hashed provider subject, sets an HttpOnly pending cookie, and redirects to the bound local console path.
+      security: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/AuthIdentityProvider"
+        - name: code
+          in: query
+          required: false
+          description: Authorization code returned by the upstream provider.
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          description: State returned by the upstream provider. Must match the encrypted flow cookie.
+          schema:
+            type: string
+        - name: error
+          in: query
+          required: false
+          description: Upstream OAuth error value. When present the server rejects and clears the flow cookie.
+          schema:
+            type: string
+        - name: error_description
+          in: query
+          required: false
+          description: Upstream OAuth error description. It is not reflected verbatim in the error response.
+          schema:
+            type: string
+      responses:
+        "302":
+          description: Redirect to the local console continuation path with HttpOnly OAuth pending cookie set.
+          headers:
+            Location:
+              description: Local console continuation path.
+              schema:
+                type: string
+            Set-Cookie:
+              description: Clears the encrypted flow cookie and sets the short-lived HttpOnly pending OAuth cookie.
+              schema:
+                type: string
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "502":
+          $ref: "#/components/responses/StandardError"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/auth/oauth/pending:
+    get:
+      tags:
+        - Auth
+      operationId: getPendingOAuthSession
+      summary: Inspect a pending OAuth/OIDC decision session.
+      description: Reads the short-lived HttpOnly `srapi_oauth_pending` cookie and returns a safe profile summary plus the next console action. This endpoint is read-only and does not consume the pending session token.
+      security: []
+      responses:
+        "200":
+          description: Pending OAuth decision session preview.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OAuthPendingSessionResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/auth/oauth/pending/bind-current-user:
+    post:
+      tags:
+        - Auth
+      operationId: bindPendingOAuthCurrentUser
+      summary: Bind a pending OAuth/OIDC identity to the current console user.
+      description: Uses the short-lived HttpOnly `srapi_oauth_pending` cookie plus the current console session and CSRF header to attach the verified external identity to the authenticated user. The pending session is consumed only after a successful bind, and the response never exposes raw upstream subjects, provider-subject hashes, authorization codes, provider tokens, session cookies, or CSRF tokens. An optional body may opt in to adopting the provider display name onto the account profile.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PendingOAuthBindCurrentUserRequest"
+      responses:
+        "200":
+          description: Current user sign-in identities after binding.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+            Set-Cookie:
+              description: Clears the consumed pending OAuth cookie.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurrentUserAuthIdentityListResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/auth/oauth/pending/send-verify-code:
+    post:
+      tags:
+        - Auth
+      operationId: sendPendingOAuthEmailCompletion
+      summary: Send a pending OAuth/OIDC email-completion verification link.
+      description: Uses the short-lived HttpOnly `srapi_oauth_pending` cookie to enqueue a high-entropy, single-use email-completion link when the provider profile did not include a usable verified email. The response is uniform and does not reveal whether the submitted email belongs to an existing console account.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PendingOAuthEmailCompletionRequest"
+      responses:
+        "202":
+          description: Email-completion request accepted for asynchronous delivery when the pending session is eligible.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PendingOAuthEmailCompletionAcceptedResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/auth/oauth/pending/email-completion/confirm:
+    post:
+      tags:
+        - Auth
+      operationId: confirmPendingOAuthEmailCompletion
+      summary: Confirm a pending OAuth/OIDC email-completion link.
+      description: Requires the same HttpOnly `srapi_oauth_pending` cookie that requested the verification link, consumes the high-entropy email-completion token, writes the verified email into the pending OAuth session, and returns a fresh safe pending-session preview. The pending OAuth session is not consumed by this route.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfirmPendingOAuthEmailCompletionRequest"
+      responses:
+        "200":
+          description: Pending OAuth email completion confirmed; inspect `next_step` to continue.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OAuthPendingSessionResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/auth/oauth/pending/create-account:
+    post:
+      tags:
+        - Auth
+      operationId: createPendingOAuthAccount
+      summary: Create a console account from a pending OAuth/OIDC identity.
+      description: Uses the short-lived HttpOnly `srapi_oauth_pending` cookie plus a pending-action token issued by `getPendingOAuthSession` to create a local account, bind the verified external identity, consume the pending session, clear the pending cookie, and issue a normal console session. The action token is bound to the pending OAuth cookie to avoid cross-site form posts against a SameSite-permitted top-level OAuth continuation.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PendingOAuthCreateAccountRequest"
+      responses:
+        "201":
+          description: Account created, identity bound, pending cookie cleared, and session cookie set.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+            Set-Cookie:
+              description: HttpOnly console session cookie plus clearing cookie for the consumed pending OAuth session.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/auth/oauth/pending/bind-login:
+    post:
+      tags:
+        - Auth
+      operationId: bindPendingOAuthLogin
+      summary: Bind a pending OAuth/OIDC identity to an existing console account and login.
+      description: Uses the short-lived HttpOnly `srapi_oauth_pending` cookie plus local email/password credentials to authenticate the account owner, attach the verified external identity to that existing active account, consume the pending session, clear the pending cookie, and issue a normal console session. If the account requires two-factor verification, this endpoint returns a pending OAuth specific two-factor challenge and does not bind, consume, or issue a session until the follow-up two-factor route succeeds.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PendingOAuthBindLoginRequest"
+      responses:
+        "200":
+          description: Existing account authenticated, identity bound, pending cookie cleared, and session cookie set.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+            Set-Cookie:
+              description: HttpOnly console session cookie plus clearing cookie for the consumed pending OAuth session.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "202":
+          description: Password accepted but two-factor verification is required before binding and login.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginTwoFactorRequiredResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/auth/oauth/pending/bind-login/2fa:
+    post:
+      tags:
+        - Auth
+      operationId: completePendingOAuthBindLoginTwoFactor
+      summary: Complete pending OAuth/OIDC bind-login with two-factor verification.
+      description: Uses the same HttpOnly `srapi_oauth_pending` cookie plus a pending-OAuth-specific two-factor challenge to finish binding an external identity to the authenticated existing account. The two-factor challenge is cryptographically bound to the pending OAuth token, so a normal login challenge or a challenge from another pending OAuth session cannot be reused here.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PendingOAuthBindLoginTwoFactorRequest"
+      responses:
+        "200":
+          description: Two-factor verification succeeded, identity bound, pending cookie cleared, and session cookie set.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+            Set-Cookie:
+              description: HttpOnly console session cookie plus clearing cookie for the consumed pending OAuth session.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/auth/password-reset/request:
+    post:
+      tags:
+        - Auth
+      operationId: requestPasswordReset
+      summary: Request a console password reset token.
+      description: Always returns an accepted response for syntactically valid email input. If the active user exists, SRapi stores only a hash of the single-use reset token and enqueues encrypted outbox delivery metadata.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RequestPasswordResetRequest"
+      responses:
+        "202":
+          description: Password reset request accepted without revealing whether the email exists.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PasswordResetAcceptedResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/auth/password-reset/confirm:
+    post:
+      tags:
+        - Auth
+      operationId: confirmPasswordReset
+      summary: Confirm a console password reset.
+      description: Consumes a single-use password reset token, replaces the user's password hash, and revokes active console sessions for that user.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfirmPasswordResetRequest"
+      responses:
+        "200":
+          description: Password reset succeeded.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PasswordResetAcceptedResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/auth/email-verification/request:
+    post:
+      tags:
+        - Auth
+      operationId: requestEmailVerification
+      summary: Request a console email verification token.
+      description: Always returns an accepted response for syntactically valid email input. If an active unverified user exists, SRapi stores only a hash of the single-use verification token and enqueues encrypted outbox delivery metadata.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RequestEmailVerificationRequest"
+      responses:
+        "202":
+          description: Email verification request accepted without revealing whether the email exists or is already verified.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailVerificationAcceptedResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/auth/email-verification/confirm:
+    post:
+      tags:
+        - Auth
+      operationId: confirmEmailVerification
+      summary: Confirm a console email verification token.
+      description: Consumes a single-use email verification token and marks the user's primary email as verified. This route does not create a login session.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfirmEmailVerificationRequest"
+      responses:
+        "200":
+          description: Email verification succeeded.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailVerificationAcceptedResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/auth/login/2fa:
+    post:
+      tags:
+        - Auth
+      operationId: loginTwoFactor
+      summary: Complete console login with a TOTP or recovery code.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginTwoFactorRequest"
+      responses:
+        "200":
+          description: Two-factor login succeeded and session cookie was set.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+            Set-Cookie:
+              description: HttpOnly console session cookie.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
         "400":
           $ref: "#/components/responses/ValidationError"
         "401":
@@ -163,6 +744,73 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/notifications/unsubscribe:
+    get:
+      tags:
+        - Notifications
+      operationId: previewNotificationUnsubscribe
+      summary: Preview a notification unsubscribe token.
+      description: Validates a signed optional-notification unsubscribe token without changing preference state. Transactional auth emails cannot be unsubscribed.
+      security: []
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        "200":
+          description: Unsubscribe token is valid.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationUnsubscribeResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        default:
+          $ref: "#/components/responses/StandardError"
+    post:
+      tags:
+        - Notifications
+      operationId: unsubscribeNotificationEmail
+      summary: Unsubscribe from an optional notification email.
+      description: Applies a signed optional-notification unsubscribe token. The token may be provided as a query parameter, JSON body, or form field to support one-click unsubscribe POSTs.
+      security: []
+      parameters:
+        - name: token
+          in: query
+          required: false
+          schema:
+            type: string
+            minLength: 1
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationUnsubscribeRequest"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/NotificationUnsubscribeRequest"
+      responses:
+        "200":
+          description: Optional notification preference updated.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationUnsubscribeResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/me:
     get:
       tags:
@@ -183,6 +831,648 @@ paths:
                 $ref: "#/components/schemas/UserResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        default:
+          $ref: "#/components/responses/StandardError"
+    patch:
+      tags:
+        - CurrentUser
+      operationId: updateCurrentUserProfile
+      summary: Update current console user profile.
+      description: Updates the current user's editable profile fields. The request is field-allowlisted so callers cannot change email, roles, status, balance, or other admin-managed fields.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCurrentUserProfileRequest"
+      responses:
+        "200":
+          description: Current user profile updated.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/me/auth-identities:
+    get:
+      tags:
+        - CurrentUser
+      operationId: listCurrentUserAuthIdentities
+      summary: List current console user sign-in identities.
+      description: Returns the local email sign-in identity plus verified external OAuth/OIDC identities already bound to the current user. External identities expose only a display-safe subject hint, never the raw upstream subject or tokens.
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Current user sign-in identities.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurrentUserAuthIdentityListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/me/auth-identities/{id}:
+    delete:
+      tags:
+        - CurrentUser
+      operationId: unbindCurrentUserAuthIdentity
+      summary: Unbind a current console user external sign-in identity.
+      description: Removes one external OAuth/OIDC sign-in identity owned by the current user and returns the updated identity list. The local email identity cannot be removed through this endpoint.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Current user sign-in identities after unbinding.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurrentUserAuthIdentityListResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/me/avatar:
+    put:
+      tags:
+        - CurrentUser
+      operationId: uploadCurrentUserAvatar
+      summary: Upload current console user avatar.
+      description: Uploads a PNG or JPEG avatar image. SRapi validates the decoded image, rejects oversized input, and stores a normalized PNG for controlled serving.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - avatar
+              properties:
+                avatar:
+                  type: string
+                  format: binary
+                  description: PNG or JPEG avatar image. The upload limit is 1 MiB and dimensions must not exceed 1024x1024.
+      responses:
+        "200":
+          description: Avatar uploaded.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserAvatarResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+    delete:
+      tags:
+        - CurrentUser
+      operationId: deleteCurrentUserAvatar
+      summary: Delete current console user avatar.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      responses:
+        "200":
+          description: Avatar deleted.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/users/{id}/avatar:
+    get:
+      tags:
+        - CurrentUser
+      operationId: getUserAvatar
+      summary: Get a console user avatar image.
+      description: Returns the normalized avatar image for an authenticated console user. Avatar bytes are served from SRapi-controlled storage with image/png and nosniff headers.
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Avatar image.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+            ETag:
+              schema:
+                type: string
+            X-Content-Type-Options:
+              schema:
+                type: string
+                enum:
+                  - nosniff
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/me/password:
+    post:
+      tags:
+        - CurrentUser
+      operationId: changeCurrentUserPassword
+      summary: Change current console user password.
+      description: Verifies the current password, updates the password hash, revokes active console sessions for the user, and clears the current session cookie.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeCurrentUserPasswordRequest"
+      responses:
+        "204":
+          description: Password changed and active sessions were revoked.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+            Set-Cookie:
+              description: Expired HttpOnly console session cookie.
+              schema:
+                type: string
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/me/notification-preferences:
+    get:
+      tags:
+        - CurrentUser
+      operationId: getCurrentUserNotificationPreferences
+      summary: Get current user notification preferences.
+      description: Returns the current user's optional notification email subscription state. Transactional auth emails are not included because they cannot be unsubscribed.
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Current user notification preferences.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationPreferenceListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        default:
+          $ref: "#/components/responses/StandardError"
+    put:
+      tags:
+        - CurrentUser
+      operationId: updateCurrentUserNotificationPreferences
+      summary: Update current user notification preferences.
+      description: Updates optional notification email subscription state for the current user's primary email hash. It never stores plaintext recipient email addresses.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateNotificationPreferencesRequest"
+      responses:
+        "200":
+          description: Current user notification preferences updated.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationPreferenceListResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/me/notification-contacts:
+    get:
+      tags:
+        - CurrentUser
+      operationId: listCurrentUserNotificationContacts
+      summary: List current user notification contacts.
+      description: Returns the current user's secondary notification email contacts. Only verified and enabled contacts receive optional notification emails.
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Current user notification contacts.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationContactListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        default:
+          $ref: "#/components/responses/StandardError"
+    post:
+      tags:
+        - CurrentUser
+      operationId: requestCurrentUserNotificationContactVerification
+      summary: Request notification contact verification.
+      description: Creates or reuses a pending secondary notification email contact and sends a time-limited verification link to that address. The primary account email cannot be added as a secondary contact.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationContactVerificationRequest"
+      responses:
+        "202":
+          description: Notification contact verification accepted.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationContactVerificationResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/me/notification-contacts/verify:
+    post:
+      tags:
+        - CurrentUser
+      operationId: confirmCurrentUserNotificationContactVerification
+      summary: Verify a notification contact.
+      description: Marks a pending secondary notification email contact as verified after the current user submits the time-limited verification token sent to that address.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationContactConfirmRequest"
+      responses:
+        "200":
+          description: Notification contact verified.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationContactResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/me/notification-contacts/{id}:
+    patch:
+      tags:
+        - CurrentUser
+      operationId: updateCurrentUserNotificationContact
+      summary: Update a notification contact.
+      description: Enables or disables one current-user secondary notification contact without removing its verification state.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateNotificationContactRequest"
+      responses:
+        "200":
+          description: Notification contact updated.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationContactResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+    delete:
+      tags:
+        - CurrentUser
+      operationId: deleteCurrentUserNotificationContact
+      summary: Delete a notification contact.
+      description: Removes one current-user secondary notification contact.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        "204":
+          description: Notification contact deleted.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/me/announcements:
+    get:
+      tags:
+        - CurrentUser
+      operationId: listCurrentUserAnnouncements
+      summary: List current user announcements.
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: Current user visible announcements with read state.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserAnnouncementListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/me/announcements/{id}/read:
+    post:
+      tags:
+        - CurrentUser
+      operationId: markCurrentUserAnnouncementRead
+      summary: Mark a current user announcement as read.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Announcement read state.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserAnnouncementResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/me/totp/status:
+    get:
+      tags:
+        - CurrentUser
+      operationId: getCurrentUserTOTPStatus
+      summary: Get current user TOTP status.
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Current user TOTP status.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TOTPStatusResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/me/totp/setup:
+    post:
+      tags:
+        - CurrentUser
+      operationId: setupCurrentUserTOTP
+      summary: Start or rotate current user TOTP setup.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      responses:
+        "200":
+          description: TOTP setup secret and otpauth URI.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TOTPSetupResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/me/totp/enable:
+    post:
+      tags:
+        - CurrentUser
+      operationId: enableCurrentUserTOTP
+      summary: Enable current user TOTP after verifying the setup code.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TOTPVerifyRequest"
+      responses:
+        "200":
+          description: TOTP enabled with one-time recovery codes.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TOTPEnableResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/me/totp/disable:
+    post:
+      tags:
+        - CurrentUser
+      operationId: disableCurrentUserTOTP
+      summary: Disable current user TOTP after verifying a TOTP or recovery code.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TOTPVerifyRequest"
+      responses:
+        "200":
+          description: TOTP disabled.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TOTPStatusResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         default:
           $ref: "#/components/responses/StandardError"
 
@@ -206,6 +1496,45 @@ paths:
                 $ref: "#/components/schemas/UserBalanceResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/me/redeem-codes/redeem:
+    post:
+      tags:
+        - CurrentUser
+        - AdminControl
+      operationId: redeemCurrentUserRedeemCode
+      summary: Redeem a code for the current user.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RedeemCodeRedemptionRequest"
+      responses:
+        "200":
+          description: Code redeemed or previously redeemed by the same user.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RedeemCodeRedemptionResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
         default:
           $ref: "#/components/responses/StandardError"
 
@@ -3684,7 +5013,23 @@ paths:
         - name: level
           in: query
           schema:
+            $ref: "#/components/schemas/OpsSystemLogLevel"
+        - name: source
+          in: query
+          schema:
             type: string
+        - name: q
+          in: query
+          schema:
+            type: string
+        - name: start
+          in: query
+          schema:
+            $ref: "#/components/schemas/Timestamp"
+        - name: end
+          in: query
+          schema:
+            $ref: "#/components/schemas/Timestamp"
       responses:
         "200":
           description: System log list.
@@ -3695,6 +5040,44 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/OpsSystemLogListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/ops/system-logs/cleanup:
+    post:
+      tags:
+        - AdminOps
+      operationId: cleanupAdminOpsSystemLogs
+      summary: Cleanup sanitized system log events by bounded filter.
+      description: Requires at least one filter condition. Deletion is capped by max_delete and always records a safe audit summary.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OpsSystemLogCleanupRequest"
+      responses:
+        "200":
+          description: System log cleanup result.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsSystemLogCleanupResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -4066,6 +5449,189 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/notifications/email-templates:
+    get:
+      tags:
+        - AdminNotifications
+      operationId: listAdminNotificationEmailTemplates
+      summary: List editable notification email templates.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+      responses:
+        "200":
+          description: Notification email templates and placeholder metadata.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationEmailTemplateListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/notifications/email-template-preview:
+    post:
+      tags:
+        - AdminNotifications
+      operationId: previewAdminNotificationEmailTemplate
+      summary: Preview a notification email template without saving it.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PreviewNotificationEmailTemplateRequest"
+      responses:
+        "200":
+          description: Rendered template preview.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationEmailTemplatePreviewResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/notifications/email-templates/{event}:
+    get:
+      tags:
+        - AdminNotifications
+      operationId: getAdminNotificationEmailTemplate
+      summary: Get one editable notification email template.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+      parameters:
+        - name: event
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/NotificationEmailTemplateEventName"
+      responses:
+        "200":
+          description: Notification email template.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationEmailTemplateResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+    put:
+      tags:
+        - AdminNotifications
+      operationId: updateAdminNotificationEmailTemplate
+      summary: Update one notification email template override.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: event
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/NotificationEmailTemplateEventName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateNotificationEmailTemplateRequest"
+      responses:
+        "200":
+          description: Notification email template updated.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationEmailTemplateResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/notifications/email-templates/{event}/restore:
+    post:
+      tags:
+        - AdminNotifications
+      operationId: restoreAdminNotificationEmailTemplate
+      summary: Restore one notification email template to its built-in default.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: event
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/NotificationEmailTemplateEventName"
+      responses:
+        "200":
+          description: Notification email template restored.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationEmailTemplateResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         default:
           $ref: "#/components/responses/StandardError"
 
@@ -4961,6 +6527,8 @@ paths:
       summary: Create an OpenAI-compatible chat completion.
       security:
         - gatewayBearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GatewayIdempotencyKey"
       requestBody:
         required: true
         content:
@@ -4995,6 +6563,8 @@ paths:
           $ref: "#/components/responses/GatewayUnauthorized"
         "403":
           $ref: "#/components/responses/GatewayForbidden"
+        "409":
+          $ref: "#/components/responses/GatewayIdempotencyConflict"
         "422":
           $ref: "#/components/responses/GatewayValidationError"
         "503":
@@ -5010,6 +6580,8 @@ paths:
       summary: Create an OpenAI Responses-compatible response.
       security:
         - gatewayBearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GatewayIdempotencyKey"
       requestBody:
         required: true
         content:
@@ -5036,6 +6608,8 @@ paths:
           $ref: "#/components/responses/GatewayUnauthorized"
         "403":
           $ref: "#/components/responses/GatewayForbidden"
+        "409":
+          $ref: "#/components/responses/GatewayIdempotencyConflict"
         "422":
           $ref: "#/components/responses/GatewayValidationError"
         "503":
@@ -5301,6 +6875,8 @@ paths:
       summary: Create an Anthropic Messages-compatible message.
       security:
         - gatewayBearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GatewayIdempotencyKey"
       requestBody:
         required: true
         content:
@@ -5327,6 +6903,8 @@ paths:
           $ref: "#/components/responses/GatewayUnauthorized"
         "403":
           $ref: "#/components/responses/GatewayForbidden"
+        "409":
+          $ref: "#/components/responses/GatewayIdempotencyConflict"
         "422":
           $ref: "#/components/responses/GatewayValidationError"
         "503":
@@ -5381,6 +6959,8 @@ paths:
       description: OpenAI-compatible embeddings route. SRapi validates the gateway API key, applies model policy and entitlement, schedules an eligible provider account, invokes the selected OpenAI-compatible provider adapter, and records usage and Scheduler evidence.
       security:
         - gatewayBearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GatewayIdempotencyKey"
       requestBody:
         required: true
         content:
@@ -5410,6 +6990,8 @@ paths:
           $ref: "#/components/responses/GatewayUnauthorized"
         "403":
           $ref: "#/components/responses/GatewayForbidden"
+        "409":
+          $ref: "#/components/responses/GatewayIdempotencyConflict"
         "422":
           $ref: "#/components/responses/GatewayValidationError"
         "503":
@@ -8153,6 +9735,18 @@ components:
         minLength: 1
         maxLength: 200
       description: Idempotency key for financial write operations.
+    GatewayIdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 255
+      description: >-
+        Optional opt-in idempotency key. A retried non-streaming request that
+        repeats the same key and body replays the original response instead of
+        re-executing (and re-billing). Streaming requests are not replayed.
     Status:
       name: status
       in: query
@@ -8290,6 +9884,15 @@ components:
             $ref: "#/components/schemas/GatewayErrorResponse"
     GatewayForbidden:
       description: Gateway API key or user policy forbids this operation.
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestIdHeader"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/GatewayErrorResponse"
+    GatewayIdempotencyConflict:
+      description: A request with this Idempotency-Key is already being processed or already completed without a replayable response.
       headers:
         X-Request-ID:
           $ref: "#/components/headers/RequestIdHeader"
@@ -8659,6 +10262,233 @@ components:
         - disabled
         - pending
 
+    AuthIdentityProvider:
+      type: string
+      enum:
+        - email
+        - oidc
+        - github
+        - google
+        - linuxdo
+        - wechat
+        - dingtalk
+
+    PendingOAuthIntent:
+      type: string
+      enum:
+        - login
+        - bind_current_user
+
+    OAuthPendingNextStep:
+      type: string
+      enum:
+        - email_completion_required
+        - bind_existing_login_required
+        - create_account_required
+        - ready_for_login
+        - bind_current_user_required
+
+    OAuthPendingProfile:
+      type: object
+      required:
+        - resolved_email
+        - display_name
+        - email_verified
+        - avatar_url
+      properties:
+        resolved_email:
+          type: string
+          description: Normalized email claim retained from the provider when present and syntactically safe.
+        display_name:
+          type: string
+          description: Display-safe provider profile name.
+        email_verified:
+          type: boolean
+        avatar_url:
+          type: string
+          description: Display-safe provider profile image URL.
+
+    PendingOAuthAction:
+      type: object
+      required:
+        - token
+        - expires_at
+      properties:
+        token:
+          type: string
+          minLength: 16
+          description: Short-lived signed action token bound to the current pending OAuth cookie. It is not a session token and cannot be reused with another pending cookie.
+        expires_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    OAuthPendingSession:
+      type: object
+      required:
+        - intent
+        - provider
+        - provider_key
+        - subject_hint
+        - redirect
+        - profile
+        - next_step
+        - existing_account_bindable
+        - expires_at
+      properties:
+        intent:
+          $ref: "#/components/schemas/PendingOAuthIntent"
+        provider:
+          $ref: "#/components/schemas/AuthIdentityProvider"
+        provider_key:
+          type: string
+          description: Stable provider instance key used for this pending flow.
+        subject_hint:
+          type: string
+          description: Display-safe provider subject hint. Raw provider subjects and hashes are never returned.
+        redirect:
+          type: string
+          description: Bound local console continuation path.
+        profile:
+          $ref: "#/components/schemas/OAuthPendingProfile"
+        next_step:
+          $ref: "#/components/schemas/OAuthPendingNextStep"
+        existing_account_bindable:
+          type: boolean
+          description: True when the retained provider email matches an active local account that can continue through the bind-existing-login flow.
+        create_account_action:
+          $ref: "#/components/schemas/PendingOAuthAction"
+        expires_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    OAuthPendingSessionResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/OAuthPendingSession"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    CurrentUserAuthIdentity:
+      type: object
+      required:
+        - user_id
+        - provider
+        - provider_key
+        - external
+        - email_verified
+        - can_unbind
+        - created_at
+        - updated_at
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+          nullable: true
+          description: Persistent identity id for external identities. Local email identity is derived and has no persistent id.
+        user_id:
+          $ref: "#/components/schemas/Id"
+        provider:
+          $ref: "#/components/schemas/AuthIdentityProvider"
+        provider_key:
+          type: string
+          description: Stable provider instance key, such as `local` or an OIDC issuer.
+        subject_hint:
+          type: string
+          description: Display-safe subject hint. The raw upstream subject is never returned.
+        display_name:
+          type: string
+        email:
+          type: string
+          format: email
+        email_verified:
+          type: boolean
+        avatar_url:
+          type: string
+          description: Upstream profile avatar URL suggested by a verified external identity, when retained for display.
+        external:
+          type: boolean
+        verified_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_used_at:
+          type: string
+          format: date-time
+          nullable: true
+        can_unbind:
+          type: boolean
+        unbind_blocked_by:
+          type: string
+          description: Machine-readable reason when unbinding this identity is blocked.
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+        updated_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    CurrentUserAuthIdentityListResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/CurrentUserAuthIdentity"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    OAuthProviderConfig:
+      type: object
+      required:
+        - provider
+        - provider_key
+        - display_name
+        - client_id
+        - authorize_url
+        - redirect_uri
+        - scopes
+      properties:
+        provider:
+          $ref: "#/components/schemas/AuthIdentityProvider"
+        provider_key:
+          type: string
+          description: Stable provider instance key. Defaults to provider name for single-instance providers.
+        display_name:
+          type: string
+          description: Non-secret label shown in console settings.
+        client_id:
+          type: string
+          description: Public OAuth client id. Client secrets are not exposed in admin settings.
+        authorize_url:
+          type: string
+          format: uri
+          description: HTTPS provider authorization endpoint without query or fragment.
+        token_url:
+          type: string
+          format: uri
+          description: Optional provider token endpoint for callback completion. HTTPS is required except localhost development. v1 supports public clients with token_auth_method=none.
+        userinfo_url:
+          type: string
+          format: uri
+          description: Optional provider UserInfo/profile endpoint for callback completion. HTTPS is required except localhost development.
+        token_auth_method:
+          type: string
+          description: Token endpoint client authentication method. v1 accepts none so client secrets stay outside Admin Settings.
+          enum:
+            - none
+          default: none
+        redirect_uri:
+          type: string
+          format: uri
+          description: Registered callback URI. HTTP is accepted only for localhost development.
+        scopes:
+          type: array
+          description: Provider scopes sent as a space-delimited authorization request parameter.
+          items:
+            type: string
+
     User:
       type: object
       required:
@@ -8697,8 +10527,81 @@ components:
           type: string
           format: date-time
           nullable: true
+        email_verified_at:
+          type: string
+          format: date-time
+          nullable: true
+        avatar_url:
+          type: string
+          description: Relative URL for the user's SRapi-hosted avatar image, when configured.
+        avatar_mime:
+          type: string
+          description: Normalized avatar MIME type.
+          enum:
+            - image/png
+        avatar_byte_size:
+          type: integer
+          minimum: 1
+        avatar_sha256:
+          type: string
+          minLength: 64
+          maxLength: 64
+        avatar_updated_at:
+          type: string
+          format: date-time
+          nullable: true
         created_at:
           $ref: "#/components/schemas/Timestamp"
+
+    UserAvatar:
+      type: object
+      required:
+        - user_id
+        - url
+        - content_type
+        - byte_size
+        - sha256
+        - width
+        - height
+        - updated_at
+      properties:
+        user_id:
+          $ref: "#/components/schemas/Id"
+        url:
+          type: string
+          description: Relative URL that serves the normalized avatar image.
+        content_type:
+          type: string
+          enum:
+            - image/png
+        byte_size:
+          type: integer
+          minimum: 1
+        sha256:
+          type: string
+          minLength: 64
+          maxLength: 64
+        width:
+          type: integer
+          minimum: 1
+          maximum: 1024
+        height:
+          type: integer
+          minimum: 1
+          maximum: 1024
+        updated_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    UserAvatarResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/UserAvatar"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
 
     CreateAdminUserRequest:
       type: object
@@ -8807,6 +10710,17 @@ components:
         request_id:
           $ref: "#/components/schemas/RequestId"
 
+    UpdateCurrentUserProfileRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+          description: Current user's display name.
+
     UpdateUserRpmLimitRequest:
       type: object
       required:
@@ -8899,6 +10813,481 @@ components:
           format: password
           minLength: 8
 
+    PendingOAuthBindCurrentUserRequest:
+      type: object
+      description: Optional preferences applied while binding a pending external identity to the current console user. Omitting the body is equivalent to all preferences disabled.
+      properties:
+        adopt_display_name:
+          type: boolean
+          default: false
+          description: When true, adopt the provider-returned display name as the account display name if the provider supplied a present, valid name. Provider avatar URLs are never adopted automatically because SRapi avatars use a controlled upload/storage model.
+
+    PendingOAuthBindLoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          description: Existing console account email to authenticate before binding the pending external identity.
+        password:
+          type: string
+          format: password
+          minLength: 8
+        adopt_display_name:
+          type: boolean
+          default: false
+          description: When true, adopt the provider-returned display name onto the authenticated account after a successful bind, if the provider supplied a present, valid name. Provider avatar URLs are never adopted automatically because SRapi avatars use a controlled upload/storage model.
+
+    PendingOAuthBindLoginTwoFactorRequest:
+      type: object
+      required:
+        - challenge_id
+        - code
+      properties:
+        challenge_id:
+          type: string
+          minLength: 16
+          description: Pending OAuth bind-login two-factor challenge returned by `bindPendingOAuthLogin`.
+        code:
+          type: string
+          minLength: 6
+          maxLength: 32
+          description: Six-digit TOTP code or one recovery code.
+
+    PendingOAuthEmailCompletionRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+          description: Email address the user wants to prove for an OAuth pending session that lacks a provider email.
+
+    ConfirmPendingOAuthEmailCompletionRequest:
+      type: object
+      required:
+        - token
+      properties:
+        token:
+          type: string
+          minLength: 16
+          description: High-entropy pending OAuth email-completion token delivered by email. It must be submitted with the same pending OAuth cookie.
+
+    PendingOAuthEmailCompletionAccepted:
+      type: object
+      required:
+        - accepted
+        - expires_at
+      properties:
+        accepted:
+          type: boolean
+        expires_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    PendingOAuthEmailCompletionAcceptedResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/PendingOAuthEmailCompletionAccepted"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    PendingOAuthCreateAccountRequest:
+      type: object
+      required:
+        - email
+        - password
+        - action_token
+      properties:
+        email:
+          type: string
+          format: email
+          description: New console account email. For v1 this must match the verified email retained in the pending OAuth session.
+        name:
+          type: string
+          minLength: 1
+          description: Optional local display name. Defaults to the provider display name or email.
+        password:
+          type: string
+          format: password
+          minLength: 8
+        action_token:
+          type: string
+          minLength: 16
+          description: Pending OAuth create-account action token returned by `getPendingOAuthSession`.
+
+    RegisterRequest:
+      type: object
+      required:
+        - email
+        - name
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+          minLength: 1
+        password:
+          type: string
+          format: password
+          minLength: 8
+
+    RequestPasswordResetRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+
+    ConfirmPasswordResetRequest:
+      type: object
+      required:
+        - token
+        - new_password
+      properties:
+        token:
+          type: string
+          minLength: 1
+        new_password:
+          type: string
+          format: password
+          minLength: 8
+
+    PasswordResetAccepted:
+      type: object
+      required:
+        - accepted
+      properties:
+        accepted:
+          type: boolean
+
+    PasswordResetAcceptedResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/PasswordResetAccepted"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    RequestEmailVerificationRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+
+    ConfirmEmailVerificationRequest:
+      type: object
+      required:
+        - token
+      properties:
+        token:
+          type: string
+          minLength: 1
+
+    EmailVerificationAccepted:
+      type: object
+      required:
+        - accepted
+      properties:
+        accepted:
+          type: boolean
+
+    EmailVerificationAcceptedResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/EmailVerificationAccepted"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    NotificationUnsubscribeRequest:
+      type: object
+      required:
+        - token
+      properties:
+        token:
+          type: string
+          minLength: 1
+
+    NotificationUnsubscribe:
+      type: object
+      required:
+        - event
+        - done
+      properties:
+        event:
+          type: string
+          enum:
+            - balance.low
+            - subscription.expiry_reminder
+            - account.quota_alert
+        done:
+          type: boolean
+
+    NotificationUnsubscribeResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/NotificationUnsubscribe"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    NotificationPreferenceEventName:
+      type: string
+      enum:
+        - balance.low
+        - subscription.expiry_reminder
+        - account.quota_alert
+
+    NotificationPreference:
+      type: object
+      required:
+        - event
+        - label
+        - description
+        - category
+        - subscribed
+      properties:
+        event:
+          $ref: "#/components/schemas/NotificationPreferenceEventName"
+        label:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        subscribed:
+          type: boolean
+          description: True when the current user is subscribed to this optional notification event.
+        updated_at:
+          $ref: "#/components/schemas/Timestamp"
+          nullable: true
+
+    NotificationPreferenceUpdate:
+      type: object
+      required:
+        - event
+        - subscribed
+      properties:
+        event:
+          $ref: "#/components/schemas/NotificationPreferenceEventName"
+        subscribed:
+          type: boolean
+
+    UpdateNotificationPreferencesRequest:
+      type: object
+      required:
+        - preferences
+      properties:
+        preferences:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/NotificationPreferenceUpdate"
+
+    NotificationPreferenceListResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/NotificationPreference"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    NotificationContact:
+      type: object
+      required:
+        - id
+        - email
+        - email_hash
+        - verified
+        - disabled
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        email_hash:
+          type: string
+          description: SHA-256 hash of the normalized contact email.
+        verified:
+          type: boolean
+        disabled:
+          type: boolean
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+        updated_at:
+          $ref: "#/components/schemas/Timestamp"
+        verified_at:
+          $ref: "#/components/schemas/Timestamp"
+          nullable: true
+
+    NotificationContactListResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/NotificationContact"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    NotificationContactVerificationRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+
+    NotificationContactVerificationAccepted:
+      type: object
+      required:
+        - accepted
+        - contact
+        - verification_sent
+      properties:
+        accepted:
+          type: boolean
+        contact:
+          $ref: "#/components/schemas/NotificationContact"
+        verification_sent:
+          type: boolean
+        expires_at:
+          $ref: "#/components/schemas/Timestamp"
+          nullable: true
+
+    NotificationContactVerificationResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/NotificationContactVerificationAccepted"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    NotificationContactConfirmRequest:
+      type: object
+      required:
+        - token
+      properties:
+        token:
+          type: string
+          minLength: 1
+
+    UpdateNotificationContactRequest:
+      type: object
+      required:
+        - disabled
+      properties:
+        disabled:
+          type: boolean
+
+    NotificationContactResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/NotificationContact"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    ChangeCurrentUserPasswordRequest:
+      type: object
+      required:
+        - current_password
+        - new_password
+      properties:
+        current_password:
+          type: string
+          format: password
+          minLength: 8
+        new_password:
+          type: string
+          format: password
+          minLength: 8
+
+    LoginTwoFactorRequest:
+      type: object
+      required:
+        - challenge_id
+        - code
+      properties:
+        challenge_id:
+          type: string
+          minLength: 16
+        code:
+          type: string
+          minLength: 6
+          maxLength: 32
+          description: Six-digit TOTP code or one recovery code.
+
+    LoginTwoFactorRequired:
+      type: object
+      required:
+        - required
+        - challenge_id
+        - expires_at
+      properties:
+        required:
+          type: boolean
+          enum:
+            - true
+        challenge_id:
+          type: string
+        expires_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    LoginTwoFactorRequiredResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/LoginTwoFactorRequired"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
     SessionData:
       type: object
       required:
@@ -8922,6 +11311,91 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/SessionData"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    TOTPStatus:
+      type: object
+      required:
+        - enabled
+        - pending_setup
+      properties:
+        enabled:
+          type: boolean
+        pending_setup:
+          type: boolean
+
+    TOTPStatusResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/TOTPStatus"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    TOTPSetup:
+      type: object
+      required:
+        - enabled
+        - secret
+        - otp_auth_url
+      properties:
+        enabled:
+          type: boolean
+        secret:
+          type: string
+          description: Base32 TOTP secret returned once for enrollment.
+        otp_auth_url:
+          type: string
+          format: uri
+
+    TOTPSetupResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/TOTPSetup"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    TOTPVerifyRequest:
+      type: object
+      required:
+        - code
+      properties:
+        code:
+          type: string
+          minLength: 6
+          maxLength: 32
+          description: Six-digit TOTP code or one recovery code.
+
+    TOTPEnableResult:
+      type: object
+      required:
+        - enabled
+        - recovery_codes
+      properties:
+        enabled:
+          type: boolean
+        recovery_codes:
+          type: array
+          items:
+            type: string
+          minItems: 1
+
+    TOTPEnableResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/TOTPEnableResult"
         request_id:
           $ref: "#/components/schemas/RequestId"
 
@@ -9309,6 +11783,8 @@ components:
         - user_id
         - order_no
         - provider_instance_id
+        - original_amount
+        - discount_amount
         - amount
         - currency
         - status
@@ -9327,6 +11803,15 @@ components:
           type: string
         provider_instance_id:
           $ref: "#/components/schemas/Id"
+        original_amount:
+          type: string
+          example: "10.00000000"
+        discount_amount:
+          type: string
+          example: "1.00000000"
+        promo_code_id:
+          $ref: "#/components/schemas/Id"
+          nullable: true
         amount:
           type: string
           example: "10.00000000"
@@ -9383,6 +11868,9 @@ components:
           $ref: "#/components/schemas/PaymentProductType"
         product_id:
           type: string
+        promo_code:
+          type: string
+          minLength: 1
         expires_at:
           type: string
           format: date-time
@@ -11786,6 +14274,14 @@ components:
         request_id:
           $ref: "#/components/schemas/RequestId"
 
+    OpsSystemLogLevel:
+      type: string
+      enum:
+        - debug
+        - info
+        - warn
+        - error
+
     OpsSystemLog:
       type: object
       required:
@@ -11798,15 +14294,14 @@ components:
         id:
           $ref: "#/components/schemas/Id"
         level:
-          type: string
-          enum:
-            - debug
-            - info
-            - warn
-            - error
+          $ref: "#/components/schemas/OpsSystemLogLevel"
         message:
           type: string
         source:
+          type: string
+        request_id:
+          type: string
+        trace_id:
           type: string
         metadata:
           $ref: "#/components/schemas/JsonObject"
@@ -11826,6 +14321,63 @@ components:
             $ref: "#/components/schemas/OpsSystemLog"
         pagination:
           $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    OpsSystemLogCleanupRequest:
+      type: object
+      properties:
+        level:
+          $ref: "#/components/schemas/OpsSystemLogLevel"
+        source:
+          type: string
+        q:
+          type: string
+        start:
+          $ref: "#/components/schemas/Timestamp"
+        end:
+          $ref: "#/components/schemas/Timestamp"
+        dry_run:
+          type: boolean
+          default: false
+        max_delete:
+          type: integer
+          minimum: 1
+          maximum: 10000
+          default: 1000
+
+    OpsSystemLogCleanupResult:
+      type: object
+      required:
+        - matched
+        - deleted
+        - dry_run
+        - max_delete
+        - limited
+      properties:
+        matched:
+          type: integer
+          minimum: 0
+        deleted:
+          type: integer
+          minimum: 0
+        dry_run:
+          type: boolean
+        max_delete:
+          type: integer
+          minimum: 1
+          maximum: 10000
+        limited:
+          type: boolean
+
+    OpsSystemLogCleanupResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/OpsSystemLogCleanupResult"
         request_id:
           $ref: "#/components/schemas/RequestId"
 
@@ -11933,19 +14485,32 @@ components:
       required:
         - admin_api_key
         - registration_enabled
+        - registration_email_suffix_allowlist
         - oauth_enabled
         - oauth_providers
+        - oauth_provider_configs
       properties:
         admin_api_key:
           $ref: "#/components/schemas/SecretConfigured"
         registration_enabled:
           type: boolean
+        registration_email_suffix_allowlist:
+          type: array
+          description: Normalized allowed email suffixes for public registration. Empty means all valid email domains are allowed.
+          items:
+            type: string
+            pattern: "^@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$"
         oauth_enabled:
           type: boolean
         oauth_providers:
           type: array
           items:
             type: string
+        oauth_provider_configs:
+          type: array
+          description: Non-secret OAuth/OIDC provider authorization settings. Secrets for token exchange are configured outside this response.
+          items:
+            $ref: "#/components/schemas/OAuthProviderConfig"
 
     AdminSettingsUsers:
       type: object
@@ -12037,10 +14602,66 @@ components:
       properties:
         smtp_configured:
           type: boolean
+          description: True when host and sender are configured. Password state is exposed separately.
+        smtp_host:
+          type: string
+          default: ""
+        smtp_port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+          default: 587
+        smtp_username:
+          type: string
+          default: ""
+        smtp_password_configured:
+          type: boolean
+          default: false
+          description: True when an SMTP password is configured by deployment environment.
+        smtp_from:
+          type: string
+          format: email
+          default: ""
+        smtp_from_name:
+          type: string
+          default: ""
+        smtp_use_tls:
+          type: boolean
+          default: false
+        public_base_url:
+          type: string
+          default: ""
+          description: Absolute public console base URL used to build auth email links.
         templates:
           type: object
           additionalProperties:
             type: string
+        balance_low_notify_enabled:
+          type: boolean
+          default: true
+          description: Enables optional low-balance notification trigger after usage charges cross the threshold.
+        balance_low_notify_threshold:
+          type: string
+          default: "5.00000000"
+          pattern: '^[0-9]+(\.[0-9]+)?$'
+          description: Default wallet balance threshold used for low-balance notifications.
+        balance_low_notify_recharge_url:
+          type: string
+          default: ""
+          description: Optional absolute recharge URL used by low-balance notification templates.
+        subscription_expiry_notify_enabled:
+          type: boolean
+          default: true
+          description: Enables optional subscription expiry reminder trigger for active subscriptions before they expire.
+        account_quota_notify_enabled:
+          type: boolean
+          default: true
+          description: Enables optional provider-account quota alert trigger when quota snapshots cross the remaining-ratio threshold.
+        account_quota_notify_remaining_ratio:
+          type: string
+          default: "0.20000000"
+          pattern: '^(0(\.[0-9]+)?|1(\.0+)?)$'
+          description: Remaining quota ratio threshold for account quota alerts. For example, 0.20 alerts when remaining quota crosses 20%.
 
     AdminSettingsBackup:
       type: object
@@ -12097,6 +14718,176 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/AdminSettings"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    NotificationEmailTemplateEventName:
+      type: string
+      enum:
+        - auth.password_reset
+        - auth.email_verification
+        - auth.oauth_pending_email_completion
+        - notification.contact_verification
+        - balance.low
+        - subscription.expiry_reminder
+        - account.quota_alert
+
+    NotificationEmailTemplateEvent:
+      type: object
+      required:
+        - event
+        - label
+        - description
+        - category
+        - optional
+        - placeholders
+      properties:
+        event:
+          $ref: "#/components/schemas/NotificationEmailTemplateEventName"
+        label:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        optional:
+          type: boolean
+          description: True when recipients may unsubscribe from this event.
+        placeholders:
+          type: array
+          items:
+            type: string
+          default: []
+
+    NotificationEmailTemplate:
+      type: object
+      required:
+        - event
+        - subject
+        - html
+        - is_custom
+        - placeholders
+      properties:
+        event:
+          $ref: "#/components/schemas/NotificationEmailTemplateEventName"
+        subject:
+          type: string
+          minLength: 1
+          maxLength: 200
+        html:
+          type: string
+          minLength: 1
+          maxLength: 30000
+        is_custom:
+          type: boolean
+        placeholders:
+          type: array
+          items:
+            type: string
+          default: []
+
+    NotificationEmailTemplateList:
+      type: object
+      required:
+        - events
+        - templates
+        - placeholders
+      properties:
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/NotificationEmailTemplateEvent"
+          default: []
+        templates:
+          type: array
+          items:
+            $ref: "#/components/schemas/NotificationEmailTemplate"
+          default: []
+        placeholders:
+          type: array
+          items:
+            type: string
+          default: []
+
+    NotificationEmailTemplateResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/NotificationEmailTemplate"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    NotificationEmailTemplateListResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/NotificationEmailTemplateList"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    UpdateNotificationEmailTemplateRequest:
+      type: object
+      required:
+        - subject
+        - html
+      properties:
+        subject:
+          type: string
+          minLength: 1
+          maxLength: 200
+        html:
+          type: string
+          minLength: 1
+          maxLength: 30000
+
+    PreviewNotificationEmailTemplateRequest:
+      type: object
+      required:
+        - event
+        - subject
+        - html
+      properties:
+        event:
+          $ref: "#/components/schemas/NotificationEmailTemplateEventName"
+        subject:
+          type: string
+          maxLength: 200
+          description: Template subject to preview. Empty string uses the saved or built-in subject.
+        html:
+          type: string
+          maxLength: 30000
+          description: Template HTML to preview. Empty string uses the saved or built-in HTML.
+        variables:
+          type: object
+          additionalProperties:
+            type: string
+          default: {}
+
+    NotificationEmailTemplatePreview:
+      type: object
+      required:
+        - subject
+        - html
+      properties:
+        subject:
+          type: string
+        html:
+          type: string
+
+    NotificationEmailTemplatePreviewResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/NotificationEmailTemplatePreview"
         request_id:
           $ref: "#/components/schemas/RequestId"
 
@@ -12216,6 +15007,51 @@ components:
         request_id:
           $ref: "#/components/schemas/RequestId"
 
+    UserAnnouncement:
+      type: object
+      required:
+        - announcement
+        - read
+      properties:
+        announcement:
+          $ref: "#/components/schemas/Announcement"
+        read:
+          type: boolean
+        read_at:
+          $ref: "#/components/schemas/Timestamp"
+          nullable: true
+
+    UserAnnouncementResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/UserAnnouncement"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    UserAnnouncementListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - unread
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserAnnouncement"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        unread:
+          type: integer
+          minimum: 0
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
     RedeemCodeStatus:
       type: string
       enum:
@@ -12256,7 +15092,8 @@ components:
           $ref: "#/components/schemas/RedeemCodeStatus"
         value:
           type: string
-          pattern: "^-?[0-9]+(\\.[0-9]+)?$"
+          pattern: "^[0-9]+(\\.[0-9]+)?$"
+          description: Balance amount for balance codes, or subscription plan id for subscription codes.
         currency:
           type: string
           minLength: 3
@@ -12290,7 +15127,8 @@ components:
           $ref: "#/components/schemas/RedeemCodeType"
         value:
           type: string
-          pattern: "^-?[0-9]+(\\.[0-9]+)?$"
+          pattern: "^[0-9]+(\\.[0-9]+)?$"
+          description: Balance amount for balance codes, or subscription plan id for subscription codes.
         currency:
           type: string
           minLength: 3
@@ -12303,6 +15141,85 @@ components:
         expires_at:
           $ref: "#/components/schemas/Timestamp"
           nullable: true
+
+    RedeemCodeRedemptionRequest:
+      type: object
+      required:
+        - code
+      properties:
+        code:
+          type: string
+          minLength: 4
+          maxLength: 80
+
+    RedeemCodeRedemption:
+      type: object
+      required:
+        - id
+        - user_id
+        - redeem_code_id
+        - type
+        - amount
+        - currency
+        - balance_before
+        - balance_after
+        - redeemed_at
+        - created_at
+        - updated_at
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        user_id:
+          $ref: "#/components/schemas/Id"
+        redeem_code_id:
+          $ref: "#/components/schemas/Id"
+        type:
+          $ref: "#/components/schemas/RedeemCodeType"
+        amount:
+          type: string
+        currency:
+          type: string
+        balance_before:
+          type: string
+        balance_after:
+          type: string
+        billing_ledger_id:
+          $ref: "#/components/schemas/Id"
+          nullable: true
+        user_subscription_id:
+          $ref: "#/components/schemas/Id"
+          nullable: true
+        redeemed_at:
+          $ref: "#/components/schemas/Timestamp"
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+        updated_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    RedeemCodeRedemptionResult:
+      type: object
+      required:
+        - redemption
+        - redeem_code
+        - already_redeemed
+      properties:
+        redemption:
+          $ref: "#/components/schemas/RedeemCodeRedemption"
+        redeem_code:
+          $ref: "#/components/schemas/RedeemCode"
+        already_redeemed:
+          type: boolean
+
+    RedeemCodeRedemptionResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/RedeemCodeRedemptionResult"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
 
     BatchGenerateRedeemCodesRequest:
       type: object
@@ -12323,7 +15240,8 @@ components:
           $ref: "#/components/schemas/RedeemCodeType"
         value:
           type: string
-          pattern: "^-?[0-9]+(\\.[0-9]+)?$"
+          pattern: "^[0-9]+(\\.[0-9]+)?$"
+          description: Balance amount for balance codes, or subscription plan id for subscription codes.
         currency:
           type: string
           minLength: 3
@@ -13086,6 +16004,8 @@ components:
             - refund
             - adjustment
             - compensation
+            - affiliate_transfer
+            - redeem_code_credit
         amount:
           type: string
         currency:

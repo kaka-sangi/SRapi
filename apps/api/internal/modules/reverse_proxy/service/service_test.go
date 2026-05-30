@@ -306,7 +306,7 @@ func TestRuntimeBuildsUTLSTransportForSupportedEgressProfile(t *testing.T) {
 		Metadata: map[string]any{
 			"egress_profile": map[string]any{"tls_template": "chrome_120"},
 		},
-	})
+	}, false)
 	if err != nil {
 		t.Fatalf("create isolated client: %v", err)
 	}
@@ -346,7 +346,7 @@ func TestRuntimeRejectsTLSEgressProfileWithProxy(t *testing.T) {
 		Metadata: map[string]any{
 			"egress_profile": map[string]any{"tls_template": "chrome_120"},
 		},
-	})
+	}, false)
 	var runtimeErr contract.RuntimeError
 	if !errors.As(err, &runtimeErr) || runtimeErr.Class != "unsupported_egress_profile" {
 		t.Fatalf("expected unsupported egress profile error, got %T %v", err, err)
@@ -424,7 +424,7 @@ func TestRuntimeSupportsTLSEgressProfileThroughHTTPConnectProxy(t *testing.T) {
 		AccountID: 17,
 		ProxyID:   ptrString(proxyURL.String()),
 		Metadata:  map[string]any{"egress_profile": map[string]any{"tls_template": "chrome_120"}},
-	}, egressProfile{TLSTemplate: "chrome_120"}); err != nil {
+	}, egressProfile{TLSTemplate: "chrome_120"}, false); err != nil {
 		t.Fatalf("configure egress transport: %v", err)
 	}
 	client := &http.Client{Transport: transport, Timeout: 3 * time.Second}
@@ -460,7 +460,7 @@ func TestRuntimeRejectsTLSEgressProfileWithHTTPSProxy(t *testing.T) {
 		Metadata: map[string]any{
 			"egress_profile": map[string]any{"tls_template": "chrome_120"},
 		},
-	})
+	}, false)
 	var runtimeErr contract.RuntimeError
 	if !errors.As(err, &runtimeErr) || runtimeErr.Class != "unsupported_egress_profile" {
 		t.Fatalf("expected unsupported egress profile error, got %T %v", err, err)

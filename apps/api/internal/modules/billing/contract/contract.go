@@ -14,6 +14,7 @@ const (
 	LedgerTypeAdjustment        LedgerType = "adjustment"
 	LedgerTypeCompensation      LedgerType = "compensation"
 	LedgerTypeAffiliateTransfer LedgerType = "affiliate_transfer"
+	LedgerTypeRedeemCodeCredit  LedgerType = "redeem_code_credit"
 )
 
 type LedgerEntry struct {

@@ -484,12 +484,37 @@ func writeUserServiceError(w http.ResponseWriter, err error, requestID string) {
 	switch {
 	case errors.Is(err, usersservice.ErrInvalidInput):
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid user request", requestID)
+	case errors.Is(err, usersservice.ErrInvalidCredentials):
+		writeStandardError(w, http.StatusUnauthorized, apiopenapi.UNAUTHORIZED, "invalid credentials", requestID)
+	case errors.Is(err, usersservice.ErrUserDisabled):
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "user disabled", requestID)
 	case errors.Is(err, usersservice.ErrUserNotFound):
 		writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "user not found", requestID)
+	case errors.Is(err, usersservice.ErrIdentityNotFound):
+		writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "user auth identity not found", requestID)
+	case errors.Is(err, usersservice.ErrIdentityAlreadyBound):
+		writeStandardError(w, http.StatusConflict, apiopenapi.RESOURCECONFLICT, "user auth identity already bound", requestID)
+	case errors.Is(err, usersservice.ErrIdentityUnbindBlocked):
+		writeStandardError(w, http.StatusConflict, apiopenapi.RESOURCECONFLICT, "bind another sign-in method before unbinding this identity", requestID)
 	case errors.Is(err, usersservice.ErrUserAlreadyExists):
 		writeStandardError(w, http.StatusConflict, apiopenapi.RESOURCECONFLICT, "user already exists", requestID)
 	default:
 		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "user service failed", requestID)
+	}
+}
+
+func writeChangePasswordError(w http.ResponseWriter, err error, requestID string) {
+	switch {
+	case errors.Is(err, usersservice.ErrInvalidInput):
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid password change request", requestID)
+	case errors.Is(err, usersservice.ErrInvalidCredentials):
+		writeStandardError(w, http.StatusUnauthorized, apiopenapi.UNAUTHORIZED, "invalid credentials", requestID)
+	case errors.Is(err, usersservice.ErrUserDisabled):
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "user disabled", requestID)
+	case errors.Is(err, usersservice.ErrUserNotFound):
+		writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "user not found", requestID)
+	default:
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "password change failed", requestID)
 	}
 }
 

@@ -2,7 +2,13 @@ package contract
 
 import (
 	"context"
+	"errors"
 	"time"
+)
+
+var (
+	ErrNotFound      = errors.New("user not found")
+	ErrAlreadyExists = errors.New("user already exists")
 )
 
 type Status string
@@ -41,19 +47,72 @@ type BalanceUpdateRequest struct {
 	Currency  string
 }
 
+type AuthIdentityProvider string
+
+const (
+	AuthIdentityProviderEmail    AuthIdentityProvider = "email"
+	AuthIdentityProviderOIDC     AuthIdentityProvider = "oidc"
+	AuthIdentityProviderGitHub   AuthIdentityProvider = "github"
+	AuthIdentityProviderGoogle   AuthIdentityProvider = "google"
+	AuthIdentityProviderLinuxDo  AuthIdentityProvider = "linuxdo"
+	AuthIdentityProviderWeChat   AuthIdentityProvider = "wechat"
+	AuthIdentityProviderDingTalk AuthIdentityProvider = "dingtalk"
+)
+
+// UserAuthIdentity describes a console sign-in identity visible to a user.
+type UserAuthIdentity struct {
+	ID              int
+	UserID          int
+	Provider        AuthIdentityProvider
+	ProviderKey     string
+	SubjectHint     string
+	DisplayName     string
+	Email           string
+	EmailVerified   bool
+	AvatarURL       string
+	External        bool
+	VerifiedAt      *time.Time
+	LastUsedAt      *time.Time
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	CanUnbind       bool
+	UnbindBlockedBy string
+}
+
+// CreateUserAuthIdentity is the persistence payload for a verified external sign-in identity.
+type CreateUserAuthIdentity struct {
+	UserID              int
+	Provider            AuthIdentityProvider
+	ProviderKey         string
+	ProviderSubjectHash string
+	SubjectHint         string
+	DisplayName         string
+	Email               string
+	EmailVerified       bool
+	AvatarURL           string
+	VerifiedAt          *time.Time
+	LastUsedAt          *time.Time
+}
+
 type User struct {
-	ID          int
-	Email       string
-	Name        string
-	Status      Status
-	WorkspaceID *int
-	Roles       []Role
-	Permissions []string
-	Balance     string
-	Currency    string
-	RPMLimit    *int
-	CreatedAt   time.Time
-	LastLoginAt *time.Time
+	ID              int
+	Email           string
+	Name            string
+	Status          Status
+	WorkspaceID     *int
+	Roles           []Role
+	Permissions     []string
+	Balance         string
+	Currency        string
+	RPMLimit        *int
+	CreatedAt       time.Time
+	LastLoginAt     *time.Time
+	EmailVerifiedAt *time.Time
+	AvatarURL       string
+	AvatarMIME      string
+	AvatarByteSize  int
+	AvatarSHA256    string
+	AvatarUpdatedAt *time.Time
 }
 
 // RoleDefinition is a persisted role catalog entry used to resolve user permissions.
@@ -93,15 +152,16 @@ type CreateStoredUser struct {
 }
 
 type UpdateStoredUser struct {
-	Email        *string
-	Name         *string
-	PasswordHash *string
-	Status       *Status
-	WorkspaceID  **int
-	Roles        *[]Role
-	Balance      *string
-	Currency     *string
-	RPMLimit     **int
+	Email           *string
+	Name            *string
+	PasswordHash    *string
+	Status          *Status
+	WorkspaceID     **int
+	Roles           *[]Role
+	Balance         *string
+	Currency        *string
+	RPMLimit        **int
+	EmailVerifiedAt **time.Time
 }
 
 type ListUsersFilter struct {
@@ -116,9 +176,14 @@ type Store interface {
 	List(ctx context.Context, filter ListUsersFilter) ([]StoredUser, error)
 	ListByIDs(ctx context.Context, ids []int) ([]StoredUser, error)
 	Update(ctx context.Context, id int, input UpdateStoredUser) (StoredUser, error)
+	Delete(ctx context.Context, id int) error
 	UpdateLastLogin(ctx context.Context, id int, at time.Time) error
 	CreateRole(ctx context.Context, input CreateStoredRole) (RoleDefinition, error)
 	ListRoles(ctx context.Context) ([]RoleDefinition, error)
+	ListAuthIdentities(ctx context.Context, userID int) ([]UserAuthIdentity, error)
+	FindAuthIdentityByProviderSubject(ctx context.Context, provider AuthIdentityProvider, providerKey string, providerSubjectHash string) (UserAuthIdentity, error)
+	UpsertAuthIdentity(ctx context.Context, input CreateUserAuthIdentity) (UserAuthIdentity, error)
+	DeleteAuthIdentity(ctx context.Context, userID int, identityID int) error
 }
 
 // IsBuiltInRole reports whether a role is one of SRapi's bootstrap roles.

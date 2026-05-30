@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"crypto"
 	"crypto/aes"
 	"crypto/cipher"
@@ -400,6 +401,57 @@ func TestEasyPayOrderCreatesSignedCheckoutURL(t *testing.T) {
 	}
 }
 
+func TestCreateOrderAppliesPromoCodeBeforeCheckout(t *testing.T) {
+	store := &promoPreviewStore{
+		Store: paymentmemory.New(),
+		preview: contract.PromoCodeApplication{
+			UserID:         7,
+			PromoCodeID:    44,
+			OriginalAmount: "20.00000000",
+			DiscountAmount: "5.00000000",
+			FinalAmount:    "15.00000000",
+			Currency:       "USD",
+			DiscountType:   "amount",
+		},
+	}
+	paymentsSvc, err := New(store, testMasterKey, Dependencies{}, fixedClock{now: time.Date(2026, 5, 22, 12, 0, 0, 0, time.UTC)})
+	if err != nil {
+		t.Fatalf("new payment service: %v", err)
+	}
+	if _, err := paymentsSvc.CreateProviderInstance(t.Context(), contract.CreateProviderInstanceRequest{
+		Provider:         "easypay",
+		Name:             "promo-provider",
+		Config:           easypayTestConfig("promo-secret"),
+		SupportedMethods: []string{"alipay"},
+		Limits:           map[string]any{"currency": "USD", "min_amount": "1.00", "max_amount": "100.00"},
+	}); err != nil {
+		t.Fatalf("create provider: %v", err)
+	}
+	order, err := paymentsSvc.CreateOrder(t.Context(), contract.CreateOrderRequest{
+		UserID:      7,
+		Method:      "alipay",
+		Amount:      "20",
+		Currency:    "usd",
+		ProductType: contract.ProductTypeBalanceCredit,
+		PromoCode:   " save5 ",
+	})
+	if err != nil {
+		t.Fatalf("create order with promo: %v", err)
+	}
+	if store.previewInput.Code != "SAVE5" || store.previewInput.Amount != "20.00000000" || store.previewInput.Currency != "USD" {
+		t.Fatalf("unexpected promo preview input: %+v", store.previewInput)
+	}
+	if order.OriginalAmount != "20.00000000" || order.DiscountAmount != "5.00000000" || order.Amount != "15.00000000" {
+		t.Fatalf("unexpected discounted order amounts: %+v", order)
+	}
+	if order.PromoCodeID == nil || *order.PromoCodeID != 44 {
+		t.Fatalf("expected promo code id on order, got %+v", order.PromoCodeID)
+	}
+	if store.createInput.PromoCode != "SAVE5" || store.createInput.PromoCodeID == nil || *store.createInput.PromoCodeID != 44 {
+		t.Fatalf("expected stored promo details, got %+v", store.createInput)
+	}
+}
+
 func TestWechatOrderCreatesPrepayCheckoutMetadata(t *testing.T) {
 	h := newHarnessWithDeps(t, Dependencies{
 		Checkout: checkoutprovider.Registry{
@@ -789,6 +841,59 @@ func TestUpdateProviderInstanceRejectsDuplicateProviderName(t *testing.T) {
 	}
 }
 
+func TestUpdateProviderInstanceProtectsInProgressOrders(t *testing.T) {
+	h := newHarness(t)
+	provider, err := h.payments.CreateProviderInstance(t.Context(), contract.CreateProviderInstanceRequest{
+		Provider:         "manual",
+		Name:             "manual-credit",
+		Config:           map[string]any{"webhook_secret": "manual-secret"},
+		SupportedMethods: []string{"manual", "bank"},
+	})
+	if err != nil {
+		t.Fatalf("create provider instance: %v", err)
+	}
+	order, err := h.payments.CreateOrder(t.Context(), contract.CreateOrderRequest{
+		UserID:      7,
+		Method:      "manual",
+		Amount:      "5.00",
+		Currency:    "USD",
+		ProductType: contract.ProductTypeBalanceCredit,
+	})
+	if err != nil {
+		t.Fatalf("create order: %v", err)
+	}
+	renamed := "manual-renamed"
+	metadata := map[string]any{"display_name": "Manual Renamed"}
+	if _, err := h.payments.UpdateProviderInstance(t.Context(), provider.ID, contract.UpdateProviderInstanceRequest{
+		Name:     &renamed,
+		Metadata: &metadata,
+	}); err != nil {
+		t.Fatalf("safe provider update with pending order: %v", err)
+	}
+	disabled := contract.ProviderStatusDisabled
+	if _, err := h.payments.UpdateProviderInstance(t.Context(), provider.ID, contract.UpdateProviderInstanceRequest{Status: &disabled}); !errors.Is(err, contract.ErrConflict) {
+		t.Fatalf("expected disabling provider with pending order to conflict, got %v", err)
+	}
+	methods := []string{"bank"}
+	if _, err := h.payments.UpdateProviderInstance(t.Context(), provider.ID, contract.UpdateProviderInstanceRequest{SupportedMethods: &methods}); !errors.Is(err, contract.ErrConflict) {
+		t.Fatalf("expected removing method with pending order to conflict, got %v", err)
+	}
+	config := map[string]any{"webhook_secret": "replacement-secret"}
+	if _, err := h.payments.UpdateProviderInstance(t.Context(), provider.ID, contract.UpdateProviderInstanceRequest{Config: &config}); !errors.Is(err, contract.ErrConflict) {
+		t.Fatalf("expected replacing config with pending order to conflict, got %v", err)
+	}
+	if _, err := h.payments.CancelOrder(t.Context(), 7, order.ID); err != nil {
+		t.Fatalf("cancel order: %v", err)
+	}
+	updated, err := h.payments.UpdateProviderInstance(t.Context(), provider.ID, contract.UpdateProviderInstanceRequest{Status: &disabled, SupportedMethods: &methods})
+	if err != nil {
+		t.Fatalf("expected disabling provider after order closes: %v", err)
+	}
+	if updated.Status != contract.ProviderStatusDisabled || strings.Join(updated.SupportedMethods, ",") != "bank" {
+		t.Fatalf("unexpected provider after closed-order update: %+v", updated)
+	}
+}
+
 func TestStripeCheckoutFailureReturnsProviderUnavailable(t *testing.T) {
 	h := newHarness(t)
 	h.stripe.err = errors.New("stripe api unavailable")
@@ -950,6 +1055,24 @@ type harness struct {
 	audit         *auditservice.Service
 	events        *eventsservice.Service
 	stripe        *fakeStripeCheckout
+}
+
+type promoPreviewStore struct {
+	*paymentmemory.Store
+	preview      contract.PromoCodeApplication
+	previewErr   error
+	previewInput contract.PromoCodePreviewInput
+	createInput  contract.CreateStoredOrder
+}
+
+func (s *promoPreviewStore) PreviewPromoCode(_ context.Context, input contract.PromoCodePreviewInput) (contract.PromoCodeApplication, error) {
+	s.previewInput = input
+	return s.preview, s.previewErr
+}
+
+func (s *promoPreviewStore) CreateOrder(ctx context.Context, input contract.CreateStoredOrder) (contract.PaymentOrder, error) {
+	s.createInput = input
+	return s.Store.CreateOrder(ctx, input)
 }
 
 func newHarness(t *testing.T) harness {

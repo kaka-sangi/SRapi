@@ -174,17 +174,81 @@ func toAPIUser(user userscontract.User) apiopenapi.User {
 		roles = append(roles, apiopenapi.UserRole(role))
 	}
 	return apiopenapi.User{
-		Balance:     user.Balance,
-		CreatedAt:   user.CreatedAt,
-		Currency:    user.Currency,
-		Email:       openapi_types.Email(user.Email),
-		Id:          apiopenapi.Id(strconv.Itoa(user.ID)),
-		LastLoginAt: user.LastLoginAt,
-		Name:        user.Name,
-		Roles:       roles,
-		RpmLimit:    user.RPMLimit,
-		Status:      apiopenapi.UserStatus(user.Status),
+		Balance:         user.Balance,
+		CreatedAt:       user.CreatedAt,
+		Currency:        user.Currency,
+		Email:           openapi_types.Email(user.Email),
+		Id:              apiopenapi.Id(strconv.Itoa(user.ID)),
+		LastLoginAt:     user.LastLoginAt,
+		Name:            user.Name,
+		Roles:           roles,
+		RpmLimit:        user.RPMLimit,
+		Status:          apiopenapi.UserStatus(user.Status),
+		EmailVerifiedAt: user.EmailVerifiedAt,
+		AvatarUrl:       optionalString(user.AvatarURL),
+		AvatarMime:      optionalUserAvatarMime(user.AvatarMIME),
+		AvatarByteSize:  optionalPositiveInt(user.AvatarByteSize),
+		AvatarSha256:    optionalString(user.AvatarSHA256),
+		AvatarUpdatedAt: user.AvatarUpdatedAt,
 	}
+}
+
+func toAPICurrentUserAuthIdentities(identities []userscontract.UserAuthIdentity) []apiopenapi.CurrentUserAuthIdentity {
+	out := make([]apiopenapi.CurrentUserAuthIdentity, 0, len(identities))
+	for _, identity := range identities {
+		out = append(out, apiopenapi.CurrentUserAuthIdentity{
+			AvatarUrl:       optionalString(identity.AvatarURL),
+			CanUnbind:       identity.CanUnbind,
+			CreatedAt:       identity.CreatedAt,
+			DisplayName:     optionalString(identity.DisplayName),
+			Email:           optionalAuthIdentityEmail(identity.Email),
+			EmailVerified:   identity.EmailVerified,
+			External:        identity.External,
+			Id:              optionalIdentityID(identity.ID),
+			LastUsedAt:      identity.LastUsedAt,
+			Provider:        apiopenapi.AuthIdentityProvider(identity.Provider),
+			ProviderKey:     identity.ProviderKey,
+			SubjectHint:     optionalString(identity.SubjectHint),
+			UnbindBlockedBy: optionalString(identity.UnbindBlockedBy),
+			UpdatedAt:       identity.UpdatedAt,
+			UserId:          apiopenapi.Id(strconv.Itoa(identity.UserID)),
+			VerifiedAt:      identity.VerifiedAt,
+		})
+	}
+	return out
+}
+
+func optionalUserAvatarMime(value string) *apiopenapi.UserAvatarMime {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	out := apiopenapi.UserAvatarMime(value)
+	return &out
+}
+
+func optionalPositiveInt(value int) *int {
+	if value <= 0 {
+		return nil
+	}
+	return &value
+}
+
+func optionalAuthIdentityEmail(value string) *openapi_types.Email {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	email := openapi_types.Email(value)
+	return &email
+}
+
+func optionalIdentityID(id int) *apiopenapi.Id {
+	if id <= 0 {
+		return nil
+	}
+	value := apiopenapi.Id(strconv.Itoa(id))
+	return &value
 }
 
 func toAPIRole(role userscontract.RoleDefinition) apiopenapi.Role {
@@ -596,13 +660,16 @@ func toAPIPaymentOrder(order paymentcontract.PaymentOrder) apiopenapi.PaymentOrd
 		ClosedAt:              cloneTimePtr(order.ClosedAt),
 		CreatedAt:             order.CreatedAt,
 		Currency:              order.Currency,
+		DiscountAmount:        defaultString(order.DiscountAmount, "0.00000000"),
 		ExpiresAt:             cloneTimePtr(order.ExpiresAt),
 		Id:                    apiopenapi.Id(strconv.Itoa(order.ID)),
 		Metadata:              jsonObject(order.Metadata),
 		OrderNo:               order.OrderNo,
+		OriginalAmount:        defaultString(order.OriginalAmount, order.Amount),
 		PaidAt:                cloneTimePtr(order.PaidAt),
 		ProductId:             order.ProductID,
 		ProductType:           apiopenapi.PaymentProductType(order.ProductType),
+		PromoCodeId:           optionalAPIID(order.PromoCodeID),
 		ProviderInstanceId:    apiopenapi.Id(strconv.Itoa(order.ProviderInstanceID)),
 		ProviderSnapshot:      jsonObject(order.ProviderSnapshot),
 		ProviderTransactionId: cloneStringPtr(order.ProviderTransactionID),
@@ -1357,6 +1424,13 @@ func optionalStringValue(value *string) string {
 		return ""
 	}
 	return strings.TrimSpace(*value)
+}
+
+func defaultString(value string, fallback string) string {
+	if strings.TrimSpace(value) == "" {
+		return fallback
+	}
+	return value
 }
 
 func optionalNullableString(value *string) **string {

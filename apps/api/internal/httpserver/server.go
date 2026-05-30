@@ -25,8 +25,11 @@ import (
 	authcontract "github.com/srapi/srapi/apps/api/internal/modules/auth/contract"
 	billingcontract "github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
 	capabilitiescontract "github.com/srapi/srapi/apps/api/internal/modules/capabilities/contract"
+	errorpassthroughcontract "github.com/srapi/srapi/apps/api/internal/modules/error_passthrough/contract"
 	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	gatewaycontract "github.com/srapi/srapi/apps/api/internal/modules/gateway/contract"
+	healthrollupscontract "github.com/srapi/srapi/apps/api/internal/modules/health_rollups/contract"
+	idempotencycontract "github.com/srapi/srapi/apps/api/internal/modules/idempotency/contract"
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
 	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
 	paymentcontract "github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
@@ -36,7 +39,10 @@ import (
 	realtimecontract "github.com/srapi/srapi/apps/api/internal/modules/realtime/contract"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
+	tlsprofilescontract "github.com/srapi/srapi/apps/api/internal/modules/tls_profiles/contract"
+	totpcontract "github.com/srapi/srapi/apps/api/internal/modules/totp/contract"
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
+	userattributescontract "github.com/srapi/srapi/apps/api/internal/modules/userattributes/contract"
 	userscontract "github.com/srapi/srapi/apps/api/internal/modules/users/contract"
 	platformlogger "github.com/srapi/srapi/apps/api/internal/platform/logger"
 	"github.com/srapi/srapi/apps/api/internal/platform/ratelimit"
@@ -62,27 +68,33 @@ type dependencyPinger interface {
 type Option func(*runtimeOptions)
 
 type runtimeOptions struct {
-	adminControl  admincontrolcontract.Store
-	database      dependencyPinger
-	redis         dependencyPinger
-	users         userscontract.Store
-	apiKeys       apikeycontract.Store
-	providers     providercontract.Store
-	models        modelcontract.Store
-	accounts      accountcontract.Store
-	audit         auditcontract.Store
-	authSessions  authcontract.Store
-	billing       billingcontract.Store
-	events        eventscontract.Store
-	affiliate     affiliatecontract.Store
-	operations    operationscontract.Store
-	payments      paymentcontract.Store
-	qualityEval   qualitycontract.Store
-	realtime      realtimecontract.Store
-	rateLimiter   *ratelimit.Limiter
-	scheduler     schedulercontract.Store
-	subscriptions subscriptioncontract.Store
-	usage         usagecontract.Store
+	adminControl     admincontrolcontract.Store
+	database         dependencyPinger
+	redis            dependencyPinger
+	users            userscontract.Store
+	apiKeys          apikeycontract.Store
+	providers        providercontract.Store
+	models           modelcontract.Store
+	accounts         accountcontract.Store
+	audit            auditcontract.Store
+	authSessions     authcontract.Store
+	billing          billingcontract.Store
+	events           eventscontract.Store
+	affiliate        affiliatecontract.Store
+	idempotency      idempotencycontract.Store
+	operations       operationscontract.Store
+	payments         paymentcontract.Store
+	qualityEval      qualitycontract.Store
+	realtime         realtimecontract.Store
+	rateLimiter      *ratelimit.Limiter
+	scheduler        schedulercontract.Store
+	subscriptions    subscriptioncontract.Store
+	totp             totpcontract.Store
+	usage            usagecontract.Store
+	userAttributes   userattributescontract.Store
+	errorPassthrough errorpassthroughcontract.Store
+	tlsProfiles      tlsprofilescontract.Store
+	healthRollups    healthrollupscontract.Store
 }
 
 func WithAdminControlStore(store admincontrolcontract.Store) Option {
@@ -169,6 +181,36 @@ func WithOperationsStore(store operationscontract.Store) Option {
 	}
 }
 
+func WithIdempotencyStore(store idempotencycontract.Store) Option {
+	return func(opts *runtimeOptions) {
+		opts.idempotency = store
+	}
+}
+
+func WithUserAttributesStore(store userattributescontract.Store) Option {
+	return func(opts *runtimeOptions) {
+		opts.userAttributes = store
+	}
+}
+
+func WithErrorPassthroughStore(store errorpassthroughcontract.Store) Option {
+	return func(opts *runtimeOptions) {
+		opts.errorPassthrough = store
+	}
+}
+
+func WithTLSProfilesStore(store tlsprofilescontract.Store) Option {
+	return func(opts *runtimeOptions) {
+		opts.tlsProfiles = store
+	}
+}
+
+func WithHealthRollupsStore(store healthrollupscontract.Store) Option {
+	return func(opts *runtimeOptions) {
+		opts.healthRollups = store
+	}
+}
+
 func WithPaymentStore(store paymentcontract.Store) Option {
 	return func(opts *runtimeOptions) {
 		opts.payments = store
@@ -213,6 +255,12 @@ func WithSubscriptionStore(store subscriptioncontract.Store) Option {
 	}
 }
 
+func WithTOTPStore(store totpcontract.Store) Option {
+	return func(opts *runtimeOptions) {
+		opts.totp = store
+	}
+}
+
 func WithUsageStore(store usagecontract.Store) Option {
 	return func(opts *runtimeOptions) {
 		opts.usage = store
@@ -253,14 +301,25 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("GET /metrics", server.handleMetrics)
 	mux.HandleFunc("GET /api/v1/health", server.handleHealth)
 	mux.HandleFunc("POST /api/v1/auth/login", server.handleLogin)
+	mux.HandleFunc("POST /api/v1/auth/register", server.handleRegister)
+	mux.HandleFunc("POST /api/v1/auth/password-reset/request", server.handleRequestPasswordReset)
+	mux.HandleFunc("POST /api/v1/auth/password-reset/confirm", server.handleConfirmPasswordReset)
+	mux.HandleFunc("POST /api/v1/auth/email-verification/request", server.handleRequestEmailVerification)
+	mux.HandleFunc("POST /api/v1/auth/email-verification/confirm", server.handleConfirmEmailVerification)
+	mux.HandleFunc("GET /api/v1/auth/oauth/{provider}/start", server.handleStartOAuthAuthorization)
+	mux.HandleFunc("GET /api/v1/auth/oauth/{provider}/callback", server.handleCompleteOAuthAuthorization)
+	mux.HandleFunc("GET /api/v1/auth/oauth/pending", server.handleGetPendingOAuthSession)
+	mux.HandleFunc("POST /api/v1/auth/oauth/pending/bind-current-user", server.handleBindPendingOAuthCurrentUser)
+	mux.HandleFunc("POST /api/v1/auth/oauth/pending/send-verify-code", server.handleSendPendingOAuthEmailCompletion)
+	mux.HandleFunc("POST /api/v1/auth/oauth/pending/email-completion/confirm", server.handleConfirmPendingOAuthEmailCompletion)
+	mux.HandleFunc("POST /api/v1/auth/oauth/pending/create-account", server.handleCreatePendingOAuthAccount)
+	mux.HandleFunc("POST /api/v1/auth/oauth/pending/bind-login", server.handleBindPendingOAuthLogin)
+	mux.HandleFunc("POST /api/v1/auth/oauth/pending/bind-login/2fa", server.handleCompletePendingOAuthBindLoginTwoFactor)
+	mux.HandleFunc("POST /api/v1/auth/login/2fa", server.handleLoginSecondFactor)
 	mux.HandleFunc("POST /api/v1/auth/logout", server.handleLogout)
-	mux.HandleFunc("GET /api/v1/me", server.handleCurrentUser)
-	mux.HandleFunc("GET /api/v1/me/balance", server.handleCurrentUserBalance)
-	mux.HandleFunc("GET /api/v1/me/affiliate", server.handleCurrentUserAffiliate)
-	mux.HandleFunc("GET /api/v1/me/affiliate/ledger", server.handleCurrentUserAffiliateLedger)
-	mux.HandleFunc("POST /api/v1/me/affiliate/transfer-to-balance", server.handleCurrentUserAffiliateTransferToBalance)
-	mux.HandleFunc("GET /api/v1/me/usage", server.handleCurrentUserUsage)
-	mux.HandleFunc("GET /api/v1/me/subscriptions", server.handleCurrentUserSubscriptions)
+	mux.HandleFunc("GET /api/v1/notifications/unsubscribe", server.handlePreviewNotificationUnsubscribe)
+	mux.HandleFunc("POST /api/v1/notifications/unsubscribe", server.handleNotificationUnsubscribe)
+	server.registerCurrentUserRoutes(mux)
 	mux.HandleFunc("GET /api/v1/payment/methods", server.handleListPaymentMethods)
 	mux.HandleFunc("POST /api/v1/payment/orders", server.handleCreatePaymentOrder)
 	mux.HandleFunc("GET /api/v1/payment/orders", server.handleListPaymentOrders)
@@ -285,6 +344,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("PATCH /api/v1/admin/users/{id}/rpm-limit", server.handleUpdateAdminUserRpmLimit)
 	mux.HandleFunc("POST /api/v1/admin/users/{id}/disable", server.handleDisableAdminUser)
 	mux.HandleFunc("POST /api/v1/admin/users/{id}/enable", server.handleEnableAdminUser)
+	server.registerCapabilityAdminRoutes(mux)
 	mux.HandleFunc("GET /api/v1/admin/providers", server.handleListAdminProviders)
 	mux.HandleFunc("POST /api/v1/admin/providers", server.handleCreateAdminProvider)
 	mux.HandleFunc("POST /api/v1/admin/providers/preset/install", server.handleInstallAdminProviderPresets)
@@ -351,6 +411,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("GET /api/v1/admin/ops/latency-histogram", server.handleAdminOpsLatencyHistogram)
 	mux.HandleFunc("GET /api/v1/admin/ops/concurrency", server.handleAdminOpsConcurrency)
 	mux.HandleFunc("GET /api/v1/admin/ops/system-logs", server.handleListAdminOpsSystemLogs)
+	mux.HandleFunc("POST /api/v1/admin/ops/system-logs/cleanup", server.handleCleanupAdminOpsSystemLogs)
 	mux.HandleFunc("GET /api/v1/admin/ops/alert-events", server.handleListAdminOpsAlerts)
 	mux.HandleFunc("PUT /api/v1/admin/ops/settings", server.handleUpdateAdminOpsSettings)
 	mux.HandleFunc("GET /api/v1/admin/ops/realtime/slots", server.handleListAdminOpsRealtimeSlots)
@@ -361,6 +422,11 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("POST /api/v1/admin/ops/alerts/{id}/ack", server.handleAcknowledgeAdminOpsAlert)
 	mux.HandleFunc("GET /api/v1/admin/settings", server.handleGetAdminSettings)
 	mux.HandleFunc("PUT /api/v1/admin/settings", server.handleUpdateAdminSettings)
+	mux.HandleFunc("GET /api/v1/admin/notifications/email-templates", server.handleListAdminNotificationEmailTemplates)
+	mux.HandleFunc("POST /api/v1/admin/notifications/email-template-preview", server.handlePreviewAdminNotificationEmailTemplate)
+	mux.HandleFunc("GET /api/v1/admin/notifications/email-templates/{event}", server.handleGetAdminNotificationEmailTemplate)
+	mux.HandleFunc("PUT /api/v1/admin/notifications/email-templates/{event}", server.handleUpdateAdminNotificationEmailTemplate)
+	mux.HandleFunc("POST /api/v1/admin/notifications/email-templates/{event}/restore", server.handleRestoreAdminNotificationEmailTemplate)
 	mux.HandleFunc("GET /api/v1/admin/announcements", server.handleListAdminAnnouncements)
 	mux.HandleFunc("POST /api/v1/admin/announcements", server.handleCreateAdminAnnouncement)
 	mux.HandleFunc("PUT /api/v1/admin/announcements/{id}", server.handleUpdateAdminAnnouncement)
@@ -388,15 +454,15 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("GET /v1/usage", server.handleGatewayUsage)
 	mux.HandleFunc("GET /v1beta/models", server.handleListGeminiModels)
 	mux.HandleFunc("GET /v1beta/models/", server.handleGetGeminiModel)
-	mux.HandleFunc("POST /v1/chat/completions", server.handleCreateChatCompletion)
-	mux.HandleFunc("POST /v1/responses", server.handleCreateResponse)
+	mux.HandleFunc("POST /v1/chat/completions", server.withGatewayIdempotency(server.handleCreateChatCompletion))
+	mux.HandleFunc("POST /v1/responses", server.withGatewayIdempotency(server.handleCreateResponse))
 	mux.HandleFunc("GET /v1/responses/{response_id}/input_items", server.handleListResponseInputItems)
 	mux.HandleFunc("POST /v1/responses/compact", server.withGatewaySourceEndpoint(string(gatewaycontract.EndpointResponsesCompact), server.handleCreateResponse))
 	mux.HandleFunc("GET /v1/responses/ws", server.handleResponsesWebSocket)
 	mux.HandleFunc("GET /v1/realtime", server.handleRealtimeWebSocket)
-	mux.HandleFunc("POST /v1/messages", server.handleCreateMessage)
+	mux.HandleFunc("POST /v1/messages", server.withGatewayIdempotency(server.handleCreateMessage))
 	mux.HandleFunc("POST /v1/messages/count_tokens", server.handleAnthropicCountTokens)
-	mux.HandleFunc("POST /v1/embeddings", server.handleCreateEmbedding)
+	mux.HandleFunc("POST /v1/embeddings", server.withGatewayIdempotency(server.handleCreateEmbedding))
 	mux.HandleFunc("POST /v1/images/generations", server.handleCreateImageGeneration)
 	mux.HandleFunc("POST /v1/images/edits", server.handleCreateImageEdit)
 	mux.HandleFunc("POST /v1/images/variations", server.handleCreateImageVariation)
@@ -408,6 +474,59 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	server.registerGatewayProviderAliases(mux)
 
 	return requestIDMiddleware(server.tracingMiddleware(server.gatewayConcurrencyMiddleware(mux)))
+}
+
+// registerCapabilityAdminRoutes registers the sub2api gap-closure admin surfaces
+// (user attributes, error-passthrough rules, account availability/quota, and TLS
+// fingerprint profiles).
+func (s *Server) registerCapabilityAdminRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("GET /api/v1/admin/users/{id}/attributes", s.handleListAdminUserAttributeValues)
+	mux.HandleFunc("PUT /api/v1/admin/users/{id}/attributes/{definitionId}", s.handleSetAdminUserAttributeValue)
+	mux.HandleFunc("GET /api/v1/admin/user-attributes", s.handleListAdminUserAttributeDefinitions)
+	mux.HandleFunc("POST /api/v1/admin/user-attributes", s.handleCreateAdminUserAttributeDefinition)
+	mux.HandleFunc("PATCH /api/v1/admin/user-attributes/{id}", s.handleUpdateAdminUserAttributeDefinition)
+	mux.HandleFunc("DELETE /api/v1/admin/user-attributes/{id}", s.handleDeleteAdminUserAttributeDefinition)
+	mux.HandleFunc("GET /api/v1/admin/error-passthrough-rules", s.handleListAdminErrorPassthroughRules)
+	mux.HandleFunc("POST /api/v1/admin/error-passthrough-rules", s.handleCreateAdminErrorPassthroughRule)
+	mux.HandleFunc("PATCH /api/v1/admin/error-passthrough-rules/{id}", s.handleUpdateAdminErrorPassthroughRule)
+	mux.HandleFunc("DELETE /api/v1/admin/error-passthrough-rules/{id}", s.handleDeleteAdminErrorPassthroughRule)
+	mux.HandleFunc("GET /api/v1/admin/accounts/{id}/availability", s.handleAdminAccountAvailability)
+	mux.HandleFunc("POST /api/v1/admin/accounts/{id}/quota-fetch", s.handleAdminAccountQuotaFetch)
+	mux.HandleFunc("GET /api/v1/admin/tls-profiles", s.handleListAdminTLSProfiles)
+	mux.HandleFunc("POST /api/v1/admin/tls-profiles", s.handleCreateAdminTLSProfile)
+	mux.HandleFunc("PATCH /api/v1/admin/tls-profiles/{id}", s.handleUpdateAdminTLSProfile)
+	mux.HandleFunc("DELETE /api/v1/admin/tls-profiles/{id}", s.handleDeleteAdminTLSProfile)
+}
+
+func (s *Server) registerCurrentUserRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("GET /api/v1/me", s.handleCurrentUser)
+	mux.HandleFunc("GET /api/v1/me/auth-identities", s.handleCurrentUserAuthIdentities)
+	mux.HandleFunc("DELETE /api/v1/me/auth-identities/{id}", s.handleUnbindCurrentUserAuthIdentity)
+	mux.HandleFunc("PATCH /api/v1/me", s.handleUpdateCurrentUser)
+	mux.HandleFunc("PUT /api/v1/me/avatar", s.handleUploadCurrentUserAvatar)
+	mux.HandleFunc("DELETE /api/v1/me/avatar", s.handleDeleteCurrentUserAvatar)
+	mux.HandleFunc("GET /api/v1/users/{id}/avatar", s.handleGetUserAvatar)
+	mux.HandleFunc("POST /api/v1/me/password", s.handleChangeCurrentUserPassword)
+	mux.HandleFunc("GET /api/v1/me/notification-contacts", s.handleCurrentUserNotificationContacts)
+	mux.HandleFunc("POST /api/v1/me/notification-contacts", s.handleRequestCurrentUserNotificationContactVerification)
+	mux.HandleFunc("POST /api/v1/me/notification-contacts/verify", s.handleConfirmCurrentUserNotificationContactVerification)
+	mux.HandleFunc("PATCH /api/v1/me/notification-contacts/{id}", s.handleUpdateCurrentUserNotificationContact)
+	mux.HandleFunc("DELETE /api/v1/me/notification-contacts/{id}", s.handleDeleteCurrentUserNotificationContact)
+	mux.HandleFunc("GET /api/v1/me/notification-preferences", s.handleCurrentUserNotificationPreferences)
+	mux.HandleFunc("PUT /api/v1/me/notification-preferences", s.handleUpdateCurrentUserNotificationPreferences)
+	mux.HandleFunc("GET /api/v1/me/announcements", s.handleCurrentUserAnnouncements)
+	mux.HandleFunc("POST /api/v1/me/announcements/{id}/read", s.handleMarkCurrentUserAnnouncementRead)
+	mux.HandleFunc("GET /api/v1/me/totp/status", s.handleCurrentUserTOTPStatus)
+	mux.HandleFunc("POST /api/v1/me/totp/setup", s.handleCurrentUserTOTPSetup)
+	mux.HandleFunc("POST /api/v1/me/totp/enable", s.handleCurrentUserTOTPEnable)
+	mux.HandleFunc("POST /api/v1/me/totp/disable", s.handleCurrentUserTOTPDisable)
+	mux.HandleFunc("GET /api/v1/me/balance", s.handleCurrentUserBalance)
+	mux.HandleFunc("POST /api/v1/me/redeem-codes/redeem", s.handleRedeemCurrentUserRedeemCode)
+	mux.HandleFunc("GET /api/v1/me/affiliate", s.handleCurrentUserAffiliate)
+	mux.HandleFunc("GET /api/v1/me/affiliate/ledger", s.handleCurrentUserAffiliateLedger)
+	mux.HandleFunc("POST /api/v1/me/affiliate/transfer-to-balance", s.handleCurrentUserAffiliateTransferToBalance)
+	mux.HandleFunc("GET /api/v1/me/usage", s.handleCurrentUserUsage)
+	mux.HandleFunc("GET /api/v1/me/subscriptions", s.handleCurrentUserSubscriptions)
 }
 
 func (s *Server) handleLive(w http.ResponseWriter, r *http.Request) {

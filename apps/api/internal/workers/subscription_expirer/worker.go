@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	admincontrolcontract "github.com/srapi/srapi/apps/api/internal/modules/admin_control/contract"
+	admincontrolservice "github.com/srapi/srapi/apps/api/internal/modules/admin_control/service"
 	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	eventsservice "github.com/srapi/srapi/apps/api/internal/modules/events/service"
 	"github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
@@ -19,15 +21,17 @@ const (
 )
 
 type Config struct {
-	Interval time.Duration
-	Clock    service.Clock
-	Events   eventscontract.Store
+	Interval     time.Duration
+	Clock        service.Clock
+	Events       eventscontract.Store
+	AdminControl admincontrolcontract.Store
 }
 
 type Dependencies = service.Dependencies
 
 type Worker struct {
 	subscriptions *service.Service
+	adminControl  *admincontrolservice.Service
 	logger        *slog.Logger
 	interval      time.Duration
 
@@ -50,6 +54,14 @@ func New(store contract.Store, deps Dependencies, logger *slog.Logger, cfg Confi
 		}
 		deps.Events = events
 	}
+	var adminControl *admincontrolservice.Service
+	if cfg.AdminControl != nil {
+		var err error
+		adminControl, err = admincontrolservice.New(cfg.AdminControl, nil)
+		if err != nil {
+			return nil, err
+		}
+	}
 	subscriptions, err := service.NewWithDependencies(store, deps, cfg.Clock)
 	if err != nil {
 		return nil, err
@@ -58,7 +70,7 @@ func New(store contract.Store, deps Dependencies, logger *slog.Logger, cfg Confi
 	if interval <= 0 {
 		interval = defaultInterval
 	}
-	return &Worker{subscriptions: subscriptions, logger: logger, interval: interval}, nil
+	return &Worker{subscriptions: subscriptions, adminControl: adminControl, logger: logger, interval: interval}, nil
 }
 
 func (w *Worker) Start(parent context.Context) {
@@ -124,7 +136,15 @@ func (w *Worker) RunOnce(ctx context.Context) (contract.ExpireSubscriptionsResul
 	if w == nil {
 		return contract.ExpireSubscriptionsResult{}, nil
 	}
-	return w.subscriptions.ExpireActiveUserSubscriptions(ctx, time.Time{})
+	expiration, err := w.subscriptions.ExpireActiveUserSubscriptions(ctx, time.Time{})
+	if err != nil {
+		return expiration, err
+	}
+	if !w.subscriptionExpiryReminderEnabled(ctx) {
+		return expiration, nil
+	}
+	_, err = w.subscriptions.EnqueueSubscriptionExpiryReminders(ctx, time.Time{})
+	return expiration, err
 }
 
 func (w *Worker) run(ctx context.Context) {
@@ -150,4 +170,19 @@ func (w *Worker) expireAndLog(ctx context.Context) {
 	if result.Expired > 0 {
 		w.logger.Info("subscriptions expired", "selected", result.Selected, "expired", result.Expired)
 	}
+}
+
+func (w *Worker) subscriptionExpiryReminderEnabled(ctx context.Context) bool {
+	if w.adminControl == nil {
+		return true
+	}
+	settings, err := w.adminControl.GetAdminSettings(ctx)
+	if err != nil {
+		w.logger.Warn("failed to read admin settings for subscription expiry reminder", "error", err)
+		return false
+	}
+	if settings.Email.SubscriptionExpiryNotifyEnabled == nil {
+		return true
+	}
+	return *settings.Email.SubscriptionExpiryNotifyEnabled
 }

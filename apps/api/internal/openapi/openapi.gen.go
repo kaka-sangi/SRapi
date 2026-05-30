@@ -377,13 +377,48 @@ func (e AudioTranscriptionRequestResponseFormat) Valid() bool {
 	}
 }
 
+// Defines values for AuthIdentityProvider.
+const (
+	Dingtalk AuthIdentityProvider = "dingtalk"
+	Email    AuthIdentityProvider = "email"
+	Github   AuthIdentityProvider = "github"
+	Google   AuthIdentityProvider = "google"
+	Linuxdo  AuthIdentityProvider = "linuxdo"
+	Oidc     AuthIdentityProvider = "oidc"
+	Wechat   AuthIdentityProvider = "wechat"
+)
+
+// Valid indicates whether the value is a known member of the AuthIdentityProvider enum.
+func (e AuthIdentityProvider) Valid() bool {
+	switch e {
+	case Dingtalk:
+		return true
+	case Email:
+		return true
+	case Github:
+		return true
+	case Google:
+		return true
+	case Linuxdo:
+		return true
+	case Oidc:
+		return true
+	case Wechat:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for BillingLedgerEntryType.
 const (
-	Adjustment    BillingLedgerEntryType = "adjustment"
-	Compensation  BillingLedgerEntryType = "compensation"
-	PaymentCredit BillingLedgerEntryType = "payment_credit"
-	Refund        BillingLedgerEntryType = "refund"
-	UsageCharge   BillingLedgerEntryType = "usage_charge"
+	Adjustment        BillingLedgerEntryType = "adjustment"
+	AffiliateTransfer BillingLedgerEntryType = "affiliate_transfer"
+	Compensation      BillingLedgerEntryType = "compensation"
+	PaymentCredit     BillingLedgerEntryType = "payment_credit"
+	RedeemCodeCredit  BillingLedgerEntryType = "redeem_code_credit"
+	Refund            BillingLedgerEntryType = "refund"
+	UsageCharge       BillingLedgerEntryType = "usage_charge"
 )
 
 // Valid indicates whether the value is a known member of the BillingLedgerEntryType enum.
@@ -391,9 +426,13 @@ func (e BillingLedgerEntryType) Valid() bool {
 	switch e {
 	case Adjustment:
 		return true
+	case AffiliateTransfer:
+		return true
 	case Compensation:
 		return true
 	case PaymentCredit:
+		return true
+	case RedeemCodeCredit:
 		return true
 	case Refund:
 		return true
@@ -1010,6 +1049,138 @@ func (e ImageVariationRequestSize) Valid() bool {
 	}
 }
 
+// Defines values for LoginTwoFactorRequiredRequired.
+const (
+	True LoginTwoFactorRequiredRequired = true
+)
+
+// Valid indicates whether the value is a known member of the LoginTwoFactorRequiredRequired enum.
+func (e LoginTwoFactorRequiredRequired) Valid() bool {
+	switch e {
+	case True:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for NotificationEmailTemplateEventName.
+const (
+	NotificationEmailTemplateEventNameAccountQuotaAlert               NotificationEmailTemplateEventName = "account.quota_alert"
+	NotificationEmailTemplateEventNameAuthEmailVerification           NotificationEmailTemplateEventName = "auth.email_verification"
+	NotificationEmailTemplateEventNameAuthOauthPendingEmailCompletion NotificationEmailTemplateEventName = "auth.oauth_pending_email_completion"
+	NotificationEmailTemplateEventNameAuthPasswordReset               NotificationEmailTemplateEventName = "auth.password_reset"
+	NotificationEmailTemplateEventNameBalanceLow                      NotificationEmailTemplateEventName = "balance.low"
+	NotificationEmailTemplateEventNameNotificationContactVerification NotificationEmailTemplateEventName = "notification.contact_verification"
+	NotificationEmailTemplateEventNameSubscriptionExpiryReminder      NotificationEmailTemplateEventName = "subscription.expiry_reminder"
+)
+
+// Valid indicates whether the value is a known member of the NotificationEmailTemplateEventName enum.
+func (e NotificationEmailTemplateEventName) Valid() bool {
+	switch e {
+	case NotificationEmailTemplateEventNameAccountQuotaAlert:
+		return true
+	case NotificationEmailTemplateEventNameAuthEmailVerification:
+		return true
+	case NotificationEmailTemplateEventNameAuthOauthPendingEmailCompletion:
+		return true
+	case NotificationEmailTemplateEventNameAuthPasswordReset:
+		return true
+	case NotificationEmailTemplateEventNameBalanceLow:
+		return true
+	case NotificationEmailTemplateEventNameNotificationContactVerification:
+		return true
+	case NotificationEmailTemplateEventNameSubscriptionExpiryReminder:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for NotificationPreferenceEventName.
+const (
+	NotificationPreferenceEventNameAccountQuotaAlert          NotificationPreferenceEventName = "account.quota_alert"
+	NotificationPreferenceEventNameBalanceLow                 NotificationPreferenceEventName = "balance.low"
+	NotificationPreferenceEventNameSubscriptionExpiryReminder NotificationPreferenceEventName = "subscription.expiry_reminder"
+)
+
+// Valid indicates whether the value is a known member of the NotificationPreferenceEventName enum.
+func (e NotificationPreferenceEventName) Valid() bool {
+	switch e {
+	case NotificationPreferenceEventNameAccountQuotaAlert:
+		return true
+	case NotificationPreferenceEventNameBalanceLow:
+		return true
+	case NotificationPreferenceEventNameSubscriptionExpiryReminder:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for NotificationUnsubscribeEvent.
+const (
+	AccountQuotaAlert          NotificationUnsubscribeEvent = "account.quota_alert"
+	BalanceLow                 NotificationUnsubscribeEvent = "balance.low"
+	SubscriptionExpiryReminder NotificationUnsubscribeEvent = "subscription.expiry_reminder"
+)
+
+// Valid indicates whether the value is a known member of the NotificationUnsubscribeEvent enum.
+func (e NotificationUnsubscribeEvent) Valid() bool {
+	switch e {
+	case AccountQuotaAlert:
+		return true
+	case BalanceLow:
+		return true
+	case SubscriptionExpiryReminder:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for OAuthPendingNextStep.
+const (
+	BindCurrentUserRequired   OAuthPendingNextStep = "bind_current_user_required"
+	BindExistingLoginRequired OAuthPendingNextStep = "bind_existing_login_required"
+	CreateAccountRequired     OAuthPendingNextStep = "create_account_required"
+	EmailCompletionRequired   OAuthPendingNextStep = "email_completion_required"
+	ReadyForLogin             OAuthPendingNextStep = "ready_for_login"
+)
+
+// Valid indicates whether the value is a known member of the OAuthPendingNextStep enum.
+func (e OAuthPendingNextStep) Valid() bool {
+	switch e {
+	case BindCurrentUserRequired:
+		return true
+	case BindExistingLoginRequired:
+		return true
+	case CreateAccountRequired:
+		return true
+	case EmailCompletionRequired:
+		return true
+	case ReadyForLogin:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for OAuthProviderConfigTokenAuthMethod.
+const (
+	OAuthProviderConfigTokenAuthMethodNone OAuthProviderConfigTokenAuthMethod = "none"
+)
+
+// Valid indicates whether the value is a known member of the OAuthProviderConfigTokenAuthMethod enum.
+func (e OAuthProviderConfigTokenAuthMethod) Valid() bool {
+	switch e {
+	case OAuthProviderConfigTokenAuthMethodNone:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for OpenAIModelObject.
 const (
 	OpenAIModelObjectModel OpenAIModelObject = "model"
@@ -1286,6 +1457,24 @@ func (e PaymentProviderStatus) Valid() bool {
 	case PaymentProviderStatusArchived:
 		return true
 	case PaymentProviderStatusDisabled:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PendingOAuthIntent.
+const (
+	PendingOAuthIntentBindCurrentUser PendingOAuthIntent = "bind_current_user"
+	PendingOAuthIntentLogin           PendingOAuthIntent = "login"
+)
+
+// Valid indicates whether the value is a known member of the PendingOAuthIntent enum.
+func (e PendingOAuthIntent) Valid() bool {
+	switch e {
+	case PendingOAuthIntentBindCurrentUser:
+		return true
+	case PendingOAuthIntentLogin:
 		return true
 	default:
 		return false
@@ -1904,6 +2093,36 @@ func (e UsageAggregateDimension) Valid() bool {
 	}
 }
 
+// Defines values for UserAvatarMime.
+const (
+	UserAvatarMimeImagepng UserAvatarMime = "image/png"
+)
+
+// Valid indicates whether the value is a known member of the UserAvatarMime enum.
+func (e UserAvatarMime) Valid() bool {
+	switch e {
+	case UserAvatarMimeImagepng:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UserAvatarContentType.
+const (
+	UserAvatarContentTypeImagepng UserAvatarContentType = "image/png"
+)
+
+// Valid indicates whether the value is a known member of the UserAvatarContentType enum.
+func (e UserAvatarContentType) Valid() bool {
+	switch e {
+	case UserAvatarContentTypeImagepng:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for UserStatus.
 const (
 	UserStatusActive   UserStatus = "active"
@@ -2021,6 +2240,24 @@ func (e GetAdminOpsThroughputTrendParamsBucket) Valid() bool {
 	}
 }
 
+// Defines values for StartOAuthAuthorizationParamsIntent.
+const (
+	StartOAuthAuthorizationParamsIntentBindCurrentUser StartOAuthAuthorizationParamsIntent = "bind_current_user"
+	StartOAuthAuthorizationParamsIntentLogin           StartOAuthAuthorizationParamsIntent = "login"
+)
+
+// Valid indicates whether the value is a known member of the StartOAuthAuthorizationParamsIntent enum.
+func (e StartOAuthAuthorizationParamsIntent) Valid() bool {
+	switch e {
+	case StartOAuthAuthorizationParamsIntentBindCurrentUser:
+		return true
+	case StartOAuthAuthorizationParamsIntentLogin:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ListGrokResponseInputItemsAliasParamsOrder.
 const (
 	ListGrokResponseInputItemsAliasParamsOrderAsc  ListGrokResponseInputItemsAliasParamsOrder = "asc"
@@ -2077,16 +2314,16 @@ func (e ConnectRealtimeWebSocketParamsStickyStrength) Valid() bool {
 
 // Defines values for ConnectResponsesWebSocketParamsStickyStrength.
 const (
-	Hard ConnectResponsesWebSocketParamsStickyStrength = "hard"
-	Soft ConnectResponsesWebSocketParamsStickyStrength = "soft"
+	ConnectResponsesWebSocketParamsStickyStrengthHard ConnectResponsesWebSocketParamsStickyStrength = "hard"
+	ConnectResponsesWebSocketParamsStickyStrengthSoft ConnectResponsesWebSocketParamsStickyStrength = "soft"
 )
 
 // Valid indicates whether the value is a known member of the ConnectResponsesWebSocketParamsStickyStrength enum.
 func (e ConnectResponsesWebSocketParamsStickyStrength) Valid() bool {
 	switch e {
-	case Hard:
+	case ConnectResponsesWebSocketParamsStickyStrengthHard:
 		return true
-	case Soft:
+	case ConnectResponsesWebSocketParamsStickyStrengthSoft:
 		return true
 	default:
 		return false
@@ -2384,8 +2621,39 @@ type AdminSettingsBackup struct {
 
 // AdminSettingsEmail defines model for AdminSettingsEmail.
 type AdminSettingsEmail struct {
-	SmtpConfigured bool              `json:"smtp_configured"`
-	Templates      map[string]string `json:"templates"`
+	// AccountQuotaNotifyEnabled Enables optional provider-account quota alert trigger when quota snapshots cross the remaining-ratio threshold.
+	AccountQuotaNotifyEnabled *bool `json:"account_quota_notify_enabled,omitempty"`
+
+	// AccountQuotaNotifyRemainingRatio Remaining quota ratio threshold for account quota alerts. For example, 0.20 alerts when remaining quota crosses 20%.
+	AccountQuotaNotifyRemainingRatio *string `json:"account_quota_notify_remaining_ratio,omitempty"`
+
+	// BalanceLowNotifyEnabled Enables optional low-balance notification trigger after usage charges cross the threshold.
+	BalanceLowNotifyEnabled *bool `json:"balance_low_notify_enabled,omitempty"`
+
+	// BalanceLowNotifyRechargeUrl Optional absolute recharge URL used by low-balance notification templates.
+	BalanceLowNotifyRechargeUrl *string `json:"balance_low_notify_recharge_url,omitempty"`
+
+	// BalanceLowNotifyThreshold Default wallet balance threshold used for low-balance notifications.
+	BalanceLowNotifyThreshold *string `json:"balance_low_notify_threshold,omitempty"`
+
+	// PublicBaseUrl Absolute public console base URL used to build auth email links.
+	PublicBaseUrl *string `json:"public_base_url,omitempty"`
+
+	// SmtpConfigured True when host and sender are configured. Password state is exposed separately.
+	SmtpConfigured bool                 `json:"smtp_configured"`
+	SmtpFrom       *openapi_types.Email `json:"smtp_from,omitempty"`
+	SmtpFromName   *string              `json:"smtp_from_name,omitempty"`
+	SmtpHost       *string              `json:"smtp_host,omitempty"`
+
+	// SmtpPasswordConfigured True when an SMTP password is configured by deployment environment.
+	SmtpPasswordConfigured *bool   `json:"smtp_password_configured,omitempty"`
+	SmtpPort               *int    `json:"smtp_port,omitempty"`
+	SmtpUseTls             *bool   `json:"smtp_use_tls,omitempty"`
+	SmtpUsername           *string `json:"smtp_username,omitempty"`
+
+	// SubscriptionExpiryNotifyEnabled Enables optional subscription expiry reminder trigger for active subscriptions before they expire.
+	SubscriptionExpiryNotifyEnabled *bool             `json:"subscription_expiry_notify_enabled,omitempty"`
+	Templates                       map[string]string `json:"templates"`
 }
 
 // AdminSettingsFeatures defines model for AdminSettingsFeatures.
@@ -2439,10 +2707,16 @@ type AdminSettingsResponse struct {
 
 // AdminSettingsSecurity defines model for AdminSettingsSecurity.
 type AdminSettingsSecurity struct {
-	AdminApiKey         SecretConfigured `json:"admin_api_key"`
-	OauthEnabled        bool             `json:"oauth_enabled"`
-	OauthProviders      []string         `json:"oauth_providers"`
-	RegistrationEnabled bool             `json:"registration_enabled"`
+	AdminApiKey  SecretConfigured `json:"admin_api_key"`
+	OauthEnabled bool             `json:"oauth_enabled"`
+
+	// OauthProviderConfigs Non-secret OAuth/OIDC provider authorization settings. Secrets for token exchange are configured outside this response.
+	OauthProviderConfigs []OAuthProviderConfig `json:"oauth_provider_configs"`
+	OauthProviders       []string              `json:"oauth_providers"`
+
+	// RegistrationEmailSuffixAllowlist Normalized allowed email suffixes for public registration. Empty means all valid email domains are allowed.
+	RegistrationEmailSuffixAllowlist []string `json:"registration_email_suffix_allowlist"`
+	RegistrationEnabled              bool     `json:"registration_enabled"`
 }
 
 // AdminSettingsUsers defines model for AdminSettingsUsers.
@@ -2852,6 +3126,9 @@ type AuditLogListResponse struct {
 	RequestId  RequestId  `json:"request_id"`
 }
 
+// AuthIdentityProvider defines model for AuthIdentityProvider.
+type AuthIdentityProvider string
+
 // BatchDisableRedeemCodesRequest defines model for BatchDisableRedeemCodesRequest.
 type BatchDisableRedeemCodesRequest struct {
 	Ids []Id `json:"ids"`
@@ -2865,7 +3142,9 @@ type BatchGenerateRedeemCodesRequest struct {
 	MaxRedemptions *int           `json:"max_redemptions,omitempty"`
 	Prefix         *string        `json:"prefix,omitempty"`
 	Type           RedeemCodeType `json:"type"`
-	Value          string         `json:"value"`
+
+	// Value Balance amount for balance codes, or subscription plan id for subscription codes.
+	Value string `json:"value"`
 }
 
 // BatchOperationResponse defines model for BatchOperationResponse.
@@ -3017,6 +3296,12 @@ type CapabilityListResponse struct {
 	RequestId  RequestId              `json:"request_id"`
 }
 
+// ChangeCurrentUserPasswordRequest defines model for ChangeCurrentUserPasswordRequest.
+type ChangeCurrentUserPasswordRequest struct {
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
+}
+
 // ChatCompletionChoice defines model for ChatCompletionChoice.
 type ChatCompletionChoice struct {
 	FinishReason *string     `json:"finish_reason"`
@@ -3104,6 +3389,23 @@ type ChatToolCall struct {
 	Id                   string                 `json:"id"`
 	Type                 string                 `json:"type"`
 	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// ConfirmEmailVerificationRequest defines model for ConfirmEmailVerificationRequest.
+type ConfirmEmailVerificationRequest struct {
+	Token string `json:"token"`
+}
+
+// ConfirmPasswordResetRequest defines model for ConfirmPasswordResetRequest.
+type ConfirmPasswordResetRequest struct {
+	NewPassword string `json:"new_password"`
+	Token       string `json:"token"`
+}
+
+// ConfirmPendingOAuthEmailCompletionRequest defines model for ConfirmPendingOAuthEmailCompletionRequest.
+type ConfirmPendingOAuthEmailCompletionRequest struct {
+	// Token High-entropy pending OAuth email-completion token delivered by email. It must be submitted with the same pending OAuth cookie.
+	Token string `json:"token"`
 }
 
 // ContentBlock defines model for ContentBlock.
@@ -3219,6 +3521,7 @@ type CreatePaymentOrderRequest struct {
 	Method      string             `json:"method"`
 	ProductId   *string            `json:"product_id,omitempty"`
 	ProductType PaymentProductType `json:"product_type"`
+	PromoCode   *string            `json:"promo_code,omitempty"`
 }
 
 // CreatePaymentProviderInstanceRequest defines model for CreatePaymentProviderInstanceRequest.
@@ -3302,7 +3605,9 @@ type CreateRedeemCodeRequest struct {
 	ExpiresAt      *Timestamp     `json:"expires_at,omitempty"`
 	MaxRedemptions *int           `json:"max_redemptions,omitempty"`
 	Type           RedeemCodeType `json:"type"`
-	Value          string         `json:"value"`
+
+	// Value Balance amount for balance codes, or subscription plan id for subscription codes.
+	Value string `json:"value"`
 }
 
 // CreateRoleRequest defines model for CreateRoleRequest.
@@ -3338,6 +3643,39 @@ type CreateUserSubscriptionRequest struct {
 	StartsAt   *time.Time              `json:"starts_at,omitempty"`
 	Status     *UserSubscriptionStatus `json:"status,omitempty"`
 	UserId     Id                      `json:"user_id"`
+}
+
+// CurrentUserAuthIdentity defines model for CurrentUserAuthIdentity.
+type CurrentUserAuthIdentity struct {
+	// AvatarUrl Upstream profile avatar URL suggested by a verified external identity, when retained for display.
+	AvatarUrl     *string              `json:"avatar_url,omitempty"`
+	CanUnbind     bool                 `json:"can_unbind"`
+	CreatedAt     Timestamp            `json:"created_at"`
+	DisplayName   *string              `json:"display_name,omitempty"`
+	Email         *openapi_types.Email `json:"email,omitempty"`
+	EmailVerified bool                 `json:"email_verified"`
+	External      bool                 `json:"external"`
+	Id            *Id                  `json:"id,omitempty"`
+	LastUsedAt    *time.Time           `json:"last_used_at,omitempty"`
+	Provider      AuthIdentityProvider `json:"provider"`
+
+	// ProviderKey Stable provider instance key, such as `local` or an OIDC issuer.
+	ProviderKey string `json:"provider_key"`
+
+	// SubjectHint Display-safe subject hint. The raw upstream subject is never returned.
+	SubjectHint *string `json:"subject_hint,omitempty"`
+
+	// UnbindBlockedBy Machine-readable reason when unbinding this identity is blocked.
+	UnbindBlockedBy *string    `json:"unbind_blocked_by,omitempty"`
+	UpdatedAt       Timestamp  `json:"updated_at"`
+	UserId          Id         `json:"user_id"`
+	VerifiedAt      *time.Time `json:"verified_at,omitempty"`
+}
+
+// CurrentUserAuthIdentityListResponse defines model for CurrentUserAuthIdentityListResponse.
+type CurrentUserAuthIdentityListResponse struct {
+	Data      []CurrentUserAuthIdentity `json:"data"`
+	RequestId RequestId                 `json:"request_id"`
 }
 
 // DashboardModelDistribution defines model for DashboardModelDistribution.
@@ -3413,6 +3751,17 @@ type DomainEventOutboxListResponse struct {
 	Data       []DomainEventOutbox `json:"data"`
 	Pagination Pagination          `json:"pagination"`
 	RequestId  RequestId           `json:"request_id"`
+}
+
+// EmailVerificationAccepted defines model for EmailVerificationAccepted.
+type EmailVerificationAccepted struct {
+	Accepted bool `json:"accepted"`
+}
+
+// EmailVerificationAcceptedResponse defines model for EmailVerificationAcceptedResponse.
+type EmailVerificationAcceptedResponse struct {
+	Data      EmailVerificationAccepted `json:"data"`
+	RequestId RequestId                 `json:"request_id"`
 }
 
 // EmbeddingObject defines model for EmbeddingObject.
@@ -3958,6 +4307,30 @@ type LoginResponse struct {
 	RequestId RequestId   `json:"request_id"`
 }
 
+// LoginTwoFactorRequest defines model for LoginTwoFactorRequest.
+type LoginTwoFactorRequest struct {
+	ChallengeId string `json:"challenge_id"`
+
+	// Code Six-digit TOTP code or one recovery code.
+	Code string `json:"code"`
+}
+
+// LoginTwoFactorRequired defines model for LoginTwoFactorRequired.
+type LoginTwoFactorRequired struct {
+	ChallengeId string                         `json:"challenge_id"`
+	ExpiresAt   Timestamp                      `json:"expires_at"`
+	Required    LoginTwoFactorRequiredRequired `json:"required"`
+}
+
+// LoginTwoFactorRequiredRequired defines model for LoginTwoFactorRequired.Required.
+type LoginTwoFactorRequiredRequired bool
+
+// LoginTwoFactorRequiredResponse defines model for LoginTwoFactorRequiredResponse.
+type LoginTwoFactorRequiredResponse struct {
+	Data      LoginTwoFactorRequired `json:"data"`
+	RequestId RequestId              `json:"request_id"`
+}
+
 // Model defines model for Model.
 type Model struct {
 	CanonicalName   string                 `json:"canonical_name"`
@@ -4055,6 +4428,236 @@ type ModerationResult struct {
 	Flagged                   bool                   `json:"flagged"`
 	AdditionalProperties      map[string]interface{} `json:"-"`
 }
+
+// NotificationContact defines model for NotificationContact.
+type NotificationContact struct {
+	CreatedAt Timestamp           `json:"created_at"`
+	Disabled  bool                `json:"disabled"`
+	Email     openapi_types.Email `json:"email"`
+
+	// EmailHash SHA-256 hash of the normalized contact email.
+	EmailHash  string     `json:"email_hash"`
+	Id         string     `json:"id"`
+	UpdatedAt  Timestamp  `json:"updated_at"`
+	Verified   bool       `json:"verified"`
+	VerifiedAt *Timestamp `json:"verified_at,omitempty"`
+}
+
+// NotificationContactConfirmRequest defines model for NotificationContactConfirmRequest.
+type NotificationContactConfirmRequest struct {
+	Token string `json:"token"`
+}
+
+// NotificationContactListResponse defines model for NotificationContactListResponse.
+type NotificationContactListResponse struct {
+	Data      []NotificationContact `json:"data"`
+	RequestId RequestId             `json:"request_id"`
+}
+
+// NotificationContactResponse defines model for NotificationContactResponse.
+type NotificationContactResponse struct {
+	Data      NotificationContact `json:"data"`
+	RequestId RequestId           `json:"request_id"`
+}
+
+// NotificationContactVerificationAccepted defines model for NotificationContactVerificationAccepted.
+type NotificationContactVerificationAccepted struct {
+	Accepted         bool                `json:"accepted"`
+	Contact          NotificationContact `json:"contact"`
+	ExpiresAt        *Timestamp          `json:"expires_at,omitempty"`
+	VerificationSent bool                `json:"verification_sent"`
+}
+
+// NotificationContactVerificationRequest defines model for NotificationContactVerificationRequest.
+type NotificationContactVerificationRequest struct {
+	Email openapi_types.Email `json:"email"`
+}
+
+// NotificationContactVerificationResponse defines model for NotificationContactVerificationResponse.
+type NotificationContactVerificationResponse struct {
+	Data      NotificationContactVerificationAccepted `json:"data"`
+	RequestId RequestId                               `json:"request_id"`
+}
+
+// NotificationEmailTemplate defines model for NotificationEmailTemplate.
+type NotificationEmailTemplate struct {
+	Event        NotificationEmailTemplateEventName `json:"event"`
+	Html         string                             `json:"html"`
+	IsCustom     bool                               `json:"is_custom"`
+	Placeholders []string                           `json:"placeholders"`
+	Subject      string                             `json:"subject"`
+}
+
+// NotificationEmailTemplateEvent defines model for NotificationEmailTemplateEvent.
+type NotificationEmailTemplateEvent struct {
+	Category    string                             `json:"category"`
+	Description string                             `json:"description"`
+	Event       NotificationEmailTemplateEventName `json:"event"`
+	Label       string                             `json:"label"`
+
+	// Optional True when recipients may unsubscribe from this event.
+	Optional     bool     `json:"optional"`
+	Placeholders []string `json:"placeholders"`
+}
+
+// NotificationEmailTemplateEventName defines model for NotificationEmailTemplateEventName.
+type NotificationEmailTemplateEventName string
+
+// NotificationEmailTemplateList defines model for NotificationEmailTemplateList.
+type NotificationEmailTemplateList struct {
+	Events       []NotificationEmailTemplateEvent `json:"events"`
+	Placeholders []string                         `json:"placeholders"`
+	Templates    []NotificationEmailTemplate      `json:"templates"`
+}
+
+// NotificationEmailTemplateListResponse defines model for NotificationEmailTemplateListResponse.
+type NotificationEmailTemplateListResponse struct {
+	Data      NotificationEmailTemplateList `json:"data"`
+	RequestId RequestId                     `json:"request_id"`
+}
+
+// NotificationEmailTemplatePreview defines model for NotificationEmailTemplatePreview.
+type NotificationEmailTemplatePreview struct {
+	Html    string `json:"html"`
+	Subject string `json:"subject"`
+}
+
+// NotificationEmailTemplatePreviewResponse defines model for NotificationEmailTemplatePreviewResponse.
+type NotificationEmailTemplatePreviewResponse struct {
+	Data      NotificationEmailTemplatePreview `json:"data"`
+	RequestId RequestId                        `json:"request_id"`
+}
+
+// NotificationEmailTemplateResponse defines model for NotificationEmailTemplateResponse.
+type NotificationEmailTemplateResponse struct {
+	Data      NotificationEmailTemplate `json:"data"`
+	RequestId RequestId                 `json:"request_id"`
+}
+
+// NotificationPreference defines model for NotificationPreference.
+type NotificationPreference struct {
+	Category    string                          `json:"category"`
+	Description string                          `json:"description"`
+	Event       NotificationPreferenceEventName `json:"event"`
+	Label       string                          `json:"label"`
+
+	// Subscribed True when the current user is subscribed to this optional notification event.
+	Subscribed bool       `json:"subscribed"`
+	UpdatedAt  *Timestamp `json:"updated_at,omitempty"`
+}
+
+// NotificationPreferenceEventName defines model for NotificationPreferenceEventName.
+type NotificationPreferenceEventName string
+
+// NotificationPreferenceListResponse defines model for NotificationPreferenceListResponse.
+type NotificationPreferenceListResponse struct {
+	Data      []NotificationPreference `json:"data"`
+	RequestId RequestId                `json:"request_id"`
+}
+
+// NotificationPreferenceUpdate defines model for NotificationPreferenceUpdate.
+type NotificationPreferenceUpdate struct {
+	Event      NotificationPreferenceEventName `json:"event"`
+	Subscribed bool                            `json:"subscribed"`
+}
+
+// NotificationUnsubscribe defines model for NotificationUnsubscribe.
+type NotificationUnsubscribe struct {
+	Done  bool                         `json:"done"`
+	Event NotificationUnsubscribeEvent `json:"event"`
+}
+
+// NotificationUnsubscribeEvent defines model for NotificationUnsubscribe.Event.
+type NotificationUnsubscribeEvent string
+
+// NotificationUnsubscribeRequest defines model for NotificationUnsubscribeRequest.
+type NotificationUnsubscribeRequest struct {
+	Token string `json:"token"`
+}
+
+// NotificationUnsubscribeResponse defines model for NotificationUnsubscribeResponse.
+type NotificationUnsubscribeResponse struct {
+	Data      NotificationUnsubscribe `json:"data"`
+	RequestId RequestId               `json:"request_id"`
+}
+
+// OAuthPendingNextStep defines model for OAuthPendingNextStep.
+type OAuthPendingNextStep string
+
+// OAuthPendingProfile defines model for OAuthPendingProfile.
+type OAuthPendingProfile struct {
+	// AvatarUrl Display-safe provider profile image URL.
+	AvatarUrl string `json:"avatar_url"`
+
+	// DisplayName Display-safe provider profile name.
+	DisplayName   string `json:"display_name"`
+	EmailVerified bool   `json:"email_verified"`
+
+	// ResolvedEmail Normalized email claim retained from the provider when present and syntactically safe.
+	ResolvedEmail string `json:"resolved_email"`
+}
+
+// OAuthPendingSession defines model for OAuthPendingSession.
+type OAuthPendingSession struct {
+	CreateAccountAction *PendingOAuthAction `json:"create_account_action,omitempty"`
+
+	// ExistingAccountBindable True when the retained provider email matches an active local account that can continue through the bind-existing-login flow.
+	ExistingAccountBindable bool                 `json:"existing_account_bindable"`
+	ExpiresAt               Timestamp            `json:"expires_at"`
+	Intent                  PendingOAuthIntent   `json:"intent"`
+	NextStep                OAuthPendingNextStep `json:"next_step"`
+	Profile                 OAuthPendingProfile  `json:"profile"`
+	Provider                AuthIdentityProvider `json:"provider"`
+
+	// ProviderKey Stable provider instance key used for this pending flow.
+	ProviderKey string `json:"provider_key"`
+
+	// Redirect Bound local console continuation path.
+	Redirect string `json:"redirect"`
+
+	// SubjectHint Display-safe provider subject hint. Raw provider subjects and hashes are never returned.
+	SubjectHint string `json:"subject_hint"`
+}
+
+// OAuthPendingSessionResponse defines model for OAuthPendingSessionResponse.
+type OAuthPendingSessionResponse struct {
+	Data      OAuthPendingSession `json:"data"`
+	RequestId RequestId           `json:"request_id"`
+}
+
+// OAuthProviderConfig defines model for OAuthProviderConfig.
+type OAuthProviderConfig struct {
+	// AuthorizeUrl HTTPS provider authorization endpoint without query or fragment.
+	AuthorizeUrl string `json:"authorize_url"`
+
+	// ClientId Public OAuth client id. Client secrets are not exposed in admin settings.
+	ClientId string `json:"client_id"`
+
+	// DisplayName Non-secret label shown in console settings.
+	DisplayName string               `json:"display_name"`
+	Provider    AuthIdentityProvider `json:"provider"`
+
+	// ProviderKey Stable provider instance key. Defaults to provider name for single-instance providers.
+	ProviderKey string `json:"provider_key"`
+
+	// RedirectUri Registered callback URI. HTTP is accepted only for localhost development.
+	RedirectUri string `json:"redirect_uri"`
+
+	// Scopes Provider scopes sent as a space-delimited authorization request parameter.
+	Scopes []string `json:"scopes"`
+
+	// TokenAuthMethod Token endpoint client authentication method. v1 accepts none so client secrets stay outside Admin Settings.
+	TokenAuthMethod *OAuthProviderConfigTokenAuthMethod `json:"token_auth_method,omitempty"`
+
+	// TokenUrl Optional provider token endpoint for callback completion. HTTPS is required except localhost development. v1 supports public clients with token_auth_method=none.
+	TokenUrl *string `json:"token_url,omitempty"`
+
+	// UserinfoUrl Optional provider UserInfo/profile endpoint for callback completion. HTTPS is required except localhost development.
+	UserinfoUrl *string `json:"userinfo_url,omitempty"`
+}
+
+// OAuthProviderConfigTokenAuthMethod Token endpoint client authentication method. v1 accepts none so client secrets stay outside Admin Settings.
+type OAuthProviderConfigTokenAuthMethod string
 
 // OpenAIModel defines model for OpenAIModel.
 type OpenAIModel struct {
@@ -4317,10 +4920,38 @@ type OpsSystemLog struct {
 	Level     OpsSystemLogLevel `json:"level"`
 	Message   string            `json:"message"`
 	Metadata  *JsonObject       `json:"metadata,omitempty"`
+	RequestId *string           `json:"request_id,omitempty"`
 	Source    string            `json:"source"`
+	TraceId   *string           `json:"trace_id,omitempty"`
 }
 
-// OpsSystemLogLevel defines model for OpsSystemLog.Level.
+// OpsSystemLogCleanupRequest defines model for OpsSystemLogCleanupRequest.
+type OpsSystemLogCleanupRequest struct {
+	DryRun    *bool              `json:"dry_run,omitempty"`
+	End       *Timestamp         `json:"end,omitempty"`
+	Level     *OpsSystemLogLevel `json:"level,omitempty"`
+	MaxDelete *int               `json:"max_delete,omitempty"`
+	Q         *string            `json:"q,omitempty"`
+	Source    *string            `json:"source,omitempty"`
+	Start     *Timestamp         `json:"start,omitempty"`
+}
+
+// OpsSystemLogCleanupResponse defines model for OpsSystemLogCleanupResponse.
+type OpsSystemLogCleanupResponse struct {
+	Data      OpsSystemLogCleanupResult `json:"data"`
+	RequestId RequestId                 `json:"request_id"`
+}
+
+// OpsSystemLogCleanupResult defines model for OpsSystemLogCleanupResult.
+type OpsSystemLogCleanupResult struct {
+	Deleted   int  `json:"deleted"`
+	DryRun    bool `json:"dry_run"`
+	Limited   bool `json:"limited"`
+	Matched   int  `json:"matched"`
+	MaxDelete int  `json:"max_delete"`
+}
+
+// OpsSystemLogLevel defines model for OpsSystemLogLevel.
 type OpsSystemLogLevel string
 
 // OpsSystemLogListResponse defines model for OpsSystemLogListResponse.
@@ -4364,6 +4995,17 @@ type Pagination struct {
 	Total    int  `json:"total"`
 }
 
+// PasswordResetAccepted defines model for PasswordResetAccepted.
+type PasswordResetAccepted struct {
+	Accepted bool `json:"accepted"`
+}
+
+// PasswordResetAcceptedResponse defines model for PasswordResetAcceptedResponse.
+type PasswordResetAcceptedResponse struct {
+	Data      PasswordResetAccepted `json:"data"`
+	RequestId RequestId             `json:"request_id"`
+}
+
 // PaymentMethod defines model for PaymentMethod.
 type PaymentMethod struct {
 	Metadata           JsonObject `json:"metadata"`
@@ -4386,13 +5028,16 @@ type PaymentOrder struct {
 	ClosedAt              *time.Time         `json:"closed_at,omitempty"`
 	CreatedAt             Timestamp          `json:"created_at"`
 	Currency              string             `json:"currency"`
+	DiscountAmount        string             `json:"discount_amount"`
 	ExpiresAt             *time.Time         `json:"expires_at,omitempty"`
 	Id                    Id                 `json:"id"`
 	Metadata              JsonObject         `json:"metadata"`
 	OrderNo               string             `json:"order_no"`
+	OriginalAmount        string             `json:"original_amount"`
 	PaidAt                *time.Time         `json:"paid_at,omitempty"`
 	ProductId             string             `json:"product_id"`
 	ProductType           PaymentProductType `json:"product_type"`
+	PromoCodeId           *Id                `json:"promo_code_id,omitempty"`
 	ProviderInstanceId    Id                 `json:"provider_instance_id"`
 	ProviderSnapshot      JsonObject         `json:"provider_snapshot"`
 	ProviderTransactionId *string            `json:"provider_transaction_id,omitempty"`
@@ -4464,6 +5109,85 @@ type PaymentWebhookResponse struct {
 type PaymentWebhookResult struct {
 	Handled bool         `json:"handled"`
 	Order   PaymentOrder `json:"order"`
+}
+
+// PendingOAuthAction defines model for PendingOAuthAction.
+type PendingOAuthAction struct {
+	ExpiresAt Timestamp `json:"expires_at"`
+
+	// Token Short-lived signed action token bound to the current pending OAuth cookie. It is not a session token and cannot be reused with another pending cookie.
+	Token string `json:"token"`
+}
+
+// PendingOAuthBindCurrentUserRequest Optional preferences applied while binding a pending external identity to the current console user. Omitting the body is equivalent to all preferences disabled.
+type PendingOAuthBindCurrentUserRequest struct {
+	// AdoptDisplayName When true, adopt the provider-returned display name as the account display name if the provider supplied a present, valid name. Provider avatar URLs are never adopted automatically because SRapi avatars use a controlled upload/storage model.
+	AdoptDisplayName *bool `json:"adopt_display_name,omitempty"`
+}
+
+// PendingOAuthBindLoginRequest defines model for PendingOAuthBindLoginRequest.
+type PendingOAuthBindLoginRequest struct {
+	// AdoptDisplayName When true, adopt the provider-returned display name onto the authenticated account after a successful bind, if the provider supplied a present, valid name. Provider avatar URLs are never adopted automatically because SRapi avatars use a controlled upload/storage model.
+	AdoptDisplayName *bool `json:"adopt_display_name,omitempty"`
+
+	// Email Existing console account email to authenticate before binding the pending external identity.
+	Email    openapi_types.Email `json:"email"`
+	Password string              `json:"password"`
+}
+
+// PendingOAuthBindLoginTwoFactorRequest defines model for PendingOAuthBindLoginTwoFactorRequest.
+type PendingOAuthBindLoginTwoFactorRequest struct {
+	// ChallengeId Pending OAuth bind-login two-factor challenge returned by `bindPendingOAuthLogin`.
+	ChallengeId string `json:"challenge_id"`
+
+	// Code Six-digit TOTP code or one recovery code.
+	Code string `json:"code"`
+}
+
+// PendingOAuthCreateAccountRequest defines model for PendingOAuthCreateAccountRequest.
+type PendingOAuthCreateAccountRequest struct {
+	// ActionToken Pending OAuth create-account action token returned by `getPendingOAuthSession`.
+	ActionToken string `json:"action_token"`
+
+	// Email New console account email. For v1 this must match the verified email retained in the pending OAuth session.
+	Email openapi_types.Email `json:"email"`
+
+	// Name Optional local display name. Defaults to the provider display name or email.
+	Name     *string `json:"name,omitempty"`
+	Password string  `json:"password"`
+}
+
+// PendingOAuthEmailCompletionAccepted defines model for PendingOAuthEmailCompletionAccepted.
+type PendingOAuthEmailCompletionAccepted struct {
+	Accepted  bool      `json:"accepted"`
+	ExpiresAt Timestamp `json:"expires_at"`
+}
+
+// PendingOAuthEmailCompletionAcceptedResponse defines model for PendingOAuthEmailCompletionAcceptedResponse.
+type PendingOAuthEmailCompletionAcceptedResponse struct {
+	Data      PendingOAuthEmailCompletionAccepted `json:"data"`
+	RequestId RequestId                           `json:"request_id"`
+}
+
+// PendingOAuthEmailCompletionRequest defines model for PendingOAuthEmailCompletionRequest.
+type PendingOAuthEmailCompletionRequest struct {
+	// Email Email address the user wants to prove for an OAuth pending session that lacks a provider email.
+	Email openapi_types.Email `json:"email"`
+}
+
+// PendingOAuthIntent defines model for PendingOAuthIntent.
+type PendingOAuthIntent string
+
+// PreviewNotificationEmailTemplateRequest defines model for PreviewNotificationEmailTemplateRequest.
+type PreviewNotificationEmailTemplateRequest struct {
+	Event NotificationEmailTemplateEventName `json:"event"`
+
+	// Html Template HTML to preview. Empty string uses the saved or built-in HTML.
+	Html string `json:"html"`
+
+	// Subject Template subject to preview. Empty string uses the saved or built-in subject.
+	Subject   string             `json:"subject"`
+	Variables *map[string]string `json:"variables,omitempty"`
 }
 
 // PricingRule defines model for PricingRule.
@@ -4742,7 +5466,9 @@ type RedeemCode struct {
 	Status         RedeemCodeStatus `json:"status"`
 	Type           RedeemCodeType   `json:"type"`
 	UpdatedAt      Timestamp        `json:"updated_at"`
-	Value          string           `json:"value"`
+
+	// Value Balance amount for balance codes, or subscription plan id for subscription codes.
+	Value string `json:"value"`
 }
 
 // RedeemCodeListResponse defines model for RedeemCodeListResponse.
@@ -4750,6 +5476,41 @@ type RedeemCodeListResponse struct {
 	Data       []RedeemCode `json:"data"`
 	Pagination Pagination   `json:"pagination"`
 	RequestId  RequestId    `json:"request_id"`
+}
+
+// RedeemCodeRedemption defines model for RedeemCodeRedemption.
+type RedeemCodeRedemption struct {
+	Amount             string         `json:"amount"`
+	BalanceAfter       string         `json:"balance_after"`
+	BalanceBefore      string         `json:"balance_before"`
+	BillingLedgerId    *Id            `json:"billing_ledger_id,omitempty"`
+	CreatedAt          Timestamp      `json:"created_at"`
+	Currency           string         `json:"currency"`
+	Id                 Id             `json:"id"`
+	RedeemCodeId       Id             `json:"redeem_code_id"`
+	RedeemedAt         Timestamp      `json:"redeemed_at"`
+	Type               RedeemCodeType `json:"type"`
+	UpdatedAt          Timestamp      `json:"updated_at"`
+	UserId             Id             `json:"user_id"`
+	UserSubscriptionId *Id            `json:"user_subscription_id,omitempty"`
+}
+
+// RedeemCodeRedemptionRequest defines model for RedeemCodeRedemptionRequest.
+type RedeemCodeRedemptionRequest struct {
+	Code string `json:"code"`
+}
+
+// RedeemCodeRedemptionResponse defines model for RedeemCodeRedemptionResponse.
+type RedeemCodeRedemptionResponse struct {
+	Data      RedeemCodeRedemptionResult `json:"data"`
+	RequestId RequestId                  `json:"request_id"`
+}
+
+// RedeemCodeRedemptionResult defines model for RedeemCodeRedemptionResult.
+type RedeemCodeRedemptionResult struct {
+	AlreadyRedeemed bool                 `json:"already_redeemed"`
+	RedeemCode      RedeemCode           `json:"redeem_code"`
+	Redemption      RedeemCodeRedemption `json:"redemption"`
 }
 
 // RedeemCodeResponse defines model for RedeemCodeResponse.
@@ -4786,8 +5547,25 @@ type RefundPaymentOrderRequest struct {
 	Reason *string `json:"reason,omitempty"`
 }
 
+// RegisterRequest defines model for RegisterRequest.
+type RegisterRequest struct {
+	Email    openapi_types.Email `json:"email"`
+	Name     string              `json:"name"`
+	Password string              `json:"password"`
+}
+
+// RequestEmailVerificationRequest defines model for RequestEmailVerificationRequest.
+type RequestEmailVerificationRequest struct {
+	Email openapi_types.Email `json:"email"`
+}
+
 // RequestId defines model for RequestId.
 type RequestId = string
+
+// RequestPasswordResetRequest defines model for RequestPasswordResetRequest.
+type RequestPasswordResetRequest struct {
+	Email openapi_types.Email `json:"email"`
+}
 
 // RerankDocument defines model for RerankDocument.
 type RerankDocument struct {
@@ -5349,6 +6127,51 @@ type SubscriptionPlanResponse struct {
 // SubscriptionPlanStatus defines model for SubscriptionPlanStatus.
 type SubscriptionPlanStatus string
 
+// TOTPEnableResponse defines model for TOTPEnableResponse.
+type TOTPEnableResponse struct {
+	Data      TOTPEnableResult `json:"data"`
+	RequestId RequestId        `json:"request_id"`
+}
+
+// TOTPEnableResult defines model for TOTPEnableResult.
+type TOTPEnableResult struct {
+	Enabled       bool     `json:"enabled"`
+	RecoveryCodes []string `json:"recovery_codes"`
+}
+
+// TOTPSetup defines model for TOTPSetup.
+type TOTPSetup struct {
+	Enabled    bool   `json:"enabled"`
+	OtpAuthUrl string `json:"otp_auth_url"`
+
+	// Secret Base32 TOTP secret returned once for enrollment.
+	Secret string `json:"secret"`
+}
+
+// TOTPSetupResponse defines model for TOTPSetupResponse.
+type TOTPSetupResponse struct {
+	Data      TOTPSetup `json:"data"`
+	RequestId RequestId `json:"request_id"`
+}
+
+// TOTPStatus defines model for TOTPStatus.
+type TOTPStatus struct {
+	Enabled      bool `json:"enabled"`
+	PendingSetup bool `json:"pending_setup"`
+}
+
+// TOTPStatusResponse defines model for TOTPStatusResponse.
+type TOTPStatusResponse struct {
+	Data      TOTPStatus `json:"data"`
+	RequestId RequestId  `json:"request_id"`
+}
+
+// TOTPVerifyRequest defines model for TOTPVerifyRequest.
+type TOTPVerifyRequest struct {
+	// Code Six-digit TOTP code or one recovery code.
+	Code string `json:"code"`
+}
+
 // TimeWindow defines model for TimeWindow.
 type TimeWindow struct {
 	End   Timestamp `json:"end"`
@@ -5410,6 +6233,12 @@ type UpdateApiKeyRequest struct {
 	Status        *ApiKeyStatus `json:"status,omitempty"`
 }
 
+// UpdateCurrentUserProfileRequest defines model for UpdateCurrentUserProfileRequest.
+type UpdateCurrentUserProfileRequest struct {
+	// Name Current user's display name.
+	Name string `json:"name"`
+}
+
 // UpdateModelRequest defines model for UpdateModelRequest.
 type UpdateModelRequest struct {
 	Capabilities    *[]CapabilityDescriptor `json:"capabilities,omitempty"`
@@ -5419,6 +6248,22 @@ type UpdateModelRequest struct {
 	MaxOutputTokens *int                    `json:"max_output_tokens,omitempty"`
 	QualityTier     *string                 `json:"quality_tier,omitempty"`
 	Status          *ResourceStatus         `json:"status,omitempty"`
+}
+
+// UpdateNotificationContactRequest defines model for UpdateNotificationContactRequest.
+type UpdateNotificationContactRequest struct {
+	Disabled bool `json:"disabled"`
+}
+
+// UpdateNotificationEmailTemplateRequest defines model for UpdateNotificationEmailTemplateRequest.
+type UpdateNotificationEmailTemplateRequest struct {
+	Html    string `json:"html"`
+	Subject string `json:"subject"`
+}
+
+// UpdateNotificationPreferencesRequest defines model for UpdateNotificationPreferencesRequest.
+type UpdateNotificationPreferencesRequest struct {
+	Preferences []NotificationPreferenceUpdate `json:"preferences"`
 }
 
 // UpdateOpsSLORequest defines model for UpdateOpsSLORequest.
@@ -5576,17 +6421,75 @@ type UsageLogListResponse struct {
 
 // User defines model for User.
 type User struct {
+	AvatarByteSize *int `json:"avatar_byte_size,omitempty"`
+
+	// AvatarMime Normalized avatar MIME type.
+	AvatarMime      *UserAvatarMime `json:"avatar_mime,omitempty"`
+	AvatarSha256    *string         `json:"avatar_sha256,omitempty"`
+	AvatarUpdatedAt *time.Time      `json:"avatar_updated_at,omitempty"`
+
+	// AvatarUrl Relative URL for the user's SRapi-hosted avatar image, when configured.
+	AvatarUrl *string `json:"avatar_url,omitempty"`
+
 	// Balance Decimal string balance.
-	Balance     string              `json:"balance"`
-	CreatedAt   Timestamp           `json:"created_at"`
-	Currency    string              `json:"currency"`
-	Email       openapi_types.Email `json:"email"`
-	Id          Id                  `json:"id"`
-	LastLoginAt *time.Time          `json:"last_login_at,omitempty"`
-	Name        string              `json:"name"`
-	Roles       []UserRole          `json:"roles"`
-	RpmLimit    *int                `json:"rpm_limit,omitempty"`
-	Status      UserStatus          `json:"status"`
+	Balance         string              `json:"balance"`
+	CreatedAt       Timestamp           `json:"created_at"`
+	Currency        string              `json:"currency"`
+	Email           openapi_types.Email `json:"email"`
+	EmailVerifiedAt *time.Time          `json:"email_verified_at,omitempty"`
+	Id              Id                  `json:"id"`
+	LastLoginAt     *time.Time          `json:"last_login_at,omitempty"`
+	Name            string              `json:"name"`
+	Roles           []UserRole          `json:"roles"`
+	RpmLimit        *int                `json:"rpm_limit,omitempty"`
+	Status          UserStatus          `json:"status"`
+}
+
+// UserAvatarMime Normalized avatar MIME type.
+type UserAvatarMime string
+
+// UserAnnouncement defines model for UserAnnouncement.
+type UserAnnouncement struct {
+	Announcement Announcement `json:"announcement"`
+	Read         bool         `json:"read"`
+	ReadAt       *Timestamp   `json:"read_at,omitempty"`
+}
+
+// UserAnnouncementListResponse defines model for UserAnnouncementListResponse.
+type UserAnnouncementListResponse struct {
+	Data       []UserAnnouncement `json:"data"`
+	Pagination Pagination         `json:"pagination"`
+	RequestId  RequestId          `json:"request_id"`
+	Unread     int                `json:"unread"`
+}
+
+// UserAnnouncementResponse defines model for UserAnnouncementResponse.
+type UserAnnouncementResponse struct {
+	Data      UserAnnouncement `json:"data"`
+	RequestId RequestId        `json:"request_id"`
+}
+
+// UserAvatar defines model for UserAvatar.
+type UserAvatar struct {
+	ByteSize    int                   `json:"byte_size"`
+	ContentType UserAvatarContentType `json:"content_type"`
+	Height      int                   `json:"height"`
+	Sha256      string                `json:"sha256"`
+	UpdatedAt   Timestamp             `json:"updated_at"`
+
+	// Url Relative URL that serves the normalized avatar image.
+	Url    string `json:"url"`
+	UserId Id     `json:"user_id"`
+	Width  int    `json:"width"`
+}
+
+// UserAvatarContentType defines model for UserAvatar.ContentType.
+type UserAvatarContentType string
+
+// UserAvatarResponse defines model for UserAvatarResponse.
+type UserAvatarResponse struct {
+	Data      UserAvatar `json:"data"`
+	RequestId RequestId  `json:"request_id"`
 }
 
 // UserBalance defines model for UserBalance.
@@ -5659,6 +6562,9 @@ type Bucket string
 // EndTime defines model for EndTime.
 type EndTime = time.Time
 
+// GatewayIdempotencyKey defines model for GatewayIdempotencyKey.
+type GatewayIdempotencyKey = string
+
 // GeminiModel defines model for GeminiModel.
 type GeminiModel = string
 
@@ -5694,6 +6600,9 @@ type GatewayError = GatewayErrorResponse
 
 // GatewayForbidden defines model for GatewayForbidden.
 type GatewayForbidden = GatewayErrorResponse
+
+// GatewayIdempotencyConflict defines model for GatewayIdempotencyConflict.
+type GatewayIdempotencyConflict = GatewayErrorResponse
 
 // GatewayUnauthorized defines model for GatewayUnauthorized.
 type GatewayUnauthorized = GatewayErrorResponse
@@ -5909,9 +6818,13 @@ type ListAdminOpsSLOsParams struct {
 
 // ListAdminOpsSystemLogsParams defines parameters for ListAdminOpsSystemLogs.
 type ListAdminOpsSystemLogsParams struct {
-	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
-	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
-	Level    *string   `form:"level,omitempty" json:"level,omitempty"`
+	Page     *Page              `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *PageSize          `form:"page_size,omitempty" json:"page_size,omitempty"`
+	Level    *OpsSystemLogLevel `form:"level,omitempty" json:"level,omitempty"`
+	Source   *string            `form:"source,omitempty" json:"source,omitempty"`
+	Q        *string            `form:"q,omitempty" json:"q,omitempty"`
+	Start    *Timestamp         `form:"start,omitempty" json:"start,omitempty"`
+	End      *Timestamp         `form:"end,omitempty" json:"end,omitempty"`
 }
 
 // GetAdminOpsThroughputTrendParams defines parameters for GetAdminOpsThroughputTrend.
@@ -6076,6 +6989,36 @@ type ListApiKeysParams struct {
 	Status   *Status   `form:"status,omitempty" json:"status,omitempty"`
 }
 
+// CompleteOAuthAuthorizationParams defines parameters for CompleteOAuthAuthorization.
+type CompleteOAuthAuthorizationParams struct {
+	// Code Authorization code returned by the upstream provider.
+	Code *string `form:"code,omitempty" json:"code,omitempty"`
+
+	// State State returned by the upstream provider. Must match the encrypted flow cookie.
+	State *string `form:"state,omitempty" json:"state,omitempty"`
+
+	// Error Upstream OAuth error value. When present the server rejects and clears the flow cookie.
+	Error *string `form:"error,omitempty" json:"error,omitempty"`
+
+	// ErrorDescription Upstream OAuth error description. It is not reflected verbatim in the error response.
+	ErrorDescription *string `form:"error_description,omitempty" json:"error_description,omitempty"`
+}
+
+// StartOAuthAuthorizationParams defines parameters for StartOAuthAuthorization.
+type StartOAuthAuthorizationParams struct {
+	// Redirect Local console path to continue to after callback handling. Cross-site values are normalized by the server.
+	Redirect *string `form:"redirect,omitempty" json:"redirect,omitempty"`
+
+	// Intent Flow intent. v1 public start accepts only login; bind-current-user will use a CSRF-protected follow-up route.
+	Intent *StartOAuthAuthorizationParamsIntent `form:"intent,omitempty" json:"intent,omitempty"`
+
+	// ProviderKey Optional provider instance key when multiple configs exist for the same provider.
+	ProviderKey *string `form:"provider_key,omitempty" json:"provider_key,omitempty"`
+}
+
+// StartOAuthAuthorizationParamsIntent defines parameters for StartOAuthAuthorization.
+type StartOAuthAuthorizationParamsIntent string
+
 // ListCurrentUserAffiliateLedgerParams defines parameters for ListCurrentUserAffiliateLedger.
 type ListCurrentUserAffiliateLedgerParams struct {
 	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
@@ -6088,6 +7031,18 @@ type TransferCurrentUserAffiliateToBalanceParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
 
+// ListCurrentUserAnnouncementsParams defines parameters for ListCurrentUserAnnouncements.
+type ListCurrentUserAnnouncementsParams struct {
+	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
+
+// UploadCurrentUserAvatarMultipartBody defines parameters for UploadCurrentUserAvatar.
+type UploadCurrentUserAvatarMultipartBody struct {
+	// Avatar PNG or JPEG avatar image. The upload limit is 1 MiB and dimensions must not exceed 1024x1024.
+	Avatar openapi_types.File `json:"avatar"`
+}
+
 // GetCurrentUserSubscriptionsParams defines parameters for GetCurrentUserSubscriptions.
 type GetCurrentUserSubscriptionsParams struct {
 	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
@@ -6098,6 +7053,16 @@ type GetCurrentUserSubscriptionsParams struct {
 type GetCurrentUserUsageParams struct {
 	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
 	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
+
+// PreviewNotificationUnsubscribeParams defines parameters for PreviewNotificationUnsubscribe.
+type PreviewNotificationUnsubscribeParams struct {
+	Token string `form:"token" json:"token"`
+}
+
+// UnsubscribeNotificationEmailParams defines parameters for UnsubscribeNotificationEmail.
+type UnsubscribeNotificationEmailParams struct {
+	Token *string `form:"token,omitempty" json:"token,omitempty"`
 }
 
 // ListPaymentOrdersParams defines parameters for ListPaymentOrders.
@@ -6132,6 +7097,24 @@ type ListOpenAIResponseInputItemsAliasParams struct {
 // ListOpenAIResponseInputItemsAliasParamsOrder defines parameters for ListOpenAIResponseInputItemsAlias.
 type ListOpenAIResponseInputItemsAliasParamsOrder string
 
+// CreateChatCompletionParams defines parameters for CreateChatCompletion.
+type CreateChatCompletionParams struct {
+	// IdempotencyKey Optional opt-in idempotency key. A retried non-streaming request that repeats the same key and body replays the original response instead of re-executing (and re-billing). Streaming requests are not replayed.
+	IdempotencyKey *GatewayIdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// CreateEmbeddingParams defines parameters for CreateEmbedding.
+type CreateEmbeddingParams struct {
+	// IdempotencyKey Optional opt-in idempotency key. A retried non-streaming request that repeats the same key and body replays the original response instead of re-executing (and re-billing). Streaming requests are not replayed.
+	IdempotencyKey *GatewayIdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// CreateMessageParams defines parameters for CreateMessage.
+type CreateMessageParams struct {
+	// IdempotencyKey Optional opt-in idempotency key. A retried non-streaming request that repeats the same key and body replays the original response instead of re-executing (and re-billing). Streaming requests are not replayed.
+	IdempotencyKey *GatewayIdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // ConnectRealtimeWebSocketParams defines parameters for ConnectRealtimeWebSocket.
 type ConnectRealtimeWebSocketParams struct {
 	// Model Model name requested by the downstream realtime client.
@@ -6152,6 +7135,12 @@ type ConnectRealtimeWebSocketParams struct {
 
 // ConnectRealtimeWebSocketParamsStickyStrength defines parameters for ConnectRealtimeWebSocket.
 type ConnectRealtimeWebSocketParamsStickyStrength string
+
+// CreateResponseParams defines parameters for CreateResponse.
+type CreateResponseParams struct {
+	// IdempotencyKey Optional opt-in idempotency key. A retried non-streaming request that repeats the same key and body replays the original response instead of re-executing (and re-billing). Streaming requests are not replayed.
+	IdempotencyKey *GatewayIdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
 
 // ConnectResponsesWebSocketParams defines parameters for ConnectResponsesWebSocket.
 type ConnectResponsesWebSocketParams struct {
@@ -6316,6 +7305,12 @@ type CreateAdminModelAliasJSONRequestBody = CreateModelAliasRequest
 // CreateAdminModelMappingJSONRequestBody defines body for CreateAdminModelMapping for application/json ContentType.
 type CreateAdminModelMappingJSONRequestBody = CreateModelProviderMappingRequest
 
+// PreviewAdminNotificationEmailTemplateJSONRequestBody defines body for PreviewAdminNotificationEmailTemplate for application/json ContentType.
+type PreviewAdminNotificationEmailTemplateJSONRequestBody = PreviewNotificationEmailTemplateRequest
+
+// UpdateAdminNotificationEmailTemplateJSONRequestBody defines body for UpdateAdminNotificationEmailTemplate for application/json ContentType.
+type UpdateAdminNotificationEmailTemplateJSONRequestBody = UpdateNotificationEmailTemplateRequest
+
 // UpdateAdminOpsSettingsJSONRequestBody defines body for UpdateAdminOpsSettings for application/json ContentType.
 type UpdateAdminOpsSettingsJSONRequestBody = OpsSettings
 
@@ -6324,6 +7319,9 @@ type CreateAdminOpsSLOJSONRequestBody = CreateOpsSLORequest
 
 // UpdateAdminOpsSLOJSONRequestBody defines body for UpdateAdminOpsSLO for application/json ContentType.
 type UpdateAdminOpsSLOJSONRequestBody = UpdateOpsSLORequest
+
+// CleanupAdminOpsSystemLogsJSONRequestBody defines body for CleanupAdminOpsSystemLogs for application/json ContentType.
+type CleanupAdminOpsSystemLogsJSONRequestBody = OpsSystemLogCleanupRequest
 
 // RefundAdminPaymentOrderJSONRequestBody defines body for RefundAdminPaymentOrder for application/json ContentType.
 type RefundAdminPaymentOrderJSONRequestBody = RefundPaymentOrderRequest
@@ -6409,11 +7407,83 @@ type CreateApiKeyJSONRequestBody = CreateApiKeyRequest
 // UpdateApiKeyJSONRequestBody defines body for UpdateApiKey for application/json ContentType.
 type UpdateApiKeyJSONRequestBody = UpdateApiKeyRequest
 
+// ConfirmEmailVerificationJSONRequestBody defines body for ConfirmEmailVerification for application/json ContentType.
+type ConfirmEmailVerificationJSONRequestBody = ConfirmEmailVerificationRequest
+
+// RequestEmailVerificationJSONRequestBody defines body for RequestEmailVerification for application/json ContentType.
+type RequestEmailVerificationJSONRequestBody = RequestEmailVerificationRequest
+
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = LoginRequest
 
+// LoginTwoFactorJSONRequestBody defines body for LoginTwoFactor for application/json ContentType.
+type LoginTwoFactorJSONRequestBody = LoginTwoFactorRequest
+
+// BindPendingOAuthCurrentUserJSONRequestBody defines body for BindPendingOAuthCurrentUser for application/json ContentType.
+type BindPendingOAuthCurrentUserJSONRequestBody = PendingOAuthBindCurrentUserRequest
+
+// BindPendingOAuthLoginJSONRequestBody defines body for BindPendingOAuthLogin for application/json ContentType.
+type BindPendingOAuthLoginJSONRequestBody = PendingOAuthBindLoginRequest
+
+// CompletePendingOAuthBindLoginTwoFactorJSONRequestBody defines body for CompletePendingOAuthBindLoginTwoFactor for application/json ContentType.
+type CompletePendingOAuthBindLoginTwoFactorJSONRequestBody = PendingOAuthBindLoginTwoFactorRequest
+
+// CreatePendingOAuthAccountJSONRequestBody defines body for CreatePendingOAuthAccount for application/json ContentType.
+type CreatePendingOAuthAccountJSONRequestBody = PendingOAuthCreateAccountRequest
+
+// ConfirmPendingOAuthEmailCompletionJSONRequestBody defines body for ConfirmPendingOAuthEmailCompletion for application/json ContentType.
+type ConfirmPendingOAuthEmailCompletionJSONRequestBody = ConfirmPendingOAuthEmailCompletionRequest
+
+// SendPendingOAuthEmailCompletionJSONRequestBody defines body for SendPendingOAuthEmailCompletion for application/json ContentType.
+type SendPendingOAuthEmailCompletionJSONRequestBody = PendingOAuthEmailCompletionRequest
+
+// ConfirmPasswordResetJSONRequestBody defines body for ConfirmPasswordReset for application/json ContentType.
+type ConfirmPasswordResetJSONRequestBody = ConfirmPasswordResetRequest
+
+// RequestPasswordResetJSONRequestBody defines body for RequestPasswordReset for application/json ContentType.
+type RequestPasswordResetJSONRequestBody = RequestPasswordResetRequest
+
+// RegisterJSONRequestBody defines body for Register for application/json ContentType.
+type RegisterJSONRequestBody = RegisterRequest
+
+// UpdateCurrentUserProfileJSONRequestBody defines body for UpdateCurrentUserProfile for application/json ContentType.
+type UpdateCurrentUserProfileJSONRequestBody = UpdateCurrentUserProfileRequest
+
 // TransferCurrentUserAffiliateToBalanceJSONRequestBody defines body for TransferCurrentUserAffiliateToBalance for application/json ContentType.
 type TransferCurrentUserAffiliateToBalanceJSONRequestBody = AffiliateTransferToBalanceRequest
+
+// UploadCurrentUserAvatarMultipartRequestBody defines body for UploadCurrentUserAvatar for multipart/form-data ContentType.
+type UploadCurrentUserAvatarMultipartRequestBody UploadCurrentUserAvatarMultipartBody
+
+// RequestCurrentUserNotificationContactVerificationJSONRequestBody defines body for RequestCurrentUserNotificationContactVerification for application/json ContentType.
+type RequestCurrentUserNotificationContactVerificationJSONRequestBody = NotificationContactVerificationRequest
+
+// ConfirmCurrentUserNotificationContactVerificationJSONRequestBody defines body for ConfirmCurrentUserNotificationContactVerification for application/json ContentType.
+type ConfirmCurrentUserNotificationContactVerificationJSONRequestBody = NotificationContactConfirmRequest
+
+// UpdateCurrentUserNotificationContactJSONRequestBody defines body for UpdateCurrentUserNotificationContact for application/json ContentType.
+type UpdateCurrentUserNotificationContactJSONRequestBody = UpdateNotificationContactRequest
+
+// UpdateCurrentUserNotificationPreferencesJSONRequestBody defines body for UpdateCurrentUserNotificationPreferences for application/json ContentType.
+type UpdateCurrentUserNotificationPreferencesJSONRequestBody = UpdateNotificationPreferencesRequest
+
+// ChangeCurrentUserPasswordJSONRequestBody defines body for ChangeCurrentUserPassword for application/json ContentType.
+type ChangeCurrentUserPasswordJSONRequestBody = ChangeCurrentUserPasswordRequest
+
+// RedeemCurrentUserRedeemCodeJSONRequestBody defines body for RedeemCurrentUserRedeemCode for application/json ContentType.
+type RedeemCurrentUserRedeemCodeJSONRequestBody = RedeemCodeRedemptionRequest
+
+// DisableCurrentUserTOTPJSONRequestBody defines body for DisableCurrentUserTOTP for application/json ContentType.
+type DisableCurrentUserTOTPJSONRequestBody = TOTPVerifyRequest
+
+// EnableCurrentUserTOTPJSONRequestBody defines body for EnableCurrentUserTOTP for application/json ContentType.
+type EnableCurrentUserTOTPJSONRequestBody = TOTPVerifyRequest
+
+// UnsubscribeNotificationEmailJSONRequestBody defines body for UnsubscribeNotificationEmail for application/json ContentType.
+type UnsubscribeNotificationEmailJSONRequestBody = NotificationUnsubscribeRequest
+
+// UnsubscribeNotificationEmailFormdataRequestBody defines body for UnsubscribeNotificationEmail for application/x-www-form-urlencoded ContentType.
+type UnsubscribeNotificationEmailFormdataRequestBody = NotificationUnsubscribeRequest
 
 // CreatePaymentOrderJSONRequestBody defines body for CreatePaymentOrder for application/json ContentType.
 type CreatePaymentOrderJSONRequestBody = CreatePaymentOrderRequest
@@ -12929,6 +13999,21 @@ type ServerInterface interface {
 	// Create a provider mapping for a model.
 	// (POST /api/v1/admin/models/{id}/mappings)
 	CreateAdminModelMapping(w http.ResponseWriter, r *http.Request, id Id)
+	// Preview a notification email template without saving it.
+	// (POST /api/v1/admin/notifications/email-template-preview)
+	PreviewAdminNotificationEmailTemplate(w http.ResponseWriter, r *http.Request)
+	// List editable notification email templates.
+	// (GET /api/v1/admin/notifications/email-templates)
+	ListAdminNotificationEmailTemplates(w http.ResponseWriter, r *http.Request)
+	// Get one editable notification email template.
+	// (GET /api/v1/admin/notifications/email-templates/{event})
+	GetAdminNotificationEmailTemplate(w http.ResponseWriter, r *http.Request, event NotificationEmailTemplateEventName)
+	// Update one notification email template override.
+	// (PUT /api/v1/admin/notifications/email-templates/{event})
+	UpdateAdminNotificationEmailTemplate(w http.ResponseWriter, r *http.Request, event NotificationEmailTemplateEventName)
+	// Restore one notification email template to its built-in default.
+	// (POST /api/v1/admin/notifications/email-templates/{event}/restore)
+	RestoreAdminNotificationEmailTemplate(w http.ResponseWriter, r *http.Request, event NotificationEmailTemplateEventName)
 	// List operational alert events.
 	// (GET /api/v1/admin/ops/alert-events)
 	ListAdminOpsAlertEvents(w http.ResponseWriter, r *http.Request, params ListAdminOpsAlertEventsParams)
@@ -12974,6 +14059,9 @@ type ServerInterface interface {
 	// List sanitized system log events.
 	// (GET /api/v1/admin/ops/system-logs)
 	ListAdminOpsSystemLogs(w http.ResponseWriter, r *http.Request, params ListAdminOpsSystemLogsParams)
+	// Cleanup sanitized system log events by bounded filter.
+	// (POST /api/v1/admin/ops/system-logs/cleanup)
+	CleanupAdminOpsSystemLogs(w http.ResponseWriter, r *http.Request)
 	// Get request and token throughput trend.
 	// (GET /api/v1/admin/ops/throughput-trend)
 	GetAdminOpsThroughputTrend(w http.ResponseWriter, r *http.Request, params GetAdminOpsThroughputTrendParams)
@@ -13160,18 +14248,66 @@ type ServerInterface interface {
 	// Update API key metadata and policy.
 	// (PATCH /api/v1/api-keys/{id})
 	UpdateApiKey(w http.ResponseWriter, r *http.Request, id Id)
+	// Confirm a console email verification token.
+	// (POST /api/v1/auth/email-verification/confirm)
+	ConfirmEmailVerification(w http.ResponseWriter, r *http.Request)
+	// Request a console email verification token.
+	// (POST /api/v1/auth/email-verification/request)
+	RequestEmailVerification(w http.ResponseWriter, r *http.Request)
 	// Login to the console.
 	// (POST /api/v1/auth/login)
 	Login(w http.ResponseWriter, r *http.Request)
+	// Complete console login with a TOTP or recovery code.
+	// (POST /api/v1/auth/login/2fa)
+	LoginTwoFactor(w http.ResponseWriter, r *http.Request)
 	// Logout from the console.
 	// (POST /api/v1/auth/logout)
 	Logout(w http.ResponseWriter, r *http.Request)
+	// Inspect a pending OAuth/OIDC decision session.
+	// (GET /api/v1/auth/oauth/pending)
+	GetPendingOAuthSession(w http.ResponseWriter, r *http.Request)
+	// Bind a pending OAuth/OIDC identity to the current console user.
+	// (POST /api/v1/auth/oauth/pending/bind-current-user)
+	BindPendingOAuthCurrentUser(w http.ResponseWriter, r *http.Request)
+	// Bind a pending OAuth/OIDC identity to an existing console account and login.
+	// (POST /api/v1/auth/oauth/pending/bind-login)
+	BindPendingOAuthLogin(w http.ResponseWriter, r *http.Request)
+	// Complete pending OAuth/OIDC bind-login with two-factor verification.
+	// (POST /api/v1/auth/oauth/pending/bind-login/2fa)
+	CompletePendingOAuthBindLoginTwoFactor(w http.ResponseWriter, r *http.Request)
+	// Create a console account from a pending OAuth/OIDC identity.
+	// (POST /api/v1/auth/oauth/pending/create-account)
+	CreatePendingOAuthAccount(w http.ResponseWriter, r *http.Request)
+	// Confirm a pending OAuth/OIDC email-completion link.
+	// (POST /api/v1/auth/oauth/pending/email-completion/confirm)
+	ConfirmPendingOAuthEmailCompletion(w http.ResponseWriter, r *http.Request)
+	// Send a pending OAuth/OIDC email-completion verification link.
+	// (POST /api/v1/auth/oauth/pending/send-verify-code)
+	SendPendingOAuthEmailCompletion(w http.ResponseWriter, r *http.Request)
+	// Complete an OAuth/OIDC authorization-code callback.
+	// (GET /api/v1/auth/oauth/{provider}/callback)
+	CompleteOAuthAuthorization(w http.ResponseWriter, r *http.Request, provider AuthIdentityProvider, params CompleteOAuthAuthorizationParams)
+	// Start an OAuth/OIDC authorization-code flow.
+	// (GET /api/v1/auth/oauth/{provider}/start)
+	StartOAuthAuthorization(w http.ResponseWriter, r *http.Request, provider AuthIdentityProvider, params StartOAuthAuthorizationParams)
+	// Confirm a console password reset.
+	// (POST /api/v1/auth/password-reset/confirm)
+	ConfirmPasswordReset(w http.ResponseWriter, r *http.Request)
+	// Request a console password reset token.
+	// (POST /api/v1/auth/password-reset/request)
+	RequestPasswordReset(w http.ResponseWriter, r *http.Request)
+	// Register a console user account.
+	// (POST /api/v1/auth/register)
+	Register(w http.ResponseWriter, r *http.Request)
 	// Check API health.
 	// (GET /api/v1/health)
 	GetHealth(w http.ResponseWriter, r *http.Request)
 	// Get current console user.
 	// (GET /api/v1/me)
 	GetCurrentUser(w http.ResponseWriter, r *http.Request)
+	// Update current console user profile.
+	// (PATCH /api/v1/me)
+	UpdateCurrentUserProfile(w http.ResponseWriter, r *http.Request)
 	// Get current user affiliate summary.
 	// (GET /api/v1/me/affiliate)
 	GetCurrentUserAffiliate(w http.ResponseWriter, r *http.Request)
@@ -13181,15 +14317,78 @@ type ServerInterface interface {
 	// Transfer current user affiliate balance into gateway balance.
 	// (POST /api/v1/me/affiliate/transfer-to-balance)
 	TransferCurrentUserAffiliateToBalance(w http.ResponseWriter, r *http.Request, params TransferCurrentUserAffiliateToBalanceParams)
+	// List current user announcements.
+	// (GET /api/v1/me/announcements)
+	ListCurrentUserAnnouncements(w http.ResponseWriter, r *http.Request, params ListCurrentUserAnnouncementsParams)
+	// Mark a current user announcement as read.
+	// (POST /api/v1/me/announcements/{id}/read)
+	MarkCurrentUserAnnouncementRead(w http.ResponseWriter, r *http.Request, id Id)
+	// List current console user sign-in identities.
+	// (GET /api/v1/me/auth-identities)
+	ListCurrentUserAuthIdentities(w http.ResponseWriter, r *http.Request)
+	// Unbind a current console user external sign-in identity.
+	// (DELETE /api/v1/me/auth-identities/{id})
+	UnbindCurrentUserAuthIdentity(w http.ResponseWriter, r *http.Request, id Id)
+	// Delete current console user avatar.
+	// (DELETE /api/v1/me/avatar)
+	DeleteCurrentUserAvatar(w http.ResponseWriter, r *http.Request)
+	// Upload current console user avatar.
+	// (PUT /api/v1/me/avatar)
+	UploadCurrentUserAvatar(w http.ResponseWriter, r *http.Request)
 	// Get current user balance.
 	// (GET /api/v1/me/balance)
 	GetCurrentUserBalance(w http.ResponseWriter, r *http.Request)
+	// List current user notification contacts.
+	// (GET /api/v1/me/notification-contacts)
+	ListCurrentUserNotificationContacts(w http.ResponseWriter, r *http.Request)
+	// Request notification contact verification.
+	// (POST /api/v1/me/notification-contacts)
+	RequestCurrentUserNotificationContactVerification(w http.ResponseWriter, r *http.Request)
+	// Verify a notification contact.
+	// (POST /api/v1/me/notification-contacts/verify)
+	ConfirmCurrentUserNotificationContactVerification(w http.ResponseWriter, r *http.Request)
+	// Delete a notification contact.
+	// (DELETE /api/v1/me/notification-contacts/{id})
+	DeleteCurrentUserNotificationContact(w http.ResponseWriter, r *http.Request, id string)
+	// Update a notification contact.
+	// (PATCH /api/v1/me/notification-contacts/{id})
+	UpdateCurrentUserNotificationContact(w http.ResponseWriter, r *http.Request, id string)
+	// Get current user notification preferences.
+	// (GET /api/v1/me/notification-preferences)
+	GetCurrentUserNotificationPreferences(w http.ResponseWriter, r *http.Request)
+	// Update current user notification preferences.
+	// (PUT /api/v1/me/notification-preferences)
+	UpdateCurrentUserNotificationPreferences(w http.ResponseWriter, r *http.Request)
+	// Change current console user password.
+	// (POST /api/v1/me/password)
+	ChangeCurrentUserPassword(w http.ResponseWriter, r *http.Request)
+	// Redeem a code for the current user.
+	// (POST /api/v1/me/redeem-codes/redeem)
+	RedeemCurrentUserRedeemCode(w http.ResponseWriter, r *http.Request)
 	// List subscriptions for the current console user.
 	// (GET /api/v1/me/subscriptions)
 	GetCurrentUserSubscriptions(w http.ResponseWriter, r *http.Request, params GetCurrentUserSubscriptionsParams)
+	// Disable current user TOTP after verifying a TOTP or recovery code.
+	// (POST /api/v1/me/totp/disable)
+	DisableCurrentUserTOTP(w http.ResponseWriter, r *http.Request)
+	// Enable current user TOTP after verifying the setup code.
+	// (POST /api/v1/me/totp/enable)
+	EnableCurrentUserTOTP(w http.ResponseWriter, r *http.Request)
+	// Start or rotate current user TOTP setup.
+	// (POST /api/v1/me/totp/setup)
+	SetupCurrentUserTOTP(w http.ResponseWriter, r *http.Request)
+	// Get current user TOTP status.
+	// (GET /api/v1/me/totp/status)
+	GetCurrentUserTOTPStatus(w http.ResponseWriter, r *http.Request)
 	// List usage logs for the current console user.
 	// (GET /api/v1/me/usage)
 	GetCurrentUserUsage(w http.ResponseWriter, r *http.Request, params GetCurrentUserUsageParams)
+	// Preview a notification unsubscribe token.
+	// (GET /api/v1/notifications/unsubscribe)
+	PreviewNotificationUnsubscribe(w http.ResponseWriter, r *http.Request, params PreviewNotificationUnsubscribeParams)
+	// Unsubscribe from an optional notification email.
+	// (POST /api/v1/notifications/unsubscribe)
+	UnsubscribeNotificationEmail(w http.ResponseWriter, r *http.Request, params UnsubscribeNotificationEmailParams)
 	// List available payment methods for the current user.
 	// (GET /api/v1/payment/methods)
 	ListPaymentMethods(w http.ResponseWriter, r *http.Request)
@@ -13205,6 +14404,9 @@ type ServerInterface interface {
 	// Cancel a pending payment order owned by the current user.
 	// (POST /api/v1/payment/orders/{id}/cancel)
 	CancelPaymentOrder(w http.ResponseWriter, r *http.Request, id Id)
+	// Get a console user avatar image.
+	// (GET /api/v1/users/{id}/avatar)
+	GetUserAvatar(w http.ResponseWriter, r *http.Request, id Id)
 	// Handle a signed payment provider webhook.
 	// (POST /api/v1/webhooks/payments/{provider})
 	HandlePaymentWebhook(w http.ResponseWriter, r *http.Request, provider string)
@@ -13285,10 +14487,10 @@ type ServerInterface interface {
 	CreateAudioTranscription(w http.ResponseWriter, r *http.Request)
 	// Create an OpenAI-compatible chat completion.
 	// (POST /v1/chat/completions)
-	CreateChatCompletion(w http.ResponseWriter, r *http.Request)
+	CreateChatCompletion(w http.ResponseWriter, r *http.Request, params CreateChatCompletionParams)
 	// Create OpenAI-compatible embeddings.
 	// (POST /v1/embeddings)
-	CreateEmbedding(w http.ResponseWriter, r *http.Request)
+	CreateEmbedding(w http.ResponseWriter, r *http.Request, params CreateEmbeddingParams)
 	// Create OpenAI-compatible image edits.
 	// (POST /v1/images/edits)
 	CreateImageEdit(w http.ResponseWriter, r *http.Request)
@@ -13300,7 +14502,7 @@ type ServerInterface interface {
 	CreateImageVariation(w http.ResponseWriter, r *http.Request)
 	// Create an Anthropic Messages-compatible message.
 	// (POST /v1/messages)
-	CreateMessage(w http.ResponseWriter, r *http.Request)
+	CreateMessage(w http.ResponseWriter, r *http.Request, params CreateMessageParams)
 	// Count input tokens with the Anthropic Messages-compatible gateway route.
 	// (POST /v1/messages/count_tokens)
 	CountAnthropicMessageTokens(w http.ResponseWriter, r *http.Request)
@@ -13318,7 +14520,7 @@ type ServerInterface interface {
 	CreateRerank(w http.ResponseWriter, r *http.Request)
 	// Create an OpenAI Responses-compatible response.
 	// (POST /v1/responses)
-	CreateResponse(w http.ResponseWriter, r *http.Request)
+	CreateResponse(w http.ResponseWriter, r *http.Request, params CreateResponseParams)
 	// Compact an OpenAI Responses-compatible conversation context.
 	// (POST /v1/responses/compact)
 	CreateResponseCompact(w http.ResponseWriter, r *http.Request)
@@ -15588,6 +16790,148 @@ func (siw *ServerInterfaceWrapper) CreateAdminModelMapping(w http.ResponseWriter
 	handler.ServeHTTP(w, r)
 }
 
+// PreviewAdminNotificationEmailTemplate operation middleware
+func (siw *ServerInterfaceWrapper) PreviewAdminNotificationEmailTemplate(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PreviewAdminNotificationEmailTemplate(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAdminNotificationEmailTemplates operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminNotificationEmailTemplates(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminNotificationEmailTemplates(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminNotificationEmailTemplate operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminNotificationEmailTemplate(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "event" -------------
+	var event NotificationEmailTemplateEventName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "event", r.PathValue("event"), &event, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "event", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminNotificationEmailTemplate(w, r, event)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateAdminNotificationEmailTemplate operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAdminNotificationEmailTemplate(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "event" -------------
+	var event NotificationEmailTemplateEventName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "event", r.PathValue("event"), &event, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "event", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAdminNotificationEmailTemplate(w, r, event)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RestoreAdminNotificationEmailTemplate operation middleware
+func (siw *ServerInterfaceWrapper) RestoreAdminNotificationEmailTemplate(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "event" -------------
+	var event NotificationEmailTemplateEventName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "event", r.PathValue("event"), &event, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "event", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RestoreAdminNotificationEmailTemplate(w, r, event)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListAdminOpsAlertEvents operation middleware
 func (siw *ServerInterfaceWrapper) ListAdminOpsAlertEvents(w http.ResponseWriter, r *http.Request) {
 
@@ -16333,8 +17677,82 @@ func (siw *ServerInterfaceWrapper) ListAdminOpsSystemLogs(w http.ResponseWriter,
 		return
 	}
 
+	// ------------- Optional query parameter "source" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "source", r.URL.Query(), &params.Source, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "source"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "source", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "q" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "q", r.URL.Query(), &params.Q, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "start" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "start", r.URL.Query(), &params.Start, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "start"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "start", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "end" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "end", r.URL.Query(), &params.End, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "end"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "end", Err: err})
+		}
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListAdminOpsSystemLogs(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CleanupAdminOpsSystemLogs operation middleware
+func (siw *ServerInterfaceWrapper) CleanupAdminOpsSystemLogs(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CleanupAdminOpsSystemLogs(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -18760,11 +20178,53 @@ func (siw *ServerInterfaceWrapper) UpdateApiKey(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
+// ConfirmEmailVerification operation middleware
+func (siw *ServerInterfaceWrapper) ConfirmEmailVerification(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ConfirmEmailVerification(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RequestEmailVerification operation middleware
+func (siw *ServerInterfaceWrapper) RequestEmailVerification(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RequestEmailVerification(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // Login operation middleware
 func (siw *ServerInterfaceWrapper) Login(w http.ResponseWriter, r *http.Request) {
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.Login(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// LoginTwoFactor operation middleware
+func (siw *ServerInterfaceWrapper) LoginTwoFactor(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.LoginTwoFactor(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -18787,6 +20247,303 @@ func (siw *ServerInterfaceWrapper) Logout(w http.ResponseWriter, r *http.Request
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.Logout(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetPendingOAuthSession operation middleware
+func (siw *ServerInterfaceWrapper) GetPendingOAuthSession(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetPendingOAuthSession(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// BindPendingOAuthCurrentUser operation middleware
+func (siw *ServerInterfaceWrapper) BindPendingOAuthCurrentUser(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BindPendingOAuthCurrentUser(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// BindPendingOAuthLogin operation middleware
+func (siw *ServerInterfaceWrapper) BindPendingOAuthLogin(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BindPendingOAuthLogin(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CompletePendingOAuthBindLoginTwoFactor operation middleware
+func (siw *ServerInterfaceWrapper) CompletePendingOAuthBindLoginTwoFactor(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CompletePendingOAuthBindLoginTwoFactor(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreatePendingOAuthAccount operation middleware
+func (siw *ServerInterfaceWrapper) CreatePendingOAuthAccount(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreatePendingOAuthAccount(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ConfirmPendingOAuthEmailCompletion operation middleware
+func (siw *ServerInterfaceWrapper) ConfirmPendingOAuthEmailCompletion(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ConfirmPendingOAuthEmailCompletion(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SendPendingOAuthEmailCompletion operation middleware
+func (siw *ServerInterfaceWrapper) SendPendingOAuthEmailCompletion(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SendPendingOAuthEmailCompletion(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CompleteOAuthAuthorization operation middleware
+func (siw *ServerInterfaceWrapper) CompleteOAuthAuthorization(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "provider" -------------
+	var provider AuthIdentityProvider
+
+	err = runtime.BindStyledParameterWithOptions("simple", "provider", r.PathValue("provider"), &provider, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "provider", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CompleteOAuthAuthorizationParams
+
+	// ------------- Optional query parameter "code" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "code", r.URL.Query(), &params.Code, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "code"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "code", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "state" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "state", r.URL.Query(), &params.State, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "state"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "state", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "error" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "error", r.URL.Query(), &params.Error, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "error"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "error", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "error_description" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "error_description", r.URL.Query(), &params.ErrorDescription, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "error_description"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "error_description", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CompleteOAuthAuthorization(w, r, provider, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// StartOAuthAuthorization operation middleware
+func (siw *ServerInterfaceWrapper) StartOAuthAuthorization(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "provider" -------------
+	var provider AuthIdentityProvider
+
+	err = runtime.BindStyledParameterWithOptions("simple", "provider", r.PathValue("provider"), &provider, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "provider", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params StartOAuthAuthorizationParams
+
+	// ------------- Optional query parameter "redirect" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "redirect", r.URL.Query(), &params.Redirect, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "redirect"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "redirect", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "intent" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "intent", r.URL.Query(), &params.Intent, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "intent"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "intent", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "provider_key" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "provider_key", r.URL.Query(), &params.ProviderKey, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "provider_key"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "provider_key", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StartOAuthAuthorization(w, r, provider, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ConfirmPasswordReset operation middleware
+func (siw *ServerInterfaceWrapper) ConfirmPasswordReset(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ConfirmPasswordReset(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RequestPasswordReset operation middleware
+func (siw *ServerInterfaceWrapper) RequestPasswordReset(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RequestPasswordReset(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// Register operation middleware
+func (siw *ServerInterfaceWrapper) Register(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.Register(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -18821,6 +20578,28 @@ func (siw *ServerInterfaceWrapper) GetCurrentUser(w http.ResponseWriter, r *http
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetCurrentUser(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateCurrentUserProfile operation middleware
+func (siw *ServerInterfaceWrapper) UpdateCurrentUserProfile(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateCurrentUserProfile(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -18955,6 +20734,190 @@ func (siw *ServerInterfaceWrapper) TransferCurrentUserAffiliateToBalance(w http.
 	handler.ServeHTTP(w, r)
 }
 
+// ListCurrentUserAnnouncements operation middleware
+func (siw *ServerInterfaceWrapper) ListCurrentUserAnnouncements(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListCurrentUserAnnouncementsParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListCurrentUserAnnouncements(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// MarkCurrentUserAnnouncementRead operation middleware
+func (siw *ServerInterfaceWrapper) MarkCurrentUserAnnouncementRead(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.MarkCurrentUserAnnouncementRead(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListCurrentUserAuthIdentities operation middleware
+func (siw *ServerInterfaceWrapper) ListCurrentUserAuthIdentities(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListCurrentUserAuthIdentities(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UnbindCurrentUserAuthIdentity operation middleware
+func (siw *ServerInterfaceWrapper) UnbindCurrentUserAuthIdentity(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UnbindCurrentUserAuthIdentity(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteCurrentUserAvatar operation middleware
+func (siw *ServerInterfaceWrapper) DeleteCurrentUserAvatar(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteCurrentUserAvatar(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UploadCurrentUserAvatar operation middleware
+func (siw *ServerInterfaceWrapper) UploadCurrentUserAvatar(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UploadCurrentUserAvatar(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetCurrentUserBalance operation middleware
 func (siw *ServerInterfaceWrapper) GetCurrentUserBalance(w http.ResponseWriter, r *http.Request) {
 
@@ -18966,6 +20929,224 @@ func (siw *ServerInterfaceWrapper) GetCurrentUserBalance(w http.ResponseWriter, 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetCurrentUserBalance(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListCurrentUserNotificationContacts operation middleware
+func (siw *ServerInterfaceWrapper) ListCurrentUserNotificationContacts(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListCurrentUserNotificationContacts(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RequestCurrentUserNotificationContactVerification operation middleware
+func (siw *ServerInterfaceWrapper) RequestCurrentUserNotificationContactVerification(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RequestCurrentUserNotificationContactVerification(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ConfirmCurrentUserNotificationContactVerification operation middleware
+func (siw *ServerInterfaceWrapper) ConfirmCurrentUserNotificationContactVerification(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ConfirmCurrentUserNotificationContactVerification(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteCurrentUserNotificationContact operation middleware
+func (siw *ServerInterfaceWrapper) DeleteCurrentUserNotificationContact(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteCurrentUserNotificationContact(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateCurrentUserNotificationContact operation middleware
+func (siw *ServerInterfaceWrapper) UpdateCurrentUserNotificationContact(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateCurrentUserNotificationContact(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetCurrentUserNotificationPreferences operation middleware
+func (siw *ServerInterfaceWrapper) GetCurrentUserNotificationPreferences(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetCurrentUserNotificationPreferences(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateCurrentUserNotificationPreferences operation middleware
+func (siw *ServerInterfaceWrapper) UpdateCurrentUserNotificationPreferences(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateCurrentUserNotificationPreferences(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ChangeCurrentUserPassword operation middleware
+func (siw *ServerInterfaceWrapper) ChangeCurrentUserPassword(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ChangeCurrentUserPassword(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RedeemCurrentUserRedeemCode operation middleware
+func (siw *ServerInterfaceWrapper) RedeemCurrentUserRedeemCode(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RedeemCurrentUserRedeemCode(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -19027,6 +21208,92 @@ func (siw *ServerInterfaceWrapper) GetCurrentUserSubscriptions(w http.ResponseWr
 	handler.ServeHTTP(w, r)
 }
 
+// DisableCurrentUserTOTP operation middleware
+func (siw *ServerInterfaceWrapper) DisableCurrentUserTOTP(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DisableCurrentUserTOTP(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// EnableCurrentUserTOTP operation middleware
+func (siw *ServerInterfaceWrapper) EnableCurrentUserTOTP(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.EnableCurrentUserTOTP(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetupCurrentUserTOTP operation middleware
+func (siw *ServerInterfaceWrapper) SetupCurrentUserTOTP(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetupCurrentUserTOTP(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetCurrentUserTOTPStatus operation middleware
+func (siw *ServerInterfaceWrapper) GetCurrentUserTOTPStatus(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetCurrentUserTOTPStatus(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetCurrentUserUsage operation middleware
 func (siw *ServerInterfaceWrapper) GetCurrentUserUsage(w http.ResponseWriter, r *http.Request) {
 
@@ -19070,6 +21337,72 @@ func (siw *ServerInterfaceWrapper) GetCurrentUserUsage(w http.ResponseWriter, r 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetCurrentUserUsage(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PreviewNotificationUnsubscribe operation middleware
+func (siw *ServerInterfaceWrapper) PreviewNotificationUnsubscribe(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PreviewNotificationUnsubscribeParams
+
+	// ------------- Required query parameter "token" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "token", r.URL.Query(), &params.Token, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "token"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "token", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PreviewNotificationUnsubscribe(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UnsubscribeNotificationEmail operation middleware
+func (siw *ServerInterfaceWrapper) UnsubscribeNotificationEmail(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UnsubscribeNotificationEmailParams
+
+	// ------------- Optional query parameter "token" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "token", r.URL.Query(), &params.Token, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "token"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "token", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UnsubscribeNotificationEmail(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -19230,6 +21563,38 @@ func (siw *ServerInterfaceWrapper) CancelPaymentOrder(w http.ResponseWriter, r *
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CancelPaymentOrder(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetUserAvatar operation middleware
+func (siw *ServerInterfaceWrapper) GetUserAvatar(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetUserAvatar(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -19928,14 +22293,41 @@ func (siw *ServerInterfaceWrapper) CreateAudioTranscription(w http.ResponseWrite
 // CreateChatCompletion operation middleware
 func (siw *ServerInterfaceWrapper) CreateChatCompletion(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+	_ = err
+
 	ctx := r.Context()
 
 	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
 
 	r = r.WithContext(ctx)
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateChatCompletionParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey GatewayIdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateChatCompletion(w, r)
+		siw.Handler.CreateChatCompletion(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -19948,14 +22340,41 @@ func (siw *ServerInterfaceWrapper) CreateChatCompletion(w http.ResponseWriter, r
 // CreateEmbedding operation middleware
 func (siw *ServerInterfaceWrapper) CreateEmbedding(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+	_ = err
+
 	ctx := r.Context()
 
 	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
 
 	r = r.WithContext(ctx)
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateEmbeddingParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey GatewayIdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateEmbedding(w, r)
+		siw.Handler.CreateEmbedding(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -20028,14 +22447,41 @@ func (siw *ServerInterfaceWrapper) CreateImageVariation(w http.ResponseWriter, r
 // CreateMessage operation middleware
 func (siw *ServerInterfaceWrapper) CreateMessage(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+	_ = err
+
 	ctx := r.Context()
 
 	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
 
 	r = r.WithContext(ctx)
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateMessageParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey GatewayIdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateMessage(w, r)
+		siw.Handler.CreateMessage(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -20227,14 +22673,41 @@ func (siw *ServerInterfaceWrapper) CreateRerank(w http.ResponseWriter, r *http.R
 // CreateResponse operation middleware
 func (siw *ServerInterfaceWrapper) CreateResponse(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+	_ = err
+
 	ctx := r.Context()
 
 	ctx = context.WithValue(ctx, GatewayBearerAuthScopes, []string{})
 
 	r = r.WithContext(ctx)
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateResponseParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey GatewayIdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateResponse(w, r)
+		siw.Handler.CreateResponse(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -20846,6 +23319,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/models/{id}", wrapper.UpdateAdminModel)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/models/{id}/aliases", wrapper.CreateAdminModelAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/models/{id}/mappings", wrapper.CreateAdminModelMapping)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/notifications/email-template-preview", wrapper.PreviewAdminNotificationEmailTemplate)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/notifications/email-templates", wrapper.ListAdminNotificationEmailTemplates)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/notifications/email-templates/{event}", wrapper.GetAdminNotificationEmailTemplate)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/admin/notifications/email-templates/{event}", wrapper.UpdateAdminNotificationEmailTemplate)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/notifications/email-templates/{event}/restore", wrapper.RestoreAdminNotificationEmailTemplate)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/alert-events", wrapper.ListAdminOpsAlertEvents)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/alerts", wrapper.ListAdminOpsAlerts)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/ops/alerts/{id}/ack", wrapper.AcknowledgeAdminOpsAlert)
@@ -20861,6 +23339,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/ops/slo", wrapper.CreateAdminOpsSLO)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/ops/slo/{id}", wrapper.UpdateAdminOpsSLO)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/system-logs", wrapper.ListAdminOpsSystemLogs)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/ops/system-logs/cleanup", wrapper.CleanupAdminOpsSystemLogs)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/throughput-trend", wrapper.GetAdminOpsThroughputTrend)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/overview", wrapper.GetAdminOverview)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/payments/orders", wrapper.ListAdminPaymentOrders)
@@ -20923,21 +23402,59 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/api-keys", wrapper.ListApiKeys)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/api-keys", wrapper.CreateApiKey)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/api-keys/{id}", wrapper.UpdateApiKey)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/auth/email-verification/confirm", wrapper.ConfirmEmailVerification)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/auth/email-verification/request", wrapper.RequestEmailVerification)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/auth/login", wrapper.Login)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/auth/login/2fa", wrapper.LoginTwoFactor)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/auth/logout", wrapper.Logout)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/auth/oauth/pending", wrapper.GetPendingOAuthSession)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/auth/oauth/pending/bind-current-user", wrapper.BindPendingOAuthCurrentUser)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/auth/oauth/pending/bind-login", wrapper.BindPendingOAuthLogin)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/auth/oauth/pending/bind-login/2fa", wrapper.CompletePendingOAuthBindLoginTwoFactor)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/auth/oauth/pending/create-account", wrapper.CreatePendingOAuthAccount)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/auth/oauth/pending/email-completion/confirm", wrapper.ConfirmPendingOAuthEmailCompletion)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/auth/oauth/pending/send-verify-code", wrapper.SendPendingOAuthEmailCompletion)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/auth/oauth/{provider}/callback", wrapper.CompleteOAuthAuthorization)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/auth/oauth/{provider}/start", wrapper.StartOAuthAuthorization)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/auth/password-reset/confirm", wrapper.ConfirmPasswordReset)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/auth/password-reset/request", wrapper.RequestPasswordReset)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/auth/register", wrapper.Register)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/health", wrapper.GetHealth)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me", wrapper.GetCurrentUser)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/me", wrapper.UpdateCurrentUserProfile)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/affiliate", wrapper.GetCurrentUserAffiliate)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/affiliate/ledger", wrapper.ListCurrentUserAffiliateLedger)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/me/affiliate/transfer-to-balance", wrapper.TransferCurrentUserAffiliateToBalance)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/announcements", wrapper.ListCurrentUserAnnouncements)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/me/announcements/{id}/read", wrapper.MarkCurrentUserAnnouncementRead)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/auth-identities", wrapper.ListCurrentUserAuthIdentities)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/me/auth-identities/{id}", wrapper.UnbindCurrentUserAuthIdentity)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/me/avatar", wrapper.DeleteCurrentUserAvatar)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/me/avatar", wrapper.UploadCurrentUserAvatar)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/balance", wrapper.GetCurrentUserBalance)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/notification-contacts", wrapper.ListCurrentUserNotificationContacts)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/me/notification-contacts", wrapper.RequestCurrentUserNotificationContactVerification)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/me/notification-contacts/verify", wrapper.ConfirmCurrentUserNotificationContactVerification)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/me/notification-contacts/{id}", wrapper.DeleteCurrentUserNotificationContact)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/me/notification-contacts/{id}", wrapper.UpdateCurrentUserNotificationContact)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/notification-preferences", wrapper.GetCurrentUserNotificationPreferences)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/me/notification-preferences", wrapper.UpdateCurrentUserNotificationPreferences)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/me/password", wrapper.ChangeCurrentUserPassword)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/me/redeem-codes/redeem", wrapper.RedeemCurrentUserRedeemCode)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/subscriptions", wrapper.GetCurrentUserSubscriptions)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/me/totp/disable", wrapper.DisableCurrentUserTOTP)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/me/totp/enable", wrapper.EnableCurrentUserTOTP)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/me/totp/setup", wrapper.SetupCurrentUserTOTP)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/totp/status", wrapper.GetCurrentUserTOTPStatus)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/usage", wrapper.GetCurrentUserUsage)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/notifications/unsubscribe", wrapper.PreviewNotificationUnsubscribe)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/notifications/unsubscribe", wrapper.UnsubscribeNotificationEmail)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/payment/methods", wrapper.ListPaymentMethods)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/payment/orders", wrapper.ListPaymentOrders)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/payment/orders", wrapper.CreatePaymentOrder)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/payment/orders/{id}", wrapper.GetPaymentOrder)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/payment/orders/{id}/cancel", wrapper.CancelPaymentOrder)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/users/{id}/avatar", wrapper.GetUserAvatar)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/webhooks/payments/{provider}", wrapper.HandlePaymentWebhook)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/grok/v1/audio/speech", wrapper.CreateGrokAudioSpeechAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/grok/v1/audio/transcriptions", wrapper.CreateGrokAudioTranscriptionAlias)

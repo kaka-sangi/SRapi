@@ -130,6 +130,263 @@ bcrypt cost >= 12
 - 登录失败必须有速率限制。
 - 管理员密码重置必须写 audit log。
 
+Public registration:
+
+- `POST /api/v1/auth/register` 只在
+  `admin_settings.security.registration_enabled=true` 时开放。
+- `admin_settings.security.registration_email_suffix_allowlist` 非空时，注册邮箱域名
+  必须精确匹配归一化后缀；空列表允许所有合法邮箱域名。
+- 注册接口只创建普通用户，使用系统默认余额和 RPM 限制，并在成功后创建
+  HttpOnly console session cookie 与一次性 CSRF token。
+- 重复邮箱、邮箱后缀策略拒绝、非法邮箱、弱密码和非法姓名必须返回同一类
+  通用注册错误，避免通过注册结果枚举现有账号或配置的注册域名。
+- 注册成功写入安全 audit，但 audit 不得包含明文密码、session cookie 或 CSRF
+  token。
+- 注册成功后，邮箱所有权通过独立 email verification flow 证明；注册接口本身
+  不把邮件验证 token 或投递细节返回给调用方。
+
+Email verification:
+
+- `POST /api/v1/auth/email-verification/request` 是公开接口；对于格式合法的邮箱，
+  必须返回统一 accepted 响应，不能泄露邮箱是否存在、用户是否激活、邮箱是否已验证
+  或邮件是否实际投递。
+- 存储层只能保存 verification token 的 keyed hash、过期时间和使用时间，不能保存明文 token。
+- outbox 投递事件只能保存加密 token、邮箱 hash、用户 id、模板和过期时间；不得保存
+  明文邮箱、明文 token、密码、session cookie 或 CSRF token。
+- `POST /api/v1/auth/email-verification/confirm` 必须单次消费未过期 token 并设置
+  `users.email_verified_at`；重复使用、过期或未知 token 必须失败。
+- 邮箱验证只证明邮箱所有权，不创建 console session，不刷新 session cookie，
+  也不授予额外权限。
+
+Password reset:
+
+- `POST /api/v1/auth/password-reset/request` 是公开接口；对于格式合法的邮箱，
+  必须返回统一 accepted 响应，不能泄露邮箱是否存在、用户是否激活或邮件是否实际投递。
+- 存储层只能保存 reset token 的 keyed hash、过期时间和使用时间，不能保存明文 token。
+- outbox 投递事件只能保存加密 token、邮箱 hash、用户 id、模板和过期时间；不得保存
+  明文邮箱、明文 token、密码、session cookie 或 CSRF token。
+- `POST /api/v1/auth/password-reset/confirm` 必须单次消费未过期 token，重置 password hash
+  后撤销该用户活跃 console session；重复使用、过期或未知 token 必须失败。
+
+Transactional auth email delivery:
+
+- Outbox worker 只能在 `EMAIL_PUBLIC_BASE_URL`、`EMAIL_SMTP_HOST` 和
+  `EMAIL_SMTP_FROM` 配齐后投递 password reset / email verification 邮件；缺少配置时事件
+  保持 retry/fail 状态，不得静默标记成功。
+- worker 只能在内存中解密 token payload，持久 outbox 仍只能保存加密 token 和邮箱 hash。
+- action URL 必须从 `EMAIL_PUBLIC_BASE_URL` 和事件里的相对 path 构造，不能使用请求
+  `Host` header；base URL 必须是绝对 `http` / `https` URL 且不带 query/fragment。
+- 发送前必须重新读取当前用户，并校验用户仍为 active 且当前邮箱 hash 与事件 hash 一致；
+  邮箱已变更或用户停用时跳过发送。
+- 邮件 header 字段必须过滤 CR/LF，防止 SMTP header injection。
+- `EMAIL_SMTP_PASSWORD` 只允许通过部署环境注入；Admin Settings、OpenAPI/SDK、audit
+  snapshot 和 settings JSON 不得接收或保存 SMTP password。
+
+Optional notification unsubscribe:
+
+- 只有可选通知事件可以退订，例如 `balance.low`、
+  `subscription.expiry_reminder` 和 `account.quota_alert`；password reset、
+  email verification、notification contact verification 等 transactional mail
+  不得被偏好状态压制。
+- 退订 token 必须签名且有过期时间；payload 只能包含 event、邮箱 hash 和 expiry，
+  不得包含明文邮箱、用户 id、session cookie、CSRF token 或 SMTP secret。
+- 一键退订邮件头只允许 `List-Unsubscribe` 与
+  `List-Unsubscribe-Post: List-Unsubscribe=One-Click`，且所有 header value 必须过滤
+  CR/LF。
+- `GET /api/v1/notifications/unsubscribe` 只能预览 token；实际状态变更使用
+  `POST /api/v1/notifications/unsubscribe`。写入的偏好状态只保存 event、邮箱 hash、
+  status、source 和更新时间。
+- `GET /api/v1/me/notification-preferences` 返回当前用户主邮箱对应的可选通知订阅状态；
+  `PUT /api/v1/me/notification-preferences` 必须使用当前 console session 和 CSRF。
+- 当前用户偏好更新只能修改 allowlisted optional events，不能修改 transactional auth mail。
+  存储层仍只保存 event、邮箱 hash、status、source 和更新时间，不得保存明文邮箱。
+- 额外通知邮箱使用独立的验证型 contact flow，不得通过偏好 API 直接写入未验证邮箱。
+  `POST /api/v1/me/notification-contacts` 和 contact update/delete 必须使用当前
+  console session 与 CSRF。Contact verification outbox payload 只能保存 contact id、
+  recipient email hash、加密后的 contact email、加密后的 verification token、过期时间和
+  action path；不得保存明文 contact email、session cookie、CSRF token、SMTP secret、
+  API key、provider credential 或 prompt。只有 verified 且未 disabled 的 contact 会参与
+  optional notification delivery，并且仍按该 contact email 的 event-scoped unsubscribe
+  状态和 one-click header 处理。
+- Low-balance notification triggers are emitted as `BalanceLowTriggered`
+  outbox events only after a successful usage charge crosses the configured
+  threshold downward. Payloads store recipient user id, recipient email hash,
+  balance numbers, threshold, ledger reference, usage log ids, and optional
+  recharge URL; they must not store plaintext email, unsubscribe token, session
+  cookie, CSRF token, SMTP secret, API key, provider credential, or prompt.
+- Notification dispatch must re-read the current user, verify the recipient
+  email hash, honor `balance.low` unsubscribe state, add one-click unsubscribe
+  headers when a public base URL is configured, and leave SMTP failures
+  retryable in outbox instead of blocking or rolling back balance charging.
+- Subscription expiry reminder triggers are emitted as
+  `SubscriptionExpiryReminderTriggered` outbox events when active subscriptions
+  are 7, 3, or 1 days from expiry. Payloads store subscription id, user id, plan
+  id/name, reminder key, expiry timestamp, triggered timestamp, and console
+  path only; they must not store plaintext email, unsubscribe token, session
+  cookie, CSRF token, SMTP secret, API key, provider credential, or prompt.
+- Subscription reminder dispatch must re-read the current user, skip inactive
+  users, honor `subscription.expiry_reminder` unsubscribe state, add one-click
+  unsubscribe headers when a public base URL is configured, and leave SMTP
+  failures retryable in outbox instead of changing subscription state.
+- Account quota notification triggers are emitted as
+  `AccountQuotaAlertTriggered` outbox events only when persisted quota
+  snapshots cross the configured remaining-ratio threshold downward. Payloads
+  store account id/name, provider id, runtime class, quota type, quota numbers,
+  threshold, snapshot timestamps, and console path only; they must not store
+  plaintext recipient emails, unsubscribe tokens, session cookies, CSRF tokens,
+  SMTP secrets, API keys, provider credentials, or prompts.
+- Account quota alert dispatch must select active owner/admin users at send
+  time, honor each user's `account.quota_alert` unsubscribe state, add
+  one-click unsubscribe headers when a public base URL is configured, and leave
+  SMTP/template failures retryable in outbox instead of changing account quota
+  state.
+
+Notification email templates:
+
+- Admin template reads require an admin session. Template update、restore 和 preview 使用
+  CSRF；preview 不保存状态。
+- 模板只能使用事件允许的 placeholder；未知事件、未知 placeholder、畸形 `{{...}}`
+  标记、空模板和超长模板必须拒绝。
+- 预览和投递渲染必须对变量做 HTML escaping；subject 必须过滤 CR/LF。
+- URL placeholder 只允许 `http`、`https`、`mailto` 或安全相对路径；不安全值
+  必须渲染为空字符串，不能进入 HTML href。
+- Template API、audit 和 settings snapshot 不得包含 SMTP password、plaintext recipient
+  email、unsubscribe token、provider credential、API key 或 session/CSRF token。
+
+Current-user profile updates:
+
+- `PATCH /api/v1/me` 必须使用当前 console session，并要求 CSRF header。
+- 请求体必须是字段白名单；当前只允许更新 `name`，不得通过该接口修改 email、
+  roles、status、balance、RPM limit、password、avatar 或其他管理员字段。
+- Profile update audit 只能记录非敏感用户元数据，不得记录 session cookie、
+  CSRF token 或 credential-like 字段。
+
+Current-user avatar storage:
+
+- `PUT /api/v1/me/avatar` 和 `DELETE /api/v1/me/avatar` 必须使用当前 console
+  session，并要求 CSRF header。
+- 上传只接受 `multipart/form-data` 字段 `avatar`；服务端必须执行大小限制、
+  图片解码、格式白名单和尺寸限制，不能信任浏览器提供的文件名或
+  `Content-Type`。
+- v1 只接受 PNG/JPEG 输入，并统一重编码为 PNG 后存储和服务；SVG、远程 URL
+  和任意 data URL 不进入存储，避免脚本、SSRF 和外链追踪风险。
+- 头像服务响应和 audit 只能记录 content type、byte size、sha256、尺寸和
+ 更新时间；不得记录 session cookie、CSRF token、原始文件名、API key、
+  provider credential 或 prompt。
+- 头像读取必须走受控 API，返回 `image/png`、`ETag` 和
+  `X-Content-Type-Options: nosniff`。
+
+Current-user auth identity directory:
+
+- `GET /api/v1/me/auth-identities` 必须使用当前 console session。
+- `DELETE /api/v1/me/auth-identities/{id}` 必须使用当前 console session 和
+  `csrfHeader`，并且只能删除当前用户拥有的外部身份。不得按 provider 批量解绑，
+  以免同类 provider 多实例时误删其它登录入口。
+- 响应只能包含本地 email 派生身份和已绑定外部身份的安全摘要，不得返回原始
+  upstream subject、authorization code、access token、refresh token、session cookie、
+  CSRF token、provider secret 或完整 credential payload。
+- 外部身份持久化只能保存 provider、provider instance key、
+  `provider_subject_hash`、display-safe `subject_hint`、验证时间和非敏感资料摘要。
+- 本地 email 身份由 `users.email` 派生，不是可删除的外部身份；当删除会导致用户
+  没有任何登录方式时，服务层必须拒绝解绑。
+- 后续 OAuth/OIDC callback 写入该目录时必须使用 state/nonce/PKCE 或等价机制防止
+  CSRF、authorization-code injection 和 mix-up；绑定现有 console user 的写操作仍需
+  当前会话和 CSRF 保护。
+
+Pending OAuth/OIDC decision sessions:
+
+- `pending_oauth_sessions` 只能保存短期决策状态；不得保存 authorization code、
+  access token、refresh token、raw upstream subject、state、nonce、PKCE verifier、
+  provider secret 或完整 claim payload。
+- `session_token_hash` 必须使用服务端密钥 HMAC 派生；明文 pending token 只返回给
+  本次浏览器流程，并且消费后通过 `consumed_at` 标记单次使用。
+- `provider_subject_hash` 必须是上游 subject 的 hash；API/日志/审计只能使用
+  `subject_hint` 这类 display-safe 摘要。
+- `redirect_to` 必须限制为站内路径，跨站或协议相对路径归一为 `/`。
+- 后续公开 start/callback 路由必须使用 state、nonce、PKCE 或等价机制绑定浏览器
+  流程，并继续避免把 provider claim payload 或 token material 暴露给 OpenAPI。
+
+OAuth/OIDC authorization start:
+
+- `GET /api/v1/auth/oauth/{provider}/start` 只创建浏览器授权流程，不创建或绑定
+  用户身份；`bind_current_user` 仍留给后续 CSRF-protected 写路径。
+- 授权请求必须使用 authorization code + PKCE S256，并使用 `state` 绑定浏览器
+  流程；OpenID scopes 必须附带 `nonce`，供 callback 校验 ID Token replay。
+- 浏览器流程状态保存在短期 encrypted HttpOnly `srapi_oauth_flow` cookie 中，
+  cookie path 限定为 `/api/v1/auth/oauth`，内容包括 provider、provider key、
+  intent、local redirect、state、PKCE verifier、nonce 和 expiry。
+- flow cookie 不得包含 provider client secret、authorization code、access token、
+  refresh token、raw upstream subject、完整 claim payload、session cookie、CSRF token
+  或 API key material。
+- `redirect` 只能保留站内路径；空值、跨站 URL 或 protocol-relative URL 必须归一为 `/`。
+- Admin Settings 只暴露非密钥 provider authorization config，例如 client id、
+  authorize URL、token URL、userinfo URL、redirect URI、token auth method 和
+  scopes；token exchange 所需 client secret 不得进入 Admin Settings API、
+  OpenAPI/SDK 响应或 audit snapshot。
+- `GET /api/v1/auth/oauth/{provider}/callback` 必须校验 flow cookie、provider、
+  provider key、state、client id 和 redirect URI；state 不匹配或 provider 返回
+  error 时必须清理 flow cookie。
+- callback v1 只支持 `token_auth_method=none` 的 public-client PKCE 交换：
+  token request 使用 `grant_type=authorization_code`、authorization `code`、
+  原始 `redirect_uri`、`client_id` 和 flow cookie 中的 `code_verifier`。
+- callback 只能用 access token 通过 Bearer 请求 UserInfo，并只保留安全 profile
+  摘要。raw upstream subject 必须先用 server secret 做 keyed hash 后才能写入
+  pending OAuth session；access token、refresh token、authorization code、raw
+  subject 和完整 claims 不得落库、入 cookie、写日志或出现在 redirect URL。
+- callback 成功后必须设置短期 HttpOnly `srapi_oauth_pending` cookie，并把 cookie
+  path 限定为 `/api/v1/auth/oauth/pending`。pending token 不得放进 query string。
+- `GET /api/v1/auth/oauth/pending` 只能只读查看 pending decision，不得 consume
+  pending token 或执行创建账号、绑定账号、签发登录 session 等状态变更。响应只能包含
+  provider、provider key、display-safe subject hint、安全 profile 摘要、站内
+  redirect、expiry 和 next-step 结论；不得返回 pending token、raw upstream
+  subject、provider-subject hash、authorization code、provider access/refresh
+  token、session cookie、CSRF token 或完整 claims。
+- `POST /api/v1/auth/oauth/pending/bind-current-user` 必须使用当前 console
+  session、CSRF header 和 HttpOnly pending cookie。它只能把 pending 外部身份绑定到
+  当前登录用户；如果相同 provider/provider_key/provider_subject_hash 已归属其它用户，
+  服务层和持久层都必须拒绝，不能静默转移身份归属。成功后必须消费 pending session、
+  清理 pending cookie，并且响应仍只能返回 current-user auth identity 目录的安全摘要。
+- 当前用户绑定 pending OAuth 身份不创建账号、不校验密码、不签发新的登录 session，
+  这些动作必须通过后续独立的 create-account / bind-existing-login 流程处理。
+- `POST /api/v1/auth/oauth/pending/send-verify-code` 只能用于 provider 没有返回可用邮箱的
+  pending OAuth 登录流程。它必须要求 HttpOnly pending cookie，统一返回 accepted，不得泄露
+  目标邮箱是否已存在。发送内容必须通过 outbox 投递高熵一次性 email-completion 链接，outbox
+  payload 只能保存加密邮箱、加密 token、邮箱 hash 和过期时间，不得保存明文邮箱、pending token
+  或 provider subject。
+- `POST /api/v1/auth/oauth/pending/email-completion/confirm` 必须要求同一个 HttpOnly pending
+  cookie 和邮件 token。token 解密后必须匹配当前 pending session id、未过期且邮箱语法安全；
+  成功只把该邮箱写回 pending session 并标记 provider-independent email ownership verified，
+  不得消费 pending session、绑定身份、创建账号或签发 console session。确认后由新的
+  pending preview 决定进入 create-account 或 bind-login。
+- `POST /api/v1/auth/oauth/pending/create-account` 只能用于未登录浏览器把 verified
+  provider email 创建为新的 console 账号。它必须同时要求 HttpOnly pending cookie 和
+  `GET /pending` 返回的短期 create-account action token；该 token 必须绑定 pending
+  token hash，不能与其它 pending OAuth session 互换。成功前必须校验注册开关、邮箱后缀
+  策略、pending email 一致性和身份归属冲突；成功后才能绑定身份、消费 pending session、
+  清理 pending cookie 并签发新的 console session。绑定或 pending 消费失败且尚未签发
+  session 时，必须回滚新建用户，避免半完成 OAuth 流程占用邮箱。
+- `POST /api/v1/auth/oauth/pending/bind-login` 只能用于未登录浏览器把 pending 外部身份
+  绑定到一个已有 console 账号。它必须要求 HttpOnly pending cookie 和本地
+  email/password；密码错误、禁用用户、pending 目标用户不一致、身份已归属其它用户都必须
+  拒绝。未启用 2FA 的账号成功后才能绑定身份、消费 pending session、清理 pending
+  cookie 并签发新的 console session。
+- 启用 2FA 的账号在 `/bind-login` 密码通过后只能返回 pending-OAuth 专用的
+  two-factor challenge，不得绑定身份、消费 pending session 或签发 session cookie。
+  `POST /api/v1/auth/oauth/pending/bind-login/2fa` 必须重新要求同一个 HttpOnly pending
+  cookie；challenge 必须绑定 pending token hash，不能与普通登录 2FA challenge 或其它
+  pending OAuth session 互换。
+- pending OAuth email-completion / create-account / bind-login 响应和审计仍不得返回/记录 pending token、raw upstream
+  subject、provider-subject hash、authorization code、provider access/refresh token、
+  password、TOTP secret、TOTP code、session cookie、CSRF token 或完整 claims。
+
+Current-user password changes:
+
+- `POST /api/v1/me/password` 必须使用当前 console session，并要求 CSRF header。
+- 服务端必须校验当前密码后才替换 password hash；请求不得携带或指定目标 user id。
+- 改密成功后必须撤销该用户活跃 console session，并清除当前 session cookie。
+- Audit 只能记录非敏感用户元数据，不得记录当前密码、新密码、password hash、
+  session cookie 或 CSRF token。
+
 ## 4. API Key 安全
 
 API Key 用于 Gateway API。
@@ -359,6 +616,14 @@ QualityEval 是默认关闭的特殊在线评估路径：
 - `quality_eval_samples.sample_payload_ciphertext` 只保存截断后的脱敏 prompt/output 摘要，必须用 `SRAPI_MASTER_KEY` 派生密钥 AES-GCM 加密；`quality_evaluations` 只保存 score、rubric、judge model 和不可逆 hash。
 - LLM judge 调用会把脱敏样本发送给配置的 OpenAI-compatible Chat Completions endpoint；生产启用前必须按数据处理要求确认该外部评估端点。
 - Usage、audit、scheduler decision、scheduler snapshot 仍不得保存原始 prompt/messages/tool arguments。
+
+Console TOTP / 2FA:
+
+- TOTP secret 只保存在 `user_totp_secrets.secret_ciphertext`，使用 `TOTP_ENCRYPTION_KEY` 派生 AES-GCM key 加密。
+- 登录密码校验通过但用户启用 TOTP 时，只返回短期 `challenge_id`，不设置 console session cookie。
+- `/api/v1/auth/login/2fa` 校验 challenge 与 TOTP/恢复码后才创建 session 并触发 last-login 更新。
+- 恢复码只返回一次，数据库只保存 HMAC-SHA256 hash；成功使用后必须移除该 hash。
+- setup/enable/disable 都是当前用户写接口，必须要求 HttpOnly session cookie 和 CSRF header。
 
 ## 8. Gateway 安全
 

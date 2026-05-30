@@ -19,6 +19,9 @@ func (PaymentOrder) Fields() []ent.Field {
 		field.Int("user_id"),
 		field.String("order_no").NotEmpty(),
 		field.Int("provider_instance_id"),
+		field.String("original_amount").Default("0.00000000"),
+		field.String("discount_amount").Default("0.00000000"),
+		field.Int("promo_code_id").Optional().Nillable(),
 		field.String("amount").Default("0.00000000"),
 		field.String("currency").Default("USD"),
 		field.String("status").Default("pending"),
@@ -40,6 +43,7 @@ func (PaymentOrder) Indexes() []ent.Index {
 		index.Fields("status", "created_at"),
 		index.Fields("provider_transaction_id"),
 		index.Fields("provider_instance_id", "created_at"),
+		index.Fields("promo_code_id"),
 		index.Fields("expires_at"),
 	}
 }

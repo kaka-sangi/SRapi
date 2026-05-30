@@ -13,10 +13,13 @@ import (
 	"time"
 
 	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
+	notificationscontract "github.com/srapi/srapi/apps/api/internal/modules/notifications/contract"
 	"github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 )
 
 const defaultCurrency = "USD"
+
+var defaultSubscriptionReminderDays = []int{7, 3, 1}
 
 type Clock interface {
 	Now() time.Time
@@ -180,6 +183,37 @@ func (s *Service) ExpireActiveUserSubscriptions(ctx context.Context, now time.Ti
 	return result, nil
 }
 
+// EnqueueSubscriptionExpiryReminders scans active subscriptions and emits optional reminder events for supported pre-expiry windows.
+func (s *Service) EnqueueSubscriptionExpiryReminders(ctx context.Context, now time.Time) (contract.ReminderSubscriptionsResult, error) {
+	if s.deps.Events == nil {
+		return contract.ReminderSubscriptionsResult{}, nil
+	}
+	if now.IsZero() {
+		now = s.clock.Now()
+	}
+	now = now.UTC()
+	windowEnd := now.AddDate(0, 0, maxReminderDays(defaultSubscriptionReminderDays))
+	subscriptions, err := s.store.ListActiveUserSubscriptionsExpiringBetween(ctx, now, windowEnd)
+	if err != nil {
+		return contract.ReminderSubscriptionsResult{}, err
+	}
+	result := contract.ReminderSubscriptionsResult{Selected: len(subscriptions)}
+	for _, subscription := range subscriptions {
+		days, ok := subscriptionReminderDay(now, subscription.ExpiresAt)
+		if !ok {
+			continue
+		}
+		enqueued, err := s.enqueueSubscriptionExpiryReminder(ctx, subscription, days, now)
+		if err != nil {
+			return result, err
+		}
+		if enqueued {
+			result.Enqueued++
+		}
+	}
+	return result, nil
+}
+
 func (s *Service) CreatePricingRule(ctx context.Context, req contract.CreatePricingRuleRequest) (contract.PricingRule, error) {
 	rule, err := pricingRuleFromRequest(req)
 	if err != nil {
@@ -327,6 +361,66 @@ func (s *Service) enqueueSubscriptionExpired(ctx context.Context, subscription c
 			"expired_at":      expiredAt.Format(time.RFC3339Nano),
 		},
 	})
+}
+
+func (s *Service) enqueueSubscriptionExpiryReminder(ctx context.Context, subscription contract.UserSubscription, daysRemaining int, now time.Time) (bool, error) {
+	if s.deps.Events == nil {
+		return false, nil
+	}
+	planName := "Subscription"
+	plan, err := s.store.FindPlanByID(ctx, subscription.PlanID)
+	if err == nil && strings.TrimSpace(plan.Name) != "" {
+		planName = strings.TrimSpace(plan.Name)
+	}
+	_, err = s.deps.Events.Enqueue(ctx, eventscontract.EnqueueRequest{
+		EventType:      notificationscontract.EventSubscriptionExpiryReminder,
+		ProducerModule: "subscriptions",
+		AggregateType:  "user_subscription",
+		AggregateID:    strconv.Itoa(subscription.ID),
+		IdempotencyKey: "subscription_expiry_reminder:" + strconv.Itoa(subscription.ID) + ":" + strconv.Itoa(daysRemaining) + "d",
+		Payload: map[string]any{
+			"subscription_id":   subscription.ID,
+			"recipient_user_id": subscription.UserID,
+			"plan_id":           subscription.PlanID,
+			"subscription_name": planName,
+			"days_remaining":    daysRemaining,
+			"reminder_key":      strconv.Itoa(daysRemaining) + "d",
+			"expires_at":        subscription.ExpiresAt.Format(time.RFC3339Nano),
+			"triggered_at":      now.Format(time.RFC3339Nano),
+			"subscription_url":  "/subscriptions",
+		},
+	})
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func subscriptionReminderDay(now time.Time, expiresAt time.Time) (int, bool) {
+	if expiresAt.Before(now) {
+		return 0, false
+	}
+	remaining := expiresAt.Sub(now)
+	days := int(remaining / (24 * time.Hour))
+	if remaining%(24*time.Hour) != 0 {
+		days++
+	}
+	for _, allowed := range defaultSubscriptionReminderDays {
+		if days == allowed {
+			return days, true
+		}
+	}
+	return 0, false
+}
+
+func maxReminderDays(days []int) int {
+	max := 0
+	for _, day := range days {
+		if day > max {
+			max = day
+		}
+	}
+	return max
 }
 
 func mergeEntitlements(subscriptions []contract.UserSubscription) map[string]any {

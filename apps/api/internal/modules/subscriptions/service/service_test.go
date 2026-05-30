@@ -6,6 +6,7 @@ import (
 
 	eventsservice "github.com/srapi/srapi/apps/api/internal/modules/events/service"
 	eventsmemory "github.com/srapi/srapi/apps/api/internal/modules/events/store/memory"
+	notificationscontract "github.com/srapi/srapi/apps/api/internal/modules/notifications/contract"
 	"github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	"github.com/srapi/srapi/apps/api/internal/modules/subscriptions/service"
 	subscriptionmemory "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/store/memory"
@@ -351,6 +352,89 @@ func TestExpireActiveUserSubscriptionsMarksExpiredAndEnqueuesEvent(t *testing.T)
 	}
 	if len(outbox) != 1 {
 		t.Fatalf("expected one expiration event after second run, got %+v", outbox)
+	}
+}
+
+func TestEnqueueSubscriptionExpiryRemindersUsesReminderWindowsAndIdempotency(t *testing.T) {
+	store := subscriptionmemory.New()
+	eventsStore := eventsmemory.New()
+	now := time.Date(2026, 5, 22, 12, 0, 0, 0, time.UTC)
+	eventsSvc, err := eventsservice.New(eventsStore, fixedClock{now: now})
+	if err != nil {
+		t.Fatalf("new events service: %v", err)
+	}
+	svc, err := service.NewWithDependencies(store, service.Dependencies{Events: eventsSvc}, fixedClock{now: now})
+	if err != nil {
+		t.Fatalf("new subscription service: %v", err)
+	}
+	plan, err := svc.CreatePlan(t.Context(), contract.CreatePlanRequest{
+		Name:         "Pro",
+		Price:        "9.99",
+		Currency:     "USD",
+		ValidityDays: 30,
+	})
+	if err != nil {
+		t.Fatalf("create plan: %v", err)
+	}
+	createSubscription := func(userID int, expiresAt time.Time) {
+		t.Helper()
+		startsAt := now.Add(-time.Hour)
+		if _, err := svc.CreateUserSubscription(t.Context(), contract.CreateSubscriptionRequest{
+			UserID:    userID,
+			PlanID:    plan.ID,
+			StartsAt:  &startsAt,
+			ExpiresAt: &expiresAt,
+		}); err != nil {
+			t.Fatalf("create subscription for user %d: %v", userID, err)
+		}
+	}
+	createSubscription(1, now.Add(7*24*time.Hour))
+	createSubscription(2, now.Add(3*24*time.Hour))
+	createSubscription(3, now.Add(1*24*time.Hour))
+	createSubscription(4, now.Add(2*24*time.Hour))
+	createSubscription(5, now.Add(8*24*time.Hour))
+
+	result, err := svc.EnqueueSubscriptionExpiryReminders(t.Context(), now)
+	if err != nil {
+		t.Fatalf("enqueue subscription expiry reminders: %v", err)
+	}
+	if result.Selected != 4 || result.Enqueued != 3 {
+		t.Fatalf("unexpected reminder result: %+v", result)
+	}
+	outbox, err := eventsSvc.ListOutbox(t.Context())
+	if err != nil {
+		t.Fatalf("list outbox: %v", err)
+	}
+	if len(outbox) != 3 {
+		t.Fatalf("expected three reminder events, got %+v", outbox)
+	}
+	seenKeys := map[string]bool{}
+	for _, event := range outbox {
+		if event.EventType != notificationscontract.EventSubscriptionExpiryReminder || event.ProducerModule != "subscriptions" || event.AggregateType != "user_subscription" {
+			t.Fatalf("unexpected reminder event metadata: %+v", event)
+		}
+		if event.Payload["recipient_user_id"] == nil || event.Payload["subscription_name"] != "Pro" || event.Payload["recipient_email_hash"] != nil {
+			t.Fatalf("expected safe reminder payload with plan name and no email hash, got %+v", event.Payload)
+		}
+		key, ok := event.Payload["reminder_key"].(string)
+		if !ok {
+			t.Fatalf("expected reminder key string, got %+v", event.Payload)
+		}
+		seenKeys[key] = true
+	}
+	if !seenKeys["7d"] || !seenKeys["3d"] || !seenKeys["1d"] || seenKeys["2d"] {
+		t.Fatalf("unexpected reminder keys: %+v", seenKeys)
+	}
+
+	if _, err := svc.EnqueueSubscriptionExpiryReminders(t.Context(), now); err != nil {
+		t.Fatalf("enqueue reminders again: %v", err)
+	}
+	outbox, err = eventsSvc.ListOutbox(t.Context())
+	if err != nil {
+		t.Fatalf("list outbox again: %v", err)
+	}
+	if len(outbox) != 3 {
+		t.Fatalf("expected idempotent reminder outbox after second run, got %+v", outbox)
 	}
 }
 

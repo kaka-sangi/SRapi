@@ -16,6 +16,8 @@ type Tx struct {
 	APIKey *APIKeyClient
 	// APIKeyGroup is the client for interacting with the APIKeyGroup builders.
 	APIKeyGroup *APIKeyGroupClient
+	// AccountAvailabilityRollup is the client for interacting with the AccountAvailabilityRollup builders.
+	AccountAvailabilityRollup *AccountAvailabilityRollupClient
 	// AccountGroup is the client for interacting with the AccountGroup builders.
 	AccountGroup *AccountGroupClient
 	// AccountGroupMember is the client for interacting with the AccountGroupMember builders.
@@ -40,8 +42,12 @@ type Tx struct {
 	DomainEventsInbox *DomainEventsInboxClient
 	// DomainEventsOutbox is the client for interacting with the DomainEventsOutbox builders.
 	DomainEventsOutbox *DomainEventsOutboxClient
+	// EmailVerificationToken is the client for interacting with the EmailVerificationToken builders.
+	EmailVerificationToken *EmailVerificationTokenClient
 	// Entitlement is the client for interacting with the Entitlement builders.
 	Entitlement *EntitlementClient
+	// ErrorPassthroughRule is the client for interacting with the ErrorPassthroughRule builders.
+	ErrorPassthroughRule *ErrorPassthroughRuleClient
 	// IdempotencyRecord is the client for interacting with the IdempotencyRecord builders.
 	IdempotencyRecord *IdempotencyRecordClient
 	// InviteCode is the client for interacting with the InviteCode builders.
@@ -58,12 +64,18 @@ type Tx struct {
 	ObsAlertEvent *ObsAlertEventClient
 	// ObsSLODefinition is the client for interacting with the ObsSLODefinition builders.
 	ObsSLODefinition *ObsSLODefinitionClient
+	// OpsSystemLog is the client for interacting with the OpsSystemLog builders.
+	OpsSystemLog *OpsSystemLogClient
+	// PasswordResetToken is the client for interacting with the PasswordResetToken builders.
+	PasswordResetToken *PasswordResetTokenClient
 	// PaymentAuditLog is the client for interacting with the PaymentAuditLog builders.
 	PaymentAuditLog *PaymentAuditLogClient
 	// PaymentOrder is the client for interacting with the PaymentOrder builders.
 	PaymentOrder *PaymentOrderClient
 	// PaymentProviderInstance is the client for interacting with the PaymentProviderInstance builders.
 	PaymentProviderInstance *PaymentProviderInstanceClient
+	// PendingOAuthSession is the client for interacting with the PendingOAuthSession builders.
+	PendingOAuthSession *PendingOAuthSessionClient
 	// PricingRule is the client for interacting with the PricingRule builders.
 	PricingRule *PricingRuleClient
 	// Provider is the client for interacting with the Provider builders.
@@ -90,14 +102,30 @@ type Tx struct {
 	Setting *SettingClient
 	// SubscriptionPlan is the client for interacting with the SubscriptionPlan builders.
 	SubscriptionPlan *SubscriptionPlanClient
+	// TLSFingerprintProfile is the client for interacting with the TLSFingerprintProfile builders.
+	TLSFingerprintProfile *TLSFingerprintProfileClient
 	// UsageLog is the client for interacting with the UsageLog builders.
 	UsageLog *UsageLogClient
 	// User is the client for interacting with the User builders.
 	User *UserClient
+	// UserAnnouncementRead is the client for interacting with the UserAnnouncementRead builders.
+	UserAnnouncementRead *UserAnnouncementReadClient
+	// UserAttributeDefinition is the client for interacting with the UserAttributeDefinition builders.
+	UserAttributeDefinition *UserAttributeDefinitionClient
+	// UserAttributeValue is the client for interacting with the UserAttributeValue builders.
+	UserAttributeValue *UserAttributeValueClient
+	// UserAuthIdentity is the client for interacting with the UserAuthIdentity builders.
+	UserAuthIdentity *UserAuthIdentityClient
+	// UserPromoCodeApplication is the client for interacting with the UserPromoCodeApplication builders.
+	UserPromoCodeApplication *UserPromoCodeApplicationClient
+	// UserRedeemCodeRedemption is the client for interacting with the UserRedeemCodeRedemption builders.
+	UserRedeemCodeRedemption *UserRedeemCodeRedemptionClient
 	// UserRole is the client for interacting with the UserRole builders.
 	UserRole *UserRoleClient
 	// UserSubscription is the client for interacting with the UserSubscription builders.
 	UserSubscription *UserSubscriptionClient
+	// UserTOTPSecret is the client for interacting with the UserTOTPSecret builders.
+	UserTOTPSecret *UserTOTPSecretClient
 	// Workspace is the client for interacting with the Workspace builders.
 	Workspace *WorkspaceClient
 
@@ -233,6 +261,7 @@ func (tx *Tx) Client() *Client {
 func (tx *Tx) init() {
 	tx.APIKey = NewAPIKeyClient(tx.config)
 	tx.APIKeyGroup = NewAPIKeyGroupClient(tx.config)
+	tx.AccountAvailabilityRollup = NewAccountAvailabilityRollupClient(tx.config)
 	tx.AccountGroup = NewAccountGroupClient(tx.config)
 	tx.AccountGroupMember = NewAccountGroupMemberClient(tx.config)
 	tx.AccountHealthSnapshot = NewAccountHealthSnapshotClient(tx.config)
@@ -245,7 +274,9 @@ func (tx *Tx) init() {
 	tx.CapabilityDefinition = NewCapabilityDefinitionClient(tx.config)
 	tx.DomainEventsInbox = NewDomainEventsInboxClient(tx.config)
 	tx.DomainEventsOutbox = NewDomainEventsOutboxClient(tx.config)
+	tx.EmailVerificationToken = NewEmailVerificationTokenClient(tx.config)
 	tx.Entitlement = NewEntitlementClient(tx.config)
+	tx.ErrorPassthroughRule = NewErrorPassthroughRuleClient(tx.config)
 	tx.IdempotencyRecord = NewIdempotencyRecordClient(tx.config)
 	tx.InviteCode = NewInviteCodeClient(tx.config)
 	tx.InviteRelationship = NewInviteRelationshipClient(tx.config)
@@ -254,9 +285,12 @@ func (tx *Tx) init() {
 	tx.ModelRegistry = NewModelRegistryClient(tx.config)
 	tx.ObsAlertEvent = NewObsAlertEventClient(tx.config)
 	tx.ObsSLODefinition = NewObsSLODefinitionClient(tx.config)
+	tx.OpsSystemLog = NewOpsSystemLogClient(tx.config)
+	tx.PasswordResetToken = NewPasswordResetTokenClient(tx.config)
 	tx.PaymentAuditLog = NewPaymentAuditLogClient(tx.config)
 	tx.PaymentOrder = NewPaymentOrderClient(tx.config)
 	tx.PaymentProviderInstance = NewPaymentProviderInstanceClient(tx.config)
+	tx.PendingOAuthSession = NewPendingOAuthSessionClient(tx.config)
 	tx.PricingRule = NewPricingRuleClient(tx.config)
 	tx.Provider = NewProviderClient(tx.config)
 	tx.ProviderAccount = NewProviderAccountClient(tx.config)
@@ -270,10 +304,18 @@ func (tx *Tx) init() {
 	tx.SchedulerStrategy = NewSchedulerStrategyClient(tx.config)
 	tx.Setting = NewSettingClient(tx.config)
 	tx.SubscriptionPlan = NewSubscriptionPlanClient(tx.config)
+	tx.TLSFingerprintProfile = NewTLSFingerprintProfileClient(tx.config)
 	tx.UsageLog = NewUsageLogClient(tx.config)
 	tx.User = NewUserClient(tx.config)
+	tx.UserAnnouncementRead = NewUserAnnouncementReadClient(tx.config)
+	tx.UserAttributeDefinition = NewUserAttributeDefinitionClient(tx.config)
+	tx.UserAttributeValue = NewUserAttributeValueClient(tx.config)
+	tx.UserAuthIdentity = NewUserAuthIdentityClient(tx.config)
+	tx.UserPromoCodeApplication = NewUserPromoCodeApplicationClient(tx.config)
+	tx.UserRedeemCodeRedemption = NewUserRedeemCodeRedemptionClient(tx.config)
 	tx.UserRole = NewUserRoleClient(tx.config)
 	tx.UserSubscription = NewUserSubscriptionClient(tx.config)
+	tx.UserTOTPSecret = NewUserTOTPSecretClient(tx.config)
 	tx.Workspace = NewWorkspaceClient(tx.config)
 }
 

@@ -7,21 +7,19 @@ import (
 	"strings"
 	"time"
 
+	admincontrolservice "github.com/srapi/srapi/apps/api/internal/modules/admin_control/service"
 	affiliatecontract "github.com/srapi/srapi/apps/api/internal/modules/affiliate/contract"
 	affiliateservice "github.com/srapi/srapi/apps/api/internal/modules/affiliate/service"
 	auditservice "github.com/srapi/srapi/apps/api/internal/modules/audit/service"
 	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	eventsservice "github.com/srapi/srapi/apps/api/internal/modules/events/service"
+	notificationscontract "github.com/srapi/srapi/apps/api/internal/modules/notifications/contract"
+	notificationsservice "github.com/srapi/srapi/apps/api/internal/modules/notifications/service"
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	subscriptionservice "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/service"
 )
 
 func defaultEventHandler(events *eventsservice.Service, cfg Config) (eventsservice.OutboxHandler, error) {
-	if cfg.AffiliateStore == nil && cfg.SubscriptionStore == nil {
-		return eventsservice.OutboxHandlerFunc(func(context.Context, eventscontract.OutboxEvent) error {
-			return nil
-		}), nil
-	}
 	var audit *auditservice.Service
 	if cfg.AuditStore != nil {
 		var err error
@@ -50,11 +48,76 @@ func defaultEventHandler(events *eventsservice.Service, cfg Config) (eventsservi
 			return nil, err
 		}
 	}
-	return domainEventHandler{affiliate: affiliate, subscriptions: subscriptions}, nil
+	var notifications *notificationsservice.Service
+	if cfg.UserStore != nil {
+		var err error
+		emailConfig := notificationEmailConfig(cfg)
+		sender := cfg.EmailSender
+		if sender == nil {
+			sender = notificationsservice.NewSMTPSender(emailConfig)
+		}
+		var preferences *notificationsservice.PreferenceService
+		var contacts *notificationsservice.ContactService
+		if cfg.AdminControlStore != nil {
+			preferences, err = notificationsservice.NewPreferenceService(cfg.AdminControlStore, cfg.MasterKey, emailConfig.PublicBaseURL)
+			if err != nil {
+				return nil, err
+			}
+			contacts, err = notificationsservice.NewContactService(cfg.AdminControlStore, cfg.MasterKey, emailConfig.PublicBaseURL, nil)
+			if err != nil {
+				return nil, err
+			}
+		}
+		notifications, err = notificationsservice.NewWithPreferencesAndContacts(cfg.UserStore, sender, emailConfig, cfg.MasterKey, cfg.EmailTemplates, preferences, contacts)
+		if err != nil {
+			return nil, err
+		}
+		templateProvider := cfg.EmailTemplateProvider
+		if templateProvider == nil && cfg.AdminControlStore != nil {
+			templateProvider, err = admincontrolservice.New(cfg.AdminControlStore, nil)
+			if err != nil {
+				return nil, err
+			}
+		}
+		if templateProvider != nil {
+			notifications.SetTemplateProvider(templateProvider)
+		}
+	}
+	return domainEventHandler{affiliate: affiliate, subscriptions: subscriptions, notifications: notifications}, nil
+}
+
+func notificationEmailConfig(cfg Config) notificationscontract.EmailConfig {
+	emailConfig := cfg.EmailConfig
+	if emailConfig.PublicBaseURL == "" {
+		emailConfig.PublicBaseURL = cfg.EmailPublicBaseURL
+	}
+	if emailConfig.SMTPHost == "" {
+		emailConfig.SMTPHost = cfg.EmailSMTPHost
+	}
+	if emailConfig.SMTPPort == 0 {
+		emailConfig.SMTPPort = cfg.EmailSMTPPort
+	}
+	if emailConfig.SMTPUsername == "" {
+		emailConfig.SMTPUsername = cfg.EmailSMTPUsername
+	}
+	if emailConfig.SMTPPassword == "" {
+		emailConfig.SMTPPassword = cfg.EmailSMTPPassword
+	}
+	if emailConfig.SMTPFrom == "" {
+		emailConfig.SMTPFrom = cfg.EmailSMTPFrom
+	}
+	if emailConfig.SMTPFromName == "" {
+		emailConfig.SMTPFromName = cfg.EmailSMTPFromName
+	}
+	if !emailConfig.SMTPUseTLS {
+		emailConfig.SMTPUseTLS = cfg.EmailSMTPUseTLS
+	}
+	return emailConfig
 }
 
 type domainEventHandler struct {
 	affiliate     *affiliateservice.Service
+	notifications *notificationsservice.Service
 	subscriptions *subscriptionservice.Service
 }
 
@@ -75,6 +138,11 @@ func (h domainEventHandler) HandleOutboxEvent(ctx context.Context, event eventsc
 		}
 		_, err := h.affiliate.CompensateRefund(ctx, affiliateCompensationFromEvent(event))
 		return err
+	case notificationscontract.EventAuthPasswordResetRequested, notificationscontract.EventAuthEmailVerificationRequested, notificationscontract.EventPendingOAuthEmailCompletionRequested, notificationscontract.EventNotificationContactVerificationRequested, notificationscontract.EventBalanceLowTriggered, notificationscontract.EventSubscriptionExpiryReminder, notificationscontract.EventAccountQuotaAlertTriggered:
+		if h.notifications == nil {
+			return notificationsservice.ErrNotConfigured
+		}
+		return h.notifications.HandleOutboxEvent(ctx, event)
 	default:
 		return nil
 	}

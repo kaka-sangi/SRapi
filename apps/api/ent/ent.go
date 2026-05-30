@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
+	"github.com/srapi/srapi/apps/api/ent/accountavailabilityrollup"
 	"github.com/srapi/srapi/apps/api/ent/accountgroup"
 	"github.com/srapi/srapi/apps/api/ent/accountgroupmember"
 	"github.com/srapi/srapi/apps/api/ent/accounthealthsnapshot"
@@ -26,7 +27,9 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/capabilitydefinition"
 	"github.com/srapi/srapi/apps/api/ent/domaineventsinbox"
 	"github.com/srapi/srapi/apps/api/ent/domaineventsoutbox"
+	"github.com/srapi/srapi/apps/api/ent/emailverificationtoken"
 	"github.com/srapi/srapi/apps/api/ent/entitlement"
+	"github.com/srapi/srapi/apps/api/ent/errorpassthroughrule"
 	"github.com/srapi/srapi/apps/api/ent/idempotencyrecord"
 	"github.com/srapi/srapi/apps/api/ent/invitecode"
 	"github.com/srapi/srapi/apps/api/ent/inviterelationship"
@@ -35,9 +38,12 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/modelregistry"
 	"github.com/srapi/srapi/apps/api/ent/obsalertevent"
 	"github.com/srapi/srapi/apps/api/ent/obsslodefinition"
+	"github.com/srapi/srapi/apps/api/ent/opssystemlog"
+	"github.com/srapi/srapi/apps/api/ent/passwordresettoken"
 	"github.com/srapi/srapi/apps/api/ent/paymentauditlog"
 	"github.com/srapi/srapi/apps/api/ent/paymentorder"
 	"github.com/srapi/srapi/apps/api/ent/paymentproviderinstance"
+	"github.com/srapi/srapi/apps/api/ent/pendingoauthsession"
 	"github.com/srapi/srapi/apps/api/ent/pricingrule"
 	"github.com/srapi/srapi/apps/api/ent/provider"
 	"github.com/srapi/srapi/apps/api/ent/provideraccount"
@@ -51,10 +57,18 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/schedulerstrategy"
 	"github.com/srapi/srapi/apps/api/ent/setting"
 	"github.com/srapi/srapi/apps/api/ent/subscriptionplan"
+	"github.com/srapi/srapi/apps/api/ent/tlsfingerprintprofile"
 	"github.com/srapi/srapi/apps/api/ent/usagelog"
 	"github.com/srapi/srapi/apps/api/ent/user"
+	"github.com/srapi/srapi/apps/api/ent/userannouncementread"
+	"github.com/srapi/srapi/apps/api/ent/userattributedefinition"
+	"github.com/srapi/srapi/apps/api/ent/userattributevalue"
+	"github.com/srapi/srapi/apps/api/ent/userauthidentity"
+	"github.com/srapi/srapi/apps/api/ent/userpromocodeapplication"
+	"github.com/srapi/srapi/apps/api/ent/userredeemcoderedemption"
 	"github.com/srapi/srapi/apps/api/ent/userrole"
 	"github.com/srapi/srapi/apps/api/ent/usersubscription"
+	"github.com/srapi/srapi/apps/api/ent/usertotpsecret"
 	"github.com/srapi/srapi/apps/api/ent/workspace"
 )
 
@@ -116,50 +130,64 @@ var (
 func checkColumn(t, c string) error {
 	initCheck.Do(func() {
 		columnCheck = sql.NewColumnCheck(map[string]func(string) bool{
-			apikey.Table:                   apikey.ValidColumn,
-			apikeygroup.Table:              apikeygroup.ValidColumn,
-			accountgroup.Table:             accountgroup.ValidColumn,
-			accountgroupmember.Table:       accountgroupmember.ValidColumn,
-			accounthealthsnapshot.Table:    accounthealthsnapshot.ValidColumn,
-			accountquotasnapshot.Table:     accountquotasnapshot.ValidColumn,
-			affiliateledger.Table:          affiliateledger.ValidColumn,
-			affiliaterule.Table:            affiliaterule.ValidColumn,
-			auditlog.Table:                 auditlog.ValidColumn,
-			authsession.Table:              authsession.ValidColumn,
-			billingledger.Table:            billingledger.ValidColumn,
-			capabilitydefinition.Table:     capabilitydefinition.ValidColumn,
-			domaineventsinbox.Table:        domaineventsinbox.ValidColumn,
-			domaineventsoutbox.Table:       domaineventsoutbox.ValidColumn,
-			entitlement.Table:              entitlement.ValidColumn,
-			idempotencyrecord.Table:        idempotencyrecord.ValidColumn,
-			invitecode.Table:               invitecode.ValidColumn,
-			inviterelationship.Table:       inviterelationship.ValidColumn,
-			modelalias.Table:               modelalias.ValidColumn,
-			modelprovidermapping.Table:     modelprovidermapping.ValidColumn,
-			modelregistry.Table:            modelregistry.ValidColumn,
-			obsalertevent.Table:            obsalertevent.ValidColumn,
-			obsslodefinition.Table:         obsslodefinition.ValidColumn,
-			paymentauditlog.Table:          paymentauditlog.ValidColumn,
-			paymentorder.Table:             paymentorder.ValidColumn,
-			paymentproviderinstance.Table:  paymentproviderinstance.ValidColumn,
-			pricingrule.Table:              pricingrule.ValidColumn,
-			provider.Table:                 provider.ValidColumn,
-			provideraccount.Table:          provideraccount.ValidColumn,
-			proxy.Table:                    proxy.ValidColumn,
-			qualityevalsample.Table:        qualityevalsample.ValidColumn,
-			qualityevaluation.Table:        qualityevaluation.ValidColumn,
-			role.Table:                     role.ValidColumn,
-			schedulerdecision.Table:        schedulerdecision.ValidColumn,
-			schedulerfeedback.Table:        schedulerfeedback.ValidColumn,
-			schedulerrequestsnapshot.Table: schedulerrequestsnapshot.ValidColumn,
-			schedulerstrategy.Table:        schedulerstrategy.ValidColumn,
-			setting.Table:                  setting.ValidColumn,
-			subscriptionplan.Table:         subscriptionplan.ValidColumn,
-			usagelog.Table:                 usagelog.ValidColumn,
-			user.Table:                     user.ValidColumn,
-			userrole.Table:                 userrole.ValidColumn,
-			usersubscription.Table:         usersubscription.ValidColumn,
-			workspace.Table:                workspace.ValidColumn,
+			apikey.Table:                    apikey.ValidColumn,
+			apikeygroup.Table:               apikeygroup.ValidColumn,
+			accountavailabilityrollup.Table: accountavailabilityrollup.ValidColumn,
+			accountgroup.Table:              accountgroup.ValidColumn,
+			accountgroupmember.Table:        accountgroupmember.ValidColumn,
+			accounthealthsnapshot.Table:     accounthealthsnapshot.ValidColumn,
+			accountquotasnapshot.Table:      accountquotasnapshot.ValidColumn,
+			affiliateledger.Table:           affiliateledger.ValidColumn,
+			affiliaterule.Table:             affiliaterule.ValidColumn,
+			auditlog.Table:                  auditlog.ValidColumn,
+			authsession.Table:               authsession.ValidColumn,
+			billingledger.Table:             billingledger.ValidColumn,
+			capabilitydefinition.Table:      capabilitydefinition.ValidColumn,
+			domaineventsinbox.Table:         domaineventsinbox.ValidColumn,
+			domaineventsoutbox.Table:        domaineventsoutbox.ValidColumn,
+			emailverificationtoken.Table:    emailverificationtoken.ValidColumn,
+			entitlement.Table:               entitlement.ValidColumn,
+			errorpassthroughrule.Table:      errorpassthroughrule.ValidColumn,
+			idempotencyrecord.Table:         idempotencyrecord.ValidColumn,
+			invitecode.Table:                invitecode.ValidColumn,
+			inviterelationship.Table:        inviterelationship.ValidColumn,
+			modelalias.Table:                modelalias.ValidColumn,
+			modelprovidermapping.Table:      modelprovidermapping.ValidColumn,
+			modelregistry.Table:             modelregistry.ValidColumn,
+			obsalertevent.Table:             obsalertevent.ValidColumn,
+			obsslodefinition.Table:          obsslodefinition.ValidColumn,
+			opssystemlog.Table:              opssystemlog.ValidColumn,
+			passwordresettoken.Table:        passwordresettoken.ValidColumn,
+			paymentauditlog.Table:           paymentauditlog.ValidColumn,
+			paymentorder.Table:              paymentorder.ValidColumn,
+			paymentproviderinstance.Table:   paymentproviderinstance.ValidColumn,
+			pendingoauthsession.Table:       pendingoauthsession.ValidColumn,
+			pricingrule.Table:               pricingrule.ValidColumn,
+			provider.Table:                  provider.ValidColumn,
+			provideraccount.Table:           provideraccount.ValidColumn,
+			proxy.Table:                     proxy.ValidColumn,
+			qualityevalsample.Table:         qualityevalsample.ValidColumn,
+			qualityevaluation.Table:         qualityevaluation.ValidColumn,
+			role.Table:                      role.ValidColumn,
+			schedulerdecision.Table:         schedulerdecision.ValidColumn,
+			schedulerfeedback.Table:         schedulerfeedback.ValidColumn,
+			schedulerrequestsnapshot.Table:  schedulerrequestsnapshot.ValidColumn,
+			schedulerstrategy.Table:         schedulerstrategy.ValidColumn,
+			setting.Table:                   setting.ValidColumn,
+			subscriptionplan.Table:          subscriptionplan.ValidColumn,
+			tlsfingerprintprofile.Table:     tlsfingerprintprofile.ValidColumn,
+			usagelog.Table:                  usagelog.ValidColumn,
+			user.Table:                      user.ValidColumn,
+			userannouncementread.Table:      userannouncementread.ValidColumn,
+			userattributedefinition.Table:   userattributedefinition.ValidColumn,
+			userattributevalue.Table:        userattributevalue.ValidColumn,
+			userauthidentity.Table:          userauthidentity.ValidColumn,
+			userpromocodeapplication.Table:  userpromocodeapplication.ValidColumn,
+			userredeemcoderedemption.Table:  userredeemcoderedemption.ValidColumn,
+			userrole.Table:                  userrole.ValidColumn,
+			usersubscription.Table:          usersubscription.ValidColumn,
+			usertotpsecret.Table:            usertotpsecret.ValidColumn,
+			workspace.Table:                 workspace.ValidColumn,
 		})
 	})
 	return columnCheck(t, c)

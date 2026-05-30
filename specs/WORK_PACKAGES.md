@@ -2643,3 +2643,2123 @@ Required gates:
 - `make secret-scan`
 - `make check`
 - `git diff --check`
+
+## WP-760: AdminOps Durable System Logs v1
+
+Objective: finish the AdminOps system-log follow-up from the control-plane
+phase by moving sanitized system logs out of settings-backed placeholder state
+and into a durable, queryable, bounded-cleanup store.
+
+Read first:
+
+- `docs/ADMIN_CONTROL_PLANE_SPEC.md`
+- `docs/OPENAPI_CONTRACT.md`
+- `docs/DATA_MODEL.md`
+- `docs/SECURITY_MODEL.md`
+- `docs/MODULE_INTERFACE_CONTRACTS.md`
+- `packages/openapi/openapi.yaml`
+
+Owns:
+
+- `ops_system_logs` Ent schema and incremental PostgreSQL migration.
+- Admin-control service/store contract for recording, listing, and cleaning
+  sanitized system-log events.
+- In-memory and Ent-backed store implementations.
+- `GET /api/v1/admin/ops/system-logs` filters for level, source, text query,
+  and time range.
+- `POST /api/v1/admin/ops/system-logs/cleanup` with CSRF, dry-run,
+  `max_delete` caps, and safe audit summaries.
+- Generated OpenAPI Go types and TypeScript SDK.
+- Focused service, HTTP, migration, and contract drift tests.
+
+Definition of Done:
+
+- System logs persist to `ops_system_logs` with indexed level/source/time and
+  request/trace correlation fields.
+- List responses include request and trace IDs and never include credentials,
+  prompts, cookies, raw API keys, or provider-native frames.
+- Cleanup rejects unbounded requests, supports dry-run, caps deletion volume,
+  and records audit evidence without raw search strings or log bodies.
+- Admin Control Plane and data-model docs no longer describe durable system
+  logs as pending.
+- `specs/STATUS.md` records completion and gates.
+
+Required gates:
+
+- `make ent-generate-check`
+- `make migration-check`
+- `make openapi-lint`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/modules/admin_control/... ./internal/persistence/entstore/admincontrol ./internal/platform/db ./internal/httpserver -run 'TestSystemLogsRecordListAndCleanup|TestAdminOpsSystemLogsListAndCleanup|TestConsoleWriteRoutesRequireCSRF|Test(PostgresVersionedUpMigrationsMatchEntSchema|PostgresDownMigrationsCoverCreatedTables|PostgresIncrementalMigrationsArePairedAndContiguous|EntSchemaAppliesToEmptyDatabase)' -count=1`
+- `make architecture-check`
+- `make code-quality-check`
+- `git diff --check`
+
+## WP-830: Current-User Profile Update
+
+Objective: close the current-user profile management gap found during the
+docs/sub2api comparison by adding a SRapi-native self-service profile update
+flow. This intentionally uses SRapi's current User model and does not copy
+sub2api's username/avatar/notify-email shape.
+
+Read first:
+
+- `docs/SECURITY_MODEL.md`
+- `docs/OPENAPI_CONTRACT.md`
+- `packages/openapi/openapi.yaml`
+- `apps/api/internal/modules/users/contract/contract.go`
+- `apps/api/internal/httpserver/runtime_user_handlers.go`
+
+Owns:
+
+- Current-user API:
+  - `PATCH /api/v1/me`
+- Users service profile update method that only edits user-owned profile
+  fields.
+- Explicit OpenAPI request schema allowlisting `name`.
+- Audit-safe profile-update evidence.
+- Generated OpenAPI Go types and TypeScript SDK.
+- Focused users service and HTTP tests for CSRF and mass-assignment protection.
+
+Definition of Done:
+
+- The route requires a valid console session and CSRF header.
+- The request body can update `name` only.
+- Attempts to include `email`, `roles`, `status`, balance, RPM limit, password,
+  or other admin-managed fields are rejected and do not change those fields.
+- Empty names are rejected; accepted names are trimmed and capped at 120
+  characters.
+- Email change, avatar URL, notification email, and auth identity binding remain
+  explicit follow-ups because they need verification, dedicated schema, or OAuth
+  provider flows.
+- `specs/STATUS.md` records completion and gates.
+
+Required gates:
+
+- `make openapi-lint`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/modules/users/... ./internal/httpserver -run 'Test(UpdateProfile|UpdateCurrentUserProfile|Register)' -count=1`
+- `make architecture-check`
+- `make code-quality-check`
+- `git diff --check`
+
+## WP-820: Current-User Password Change
+
+Objective: close the next auth account-lifecycle gap found during the
+docs/sub2api comparison by adding a SRapi-native current-user password change
+flow. This does not copy sub2api's handler shape; it uses SRapi's cookie
+session, CSRF, users service, hashed session store, and audit boundaries.
+
+Read first:
+
+- `docs/SECURITY_MODEL.md`
+- `docs/OPENAPI_CONTRACT.md`
+- `packages/openapi/openapi.yaml`
+- `apps/api/internal/modules/users/contract/contract.go`
+- `apps/api/internal/modules/auth/contract/contract.go`
+- `apps/api/internal/httpserver/runtime_user_handlers.go`
+
+Owns:
+
+- Current-user API:
+  - `POST /api/v1/me/password`
+- Users service password replacement only after verifying the current password.
+- Auth session store support for revoking active sessions by user id.
+- Cookie clearing after successful password change.
+- Audit-safe password-change evidence without passwords, password hashes,
+  session cookies, or CSRF tokens.
+- Generated OpenAPI Go types and TypeScript SDK.
+- Focused users/auth/HTTP/persistence tests.
+
+Definition of Done:
+
+- The route requires a valid console session and CSRF header.
+- The request body includes only `current_password` and `new_password`; callers
+  cannot specify a target user id.
+- Wrong current password returns `401 UNAUTHORIZED` and leaves the session
+  active.
+- Successful password change updates the password hash, rejects the old
+  password on subsequent login, accepts the new password, revokes active console
+  sessions for the user, and clears the current cookie.
+- Persistent auth sessions are revoked by `user_id` using existing indexed
+  `auth_sessions` fields; no new migration is required.
+- `specs/STATUS.md` records completion and gates.
+
+Required gates:
+
+- `make openapi-lint`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/modules/users/... ./internal/modules/auth/... ./internal/persistence/entstore/auth ./internal/httpserver -run 'Test(ChangeCurrentUserPassword|ChangePassword|LogoutUser|DeleteByUserID|Register|LoginCreatesSession|AuthenticatePassword)' -count=1`
+- `make architecture-check`
+- `make code-quality-check`
+- `git diff --check`
+
+## WP-780: Current-User Announcement Inbox v1
+
+Objective: close the announcement follow-up found during sub2api comparison by
+adding SRapi-native current-user announcement delivery and read receipts without
+copying sub2api frontend or storage internals.
+
+Read first:
+
+- `docs/ADMIN_CONTROL_PLANE_SPEC.md`
+- `docs/OPENAPI_CONTRACT.md`
+- `docs/DATA_MODEL.md`
+- `packages/openapi/openapi.yaml`
+
+Owns:
+
+- `user_announcement_reads` Ent schema and incremental PostgreSQL migration.
+- Admin Control service/store methods for visible current-user announcements
+  and idempotent read receipts.
+- Current-user APIs:
+  - `GET /api/v1/me/announcements`
+  - `POST /api/v1/me/announcements/{id}/read`
+- Generated OpenAPI Go types and TypeScript SDK.
+- Focused service, HTTP, migration, and contract drift tests.
+
+Definition of Done:
+
+- Users only see published announcements matching their role audience and time
+  window.
+- Read receipts are unique on `(user_id, announcement_id)` and do not store
+  announcement bodies, emails, role snapshots, or delivery payloads.
+- Updating an announcement after `read_at` makes it unread again for that user.
+- Mark-read requires CSRF and returns 404 for invisible announcements.
+- Data-model and control-plane docs no longer describe announcement read
+  receipts as pending.
+- `specs/STATUS.md` records completion and gates.
+
+Required gates:
+
+- `make ent-generate-check`
+- `make migration-check`
+- `make openapi-lint`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/modules/admin_control/... ./internal/persistence/entstore/admincontrol ./internal/platform/db ./internal/httpserver -run 'Test(UserAnnouncementsFilterVisibleAndTrackReadState|CurrentUserAnnouncementsListAndReadState|ConsoleWriteRoutesRequireCSRF|PostgresVersionedUpMigrationsMatchEntSchema|PostgresDownMigrationsCoverCreatedTables|PostgresIncrementalMigrationsArePairedAndContiguous|EntSchemaAppliesToEmptyDatabase)' -count=1`
+- `make architecture-check`
+- `make code-quality-check`
+- `git diff --check`
+
+## WP-790: Current-User Redeem Code Redemption v1
+
+Objective: close the redeem-code follow-up found during sub2api comparison by
+adding SRapi-native user-side redemption without copying sub2api storage or
+route internals.
+
+Read first:
+
+- `docs/ADMIN_CONTROL_PLANE_SPEC.md`
+- `docs/OPENAPI_CONTRACT.md`
+- `docs/DATA_MODEL.md`
+- `docs/PAYMENT_SPEC.md`
+- `packages/openapi/openapi.yaml`
+
+Owns:
+
+- `user_redeem_code_redemptions` Ent schema and incremental PostgreSQL
+  migration.
+- Admin Control service/store methods for idempotent current-user redemption.
+- Current-user API:
+  - `POST /api/v1/me/redeem-codes/redeem`
+- Balance redemption fulfillment into `users.balance` and
+  `billing_ledger(type=redeem_code_credit)`.
+- Subscription redemption fulfillment into `user_subscriptions` and materialized
+  `entitlements`.
+- Generated OpenAPI Go types and TypeScript SDK.
+- Focused service, HTTP, migration, and contract drift tests.
+
+Definition of Done:
+
+- Redemption requires a console session and CSRF token.
+- Codes are normalized case-insensitively, honor disabled/expired/max
+  redemption limits, and update `redeemed_count`.
+- Repeating the same code by the same user returns the original receipt without
+  duplicating balance credits, subscriptions, or ledger rows.
+- Balance credits update user balance and billing ledger atomically in the
+  persistent store.
+- Subscription codes create a subscription and entitlement cache rows from the
+  referenced active plan.
+- Redemption receipts are unique on `(user_id, redeem_code_id)` and do not store
+  the plaintext code.
+- Data-model, OpenAPI, and control-plane docs no longer describe user redeem
+  flow as pending.
+- `specs/STATUS.md` records completion and gates.
+
+Required gates:
+
+- `make ent-generate-check`
+- `make migration-check`
+- `make openapi-lint`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/modules/admin_control/... ./internal/persistence/entstore/admincontrol ./internal/platform/db ./internal/httpserver -run 'Test(RedeemCodeCreditsBalanceOnce|CurrentUserRedeemCodeCreditsBalanceOnce|PostgresVersionedUpMigrationsMatchEntSchema|PostgresDownMigrationsCoverCreatedTables|PostgresIncrementalMigrationsArePairedAndContiguous|EntSchemaAppliesToEmptyDatabase)' -count=1`
+- `make architecture-check`
+- `make code-quality-check`
+- `git diff --check`
+
+## WP-800: Current-User Promo Code Application v1
+
+Objective: close the promo-code follow-up found during the docs/sub2api
+comparison by adding SRapi-native user-side promo application to payment order
+creation without copying sub2api order or coupon internals.
+
+Read first:
+
+- `docs/ADMIN_CONTROL_PLANE_SPEC.md`
+- `docs/OPENAPI_CONTRACT.md`
+- `docs/DATA_MODEL.md`
+- `docs/PAYMENT_SPEC.md`
+- `packages/openapi/openapi.yaml`
+- `apps/api/internal/modules/payments/contract/contract.go`
+- `apps/api/internal/modules/admin_control/contract/contract.go`
+
+Owns:
+
+- A durable promo-code application receipt table if order creation needs
+  per-user/order idempotency beyond the settings-backed promo-code collection.
+- Current-user payment-order request contract support for an optional promo
+  code.
+- Admin Control or Payment service logic that validates active promo codes,
+  expiry, max uses, currency, and amount/percent discount rules before payment
+  provider checkout creation.
+- Atomic persistent updates for promo `used_count`, payment order discounted
+  amount, and receipt evidence.
+- Generated OpenAPI Go types and TypeScript SDK.
+- Focused service, HTTP, migration, and contract drift tests.
+
+Definition of Done:
+
+- Promo application requires a current-user payment order flow and the existing
+  payment-order CSRF/idempotency expectations are preserved.
+- Amount discounts cannot make an order negative and must match order currency.
+- Percent discounts use decimal ratios and produce deterministic decimal-string
+  order amounts.
+- Disabled, expired, exhausted, wrong-currency, and malformed promo codes return
+  explicit client errors before provider checkout creation.
+- Reusing the same promo for the same committed order cannot increment
+  `used_count` twice.
+- Data-model, OpenAPI, payment, and control-plane docs no longer describe promo
+  application as pending.
+- `specs/STATUS.md` records completion and gates.
+
+Required gates:
+
+- `make ent-generate-check` when a receipt table is added
+- `make migration-check` when a receipt table is added
+- `make openapi-lint`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/modules/admin_control/... ./internal/modules/payments/... ./internal/persistence/entstore/admincontrol ./internal/platform/db ./internal/httpserver -run 'Test(PromoCode|PaymentOrder|PostgresVersionedUpMigrationsMatchEntSchema|PostgresDownMigrationsCoverCreatedTables|PostgresIncrementalMigrationsArePairedAndContiguous|EntSchemaAppliesToEmptyDatabase)' -count=1`
+- `make architecture-check`
+- `make code-quality-check`
+- `git diff --check`
+
+## WP-770: Console TOTP 2FA v1
+
+Objective: finish the Auth follow-up by adding SRapi-native current-user TOTP
+enrollment and login second-factor verification without copying sub2api route
+or storage internals.
+
+Read first:
+
+- `docs/SECURITY_MODEL.md`
+- `docs/CONFIGURATION_SPEC.md`
+- `docs/OPENAPI_CONTRACT.md`
+- `docs/DATA_MODEL.md`
+- `packages/openapi/openapi.yaml`
+
+Owns:
+
+- `user_totp_secrets` Ent schema and incremental PostgreSQL migration.
+- TOTP service/store contract with memory and Ent-backed persistence.
+- AES-GCM encrypted TOTP secret storage using `TOTP_ENCRYPTION_KEY`.
+- Recovery code generation, HMAC-only storage, and one-time consumption.
+- Login 2FA challenge flow: `POST /api/v1/auth/login` returns `202` when
+  TOTP is enabled, and `POST /api/v1/auth/login/2fa` creates the session after
+  TOTP or recovery-code verification.
+- Current-user TOTP APIs: status, setup, enable, disable.
+- Generated OpenAPI Go types and TypeScript SDK.
+- Focused service, HTTP, migration, and contract drift tests.
+
+Definition of Done:
+
+- Password-only login remains backward-compatible for users without TOTP.
+- TOTP-enabled users do not receive a session cookie until second factor
+  verification succeeds.
+- Setup/enable/disable routes require CSRF and never log or persist plaintext
+  recovery codes beyond the enable response.
+- `TOTP_ENCRYPTION_KEY` is documented and release validation rejects weak
+  values.
+- `specs/STATUS.md` records completion and gates.
+
+Required gates:
+
+- `make ent-generate-check`
+- `make migration-check`
+- `make openapi-lint`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/modules/auth/... ./internal/modules/totp/... ./internal/persistence/entstore/totp ./internal/httpserver -run 'Test(LoginCreatesSessionAndTouchesUser|LoginRequiresSecondFactorWhenEnabled|CompleteSecondFactorLoginCreatesSession|SetupEnableAndVerifyTOTP|VerifyLoginConsumesRecoveryCode|CurrentUserTOTPSetupEnableAndTwoFactorLogin|ConsoleWriteRoutesRequireCSRF)' -count=1`
+- `make architecture-check`
+- `make code-quality-check`
+- `git diff --check`
+
+## WP-810: Public Console Registration v1
+
+Objective: close the auth registration gap found during the docs/sub2api
+comparison by adding a small SRapi-native public registration flow without
+copying sub2api auth routes or storage internals.
+
+Read first:
+
+- `docs/SECURITY_MODEL.md`
+- `docs/OPENAPI_CONTRACT.md`
+- `packages/openapi/openapi.yaml`
+- `apps/api/internal/modules/users/contract/contract.go`
+- `apps/api/internal/modules/auth/contract/contract.go`
+
+Owns:
+
+- Public auth API:
+  - `POST /api/v1/auth/register`
+- Admin settings gate using `security.registration_enabled`.
+- Optional registration email suffix policy using
+  `security.registration_email_suffix_allowlist`; values are normalized to exact
+  `@domain.tld` suffixes and an empty list allows all valid email domains.
+- Regular user creation through the existing users service with configured
+  default balance and default RPM limit.
+- Immediate console session creation using the existing session cookie and CSRF
+  response shape.
+- Generic duplicate/invalid registration errors to avoid account enumeration.
+- Generated OpenAPI Go types and TypeScript SDK.
+- Focused HTTP, auth, user service, and contract drift tests.
+
+Definition of Done:
+
+- Registration is disabled with `403 FORBIDDEN` when admin settings disable it.
+- Non-empty registration email suffix allowlists are normalized, reject invalid
+  domains at settings update time, and block unmatched registration emails with
+  the same generic registration error.
+- Successful registration creates a regular `user` role account, sets the
+  HttpOnly session cookie, and returns a CSRF token in `LoginResponse`.
+- Duplicate email, suffix-policy rejection, and invalid input return the same
+  generic `400 INVALID_REQUEST` response.
+- Registration audit evidence never records plaintext password, session cookie,
+  or CSRF token.
+- Email verification and password reset remain explicit follow-ups until SRapi
+  has mail/outbox delivery and hash-stored one-time token infrastructure.
+- `specs/STATUS.md` records completion and gates.
+
+Required gates:
+
+- `make openapi-lint`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/modules/users/... ./internal/modules/auth/... ./internal/persistence/entstore/users ./internal/httpserver -run 'Test(Register|CreateHashesPasswordAndDefaultsRole|AuthenticatePassword|CreateRole|UpdateBalance|LoginCreatesSession|CurrentUser)' -count=1`
+- `make architecture-check`
+- `make code-quality-check`
+- `git diff --check`
+
+## WP-860: Notification Email Dispatch Foundation v1
+
+Objective: close the delivery gap left by WP-840/WP-850 by adding an
+SRapi-native transactional email dispatcher for auth lifecycle events. This does
+not copy sub2api's broad notification preference/template system; SRapi consumes
+the existing domain-event outbox, keeps tokens encrypted until worker dispatch,
+and keeps SMTP secrets in deployment env until encrypted settings secret storage
+exists.
+
+Read first:
+
+- `docs/SECURITY_MODEL.md`
+- `docs/OPENAPI_CONTRACT.md`
+- `docs/DATA_MODEL.md`
+- `docs/ADMIN_CONTROL_PLANE_SPEC.md`
+- `docs/CONFIGURATION_SPEC.md`
+- `apps/api/internal/workers/outbox`
+- `apps/api/internal/modules/auth/service/password_reset.go`
+- `apps/api/internal/modules/auth/service/email_verification.go`
+
+Owns:
+
+- `internal/modules/notifications` service and contract for auth transactional
+  email rendering and sending.
+- Outbox worker dispatch for:
+  - `AuthPasswordResetRequested`
+  - `AuthEmailVerificationRequested`
+- SMTP sender adapter with TLS/STARTTLS support and no-auth local SMTP support.
+- Deployment env config:
+  - `EMAIL_PUBLIC_BASE_URL`
+  - `EMAIL_SMTP_HOST`
+  - `EMAIL_SMTP_PORT`
+  - `EMAIL_SMTP_USERNAME`
+  - `EMAIL_SMTP_PASSWORD`
+  - `EMAIL_SMTP_FROM`
+  - `EMAIL_SMTP_FROM_NAME`
+  - `EMAIL_SMTP_USE_TLS`
+- Admin Settings non-secret email metadata only; `smtp_password` is not accepted
+  or persisted in Admin Settings/OpenAPI/SDK/audit, and
+  `smtp_password_configured` is derived from runtime config in responses.
+- Focused notification service, config, outbox, app wiring, HTTP contract, and
+  OpenAPI/SDK drift tests.
+
+Definition of Done:
+
+- Password reset and email verification outbox events send rendered HTML mail
+  only when public base URL, SMTP host, and sender are configured.
+- Outbox payload remains secret-safe: no plaintext email, plaintext token,
+  password, session cookie, CSRF token, or SMTP password.
+- Worker decrypts the token only in memory and builds links from
+  `EMAIL_PUBLIC_BASE_URL` plus the event's relative action path; it never uses
+  request Host headers.
+- Worker re-reads the current user before sending and skips inactive users or
+  stale events whose recipient email hash no longer matches the current email.
+- Missing email config leaves auth mail delivery retryable/failed instead of
+  silently marking the event as published.
+- SMTP header fields are CR/LF sanitized and local unauthenticated SMTP remains
+  supported.
+- OpenAPI and TypeScript SDK expose no `smtp_password` request/response field.
+- Admin Settings update requests cannot set `smtp_password_configured`; the
+  response flag comes from `EMAIL_SMTP_PASSWORD`.
+- Broader user notification preferences, unsubscribe links, balance/subscription
+  notifications, template preview/restore APIs, avatar storage, and OAuth
+  identity onboarding remain separate follow-up packages.
+- `specs/STATUS.md` records completion and gates.
+
+Required gates:
+
+- `make openapi-lint`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/modules/notifications/... ./internal/modules/admin_control/... ./internal/config ./internal/workers/outbox ./internal/app ./internal/httpserver -run 'Test(AuthPasswordResetEventSendsRenderedEmail|AuthEmailEventSkipsStaleRecipientHash|AuthEmailEventRequiresConfiguredSMTPAndBaseURL|UpdateAdminSettingsNormalizesEmailConfigWithoutSMTPSecret|UpdateAdminSettingsRejectsInvalidEmailPublicBaseURL|EmailConfigDefaultsOverridesAndValidation|WorkerRetriesAuthEmailWhenEmailDeliveryNotConfigured|Register|UpdateAdminSettings|EmailVerification|PasswordReset|UpdateAdminSettingsEmailDoesNotAcceptSMTPPassword|AdminSettingsEmailPasswordConfiguredComesFromRuntimeConfig)' -count=1`
+- `make architecture-check`
+- `make code-quality-check`
+- `git diff --check`
+
+## WP-870: Notification Preferences and One-Click Unsubscribe v1
+
+Objective: close the first notification-management gap after WP-860 by adding
+SRapi-native optional notification unsubscribe primitives. This does not copy
+sub2api's user-column JSON email list; SRapi stores event-scoped preference
+state by recipient email hash and keeps transactional auth mail non-suppressible.
+
+Read first:
+
+- `docs/SECURITY_MODEL.md`
+- `docs/OPENAPI_CONTRACT.md`
+- `docs/DATA_MODEL.md`
+- `docs/ADMIN_CONTROL_PLANE_SPEC.md`
+- `packages/openapi/openapi.yaml`
+- `apps/api/internal/modules/notifications/contract/contract.go`
+- `apps/api/internal/modules/notifications/service`
+
+Owns:
+
+- Public notification preference APIs:
+  - `GET /api/v1/notifications/unsubscribe`
+  - `POST /api/v1/notifications/unsubscribe`
+- Signed unsubscribe token generation and validation with event, email hash,
+  and expiry only.
+- Event-scoped settings-backed preference storage while this remains low-volume.
+- Optional email `List-Unsubscribe` and `List-Unsubscribe-Post` header support
+  with a strict SMTP header allowlist.
+- Generated OpenAPI Go types and TypeScript SDK.
+- Focused service and HTTP tests.
+
+Definition of Done:
+
+- `GET` validates a token without mutating state; `POST` applies the preference.
+- `POST` accepts token from query, JSON body, or form body to support one-click
+  unsubscribe POSTs.
+- Tokens and stored preference keys never include plaintext email, user id,
+  session cookie, CSRF token, SMTP secret, or provider credential.
+- Only optional notification events such as `balance.low` and
+  `account.quota_alert` can be unsubscribed.
+- Transactional auth templates such as `auth.password_reset` and
+  `auth.email_verification` cannot generate unsubscribe tokens and are never
+  suppressed by optional preferences.
+- SMTP custom headers are limited to `List-Unsubscribe` and
+  `List-Unsubscribe-Post` after CR/LF sanitization.
+- Balance/subscription/account-quota triggers, template preview/restore APIs,
+  avatar storage, OAuth identity binding/onboarding, and credential-gated SMTP
+  smoke remain separate follow-up packages.
+- `specs/STATUS.md` records completion and gates.
+
+Required gates:
+
+- `make openapi-lint`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/modules/notifications/... ./internal/httpserver -run 'TestNotificationUnsubscribeEndpoint|TestPreferenceService' -count=1`
+- `make architecture-check`
+- `make code-quality-check`
+- `git diff --check`
+
+## WP-880: Notification Email Template Management v1
+
+Objective: close the notification-template control-plane gap found during the
+docs/sub2api comparison by adding SRapi-native admin template list, detail,
+preview, update, and restore APIs. This does not copy sub2api's locale-specific
+settings shape; SRapi v1 stores event-level overrides in the existing typed
+Admin Settings email template map and keeps the template catalog in the
+notifications module so locale support can be added later without changing the
+current key contract.
+
+Read first:
+
+- `docs/SECURITY_MODEL.md`
+- `docs/OPENAPI_CONTRACT.md`
+- `docs/ADMIN_CONTROL_PLANE_SPEC.md`
+- `packages/openapi/openapi.yaml`
+- `apps/api/internal/modules/notifications/contract/contract.go`
+- `apps/api/internal/modules/notifications/service`
+- `apps/api/internal/httpserver/runtime_admin_control_plane_handlers.go`
+
+Owns:
+
+- Admin notification template APIs:
+  - `GET /api/v1/admin/notifications/email-templates`
+  - `GET /api/v1/admin/notifications/email-templates/{event}`
+  - `PUT /api/v1/admin/notifications/email-templates/{event}`
+  - `POST /api/v1/admin/notifications/email-templates/{event}/restore`
+  - `POST /api/v1/admin/notifications/email-template-preview`
+- Template event catalog for `auth.password_reset`,
+  `auth.email_verification`, `balance.low`, and `account.quota_alert`.
+- Placeholder allowlists, subject/HTML size validation, safe preview rendering,
+  and URL placeholder scheme checks.
+- Admin Settings-backed override storage using `<event>.subject` and
+  `<event>.html` keys.
+- Safe audit records for template update and restore actions.
+- Generated OpenAPI Go types and TypeScript SDK.
+- Focused notification service and admin HTTP tests.
+
+Definition of Done:
+
+- Admin reads require a console admin session; update, restore, and preview use
+  `cookieAuth` plus `csrfHeader`.
+- List returns event metadata, template details, and a placeholder union without
+  SMTP secrets, recipient data, provider credentials, or unsubscribe tokens.
+- Update rejects unknown events, empty templates, oversized templates, malformed
+  placeholders, and placeholders outside the event allowlist.
+- Preview renders without saving state, escapes variable values for HTML output,
+  sanitizes subjects against header injection, and blanks unsafe URL placeholders
+  such as `javascript:` URLs.
+- Restore removes only the selected event's override keys and returns the
+  built-in template.
+- Transactional auth email delivery uses the same renderer while remaining
+  non-suppressible by unsubscribe preferences.
+- Balance/subscription/account-quota trigger scheduling, current-user
+  preference management, avatar storage, OAuth identity binding/onboarding, and
+  credential-gated SMTP smoke remain separate follow-up packages.
+- `specs/STATUS.md` records completion and gates.
+
+Required gates:
+
+- `make openapi-lint`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/modules/notifications/... -count=1`
+- `cd apps/api && go test ./internal/httpserver -run 'TestAdminNotificationEmailTemplate|TestNotificationUnsubscribeEndpoint' -count=1`
+- `make architecture-check`
+- `make code-quality-check`
+- `git diff --check`
+
+## WP-910: Subscription Expiry Reminder Trigger v1
+
+Objective: close the next notification-trigger gap found during the
+docs/sub2api comparison by adding an SRapi-native subscription expiry reminder
+trigger. This does not copy sub2api's service-local email sender; SRapi scans
+active subscriptions, enqueues safe reminder domain events, and lets the
+existing outbox notification dispatcher render, suppress, retry, and deliver
+optional email with one-click unsubscribe support.
+
+Read first:
+
+- `docs/DOMAIN_EVENTS_SPEC.md`
+- `docs/SECURITY_MODEL.md`
+- `docs/OPENAPI_CONTRACT.md`
+- `apps/api/internal/workers/subscription_expirer/worker.go`
+- `apps/api/internal/modules/subscriptions/service/service.go`
+- `apps/api/internal/modules/notifications/service/service.go`
+
+Owns:
+
+- `SubscriptionExpiryReminderTriggered` domain event.
+- Active subscription expiry reminder windows: 7 days, 3 days, and 1 day.
+- Admin Settings email default:
+  - `subscription_expiry_notify_enabled`
+- Outbox notification handling for `subscription.expiry_reminder` with template
+  rendering, one-click unsubscribe headers, and current-user preference
+  suppression.
+- Generated OpenAPI Go types and TypeScript SDK.
+- Focused subscription, notification, worker, HTTP preference, and admin
+  settings tests.
+
+Definition of Done:
+
+- The subscription expirer worker keeps expiring overdue subscriptions and also
+  enqueues reminder events for active subscriptions in the configured reminder
+  windows when the global switch is enabled.
+- Reminder events are idempotent per subscription and reminder key.
+- Event payloads contain only safe operational fields: subscription id, user id,
+  plan id/name, days remaining, reminder key, expiry timestamp, triggered
+  timestamp, and console path.
+- Payloads and idempotency keys do not include plaintext email, unsubscribe
+  token, session cookie, CSRF token, SMTP secret, API key, provider credential,
+  or prompt.
+- Notification dispatch re-reads the current user, skips inactive users, honors
+  `subscription.expiry_reminder` unsubscribe state, and attaches one-click
+  unsubscribe headers when possible.
+- SMTP/template failures remain outbox-retryable and never change subscription
+  state.
+- Avatar storage, OAuth identity binding/onboarding, and credential-gated SMTP
+  smoke remain separate follow-up packages.
+- `specs/STATUS.md` records completion and gates.
+
+Required gates:
+
+- `make openapi-lint`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/modules/notifications/... ./internal/modules/subscriptions/... ./internal/workers/subscription_expirer ./internal/workers/outbox ./internal/modules/admin_control/... -count=1`
+- `cd apps/api && go test ./internal/httpserver -run 'Test(CurrentUserNotificationPreferences|NotificationUnsubscribeEndpoint)' -count=1`
+- `make architecture-check`
+- `make code-quality-check`
+- `git diff --check`
+
+## WP-920: Account Quota Notification Trigger v1
+
+Objective: close the account-quota notification-trigger gap found during the
+docs/sub2api comparison by adding an SRapi-native quota alert trigger. This
+does not copy sub2api's gateway-local goroutine mail sender or per-account
+extra-field email list; SRapi scans persisted quota snapshots, enqueues safe
+domain events, and lets the outbox notification dispatcher render, suppress,
+retry, and deliver optional admin email.
+
+Read first:
+
+- `docs/DOMAIN_EVENTS_SPEC.md`
+- `docs/SECURITY_MODEL.md`
+- `docs/OPENAPI_CONTRACT.md`
+- `apps/api/internal/workers/account_quota_alert/worker.go`
+- `apps/api/internal/modules/notifications/service/service.go`
+- `apps/api/internal/modules/accounts/contract/contract.go`
+
+Owns:
+
+- `AccountQuotaAlertTriggered` domain event.
+- Account quota snapshot threshold-crossing detection:
+  `previous_remaining_ratio > threshold && latest_remaining_ratio <= threshold`.
+- Admin Settings email defaults:
+  - `account_quota_notify_enabled`
+  - `account_quota_notify_remaining_ratio`
+- Outbox notification handling for `account.quota_alert` with active owner/admin
+  recipient selection, template rendering, one-click unsubscribe headers, and
+  current-user preference suppression.
+- Generated OpenAPI Go types and TypeScript SDK.
+- Focused notification, worker, admin settings, and outbox routing tests.
+
+Definition of Done:
+
+- The account quota alert worker scans active provider accounts and recent quota
+  snapshots, then enqueues an idempotent event only on downward threshold
+  crossing.
+- Event idempotency is scoped by account, quota type, threshold, and reset/date
+  bucket.
+- Event payloads contain only safe operational fields: account id/name,
+  provider id, runtime class, quota snapshot id, quota type, quota numbers,
+  threshold, previous ratio, reset/snapshot/trigger timestamps, and console
+  path.
+- Payloads and idempotency keys do not include plaintext recipient email,
+  unsubscribe token, session cookie, CSRF token, SMTP secret, API key, provider
+  credential, or prompt.
+- Notification dispatch selects active owner/admin users at send time, honors
+  each user's `account.quota_alert` unsubscribe state, and attaches one-click
+  unsubscribe headers when possible.
+- SMTP/template failures remain outbox-retryable and never change account quota
+  state or gateway request outcomes.
+- Avatar storage, OAuth identity binding/onboarding, and credential-gated SMTP
+  smoke remain separate follow-up packages.
+- `specs/STATUS.md` records completion and gates.
+
+Required gates:
+
+- `make openapi-lint`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/modules/notifications/... ./internal/workers/account_quota_alert ./internal/workers/outbox ./internal/modules/admin_control/... ./internal/app -count=1`
+- `make architecture-check`
+- `make code-quality-check`
+- `git diff --check`
+
+## WP-930: Verified Notification Contacts v1
+
+Objective: close the verified-extra-notification-contact gap found during the
+docs/sub2api comparison by adding an SRapi-native contact flow. This does not
+copy sub2api's user JSON extra-email field or code-cache flow; SRapi stores
+settings-backed contact state, verifies ownership with signed time-limited
+tokens, routes verification mail through outbox, and includes only verified,
+enabled contacts in optional notification delivery.
+
+Read first:
+
+- `docs/OPENAPI_CONTRACT.md`
+- `docs/SECURITY_MODEL.md`
+- `docs/DOMAIN_EVENTS_SPEC.md`
+- `apps/api/internal/modules/notifications/service/contacts.go`
+- `apps/api/internal/modules/notifications/service/service.go`
+- `apps/api/internal/httpserver/runtime_notification_handlers.go`
+
+Owns:
+
+- Current-user notification contact APIs:
+  - `GET /api/v1/me/notification-contacts`
+  - `POST /api/v1/me/notification-contacts`
+  - `POST /api/v1/me/notification-contacts/verify`
+  - `PATCH /api/v1/me/notification-contacts/{id}`
+  - `DELETE /api/v1/me/notification-contacts/{id}`
+- `NotificationContactVerificationRequested` domain event.
+- Transactional `notification.contact_verification` email template.
+- Optional notification dispatch expansion for verified, enabled contacts.
+- Generated OpenAPI Go types and TypeScript SDK.
+- Focused notification service, HTTP lifecycle, and outbox routing tests.
+
+Definition of Done:
+
+- Users can add up to three secondary notification contacts, excluding their
+  primary account email.
+- Contact writes require current console session plus CSRF.
+- Verification events contain only contact id, recipient email hash, encrypted
+  contact email, encrypted verification token, action path, and expiry.
+- Verification tokens are signed, time-limited, and checked against the stored
+  contact token hash before marking a contact verified.
+- Optional notification delivery includes the primary email plus verified,
+  enabled secondary contacts, deduplicates addresses, and honors each
+  recipient email's event-scoped unsubscribe state and one-click headers.
+- Contact verification email is transactional and not suppressible by optional
+  unsubscribe preferences.
+- Payloads, idempotency keys, audit snapshots, and preference storage do not
+  include plaintext unsubscribe token, session cookie, CSRF token, SMTP secret,
+  API key, provider credential, or prompt.
+- Avatar storage, OAuth identity binding/onboarding, and credential-gated SMTP
+  smoke remain separate follow-up packages.
+- `specs/STATUS.md` records completion and gates.
+
+Required gates:
+
+- `make openapi-lint`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/modules/notifications/... ./internal/httpserver ./internal/workers/outbox -count=1`
+- `make architecture-check`
+- `make code-quality-check`
+- `git diff --check`
+
+## WP-940: Current-User Avatar Storage v1
+
+Objective: close the avatar-storage gap found during the docs/sub2api
+comparison with an SRapi-native flow. This does not copy sub2api's profile
+`avatar_url` setter, remote URL adoption, or data URL storage. SRapi keeps
+profile updates field-allowlisted, accepts only authenticated current-user
+avatar uploads, validates image bytes server-side, stores a normalized
+SRapi-owned PNG, and serves it through a controlled API.
+
+Read first:
+
+- `docs/OPENAPI_CONTRACT.md`
+- `docs/SECURITY_MODEL.md`
+- `docs/DATA_MODEL.md`
+- `apps/api/internal/modules/users/service/avatar.go`
+- `apps/api/internal/httpserver/runtime_user_handlers.go`
+
+Owns:
+
+- Current-user avatar APIs:
+  - `PUT /api/v1/me/avatar`
+  - `DELETE /api/v1/me/avatar`
+  - `GET /api/v1/users/{id}/avatar`
+- `GET /api/v1/me` avatar metadata (`avatar_url`, MIME, byte size, SHA-256,
+  updated-at).
+- Settings-backed avatar v1 storage under `users.avatar:v1:user:{user_id}`.
+- Generated OpenAPI Go types and TypeScript SDK.
+- Focused users service and HTTP lifecycle tests.
+
+Definition of Done:
+
+- Avatar writes require current console session plus CSRF.
+- Uploads accept only `multipart/form-data` field `avatar`.
+- PNG/JPEG inputs are decoded, size-limited to 1 MiB, dimension-limited to
+  1024x1024, re-encoded as PNG, and stored with sha256/size/dimension metadata.
+- Remote URLs, SVG, arbitrary data URLs, browser filenames, and caller
+  `Content-Type` are not trusted or stored.
+- Avatar reads require a console session and return controlled `image/png`
+  bytes with `ETag` and `X-Content-Type-Options: nosniff`.
+- Audit snapshots and API responses do not include session cookie, CSRF token,
+  original filename, API key, provider credential, prompt, or raw upload body.
+- Objectstore/CDN-backed avatar storage remains a future promotion path if
+  avatar traffic or storage volume exceeds the low-frequency settings-backed
+  v1 design.
+- `specs/STATUS.md` records completion and gates.
+
+Required gates:
+
+- `make openapi-lint`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/modules/users/service ./internal/httpserver -run 'TestAvatarService|TestCurrentUserAvatar|TestUpdateCurrentUserProfileRequiresCSRFAndAllowlistsFields' -count=1`
+- `cd apps/api && go test ./internal/modules/users/... ./internal/httpserver -count=1`
+- `make architecture-check`
+- `make code-quality-check`
+- `git diff --check`
+
+## WP-950: User Auth Identity Directory v1
+
+Objective: close the first OAuth identity binding/onboarding gap found during
+the docs/sub2api comparison by adding an SRapi-native current-user sign-in
+identity directory. This does not copy sub2api's pending OAuth flow or raw
+provider subject storage. SRapi first creates a durable, hash-only external
+identity foundation that future OAuth/OIDC callbacks can write to safely.
+
+Read first:
+
+- `docs/OPENAPI_CONTRACT.md`
+- `docs/SECURITY_MODEL.md`
+- `docs/DATA_MODEL.md`
+- `packages/openapi/openapi.yaml`
+- `apps/api/internal/modules/users/contract/contract.go`
+- `apps/api/internal/persistence/entstore/users/store.go`
+
+Owns:
+
+- Current-user API:
+  - `GET /api/v1/me/auth-identities`
+  - `DELETE /api/v1/me/auth-identities/{id}`
+- `user_auth_identities` Ent schema and incremental PostgreSQL migration.
+- Users contract/store/service support for derived local email identity plus
+  external OAuth/OIDC identity records.
+- Memory and Ent persistence support for future provider callback upserts.
+- Generated OpenAPI Go types and TypeScript SDK.
+- CSRF-protected external identity unbind by persistent identity id.
+- Focused users service, Ent store, HTTP, migration, and contract drift tests.
+
+Definition of Done:
+
+- `GET /api/v1/me/auth-identities` requires current console session and returns
+  a derived local email sign-in identity.
+- `DELETE /api/v1/me/auth-identities/{id}` requires current console session plus
+  CSRF, deletes only the current user's external identity with that exact id, and
+  returns the refreshed identity list.
+- The derived local email identity is not addressable for unbind; unbind refuses
+  to remove the user's last available sign-in method.
+- External identities are stored with provider, provider key, subject hash,
+  display-safe subject hint, verified/profile metadata, and timestamps.
+- Raw upstream subject, authorization code, access token, refresh token,
+  session cookie, CSRF token, provider secret, API key, and credential payloads
+  are never returned or persisted in the identity directory.
+- OpenAPI and SDK expose stable `AuthIdentityProvider`,
+  `CurrentUserAuthIdentity`, and list response schemas.
+- OAuth/OIDC start/callback, pending decision sessions, profile adoption, and
+  external identity bind mutation APIs remain follow-up packages built on this
+  directory.
+- `specs/STATUS.md` records completion and gates.
+
+Required gates:
+
+- `make ent-generate-check`
+- `make migration-check`
+- `make openapi-lint`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/modules/users/... ./internal/persistence/entstore/users ./internal/httpserver -run 'Test(ListAuthIdentities|UnbindAuthIdentity|CurrentUserAuthIdentit)' -count=1`
+- `make architecture-check`
+- `make code-quality-check`
+- `git diff --check`
+
+## WP-960: Pending OAuth Session Foundation v1
+
+Objective: close the next OAuth onboarding gap found during the docs/sub2api
+comparison by adding an SRapi-native pending decision session foundation. This
+does not copy sub2api's browser-cookie/session flow or raw provider subject
+storage. SRapi stores only a short-lived hash-only decision receipt that future
+OAuth/OIDC start/callback, bind, create-account, and profile-adoption routes can
+consume safely.
+
+Read first:
+
+- `docs/SECURITY_MODEL.md`
+- `docs/DATA_MODEL.md`
+- `docs/OPENAPI_CONTRACT.md`
+- `apps/api/internal/modules/auth/contract/contract.go`
+- `apps/api/internal/persistence/entstore/auth/store.go`
+- `apps/api/ent/schema/userauthidentity.go`
+
+Owns:
+
+- `pending_oauth_sessions` Ent schema and incremental PostgreSQL migration.
+- Auth contract/store/service support for creating and consuming pending OAuth
+  sessions.
+- Memory and Ent persistence implementations.
+- HMAC hash-only pending session tokens using the existing auth server secret.
+- Hashed provider subject storage and display-safe profile summaries.
+- Single-use consume semantics with `consumed_at` and expiry checks.
+- Data model, security model, OpenAPI boundary docs, and focused service/store
+  regressions.
+
+Definition of Done:
+
+- Pending session creation rejects missing provider, provider key, intent,
+  provider subject hash, invalid target user ids, and missing server secret.
+- The plaintext pending token is returned only to the current browser flow; the
+  store receives only `session_token_hash`.
+- Raw upstream subject, authorization code, access token, refresh token,
+  provider secret, state, nonce, PKCE verifier, session cookie, CSRF token, and
+  full claim payloads are never persisted in `pending_oauth_sessions`.
+- `provider_subject_hash` is the only provider subject identity stored; UI
+  summary fields are limited to `subject_hint`, email/display/avatar metadata,
+  and email verification state.
+- `redirect_to` accepts only local paths and normalizes empty, cross-site, or
+  protocol-relative redirects to `/`.
+- Consume operations are single-use and expiry-aware.
+- No public OAuth/OIDC OpenAPI route is exposed in this package; provider
+  start/callback, profile adoption, bind-current-user, and create-account routes
+  remain follow-up packages built on this foundation.
+- `specs/STATUS.md` records completion and gates.
+
+Required gates:
+
+- `make ent-generate-check`
+- `make migration-check`
+- `cd apps/api && go test ./internal/modules/auth/... ./internal/persistence/entstore/auth -run 'Test(PendingOAuth|StorePersists|Cleanup|DeleteByUser|PasswordReset|EmailVerification|Login|Authenticate|Logout)' -count=1`
+- `make architecture-check`
+- `make code-quality-check`
+- `git diff --check`
+
+## WP-970: OAuth Authorization Start v1
+
+Objective: close the next OAuth onboarding gap found during the docs/sub2api
+comparison by adding an SRapi-native authorization start route. This does not
+copy sub2api's multiple plaintext OAuth cookies or callback/session adoption
+behavior. SRapi issues one encrypted short-lived browser flow cookie, sends
+state + PKCE S256 + OIDC nonce to the provider, and leaves callback/token
+exchange/profile adoption for the next package.
+
+Read first:
+
+- `docs/SECURITY_MODEL.md`
+- `docs/OPENAPI_CONTRACT.md`
+- `docs/CONFIGURATION_SPEC.md`
+- `apps/api/internal/modules/auth/service/pending_oauth.go`
+- `apps/api/internal/modules/users/contract/contract.go`
+- `packages/openapi/openapi.yaml`
+
+Owns:
+
+- Public auth API:
+  - `GET /api/v1/auth/oauth/{provider}/start`
+- Admin Settings `oauth_provider_configs` for non-secret provider authorization
+  config: provider, provider key, display name, client id, authorize URL,
+  redirect URI, and scopes.
+- Auth service authorization URL generation with state, PKCE S256, and OIDC
+  nonce.
+- Encrypted HttpOnly `srapi_oauth_flow` cookie scoped to `/api/v1/auth/oauth`.
+- Local redirect normalization and provider allowlist/config validation.
+- Generated OpenAPI Go types and TypeScript SDK.
+- Focused service, admin settings, HTTP, and contract drift tests.
+
+Definition of Done:
+
+- OAuth start is disabled unless Admin Settings has `oauth_enabled=true` and a
+  matching enabled provider config.
+- The provider redirect includes `response_type=code`, `client_id`,
+  `redirect_uri`, `state`, `code_challenge_method=S256`, `code_challenge`,
+  scopes, and `nonce` for OpenID scopes.
+- The encrypted flow cookie binds provider, provider key, intent, local redirect,
+  state, PKCE verifier, nonce, creation time, and expiry.
+- The flow cookie and Admin Settings responses do not expose provider secret,
+  authorization code, access token, refresh token, raw upstream subject, full
+  claim payload, session cookie, CSRF token, or API key material.
+- `intent=login` is the only public start intent in this package; binding an
+  external identity to a current user remains a CSRF-protected follow-up route.
+- Callback token exchange, ID token validation, profile normalization, pending
+  decision session creation, bind-current-user, create-account, and
+  bind-existing-login flows remain follow-up packages.
+- `specs/STATUS.md` records completion and gates.
+
+Required gates:
+
+- `make openapi-lint`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/modules/auth/service ./internal/modules/admin_control/service -run 'Test(StartOAuthAuthorization|PendingOAuth|UpdateAdminSettings.*OAuth)' -count=1`
+- `cd apps/api && go test ./internal/httpserver -run 'TestOAuthStart|TestUpdateAdminSettingsRejectsInvalidRegistrationEmailSuffixAllowlist|TestAdminControlPlaneV1EndpointsAndAudit' -count=1`
+- `make architecture-check`
+- `make code-quality-check`
+- `git diff --check`
+
+## WP-980: OAuth Callback Pending Session v1
+
+Objective: close the next OAuth onboarding gap found during the docs/sub2api
+comparison by adding an SRapi-native authorization callback route on top of the
+encrypted flow cookie and hash-only pending OAuth session foundation. This does
+not copy sub2api's plaintext browser/session cookies or raw claim storage.
+SRapi validates state + provider config, uses PKCE public-client token exchange,
+normalizes UserInfo into a safe profile summary, and stores only HMAC-scoped
+provider subject hashes.
+
+Read first:
+
+- `docs/SECURITY_MODEL.md`
+- `docs/OPENAPI_CONTRACT.md`
+- `docs/CONFIGURATION_SPEC.md`
+- `apps/api/internal/httpserver/runtime_oauth_handlers.go`
+- `apps/api/internal/modules/auth/service/pending_oauth.go`
+- `packages/openapi/openapi.yaml`
+
+Owns:
+
+- Public auth API:
+  - `GET /api/v1/auth/oauth/{provider}/callback`
+- Admin Settings callback config fields: `token_url`, `userinfo_url`, and
+  `token_auth_method=none`.
+- OAuth callback validation for flow cookie, provider, provider key, client id,
+  redirect URI, and returned state.
+- PKCE token exchange with `grant_type=authorization_code`, code, redirect URI,
+  client id, and code verifier.
+- Bearer UserInfo fetch and safe profile extraction.
+- Auth service HMAC helper for provider subject hashes scoped by provider and
+  provider key.
+- Short-lived HttpOnly `srapi_oauth_pending` cookie scoped to
+  `/api/v1/auth/oauth/pending`.
+- Generated OpenAPI Go types and TypeScript SDK.
+- Focused service, admin settings, HTTP callback, and contract drift tests.
+
+Definition of Done:
+
+- Callback rejects missing/mismatched flow state and clears the flow cookie.
+- Callback rejects disabled/missing provider configs and callback configs that
+  are not complete for v1 public-client exchange.
+- Successful callback exchanges the authorization code with the original PKCE
+  verifier and fetches UserInfo with `Authorization: Bearer <access_token>`.
+- Pending OAuth sessions store only a keyed hash of the upstream subject plus
+  safe display/email/avatar summary fields.
+- Flow cookie is cleared after callback completion; pending token is set only in
+  an HttpOnly cookie and is not placed in redirect URLs.
+- Client secrets, refresh tokens, access tokens, authorization codes, raw
+  upstream subjects, full claims, session cookies, CSRF tokens, and API key
+  material are not stored in Admin Settings, pending sessions, logs, or OpenAPI
+  responses.
+- Confidential-client secret handling, ID token signature/nonce validation,
+  pending decision exchange, create-account, bind-existing-login, and
+  bind-current-user mutation APIs remain follow-up packages.
+- `specs/STATUS.md` records completion and gates.
+
+Required gates:
+
+- `make openapi-lint`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/modules/auth/service ./internal/modules/admin_control/service -run 'Test(StartOAuthAuthorization|PendingOAuth|HashOAuthProviderSubject|UpdateAdminSettings.*OAuth)' -count=1`
+- `cd apps/api && go test ./internal/httpserver -run 'TestOAuth(Start|Callback)' -count=1`
+- `make architecture-check`
+- `make code-quality-check`
+- `git diff --check`
+
+## WP-990: Pending OAuth Decision Preview v1
+
+Objective: close the next OAuth onboarding gap found during the docs/sub2api
+comparison by adding an SRapi-native pending decision preview. This does not
+copy sub2api's mutation-heavy pending exchange. SRapi exposes a read-only
+inspection route that lets the console decide whether to ask for email
+completion, bind an existing login, create a new account, or continue a later
+authenticated bind flow without consuming the pending token.
+
+Read first:
+
+- `docs/SECURITY_MODEL.md`
+- `docs/OPENAPI_CONTRACT.md`
+- `apps/api/internal/httpserver/runtime_oauth_handlers.go`
+- `apps/api/internal/modules/auth/service/pending_oauth.go`
+- `apps/api/internal/persistence/entstore/auth/store.go`
+- `packages/openapi/openapi.yaml`
+
+Owns:
+
+- Public auth API:
+  - `GET /api/v1/auth/oauth/pending`
+- Non-consuming pending OAuth lookup in auth contract/service/store.
+- Safe pending decision response with provider, provider key, display-safe
+  subject hint, local redirect, profile summary, expiry, and `next_step`.
+- Next-step decisions for email completion, bind-existing-login,
+  create-account, ready-for-login, and bind-current-user continuation.
+- Generated OpenAPI Go types and TypeScript SDK.
+- Focused service, Ent persistence, HTTP pending-preview, and contract drift
+  tests.
+
+Definition of Done:
+
+- Missing, invalid, expired, or consumed pending cookies return 401 and clear
+  the pending cookie where applicable.
+- Preview is read-only and does not consume the pending OAuth session.
+- Responses do not include pending token, raw upstream subject,
+  provider-subject hash, authorization code, provider access/refresh token,
+  session cookie, CSRF token, API key material, or full upstream claims.
+- Existing active-account detection is limited to a next-step decision and a
+  boolean continuation hint; final account creation/binding remains a follow-up
+  mutation package.
+- `specs/STATUS.md` records completion and gates.
+
+Required gates:
+
+- `make openapi-lint`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/modules/auth/service ./internal/persistence/entstore/auth -run 'Test(PendingOAuth|HashOAuthProviderSubject)' -count=1`
+- `cd apps/api && go test ./internal/httpserver -run 'TestOAuth(Start|Callback)' -count=1`
+- `make architecture-check`
+- `make code-quality-check`
+- `git diff --check`
+
+## WP-1000: Pending OAuth Current-User Bind v1
+
+Objective: close the next pending OAuth mutation gap found during the
+docs/sub2api comparison by adding an SRapi-native current-user bind path. This
+does not copy sub2api's combined pending exchange/create/bind-login handlers.
+SRapi keeps callback read-only, then requires an authenticated console session
+and CSRF header before attaching the verified external identity to the current
+user.
+
+Read first:
+
+- `docs/SECURITY_MODEL.md`
+- `docs/OPENAPI_CONTRACT.md`
+- `docs/DATA_MODEL.md`
+- `apps/api/internal/modules/users/contract/contract.go`
+- `apps/api/internal/modules/users/service/service.go`
+- `apps/api/internal/modules/auth/service/pending_oauth.go`
+- `apps/api/internal/httpserver/runtime_oauth_handlers.go`
+- `packages/openapi/openapi.yaml`
+
+Owns:
+
+- Public auth API:
+  - `POST /api/v1/auth/oauth/pending/bind-current-user`
+- Users service command for binding a verified external identity to one user.
+- Store lookup by provider/provider key/provider-subject hash so identity
+  ownership can be checked before writes.
+- Store-level rejection of attempts to transfer an existing external identity
+  to a different user.
+- Pending OAuth bind handler that requires session + CSRF + pending cookie,
+  consumes the pending session only after successful binding, clears the pending
+  cookie, records audit-safe identity snapshots, and returns the refreshed
+  current-user auth identity list.
+- Generated OpenAPI Go types and TypeScript SDK.
+- Focused users service, Ent persistence, HTTP pending-bind, and contract drift
+  tests.
+
+Definition of Done:
+
+- Missing console session returns 401; missing or invalid CSRF returns 403;
+  missing, invalid, expired, or consumed pending cookie returns 401 and clears
+  the pending cookie where applicable.
+- Binding succeeds only for the authenticated console user. A pending session
+  targeting another user or an external identity already owned by another user
+  returns conflict and does not transfer identity ownership.
+- Successful bind persists only provider, provider key, hashed subject,
+  display-safe subject hint, verification timestamp, last-used timestamp, and
+  non-sensitive profile summary.
+- Successful bind consumes the pending OAuth token, clears the pending cookie,
+  and returns the current user's auth identity list without pending token, raw
+  upstream subject, provider-subject hash, authorization code, provider tokens,
+  session cookie, CSRF token, API key material, or full upstream claims.
+- Create-account, bind-existing-login with password/2FA, email completion, and
+  verification-code pending flows remain separate follow-up mutation packages.
+- `specs/STATUS.md` records completion and gates.
+
+Required gates:
+
+- `make openapi-lint`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/modules/users/service ./internal/persistence/entstore/users -run 'Test(BindAuthIdentity|StoreFindsAuthIdentity)' -count=1`
+- `cd apps/api && go test ./internal/modules/auth/service ./internal/persistence/entstore/auth -run 'Test(PendingOAuth|HashOAuthProviderSubject)' -count=1`
+- `cd apps/api && go test ./internal/httpserver -run 'TestOAuth(Start|Callback)' -count=1`
+- `make architecture-check`
+- `make code-quality-check`
+- `git diff --check`
+
+## WP-1160: Per-Provider Quota/Subscription Fetch Scaffold v1
+
+Objective: add an active, out-of-band per-account quota/subscription fetch for OAuth providers (Codex/Antigravity/Gemini-CLI), complementing the existing passive in-band `QuotaSignal` header parsing. Design is SRapi-native and avoids inventing provider API shapes.
+
+What changed:
+- `provider_adapters/contract`: `QuotaReport` (provider, supported, source, plan, credits remaining/used/limit, currency, quota signals, status, fetched-at) + `AccountQuotaFetcher` interface.
+- `provider_adapters/service/quota_fetch.go`: `FetchAccountQuota` reuses the probe HTTP plumbing (`probeHeaders`, egress client) and is fully config-driven — quota endpoint (`quota_url`/`subscription_url`/`credits_url`) and JSON-path field mappings come from provider config / account metadata, so each provider is supported by configuration; Codex response headers are folded in via the existing `codexQuotaSignalsFromHeaders`. Returns `Supported:false` when no endpoint is configured.
+- `POST /api/v1/admin/accounts/{id}/quota-fetch`: decrypts the credential (`accounts.DecryptCredential`), fetches, persists quota signals (`RecordQuotaSnapshot`), audits, and returns the normalized report.
+
+Tests/gates: `make architecture-check`, `make code-quality-check`, full `go test ./...`, `git diff --check`. Follow-up: promote to a scheduled runner with confirmed provider subscription endpoints.
+
+## WP-1150: Health-Probe Availability Rollups v1
+
+Objective: aggregate fine-grained health snapshots into per-day availability rollups over a rolling window.
+
+What changed: `AccountAvailabilityRollup` Ent entity; `health_rollups` module (pure UTC per-day bucketing → availability ratio + avg success rate, provider-agnostic `Sample` input); `entstore/healthrollups` (upsert keyed on account+date); `GET /api/v1/admin/accounts/{id}/availability?days=N` computes from recent snapshots, persists (upsert), and returns the trailing window plus overall uptime. No worker added — computed on admin read + persisted.
+
+Tests/gates: migration `000021`, `make architecture-check`, `make code-quality-check`, full `go test ./...`, `git diff --check`.
+
+## WP-1140: Auth CAPTCHA v1
+
+Objective: add human verification on auth endpoints, off by default.
+
+What changed: stateless `captcha` module (`Verifier` + HTTP siteverify for Turnstile/hCaptcha/reCAPTCHA — shared form-POST + `success` JSON shape); `config.CaptchaConfig` (`CAPTCHA_ENABLED`/`PROVIDER`/`SECRET_KEY`/`VERIFY_URL`); `verifyCaptcha` reads `X-Captcha-Token`/`Cf-Turnstile-Response` and gates `handleLogin`+`handleRegister`. Disabled → no-op (behavior unchanged).
+
+Tests/gates: `internal/config` test, `make architecture-check`, `make code-quality-check`, full `go test ./...`, `git diff --check`.
+
+## WP-1130: TLS Fingerprint DB Profiles v1
+
+Objective: let operators manage named egress fingerprint profiles centrally instead of repeating `egress_profile` metadata per account.
+
+What changed: `TLSFingerprintProfile` Ent entity; `tls_profiles` module (validates uTLS template + HTTP-version policy against the egress resolver's supported set; `Snapshot` for resolution); `entstore/tlsprofiles`; admin CRUD (`/api/v1/admin/tls-profiles*`); `reverse_proxy.SetNamedProfileExpander` wired from `runtimeState.expandEgressProfileMetadata` so a `tls_profile`-referenced account gets the named profile's fields filled into `egress_profile` — only for keys it left unset (account values always win, behavior unchanged when the expander is unset/no ref).
+
+Tests/gates: migration `000021`, `make architecture-check`, `make code-quality-check`, full `go test ./...`, `git diff --check`.
+
+## WP-1120: Error-Passthrough DB Rules v1
+
+Objective: centralize upstream error expose/mask decisions that were previously only configurable via per-account/provider metadata.
+
+What changed: `ErrorPassthroughRule` Ent entity; `error_passthrough` module (priority-ordered rules matched on status code + error class + keyword; `Resolve` returns expose/mask); `entstore/errorpassthrough`; admin CRUD (`/api/v1/admin/error-passthrough-rules*`); the gateway's failover writers became `*Server` methods consulting `gatewayPublicMessage`, where a matching global rule overrides (expose raw / mask) and otherwise falls back to the existing `gatewayProviderPublicMessage` per-account metadata behavior. Existing per-account tests on `gatewayProviderPublicMessage` are unaffected.
+
+Tests/gates: migration `000021`, `make architecture-check`, `make code-quality-check`, full `go test ./...`, `git diff --check`.
+
+## WP-1110: User Custom Attributes (EAV) v1
+
+Objective: operator-defined custom user profile fields.
+
+What changed: `UserAttributeDefinition` + `UserAttributeValue` Ent entities (EAV); `userattributes` module (typed validation — string/number/boolean/select with required + select-option enforcement); `entstore/userattributes`; admin CRUD for definitions (`/api/v1/admin/user-attributes*`) and per-user value get/set (`/api/v1/admin/users/{id}/attributes*`, joining enabled definitions with stored values).
+
+Tests/gates: migration `000021`, `make architecture-check`, `make code-quality-check`, full `go test ./...`, `git diff --check`.
+
+## WP-1100: API-Key Account Egress Consistency v1
+
+Objective: close the egress gap discovered during WP-1090. SRapi routes
+non-`api_key` upstream traffic through the per-account `reverse_proxy` egress
+(proxy + uTLS fingerprint + SSRF guard) but routes native `api_key` traffic through
+the adapter's shared `s.client`, so an `api_key` account configured with a proxy or
+TLS-fingerprint profile silently does NOT use it. This makes native `api_key`
+gateway traffic AND its health probe honor the account's configured egress.
+
+Owns:
+
+- `reverse_proxy` exposes `ManagedEgressClient(account) (*http.Client, bool, error)`
+  on the `Runtime` interface + Service: returns the per-account egress client and
+  `true` only when the account actually has managed egress (a proxy or an
+  `egress_profile`/`tls_template` etc. in metadata); otherwise `(nil, false, nil)`.
+- The provider adapter selects its HTTP client via a gated `egressHTTPClient`
+  helper: the managed egress client when the account is configured, else the
+  unchanged shared `s.client`. Applied to all native `api_key` invoke paths
+  (chat/responses/messages/embeddings/images/input-items/compact) and the health
+  probe, so a managed `api_key` account's probe and real traffic share one egress.
+- Test mocks of `Runtime` implement the new method as a no-op `(nil, false, nil)`.
+- Focused reverse_proxy and adapter regressions.
+
+Out of scope (explicit follow-ups):
+
+- Making ALL `api_key` traffic SSRF-guarded (v1 only changes accounts that already
+  opted into managed egress, keeping the default path byte-identical); per-account
+  egress for WebSocket/realtime native paths.
+
+Definition of Done:
+
+- An `api_key` account with a proxy or TLS profile sends its native gateway traffic
+  and its health probe through that egress; an account with no egress config is
+  byte-for-byte unchanged (still uses `s.client`).
+- The probe and real traffic of a managed `api_key` account use the same client.
+- No credential or internal detail is logged; existing adapter behavior for
+  non-managed accounts is unchanged.
+
+Required gates:
+
+- `cd apps/api && go test ./internal/modules/reverse_proxy/... ./internal/modules/provider_adapters/... -count=1`
+- `cd apps/api && go test ./internal/httpserver -run 'Gateway|Codex|OAuthRefresh' -count=1`
+- `make architecture-check`
+- `make code-quality-check`
+- `git diff --check`
+
+## WP-1090: Health Probe Desync Jitter v1
+
+Objective: harden SRapi's active account health probing against upstream
+anti-abuse/correlation detection. Analysis: SRapi already does the safe thing —
+the probe is a cheap non-generative `GET /models` (not a generative "hi"), gated to
+`api_key` accounts only (OAuth/subscription accounts are never actively probed,
+kept purely passive). The remaining risk is that one probe pass fires probes for
+all eligible accounts as a near-synchronized burst, which — combined with a shared
+egress pool — is itself a correlation signal. This package desynchronizes probes.
+It does NOT add generative probes or probe OAuth accounts.
+
+Egress finding (no change required): the request says "probe through the account
+egress". For the only probed class (`api_key`), real traffic already uses the same
+shared adapter client as the probe (native api_key requests use `s.client`, not the
+per-account `reverseProxy.Do` egress), so the probe is already indistinguishable
+from real traffic. Routing the probe through `reverseProxy.Do` would give it a
+proxy/TLS profile the real traffic lacks — the opposite of the goal — so it is
+deliberately not done. The deeper gap (api_key native traffic ignoring per-account
+proxy/TLS entirely) is a separate adapter concern, out of scope here.
+
+Owns:
+
+- `health_probe` worker `Config.Jitter` (default = probe interval, capped at the
+  interval) and an injectable random source; each eligible account sleeps a
+  ctx-aware random `[0, jitter)` before probing, bounded by the existing
+  concurrency semaphore, so probes spread across the interval instead of bursting.
+- `api_key`-only eligibility and the cheap non-generative `GET /models` probe are
+  unchanged; OAuth/subscription accounts stay passive.
+- Focused worker regressions.
+
+Out of scope (explicit follow-ups):
+
+- Probe history + 7-day availability rollups (sub2api parity); making api_key native
+  traffic honor per-account proxy/TLS egress; any OAuth active probing.
+
+Definition of Done:
+
+- Probes for multiple accounts no longer start simultaneously; the per-account
+  start offset is a bounded random value and respects context cancellation.
+- A zero/disabled jitter leaves behavior unchanged; default behavior spreads probes
+  across the interval.
+- No generative probe is introduced and no OAuth/subscription account is probed.
+
+Required gates:
+
+- `cd apps/api && go test ./internal/workers/health_probe/... -count=1`
+- `make architecture-check`
+- `make code-quality-check`
+- `git diff --check`
+
+## WP-1080: Gateway Idempotency Hardening v1
+
+Objective: harden the WP-1070 gateway idempotency by closing the two loose ends it
+left: stored records grow unbounded (the entity carries `expires_at` but nothing
+reaps it) and only two of the four mutating gateway endpoints are covered. This
+reuses SRapi's existing cleanup-worker fleet and the `withGatewayIdempotency`
+wrapper — no new mechanism.
+
+Owns:
+
+- `idempotency.Store.DeleteExpired(ctx, before)` (contract + memory + entstore) and
+  a `workers/idempotency_cleanup` worker modeled on `auth_session_cleanup` that
+  periodically deletes records whose `expires_at` has passed; wired into the app
+  worker lifecycle (start/shutdown) and skipped under memory storage.
+- `withGatewayIdempotency` extended to `POST /v1/messages` and `POST /v1/embeddings`
+  (embeddings is always non-streaming; messages streams pass through), with the
+  optional `Idempotency-Key` header + 409 response added to both OpenAPI operations
+  and regenerated Go types + TS SDK.
+- Focused worker and gateway regressions.
+
+Out of scope (explicit follow-ups):
+
+- Streaming response replay; images/audio idempotency; multi-instance reap
+  coordination (single periodic reaper is sufficient for v1).
+
+Definition of Done:
+
+- Expired idempotency records are reaped on the worker interval; non-expired and
+  in-flight records are retained.
+- A retried non-streaming `/v1/messages` or `/v1/embeddings` request with the same
+  key+body replays the first response without re-executing; streaming/key-less
+  requests are unchanged.
+- `api_key`/existing behavior is otherwise unchanged; no secret is logged.
+
+Required gates:
+
+- `make openapi-lint`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/modules/idempotency/... ./internal/workers/idempotency_cleanup/... -count=1`
+- `cd apps/api && go test ./internal/httpserver -run 'Idempotenc|Gateway' -count=1`
+- `make architecture-check`
+- `make code-quality-check`
+- `git diff --check`
+
+## WP-1070: Gateway Request Idempotency v1
+
+Objective: close the gateway-idempotency gap from the docs/sub2api comparison.
+SRapi already defines an `IdempotencyRecord` Ent entity (key+method+path+request
+hash, status, response snapshot, `locked_until`, `expires_at`) but never wires it,
+so a client that retries a mutating gateway call after a timeout can double-execute
+(double-bill). This does not copy sub2api's IdempotencyCoordinator; SRapi wires its
+own entity behind an opt-in `Idempotency-Key` header on the OpenAI-compatible
+gateway, reusing the existing isolated-store + HTTP-wrapper patterns.
+
+Scope (v1, deliberately narrow):
+
+- An `idempotency` module (contract + service + memory store) and an
+  `entstore/idempotency` over the existing entity; atomic begin via the unique
+  `(idempotency_key, method, path)` index with constraint-race handling.
+- A `withGatewayIdempotency` HTTP wrapper applied to `POST /v1/chat/completions`
+  and `POST /v1/responses` (and their source-endpoint/provider-alias variants):
+  - No `Idempotency-Key` header → passthrough unchanged.
+  - Streaming requests (`stream:true`) → passthrough (replay deferred to v2).
+  - First non-streaming request with a key records in-progress (locked), runs the
+    handler through a capturing writer, and stores the response snapshot on
+    success; retry with the same key + same request replays the snapshot.
+  - Same key, request still in flight → 409; same key, different request body →
+    422; the key is scoped per bearer token so tenants never collide.
+- Records carry a TTL (`expires_at`); a stale in-progress lock (process crash)
+  becomes re-acquirable after `locked_until`.
+- OpenAPI: a reusable `Idempotency-Key` header parameter + conflict response on the
+  two canonical gateway operations; regenerated Go types + TS SDK.
+- Focused service/store and HTTP regressions.
+
+Out of scope (explicit follow-ups):
+
+- Streaming response replay; idempotency on messages/embeddings/images/audio and
+  the provider-prefixed alias docs; a TTL cleanup worker (entity carries
+  `expires_at`; reaping is a follow-up).
+
+Definition of Done:
+
+- A duplicate non-streaming request with the same `Idempotency-Key` and body
+  replays the first response and never re-executes (no second upstream call / bill).
+- A concurrent duplicate returns 409; the same key with a different body returns
+  422; a missing key or a streaming request is unaffected.
+- The key is bound to the bearer token; snapshots and the conflict errors never leak
+  another tenant's data, the raw token, or upstream credentials.
+- `api_key`/existing gateway behavior is otherwise unchanged.
+
+Required gates:
+
+- `make openapi-lint`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/modules/idempotency/... -count=1`
+- `cd apps/api && go test ./internal/httpserver -run 'Idempotenc|Gateway' -count=1`
+- `make architecture-check`
+- `make code-quality-check`
+- `git diff --check`
+
+## WP-1060: Outbound SSRF Egress Guard v1
+
+Objective: close the one confirmed security gap from the docs/sub2api comparison.
+SRapi's reverse-proxy egress (`reverse_proxy/service/egress_profile.go`
+`validateEgressTargetURL`) only validates URL scheme; outbound upstream-forward
+and OAuth-refresh dials have no IP/CIDR screen, so an admin-configured (or
+future user-influenced) target that resolves into the private network — loopback,
+RFC1918, link-local, or the `169.254.169.254` cloud-metadata endpoint — is
+reachable. This does not copy sub2api's `channel_monitor_ssrf` host/CIDR blocklist
+service; SRapi adds a dial-time IP screen on its existing isolated-client transport,
+gated by run mode exactly like the existing cookie-`Secure` convention
+(`Server.Mode != "local"`).
+
+Owns:
+
+- `reverse_proxy/service/ssrf.go`: `blockedEgressIP` (loopback, unspecified,
+  link-local unicast/multicast incl. `169.254.0.0/16` metadata, RFC1918 + ULA via
+  `net.IP.IsPrivate`, RFC6598 CGNAT `100.64.0.0/10`, multicast) and a
+  `net.Dialer.Control` that screens the POST-DNS-resolution remote IP, defeating
+  DNS-rebinding that a URL-string check cannot.
+- A `WithBlockedPrivateEgress(bool)` option on `reverse_proxy.New` threaded into the
+  isolated-client transport (`newIsolatedClient`) and the uTLS direct dial
+  (`dialUTLSHTTP1`); the screen applies to DIRECT dials only — an explicitly
+  configured egress proxy remains operator-trusted and unscreened.
+- Runtime wiring enables the guard when `cfg.Server.Mode != "local"` so production
+  blocks private egress while local/dev/test (loopback httptest servers) keep
+  working; the existing `New(nil)` default stays non-blocking and back-compatible.
+- Focused unit regressions for the IP classifier and for client-level block/allow.
+
+Out of scope (explicit follow-ups):
+
+- Account health-probe and console-OAuth backchannel egress paths (separate clients)
+  and a DB/settings-backed host/CIDR allowlist for intentional private targets.
+- Screening proxied (CONNECT) egress and per-account egress policy overrides.
+
+Definition of Done:
+
+- With the guard on, a direct dial whose resolved IP is loopback/private/link-local/
+  metadata/CGNAT/multicast fails before connecting; public IPs are unaffected.
+- The screen runs at `net.Dialer.Control` (resolved IP), not on the URL string, so a
+  hostname that resolves to a private IP is still blocked.
+- `Server.Mode == "local"` (default, tests) does not block; `New(nil)` is unchanged.
+- `api_key` and all existing reverse-proxy behavior is otherwise unchanged; no secret
+  or internal IP is leaked in the blocked-dial error.
+
+Required gates:
+
+- `cd apps/api && go test ./internal/modules/reverse_proxy/... -count=1`
+- `cd apps/api && go test ./internal/httpserver -run 'OAuthRefresh|ReverseProxy|Gateway|Egress|SSRF' -count=1`
+- `make architecture-check`
+- `make code-quality-check`
+- `git diff --check`
+
+## WP-1050: Upstream Account OAuth Re-auth Parking v1
+
+Objective: harden the existing upstream-account OAuth runtime found during the
+docs/sub2api comparison. Analysis showed SRapi already refreshes `oauth_refresh`
+/ `oauth_device_code` access tokens on the serving path
+(`runtime_gateway_core.refreshReverseProxyCredential` + the provider-aware
+`reverse_proxy.Refresh`, with import-time minting via `refreshImportCredential`),
+so this package does NOT rebuild that runtime. The single remaining correctness
+gap: when a serve-time refresh fails *permanently* (a dead/rotated refresh token →
+`session_invalid`), the account was only audited and left `active`, so the
+scheduler kept selecting it and every request replayed the dead refresh token
+against the provider token endpoint. This package parks such accounts for re-auth,
+reusing SRapi's existing failure-class→status protection rather than copying
+sub2api's per-provider refresher fleet.
+
+Owns:
+
+- A shared `runtimeState.protectProviderAccountForClass` extracted from
+  `applyProviderAccountProtection`, so adapter-invoke failures and refresh failures
+  use one class→status transition with one `auto_protect` audit.
+- `refreshReverseProxyCredential` applies that protection to the refresh error
+  class: a permanent `session_invalid` (provider `invalid_grant` /
+  `refresh_token_reused` / invalid refresh) transitions the account to
+  `needs_reauth`; transient classes (`rate_limit`, `timeout`, `upstream_error`,
+  `auth_failed`, `invalid_response`) map to no status and leave it untouched for
+  the next attempt.
+- Focused gateway regression proving permanent refresh failure parks the account
+  and transient failure does not.
+
+Out of scope (explicit follow-ups):
+
+- Interactive authorization-code/device-code re-auth to mint a fresh refresh token
+  after parking (per-provider, large) — operators re-import for now.
+- Per-provider quota/subscription/credits accounting and proactive background
+  refresh; multi-instance refresh coordination beyond the existing per-account
+  in-process lock.
+
+Definition of Done:
+
+- A permanently rejected serve-time refresh flips the account to `needs_reauth`
+  (idempotently) and records an `auto_protect` audit; the scheduler then stops
+  selecting it, ending the dead-token replay loop.
+- Transient refresh failures never change account status.
+- `api_key` accounts and the existing refresh-on-expiry/rotate/persist behavior are
+  unchanged; no new refresh implementation is introduced.
+- No secret material (refresh token, access token, client secret, ciphertext) is
+  logged, audited, or returned.
+
+Required gates:
+
+- `cd apps/api && go test ./internal/httpserver -run 'OAuthRefresh|ReverseProxy|ProviderAccount' -count=1`
+- `make architecture-check`
+- `make code-quality-check`
+- `git diff --check`
+
+## WP-1040: Pending OAuth Profile Adoption v1
+
+Objective: close the profile-adoption follow-up explicitly deferred by WP-1030 by
+letting a pending OAuth session that binds to an existing account opt in to
+adopting the provider-returned display name onto the SRapi profile. This does not
+copy sub2api's implicit provider-profile overwrite on every sign-in. SRapi keeps
+adoption opt-in, validates the adopted name exactly like a self-service profile
+edit, and never auto-adopts provider avatar URLs: SRapi avatars use a controlled
+upload/storage model, so fetching a remote avatar URL would add SSRF and privacy
+exposure that the account owner never authorized.
+
+Owns:
+
+- `PendingOAuthBindLoginRequest` gains an optional `adopt_display_name` flag and a
+  new `PendingOAuthBindCurrentUserRequest` carries the same optional flag; both
+  default to false and omitting the bind-current-user body keeps every preference
+  disabled.
+- `POST /api/v1/auth/oauth/pending/bind-current-user`,
+  `POST /api/v1/auth/oauth/pending/bind-login`, and
+  `POST /api/v1/auth/oauth/pending/bind-login/2fa` honour the opt-in only when the
+  bind attaches the identity to an existing account.
+- The bind-login two-factor path carries the opt-in inside the existing
+  HMAC-signed, pending-cookie-bound challenge (version bumped to `oauth-bind-v2`)
+  so the preference is tamper-evident and the two-factor request body is
+  unchanged.
+- Adoption reuses `users.UpdateProfile` validation (trimmed, non-empty,
+  <= 120 runes) and is skipped silently when the provider supplied no name, the
+  name exceeds the profile limit, the name is unchanged, or the profile update
+  fails, so a successful identity bind is never undone by an adoption preference.
+- Audit "after" snapshots for both existing-account bind paths record
+  `display_name_adopted`.
+- Generated OpenAPI Go types and TypeScript SDK.
+- Focused service and HTTP regressions for opt-in adoption, default-off binding,
+  the signed two-factor opt-in, and the avatar non-adoption guarantee.
+
+Definition of Done:
+
+- Adoption is opt-in only; default and omitted request bodies never change the
+  profile display name or avatar.
+- Only existing-account bind flows (bind-current-user and bind-login, including
+  its two-factor completion) adopt; create-account naming is unchanged.
+- Provider avatar URLs are never adopted, fetched, or written to the profile.
+- The adopted display name is validated exactly like a self-service profile edit,
+  and an unusable provider name leaves the profile unchanged without failing the
+  bind.
+- The two-factor opt-in is bound to the current pending cookie and cannot be
+  replayed against another pending OAuth session.
+- Responses and audit never expose pending token, raw upstream subject,
+  provider-subject hash, authorization code, provider tokens, password, session
+  cookie, CSRF token, or API key material.
+
+Required gates:
+
+- `make openapi-lint`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/modules/auth/service -run 'TestPreparePendingOAuthBindLogin|TestPendingOAuth(Session|ActionToken|EmailCompletion)' -count=1`
+- `cd apps/api && go test ./internal/httpserver -run 'TestPendingOAuthBind(Login|CurrentUser)|TestOAuthCallback' -count=1`
+- `make architecture-check`
+- `make code-quality-check`
+- `git diff --check`
+
+## WP-1030: Pending OAuth Email Completion v1
+
+Objective: close the next pending OAuth mutation gap found during the
+docs/sub2api comparison by adding an SRapi-native email-completion flow for
+OAuth/OIDC providers that do not return a usable email. This does not copy
+sub2api's front-end pending token or low-entropy code exchange. SRapi keeps the
+HttpOnly pending cookie as the browser binding and sends an encrypted,
+high-entropy, short-lived email-completion link through the existing
+transactional outbox.
+
+Owns:
+
+- `POST /api/v1/auth/oauth/pending/send-verify-code` accepts a submitted email
+  only when the pending session is a login flow with no retained email.
+- The send route enqueues `PendingOAuthEmailCompletionRequested` with encrypted
+  recipient email, encrypted confirmation token, email hash, expiry, and no raw
+  pending token/provider subject material.
+- Notification templates include `auth.oauth_pending_email_completion`, and the
+  worker sends a link containing the encrypted confirmation token.
+- `POST /api/v1/auth/oauth/pending/email-completion/confirm` requires the same
+  pending cookie plus the emailed token, writes the verified email back to the
+  pending session, and returns a fresh safe pending preview.
+- Confirmation does not consume pending OAuth, bind identities, create accounts,
+  or issue console sessions; the next step remains explicit create-account or
+  bind-login.
+- Generated OpenAPI Go types and TypeScript SDK.
+- Focused service, notification, Ent persistence, and HTTP regressions.
+
+Definition of Done:
+
+- Missing/invalid/expired/consumed pending cookie returns 401 and clears the
+  pending cookie where applicable.
+- Send and confirm reject sessions that already have email, target a user, or do
+  not represent a login flow.
+- Send response is uniform and does not reveal whether the email belongs to an
+  existing account.
+- Email-completion token is high entropy, encrypted at rest in outbox, tied to
+  the current pending session id, expires quickly, and cannot be used with
+  another pending OAuth cookie.
+- Confirmed email is normalized, marked verified for the pending session, and
+  causes the next preview to choose create-account or bind-existing-login using
+  existing SRapi decision logic.
+- Responses, outbox payload, and audit never expose pending token, raw upstream
+  subject, provider-subject hash, authorization code, provider tokens, password,
+  session cookie, CSRF token, API key material, or full upstream claims.
+- Profile adoption remains a separate follow-up package.
+
+Required gates:
+
+- `make openapi-lint`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/modules/auth/service -run 'TestPendingOAuth(EmailCompletion|ActionToken|Session|PreparePendingOAuthBindLogin|HashOAuthProviderSubject)' -count=1`
+- `cd apps/api && go test ./internal/modules/notifications/service -run 'Test(PendingOAuthEmailCompletionEvent|AuthEmailEvent|AuthPasswordResetEvent)' -count=1`
+- `cd apps/api && go test ./internal/persistence/entstore/auth -run 'TestPendingOAuth(EmailCompletion|SessionsAreHashOnly)' -count=1`
+- `cd apps/api && go test ./internal/httpserver -run 'TestPendingOAuth(EmailCompletion|CreateAccount|BindLogin)' -count=1`
+- `make architecture-check`
+- `make code-quality-check`
+- `git diff --check`
+
+## WP-1020: Pending OAuth Create Account v1
+
+Objective: close the next pending OAuth mutation gap found during the
+docs/sub2api comparison by adding an SRapi-native create-account flow for
+provider-verified emails. This does not copy sub2api's browser-session pair or
+combined exchange response. SRapi keeps `GET /pending` as the decision surface
+and issues a short-lived action token bound to the HttpOnly pending cookie before
+accepting a state-changing unauthenticated create-account request.
+
+Owns:
+
+- `GET /api/v1/auth/oauth/pending` includes `create_account_action` only when
+  `next_step=create_account_required`.
+- `POST /api/v1/auth/oauth/pending/create-account` validates the pending cookie,
+  action token, registration settings, email suffix policy, provider-retained
+  email match, and identity ownership before creating a user.
+- New users created from verified provider emails are marked email-verified,
+  bound to the external identity, signed in with the normal console session
+  cookie, and have the pending cookie consumed/cleared.
+- If identity binding or pending consumption fails before session issuance, the
+  newly created local user is deleted so the email is not reserved by a partial
+  OAuth flow.
+- Generated OpenAPI Go types and TypeScript SDK.
+- Focused service and HTTP regressions for action-token binding and successful
+  create-account completion.
+
+Definition of Done:
+
+- Missing/invalid/expired/consumed pending cookie returns 401 and clears the
+  pending cookie where applicable.
+- Missing or wrong action token returns 403; action tokens cannot be reused with
+  another pending OAuth cookie.
+- Email mismatch, targeted existing-user sessions, disabled registration, suffix
+  policy rejection, and already-used emails fail without consuming pending.
+- Success creates the user, marks provider-verified email ownership, binds the
+  identity, consumes/clears pending, sets a normal session cookie, and returns
+  `LoginResponse`.
+- Responses and audit never expose pending token, raw upstream subject,
+  provider-subject hash, authorization code, provider tokens, password, session
+  cookie, CSRF token, API key material, or full upstream claims.
+- Send-verify-code, email completion, and profile adoption remain separate
+  follow-up mutation packages.
+
+Required gates:
+
+- `make openapi-lint`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/modules/auth/service -run 'TestPendingOAuth(ActionToken|Session|PreparePendingOAuthBindLogin|HashOAuthProviderSubject)' -count=1`
+- `cd apps/api && go test ./internal/modules/users/service ./internal/persistence/entstore/users -run 'Test(DeleteRemovesUser|BindAuthIdentity|ListAuthIdentities|StoreFindsAuthIdentity)' -count=1`
+- `cd apps/api && go test ./internal/httpserver -run 'Test(PendingOAuthCreateAccount|PendingOAuthBindLogin|OAuth(Start|Callback))' -count=1`
+- `make architecture-check`
+- `make code-quality-check`
+- `git diff --check`
+
+## WP-1010: Pending OAuth Existing-Account Bind Login v1
+
+Objective: close the next pending OAuth mutation gap found during the
+docs/sub2api comparison by adding an SRapi-native existing-account bind-login
+flow. This does not copy sub2api's combined exchange handler or token-pair
+response shape. SRapi keeps pending preview read-only, then requires local
+password authentication and, when enabled, TOTP before binding the external
+identity and issuing a normal console session cookie.
+
+Read first:
+
+- `docs/SECURITY_MODEL.md`
+- `docs/OPENAPI_CONTRACT.md`
+- `apps/api/internal/modules/auth/service/pending_oauth.go`
+- `apps/api/internal/modules/users/service/service.go`
+- `apps/api/internal/httpserver/runtime_oauth_handlers.go`
+- `packages/openapi/openapi.yaml`
+
+Owns:
+
+- Public auth APIs:
+  - `POST /api/v1/auth/oauth/pending/bind-login`
+  - `POST /api/v1/auth/oauth/pending/bind-login/2fa`
+- Auth service prepare/complete commands that validate pending OAuth session,
+  authenticate local credentials, issue pending-OAuth-specific 2FA challenges
+  when needed, and bind those challenges to the pending token hash.
+- HTTP bind-login handlers that attach the verified external identity to the
+  existing account, reject target-user mismatches and identity ownership
+  conflicts, consume/clear pending cookies only after successful binding, and
+  issue normal console session cookies.
+- Generated OpenAPI Go types and TypeScript SDK.
+- Focused auth service and HTTP regressions for no-2FA and 2FA flows.
+
+Definition of Done:
+
+- Missing/invalid/expired/consumed pending cookie returns 401 and clears the
+  pending cookie where applicable.
+- Invalid email/password returns 401; disabled target users return 403; pending
+  sessions targeting a different user or identities already owned by another
+  user return conflict.
+- Accounts without 2FA bind the identity, consume the pending session, clear the
+  pending cookie, set a normal console session cookie, and return `LoginResponse`.
+- Accounts with 2FA return `202 LoginTwoFactorRequiredResponse` after password
+  validation without binding, consuming pending session, or issuing a session
+  cookie. The 2FA completion route requires the same pending cookie and rejects
+  challenges paired with a different pending token.
+- Responses and audit never expose pending token, raw upstream subject,
+  provider-subject hash, authorization code, provider tokens, password, TOTP
+  secret/code, session cookie, CSRF token, API key material, or full upstream
+  claims.
+- Create-account, email completion, send-verify-code, and profile adoption
+  remain separate follow-up mutation packages.
+- `specs/STATUS.md` records completion and gates.
+
+Required gates:
+
+- `make openapi-lint`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/modules/auth/service -run 'TestPreparePendingOAuthBindLogin|TestPendingOAuthSession|TestHashOAuthProviderSubject' -count=1`
+- `cd apps/api && go test ./internal/modules/users/service ./internal/persistence/entstore/users -run 'Test(BindAuthIdentity|StoreFindsAuthIdentity)' -count=1`
+- `cd apps/api && go test ./internal/httpserver -run 'Test(PendingOAuthBindLogin|OAuth(Start|Callback))' -count=1`
+- `make architecture-check`
+- `make code-quality-check`
+- `git diff --check`
+
+## WP-900: Low-Balance Notification Trigger v1
+
+Objective: close the first notification-trigger gap found during the
+docs/sub2api comparison by adding an SRapi-native balance-low trigger. This
+does not copy sub2api's synchronous goroutine email sender or user-column extra
+email list; SRapi enqueues a safe domain event after successful balance charging
+and lets the existing outbox notification dispatcher render, suppress, retry,
+and deliver the optional email.
+
+Read first:
+
+- `docs/DOMAIN_EVENTS_SPEC.md`
+- `docs/SECURITY_MODEL.md`
+- `docs/OPENAPI_CONTRACT.md`
+- `apps/api/internal/workers/balance_charger/worker.go`
+- `apps/api/internal/modules/notifications/service/service.go`
+- `apps/api/internal/workers/outbox/domain_handler.go`
+
+Owns:
+
+- `BalanceLowTriggered` domain event.
+- Balance charger threshold-crossing detection:
+  `balance_before >= threshold && balance_after < threshold`.
+- Admin Settings email defaults:
+  - `balance_low_notify_enabled`
+  - `balance_low_notify_threshold`
+  - `balance_low_notify_recharge_url`
+- Outbox notification handling for `balance.low` with template rendering,
+  one-click unsubscribe headers, and current-user preference suppression.
+- Generated OpenAPI Go types and TypeScript SDK.
+- Focused notification, balance charger, outbox, and admin settings tests.
+
+Definition of Done:
+
+- Successful usage charging can enqueue exactly one idempotent
+  `BalanceLowTriggered` event when the user crosses below the configured
+  threshold.
+- The event payload contains only safe operational fields: user id, recipient
+  email hash, balances, threshold, currency, ledger reference, usage log ids,
+  charged timestamp, and recharge URL.
+- Payloads and idempotency keys do not include plaintext email, unsubscribe
+  token, session cookie, CSRF token, SMTP secret, API key, provider credential,
+  or prompt.
+- Notification dispatch re-reads the current user, rejects stale recipient
+  hashes, skips inactive users, honors `balance.low` unsubscribe state, and
+  attaches one-click unsubscribe headers when possible.
+- SMTP/template failures remain outbox-retryable and never roll back balance
+  charging.
+- Avatar storage, OAuth identity binding/onboarding, and credential-gated SMTP
+  smoke remain separate follow-up packages.
+- `specs/STATUS.md` records completion and gates.
+
+Required gates:
+
+- `make openapi-lint`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/modules/notifications/... -count=1`
+- `cd apps/api && go test ./internal/workers/balance_charger ./internal/workers/outbox ./internal/modules/admin_control/... -count=1`
+- `make architecture-check`
+- `make code-quality-check`
+- `git diff --check`
+
+## WP-890: Current-User Notification Preferences v1
+
+Objective: close the current-user notification preference gap found during the
+docs/sub2api comparison by adding SRapi-native primary-email optional
+notification preference APIs. This does not copy sub2api's user-column extra
+email JSON model; SRapi keeps hash-only event-scoped preference state shared
+with one-click unsubscribe, and leaves extra notification contacts for a
+separate verified-contact flow.
+
+Read first:
+
+- `docs/SECURITY_MODEL.md`
+- `docs/OPENAPI_CONTRACT.md`
+- `packages/openapi/openapi.yaml`
+- `apps/api/internal/modules/notifications/service/preferences.go`
+- `apps/api/internal/httpserver/runtime_notification_handlers.go`
+
+Owns:
+
+- Current-user APIs:
+  - `GET /api/v1/me/notification-preferences`
+  - `PUT /api/v1/me/notification-preferences`
+- Preference service list/update methods for optional event subscriptions.
+- Shared storage with one-click unsubscribe using event plus primary-email hash.
+- Audit-safe current-user preference update records.
+- Generated OpenAPI Go types and TypeScript SDK.
+- Focused notification service and HTTP tests.
+
+Definition of Done:
+
+- `GET` requires a console session and returns all optional notification events
+  with default `subscribed=true` when no stored preference exists.
+- `PUT` requires console session plus CSRF and updates only allowlisted optional
+  events such as `balance.low` and `account.quota_alert`.
+- Transactional auth mail events such as `auth.password_reset` and
+  `auth.email_verification` cannot be modified through the preference API.
+- Stored preference keys and values do not include plaintext recipient email,
+  unsubscribe token, session cookie, CSRF token, SMTP secret, API key, provider
+  credential, or prompt.
+- Current-user preference updates and one-click unsubscribe share the same
+  suppression state used by notification senders.
+- Extra notification email addresses, notification triggers, avatar storage,
+  OAuth identity binding/onboarding, and credential-gated SMTP smoke remain
+  separate follow-up packages.
+- `specs/STATUS.md` records completion and gates.
+
+Required gates:
+
+- `make openapi-lint`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/modules/notifications/... -count=1`
+- `cd apps/api && go test ./internal/httpserver -run 'Test(CurrentUserNotificationPreferences|NotificationUnsubscribeEndpoint)' -count=1`
+- `make architecture-check`
+- `make code-quality-check`
+- `git diff --check`
+
+## WP-850: Public Email Verification v1
+
+Objective: close the email-verification gap found during the docs/sub2api
+comparison by adding SRapi-native public email verification with hash-only
+durable tokens and outbox-backed delivery metadata. This does not copy
+sub2api's short verification-code cache; SRapi persists a single-use receipt,
+keeps delivery behind the existing domain-event outbox boundary, and treats
+verification as proof of email ownership rather than login.
+
+Read first:
+
+- `docs/SECURITY_MODEL.md`
+- `docs/OPENAPI_CONTRACT.md`
+- `docs/DATA_MODEL.md`
+- `packages/openapi/openapi.yaml`
+- `apps/api/internal/modules/auth/contract/contract.go`
+- `apps/api/internal/modules/users/contract/contract.go`
+
+Owns:
+
+- Public auth APIs:
+  - `POST /api/v1/auth/email-verification/request`
+  - `POST /api/v1/auth/email-verification/confirm`
+- `email_verification_tokens` Ent schema and incremental PostgreSQL migration.
+- Auth store support for hash-only verification token creation and atomic
+  single-use consumption.
+- Auth service request/confirm flow with uniform request responses and
+  `users.email_verified_at` marking after confirmation.
+- Outbox event `AuthEmailVerificationRequested` carrying only encrypted token
+  delivery metadata and email hash.
+- Generated OpenAPI Go types and TypeScript SDK.
+- Focused service, Ent persistence, HTTP, migration, and contract drift tests.
+
+Definition of Done:
+
+- Request route is unauthenticated and returns the same accepted response for
+  syntactically valid existing, missing, inactive, already verified, or
+  otherwise unavailable emails.
+- No plaintext verification token is persisted; durable storage contains only
+  keyed token hash, expiry, and used-at receipt data.
+- Outbox payload does not contain plaintext email, password, session cookie,
+  CSRF token, or plaintext verification token.
+- Confirm route consumes exactly one unexpired token, sets
+  `users.email_verified_at`, exposes the verified timestamp through current-user
+  and admin user responses, and rejects token reuse.
+- Confirming email ownership does not create or revoke console sessions.
+- Notification email management, avatar storage, and OAuth identity binding
+  remain separate follow-up flows.
+- `specs/STATUS.md` records completion and gates.
+
+Required gates:
+
+- `make ent-generate-check`
+- `make migration-check`
+- `make openapi-lint`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/modules/auth/... ./internal/modules/users/... ./internal/persistence/entstore/auth ./internal/httpserver -run 'Test(RequestEmailVerification|ConfirmEmailVerification|VerifyEmail|EmailVerification|Register)' -count=1`
+- `make architecture-check`
+- `make code-quality-check`
+- `git diff --check`
+
+## WP-840: Public Password Reset v1
+
+Objective: close the next auth lifecycle gap found during the docs/sub2api
+comparison by adding SRapi-native public password reset with hash-only durable
+tokens and outbox-backed delivery metadata. This does not copy sub2api's Redis
+code cache; SRapi persists a single-use receipt and keeps mail delivery behind
+the existing domain-event outbox boundary.
+
+Read first:
+
+- `docs/SECURITY_MODEL.md`
+- `docs/OPENAPI_CONTRACT.md`
+- `docs/DATA_MODEL.md`
+- `packages/openapi/openapi.yaml`
+- `apps/api/internal/modules/auth/contract/contract.go`
+- `apps/api/internal/modules/users/contract/contract.go`
+
+Owns:
+
+- Public auth APIs:
+  - `POST /api/v1/auth/password-reset/request`
+  - `POST /api/v1/auth/password-reset/confirm`
+- `password_reset_tokens` Ent schema and incremental PostgreSQL migration.
+- Auth store support for hash-only reset token creation and atomic single-use
+  consumption.
+- Auth service request/confirm flow with uniform request responses and active
+  session revocation after reset.
+- Outbox event `AuthPasswordResetRequested` carrying only encrypted token
+  delivery metadata and email hash.
+- Generated OpenAPI Go types and TypeScript SDK.
+- Focused service, Ent persistence, HTTP, migration, and contract drift tests.
+
+Definition of Done:
+
+- Request route is unauthenticated and returns the same accepted response for
+  syntactically valid existing, missing, inactive, or otherwise unavailable
+  emails.
+- No plaintext reset token is persisted; durable storage contains only keyed
+  token hash, expiry, and used-at receipt data.
+- Outbox payload does not contain plaintext email, password, session cookie,
+  CSRF token, or plaintext reset token.
+- Confirm route consumes exactly one unexpired token, updates the password hash,
+  revokes active console sessions for the user, rejects old password login, and
+  rejects token reuse.
+- Email verification, notification email management, avatar storage, and OAuth
+  identity binding remain separate follow-up flows.
+- `specs/STATUS.md` records completion and gates.
+
+Required gates:
+
+- `make ent-generate-check`
+- `make migration-check`
+- `make openapi-lint`
+- `make openapi-codegen-check`
+- `make openapi-ts-codegen-check`
+- `make sdk-ts-typecheck`
+- `cd apps/api && go test ./internal/modules/auth/... ./internal/modules/users/... ./internal/persistence/entstore/auth ./internal/httpserver -run 'Test(RequestPasswordReset|ConfirmPasswordReset|ResetPassword|PasswordReset|Register|LoginCreatesSession)' -count=1`
+- `make architecture-check`
+- `make code-quality-check`
+- `git diff --check`

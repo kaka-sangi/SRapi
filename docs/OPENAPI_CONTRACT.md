@@ -85,6 +85,7 @@ packages/openapi/
 /api/v1/admin/affiliates
 /api/v1/admin/ops
 /api/v1/admin/settings
+/api/v1/admin/notifications
 /api/v1/admin/dashboard/snapshot
 /api/v1/admin/announcements
 /api/v1/admin/redeem-codes
@@ -207,7 +208,423 @@ components:
 - 控制台写接口使用 `cookieAuth` + `csrfHeader`。
 - Gateway `/v1/*` 接口使用 `gatewayBearerAuth`。
 
-### 4.5 Provider Account Import / Export
+### 4.5 Public Registration
+
+Public console registration is an unauthenticated auth route:
+
+```txt
+POST /api/v1/auth/register
+```
+
+The route is enabled only when admin settings
+`security.registration_enabled=true`. If
+`security.registration_email_suffix_allowlist` is non-empty, the request email
+domain must exactly match one normalized suffix such as `@example.com`; an empty
+list allows all valid email domains. The route creates a regular user account,
+applies the configured default balance and default RPM limit, sets the HttpOnly
+console session cookie, and returns the standard `LoginResponse` with the
+one-time CSRF token. Duplicate email, suffix-policy rejection, and malformed
+input responses must use the same generic `400 INVALID_REQUEST` shape so callers
+cannot use registration errors to enumerate existing accounts or configured
+registration domains.
+
+Email verification and password reset are handled by the dedicated
+unauthenticated contracts below.
+
+### 4.5.1 Email Verification
+
+Public console email verification uses two unauthenticated auth routes:
+
+```txt
+POST /api/v1/auth/email-verification/request
+POST /api/v1/auth/email-verification/confirm
+```
+
+`request` accepts an email and returns the same `202` accepted response for
+syntactically valid input whether the email is missing, inactive, already
+verified, or linked to an active unverified user. When an active unverified user
+exists, SRapi stores only a keyed hash of the single-use verification token in
+`email_verification_tokens` and enqueues `AuthEmailVerificationRequested` with
+an encrypted verification token payload for later mail delivery. The event
+payload must not contain the plaintext email, plaintext token, password,
+session cookie, or CSRF token.
+
+`confirm` accepts the verification token, consumes it exactly once, and marks
+the user's primary email as verified by setting `users.email_verified_at`.
+Invalid, expired, or already consumed tokens return `401`. Confirming email
+ownership does not create a login session.
+
+### 4.5.2 Password Reset
+
+Public console password recovery uses two unauthenticated auth routes:
+
+```txt
+POST /api/v1/auth/password-reset/request
+POST /api/v1/auth/password-reset/confirm
+```
+
+`request` accepts an email and returns the same `202` accepted response for
+syntactically valid input whether or not an active user exists. When an active
+user exists, SRapi stores only a keyed hash of the single-use reset token in
+`password_reset_tokens` and enqueues `AuthPasswordResetRequested` with an
+encrypted reset token payload for later mail delivery. The event payload must
+not contain the plaintext email, plaintext token, password, session cookie, or
+CSRF token.
+
+`confirm` accepts the reset token and new password, consumes the token exactly
+once, replaces the user's password hash, and revokes active console sessions
+for that user. Invalid, expired, or already consumed tokens return `401`.
+
+### 4.5.3 OAuth/OIDC Browser Flow
+
+Public OAuth/OIDC authorization starts through:
+
+```txt
+GET /api/v1/auth/oauth/{provider}/start
+GET /api/v1/auth/oauth/{provider}/callback
+```
+
+The start route is unauthenticated but only works when Admin Settings enable OAuth
+and provide a matching non-secret provider config. It returns `302` to the
+provider authorization endpoint and sets a short-lived encrypted HttpOnly
+`srapi_oauth_flow` cookie scoped to `/api/v1/auth/oauth`.
+
+The authorization request always uses authorization code + PKCE S256, includes
+`state`, and includes `nonce` for OpenID scopes. The encrypted flow cookie binds
+state, PKCE verifier, nonce, provider, provider key, intent, local redirect
+path, creation time, and expiry. The cookie must not expose provider client
+secret, authorization code, token material, raw subject, profile claims, session
+cookie, CSRF token, or API key material.
+
+The callback route validates the encrypted flow cookie and returned `state`,
+uses the stored PKCE verifier to exchange the authorization code at the
+configured token endpoint, fetches UserInfo with a bearer access token, and
+creates a short-lived pending OAuth session. The pending session stores only a
+keyed hash of the upstream subject plus a safe profile summary, then sets an
+HttpOnly `srapi_oauth_pending` cookie scoped to `/api/v1/auth/oauth/pending`
+and redirects to the bound local console path. Callback v1 supports public
+clients with `token_auth_method=none`; confidential-client secret handling and
+final account adoption routes are follow-up packages.
+
+The console can inspect the pending decision through:
+
+```txt
+GET  /api/v1/auth/oauth/pending
+POST /api/v1/auth/oauth/pending/bind-current-user
+POST /api/v1/auth/oauth/pending/send-verify-code
+POST /api/v1/auth/oauth/pending/email-completion/confirm
+POST /api/v1/auth/oauth/pending/create-account
+POST /api/v1/auth/oauth/pending/bind-login
+POST /api/v1/auth/oauth/pending/bind-login/2fa
+```
+
+The `GET` route reads only the HttpOnly `srapi_oauth_pending` cookie and returns a
+safe pending-session preview: provider, provider key, display-safe subject
+hint, normalized profile summary, local redirect, expiry, and a `next_step`
+decision such as `email_completion_required`, `bind_existing_login_required`,
+or `create_account_required`. The route is read-only and must not consume the
+pending session; it never returns the pending token, raw upstream subject,
+provider-subject hash, authorization code, provider access/refresh token,
+session cookie, CSRF token, or full upstream claims. When `next_step` is
+`create_account_required`, the preview also returns a short-lived
+`create_account_action` token. That token is signed, bound to the current
+pending OAuth cookie, and usable only for the create-account mutation.
+
+The `POST /bind-current-user` route requires `cookieAuth` plus `csrfHeader`.
+It binds the pending external identity to the authenticated console user, rejects
+identities already owned by another user, consumes the pending token after a
+successful bind, clears the pending cookie, and returns the refreshed current
+user auth identity list. It does not create accounts, validate passwords, or
+issue login sessions.
+
+The `POST /send-verify-code` route is for pending OAuth sessions whose provider
+profile did not contain a usable email. It requires only the HttpOnly pending
+cookie and a submitted email address, then enqueues a high-entropy encrypted
+email-completion link through the transactional outbox. The response is uniform
+`202` and does not reveal whether the email already belongs to a local account.
+The follow-up `POST /email-completion/confirm` route requires the same pending
+cookie plus the emailed token. It writes the verified email into the pending
+session and returns a fresh safe pending preview; it does not consume the pending
+session or issue a console session.
+
+The `POST /create-account` route is for unauthenticated browser completion when
+the provider returned a verified email that does not belong to an existing local
+account. It requires the HttpOnly pending cookie plus the `create_account_action`
+token from the preview response. SRapi validates the pending session, action
+token, registration settings, email suffix policy, and email match before
+creating the account. On success it binds the external identity, consumes and
+clears the pending cookie, sets a normal console session cookie, and returns
+`LoginResponse`. If binding or pending consumption fails before a session is
+issued, SRapi rolls back the newly created local user so the email is not left
+reserved by a half-completed OAuth flow.
+
+The `POST /bind-login` route is for unauthenticated browser completion when the
+pending provider profile should be attached to an existing console account. It
+requires the pending cookie plus local email/password credentials. If password
+authentication succeeds and the account has no second factor enabled, SRapi binds
+the external identity to that account, consumes the pending token, clears the
+pending cookie, sets a normal console session cookie, and returns `LoginResponse`.
+If the account requires TOTP, it returns `202 LoginTwoFactorRequiredResponse`
+without binding or consuming the pending token. The follow-up
+`POST /bind-login/2fa` requires the same pending cookie and a pending-OAuth
+specific challenge id; the challenge is bound to the pending token and cannot be
+reused as a normal login challenge or with another pending session.
+
+Only `intent=login` is accepted by this v1 start/callback flow. The explicit
+CSRF-protected bind route may adopt either a login pending session or a future
+`bind_current_user` pending session for the currently authenticated user.
+
+### 4.5.4 Transactional Auth Email Delivery
+
+Password reset and email verification delivery is handled by the domain-event
+outbox worker, not by the public auth request handlers. When
+`EMAIL_PUBLIC_BASE_URL`, `EMAIL_SMTP_HOST`, and `EMAIL_SMTP_FROM` are configured,
+the worker consumes `AuthPasswordResetRequested` and
+`AuthEmailVerificationRequested`, decrypts the token payload with the
+deployment master key, and renders the configured action path with a `token`
+query parameter.
+
+The dispatcher must validate the current user record before sending: inactive
+users are skipped, and the current `users.email` hash must match the event's
+recipient email hash. This makes stale queued events harmless after an email
+change. Missing email configuration leaves delivery retryable/failed in the
+outbox rather than silently marking the event as published. SMTP password
+material is deployment env only and is not part of the Admin Settings API,
+generated SDK request types, responses, or audit snapshots.
+
+### 4.5.5 Optional Notification Unsubscribe
+
+Optional notification email preferences use public notification routes:
+
+```txt
+GET  /api/v1/notifications/unsubscribe?token=...
+POST /api/v1/notifications/unsubscribe
+```
+
+`GET` validates a signed unsubscribe token without changing state. `POST`
+applies the preference and accepts the token from a query parameter, JSON body,
+or form field so one-click unsubscribe clients can submit the generated link.
+Tokens contain the event name, an email hash, and expiry; they do not contain
+the plaintext email address.
+
+Only optional notification events such as `balance.low`,
+`subscription.expiry_reminder`, and `account.quota_alert` can be unsubscribed.
+Transactional auth and contact-verification mail such as password reset, email
+verification, and `notification.contact_verification` is not suppressible
+through this route and does not include unsubscribe headers.
+
+Current users can also manage the same optional event preferences directly:
+
+```txt
+GET /api/v1/me/notification-preferences
+PUT /api/v1/me/notification-preferences
+```
+
+`GET` returns the optional notification event catalog and the current user's
+subscription state. `PUT` requires `cookieAuth` plus `csrfHeader` and updates
+only allowlisted optional events for the current user's primary email hash. The
+stored preference state is shared with one-click unsubscribe and does not store
+plaintext recipient emails.
+
+Current users manage secondary notification recipients through the separate
+verified-contact API:
+
+```txt
+GET    /api/v1/me/notification-contacts
+POST   /api/v1/me/notification-contacts
+POST   /api/v1/me/notification-contacts/verify
+PATCH  /api/v1/me/notification-contacts/{id}
+DELETE /api/v1/me/notification-contacts/{id}
+```
+
+`POST` requires `cookieAuth` plus `csrfHeader`, creates or reuses a pending
+contact, and enqueues `NotificationContactVerificationRequested` with encrypted
+recipient email and encrypted verification token payloads. The primary account
+email cannot be added as a secondary contact. `verify` consumes the signed,
+time-limited token from the current session and marks the contact verified.
+Optional notification delivery includes only verified, enabled contacts and
+still applies each recipient email's event-scoped unsubscribe preference and
+one-click unsubscribe headers.
+
+`AdminSettings.email` also carries the low-balance trigger defaults:
+`balance_low_notify_enabled`, `balance_low_notify_threshold`, and
+`balance_low_notify_recharge_url`. These settings control when the
+`balance.low` optional notification is enqueued after balance charging. The
+actual email remains outbox-dispatched and preference-aware; the charge worker
+does not call SMTP directly.
+
+`subscription_expiry_notify_enabled` controls the optional
+`subscription.expiry_reminder` trigger. The subscription expiry worker scans
+active subscriptions and enqueues 7-day, 3-day, and 1-day reminder events with
+subscription metadata only. Email rendering, one-click unsubscribe handling,
+and SMTP retry stay inside the outbox notification dispatcher.
+
+`account_quota_notify_enabled` and
+`account_quota_notify_remaining_ratio` control the optional
+`account.quota_alert` trigger. The account quota alert worker scans persisted
+provider-account quota snapshots and enqueues an alert only when the latest
+remaining ratio crosses downward through the configured threshold. Dispatch is
+still outbox-backed, preference-aware, and SMTP-retryable.
+
+### 4.6 Current-User Profile
+
+Current users can update the small set of profile fields they own:
+
+```txt
+PATCH /api/v1/me
+```
+
+The route requires `cookieAuth` plus `csrfHeader` and currently accepts only
+`name`. The request schema is an explicit allowlist: callers cannot update
+email, roles, status, balance, RPM limits, password, avatar, or other
+admin-managed fields through this route. Email changes, notification emails,
+and identity bindings remain separate flows because they need verification or
+provider-specific OAuth handling.
+
+Current-user avatar storage is a dedicated flow:
+
+```txt
+PUT    /api/v1/me/avatar
+DELETE /api/v1/me/avatar
+GET    /api/v1/users/{id}/avatar
+```
+
+Avatar writes require `cookieAuth` plus `csrfHeader` and accept only
+`multipart/form-data` field `avatar`. SRapi decodes PNG/JPEG uploads, rejects
+files over 1 MiB or images above 1024x1024, re-encodes accepted images as PNG,
+stores only SRapi-owned image bytes and metadata, and serves the normalized
+image through `GET /api/v1/users/{id}/avatar` with `image/png` and `nosniff`.
+`GET /api/v1/me` includes avatar metadata and a relative `avatar_url` when the
+current user has configured an avatar.
+
+Current-user auth identity directory:
+
+```txt
+GET    /api/v1/me/auth-identities
+DELETE /api/v1/me/auth-identities/{id}
+```
+
+The route requires `cookieAuth` and returns the local email sign-in identity
+plus verified external OAuth/OIDC identities already bound to the current user.
+External identities expose only `provider`, `provider_key`, display-safe
+`subject_hint`, non-sensitive profile summary fields, and timestamps. Raw
+upstream subjects, OAuth codes, tokens, cookies, provider secrets, and
+credential payloads are never part of this contract.
+The delete route requires `cookieAuth` plus `csrfHeader`, removes one external
+identity by its persistent id, returns the refreshed identity list, and never
+accepts provider-wide unbinds that could remove another provider instance
+accidentally. The derived local email identity has no persistent id and cannot
+be unbound through this endpoint.
+paths.
+
+### 4.7 Current-User Password
+
+Current users can change their own console password:
+
+```txt
+POST /api/v1/me/password
+```
+
+The route requires `cookieAuth` plus `csrfHeader`, verifies the current
+password before replacing the stored password hash, revokes active console
+sessions for that user, clears the current session cookie, and returns `204`.
+Audit evidence records only non-secret user metadata; it must not include either
+password, session cookie, CSRF token, or password hash.
+
+### 4.8 Current-User Announcements
+
+Current-user announcements are read from the console control plane:
+
+```txt
+GET  /api/v1/me/announcements
+POST /api/v1/me/announcements/{id}/read
+```
+
+`GET /api/v1/me/announcements` returns only published announcements visible to
+the current user's role and active time window. Each item includes read state
+from `user_announcement_reads`; if an announcement is updated after `read_at`,
+it is treated as unread again. `POST /api/v1/me/announcements/{id}/read` is a
+console write and requires `cookieAuth` plus `csrfHeader`.
+
+### 4.9 Console TOTP / 2FA
+
+Console TOTP routes are part of the current-user control plane:
+
+```txt
+POST /api/v1/auth/login/2fa
+GET  /api/v1/me/totp/status
+POST /api/v1/me/totp/setup
+POST /api/v1/me/totp/enable
+POST /api/v1/me/totp/disable
+```
+
+`POST /api/v1/auth/login` keeps the existing `200 LoginResponse` shape for
+users without TOTP. When TOTP is enabled it returns `202
+LoginTwoFactorRequiredResponse`, does not set the session cookie, and provides
+a short-lived `challenge_id`. `POST /api/v1/auth/login/2fa` accepts that
+challenge plus a TOTP or recovery code, sets the session cookie on success, and
+returns the standard `LoginResponse`.
+
+Current-user setup, enable, and disable routes are console writes and must
+require `cookieAuth` plus `csrfHeader`. Setup returns the enrollment secret and
+`otpauth://` URI once; enable verifies a TOTP code and returns one-time
+recovery codes. Recovery codes are accepted for login/disable but must be
+stored only as keyed hashes and consumed on first use.
+
+### 4.8 Current-User Redeem Codes
+
+Current-user redeem-code application is a console write:
+
+```txt
+POST /api/v1/me/redeem-codes/redeem
+```
+
+The route requires `cookieAuth` plus `csrfHeader`. It accepts a code, normalizes
+it case-insensitively, and returns a `RedeemCodeRedemptionResult` containing
+the redemption receipt, the updated redeem-code summary, and an
+`already_redeemed` flag. Balance codes credit the current user's balance and
+produce a `billing_ledger` entry with `type=redeem_code_credit`; subscription
+codes create a user subscription from the referenced plan and materialize
+entitlements. Repeating the same code for the same user returns the original
+receipt without a second balance/subscription side effect.
+
+### 4.9 Current-User Promo Codes
+
+Current-user promo-code application is part of payment order creation:
+
+```txt
+POST /api/v1/payment/orders
+```
+
+The route already requires `cookieAuth` plus `csrfHeader`.
+`CreatePaymentOrderRequest` accepts optional `promo_code`; `PaymentOrder`
+returns `original_amount`, `discount_amount`, and nullable `promo_code_id`.
+The server validates and applies the promo before provider checkout creation,
+so the payment provider only sees the final payable `amount`. Persistent stores
+write the payment order, `user_promo_code_applications` receipt, and promo-code
+`used_count` increment atomically.
+
+### 4.10 AdminOps System Logs
+
+AdminOps system-log routes are part of the console control plane:
+
+```txt
+GET  /api/v1/admin/ops/system-logs
+POST /api/v1/admin/ops/system-logs/cleanup
+```
+
+`GET /api/v1/admin/ops/system-logs` returns sanitized structured events from
+`ops_system_logs`. Query filters may include `level`, `source`, `q`, `start`,
+and `end`; pagination uses the existing admin list defaults.
+
+`POST /api/v1/admin/ops/system-logs/cleanup` is a write route and must require
+`cookieAuth` plus `csrfHeader`. Cleanup requires at least one bounded filter,
+supports `dry_run`, caps `max_delete`, and writes a safe audit record with
+matched/deleted counts and normalized filter metadata. Audit payloads must not
+copy raw log messages, raw search strings, credentials, prompts, cookies, API
+keys, or provider-native frames.
+
+### 4.11 Provider Account Import / Export
 
 账号池导入导出接口必须保持凭证安全边界：
 
@@ -222,7 +639,7 @@ components:
 - WP-530 起，Antigravity discovery 在账号缺少 project metadata 时会先通过同一 Reverse Proxy Runtime / selected account credential 调用 `{base_url}/v1internal:loadCodeAssist`，必要时调用 `{base_url}/v1internal:onboardUser`，再进行模型发现；`persist=true` 时写回解析到的 project metadata。
 - 该 discovery 结果必须用于后续 Provider Account model 选择，保持 `supported_models` 与现有 Scheduler/Gateway 边界一致。
 
-### 4.6 RBAC Matrix
+### 4.12 RBAC Matrix
 
 管理员接口必须在 OpenAPI 描述中标注权限需求。
 
@@ -237,6 +654,7 @@ components:
 | `/api/v1/admin/ops/slo` | yes | yes | read only | no |
 | `/api/v1/admin/ops/alerts` | yes | yes | read only | no |
 | `/api/v1/admin/settings` | yes | yes | no | no |
+| `/api/v1/admin/notifications/email-templates` | yes | yes | no | no |
 | `/api/v1/admin/dashboard/snapshot` | yes | yes | read only | no |
 | `/api/v1/admin/announcements` | yes | yes | no | no |
 | `/api/v1/admin/redeem-codes` | yes | yes | no | no |
@@ -244,7 +662,7 @@ components:
 | `/api/v1/admin/risk-control` | yes | yes | read only | no |
 | `/api/v1/admin/audit-logs` | yes | yes | no | no |
 
-### 4.7 Ops SLO / Alert APIs
+### 4.13 Ops SLO / Alert APIs
 
 `/api/v1/admin/ops/slo` 和 `/api/v1/admin/ops/alerts` 属于 AdminOps 控制面：
 
@@ -510,6 +928,7 @@ Provider 特有字段放入：
 
 ```txt
 POST /api/v1/auth/login
+POST /api/v1/auth/register
 POST /api/v1/auth/logout
 POST /api/v1/auth/refresh
 GET  /api/v1/auth/session

@@ -7,11 +7,14 @@ import (
 	"sync"
 	"time"
 
+	admincontrolcontract "github.com/srapi/srapi/apps/api/internal/modules/admin_control/contract"
 	affiliatecontract "github.com/srapi/srapi/apps/api/internal/modules/affiliate/contract"
 	auditcontract "github.com/srapi/srapi/apps/api/internal/modules/audit/contract"
 	"github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	"github.com/srapi/srapi/apps/api/internal/modules/events/service"
+	notificationscontract "github.com/srapi/srapi/apps/api/internal/modules/notifications/contract"
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
+	userscontract "github.com/srapi/srapi/apps/api/internal/modules/users/contract"
 )
 
 const (
@@ -23,15 +26,30 @@ const (
 )
 
 type Config struct {
-	Interval          time.Duration
-	Limit             int
-	RetryBackoff      time.Duration
-	ConsumerName      string
-	EventHandler      service.OutboxHandler
-	DispatchClock     service.Clock
-	AffiliateStore    affiliatecontract.Store
-	AuditStore        auditcontract.Store
-	SubscriptionStore subscriptioncontract.Store
+	Interval              time.Duration
+	Limit                 int
+	RetryBackoff          time.Duration
+	ConsumerName          string
+	EventHandler          service.OutboxHandler
+	DispatchClock         service.Clock
+	AffiliateStore        affiliatecontract.Store
+	AdminControlStore     admincontrolcontract.Store
+	AuditStore            auditcontract.Store
+	UserStore             userscontract.Store
+	EmailConfig           notificationscontract.EmailConfig
+	EmailPublicBaseURL    string
+	EmailSMTPHost         string
+	EmailSMTPPort         int
+	EmailSMTPUsername     string
+	EmailSMTPPassword     string
+	EmailSMTPFrom         string
+	EmailSMTPFromName     string
+	EmailSMTPUseTLS       bool
+	EmailSender           notificationscontract.EmailSender
+	EmailTemplates        map[string]string
+	EmailTemplateProvider notificationscontract.EmailTemplateProvider
+	MasterKey             string
+	SubscriptionStore     subscriptioncontract.Store
 }
 
 type Worker struct {
