@@ -3912,6 +3912,18 @@ Required gates:
 - `make code-quality-check`
 - `git diff --check`
 
+## WP-1290: OIDC id_token Validation v1
+
+Objective: complete confidential-client console OAuth (WP-1270 deferred this) with full OIDC id_token verification — signature, standard claims, and nonce — using a vetted library (user-approved dependency).
+
+What changed:
+- Dependency: `github.com/coreos/go-oidc/v3` (+ `go-jose/v4`), the standard Go OIDC verifier. `go get` + `go mod tidy`; httpserver-only import (no architecture-rule impact).
+- `exchangeOAuthAuthorizationCode` now returns the `id_token` alongside the access token (the token response's `id_token` field, previously ignored).
+- `config.OAuthConfig.Issuers` — a `map[provider_key]issuer` from env `OAUTH_ISSUERS_JSON`. The issuer is a public URL, kept in env alongside the client_secret (no AdminSettings/OpenAPI surface). `runtimeState.oauthIssuer` resolves it.
+- `verifyOIDCIDToken(ctx, issuer, clientID, rawIDToken, expectedNonce)`: `oidc.NewProvider(issuer)` performs discovery (→ JWKS), `provider.Verifier(&oidc.Config{ClientID})` verifies RS256 signature + iss + aud(==clientID) + exp, then the code checks `nonce` == the flow's nonce. The callback calls it only when an issuer is configured; verification failure rejects login (`PROVIDER_AUTH_FAILED`). No issuer → unchanged behavior.
+
+Tests/gates: end-to-end `verifyOIDCIDToken` test against a fake OIDC provider (RSA keygen + discovery + JWKS + RS256 signing) covering valid / nonce-mismatch / wrong-aud / expired / empty / forged-key-signature; exchange test updated for the new return; full `make check`. No new tables.
+
 ## WP-1280: ID-Referencing Config Import (Natural-Key Remap) v1
 
 Objective: make rate-limit config (which references model/group integer IDs) importable across environments — the piece WP-1250 deferred because integer IDs do not port. Solution: denormalize the natural key into the export and remap it on import.

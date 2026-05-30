@@ -26,7 +26,7 @@ func TestExchangeOAuthAuthorizationCodeClientSecret(t *testing.T) {
 	flow := authservice.OAuthAuthorizationFlowState{ClientID: "cid", RedirectURI: "https://app.example/cb", CodeVerifier: "verif"}
 
 	// Confidential client: secret is sent, PKCE is preserved.
-	tok, err := exchangeOAuthAuthorizationCode(context.Background(), srv.Client(), config, flow, "the-code", "shh")
+	tok, _, err := exchangeOAuthAuthorizationCode(context.Background(), srv.Client(), config, flow, "the-code", "shh")
 	if err != nil || tok != "tok" {
 		t.Fatalf("exchange = %q err=%v, want tok", tok, err)
 	}
@@ -38,7 +38,7 @@ func TestExchangeOAuthAuthorizationCodeClientSecret(t *testing.T) {
 	}
 
 	// Public client: no secret is sent.
-	if _, err := exchangeOAuthAuthorizationCode(context.Background(), srv.Client(), config, flow, "the-code", ""); err != nil {
+	if _, _, err := exchangeOAuthAuthorizationCode(context.Background(), srv.Client(), config, flow, "the-code", ""); err != nil {
 		t.Fatalf("public exchange err=%v", err)
 	}
 	if got := captured.Get("client_secret"); got != "" {

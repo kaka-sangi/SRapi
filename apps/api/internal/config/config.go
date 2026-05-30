@@ -113,11 +113,14 @@ type CaptchaConfig struct {
 	VerifyURL string // optional override of the provider's siteverify endpoint
 }
 
-// OAuthConfig holds console-login OAuth secrets that must stay in deployment env
-// (never in AdminSettings). ClientSecrets is keyed by provider_key; when a key
-// is present the token exchange runs as a confidential client (client_secret).
+// OAuthConfig holds console-login OAuth deployment-env config (never in
+// AdminSettings). ClientSecrets is keyed by provider_key; when a key is present
+// the token exchange runs as a confidential client (client_secret). Issuers is
+// keyed by provider_key; when set, the provider's id_token is verified (OIDC:
+// signature via JWKS + iss/aud/exp + nonce).
 type OAuthConfig struct {
 	ClientSecrets map[string]string
+	Issuers       map[string]string
 }
 
 type RetentionConfig struct {
@@ -312,6 +315,7 @@ func Load() Config {
 		},
 		OAuth: OAuthConfig{
 			ClientSecrets: parseStringMapEnv("OAUTH_CLIENT_SECRETS_JSON"),
+			Issuers:       parseStringMapEnv("OAUTH_ISSUERS_JSON"),
 		},
 	}
 }

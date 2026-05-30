@@ -158,12 +158,20 @@ func (s *Server) handleCompleteOAuthAuthorization(w http.ResponseWriter, r *http
 
 	ctx, cancel := context.WithTimeout(r.Context(), oauthProviderHTTPTimeout)
 	defer cancel()
-	accessToken, err := exchangeOAuthAuthorizationCode(ctx, http.DefaultClient, config, flow, code, s.runtime.oauthClientSecret(flow.ProviderKey))
+	accessToken, idToken, err := exchangeOAuthAuthorizationCode(ctx, http.DefaultClient, config, flow, code, s.runtime.oauthClientSecret(flow.ProviderKey))
 	if err != nil {
 		s.clearOAuthFlowCookie(w)
 		s.logger.Warn("oauth token exchange failed", "provider", provider, "provider_key", flow.ProviderKey, "error", err)
 		writeStandardError(w, http.StatusBadGateway, apiopenapi.PROVIDERAUTHFAILED, "oauth provider exchange failed", requestID)
 		return
+	}
+	if issuer := s.runtime.oauthIssuer(flow.ProviderKey); issuer != "" {
+		if err := verifyOIDCIDToken(ctx, issuer, flow.ClientID, idToken, flow.Nonce); err != nil {
+			s.clearOAuthFlowCookie(w)
+			s.logger.Warn("oauth id_token verification failed", "provider", provider, "provider_key", flow.ProviderKey, "error", err)
+			writeStandardError(w, http.StatusBadGateway, apiopenapi.PROVIDERAUTHFAILED, "oauth id_token verification failed", requestID)
+			return
+		}
 	}
 	userInfo, err := fetchOAuthUserInfo(ctx, http.DefaultClient, config.UserInfoURL, accessToken)
 	if err != nil {
@@ -848,7 +856,17 @@ func (rt *runtimeState) oauthClientSecret(providerKey string) string {
 	return rt.cfg.OAuth.ClientSecrets[strings.TrimSpace(providerKey)]
 }
 
-func exchangeOAuthAuthorizationCode(ctx context.Context, client *http.Client, config admincontrolcontract.OAuthProviderConfig, flow authservice.OAuthAuthorizationFlowState, code string, clientSecret string) (string, error) {
+// oauthIssuer returns the configured OIDC issuer for a console OAuth provider
+// key. When set, the provider's id_token is verified at callback. Empty disables
+// id_token verification (the access_token + userinfo flow still authenticates).
+func (rt *runtimeState) oauthIssuer(providerKey string) string {
+	if rt == nil || rt.cfg.OAuth.Issuers == nil {
+		return ""
+	}
+	return strings.TrimSpace(rt.cfg.OAuth.Issuers[strings.TrimSpace(providerKey)])
+}
+
+func exchangeOAuthAuthorizationCode(ctx context.Context, client *http.Client, config admincontrolcontract.OAuthProviderConfig, flow authservice.OAuthAuthorizationFlowState, code string, clientSecret string) (accessToken string, idToken string, err error) {
 	form := url.Values{}
 	form.Set("grant_type", "authorization_code")
 	form.Set("code", strings.TrimSpace(code))
@@ -862,34 +880,35 @@ func exchangeOAuthAuthorizationCode(ctx context.Context, client *http.Client, co
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimSpace(config.TokenURL), strings.NewReader(form.Encode()))
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
-		return "", fmt.Errorf("oauth token endpoint status %d", resp.StatusCode)
+		return "", "", fmt.Errorf("oauth token endpoint status %d", resp.StatusCode)
 	}
 	var body struct {
 		AccessToken string `json:"access_token"`
+		IDToken     string `json:"id_token"`
 		TokenType   string `json:"token_type"`
 		Error       string `json:"error"`
 	}
 	if err := decodeOAuthProviderJSON(resp.Body, &body); err != nil {
-		return "", err
+		return "", "", err
 	}
 	if strings.TrimSpace(body.Error) != "" || strings.TrimSpace(body.AccessToken) == "" {
-		return "", errors.New("oauth token endpoint returned no access token")
+		return "", "", errors.New("oauth token endpoint returned no access token")
 	}
 	if body.TokenType != "" && !strings.EqualFold(strings.TrimSpace(body.TokenType), "bearer") {
-		return "", errors.New("oauth token endpoint returned unsupported token type")
+		return "", "", errors.New("oauth token endpoint returned unsupported token type")
 	}
-	return strings.TrimSpace(body.AccessToken), nil
+	return strings.TrimSpace(body.AccessToken), strings.TrimSpace(body.IDToken), nil
 }
 
 func fetchOAuthUserInfo(ctx context.Context, client *http.Client, userInfoURL string, accessToken string) (map[string]any, error) {
