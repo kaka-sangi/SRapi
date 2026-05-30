@@ -76,6 +76,27 @@ func (_u *AccountGroupRateLimitUpdate) AddRpmLimit(v int) *AccountGroupRateLimit
 	return _u
 }
 
+// SetTpmLimit sets the "tpm_limit" field.
+func (_u *AccountGroupRateLimitUpdate) SetTpmLimit(v int) *AccountGroupRateLimitUpdate {
+	_u.mutation.ResetTpmLimit()
+	_u.mutation.SetTpmLimit(v)
+	return _u
+}
+
+// SetNillableTpmLimit sets the "tpm_limit" field if the given value is not nil.
+func (_u *AccountGroupRateLimitUpdate) SetNillableTpmLimit(v *int) *AccountGroupRateLimitUpdate {
+	if v != nil {
+		_u.SetTpmLimit(*v)
+	}
+	return _u
+}
+
+// AddTpmLimit adds value to the "tpm_limit" field.
+func (_u *AccountGroupRateLimitUpdate) AddTpmLimit(v int) *AccountGroupRateLimitUpdate {
+	_u.mutation.AddTpmLimit(v)
+	return _u
+}
+
 // SetMaxConcurrency sets the "max_concurrency" field.
 func (_u *AccountGroupRateLimitUpdate) SetMaxConcurrency(v int) *AccountGroupRateLimitUpdate {
 	_u.mutation.ResetMaxConcurrency()
@@ -176,6 +197,12 @@ func (_u *AccountGroupRateLimitUpdate) sqlSave(ctx context.Context) (_node int, 
 	if value, ok := _u.mutation.AddedRpmLimit(); ok {
 		_spec.AddField(accountgroupratelimit.FieldRpmLimit, field.TypeInt, value)
 	}
+	if value, ok := _u.mutation.TpmLimit(); ok {
+		_spec.SetField(accountgroupratelimit.FieldTpmLimit, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedTpmLimit(); ok {
+		_spec.AddField(accountgroupratelimit.FieldTpmLimit, field.TypeInt, value)
+	}
 	if value, ok := _u.mutation.MaxConcurrency(); ok {
 		_spec.SetField(accountgroupratelimit.FieldMaxConcurrency, field.TypeInt, value)
 	}
@@ -250,6 +277,27 @@ func (_u *AccountGroupRateLimitUpdateOne) SetNillableRpmLimit(v *int) *AccountGr
 // AddRpmLimit adds value to the "rpm_limit" field.
 func (_u *AccountGroupRateLimitUpdateOne) AddRpmLimit(v int) *AccountGroupRateLimitUpdateOne {
 	_u.mutation.AddRpmLimit(v)
+	return _u
+}
+
+// SetTpmLimit sets the "tpm_limit" field.
+func (_u *AccountGroupRateLimitUpdateOne) SetTpmLimit(v int) *AccountGroupRateLimitUpdateOne {
+	_u.mutation.ResetTpmLimit()
+	_u.mutation.SetTpmLimit(v)
+	return _u
+}
+
+// SetNillableTpmLimit sets the "tpm_limit" field if the given value is not nil.
+func (_u *AccountGroupRateLimitUpdateOne) SetNillableTpmLimit(v *int) *AccountGroupRateLimitUpdateOne {
+	if v != nil {
+		_u.SetTpmLimit(*v)
+	}
+	return _u
+}
+
+// AddTpmLimit adds value to the "tpm_limit" field.
+func (_u *AccountGroupRateLimitUpdateOne) AddTpmLimit(v int) *AccountGroupRateLimitUpdateOne {
+	_u.mutation.AddTpmLimit(v)
 	return _u
 }
 
@@ -382,6 +430,12 @@ func (_u *AccountGroupRateLimitUpdateOne) sqlSave(ctx context.Context) (_node *A
 	}
 	if value, ok := _u.mutation.AddedRpmLimit(); ok {
 		_spec.AddField(accountgroupratelimit.FieldRpmLimit, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.TpmLimit(); ok {
+		_spec.SetField(accountgroupratelimit.FieldTpmLimit, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedTpmLimit(); ok {
+		_spec.AddField(accountgroupratelimit.FieldTpmLimit, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.MaxConcurrency(); ok {
 		_spec.SetField(accountgroupratelimit.FieldMaxConcurrency, field.TypeInt, value)

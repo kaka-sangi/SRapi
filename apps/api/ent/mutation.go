@@ -4545,6 +4545,8 @@ type AccountGroupRateLimitMutation struct {
 	addaccount_group_id *int
 	rpm_limit           *int
 	addrpm_limit        *int
+	tpm_limit           *int
+	addtpm_limit        *int
 	max_concurrency     *int
 	addmax_concurrency  *int
 	enabled             *bool
@@ -4836,6 +4838,62 @@ func (m *AccountGroupRateLimitMutation) ResetRpmLimit() {
 	m.addrpm_limit = nil
 }
 
+// SetTpmLimit sets the "tpm_limit" field.
+func (m *AccountGroupRateLimitMutation) SetTpmLimit(i int) {
+	m.tpm_limit = &i
+	m.addtpm_limit = nil
+}
+
+// TpmLimit returns the value of the "tpm_limit" field in the mutation.
+func (m *AccountGroupRateLimitMutation) TpmLimit() (r int, exists bool) {
+	v := m.tpm_limit
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTpmLimit returns the old "tpm_limit" field's value of the AccountGroupRateLimit entity.
+// If the AccountGroupRateLimit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountGroupRateLimitMutation) OldTpmLimit(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTpmLimit is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTpmLimit requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTpmLimit: %w", err)
+	}
+	return oldValue.TpmLimit, nil
+}
+
+// AddTpmLimit adds i to the "tpm_limit" field.
+func (m *AccountGroupRateLimitMutation) AddTpmLimit(i int) {
+	if m.addtpm_limit != nil {
+		*m.addtpm_limit += i
+	} else {
+		m.addtpm_limit = &i
+	}
+}
+
+// AddedTpmLimit returns the value that was added to the "tpm_limit" field in this mutation.
+func (m *AccountGroupRateLimitMutation) AddedTpmLimit() (r int, exists bool) {
+	v := m.addtpm_limit
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetTpmLimit resets all changes to the "tpm_limit" field.
+func (m *AccountGroupRateLimitMutation) ResetTpmLimit() {
+	m.tpm_limit = nil
+	m.addtpm_limit = nil
+}
+
 // SetMaxConcurrency sets the "max_concurrency" field.
 func (m *AccountGroupRateLimitMutation) SetMaxConcurrency(i int) {
 	m.max_concurrency = &i
@@ -4962,7 +5020,7 @@ func (m *AccountGroupRateLimitMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *AccountGroupRateLimitMutation) Fields() []string {
-	fields := make([]string, 0, 6)
+	fields := make([]string, 0, 7)
 	if m.created_at != nil {
 		fields = append(fields, accountgroupratelimit.FieldCreatedAt)
 	}
@@ -4974,6 +5032,9 @@ func (m *AccountGroupRateLimitMutation) Fields() []string {
 	}
 	if m.rpm_limit != nil {
 		fields = append(fields, accountgroupratelimit.FieldRpmLimit)
+	}
+	if m.tpm_limit != nil {
+		fields = append(fields, accountgroupratelimit.FieldTpmLimit)
 	}
 	if m.max_concurrency != nil {
 		fields = append(fields, accountgroupratelimit.FieldMaxConcurrency)
@@ -4997,6 +5058,8 @@ func (m *AccountGroupRateLimitMutation) Field(name string) (ent.Value, bool) {
 		return m.AccountGroupID()
 	case accountgroupratelimit.FieldRpmLimit:
 		return m.RpmLimit()
+	case accountgroupratelimit.FieldTpmLimit:
+		return m.TpmLimit()
 	case accountgroupratelimit.FieldMaxConcurrency:
 		return m.MaxConcurrency()
 	case accountgroupratelimit.FieldEnabled:
@@ -5018,6 +5081,8 @@ func (m *AccountGroupRateLimitMutation) OldField(ctx context.Context, name strin
 		return m.OldAccountGroupID(ctx)
 	case accountgroupratelimit.FieldRpmLimit:
 		return m.OldRpmLimit(ctx)
+	case accountgroupratelimit.FieldTpmLimit:
+		return m.OldTpmLimit(ctx)
 	case accountgroupratelimit.FieldMaxConcurrency:
 		return m.OldMaxConcurrency(ctx)
 	case accountgroupratelimit.FieldEnabled:
@@ -5059,6 +5124,13 @@ func (m *AccountGroupRateLimitMutation) SetField(name string, value ent.Value) e
 		}
 		m.SetRpmLimit(v)
 		return nil
+	case accountgroupratelimit.FieldTpmLimit:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTpmLimit(v)
+		return nil
 	case accountgroupratelimit.FieldMaxConcurrency:
 		v, ok := value.(int)
 		if !ok {
@@ -5087,6 +5159,9 @@ func (m *AccountGroupRateLimitMutation) AddedFields() []string {
 	if m.addrpm_limit != nil {
 		fields = append(fields, accountgroupratelimit.FieldRpmLimit)
 	}
+	if m.addtpm_limit != nil {
+		fields = append(fields, accountgroupratelimit.FieldTpmLimit)
+	}
 	if m.addmax_concurrency != nil {
 		fields = append(fields, accountgroupratelimit.FieldMaxConcurrency)
 	}
@@ -5102,6 +5177,8 @@ func (m *AccountGroupRateLimitMutation) AddedField(name string) (ent.Value, bool
 		return m.AddedAccountGroupID()
 	case accountgroupratelimit.FieldRpmLimit:
 		return m.AddedRpmLimit()
+	case accountgroupratelimit.FieldTpmLimit:
+		return m.AddedTpmLimit()
 	case accountgroupratelimit.FieldMaxConcurrency:
 		return m.AddedMaxConcurrency()
 	}
@@ -5126,6 +5203,13 @@ func (m *AccountGroupRateLimitMutation) AddField(name string, value ent.Value) e
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddRpmLimit(v)
+		return nil
+	case accountgroupratelimit.FieldTpmLimit:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddTpmLimit(v)
 		return nil
 	case accountgroupratelimit.FieldMaxConcurrency:
 		v, ok := value.(int)
@@ -5172,6 +5256,9 @@ func (m *AccountGroupRateLimitMutation) ResetField(name string) error {
 		return nil
 	case accountgroupratelimit.FieldRpmLimit:
 		m.ResetRpmLimit()
+		return nil
+	case accountgroupratelimit.FieldTpmLimit:
+		m.ResetTpmLimit()
 		return nil
 	case accountgroupratelimit.FieldMaxConcurrency:
 		m.ResetMaxConcurrency()
@@ -21751,6 +21838,8 @@ type ModelRateLimitMutation struct {
 	addmodel_id        *int
 	rpm_limit          *int
 	addrpm_limit       *int
+	tpm_limit          *int
+	addtpm_limit       *int
 	max_concurrency    *int
 	addmax_concurrency *int
 	enabled            *bool
@@ -22042,6 +22131,62 @@ func (m *ModelRateLimitMutation) ResetRpmLimit() {
 	m.addrpm_limit = nil
 }
 
+// SetTpmLimit sets the "tpm_limit" field.
+func (m *ModelRateLimitMutation) SetTpmLimit(i int) {
+	m.tpm_limit = &i
+	m.addtpm_limit = nil
+}
+
+// TpmLimit returns the value of the "tpm_limit" field in the mutation.
+func (m *ModelRateLimitMutation) TpmLimit() (r int, exists bool) {
+	v := m.tpm_limit
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTpmLimit returns the old "tpm_limit" field's value of the ModelRateLimit entity.
+// If the ModelRateLimit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ModelRateLimitMutation) OldTpmLimit(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTpmLimit is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTpmLimit requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTpmLimit: %w", err)
+	}
+	return oldValue.TpmLimit, nil
+}
+
+// AddTpmLimit adds i to the "tpm_limit" field.
+func (m *ModelRateLimitMutation) AddTpmLimit(i int) {
+	if m.addtpm_limit != nil {
+		*m.addtpm_limit += i
+	} else {
+		m.addtpm_limit = &i
+	}
+}
+
+// AddedTpmLimit returns the value that was added to the "tpm_limit" field in this mutation.
+func (m *ModelRateLimitMutation) AddedTpmLimit() (r int, exists bool) {
+	v := m.addtpm_limit
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetTpmLimit resets all changes to the "tpm_limit" field.
+func (m *ModelRateLimitMutation) ResetTpmLimit() {
+	m.tpm_limit = nil
+	m.addtpm_limit = nil
+}
+
 // SetMaxConcurrency sets the "max_concurrency" field.
 func (m *ModelRateLimitMutation) SetMaxConcurrency(i int) {
 	m.max_concurrency = &i
@@ -22168,7 +22313,7 @@ func (m *ModelRateLimitMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ModelRateLimitMutation) Fields() []string {
-	fields := make([]string, 0, 6)
+	fields := make([]string, 0, 7)
 	if m.created_at != nil {
 		fields = append(fields, modelratelimit.FieldCreatedAt)
 	}
@@ -22180,6 +22325,9 @@ func (m *ModelRateLimitMutation) Fields() []string {
 	}
 	if m.rpm_limit != nil {
 		fields = append(fields, modelratelimit.FieldRpmLimit)
+	}
+	if m.tpm_limit != nil {
+		fields = append(fields, modelratelimit.FieldTpmLimit)
 	}
 	if m.max_concurrency != nil {
 		fields = append(fields, modelratelimit.FieldMaxConcurrency)
@@ -22203,6 +22351,8 @@ func (m *ModelRateLimitMutation) Field(name string) (ent.Value, bool) {
 		return m.ModelID()
 	case modelratelimit.FieldRpmLimit:
 		return m.RpmLimit()
+	case modelratelimit.FieldTpmLimit:
+		return m.TpmLimit()
 	case modelratelimit.FieldMaxConcurrency:
 		return m.MaxConcurrency()
 	case modelratelimit.FieldEnabled:
@@ -22224,6 +22374,8 @@ func (m *ModelRateLimitMutation) OldField(ctx context.Context, name string) (ent
 		return m.OldModelID(ctx)
 	case modelratelimit.FieldRpmLimit:
 		return m.OldRpmLimit(ctx)
+	case modelratelimit.FieldTpmLimit:
+		return m.OldTpmLimit(ctx)
 	case modelratelimit.FieldMaxConcurrency:
 		return m.OldMaxConcurrency(ctx)
 	case modelratelimit.FieldEnabled:
@@ -22265,6 +22417,13 @@ func (m *ModelRateLimitMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetRpmLimit(v)
 		return nil
+	case modelratelimit.FieldTpmLimit:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTpmLimit(v)
+		return nil
 	case modelratelimit.FieldMaxConcurrency:
 		v, ok := value.(int)
 		if !ok {
@@ -22293,6 +22452,9 @@ func (m *ModelRateLimitMutation) AddedFields() []string {
 	if m.addrpm_limit != nil {
 		fields = append(fields, modelratelimit.FieldRpmLimit)
 	}
+	if m.addtpm_limit != nil {
+		fields = append(fields, modelratelimit.FieldTpmLimit)
+	}
 	if m.addmax_concurrency != nil {
 		fields = append(fields, modelratelimit.FieldMaxConcurrency)
 	}
@@ -22308,6 +22470,8 @@ func (m *ModelRateLimitMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedModelID()
 	case modelratelimit.FieldRpmLimit:
 		return m.AddedRpmLimit()
+	case modelratelimit.FieldTpmLimit:
+		return m.AddedTpmLimit()
 	case modelratelimit.FieldMaxConcurrency:
 		return m.AddedMaxConcurrency()
 	}
@@ -22332,6 +22496,13 @@ func (m *ModelRateLimitMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddRpmLimit(v)
+		return nil
+	case modelratelimit.FieldTpmLimit:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddTpmLimit(v)
 		return nil
 	case modelratelimit.FieldMaxConcurrency:
 		v, ok := value.(int)
@@ -22378,6 +22549,9 @@ func (m *ModelRateLimitMutation) ResetField(name string) error {
 		return nil
 	case modelratelimit.FieldRpmLimit:
 		m.ResetRpmLimit()
+		return nil
+	case modelratelimit.FieldTpmLimit:
+		m.ResetTpmLimit()
 		return nil
 	case modelratelimit.FieldMaxConcurrency:
 		m.ResetMaxConcurrency()

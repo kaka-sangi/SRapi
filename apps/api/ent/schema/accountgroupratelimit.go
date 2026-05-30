@@ -21,6 +21,7 @@ func (AccountGroupRateLimit) Fields() []ent.Field {
 	return []ent.Field{
 		field.Int("account_group_id"),
 		field.Int("rpm_limit").Default(0),       // 0 = unlimited / disabled
+		field.Int("tpm_limit").Default(0),       // 0 = unlimited / disabled
 		field.Int("max_concurrency").Default(0), // 0 = unlimited / disabled
 		field.Bool("enabled").Default(true),
 	}

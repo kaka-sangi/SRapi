@@ -250,8 +250,8 @@ func (rt *runtimeState) checkGatewayRateLimit(ctx context.Context, canonical gat
 			Window: time.Minute,
 		})
 	}
-	// Global per-model RPM ceiling (WP-1190): protects an upstream model from
-	// overload across all users, on top of the per-key / per-user limits.
+	// Global per-model RPM/TPM ceilings (WP-1190/1260): protect an upstream model
+	// from overload across all users, on top of the per-key / per-user limits.
 	if rt.modelRateLimits != nil && modelID > 0 {
 		if limit := rt.modelRateLimits.RPMForModel(ctx, modelID); limit > 0 {
 			checks = append(checks, ratelimit.Check{
@@ -259,6 +259,15 @@ func (rt *runtimeState) checkGatewayRateLimit(ctx context.Context, canonical gat
 				Key:    fmt.Sprintf("model:%d:rpm", modelID),
 				Limit:  limit,
 				Cost:   1,
+				Window: time.Minute,
+			})
+		}
+		if limit := rt.modelRateLimits.TPMForModel(ctx, modelID); limit > 0 {
+			checks = append(checks, ratelimit.Check{
+				Name:   "model_tpm",
+				Key:    fmt.Sprintf("model:%d:tpm", modelID),
+				Limit:  limit,
+				Cost:   max(1, usage.InputTokens+usage.OutputTokens+usage.CachedTokens),
 				Window: time.Minute,
 			})
 		}
@@ -301,6 +310,15 @@ func (rt *runtimeState) reserveGatewayAccountQuota(ctx context.Context, usage ga
 						Key:    fmt.Sprintf("group:%d:rpm", groupID),
 						Limit:  limit,
 						Cost:   1,
+						Window: time.Minute,
+					})
+				}
+				if limit := rt.groupRateLimits.TPMForGroup(ctx, groupID); limit > 0 {
+					checks = append(checks, ratelimit.Check{
+						Name:   "group_tpm",
+						Key:    fmt.Sprintf("group:%d:tpm", groupID),
+						Limit:  limit,
+						Cost:   max(1, usage.InputTokens+usage.OutputTokens+usage.CachedTokens),
 						Window: time.Minute,
 					})
 				}

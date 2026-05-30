@@ -32,6 +32,7 @@ func (s *Store) UpsertLimit(ctx context.Context, input contract.UpsertLimit) (co
 	affected, err := s.client.ModelRateLimit.Update().
 		Where(entlimit.ModelIDEQ(input.ModelID)).
 		SetRpmLimit(input.RPMLimit).
+		SetTpmLimit(input.TPMLimit).
 		SetMaxConcurrency(input.MaxConcurrency).
 		SetEnabled(input.Enabled).
 		SetUpdatedAt(now).
@@ -43,6 +44,7 @@ func (s *Store) UpsertLimit(ctx context.Context, input contract.UpsertLimit) (co
 		row, err := s.client.ModelRateLimit.Create().
 			SetModelID(input.ModelID).
 			SetRpmLimit(input.RPMLimit).
+			SetTpmLimit(input.TPMLimit).
 			SetMaxConcurrency(input.MaxConcurrency).
 			SetEnabled(input.Enabled).
 			SetCreatedAt(now).
@@ -110,6 +112,7 @@ func toLimit(row *ent.ModelRateLimit) contract.Limit {
 		ID:             row.ID,
 		ModelID:        row.ModelID,
 		RPMLimit:       row.RpmLimit,
+		TPMLimit:       row.TpmLimit,
 		MaxConcurrency: row.MaxConcurrency,
 		Enabled:        row.Enabled,
 		CreatedAt:      row.CreatedAt,

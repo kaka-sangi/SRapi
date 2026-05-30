@@ -76,6 +76,27 @@ func (_u *ModelRateLimitUpdate) AddRpmLimit(v int) *ModelRateLimitUpdate {
 	return _u
 }
 
+// SetTpmLimit sets the "tpm_limit" field.
+func (_u *ModelRateLimitUpdate) SetTpmLimit(v int) *ModelRateLimitUpdate {
+	_u.mutation.ResetTpmLimit()
+	_u.mutation.SetTpmLimit(v)
+	return _u
+}
+
+// SetNillableTpmLimit sets the "tpm_limit" field if the given value is not nil.
+func (_u *ModelRateLimitUpdate) SetNillableTpmLimit(v *int) *ModelRateLimitUpdate {
+	if v != nil {
+		_u.SetTpmLimit(*v)
+	}
+	return _u
+}
+
+// AddTpmLimit adds value to the "tpm_limit" field.
+func (_u *ModelRateLimitUpdate) AddTpmLimit(v int) *ModelRateLimitUpdate {
+	_u.mutation.AddTpmLimit(v)
+	return _u
+}
+
 // SetMaxConcurrency sets the "max_concurrency" field.
 func (_u *ModelRateLimitUpdate) SetMaxConcurrency(v int) *ModelRateLimitUpdate {
 	_u.mutation.ResetMaxConcurrency()
@@ -176,6 +197,12 @@ func (_u *ModelRateLimitUpdate) sqlSave(ctx context.Context) (_node int, err err
 	if value, ok := _u.mutation.AddedRpmLimit(); ok {
 		_spec.AddField(modelratelimit.FieldRpmLimit, field.TypeInt, value)
 	}
+	if value, ok := _u.mutation.TpmLimit(); ok {
+		_spec.SetField(modelratelimit.FieldTpmLimit, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedTpmLimit(); ok {
+		_spec.AddField(modelratelimit.FieldTpmLimit, field.TypeInt, value)
+	}
 	if value, ok := _u.mutation.MaxConcurrency(); ok {
 		_spec.SetField(modelratelimit.FieldMaxConcurrency, field.TypeInt, value)
 	}
@@ -250,6 +277,27 @@ func (_u *ModelRateLimitUpdateOne) SetNillableRpmLimit(v *int) *ModelRateLimitUp
 // AddRpmLimit adds value to the "rpm_limit" field.
 func (_u *ModelRateLimitUpdateOne) AddRpmLimit(v int) *ModelRateLimitUpdateOne {
 	_u.mutation.AddRpmLimit(v)
+	return _u
+}
+
+// SetTpmLimit sets the "tpm_limit" field.
+func (_u *ModelRateLimitUpdateOne) SetTpmLimit(v int) *ModelRateLimitUpdateOne {
+	_u.mutation.ResetTpmLimit()
+	_u.mutation.SetTpmLimit(v)
+	return _u
+}
+
+// SetNillableTpmLimit sets the "tpm_limit" field if the given value is not nil.
+func (_u *ModelRateLimitUpdateOne) SetNillableTpmLimit(v *int) *ModelRateLimitUpdateOne {
+	if v != nil {
+		_u.SetTpmLimit(*v)
+	}
+	return _u
+}
+
+// AddTpmLimit adds value to the "tpm_limit" field.
+func (_u *ModelRateLimitUpdateOne) AddTpmLimit(v int) *ModelRateLimitUpdateOne {
+	_u.mutation.AddTpmLimit(v)
 	return _u
 }
 
@@ -382,6 +430,12 @@ func (_u *ModelRateLimitUpdateOne) sqlSave(ctx context.Context) (_node *ModelRat
 	}
 	if value, ok := _u.mutation.AddedRpmLimit(); ok {
 		_spec.AddField(modelratelimit.FieldRpmLimit, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.TpmLimit(); ok {
+		_spec.SetField(modelratelimit.FieldTpmLimit, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedTpmLimit(); ok {
+		_spec.AddField(modelratelimit.FieldTpmLimit, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.MaxConcurrency(); ok {
 		_spec.SetField(modelratelimit.FieldMaxConcurrency, field.TypeInt, value)

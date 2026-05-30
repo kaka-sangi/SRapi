@@ -26,7 +26,7 @@ func (s *Service) ListLimits(ctx context.Context) ([]contract.Limit, error) {
 }
 
 func (s *Service) UpsertLimit(ctx context.Context, input contract.UpsertLimit) (contract.Limit, error) {
-	if input.ModelID <= 0 || input.RPMLimit < 0 || input.MaxConcurrency < 0 {
+	if input.ModelID <= 0 || input.RPMLimit < 0 || input.TPMLimit < 0 || input.MaxConcurrency < 0 {
 		return contract.Limit{}, ErrInvalidInput
 	}
 	return s.store.UpsertLimit(ctx, input)
@@ -51,6 +51,19 @@ func (s *Service) RPMForModel(ctx context.Context, modelID int) int {
 		return 0
 	}
 	return limit.RPMLimit
+}
+
+// TPMForModel returns the active tokens-per-minute ceiling for a model, or 0
+// when none applies (fail-open).
+func (s *Service) TPMForModel(ctx context.Context, modelID int) int {
+	if modelID <= 0 {
+		return 0
+	}
+	limit, err := s.store.FindByModel(ctx, modelID)
+	if err != nil || !limit.Enabled || limit.TPMLimit <= 0 {
+		return 0
+	}
+	return limit.TPMLimit
 }
 
 // ConcurrencyForModel returns the active max-concurrency ceiling for a model, or

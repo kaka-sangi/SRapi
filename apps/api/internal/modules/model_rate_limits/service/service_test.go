@@ -67,6 +67,16 @@ func TestConcurrencyForModel(t *testing.T) {
 	if got := svc.RPMForModel(ctx, 5); got != 0 {
 		t.Fatalf("RPMForModel with only concurrency set = %d, want 0", got)
 	}
+	// TPM is independent of RPM and concurrency on the same rule.
+	if _, err := svc.UpsertLimit(ctx, contract.UpsertLimit{ModelID: 6, TPMLimit: 5000, Enabled: true}); err != nil {
+		t.Fatalf("upsert tpm: %v", err)
+	}
+	if got := svc.TPMForModel(ctx, 6); got != 5000 {
+		t.Fatalf("TPMForModel = %d, want 5000", got)
+	}
+	if got := svc.RPMForModel(ctx, 6); got != 0 {
+		t.Fatalf("RPMForModel with only tpm set = %d, want 0", got)
+	}
 	if _, err := svc.UpsertLimit(ctx, contract.UpsertLimit{ModelID: 5, MaxConcurrency: 8, Enabled: false}); err != nil {
 		t.Fatalf("upsert disable: %v", err)
 	}

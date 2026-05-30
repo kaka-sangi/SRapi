@@ -56,6 +56,16 @@ func TestConcurrencyForGroup(t *testing.T) {
 	if got := svc.RPMForGroup(ctx, 9); got != 0 {
 		t.Fatalf("RPMForGroup with only concurrency set = %d, want 0", got)
 	}
+	// TPM is independent too.
+	if _, err := svc.UpsertLimit(ctx, contract.UpsertLimit{GroupID: 11, TPMLimit: 9000, Enabled: true}); err != nil {
+		t.Fatalf("upsert tpm: %v", err)
+	}
+	if got := svc.TPMForGroup(ctx, 11); got != 9000 {
+		t.Fatalf("TPMForGroup = %d, want 9000", got)
+	}
+	if got := svc.ConcurrencyForGroup(ctx, 11); got != 0 {
+		t.Fatalf("ConcurrencyForGroup with only tpm set = %d, want 0", got)
+	}
 	if _, err := svc.UpsertLimit(ctx, contract.UpsertLimit{GroupID: 9, MaxConcurrency: 16, Enabled: false}); err != nil {
 		t.Fatalf("upsert disable: %v", err)
 	}

@@ -68,6 +68,20 @@ func (_c *ModelRateLimitCreate) SetNillableRpmLimit(v *int) *ModelRateLimitCreat
 	return _c
 }
 
+// SetTpmLimit sets the "tpm_limit" field.
+func (_c *ModelRateLimitCreate) SetTpmLimit(v int) *ModelRateLimitCreate {
+	_c.mutation.SetTpmLimit(v)
+	return _c
+}
+
+// SetNillableTpmLimit sets the "tpm_limit" field if the given value is not nil.
+func (_c *ModelRateLimitCreate) SetNillableTpmLimit(v *int) *ModelRateLimitCreate {
+	if v != nil {
+		_c.SetTpmLimit(*v)
+	}
+	return _c
+}
+
 // SetMaxConcurrency sets the "max_concurrency" field.
 func (_c *ModelRateLimitCreate) SetMaxConcurrency(v int) *ModelRateLimitCreate {
 	_c.mutation.SetMaxConcurrency(v)
@@ -143,6 +157,10 @@ func (_c *ModelRateLimitCreate) defaults() {
 		v := modelratelimit.DefaultRpmLimit
 		_c.mutation.SetRpmLimit(v)
 	}
+	if _, ok := _c.mutation.TpmLimit(); !ok {
+		v := modelratelimit.DefaultTpmLimit
+		_c.mutation.SetTpmLimit(v)
+	}
 	if _, ok := _c.mutation.MaxConcurrency(); !ok {
 		v := modelratelimit.DefaultMaxConcurrency
 		_c.mutation.SetMaxConcurrency(v)
@@ -166,6 +184,9 @@ func (_c *ModelRateLimitCreate) check() error {
 	}
 	if _, ok := _c.mutation.RpmLimit(); !ok {
 		return &ValidationError{Name: "rpm_limit", err: errors.New(`ent: missing required field "ModelRateLimit.rpm_limit"`)}
+	}
+	if _, ok := _c.mutation.TpmLimit(); !ok {
+		return &ValidationError{Name: "tpm_limit", err: errors.New(`ent: missing required field "ModelRateLimit.tpm_limit"`)}
 	}
 	if _, ok := _c.mutation.MaxConcurrency(); !ok {
 		return &ValidationError{Name: "max_concurrency", err: errors.New(`ent: missing required field "ModelRateLimit.max_concurrency"`)}
@@ -214,6 +235,10 @@ func (_c *ModelRateLimitCreate) createSpec() (*ModelRateLimit, *sqlgraph.CreateS
 	if value, ok := _c.mutation.RpmLimit(); ok {
 		_spec.SetField(modelratelimit.FieldRpmLimit, field.TypeInt, value)
 		_node.RpmLimit = value
+	}
+	if value, ok := _c.mutation.TpmLimit(); ok {
+		_spec.SetField(modelratelimit.FieldTpmLimit, field.TypeInt, value)
+		_node.TpmLimit = value
 	}
 	if value, ok := _c.mutation.MaxConcurrency(); ok {
 		_spec.SetField(modelratelimit.FieldMaxConcurrency, field.TypeInt, value)

@@ -14,6 +14,7 @@ import (
 type modelRateLimitPayload struct {
 	ModelID        int       `json:"model_id"`
 	RPMLimit       int       `json:"rpm_limit"`
+	TPMLimit       int       `json:"tpm_limit"`
 	MaxConcurrency int       `json:"max_concurrency"`
 	Enabled        bool      `json:"enabled"`
 	CreatedAt      time.Time `json:"created_at"`
@@ -23,6 +24,7 @@ type modelRateLimitPayload struct {
 type upsertModelRateLimitRequest struct {
 	ModelID        int   `json:"model_id"`
 	RPMLimit       int   `json:"rpm_limit"`
+	TPMLimit       int   `json:"tpm_limit"`
 	MaxConcurrency int   `json:"max_concurrency"`
 	Enabled        *bool `json:"enabled"`
 }
@@ -31,6 +33,7 @@ func toModelRateLimitPayload(limit modelratelimitscontract.Limit) modelRateLimit
 	return modelRateLimitPayload{
 		ModelID:        limit.ModelID,
 		RPMLimit:       limit.RPMLimit,
+		TPMLimit:       limit.TPMLimit,
 		MaxConcurrency: limit.MaxConcurrency,
 		Enabled:        limit.Enabled,
 		CreatedAt:      limit.CreatedAt.UTC(),
@@ -91,6 +94,7 @@ func (s *Server) handleUpsertAdminModelRateLimit(w http.ResponseWriter, r *http.
 	limit, err := s.runtime.modelRateLimits.UpsertLimit(r.Context(), modelratelimitscontract.UpsertLimit{
 		ModelID:        body.ModelID,
 		RPMLimit:       body.RPMLimit,
+		TPMLimit:       body.TPMLimit,
 		MaxConcurrency: body.MaxConcurrency,
 		Enabled:        enabled,
 	})
@@ -101,6 +105,7 @@ func (s *Server) handleUpsertAdminModelRateLimit(w http.ResponseWriter, r *http.
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "model_rate_limit.upsert", "model_rate_limit", strconv.Itoa(limit.ModelID), nil, map[string]any{
 		"model_id":        limit.ModelID,
 		"rpm_limit":       limit.RPMLimit,
+		"tpm_limit":       limit.TPMLimit,
 		"max_concurrency": limit.MaxConcurrency,
 		"enabled":         limit.Enabled,
 	}))

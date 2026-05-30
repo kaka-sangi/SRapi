@@ -3912,6 +3912,17 @@ Required gates:
 - `make code-quality-check`
 - `git diff --check`
 
+## WP-1260: Per-Model / Per-Group TPM v1
+
+Objective: add tokens-per-minute ceilings for models and account groups — the last missing cells of the rate/capacity matrix (accounts/keys already had TPM; model/group had only RPM + concurrency). TPM bounds aggregate token throughput more precisely than RPM (a few large requests can overload an upstream even at low request rates).
+
+What changed:
+- `tpm_limit` column on `ModelRateLimit` and `AccountGroupRateLimit` (migration `000027`, default 0 = unlimited; existing rows correct without backfill). `TPMForModel`/`TPMForGroup` (fail-open); admin upsert accepts/returns it on both `/admin/model-rate-limits` and `/admin/group-rate-limits`.
+- Enforcement reuses the existing limiter seams alongside the RPM checks: model TPM in `checkGatewayRateLimit` (`model:<id>:tpm`, evaluated at admission where the model id + token estimate are known) and group TPM in `reserveGatewayAccountQuota` (`group:<id>:tpm`, after the scheduler selects an account). Each check's Cost is `max(1, input+output+cached tokens)` over a 1-minute window — identical to the existing per-account / per-key TPM. Exceeding returns the established 429-class error → failover.
+- Matrix now complete: per-API-key (rpm/tpm), per-user (rpm), per-account (rpm/tpm/concurrency), per-model (rpm/tpm/concurrency), per-group (rpm/tpm/concurrency).
+
+Tests/gates: `model_rate_limits` + `group_rate_limits` service tests extended (`TPMForModel`/`TPMForGroup` + independence from rpm/concurrency), migration `000027`, full `make check`.
+
 ## WP-1250: Config Snapshot Import v1
 
 Objective: complete the WP-1240 backup/restore loop by safely applying a config snapshot back, using natural-key upsert + a dry-run validation pass — without the cross-environment ID remapping that makes ID-referencing entities unsafe to import.

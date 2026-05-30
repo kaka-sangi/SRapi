@@ -32,6 +32,7 @@ func (s *Store) UpsertLimit(ctx context.Context, input contract.UpsertLimit) (co
 	affected, err := s.client.AccountGroupRateLimit.Update().
 		Where(entlimit.AccountGroupIDEQ(input.GroupID)).
 		SetRpmLimit(input.RPMLimit).
+		SetTpmLimit(input.TPMLimit).
 		SetMaxConcurrency(input.MaxConcurrency).
 		SetEnabled(input.Enabled).
 		SetUpdatedAt(now).
@@ -43,6 +44,7 @@ func (s *Store) UpsertLimit(ctx context.Context, input contract.UpsertLimit) (co
 		row, err := s.client.AccountGroupRateLimit.Create().
 			SetAccountGroupID(input.GroupID).
 			SetRpmLimit(input.RPMLimit).
+			SetTpmLimit(input.TPMLimit).
 			SetMaxConcurrency(input.MaxConcurrency).
 			SetEnabled(input.Enabled).
 			SetCreatedAt(now).
@@ -110,6 +112,7 @@ func toLimit(row *ent.AccountGroupRateLimit) contract.Limit {
 		ID:             row.ID,
 		GroupID:        row.AccountGroupID,
 		RPMLimit:       row.RpmLimit,
+		TPMLimit:       row.TpmLimit,
 		MaxConcurrency: row.MaxConcurrency,
 		Enabled:        row.Enabled,
 		CreatedAt:      row.CreatedAt,

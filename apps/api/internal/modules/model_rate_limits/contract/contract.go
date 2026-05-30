@@ -15,6 +15,7 @@ type Limit struct {
 	ID             int
 	ModelID        int
 	RPMLimit       int
+	TPMLimit       int
 	MaxConcurrency int
 	Enabled        bool
 	CreatedAt      time.Time
@@ -24,6 +25,7 @@ type Limit struct {
 type UpsertLimit struct {
 	ModelID        int
 	RPMLimit       int
+	TPMLimit       int
 	MaxConcurrency int
 	Enabled        bool
 }

@@ -74,6 +74,11 @@ func RpmLimit(v int) predicate.AccountGroupRateLimit {
 	return predicate.AccountGroupRateLimit(sql.FieldEQ(FieldRpmLimit, v))
 }
 
+// TpmLimit applies equality check predicate on the "tpm_limit" field. It's identical to TpmLimitEQ.
+func TpmLimit(v int) predicate.AccountGroupRateLimit {
+	return predicate.AccountGroupRateLimit(sql.FieldEQ(FieldTpmLimit, v))
+}
+
 // MaxConcurrency applies equality check predicate on the "max_concurrency" field. It's identical to MaxConcurrencyEQ.
 func MaxConcurrency(v int) predicate.AccountGroupRateLimit {
 	return predicate.AccountGroupRateLimit(sql.FieldEQ(FieldMaxConcurrency, v))
@@ -242,6 +247,46 @@ func RpmLimitLT(v int) predicate.AccountGroupRateLimit {
 // RpmLimitLTE applies the LTE predicate on the "rpm_limit" field.
 func RpmLimitLTE(v int) predicate.AccountGroupRateLimit {
 	return predicate.AccountGroupRateLimit(sql.FieldLTE(FieldRpmLimit, v))
+}
+
+// TpmLimitEQ applies the EQ predicate on the "tpm_limit" field.
+func TpmLimitEQ(v int) predicate.AccountGroupRateLimit {
+	return predicate.AccountGroupRateLimit(sql.FieldEQ(FieldTpmLimit, v))
+}
+
+// TpmLimitNEQ applies the NEQ predicate on the "tpm_limit" field.
+func TpmLimitNEQ(v int) predicate.AccountGroupRateLimit {
+	return predicate.AccountGroupRateLimit(sql.FieldNEQ(FieldTpmLimit, v))
+}
+
+// TpmLimitIn applies the In predicate on the "tpm_limit" field.
+func TpmLimitIn(vs ...int) predicate.AccountGroupRateLimit {
+	return predicate.AccountGroupRateLimit(sql.FieldIn(FieldTpmLimit, vs...))
+}
+
+// TpmLimitNotIn applies the NotIn predicate on the "tpm_limit" field.
+func TpmLimitNotIn(vs ...int) predicate.AccountGroupRateLimit {
+	return predicate.AccountGroupRateLimit(sql.FieldNotIn(FieldTpmLimit, vs...))
+}
+
+// TpmLimitGT applies the GT predicate on the "tpm_limit" field.
+func TpmLimitGT(v int) predicate.AccountGroupRateLimit {
+	return predicate.AccountGroupRateLimit(sql.FieldGT(FieldTpmLimit, v))
+}
+
+// TpmLimitGTE applies the GTE predicate on the "tpm_limit" field.
+func TpmLimitGTE(v int) predicate.AccountGroupRateLimit {
+	return predicate.AccountGroupRateLimit(sql.FieldGTE(FieldTpmLimit, v))
+}
+
+// TpmLimitLT applies the LT predicate on the "tpm_limit" field.
+func TpmLimitLT(v int) predicate.AccountGroupRateLimit {
+	return predicate.AccountGroupRateLimit(sql.FieldLT(FieldTpmLimit, v))
+}
+
+// TpmLimitLTE applies the LTE predicate on the "tpm_limit" field.
+func TpmLimitLTE(v int) predicate.AccountGroupRateLimit {
+	return predicate.AccountGroupRateLimit(sql.FieldLTE(FieldTpmLimit, v))
 }
 
 // MaxConcurrencyEQ applies the EQ predicate on the "max_concurrency" field.

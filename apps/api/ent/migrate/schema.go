@@ -177,6 +177,7 @@ var (
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "account_group_id", Type: field.TypeInt},
 		{Name: "rpm_limit", Type: field.TypeInt, Default: 0},
+		{Name: "tpm_limit", Type: field.TypeInt, Default: 0},
 		{Name: "max_concurrency", Type: field.TypeInt, Default: 0},
 		{Name: "enabled", Type: field.TypeBool, Default: true},
 	}
@@ -194,7 +195,7 @@ var (
 			{
 				Name:    "accountgroupratelimit_enabled",
 				Unique:  false,
-				Columns: []*schema.Column{AccountGroupRateLimitsColumns[6]},
+				Columns: []*schema.Column{AccountGroupRateLimitsColumns[7]},
 			},
 		},
 	}
@@ -855,6 +856,7 @@ var (
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "model_id", Type: field.TypeInt},
 		{Name: "rpm_limit", Type: field.TypeInt, Default: 0},
+		{Name: "tpm_limit", Type: field.TypeInt, Default: 0},
 		{Name: "max_concurrency", Type: field.TypeInt, Default: 0},
 		{Name: "enabled", Type: field.TypeBool, Default: true},
 	}
@@ -872,7 +874,7 @@ var (
 			{
 				Name:    "modelratelimit_enabled",
 				Unique:  false,
-				Columns: []*schema.Column{ModelRateLimitsColumns[6]},
+				Columns: []*schema.Column{ModelRateLimitsColumns[7]},
 			},
 		},
 	}

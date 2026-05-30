@@ -26,7 +26,7 @@ func (s *Service) ListLimits(ctx context.Context) ([]contract.Limit, error) {
 }
 
 func (s *Service) UpsertLimit(ctx context.Context, input contract.UpsertLimit) (contract.Limit, error) {
-	if input.GroupID <= 0 || input.RPMLimit < 0 || input.MaxConcurrency < 0 {
+	if input.GroupID <= 0 || input.RPMLimit < 0 || input.TPMLimit < 0 || input.MaxConcurrency < 0 {
 		return contract.Limit{}, ErrInvalidInput
 	}
 	return s.store.UpsertLimit(ctx, input)
@@ -51,6 +51,19 @@ func (s *Service) RPMForGroup(ctx context.Context, groupID int) int {
 		return 0
 	}
 	return limit.RPMLimit
+}
+
+// TPMForGroup returns the active tokens-per-minute ceiling for a group, or 0
+// when none applies (fail-open).
+func (s *Service) TPMForGroup(ctx context.Context, groupID int) int {
+	if groupID <= 0 {
+		return 0
+	}
+	limit, err := s.store.FindByGroup(ctx, groupID)
+	if err != nil || !limit.Enabled || limit.TPMLimit <= 0 {
+		return 0
+	}
+	return limit.TPMLimit
 }
 
 // ConcurrencyForGroup returns the active max-concurrency ceiling for a group, or

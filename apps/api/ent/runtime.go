@@ -214,12 +214,16 @@ func init() {
 	accountgroupratelimitDescRpmLimit := accountgroupratelimitFields[1].Descriptor()
 	// accountgroupratelimit.DefaultRpmLimit holds the default value on creation for the rpm_limit field.
 	accountgroupratelimit.DefaultRpmLimit = accountgroupratelimitDescRpmLimit.Default.(int)
+	// accountgroupratelimitDescTpmLimit is the schema descriptor for tpm_limit field.
+	accountgroupratelimitDescTpmLimit := accountgroupratelimitFields[2].Descriptor()
+	// accountgroupratelimit.DefaultTpmLimit holds the default value on creation for the tpm_limit field.
+	accountgroupratelimit.DefaultTpmLimit = accountgroupratelimitDescTpmLimit.Default.(int)
 	// accountgroupratelimitDescMaxConcurrency is the schema descriptor for max_concurrency field.
-	accountgroupratelimitDescMaxConcurrency := accountgroupratelimitFields[2].Descriptor()
+	accountgroupratelimitDescMaxConcurrency := accountgroupratelimitFields[3].Descriptor()
 	// accountgroupratelimit.DefaultMaxConcurrency holds the default value on creation for the max_concurrency field.
 	accountgroupratelimit.DefaultMaxConcurrency = accountgroupratelimitDescMaxConcurrency.Default.(int)
 	// accountgroupratelimitDescEnabled is the schema descriptor for enabled field.
-	accountgroupratelimitDescEnabled := accountgroupratelimitFields[3].Descriptor()
+	accountgroupratelimitDescEnabled := accountgroupratelimitFields[4].Descriptor()
 	// accountgroupratelimit.DefaultEnabled holds the default value on creation for the enabled field.
 	accountgroupratelimit.DefaultEnabled = accountgroupratelimitDescEnabled.Default.(bool)
 	accounthealthsnapshotFields := schema.AccountHealthSnapshot{}.Fields()
@@ -825,12 +829,16 @@ func init() {
 	modelratelimitDescRpmLimit := modelratelimitFields[1].Descriptor()
 	// modelratelimit.DefaultRpmLimit holds the default value on creation for the rpm_limit field.
 	modelratelimit.DefaultRpmLimit = modelratelimitDescRpmLimit.Default.(int)
+	// modelratelimitDescTpmLimit is the schema descriptor for tpm_limit field.
+	modelratelimitDescTpmLimit := modelratelimitFields[2].Descriptor()
+	// modelratelimit.DefaultTpmLimit holds the default value on creation for the tpm_limit field.
+	modelratelimit.DefaultTpmLimit = modelratelimitDescTpmLimit.Default.(int)
 	// modelratelimitDescMaxConcurrency is the schema descriptor for max_concurrency field.
-	modelratelimitDescMaxConcurrency := modelratelimitFields[2].Descriptor()
+	modelratelimitDescMaxConcurrency := modelratelimitFields[3].Descriptor()
 	// modelratelimit.DefaultMaxConcurrency holds the default value on creation for the max_concurrency field.
 	modelratelimit.DefaultMaxConcurrency = modelratelimitDescMaxConcurrency.Default.(int)
 	// modelratelimitDescEnabled is the schema descriptor for enabled field.
-	modelratelimitDescEnabled := modelratelimitFields[3].Descriptor()
+	modelratelimitDescEnabled := modelratelimitFields[4].Descriptor()
 	// modelratelimit.DefaultEnabled holds the default value on creation for the enabled field.
 	modelratelimit.DefaultEnabled = modelratelimitDescEnabled.Default.(bool)
 	modelregistryMixin := schema.ModelRegistry{}.Mixin()

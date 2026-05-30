@@ -14,6 +14,7 @@ import (
 type groupRateLimitPayload struct {
 	GroupID        int       `json:"account_group_id"`
 	RPMLimit       int       `json:"rpm_limit"`
+	TPMLimit       int       `json:"tpm_limit"`
 	MaxConcurrency int       `json:"max_concurrency"`
 	Enabled        bool      `json:"enabled"`
 	CreatedAt      time.Time `json:"created_at"`
@@ -23,6 +24,7 @@ type groupRateLimitPayload struct {
 type upsertGroupRateLimitRequest struct {
 	GroupID        int   `json:"account_group_id"`
 	RPMLimit       int   `json:"rpm_limit"`
+	TPMLimit       int   `json:"tpm_limit"`
 	MaxConcurrency int   `json:"max_concurrency"`
 	Enabled        *bool `json:"enabled"`
 }
@@ -31,6 +33,7 @@ func toGroupRateLimitPayload(limit groupratelimitscontract.Limit) groupRateLimit
 	return groupRateLimitPayload{
 		GroupID:        limit.GroupID,
 		RPMLimit:       limit.RPMLimit,
+		TPMLimit:       limit.TPMLimit,
 		MaxConcurrency: limit.MaxConcurrency,
 		Enabled:        limit.Enabled,
 		CreatedAt:      limit.CreatedAt.UTC(),
@@ -91,6 +94,7 @@ func (s *Server) handleUpsertAdminGroupRateLimit(w http.ResponseWriter, r *http.
 	limit, err := s.runtime.groupRateLimits.UpsertLimit(r.Context(), groupratelimitscontract.UpsertLimit{
 		GroupID:        body.GroupID,
 		RPMLimit:       body.RPMLimit,
+		TPMLimit:       body.TPMLimit,
 		MaxConcurrency: body.MaxConcurrency,
 		Enabled:        enabled,
 	})
@@ -101,6 +105,7 @@ func (s *Server) handleUpsertAdminGroupRateLimit(w http.ResponseWriter, r *http.
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "group_rate_limit.upsert", "account_group_rate_limit", strconv.Itoa(limit.GroupID), nil, map[string]any{
 		"account_group_id": limit.GroupID,
 		"rpm_limit":        limit.RPMLimit,
+		"tpm_limit":        limit.TPMLimit,
 		"max_concurrency":  limit.MaxConcurrency,
 		"enabled":          limit.Enabled,
 	}))

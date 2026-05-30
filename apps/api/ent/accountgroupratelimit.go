@@ -25,6 +25,8 @@ type AccountGroupRateLimit struct {
 	AccountGroupID int `json:"account_group_id,omitempty"`
 	// RpmLimit holds the value of the "rpm_limit" field.
 	RpmLimit int `json:"rpm_limit,omitempty"`
+	// TpmLimit holds the value of the "tpm_limit" field.
+	TpmLimit int `json:"tpm_limit,omitempty"`
 	// MaxConcurrency holds the value of the "max_concurrency" field.
 	MaxConcurrency int `json:"max_concurrency,omitempty"`
 	// Enabled holds the value of the "enabled" field.
@@ -39,7 +41,7 @@ func (*AccountGroupRateLimit) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case accountgroupratelimit.FieldEnabled:
 			values[i] = new(sql.NullBool)
-		case accountgroupratelimit.FieldID, accountgroupratelimit.FieldAccountGroupID, accountgroupratelimit.FieldRpmLimit, accountgroupratelimit.FieldMaxConcurrency:
+		case accountgroupratelimit.FieldID, accountgroupratelimit.FieldAccountGroupID, accountgroupratelimit.FieldRpmLimit, accountgroupratelimit.FieldTpmLimit, accountgroupratelimit.FieldMaxConcurrency:
 			values[i] = new(sql.NullInt64)
 		case accountgroupratelimit.FieldCreatedAt, accountgroupratelimit.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -87,6 +89,12 @@ func (_m *AccountGroupRateLimit) assignValues(columns []string, values []any) er
 				return fmt.Errorf("unexpected type %T for field rpm_limit", values[i])
 			} else if value.Valid {
 				_m.RpmLimit = int(value.Int64)
+			}
+		case accountgroupratelimit.FieldTpmLimit:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field tpm_limit", values[i])
+			} else if value.Valid {
+				_m.TpmLimit = int(value.Int64)
 			}
 		case accountgroupratelimit.FieldMaxConcurrency:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -147,6 +155,9 @@ func (_m *AccountGroupRateLimit) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("rpm_limit=")
 	builder.WriteString(fmt.Sprintf("%v", _m.RpmLimit))
+	builder.WriteString(", ")
+	builder.WriteString("tpm_limit=")
+	builder.WriteString(fmt.Sprintf("%v", _m.TpmLimit))
 	builder.WriteString(", ")
 	builder.WriteString("max_concurrency=")
 	builder.WriteString(fmt.Sprintf("%v", _m.MaxConcurrency))
