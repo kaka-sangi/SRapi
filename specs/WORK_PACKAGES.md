@@ -3912,6 +3912,17 @@ Required gates:
 - `make code-quality-check`
 - `git diff --check`
 
+## WP-1230: Scheduled Connectivity Test Runner v1
+
+Problem (verified): the `health_probe` worker is scheduled but api_key-only (`doProbe` rejects non-api_key runtime classes), and the real generative connectivity test (`runtimeState.testAccount` responses-compact mode) only runs on admin demand. So OAuth / non-api_key accounts had no automated connectivity verification.
+
+What changed:
+- New `internal/workers/connectivity_test` worker (modeled on `health_probe`). Per pass: list accounts, skip inactive, resolve a probe model from account metadata / provider config (`responses_compact_probe_model` / `compact_probe_model` / `test_model`) — a configured model is the **opt-in** signal — and for eligible accounts run a `conversationProber` through `accounts.ProbeAccount(ctx, id, prober, policy)`, which decrypts the credential, folds the result into a health snapshot (status, cooldown, circuit state), and records it.
+- `conversationProber.ProbeAccount` issues a minimal real generative call via `provider_adapters.InvokeConversation` ("Respond with OK.", `Mapping{UpstreamModelName: model}`). Success → OK result with upstream status; a `ProviderError` → a **not-OK result returned with nil error** so it folds into an unhealthy snapshot rather than being dropped.
+- Because the probe is billable, it is **off by default** and only touches accounts that configure a probe model. `ConnectivityTestConfig` (`ACCOUNT_CONNECTIVITY_TEST_ENABLED` / `_INTERVAL_SECONDS` default 3600 / `_TIMEOUT_SECONDS` / `_MAX_CONCURRENT` default 2). Wired through `app.newHandler` (return tuple), `startWorkers`/`stopWorkers`, and the `internal/architecture` bootstrap-import allowlist.
+
+Tests/gates: internal worker test (`probeModel` opt-in resolution + `conversationProber` success/failure outcome mapping with a stub adapter), `internal/app` bootstrap test, full `make check`. No new tables/migrations.
+
 ## WP-1220: Per-Model Max Concurrency v1
 
 Objective: add a global max concurrent in-flight request ceiling per model (the concurrency complement to WP-1190's per-model RPM), completing the rate/capacity matrix.

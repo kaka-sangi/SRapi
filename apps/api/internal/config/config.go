@@ -19,29 +19,41 @@ const (
 )
 
 type Config struct {
-	Server         ServerConfig
-	Storage        StorageConfig
-	Database       DependencyConfig
-	Redis          DependencyConfig
-	Gateway        GatewayConfig
-	Security       SecurityConfig
-	Bootstrap      BootstrapConfig
-	Retention      RetentionConfig
-	AuthCleanup    AuthCleanupConfig
-	BalanceCharger BalanceChargerConfig
-	HealthProbe    HealthProbeConfig
-	QualityEval    QualityEvalConfig
-	SLOEvaluator   SLOEvaluatorConfig
-	Email          EmailConfig
-	Observability  ObservabilityConfig
-	Captcha        CaptchaConfig
-	QuotaRefresh   QuotaRefreshConfig
+	Server           ServerConfig
+	Storage          StorageConfig
+	Database         DependencyConfig
+	Redis            DependencyConfig
+	Gateway          GatewayConfig
+	Security         SecurityConfig
+	Bootstrap        BootstrapConfig
+	Retention        RetentionConfig
+	AuthCleanup      AuthCleanupConfig
+	BalanceCharger   BalanceChargerConfig
+	HealthProbe      HealthProbeConfig
+	QualityEval      QualityEvalConfig
+	SLOEvaluator     SLOEvaluatorConfig
+	Email            EmailConfig
+	Observability    ObservabilityConfig
+	Captcha          CaptchaConfig
+	QuotaRefresh     QuotaRefreshConfig
+	ConnectivityTest ConnectivityTestConfig
 }
 
 // QuotaRefreshConfig controls the scheduled per-account quota/subscription
 // refresh worker. Disabled by default; accounts still need a configured quota
 // endpoint for the worker to act on them.
 type QuotaRefreshConfig struct {
+	Enabled       bool
+	Interval      time.Duration
+	Timeout       time.Duration
+	MaxConcurrent int
+}
+
+// ConnectivityTestConfig controls the scheduled connectivity test worker, which
+// issues a real (billable) generative probe to opt-in accounts of any runtime
+// class. Disabled by default; only accounts with a configured probe model are
+// tested.
+type ConnectivityTestConfig struct {
 	Enabled       bool
 	Interval      time.Duration
 	Timeout       time.Duration
@@ -282,6 +294,12 @@ func Load() Config {
 			Interval:      time.Duration(getIntEnv("ACCOUNT_QUOTA_REFRESH_INTERVAL_SECONDS", 1800)) * time.Second,
 			Timeout:       time.Duration(getIntEnv("ACCOUNT_QUOTA_REFRESH_TIMEOUT_SECONDS", 15)) * time.Second,
 			MaxConcurrent: getIntEnv("ACCOUNT_QUOTA_REFRESH_MAX_CONCURRENT", 4),
+		},
+		ConnectivityTest: ConnectivityTestConfig{
+			Enabled:       getBoolEnv("ACCOUNT_CONNECTIVITY_TEST_ENABLED", false),
+			Interval:      time.Duration(getIntEnv("ACCOUNT_CONNECTIVITY_TEST_INTERVAL_SECONDS", 3600)) * time.Second,
+			Timeout:       time.Duration(getIntEnv("ACCOUNT_CONNECTIVITY_TEST_TIMEOUT_SECONDS", 30)) * time.Second,
+			MaxConcurrent: getIntEnv("ACCOUNT_CONNECTIVITY_TEST_MAX_CONCURRENT", 2),
 		},
 	}
 }
