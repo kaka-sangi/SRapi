@@ -158,7 +158,7 @@ func (s *Server) handleCompleteOAuthAuthorization(w http.ResponseWriter, r *http
 
 	ctx, cancel := context.WithTimeout(r.Context(), oauthProviderHTTPTimeout)
 	defer cancel()
-	accessToken, err := exchangeOAuthAuthorizationCode(ctx, http.DefaultClient, config, flow, code)
+	accessToken, err := exchangeOAuthAuthorizationCode(ctx, http.DefaultClient, config, flow, code, s.runtime.oauthClientSecret(flow.ProviderKey))
 	if err != nil {
 		s.clearOAuthFlowCookie(w)
 		s.logger.Warn("oauth token exchange failed", "provider", provider, "provider_key", flow.ProviderKey, "error", err)
@@ -838,13 +838,28 @@ func callbackOAuthProviderConfigReady(config admincontrolcontract.OAuthProviderC
 	return validOAuthBackchannelURL(config.TokenURL) && validOAuthBackchannelURL(config.UserInfoURL)
 }
 
-func exchangeOAuthAuthorizationCode(ctx context.Context, client *http.Client, config admincontrolcontract.OAuthProviderConfig, flow authservice.OAuthAuthorizationFlowState, code string) (string, error) {
+// oauthClientSecret returns the confidential-client secret for a console OAuth
+// provider key, sourced from deployment env (never AdminSettings). Empty means a
+// public client.
+func (rt *runtimeState) oauthClientSecret(providerKey string) string {
+	if rt == nil || rt.cfg.OAuth.ClientSecrets == nil {
+		return ""
+	}
+	return rt.cfg.OAuth.ClientSecrets[strings.TrimSpace(providerKey)]
+}
+
+func exchangeOAuthAuthorizationCode(ctx context.Context, client *http.Client, config admincontrolcontract.OAuthProviderConfig, flow authservice.OAuthAuthorizationFlowState, code string, clientSecret string) (string, error) {
 	form := url.Values{}
 	form.Set("grant_type", "authorization_code")
 	form.Set("code", strings.TrimSpace(code))
 	form.Set("redirect_uri", flow.RedirectURI)
 	form.Set("client_id", flow.ClientID)
 	form.Set("code_verifier", flow.CodeVerifier)
+	// Confidential clients additionally authenticate with a client_secret
+	// (client_secret_post). PKCE and the secret coexist; public clients omit it.
+	if secret := strings.TrimSpace(clientSecret); secret != "" {
+		form.Set("client_secret", secret)
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimSpace(config.TokenURL), strings.NewReader(form.Encode()))
 	if err != nil {
 		return "", err

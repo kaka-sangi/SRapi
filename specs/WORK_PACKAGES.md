@@ -3912,6 +3912,18 @@ Required gates:
 - `make code-quality-check`
 - `git diff --check`
 
+## WP-1270: Confidential-Client Console OAuth v1
+
+Problem (verified): the console-login OAuth token exchange (`exchangeOAuthAuthorizationCode`) sent `grant_type`/`code`/`redirect_uri`/`client_id`/`code_verifier` only — a public client with PKCE. Providers configured as confidential clients (web-application type) require a `client_secret` at the token endpoint and could not be used. `OAuthProviderConfig` had a `TokenAuthMethod` field but no secret to send.
+
+What changed:
+- `config.OAuthConfig.ClientSecrets` — a `map[provider_key]client_secret` parsed from env `OAUTH_CLIENT_SECRETS_JSON` via `parseStringMapEnv`. Secrets stay in deployment env, matching SRapi's posture (JWT/MASTER/SMTP secrets are env-only, never AdminSettings) — so no settings/OpenAPI/redaction surface is touched.
+- `runtimeState.oauthClientSecret(providerKey)` resolves the secret; `exchangeOAuthAuthorizationCode` gained a `clientSecret` param and sets `client_secret` (client_secret_post) when non-empty. PKCE is preserved (the two coexist); public clients (no secret) are byte-identical to before.
+
+Deferred: id_token validation. The flow authenticates the profile via the userinfo endpoint over TLS (access token from a PKCE-protected exchange), which is already secure; full OIDC id_token validation needs JWT signature verification (RS256 + JWKS), and there is no JWT/JOSE library in go.mod. Hand-rolling JWT verification is a security anti-pattern, so id_token validation is deferred pending a vetted dependency (e.g. golang-jwt + a JWKS fetcher) — a separate decision.
+
+Tests/gates: `parseStringMapEnv` unit test; `exchangeOAuthAuthorizationCode` httptest verifying `client_secret` is sent for confidential clients, PKCE preserved, and omitted for public clients. Full `make check`. No new tables.
+
 ## WP-1260: Per-Model / Per-Group TPM v1
 
 Objective: add tokens-per-minute ceilings for models and account groups — the last missing cells of the rate/capacity matrix (accounts/keys already had TPM; model/group had only RPM + concurrency). TPM bounds aggregate token throughput more precisely than RPM (a few large requests can overload an upstream even at low request rates).

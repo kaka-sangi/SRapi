@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
@@ -37,6 +38,7 @@ type Config struct {
 	Captcha          CaptchaConfig
 	QuotaRefresh     QuotaRefreshConfig
 	ConnectivityTest ConnectivityTestConfig
+	OAuth            OAuthConfig
 }
 
 // QuotaRefreshConfig controls the scheduled per-account quota/subscription
@@ -109,6 +111,13 @@ type CaptchaConfig struct {
 	Provider  string // turnstile | hcaptcha | recaptcha
 	SecretKey string
 	VerifyURL string // optional override of the provider's siteverify endpoint
+}
+
+// OAuthConfig holds console-login OAuth secrets that must stay in deployment env
+// (never in AdminSettings). ClientSecrets is keyed by provider_key; when a key
+// is present the token exchange runs as a confidential client (client_secret).
+type OAuthConfig struct {
+	ClientSecrets map[string]string
 }
 
 type RetentionConfig struct {
@@ -301,6 +310,9 @@ func Load() Config {
 			Timeout:       time.Duration(getIntEnv("ACCOUNT_CONNECTIVITY_TEST_TIMEOUT_SECONDS", 30)) * time.Second,
 			MaxConcurrent: getIntEnv("ACCOUNT_CONNECTIVITY_TEST_MAX_CONCURRENT", 2),
 		},
+		OAuth: OAuthConfig{
+			ClientSecrets: parseStringMapEnv("OAUTH_CLIENT_SECRETS_JSON"),
+		},
 	}
 }
 
@@ -476,6 +488,28 @@ func getEnv(key, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+// parseStringMapEnv parses a JSON object env var into a string map. Returns an
+// empty map when unset or unparseable so callers never see nil.
+func parseStringMapEnv(key string) map[string]string {
+	raw := strings.TrimSpace(os.Getenv(key))
+	out := map[string]string{}
+	if raw == "" {
+		return out
+	}
+	parsed := map[string]string{}
+	if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
+		return out
+	}
+	for k, v := range parsed {
+		k = strings.TrimSpace(k)
+		if k == "" {
+			continue
+		}
+		out[k] = v
+	}
+	return out
 }
 
 func securityConfigFromEnv() SecurityConfig {
