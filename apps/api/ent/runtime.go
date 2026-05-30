@@ -825,8 +825,12 @@ func init() {
 	modelratelimitDescRpmLimit := modelratelimitFields[1].Descriptor()
 	// modelratelimit.DefaultRpmLimit holds the default value on creation for the rpm_limit field.
 	modelratelimit.DefaultRpmLimit = modelratelimitDescRpmLimit.Default.(int)
+	// modelratelimitDescMaxConcurrency is the schema descriptor for max_concurrency field.
+	modelratelimitDescMaxConcurrency := modelratelimitFields[2].Descriptor()
+	// modelratelimit.DefaultMaxConcurrency holds the default value on creation for the max_concurrency field.
+	modelratelimit.DefaultMaxConcurrency = modelratelimitDescMaxConcurrency.Default.(int)
 	// modelratelimitDescEnabled is the schema descriptor for enabled field.
-	modelratelimitDescEnabled := modelratelimitFields[2].Descriptor()
+	modelratelimitDescEnabled := modelratelimitFields[3].Descriptor()
 	// modelratelimit.DefaultEnabled holds the default value on creation for the enabled field.
 	modelratelimit.DefaultEnabled = modelratelimitDescEnabled.Default.(bool)
 	modelregistryMixin := schema.ModelRegistry{}.Mixin()

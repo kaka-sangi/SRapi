@@ -26,7 +26,7 @@ func (s *Service) ListLimits(ctx context.Context) ([]contract.Limit, error) {
 }
 
 func (s *Service) UpsertLimit(ctx context.Context, input contract.UpsertLimit) (contract.Limit, error) {
-	if input.ModelID <= 0 || input.RPMLimit < 0 {
+	if input.ModelID <= 0 || input.RPMLimit < 0 || input.MaxConcurrency < 0 {
 		return contract.Limit{}, ErrInvalidInput
 	}
 	return s.store.UpsertLimit(ctx, input)
@@ -47,11 +47,21 @@ func (s *Service) RPMForModel(ctx context.Context, modelID int) int {
 		return 0
 	}
 	limit, err := s.store.FindByModel(ctx, modelID)
-	if err != nil {
-		return 0
-	}
-	if !limit.Enabled || limit.RPMLimit <= 0 {
+	if err != nil || !limit.Enabled || limit.RPMLimit <= 0 {
 		return 0
 	}
 	return limit.RPMLimit
+}
+
+// ConcurrencyForModel returns the active max-concurrency ceiling for a model, or
+// 0 when none applies (fail-open).
+func (s *Service) ConcurrencyForModel(ctx context.Context, modelID int) int {
+	if modelID <= 0 {
+		return 0
+	}
+	limit, err := s.store.FindByModel(ctx, modelID)
+	if err != nil || !limit.Enabled || limit.MaxConcurrency <= 0 {
+		return 0
+	}
+	return limit.MaxConcurrency
 }

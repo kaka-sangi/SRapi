@@ -51,6 +51,30 @@ func TestUpsertAndRPMForModel(t *testing.T) {
 	}
 }
 
+func TestConcurrencyForModel(t *testing.T) {
+	ctx := context.Background()
+	svc := newService(t)
+
+	if got := svc.ConcurrencyForModel(ctx, 5); got != 0 {
+		t.Fatalf("ConcurrencyForModel with no rule = %d, want 0", got)
+	}
+	if _, err := svc.UpsertLimit(ctx, contract.UpsertLimit{ModelID: 5, MaxConcurrency: 8, Enabled: true}); err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+	if got := svc.ConcurrencyForModel(ctx, 5); got != 8 {
+		t.Fatalf("ConcurrencyForModel enabled = %d, want 8", got)
+	}
+	if got := svc.RPMForModel(ctx, 5); got != 0 {
+		t.Fatalf("RPMForModel with only concurrency set = %d, want 0", got)
+	}
+	if _, err := svc.UpsertLimit(ctx, contract.UpsertLimit{ModelID: 5, MaxConcurrency: 8, Enabled: false}); err != nil {
+		t.Fatalf("upsert disable: %v", err)
+	}
+	if got := svc.ConcurrencyForModel(ctx, 5); got != 0 {
+		t.Fatalf("ConcurrencyForModel disabled = %d, want 0", got)
+	}
+}
+
 func TestUpsertValidationAndDelete(t *testing.T) {
 	ctx := context.Background()
 	svc := newService(t)

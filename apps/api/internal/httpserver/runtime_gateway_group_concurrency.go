@@ -52,6 +52,36 @@ func (rt *runtimeState) acquireAccountGroupConcurrency(ctx context.Context, acco
 	return leases, nil
 }
 
+// acquireModelConcurrency acquires a global concurrency lease for a model that
+// has a max-concurrency ceiling (WP-1220). Returns an empty lease when no limit
+// applies.
+func (rt *runtimeState) acquireModelConcurrency(ctx context.Context, modelID int) (ratelimit.ConcurrencyLease, error) {
+	if rt.rateLimiter == nil || rt.modelRateLimits == nil || modelID <= 0 {
+		return ratelimit.ConcurrencyLease{}, nil
+	}
+	limit := rt.modelRateLimits.ConcurrencyForModel(ctx, modelID)
+	if limit <= 0 {
+		return ratelimit.ConcurrencyLease{}, nil
+	}
+	lease, decision, err := rt.rateLimiter.AcquireConcurrency(ctx, ratelimit.ConcurrencyCheck{
+		Name:  "model_concurrency",
+		Key:   fmt.Sprintf("model:%d:concurrency", modelID),
+		Limit: limit,
+		TTL:   rt.providerAccountConcurrencyTTL(),
+	}, time.Now().UTC())
+	if err != nil {
+		return ratelimit.ConcurrencyLease{}, err
+	}
+	if !decision.Allowed {
+		return ratelimit.ConcurrencyLease{}, provideradaptercontract.ProviderError{
+			Class:      "concurrency_limit_exceeded",
+			StatusCode: http.StatusTooManyRequests,
+			Message:    "model concurrency limit exceeded",
+		}
+	}
+	return lease, nil
+}
+
 // releaseGatewayConcurrency releases every held lease (empty leases are skipped
 // by releaseProviderAccountConcurrency).
 func (rt *runtimeState) releaseGatewayConcurrency(leases []ratelimit.ConcurrencyLease) {

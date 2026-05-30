@@ -25,6 +25,8 @@ type ModelRateLimit struct {
 	ModelID int `json:"model_id,omitempty"`
 	// RpmLimit holds the value of the "rpm_limit" field.
 	RpmLimit int `json:"rpm_limit,omitempty"`
+	// MaxConcurrency holds the value of the "max_concurrency" field.
+	MaxConcurrency int `json:"max_concurrency,omitempty"`
 	// Enabled holds the value of the "enabled" field.
 	Enabled      bool `json:"enabled,omitempty"`
 	selectValues sql.SelectValues
@@ -37,7 +39,7 @@ func (*ModelRateLimit) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case modelratelimit.FieldEnabled:
 			values[i] = new(sql.NullBool)
-		case modelratelimit.FieldID, modelratelimit.FieldModelID, modelratelimit.FieldRpmLimit:
+		case modelratelimit.FieldID, modelratelimit.FieldModelID, modelratelimit.FieldRpmLimit, modelratelimit.FieldMaxConcurrency:
 			values[i] = new(sql.NullInt64)
 		case modelratelimit.FieldCreatedAt, modelratelimit.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -85,6 +87,12 @@ func (_m *ModelRateLimit) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field rpm_limit", values[i])
 			} else if value.Valid {
 				_m.RpmLimit = int(value.Int64)
+			}
+		case modelratelimit.FieldMaxConcurrency:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field max_concurrency", values[i])
+			} else if value.Valid {
+				_m.MaxConcurrency = int(value.Int64)
 			}
 		case modelratelimit.FieldEnabled:
 			if value, ok := values[i].(*sql.NullBool); !ok {
@@ -139,6 +147,9 @@ func (_m *ModelRateLimit) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("rpm_limit=")
 	builder.WriteString(fmt.Sprintf("%v", _m.RpmLimit))
+	builder.WriteString(", ")
+	builder.WriteString("max_concurrency=")
+	builder.WriteString(fmt.Sprintf("%v", _m.MaxConcurrency))
 	builder.WriteString(", ")
 	builder.WriteString("enabled=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Enabled))

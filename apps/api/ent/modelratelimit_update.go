@@ -76,6 +76,27 @@ func (_u *ModelRateLimitUpdate) AddRpmLimit(v int) *ModelRateLimitUpdate {
 	return _u
 }
 
+// SetMaxConcurrency sets the "max_concurrency" field.
+func (_u *ModelRateLimitUpdate) SetMaxConcurrency(v int) *ModelRateLimitUpdate {
+	_u.mutation.ResetMaxConcurrency()
+	_u.mutation.SetMaxConcurrency(v)
+	return _u
+}
+
+// SetNillableMaxConcurrency sets the "max_concurrency" field if the given value is not nil.
+func (_u *ModelRateLimitUpdate) SetNillableMaxConcurrency(v *int) *ModelRateLimitUpdate {
+	if v != nil {
+		_u.SetMaxConcurrency(*v)
+	}
+	return _u
+}
+
+// AddMaxConcurrency adds value to the "max_concurrency" field.
+func (_u *ModelRateLimitUpdate) AddMaxConcurrency(v int) *ModelRateLimitUpdate {
+	_u.mutation.AddMaxConcurrency(v)
+	return _u
+}
+
 // SetEnabled sets the "enabled" field.
 func (_u *ModelRateLimitUpdate) SetEnabled(v bool) *ModelRateLimitUpdate {
 	_u.mutation.SetEnabled(v)
@@ -155,6 +176,12 @@ func (_u *ModelRateLimitUpdate) sqlSave(ctx context.Context) (_node int, err err
 	if value, ok := _u.mutation.AddedRpmLimit(); ok {
 		_spec.AddField(modelratelimit.FieldRpmLimit, field.TypeInt, value)
 	}
+	if value, ok := _u.mutation.MaxConcurrency(); ok {
+		_spec.SetField(modelratelimit.FieldMaxConcurrency, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedMaxConcurrency(); ok {
+		_spec.AddField(modelratelimit.FieldMaxConcurrency, field.TypeInt, value)
+	}
 	if value, ok := _u.mutation.Enabled(); ok {
 		_spec.SetField(modelratelimit.FieldEnabled, field.TypeBool, value)
 	}
@@ -223,6 +250,27 @@ func (_u *ModelRateLimitUpdateOne) SetNillableRpmLimit(v *int) *ModelRateLimitUp
 // AddRpmLimit adds value to the "rpm_limit" field.
 func (_u *ModelRateLimitUpdateOne) AddRpmLimit(v int) *ModelRateLimitUpdateOne {
 	_u.mutation.AddRpmLimit(v)
+	return _u
+}
+
+// SetMaxConcurrency sets the "max_concurrency" field.
+func (_u *ModelRateLimitUpdateOne) SetMaxConcurrency(v int) *ModelRateLimitUpdateOne {
+	_u.mutation.ResetMaxConcurrency()
+	_u.mutation.SetMaxConcurrency(v)
+	return _u
+}
+
+// SetNillableMaxConcurrency sets the "max_concurrency" field if the given value is not nil.
+func (_u *ModelRateLimitUpdateOne) SetNillableMaxConcurrency(v *int) *ModelRateLimitUpdateOne {
+	if v != nil {
+		_u.SetMaxConcurrency(*v)
+	}
+	return _u
+}
+
+// AddMaxConcurrency adds value to the "max_concurrency" field.
+func (_u *ModelRateLimitUpdateOne) AddMaxConcurrency(v int) *ModelRateLimitUpdateOne {
+	_u.mutation.AddMaxConcurrency(v)
 	return _u
 }
 
@@ -334,6 +382,12 @@ func (_u *ModelRateLimitUpdateOne) sqlSave(ctx context.Context) (_node *ModelRat
 	}
 	if value, ok := _u.mutation.AddedRpmLimit(); ok {
 		_spec.AddField(modelratelimit.FieldRpmLimit, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.MaxConcurrency(); ok {
+		_spec.SetField(modelratelimit.FieldMaxConcurrency, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedMaxConcurrency(); ok {
+		_spec.AddField(modelratelimit.FieldMaxConcurrency, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.Enabled(); ok {
 		_spec.SetField(modelratelimit.FieldEnabled, field.TypeBool, value)

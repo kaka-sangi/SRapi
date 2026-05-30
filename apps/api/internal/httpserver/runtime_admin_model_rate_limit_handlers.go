@@ -12,26 +12,29 @@ import (
 )
 
 type modelRateLimitPayload struct {
-	ModelID   int       `json:"model_id"`
-	RPMLimit  int       `json:"rpm_limit"`
-	Enabled   bool      `json:"enabled"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ModelID        int       `json:"model_id"`
+	RPMLimit       int       `json:"rpm_limit"`
+	MaxConcurrency int       `json:"max_concurrency"`
+	Enabled        bool      `json:"enabled"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 type upsertModelRateLimitRequest struct {
-	ModelID  int   `json:"model_id"`
-	RPMLimit int   `json:"rpm_limit"`
-	Enabled  *bool `json:"enabled"`
+	ModelID        int   `json:"model_id"`
+	RPMLimit       int   `json:"rpm_limit"`
+	MaxConcurrency int   `json:"max_concurrency"`
+	Enabled        *bool `json:"enabled"`
 }
 
 func toModelRateLimitPayload(limit modelratelimitscontract.Limit) modelRateLimitPayload {
 	return modelRateLimitPayload{
-		ModelID:   limit.ModelID,
-		RPMLimit:  limit.RPMLimit,
-		Enabled:   limit.Enabled,
-		CreatedAt: limit.CreatedAt.UTC(),
-		UpdatedAt: limit.UpdatedAt.UTC(),
+		ModelID:        limit.ModelID,
+		RPMLimit:       limit.RPMLimit,
+		MaxConcurrency: limit.MaxConcurrency,
+		Enabled:        limit.Enabled,
+		CreatedAt:      limit.CreatedAt.UTC(),
+		UpdatedAt:      limit.UpdatedAt.UTC(),
 	}
 }
 
@@ -86,18 +89,20 @@ func (s *Server) handleUpsertAdminModelRateLimit(w http.ResponseWriter, r *http.
 		enabled = *body.Enabled
 	}
 	limit, err := s.runtime.modelRateLimits.UpsertLimit(r.Context(), modelratelimitscontract.UpsertLimit{
-		ModelID:  body.ModelID,
-		RPMLimit: body.RPMLimit,
-		Enabled:  enabled,
+		ModelID:        body.ModelID,
+		RPMLimit:       body.RPMLimit,
+		MaxConcurrency: body.MaxConcurrency,
+		Enabled:        enabled,
 	})
 	if err != nil {
 		s.writeModelRateLimitError(w, err, requestID)
 		return
 	}
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "model_rate_limit.upsert", "model_rate_limit", strconv.Itoa(limit.ModelID), nil, map[string]any{
-		"model_id":  limit.ModelID,
-		"rpm_limit": limit.RPMLimit,
-		"enabled":   limit.Enabled,
+		"model_id":        limit.ModelID,
+		"rpm_limit":       limit.RPMLimit,
+		"max_concurrency": limit.MaxConcurrency,
+		"enabled":         limit.Enabled,
 	}))
 	writeJSONAny(w, http.StatusOK, map[string]any{
 		"data":       toModelRateLimitPayload(limit),

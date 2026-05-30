@@ -21,6 +21,8 @@ const (
 	FieldModelID = "model_id"
 	// FieldRpmLimit holds the string denoting the rpm_limit field in the database.
 	FieldRpmLimit = "rpm_limit"
+	// FieldMaxConcurrency holds the string denoting the max_concurrency field in the database.
+	FieldMaxConcurrency = "max_concurrency"
 	// FieldEnabled holds the string denoting the enabled field in the database.
 	FieldEnabled = "enabled"
 	// Table holds the table name of the modelratelimit in the database.
@@ -34,6 +36,7 @@ var Columns = []string{
 	FieldUpdatedAt,
 	FieldModelID,
 	FieldRpmLimit,
+	FieldMaxConcurrency,
 	FieldEnabled,
 }
 
@@ -56,6 +59,8 @@ var (
 	UpdateDefaultUpdatedAt func() time.Time
 	// DefaultRpmLimit holds the default value on creation for the "rpm_limit" field.
 	DefaultRpmLimit int
+	// DefaultMaxConcurrency holds the default value on creation for the "max_concurrency" field.
+	DefaultMaxConcurrency int
 	// DefaultEnabled holds the default value on creation for the "enabled" field.
 	DefaultEnabled bool
 )
@@ -86,6 +91,11 @@ func ByModelID(opts ...sql.OrderTermOption) OrderOption {
 // ByRpmLimit orders the results by the rpm_limit field.
 func ByRpmLimit(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldRpmLimit, opts...).ToFunc()
+}
+
+// ByMaxConcurrency orders the results by the max_concurrency field.
+func ByMaxConcurrency(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldMaxConcurrency, opts...).ToFunc()
 }
 
 // ByEnabled orders the results by the enabled field.

@@ -369,7 +369,7 @@ func (rt *runtimeState) providerAccountConcurrencyTTL() time.Duration {
 	return rt.cfg.Gateway.RequestTimeout
 }
 
-func (rt *runtimeState) prepareProviderDispatch(ctx context.Context, account *accountcontract.ProviderAccount) (providerDispatchState, error) {
+func (rt *runtimeState) prepareProviderDispatch(ctx context.Context, account *accountcontract.ProviderAccount, modelID int) (providerDispatchState, error) {
 	if account == nil || account.ID <= 0 {
 		return providerDispatchState{}, provideradaptercontract.ProviderError{Class: "no_available_account", StatusCode: http.StatusServiceUnavailable, Message: "provider account missing"}
 	}
@@ -387,6 +387,11 @@ func (rt *runtimeState) prepareProviderDispatch(ctx context.Context, account *ac
 			rt.releaseGatewayConcurrency(leases)
 		}
 	}()
+	modelLease, err := rt.acquireModelConcurrency(ctx, modelID)
+	if err != nil {
+		return providerDispatchState{}, err
+	}
+	leases = append(leases, modelLease)
 	groupLeases, err := rt.acquireAccountGroupConcurrency(ctx, *account)
 	if err != nil {
 		return providerDispatchState{}, err
@@ -1381,7 +1386,7 @@ func metadataCooldownActive(metadata map[string]any, now time.Time) bool {
 }
 
 func (rt *runtimeState) invokeProviderConversation(ctx context.Context, req provideradaptercontract.ConversationRequest) (provideradaptercontract.ConversationResponse, error) {
-	dispatch, err := rt.prepareProviderDispatch(ctx, &req.Account)
+	dispatch, err := rt.prepareProviderDispatch(ctx, &req.Account, req.Mapping.ModelID)
 	if err != nil {
 		return provideradaptercontract.ConversationResponse{}, err
 	}
@@ -1396,7 +1401,7 @@ func (rt *runtimeState) invokeProviderConversation(ctx context.Context, req prov
 }
 
 func (rt *runtimeState) invokeProviderTokenCount(ctx context.Context, req provideradaptercontract.TokenCountRequest) (provideradaptercontract.TokenCountResponse, error) {
-	dispatch, err := rt.prepareProviderDispatch(ctx, &req.Account)
+	dispatch, err := rt.prepareProviderDispatch(ctx, &req.Account, req.Mapping.ModelID)
 	if err != nil {
 		return provideradaptercontract.TokenCountResponse{}, err
 	}
@@ -1411,7 +1416,7 @@ func (rt *runtimeState) invokeProviderTokenCount(ctx context.Context, req provid
 }
 
 func (rt *runtimeState) invokeProviderResponseInputItems(ctx context.Context, req provideradaptercontract.ResponseInputItemsRequest) (provideradaptercontract.ResponseInputItemsResponse, error) {
-	dispatch, err := rt.prepareProviderDispatch(ctx, &req.Account)
+	dispatch, err := rt.prepareProviderDispatch(ctx, &req.Account, req.Mapping.ModelID)
 	if err != nil {
 		return provideradaptercontract.ResponseInputItemsResponse{}, err
 	}
@@ -1426,7 +1431,7 @@ func (rt *runtimeState) invokeProviderResponseInputItems(ctx context.Context, re
 }
 
 func (rt *runtimeState) invokeProviderEmbeddings(ctx context.Context, req provideradaptercontract.EmbeddingRequest) (provideradaptercontract.EmbeddingResponse, error) {
-	dispatch, err := rt.prepareProviderDispatch(ctx, &req.Account)
+	dispatch, err := rt.prepareProviderDispatch(ctx, &req.Account, req.Mapping.ModelID)
 	if err != nil {
 		return provideradaptercontract.EmbeddingResponse{}, err
 	}
@@ -1441,7 +1446,7 @@ func (rt *runtimeState) invokeProviderEmbeddings(ctx context.Context, req provid
 }
 
 func (rt *runtimeState) invokeProviderImageGeneration(ctx context.Context, req provideradaptercontract.ImageGenerationRequest) (provideradaptercontract.ImageGenerationResponse, error) {
-	dispatch, err := rt.prepareProviderDispatch(ctx, &req.Account)
+	dispatch, err := rt.prepareProviderDispatch(ctx, &req.Account, req.Mapping.ModelID)
 	if err != nil {
 		return provideradaptercontract.ImageGenerationResponse{}, err
 	}
@@ -1456,7 +1461,7 @@ func (rt *runtimeState) invokeProviderImageGeneration(ctx context.Context, req p
 }
 
 func (rt *runtimeState) invokeProviderImageEdit(ctx context.Context, req provideradaptercontract.ImageEditRequest) (provideradaptercontract.ImageGenerationResponse, error) {
-	dispatch, err := rt.prepareProviderDispatch(ctx, &req.Account)
+	dispatch, err := rt.prepareProviderDispatch(ctx, &req.Account, req.Mapping.ModelID)
 	if err != nil {
 		return provideradaptercontract.ImageGenerationResponse{}, err
 	}
@@ -1471,7 +1476,7 @@ func (rt *runtimeState) invokeProviderImageEdit(ctx context.Context, req provide
 }
 
 func (rt *runtimeState) invokeProviderImageVariation(ctx context.Context, req provideradaptercontract.ImageVariationRequest) (provideradaptercontract.ImageGenerationResponse, error) {
-	dispatch, err := rt.prepareProviderDispatch(ctx, &req.Account)
+	dispatch, err := rt.prepareProviderDispatch(ctx, &req.Account, req.Mapping.ModelID)
 	if err != nil {
 		return provideradaptercontract.ImageGenerationResponse{}, err
 	}
@@ -1486,7 +1491,7 @@ func (rt *runtimeState) invokeProviderImageVariation(ctx context.Context, req pr
 }
 
 func (rt *runtimeState) invokeProviderAudioTranscription(ctx context.Context, req provideradaptercontract.AudioTranscriptionRequest) (provideradaptercontract.AudioTranscriptionResponse, error) {
-	dispatch, err := rt.prepareProviderDispatch(ctx, &req.Account)
+	dispatch, err := rt.prepareProviderDispatch(ctx, &req.Account, req.Mapping.ModelID)
 	if err != nil {
 		return provideradaptercontract.AudioTranscriptionResponse{}, err
 	}
@@ -1501,7 +1506,7 @@ func (rt *runtimeState) invokeProviderAudioTranscription(ctx context.Context, re
 }
 
 func (rt *runtimeState) invokeProviderAudioSpeech(ctx context.Context, req provideradaptercontract.AudioSpeechRequest) (provideradaptercontract.AudioSpeechResponse, error) {
-	dispatch, err := rt.prepareProviderDispatch(ctx, &req.Account)
+	dispatch, err := rt.prepareProviderDispatch(ctx, &req.Account, req.Mapping.ModelID)
 	if err != nil {
 		return provideradaptercontract.AudioSpeechResponse{}, err
 	}
@@ -1516,7 +1521,7 @@ func (rt *runtimeState) invokeProviderAudioSpeech(ctx context.Context, req provi
 }
 
 func (rt *runtimeState) invokeProviderModerations(ctx context.Context, req provideradaptercontract.ModerationRequest) (provideradaptercontract.ModerationResponse, error) {
-	dispatch, err := rt.prepareProviderDispatch(ctx, &req.Account)
+	dispatch, err := rt.prepareProviderDispatch(ctx, &req.Account, req.Mapping.ModelID)
 	if err != nil {
 		return provideradaptercontract.ModerationResponse{}, err
 	}
@@ -1531,7 +1536,7 @@ func (rt *runtimeState) invokeProviderModerations(ctx context.Context, req provi
 }
 
 func (rt *runtimeState) invokeProviderRerank(ctx context.Context, req provideradaptercontract.RerankRequest) (provideradaptercontract.RerankResponse, error) {
-	dispatch, err := rt.prepareProviderDispatch(ctx, &req.Account)
+	dispatch, err := rt.prepareProviderDispatch(ctx, &req.Account, req.Mapping.ModelID)
 	if err != nil {
 		return provideradaptercontract.RerankResponse{}, err
 	}

@@ -855,6 +855,7 @@ var (
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "model_id", Type: field.TypeInt},
 		{Name: "rpm_limit", Type: field.TypeInt, Default: 0},
+		{Name: "max_concurrency", Type: field.TypeInt, Default: 0},
 		{Name: "enabled", Type: field.TypeBool, Default: true},
 	}
 	// ModelRateLimitsTable holds the schema information for the "model_rate_limits" table.
@@ -871,7 +872,7 @@ var (
 			{
 				Name:    "modelratelimit_enabled",
 				Unique:  false,
-				Columns: []*schema.Column{ModelRateLimitsColumns[5]},
+				Columns: []*schema.Column{ModelRateLimitsColumns[6]},
 			},
 		},
 	}

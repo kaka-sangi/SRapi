@@ -20,7 +20,8 @@ func (ModelRateLimit) Mixin() []ent.Mixin {
 func (ModelRateLimit) Fields() []ent.Field {
 	return []ent.Field{
 		field.Int("model_id"),
-		field.Int("rpm_limit").Default(0), // 0 = unlimited / disabled
+		field.Int("rpm_limit").Default(0),       // 0 = unlimited / disabled
+		field.Int("max_concurrency").Default(0), // 0 = unlimited / disabled
 		field.Bool("enabled").Default(true),
 	}
 }

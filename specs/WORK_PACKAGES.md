@@ -3912,6 +3912,18 @@ Required gates:
 - `make code-quality-check`
 - `git diff --check`
 
+## WP-1220: Per-Model Max Concurrency v1
+
+Objective: add a global max concurrent in-flight request ceiling per model (the concurrency complement to WP-1190's per-model RPM), completing the rate/capacity matrix.
+
+What changed:
+- `max_concurrency` column on `ModelRateLimit` (migration `000026`, default 0 = unlimited; existing rows correct without backfill). `model_rate_limits.ConcurrencyForModel` (fail-open); admin upsert accepts/returns it.
+- `prepareProviderDispatch(ctx, account)` → `prepareProviderDispatch(ctx, account, modelID)`. All 11 dispatch entry points pass `req.Mapping.ModelID` (every provider invoke request — Conversation/TokenCount/ResponseInputItems/Embedding/Image/... — carries `Mapping modelcontract.ModelProviderMapping` with `ModelID`). The function acquires a `model:<id>:concurrency` lease via `acquireModelConcurrency` into `concurrencyLeases` with the existing acquire-with-rollback; exceeding returns the 429-class error → failover.
+- New helper in `runtime_gateway_group_concurrency.go`.
+- Limiter matrix now complete: per-API-key (rpm/tpm), per-user (rpm), per-account (rpm/tpm/concurrency), per-model (rpm/concurrency), per-group (rpm/concurrency).
+
+Tests/gates: `model_rate_limits` service test extended (`ConcurrencyForModel` + RPM/concurrency independence), migration `000026`, full `make check`.
+
 ## WP-1210: Per-Account-Group Max Concurrency v1
 
 Objective: add a max concurrent in-flight request ceiling per account group (the "concurrency capacity" complement to WP-1200's RPM), reusing the existing account concurrency-lease mechanism.

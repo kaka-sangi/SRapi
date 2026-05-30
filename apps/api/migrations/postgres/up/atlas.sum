@@ -1,4 +1,4 @@
-h1:qsGwpitT0Jfx9zPQl1aumO+37ArVGZP+L0InxHkL7jw=
+h1:YDRmymEZZtv9/Nt0NWEBmQHqLE/ZBO0aKozaxiMupS0=
 000001_initial_schema.sql h1:cyZ0pax3l7J4onSmEmgqPwpoJYXPXuJYXeTAGUOEHs4=
 000002_auth_sessions.sql h1:zJ6uEWQDpw4sa3JpABmlbbFR2Sy3JCceNl4UnBtcX9c=
 000003_api_key_concurrency_limit.sql h1:j/8OE2iF7+LUa5XCsyYSC4dvN1Vh2cihbc41rySg4OQ=
@@ -24,3 +24,4 @@ h1:qsGwpitT0Jfx9zPQl1aumO+37ArVGZP+L0InxHkL7jw=
 000023_model_rate_limits.sql h1:ifzJ828WfBkTaHv31f6wTdJIBjcO1/6rmtJGU9iNFIE=
 000024_account_group_rate_limits.sql h1:ixYh0W8XxUGOCny4Tka10+2bx9pwkRZA3Guqn0cGhbM=
 000025_account_group_max_concurrency.sql h1:w0kstmp/2nMKo7AZZM2W8K9V68h09eRD9NofwYgKRYE=
+000026_model_max_concurrency.sql h1:CdZaqaqJAVAeRYGEgp43zKyUeKcVyL4sY4gmIJN7dxA=
