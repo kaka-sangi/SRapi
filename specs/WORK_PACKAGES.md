@@ -3912,6 +3912,18 @@ Required gates:
 - `make code-quality-check`
 - `git diff --check`
 
+## WP-1250: Config Snapshot Import v1
+
+Objective: complete the WP-1240 backup/restore loop by safely applying a config snapshot back, using natural-key upsert + a dry-run validation pass — without the cross-environment ID remapping that makes ID-referencing entities unsafe to import.
+
+What changed:
+- `POST /api/v1/admin/config-snapshot/import?dry_run=true|false`. Body is the importable subset: `{ tls_profiles, user_attribute_definitions, error_passthrough_rules }`.
+- For each section: list existing rows, index by natural key (TLS profile `name`, user-attribute `key`, error-rule `name`), and for each incoming item create when the key is new or update the matched row — via the modules' existing Create/Update methods. Returns per-section `{ created, updated }`.
+- `dry_run=true` computes the create/update decision per item but performs no writes (a validation/preview pass). Real imports are audited.
+- Scope rationale: only natural-keyed, self-contained config is importable. Rate limits reference model/group integer IDs; providers/models carry IDs and cross-references — these do not port across environments, so they stay export-only. Sections apply independently (no cross-section transaction); imports are idempotent on re-run, and dry-run lets operators validate first.
+
+Tests/gates: build + full `make check`. No new tables (orchestration over existing module services).
+
 ## WP-1240: Config Snapshot Export v1
 
 Problem (verified): backup options were infra-level (`make backup-postgres` / `restore-postgres` pg_dump) or per-resource (accounts export/import, usage export) — there was no single portable snapshot of operator-managed configuration for review, migration, or version control.
