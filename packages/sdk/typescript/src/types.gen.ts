@@ -3613,6 +3613,358 @@ export type GeminiModelList = {
     nextPageToken?: string;
 };
 
+export type ModelRateLimit = {
+    model_id: number;
+    rpm_limit: number;
+    tpm_limit: number;
+    max_concurrency: number;
+    enabled: boolean;
+    created_at: string;
+    updated_at: string;
+};
+
+export type UpsertModelRateLimitRequest = {
+    model_id: number;
+    rpm_limit?: number;
+    tpm_limit?: number;
+    max_concurrency?: number;
+    enabled?: boolean;
+};
+
+export type ModelRateLimitResponse = {
+    data: ModelRateLimit;
+    request_id: RequestId;
+};
+
+export type ModelRateLimitListResponse = {
+    data: Array<ModelRateLimit>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type AccountGroupRateLimit = {
+    account_group_id: number;
+    rpm_limit: number;
+    tpm_limit: number;
+    max_concurrency: number;
+    enabled: boolean;
+    created_at: string;
+    updated_at: string;
+};
+
+export type UpsertGroupRateLimitRequest = {
+    account_group_id: number;
+    rpm_limit?: number;
+    tpm_limit?: number;
+    max_concurrency?: number;
+    enabled?: boolean;
+};
+
+export type GroupRateLimitResponse = {
+    data: AccountGroupRateLimit;
+    request_id: RequestId;
+};
+
+export type GroupRateLimitListResponse = {
+    data: Array<AccountGroupRateLimit>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type TlsProfile = {
+    id: number;
+    name: string;
+    tls_template: string;
+    http_version_policy: string;
+    user_agent: string;
+    extra_headers: {
+        [key: string]: string;
+    };
+    enabled: boolean;
+    created_at: string;
+    updated_at: string;
+};
+
+export type CreateTlsProfileRequest = {
+    name: string;
+    tls_template?: string;
+    http_version_policy?: string;
+    user_agent?: string;
+    extra_headers?: {
+        [key: string]: string;
+    };
+    enabled?: boolean;
+};
+
+export type UpdateTlsProfileRequest = {
+    name?: string;
+    tls_template?: string;
+    http_version_policy?: string;
+    user_agent?: string;
+    extra_headers?: {
+        [key: string]: string;
+    };
+    enabled?: boolean;
+};
+
+export type TlsProfileResponse = {
+    data: TlsProfile;
+    request_id: RequestId;
+};
+
+export type TlsProfileListResponse = {
+    data: Array<TlsProfile>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type ErrorPassthroughRule = {
+    id: number;
+    name: string;
+    enabled: boolean;
+    priority: number;
+    action: 'expose' | 'mask';
+    status_codes: Array<number>;
+    classes: Array<string>;
+    keywords: Array<string>;
+    created_at: string;
+    updated_at: string;
+};
+
+export type CreateErrorPassthroughRuleRequest = {
+    name: string;
+    enabled?: boolean;
+    priority?: number;
+    action: 'expose' | 'mask';
+    status_codes?: Array<number>;
+    classes?: Array<string>;
+    keywords?: Array<string>;
+};
+
+export type UpdateErrorPassthroughRuleRequest = {
+    name?: string;
+    enabled?: boolean;
+    priority?: number;
+    action?: 'expose' | 'mask';
+    status_codes?: Array<number>;
+    classes?: Array<string>;
+    keywords?: Array<string>;
+};
+
+export type ErrorPassthroughRuleResponse = {
+    data: ErrorPassthroughRule;
+    request_id: RequestId;
+};
+
+export type ErrorPassthroughRuleListResponse = {
+    data: Array<ErrorPassthroughRule>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type UserAttributeDefinition = {
+    id: number;
+    key: string;
+    name: string;
+    data_type: 'string' | 'number' | 'boolean' | 'select';
+    options: Array<string>;
+    required: boolean;
+    display_order: number;
+    enabled: boolean;
+    created_at: string;
+    updated_at: string;
+};
+
+export type CreateUserAttributeDefinitionRequest = {
+    key: string;
+    name: string;
+    data_type: 'string' | 'number' | 'boolean' | 'select';
+    options?: Array<string>;
+    required?: boolean;
+    display_order?: number;
+    enabled?: boolean;
+};
+
+export type UpdateUserAttributeDefinitionRequest = {
+    name?: string;
+    data_type?: 'string' | 'number' | 'boolean' | 'select';
+    options?: Array<string>;
+    required?: boolean;
+    display_order?: number;
+    enabled?: boolean;
+};
+
+export type UserAttributeValue = {
+    definition_id: number;
+    key: string;
+    name: string;
+    data_type: string;
+    value: string;
+    updated_at?: string;
+};
+
+export type SetUserAttributeValueRequest = {
+    value?: string;
+};
+
+export type UserAttributeDefinitionResponse = {
+    data: UserAttributeDefinition;
+    request_id: RequestId;
+};
+
+export type UserAttributeDefinitionListResponse = {
+    data: Array<UserAttributeDefinition>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type UserAttributeValueListResponse = {
+    data: Array<UserAttributeValue>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type SetUserAttributeValueResponse = {
+    data: {
+        definition_id: number;
+        value: string;
+        updated_at?: string;
+    };
+    request_id: RequestId;
+};
+
+export type AccountAvailabilityRollup = {
+    date: string;
+    provider_id: number;
+    total_samples: number;
+    healthy_samples: number;
+    availability_ratio: number;
+    avg_success_rate: number;
+    computed_at: string;
+};
+
+export type AccountAvailabilityResponse = {
+    data: {
+        account_id: number;
+        window_days: number;
+        overall_uptime: number;
+        daily_availability: Array<AccountAvailabilityRollup>;
+    };
+    request_id: RequestId;
+};
+
+export type AccountQuotaSignal = {
+    quota_type: string;
+    remaining: string;
+    used: string;
+    quota_limit: string;
+    remaining_ratio: number;
+    reset_at?: string;
+};
+
+export type AccountQuotaReport = {
+    provider: string;
+    supported: boolean;
+    source: string;
+    plan: string;
+    credits_remaining: string;
+    credits_used: string;
+    credits_limit: string;
+    currency: string;
+    status_code: number;
+    fetched_at: string;
+    quota_signals: Array<AccountQuotaSignal>;
+};
+
+export type AccountQuotaReportResponse = {
+    data: AccountQuotaReport;
+    request_id: RequestId;
+};
+
+export type SnapshotModelRateLimit = {
+    model_id: number;
+    model_name: string;
+    rpm_limit: number;
+    tpm_limit: number;
+    max_concurrency: number;
+    enabled: boolean;
+};
+
+export type SnapshotGroupRateLimit = {
+    account_group_id: number;
+    account_group_name: string;
+    rpm_limit: number;
+    tpm_limit: number;
+    max_concurrency: number;
+    enabled: boolean;
+};
+
+export type ConfigSnapshotResponse = {
+    data: {
+        snapshot_version: string;
+        generated_at: string;
+        providers?: Array<Provider>;
+        models?: Array<Model>;
+        account_groups?: Array<AccountGroup>;
+        subscription_plans?: Array<SubscriptionPlan>;
+        pricing_rules?: Array<PricingRule>;
+        model_rate_limits?: Array<SnapshotModelRateLimit>;
+        group_rate_limits?: Array<SnapshotGroupRateLimit>;
+        error_passthrough_rules?: Array<ErrorPassthroughRule>;
+        tls_profiles?: Array<TlsProfile>;
+        user_attribute_definitions?: Array<UserAttributeDefinition>;
+        settings?: AdminSettings;
+    };
+    request_id: RequestId;
+};
+
+export type ImportModelRateLimit = {
+    model_name: string;
+    rpm_limit?: number;
+    tpm_limit?: number;
+    max_concurrency?: number;
+    enabled?: boolean;
+};
+
+export type ImportGroupRateLimit = {
+    account_group_name: string;
+    rpm_limit?: number;
+    tpm_limit?: number;
+    max_concurrency?: number;
+    enabled?: boolean;
+};
+
+export type ConfigImportRequest = {
+    tls_profiles?: Array<CreateTlsProfileRequest>;
+    user_attribute_definitions?: Array<CreateUserAttributeDefinitionRequest>;
+    error_passthrough_rules?: Array<CreateErrorPassthroughRuleRequest>;
+    model_rate_limits?: Array<ImportModelRateLimit>;
+    group_rate_limits?: Array<ImportGroupRateLimit>;
+};
+
+export type ImportSectionResult = {
+    created: number;
+    updated: number;
+};
+
+export type ImportRemapResult = {
+    created: number;
+    updated: number;
+    skipped: number;
+};
+
+export type ConfigImportResponse = {
+    data: {
+        dry_run: boolean;
+        tls_profiles: ImportSectionResult;
+        user_attribute_definitions: ImportSectionResult;
+        error_passthrough_rules: ImportSectionResult;
+        model_rate_limits: ImportRemapResult;
+        group_rate_limits: ImportRemapResult;
+    };
+    request_id: RequestId;
+};
+
 export type CreateProviderAccountRequestWritable = {
     provider_id: Id;
     name: string;
@@ -13879,3 +14231,932 @@ export type CountAnthropicCompatibleMessageTokensAliasResponses = {
 };
 
 export type CountAnthropicCompatibleMessageTokensAliasResponse = CountAnthropicCompatibleMessageTokensAliasResponses[keyof CountAnthropicCompatibleMessageTokensAliasResponses];
+
+export type ListAdminModelRateLimitsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/model-rate-limits';
+};
+
+export type ListAdminModelRateLimitsErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminModelRateLimitsError = ListAdminModelRateLimitsErrors[keyof ListAdminModelRateLimitsErrors];
+
+export type ListAdminModelRateLimitsResponses = {
+    /**
+     * Model rate limit list.
+     */
+    200: ModelRateLimitListResponse;
+};
+
+export type ListAdminModelRateLimitsResponse = ListAdminModelRateLimitsResponses[keyof ListAdminModelRateLimitsResponses];
+
+export type UpsertAdminModelRateLimitData = {
+    body: UpsertModelRateLimitRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/model-rate-limits';
+};
+
+export type UpsertAdminModelRateLimitErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UpsertAdminModelRateLimitError = UpsertAdminModelRateLimitErrors[keyof UpsertAdminModelRateLimitErrors];
+
+export type UpsertAdminModelRateLimitResponses = {
+    /**
+     * Model rate limit upserted.
+     */
+    200: ModelRateLimitResponse;
+};
+
+export type UpsertAdminModelRateLimitResponse = UpsertAdminModelRateLimitResponses[keyof UpsertAdminModelRateLimitResponses];
+
+export type DeleteAdminModelRateLimitData = {
+    body?: never;
+    path: {
+        modelId: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/model-rate-limits/{modelId}';
+};
+
+export type DeleteAdminModelRateLimitErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DeleteAdminModelRateLimitError = DeleteAdminModelRateLimitErrors[keyof DeleteAdminModelRateLimitErrors];
+
+export type DeleteAdminModelRateLimitResponses = {
+    /**
+     * Model rate limit deleted.
+     */
+    200: DeleteResponse;
+};
+
+export type DeleteAdminModelRateLimitResponse = DeleteAdminModelRateLimitResponses[keyof DeleteAdminModelRateLimitResponses];
+
+export type ListAdminGroupRateLimitsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/group-rate-limits';
+};
+
+export type ListAdminGroupRateLimitsErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminGroupRateLimitsError = ListAdminGroupRateLimitsErrors[keyof ListAdminGroupRateLimitsErrors];
+
+export type ListAdminGroupRateLimitsResponses = {
+    /**
+     * Account group rate limit list.
+     */
+    200: GroupRateLimitListResponse;
+};
+
+export type ListAdminGroupRateLimitsResponse = ListAdminGroupRateLimitsResponses[keyof ListAdminGroupRateLimitsResponses];
+
+export type UpsertAdminGroupRateLimitData = {
+    body: UpsertGroupRateLimitRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/group-rate-limits';
+};
+
+export type UpsertAdminGroupRateLimitErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UpsertAdminGroupRateLimitError = UpsertAdminGroupRateLimitErrors[keyof UpsertAdminGroupRateLimitErrors];
+
+export type UpsertAdminGroupRateLimitResponses = {
+    /**
+     * Account group rate limit upserted.
+     */
+    200: GroupRateLimitResponse;
+};
+
+export type UpsertAdminGroupRateLimitResponse = UpsertAdminGroupRateLimitResponses[keyof UpsertAdminGroupRateLimitResponses];
+
+export type DeleteAdminGroupRateLimitData = {
+    body?: never;
+    path: {
+        groupId: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/group-rate-limits/{groupId}';
+};
+
+export type DeleteAdminGroupRateLimitErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DeleteAdminGroupRateLimitError = DeleteAdminGroupRateLimitErrors[keyof DeleteAdminGroupRateLimitErrors];
+
+export type DeleteAdminGroupRateLimitResponses = {
+    /**
+     * Account group rate limit deleted.
+     */
+    200: DeleteResponse;
+};
+
+export type DeleteAdminGroupRateLimitResponse = DeleteAdminGroupRateLimitResponses[keyof DeleteAdminGroupRateLimitResponses];
+
+export type ListAdminTlsProfilesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/tls-profiles';
+};
+
+export type ListAdminTlsProfilesErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminTlsProfilesError = ListAdminTlsProfilesErrors[keyof ListAdminTlsProfilesErrors];
+
+export type ListAdminTlsProfilesResponses = {
+    /**
+     * TLS fingerprint profile list.
+     */
+    200: TlsProfileListResponse;
+};
+
+export type ListAdminTlsProfilesResponse = ListAdminTlsProfilesResponses[keyof ListAdminTlsProfilesResponses];
+
+export type CreateAdminTlsProfileData = {
+    body: CreateTlsProfileRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/tls-profiles';
+};
+
+export type CreateAdminTlsProfileErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource conflict.
+     */
+    409: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type CreateAdminTlsProfileError = CreateAdminTlsProfileErrors[keyof CreateAdminTlsProfileErrors];
+
+export type CreateAdminTlsProfileResponses = {
+    /**
+     * TLS fingerprint profile created.
+     */
+    201: TlsProfileResponse;
+};
+
+export type CreateAdminTlsProfileResponse = CreateAdminTlsProfileResponses[keyof CreateAdminTlsProfileResponses];
+
+export type DeleteAdminTlsProfileData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/tls-profiles/{id}';
+};
+
+export type DeleteAdminTlsProfileErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DeleteAdminTlsProfileError = DeleteAdminTlsProfileErrors[keyof DeleteAdminTlsProfileErrors];
+
+export type DeleteAdminTlsProfileResponses = {
+    /**
+     * TLS fingerprint profile deleted.
+     */
+    200: DeleteResponse;
+};
+
+export type DeleteAdminTlsProfileResponse = DeleteAdminTlsProfileResponses[keyof DeleteAdminTlsProfileResponses];
+
+export type UpdateAdminTlsProfileData = {
+    body: UpdateTlsProfileRequest;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/tls-profiles/{id}';
+};
+
+export type UpdateAdminTlsProfileErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict.
+     */
+    409: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UpdateAdminTlsProfileError = UpdateAdminTlsProfileErrors[keyof UpdateAdminTlsProfileErrors];
+
+export type UpdateAdminTlsProfileResponses = {
+    /**
+     * TLS fingerprint profile updated.
+     */
+    200: TlsProfileResponse;
+};
+
+export type UpdateAdminTlsProfileResponse = UpdateAdminTlsProfileResponses[keyof UpdateAdminTlsProfileResponses];
+
+export type ListAdminErrorPassthroughRulesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/error-passthrough-rules';
+};
+
+export type ListAdminErrorPassthroughRulesErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminErrorPassthroughRulesError = ListAdminErrorPassthroughRulesErrors[keyof ListAdminErrorPassthroughRulesErrors];
+
+export type ListAdminErrorPassthroughRulesResponses = {
+    /**
+     * Error-passthrough rule list.
+     */
+    200: ErrorPassthroughRuleListResponse;
+};
+
+export type ListAdminErrorPassthroughRulesResponse = ListAdminErrorPassthroughRulesResponses[keyof ListAdminErrorPassthroughRulesResponses];
+
+export type CreateAdminErrorPassthroughRuleData = {
+    body: CreateErrorPassthroughRuleRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/error-passthrough-rules';
+};
+
+export type CreateAdminErrorPassthroughRuleErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type CreateAdminErrorPassthroughRuleError = CreateAdminErrorPassthroughRuleErrors[keyof CreateAdminErrorPassthroughRuleErrors];
+
+export type CreateAdminErrorPassthroughRuleResponses = {
+    /**
+     * Error-passthrough rule created.
+     */
+    201: ErrorPassthroughRuleResponse;
+};
+
+export type CreateAdminErrorPassthroughRuleResponse = CreateAdminErrorPassthroughRuleResponses[keyof CreateAdminErrorPassthroughRuleResponses];
+
+export type DeleteAdminErrorPassthroughRuleData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/error-passthrough-rules/{id}';
+};
+
+export type DeleteAdminErrorPassthroughRuleErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DeleteAdminErrorPassthroughRuleError = DeleteAdminErrorPassthroughRuleErrors[keyof DeleteAdminErrorPassthroughRuleErrors];
+
+export type DeleteAdminErrorPassthroughRuleResponses = {
+    /**
+     * Error-passthrough rule deleted.
+     */
+    200: DeleteResponse;
+};
+
+export type DeleteAdminErrorPassthroughRuleResponse = DeleteAdminErrorPassthroughRuleResponses[keyof DeleteAdminErrorPassthroughRuleResponses];
+
+export type UpdateAdminErrorPassthroughRuleData = {
+    body: UpdateErrorPassthroughRuleRequest;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/error-passthrough-rules/{id}';
+};
+
+export type UpdateAdminErrorPassthroughRuleErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UpdateAdminErrorPassthroughRuleError = UpdateAdminErrorPassthroughRuleErrors[keyof UpdateAdminErrorPassthroughRuleErrors];
+
+export type UpdateAdminErrorPassthroughRuleResponses = {
+    /**
+     * Error-passthrough rule updated.
+     */
+    200: ErrorPassthroughRuleResponse;
+};
+
+export type UpdateAdminErrorPassthroughRuleResponse = UpdateAdminErrorPassthroughRuleResponses[keyof UpdateAdminErrorPassthroughRuleResponses];
+
+export type ListAdminUserAttributeDefinitionsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/user-attributes';
+};
+
+export type ListAdminUserAttributeDefinitionsErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminUserAttributeDefinitionsError = ListAdminUserAttributeDefinitionsErrors[keyof ListAdminUserAttributeDefinitionsErrors];
+
+export type ListAdminUserAttributeDefinitionsResponses = {
+    /**
+     * User attribute definition list.
+     */
+    200: UserAttributeDefinitionListResponse;
+};
+
+export type ListAdminUserAttributeDefinitionsResponse = ListAdminUserAttributeDefinitionsResponses[keyof ListAdminUserAttributeDefinitionsResponses];
+
+export type CreateAdminUserAttributeDefinitionData = {
+    body: CreateUserAttributeDefinitionRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/user-attributes';
+};
+
+export type CreateAdminUserAttributeDefinitionErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource conflict.
+     */
+    409: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type CreateAdminUserAttributeDefinitionError = CreateAdminUserAttributeDefinitionErrors[keyof CreateAdminUserAttributeDefinitionErrors];
+
+export type CreateAdminUserAttributeDefinitionResponses = {
+    /**
+     * User attribute definition created.
+     */
+    201: UserAttributeDefinitionResponse;
+};
+
+export type CreateAdminUserAttributeDefinitionResponse = CreateAdminUserAttributeDefinitionResponses[keyof CreateAdminUserAttributeDefinitionResponses];
+
+export type DeleteAdminUserAttributeDefinitionData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/user-attributes/{id}';
+};
+
+export type DeleteAdminUserAttributeDefinitionErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DeleteAdminUserAttributeDefinitionError = DeleteAdminUserAttributeDefinitionErrors[keyof DeleteAdminUserAttributeDefinitionErrors];
+
+export type DeleteAdminUserAttributeDefinitionResponses = {
+    /**
+     * User attribute definition deleted.
+     */
+    200: DeleteResponse;
+};
+
+export type DeleteAdminUserAttributeDefinitionResponse = DeleteAdminUserAttributeDefinitionResponses[keyof DeleteAdminUserAttributeDefinitionResponses];
+
+export type UpdateAdminUserAttributeDefinitionData = {
+    body: UpdateUserAttributeDefinitionRequest;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/user-attributes/{id}';
+};
+
+export type UpdateAdminUserAttributeDefinitionErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UpdateAdminUserAttributeDefinitionError = UpdateAdminUserAttributeDefinitionErrors[keyof UpdateAdminUserAttributeDefinitionErrors];
+
+export type UpdateAdminUserAttributeDefinitionResponses = {
+    /**
+     * User attribute definition updated.
+     */
+    200: UserAttributeDefinitionResponse;
+};
+
+export type UpdateAdminUserAttributeDefinitionResponse = UpdateAdminUserAttributeDefinitionResponses[keyof UpdateAdminUserAttributeDefinitionResponses];
+
+export type ListAdminUserAttributeValuesData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/users/{id}/attributes';
+};
+
+export type ListAdminUserAttributeValuesErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminUserAttributeValuesError = ListAdminUserAttributeValuesErrors[keyof ListAdminUserAttributeValuesErrors];
+
+export type ListAdminUserAttributeValuesResponses = {
+    /**
+     * User attribute value list.
+     */
+    200: UserAttributeValueListResponse;
+};
+
+export type ListAdminUserAttributeValuesResponse = ListAdminUserAttributeValuesResponses[keyof ListAdminUserAttributeValuesResponses];
+
+export type SetAdminUserAttributeValueData = {
+    body: SetUserAttributeValueRequest;
+    path: {
+        id: Id;
+        definitionId: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/users/{id}/attributes/{definitionId}';
+};
+
+export type SetAdminUserAttributeValueErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type SetAdminUserAttributeValueError = SetAdminUserAttributeValueErrors[keyof SetAdminUserAttributeValueErrors];
+
+export type SetAdminUserAttributeValueResponses = {
+    /**
+     * User attribute value set.
+     */
+    200: SetUserAttributeValueResponse;
+};
+
+export type SetAdminUserAttributeValueResponse = SetAdminUserAttributeValueResponses[keyof SetAdminUserAttributeValueResponses];
+
+export type GetAdminAccountAvailabilityData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: {
+        days?: number;
+    };
+    url: '/api/v1/admin/accounts/{id}/availability';
+};
+
+export type GetAdminAccountAvailabilityErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminAccountAvailabilityError = GetAdminAccountAvailabilityErrors[keyof GetAdminAccountAvailabilityErrors];
+
+export type GetAdminAccountAvailabilityResponses = {
+    /**
+     * Account availability rollups.
+     */
+    200: AccountAvailabilityResponse;
+};
+
+export type GetAdminAccountAvailabilityResponse = GetAdminAccountAvailabilityResponses[keyof GetAdminAccountAvailabilityResponses];
+
+export type FetchAdminAccountQuotaData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/accounts/{id}/quota-fetch';
+};
+
+export type FetchAdminAccountQuotaErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    502: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type FetchAdminAccountQuotaError = FetchAdminAccountQuotaErrors[keyof FetchAdminAccountQuotaErrors];
+
+export type FetchAdminAccountQuotaResponses = {
+    /**
+     * Account quota report.
+     */
+    200: AccountQuotaReportResponse;
+};
+
+export type FetchAdminAccountQuotaResponse = FetchAdminAccountQuotaResponses[keyof FetchAdminAccountQuotaResponses];
+
+export type GetAdminConfigSnapshotData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/config-snapshot';
+};
+
+export type GetAdminConfigSnapshotErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminConfigSnapshotError = GetAdminConfigSnapshotErrors[keyof GetAdminConfigSnapshotErrors];
+
+export type GetAdminConfigSnapshotResponses = {
+    /**
+     * Config snapshot.
+     */
+    200: ConfigSnapshotResponse;
+};
+
+export type GetAdminConfigSnapshotResponse = GetAdminConfigSnapshotResponses[keyof GetAdminConfigSnapshotResponses];
+
+export type ImportAdminConfigSnapshotData = {
+    body: ConfigImportRequest;
+    path?: never;
+    query?: {
+        dry_run?: boolean;
+    };
+    url: '/api/v1/admin/config-snapshot/import';
+};
+
+export type ImportAdminConfigSnapshotErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ImportAdminConfigSnapshotError = ImportAdminConfigSnapshotErrors[keyof ImportAdminConfigSnapshotErrors];
+
+export type ImportAdminConfigSnapshotResponses = {
+    /**
+     * Config import result.
+     */
+    200: ConfigImportResponse;
+};
+
+export type ImportAdminConfigSnapshotResponse = ImportAdminConfigSnapshotResponses[keyof ImportAdminConfigSnapshotResponses];

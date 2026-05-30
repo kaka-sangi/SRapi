@@ -9690,6 +9690,874 @@ paths:
         default:
           $ref: "#/components/responses/GatewayError"
 
+  /api/v1/admin/model-rate-limits:
+    get:
+      tags:
+        - AdminModelRateLimits
+      operationId: listAdminModelRateLimits
+      summary: List per-model rate limits.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      responses:
+        "200":
+          description: Model rate limit list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelRateLimitListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+    put:
+      tags:
+        - AdminModelRateLimits
+      operationId: upsertAdminModelRateLimit
+      summary: Create or update a per-model rate limit.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertModelRateLimitRequest"
+      responses:
+        "200":
+          description: Model rate limit upserted.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelRateLimitResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+  /api/v1/admin/model-rate-limits/{modelId}:
+    delete:
+      tags:
+        - AdminModelRateLimits
+      operationId: deleteAdminModelRateLimit
+      summary: Delete a per-model rate limit.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: modelId
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Model rate limit deleted.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/group-rate-limits:
+    get:
+      tags:
+        - AdminGroupRateLimits
+      operationId: listAdminGroupRateLimits
+      summary: List per-account-group rate limits.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      responses:
+        "200":
+          description: Account group rate limit list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupRateLimitListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+    put:
+      tags:
+        - AdminGroupRateLimits
+      operationId: upsertAdminGroupRateLimit
+      summary: Create or update a per-account-group rate limit.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertGroupRateLimitRequest"
+      responses:
+        "200":
+          description: Account group rate limit upserted.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupRateLimitResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+  /api/v1/admin/group-rate-limits/{groupId}:
+    delete:
+      tags:
+        - AdminGroupRateLimits
+      operationId: deleteAdminGroupRateLimit
+      summary: Delete a per-account-group rate limit.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Account group rate limit deleted.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+  /api/v1/admin/tls-profiles:
+    get:
+      tags:
+        - AdminTLSProfiles
+      operationId: listAdminTLSProfiles
+      summary: List TLS fingerprint profiles.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      responses:
+        "200":
+          description: TLS fingerprint profile list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TLSProfileListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+    post:
+      tags:
+        - AdminTLSProfiles
+      operationId: createAdminTLSProfile
+      summary: Create a TLS fingerprint profile.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTLSProfileRequest"
+      responses:
+        "201":
+          description: TLS fingerprint profile created.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TLSProfileResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        default:
+          $ref: "#/components/responses/StandardError"
+  /api/v1/admin/tls-profiles/{id}:
+    patch:
+      tags:
+        - AdminTLSProfiles
+      operationId: updateAdminTLSProfile
+      summary: Update a TLS fingerprint profile.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTLSProfileRequest"
+      responses:
+        "200":
+          description: TLS fingerprint profile updated.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TLSProfileResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        default:
+          $ref: "#/components/responses/StandardError"
+    delete:
+      tags:
+        - AdminTLSProfiles
+      operationId: deleteAdminTLSProfile
+      summary: Delete a TLS fingerprint profile.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: TLS fingerprint profile deleted.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+  /api/v1/admin/error-passthrough-rules:
+    get:
+      tags:
+        - AdminErrorPassthroughRules
+      operationId: listAdminErrorPassthroughRules
+      summary: List error-passthrough rules.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      responses:
+        "200":
+          description: Error-passthrough rule list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorPassthroughRuleListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+    post:
+      tags:
+        - AdminErrorPassthroughRules
+      operationId: createAdminErrorPassthroughRule
+      summary: Create an error-passthrough rule.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateErrorPassthroughRuleRequest"
+      responses:
+        "201":
+          description: Error-passthrough rule created.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorPassthroughRuleResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+  /api/v1/admin/error-passthrough-rules/{id}:
+    patch:
+      tags:
+        - AdminErrorPassthroughRules
+      operationId: updateAdminErrorPassthroughRule
+      summary: Update an error-passthrough rule.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateErrorPassthroughRuleRequest"
+      responses:
+        "200":
+          description: Error-passthrough rule updated.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorPassthroughRuleResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+    delete:
+      tags:
+        - AdminErrorPassthroughRules
+      operationId: deleteAdminErrorPassthroughRule
+      summary: Delete an error-passthrough rule.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Error-passthrough rule deleted.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+  /api/v1/admin/user-attributes:
+    get:
+      tags:
+        - AdminUserAttributes
+      operationId: listAdminUserAttributeDefinitions
+      summary: List user attribute definitions.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      responses:
+        "200":
+          description: User attribute definition list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserAttributeDefinitionListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+    post:
+      tags:
+        - AdminUserAttributes
+      operationId: createAdminUserAttributeDefinition
+      summary: Create a user attribute definition.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserAttributeDefinitionRequest"
+      responses:
+        "201":
+          description: User attribute definition created.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserAttributeDefinitionResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        default:
+          $ref: "#/components/responses/StandardError"
+  /api/v1/admin/user-attributes/{id}:
+    patch:
+      tags:
+        - AdminUserAttributes
+      operationId: updateAdminUserAttributeDefinition
+      summary: Update a user attribute definition.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserAttributeDefinitionRequest"
+      responses:
+        "200":
+          description: User attribute definition updated.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserAttributeDefinitionResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+    delete:
+      tags:
+        - AdminUserAttributes
+      operationId: deleteAdminUserAttributeDefinition
+      summary: Delete a user attribute definition.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: User attribute definition deleted.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+  /api/v1/admin/users/{id}/attributes:
+    get:
+      tags:
+        - AdminUserAttributes
+      operationId: listAdminUserAttributeValues
+      summary: List a user's attribute values.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: User attribute value list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserAttributeValueListResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+  /api/v1/admin/users/{id}/attributes/{definitionId}:
+    put:
+      tags:
+        - AdminUserAttributes
+      operationId: setAdminUserAttributeValue
+      summary: Set a user's attribute value.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+        - name: definitionId
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetUserAttributeValueRequest"
+      responses:
+        "200":
+          description: User attribute value set.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SetUserAttributeValueResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+  /api/v1/admin/accounts/{id}/availability:
+    get:
+      tags:
+        - AdminAccounts
+      operationId: getAdminAccountAvailability
+      summary: Per-day account availability over a trailing window.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+        - name: days
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 90
+      responses:
+        "200":
+          description: Account availability rollups.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountAvailabilityResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+  /api/v1/admin/accounts/{id}/quota-fetch:
+    post:
+      tags:
+        - AdminAccounts
+      operationId: fetchAdminAccountQuota
+      summary: Active per-account quota/subscription fetch.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Account quota report.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountQuotaReportResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "502":
+          $ref: "#/components/responses/StandardError"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/config-snapshot:
+    get:
+      tags:
+        - AdminConfigSnapshot
+      operationId: getAdminConfigSnapshot
+      summary: Export a versioned snapshot of operator configuration.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+      responses:
+        "200":
+          description: Config snapshot.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigSnapshotResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+  /api/v1/admin/config-snapshot/import:
+    post:
+      tags:
+        - AdminConfigSnapshot
+      operationId: importAdminConfigSnapshot
+      summary: Import the portable sections of a config snapshot.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: dry_run
+          in: query
+          schema:
+            type: boolean
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfigImportRequest"
+      responses:
+        "200":
+          description: Config import result.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigImportResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
 components:
   securitySchemes:
     cookieAuth:
@@ -19268,3 +20136,949 @@ components:
             $ref: "#/components/schemas/GeminiModelInfo"
         nextPageToken:
           type: string
+
+    ModelRateLimit:
+      type: object
+      required:
+        - model_id
+        - rpm_limit
+        - tpm_limit
+        - max_concurrency
+        - enabled
+        - created_at
+        - updated_at
+      properties:
+        model_id:
+          type: integer
+          format: int64
+        rpm_limit:
+          type: integer
+          format: int64
+          minimum: 0
+        tpm_limit:
+          type: integer
+          format: int64
+          minimum: 0
+        max_concurrency:
+          type: integer
+          format: int64
+          minimum: 0
+        enabled:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    UpsertModelRateLimitRequest:
+      type: object
+      required:
+        - model_id
+      properties:
+        model_id:
+          type: integer
+          format: int64
+        rpm_limit:
+          type: integer
+          format: int64
+          minimum: 0
+        tpm_limit:
+          type: integer
+          format: int64
+          minimum: 0
+        max_concurrency:
+          type: integer
+          format: int64
+          minimum: 0
+        enabled:
+          type: boolean
+    ModelRateLimitResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/ModelRateLimit"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+    ModelRateLimitListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModelRateLimit"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    AccountGroupRateLimit:
+      type: object
+      required:
+        - account_group_id
+        - rpm_limit
+        - tpm_limit
+        - max_concurrency
+        - enabled
+        - created_at
+        - updated_at
+      properties:
+        account_group_id:
+          type: integer
+          format: int64
+        rpm_limit:
+          type: integer
+          format: int64
+          minimum: 0
+        tpm_limit:
+          type: integer
+          format: int64
+          minimum: 0
+        max_concurrency:
+          type: integer
+          format: int64
+          minimum: 0
+        enabled:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    UpsertGroupRateLimitRequest:
+      type: object
+      required:
+        - account_group_id
+      properties:
+        account_group_id:
+          type: integer
+          format: int64
+        rpm_limit:
+          type: integer
+          format: int64
+          minimum: 0
+        tpm_limit:
+          type: integer
+          format: int64
+          minimum: 0
+        max_concurrency:
+          type: integer
+          format: int64
+          minimum: 0
+        enabled:
+          type: boolean
+    GroupRateLimitResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/AccountGroupRateLimit"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+    GroupRateLimitListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountGroupRateLimit"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+    TLSProfile:
+      type: object
+      required:
+        - id
+        - name
+        - tls_template
+        - http_version_policy
+        - user_agent
+        - extra_headers
+        - enabled
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        tls_template:
+          type: string
+        http_version_policy:
+          type: string
+        user_agent:
+          type: string
+        extra_headers:
+          type: object
+          additionalProperties:
+            type: string
+        enabled:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    CreateTLSProfileRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+        tls_template:
+          type: string
+        http_version_policy:
+          type: string
+        user_agent:
+          type: string
+        extra_headers:
+          type: object
+          additionalProperties:
+            type: string
+        enabled:
+          type: boolean
+    UpdateTLSProfileRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        tls_template:
+          type: string
+        http_version_policy:
+          type: string
+        user_agent:
+          type: string
+        extra_headers:
+          type: object
+          additionalProperties:
+            type: string
+        enabled:
+          type: boolean
+    TLSProfileResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/TLSProfile"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+    TLSProfileListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/TLSProfile"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+    ErrorPassthroughRule:
+      type: object
+      required:
+        - id
+        - name
+        - enabled
+        - priority
+        - action
+        - status_codes
+        - classes
+        - keywords
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        enabled:
+          type: boolean
+        priority:
+          type: integer
+          format: int64
+        action:
+          type: string
+          enum:
+            - expose
+            - mask
+        status_codes:
+          type: array
+          items:
+            type: integer
+            format: int64
+        classes:
+          type: array
+          items:
+            type: string
+        keywords:
+          type: array
+          items:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    CreateErrorPassthroughRuleRequest:
+      type: object
+      required:
+        - name
+        - action
+      properties:
+        name:
+          type: string
+        enabled:
+          type: boolean
+        priority:
+          type: integer
+          format: int64
+        action:
+          type: string
+          enum:
+            - expose
+            - mask
+        status_codes:
+          type: array
+          items:
+            type: integer
+            format: int64
+        classes:
+          type: array
+          items:
+            type: string
+        keywords:
+          type: array
+          items:
+            type: string
+    UpdateErrorPassthroughRuleRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        enabled:
+          type: boolean
+        priority:
+          type: integer
+          format: int64
+        action:
+          type: string
+          enum:
+            - expose
+            - mask
+        status_codes:
+          type: array
+          items:
+            type: integer
+            format: int64
+        classes:
+          type: array
+          items:
+            type: string
+        keywords:
+          type: array
+          items:
+            type: string
+    ErrorPassthroughRuleResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/ErrorPassthroughRule"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+    ErrorPassthroughRuleListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ErrorPassthroughRule"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    UserAttributeDefinition:
+      type: object
+      required:
+        - id
+        - key
+        - name
+        - data_type
+        - options
+        - required
+        - display_order
+        - enabled
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+          format: int64
+        key:
+          type: string
+        name:
+          type: string
+        data_type:
+          type: string
+          enum:
+            - string
+            - number
+            - boolean
+            - select
+        options:
+          type: array
+          items:
+            type: string
+        required:
+          type: boolean
+        display_order:
+          type: integer
+          format: int64
+        enabled:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    CreateUserAttributeDefinitionRequest:
+      type: object
+      required:
+        - key
+        - name
+        - data_type
+      properties:
+        key:
+          type: string
+        name:
+          type: string
+        data_type:
+          type: string
+          enum:
+            - string
+            - number
+            - boolean
+            - select
+        options:
+          type: array
+          items:
+            type: string
+        required:
+          type: boolean
+        display_order:
+          type: integer
+          format: int64
+        enabled:
+          type: boolean
+    UpdateUserAttributeDefinitionRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        data_type:
+          type: string
+          enum:
+            - string
+            - number
+            - boolean
+            - select
+        options:
+          type: array
+          items:
+            type: string
+        required:
+          type: boolean
+        display_order:
+          type: integer
+          format: int64
+        enabled:
+          type: boolean
+    UserAttributeValue:
+      type: object
+      required:
+        - definition_id
+        - key
+        - name
+        - data_type
+        - value
+      properties:
+        definition_id:
+          type: integer
+          format: int64
+        key:
+          type: string
+        name:
+          type: string
+        data_type:
+          type: string
+        value:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
+    SetUserAttributeValueRequest:
+      type: object
+      properties:
+        value:
+          type: string
+    UserAttributeDefinitionResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/UserAttributeDefinition"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+    UserAttributeDefinitionListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserAttributeDefinition"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+    UserAttributeValueListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserAttributeValue"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+    SetUserAttributeValueResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          type: object
+          required:
+            - definition_id
+            - value
+          properties:
+            definition_id:
+              type: integer
+              format: int64
+            value:
+              type: string
+            updated_at:
+              type: string
+              format: date-time
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+    AccountAvailabilityRollup:
+      type: object
+      required:
+        - date
+        - provider_id
+        - total_samples
+        - healthy_samples
+        - availability_ratio
+        - avg_success_rate
+        - computed_at
+      properties:
+        date:
+          type: string
+        provider_id:
+          type: integer
+          format: int64
+        total_samples:
+          type: integer
+          format: int64
+        healthy_samples:
+          type: integer
+          format: int64
+        availability_ratio:
+          type: number
+          format: float
+        avg_success_rate:
+          type: number
+          format: float
+        computed_at:
+          type: string
+          format: date-time
+    AccountAvailabilityResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          type: object
+          required:
+            - account_id
+            - window_days
+            - overall_uptime
+            - daily_availability
+          properties:
+            account_id:
+              type: integer
+              format: int64
+            window_days:
+              type: integer
+              format: int64
+            overall_uptime:
+              type: number
+              format: float
+            daily_availability:
+              type: array
+              items:
+                $ref: "#/components/schemas/AccountAvailabilityRollup"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+    AccountQuotaSignal:
+      type: object
+      required:
+        - quota_type
+        - remaining
+        - used
+        - quota_limit
+        - remaining_ratio
+      properties:
+        quota_type:
+          type: string
+        remaining:
+          type: string
+        used:
+          type: string
+        quota_limit:
+          type: string
+        remaining_ratio:
+          type: number
+          format: float
+        reset_at:
+          type: string
+          format: date-time
+    AccountQuotaReport:
+      type: object
+      required:
+        - provider
+        - supported
+        - source
+        - plan
+        - credits_remaining
+        - credits_used
+        - credits_limit
+        - currency
+        - status_code
+        - fetched_at
+        - quota_signals
+      properties:
+        provider:
+          type: string
+        supported:
+          type: boolean
+        source:
+          type: string
+        plan:
+          type: string
+        credits_remaining:
+          type: string
+        credits_used:
+          type: string
+        credits_limit:
+          type: string
+        currency:
+          type: string
+        status_code:
+          type: integer
+          format: int64
+        fetched_at:
+          type: string
+          format: date-time
+        quota_signals:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountQuotaSignal"
+    AccountQuotaReportResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/AccountQuotaReport"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    SnapshotModelRateLimit:
+      type: object
+      required:
+        - model_id
+        - model_name
+        - rpm_limit
+        - tpm_limit
+        - max_concurrency
+        - enabled
+      properties:
+        model_id:
+          type: integer
+          format: int64
+        model_name:
+          type: string
+        rpm_limit:
+          type: integer
+          format: int64
+        tpm_limit:
+          type: integer
+          format: int64
+        max_concurrency:
+          type: integer
+          format: int64
+        enabled:
+          type: boolean
+    SnapshotGroupRateLimit:
+      type: object
+      required:
+        - account_group_id
+        - account_group_name
+        - rpm_limit
+        - tpm_limit
+        - max_concurrency
+        - enabled
+      properties:
+        account_group_id:
+          type: integer
+          format: int64
+        account_group_name:
+          type: string
+        rpm_limit:
+          type: integer
+          format: int64
+        tpm_limit:
+          type: integer
+          format: int64
+        max_concurrency:
+          type: integer
+          format: int64
+        enabled:
+          type: boolean
+    ConfigSnapshotResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          type: object
+          required:
+            - snapshot_version
+            - generated_at
+          properties:
+            snapshot_version:
+              type: string
+            generated_at:
+              type: string
+              format: date-time
+            providers:
+              type: array
+              items:
+                $ref: "#/components/schemas/Provider"
+            models:
+              type: array
+              items:
+                $ref: "#/components/schemas/Model"
+            account_groups:
+              type: array
+              items:
+                $ref: "#/components/schemas/AccountGroup"
+            subscription_plans:
+              type: array
+              items:
+                $ref: "#/components/schemas/SubscriptionPlan"
+            pricing_rules:
+              type: array
+              items:
+                $ref: "#/components/schemas/PricingRule"
+            model_rate_limits:
+              type: array
+              items:
+                $ref: "#/components/schemas/SnapshotModelRateLimit"
+            group_rate_limits:
+              type: array
+              items:
+                $ref: "#/components/schemas/SnapshotGroupRateLimit"
+            error_passthrough_rules:
+              type: array
+              items:
+                $ref: "#/components/schemas/ErrorPassthroughRule"
+            tls_profiles:
+              type: array
+              items:
+                $ref: "#/components/schemas/TLSProfile"
+            user_attribute_definitions:
+              type: array
+              items:
+                $ref: "#/components/schemas/UserAttributeDefinition"
+            settings:
+              $ref: "#/components/schemas/AdminSettings"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+    ImportModelRateLimit:
+      type: object
+      required:
+        - model_name
+      properties:
+        model_name:
+          type: string
+        rpm_limit:
+          type: integer
+          format: int64
+        tpm_limit:
+          type: integer
+          format: int64
+        max_concurrency:
+          type: integer
+          format: int64
+        enabled:
+          type: boolean
+    ImportGroupRateLimit:
+      type: object
+      required:
+        - account_group_name
+      properties:
+        account_group_name:
+          type: string
+        rpm_limit:
+          type: integer
+          format: int64
+        tpm_limit:
+          type: integer
+          format: int64
+        max_concurrency:
+          type: integer
+          format: int64
+        enabled:
+          type: boolean
+    ConfigImportRequest:
+      type: object
+      properties:
+        tls_profiles:
+          type: array
+          items:
+            $ref: "#/components/schemas/CreateTLSProfileRequest"
+        user_attribute_definitions:
+          type: array
+          items:
+            $ref: "#/components/schemas/CreateUserAttributeDefinitionRequest"
+        error_passthrough_rules:
+          type: array
+          items:
+            $ref: "#/components/schemas/CreateErrorPassthroughRuleRequest"
+        model_rate_limits:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImportModelRateLimit"
+        group_rate_limits:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImportGroupRateLimit"
+    ImportSectionResult:
+      type: object
+      required:
+        - created
+        - updated
+      properties:
+        created:
+          type: integer
+          format: int64
+        updated:
+          type: integer
+          format: int64
+    ImportRemapResult:
+      type: object
+      required:
+        - created
+        - updated
+        - skipped
+      properties:
+        created:
+          type: integer
+          format: int64
+        updated:
+          type: integer
+          format: int64
+        skipped:
+          type: integer
+          format: int64
+    ConfigImportResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          type: object
+          required:
+            - dry_run
+            - tls_profiles
+            - user_attribute_definitions
+            - error_passthrough_rules
+            - model_rate_limits
+            - group_rate_limits
+          properties:
+            dry_run:
+              type: boolean
+            tls_profiles:
+              $ref: "#/components/schemas/ImportSectionResult"
+            user_attribute_definitions:
+              $ref: "#/components/schemas/ImportSectionResult"
+            error_passthrough_rules:
+              $ref: "#/components/schemas/ImportSectionResult"
+            model_rate_limits:
+              $ref: "#/components/schemas/ImportRemapResult"
+            group_rate_limits:
+              $ref: "#/components/schemas/ImportRemapResult"
+        request_id:
+          $ref: "#/components/schemas/RequestId"

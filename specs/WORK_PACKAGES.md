@@ -3912,6 +3912,19 @@ Required gates:
 - `make code-quality-check`
 - `git diff --check`
 
+## WP-1300: OpenAPI Formalization Of The New Admin Surfaces v1
+
+Objective: close the consistency/SDK debt accrued across WP-1110..WP-1280, which shipped their admin handlers as local DTOs (served via `writeJSONAny`, with no route↔spec conformance test). Describe every one of those endpoints in the OpenAPI contract so the generated Go and TypeScript types cover them, without changing any handler behavior.
+
+What changed (spec-only — `packages/openapi/openapi.yaml`):
+- Added 24 admin operations across 9 surfaces: model-rate-limits (list/upsert/delete), account-group-rate-limits (list/upsert/delete), TLS fingerprint profiles (list/create/update/delete), error-passthrough rules (list/create/update/delete), user-attribute definitions (list/create/update/delete) + per-user attribute values (list/set), `GET /admin/accounts/{id}/availability`, `POST /admin/accounts/{id}/quota-fetch`, and config snapshot `GET /admin/config-snapshot` + `POST /admin/config-snapshot/import`.
+- Schemas hand-verified field-for-field against the Go handler payloads: single responses use `data`/`request_id`, list responses use `data`/`pagination`/`request_id`; write ops carry `csrfHeader: []` + the `x-srapi-rbac` write grant; ID path params reuse `#/components/schemas/Id`; deletes reuse `DeleteResponse`.
+- `ConfigSnapshotResponse` references the existing `Provider`/`Model`/`AccountGroup`/`SubscriptionPlan`/`PricingRule`/`AdminSettings` plus the new `ErrorPassthroughRule`/`TLSProfile`/`UserAttributeDefinition` and denormalized `Snapshot{Model,Group}RateLimit` (carrying the natural-key name). `ConfigImportRequest` reuses the `Create*Request` schemas for the natural-keyed sections (TLS / user-attr / error rules) and dedicated `Import{Model,Group}RateLimit` for the ID-remapped ones; `ConfigImportResponse` mirrors the handler's per-section `ImportSectionResult` (created/updated) and `ImportRemapResult` (created/updated/skipped).
+
+Design note: this is reference/SDK material, not a rewire. The handlers still emit local DTOs at the wire; the formal types make the surfaces discoverable and SDK-generable, and leave a clean path for a future WP to optionally route the handlers through the generated structs (and add a route↔spec conformance test) if desired.
+
+Tests/gates: `make openapi-lint` (valid), `make openapi-codegen` + `make openapi-codegen-check` (Go types, no drift), `make openapi-ts-codegen` + `make openapi-ts-codegen-check` (TS types, no drift), `make sdk-ts-typecheck`, `go build ./...`, and full `go test ./...` — all pass. No new tables, no migrations, no handler changes.
+
 ## WP-1290: OIDC id_token Validation v1
 
 Objective: complete confidential-client console OAuth (WP-1270 deferred this) with full OIDC id_token verification — signature, standard claims, and nonce — using a vetted library (user-approved dependency).
