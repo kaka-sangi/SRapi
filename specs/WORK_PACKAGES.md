@@ -3912,6 +3912,17 @@ Required gates:
 - `make code-quality-check`
 - `git diff --check`
 
+## WP-1280: ID-Referencing Config Import (Natural-Key Remap) v1
+
+Objective: make rate-limit config (which references model/group integer IDs) importable across environments — the piece WP-1250 deferred because integer IDs do not port. Solution: denormalize the natural key into the export and remap it on import.
+
+What changed:
+- Export: `model_rate_limits` and `group_rate_limits` snapshot sections now carry the referenced entity's natural key — `model_name` (the model's canonical name) and `account_group_name` — resolved via id→name maps built from the listed models/groups (`snapshotModelRateLimits` / `snapshotGroupRateLimits`). Additive (the existing `model_id`/`account_group_id` fields remain).
+- Import: `config-snapshot/import` gained `model_rate_limits` + `group_rate_limits` sections. For each row it resolves the name against the target environment's models/groups (canonical-name / group-name → id), then upserts the limit with the **target** id. A row whose referenced model/group is absent in the target is `skipped` (counted via `importRemapResult{created,updated,skipped}`), not an error — so a partial environment imports what it can. `dry_run` reports the counts without writing.
+- Why this is safe where a raw ID import is not: integer PKs differ across environments; matching on the stable natural key (model canonical name, group name) is the correct portable join. Natural-keyed entities (TLS profiles, user attributes, error rules) were already importable in WP-1250; this extends the same principle to the ID-referencing rate limits.
+
+Tests/gates: build + full `make check`. No new tables (orchestration over existing services).
+
 ## WP-1270: Confidential-Client Console OAuth v1
 
 Problem (verified): the console-login OAuth token exchange (`exchangeOAuthAuthorizationCode`) sent `grant_type`/`code`/`redirect_uri`/`client_id`/`code_verifier` only — a public client with PKCE. Providers configured as confidential clients (web-application type) require a `client_secret` at the token endpoint and could not be used. `OAuthProviderConfig` had a `TokenAuthMethod` field but no secret to send.

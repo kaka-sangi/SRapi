@@ -64,12 +64,12 @@ func (s *Server) handleAdminConfigSnapshot(w http.ResponseWriter, r *http.Reques
 		s.writeConfigSnapshotError(w, requestID)
 		return
 	}
-	modelRateLimits, err := snapshotSection(ctx, s.runtime.modelRateLimits.ListLimits, toModelRateLimitPayload)
+	modelRateLimits, err := s.snapshotModelRateLimits(ctx)
 	if err != nil {
 		s.writeConfigSnapshotError(w, requestID)
 		return
 	}
-	groupRateLimits, err := snapshotSection(ctx, s.runtime.groupRateLimits.ListLimits, toGroupRateLimitPayload)
+	groupRateLimits, err := s.snapshotGroupRateLimits(ctx)
 	if err != nil {
 		s.writeConfigSnapshotError(w, requestID)
 		return
@@ -117,4 +117,79 @@ func (s *Server) handleAdminConfigSnapshot(w http.ResponseWriter, r *http.Reques
 
 func (s *Server) writeConfigSnapshotError(w http.ResponseWriter, requestID string) {
 	writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to assemble config snapshot", requestID)
+}
+
+// snapshotModelRateLimit / snapshotGroupRateLimit denormalize the model/group
+// natural key (name) onto each rate limit so import can remap to the target
+// environment's IDs (integer IDs do not port across environments).
+type snapshotModelRateLimit struct {
+	ModelID        int    `json:"model_id"`
+	ModelName      string `json:"model_name"`
+	RPMLimit       int    `json:"rpm_limit"`
+	TPMLimit       int    `json:"tpm_limit"`
+	MaxConcurrency int    `json:"max_concurrency"`
+	Enabled        bool   `json:"enabled"`
+}
+
+type snapshotGroupRateLimit struct {
+	GroupID        int    `json:"account_group_id"`
+	GroupName      string `json:"account_group_name"`
+	RPMLimit       int    `json:"rpm_limit"`
+	TPMLimit       int    `json:"tpm_limit"`
+	MaxConcurrency int    `json:"max_concurrency"`
+	Enabled        bool   `json:"enabled"`
+}
+
+func (s *Server) snapshotModelRateLimits(ctx context.Context) ([]snapshotModelRateLimit, error) {
+	limits, err := s.runtime.modelRateLimits.ListLimits(ctx)
+	if err != nil {
+		return nil, err
+	}
+	models, err := s.runtime.models.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	nameByID := make(map[int]string, len(models))
+	for _, model := range models {
+		nameByID[model.ID] = model.CanonicalName
+	}
+	out := make([]snapshotModelRateLimit, 0, len(limits))
+	for _, limit := range limits {
+		out = append(out, snapshotModelRateLimit{
+			ModelID:        limit.ModelID,
+			ModelName:      nameByID[limit.ModelID],
+			RPMLimit:       limit.RPMLimit,
+			TPMLimit:       limit.TPMLimit,
+			MaxConcurrency: limit.MaxConcurrency,
+			Enabled:        limit.Enabled,
+		})
+	}
+	return out, nil
+}
+
+func (s *Server) snapshotGroupRateLimits(ctx context.Context) ([]snapshotGroupRateLimit, error) {
+	limits, err := s.runtime.groupRateLimits.ListLimits(ctx)
+	if err != nil {
+		return nil, err
+	}
+	groups, err := s.runtime.accounts.ListGroups(ctx)
+	if err != nil {
+		return nil, err
+	}
+	nameByID := make(map[int]string, len(groups))
+	for _, group := range groups {
+		nameByID[group.ID] = group.Name
+	}
+	out := make([]snapshotGroupRateLimit, 0, len(limits))
+	for _, limit := range limits {
+		out = append(out, snapshotGroupRateLimit{
+			GroupID:        limit.GroupID,
+			GroupName:      nameByID[limit.GroupID],
+			RPMLimit:       limit.RPMLimit,
+			TPMLimit:       limit.TPMLimit,
+			MaxConcurrency: limit.MaxConcurrency,
+			Enabled:        limit.Enabled,
+		})
+	}
+	return out, nil
 }

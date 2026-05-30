@@ -5,6 +5,8 @@ import (
 	"net/http"
 
 	errorpassthroughcontract "github.com/srapi/srapi/apps/api/internal/modules/error_passthrough/contract"
+	groupratelimitscontract "github.com/srapi/srapi/apps/api/internal/modules/group_rate_limits/contract"
+	modelratelimitscontract "github.com/srapi/srapi/apps/api/internal/modules/model_rate_limits/contract"
 	tlsprofilescontract "github.com/srapi/srapi/apps/api/internal/modules/tls_profiles/contract"
 	userattributescontract "github.com/srapi/srapi/apps/api/internal/modules/userattributes/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
@@ -15,9 +17,30 @@ import (
 // without ID remapping. ID-referencing entities (rate limits, providers, models)
 // are intentionally export-only.
 type configImportRequest struct {
-	TLSProfiles              []importTLSProfile    `json:"tls_profiles"`
-	UserAttributeDefinitions []importUserAttribute `json:"user_attribute_definitions"`
-	ErrorPassthroughRules    []importErrorRule     `json:"error_passthrough_rules"`
+	TLSProfiles              []importTLSProfile     `json:"tls_profiles"`
+	UserAttributeDefinitions []importUserAttribute  `json:"user_attribute_definitions"`
+	ErrorPassthroughRules    []importErrorRule      `json:"error_passthrough_rules"`
+	ModelRateLimits          []importModelRateLimit `json:"model_rate_limits"`
+	GroupRateLimits          []importGroupRateLimit `json:"group_rate_limits"`
+}
+
+// importModelRateLimit / importGroupRateLimit carry the natural key (name) so the
+// referenced model/group is remapped to the target environment's ID; when the
+// name does not exist in the target the row is skipped (not an error).
+type importModelRateLimit struct {
+	ModelName      string `json:"model_name"`
+	RPMLimit       int    `json:"rpm_limit"`
+	TPMLimit       int    `json:"tpm_limit"`
+	MaxConcurrency int    `json:"max_concurrency"`
+	Enabled        *bool  `json:"enabled"`
+}
+
+type importGroupRateLimit struct {
+	GroupName      string `json:"account_group_name"`
+	RPMLimit       int    `json:"rpm_limit"`
+	TPMLimit       int    `json:"tpm_limit"`
+	MaxConcurrency int    `json:"max_concurrency"`
+	Enabled        *bool  `json:"enabled"`
 }
 
 type importTLSProfile struct {
@@ -52,6 +75,14 @@ type importErrorRule struct {
 type importSectionResult struct {
 	Created int `json:"created"`
 	Updated int `json:"updated"`
+}
+
+// importRemapResult adds a skipped count for sections whose rows reference
+// another entity by natural key that may not exist in the target environment.
+type importRemapResult struct {
+	Created int `json:"created"`
+	Updated int `json:"updated"`
+	Skipped int `json:"skipped"`
 }
 
 // handleAdminConfigImport applies the importable sections of a config snapshot by
@@ -96,23 +127,133 @@ func (s *Server) handleAdminConfigImport(w http.ResponseWriter, r *http.Request)
 		s.writeConfigImportError(w, err, requestID)
 		return
 	}
-
-	if !dryRun {
-		s.runtime.recordAudit(ctx, auditRecordFromRequest(r, session.User.ID, "config_snapshot.import", "config_snapshot", "import", nil, map[string]any{
-			"tls_profiles":               tlsResult,
-			"user_attribute_definitions": attrResult,
-			"error_passthrough_rules":    ruleResult,
-		}))
+	modelLimitResult, err := s.importModelRateLimits(ctx, body.ModelRateLimits, dryRun)
+	if err != nil {
+		s.writeConfigImportError(w, err, requestID)
+		return
 	}
-	writeJSONAny(w, http.StatusOK, map[string]any{
-		"data": map[string]any{
-			"dry_run":                    dryRun,
-			"tls_profiles":               tlsResult,
-			"user_attribute_definitions": attrResult,
-			"error_passthrough_rules":    ruleResult,
-		},
-		"request_id": requestID,
-	})
+	groupLimitResult, err := s.importGroupRateLimits(ctx, body.GroupRateLimits, dryRun)
+	if err != nil {
+		s.writeConfigImportError(w, err, requestID)
+		return
+	}
+
+	data := map[string]any{
+		"dry_run":                    dryRun,
+		"tls_profiles":               tlsResult,
+		"user_attribute_definitions": attrResult,
+		"error_passthrough_rules":    ruleResult,
+		"model_rate_limits":          modelLimitResult,
+		"group_rate_limits":          groupLimitResult,
+	}
+	if !dryRun {
+		s.runtime.recordAudit(ctx, auditRecordFromRequest(r, session.User.ID, "config_snapshot.import", "config_snapshot", "import", nil, data))
+	}
+	writeJSONAny(w, http.StatusOK, map[string]any{"data": data, "request_id": requestID})
+}
+
+func (s *Server) importModelRateLimits(ctx context.Context, items []importModelRateLimit, dryRun bool) (importRemapResult, error) {
+	var result importRemapResult
+	if len(items) == 0 {
+		return result, nil
+	}
+	models, err := s.runtime.models.List(ctx)
+	if err != nil {
+		return result, err
+	}
+	idByName := make(map[string]int, len(models))
+	for _, model := range models {
+		idByName[model.CanonicalName] = model.ID
+	}
+	existing, err := s.runtime.modelRateLimits.ListLimits(ctx)
+	if err != nil {
+		return result, err
+	}
+	hasLimit := make(map[int]struct{}, len(existing))
+	for _, limit := range existing {
+		hasLimit[limit.ModelID] = struct{}{}
+	}
+	for _, item := range items {
+		modelID, ok := idByName[item.ModelName]
+		if !ok {
+			result.Skipped++
+			continue
+		}
+		if _, found := hasLimit[modelID]; found {
+			result.Updated++
+		} else {
+			result.Created++
+		}
+		if dryRun {
+			continue
+		}
+		enabled := true
+		if item.Enabled != nil {
+			enabled = *item.Enabled
+		}
+		if _, err := s.runtime.modelRateLimits.UpsertLimit(ctx, modelratelimitscontract.UpsertLimit{
+			ModelID:        modelID,
+			RPMLimit:       item.RPMLimit,
+			TPMLimit:       item.TPMLimit,
+			MaxConcurrency: item.MaxConcurrency,
+			Enabled:        enabled,
+		}); err != nil {
+			return result, err
+		}
+	}
+	return result, nil
+}
+
+func (s *Server) importGroupRateLimits(ctx context.Context, items []importGroupRateLimit, dryRun bool) (importRemapResult, error) {
+	var result importRemapResult
+	if len(items) == 0 {
+		return result, nil
+	}
+	groups, err := s.runtime.accounts.ListGroups(ctx)
+	if err != nil {
+		return result, err
+	}
+	idByName := make(map[string]int, len(groups))
+	for _, group := range groups {
+		idByName[group.Name] = group.ID
+	}
+	existing, err := s.runtime.groupRateLimits.ListLimits(ctx)
+	if err != nil {
+		return result, err
+	}
+	hasLimit := make(map[int]struct{}, len(existing))
+	for _, limit := range existing {
+		hasLimit[limit.GroupID] = struct{}{}
+	}
+	for _, item := range items {
+		groupID, ok := idByName[item.GroupName]
+		if !ok {
+			result.Skipped++
+			continue
+		}
+		if _, found := hasLimit[groupID]; found {
+			result.Updated++
+		} else {
+			result.Created++
+		}
+		if dryRun {
+			continue
+		}
+		enabled := true
+		if item.Enabled != nil {
+			enabled = *item.Enabled
+		}
+		if _, err := s.runtime.groupRateLimits.UpsertLimit(ctx, groupratelimitscontract.UpsertLimit{
+			GroupID:        groupID,
+			RPMLimit:       item.RPMLimit,
+			TPMLimit:       item.TPMLimit,
+			MaxConcurrency: item.MaxConcurrency,
+			Enabled:        enabled,
+		}); err != nil {
+			return result, err
+		}
+	}
+	return result, nil
 }
 
 func (s *Server) importTLSProfiles(ctx context.Context, items []importTLSProfile, dryRun bool) (importSectionResult, error) {
