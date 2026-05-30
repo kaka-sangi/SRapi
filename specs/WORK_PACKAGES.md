@@ -3912,6 +3912,19 @@ Required gates:
 - `make code-quality-check`
 - `git diff --check`
 
+## WP-1240: Config Snapshot Export v1
+
+Problem (verified): backup options were infra-level (`make backup-postgres` / `restore-postgres` pg_dump) or per-resource (accounts export/import, usage export) — there was no single portable snapshot of operator-managed configuration for review, migration, or version control.
+
+What changed:
+- Read-only `GET /api/v1/admin/config-snapshot` returns one versioned JSON: `{ snapshot_version, generated_at, data: { providers, models, account_groups, subscription_plans, pricing_rules, model_rate_limits, group_rate_limits, error_passthrough_rules, tls_profiles, user_attribute_definitions, settings } }`.
+- A generic `snapshotSection[T,R](ctx, list, conv)` lists each collection and converts via the SAME `toAPI*` / local payload converters the per-resource admin list endpoints use, so the snapshot is snake_case-consistent and never drifts from them. Any list error fails the whole snapshot (no misleading partials).
+- Scope is deliberately the config plane: it excludes account credentials (accounts have their own redacted export) and operational data (usage/audit/health snapshots).
+
+Deferred: re-import. Applying a snapshot back is materially riskier than reading it — FK/dependency ordering (providers before mappings before rate limits), per-entity upsert vs create semantics, and conflict handling. It warrants its own WP with validation + dry-run.
+
+Tests/gates: build + full `make check`. No new tables/migrations (read-only assembly over existing services).
+
 ## WP-1230: Scheduled Connectivity Test Runner v1
 
 Problem (verified): the `health_probe` worker is scheduled but api_key-only (`doProbe` rejects non-api_key runtime classes), and the real generative connectivity test (`runtimeState.testAccount` responses-compact mode) only runs on admin demand. So OAuth / non-api_key accounts had no automated connectivity verification.

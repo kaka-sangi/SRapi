@@ -518,6 +518,7 @@ func (s *Server) registerCapabilityAdminRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/admin/group-rate-limits", s.handleListAdminGroupRateLimits)
 	mux.HandleFunc("PUT /api/v1/admin/group-rate-limits", s.handleUpsertAdminGroupRateLimit)
 	mux.HandleFunc("DELETE /api/v1/admin/group-rate-limits/{groupId}", s.handleDeleteAdminGroupRateLimit)
+	mux.HandleFunc("GET /api/v1/admin/config-snapshot", s.handleAdminConfigSnapshot)
 }
 
 func (s *Server) registerCurrentUserRoutes(mux *http.ServeMux) {
