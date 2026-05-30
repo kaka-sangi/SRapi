@@ -31,7 +31,7 @@ export default function RootError({
           </CardDescription>
         </div>
         {error.digest ? (
-          <p className="font-mono text-[11px] text-srapi-text-secondary">
+          <p className="font-mono text-2xs text-srapi-text-secondary">
             Error reference: {error.digest}
           </p>
         ) : null}

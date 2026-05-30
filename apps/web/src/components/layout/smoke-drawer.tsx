@@ -78,7 +78,7 @@ export function SmokeDrawer({ open, onClose, status }: SmokeDrawerProps) {
         </div>
 
         <div className="space-y-5">
-          <span className="block border-b border-srapi-border pb-2 font-mono text-[11px] font-bold uppercase tracking-wider text-srapi-text-secondary">
+          <span className="block border-b border-srapi-border pb-2 font-mono text-2xs font-bold uppercase tracking-wider text-srapi-text-secondary">
             {t("constraintsMatrix")}
           </span>
 
@@ -93,17 +93,17 @@ export function SmokeDrawer({ open, onClose, status }: SmokeDrawerProps) {
             <div className="flex items-start justify-between">
               <div className="text-xs">
                 <p className="font-semibold">{t("publicUpstreamAcc")}</p>
-                <p className="mt-0.5 text-[11px] text-srapi-text-secondary">
+                <p className="mt-0.5 text-2xs text-srapi-text-secondary">
                   {t("requiresPublic")}
                 </p>
               </div>
-              <div className="flex flex-col items-end gap-1 font-mono text-[11px]">
+              <div className="flex flex-col items-end gap-1 font-mono text-2xs">
                 <Badge
                   variant={status.public_https_upstream_account_count > 0 ? "success" : "danger"}
                 >
                   {t("activeAccounts", { count: status.public_https_upstream_account_count })}
                 </Badge>
-                <span className="text-[11px] text-srapi-text-secondary">
+                <span className="text-2xs text-srapi-text-secondary">
                   ({status.active_account_count} active accounts)
                 </span>
               </div>
@@ -130,14 +130,14 @@ export function SmokeDrawer({ open, onClose, status }: SmokeDrawerProps) {
             />
           </div>
 
-          <div className="space-y-2 rounded-2xl border border-srapi-border bg-srapi-card-muted p-4 font-mono text-[11px] text-srapi-text-secondary">
+          <div className="space-y-2 rounded-2xl border border-srapi-border bg-srapi-card-muted p-4 font-mono text-2xs text-srapi-text-secondary">
             <p className="text-xs font-bold text-srapi-text-primary">
               {t("diagnosticInstructions")}
             </p>
             <p>{t("instr1")}</p>
             <p>{t("instr2")}</p>
             <p>{t("instr3")}</p>
-            <pre className="mt-2 overflow-x-auto rounded-lg border border-srapi-border bg-srapi-card p-2 text-[11px] text-srapi-text-primary">
+            <pre className="mt-2 overflow-x-auto rounded-lg border border-srapi-border bg-srapi-card p-2 text-2xs text-srapi-text-primary">
               node tools/srapi-admin.mjs smoke-status
             </pre>
           </div>
@@ -162,7 +162,7 @@ function CheckRow({
     <div className="flex items-start justify-between">
       <div className="text-xs">
         <p className="font-semibold">{title}</p>
-        <p className="mt-0.5 text-[11px] text-srapi-text-secondary">{detail}</p>
+        <p className="mt-0.5 text-2xs text-srapi-text-secondary">{detail}</p>
       </div>
       <Badge variant={ok ? "success" : "danger"}>{badge}</Badge>
     </div>
@@ -194,7 +194,7 @@ function EndpointMatrix({
           {isComplete ? okLabel : pendingLabel}
         </Badge>
       </div>
-      <p className="text-[11px] text-srapi-text-secondary">{description}</p>
+      <p className="text-2xs text-srapi-text-secondary">{description}</p>
       <div className="mt-1 grid grid-cols-3 gap-2">
         {endpoints.map((ep) => {
           const has = recordedEndpoints.includes(ep);
@@ -202,7 +202,7 @@ function EndpointMatrix({
             <div
               key={ep}
               className={cn(
-                "rounded-lg border p-2 text-center font-mono text-[11px]",
+                "rounded-lg border p-2 text-center font-mono text-2xs",
                 has
                   ? "border-srapi-success/30 bg-srapi-success/5 text-srapi-success"
                   : "border-srapi-border bg-srapi-card-muted/40 text-srapi-text-secondary",

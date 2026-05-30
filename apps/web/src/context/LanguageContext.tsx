@@ -5,6 +5,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useSyncExternalStore,
 } from 'react';
@@ -47,6 +48,9 @@ function subscribeToLanguage(notify: () => void): () => void {
 function setLanguageInStorage(next: Language): void {
   if (typeof window === 'undefined') return;
   window.localStorage.setItem(STORAGE_KEY, next);
+  // Mirror into a cookie so the edge/server can read the locale (e.g. to set
+  // <html lang> without a flash) in a later pass. Carries no credentials.
+  document.cookie = `${STORAGE_KEY}=${next}; Path=/; Max-Age=${60 * 60 * 24 * 365}; SameSite=Lax`;
   window.dispatchEvent(new Event(STORAGE_EVENT));
 }
 
@@ -58,6 +62,13 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     readLanguageFromStorage,
     () => 'en',
   );
+
+  // Keep the document language attribute in sync for accessibility / SEO.
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.documentElement.lang = language;
+    }
+  }, [language]);
 
   const toggleLanguage = useCallback(() => {
     setLanguageInStorage(language === 'en' ? 'zh' : 'en');

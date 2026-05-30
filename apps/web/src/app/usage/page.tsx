@@ -10,11 +10,12 @@ import {
   AlertTriangle,
   Calculator,
 } from 'lucide-react';
-import DashboardLayout from '../../components/DashboardLayout';
+import { AppShell } from "@/components/layout";
+import { EmptyState, Skeleton } from '@/components/ui';
 import { apiService } from '../../lib/api';
 import { useUsageLogs } from '@/hooks/queries';
 import { useLanguage } from '../../context/LanguageContext';
-import { PageQueryError, PageQueryLoading } from '@/components/layout/page-query-state';
+import { PageQueryError } from '@/components/layout/page-query-state';
 
 export default function UsagePage() {
   const { language, t } = useLanguage();
@@ -66,27 +67,27 @@ export default function UsagePage() {
   const textSuccessRateUpper = language === 'en' ? 'SUCCESS RATE' : '成功率';
 
   return (
-    <DashboardLayout>
+    <AppShell>
       <div className="space-y-8 animate-bloom">
         
         {/* Usage Overview Banner */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           
           {/* Card 1: Requests */}
-          <div className="bg-srapi-card border border-srapi-border rounded-2xl p-6 tactile-card space-y-3">
-            <div className="flex items-center justify-between text-srapi-text-secondary text-[10px] font-mono uppercase tracking-wider font-bold">
+          <div className="surface rounded-2xl p-6 space-y-3">
+            <div className="flex items-center justify-between text-srapi-text-secondary text-2xs font-mono uppercase tracking-wider font-bold">
               <span>{t('auditedTraffic')}</span>
               <Activity size={14} className="text-srapi-primary" />
             </div>
             <div className="space-y-1">
               <div className="font-serif text-3xl font-medium tracking-tight text-srapi-text-primary">{totalRequests}</div>
-              <div className="text-[9px] font-mono text-srapi-text-secondary uppercase">{t('invocationsEvaluated')}</div>
+              <div className="text-2xs font-mono text-srapi-text-secondary uppercase">{t('invocationsEvaluated')}</div>
             </div>
           </div>
 
           {/* Card 2: Success Rate */}
-          <div className="bg-srapi-card border border-srapi-border rounded-2xl p-6 tactile-card space-y-3">
-            <div className="flex items-center justify-between text-srapi-text-secondary text-[10px] font-mono uppercase tracking-wider font-bold">
+          <div className="surface rounded-2xl p-6 space-y-3">
+            <div className="flex items-center justify-between text-srapi-text-secondary text-2xs font-mono uppercase tracking-wider font-bold">
               <span>{t('routerSla')}</span>
               {successRate >= 99 ? (
                 <TrendingUp size={14} className="text-srapi-success" />
@@ -98,13 +99,13 @@ export default function UsagePage() {
               <div className={`font-serif text-3xl font-medium tracking-tight ${successRate >= 99 ? 'text-srapi-success' : 'text-srapi-primary'}`}>
                 {successRate.toFixed(2)}%
               </div>
-              <div className="text-[9px] font-mono text-srapi-text-secondary uppercase">{textSuccessRateUpper}</div>
+              <div className="text-2xs font-mono text-srapi-text-secondary uppercase">{textSuccessRateUpper}</div>
             </div>
           </div>
 
           {/* Card 3: Total Tokens */}
-          <div className="bg-srapi-card border border-srapi-border rounded-2xl p-6 tactile-card space-y-3">
-            <div className="flex items-center justify-between text-srapi-text-secondary text-[10px] font-mono uppercase tracking-wider font-bold">
+          <div className="surface rounded-2xl p-6 space-y-3">
+            <div className="flex items-center justify-between text-srapi-text-secondary text-2xs font-mono uppercase tracking-wider font-bold">
               <span>{t('payloadRouted')}</span>
               <Calculator size={14} className="text-srapi-primary" />
             </div>
@@ -112,13 +113,13 @@ export default function UsagePage() {
               <div className="font-serif text-3xl font-medium tracking-tight text-srapi-text-primary">
                 {totalTokens >= 1000 ? `${(totalTokens / 1000).toFixed(1)}k` : totalTokens}
               </div>
-              <div className="text-[9px] font-mono text-srapi-text-secondary uppercase">{t('totalTokens')}</div>
+              <div className="text-2xs font-mono text-srapi-text-secondary uppercase">{t('totalTokens')}</div>
             </div>
           </div>
 
           {/* Card 4: Accrued Cost */}
-          <div className="bg-srapi-card border border-srapi-border rounded-2xl p-6 tactile-card space-y-3">
-            <div className="flex items-center justify-between text-srapi-text-secondary text-[10px] font-mono uppercase tracking-wider font-bold">
+          <div className="surface rounded-2xl p-6 space-y-3">
+            <div className="flex items-center justify-between text-srapi-text-secondary text-2xs font-mono uppercase tracking-wider font-bold">
               <span>{t('financialCost')}</span>
               <span className="text-xs font-bold text-srapi-primary">USD</span>
             </div>
@@ -126,14 +127,14 @@ export default function UsagePage() {
               <div className="font-serif text-3xl font-medium tracking-tight text-srapi-primary">
                 ${totalCost.toFixed(5)}
               </div>
-              <div className="text-[9px] font-mono text-srapi-text-secondary uppercase">{t('estimatedDebit')}</div>
+              <div className="text-2xs font-mono text-srapi-text-secondary uppercase">{t('estimatedDebit')}</div>
             </div>
           </div>
 
         </div>
 
         {/* Filter Toolbar */}
-        <div className="bg-srapi-card border border-srapi-border rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 tactile-card">
+        <div className="surface flex flex-col justify-between gap-4 rounded-2xl p-4 md:flex-row md:items-center">
           
           {/* Search bar */}
           <div className="flex-1 relative">
@@ -179,31 +180,31 @@ export default function UsagePage() {
         </div>
 
         {/* Logs Table Card (rounded-3xl card with tactile feel) */}
-        <div className="bg-srapi-card border border-srapi-border rounded-3xl p-6 space-y-5 tactile-card">
+        <div className="surface space-y-5 rounded-3xl p-6">
           <div className="flex items-center justify-between border-b border-srapi-border pb-3">
             <h4 className="font-serif text-lg italic text-srapi-text-primary">
               {user?.role === 'admin' ? t('globalLogs') : t('personalLogs')}
             </h4>
-            <span className="text-[10px] font-mono text-srapi-text-secondary bg-srapi-card-muted/50 border border-srapi-border px-2.5 py-1 rounded-lg font-bold">
+            <span className="text-2xs font-mono text-srapi-text-secondary bg-srapi-card-muted/50 border border-srapi-border px-2.5 py-1 rounded-lg font-bold">
               {t('showingEvents', { filtered: filteredLogs.length, total: logs.length })}
             </span>
           </div>
 
           {loading ? (
-            <PageQueryLoading label={t('fetchingEvidence')} />
+            <UsageTableSkeleton />
           ) : logsQuery.isError ? (
             <PageQueryError error={logsQuery.error} onRetry={() => void logsQuery.refetch()} />
           ) : filteredLogs.length === 0 ? (
-            <div className="py-16 border border-dashed border-srapi-border rounded-2xl text-center space-y-3.5">
-              <AlertTriangle className="mx-auto text-srapi-text-secondary opacity-40" size={28} />
-              <p className="text-xs font-bold text-srapi-text-primary font-serif">{t('noTraffic')}</p>
-              <p className="text-[10px] text-srapi-text-secondary font-mono">{t('noTrafficDesc')}</p>
-            </div>
+            <EmptyState
+              icon={<AlertTriangle size={18} />}
+              title={t('noTraffic')}
+              description={t('noTrafficDesc')}
+            />
           ) : (
             <div className="overflow-x-auto scrollbar-none border border-srapi-border rounded-2xl shadow-[0_4px_20px_rgba(25,25,25,0.015)] dark:shadow-none bg-srapi-card">
               <table className="w-full text-left border-collapse text-xs min-w-[700px]">
                 <thead>
-                  <tr className="bg-srapi-card-muted/65 border-b border-srapi-border font-mono text-srapi-text-secondary text-[10px] uppercase tracking-wider">
+                  <tr className="bg-srapi-card-muted/65 border-b border-srapi-border font-mono text-srapi-text-secondary text-2xs uppercase tracking-wider">
                     <th className="py-4 px-6 font-medium">{t('timestamp')}</th>
                     <th className="py-4 px-6 font-medium">{t('requestId')}</th>
                     <th className="py-4 px-6 font-medium">Model</th>
@@ -213,7 +214,7 @@ export default function UsagePage() {
                     <th className="py-4 px-6 font-medium text-right font-bold">{t('transactCost')}</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-srapi-border font-mono text-[11px]">
+                <tbody className="divide-y divide-srapi-border font-mono text-2xs">
                   {filteredLogs.map((log) => (
                     <tr key={log.request_id} className="hover:bg-srapi-card-muted/20 transition-colors">
                       <td className="py-4.5 px-6 whitespace-nowrap text-srapi-text-secondary">
@@ -223,7 +224,7 @@ export default function UsagePage() {
                         {log.request_id}
                       </td>
                       <td className="py-4.5 px-6 whitespace-nowrap">
-                        <span className="px-2 py-0.5 bg-srapi-card-muted border border-srapi-border rounded text-[9px] font-bold text-srapi-text-primary">
+                        <span className="px-2 py-0.5 bg-srapi-card-muted border border-srapi-border rounded text-2xs font-bold text-srapi-text-primary">
                           {log.model}
                         </span>
                       </td>
@@ -231,9 +232,9 @@ export default function UsagePage() {
                         {log.source_endpoint}
                       </td>
                       <td className="py-4.5 px-6 whitespace-nowrap">
-                        <span className={`text-[10px] font-bold border px-2.5 py-0.5 rounded-full ${
-                          log.success 
-                            ? 'border-green-500/20 text-green-700 dark:text-green-500 bg-green-500/10' 
+                        <span className={`rounded-full border px-2.5 py-0.5 text-2xs font-bold ${
+                          log.success
+                            ? 'border-srapi-success/20 bg-srapi-success/10 text-srapi-success'
                             : 'border-srapi-error/20 text-srapi-error bg-srapi-error/5'
                         }`}>
                           {log.success ? (language === 'en' ? 'Success' : '成功') : (language === 'en' ? 'Failed' : '失败')}
@@ -254,6 +255,22 @@ export default function UsagePage() {
         </div>
 
       </div>
-    </DashboardLayout>
+    </AppShell>
+  );
+}
+
+/** Shimmer rows mirroring the usage log table while evidence loads. */
+function UsageTableSkeleton() {
+  return (
+    <div className="space-y-3">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div key={i} className="flex items-center gap-4 px-2">
+          <Skeleton className="h-3 w-28" />
+          <Skeleton className="h-3 flex-1" />
+          <Skeleton className="h-3 w-16" />
+          <Skeleton className="h-3 w-12" />
+        </div>
+      ))}
+    </div>
   );
 }

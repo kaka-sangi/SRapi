@@ -13,7 +13,7 @@ export function LanguageToggle({ className }: { className?: string }) {
       title="Switch language"
       aria-label="Switch language"
       className={cn(
-        "rounded-xl border border-srapi-border px-2.5 py-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-srapi-text-secondary",
+        "rounded-xl border border-srapi-border px-2.5 py-1.5 font-mono text-2xs font-bold uppercase tracking-wider text-srapi-text-secondary",
         "transition-all hover:bg-srapi-card-muted hover:text-srapi-text-primary",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-srapi-primary focus-visible:ring-offset-2 focus-visible:ring-offset-srapi-bg",
         className,

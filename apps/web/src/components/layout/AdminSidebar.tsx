@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Activity,
@@ -44,7 +45,6 @@ interface SidebarGroup {
 
 export function AdminSidebar() {
   const pathname = usePathname();
-  const router = useRouter();
   const { language } = useLanguage();
 
   // Collapsible state for menu groups
@@ -122,29 +122,30 @@ export function AdminSidebar() {
     const Icon = item.icon;
 
     return (
-      <button
+      <Link
         key={item.href}
-        onClick={() => router.push(item.href)}
+        href={item.href}
+        aria-current={isActive ? "page" : undefined}
         className={cn(
-          "w-full text-left px-3.5 py-2.5 rounded-xl font-mono text-xs uppercase tracking-wider flex items-center gap-3 transition-all cursor-pointer",
+          "w-full text-left px-4 py-3 rounded-xl font-mono text-xs uppercase tracking-wider flex items-center gap-3 transition-all duration-300 cursor-pointer active:scale-[0.98] focus-ring",
           isActive
-            ? "bg-srapi-primary/10 text-srapi-primary font-bold border-l-2 border-srapi-primary"
+            ? "bg-srapi-primary/10 text-srapi-primary font-bold border-l-2 border-srapi-primary shadow-sm"
             : "text-srapi-text-secondary hover:text-srapi-text-primary hover:bg-srapi-card-muted/40"
         )}
       >
-        <Icon size={14} className={isActive ? "text-srapi-primary" : "text-srapi-text-secondary"} />
+        <Icon size={14} className={isActive ? "text-srapi-primary animate-pulse" : "text-srapi-text-secondary group-hover:text-srapi-text-primary transition-colors"} />
         <span>{isChinese ? item.nameZh : item.name}</span>
-      </button>
+      </Link>
     );
   };
 
   return (
-    <aside className="bg-srapi-card border border-srapi-border rounded-3xl p-5 space-y-2.5 tactile-card">
-      <div className="pb-3 border-b border-srapi-border mb-3 font-serif text-[11px] font-bold tracking-widest text-srapi-text-secondary uppercase">
+    <aside className="bg-srapi-card/90 backdrop-blur-md border border-srapi-border rounded-3xl p-5 space-y-4 tactile-card animate-bloom">
+      <div className="pb-3 border-b border-srapi-border mb-3 font-serif text-2xs font-bold tracking-widest text-srapi-text-secondary/70 uppercase">
         {isChinese ? "控制台中心" : "OPERATOR CONSOLE"}
       </div>
 
-      <div className="space-y-1">
+      <div className="space-y-1.5 scrollbar-thin max-h-[calc(100vh-180px)] overflow-y-auto pr-1">
         {mainItems.slice(0, 5).map(renderItem)}
 
         {/* Collapsible Menu Groups */}
@@ -158,9 +159,9 @@ export function AdminSidebar() {
               <button
                 onClick={() => toggleGroup(key)}
                 className={cn(
-                  "w-full text-left px-3.5 py-2.5 rounded-xl font-mono text-xs uppercase tracking-wider flex items-center justify-between transition-all cursor-pointer",
+                  "w-full text-left px-4 py-3 rounded-xl font-mono text-xs uppercase tracking-wider flex items-center justify-between transition-all duration-300 cursor-pointer focus-ring",
                   isGroupActive
-                    ? "text-srapi-primary font-semibold"
+                    ? "text-srapi-primary font-bold bg-srapi-primary/5"
                     : "text-srapi-text-secondary hover:text-srapi-text-primary hover:bg-srapi-card-muted/40"
                 )}
               >
@@ -168,11 +169,11 @@ export function AdminSidebar() {
                   <GroupIcon size={14} />
                   <span>{isChinese ? group.nameZh : group.name}</span>
                 </div>
-                {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                {isOpen ? <ChevronDown size={14} className="text-srapi-text-secondary" /> : <ChevronRight size={14} className="text-srapi-text-secondary" />}
               </button>
 
               {isOpen && (
-                <div className="pl-4 border-l border-srapi-border/60 ml-5 space-y-1 animate-bloom-soft">
+                <div className="pl-3.5 border-l border-srapi-border/40 ml-5.5 my-1 space-y-1 animate-bloom-soft">
                   {group.items.map(renderItem)}
                 </div>
               )}

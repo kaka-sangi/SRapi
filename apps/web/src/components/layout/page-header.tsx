@@ -23,7 +23,7 @@ export function PageHeader({ category, title, description, user, showSmoke = fal
     <>
       <div className="mb-12 flex flex-col justify-between gap-6 border-b border-srapi-border pb-8 animate-bloom delay-100 md:flex-row md:items-end">
         <div className="max-w-3xl space-y-2.5">
-          <div className="font-mono text-[11px] font-bold uppercase tracking-widest text-srapi-primary">
+          <div className="font-mono text-2xs font-bold uppercase tracking-widest text-srapi-primary">
             {category}
           </div>
           <h2 className="font-serif text-3xl font-normal leading-tight tracking-tight text-srapi-text-primary md:text-4xl">
@@ -35,7 +35,7 @@ export function PageHeader({ category, title, description, user, showSmoke = fal
         </div>
 
         <div className="flex shrink-0 flex-col items-start gap-3 md:items-end">
-          <div className="space-y-0.5 rounded-xl border border-srapi-border bg-srapi-card-muted/50 px-3 py-1.5 text-right font-mono text-[11px]">
+          <div className="space-y-0.5 rounded-xl border border-srapi-border bg-srapi-card-muted/50 px-3 py-1.5 text-right font-mono text-2xs">
             <div>
               {t("operatorName")}: <span className="font-bold text-srapi-text-primary">{user.name}</span>
             </div>

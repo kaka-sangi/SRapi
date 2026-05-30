@@ -173,7 +173,7 @@ function replayRows(items: SchedulerReplayItem[]) {
   return items.slice(0, 25).map((item) => ({
     rowKey: item.snapshot_id,
     created: (
-      <div className="text-srapi-text-secondary font-mono text-[11px]">
+      <div className="text-srapi-text-secondary font-mono text-2xs">
         {new Date(item.created_at).toLocaleString()}
       </div>
     ),
@@ -187,13 +187,13 @@ function replayRows(items: SchedulerReplayItem[]) {
         <div className="text-srapi-text-primary">
           {strategyLabel(item.current.strategy)} {"->"} {strategyLabel(item.shadow.strategy)}
         </div>
-        <div className="text-srapi-text-secondary font-mono text-[11px]">
+        <div className="text-srapi-text-secondary font-mono text-2xs">
           original {strategyLabel(item.original_strategy)}
         </div>
       </div>
     ),
     winners: (
-      <div className="space-y-1 font-mono text-[11px]">
+      <div className="space-y-1 font-mono text-2xs">
         <div className="text-srapi-text-primary truncate">
           current {selectedAccountLabel(item.diff.current_selected_account_id)}
         </div>
@@ -203,7 +203,7 @@ function replayRows(items: SchedulerReplayItem[]) {
       </div>
     ),
     delta: (
-      <div className="text-srapi-text-secondary space-y-1 font-mono text-[11px]">
+      <div className="text-srapi-text-secondary space-y-1 font-mono text-2xs">
         <div>final {formatScore(item.diff.final_score_delta)}</div>
         <div>cost {formatScore(item.diff.cost_score_delta)}</div>
         <div>latency {formatScore(item.diff.latency_score_delta)}</div>
@@ -211,12 +211,12 @@ function replayRows(items: SchedulerReplayItem[]) {
       </div>
     ),
     rollout: item.rollout.enabled ? (
-      <div className="text-srapi-text-secondary space-y-1 font-mono text-[11px]">
+      <div className="text-srapi-text-secondary space-y-1 font-mono text-2xs">
         <div>{item.rollout.shadow_selected ? "shadow" : "current"}</div>
         <div>bucket {item.rollout.bucket.toFixed(2)}</div>
       </div>
     ) : (
-      <span className="text-srapi-text-secondary font-mono text-[11px]">off</span>
+      <span className="text-srapi-text-secondary font-mono text-2xs">off</span>
     ),
   }));
 }
@@ -236,7 +236,7 @@ function ScoreTooltip({
 
   return (
     <div className="border-srapi-border bg-srapi-card rounded-xl border px-3 py-2 text-xs shadow-sm">
-      <div className="text-srapi-text-secondary mb-1 font-mono text-[11px]">Replay #{label}</div>
+      <div className="text-srapi-text-secondary mb-1 font-mono text-2xs">Replay #{label}</div>
       {payload.map((point) => (
         <div key={point.name} className="flex items-center justify-between gap-6">
           <span className="text-srapi-text-secondary">{point.name}</span>

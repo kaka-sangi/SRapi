@@ -34,6 +34,23 @@ export const zhMessages = {
     loginError: "请输入邮箱和密码。",
     authRejected: "邮箱或密码不正确。",
   },
+  marketing: {
+    mktEyebrow: "自托管 AI 网关",
+    mktHeroLead: "一个入口，接入所有服务商。",
+    mktHeroAccent: "账号自管，调度可控。",
+    mktHeroSub:
+      "SRapi 把 OpenAI、Anthropic、Gemini 以及 CLI / 反代账号统一在一个 OpenAI 兼容的接口之后。你接入自己的账号，设置配额与限速，内置调度器为每一次请求挑选最合适的账号。",
+    mktCtaStart: "开始使用",
+    mktFeat1Title: "账号始终在你手里",
+    mktFeat1Body: "自托管部署。上游凭据落库前加密，管理 API 永不回显明文。",
+    mktFeat2Title: "调度透明可解释",
+    mktFeat2Body: "调度器综合健康度、配额、成本与会话亲和，并清晰呈现每次为何选中该账号。",
+    mktFeat3Title: "配额与限速",
+    mktFeat3Body: "为每个密钥与账号设置配额与 RPM 限制，花费与流量尽在掌握。",
+    mktFeat4Title: "一个兼容接口",
+    mktFeat4Body: "OpenAI、Anthropic、Gemini 与 CLI / 反代账号，统一在一个 OpenAI 兼容 API 之后。",
+    mktFooter: "© 2026 SRapi · 自托管 AI 网关 · v0.1.0",
+  },
   workspace: {
     devCat: "工作台",
     devTitle: "账户概览",

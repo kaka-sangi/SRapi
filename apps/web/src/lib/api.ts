@@ -333,6 +333,12 @@ export const apiService = {
       throwOnError: true
     });
     const session = response.data?.data;
+    if (session && 'required' in session) {
+      // 202: password accepted but two-factor verification is required. The
+      // console sign-in form does not yet collect a TOTP code, so surface a
+      // clear error instead of silently failing.
+      throw new Error('Two-factor verification is required for this account.');
+    }
     if (!session?.user) {
       throw new Error('Authentication rejected. Verify email and password.');
     }

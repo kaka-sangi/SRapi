@@ -29,8 +29,10 @@ const baseSettings: AdminSettings = {
   security: {
     admin_api_key: { configured: true },
     registration_enabled: true,
+    registration_email_suffix_allowlist: [],
     oauth_enabled: false,
     oauth_providers: [],
+    oauth_provider_configs: [],
   },
   users: {
     default_balance: "0",
@@ -58,6 +60,12 @@ const baseSettings: AdminSettings = {
   email: {
     smtp_configured: true,
     templates: { welcome: "Hello" },
+    balance_low_notify_enabled: true,
+    balance_low_notify_threshold: "5.00000000",
+    balance_low_notify_recharge_url: "https://console.srapi.local/billing",
+    subscription_expiry_notify_enabled: true,
+    account_quota_notify_enabled: true,
+    account_quota_notify_remaining_ratio: "0.20000000",
   },
   backup: {
     enabled: false,
@@ -84,6 +92,7 @@ describe("admin-settings-form", () => {
     draft.paymentProvidersText = "stripe";
     draft.customMenusJson = '[{"label":"Ops","href":"/admin/ops"}]';
     draft.emailTemplatesJson = '{"welcome":"Welcome to SRapi"}';
+    draft.value.email.account_quota_notify_remaining_ratio = "0.15000000";
 
     const materialized = materializeSettingsDraft(draft);
 
@@ -97,6 +106,7 @@ describe("admin-settings-form", () => {
     expect(materialized.gateway.scheduler_strategy_rollout_api_key_hashes).toEqual(["sha256:first", "sha256:second"]);
     expect(materialized.payment.providers).toEqual(["stripe"]);
     expect(materialized.email.templates).toEqual({ welcome: "Welcome to SRapi" });
+    expect(materialized.email.account_quota_notify_remaining_ratio).toBe("0.15000000");
   });
 
   it("rejects custom menus that are not an array of objects", () => {

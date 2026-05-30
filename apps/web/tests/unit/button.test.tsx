@@ -47,6 +47,6 @@ describe("Button", () => {
     );
     const btn = screen.getByRole("button", { name: "Delete" });
     expect(btn.className).toMatch(/border-srapi-error/);
-    expect(btn.className).toMatch(/text-\[11px\]/);
+    expect(btn.className).toMatch(/text-2xs/);
   });
 });

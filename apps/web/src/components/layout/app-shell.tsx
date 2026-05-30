@@ -3,6 +3,7 @@
 import * as React from "react";
 import { usePathname } from "next/navigation";
 import { useLanguage } from "@/context/LanguageContext";
+import { useSpotlight } from "@/hooks/use-spotlight";
 import { AuthGate } from "./auth-gate";
 import { TopNav } from "./top-nav";
 import { PageHeader } from "./page-header";
@@ -20,13 +21,17 @@ export function AppShell({ children, allowedRole }: AppShellProps) {
   const pathname = usePathname();
   const { t } = useLanguage();
   const meta = getRouteMeta(pathname, t);
+  const spotlightRef = useSpotlight<HTMLDivElement>();
 
   return (
     <AuthGate allowedRole={allowedRole} loadingLabel={t("authenticating")}>
       {({ user, runtimeStatus }) => (
-        <div className="paper-grain relative min-h-screen bg-srapi-bg pb-24 font-sans text-srapi-text-primary antialiased transition-colors duration-300">
+        <div
+          ref={spotlightRef}
+          className="spotlight paper-grain relative min-h-screen bg-srapi-bg pb-24 font-sans text-srapi-text-primary antialiased transition-colors duration-300"
+        >
           <TopNav user={user} runtimeStatus={runtimeStatus} />
-          <main className="mx-auto mt-12 max-w-6xl px-6 md:mt-16 md:px-8">
+          <main className="relative z-10 mx-auto mt-12 max-w-6xl px-6 md:mt-16 md:px-8">
             <PageHeader
               category={meta.category}
               title={meta.title}

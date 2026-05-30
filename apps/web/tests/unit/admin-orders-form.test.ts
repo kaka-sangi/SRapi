@@ -16,6 +16,8 @@ const order: PaymentOrder = {
   order_no: "ord_1",
   provider_instance_id: "provider-1",
   amount: "19.99000000",
+  original_amount: "19.99000000",
+  discount_amount: "0.00000000",
   currency: "USD",
   status: "paid",
   product_type: "balance_credit",

@@ -4,7 +4,7 @@ import * as React from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Key, Plus, Copy, Check, AlertCircle, Power, Sparkles } from "lucide-react";
-import DashboardLayout from "@/components/DashboardLayout";
+import { AppShell } from "@/components/layout";
 import { useApiKeys, useCreateApiKey, useToggleApiKey } from "@/hooks/queries";
 import { useLanguage } from "@/context/LanguageContext";
 import {
@@ -16,8 +16,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  EmptyState,
   Input,
   Label,
+  Skeleton,
   Table,
   TableBody,
   TableCell,
@@ -25,7 +27,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui";
-import { PageQueryError, PageQueryLoading } from "@/components/layout/page-query-state";
+import { PageQueryError } from "@/components/layout/page-query-state";
 import { cn } from "@/lib/cn";
 import {
   createApiKeySchema,
@@ -116,10 +118,10 @@ export default function ApiKeysPage() {
   const placeholderName = language === "en" ? "e.g. production-web" : "例如：production-web";
 
   return (
-    <DashboardLayout>
+    <AppShell>
       <div className="space-y-8 animate-bloom">
         {/* Top operational header */}
-        <div className="tactile-card flex flex-col justify-between gap-6 rounded-2xl border border-srapi-border bg-srapi-card p-6 sm:flex-row sm:items-center">
+        <div className="surface flex flex-col justify-between gap-6 rounded-2xl p-6 sm:flex-row sm:items-center">
           <div className="space-y-1">
             <h3 className="font-serif text-lg font-medium tracking-tight">{textHeading}</h3>
             <p className="text-xs leading-relaxed text-srapi-text-secondary">{textHeadingDesc}</p>
@@ -179,25 +181,33 @@ export default function ApiKeysPage() {
           <PageQueryError error={toggleMutation.error} title="API key status update failed" />
         ) : null}
 
-        <div className="tactile-card space-y-5 rounded-3xl border border-srapi-border bg-srapi-card p-6">
+        <div className="surface space-y-5 rounded-3xl p-6">
           <h4 className="font-serif text-lg italic text-srapi-text-primary">
             {t("activeChannels")}
           </h4>
 
           {loading ? (
-            <PageQueryLoading label={t("queryRegistry")} />
+            <ApiKeysSkeleton />
           ) : apiKeysQuery.isError ? (
             <PageQueryError error={apiKeysQuery.error} onRetry={() => void apiKeysQuery.refetch()} />
           ) : keys.length === 0 ? (
-            <div className="space-y-3.5 rounded-2xl border border-dashed border-srapi-border py-16 text-center">
-              <Key
-                size={28}
-                aria-hidden="true"
-                className="mx-auto text-srapi-text-secondary opacity-40"
-              />
-              <p className="font-serif text-xs font-bold text-srapi-text-primary">{t("noKeys")}</p>
-              <p className="font-mono text-xs text-srapi-text-secondary">{t("noKeysDesc")}</p>
-            </div>
+            <EmptyState
+              icon={<Key size={18} aria-hidden="true" />}
+              title={t("noKeys")}
+              description={t("noKeysDesc")}
+              action={
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setGeneratedKey(null);
+                    setShowCreateModal(true);
+                  }}
+                >
+                  <Plus size={14} aria-hidden="true" />
+                  {t("generateKey")}
+                </Button>
+              }
+            />
           ) : (
             <Table>
               <TableHeader>
@@ -228,7 +238,7 @@ export default function ApiKeysPage() {
                           className="rounded border border-transparent p-1 text-srapi-text-secondary transition-all hover:border-srapi-border hover:bg-srapi-card-muted hover:text-srapi-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-srapi-primary"
                         >
                           {copiedId === k.id ? (
-                            <Check size={12} aria-hidden="true" className="text-green-700" />
+                            <Check size={12} aria-hidden="true" className="text-srapi-success" />
                           ) : (
                             <Copy size={12} aria-hidden="true" />
                           )}
@@ -382,6 +392,23 @@ export default function ApiKeysPage() {
           </DialogContent>
         </Dialog>
       </div>
-    </DashboardLayout>
+    </AppShell>
+  );
+}
+
+/** Shimmer rows mirroring the API key registry table while it loads. */
+function ApiKeysSkeleton() {
+  return (
+    <div className="space-y-3">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="flex items-center gap-4 px-1">
+          <Skeleton className="h-3 w-32" />
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="h-3 flex-1" />
+          <Skeleton className="h-5 w-16 rounded-full" />
+          <Skeleton className="h-3 w-20" />
+        </div>
+      ))}
+    </div>
   );
 }

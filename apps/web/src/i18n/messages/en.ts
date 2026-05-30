@@ -39,6 +39,27 @@ export const enMessages = {
     loginError: "Email and password are required.",
     authRejected: "Wrong email or password.",
   },
+  marketing: {
+    mktEyebrow: "Self-hosted AI gateway",
+    mktHeroLead: "One endpoint, every provider.",
+    mktHeroAccent: "Your accounts, your control.",
+    mktHeroSub:
+      "SRapi routes OpenAI, Anthropic, Gemini and CLI / web-session accounts through one OpenAI-compatible endpoint. Bring your own accounts, set quotas and limits, and the built-in scheduler picks the best account for every request.",
+    mktCtaStart: "Get started",
+    mktFeat1Title: "Your accounts stay yours",
+    mktFeat1Body:
+      "Self-hosted. Provider credentials are encrypted at rest and never returned by the admin API.",
+    mktFeat2Title: "Transparent scheduling",
+    mktFeat2Body:
+      "The scheduler weighs health, quota, cost and session affinity, and shows you why each account was picked.",
+    mktFeat3Title: "Quotas and rate limits",
+    mktFeat3Body:
+      "Set per-key and per-account quotas and RPM limits. Stay in control of spend and traffic.",
+    mktFeat4Title: "One compatible endpoint",
+    mktFeat4Body:
+      "OpenAI, Anthropic, Gemini and CLI / web-session accounts behind a single OpenAI-compatible API.",
+    mktFooter: "© 2026 SRapi · Self-hosted AI gateway · v0.1.0",
+  },
   workspace: {
     devCat: "Workspace",
     devTitle: "Your account at a glance",

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { LogOut, Server } from "lucide-react";
 import { Badge } from "@/components/ui";
@@ -47,17 +48,17 @@ export function TopNav({ user, runtimeStatus }: TopNavProps) {
     <header className="sticky top-0 z-40 animate-bloom border-b border-srapi-border bg-srapi-bg/85 backdrop-blur-md">
       <div className="mx-auto flex h-20 max-w-6xl items-center justify-between px-6 md:px-8">
         <div className="flex items-center gap-4">
-          <a
+          <Link
             href={homeRouteForRole(user.role)}
             className="font-serif text-xl font-medium italic tracking-tight text-srapi-primary"
           >
             SRapi.
-          </a>
+          </Link>
           <Badge>{user.role === "admin" ? t("operatorConsole") : t("developerConsole")}</Badge>
           <span
             title={runtimeStatus?.apiBaseUrl ?? ""}
             className={cn(
-              "hidden items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-mono text-[11px] font-bold uppercase tracking-wider md:inline-flex",
+              "hidden items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-mono text-2xs font-bold uppercase tracking-wider md:inline-flex",
               isOfflineRuntime
                   ? "border-srapi-error/30 bg-srapi-error/5 text-srapi-error"
                 : "border-srapi-success/30 bg-srapi-success/5 text-srapi-success",
@@ -73,7 +74,7 @@ export function TopNav({ user, runtimeStatus }: TopNavProps) {
             {navigation.map((item) => {
               const isActive = pathname === item.href;
               return (
-                <a
+                <Link
                   key={item.key}
                   href={item.href}
                   aria-current={isActive ? "page" : undefined}
@@ -83,7 +84,7 @@ export function TopNav({ user, runtimeStatus }: TopNavProps) {
                   )}
                 >
                   {t(item.key)}
-                </a>
+                </Link>
               );
             })}
           </nav>

@@ -1,15 +1,19 @@
 @import "tailwindcss";
 
 /*
- * SRapi v0.1.0 design tokens.
+ * SRapi v0.1.0 design tokens — "AI-Lab warm" identity.
  *
- * Theme tokens are exposed as CSS variables and surfaced through Tailwind
- * via the @theme block. Page code should never hardcode hex values, font
- * stacks, or one-off pixel sizes — pull from the tokens here.
+ * A warm, premium, editorial system in the spirit of Claude / OpenAI / Gemini:
+ * bone paper light mode, warm near-black dark mode, a clay brand accent, and a
+ * very restrained blue→violet spectrum reserved for gradient accents only.
  *
- * Typography scale floor is `--text-xs` (12px). The legacy 9–10px sizes
- * present in the v0.1.0 frontend predate WCAG-AA discipline and are being
- * migrated. Add new copy at >= 12px.
+ * Theme tokens are exposed as CSS variables and surfaced through Tailwind via
+ * the @theme block. Page code should never hardcode hex values, font stacks,
+ * or one-off pixel sizes — pull from the tokens here.
+ *
+ * Typography: body floor is `--text-xs` (12px). `--text-2xs` (11px) is reserved
+ * for mono "caps"/overline labels only. Display sizes (`--text-display-*`) are
+ * for hero headlines. Add new copy at >= 12px.
  */
 @theme {
   /* Color tokens (resolved per .light/.dark via CSS variables below) */
@@ -22,7 +26,14 @@
   --color-srapi-primary: var(--srapi-primary);
   --color-srapi-primary-hover: var(--srapi-primary-hover);
   --color-srapi-success: var(--srapi-success);
+  --color-srapi-warning: var(--srapi-warning);
   --color-srapi-error: var(--srapi-error);
+  --color-srapi-info: var(--srapi-info);
+
+  /* Spectrum accent stops — used ONLY for gradient text / rings / glows */
+  --color-srapi-grad-from: var(--srapi-grad-from);
+  --color-srapi-grad-via: var(--srapi-grad-via);
+  --color-srapi-grad-to: var(--srapi-grad-to);
 
   /* Font families */
   --font-serif: var(--font-lora), Georgia, serif;
@@ -40,6 +51,12 @@
   --text-2xl: 1.875rem;  /* 30px */
   --text-3xl: 2.25rem;   /* 36px */
 
+  /* Display scale — hero headlines only (paired line-heights are tight) */
+  --text-display-sm: 2.5rem;   --text-display-sm--line-height: 1.08;
+  --text-display-md: 3.25rem;  --text-display-md--line-height: 1.04;
+  --text-display-lg: 4rem;     --text-display-lg--line-height: 1.0;
+  --text-display-xl: 5rem;     --text-display-xl--line-height: 0.98;
+
   /* Radius scale */
   --radius-xs: 0.25rem;
   --radius-sm: 0.5rem;
@@ -50,34 +67,63 @@
 
   /* Motion */
   --ease-bloom: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 :root {
-  /* Light Mode (Warm Alabaster Paper) */
-  --srapi-bg: #F9F6F0;
-  --srapi-card: #FFFFFF;
-  --srapi-card-muted: #F1EBE4;
-  --srapi-text-primary: #191919;
-  --srapi-text-secondary: #6E6A5F;
-  --srapi-border: #E3DAC9;
-  --srapi-primary: #C05638;
-  --srapi-primary-hover: #A24329;
-  --srapi-success: #15803D;
-  --srapi-error: #B91C1C;
+  /* Light Mode — Warm Bone Paper */
+  --srapi-bg: #f7f4ee;
+  --srapi-card: #ffffff;
+  --srapi-card-muted: #f0ebe3;
+  --srapi-text-primary: #1a1714;
+  --srapi-text-secondary: #6b6459;
+  --srapi-border: #e6decf;
+  --srapi-primary: #c9684a;
+  --srapi-primary-hover: #a8512f;
+  --srapi-success: #15803d;
+  --srapi-warning: #b45309;
+  --srapi-error: #b91c1c;
+  --srapi-info: #2563eb;
+
+  /* Restrained spectrum accent (clay → indigo → violet) */
+  --srapi-grad-from: #c9684a;
+  --srapi-grad-via: #6366f1;
+  --srapi-grad-to: #8b5cf6;
+
+  /* Elevation — warm-tinted, soft */
+  --shadow-sm: 0 1px 2px rgba(26, 23, 20, 0.04), 0 1px 3px rgba(26, 23, 20, 0.03);
+  --shadow-md: 0 4px 12px -2px rgba(26, 23, 20, 0.06), 0 2px 6px -2px rgba(26, 23, 20, 0.04);
+  --shadow-lg: 0 18px 48px -12px rgba(26, 23, 20, 0.14), 0 6px 16px -8px rgba(26, 23, 20, 0.08);
+  --shadow-glow: 0 0 0 1px color-mix(in srgb, var(--srapi-primary) 18%, transparent),
+    0 12px 40px -12px color-mix(in srgb, var(--srapi-primary) 30%, transparent);
+  --surface-inset: inset 0 1px 0 0 rgba(255, 255, 255, 0.8);
 }
 
 .dark {
-  /* Dark Mode (Ink Dark) */
-  --srapi-bg: #111110;
-  --srapi-card: #1A1A18;
-  --srapi-card-muted: #252420;
-  --srapi-text-primary: #F1EFEA;
-  --srapi-text-secondary: #9E9A90;
-  --srapi-border: #2D2C26;
-  --srapi-primary: #E26D5C;
-  --srapi-primary-hover: #C05638;
-  --srapi-success: #22C55E;
-  --srapi-error: #EF4444;
+  /* Dark Mode — Warm Ink */
+  --srapi-bg: #14110d;
+  --srapi-card: #1e1a15;
+  --srapi-card-muted: #26221b;
+  --srapi-text-primary: #f3efe8;
+  --srapi-text-secondary: #a39c8e;
+  --srapi-border: #322b22;
+  --srapi-primary: #e08763;
+  --srapi-primary-hover: #c9684a;
+  --srapi-success: #22c55e;
+  --srapi-warning: #f59e0b;
+  --srapi-error: #ef4444;
+  --srapi-info: #60a5fa;
+
+  --srapi-grad-from: #e08763;
+  --srapi-grad-via: #818cf8;
+  --srapi-grad-to: #a78bfa;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 14px -2px rgba(0, 0, 0, 0.5), 0 2px 6px -2px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 22px 56px -14px rgba(0, 0, 0, 0.7), 0 8px 20px -10px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 0 1px color-mix(in srgb, var(--srapi-primary) 26%, transparent),
+    0 14px 44px -12px color-mix(in srgb, var(--srapi-primary) 36%, transparent);
+  --surface-inset: inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
 }
 
 body {
@@ -96,30 +142,88 @@ body {
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
   width: 100%; height: 100%;
-  opacity: 0.035; /* 3.5% opacity for fibers texture without looking dirty */
+  opacity: 0.025;
   pointer-events: none;
   z-index: 10;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
 }
 
-/* Letterpress Tactile Depth Shadows */
+/* ─── Premium Surface / Card ───
+ * The canonical card treatment: hairline border, soft elevation, gentle lift
+ * on hover. `tactile-card` is kept as an alias so legacy pages uplift for free.
+ */
+.surface,
 .tactile-card {
-  box-shadow:
-    0 1px 2px rgba(25, 25, 25, 0.02),
-    0 4px 20px -2px rgba(25, 25, 25, 0.015),
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.7);
-  border: 1px solid var(--srapi-border);
   background-color: var(--srapi-card);
+  border: 1px solid var(--srapi-border);
+  box-shadow: var(--shadow-sm), var(--surface-inset);
+  transition:
+    box-shadow 0.3s var(--ease-bloom),
+    transform 0.3s var(--ease-bloom),
+    border-color 0.3s ease;
 }
 
-.dark .tactile-card {
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.2),
-    0 4px 20px -2px rgba(0, 0, 0, 0.15),
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.04);
+.surface:hover,
+.tactile-card:hover {
+  box-shadow: var(--shadow-md), var(--surface-inset);
+  border-color: color-mix(in srgb, var(--srapi-primary) 22%, var(--srapi-border));
 }
 
-/* Quiet Badges */
+/* Opt-in lift for cards that should read as clickable (e.g. bento tiles). */
+.surface-interactive {
+  cursor: pointer;
+}
+.surface-interactive:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg), var(--surface-inset);
+}
+
+/* Spectrum hover ring — for flagship bento cards */
+.surface-glow {
+  position: relative;
+}
+.surface-glow::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, var(--srapi-grad-from), var(--srapi-grad-via), var(--srapi-grad-to));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.35s var(--ease-bloom);
+  pointer-events: none;
+}
+.surface-glow:hover::after {
+  opacity: 0.55;
+}
+
+/* ─── Glassmorphism Card ─── */
+.glass-card {
+  background: color-mix(in srgb, var(--srapi-card) 72%, transparent);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid color-mix(in srgb, var(--srapi-border) 80%, transparent);
+  box-shadow: var(--shadow-lg), var(--surface-inset);
+}
+
+/* ─── Gradient Text ─── */
+.gradient-text {
+  background-image: linear-gradient(
+    100deg,
+    var(--srapi-grad-from),
+    var(--srapi-grad-via),
+    var(--srapi-grad-to)
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+/* ─── Quiet Badges ─── */
 .quiet-badge {
   font-family: var(--font-jetbrains-mono), monospace;
   font-size: 11px;
@@ -131,7 +235,7 @@ body {
   gap: 6px;
 }
 
-/* Quota Notch Meter */
+/* ─── Quota Notch Meter ─── */
 .notch-rail {
   height: 1px;
   background-color: var(--srapi-border);
@@ -147,7 +251,7 @@ body {
   transition: left 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Typing Stream Cursor */
+/* ─── Typing Stream Cursor ─── */
 .stream-cursor {
   display: inline-block;
   width: 4px;
@@ -163,58 +267,313 @@ body {
   100% { opacity: 1; }
 }
 
-/* High Fidelity Editorial bloom intro animation */
+/* ─── High Fidelity Editorial Bloom Intro Animation ─── */
 @keyframes editorialBloom {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(16px);
+    filter: blur(4px);
   }
   to {
     opacity: 1;
     transform: translateY(0);
+    filter: blur(0);
   }
 }
 
 .animate-bloom {
   opacity: 0;
-  animation: editorialBloom 700ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: editorialBloom 600ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* Stagger delay helpers: keep CSS-driven so first paint never sticks at
- * opacity:0 if JS is slow or fails. The `animate-bloom-soft` variant is a
- * shorter, lower-displacement bloom for the auth form card. */
+/* Stagger delay helpers */
 .animate-bloom.delay-100 { animation-delay: 80ms; }
 .animate-bloom.delay-200 { animation-delay: 160ms; }
 .animate-bloom.delay-300 { animation-delay: 240ms; }
+.animate-bloom.delay-400 { animation-delay: 320ms; }
 
 @keyframes editorialBloomSoft {
-  from { opacity: 0; transform: scale(0.985); }
-  to { opacity: 1; transform: scale(1); }
+  from { opacity: 0; transform: scale(0.97) translateY(8px); filter: blur(2px); }
+  to { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
 }
 .animate-bloom-soft {
   opacity: 0;
-  animation: editorialBloomSoft 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: editorialBloomSoft 500ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* Respect user preference: skip the bloom entirely so motion-sensitive
- * users see content instantly. */
-@media (prefers-reduced-motion: reduce) {
-  .animate-bloom,
-  .animate-bloom-soft,
-  .animate-bloom.delay-100,
-  .animate-bloom.delay-200,
-  .animate-bloom.delay-300 {
-    animation: none;
-    opacity: 1;
-    transform: none;
-  }
+/* ─── Scroll Reveal (driven by IntersectionObserver via useReveal) ─── */
+.reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  filter: blur(3px);
+  transition:
+    opacity 0.7s var(--ease-bloom),
+    transform 0.7s var(--ease-bloom),
+    filter 0.7s var(--ease-bloom);
+  will-change: opacity, transform;
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+  filter: none;
 }
 
-/* Custom Scrollbar for side-scrolling tables on mobile */
+/* ─── 3D Tilt (transform set inline via JS; this is the base) ─── */
+.tilt {
+  transform-style: preserve-3d;
+  transition: transform 0.2s var(--ease-bloom);
+  will-change: transform;
+}
+
+/* ─── Shimmer Loading Skeleton ─── */
+@keyframes shimmerSlide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.shimmer {
+  position: relative;
+  overflow: hidden;
+  background: var(--srapi-card-muted);
+  border-radius: 0.75rem;
+}
+
+.shimmer::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.3) 50%,
+    transparent 100%
+  );
+  animation: shimmerSlide 1.8s ease-in-out infinite;
+}
+
+.dark .shimmer::after {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.04) 50%,
+    transparent 100%
+  );
+}
+
+/* ─── Animated Gradient Background for Login ─── */
+@keyframes gradientShift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.gradient-bg {
+  background: linear-gradient(
+    135deg,
+    var(--srapi-bg) 0%,
+    color-mix(in srgb, var(--srapi-primary) 6%, var(--srapi-bg)) 25%,
+    var(--srapi-bg) 50%,
+    color-mix(in srgb, var(--srapi-primary) 4%, var(--srapi-bg)) 75%,
+    var(--srapi-bg) 100%
+  );
+  background-size: 400% 400%;
+  animation: gradientShift 20s ease infinite;
+}
+
+/* ─── Aurora Ambient Field (CSS-only hero wash) ─── */
+.aurora {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.aurora::before,
+.aurora::after {
+  content: "";
+  position: absolute;
+  width: 60vw;
+  height: 60vw;
+  max-width: 760px;
+  max-height: 760px;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.5;
+  will-change: transform;
+}
+.aurora::before {
+  top: -18%;
+  left: -8%;
+  background: radial-gradient(circle at 30% 30%, color-mix(in srgb, var(--srapi-grad-from) 60%, transparent), transparent 65%);
+  animation: orbFloat1 22s ease-in-out infinite;
+}
+.aurora::after {
+  bottom: -22%;
+  right: -10%;
+  background: radial-gradient(circle at 70% 70%, color-mix(in srgb, var(--srapi-grad-via) 42%, transparent), transparent 65%);
+  animation: orbFloat2 26s ease-in-out infinite;
+}
+.dark .aurora::before { opacity: 0.32; }
+.dark .aurora::after { opacity: 0.26; }
+
+/* ─── Cursor Spotlight (CSS vars --mx/--my updated via JS) ─── */
+.spotlight {
+  position: relative;
+}
+.spotlight::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    600px circle at var(--mx, 50%) var(--my, 0%),
+    color-mix(in srgb, var(--srapi-primary) 9%, transparent),
+    transparent 42%
+  );
+  transition: background 0.2s ease;
+  z-index: 0;
+}
+
+/* ─── Floating Orb Ambient Light ─── */
+@keyframes orbFloat1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(30px, -20px) scale(1.05); }
+  66% { transform: translate(-10px, 15px) scale(0.95); }
+}
+
+@keyframes orbFloat2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(-25px, 25px) scale(1.1); }
+  66% { transform: translate(15px, -10px) scale(0.9); }
+}
+
+.orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  pointer-events: none;
+  will-change: transform;
+}
+
+.orb-1 {
+  width: 300px;
+  height: 300px;
+  background: color-mix(in srgb, var(--srapi-primary) 12%, transparent);
+  animation: orbFloat1 18s ease-in-out infinite;
+}
+
+.orb-2 {
+  width: 250px;
+  height: 250px;
+  background: color-mix(in srgb, var(--srapi-primary) 8%, transparent);
+  animation: orbFloat2 22s ease-in-out infinite;
+}
+
+/* ─── Pulse Status Dot ─── */
+@keyframes statusPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.5); }
+}
+
+.pulse-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  animation: statusPulse 2s ease-in-out infinite;
+}
+
+/* ─── Focus Ring ─── */
+.focus-ring {
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.focus-ring:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--srapi-primary) 25%, transparent);
+  border-color: var(--srapi-primary);
+}
+
+/* ─── Stat Card Accent Stripe ─── */
+.stat-accent {
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-accent::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--srapi-primary), color-mix(in srgb, var(--srapi-primary) 40%, var(--srapi-bg)));
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.stat-accent:hover::before {
+  opacity: 1;
+}
+
+/* ─── Smooth Scrollbar ─── */
 .scrollbar-none::-webkit-scrollbar {
   display: none;
 }
 .scrollbar-none {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: var(--srapi-border);
+  border-radius: 9999px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: var(--srapi-text-secondary);
+}
+
+/* Respect user preference: skip motion entirely so motion-sensitive users see
+ * content instantly. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-bloom,
+  .animate-bloom-soft,
+  .animate-bloom.delay-100,
+  .animate-bloom.delay-200,
+  .animate-bloom.delay-300,
+  .animate-bloom.delay-400 {
+    animation: none;
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+    filter: none;
+    transition: none;
+  }
+  .tilt {
+    transform: none !important;
+  }
+  .gradient-bg,
+  .aurora::before,
+  .aurora::after {
+    animation: none;
+  }
+  .orb-1, .orb-2 {
+    animation: none;
+  }
+  .pulse-dot {
+    animation: none;
+  }
 }

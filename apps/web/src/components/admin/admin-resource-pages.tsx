@@ -427,7 +427,7 @@ export function AdminDashboardProductionPage() {
 
       {snapshot ? (
         <>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <AdminStatCard
               label="API Keys"
               value={formatInteger(snapshot.inventory.total_api_keys)}
@@ -459,7 +459,7 @@ export function AdminDashboardProductionPage() {
             title="Token And Cost"
             description="Decimal values come directly from the backend; financial math is not recomputed in the browser."
           >
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
               <AdminStatCard
                 label="Today Tokens"
                 value={formatCompactNumber(snapshot.tokens.today_tokens)}
@@ -490,7 +490,7 @@ export function AdminDashboardProductionPage() {
             </div>
           </AdminSection>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <AdminStatCard
               label="RPM"
               value={formatCompactNumber(snapshot.performance.current_rpm)}
@@ -546,7 +546,7 @@ export function AdminDashboardProductionPage() {
                 user: (
                   <div>
                     <div className="font-semibold text-srapi-text-primary">{item.email || item.user_id}</div>
-                    <div className="text-[10px] text-srapi-text-secondary">{item.user_id}</div>
+                    <div className="text-2xs text-srapi-text-secondary">{item.user_id}</div>
                   </div>
                 ),
                 requests: formatInteger(item.request_count),
@@ -652,7 +652,7 @@ export function AdminOpsProductionPage() {
         }} /> : null}
 
         {overview ? (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <AdminStatCard label="Requests" value={formatInteger(overview.request_count)} detail={`${formatInteger(overview.success_count)} success`} icon={<Activity size={16} />} />
             <AdminStatCard label="Error Rate" value={formatPercent(overview.error_rate)} detail={`${formatInteger(overview.error_count)} errors`} icon={<AlertTriangle size={16} />} tone={overview.error_rate > 0.02 ? "danger" : "success"} />
             <AdminStatCard label="Latency P95 / P99" value={`${formatInteger(overview.latency_p95_ms)}ms`} detail={`P99 ${formatInteger(overview.latency_p99_ms)}ms`} icon={<Cpu size={16} />} />
@@ -661,7 +661,7 @@ export function AdminOpsProductionPage() {
         ) : null}
 
         <AdminSection title="Alert Posture" description="Current alert state from the Ops alert event stream.">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <AdminStatCard
               label="Firing"
               value={formatInteger(alertSummary.firing)}
@@ -677,7 +677,7 @@ export function AdminOpsProductionPage() {
 
         {concurrency ? (
           <AdminSection title="Concurrency" description="Active gateway requests and realtime slots, without API-key labels in the UI.">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <AdminStatCard label="Gateway Requests" value={formatInteger(concurrency.active_gateway_requests)} icon={<Activity size={16} />} />
               <AdminStatCard label="Realtime Slots" value={formatInteger(concurrency.active_realtime_slots)} icon={<Zap size={16} />} />
               <AdminStatCard label="API Keys With Activity" value={formatInteger(Object.keys(concurrency.active_by_api_key).length)} icon={<Key size={16} />} />
@@ -760,11 +760,11 @@ export function AdminOpsProductionPage() {
               name: (
                 <div>
                   <div className="font-semibold text-srapi-text-primary">{slo.definition.name}</div>
-                  <div className="text-[10px] text-srapi-text-secondary">{slo.definition.sli_type} / {slo.definition.window_days}d</div>
+                  <div className="text-2xs text-srapi-text-secondary">{slo.definition.sli_type} / {slo.definition.window_days}d</div>
                 </div>
               ),
               filter: (
-                <div className="max-w-[260px] whitespace-normal text-[11px] text-srapi-text-secondary">
+                <div className="max-w-[260px] whitespace-normal text-2xs text-srapi-text-secondary">
                   <div>{slo.definition.filter.source_endpoint || "all endpoints"}</div>
                   <div>{slo.definition.filter.model || "all models"}</div>
                 </div>
@@ -798,7 +798,7 @@ export function AdminOpsProductionPage() {
                 summary: (
                   <div className="max-w-[280px] whitespace-normal">
                     <div className="font-semibold text-srapi-text-primary">{alert.summary}</div>
-                    <div className="text-[10px] text-srapi-text-secondary">{formatDateTime(alert.started_at)}</div>
+                    <div className="text-2xs text-srapi-text-secondary">{formatDateTime(alert.started_at)}</div>
                   </div>
                 ),
                 severity: <AdminStatusBadge status={alert.severity} />,
@@ -911,10 +911,10 @@ export function AdminOpsProductionPage() {
                   { key: "actions", header: "" },
                 ]}
                 rows={recentRequests.slice(0, 12).map((request) => ({
-                  request: <span className="select-all font-mono text-[11px]">{request.request_id}</span>,
+                  request: <span className="select-all font-mono text-2xs">{request.request_id}</span>,
                   model: request.model,
                   route: (
-                    <div className="font-mono text-[11px] text-srapi-text-secondary">
+                    <div className="font-mono text-2xs text-srapi-text-secondary">
                       <div>provider {request.provider_id || "-"}</div>
                       <div>account {request.account_id || "-"}</div>
                     </div>
@@ -1227,7 +1227,7 @@ export function AdminUsersProductionPage() {
                 user: (
                   <div>
                     <div className="font-semibold text-srapi-text-primary">{user.name}</div>
-                    <div className="text-[10px] text-srapi-text-secondary">{user.email}</div>
+                    <div className="text-2xs text-srapi-text-secondary">{user.email}</div>
                   </div>
                 ),
                 roles: user.roles.join(", "),
@@ -1646,7 +1646,73 @@ export function AdminAccountsProductionPage() {
                 groups: account.group_ids.length
                   ? account.group_ids.map((id) => groupName.get(id) ?? id).join(", ")
                   : "-",
-                meta: <code className="max-w-[220px] truncate text-[10px]">{safeJson(account.metadata ?? {})}</code>,
+                meta: (() => {
+                  let meta: Record<string, unknown> = {};
+                  try {
+                    meta = typeof account.metadata === "string"
+                      ? (JSON.parse(account.metadata) as Record<string, unknown>)
+                      : ((account.metadata as Record<string, unknown>) ?? {});
+                  } catch {
+                    meta = {};
+                  }
+                  const keys = Object.keys(meta);
+                  if (keys.length === 0) return <span className="text-srapi-text-secondary text-2xs">-</span>;
+
+                  const baseUrl = typeof meta.base_url === "string" ? meta.base_url : undefined;
+                  const healthState = typeof meta.health_state === "string" ? meta.health_state : undefined;
+                  const healthScore = typeof meta.health_score === "number" ? meta.health_score : undefined;
+                  const circuitOpen = typeof meta.circuit_open === "boolean" ? meta.circuit_open : undefined;
+                  const cooldownActive = typeof meta.cooldown_active === "boolean" ? meta.cooldown_active : undefined;
+                  const cooldownReason = typeof meta.cooldown_reason === "string" ? meta.cooldown_reason : undefined;
+                  const consecutiveFailures = typeof meta.consecutive_probe_failures === "number" ? meta.consecutive_probe_failures : 0;
+
+                  const knownKeys = ["base_url", "health_state", "health_score", "circuit_open", "cooldown_active", "cooldown_reason", "consecutive_probe_failures"];
+                  const extraKeysCount = keys.filter(k => !knownKeys.includes(k)).length;
+
+                  return (
+                    <div className="flex flex-wrap gap-1.5 max-w-[280px]">
+                      {baseUrl && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-2xs font-mono bg-srapi-card-muted text-srapi-text-secondary border border-srapi-border/60 max-w-[160px] truncate" title={`Base URL: ${baseUrl}`}>
+                          URL: {baseUrl}
+                        </span>
+                      )}
+                      {healthState && (
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-2xs font-medium border ${
+                          healthState === "healthy" ? "bg-srapi-success/10 text-srapi-success border-srapi-success/20" :
+                          healthState === "degraded" ? "bg-srapi-warning/10 text-srapi-warning border-srapi-warning/20" :
+                          "bg-srapi-error/10 text-srapi-error border-srapi-error/20"
+                        }`} title={`Health State: ${healthState}`}>
+                          {healthState.toUpperCase()}
+                        </span>
+                      )}
+                      {healthScore !== undefined && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-2xs font-medium bg-srapi-info/10 text-srapi-info border border-srapi-info/20" title={`Health Score: ${healthScore}`}>
+                          Score: {healthScore}
+                        </span>
+                      )}
+                      {circuitOpen && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-2xs font-medium bg-srapi-error/10 text-srapi-error border border-srapi-error/20 animate-pulse" title="Circuit breaker is currently OPEN">
+                          CIRCUIT-OPEN
+                        </span>
+                      )}
+                      {cooldownActive && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-2xs font-medium bg-srapi-warning/10 text-srapi-warning border border-srapi-warning/20" title={`Cooldown active: ${cooldownReason ?? "unknown reason"}`}>
+                          COOLDOWN
+                        </span>
+                      )}
+                      {consecutiveFailures > 0 && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-2xs font-medium bg-srapi-error/10 text-srapi-error border border-srapi-error/20" title={`${consecutiveFailures} consecutive probe failures`}>
+                          Failures: {consecutiveFailures}
+                        </span>
+                      )}
+                      {extraKeysCount > 0 && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-2xs font-mono bg-srapi-card-muted/80 text-srapi-text-secondary border border-srapi-border/40 cursor-help" title={JSON.stringify(meta, null, 2)}>
+                          +{extraKeysCount} meta
+                        </span>
+                      )}
+                    </div>
+                  );
+                })(),
                 status: <AdminStatusBadge status={account.status} />,
                 actions: (
                   <div className="flex flex-wrap justify-end gap-2">
@@ -1831,7 +1897,7 @@ export function AdminAccountsProductionPage() {
                   <label key={group.id} className="flex items-center justify-between gap-3 rounded-lg border border-srapi-border/70 px-3 py-2 text-xs">
                     <span>
                       <span className="block font-mono font-bold text-srapi-text-primary">{group.name}</span>
-                      <span className="block text-[10px] text-srapi-text-secondary">{group.strategy_hint || group.id}</span>
+                      <span className="block text-2xs text-srapi-text-secondary">{group.strategy_hint || group.id}</span>
                     </span>
                     <input
                       type="checkbox"
@@ -2102,7 +2168,7 @@ export function AdminGroupsProductionPage() {
               name: (
                 <div>
                   <div className="font-semibold text-srapi-text-primary">{group.name}</div>
-                  <div className="max-w-[260px] truncate text-[10px] text-srapi-text-secondary">{group.description}</div>
+                  <div className="max-w-[260px] truncate text-2xs text-srapi-text-secondary">{group.description}</div>
                 </div>
               ),
               strategy: group.strategy_hint || "-",
@@ -2433,7 +2499,7 @@ function ProviderTestResultPanel({ result }: { result: AdminTestResult | null })
         </div>
       </div>
       {result.checks ? (
-        <pre className="mt-4 max-h-40 overflow-auto rounded-xl bg-srapi-bg p-3 font-mono text-[11px] text-srapi-text-secondary">
+        <pre className="mt-4 max-h-40 overflow-auto rounded-xl bg-srapi-bg p-3 font-mono text-2xs text-srapi-text-secondary">
           {safeJson(result.checks)}
         </pre>
       ) : null}
@@ -2476,7 +2542,7 @@ function AccountOperationResultPanel({
             </div>
           </div>
           {testResult.checks ? (
-            <pre className="mt-4 max-h-40 overflow-auto rounded-xl bg-srapi-bg p-3 font-mono text-[11px] text-srapi-text-secondary">
+            <pre className="mt-4 max-h-40 overflow-auto rounded-xl bg-srapi-bg p-3 font-mono text-2xs text-srapi-text-secondary">
               {safeJson(testResult.checks)}
             </pre>
           ) : null}
@@ -2504,9 +2570,9 @@ function AccountOperationResultPanel({
           </div>
           <div className="mt-3">
             <div className="font-mono font-bold uppercase text-srapi-text-secondary">Endpoint</div>
-            <div className="mt-1 break-all font-mono text-[11px] text-srapi-text-primary">{discovery.endpoint}</div>
+            <div className="mt-1 break-all font-mono text-2xs text-srapi-text-primary">{discovery.endpoint}</div>
           </div>
-          <div className="mt-3 max-h-40 overflow-auto rounded-xl bg-srapi-bg p-3 font-mono text-[11px] text-srapi-text-secondary">
+          <div className="mt-3 max-h-40 overflow-auto rounded-xl bg-srapi-bg p-3 font-mono text-2xs text-srapi-text-secondary">
             {discovery.model_ids.length ? discovery.model_ids.join("\n") : "No models discovered."}
           </div>
         </div>
@@ -2541,7 +2607,7 @@ function OpsEvidenceDrawer({
         </DialogHeader>
         {selection?.kind === "alert" || selection?.kind === "log" ? (
           <AdminSection title="Event Details">
-            <pre className="max-h-64 overflow-auto rounded-xl bg-srapi-bg p-3 font-mono text-[11px] text-srapi-text-secondary">
+            <pre className="max-h-64 overflow-auto rounded-xl bg-srapi-bg p-3 font-mono text-2xs text-srapi-text-secondary">
               {safeJson(selection.details)}
             </pre>
           </AdminSection>
@@ -2568,11 +2634,11 @@ function OpsEvidenceDrawer({
             ]}
             rows={filteredRequests.map((request) => ({
               request: (
-                <span className="select-all font-mono text-[11px]">{request.request_id}</span>
+                <span className="select-all font-mono text-2xs">{request.request_id}</span>
               ),
               model: request.model,
               route: (
-                <div className="font-mono text-[11px] text-srapi-text-secondary">
+                <div className="font-mono text-2xs text-srapi-text-secondary">
                   <div>provider {request.provider_id || "-"}</div>
                   <div>account {request.account_id || "-"}</div>
                 </div>
@@ -2602,11 +2668,11 @@ function RuntimeMetric({
 }) {
   return (
     <div className="rounded-xl border border-srapi-border bg-srapi-card-muted/20 p-4">
-      <div className="font-mono text-[10px] font-bold uppercase tracking-wider text-srapi-text-secondary">
+      <div className="font-mono text-2xs font-bold uppercase tracking-wider text-srapi-text-secondary">
         {label}
       </div>
       <div className="mt-2 font-serif text-xl font-semibold text-srapi-text-primary">{value}</div>
-      {detail ? <div className="mt-1 text-[11px] text-srapi-text-secondary">{detail}</div> : null}
+      {detail ? <div className="mt-1 text-2xs text-srapi-text-secondary">{detail}</div> : null}
     </div>
   );
 }
@@ -2632,7 +2698,7 @@ function AccountRuntimeDetails({
     <div className="space-y-4">
       <div className="rounded-2xl border border-srapi-border bg-srapi-card-muted/30 p-4">
         <div className="font-serif text-lg font-medium text-srapi-text-primary">{account.name}</div>
-        <div className="mt-1 font-mono text-[11px] text-srapi-text-secondary">
+        <div className="mt-1 font-mono text-2xs text-srapi-text-secondary">
           {account.runtime_class} / provider {account.provider_id}
         </div>
       </div>
@@ -2746,21 +2812,21 @@ function AccountBulkResultPanel({
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         {exportData ? (
           <div className="rounded-xl border border-srapi-border bg-srapi-card-muted/20 p-4">
-            <div className="font-mono text-[10px] font-bold uppercase tracking-wider text-srapi-text-secondary">Exported Accounts</div>
+            <div className="font-mono text-2xs font-bold uppercase tracking-wider text-srapi-text-secondary">Exported Accounts</div>
             <div className="mt-2 font-serif text-2xl font-semibold text-srapi-text-primary">{formatInteger(exportData.length)}</div>
-            <pre className="mt-3 max-h-48 overflow-auto rounded-xl bg-srapi-bg p-3 font-mono text-[11px] text-srapi-text-secondary">
+            <pre className="mt-3 max-h-48 overflow-auto rounded-xl bg-srapi-bg p-3 font-mono text-2xs text-srapi-text-secondary">
               {JSON.stringify({ accounts: exportData }, null, 2)}
             </pre>
           </div>
         ) : null}
         {importResult ? (
           <div className="rounded-xl border border-srapi-border bg-srapi-card-muted/20 p-4">
-            <div className="font-mono text-[10px] font-bold uppercase tracking-wider text-srapi-text-secondary">Import</div>
+            <div className="font-mono text-2xs font-bold uppercase tracking-wider text-srapi-text-secondary">Import</div>
             <div className="mt-2 text-sm text-srapi-text-primary">
               Created {formatInteger(importResult.created_count)} / skipped {formatInteger(importResult.skipped_count)}
             </div>
             {importResult.errors.length ? (
-              <pre className="mt-3 max-h-40 overflow-auto rounded-xl bg-srapi-bg p-3 font-mono text-[11px] text-srapi-error">
+              <pre className="mt-3 max-h-40 overflow-auto rounded-xl bg-srapi-bg p-3 font-mono text-2xs text-srapi-error">
                 {importResult.errors.join("\n")}
               </pre>
             ) : null}
@@ -2768,12 +2834,12 @@ function AccountBulkResultPanel({
         ) : null}
         {batchResult ? (
           <div className="rounded-xl border border-srapi-border bg-srapi-card-muted/20 p-4">
-            <div className="font-mono text-[10px] font-bold uppercase tracking-wider text-srapi-text-secondary">Batch Status</div>
+            <div className="font-mono text-2xs font-bold uppercase tracking-wider text-srapi-text-secondary">Batch Status</div>
             <div className="mt-2 text-sm text-srapi-text-primary">
               Updated {formatInteger(batchResult.updated_count)}
             </div>
             {batchResult.errors.length ? (
-              <pre className="mt-3 max-h-40 overflow-auto rounded-xl bg-srapi-bg p-3 font-mono text-[11px] text-srapi-error">
+              <pre className="mt-3 max-h-40 overflow-auto rounded-xl bg-srapi-bg p-3 font-mono text-2xs text-srapi-error">
                 {batchResult.errors.join("\n")}
               </pre>
             ) : null}
@@ -3225,7 +3291,7 @@ export function AdminAnnouncementsProductionPage() {
           {deleteState ? (
             <div className="space-y-4">
               <div className="rounded-xl border border-srapi-border p-4">
-                <div className="font-mono text-[11px] font-bold uppercase text-srapi-text-secondary">Title</div>
+                <div className="font-mono text-2xs font-bold uppercase text-srapi-text-secondary">Title</div>
                 <div className="mt-2 select-all text-sm font-semibold text-srapi-text-primary">{deleteState.title}</div>
               </div>
               <div>
@@ -3357,7 +3423,7 @@ export function AdminRedeemProductionPage() {
         title="Codes"
         actions={
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <span className="font-mono text-[11px] text-srapi-text-secondary">{selectedCodes.length} selected</span>
+            <span className="font-mono text-2xs text-srapi-text-secondary">{selectedCodes.length} selected</span>
             <Button type="button" variant="danger" size="sm" disabled={!selectedCodes.length || mutations.batchDisable.isPending} onClick={openBatchDisableRedeemCodes}>
               Disable Selected
             </Button>
@@ -3897,7 +3963,80 @@ export function AdminSettingsProductionPage() {
               <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="rounded-xl border border-srapi-border p-4">
                   <div className="font-mono text-xs font-bold uppercase">SMTP</div>
-                  <div className="mt-2"><AdminStatusBadge status={value.email.smtp_configured ? "configured" : "not_configured"} /></div>
+                  <div className="mt-2">
+                    <AdminStatusBadge status={value.email.smtp_configured ? "configured" : "not_configured"} />
+                  </div>
+                </div>
+              </div>
+              <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+                <SettingsToggle
+                  label="Low Balance Alerts"
+                  checked={value.email.balance_low_notify_enabled ?? true}
+                  onChange={(checked) =>
+                    update((current) => ({
+                      ...current,
+                      email: { ...current.email, balance_low_notify_enabled: checked },
+                    }))
+                  }
+                />
+                <SettingsToggle
+                  label="Subscription Expiry Alerts"
+                  checked={value.email.subscription_expiry_notify_enabled ?? true}
+                  onChange={(checked) =>
+                    update((current) => ({
+                      ...current,
+                      email: { ...current.email, subscription_expiry_notify_enabled: checked },
+                    }))
+                  }
+                />
+                <SettingsToggle
+                  label="Account Quota Alerts"
+                  checked={value.email.account_quota_notify_enabled ?? true}
+                  onChange={(checked) =>
+                    update((current) => ({
+                      ...current,
+                      email: { ...current.email, account_quota_notify_enabled: checked },
+                    }))
+                  }
+                />
+                <div>
+                  <Label htmlFor="settings-balance-low-threshold">Low Balance Threshold</Label>
+                  <Input
+                    id="settings-balance-low-threshold"
+                    value={value.email.balance_low_notify_threshold ?? ""}
+                    onChange={(event) =>
+                      update((current) => ({
+                        ...current,
+                        email: { ...current.email, balance_low_notify_threshold: event.target.value },
+                      }))
+                    }
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="settings-balance-recharge-url">Recharge URL</Label>
+                  <Input
+                    id="settings-balance-recharge-url"
+                    value={value.email.balance_low_notify_recharge_url ?? ""}
+                    onChange={(event) =>
+                      update((current) => ({
+                        ...current,
+                        email: { ...current.email, balance_low_notify_recharge_url: event.target.value },
+                      }))
+                    }
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="settings-account-quota-ratio">Quota Remaining Ratio</Label>
+                  <Input
+                    id="settings-account-quota-ratio"
+                    value={value.email.account_quota_notify_remaining_ratio ?? ""}
+                    onChange={(event) =>
+                      update((current) => ({
+                        ...current,
+                        email: { ...current.email, account_quota_notify_remaining_ratio: event.target.value },
+                      }))
+                    }
+                  />
                 </div>
               </div>
               <Label htmlFor="settings-email-templates">Email Templates JSON</Label>
@@ -4288,7 +4427,7 @@ export function AdminChannelsMonitorProductionPage() {
                 name: (
                   <div>
                     <div className="font-medium text-srapi-text-primary">{provider.display_name}</div>
-                    <div className="font-mono text-[11px] text-srapi-text-secondary">{provider.name}</div>
+                    <div className="font-mono text-2xs text-srapi-text-secondary">{provider.name}</div>
                   </div>
                 ),
                 adapter: provider.adapter_type,
@@ -4558,11 +4697,11 @@ export function AdminOrdersProductionPage() {
               <>
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="rounded-xl border border-srapi-border p-4">
-                    <div className="font-mono text-[11px] font-bold uppercase text-srapi-text-secondary">Order</div>
+                    <div className="font-mono text-2xs font-bold uppercase text-srapi-text-secondary">Order</div>
                     <div className="mt-2 select-all font-mono text-sm text-srapi-text-primary">{refundForm.orderNo}</div>
                   </div>
                   <div className="rounded-xl border border-srapi-border p-4">
-                    <div className="font-mono text-[11px] font-bold uppercase text-srapi-text-secondary">Currency</div>
+                    <div className="font-mono text-2xs font-bold uppercase text-srapi-text-secondary">Currency</div>
                     <div className="mt-2 font-mono text-sm text-srapi-text-primary">{refundForm.currency}</div>
                   </div>
                   <div>
@@ -4819,13 +4958,13 @@ export function AdminRiskControlProductionPage() {
           </div>
           <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="rounded-2xl border border-srapi-border bg-srapi-bg p-4">
-              <p className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-srapi-text-secondary">Blocked Countries</p>
+              <p className="font-mono text-2xs font-bold uppercase tracking-[0.2em] text-srapi-text-secondary">Blocked Countries</p>
               <p className="mt-2 text-sm text-srapi-text-primary">
                 {(risk.config.data.blocked_countries ?? []).length > 0 ? (risk.config.data.blocked_countries ?? []).join(", ") : "None"}
               </p>
             </div>
             <div className="rounded-2xl border border-srapi-border bg-srapi-bg p-4">
-              <p className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-srapi-text-secondary">Blocked IPs</p>
+              <p className="font-mono text-2xs font-bold uppercase tracking-[0.2em] text-srapi-text-secondary">Blocked IPs</p>
               <p className="mt-2 text-sm text-srapi-text-primary">
                 {(risk.config.data.blocked_ips ?? []).length > 0 ? (risk.config.data.blocked_ips ?? []).join(", ") : "None"}
               </p>
@@ -5142,13 +5281,13 @@ export function AdminProxiesProductionPage() {
                 name: (
                   <div>
                     <div className="font-semibold text-srapi-text-primary">{proxy.name}</div>
-                    <div className="font-mono text-[10px] text-srapi-text-secondary">{proxy.id}</div>
+                    <div className="font-mono text-2xs text-srapi-text-secondary">{proxy.id}</div>
                   </div>
                 ),
                 type: <Badge variant="neutral">{proxy.type}</Badge>,
                 status: <AdminStatusBadge status={proxy.status} />,
                 url: proxy.url_configured ? "Encrypted URL configured" : "Missing URL",
-                metadata: <span className="font-mono text-[11px]">{safeJson(proxy.metadata ?? {})}</span>,
+                metadata: <span className="font-mono text-2xs">{safeJson(proxy.metadata ?? {})}</span>,
                 updated: formatDateTime(proxy.updated_at),
                 action: (
                   <div className="flex justify-end">
@@ -5195,7 +5334,7 @@ export function AdminProxiesProductionPage() {
                   account: (
                     <div>
                       <div className="font-semibold text-srapi-text-primary">{account.name}</div>
-                      <div className="text-[10px] text-srapi-text-secondary">
+                      <div className="text-2xs text-srapi-text-secondary">
                         {account.id} / {account.runtime_class}
                       </div>
                     </div>
@@ -5223,7 +5362,7 @@ export function AdminProxiesProductionPage() {
                     </Select>
                   ),
                   quality: currentQuality ? (
-                    <div className="space-y-1 text-[11px] text-srapi-text-secondary">
+                    <div className="space-y-1 text-2xs text-srapi-text-secondary">
                       <div>Success {formatPercent(currentQuality.success_rate)}</div>
                       <div>Error {formatPercent(currentQuality.error_rate)}</div>
                       <div>P95 {formatInteger(currentQuality.latency_p95_ms)}ms / {formatInteger(currentQuality.sample_count)} samples</div>

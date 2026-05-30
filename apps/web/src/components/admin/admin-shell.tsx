@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import DashboardLayout from "@/components/DashboardLayout";
+import { AppShell } from "@/components/layout";
 import { AdminSidebar } from "@/components/layout/AdminSidebar";
 import { useLanguage } from "@/context/LanguageContext";
 
@@ -15,13 +15,13 @@ export function useAdminLocale() {
 
 export function AdminShell({ children }: { children: ReactNode }) {
   return (
-    <DashboardLayout allowedRole="admin">
+    <AppShell allowedRole="admin">
       <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-12">
         <div className="lg:col-span-3">
           <AdminSidebar />
         </div>
         <div className="min-w-0 space-y-8 lg:col-span-9">{children}</div>
       </div>
-    </DashboardLayout>
+    </AppShell>
   );
 }

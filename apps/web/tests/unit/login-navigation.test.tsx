@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Home from "@/app/page";
 import { LanguageProvider } from "@/context/LanguageContext";
+import { QueryProvider } from "@/providers/query-provider";
 import { apiService } from "@/lib/api";
 
 const pushMock = vi.fn();
@@ -46,9 +47,11 @@ describe("login navigation", () => {
     });
 
     render(
-      <LanguageProvider>
-        <Home />
-      </LanguageProvider>,
+      <QueryProvider>
+        <LanguageProvider>
+          <Home />
+        </LanguageProvider>
+      </QueryProvider>,
     );
 
     const submit = await screen.findByRole("button", { name: /^(sign in|登录)$/i });
