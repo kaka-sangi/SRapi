@@ -22,6 +22,8 @@ type Tx struct {
 	AccountGroup *AccountGroupClient
 	// AccountGroupMember is the client for interacting with the AccountGroupMember builders.
 	AccountGroupMember *AccountGroupMemberClient
+	// AccountGroupRateLimit is the client for interacting with the AccountGroupRateLimit builders.
+	AccountGroupRateLimit *AccountGroupRateLimitClient
 	// AccountHealthSnapshot is the client for interacting with the AccountHealthSnapshot builders.
 	AccountHealthSnapshot *AccountHealthSnapshotClient
 	// AccountQuotaSnapshot is the client for interacting with the AccountQuotaSnapshot builders.
@@ -266,6 +268,7 @@ func (tx *Tx) init() {
 	tx.AccountAvailabilityRollup = NewAccountAvailabilityRollupClient(tx.config)
 	tx.AccountGroup = NewAccountGroupClient(tx.config)
 	tx.AccountGroupMember = NewAccountGroupMemberClient(tx.config)
+	tx.AccountGroupRateLimit = NewAccountGroupRateLimitClient(tx.config)
 	tx.AccountHealthSnapshot = NewAccountHealthSnapshotClient(tx.config)
 	tx.AccountQuotaSnapshot = NewAccountQuotaSnapshotClient(tx.config)
 	tx.AffiliateLedger = NewAffiliateLedgerClient(tx.config)

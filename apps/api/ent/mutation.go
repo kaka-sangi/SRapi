@@ -14,6 +14,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/accountavailabilityrollup"
 	"github.com/srapi/srapi/apps/api/ent/accountgroup"
 	"github.com/srapi/srapi/apps/api/ent/accountgroupmember"
+	"github.com/srapi/srapi/apps/api/ent/accountgroupratelimit"
 	"github.com/srapi/srapi/apps/api/ent/accounthealthsnapshot"
 	"github.com/srapi/srapi/apps/api/ent/accountquotasnapshot"
 	"github.com/srapi/srapi/apps/api/ent/affiliateledger"
@@ -87,6 +88,7 @@ const (
 	TypeAccountAvailabilityRollup = "AccountAvailabilityRollup"
 	TypeAccountGroup              = "AccountGroup"
 	TypeAccountGroupMember        = "AccountGroupMember"
+	TypeAccountGroupRateLimit     = "AccountGroupRateLimit"
 	TypeAccountHealthSnapshot     = "AccountHealthSnapshot"
 	TypeAccountQuotaSnapshot      = "AccountQuotaSnapshot"
 	TypeAffiliateLedger           = "AffiliateLedger"
@@ -4529,6 +4531,617 @@ func (m *AccountGroupMemberMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *AccountGroupMemberMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown AccountGroupMember edge %s", name)
+}
+
+// AccountGroupRateLimitMutation represents an operation that mutates the AccountGroupRateLimit nodes in the graph.
+type AccountGroupRateLimitMutation struct {
+	config
+	op                  Op
+	typ                 string
+	id                  *int
+	created_at          *time.Time
+	updated_at          *time.Time
+	account_group_id    *int
+	addaccount_group_id *int
+	rpm_limit           *int
+	addrpm_limit        *int
+	enabled             *bool
+	clearedFields       map[string]struct{}
+	done                bool
+	oldValue            func(context.Context) (*AccountGroupRateLimit, error)
+	predicates          []predicate.AccountGroupRateLimit
+}
+
+var _ ent.Mutation = (*AccountGroupRateLimitMutation)(nil)
+
+// accountgroupratelimitOption allows management of the mutation configuration using functional options.
+type accountgroupratelimitOption func(*AccountGroupRateLimitMutation)
+
+// newAccountGroupRateLimitMutation creates new mutation for the AccountGroupRateLimit entity.
+func newAccountGroupRateLimitMutation(c config, op Op, opts ...accountgroupratelimitOption) *AccountGroupRateLimitMutation {
+	m := &AccountGroupRateLimitMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeAccountGroupRateLimit,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withAccountGroupRateLimitID sets the ID field of the mutation.
+func withAccountGroupRateLimitID(id int) accountgroupratelimitOption {
+	return func(m *AccountGroupRateLimitMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *AccountGroupRateLimit
+		)
+		m.oldValue = func(ctx context.Context) (*AccountGroupRateLimit, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().AccountGroupRateLimit.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withAccountGroupRateLimit sets the old AccountGroupRateLimit of the mutation.
+func withAccountGroupRateLimit(node *AccountGroupRateLimit) accountgroupratelimitOption {
+	return func(m *AccountGroupRateLimitMutation) {
+		m.oldValue = func(context.Context) (*AccountGroupRateLimit, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m AccountGroupRateLimitMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m AccountGroupRateLimitMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *AccountGroupRateLimitMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *AccountGroupRateLimitMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().AccountGroupRateLimit.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *AccountGroupRateLimitMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *AccountGroupRateLimitMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the AccountGroupRateLimit entity.
+// If the AccountGroupRateLimit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountGroupRateLimitMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *AccountGroupRateLimitMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *AccountGroupRateLimitMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *AccountGroupRateLimitMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the AccountGroupRateLimit entity.
+// If the AccountGroupRateLimit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountGroupRateLimitMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *AccountGroupRateLimitMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetAccountGroupID sets the "account_group_id" field.
+func (m *AccountGroupRateLimitMutation) SetAccountGroupID(i int) {
+	m.account_group_id = &i
+	m.addaccount_group_id = nil
+}
+
+// AccountGroupID returns the value of the "account_group_id" field in the mutation.
+func (m *AccountGroupRateLimitMutation) AccountGroupID() (r int, exists bool) {
+	v := m.account_group_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAccountGroupID returns the old "account_group_id" field's value of the AccountGroupRateLimit entity.
+// If the AccountGroupRateLimit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountGroupRateLimitMutation) OldAccountGroupID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAccountGroupID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAccountGroupID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAccountGroupID: %w", err)
+	}
+	return oldValue.AccountGroupID, nil
+}
+
+// AddAccountGroupID adds i to the "account_group_id" field.
+func (m *AccountGroupRateLimitMutation) AddAccountGroupID(i int) {
+	if m.addaccount_group_id != nil {
+		*m.addaccount_group_id += i
+	} else {
+		m.addaccount_group_id = &i
+	}
+}
+
+// AddedAccountGroupID returns the value that was added to the "account_group_id" field in this mutation.
+func (m *AccountGroupRateLimitMutation) AddedAccountGroupID() (r int, exists bool) {
+	v := m.addaccount_group_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetAccountGroupID resets all changes to the "account_group_id" field.
+func (m *AccountGroupRateLimitMutation) ResetAccountGroupID() {
+	m.account_group_id = nil
+	m.addaccount_group_id = nil
+}
+
+// SetRpmLimit sets the "rpm_limit" field.
+func (m *AccountGroupRateLimitMutation) SetRpmLimit(i int) {
+	m.rpm_limit = &i
+	m.addrpm_limit = nil
+}
+
+// RpmLimit returns the value of the "rpm_limit" field in the mutation.
+func (m *AccountGroupRateLimitMutation) RpmLimit() (r int, exists bool) {
+	v := m.rpm_limit
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRpmLimit returns the old "rpm_limit" field's value of the AccountGroupRateLimit entity.
+// If the AccountGroupRateLimit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountGroupRateLimitMutation) OldRpmLimit(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRpmLimit is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRpmLimit requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRpmLimit: %w", err)
+	}
+	return oldValue.RpmLimit, nil
+}
+
+// AddRpmLimit adds i to the "rpm_limit" field.
+func (m *AccountGroupRateLimitMutation) AddRpmLimit(i int) {
+	if m.addrpm_limit != nil {
+		*m.addrpm_limit += i
+	} else {
+		m.addrpm_limit = &i
+	}
+}
+
+// AddedRpmLimit returns the value that was added to the "rpm_limit" field in this mutation.
+func (m *AccountGroupRateLimitMutation) AddedRpmLimit() (r int, exists bool) {
+	v := m.addrpm_limit
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetRpmLimit resets all changes to the "rpm_limit" field.
+func (m *AccountGroupRateLimitMutation) ResetRpmLimit() {
+	m.rpm_limit = nil
+	m.addrpm_limit = nil
+}
+
+// SetEnabled sets the "enabled" field.
+func (m *AccountGroupRateLimitMutation) SetEnabled(b bool) {
+	m.enabled = &b
+}
+
+// Enabled returns the value of the "enabled" field in the mutation.
+func (m *AccountGroupRateLimitMutation) Enabled() (r bool, exists bool) {
+	v := m.enabled
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEnabled returns the old "enabled" field's value of the AccountGroupRateLimit entity.
+// If the AccountGroupRateLimit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountGroupRateLimitMutation) OldEnabled(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEnabled is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEnabled requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEnabled: %w", err)
+	}
+	return oldValue.Enabled, nil
+}
+
+// ResetEnabled resets all changes to the "enabled" field.
+func (m *AccountGroupRateLimitMutation) ResetEnabled() {
+	m.enabled = nil
+}
+
+// Where appends a list predicates to the AccountGroupRateLimitMutation builder.
+func (m *AccountGroupRateLimitMutation) Where(ps ...predicate.AccountGroupRateLimit) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the AccountGroupRateLimitMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *AccountGroupRateLimitMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.AccountGroupRateLimit, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *AccountGroupRateLimitMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *AccountGroupRateLimitMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (AccountGroupRateLimit).
+func (m *AccountGroupRateLimitMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *AccountGroupRateLimitMutation) Fields() []string {
+	fields := make([]string, 0, 5)
+	if m.created_at != nil {
+		fields = append(fields, accountgroupratelimit.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, accountgroupratelimit.FieldUpdatedAt)
+	}
+	if m.account_group_id != nil {
+		fields = append(fields, accountgroupratelimit.FieldAccountGroupID)
+	}
+	if m.rpm_limit != nil {
+		fields = append(fields, accountgroupratelimit.FieldRpmLimit)
+	}
+	if m.enabled != nil {
+		fields = append(fields, accountgroupratelimit.FieldEnabled)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *AccountGroupRateLimitMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case accountgroupratelimit.FieldCreatedAt:
+		return m.CreatedAt()
+	case accountgroupratelimit.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case accountgroupratelimit.FieldAccountGroupID:
+		return m.AccountGroupID()
+	case accountgroupratelimit.FieldRpmLimit:
+		return m.RpmLimit()
+	case accountgroupratelimit.FieldEnabled:
+		return m.Enabled()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *AccountGroupRateLimitMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case accountgroupratelimit.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case accountgroupratelimit.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case accountgroupratelimit.FieldAccountGroupID:
+		return m.OldAccountGroupID(ctx)
+	case accountgroupratelimit.FieldRpmLimit:
+		return m.OldRpmLimit(ctx)
+	case accountgroupratelimit.FieldEnabled:
+		return m.OldEnabled(ctx)
+	}
+	return nil, fmt.Errorf("unknown AccountGroupRateLimit field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *AccountGroupRateLimitMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case accountgroupratelimit.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case accountgroupratelimit.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case accountgroupratelimit.FieldAccountGroupID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAccountGroupID(v)
+		return nil
+	case accountgroupratelimit.FieldRpmLimit:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRpmLimit(v)
+		return nil
+	case accountgroupratelimit.FieldEnabled:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEnabled(v)
+		return nil
+	}
+	return fmt.Errorf("unknown AccountGroupRateLimit field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *AccountGroupRateLimitMutation) AddedFields() []string {
+	var fields []string
+	if m.addaccount_group_id != nil {
+		fields = append(fields, accountgroupratelimit.FieldAccountGroupID)
+	}
+	if m.addrpm_limit != nil {
+		fields = append(fields, accountgroupratelimit.FieldRpmLimit)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *AccountGroupRateLimitMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case accountgroupratelimit.FieldAccountGroupID:
+		return m.AddedAccountGroupID()
+	case accountgroupratelimit.FieldRpmLimit:
+		return m.AddedRpmLimit()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *AccountGroupRateLimitMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case accountgroupratelimit.FieldAccountGroupID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddAccountGroupID(v)
+		return nil
+	case accountgroupratelimit.FieldRpmLimit:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddRpmLimit(v)
+		return nil
+	}
+	return fmt.Errorf("unknown AccountGroupRateLimit numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *AccountGroupRateLimitMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *AccountGroupRateLimitMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *AccountGroupRateLimitMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown AccountGroupRateLimit nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *AccountGroupRateLimitMutation) ResetField(name string) error {
+	switch name {
+	case accountgroupratelimit.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case accountgroupratelimit.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case accountgroupratelimit.FieldAccountGroupID:
+		m.ResetAccountGroupID()
+		return nil
+	case accountgroupratelimit.FieldRpmLimit:
+		m.ResetRpmLimit()
+		return nil
+	case accountgroupratelimit.FieldEnabled:
+		m.ResetEnabled()
+		return nil
+	}
+	return fmt.Errorf("unknown AccountGroupRateLimit field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *AccountGroupRateLimitMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *AccountGroupRateLimitMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *AccountGroupRateLimitMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *AccountGroupRateLimitMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *AccountGroupRateLimitMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *AccountGroupRateLimitMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *AccountGroupRateLimitMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown AccountGroupRateLimit unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *AccountGroupRateLimitMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown AccountGroupRateLimit edge %s", name)
 }
 
 // AccountHealthSnapshotMutation represents an operation that mutates the AccountHealthSnapshot nodes in the graph.

@@ -17,6 +17,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/accountavailabilityrollup"
 	"github.com/srapi/srapi/apps/api/ent/accountgroup"
 	"github.com/srapi/srapi/apps/api/ent/accountgroupmember"
+	"github.com/srapi/srapi/apps/api/ent/accountgroupratelimit"
 	"github.com/srapi/srapi/apps/api/ent/accounthealthsnapshot"
 	"github.com/srapi/srapi/apps/api/ent/accountquotasnapshot"
 	"github.com/srapi/srapi/apps/api/ent/affiliateledger"
@@ -90,6 +91,8 @@ type Client struct {
 	AccountGroup *AccountGroupClient
 	// AccountGroupMember is the client for interacting with the AccountGroupMember builders.
 	AccountGroupMember *AccountGroupMemberClient
+	// AccountGroupRateLimit is the client for interacting with the AccountGroupRateLimit builders.
+	AccountGroupRateLimit *AccountGroupRateLimitClient
 	// AccountHealthSnapshot is the client for interacting with the AccountHealthSnapshot builders.
 	AccountHealthSnapshot *AccountHealthSnapshotClient
 	// AccountQuotaSnapshot is the client for interacting with the AccountQuotaSnapshot builders.
@@ -214,6 +217,7 @@ func (c *Client) init() {
 	c.AccountAvailabilityRollup = NewAccountAvailabilityRollupClient(c.config)
 	c.AccountGroup = NewAccountGroupClient(c.config)
 	c.AccountGroupMember = NewAccountGroupMemberClient(c.config)
+	c.AccountGroupRateLimit = NewAccountGroupRateLimitClient(c.config)
 	c.AccountHealthSnapshot = NewAccountHealthSnapshotClient(c.config)
 	c.AccountQuotaSnapshot = NewAccountQuotaSnapshotClient(c.config)
 	c.AffiliateLedger = NewAffiliateLedgerClient(c.config)
@@ -365,6 +369,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		AccountAvailabilityRollup: NewAccountAvailabilityRollupClient(cfg),
 		AccountGroup:              NewAccountGroupClient(cfg),
 		AccountGroupMember:        NewAccountGroupMemberClient(cfg),
+		AccountGroupRateLimit:     NewAccountGroupRateLimitClient(cfg),
 		AccountHealthSnapshot:     NewAccountHealthSnapshotClient(cfg),
 		AccountQuotaSnapshot:      NewAccountQuotaSnapshotClient(cfg),
 		AffiliateLedger:           NewAffiliateLedgerClient(cfg),
@@ -443,6 +448,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		AccountAvailabilityRollup: NewAccountAvailabilityRollupClient(cfg),
 		AccountGroup:              NewAccountGroupClient(cfg),
 		AccountGroupMember:        NewAccountGroupMemberClient(cfg),
+		AccountGroupRateLimit:     NewAccountGroupRateLimitClient(cfg),
 		AccountHealthSnapshot:     NewAccountHealthSnapshotClient(cfg),
 		AccountQuotaSnapshot:      NewAccountQuotaSnapshotClient(cfg),
 		AffiliateLedger:           NewAffiliateLedgerClient(cfg),
@@ -527,21 +533,22 @@ func (c *Client) Close() error {
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
 		c.APIKey, c.APIKeyGroup, c.AccountAvailabilityRollup, c.AccountGroup,
-		c.AccountGroupMember, c.AccountHealthSnapshot, c.AccountQuotaSnapshot,
-		c.AffiliateLedger, c.AffiliateRule, c.AuditLog, c.AuthSession, c.BillingLedger,
-		c.CapabilityDefinition, c.DomainEventsInbox, c.DomainEventsOutbox,
-		c.EmailVerificationToken, c.Entitlement, c.ErrorPassthroughRule,
-		c.IdempotencyRecord, c.InviteCode, c.InviteRelationship, c.ModelAlias,
-		c.ModelProviderMapping, c.ModelRateLimit, c.ModelRegistry, c.ObsAlertEvent,
-		c.ObsSLODefinition, c.OpsSystemLog, c.PasswordResetToken, c.PaymentAuditLog,
-		c.PaymentOrder, c.PaymentProviderInstance, c.PendingOAuthSession,
-		c.PricingRule, c.Provider, c.ProviderAccount, c.Proxy, c.QualityEvalSample,
-		c.QualityEvaluation, c.Role, c.SchedulerDecision, c.SchedulerFeedback,
-		c.SchedulerRequestSnapshot, c.SchedulerStrategy, c.Setting, c.SubscriptionPlan,
-		c.TLSFingerprintProfile, c.UsageLog, c.User, c.UserAnnouncementRead,
-		c.UserAttributeDefinition, c.UserAttributeValue, c.UserAuthIdentity,
-		c.UserPromoCodeApplication, c.UserRedeemCodeRedemption, c.UserRole,
-		c.UserSubscription, c.UserTOTPSecret, c.Workspace,
+		c.AccountGroupMember, c.AccountGroupRateLimit, c.AccountHealthSnapshot,
+		c.AccountQuotaSnapshot, c.AffiliateLedger, c.AffiliateRule, c.AuditLog,
+		c.AuthSession, c.BillingLedger, c.CapabilityDefinition, c.DomainEventsInbox,
+		c.DomainEventsOutbox, c.EmailVerificationToken, c.Entitlement,
+		c.ErrorPassthroughRule, c.IdempotencyRecord, c.InviteCode,
+		c.InviteRelationship, c.ModelAlias, c.ModelProviderMapping, c.ModelRateLimit,
+		c.ModelRegistry, c.ObsAlertEvent, c.ObsSLODefinition, c.OpsSystemLog,
+		c.PasswordResetToken, c.PaymentAuditLog, c.PaymentOrder,
+		c.PaymentProviderInstance, c.PendingOAuthSession, c.PricingRule, c.Provider,
+		c.ProviderAccount, c.Proxy, c.QualityEvalSample, c.QualityEvaluation, c.Role,
+		c.SchedulerDecision, c.SchedulerFeedback, c.SchedulerRequestSnapshot,
+		c.SchedulerStrategy, c.Setting, c.SubscriptionPlan, c.TLSFingerprintProfile,
+		c.UsageLog, c.User, c.UserAnnouncementRead, c.UserAttributeDefinition,
+		c.UserAttributeValue, c.UserAuthIdentity, c.UserPromoCodeApplication,
+		c.UserRedeemCodeRedemption, c.UserRole, c.UserSubscription, c.UserTOTPSecret,
+		c.Workspace,
 	} {
 		n.Use(hooks...)
 	}
@@ -552,21 +559,22 @@ func (c *Client) Use(hooks ...Hook) {
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
 		c.APIKey, c.APIKeyGroup, c.AccountAvailabilityRollup, c.AccountGroup,
-		c.AccountGroupMember, c.AccountHealthSnapshot, c.AccountQuotaSnapshot,
-		c.AffiliateLedger, c.AffiliateRule, c.AuditLog, c.AuthSession, c.BillingLedger,
-		c.CapabilityDefinition, c.DomainEventsInbox, c.DomainEventsOutbox,
-		c.EmailVerificationToken, c.Entitlement, c.ErrorPassthroughRule,
-		c.IdempotencyRecord, c.InviteCode, c.InviteRelationship, c.ModelAlias,
-		c.ModelProviderMapping, c.ModelRateLimit, c.ModelRegistry, c.ObsAlertEvent,
-		c.ObsSLODefinition, c.OpsSystemLog, c.PasswordResetToken, c.PaymentAuditLog,
-		c.PaymentOrder, c.PaymentProviderInstance, c.PendingOAuthSession,
-		c.PricingRule, c.Provider, c.ProviderAccount, c.Proxy, c.QualityEvalSample,
-		c.QualityEvaluation, c.Role, c.SchedulerDecision, c.SchedulerFeedback,
-		c.SchedulerRequestSnapshot, c.SchedulerStrategy, c.Setting, c.SubscriptionPlan,
-		c.TLSFingerprintProfile, c.UsageLog, c.User, c.UserAnnouncementRead,
-		c.UserAttributeDefinition, c.UserAttributeValue, c.UserAuthIdentity,
-		c.UserPromoCodeApplication, c.UserRedeemCodeRedemption, c.UserRole,
-		c.UserSubscription, c.UserTOTPSecret, c.Workspace,
+		c.AccountGroupMember, c.AccountGroupRateLimit, c.AccountHealthSnapshot,
+		c.AccountQuotaSnapshot, c.AffiliateLedger, c.AffiliateRule, c.AuditLog,
+		c.AuthSession, c.BillingLedger, c.CapabilityDefinition, c.DomainEventsInbox,
+		c.DomainEventsOutbox, c.EmailVerificationToken, c.Entitlement,
+		c.ErrorPassthroughRule, c.IdempotencyRecord, c.InviteCode,
+		c.InviteRelationship, c.ModelAlias, c.ModelProviderMapping, c.ModelRateLimit,
+		c.ModelRegistry, c.ObsAlertEvent, c.ObsSLODefinition, c.OpsSystemLog,
+		c.PasswordResetToken, c.PaymentAuditLog, c.PaymentOrder,
+		c.PaymentProviderInstance, c.PendingOAuthSession, c.PricingRule, c.Provider,
+		c.ProviderAccount, c.Proxy, c.QualityEvalSample, c.QualityEvaluation, c.Role,
+		c.SchedulerDecision, c.SchedulerFeedback, c.SchedulerRequestSnapshot,
+		c.SchedulerStrategy, c.Setting, c.SubscriptionPlan, c.TLSFingerprintProfile,
+		c.UsageLog, c.User, c.UserAnnouncementRead, c.UserAttributeDefinition,
+		c.UserAttributeValue, c.UserAuthIdentity, c.UserPromoCodeApplication,
+		c.UserRedeemCodeRedemption, c.UserRole, c.UserSubscription, c.UserTOTPSecret,
+		c.Workspace,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -585,6 +593,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.AccountGroup.mutate(ctx, m)
 	case *AccountGroupMemberMutation:
 		return c.AccountGroupMember.mutate(ctx, m)
+	case *AccountGroupRateLimitMutation:
+		return c.AccountGroupRateLimit.mutate(ctx, m)
 	case *AccountHealthSnapshotMutation:
 		return c.AccountHealthSnapshot.mutate(ctx, m)
 	case *AccountQuotaSnapshotMutation:
@@ -1360,6 +1370,139 @@ func (c *AccountGroupMemberClient) mutate(ctx context.Context, m *AccountGroupMe
 		return (&AccountGroupMemberDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown AccountGroupMember mutation op: %q", m.Op())
+	}
+}
+
+// AccountGroupRateLimitClient is a client for the AccountGroupRateLimit schema.
+type AccountGroupRateLimitClient struct {
+	config
+}
+
+// NewAccountGroupRateLimitClient returns a client for the AccountGroupRateLimit from the given config.
+func NewAccountGroupRateLimitClient(c config) *AccountGroupRateLimitClient {
+	return &AccountGroupRateLimitClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `accountgroupratelimit.Hooks(f(g(h())))`.
+func (c *AccountGroupRateLimitClient) Use(hooks ...Hook) {
+	c.hooks.AccountGroupRateLimit = append(c.hooks.AccountGroupRateLimit, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `accountgroupratelimit.Intercept(f(g(h())))`.
+func (c *AccountGroupRateLimitClient) Intercept(interceptors ...Interceptor) {
+	c.inters.AccountGroupRateLimit = append(c.inters.AccountGroupRateLimit, interceptors...)
+}
+
+// Create returns a builder for creating a AccountGroupRateLimit entity.
+func (c *AccountGroupRateLimitClient) Create() *AccountGroupRateLimitCreate {
+	mutation := newAccountGroupRateLimitMutation(c.config, OpCreate)
+	return &AccountGroupRateLimitCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of AccountGroupRateLimit entities.
+func (c *AccountGroupRateLimitClient) CreateBulk(builders ...*AccountGroupRateLimitCreate) *AccountGroupRateLimitCreateBulk {
+	return &AccountGroupRateLimitCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *AccountGroupRateLimitClient) MapCreateBulk(slice any, setFunc func(*AccountGroupRateLimitCreate, int)) *AccountGroupRateLimitCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &AccountGroupRateLimitCreateBulk{err: fmt.Errorf("calling to AccountGroupRateLimitClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*AccountGroupRateLimitCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &AccountGroupRateLimitCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for AccountGroupRateLimit.
+func (c *AccountGroupRateLimitClient) Update() *AccountGroupRateLimitUpdate {
+	mutation := newAccountGroupRateLimitMutation(c.config, OpUpdate)
+	return &AccountGroupRateLimitUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *AccountGroupRateLimitClient) UpdateOne(_m *AccountGroupRateLimit) *AccountGroupRateLimitUpdateOne {
+	mutation := newAccountGroupRateLimitMutation(c.config, OpUpdateOne, withAccountGroupRateLimit(_m))
+	return &AccountGroupRateLimitUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *AccountGroupRateLimitClient) UpdateOneID(id int) *AccountGroupRateLimitUpdateOne {
+	mutation := newAccountGroupRateLimitMutation(c.config, OpUpdateOne, withAccountGroupRateLimitID(id))
+	return &AccountGroupRateLimitUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for AccountGroupRateLimit.
+func (c *AccountGroupRateLimitClient) Delete() *AccountGroupRateLimitDelete {
+	mutation := newAccountGroupRateLimitMutation(c.config, OpDelete)
+	return &AccountGroupRateLimitDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *AccountGroupRateLimitClient) DeleteOne(_m *AccountGroupRateLimit) *AccountGroupRateLimitDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *AccountGroupRateLimitClient) DeleteOneID(id int) *AccountGroupRateLimitDeleteOne {
+	builder := c.Delete().Where(accountgroupratelimit.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &AccountGroupRateLimitDeleteOne{builder}
+}
+
+// Query returns a query builder for AccountGroupRateLimit.
+func (c *AccountGroupRateLimitClient) Query() *AccountGroupRateLimitQuery {
+	return &AccountGroupRateLimitQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeAccountGroupRateLimit},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a AccountGroupRateLimit entity by its id.
+func (c *AccountGroupRateLimitClient) Get(ctx context.Context, id int) (*AccountGroupRateLimit, error) {
+	return c.Query().Where(accountgroupratelimit.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *AccountGroupRateLimitClient) GetX(ctx context.Context, id int) *AccountGroupRateLimit {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *AccountGroupRateLimitClient) Hooks() []Hook {
+	return c.hooks.AccountGroupRateLimit
+}
+
+// Interceptors returns the client interceptors.
+func (c *AccountGroupRateLimitClient) Interceptors() []Interceptor {
+	return c.inters.AccountGroupRateLimit
+}
+
+func (c *AccountGroupRateLimitClient) mutate(ctx context.Context, m *AccountGroupRateLimitMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&AccountGroupRateLimitCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&AccountGroupRateLimitUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&AccountGroupRateLimitUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&AccountGroupRateLimitDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown AccountGroupRateLimit mutation op: %q", m.Op())
 	}
 }
 
@@ -8549,9 +8692,9 @@ func (c *WorkspaceClient) mutate(ctx context.Context, m *WorkspaceMutation) (Val
 type (
 	hooks struct {
 		APIKey, APIKeyGroup, AccountAvailabilityRollup, AccountGroup,
-		AccountGroupMember, AccountHealthSnapshot, AccountQuotaSnapshot,
-		AffiliateLedger, AffiliateRule, AuditLog, AuthSession, BillingLedger,
-		CapabilityDefinition, DomainEventsInbox, DomainEventsOutbox,
+		AccountGroupMember, AccountGroupRateLimit, AccountHealthSnapshot,
+		AccountQuotaSnapshot, AffiliateLedger, AffiliateRule, AuditLog, AuthSession,
+		BillingLedger, CapabilityDefinition, DomainEventsInbox, DomainEventsOutbox,
 		EmailVerificationToken, Entitlement, ErrorPassthroughRule, IdempotencyRecord,
 		InviteCode, InviteRelationship, ModelAlias, ModelProviderMapping,
 		ModelRateLimit, ModelRegistry, ObsAlertEvent, ObsSLODefinition, OpsSystemLog,
@@ -8566,9 +8709,9 @@ type (
 	}
 	inters struct {
 		APIKey, APIKeyGroup, AccountAvailabilityRollup, AccountGroup,
-		AccountGroupMember, AccountHealthSnapshot, AccountQuotaSnapshot,
-		AffiliateLedger, AffiliateRule, AuditLog, AuthSession, BillingLedger,
-		CapabilityDefinition, DomainEventsInbox, DomainEventsOutbox,
+		AccountGroupMember, AccountGroupRateLimit, AccountHealthSnapshot,
+		AccountQuotaSnapshot, AffiliateLedger, AffiliateRule, AuditLog, AuthSession,
+		BillingLedger, CapabilityDefinition, DomainEventsInbox, DomainEventsOutbox,
 		EmailVerificationToken, Entitlement, ErrorPassthroughRule, IdempotencyRecord,
 		InviteCode, InviteRelationship, ModelAlias, ModelProviderMapping,
 		ModelRateLimit, ModelRegistry, ObsAlertEvent, ObsSLODefinition, OpsSystemLog,

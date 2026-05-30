@@ -15,6 +15,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/accountavailabilityrollup"
 	"github.com/srapi/srapi/apps/api/ent/accountgroup"
 	"github.com/srapi/srapi/apps/api/ent/accountgroupmember"
+	"github.com/srapi/srapi/apps/api/ent/accountgroupratelimit"
 	"github.com/srapi/srapi/apps/api/ent/accounthealthsnapshot"
 	"github.com/srapi/srapi/apps/api/ent/accountquotasnapshot"
 	"github.com/srapi/srapi/apps/api/ent/affiliateledger"
@@ -136,6 +137,7 @@ func checkColumn(t, c string) error {
 			accountavailabilityrollup.Table: accountavailabilityrollup.ValidColumn,
 			accountgroup.Table:              accountgroup.ValidColumn,
 			accountgroupmember.Table:        accountgroupmember.ValidColumn,
+			accountgroupratelimit.Table:     accountgroupratelimit.ValidColumn,
 			accounthealthsnapshot.Table:     accounthealthsnapshot.ValidColumn,
 			accountquotasnapshot.Table:      accountquotasnapshot.ValidColumn,
 			affiliateledger.Table:           affiliateledger.ValidColumn,

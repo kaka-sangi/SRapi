@@ -56,6 +56,7 @@ func TestEntSchemaAppliesToEmptyDatabase(t *testing.T) {
 	want := []string{
 		"account_availability_rollups",
 		"account_group_members",
+		"account_group_rate_limits",
 		"account_groups",
 		"account_health_snapshots",
 		"account_quota_snapshots",

@@ -41,6 +41,9 @@ import (
 	eventsservice "github.com/srapi/srapi/apps/api/internal/modules/events/service"
 	eventsmemory "github.com/srapi/srapi/apps/api/internal/modules/events/store/memory"
 	gatewayservice "github.com/srapi/srapi/apps/api/internal/modules/gateway/service"
+	groupratelimitscontract "github.com/srapi/srapi/apps/api/internal/modules/group_rate_limits/contract"
+	groupratelimitsservice "github.com/srapi/srapi/apps/api/internal/modules/group_rate_limits/service"
+	groupratelimitsmemory "github.com/srapi/srapi/apps/api/internal/modules/group_rate_limits/store/memory"
 	healthrollupscontract "github.com/srapi/srapi/apps/api/internal/modules/health_rollups/contract"
 	healthrollupsservice "github.com/srapi/srapi/apps/api/internal/modules/health_rollups/service"
 	healthrollupsmemory "github.com/srapi/srapi/apps/api/internal/modules/health_rollups/store/memory"
@@ -143,6 +146,7 @@ type runtimeState struct {
 	captcha               *captchaservice.Service
 	healthRollups         *healthrollupsservice.Service
 	modelRateLimits       *modelratelimitsservice.Service
+	groupRateLimits       *groupratelimitsservice.Service
 	userStore             userscontract.Store
 	sessionStore          authcontract.Store
 	apiKeyStore           apikeycontract.Store
@@ -168,6 +172,7 @@ type runtimeState struct {
 	tlsProfilesStore      tlsprofilescontract.Store
 	healthRollupsStore    healthrollupscontract.Store
 	modelRateLimitsStore  modelratelimitscontract.Store
+	groupRateLimitsStore  groupratelimitscontract.Store
 	capabilities          []capabilitiescontract.Definition
 	databaseProbe         dependencyPinger
 	redisProbe            dependencyPinger
@@ -462,6 +467,20 @@ func (rt *runtimeState) buildCapabilityServices(cfg config.Config, opts runtimeO
 		return err
 	}
 	rt.modelRateLimits = modelRateLimitsSvc
+
+	groupRateLimitsStore := opts.groupRateLimits
+	if groupRateLimitsStore == nil {
+		if !allowMemoryStores {
+			return missingRuntimeStoreError("group rate limits")
+		}
+		groupRateLimitsStore = groupratelimitsmemory.New()
+	}
+	rt.groupRateLimitsStore = groupRateLimitsStore
+	groupRateLimitsSvc, err := groupratelimitsservice.New(groupRateLimitsStore)
+	if err != nil {
+		return err
+	}
+	rt.groupRateLimits = groupRateLimitsSvc
 	return nil
 }
 

@@ -261,6 +261,7 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 			httpserver.WithTLSProfilesStore(stores.TLSProfiles),
 			httpserver.WithHealthRollupsStore(stores.HealthRollups),
 			httpserver.WithModelRateLimitsStore(stores.ModelRateLimits),
+			httpserver.WithGroupRateLimitsStore(stores.GroupRateLimits),
 		)
 	}
 

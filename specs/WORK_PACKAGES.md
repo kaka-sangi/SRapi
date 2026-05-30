@@ -3912,6 +3912,19 @@ Required gates:
 - `make code-quality-check`
 - `git diff --check`
 
+## WP-1200: Per-Account-Group RPM Capacity v1
+
+Problem (verified): account groups (`provider_scope` / `model_scope` / `strategy_hint` / `status`) had no capacity control — no per-group rate or concurrency ceiling — so a group's aggregate load could not be bounded. (Also the per-group rate limit deferred from WP-1190.)
+
+What changed:
+- `AccountGroupRateLimit` Ent entity (`account_group_id` unique, `rpm_limit`, `enabled`), migration `000024`.
+- `group_rate_limits` module (contract/service/memory) + `entstore/groupratelimits`; `RPMForGroup(groupID)` returns the active ceiling (0 = unlimited/disabled/errors, fail-open).
+- Enforcement at `reserveGatewayAccountQuota` (post-selection seam, where per-account RPM/TPM already reserve): the selected account's group IDs are fetched via `accounts.ListGroupIDsByAccount`, and each group with a positive limit adds a `group:<id>:rpm` check to the same Redis limiter batch. Exceeding any returns the existing 429-class `ProviderError`, which drives failover to another candidate.
+- Admin list/upsert/delete (`/api/v1/admin/group-rate-limits`); upsert validates the group exists via `accounts.FindGroupByID`.
+- Scope is RPM in v1. Per-group *concurrency* can reuse the existing `acquireProviderAccountConcurrency` lease mechanism (`group:<id>:concurrency`) in a follow-up; deferred to avoid multi-lease lifecycle risk.
+
+Tests/gates: `group_rate_limits` service tests (upsert / RPM gating / validation / delete), migration `000024` + table-list update, full `make check`.
+
 ## WP-1190: Per-Model RPM Rate Limit v1
 
 Problem (verified): `checkGatewayRateLimit` enforced only per-API-key RPM, per-user RPM, and per-API-key TPM; there was no per-model ceiling and the model registry had no rate-limit field, so an expensive/fragile upstream model could not be globally throttled.

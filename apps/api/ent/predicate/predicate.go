@@ -21,6 +21,9 @@ type AccountGroup func(*sql.Selector)
 // AccountGroupMember is the predicate function for accountgroupmember builders.
 type AccountGroupMember func(*sql.Selector)
 
+// AccountGroupRateLimit is the predicate function for accountgroupratelimit builders.
+type AccountGroupRateLimit func(*sql.Selector)
+
 // AccountHealthSnapshot is the predicate function for accounthealthsnapshot builders.
 type AccountHealthSnapshot func(*sql.Selector)
 

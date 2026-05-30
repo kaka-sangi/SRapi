@@ -170,6 +170,33 @@ var (
 			},
 		},
 	}
+	// AccountGroupRateLimitsColumns holds the columns for the "account_group_rate_limits" table.
+	AccountGroupRateLimitsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "account_group_id", Type: field.TypeInt},
+		{Name: "rpm_limit", Type: field.TypeInt, Default: 0},
+		{Name: "enabled", Type: field.TypeBool, Default: true},
+	}
+	// AccountGroupRateLimitsTable holds the schema information for the "account_group_rate_limits" table.
+	AccountGroupRateLimitsTable = &schema.Table{
+		Name:       "account_group_rate_limits",
+		Columns:    AccountGroupRateLimitsColumns,
+		PrimaryKey: []*schema.Column{AccountGroupRateLimitsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "accountgroupratelimit_account_group_id",
+				Unique:  true,
+				Columns: []*schema.Column{AccountGroupRateLimitsColumns[3]},
+			},
+			{
+				Name:    "accountgroupratelimit_enabled",
+				Unique:  false,
+				Columns: []*schema.Column{AccountGroupRateLimitsColumns[5]},
+			},
+		},
+	}
 	// AccountHealthSnapshotsColumns holds the columns for the "account_health_snapshots" table.
 	AccountHealthSnapshotsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -2289,6 +2316,7 @@ var (
 		AccountAvailabilityRollupsTable,
 		AccountGroupsTable,
 		AccountGroupMembersTable,
+		AccountGroupRateLimitsTable,
 		AccountHealthSnapshotsTable,
 		AccountQuotaSnapshotsTable,
 		AffiliateLedgersTable,

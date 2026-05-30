@@ -69,6 +69,18 @@ func (f AccountGroupMemberFunc) Mutate(ctx context.Context, m ent.Mutation) (ent
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.AccountGroupMemberMutation", m)
 }
 
+// The AccountGroupRateLimitFunc type is an adapter to allow the use of ordinary
+// function as AccountGroupRateLimit mutator.
+type AccountGroupRateLimitFunc func(context.Context, *ent.AccountGroupRateLimitMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f AccountGroupRateLimitFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.AccountGroupRateLimitMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.AccountGroupRateLimitMutation", m)
+}
+
 // The AccountHealthSnapshotFunc type is an adapter to allow the use of ordinary
 // function as AccountHealthSnapshot mutator.
 type AccountHealthSnapshotFunc func(context.Context, *ent.AccountHealthSnapshotMutation) (ent.Value, error)

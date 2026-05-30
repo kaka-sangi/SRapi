@@ -289,6 +289,24 @@ func (rt *runtimeState) reserveGatewayAccountQuota(ctx context.Context, usage ga
 			Window: accountRuntimeQuotaWindow(candidate.Account.Metadata),
 		})
 	}
+	// Per-account-group RPM capacity (WP-1200): the selected account may belong to
+	// groups with a requests-per-minute ceiling; exceeding any one triggers the
+	// same 429-class failover as the per-account limits.
+	if rt.groupRateLimits != nil {
+		if groupIDs, err := rt.accounts.ListGroupIDsByAccount(ctx, candidate.Account.ID); err == nil {
+			for _, groupID := range groupIDs {
+				if limit := rt.groupRateLimits.RPMForGroup(ctx, groupID); limit > 0 {
+					checks = append(checks, ratelimit.Check{
+						Name:   "group_rpm",
+						Key:    fmt.Sprintf("group:%d:rpm", groupID),
+						Limit:  limit,
+						Cost:   1,
+						Window: time.Minute,
+					})
+				}
+			}
+		}
+	}
 	if len(checks) == 0 {
 		return nil
 	}

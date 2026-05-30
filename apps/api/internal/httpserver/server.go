@@ -28,6 +28,7 @@ import (
 	errorpassthroughcontract "github.com/srapi/srapi/apps/api/internal/modules/error_passthrough/contract"
 	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	gatewaycontract "github.com/srapi/srapi/apps/api/internal/modules/gateway/contract"
+	groupratelimitscontract "github.com/srapi/srapi/apps/api/internal/modules/group_rate_limits/contract"
 	healthrollupscontract "github.com/srapi/srapi/apps/api/internal/modules/health_rollups/contract"
 	idempotencycontract "github.com/srapi/srapi/apps/api/internal/modules/idempotency/contract"
 	modelratelimitscontract "github.com/srapi/srapi/apps/api/internal/modules/model_rate_limits/contract"
@@ -97,6 +98,7 @@ type runtimeOptions struct {
 	tlsProfiles      tlsprofilescontract.Store
 	healthRollups    healthrollupscontract.Store
 	modelRateLimits  modelratelimitscontract.Store
+	groupRateLimits  groupratelimitscontract.Store
 }
 
 func WithAdminControlStore(store admincontrolcontract.Store) Option {
@@ -216,6 +218,12 @@ func WithHealthRollupsStore(store healthrollupscontract.Store) Option {
 func WithModelRateLimitsStore(store modelratelimitscontract.Store) Option {
 	return func(opts *runtimeOptions) {
 		opts.modelRateLimits = store
+	}
+}
+
+func WithGroupRateLimitsStore(store groupratelimitscontract.Store) Option {
+	return func(opts *runtimeOptions) {
+		opts.groupRateLimits = store
 	}
 }
 
@@ -507,6 +515,9 @@ func (s *Server) registerCapabilityAdminRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/admin/model-rate-limits", s.handleListAdminModelRateLimits)
 	mux.HandleFunc("PUT /api/v1/admin/model-rate-limits", s.handleUpsertAdminModelRateLimit)
 	mux.HandleFunc("DELETE /api/v1/admin/model-rate-limits/{modelId}", s.handleDeleteAdminModelRateLimit)
+	mux.HandleFunc("GET /api/v1/admin/group-rate-limits", s.handleListAdminGroupRateLimits)
+	mux.HandleFunc("PUT /api/v1/admin/group-rate-limits", s.handleUpsertAdminGroupRateLimit)
+	mux.HandleFunc("DELETE /api/v1/admin/group-rate-limits/{groupId}", s.handleDeleteAdminGroupRateLimit)
 }
 
 func (s *Server) registerCurrentUserRoutes(mux *http.ServeMux) {

@@ -8,6 +8,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/accountavailabilityrollup"
 	"github.com/srapi/srapi/apps/api/ent/accountgroup"
 	"github.com/srapi/srapi/apps/api/ent/accountgroupmember"
+	"github.com/srapi/srapi/apps/api/ent/accountgroupratelimit"
 	"github.com/srapi/srapi/apps/api/ent/accounthealthsnapshot"
 	"github.com/srapi/srapi/apps/api/ent/accountquotasnapshot"
 	"github.com/srapi/srapi/apps/api/ent/affiliateledger"
@@ -194,6 +195,29 @@ func init() {
 	accountgroupmember.DefaultUpdatedAt = accountgroupmemberDescUpdatedAt.Default.(func() time.Time)
 	// accountgroupmember.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	accountgroupmember.UpdateDefaultUpdatedAt = accountgroupmemberDescUpdatedAt.UpdateDefault.(func() time.Time)
+	accountgroupratelimitMixin := schema.AccountGroupRateLimit{}.Mixin()
+	accountgroupratelimitMixinFields0 := accountgroupratelimitMixin[0].Fields()
+	_ = accountgroupratelimitMixinFields0
+	accountgroupratelimitFields := schema.AccountGroupRateLimit{}.Fields()
+	_ = accountgroupratelimitFields
+	// accountgroupratelimitDescCreatedAt is the schema descriptor for created_at field.
+	accountgroupratelimitDescCreatedAt := accountgroupratelimitMixinFields0[0].Descriptor()
+	// accountgroupratelimit.DefaultCreatedAt holds the default value on creation for the created_at field.
+	accountgroupratelimit.DefaultCreatedAt = accountgroupratelimitDescCreatedAt.Default.(func() time.Time)
+	// accountgroupratelimitDescUpdatedAt is the schema descriptor for updated_at field.
+	accountgroupratelimitDescUpdatedAt := accountgroupratelimitMixinFields0[1].Descriptor()
+	// accountgroupratelimit.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	accountgroupratelimit.DefaultUpdatedAt = accountgroupratelimitDescUpdatedAt.Default.(func() time.Time)
+	// accountgroupratelimit.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	accountgroupratelimit.UpdateDefaultUpdatedAt = accountgroupratelimitDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// accountgroupratelimitDescRpmLimit is the schema descriptor for rpm_limit field.
+	accountgroupratelimitDescRpmLimit := accountgroupratelimitFields[1].Descriptor()
+	// accountgroupratelimit.DefaultRpmLimit holds the default value on creation for the rpm_limit field.
+	accountgroupratelimit.DefaultRpmLimit = accountgroupratelimitDescRpmLimit.Default.(int)
+	// accountgroupratelimitDescEnabled is the schema descriptor for enabled field.
+	accountgroupratelimitDescEnabled := accountgroupratelimitFields[2].Descriptor()
+	// accountgroupratelimit.DefaultEnabled holds the default value on creation for the enabled field.
+	accountgroupratelimit.DefaultEnabled = accountgroupratelimitDescEnabled.Default.(bool)
 	accounthealthsnapshotFields := schema.AccountHealthSnapshot{}.Fields()
 	_ = accounthealthsnapshotFields
 	// accounthealthsnapshotDescStatus is the schema descriptor for status field.
