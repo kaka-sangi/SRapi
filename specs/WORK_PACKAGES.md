@@ -3912,6 +3912,18 @@ Required gates:
 - `make code-quality-check`
 - `git diff --check`
 
+## WP-1210: Per-Account-Group Max Concurrency v1
+
+Objective: add a max concurrent in-flight request ceiling per account group (the "concurrency capacity" complement to WP-1200's RPM), reusing the existing account concurrency-lease mechanism.
+
+What changed:
+- `max_concurrency` column on `AccountGroupRateLimit` (migration `000025`, default 0 = unlimited; existing rows correct without backfill). `group_rate_limits.ConcurrencyForGroup` (fail-open); admin upsert accepts/returns it.
+- `providerDispatchState.concurrencyLease` (single) became `concurrencyLeases []ratelimit.ConcurrencyLease`. `prepareProviderDispatch` acquires the account lease, then `acquireAccountGroupConcurrency` takes a `group:<id>:concurrency` lease for each of the selected account's groups that has a ceiling — **acquire-with-rollback**: any acquisition failure (error or capacity-exceeded) releases the leases already taken so none leak. Exceeding returns the existing 429-class `ProviderError` → failover.
+- All ~11 dispatch sites release via `releaseGatewayConcurrency(dispatch.concurrencyLeases)` (loops the existing empty-safe single-release). New helpers live in `runtime_gateway_group_concurrency.go` (extracted to keep `runtime_gateway_core.go` under the 2180-line cap).
+- Per-model concurrency deferred: it needs the model id threaded through the 11 dispatch entry points; per-group needs only the account (looked up inside dispatch), so it was the clean seam.
+
+Tests/gates: `group_rate_limits` service test extended (`ConcurrencyForGroup` + RPM/concurrency independence), migration `000025`, full `make check`.
+
 ## WP-1200: Per-Account-Group RPM Capacity v1
 
 Problem (verified): account groups (`provider_scope` / `model_scope` / `strategy_hint` / `status`) had no capacity control — no per-group rate or concurrency ceiling — so a group's aggregate load could not be bounded. (Also the per-group rate limit deferred from WP-1190.)

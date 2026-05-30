@@ -12,26 +12,29 @@ import (
 )
 
 type groupRateLimitPayload struct {
-	GroupID   int       `json:"account_group_id"`
-	RPMLimit  int       `json:"rpm_limit"`
-	Enabled   bool      `json:"enabled"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	GroupID        int       `json:"account_group_id"`
+	RPMLimit       int       `json:"rpm_limit"`
+	MaxConcurrency int       `json:"max_concurrency"`
+	Enabled        bool      `json:"enabled"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 type upsertGroupRateLimitRequest struct {
-	GroupID  int   `json:"account_group_id"`
-	RPMLimit int   `json:"rpm_limit"`
-	Enabled  *bool `json:"enabled"`
+	GroupID        int   `json:"account_group_id"`
+	RPMLimit       int   `json:"rpm_limit"`
+	MaxConcurrency int   `json:"max_concurrency"`
+	Enabled        *bool `json:"enabled"`
 }
 
 func toGroupRateLimitPayload(limit groupratelimitscontract.Limit) groupRateLimitPayload {
 	return groupRateLimitPayload{
-		GroupID:   limit.GroupID,
-		RPMLimit:  limit.RPMLimit,
-		Enabled:   limit.Enabled,
-		CreatedAt: limit.CreatedAt.UTC(),
-		UpdatedAt: limit.UpdatedAt.UTC(),
+		GroupID:        limit.GroupID,
+		RPMLimit:       limit.RPMLimit,
+		MaxConcurrency: limit.MaxConcurrency,
+		Enabled:        limit.Enabled,
+		CreatedAt:      limit.CreatedAt.UTC(),
+		UpdatedAt:      limit.UpdatedAt.UTC(),
 	}
 }
 
@@ -86,9 +89,10 @@ func (s *Server) handleUpsertAdminGroupRateLimit(w http.ResponseWriter, r *http.
 		enabled = *body.Enabled
 	}
 	limit, err := s.runtime.groupRateLimits.UpsertLimit(r.Context(), groupratelimitscontract.UpsertLimit{
-		GroupID:  body.GroupID,
-		RPMLimit: body.RPMLimit,
-		Enabled:  enabled,
+		GroupID:        body.GroupID,
+		RPMLimit:       body.RPMLimit,
+		MaxConcurrency: body.MaxConcurrency,
+		Enabled:        enabled,
 	})
 	if err != nil {
 		s.writeGroupRateLimitError(w, err, requestID)
@@ -97,6 +101,7 @@ func (s *Server) handleUpsertAdminGroupRateLimit(w http.ResponseWriter, r *http.
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "group_rate_limit.upsert", "account_group_rate_limit", strconv.Itoa(limit.GroupID), nil, map[string]any{
 		"account_group_id": limit.GroupID,
 		"rpm_limit":        limit.RPMLimit,
+		"max_concurrency":  limit.MaxConcurrency,
 		"enabled":          limit.Enabled,
 	}))
 	writeJSONAny(w, http.StatusOK, map[string]any{

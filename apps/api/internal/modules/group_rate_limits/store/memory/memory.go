@@ -30,6 +30,7 @@ func (s *Store) UpsertLimit(ctx context.Context, input contract.UpsertLimit) (co
 	for id, limit := range s.byID {
 		if limit.GroupID == input.GroupID {
 			limit.RPMLimit = input.RPMLimit
+			limit.MaxConcurrency = input.MaxConcurrency
 			limit.Enabled = input.Enabled
 			limit.UpdatedAt = now
 			s.byID[id] = limit
@@ -38,12 +39,13 @@ func (s *Store) UpsertLimit(ctx context.Context, input contract.UpsertLimit) (co
 	}
 	s.seq++
 	limit := contract.Limit{
-		ID:        s.seq,
-		GroupID:   input.GroupID,
-		RPMLimit:  input.RPMLimit,
-		Enabled:   input.Enabled,
-		CreatedAt: now,
-		UpdatedAt: now,
+		ID:             s.seq,
+		GroupID:        input.GroupID,
+		RPMLimit:       input.RPMLimit,
+		MaxConcurrency: input.MaxConcurrency,
+		Enabled:        input.Enabled,
+		CreatedAt:      now,
+		UpdatedAt:      now,
 	}
 	s.byID[limit.ID] = limit
 	return limit, nil

@@ -214,8 +214,12 @@ func init() {
 	accountgroupratelimitDescRpmLimit := accountgroupratelimitFields[1].Descriptor()
 	// accountgroupratelimit.DefaultRpmLimit holds the default value on creation for the rpm_limit field.
 	accountgroupratelimit.DefaultRpmLimit = accountgroupratelimitDescRpmLimit.Default.(int)
+	// accountgroupratelimitDescMaxConcurrency is the schema descriptor for max_concurrency field.
+	accountgroupratelimitDescMaxConcurrency := accountgroupratelimitFields[2].Descriptor()
+	// accountgroupratelimit.DefaultMaxConcurrency holds the default value on creation for the max_concurrency field.
+	accountgroupratelimit.DefaultMaxConcurrency = accountgroupratelimitDescMaxConcurrency.Default.(int)
 	// accountgroupratelimitDescEnabled is the schema descriptor for enabled field.
-	accountgroupratelimitDescEnabled := accountgroupratelimitFields[2].Descriptor()
+	accountgroupratelimitDescEnabled := accountgroupratelimitFields[3].Descriptor()
 	// accountgroupratelimit.DefaultEnabled holds the default value on creation for the enabled field.
 	accountgroupratelimit.DefaultEnabled = accountgroupratelimitDescEnabled.Default.(bool)
 	accounthealthsnapshotFields := schema.AccountHealthSnapshot{}.Fields()

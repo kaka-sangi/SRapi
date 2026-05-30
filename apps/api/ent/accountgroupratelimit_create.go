@@ -68,6 +68,20 @@ func (_c *AccountGroupRateLimitCreate) SetNillableRpmLimit(v *int) *AccountGroup
 	return _c
 }
 
+// SetMaxConcurrency sets the "max_concurrency" field.
+func (_c *AccountGroupRateLimitCreate) SetMaxConcurrency(v int) *AccountGroupRateLimitCreate {
+	_c.mutation.SetMaxConcurrency(v)
+	return _c
+}
+
+// SetNillableMaxConcurrency sets the "max_concurrency" field if the given value is not nil.
+func (_c *AccountGroupRateLimitCreate) SetNillableMaxConcurrency(v *int) *AccountGroupRateLimitCreate {
+	if v != nil {
+		_c.SetMaxConcurrency(*v)
+	}
+	return _c
+}
+
 // SetEnabled sets the "enabled" field.
 func (_c *AccountGroupRateLimitCreate) SetEnabled(v bool) *AccountGroupRateLimitCreate {
 	_c.mutation.SetEnabled(v)
@@ -129,6 +143,10 @@ func (_c *AccountGroupRateLimitCreate) defaults() {
 		v := accountgroupratelimit.DefaultRpmLimit
 		_c.mutation.SetRpmLimit(v)
 	}
+	if _, ok := _c.mutation.MaxConcurrency(); !ok {
+		v := accountgroupratelimit.DefaultMaxConcurrency
+		_c.mutation.SetMaxConcurrency(v)
+	}
 	if _, ok := _c.mutation.Enabled(); !ok {
 		v := accountgroupratelimit.DefaultEnabled
 		_c.mutation.SetEnabled(v)
@@ -148,6 +166,9 @@ func (_c *AccountGroupRateLimitCreate) check() error {
 	}
 	if _, ok := _c.mutation.RpmLimit(); !ok {
 		return &ValidationError{Name: "rpm_limit", err: errors.New(`ent: missing required field "AccountGroupRateLimit.rpm_limit"`)}
+	}
+	if _, ok := _c.mutation.MaxConcurrency(); !ok {
+		return &ValidationError{Name: "max_concurrency", err: errors.New(`ent: missing required field "AccountGroupRateLimit.max_concurrency"`)}
 	}
 	if _, ok := _c.mutation.Enabled(); !ok {
 		return &ValidationError{Name: "enabled", err: errors.New(`ent: missing required field "AccountGroupRateLimit.enabled"`)}
@@ -193,6 +214,10 @@ func (_c *AccountGroupRateLimitCreate) createSpec() (*AccountGroupRateLimit, *sq
 	if value, ok := _c.mutation.RpmLimit(); ok {
 		_spec.SetField(accountgroupratelimit.FieldRpmLimit, field.TypeInt, value)
 		_node.RpmLimit = value
+	}
+	if value, ok := _c.mutation.MaxConcurrency(); ok {
+		_spec.SetField(accountgroupratelimit.FieldMaxConcurrency, field.TypeInt, value)
+		_node.MaxConcurrency = value
 	}
 	if value, ok := _c.mutation.Enabled(); ok {
 		_spec.SetField(accountgroupratelimit.FieldEnabled, field.TypeBool, value)

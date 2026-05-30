@@ -39,6 +39,31 @@ func TestUpsertAndRPMForGroup(t *testing.T) {
 	}
 }
 
+func TestConcurrencyForGroup(t *testing.T) {
+	ctx := context.Background()
+	svc := newService(t)
+
+	if got := svc.ConcurrencyForGroup(ctx, 9); got != 0 {
+		t.Fatalf("ConcurrencyForGroup with no rule = %d, want 0", got)
+	}
+	if _, err := svc.UpsertLimit(ctx, contract.UpsertLimit{GroupID: 9, MaxConcurrency: 16, Enabled: true}); err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+	if got := svc.ConcurrencyForGroup(ctx, 9); got != 16 {
+		t.Fatalf("ConcurrencyForGroup enabled = %d, want 16", got)
+	}
+	// RPM and concurrency are independent on the same rule.
+	if got := svc.RPMForGroup(ctx, 9); got != 0 {
+		t.Fatalf("RPMForGroup with only concurrency set = %d, want 0", got)
+	}
+	if _, err := svc.UpsertLimit(ctx, contract.UpsertLimit{GroupID: 9, MaxConcurrency: 16, Enabled: false}); err != nil {
+		t.Fatalf("upsert disable: %v", err)
+	}
+	if got := svc.ConcurrencyForGroup(ctx, 9); got != 0 {
+		t.Fatalf("ConcurrencyForGroup disabled = %d, want 0", got)
+	}
+}
+
 func TestUpsertValidationAndDelete(t *testing.T) {
 	ctx := context.Background()
 	svc := newService(t)

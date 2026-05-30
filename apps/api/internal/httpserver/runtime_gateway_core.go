@@ -75,8 +75,8 @@ type gatewayPricingEvidence struct {
 }
 
 type providerDispatchState struct {
-	credential       map[string]any
-	concurrencyLease ratelimit.ConcurrencyLease
+	credential        map[string]any
+	concurrencyLeases []ratelimit.ConcurrencyLease
 }
 
 func (e gatewayPricingEvidence) withDefaults() gatewayPricingEvidence {
@@ -376,16 +376,22 @@ func (rt *runtimeState) prepareProviderDispatch(ctx context.Context, account *ac
 	if err := rt.materializeProviderProxy(ctx, account); err != nil {
 		return providerDispatchState{}, err
 	}
-	lease, err := rt.acquireProviderAccountConcurrency(ctx, *account)
+	accountLease, err := rt.acquireProviderAccountConcurrency(ctx, *account)
 	if err != nil {
 		return providerDispatchState{}, err
 	}
+	leases := []ratelimit.ConcurrencyLease{accountLease}
 	releaseOnError := true
 	defer func() {
 		if releaseOnError {
-			rt.releaseProviderAccountConcurrency(lease)
+			rt.releaseGatewayConcurrency(leases)
 		}
 	}()
+	groupLeases, err := rt.acquireAccountGroupConcurrency(ctx, *account)
+	if err != nil {
+		return providerDispatchState{}, err
+	}
+	leases = append(leases, groupLeases...)
 	credential, err := rt.accounts.DecryptCredential(ctx, account.ID)
 	if err != nil {
 		return providerDispatchState{}, provideradaptercontract.ProviderError{Class: "credential_error", StatusCode: http.StatusBadGateway, Message: "provider credential unavailable"}
@@ -396,7 +402,7 @@ func (rt *runtimeState) prepareProviderDispatch(ctx context.Context, account *ac
 		credential = refreshed
 	}
 	releaseOnError = false
-	return providerDispatchState{credential: credential, concurrencyLease: lease}, nil
+	return providerDispatchState{credential: credential, concurrencyLeases: leases}, nil
 }
 
 func gatewayAccountQuotaErrorClass(name string) string {
@@ -1379,7 +1385,7 @@ func (rt *runtimeState) invokeProviderConversation(ctx context.Context, req prov
 	if err != nil {
 		return provideradaptercontract.ConversationResponse{}, err
 	}
-	defer rt.releaseProviderAccountConcurrency(dispatch.concurrencyLease)
+	defer rt.releaseGatewayConcurrency(dispatch.concurrencyLeases)
 	req.Credential = dispatch.credential
 	resp, err := rt.adapters.InvokeConversation(ctx, req)
 	if err != nil {
@@ -1394,7 +1400,7 @@ func (rt *runtimeState) invokeProviderTokenCount(ctx context.Context, req provid
 	if err != nil {
 		return provideradaptercontract.TokenCountResponse{}, err
 	}
-	defer rt.releaseProviderAccountConcurrency(dispatch.concurrencyLease)
+	defer rt.releaseGatewayConcurrency(dispatch.concurrencyLeases)
 	req.Credential = dispatch.credential
 	resp, err := rt.adapters.InvokeTokenCount(ctx, req)
 	if err != nil {
@@ -1409,7 +1415,7 @@ func (rt *runtimeState) invokeProviderResponseInputItems(ctx context.Context, re
 	if err != nil {
 		return provideradaptercontract.ResponseInputItemsResponse{}, err
 	}
-	defer rt.releaseProviderAccountConcurrency(dispatch.concurrencyLease)
+	defer rt.releaseGatewayConcurrency(dispatch.concurrencyLeases)
 	req.Credential = dispatch.credential
 	resp, err := rt.adapters.InvokeResponseInputItems(ctx, req)
 	if err != nil {
@@ -1424,7 +1430,7 @@ func (rt *runtimeState) invokeProviderEmbeddings(ctx context.Context, req provid
 	if err != nil {
 		return provideradaptercontract.EmbeddingResponse{}, err
 	}
-	defer rt.releaseProviderAccountConcurrency(dispatch.concurrencyLease)
+	defer rt.releaseGatewayConcurrency(dispatch.concurrencyLeases)
 	req.Credential = dispatch.credential
 	resp, err := rt.adapters.InvokeEmbeddings(ctx, req)
 	if err != nil {
@@ -1439,7 +1445,7 @@ func (rt *runtimeState) invokeProviderImageGeneration(ctx context.Context, req p
 	if err != nil {
 		return provideradaptercontract.ImageGenerationResponse{}, err
 	}
-	defer rt.releaseProviderAccountConcurrency(dispatch.concurrencyLease)
+	defer rt.releaseGatewayConcurrency(dispatch.concurrencyLeases)
 	req.Credential = dispatch.credential
 	resp, err := rt.adapters.InvokeImageGeneration(ctx, req)
 	if err != nil {
@@ -1454,7 +1460,7 @@ func (rt *runtimeState) invokeProviderImageEdit(ctx context.Context, req provide
 	if err != nil {
 		return provideradaptercontract.ImageGenerationResponse{}, err
 	}
-	defer rt.releaseProviderAccountConcurrency(dispatch.concurrencyLease)
+	defer rt.releaseGatewayConcurrency(dispatch.concurrencyLeases)
 	req.Credential = dispatch.credential
 	resp, err := rt.adapters.InvokeImageEdit(ctx, req)
 	if err != nil {
@@ -1469,7 +1475,7 @@ func (rt *runtimeState) invokeProviderImageVariation(ctx context.Context, req pr
 	if err != nil {
 		return provideradaptercontract.ImageGenerationResponse{}, err
 	}
-	defer rt.releaseProviderAccountConcurrency(dispatch.concurrencyLease)
+	defer rt.releaseGatewayConcurrency(dispatch.concurrencyLeases)
 	req.Credential = dispatch.credential
 	resp, err := rt.adapters.InvokeImageVariation(ctx, req)
 	if err != nil {
@@ -1484,7 +1490,7 @@ func (rt *runtimeState) invokeProviderAudioTranscription(ctx context.Context, re
 	if err != nil {
 		return provideradaptercontract.AudioTranscriptionResponse{}, err
 	}
-	defer rt.releaseProviderAccountConcurrency(dispatch.concurrencyLease)
+	defer rt.releaseGatewayConcurrency(dispatch.concurrencyLeases)
 	req.Credential = dispatch.credential
 	resp, err := rt.adapters.InvokeAudioTranscription(ctx, req)
 	if err != nil {
@@ -1499,7 +1505,7 @@ func (rt *runtimeState) invokeProviderAudioSpeech(ctx context.Context, req provi
 	if err != nil {
 		return provideradaptercontract.AudioSpeechResponse{}, err
 	}
-	defer rt.releaseProviderAccountConcurrency(dispatch.concurrencyLease)
+	defer rt.releaseGatewayConcurrency(dispatch.concurrencyLeases)
 	req.Credential = dispatch.credential
 	resp, err := rt.adapters.InvokeAudioSpeech(ctx, req)
 	if err != nil {
@@ -1514,7 +1520,7 @@ func (rt *runtimeState) invokeProviderModerations(ctx context.Context, req provi
 	if err != nil {
 		return provideradaptercontract.ModerationResponse{}, err
 	}
-	defer rt.releaseProviderAccountConcurrency(dispatch.concurrencyLease)
+	defer rt.releaseGatewayConcurrency(dispatch.concurrencyLeases)
 	req.Credential = dispatch.credential
 	resp, err := rt.adapters.InvokeModerations(ctx, req)
 	if err != nil {
@@ -1529,7 +1535,7 @@ func (rt *runtimeState) invokeProviderRerank(ctx context.Context, req providerad
 	if err != nil {
 		return provideradaptercontract.RerankResponse{}, err
 	}
-	defer rt.releaseProviderAccountConcurrency(dispatch.concurrencyLease)
+	defer rt.releaseGatewayConcurrency(dispatch.concurrencyLeases)
 	req.Credential = dispatch.credential
 	resp, err := rt.adapters.InvokeRerank(ctx, req)
 	if err != nil {

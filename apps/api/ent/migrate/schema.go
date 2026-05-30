@@ -177,6 +177,7 @@ var (
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "account_group_id", Type: field.TypeInt},
 		{Name: "rpm_limit", Type: field.TypeInt, Default: 0},
+		{Name: "max_concurrency", Type: field.TypeInt, Default: 0},
 		{Name: "enabled", Type: field.TypeBool, Default: true},
 	}
 	// AccountGroupRateLimitsTable holds the schema information for the "account_group_rate_limits" table.
@@ -193,7 +194,7 @@ var (
 			{
 				Name:    "accountgroupratelimit_enabled",
 				Unique:  false,
-				Columns: []*schema.Column{AccountGroupRateLimitsColumns[5]},
+				Columns: []*schema.Column{AccountGroupRateLimitsColumns[6]},
 			},
 		},
 	}
