@@ -91,6 +91,12 @@ func (s *Service) doQuotaFetch(ctx context.Context, account accountcontract.Prov
 	return resp.StatusCode, body, resp.Header, nil
 }
 
+// QuotaConfigured reports whether a quota endpoint is configured for the account
+// or provider, without needing the credential.
+func (s *Service) QuotaConfigured(req contract.ProbeRequest) bool {
+	return quotaEndpoint(req) != ""
+}
+
 func quotaConfigMaps(req contract.ProbeRequest) []map[string]any {
 	return []map[string]any{req.Account.Metadata, req.Provider.ConfigSchema, req.Provider.Capabilities}
 }

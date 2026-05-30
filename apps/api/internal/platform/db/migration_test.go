@@ -77,6 +77,7 @@ func TestEntSchemaAppliesToEmptyDatabase(t *testing.T) {
 		"invite_relationships",
 		"model_alias",
 		"model_provider_mappings",
+		"model_rate_limits",
 		"model_registries",
 		"obs_alert_events",
 		"obs_slo_definitions",

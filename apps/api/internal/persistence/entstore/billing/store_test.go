@@ -204,6 +204,7 @@ func createUsageLogAt(t *testing.T, client *ent.Client, userID int, requestID, c
 		SetTotalTokens(12).
 		SetSuccess(true).
 		SetCost(cost).
+		SetBillableCost(cost).
 		SetCurrency("USD")
 	if chargedAt != nil {
 		create.SetChargedAt(*chargedAt)

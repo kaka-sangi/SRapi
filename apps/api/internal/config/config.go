@@ -35,6 +35,17 @@ type Config struct {
 	Email          EmailConfig
 	Observability  ObservabilityConfig
 	Captcha        CaptchaConfig
+	QuotaRefresh   QuotaRefreshConfig
+}
+
+// QuotaRefreshConfig controls the scheduled per-account quota/subscription
+// refresh worker. Disabled by default; accounts still need a configured quota
+// endpoint for the worker to act on them.
+type QuotaRefreshConfig struct {
+	Enabled       bool
+	Interval      time.Duration
+	Timeout       time.Duration
+	MaxConcurrent int
 }
 
 type ServerConfig struct {
@@ -265,6 +276,12 @@ func Load() Config {
 			Provider:  getEnv("CAPTCHA_PROVIDER", "turnstile"),
 			SecretKey: getEnv("CAPTCHA_SECRET_KEY", ""),
 			VerifyURL: getEnv("CAPTCHA_VERIFY_URL", ""),
+		},
+		QuotaRefresh: QuotaRefreshConfig{
+			Enabled:       getBoolEnv("ACCOUNT_QUOTA_REFRESH_ENABLED", false),
+			Interval:      time.Duration(getIntEnv("ACCOUNT_QUOTA_REFRESH_INTERVAL_SECONDS", 1800)) * time.Second,
+			Timeout:       time.Duration(getIntEnv("ACCOUNT_QUOTA_REFRESH_TIMEOUT_SECONDS", 15)) * time.Second,
+			MaxConcurrent: getIntEnv("ACCOUNT_QUOTA_REFRESH_MAX_CONCURRENT", 4),
 		},
 	}
 }

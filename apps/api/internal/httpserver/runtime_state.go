@@ -46,6 +46,9 @@ import (
 	healthrollupsmemory "github.com/srapi/srapi/apps/api/internal/modules/health_rollups/store/memory"
 	idempotencyservice "github.com/srapi/srapi/apps/api/internal/modules/idempotency/service"
 	idempotencymemory "github.com/srapi/srapi/apps/api/internal/modules/idempotency/store/memory"
+	modelratelimitscontract "github.com/srapi/srapi/apps/api/internal/modules/model_rate_limits/contract"
+	modelratelimitsservice "github.com/srapi/srapi/apps/api/internal/modules/model_rate_limits/service"
+	modelratelimitsmemory "github.com/srapi/srapi/apps/api/internal/modules/model_rate_limits/store/memory"
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
 	modelservice "github.com/srapi/srapi/apps/api/internal/modules/models/service"
 	modelmemory "github.com/srapi/srapi/apps/api/internal/modules/models/store/memory"
@@ -139,6 +142,7 @@ type runtimeState struct {
 	tlsProfiles           *tlsprofilesservice.Service
 	captcha               *captchaservice.Service
 	healthRollups         *healthrollupsservice.Service
+	modelRateLimits       *modelratelimitsservice.Service
 	userStore             userscontract.Store
 	sessionStore          authcontract.Store
 	apiKeyStore           apikeycontract.Store
@@ -163,6 +167,7 @@ type runtimeState struct {
 	errorPassthroughStore errorpassthroughcontract.Store
 	tlsProfilesStore      tlsprofilescontract.Store
 	healthRollupsStore    healthrollupscontract.Store
+	modelRateLimitsStore  modelratelimitscontract.Store
 	capabilities          []capabilitiescontract.Definition
 	databaseProbe         dependencyPinger
 	redisProbe            dependencyPinger
@@ -443,6 +448,20 @@ func (rt *runtimeState) buildCapabilityServices(cfg config.Config, opts runtimeO
 		return err
 	}
 	rt.healthRollups = healthRollupsSvc
+
+	modelRateLimitsStore := opts.modelRateLimits
+	if modelRateLimitsStore == nil {
+		if !allowMemoryStores {
+			return missingRuntimeStoreError("model rate limits")
+		}
+		modelRateLimitsStore = modelratelimitsmemory.New()
+	}
+	rt.modelRateLimitsStore = modelRateLimitsStore
+	modelRateLimitsSvc, err := modelratelimitsservice.New(modelRateLimitsStore)
+	if err != nil {
+		return err
+	}
+	rt.modelRateLimits = modelRateLimitsSvc
 	return nil
 }
 

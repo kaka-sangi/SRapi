@@ -278,7 +278,13 @@ func formatRatFixed(value *big.Rat, places int) string {
 func sumUsageCosts(rows []*ent.UsageLog) (string, error) {
 	total := new(big.Rat)
 	for _, row := range rows {
-		amount, ok := decimalRat(row.Cost)
+		// Charge the billable portion (cost minus subscription-allowance coverage,
+		// WP-1180). Fall back to full cost if billable was never set.
+		value := row.BillableCost
+		if strings.TrimSpace(value) == "" {
+			value = row.Cost
+		}
+		amount, ok := decimalRat(value)
 		if !ok {
 			return "", ErrInvalidStore
 		}

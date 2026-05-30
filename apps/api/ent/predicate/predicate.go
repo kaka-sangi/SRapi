@@ -75,6 +75,9 @@ type ModelAlias func(*sql.Selector)
 // ModelProviderMapping is the predicate function for modelprovidermapping builders.
 type ModelProviderMapping func(*sql.Selector)
 
+// ModelRateLimit is the predicate function for modelratelimit builders.
+type ModelRateLimit func(*sql.Selector)
+
 // ModelRegistry is the predicate function for modelregistry builders.
 type ModelRegistry func(*sql.Selector)
 

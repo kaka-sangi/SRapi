@@ -58,6 +58,8 @@ type Tx struct {
 	ModelAlias *ModelAliasClient
 	// ModelProviderMapping is the client for interacting with the ModelProviderMapping builders.
 	ModelProviderMapping *ModelProviderMappingClient
+	// ModelRateLimit is the client for interacting with the ModelRateLimit builders.
+	ModelRateLimit *ModelRateLimitClient
 	// ModelRegistry is the client for interacting with the ModelRegistry builders.
 	ModelRegistry *ModelRegistryClient
 	// ObsAlertEvent is the client for interacting with the ObsAlertEvent builders.
@@ -282,6 +284,7 @@ func (tx *Tx) init() {
 	tx.InviteRelationship = NewInviteRelationshipClient(tx.config)
 	tx.ModelAlias = NewModelAliasClient(tx.config)
 	tx.ModelProviderMapping = NewModelProviderMappingClient(tx.config)
+	tx.ModelRateLimit = NewModelRateLimitClient(tx.config)
 	tx.ModelRegistry = NewModelRegistryClient(tx.config)
 	tx.ObsAlertEvent = NewObsAlertEventClient(tx.config)
 	tx.ObsSLODefinition = NewObsSLODefinitionClient(tx.config)

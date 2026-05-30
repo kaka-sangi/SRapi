@@ -37,6 +37,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/inviterelationship"
 	"github.com/srapi/srapi/apps/api/ent/modelalias"
 	"github.com/srapi/srapi/apps/api/ent/modelprovidermapping"
+	"github.com/srapi/srapi/apps/api/ent/modelratelimit"
 	"github.com/srapi/srapi/apps/api/ent/modelregistry"
 	"github.com/srapi/srapi/apps/api/ent/obsalertevent"
 	"github.com/srapi/srapi/apps/api/ent/obsslodefinition"
@@ -125,6 +126,8 @@ type Client struct {
 	ModelAlias *ModelAliasClient
 	// ModelProviderMapping is the client for interacting with the ModelProviderMapping builders.
 	ModelProviderMapping *ModelProviderMappingClient
+	// ModelRateLimit is the client for interacting with the ModelRateLimit builders.
+	ModelRateLimit *ModelRateLimitClient
 	// ModelRegistry is the client for interacting with the ModelRegistry builders.
 	ModelRegistry *ModelRegistryClient
 	// ObsAlertEvent is the client for interacting with the ObsAlertEvent builders.
@@ -229,6 +232,7 @@ func (c *Client) init() {
 	c.InviteRelationship = NewInviteRelationshipClient(c.config)
 	c.ModelAlias = NewModelAliasClient(c.config)
 	c.ModelProviderMapping = NewModelProviderMappingClient(c.config)
+	c.ModelRateLimit = NewModelRateLimitClient(c.config)
 	c.ModelRegistry = NewModelRegistryClient(c.config)
 	c.ObsAlertEvent = NewObsAlertEventClient(c.config)
 	c.ObsSLODefinition = NewObsSLODefinitionClient(c.config)
@@ -379,6 +383,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		InviteRelationship:        NewInviteRelationshipClient(cfg),
 		ModelAlias:                NewModelAliasClient(cfg),
 		ModelProviderMapping:      NewModelProviderMappingClient(cfg),
+		ModelRateLimit:            NewModelRateLimitClient(cfg),
 		ModelRegistry:             NewModelRegistryClient(cfg),
 		ObsAlertEvent:             NewObsAlertEventClient(cfg),
 		ObsSLODefinition:          NewObsSLODefinitionClient(cfg),
@@ -456,6 +461,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		InviteRelationship:        NewInviteRelationshipClient(cfg),
 		ModelAlias:                NewModelAliasClient(cfg),
 		ModelProviderMapping:      NewModelProviderMappingClient(cfg),
+		ModelRateLimit:            NewModelRateLimitClient(cfg),
 		ModelRegistry:             NewModelRegistryClient(cfg),
 		ObsAlertEvent:             NewObsAlertEventClient(cfg),
 		ObsSLODefinition:          NewObsSLODefinitionClient(cfg),
@@ -526,16 +532,16 @@ func (c *Client) Use(hooks ...Hook) {
 		c.CapabilityDefinition, c.DomainEventsInbox, c.DomainEventsOutbox,
 		c.EmailVerificationToken, c.Entitlement, c.ErrorPassthroughRule,
 		c.IdempotencyRecord, c.InviteCode, c.InviteRelationship, c.ModelAlias,
-		c.ModelProviderMapping, c.ModelRegistry, c.ObsAlertEvent, c.ObsSLODefinition,
-		c.OpsSystemLog, c.PasswordResetToken, c.PaymentAuditLog, c.PaymentOrder,
-		c.PaymentProviderInstance, c.PendingOAuthSession, c.PricingRule, c.Provider,
-		c.ProviderAccount, c.Proxy, c.QualityEvalSample, c.QualityEvaluation, c.Role,
-		c.SchedulerDecision, c.SchedulerFeedback, c.SchedulerRequestSnapshot,
-		c.SchedulerStrategy, c.Setting, c.SubscriptionPlan, c.TLSFingerprintProfile,
-		c.UsageLog, c.User, c.UserAnnouncementRead, c.UserAttributeDefinition,
-		c.UserAttributeValue, c.UserAuthIdentity, c.UserPromoCodeApplication,
-		c.UserRedeemCodeRedemption, c.UserRole, c.UserSubscription, c.UserTOTPSecret,
-		c.Workspace,
+		c.ModelProviderMapping, c.ModelRateLimit, c.ModelRegistry, c.ObsAlertEvent,
+		c.ObsSLODefinition, c.OpsSystemLog, c.PasswordResetToken, c.PaymentAuditLog,
+		c.PaymentOrder, c.PaymentProviderInstance, c.PendingOAuthSession,
+		c.PricingRule, c.Provider, c.ProviderAccount, c.Proxy, c.QualityEvalSample,
+		c.QualityEvaluation, c.Role, c.SchedulerDecision, c.SchedulerFeedback,
+		c.SchedulerRequestSnapshot, c.SchedulerStrategy, c.Setting, c.SubscriptionPlan,
+		c.TLSFingerprintProfile, c.UsageLog, c.User, c.UserAnnouncementRead,
+		c.UserAttributeDefinition, c.UserAttributeValue, c.UserAuthIdentity,
+		c.UserPromoCodeApplication, c.UserRedeemCodeRedemption, c.UserRole,
+		c.UserSubscription, c.UserTOTPSecret, c.Workspace,
 	} {
 		n.Use(hooks...)
 	}
@@ -551,16 +557,16 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.CapabilityDefinition, c.DomainEventsInbox, c.DomainEventsOutbox,
 		c.EmailVerificationToken, c.Entitlement, c.ErrorPassthroughRule,
 		c.IdempotencyRecord, c.InviteCode, c.InviteRelationship, c.ModelAlias,
-		c.ModelProviderMapping, c.ModelRegistry, c.ObsAlertEvent, c.ObsSLODefinition,
-		c.OpsSystemLog, c.PasswordResetToken, c.PaymentAuditLog, c.PaymentOrder,
-		c.PaymentProviderInstance, c.PendingOAuthSession, c.PricingRule, c.Provider,
-		c.ProviderAccount, c.Proxy, c.QualityEvalSample, c.QualityEvaluation, c.Role,
-		c.SchedulerDecision, c.SchedulerFeedback, c.SchedulerRequestSnapshot,
-		c.SchedulerStrategy, c.Setting, c.SubscriptionPlan, c.TLSFingerprintProfile,
-		c.UsageLog, c.User, c.UserAnnouncementRead, c.UserAttributeDefinition,
-		c.UserAttributeValue, c.UserAuthIdentity, c.UserPromoCodeApplication,
-		c.UserRedeemCodeRedemption, c.UserRole, c.UserSubscription, c.UserTOTPSecret,
-		c.Workspace,
+		c.ModelProviderMapping, c.ModelRateLimit, c.ModelRegistry, c.ObsAlertEvent,
+		c.ObsSLODefinition, c.OpsSystemLog, c.PasswordResetToken, c.PaymentAuditLog,
+		c.PaymentOrder, c.PaymentProviderInstance, c.PendingOAuthSession,
+		c.PricingRule, c.Provider, c.ProviderAccount, c.Proxy, c.QualityEvalSample,
+		c.QualityEvaluation, c.Role, c.SchedulerDecision, c.SchedulerFeedback,
+		c.SchedulerRequestSnapshot, c.SchedulerStrategy, c.Setting, c.SubscriptionPlan,
+		c.TLSFingerprintProfile, c.UsageLog, c.User, c.UserAnnouncementRead,
+		c.UserAttributeDefinition, c.UserAttributeValue, c.UserAuthIdentity,
+		c.UserPromoCodeApplication, c.UserRedeemCodeRedemption, c.UserRole,
+		c.UserSubscription, c.UserTOTPSecret, c.Workspace,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -615,6 +621,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.ModelAlias.mutate(ctx, m)
 	case *ModelProviderMappingMutation:
 		return c.ModelProviderMapping.mutate(ctx, m)
+	case *ModelRateLimitMutation:
+		return c.ModelRateLimit.mutate(ctx, m)
 	case *ModelRegistryMutation:
 		return c.ModelRegistry.mutate(ctx, m)
 	case *ObsAlertEventMutation:
@@ -3746,6 +3754,139 @@ func (c *ModelProviderMappingClient) mutate(ctx context.Context, m *ModelProvide
 		return (&ModelProviderMappingDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown ModelProviderMapping mutation op: %q", m.Op())
+	}
+}
+
+// ModelRateLimitClient is a client for the ModelRateLimit schema.
+type ModelRateLimitClient struct {
+	config
+}
+
+// NewModelRateLimitClient returns a client for the ModelRateLimit from the given config.
+func NewModelRateLimitClient(c config) *ModelRateLimitClient {
+	return &ModelRateLimitClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `modelratelimit.Hooks(f(g(h())))`.
+func (c *ModelRateLimitClient) Use(hooks ...Hook) {
+	c.hooks.ModelRateLimit = append(c.hooks.ModelRateLimit, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `modelratelimit.Intercept(f(g(h())))`.
+func (c *ModelRateLimitClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ModelRateLimit = append(c.inters.ModelRateLimit, interceptors...)
+}
+
+// Create returns a builder for creating a ModelRateLimit entity.
+func (c *ModelRateLimitClient) Create() *ModelRateLimitCreate {
+	mutation := newModelRateLimitMutation(c.config, OpCreate)
+	return &ModelRateLimitCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ModelRateLimit entities.
+func (c *ModelRateLimitClient) CreateBulk(builders ...*ModelRateLimitCreate) *ModelRateLimitCreateBulk {
+	return &ModelRateLimitCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ModelRateLimitClient) MapCreateBulk(slice any, setFunc func(*ModelRateLimitCreate, int)) *ModelRateLimitCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ModelRateLimitCreateBulk{err: fmt.Errorf("calling to ModelRateLimitClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ModelRateLimitCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ModelRateLimitCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ModelRateLimit.
+func (c *ModelRateLimitClient) Update() *ModelRateLimitUpdate {
+	mutation := newModelRateLimitMutation(c.config, OpUpdate)
+	return &ModelRateLimitUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ModelRateLimitClient) UpdateOne(_m *ModelRateLimit) *ModelRateLimitUpdateOne {
+	mutation := newModelRateLimitMutation(c.config, OpUpdateOne, withModelRateLimit(_m))
+	return &ModelRateLimitUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ModelRateLimitClient) UpdateOneID(id int) *ModelRateLimitUpdateOne {
+	mutation := newModelRateLimitMutation(c.config, OpUpdateOne, withModelRateLimitID(id))
+	return &ModelRateLimitUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ModelRateLimit.
+func (c *ModelRateLimitClient) Delete() *ModelRateLimitDelete {
+	mutation := newModelRateLimitMutation(c.config, OpDelete)
+	return &ModelRateLimitDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ModelRateLimitClient) DeleteOne(_m *ModelRateLimit) *ModelRateLimitDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ModelRateLimitClient) DeleteOneID(id int) *ModelRateLimitDeleteOne {
+	builder := c.Delete().Where(modelratelimit.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ModelRateLimitDeleteOne{builder}
+}
+
+// Query returns a query builder for ModelRateLimit.
+func (c *ModelRateLimitClient) Query() *ModelRateLimitQuery {
+	return &ModelRateLimitQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeModelRateLimit},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ModelRateLimit entity by its id.
+func (c *ModelRateLimitClient) Get(ctx context.Context, id int) (*ModelRateLimit, error) {
+	return c.Query().Where(modelratelimit.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ModelRateLimitClient) GetX(ctx context.Context, id int) *ModelRateLimit {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ModelRateLimitClient) Hooks() []Hook {
+	return c.hooks.ModelRateLimit
+}
+
+// Interceptors returns the client interceptors.
+func (c *ModelRateLimitClient) Interceptors() []Interceptor {
+	return c.inters.ModelRateLimit
+}
+
+func (c *ModelRateLimitClient) mutate(ctx context.Context, m *ModelRateLimitMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ModelRateLimitCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ModelRateLimitUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ModelRateLimitUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ModelRateLimitDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ModelRateLimit mutation op: %q", m.Op())
 	}
 }
 
@@ -8413,7 +8554,7 @@ type (
 		CapabilityDefinition, DomainEventsInbox, DomainEventsOutbox,
 		EmailVerificationToken, Entitlement, ErrorPassthroughRule, IdempotencyRecord,
 		InviteCode, InviteRelationship, ModelAlias, ModelProviderMapping,
-		ModelRegistry, ObsAlertEvent, ObsSLODefinition, OpsSystemLog,
+		ModelRateLimit, ModelRegistry, ObsAlertEvent, ObsSLODefinition, OpsSystemLog,
 		PasswordResetToken, PaymentAuditLog, PaymentOrder, PaymentProviderInstance,
 		PendingOAuthSession, PricingRule, Provider, ProviderAccount, Proxy,
 		QualityEvalSample, QualityEvaluation, Role, SchedulerDecision,
@@ -8430,7 +8571,7 @@ type (
 		CapabilityDefinition, DomainEventsInbox, DomainEventsOutbox,
 		EmailVerificationToken, Entitlement, ErrorPassthroughRule, IdempotencyRecord,
 		InviteCode, InviteRelationship, ModelAlias, ModelProviderMapping,
-		ModelRegistry, ObsAlertEvent, ObsSLODefinition, OpsSystemLog,
+		ModelRateLimit, ModelRegistry, ObsAlertEvent, ObsSLODefinition, OpsSystemLog,
 		PasswordResetToken, PaymentAuditLog, PaymentOrder, PaymentProviderInstance,
 		PendingOAuthSession, PricingRule, Provider, ProviderAccount, Proxy,
 		QualityEvalSample, QualityEvaluation, Role, SchedulerDecision,

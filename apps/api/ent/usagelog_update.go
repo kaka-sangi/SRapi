@@ -389,6 +389,20 @@ func (_u *UsageLogUpdate) SetNillableCost(v *string) *UsageLogUpdate {
 	return _u
 }
 
+// SetBillableCost sets the "billable_cost" field.
+func (_u *UsageLogUpdate) SetBillableCost(v string) *UsageLogUpdate {
+	_u.mutation.SetBillableCost(v)
+	return _u
+}
+
+// SetNillableBillableCost sets the "billable_cost" field if the given value is not nil.
+func (_u *UsageLogUpdate) SetNillableBillableCost(v *string) *UsageLogUpdate {
+	if v != nil {
+		_u.SetBillableCost(*v)
+	}
+	return _u
+}
+
 // SetCurrency sets the "currency" field.
 func (_u *UsageLogUpdate) SetCurrency(v string) *UsageLogUpdate {
 	_u.mutation.SetCurrency(v)
@@ -602,6 +616,9 @@ func (_u *UsageLogUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.Cost(); ok {
 		_spec.SetField(usagelog.FieldCost, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.BillableCost(); ok {
+		_spec.SetField(usagelog.FieldBillableCost, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.Currency(); ok {
 		_spec.SetField(usagelog.FieldCurrency, field.TypeString, value)
@@ -1003,6 +1020,20 @@ func (_u *UsageLogUpdateOne) SetNillableCost(v *string) *UsageLogUpdateOne {
 	return _u
 }
 
+// SetBillableCost sets the "billable_cost" field.
+func (_u *UsageLogUpdateOne) SetBillableCost(v string) *UsageLogUpdateOne {
+	_u.mutation.SetBillableCost(v)
+	return _u
+}
+
+// SetNillableBillableCost sets the "billable_cost" field if the given value is not nil.
+func (_u *UsageLogUpdateOne) SetNillableBillableCost(v *string) *UsageLogUpdateOne {
+	if v != nil {
+		_u.SetBillableCost(*v)
+	}
+	return _u
+}
+
 // SetCurrency sets the "currency" field.
 func (_u *UsageLogUpdateOne) SetCurrency(v string) *UsageLogUpdateOne {
 	_u.mutation.SetCurrency(v)
@@ -1246,6 +1277,9 @@ func (_u *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, err 
 	}
 	if value, ok := _u.mutation.Cost(); ok {
 		_spec.SetField(usagelog.FieldCost, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.BillableCost(); ok {
+		_spec.SetField(usagelog.FieldBillableCost, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.Currency(); ok {
 		_spec.SetField(usagelog.FieldCurrency, field.TypeString, value)

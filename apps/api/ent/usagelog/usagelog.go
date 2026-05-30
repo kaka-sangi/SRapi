@@ -55,6 +55,8 @@ const (
 	FieldErrorClass = "error_class"
 	// FieldCost holds the string denoting the cost field in the database.
 	FieldCost = "cost"
+	// FieldBillableCost holds the string denoting the billable_cost field in the database.
+	FieldBillableCost = "billable_cost"
 	// FieldCurrency holds the string denoting the currency field in the database.
 	FieldCurrency = "currency"
 	// FieldChargedAt holds the string denoting the charged_at field in the database.
@@ -89,6 +91,7 @@ var Columns = []string{
 	FieldSuccess,
 	FieldErrorClass,
 	FieldCost,
+	FieldBillableCost,
 	FieldCurrency,
 	FieldChargedAt,
 	FieldCompatibilityWarningsJSON,
@@ -139,6 +142,8 @@ var (
 	DefaultSuccess bool
 	// DefaultCost holds the default value on creation for the "cost" field.
 	DefaultCost string
+	// DefaultBillableCost holds the default value on creation for the "billable_cost" field.
+	DefaultBillableCost string
 	// DefaultCurrency holds the default value on creation for the "currency" field.
 	DefaultCurrency string
 )
@@ -254,6 +259,11 @@ func ByErrorClass(opts ...sql.OrderTermOption) OrderOption {
 // ByCost orders the results by the cost field.
 func ByCost(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCost, opts...).ToFunc()
+}
+
+// ByBillableCost orders the results by the billable_cost field.
+func ByBillableCost(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBillableCost, opts...).ToFunc()
 }
 
 // ByCurrency orders the results by the currency field.

@@ -400,6 +400,10 @@ type QuotaReport struct {
 // AccountQuotaFetcher performs an active per-account quota/subscription fetch.
 type AccountQuotaFetcher interface {
 	FetchAccountQuota(ctx context.Context, req ProbeRequest) (QuotaReport, error)
+	// QuotaConfigured reports whether the account/provider exposes a quota
+	// endpoint, using only provider config + account metadata (no credential),
+	// so callers can skip credential decryption for accounts without quota.
+	QuotaConfigured(req ProbeRequest) bool
 }
 
 type ResponseInputItemsResponse struct {

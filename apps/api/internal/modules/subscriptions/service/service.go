@@ -296,6 +296,7 @@ func (s *Service) CheckEntitlement(ctx context.Context, req contract.Entitlement
 		SchedulerStrategy: entitlementString(entitlements, "scheduler_strategy"),
 		MonthlyTokenQuota: entitlementOptionalInt(entitlements, "monthly_token_quota"),
 		MonthlyCostQuota:  entitlementOptionalMoney(entitlements, "monthly_cost_quota"),
+		CostQuotaMode:     normalizeCostQuotaMode(entitlementString(entitlements, "cost_quota_mode")),
 	}
 	if allowedModels := entitlementStringSlice(entitlements, "allowed_models"); len(allowedModels) > 0 && !modelAllowed(req.ModelReferences, allowedModels) {
 		decision.Allowed = false
@@ -307,7 +308,10 @@ func (s *Service) CheckEntitlement(ctx context.Context, req contract.Entitlement
 		decision.Reason = "monthly_token_quota_exceeded"
 		return decision, nil
 	}
-	if decision.MonthlyCostQuota != nil {
+	// In hard_cap mode an exceeded cost quota denies the request. In allowance
+	// mode the quota is an included allowance: the request is allowed and the
+	// overage is billed to balance downstream (WP-1180).
+	if decision.MonthlyCostQuota != nil && decision.CostQuotaMode != costQuotaModeAllowance {
 		totalCost := addMoney(req.CostUsedInPeriod, req.EstimatedCost)
 		if compareMoney(totalCost, *decision.MonthlyCostQuota) > 0 {
 			decision.Allowed = false
@@ -316,6 +320,68 @@ func (s *Service) CheckEntitlement(ctx context.Context, req contract.Entitlement
 		}
 	}
 	return decision, nil
+}
+
+const (
+	costQuotaModeHardCap   = "hard_cap"
+	costQuotaModeAllowance = "allowance"
+)
+
+func normalizeCostQuotaMode(value string) string {
+	if strings.EqualFold(strings.TrimSpace(value), costQuotaModeAllowance) {
+		return costQuotaModeAllowance
+	}
+	return costQuotaModeHardCap
+}
+
+// CostAllowance returns the user's active subscription cost allowance, used by
+// the gateway to split per-request cost into subscription-covered vs billable.
+func (s *Service) CostAllowance(ctx context.Context, userID int, now time.Time) (contract.CostAllowance, error) {
+	if userID <= 0 {
+		return contract.CostAllowance{}, ErrInvalidInput
+	}
+	if now.IsZero() {
+		now = s.clock.Now()
+	}
+	active, err := s.store.ListActiveEntitlements(ctx, userID, now)
+	if err != nil {
+		return contract.CostAllowance{}, err
+	}
+	if len(active) == 0 {
+		return contract.CostAllowance{}, nil
+	}
+	entitlements := mergeEntitlementRows(active)
+	return contract.CostAllowance{
+		Mode:  normalizeCostQuotaMode(entitlementString(entitlements, "cost_quota_mode")),
+		Quota: entitlementOptionalMoney(entitlements, "monthly_cost_quota"),
+	}, nil
+}
+
+// BillableOverage returns the portion of cost billed to balance given the cost
+// already spent this period and the included allowance ceiling. The covered
+// portion (cost - billable) is absorbed by the subscription allowance. It is
+// pure and clamps the result to [0, cost].
+func BillableOverage(cost, usedBefore, allowance string) string {
+	costRat, ok := decimalRat(cost)
+	if !ok || costRat.Sign() <= 0 {
+		return cost
+	}
+	allowRat, ok := decimalRat(allowance)
+	if !ok {
+		return cost
+	}
+	usedRat, ok := decimalRat(usedBefore)
+	if !ok {
+		usedRat = new(big.Rat)
+	}
+	overage := new(big.Rat).Sub(new(big.Rat).Add(usedRat, costRat), allowRat)
+	if overage.Sign() <= 0 {
+		return formatRatFixed(new(big.Rat), 8)
+	}
+	if overage.Cmp(costRat) >= 0 {
+		return cost
+	}
+	return formatRatFixed(overage, 8)
 }
 
 func (s *Service) EstimatePrice(ctx context.Context, req contract.PricingRequest) (contract.PricingResult, error) {

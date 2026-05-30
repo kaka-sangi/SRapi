@@ -3,6 +3,7 @@ package usage
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/srapi/srapi/apps/api/ent"
@@ -44,6 +45,7 @@ func (s *Store) Create(ctx context.Context, input contract.UsageLog) (contract.U
 		SetSuccess(input.Success).
 		SetNillableErrorClass(input.ErrorClass).
 		SetCost(input.Cost).
+		SetBillableCost(billableCostOrCost(input.BillableCost, input.Cost)).
 		SetCurrency(input.Currency).
 		SetNillableChargedAt(input.ChargedAt).
 		SetCompatibilityWarningsJSON(cloneStrings(input.CompatibilityWarnings))
@@ -108,11 +110,21 @@ func toUsageLog(row *ent.UsageLog) contract.UsageLog {
 		Success:               row.Success,
 		ErrorClass:            cloneString(row.ErrorClass),
 		Cost:                  row.Cost,
+		BillableCost:          row.BillableCost,
 		Currency:              row.Currency,
 		ChargedAt:             cloneTime(row.ChargedAt),
 		CompatibilityWarnings: cloneStrings(row.CompatibilityWarningsJSON),
 		CreatedAt:             row.CreatedAt,
 	}
+}
+
+// billableCostOrCost falls back to the full cost when no billable amount is set,
+// preserving the pre-WP-1180 behavior for callers that do not compute coverage.
+func billableCostOrCost(billable, cost string) string {
+	if strings.TrimSpace(billable) == "" {
+		return cost
+	}
+	return billable
 }
 
 func cloneInt(value *int) *int {

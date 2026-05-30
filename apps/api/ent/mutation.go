@@ -34,6 +34,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/inviterelationship"
 	"github.com/srapi/srapi/apps/api/ent/modelalias"
 	"github.com/srapi/srapi/apps/api/ent/modelprovidermapping"
+	"github.com/srapi/srapi/apps/api/ent/modelratelimit"
 	"github.com/srapi/srapi/apps/api/ent/modelregistry"
 	"github.com/srapi/srapi/apps/api/ent/obsalertevent"
 	"github.com/srapi/srapi/apps/api/ent/obsslodefinition"
@@ -104,6 +105,7 @@ const (
 	TypeInviteRelationship        = "InviteRelationship"
 	TypeModelAlias                = "ModelAlias"
 	TypeModelProviderMapping      = "ModelProviderMapping"
+	TypeModelRateLimit            = "ModelRateLimit"
 	TypeModelRegistry             = "ModelRegistry"
 	TypeObsAlertEvent             = "ObsAlertEvent"
 	TypeObsSLODefinition          = "ObsSLODefinition"
@@ -21035,6 +21037,617 @@ func (m *ModelProviderMappingMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *ModelProviderMappingMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown ModelProviderMapping edge %s", name)
+}
+
+// ModelRateLimitMutation represents an operation that mutates the ModelRateLimit nodes in the graph.
+type ModelRateLimitMutation struct {
+	config
+	op            Op
+	typ           string
+	id            *int
+	created_at    *time.Time
+	updated_at    *time.Time
+	model_id      *int
+	addmodel_id   *int
+	rpm_limit     *int
+	addrpm_limit  *int
+	enabled       *bool
+	clearedFields map[string]struct{}
+	done          bool
+	oldValue      func(context.Context) (*ModelRateLimit, error)
+	predicates    []predicate.ModelRateLimit
+}
+
+var _ ent.Mutation = (*ModelRateLimitMutation)(nil)
+
+// modelratelimitOption allows management of the mutation configuration using functional options.
+type modelratelimitOption func(*ModelRateLimitMutation)
+
+// newModelRateLimitMutation creates new mutation for the ModelRateLimit entity.
+func newModelRateLimitMutation(c config, op Op, opts ...modelratelimitOption) *ModelRateLimitMutation {
+	m := &ModelRateLimitMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeModelRateLimit,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withModelRateLimitID sets the ID field of the mutation.
+func withModelRateLimitID(id int) modelratelimitOption {
+	return func(m *ModelRateLimitMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *ModelRateLimit
+		)
+		m.oldValue = func(ctx context.Context) (*ModelRateLimit, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().ModelRateLimit.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withModelRateLimit sets the old ModelRateLimit of the mutation.
+func withModelRateLimit(node *ModelRateLimit) modelratelimitOption {
+	return func(m *ModelRateLimitMutation) {
+		m.oldValue = func(context.Context) (*ModelRateLimit, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m ModelRateLimitMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m ModelRateLimitMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *ModelRateLimitMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *ModelRateLimitMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().ModelRateLimit.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *ModelRateLimitMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *ModelRateLimitMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the ModelRateLimit entity.
+// If the ModelRateLimit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ModelRateLimitMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *ModelRateLimitMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *ModelRateLimitMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *ModelRateLimitMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the ModelRateLimit entity.
+// If the ModelRateLimit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ModelRateLimitMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *ModelRateLimitMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetModelID sets the "model_id" field.
+func (m *ModelRateLimitMutation) SetModelID(i int) {
+	m.model_id = &i
+	m.addmodel_id = nil
+}
+
+// ModelID returns the value of the "model_id" field in the mutation.
+func (m *ModelRateLimitMutation) ModelID() (r int, exists bool) {
+	v := m.model_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldModelID returns the old "model_id" field's value of the ModelRateLimit entity.
+// If the ModelRateLimit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ModelRateLimitMutation) OldModelID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldModelID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldModelID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldModelID: %w", err)
+	}
+	return oldValue.ModelID, nil
+}
+
+// AddModelID adds i to the "model_id" field.
+func (m *ModelRateLimitMutation) AddModelID(i int) {
+	if m.addmodel_id != nil {
+		*m.addmodel_id += i
+	} else {
+		m.addmodel_id = &i
+	}
+}
+
+// AddedModelID returns the value that was added to the "model_id" field in this mutation.
+func (m *ModelRateLimitMutation) AddedModelID() (r int, exists bool) {
+	v := m.addmodel_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetModelID resets all changes to the "model_id" field.
+func (m *ModelRateLimitMutation) ResetModelID() {
+	m.model_id = nil
+	m.addmodel_id = nil
+}
+
+// SetRpmLimit sets the "rpm_limit" field.
+func (m *ModelRateLimitMutation) SetRpmLimit(i int) {
+	m.rpm_limit = &i
+	m.addrpm_limit = nil
+}
+
+// RpmLimit returns the value of the "rpm_limit" field in the mutation.
+func (m *ModelRateLimitMutation) RpmLimit() (r int, exists bool) {
+	v := m.rpm_limit
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRpmLimit returns the old "rpm_limit" field's value of the ModelRateLimit entity.
+// If the ModelRateLimit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ModelRateLimitMutation) OldRpmLimit(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRpmLimit is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRpmLimit requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRpmLimit: %w", err)
+	}
+	return oldValue.RpmLimit, nil
+}
+
+// AddRpmLimit adds i to the "rpm_limit" field.
+func (m *ModelRateLimitMutation) AddRpmLimit(i int) {
+	if m.addrpm_limit != nil {
+		*m.addrpm_limit += i
+	} else {
+		m.addrpm_limit = &i
+	}
+}
+
+// AddedRpmLimit returns the value that was added to the "rpm_limit" field in this mutation.
+func (m *ModelRateLimitMutation) AddedRpmLimit() (r int, exists bool) {
+	v := m.addrpm_limit
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetRpmLimit resets all changes to the "rpm_limit" field.
+func (m *ModelRateLimitMutation) ResetRpmLimit() {
+	m.rpm_limit = nil
+	m.addrpm_limit = nil
+}
+
+// SetEnabled sets the "enabled" field.
+func (m *ModelRateLimitMutation) SetEnabled(b bool) {
+	m.enabled = &b
+}
+
+// Enabled returns the value of the "enabled" field in the mutation.
+func (m *ModelRateLimitMutation) Enabled() (r bool, exists bool) {
+	v := m.enabled
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEnabled returns the old "enabled" field's value of the ModelRateLimit entity.
+// If the ModelRateLimit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ModelRateLimitMutation) OldEnabled(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEnabled is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEnabled requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEnabled: %w", err)
+	}
+	return oldValue.Enabled, nil
+}
+
+// ResetEnabled resets all changes to the "enabled" field.
+func (m *ModelRateLimitMutation) ResetEnabled() {
+	m.enabled = nil
+}
+
+// Where appends a list predicates to the ModelRateLimitMutation builder.
+func (m *ModelRateLimitMutation) Where(ps ...predicate.ModelRateLimit) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the ModelRateLimitMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *ModelRateLimitMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.ModelRateLimit, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *ModelRateLimitMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *ModelRateLimitMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (ModelRateLimit).
+func (m *ModelRateLimitMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *ModelRateLimitMutation) Fields() []string {
+	fields := make([]string, 0, 5)
+	if m.created_at != nil {
+		fields = append(fields, modelratelimit.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, modelratelimit.FieldUpdatedAt)
+	}
+	if m.model_id != nil {
+		fields = append(fields, modelratelimit.FieldModelID)
+	}
+	if m.rpm_limit != nil {
+		fields = append(fields, modelratelimit.FieldRpmLimit)
+	}
+	if m.enabled != nil {
+		fields = append(fields, modelratelimit.FieldEnabled)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *ModelRateLimitMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case modelratelimit.FieldCreatedAt:
+		return m.CreatedAt()
+	case modelratelimit.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case modelratelimit.FieldModelID:
+		return m.ModelID()
+	case modelratelimit.FieldRpmLimit:
+		return m.RpmLimit()
+	case modelratelimit.FieldEnabled:
+		return m.Enabled()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *ModelRateLimitMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case modelratelimit.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case modelratelimit.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case modelratelimit.FieldModelID:
+		return m.OldModelID(ctx)
+	case modelratelimit.FieldRpmLimit:
+		return m.OldRpmLimit(ctx)
+	case modelratelimit.FieldEnabled:
+		return m.OldEnabled(ctx)
+	}
+	return nil, fmt.Errorf("unknown ModelRateLimit field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ModelRateLimitMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case modelratelimit.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case modelratelimit.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case modelratelimit.FieldModelID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetModelID(v)
+		return nil
+	case modelratelimit.FieldRpmLimit:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRpmLimit(v)
+		return nil
+	case modelratelimit.FieldEnabled:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEnabled(v)
+		return nil
+	}
+	return fmt.Errorf("unknown ModelRateLimit field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *ModelRateLimitMutation) AddedFields() []string {
+	var fields []string
+	if m.addmodel_id != nil {
+		fields = append(fields, modelratelimit.FieldModelID)
+	}
+	if m.addrpm_limit != nil {
+		fields = append(fields, modelratelimit.FieldRpmLimit)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *ModelRateLimitMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case modelratelimit.FieldModelID:
+		return m.AddedModelID()
+	case modelratelimit.FieldRpmLimit:
+		return m.AddedRpmLimit()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ModelRateLimitMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case modelratelimit.FieldModelID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddModelID(v)
+		return nil
+	case modelratelimit.FieldRpmLimit:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddRpmLimit(v)
+		return nil
+	}
+	return fmt.Errorf("unknown ModelRateLimit numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *ModelRateLimitMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *ModelRateLimitMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *ModelRateLimitMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown ModelRateLimit nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *ModelRateLimitMutation) ResetField(name string) error {
+	switch name {
+	case modelratelimit.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case modelratelimit.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case modelratelimit.FieldModelID:
+		m.ResetModelID()
+		return nil
+	case modelratelimit.FieldRpmLimit:
+		m.ResetRpmLimit()
+		return nil
+	case modelratelimit.FieldEnabled:
+		m.ResetEnabled()
+		return nil
+	}
+	return fmt.Errorf("unknown ModelRateLimit field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *ModelRateLimitMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *ModelRateLimitMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *ModelRateLimitMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *ModelRateLimitMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *ModelRateLimitMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *ModelRateLimitMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *ModelRateLimitMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown ModelRateLimit unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *ModelRateLimitMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown ModelRateLimit edge %s", name)
 }
 
 // ModelRegistryMutation represents an operation that mutates the ModelRegistry nodes in the graph.
@@ -46292,6 +46905,7 @@ type UsageLogMutation struct {
 	success                           *bool
 	error_class                       *string
 	cost                              *string
+	billable_cost                     *string
 	currency                          *string
 	charged_at                        *time.Time
 	compatibility_warnings_json       *[]string
@@ -47397,6 +48011,42 @@ func (m *UsageLogMutation) ResetCost() {
 	m.cost = nil
 }
 
+// SetBillableCost sets the "billable_cost" field.
+func (m *UsageLogMutation) SetBillableCost(s string) {
+	m.billable_cost = &s
+}
+
+// BillableCost returns the value of the "billable_cost" field in the mutation.
+func (m *UsageLogMutation) BillableCost() (r string, exists bool) {
+	v := m.billable_cost
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBillableCost returns the old "billable_cost" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldBillableCost(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBillableCost is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBillableCost requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBillableCost: %w", err)
+	}
+	return oldValue.BillableCost, nil
+}
+
+// ResetBillableCost resets all changes to the "billable_cost" field.
+func (m *UsageLogMutation) ResetBillableCost() {
+	m.billable_cost = nil
+}
+
 // SetCurrency sets the "currency" field.
 func (m *UsageLogMutation) SetCurrency(s string) {
 	m.currency = &s
@@ -47581,7 +48231,7 @@ func (m *UsageLogMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UsageLogMutation) Fields() []string {
-	fields := make([]string, 0, 24)
+	fields := make([]string, 0, 25)
 	if m.created_at != nil {
 		fields = append(fields, usagelog.FieldCreatedAt)
 	}
@@ -47645,6 +48295,9 @@ func (m *UsageLogMutation) Fields() []string {
 	if m.cost != nil {
 		fields = append(fields, usagelog.FieldCost)
 	}
+	if m.billable_cost != nil {
+		fields = append(fields, usagelog.FieldBillableCost)
+	}
 	if m.currency != nil {
 		fields = append(fields, usagelog.FieldCurrency)
 	}
@@ -47704,6 +48357,8 @@ func (m *UsageLogMutation) Field(name string) (ent.Value, bool) {
 		return m.ErrorClass()
 	case usagelog.FieldCost:
 		return m.Cost()
+	case usagelog.FieldBillableCost:
+		return m.BillableCost()
 	case usagelog.FieldCurrency:
 		return m.Currency()
 	case usagelog.FieldChargedAt:
@@ -47761,6 +48416,8 @@ func (m *UsageLogMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldErrorClass(ctx)
 	case usagelog.FieldCost:
 		return m.OldCost(ctx)
+	case usagelog.FieldBillableCost:
+		return m.OldBillableCost(ctx)
 	case usagelog.FieldCurrency:
 		return m.OldCurrency(ctx)
 	case usagelog.FieldChargedAt:
@@ -47922,6 +48579,13 @@ func (m *UsageLogMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetCost(v)
+		return nil
+	case usagelog.FieldBillableCost:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBillableCost(v)
 		return nil
 	case usagelog.FieldCurrency:
 		v, ok := value.(string)
@@ -48211,6 +48875,9 @@ func (m *UsageLogMutation) ResetField(name string) error {
 		return nil
 	case usagelog.FieldCost:
 		m.ResetCost()
+		return nil
+	case usagelog.FieldBillableCost:
+		m.ResetBillableCost()
 		return nil
 	case usagelog.FieldCurrency:
 		m.ResetCurrency()

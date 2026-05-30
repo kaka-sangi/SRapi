@@ -3912,6 +3912,63 @@ Required gates:
 - `make code-quality-check`
 - `git diff --check`
 
+## WP-1190: Per-Model RPM Rate Limit v1
+
+Problem (verified): `checkGatewayRateLimit` enforced only per-API-key RPM, per-user RPM, and per-API-key TPM; there was no per-model ceiling and the model registry had no rate-limit field, so an expensive/fragile upstream model could not be globally throttled.
+
+What changed:
+- `ModelRateLimit` Ent entity (`model_id` unique, `rpm_limit`, `enabled`), migration `000023`.
+- `model_rate_limits` module (contract/service/memory) + `entstore/modelratelimits`. `RPMForModel(modelID)` returns the active ceiling (0 = unlimited / disabled / errors — fail-open so lookups never block traffic).
+- Enforcement: `checkGatewayRateLimit` now takes `modelID` and, when a positive limit exists, appends a `model:<id>:rpm` check to the existing Redis-backed limiter batch — a global per-model ceiling across all users, on top of the per-key/user limits. Evaluated at admission (modelID already resolved there).
+- Admin list/upsert/delete (`/api/v1/admin/model-rate-limits`); upsert validates the model exists.
+- Scope is model-only in v1 (the entity is keyed by model). Per-group rate limiting is deferred: a group is known only after account selection, so it needs a post-scheduling seam.
+
+Tests/gates: `model_rate_limits` service tests (upsert / RPM gating / validation / delete), migration `000023` + table-list update, full `make check`.
+
+## WP-1180: Subscription-Allowance-First Billing With Pay-As-You-Go Overage v1
+
+Decision: allowance is **cost-based ($)** — `monthly_cost_quota` is the included $ allowance; overage falls back to balance. Opt-in per plan (`cost_quota_mode`), default `hard_cap` (unchanged).
+
+What changed:
+- Ent `UsageLog.billable_cost` (migration `000022`, backfilled `= cost` for existing rows). It is the portion charged to balance after allowance coverage.
+- `subscriptions/service`: `EntitlementDecision.CostQuotaMode`; `CheckEntitlement` reads `cost_quota_mode` and, in `allowance` mode, stops denying on `monthly_cost_quota` (allow-with-overage). New `CostAllowance(userID, now)` lookup and pure, unit-tested `BillableOverage(cost, usedBefore, allowance)` = `clamp(0, cost, (usedBefore+cost) - allowance)`.
+- `runtime_gateway_usage.recordGatewayUsage` computes `billable_cost` once (gated on success + non-zero cost + an active allowance-mode subscription) via `CostAllowance` + the existing success-only monthly `gatewayUserPeriodUsage`, and stores it on the usage log. Threaded through one method only — no change to the dozens of usage-record call sites.
+- usage entstore writes `billable_cost` with an empty→cost fallback; billing entstore `sumUsageCosts` bills `billable_cost` (falling back to `cost`). Net: normal usage bills full cost (unchanged); allowance-covered usage bills only the overage; a fully-covered request bills 0.
+- Token allowance (`monthly_token_quota`) stays a hard cap in v1.
+
+Tests/gates: `BillableOverage` table test (covered / boundary / partial / exhausted / zero-cost / unparseable / fractional), billing+usage entstore fixtures updated for `billable_cost`, migration `000022` + backfill, full `make check`.
+
+---
+Original charter (problem statement, verified in code): subscription and balance were orthogonal, not layered.
+- `subscriptions/service.CheckEntitlement` treats `monthly_cost_quota` / `monthly_token_quota` as HARD CAPS: when `CostUsedInPeriod + EstimatedCost > monthly_cost_quota` it returns `Allowed=false` (`monthly_cost_quota_exceeded`) and the request is rejected — it does NOT fall back to pay-as-you-go.
+- `gatewayPricing`/`EstimatePrice` derive per-request cost purely from pricing rules (mapping override > pricing_rule > default_zero); the subscription never alters cost.
+- `runtime_gateway_usage.recordGatewayUsage` records `Cost = pricing.Amount` unconditionally; `balance_charger` charges every usage log's full cost with zero subscription awareness.
+- Net: a subscribed user is both capped by the monthly quota AND charged balance per request; there is no "spend the subscription allowance first, then bill the overage to balance".
+
+Objective: make subscription a consumable allowance that is spent first, with the overage falling back to pay-as-you-go balance — opt-in per plan, default unchanged.
+
+Proposed approach:
+- Per-plan entitlement flag, e.g. `cost_quota_mode: "hard_cap" | "allowance"` (default `hard_cap` = current behavior, zero change).
+- In `allowance` mode, `CheckEntitlement` stops denying on cost-quota; instead it returns the remaining allowance so downstream can split each request's cost into covered vs billable.
+- New usage field `billable_cost` (Ent + migration): at record time, `billable_cost = clamp(0, cost, (CostUsedInPeriod + cost) - allowance)` — the portion beyond the allowance. `cost - billable_cost` is subscription-covered (free).
+- `balance_charger` charges `billable_cost` instead of full `cost`; ledger/audit distinguish covered vs billed.
+- Token allowance (`monthly_token_quota`) stays a hard cap in v1 (tokens don't map to $ balance); revisit later.
+
+Open decisions for sign-off: (1) allowance unit = cost-based `monthly_cost_quota` (recommended) vs token-based; (2) opt-in per-plan flag vs global; (3) whether to surface covered-vs-billed in the billing ledger and admin usage views.
+
+Tests/gates (when built): subscriptions service entitlement-split unit tests, billing charge split tests, migration for `billable_cost`, full `make check`.
+
+## WP-1170: Scheduled Account Quota Refresh v1
+
+Objective: promote the WP-1160 quota fetch from admin-triggered to automated, so accounts with a configured quota endpoint are refreshed on a schedule.
+
+What changed:
+- `provider_adapters`: `AccountQuotaFetcher` gains `QuotaConfigured(req) bool` (credential-free endpoint check) so callers skip credential decryption for accounts without quota.
+- New `internal/workers/quota_refresh` worker (modeled on `health_probe`): lists active accounts, resolves the provider, skips when not `QuotaConfigured`, else decrypts the credential, calls `FetchAccountQuota`, and persists each returned `QuotaSignal` as an `AccountQuotaSnapshot`. Bounded concurrency, per-account timeout, graceful Start/Shutdown, `RunOnce` for deterministic single passes.
+- `config.QuotaRefreshConfig` (`ACCOUNT_QUOTA_REFRESH_ENABLED`/`_INTERVAL_SECONDS`/`_TIMEOUT_SECONDS`/`_MAX_CONCURRENT`); disabled by default. Wired through `app.newHandler` (return tuple), `startWorkers`/`stopWorkers`, and the `internal/architecture` bootstrap-import allowlist.
+
+Tests/gates: `internal/app` bootstrap test, `internal/architecture` conformance, `make code-quality-check`, full `go test ./...`. No new tables/OpenAPI changes.
+
 ## WP-1160: Per-Provider Quota/Subscription Fetch Scaffold v1
 
 Objective: add an active, out-of-band per-account quota/subscription fetch for OAuth providers (Codex/Antigravity/Gemini-CLI), complementing the existing passive in-band `QuotaSignal` header parsing. Design is SRapi-native and avoids inventing provider API shapes.

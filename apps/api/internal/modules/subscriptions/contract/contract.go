@@ -160,6 +160,17 @@ type EntitlementDecision struct {
 	SchedulerStrategy string
 	MonthlyTokenQuota *int
 	MonthlyCostQuota  *string
+	// CostQuotaMode is "hard_cap" (default — deny when the monthly cost quota is
+	// exceeded) or "allowance" (treat the quota as an included allowance and bill
+	// the overage to balance instead of denying). WP-1180.
+	CostQuotaMode string
+}
+
+// CostAllowance describes a user's active subscription cost allowance, used to
+// split per-request cost into subscription-covered vs balance-billable.
+type CostAllowance struct {
+	Mode  string  // "" / "hard_cap" / "allowance"
+	Quota *string // monthly cost quota (allowance ceiling), nil when unset
 }
 
 type PricingRequest struct {

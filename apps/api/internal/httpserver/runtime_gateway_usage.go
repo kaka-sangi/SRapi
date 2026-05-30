@@ -11,6 +11,7 @@ import (
 	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	provideradaptercontract "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
+	subscriptionservice "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/service"
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
@@ -22,6 +23,7 @@ func (rt *runtimeState) recordGatewayUsage(ctx context.Context, rec gatewayUsage
 	}
 	pricing := rec.Pricing.withDefaults()
 	rt.warnDefaultZeroGatewayPricing(rec, model, pricing)
+	billableCost := rt.gatewayBillableCost(ctx, rec, pricing.Amount)
 	usageLog, usageErr := rt.usage.Record(ctx, usagecontract.RecordRequest{
 		RequestID:             rec.RequestID,
 		AttemptNo:             rec.AttemptNo,
@@ -41,6 +43,7 @@ func (rt *runtimeState) recordGatewayUsage(ctx context.Context, rec gatewayUsage
 		Success:               rec.Success,
 		ErrorClass:            rec.ErrorClass,
 		Cost:                  pricing.Amount,
+		BillableCost:          billableCost,
 		Currency:              pricing.Currency,
 		CompatibilityWarnings: rec.CompatibilityWarnings,
 	})
@@ -80,6 +83,31 @@ func (rt *runtimeState) recordGatewayUsage(ctx context.Context, rec gatewayUsage
 		rt.applyProviderAccountCooldown(ctx, rec)
 	}
 	rt.recordGatewayAccountSnapshots(ctx, rec)
+}
+
+// gatewayBillableCost splits the request cost into the portion billed to balance
+// vs covered by an active subscription cost allowance (WP-1180). It returns the
+// full cost unless the user has an allowance-mode subscription whose monthly
+// cost allowance covers part or all of this request. Only successful, priced
+// requests are evaluated (these are the only ones the charger bills).
+func (rt *runtimeState) gatewayBillableCost(ctx context.Context, rec gatewayUsageRecord, cost string) string {
+	if rt.subscriptions == nil || !rec.Success || rec.Authed.UserID <= 0 {
+		return cost
+	}
+	trimmed := strings.TrimSpace(cost)
+	if trimmed == "" || trimmed == "0.00000000" || trimmed == "0" {
+		return cost
+	}
+	now := time.Now().UTC()
+	allowance, err := rt.subscriptions.CostAllowance(ctx, rec.Authed.UserID, now)
+	if err != nil || allowance.Mode != "allowance" || allowance.Quota == nil {
+		return cost
+	}
+	_, usedCost, err := rt.gatewayUserPeriodUsage(ctx, rec.Authed.UserID, now)
+	if err != nil {
+		return cost
+	}
+	return subscriptionservice.BillableOverage(cost, usedCost, *allowance.Quota)
 }
 
 func (rt *runtimeState) warnDefaultZeroGatewayPricing(rec gatewayUsageRecord, model string, pricing gatewayPricingEvidence) {

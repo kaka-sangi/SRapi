@@ -15,6 +15,7 @@ import (
 	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	healthrollupscontract "github.com/srapi/srapi/apps/api/internal/modules/health_rollups/contract"
 	idempotencycontract "github.com/srapi/srapi/apps/api/internal/modules/idempotency/contract"
+	modelratelimitscontract "github.com/srapi/srapi/apps/api/internal/modules/model_rate_limits/contract"
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
 	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
 	paymentcontract "github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
@@ -38,6 +39,7 @@ import (
 	eventsstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/events"
 	healthrollupsstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/healthrollups"
 	idempotencystore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/idempotency"
+	modelratelimitsstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/modelratelimits"
 	modelstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/models"
 	operationsstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/operations"
 	paymentstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/payments"
@@ -79,6 +81,7 @@ type Stores struct {
 	ErrorPassthrough errorpassthroughcontract.Store
 	TLSProfiles      tlsprofilescontract.Store
 	HealthRollups    healthrollupscontract.Store
+	ModelRateLimits  modelratelimitscontract.Store
 }
 
 func New(client *ent.Client) (Stores, error) {
@@ -177,6 +180,10 @@ func New(client *ent.Client) (Stores, error) {
 	if err != nil {
 		return Stores{}, err
 	}
+	modelRateLimits, err := modelratelimitsstore.New(client)
+	if err != nil {
+		return Stores{}, err
+	}
 	return Stores{
 		AdminControl:     adminControl,
 		Users:            users,
@@ -202,5 +209,6 @@ func New(client *ent.Client) (Stores, error) {
 		ErrorPassthrough: errorPassthrough,
 		TLSProfiles:      tlsProfiles,
 		HealthRollups:    healthRollups,
+		ModelRateLimits:  modelRateLimits,
 	}, nil
 }

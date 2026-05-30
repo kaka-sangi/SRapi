@@ -155,7 +155,7 @@ func (rt *runtimeState) prepareGatewayAdmissionWithOptions(ctx context.Context, 
 	if !entitlement.Allowed {
 		return admission, nil
 	}
-	rateLimit, err := rt.checkGatewayRateLimit(ctx, *canonical, estimatedUsage)
+	rateLimit, err := rt.checkGatewayRateLimit(ctx, *canonical, estimatedUsage, modelID)
 	if err != nil {
 		return gatewayAdmission{}, err
 	}
@@ -209,7 +209,7 @@ func contentSafetyFindingsAudit(findings []contentsafetycontract.Finding) []map[
 	return out
 }
 
-func (rt *runtimeState) checkGatewayRateLimit(ctx context.Context, canonical gatewaycontract.CanonicalRequest, usage gatewaycontract.Usage) (ratelimit.Decision, error) {
+func (rt *runtimeState) checkGatewayRateLimit(ctx context.Context, canonical gatewaycontract.CanonicalRequest, usage gatewaycontract.Usage, modelID int) (ratelimit.Decision, error) {
 	if rt.rateLimiter == nil || canonical.UserID <= 0 || canonical.APIKeyID <= 0 {
 		return ratelimit.Decision{Allowed: true}, nil
 	}
@@ -249,6 +249,19 @@ func (rt *runtimeState) checkGatewayRateLimit(ctx context.Context, canonical gat
 			Cost:   max(1, usage.InputTokens+usage.OutputTokens+usage.CachedTokens),
 			Window: time.Minute,
 		})
+	}
+	// Global per-model RPM ceiling (WP-1190): protects an upstream model from
+	// overload across all users, on top of the per-key / per-user limits.
+	if rt.modelRateLimits != nil && modelID > 0 {
+		if limit := rt.modelRateLimits.RPMForModel(ctx, modelID); limit > 0 {
+			checks = append(checks, ratelimit.Check{
+				Name:   "model_rpm",
+				Key:    fmt.Sprintf("model:%d:rpm", modelID),
+				Limit:  limit,
+				Cost:   1,
+				Window: time.Minute,
+			})
+		}
 	}
 	return rt.rateLimiter.Allow(ctx, checks, time.Now().UTC())
 }

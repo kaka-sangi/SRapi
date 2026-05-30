@@ -820,6 +820,33 @@ var (
 			},
 		},
 	}
+	// ModelRateLimitsColumns holds the columns for the "model_rate_limits" table.
+	ModelRateLimitsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "model_id", Type: field.TypeInt},
+		{Name: "rpm_limit", Type: field.TypeInt, Default: 0},
+		{Name: "enabled", Type: field.TypeBool, Default: true},
+	}
+	// ModelRateLimitsTable holds the schema information for the "model_rate_limits" table.
+	ModelRateLimitsTable = &schema.Table{
+		Name:       "model_rate_limits",
+		Columns:    ModelRateLimitsColumns,
+		PrimaryKey: []*schema.Column{ModelRateLimitsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "modelratelimit_model_id",
+				Unique:  true,
+				Columns: []*schema.Column{ModelRateLimitsColumns[3]},
+			},
+			{
+				Name:    "modelratelimit_enabled",
+				Unique:  false,
+				Columns: []*schema.Column{ModelRateLimitsColumns[5]},
+			},
+		},
+	}
 	// ModelRegistriesColumns holds the columns for the "model_registries" table.
 	ModelRegistriesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -1800,6 +1827,7 @@ var (
 		{Name: "success", Type: field.TypeBool, Default: false},
 		{Name: "error_class", Type: field.TypeString, Nullable: true},
 		{Name: "cost", Type: field.TypeString, Default: "0.00000000"},
+		{Name: "billable_cost", Type: field.TypeString, Default: "0.00000000"},
 		{Name: "currency", Type: field.TypeString, Default: "USD"},
 		{Name: "charged_at", Type: field.TypeTime, Nullable: true},
 		{Name: "compatibility_warnings_json", Type: field.TypeJSON, Nullable: true},
@@ -1823,7 +1851,7 @@ var (
 			{
 				Name:    "usagelog_charged_at_success_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[23], UsageLogsColumns[19], UsageLogsColumns[1]},
+				Columns: []*schema.Column{UsageLogsColumns[24], UsageLogsColumns[19], UsageLogsColumns[1]},
 			},
 			{
 				Name:    "usagelog_api_key_id_created_at",
@@ -2279,6 +2307,7 @@ var (
 		InviteRelationshipsTable,
 		ModelAliasTable,
 		ModelProviderMappingsTable,
+		ModelRateLimitsTable,
 		ModelRegistriesTable,
 		ObsAlertEventsTable,
 		ObsSloDefinitionsTable,

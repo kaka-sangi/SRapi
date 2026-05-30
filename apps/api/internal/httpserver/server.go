@@ -30,6 +30,7 @@ import (
 	gatewaycontract "github.com/srapi/srapi/apps/api/internal/modules/gateway/contract"
 	healthrollupscontract "github.com/srapi/srapi/apps/api/internal/modules/health_rollups/contract"
 	idempotencycontract "github.com/srapi/srapi/apps/api/internal/modules/idempotency/contract"
+	modelratelimitscontract "github.com/srapi/srapi/apps/api/internal/modules/model_rate_limits/contract"
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
 	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
 	paymentcontract "github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
@@ -95,6 +96,7 @@ type runtimeOptions struct {
 	errorPassthrough errorpassthroughcontract.Store
 	tlsProfiles      tlsprofilescontract.Store
 	healthRollups    healthrollupscontract.Store
+	modelRateLimits  modelratelimitscontract.Store
 }
 
 func WithAdminControlStore(store admincontrolcontract.Store) Option {
@@ -208,6 +210,12 @@ func WithTLSProfilesStore(store tlsprofilescontract.Store) Option {
 func WithHealthRollupsStore(store healthrollupscontract.Store) Option {
 	return func(opts *runtimeOptions) {
 		opts.healthRollups = store
+	}
+}
+
+func WithModelRateLimitsStore(store modelratelimitscontract.Store) Option {
+	return func(opts *runtimeOptions) {
+		opts.modelRateLimits = store
 	}
 }
 
@@ -496,6 +504,9 @@ func (s *Server) registerCapabilityAdminRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/admin/tls-profiles", s.handleCreateAdminTLSProfile)
 	mux.HandleFunc("PATCH /api/v1/admin/tls-profiles/{id}", s.handleUpdateAdminTLSProfile)
 	mux.HandleFunc("DELETE /api/v1/admin/tls-profiles/{id}", s.handleDeleteAdminTLSProfile)
+	mux.HandleFunc("GET /api/v1/admin/model-rate-limits", s.handleListAdminModelRateLimits)
+	mux.HandleFunc("PUT /api/v1/admin/model-rate-limits", s.handleUpsertAdminModelRateLimit)
+	mux.HandleFunc("DELETE /api/v1/admin/model-rate-limits/{modelId}", s.handleDeleteAdminModelRateLimit)
 }
 
 func (s *Server) registerCurrentUserRoutes(mux *http.ServeMux) {

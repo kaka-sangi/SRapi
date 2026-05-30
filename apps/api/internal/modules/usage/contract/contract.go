@@ -26,6 +26,7 @@ type UsageLog struct {
 	Success               bool
 	ErrorClass            *string
 	Cost                  string
+	BillableCost          string
 	Currency              string
 	ChargedAt             *time.Time
 	CompatibilityWarnings []string
@@ -51,6 +52,7 @@ type RecordRequest struct {
 	Success               bool
 	ErrorClass            *string
 	Cost                  string
+	BillableCost          string
 	Currency              string
 	ChargedAt             *time.Time
 	CompatibilityWarnings []string

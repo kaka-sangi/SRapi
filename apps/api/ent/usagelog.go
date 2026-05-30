@@ -60,6 +60,8 @@ type UsageLog struct {
 	ErrorClass *string `json:"error_class,omitempty"`
 	// Cost holds the value of the "cost" field.
 	Cost string `json:"cost,omitempty"`
+	// BillableCost holds the value of the "billable_cost" field.
+	BillableCost string `json:"billable_cost,omitempty"`
 	// Currency holds the value of the "currency" field.
 	Currency string `json:"currency,omitempty"`
 	// ChargedAt holds the value of the "charged_at" field.
@@ -80,7 +82,7 @@ func (*UsageLog) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case usagelog.FieldID, usagelog.FieldAttemptNo, usagelog.FieldUserID, usagelog.FieldAPIKeyID, usagelog.FieldProviderID, usagelog.FieldAccountID, usagelog.FieldInputTokens, usagelog.FieldOutputTokens, usagelog.FieldCachedTokens, usagelog.FieldTotalTokens, usagelog.FieldLatencyMs:
 			values[i] = new(sql.NullInt64)
-		case usagelog.FieldRequestID, usagelog.FieldSourceProtocol, usagelog.FieldSourceEndpoint, usagelog.FieldTargetProtocol, usagelog.FieldModel, usagelog.FieldErrorClass, usagelog.FieldCost, usagelog.FieldCurrency:
+		case usagelog.FieldRequestID, usagelog.FieldSourceProtocol, usagelog.FieldSourceEndpoint, usagelog.FieldTargetProtocol, usagelog.FieldModel, usagelog.FieldErrorClass, usagelog.FieldCost, usagelog.FieldBillableCost, usagelog.FieldCurrency:
 			values[i] = new(sql.NullString)
 		case usagelog.FieldCreatedAt, usagelog.FieldUpdatedAt, usagelog.FieldChargedAt:
 			values[i] = new(sql.NullTime)
@@ -234,6 +236,12 @@ func (_m *UsageLog) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.Cost = value.String
 			}
+		case usagelog.FieldBillableCost:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field billable_cost", values[i])
+			} else if value.Valid {
+				_m.BillableCost = value.String
+			}
 		case usagelog.FieldCurrency:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field currency", values[i])
@@ -359,6 +367,9 @@ func (_m *UsageLog) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("cost=")
 	builder.WriteString(_m.Cost)
+	builder.WriteString(", ")
+	builder.WriteString("billable_cost=")
+	builder.WriteString(_m.BillableCost)
 	builder.WriteString(", ")
 	builder.WriteString("currency=")
 	builder.WriteString(_m.Currency)

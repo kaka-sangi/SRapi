@@ -28,6 +28,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/inviterelationship"
 	"github.com/srapi/srapi/apps/api/ent/modelalias"
 	"github.com/srapi/srapi/apps/api/ent/modelprovidermapping"
+	"github.com/srapi/srapi/apps/api/ent/modelratelimit"
 	"github.com/srapi/srapi/apps/api/ent/modelregistry"
 	"github.com/srapi/srapi/apps/api/ent/obsalertevent"
 	"github.com/srapi/srapi/apps/api/ent/obsslodefinition"
@@ -777,6 +778,29 @@ func init() {
 	modelprovidermappingDescStatus := modelprovidermappingFields[3].Descriptor()
 	// modelprovidermapping.DefaultStatus holds the default value on creation for the status field.
 	modelprovidermapping.DefaultStatus = modelprovidermappingDescStatus.Default.(string)
+	modelratelimitMixin := schema.ModelRateLimit{}.Mixin()
+	modelratelimitMixinFields0 := modelratelimitMixin[0].Fields()
+	_ = modelratelimitMixinFields0
+	modelratelimitFields := schema.ModelRateLimit{}.Fields()
+	_ = modelratelimitFields
+	// modelratelimitDescCreatedAt is the schema descriptor for created_at field.
+	modelratelimitDescCreatedAt := modelratelimitMixinFields0[0].Descriptor()
+	// modelratelimit.DefaultCreatedAt holds the default value on creation for the created_at field.
+	modelratelimit.DefaultCreatedAt = modelratelimitDescCreatedAt.Default.(func() time.Time)
+	// modelratelimitDescUpdatedAt is the schema descriptor for updated_at field.
+	modelratelimitDescUpdatedAt := modelratelimitMixinFields0[1].Descriptor()
+	// modelratelimit.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	modelratelimit.DefaultUpdatedAt = modelratelimitDescUpdatedAt.Default.(func() time.Time)
+	// modelratelimit.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	modelratelimit.UpdateDefaultUpdatedAt = modelratelimitDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// modelratelimitDescRpmLimit is the schema descriptor for rpm_limit field.
+	modelratelimitDescRpmLimit := modelratelimitFields[1].Descriptor()
+	// modelratelimit.DefaultRpmLimit holds the default value on creation for the rpm_limit field.
+	modelratelimit.DefaultRpmLimit = modelratelimitDescRpmLimit.Default.(int)
+	// modelratelimitDescEnabled is the schema descriptor for enabled field.
+	modelratelimitDescEnabled := modelratelimitFields[2].Descriptor()
+	// modelratelimit.DefaultEnabled holds the default value on creation for the enabled field.
+	modelratelimit.DefaultEnabled = modelratelimitDescEnabled.Default.(bool)
 	modelregistryMixin := schema.ModelRegistry{}.Mixin()
 	modelregistryMixinFields0 := modelregistryMixin[0].Fields()
 	_ = modelregistryMixinFields0
@@ -1749,8 +1773,12 @@ func init() {
 	usagelogDescCost := usagelogFields[18].Descriptor()
 	// usagelog.DefaultCost holds the default value on creation for the cost field.
 	usagelog.DefaultCost = usagelogDescCost.Default.(string)
+	// usagelogDescBillableCost is the schema descriptor for billable_cost field.
+	usagelogDescBillableCost := usagelogFields[19].Descriptor()
+	// usagelog.DefaultBillableCost holds the default value on creation for the billable_cost field.
+	usagelog.DefaultBillableCost = usagelogDescBillableCost.Default.(string)
 	// usagelogDescCurrency is the schema descriptor for currency field.
-	usagelogDescCurrency := usagelogFields[19].Descriptor()
+	usagelogDescCurrency := usagelogFields[20].Descriptor()
 	// usagelog.DefaultCurrency holds the default value on creation for the currency field.
 	usagelog.DefaultCurrency = usagelogDescCurrency.Default.(string)
 	userMixin := schema.User{}.Mixin()

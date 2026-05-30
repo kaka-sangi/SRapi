@@ -285,6 +285,18 @@ func (f ModelProviderMappingFunc) Mutate(ctx context.Context, m ent.Mutation) (e
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ModelProviderMappingMutation", m)
 }
 
+// The ModelRateLimitFunc type is an adapter to allow the use of ordinary
+// function as ModelRateLimit mutator.
+type ModelRateLimitFunc func(context.Context, *ent.ModelRateLimitMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ModelRateLimitFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ModelRateLimitMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ModelRateLimitMutation", m)
+}
+
 // The ModelRegistryFunc type is an adapter to allow the use of ordinary
 // function as ModelRegistry mutator.
 type ModelRegistryFunc func(context.Context, *ent.ModelRegistryMutation) (ent.Value, error)

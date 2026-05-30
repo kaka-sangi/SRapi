@@ -35,6 +35,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/inviterelationship"
 	"github.com/srapi/srapi/apps/api/ent/modelalias"
 	"github.com/srapi/srapi/apps/api/ent/modelprovidermapping"
+	"github.com/srapi/srapi/apps/api/ent/modelratelimit"
 	"github.com/srapi/srapi/apps/api/ent/modelregistry"
 	"github.com/srapi/srapi/apps/api/ent/obsalertevent"
 	"github.com/srapi/srapi/apps/api/ent/obsslodefinition"
@@ -153,6 +154,7 @@ func checkColumn(t, c string) error {
 			inviterelationship.Table:        inviterelationship.ValidColumn,
 			modelalias.Table:                modelalias.ValidColumn,
 			modelprovidermapping.Table:      modelprovidermapping.ValidColumn,
+			modelratelimit.Table:            modelratelimit.ValidColumn,
 			modelregistry.Table:             modelregistry.ValidColumn,
 			obsalertevent.Table:             obsalertevent.ValidColumn,
 			obsslodefinition.Table:          obsslodefinition.ValidColumn,

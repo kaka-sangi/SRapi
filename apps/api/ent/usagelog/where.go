@@ -159,6 +159,11 @@ func Cost(v string) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldCost, v))
 }
 
+// BillableCost applies equality check predicate on the "billable_cost" field. It's identical to BillableCostEQ.
+func BillableCost(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldBillableCost, v))
+}
+
 // Currency applies equality check predicate on the "currency" field. It's identical to CurrencyEQ.
 func Currency(v string) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldCurrency, v))
@@ -1152,6 +1157,71 @@ func CostEqualFold(v string) predicate.UsageLog {
 // CostContainsFold applies the ContainsFold predicate on the "cost" field.
 func CostContainsFold(v string) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldContainsFold(FieldCost, v))
+}
+
+// BillableCostEQ applies the EQ predicate on the "billable_cost" field.
+func BillableCostEQ(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldBillableCost, v))
+}
+
+// BillableCostNEQ applies the NEQ predicate on the "billable_cost" field.
+func BillableCostNEQ(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNEQ(FieldBillableCost, v))
+}
+
+// BillableCostIn applies the In predicate on the "billable_cost" field.
+func BillableCostIn(vs ...string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldIn(FieldBillableCost, vs...))
+}
+
+// BillableCostNotIn applies the NotIn predicate on the "billable_cost" field.
+func BillableCostNotIn(vs ...string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNotIn(FieldBillableCost, vs...))
+}
+
+// BillableCostGT applies the GT predicate on the "billable_cost" field.
+func BillableCostGT(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGT(FieldBillableCost, v))
+}
+
+// BillableCostGTE applies the GTE predicate on the "billable_cost" field.
+func BillableCostGTE(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGTE(FieldBillableCost, v))
+}
+
+// BillableCostLT applies the LT predicate on the "billable_cost" field.
+func BillableCostLT(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLT(FieldBillableCost, v))
+}
+
+// BillableCostLTE applies the LTE predicate on the "billable_cost" field.
+func BillableCostLTE(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLTE(FieldBillableCost, v))
+}
+
+// BillableCostContains applies the Contains predicate on the "billable_cost" field.
+func BillableCostContains(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldContains(FieldBillableCost, v))
+}
+
+// BillableCostHasPrefix applies the HasPrefix predicate on the "billable_cost" field.
+func BillableCostHasPrefix(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldHasPrefix(FieldBillableCost, v))
+}
+
+// BillableCostHasSuffix applies the HasSuffix predicate on the "billable_cost" field.
+func BillableCostHasSuffix(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldHasSuffix(FieldBillableCost, v))
+}
+
+// BillableCostEqualFold applies the EqualFold predicate on the "billable_cost" field.
+func BillableCostEqualFold(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEqualFold(FieldBillableCost, v))
+}
+
+// BillableCostContainsFold applies the ContainsFold predicate on the "billable_cost" field.
+func BillableCostContainsFold(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldContainsFold(FieldBillableCost, v))
 }
 
 // CurrencyEQ applies the EQ predicate on the "currency" field.

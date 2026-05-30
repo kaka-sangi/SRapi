@@ -290,6 +290,20 @@ func (_c *UsageLogCreate) SetNillableCost(v *string) *UsageLogCreate {
 	return _c
 }
 
+// SetBillableCost sets the "billable_cost" field.
+func (_c *UsageLogCreate) SetBillableCost(v string) *UsageLogCreate {
+	_c.mutation.SetBillableCost(v)
+	return _c
+}
+
+// SetNillableBillableCost sets the "billable_cost" field if the given value is not nil.
+func (_c *UsageLogCreate) SetNillableBillableCost(v *string) *UsageLogCreate {
+	if v != nil {
+		_c.SetBillableCost(*v)
+	}
+	return _c
+}
+
 // SetCurrency sets the "currency" field.
 func (_c *UsageLogCreate) SetCurrency(v string) *UsageLogCreate {
 	_c.mutation.SetCurrency(v)
@@ -419,6 +433,10 @@ func (_c *UsageLogCreate) defaults() {
 		v := usagelog.DefaultCost
 		_c.mutation.SetCost(v)
 	}
+	if _, ok := _c.mutation.BillableCost(); !ok {
+		v := usagelog.DefaultBillableCost
+		_c.mutation.SetBillableCost(v)
+	}
 	if _, ok := _c.mutation.Currency(); !ok {
 		v := usagelog.DefaultCurrency
 		_c.mutation.SetCurrency(v)
@@ -485,6 +503,9 @@ func (_c *UsageLogCreate) check() error {
 	}
 	if _, ok := _c.mutation.Cost(); !ok {
 		return &ValidationError{Name: "cost", err: errors.New(`ent: missing required field "UsageLog.cost"`)}
+	}
+	if _, ok := _c.mutation.BillableCost(); !ok {
+		return &ValidationError{Name: "billable_cost", err: errors.New(`ent: missing required field "UsageLog.billable_cost"`)}
 	}
 	if _, ok := _c.mutation.Currency(); !ok {
 		return &ValidationError{Name: "currency", err: errors.New(`ent: missing required field "UsageLog.currency"`)}
@@ -598,6 +619,10 @@ func (_c *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Cost(); ok {
 		_spec.SetField(usagelog.FieldCost, field.TypeString, value)
 		_node.Cost = value
+	}
+	if value, ok := _c.mutation.BillableCost(); ok {
+		_spec.SetField(usagelog.FieldBillableCost, field.TypeString, value)
+		_node.BillableCost = value
 	}
 	if value, ok := _c.mutation.Currency(); ok {
 		_spec.SetField(usagelog.FieldCurrency, field.TypeString, value)

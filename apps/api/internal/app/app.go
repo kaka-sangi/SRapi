@@ -25,6 +25,7 @@ import (
 	orderexpirerworker "github.com/srapi/srapi/apps/api/internal/workers/order_expirer"
 	outboxworker "github.com/srapi/srapi/apps/api/internal/workers/outbox"
 	qualityevalworker "github.com/srapi/srapi/apps/api/internal/workers/quality_eval"
+	quotarefreshworker "github.com/srapi/srapi/apps/api/internal/workers/quota_refresh"
 	retentionworker "github.com/srapi/srapi/apps/api/internal/workers/retention"
 	sloevaluatorworker "github.com/srapi/srapi/apps/api/internal/workers/slo_evaluator"
 	subscriptionexpirerworker "github.com/srapi/srapi/apps/api/internal/workers/subscription_expirer"
@@ -33,23 +34,24 @@ import (
 const defaultReadHeaderTimeout = 10 * time.Second
 
 type App struct {
-	cfg       config.Config
-	logger    *slog.Logger
-	server    *http.Server
-	db        *platformdb.Client
-	redis     *platformredis.Client
-	tracer    platformotel.ShutdownFunc
-	outbox    *outboxworker.Worker
-	retention *retentionworker.Worker
-	authClean *authcleanupworker.Worker
-	idemClean *idempotencycleanupworker.Worker
-	expirer   *orderexpirerworker.Worker
-	subExpiry *subscriptionexpirerworker.Worker
-	quota     *accountquotaalertworker.Worker
-	balance   *balancechargerworker.Worker
-	health    *healthprobeworker.Worker
-	quality   *qualityevalworker.Worker
-	sloEval   *sloevaluatorworker.Worker
+	cfg          config.Config
+	logger       *slog.Logger
+	server       *http.Server
+	db           *platformdb.Client
+	redis        *platformredis.Client
+	tracer       platformotel.ShutdownFunc
+	outbox       *outboxworker.Worker
+	retention    *retentionworker.Worker
+	authClean    *authcleanupworker.Worker
+	idemClean    *idempotencycleanupworker.Worker
+	quotaRefresh *quotarefreshworker.Worker
+	expirer      *orderexpirerworker.Worker
+	subExpiry    *subscriptionexpirerworker.Worker
+	quota        *accountquotaalertworker.Worker
+	balance      *balancechargerworker.Worker
+	health       *healthprobeworker.Worker
+	quality      *qualityevalworker.Worker
+	sloEval      *sloevaluatorworker.Worker
 }
 
 func New(cfg config.Config, logger *slog.Logger) (*App, error) {
@@ -74,7 +76,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		return nil, err
 	}
 
-	handler, outbox, retention, authClean, expirer, subExpiry, quota, balance, health, quality, sloEval, idemClean, err := newHandler(cfg, logger, dbClient, redisClient)
+	handler, outbox, retention, authClean, expirer, subExpiry, quota, balance, health, quality, sloEval, idemClean, quotaRefresh, err := newHandler(cfg, logger, dbClient, redisClient)
 	if err != nil {
 		_ = dbClient.Close()
 		_ = redisClient.Close()
@@ -88,23 +90,24 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		ReadHeaderTimeout: defaultReadHeaderTimeout,
 	}
 	return &App{
-		cfg:       cfg,
-		logger:    logger,
-		server:    server,
-		db:        dbClient,
-		redis:     redisClient,
-		tracer:    tracerShutdown,
-		outbox:    outbox,
-		retention: retention,
-		authClean: authClean,
-		idemClean: idemClean,
-		expirer:   expirer,
-		subExpiry: subExpiry,
-		quota:     quota,
-		balance:   balance,
-		health:    health,
-		quality:   quality,
-		sloEval:   sloEval,
+		cfg:          cfg,
+		logger:       logger,
+		server:       server,
+		db:           dbClient,
+		redis:        redisClient,
+		tracer:       tracerShutdown,
+		outbox:       outbox,
+		retention:    retention,
+		authClean:    authClean,
+		idemClean:    idemClean,
+		quotaRefresh: quotaRefresh,
+		expirer:      expirer,
+		subExpiry:    subExpiry,
+		quota:        quota,
+		balance:      balance,
+		health:       health,
+		quality:      quality,
+		sloEval:      sloEval,
 	}, nil
 }
 
@@ -154,7 +157,7 @@ func Healthcheck(ctx context.Context, cfg config.Config) error {
 	return httpserver.Healthcheck(ctx, cfg.HealthcheckAddress())
 }
 
-func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Client, redisClient *platformredis.Client) (http.Handler, *outboxworker.Worker, *retentionworker.Worker, *authcleanupworker.Worker, *orderexpirerworker.Worker, *subscriptionexpirerworker.Worker, *accountquotaalertworker.Worker, *balancechargerworker.Worker, *healthprobeworker.Worker, *qualityevalworker.Worker, *sloevaluatorworker.Worker, *idempotencycleanupworker.Worker, error) {
+func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Client, redisClient *platformredis.Client) (http.Handler, *outboxworker.Worker, *retentionworker.Worker, *authcleanupworker.Worker, *orderexpirerworker.Worker, *subscriptionexpirerworker.Worker, *accountquotaalertworker.Worker, *balancechargerworker.Worker, *healthprobeworker.Worker, *qualityevalworker.Worker, *sloevaluatorworker.Worker, *idempotencycleanupworker.Worker, *quotarefreshworker.Worker, error) {
 	var (
 		handler http.Handler
 		err     error
@@ -168,65 +171,69 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 	}
 	realtimeStore, err := realtimeSlotStore(context.Background(), cfg, logger, redisClient)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	if realtimeStore != nil {
 		options = append(options, httpserver.WithRealtimeStore(realtimeStore))
 	}
 	rateLimiterOption, err := gatewayRateLimiterOption(context.Background(), cfg, logger, redisClient)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	if rateLimiterOption != nil {
 		options = append(options, rateLimiterOption)
 	}
 	stores, err := persistentStores(context.Background(), cfg, logger, dbClient, redisClient)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	outbox, err := domainEventsWorker(cfg, stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	retention, err := retentionCleanupWorker(cfg, stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	authClean, err := authSessionCleanupWorker(cfg, stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	idemClean, err := idempotencyCleanupWorker(stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	expirer, err := paymentOrderExpirerWorker(cfg, stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	subExpiry, err := subscriptionExpirerWorker(stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	quota, err := accountQuotaAlertWorker(cfg, stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	balance, err := balanceChargerWorker(cfg, stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	health, err := accountHealthProbeWorker(cfg, stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	quality, err := qualityEvalWorker(cfg, stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	sloEval, err := sloEvaluatorWorker(cfg, stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+	}
+	quotaRefresh, err := quotaRefreshWorker(cfg, stores, logger)
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	if stores != nil {
 		options = append(options,
@@ -253,6 +260,7 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 			httpserver.WithErrorPassthroughStore(stores.ErrorPassthrough),
 			httpserver.WithTLSProfilesStore(stores.TLSProfiles),
 			httpserver.WithHealthRollupsStore(stores.HealthRollups),
+			httpserver.WithModelRateLimitsStore(stores.ModelRateLimits),
 		)
 	}
 
@@ -265,7 +273,7 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 		handler = httpserver.New(cfg, logger, options...)
 	}()
 
-	return handler, outbox, retention, authClean, expirer, subExpiry, quota, balance, health, quality, sloEval, idemClean, err
+	return handler, outbox, retention, authClean, expirer, subExpiry, quota, balance, health, quality, sloEval, idemClean, quotaRefresh, err
 }
 
 func persistentStores(ctx context.Context, cfg config.Config, logger *slog.Logger, dbClient *platformdb.Client, redisClient *platformredis.Client) (*entstore.Stores, error) {
@@ -474,6 +482,18 @@ func accountHealthProbeWorker(cfg config.Config, stores *entstore.Stores, logger
 	})
 }
 
+func quotaRefreshWorker(cfg config.Config, stores *entstore.Stores, logger *slog.Logger) (*quotarefreshworker.Worker, error) {
+	if stores == nil || stores.Accounts == nil || stores.Providers == nil || !cfg.QuotaRefresh.Enabled {
+		return nil, nil
+	}
+	return quotarefreshworker.New(stores.Accounts, stores.Providers, logger, quotarefreshworker.Config{
+		Interval:      cfg.QuotaRefresh.Interval,
+		Timeout:       cfg.QuotaRefresh.Timeout,
+		MaxConcurrent: cfg.QuotaRefresh.MaxConcurrent,
+		MasterKey:     cfg.Security.MasterKey,
+	})
+}
+
 func qualityEvalWorker(cfg config.Config, stores *entstore.Stores, logger *slog.Logger) (*qualityevalworker.Worker, error) {
 	if stores == nil || stores.QualityEval == nil || !cfg.QualityEval.Enabled {
 		return nil, nil
@@ -538,6 +558,9 @@ func (a *App) startWorkers() {
 	if a.sloEval != nil {
 		a.sloEval.Start(context.Background())
 	}
+	if a.quotaRefresh != nil {
+		a.quotaRefresh.Start(context.Background())
+	}
 }
 
 func (a *App) stopWorkers(ctx context.Context) error {
@@ -577,6 +600,9 @@ func (a *App) stopWorkers(ctx context.Context) error {
 	}
 	if a.sloEval != nil {
 		errs = append(errs, a.sloEval.Shutdown(ctx))
+	}
+	if a.quotaRefresh != nil {
+		errs = append(errs, a.quotaRefresh.Shutdown(ctx))
 	}
 	return errors.Join(errs...)
 }
