@@ -110,7 +110,43 @@ func (rt *runtimeState) scheduleGatewayRequest(ctx context.Context, req schedule
 	candidates = rt.applyGatewayQualityScores(ctx, candidates, req.Model)
 	req.Candidates = candidates
 	rt.applyGatewayStrategyRollout(ctx, &req, apiKey)
-	return rt.scheduler.Schedule(ctx, req)
+	result, err := rt.scheduler.Schedule(ctx, req)
+	if err != nil {
+		return result, err
+	}
+	return applyAccountModelMapping(result, req.Model), nil
+}
+
+// accountModelMappingMetadataKey is the provider-account metadata key holding a
+// per-account "canonical catalog model -> upstream model name" override map. It
+// lets two accounts of the same provider serve the same catalog model from
+// different upstream model names (sub2api per-channel model_mapping parity).
+const accountModelMappingMetadataKey = "model_mapping"
+
+// applyAccountModelMapping overrides the scheduled candidate's upstream model
+// name when its account carries a per-account model_mapping override for the
+// requested canonical model. The failover loop re-schedules on every attempt,
+// so applying to result.Candidate here covers each attempt's chosen account.
+func applyAccountModelMapping(result schedulercontract.ScheduleResult, canonicalModel string) schedulercontract.ScheduleResult {
+	if override := accountModelOverride(result.Candidate.Account, canonicalModel); override != "" {
+		result.Candidate.Mapping.UpstreamModelName = override
+	}
+	return result
+}
+
+// accountModelOverride returns the per-account upstream model name configured
+// for canonicalModel, or "" when the account has no (valid, non-blank) override.
+func accountModelOverride(account accountcontract.ProviderAccount, canonicalModel string) string {
+	model := strings.TrimSpace(canonicalModel)
+	if model == "" || len(account.Metadata) == 0 {
+		return ""
+	}
+	mapping, ok := account.Metadata[accountModelMappingMetadataKey].(map[string]any)
+	if !ok {
+		return ""
+	}
+	override, _ := mapping[model].(string)
+	return strings.TrimSpace(override)
 }
 
 func (rt *runtimeState) prepareGatewayAdmission(ctx context.Context, canonical *gatewaycontract.CanonicalRequest, resolution modelcontract.ModelResolution, modelID int) (gatewayAdmission, error) {

@@ -228,6 +228,27 @@ export function AccountFormDialog({
   const spec = specFor(runtimeClass);
   const busy = submitting || Boolean(isPending);
 
+  // model_mapping lives inside metadata but gets a dedicated editor below; keep
+  // it out of the generic metadata editor so the two never overwrite each other.
+  const modelMappingKey = "model_mapping";
+  const rawModelMapping = metadata[modelMappingKey];
+  const modelMapping =
+    rawModelMapping && typeof rawModelMapping === "object" && !Array.isArray(rawModelMapping)
+      ? (rawModelMapping as Record<string, unknown>)
+      : {};
+  const metadataWithoutMapping: Record<string, unknown> = { ...metadata };
+  delete metadataWithoutMapping[modelMappingKey];
+  const updateMetadataFields = (next: Record<string, unknown>) =>
+    setMetadata(
+      Object.keys(modelMapping).length > 0 ? { ...next, [modelMappingKey]: modelMapping } : next,
+    );
+  const updateModelMapping = (next: Record<string, unknown>) =>
+    setMetadata(
+      Object.keys(next).length > 0
+        ? { ...metadataWithoutMapping, [modelMappingKey]: next }
+        : metadataWithoutMapping,
+    );
+
   // Auth methods the selected provider accepts. Always keep the current
   // selection visible so editing a legacy account never hides its real value.
   const availableRuntimeClasses = allowedFor(providerId);
@@ -535,10 +556,26 @@ export function AccountFormDialog({
                     <Label>{t("adminCommon.metadata")}</Label>
                     <div className="mt-1.5">
                       <KeyValueEditor
-                        value={metadata}
-                        onChange={setMetadata}
+                        value={metadataWithoutMapping}
+                        onChange={updateMetadataFields}
                         disabled={busy}
                         addLabel={t("adminCommon.addField")}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label>{t("adminAccounts.modelMapping")}</Label>
+                    <p className="mt-1 text-2xs text-srapi-text-tertiary">
+                      {t("adminAccounts.modelMappingHint")}
+                    </p>
+                    <div className="mt-1.5">
+                      <KeyValueEditor
+                        value={modelMapping}
+                        onChange={updateModelMapping}
+                        disabled={busy}
+                        keyPlaceholder={t("adminAccounts.modelMappingKeyPlaceholder")}
+                        valuePlaceholder={t("adminAccounts.modelMappingValuePlaceholder")}
+                        addLabel={t("adminAccounts.addModelMapping")}
                       />
                     </div>
                   </div>

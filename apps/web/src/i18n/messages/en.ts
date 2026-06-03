@@ -353,6 +353,12 @@ export const en = {
     priority: "Priority",
     weight: "Weight",
     upstreamClient: "Upstream client",
+    modelMapping: "Model mapping",
+    modelMappingHint:
+      "Per-account override: catalog model → upstream model name. Replaces this channel's default mapping for this account only.",
+    modelMappingKeyPlaceholder: "catalog model",
+    modelMappingValuePlaceholder: "upstream model",
+    addModelMapping: "Add mapping",
     authType: "Auth type",
     platform: {
       anthropic_compatible: "Anthropic-compatible",

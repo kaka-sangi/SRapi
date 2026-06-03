@@ -354,6 +354,11 @@ export const zh: Messages = {
     priority: "优先级",
     weight: "权重",
     upstreamClient: "上游客户端",
+    modelMapping: "模型映射",
+    modelMappingHint: "账号级覆盖：目录模型 → 上游模型名。仅对本账号生效，覆盖该渠道的默认映射。",
+    modelMappingKeyPlaceholder: "目录模型",
+    modelMappingValuePlaceholder: "上游模型",
+    addModelMapping: "添加映射",
     authType: "认证方式",
     platform: {
       anthropic_compatible: "Anthropic 兼容",
