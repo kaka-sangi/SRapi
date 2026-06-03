@@ -52,6 +52,14 @@ func anthropicCompatiblePayload(req contract.ConversationRequest) anthropicMessa
 }
 
 func anthropicCompatibleRequestBody(req contract.ConversationRequest) ([]byte, error) {
+	raw, err := anthropicCompatibleRequestBodyRaw(req)
+	if err != nil {
+		return nil, err
+	}
+	return applyPayloadTransforms(raw, req.PayloadTransforms)
+}
+
+func anthropicCompatibleRequestBodyRaw(req contract.ConversationRequest) ([]byte, error) {
 	if payload, ok, err := rawSameProtocolPayload(req, rawEndpointAnthropicMessages); ok || err != nil {
 		if err != nil {
 			return nil, err
@@ -496,6 +504,14 @@ func openAICompatiblePayload(req contract.ConversationRequest) openAIChatComplet
 }
 
 func openAICompatibleRequestBody(req contract.ConversationRequest) ([]byte, error) {
+	raw, err := openAICompatibleRequestBodyRaw(req)
+	if err != nil {
+		return nil, err
+	}
+	return applyPayloadTransforms(raw, req.PayloadTransforms)
+}
+
+func openAICompatibleRequestBodyRaw(req contract.ConversationRequest) ([]byte, error) {
 	if payload, ok, err := rawSameProtocolPayload(req, rawEndpointOpenAIChatCompletions); ok || err != nil {
 		if err != nil {
 			return nil, err

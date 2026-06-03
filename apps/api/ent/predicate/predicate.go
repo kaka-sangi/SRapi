@@ -96,6 +96,9 @@ type OpsSystemLog func(*sql.Selector)
 // PasswordResetToken is the predicate function for passwordresettoken builders.
 type PasswordResetToken func(*sql.Selector)
 
+// PayloadRule is the predicate function for payloadrule builders.
+type PayloadRule func(*sql.Selector)
+
 // PaymentAuditLog is the predicate function for paymentauditlog builders.
 type PaymentAuditLog func(*sql.Selector)
 

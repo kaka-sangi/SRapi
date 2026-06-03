@@ -278,6 +278,14 @@ export function useErrorPassthroughRules() {
   });
 }
 
+// ---- Payload transform rules ----
+export function usePayloadRules() {
+  return useQuery({
+    queryKey: queryKeys.admin.payloadRules(),
+    queryFn: () => adminApi.listPayloadRules(),
+  });
+}
+
 // ---- TLS fingerprint profiles ----
 export function useTlsProfiles() {
   return useQuery({
@@ -659,6 +667,27 @@ export function useDeleteErrorPassthroughRule() {
   return useAdminMutation(
     (id: string) => adminApi.deleteErrorPassthroughRule(id),
     ["admin", "error-passthrough-rules"],
+  );
+}
+
+// Payload transform rules
+export function useCreatePayloadRule() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.createPayloadRule>) => adminApi.createPayloadRule(body),
+    ["admin", "payload-rules"],
+  );
+}
+export function useUpdatePayloadRule() {
+  return useAdminMutation(
+    (vars: { id: string; body: B<typeof adminApi.updatePayloadRule> }) =>
+      adminApi.updatePayloadRule(vars.id, vars.body),
+    ["admin", "payload-rules"],
+  );
+}
+export function useDeletePayloadRule() {
+  return useAdminMutation(
+    (id: string) => adminApi.deletePayloadRule(id),
+    ["admin", "payload-rules"],
   );
 }
 

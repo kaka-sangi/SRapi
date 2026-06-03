@@ -1082,6 +1082,37 @@ var (
 			},
 		},
 	}
+	// PayloadRulesColumns holds the columns for the "payload_rules" table.
+	PayloadRulesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "name", Type: field.TypeString},
+		{Name: "enabled", Type: field.TypeBool, Default: true},
+		{Name: "priority", Type: field.TypeInt, Default: 0},
+		{Name: "action", Type: field.TypeString},
+		{Name: "match_model", Type: field.TypeString, Default: "*"},
+		{Name: "match_protocol", Type: field.TypeString, Default: ""},
+		{Name: "params_json", Type: field.TypeJSON, Nullable: true},
+	}
+	// PayloadRulesTable holds the schema information for the "payload_rules" table.
+	PayloadRulesTable = &schema.Table{
+		Name:       "payload_rules",
+		Columns:    PayloadRulesColumns,
+		PrimaryKey: []*schema.Column{PayloadRulesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "payloadrule_enabled",
+				Unique:  false,
+				Columns: []*schema.Column{PayloadRulesColumns[4]},
+			},
+			{
+				Name:    "payloadrule_priority",
+				Unique:  false,
+				Columns: []*schema.Column{PayloadRulesColumns[5]},
+			},
+		},
+	}
 	// PaymentAuditLogsColumns holds the columns for the "payment_audit_logs" table.
 	PaymentAuditLogsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -2382,6 +2413,7 @@ var (
 		ObsSloDefinitionsTable,
 		OpsSystemLogsTable,
 		PasswordResetTokensTable,
+		PayloadRulesTable,
 		PaymentAuditLogsTable,
 		PaymentOrdersTable,
 		PaymentProviderInstancesTable,

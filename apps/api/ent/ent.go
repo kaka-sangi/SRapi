@@ -42,6 +42,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/obsslodefinition"
 	"github.com/srapi/srapi/apps/api/ent/opssystemlog"
 	"github.com/srapi/srapi/apps/api/ent/passwordresettoken"
+	"github.com/srapi/srapi/apps/api/ent/payloadrule"
 	"github.com/srapi/srapi/apps/api/ent/paymentauditlog"
 	"github.com/srapi/srapi/apps/api/ent/paymentorder"
 	"github.com/srapi/srapi/apps/api/ent/paymentproviderinstance"
@@ -163,6 +164,7 @@ func checkColumn(t, c string) error {
 			obsslodefinition.Table:          obsslodefinition.ValidColumn,
 			opssystemlog.Table:              opssystemlog.ValidColumn,
 			passwordresettoken.Table:        passwordresettoken.ValidColumn,
+			payloadrule.Table:               payloadrule.ValidColumn,
 			paymentauditlog.Table:           paymentauditlog.ValidColumn,
 			paymentorder.Table:              paymentorder.ValidColumn,
 			paymentproviderinstance.Table:   paymentproviderinstance.ValidColumn,

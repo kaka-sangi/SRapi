@@ -57,6 +57,14 @@ func geminiCompatiblePayload(req contract.ConversationRequest) geminiGenerateCon
 }
 
 func geminiCompatibleRequestBody(req contract.ConversationRequest) ([]byte, error) {
+	raw, err := geminiCompatibleRequestBodyRaw(req)
+	if err != nil {
+		return nil, err
+	}
+	return applyPayloadTransforms(raw, req.PayloadTransforms)
+}
+
+func geminiCompatibleRequestBodyRaw(req contract.ConversationRequest) ([]byte, error) {
 	if payload, ok, err := rawSameProtocolPayload(req, rawEndpointGeminiGenerateContent); ok || err != nil {
 		if err != nil {
 			return nil, err

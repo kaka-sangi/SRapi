@@ -271,6 +271,7 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 			httpserver.WithModelRateLimitsStore(stores.ModelRateLimits),
 			httpserver.WithGroupRateLimitsStore(stores.GroupRateLimits),
 			httpserver.WithUserPlatformQuotasStore(stores.UserPlatformQuotas),
+			httpserver.WithPayloadRulesStore(stores.PayloadRules),
 		)
 	}
 

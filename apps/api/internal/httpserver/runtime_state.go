@@ -60,6 +60,9 @@ import (
 	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
 	operationsservice "github.com/srapi/srapi/apps/api/internal/modules/operations/service"
 	operationsmemory "github.com/srapi/srapi/apps/api/internal/modules/operations/store/memory"
+	payloadrulescontract "github.com/srapi/srapi/apps/api/internal/modules/payload_rules/contract"
+	payloadrulesservice "github.com/srapi/srapi/apps/api/internal/modules/payload_rules/service"
+	payloadrulesmemory "github.com/srapi/srapi/apps/api/internal/modules/payload_rules/store/memory"
 	paymentcontract "github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
 	paymentservice "github.com/srapi/srapi/apps/api/internal/modules/payments/service"
 	paymentmemory "github.com/srapi/srapi/apps/api/internal/modules/payments/store/memory"
@@ -153,6 +156,7 @@ type runtimeState struct {
 	modelRateLimits         *modelratelimitsservice.Service
 	groupRateLimits         *groupratelimitsservice.Service
 	userPlatformQuotas      *userplatformquotasservice.Service
+	payloadRules            *payloadrulesservice.Service
 	userStore               userscontract.Store
 	sessionStore            authcontract.Store
 	apiKeyStore             apikeycontract.Store
@@ -180,6 +184,7 @@ type runtimeState struct {
 	modelRateLimitsStore    modelratelimitscontract.Store
 	groupRateLimitsStore    groupratelimitscontract.Store
 	userPlatformQuotasStore userplatformquotascontract.Store
+	payloadRulesStore       payloadrulescontract.Store
 	capabilities            []capabilitiescontract.Definition
 	databaseProbe           dependencyPinger
 	redisProbe              dependencyPinger
@@ -502,6 +507,20 @@ func (rt *runtimeState) buildCapabilityServices(cfg config.Config, opts runtimeO
 		return err
 	}
 	rt.userPlatformQuotas = userPlatformQuotasSvc
+
+	payloadRulesStore := opts.payloadRules
+	if payloadRulesStore == nil {
+		if !allowMemoryStores {
+			return missingRuntimeStoreError("payload rules")
+		}
+		payloadRulesStore = payloadrulesmemory.New()
+	}
+	rt.payloadRulesStore = payloadRulesStore
+	payloadRulesSvc, err := payloadrulesservice.New(payloadRulesStore)
+	if err != nil {
+		return err
+	}
+	rt.payloadRules = payloadRulesSvc
 	return nil
 }
 

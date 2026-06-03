@@ -44,6 +44,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/obsslodefinition"
 	"github.com/srapi/srapi/apps/api/ent/opssystemlog"
 	"github.com/srapi/srapi/apps/api/ent/passwordresettoken"
+	"github.com/srapi/srapi/apps/api/ent/payloadrule"
 	"github.com/srapi/srapi/apps/api/ent/paymentauditlog"
 	"github.com/srapi/srapi/apps/api/ent/paymentorder"
 	"github.com/srapi/srapi/apps/api/ent/paymentproviderinstance"
@@ -142,6 +143,8 @@ type Client struct {
 	OpsSystemLog *OpsSystemLogClient
 	// PasswordResetToken is the client for interacting with the PasswordResetToken builders.
 	PasswordResetToken *PasswordResetTokenClient
+	// PayloadRule is the client for interacting with the PayloadRule builders.
+	PayloadRule *PayloadRuleClient
 	// PaymentAuditLog is the client for interacting with the PaymentAuditLog builders.
 	PaymentAuditLog *PaymentAuditLogClient
 	// PaymentOrder is the client for interacting with the PaymentOrder builders.
@@ -245,6 +248,7 @@ func (c *Client) init() {
 	c.ObsSLODefinition = NewObsSLODefinitionClient(c.config)
 	c.OpsSystemLog = NewOpsSystemLogClient(c.config)
 	c.PasswordResetToken = NewPasswordResetTokenClient(c.config)
+	c.PayloadRule = NewPayloadRuleClient(c.config)
 	c.PaymentAuditLog = NewPaymentAuditLogClient(c.config)
 	c.PaymentOrder = NewPaymentOrderClient(c.config)
 	c.PaymentProviderInstance = NewPaymentProviderInstanceClient(c.config)
@@ -398,6 +402,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		ObsSLODefinition:          NewObsSLODefinitionClient(cfg),
 		OpsSystemLog:              NewOpsSystemLogClient(cfg),
 		PasswordResetToken:        NewPasswordResetTokenClient(cfg),
+		PayloadRule:               NewPayloadRuleClient(cfg),
 		PaymentAuditLog:           NewPaymentAuditLogClient(cfg),
 		PaymentOrder:              NewPaymentOrderClient(cfg),
 		PaymentProviderInstance:   NewPaymentProviderInstanceClient(cfg),
@@ -478,6 +483,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		ObsSLODefinition:          NewObsSLODefinitionClient(cfg),
 		OpsSystemLog:              NewOpsSystemLogClient(cfg),
 		PasswordResetToken:        NewPasswordResetTokenClient(cfg),
+		PayloadRule:               NewPayloadRuleClient(cfg),
 		PaymentAuditLog:           NewPaymentAuditLogClient(cfg),
 		PaymentOrder:              NewPaymentOrderClient(cfg),
 		PaymentProviderInstance:   NewPaymentProviderInstanceClient(cfg),
@@ -546,7 +552,7 @@ func (c *Client) Use(hooks ...Hook) {
 		c.ErrorPassthroughRule, c.IdempotencyRecord, c.InviteCode,
 		c.InviteRelationship, c.ModelAlias, c.ModelProviderMapping, c.ModelRateLimit,
 		c.ModelRegistry, c.ObsAlertEvent, c.ObsSLODefinition, c.OpsSystemLog,
-		c.PasswordResetToken, c.PaymentAuditLog, c.PaymentOrder,
+		c.PasswordResetToken, c.PayloadRule, c.PaymentAuditLog, c.PaymentOrder,
 		c.PaymentProviderInstance, c.PendingOAuthSession, c.PricingRule, c.Provider,
 		c.ProviderAccount, c.Proxy, c.QualityEvalSample, c.QualityEvaluation, c.Role,
 		c.SchedulerDecision, c.SchedulerFeedback, c.SchedulerRequestSnapshot,
@@ -572,7 +578,7 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.ErrorPassthroughRule, c.IdempotencyRecord, c.InviteCode,
 		c.InviteRelationship, c.ModelAlias, c.ModelProviderMapping, c.ModelRateLimit,
 		c.ModelRegistry, c.ObsAlertEvent, c.ObsSLODefinition, c.OpsSystemLog,
-		c.PasswordResetToken, c.PaymentAuditLog, c.PaymentOrder,
+		c.PasswordResetToken, c.PayloadRule, c.PaymentAuditLog, c.PaymentOrder,
 		c.PaymentProviderInstance, c.PendingOAuthSession, c.PricingRule, c.Provider,
 		c.ProviderAccount, c.Proxy, c.QualityEvalSample, c.QualityEvaluation, c.Role,
 		c.SchedulerDecision, c.SchedulerFeedback, c.SchedulerRequestSnapshot,
@@ -649,6 +655,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.OpsSystemLog.mutate(ctx, m)
 	case *PasswordResetTokenMutation:
 		return c.PasswordResetToken.mutate(ctx, m)
+	case *PayloadRuleMutation:
+		return c.PayloadRule.mutate(ctx, m)
 	case *PaymentAuditLogMutation:
 		return c.PaymentAuditLog.mutate(ctx, m)
 	case *PaymentOrderMutation:
@@ -4703,6 +4711,139 @@ func (c *PasswordResetTokenClient) mutate(ctx context.Context, m *PasswordResetT
 		return (&PasswordResetTokenDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown PasswordResetToken mutation op: %q", m.Op())
+	}
+}
+
+// PayloadRuleClient is a client for the PayloadRule schema.
+type PayloadRuleClient struct {
+	config
+}
+
+// NewPayloadRuleClient returns a client for the PayloadRule from the given config.
+func NewPayloadRuleClient(c config) *PayloadRuleClient {
+	return &PayloadRuleClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `payloadrule.Hooks(f(g(h())))`.
+func (c *PayloadRuleClient) Use(hooks ...Hook) {
+	c.hooks.PayloadRule = append(c.hooks.PayloadRule, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `payloadrule.Intercept(f(g(h())))`.
+func (c *PayloadRuleClient) Intercept(interceptors ...Interceptor) {
+	c.inters.PayloadRule = append(c.inters.PayloadRule, interceptors...)
+}
+
+// Create returns a builder for creating a PayloadRule entity.
+func (c *PayloadRuleClient) Create() *PayloadRuleCreate {
+	mutation := newPayloadRuleMutation(c.config, OpCreate)
+	return &PayloadRuleCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of PayloadRule entities.
+func (c *PayloadRuleClient) CreateBulk(builders ...*PayloadRuleCreate) *PayloadRuleCreateBulk {
+	return &PayloadRuleCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *PayloadRuleClient) MapCreateBulk(slice any, setFunc func(*PayloadRuleCreate, int)) *PayloadRuleCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &PayloadRuleCreateBulk{err: fmt.Errorf("calling to PayloadRuleClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*PayloadRuleCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &PayloadRuleCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for PayloadRule.
+func (c *PayloadRuleClient) Update() *PayloadRuleUpdate {
+	mutation := newPayloadRuleMutation(c.config, OpUpdate)
+	return &PayloadRuleUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PayloadRuleClient) UpdateOne(_m *PayloadRule) *PayloadRuleUpdateOne {
+	mutation := newPayloadRuleMutation(c.config, OpUpdateOne, withPayloadRule(_m))
+	return &PayloadRuleUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PayloadRuleClient) UpdateOneID(id int) *PayloadRuleUpdateOne {
+	mutation := newPayloadRuleMutation(c.config, OpUpdateOne, withPayloadRuleID(id))
+	return &PayloadRuleUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for PayloadRule.
+func (c *PayloadRuleClient) Delete() *PayloadRuleDelete {
+	mutation := newPayloadRuleMutation(c.config, OpDelete)
+	return &PayloadRuleDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PayloadRuleClient) DeleteOne(_m *PayloadRule) *PayloadRuleDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PayloadRuleClient) DeleteOneID(id int) *PayloadRuleDeleteOne {
+	builder := c.Delete().Where(payloadrule.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PayloadRuleDeleteOne{builder}
+}
+
+// Query returns a query builder for PayloadRule.
+func (c *PayloadRuleClient) Query() *PayloadRuleQuery {
+	return &PayloadRuleQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypePayloadRule},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a PayloadRule entity by its id.
+func (c *PayloadRuleClient) Get(ctx context.Context, id int) (*PayloadRule, error) {
+	return c.Query().Where(payloadrule.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PayloadRuleClient) GetX(ctx context.Context, id int) *PayloadRule {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *PayloadRuleClient) Hooks() []Hook {
+	return c.hooks.PayloadRule
+}
+
+// Interceptors returns the client interceptors.
+func (c *PayloadRuleClient) Interceptors() []Interceptor {
+	return c.inters.PayloadRule
+}
+
+func (c *PayloadRuleClient) mutate(ctx context.Context, m *PayloadRuleMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&PayloadRuleCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&PayloadRuleUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&PayloadRuleUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&PayloadRuleDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown PayloadRule mutation op: %q", m.Op())
 	}
 }
 
@@ -8839,14 +8980,15 @@ type (
 		EmailVerificationToken, Entitlement, ErrorPassthroughRule, IdempotencyRecord,
 		InviteCode, InviteRelationship, ModelAlias, ModelProviderMapping,
 		ModelRateLimit, ModelRegistry, ObsAlertEvent, ObsSLODefinition, OpsSystemLog,
-		PasswordResetToken, PaymentAuditLog, PaymentOrder, PaymentProviderInstance,
-		PendingOAuthSession, PricingRule, Provider, ProviderAccount, Proxy,
-		QualityEvalSample, QualityEvaluation, Role, SchedulerDecision,
-		SchedulerFeedback, SchedulerRequestSnapshot, SchedulerStrategy, Setting,
-		SubscriptionPlan, TLSFingerprintProfile, UsageLog, User, UserAnnouncementRead,
-		UserAttributeDefinition, UserAttributeValue, UserAuthIdentity,
-		UserPlatformQuota, UserPromoCodeApplication, UserRedeemCodeRedemption,
-		UserRole, UserSubscription, UserTOTPSecret, Workspace []ent.Hook
+		PasswordResetToken, PayloadRule, PaymentAuditLog, PaymentOrder,
+		PaymentProviderInstance, PendingOAuthSession, PricingRule, Provider,
+		ProviderAccount, Proxy, QualityEvalSample, QualityEvaluation, Role,
+		SchedulerDecision, SchedulerFeedback, SchedulerRequestSnapshot,
+		SchedulerStrategy, Setting, SubscriptionPlan, TLSFingerprintProfile, UsageLog,
+		User, UserAnnouncementRead, UserAttributeDefinition, UserAttributeValue,
+		UserAuthIdentity, UserPlatformQuota, UserPromoCodeApplication,
+		UserRedeemCodeRedemption, UserRole, UserSubscription, UserTOTPSecret,
+		Workspace []ent.Hook
 	}
 	inters struct {
 		APIKey, APIKeyGroup, AccountAvailabilityRollup, AccountGroup,
@@ -8856,13 +8998,14 @@ type (
 		EmailVerificationToken, Entitlement, ErrorPassthroughRule, IdempotencyRecord,
 		InviteCode, InviteRelationship, ModelAlias, ModelProviderMapping,
 		ModelRateLimit, ModelRegistry, ObsAlertEvent, ObsSLODefinition, OpsSystemLog,
-		PasswordResetToken, PaymentAuditLog, PaymentOrder, PaymentProviderInstance,
-		PendingOAuthSession, PricingRule, Provider, ProviderAccount, Proxy,
-		QualityEvalSample, QualityEvaluation, Role, SchedulerDecision,
-		SchedulerFeedback, SchedulerRequestSnapshot, SchedulerStrategy, Setting,
-		SubscriptionPlan, TLSFingerprintProfile, UsageLog, User, UserAnnouncementRead,
-		UserAttributeDefinition, UserAttributeValue, UserAuthIdentity,
-		UserPlatformQuota, UserPromoCodeApplication, UserRedeemCodeRedemption,
-		UserRole, UserSubscription, UserTOTPSecret, Workspace []ent.Interceptor
+		PasswordResetToken, PayloadRule, PaymentAuditLog, PaymentOrder,
+		PaymentProviderInstance, PendingOAuthSession, PricingRule, Provider,
+		ProviderAccount, Proxy, QualityEvalSample, QualityEvaluation, Role,
+		SchedulerDecision, SchedulerFeedback, SchedulerRequestSnapshot,
+		SchedulerStrategy, Setting, SubscriptionPlan, TLSFingerprintProfile, UsageLog,
+		User, UserAnnouncementRead, UserAttributeDefinition, UserAttributeValue,
+		UserAuthIdentity, UserPlatformQuota, UserPromoCodeApplication,
+		UserRedeemCodeRedemption, UserRole, UserSubscription, UserTOTPSecret,
+		Workspace []ent.Interceptor
 	}
 )

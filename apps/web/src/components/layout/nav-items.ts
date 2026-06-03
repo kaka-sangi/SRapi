@@ -27,6 +27,7 @@ import {
   Shield,
   ShieldAlert,
   Fingerprint,
+  SlidersHorizontal,
   Megaphone,
   ScrollText,
   Receipt,
@@ -102,6 +103,7 @@ const ADMIN_GATEWAY_SECTION: NavSection = {
     { href: ADMIN_ROUTES.proxies, labelKey: "nav.adminProxies", icon: Network },
     { href: ADMIN_ROUTES.errorPassthrough, labelKey: "nav.adminErrorPassthrough", icon: ShieldAlert },
     { href: ADMIN_ROUTES.tlsProfiles, labelKey: "nav.adminTlsProfiles", icon: Fingerprint },
+    { href: ADMIN_ROUTES.payloadRules, labelKey: "nav.adminPayloadRules", icon: SlidersHorizontal },
   ],
 };
 

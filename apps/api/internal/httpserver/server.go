@@ -34,6 +34,7 @@ import (
 	modelratelimitscontract "github.com/srapi/srapi/apps/api/internal/modules/model_rate_limits/contract"
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
 	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
+	payloadrulescontract "github.com/srapi/srapi/apps/api/internal/modules/payload_rules/contract"
 	paymentcontract "github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	providerpreset "github.com/srapi/srapi/apps/api/internal/modules/providers/preset"
@@ -101,6 +102,7 @@ type runtimeOptions struct {
 	modelRateLimits    modelratelimitscontract.Store
 	groupRateLimits    groupratelimitscontract.Store
 	userPlatformQuotas userplatformquotascontract.Store
+	payloadRules       payloadrulescontract.Store
 }
 
 func WithAdminControlStore(store admincontrolcontract.Store) Option {
@@ -232,6 +234,12 @@ func WithGroupRateLimitsStore(store groupratelimitscontract.Store) Option {
 func WithUserPlatformQuotasStore(store userplatformquotascontract.Store) Option {
 	return func(opts *runtimeOptions) {
 		opts.userPlatformQuotas = store
+	}
+}
+
+func WithPayloadRulesStore(store payloadrulescontract.Store) Option {
+	return func(opts *runtimeOptions) {
+		opts.payloadRules = store
 	}
 }
 
@@ -518,6 +526,10 @@ func (s *Server) registerCapabilityAdminRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/admin/error-passthrough-rules", s.handleCreateAdminErrorPassthroughRule)
 	mux.HandleFunc("PATCH /api/v1/admin/error-passthrough-rules/{id}", s.handleUpdateAdminErrorPassthroughRule)
 	mux.HandleFunc("DELETE /api/v1/admin/error-passthrough-rules/{id}", s.handleDeleteAdminErrorPassthroughRule)
+	mux.HandleFunc("GET /api/v1/admin/payload-rules", s.handleListAdminPayloadRules)
+	mux.HandleFunc("POST /api/v1/admin/payload-rules", s.handleCreateAdminPayloadRule)
+	mux.HandleFunc("PATCH /api/v1/admin/payload-rules/{id}", s.handleUpdateAdminPayloadRule)
+	mux.HandleFunc("DELETE /api/v1/admin/payload-rules/{id}", s.handleDeleteAdminPayloadRule)
 	mux.HandleFunc("GET /api/v1/admin/accounts/availability", s.handleListAdminAccountsAvailability)
 	mux.HandleFunc("GET /api/v1/admin/accounts/{id}/availability", s.handleAdminAccountAvailability)
 	mux.HandleFunc("POST /api/v1/admin/accounts/{id}/quota-fetch", s.handleAdminAccountQuotaFetch)

@@ -26,6 +26,7 @@ export type {
   AuditLog,
   BillingLedgerEntry,
   ErrorPassthroughRule,
+  PayloadRule,
   TlsProfile,
   UserAttributeDefinition,
   NotificationEmailTemplate,

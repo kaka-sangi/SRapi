@@ -19,6 +19,7 @@ import (
 	modelratelimitscontract "github.com/srapi/srapi/apps/api/internal/modules/model_rate_limits/contract"
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
 	operationscontract "github.com/srapi/srapi/apps/api/internal/modules/operations/contract"
+	payloadrulescontract "github.com/srapi/srapi/apps/api/internal/modules/payload_rules/contract"
 	paymentcontract "github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	qualitycontract "github.com/srapi/srapi/apps/api/internal/modules/quality_eval/contract"
@@ -45,6 +46,7 @@ import (
 	modelratelimitsstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/modelratelimits"
 	modelstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/models"
 	operationsstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/operations"
+	payloadrulesstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/payloadrules"
 	paymentstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/payments"
 	providerstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/providers"
 	qualitystore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/qualityeval"
@@ -88,6 +90,7 @@ type Stores struct {
 	ModelRateLimits    modelratelimitscontract.Store
 	GroupRateLimits    groupratelimitscontract.Store
 	UserPlatformQuotas userplatformquotascontract.Store
+	PayloadRules       payloadrulescontract.Store
 }
 
 func New(client *ent.Client) (Stores, error) {
@@ -198,6 +201,10 @@ func New(client *ent.Client) (Stores, error) {
 	if err != nil {
 		return Stores{}, err
 	}
+	payloadRules, err := payloadrulesstore.New(client)
+	if err != nil {
+		return Stores{}, err
+	}
 	return Stores{
 		AdminControl:       adminControl,
 		Users:              users,
@@ -226,5 +233,6 @@ func New(client *ent.Client) (Stores, error) {
 		ModelRateLimits:    modelRateLimits,
 		GroupRateLimits:    groupRateLimits,
 		UserPlatformQuotas: userPlatformQuotas,
+		PayloadRules:       payloadRules,
 	}, nil
 }

@@ -45,6 +45,18 @@ type ConversationRequest struct {
 	Account           accountcontract.ProviderAccount
 	Mapping           modelcontract.ModelProviderMapping
 	Credential        map[string]any
+	PayloadTransforms []PayloadTransform
+}
+
+// PayloadTransform is a single operator-configured mutation applied to the
+// marshaled upstream request body just before dispatch. Action is "default"
+// (set the path only when absent), "override" (always set), or "filter" (remove
+// the path). Path is a dotted JSON path, e.g. "reasoning.effort" or
+// "generationConfig.thinkingConfig.thinkingBudget".
+type PayloadTransform struct {
+	Action string
+	Path   string
+	Value  any
 }
 
 type TokenCountRequest struct {

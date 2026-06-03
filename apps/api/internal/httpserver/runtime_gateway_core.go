@@ -1502,7 +1502,35 @@ func metadataCooldownActive(metadata map[string]any, now time.Time) bool {
 	return err == nil && now.Before(until)
 }
 
+// applyPayloadRules resolves operator payload-transform rules for the request's
+// upstream model + protocol and attaches them, so the body-builders mutate the
+// marshaled upstream payload (default / override / filter) before dispatch.
+func (rt *runtimeState) applyPayloadRules(ctx context.Context, req provideradaptercontract.ConversationRequest) provideradaptercontract.ConversationRequest {
+	if rt.payloadRules == nil {
+		return req
+	}
+	model := strings.TrimSpace(req.Mapping.UpstreamModelName)
+	if model == "" {
+		model = req.Model
+	}
+	resolved := rt.payloadRules.Resolve(ctx, model, req.TargetProtocol)
+	if len(resolved) == 0 {
+		return req
+	}
+	transforms := make([]provideradaptercontract.PayloadTransform, 0, len(resolved))
+	for _, op := range resolved {
+		transforms = append(transforms, provideradaptercontract.PayloadTransform{
+			Action: op.Action,
+			Path:   op.Path,
+			Value:  op.Value,
+		})
+	}
+	req.PayloadTransforms = transforms
+	return req
+}
+
 func (rt *runtimeState) invokeProviderConversation(ctx context.Context, req provideradaptercontract.ConversationRequest) (provideradaptercontract.ConversationResponse, error) {
+	req = rt.applyPayloadRules(ctx, req)
 	dispatch, err := rt.prepareProviderDispatch(ctx, &req.Account, req.Mapping.ModelID)
 	if err != nil {
 		return provideradaptercontract.ConversationResponse{}, err

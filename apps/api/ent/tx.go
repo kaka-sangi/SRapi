@@ -72,6 +72,8 @@ type Tx struct {
 	OpsSystemLog *OpsSystemLogClient
 	// PasswordResetToken is the client for interacting with the PasswordResetToken builders.
 	PasswordResetToken *PasswordResetTokenClient
+	// PayloadRule is the client for interacting with the PayloadRule builders.
+	PayloadRule *PayloadRuleClient
 	// PaymentAuditLog is the client for interacting with the PaymentAuditLog builders.
 	PaymentAuditLog *PaymentAuditLogClient
 	// PaymentOrder is the client for interacting with the PaymentOrder builders.
@@ -295,6 +297,7 @@ func (tx *Tx) init() {
 	tx.ObsSLODefinition = NewObsSLODefinitionClient(tx.config)
 	tx.OpsSystemLog = NewOpsSystemLogClient(tx.config)
 	tx.PasswordResetToken = NewPasswordResetTokenClient(tx.config)
+	tx.PayloadRule = NewPayloadRuleClient(tx.config)
 	tx.PaymentAuditLog = NewPaymentAuditLogClient(tx.config)
 	tx.PaymentOrder = NewPaymentOrderClient(tx.config)
 	tx.PaymentProviderInstance = NewPaymentProviderInstanceClient(tx.config)

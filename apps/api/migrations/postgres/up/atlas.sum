@@ -1,4 +1,4 @@
-h1:BaEQdcp3oASXIxKCM1kZMX8+qquOi61Xop8Xr8r7YPw=
+h1:hVQY4jNP+mW/8txQDP8dQiPkMMwtapHK9qLSBAeOBTw=
 000001_initial_schema.sql h1:cyZ0pax3l7J4onSmEmgqPwpoJYXPXuJYXeTAGUOEHs4=
 000002_auth_sessions.sql h1:zJ6uEWQDpw4sa3JpABmlbbFR2Sy3JCceNl4UnBtcX9c=
 000003_api_key_concurrency_limit.sql h1:j/8OE2iF7+LUa5XCsyYSC4dvN1Vh2cihbc41rySg4OQ=
@@ -29,3 +29,4 @@ h1:BaEQdcp3oASXIxKCM1kZMX8+qquOi61Xop8Xr8r7YPw=
 000028_api_key_ip_and_window_limits.sql h1:KD8hzsUeRIAJ6I9m26j0L6rOCJADNMLP5e3v98jQDtY=
 000029_usage_log_cache_creation_tokens.sql h1:37MQD5h5aEuPcrJC66N3iERH+VAQkIZhTIU+bfI7rEw=
 000030_user_platform_quotas.sql h1:2iX8J0QZY8UKIOcE3DU5CDA6uJBMruafaMcKJnOrUpk=
+000031_payload_rules.sql h1:S66BX9YTLc8hpoolXF+Tv/JtN4QI42QPC5oQ+kKJxZ8=

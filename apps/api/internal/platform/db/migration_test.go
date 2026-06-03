@@ -84,6 +84,7 @@ func TestEntSchemaAppliesToEmptyDatabase(t *testing.T) {
 		"obs_slo_definitions",
 		"ops_system_logs",
 		"password_reset_tokens",
+		"payload_rules",
 		"payment_audit_logs",
 		"payment_orders",
 		"payment_provider_instances",

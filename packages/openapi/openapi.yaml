@@ -10286,6 +10286,148 @@ paths:
           $ref: "#/components/responses/NotFound"
         default:
           $ref: "#/components/responses/StandardError"
+  /api/v1/admin/payload-rules:
+    get:
+      tags:
+        - AdminPayloadRules
+      operationId: listAdminPayloadRules
+      summary: List payload-transform rules.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      responses:
+        "200":
+          description: Payload rule list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PayloadRuleListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+    post:
+      tags:
+        - AdminPayloadRules
+      operationId: createAdminPayloadRule
+      summary: Create a payload-transform rule.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePayloadRuleRequest"
+      responses:
+        "201":
+          description: Payload rule created.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PayloadRuleResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+  /api/v1/admin/payload-rules/{id}:
+    patch:
+      tags:
+        - AdminPayloadRules
+      operationId: updateAdminPayloadRule
+      summary: Update a payload-transform rule.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePayloadRuleRequest"
+      responses:
+        "200":
+          description: Payload rule updated.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PayloadRuleResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+    delete:
+      tags:
+        - AdminPayloadRules
+      operationId: deleteAdminPayloadRule
+      summary: Delete a payload-transform rule.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Payload rule deleted.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
   /api/v1/admin/error-passthrough-rules:
     get:
       tags:
@@ -20952,6 +21094,124 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/TLSProfile"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+    PayloadRule:
+      type: object
+      required:
+        - id
+        - name
+        - enabled
+        - priority
+        - action
+        - match_model
+        - match_protocol
+        - params
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        enabled:
+          type: boolean
+        priority:
+          type: integer
+          format: int64
+        action:
+          type: string
+          enum:
+            - default
+            - override
+            - filter
+        match_model:
+          type: string
+        match_protocol:
+          type: string
+        params:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    CreatePayloadRuleRequest:
+      type: object
+      required:
+        - name
+        - action
+        - params
+      properties:
+        name:
+          type: string
+        enabled:
+          type: boolean
+        priority:
+          type: integer
+          format: int64
+        action:
+          type: string
+          enum:
+            - default
+            - override
+            - filter
+        match_model:
+          type: string
+        match_protocol:
+          type: string
+        params:
+          type: object
+          additionalProperties: true
+    UpdatePayloadRuleRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        enabled:
+          type: boolean
+        priority:
+          type: integer
+          format: int64
+        action:
+          type: string
+          enum:
+            - default
+            - override
+            - filter
+        match_model:
+          type: string
+        match_protocol:
+          type: string
+        params:
+          type: object
+          additionalProperties: true
+    PayloadRuleResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/PayloadRule"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+    PayloadRuleListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/PayloadRule"
         pagination:
           $ref: "#/components/schemas/Pagination"
         request_id:

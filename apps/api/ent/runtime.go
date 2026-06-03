@@ -35,6 +35,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/obsslodefinition"
 	"github.com/srapi/srapi/apps/api/ent/opssystemlog"
 	"github.com/srapi/srapi/apps/api/ent/passwordresettoken"
+	"github.com/srapi/srapi/apps/api/ent/payloadrule"
 	"github.com/srapi/srapi/apps/api/ent/paymentauditlog"
 	"github.com/srapi/srapi/apps/api/ent/paymentorder"
 	"github.com/srapi/srapi/apps/api/ent/paymentproviderinstance"
@@ -1001,6 +1002,41 @@ func init() {
 	passwordresettokenDescTokenVersion := passwordresettokenFields[2].Descriptor()
 	// passwordresettoken.DefaultTokenVersion holds the default value on creation for the token_version field.
 	passwordresettoken.DefaultTokenVersion = passwordresettokenDescTokenVersion.Default.(string)
+	payloadruleMixin := schema.PayloadRule{}.Mixin()
+	payloadruleMixinFields0 := payloadruleMixin[0].Fields()
+	_ = payloadruleMixinFields0
+	payloadruleFields := schema.PayloadRule{}.Fields()
+	_ = payloadruleFields
+	// payloadruleDescCreatedAt is the schema descriptor for created_at field.
+	payloadruleDescCreatedAt := payloadruleMixinFields0[0].Descriptor()
+	// payloadrule.DefaultCreatedAt holds the default value on creation for the created_at field.
+	payloadrule.DefaultCreatedAt = payloadruleDescCreatedAt.Default.(func() time.Time)
+	// payloadruleDescUpdatedAt is the schema descriptor for updated_at field.
+	payloadruleDescUpdatedAt := payloadruleMixinFields0[1].Descriptor()
+	// payloadrule.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	payloadrule.DefaultUpdatedAt = payloadruleDescUpdatedAt.Default.(func() time.Time)
+	// payloadrule.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	payloadrule.UpdateDefaultUpdatedAt = payloadruleDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// payloadruleDescName is the schema descriptor for name field.
+	payloadruleDescName := payloadruleFields[0].Descriptor()
+	// payloadrule.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	payloadrule.NameValidator = payloadruleDescName.Validators[0].(func(string) error)
+	// payloadruleDescEnabled is the schema descriptor for enabled field.
+	payloadruleDescEnabled := payloadruleFields[1].Descriptor()
+	// payloadrule.DefaultEnabled holds the default value on creation for the enabled field.
+	payloadrule.DefaultEnabled = payloadruleDescEnabled.Default.(bool)
+	// payloadruleDescPriority is the schema descriptor for priority field.
+	payloadruleDescPriority := payloadruleFields[2].Descriptor()
+	// payloadrule.DefaultPriority holds the default value on creation for the priority field.
+	payloadrule.DefaultPriority = payloadruleDescPriority.Default.(int)
+	// payloadruleDescMatchModel is the schema descriptor for match_model field.
+	payloadruleDescMatchModel := payloadruleFields[4].Descriptor()
+	// payloadrule.DefaultMatchModel holds the default value on creation for the match_model field.
+	payloadrule.DefaultMatchModel = payloadruleDescMatchModel.Default.(string)
+	// payloadruleDescMatchProtocol is the schema descriptor for match_protocol field.
+	payloadruleDescMatchProtocol := payloadruleFields[5].Descriptor()
+	// payloadrule.DefaultMatchProtocol holds the default value on creation for the match_protocol field.
+	payloadrule.DefaultMatchProtocol = payloadruleDescMatchProtocol.Default.(string)
 	paymentauditlogMixin := schema.PaymentAuditLog{}.Mixin()
 	paymentauditlogMixinFields0 := paymentauditlogMixin[0].Fields()
 	_ = paymentauditlogMixinFields0

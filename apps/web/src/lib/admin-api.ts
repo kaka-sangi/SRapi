@@ -24,6 +24,10 @@ import {
   deleteAdminErrorPassthroughRule,
   listAdminErrorPassthroughRules,
   updateAdminErrorPassthroughRule,
+  createAdminPayloadRule,
+  deleteAdminPayloadRule,
+  listAdminPayloadRules,
+  updateAdminPayloadRule,
   createAdminTlsProfile,
   deleteAdminTlsProfile,
   listAdminTlsProfiles,
@@ -144,6 +148,9 @@ import type {
   CreateErrorPassthroughRuleRequest,
   ErrorPassthroughRule,
   UpdateErrorPassthroughRuleRequest,
+  CreatePayloadRuleRequest,
+  PayloadRule,
+  UpdatePayloadRuleRequest,
   CreateTlsProfileRequest,
   TlsProfile,
   UpdateTlsProfileRequest,
@@ -759,6 +766,22 @@ export const adminApi = {
 
   deleteErrorPassthroughRule(id: Id): Promise<{ deleted: boolean }> {
     return unwrapData(() => deleteAdminErrorPassthroughRule({ path: { id }, throwOnError: true }));
+  },
+
+  listPayloadRules(): Promise<AdminListResult<PayloadRule>> {
+    return unwrapList(() => listAdminPayloadRules({ throwOnError: true }));
+  },
+
+  createPayloadRule(body: CreatePayloadRuleRequest): Promise<PayloadRule> {
+    return unwrapData(() => createAdminPayloadRule({ body, throwOnError: true }));
+  },
+
+  updatePayloadRule(id: Id, body: UpdatePayloadRuleRequest): Promise<PayloadRule> {
+    return unwrapData(() => updateAdminPayloadRule({ path: { id }, body, throwOnError: true }));
+  },
+
+  deletePayloadRule(id: Id): Promise<{ deleted: boolean }> {
+    return unwrapData(() => deleteAdminPayloadRule({ path: { id }, throwOnError: true }));
   },
 
   listTlsProfiles(): Promise<AdminListResult<TlsProfile>> {

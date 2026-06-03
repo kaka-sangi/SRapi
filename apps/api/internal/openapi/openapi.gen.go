@@ -596,6 +596,27 @@ func (e CreateErrorPassthroughRuleRequestAction) Valid() bool {
 	}
 }
 
+// Defines values for CreatePayloadRuleRequestAction.
+const (
+	CreatePayloadRuleRequestActionDefault  CreatePayloadRuleRequestAction = "default"
+	CreatePayloadRuleRequestActionFilter   CreatePayloadRuleRequestAction = "filter"
+	CreatePayloadRuleRequestActionOverride CreatePayloadRuleRequestAction = "override"
+)
+
+// Valid indicates whether the value is a known member of the CreatePayloadRuleRequestAction enum.
+func (e CreatePayloadRuleRequestAction) Valid() bool {
+	switch e {
+	case CreatePayloadRuleRequestActionDefault:
+		return true
+	case CreatePayloadRuleRequestActionFilter:
+		return true
+	case CreatePayloadRuleRequestActionOverride:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CreateUserAttributeDefinitionRequestDataType.
 const (
 	CreateUserAttributeDefinitionRequestDataTypeBoolean CreateUserAttributeDefinitionRequestDataType = "boolean"
@@ -1448,6 +1469,27 @@ func (e OpsThroughputTrendBucket) Valid() bool {
 	}
 }
 
+// Defines values for PayloadRuleAction.
+const (
+	PayloadRuleActionDefault  PayloadRuleAction = "default"
+	PayloadRuleActionFilter   PayloadRuleAction = "filter"
+	PayloadRuleActionOverride PayloadRuleAction = "override"
+)
+
+// Valid indicates whether the value is a known member of the PayloadRuleAction enum.
+func (e PayloadRuleAction) Valid() bool {
+	switch e {
+	case PayloadRuleActionDefault:
+		return true
+	case PayloadRuleActionFilter:
+		return true
+	case PayloadRuleActionOverride:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PaymentOrderStatus.
 const (
 	PaymentOrderStatusCanceled          PaymentOrderStatus = "canceled"
@@ -2147,6 +2189,27 @@ func (e UpdateErrorPassthroughRuleRequestAction) Valid() bool {
 	case Expose:
 		return true
 	case Mask:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UpdatePayloadRuleRequestAction.
+const (
+	Default  UpdatePayloadRuleRequestAction = "default"
+	Filter   UpdatePayloadRuleRequestAction = "filter"
+	Override UpdatePayloadRuleRequestAction = "override"
+)
+
+// Valid indicates whether the value is a known member of the UpdatePayloadRuleRequestAction enum.
+func (e UpdatePayloadRuleRequestAction) Valid() bool {
+	switch e {
+	case Default:
+		return true
+	case Filter:
+		return true
+	case Override:
 		return true
 	default:
 		return false
@@ -3835,6 +3898,20 @@ type CreateOpsSLORequest struct {
 	WindowDays *int          `json:"window_days,omitempty"`
 }
 
+// CreatePayloadRuleRequest defines model for CreatePayloadRuleRequest.
+type CreatePayloadRuleRequest struct {
+	Action        CreatePayloadRuleRequestAction `json:"action"`
+	Enabled       *bool                          `json:"enabled,omitempty"`
+	MatchModel    *string                        `json:"match_model,omitempty"`
+	MatchProtocol *string                        `json:"match_protocol,omitempty"`
+	Name          string                         `json:"name"`
+	Params        map[string]interface{}         `json:"params"`
+	Priority      *int64                         `json:"priority,omitempty"`
+}
+
+// CreatePayloadRuleRequestAction defines model for CreatePayloadRuleRequest.Action.
+type CreatePayloadRuleRequestAction string
+
 // CreatePaymentOrderRequest defines model for CreatePaymentOrderRequest.
 type CreatePaymentOrderRequest struct {
 	Amount      string             `json:"amount"`
@@ -5454,6 +5531,36 @@ type PasswordResetAcceptedResponse struct {
 	RequestId RequestId             `json:"request_id"`
 }
 
+// PayloadRule defines model for PayloadRule.
+type PayloadRule struct {
+	Action        PayloadRuleAction      `json:"action"`
+	CreatedAt     time.Time              `json:"created_at"`
+	Enabled       bool                   `json:"enabled"`
+	Id            int64                  `json:"id"`
+	MatchModel    string                 `json:"match_model"`
+	MatchProtocol string                 `json:"match_protocol"`
+	Name          string                 `json:"name"`
+	Params        map[string]interface{} `json:"params"`
+	Priority      int64                  `json:"priority"`
+	UpdatedAt     time.Time              `json:"updated_at"`
+}
+
+// PayloadRuleAction defines model for PayloadRule.Action.
+type PayloadRuleAction string
+
+// PayloadRuleListResponse defines model for PayloadRuleListResponse.
+type PayloadRuleListResponse struct {
+	Data       []PayloadRule `json:"data"`
+	Pagination Pagination    `json:"pagination"`
+	RequestId  RequestId     `json:"request_id"`
+}
+
+// PayloadRuleResponse defines model for PayloadRuleResponse.
+type PayloadRuleResponse struct {
+	Data      PayloadRule `json:"data"`
+	RequestId RequestId   `json:"request_id"`
+}
+
 // PaymentMethod defines model for PaymentMethod.
 type PaymentMethod struct {
 	Metadata           JsonObject `json:"metadata"`
@@ -6830,6 +6937,20 @@ type UpdateOpsSLORequest struct {
 	WindowDays *int          `json:"window_days,omitempty"`
 }
 
+// UpdatePayloadRuleRequest defines model for UpdatePayloadRuleRequest.
+type UpdatePayloadRuleRequest struct {
+	Action        *UpdatePayloadRuleRequestAction `json:"action,omitempty"`
+	Enabled       *bool                           `json:"enabled,omitempty"`
+	MatchModel    *string                         `json:"match_model,omitempty"`
+	MatchProtocol *string                         `json:"match_protocol,omitempty"`
+	Name          *string                         `json:"name,omitempty"`
+	Params        *map[string]interface{}         `json:"params,omitempty"`
+	Priority      *int64                          `json:"priority,omitempty"`
+}
+
+// UpdatePayloadRuleRequestAction defines model for UpdatePayloadRuleRequest.Action.
+type UpdatePayloadRuleRequestAction string
+
 // UpdatePaymentProviderInstanceRequest defines model for UpdatePaymentProviderInstanceRequest.
 type UpdatePaymentProviderInstanceRequest struct {
 	Config           *JsonObject            `json:"config,omitempty"`
@@ -8046,6 +8167,12 @@ type UpdateAdminOpsSLOJSONRequestBody = UpdateOpsSLORequest
 
 // CleanupAdminOpsSystemLogsJSONRequestBody defines body for CleanupAdminOpsSystemLogs for application/json ContentType.
 type CleanupAdminOpsSystemLogsJSONRequestBody = OpsSystemLogCleanupRequest
+
+// CreateAdminPayloadRuleJSONRequestBody defines body for CreateAdminPayloadRule for application/json ContentType.
+type CreateAdminPayloadRuleJSONRequestBody = CreatePayloadRuleRequest
+
+// UpdateAdminPayloadRuleJSONRequestBody defines body for UpdateAdminPayloadRule for application/json ContentType.
+type UpdateAdminPayloadRuleJSONRequestBody = UpdatePayloadRuleRequest
 
 // RefundAdminPaymentOrderJSONRequestBody defines body for RefundAdminPaymentOrder for application/json ContentType.
 type RefundAdminPaymentOrderJSONRequestBody = RefundPaymentOrderRequest
@@ -14864,6 +14991,18 @@ type ServerInterface interface {
 	// Get admin overview counters.
 	// (GET /api/v1/admin/overview)
 	GetAdminOverview(w http.ResponseWriter, r *http.Request)
+	// List payload-transform rules.
+	// (GET /api/v1/admin/payload-rules)
+	ListAdminPayloadRules(w http.ResponseWriter, r *http.Request)
+	// Create a payload-transform rule.
+	// (POST /api/v1/admin/payload-rules)
+	CreateAdminPayloadRule(w http.ResponseWriter, r *http.Request)
+	// Delete a payload-transform rule.
+	// (DELETE /api/v1/admin/payload-rules/{id})
+	DeleteAdminPayloadRule(w http.ResponseWriter, r *http.Request, id Id)
+	// Update a payload-transform rule.
+	// (PATCH /api/v1/admin/payload-rules/{id})
+	UpdateAdminPayloadRule(w http.ResponseWriter, r *http.Request, id Id)
 	// List payment orders.
 	// (GET /api/v1/admin/payments/orders)
 	ListAdminPaymentOrders(w http.ResponseWriter, r *http.Request, params ListAdminPaymentOrdersParams)
@@ -19158,6 +19297,116 @@ func (siw *ServerInterfaceWrapper) GetAdminOverview(w http.ResponseWriter, r *ht
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetAdminOverview(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAdminPayloadRules operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminPayloadRules(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminPayloadRules(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAdminPayloadRule operation middleware
+func (siw *ServerInterfaceWrapper) CreateAdminPayloadRule(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAdminPayloadRule(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteAdminPayloadRule operation middleware
+func (siw *ServerInterfaceWrapper) DeleteAdminPayloadRule(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteAdminPayloadRule(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateAdminPayloadRule operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAdminPayloadRule(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAdminPayloadRule(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -25144,6 +25393,10 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/ops/system-logs/cleanup", wrapper.CleanupAdminOpsSystemLogs)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/throughput-trend", wrapper.GetAdminOpsThroughputTrend)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/overview", wrapper.GetAdminOverview)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/payload-rules", wrapper.ListAdminPayloadRules)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/payload-rules", wrapper.CreateAdminPayloadRule)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/payload-rules/{id}", wrapper.DeleteAdminPayloadRule)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/payload-rules/{id}", wrapper.UpdateAdminPayloadRule)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/payments/orders", wrapper.ListAdminPaymentOrders)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/payments/orders/{id}/refund", wrapper.RefundAdminPaymentOrder)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/payments/providers", wrapper.ListAdminPaymentProviders)

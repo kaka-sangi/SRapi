@@ -3839,6 +3839,56 @@ export type TlsProfileListResponse = {
     request_id: RequestId;
 };
 
+export type PayloadRule = {
+    id: number;
+    name: string;
+    enabled: boolean;
+    priority: number;
+    action: 'default' | 'override' | 'filter';
+    match_model: string;
+    match_protocol: string;
+    params: {
+        [key: string]: unknown;
+    };
+    created_at: string;
+    updated_at: string;
+};
+
+export type CreatePayloadRuleRequest = {
+    name: string;
+    enabled?: boolean;
+    priority?: number;
+    action: 'default' | 'override' | 'filter';
+    match_model?: string;
+    match_protocol?: string;
+    params: {
+        [key: string]: unknown;
+    };
+};
+
+export type UpdatePayloadRuleRequest = {
+    name?: string;
+    enabled?: boolean;
+    priority?: number;
+    action?: 'default' | 'override' | 'filter';
+    match_model?: string;
+    match_protocol?: string;
+    params?: {
+        [key: string]: unknown;
+    };
+};
+
+export type PayloadRuleResponse = {
+    data: PayloadRule;
+    request_id: RequestId;
+};
+
+export type PayloadRuleListResponse = {
+    data: Array<PayloadRule>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
 export type ErrorPassthroughRule = {
     id: number;
     name: string;
@@ -15000,6 +15050,158 @@ export type UpdateAdminTlsProfileResponses = {
 };
 
 export type UpdateAdminTlsProfileResponse = UpdateAdminTlsProfileResponses[keyof UpdateAdminTlsProfileResponses];
+
+export type ListAdminPayloadRulesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/payload-rules';
+};
+
+export type ListAdminPayloadRulesErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminPayloadRulesError = ListAdminPayloadRulesErrors[keyof ListAdminPayloadRulesErrors];
+
+export type ListAdminPayloadRulesResponses = {
+    /**
+     * Payload rule list.
+     */
+    200: PayloadRuleListResponse;
+};
+
+export type ListAdminPayloadRulesResponse = ListAdminPayloadRulesResponses[keyof ListAdminPayloadRulesResponses];
+
+export type CreateAdminPayloadRuleData = {
+    body: CreatePayloadRuleRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/payload-rules';
+};
+
+export type CreateAdminPayloadRuleErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type CreateAdminPayloadRuleError = CreateAdminPayloadRuleErrors[keyof CreateAdminPayloadRuleErrors];
+
+export type CreateAdminPayloadRuleResponses = {
+    /**
+     * Payload rule created.
+     */
+    201: PayloadRuleResponse;
+};
+
+export type CreateAdminPayloadRuleResponse = CreateAdminPayloadRuleResponses[keyof CreateAdminPayloadRuleResponses];
+
+export type DeleteAdminPayloadRuleData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/payload-rules/{id}';
+};
+
+export type DeleteAdminPayloadRuleErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DeleteAdminPayloadRuleError = DeleteAdminPayloadRuleErrors[keyof DeleteAdminPayloadRuleErrors];
+
+export type DeleteAdminPayloadRuleResponses = {
+    /**
+     * Payload rule deleted.
+     */
+    200: DeleteResponse;
+};
+
+export type DeleteAdminPayloadRuleResponse = DeleteAdminPayloadRuleResponses[keyof DeleteAdminPayloadRuleResponses];
+
+export type UpdateAdminPayloadRuleData = {
+    body: UpdatePayloadRuleRequest;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/payload-rules/{id}';
+};
+
+export type UpdateAdminPayloadRuleErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UpdateAdminPayloadRuleError = UpdateAdminPayloadRuleErrors[keyof UpdateAdminPayloadRuleErrors];
+
+export type UpdateAdminPayloadRuleResponses = {
+    /**
+     * Payload rule updated.
+     */
+    200: PayloadRuleResponse;
+};
+
+export type UpdateAdminPayloadRuleResponse = UpdateAdminPayloadRuleResponses[keyof UpdateAdminPayloadRuleResponses];
 
 export type ListAdminErrorPassthroughRulesData = {
     body?: never;

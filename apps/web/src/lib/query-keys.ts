@@ -70,6 +70,7 @@ export const queryKeys = {
     redeemStats: () => ["admin", "redeem-stats"] as const,
     promoCodes: (params?: unknown) => ["admin", "promo-codes", params ?? {}] as const,
     errorPassthroughRules: () => ["admin", "error-passthrough-rules"] as const,
+    payloadRules: () => ["admin", "payload-rules"] as const,
     tlsProfiles: () => ["admin", "tls-profiles"] as const,
     userAttributes: () => ["admin", "user-attributes"] as const,
     notificationEmailTemplates: () => ["admin", "notification-email-templates"] as const,
