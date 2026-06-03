@@ -698,6 +698,7 @@ export const zh: Messages = {
     action_default: "默认补全",
     action_override: "强制覆盖",
     action_filter: "删除",
+    match: "匹配",
     matchModel: "模型通配",
     matchModelHint: "如 gpt-* · * 匹配任意模型",
     matchProtocol: "协议",

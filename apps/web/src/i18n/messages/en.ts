@@ -698,6 +698,7 @@ export const en = {
     action_default: "Default",
     action_override: "Override",
     action_filter: "Filter",
+    match: "Match",
     matchModel: "Model glob",
     matchModelHint: "e.g. gpt-* · * matches any model",
     matchProtocol: "Protocol",
