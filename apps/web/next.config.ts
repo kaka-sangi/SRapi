@@ -1,84 +1,53 @@
 import type { NextConfig } from "next";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import bundleAnalyzer from "@next/bundle-analyzer";
 
-const apiProxyTarget = (process.env.SRAPI_API_PROXY_TARGET || "http://127.0.0.1:8080").replace(
-  /\/+$/,
-  "",
-);
-const appDir = dirname(fileURLToPath(import.meta.url));
-
-const isProd = process.env.NODE_ENV === "production";
-
-// SRapi v0.1.0 production security headers.
-// Dev keeps loose CSP so HMR + react-refresh inline scripts still work.
-const securityHeaders = [
-  { key: "X-DNS-Prefetch-Control", value: "off" },
-  { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+const SECURITY_HEADERS = [
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
 ];
 
-export function telemetryConnectOrigin(rawUrl = process.env.NEXT_PUBLIC_SRAPI_TELEMETRY_URL ?? "") {
-  const value = rawUrl.trim();
-  if (!value || value.startsWith("/")) return null;
-  try {
-    const url = new URL(value);
-    if (url.protocol !== "https:" && url.protocol !== "http:") return null;
-    return url.origin;
-  } catch {
-    return null;
-  }
-}
+const isProd = process.env.NODE_ENV === "production";
 
-export function buildProdCSP(telemetryUrl = process.env.NEXT_PUBLIC_SRAPI_TELEMETRY_URL ?? "") {
-  const connectSrc = ["'self'"];
-  const telemetryOrigin = telemetryConnectOrigin(telemetryUrl);
-  if (telemetryOrigin) {
-    connectSrc.push(telemetryOrigin);
-  }
-
-  return [
+const cspDirectives = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'",
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
-  "font-src 'self' data:",
-    `connect-src ${connectSrc.join(" ")}`,
-  "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",
-  ].join("; ");
-}
+  "frame-ancestors 'none'",
+  "object-src 'none'",
+  isProd ? "script-src 'self'" : "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
+  isProd ? "style-src 'self'" : "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob:",
+  "font-src 'self' data:",
+  process.env.NEXT_PUBLIC_SRAPI_TELEMETRY_URL
+    ? `connect-src 'self' ${new URL(process.env.NEXT_PUBLIC_SRAPI_TELEMETRY_URL).origin}`
+    : "connect-src 'self'",
+  "frame-src 'none'",
+].join("; ");
 
-const prodCSP = buildProdCSP();
+// rewrites proxy /api and /v1 to the backend (Next same-origin proxy)
+const proxyTarget = process.env.SRAPI_API_PROXY_TARGET ?? "http://127.0.0.1:8080";
 
-const baseConfig: NextConfig = {
-  turbopack: {
-    root: resolve(appDir, "../.."),
-  },
-  poweredByHeader: false,
+const withBundleAnalyzer = bundleAnalyzer({ enabled: process.env.ANALYZE === "1" });
+
+const nextConfig: NextConfig = {
   reactStrictMode: true,
+  poweredByHeader: false,
   async headers() {
-    const headers = [...securityHeaders];
-    if (isProd) {
-      headers.push({ key: "Content-Security-Policy", value: prodCSP });
-    }
-    return [{ source: "/(.*)", headers }];
+    return [
+      {
+        source: "/(.*)",
+        headers: [...SECURITY_HEADERS, { key: "Content-Security-Policy", value: cspDirectives }],
+      },
+    ];
   },
   async rewrites() {
     return [
-      { source: "/api/:path*", destination: `${apiProxyTarget}/api/:path*` },
-      { source: "/v1/:path*", destination: `${apiProxyTarget}/v1/:path*` },
+      { source: "/api/:path*", destination: `${proxyTarget}/api/:path*` },
+      { source: "/v1/:path*", destination: `${proxyTarget}/v1/:path*` },
     ];
   },
 };
 
-const withBundleAnalyzer = bundleAnalyzer({
-  enabled: process.env.ANALYZE === "1" || process.env.ANALYZE === "true",
-});
-
-export default withBundleAnalyzer(baseConfig);
+export default withBundleAnalyzer(nextConfig);

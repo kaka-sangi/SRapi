@@ -43,6 +43,8 @@ const (
 	FieldOutputTokens = "output_tokens"
 	// FieldCachedTokens holds the string denoting the cached_tokens field in the database.
 	FieldCachedTokens = "cached_tokens"
+	// FieldCacheCreationTokens holds the string denoting the cache_creation_tokens field in the database.
+	FieldCacheCreationTokens = "cache_creation_tokens"
 	// FieldTotalTokens holds the string denoting the total_tokens field in the database.
 	FieldTotalTokens = "total_tokens"
 	// FieldUsageEstimated holds the string denoting the usage_estimated field in the database.
@@ -85,6 +87,7 @@ var Columns = []string{
 	FieldInputTokens,
 	FieldOutputTokens,
 	FieldCachedTokens,
+	FieldCacheCreationTokens,
 	FieldTotalTokens,
 	FieldUsageEstimated,
 	FieldLatencyMs,
@@ -132,6 +135,8 @@ var (
 	DefaultOutputTokens int
 	// DefaultCachedTokens holds the default value on creation for the "cached_tokens" field.
 	DefaultCachedTokens int
+	// DefaultCacheCreationTokens holds the default value on creation for the "cache_creation_tokens" field.
+	DefaultCacheCreationTokens int
 	// DefaultTotalTokens holds the default value on creation for the "total_tokens" field.
 	DefaultTotalTokens int
 	// DefaultUsageEstimated holds the default value on creation for the "usage_estimated" field.
@@ -229,6 +234,11 @@ func ByOutputTokens(opts ...sql.OrderTermOption) OrderOption {
 // ByCachedTokens orders the results by the cached_tokens field.
 func ByCachedTokens(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCachedTokens, opts...).ToFunc()
+}
+
+// ByCacheCreationTokens orders the results by the cache_creation_tokens field.
+func ByCacheCreationTokens(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCacheCreationTokens, opts...).ToFunc()
 }
 
 // ByTotalTokens orders the results by the total_tokens field.

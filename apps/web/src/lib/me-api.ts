@@ -1,0 +1,170 @@
+"use client";
+
+import type { Auth } from "../../../../packages/sdk/typescript/src/core/auth.gen";
+import { client } from "../../../../packages/sdk/typescript/src/client.gen";
+import {
+  getCurrentUser,
+  updateCurrentUserProfile,
+  changeCurrentUserPassword,
+  getCurrentUserTotpStatus,
+  setupCurrentUserTotp,
+  enableCurrentUserTotp,
+  disableCurrentUserTotp,
+  getCurrentUserBalance,
+  getCurrentUserSubscriptions,
+  redeemCurrentUserRedeemCode,
+  listPaymentMethods,
+  listPaymentOrders,
+  createPaymentOrder,
+  cancelPaymentOrder,
+  getCurrentUserAffiliate,
+  listCurrentUserAffiliateLedger,
+  transferCurrentUserAffiliateToBalance,
+} from "../../../../packages/sdk/typescript/src/index";
+import type {
+  AffiliateTransferToBalanceRequest,
+  ChangeCurrentUserPasswordRequest,
+  CreatePaymentOrderRequest,
+  ListCurrentUserAffiliateLedgerData,
+  ListPaymentOrdersData,
+  Pagination,
+  RedeemCodeRedemptionRequest,
+  TotpVerifyRequest,
+  UpdateCurrentUserProfileRequest,
+} from "../../../../packages/sdk/typescript/src/types.gen";
+
+const CSRF_STORAGE_KEY = "srapi_csrf_token";
+
+export interface MeListResult<T> {
+  data: T[];
+  pagination?: Pagination;
+}
+
+function configuredApiBaseUrl(): string {
+  return (process.env.NEXT_PUBLIC_SRAPI_BASE_URL || "").replace(/\/+$/, "");
+}
+
+function getStoredCSRFToken(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  return localStorage.getItem(CSRF_STORAGE_KEY) || undefined;
+}
+
+function resolveAuthToken(auth: Auth): string | undefined {
+  return auth.name === "X-CSRF-Token" ? getStoredCSRFToken() : undefined;
+}
+
+function configureClient() {
+  client.setConfig({
+    baseUrl: configuredApiBaseUrl(),
+    credentials: "include",
+    auth: resolveAuthToken,
+  });
+}
+
+async function unwrapData<T>(request: () => Promise<{ data?: { data?: T } }>): Promise<T> {
+  configureClient();
+  const response = await request();
+  if (!response.data || !("data" in response.data)) {
+    throw new Error("Request returned an empty response.");
+  }
+  return response.data.data as T;
+}
+
+async function unwrapList<T>(
+  request: () => Promise<{ data?: { data?: T[]; pagination?: Pagination } }>,
+): Promise<MeListResult<T>> {
+  configureClient();
+  const response = await request();
+  if (!response.data || !Array.isArray(response.data.data)) {
+    throw new Error("Request returned an empty list response.");
+  }
+  return { data: response.data.data, pagination: response.data.pagination };
+}
+
+export function meErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === "object" && error !== null) {
+    const maybe = error as {
+      error?: { message?: string };
+      message?: string;
+      response?: { data?: { error?: { message?: string } } };
+    };
+    return (
+      maybe.response?.data?.error?.message ||
+      maybe.error?.message ||
+      maybe.message ||
+      "Request failed."
+    );
+  }
+  return "Request failed.";
+}
+
+export const meApi = {
+  // ---- Profile ----
+  getProfile() {
+    return unwrapData(() => getCurrentUser({ throwOnError: true }));
+  },
+  updateProfile(body: UpdateCurrentUserProfileRequest) {
+    return unwrapData(() => updateCurrentUserProfile({ body, throwOnError: true }));
+  },
+
+  // ---- Security ----
+  async changePassword(body: ChangeCurrentUserPasswordRequest): Promise<void> {
+    configureClient();
+    await changeCurrentUserPassword({ body, throwOnError: true });
+  },
+  getTotpStatus() {
+    return unwrapData(() => getCurrentUserTotpStatus({ throwOnError: true }));
+  },
+  setupTotp() {
+    return unwrapData(() => setupCurrentUserTotp({ throwOnError: true }));
+  },
+  enableTotp(body: TotpVerifyRequest) {
+    return unwrapData(() => enableCurrentUserTotp({ body, throwOnError: true }));
+  },
+  disableTotp(body: TotpVerifyRequest) {
+    return unwrapData(() => disableCurrentUserTotp({ body, throwOnError: true }));
+  },
+
+  // ---- Billing ----
+  getBalance() {
+    return unwrapData(() => getCurrentUserBalance({ throwOnError: true }));
+  },
+  listPaymentMethods() {
+    return unwrapList(() => listPaymentMethods({ throwOnError: true }));
+  },
+  listOrders(query?: ListPaymentOrdersData["query"]) {
+    return unwrapList(() => listPaymentOrders({ query, throwOnError: true }));
+  },
+  createOrder(body: CreatePaymentOrderRequest) {
+    return unwrapData(() => createPaymentOrder({ body, throwOnError: true }));
+  },
+  cancelOrder(id: string) {
+    return unwrapData(() => cancelPaymentOrder({ path: { id }, throwOnError: true }));
+  },
+  getSubscriptions() {
+    return unwrapList(() => getCurrentUserSubscriptions({ throwOnError: true }));
+  },
+
+  // ---- Redeem ----
+  redeemCode(body: RedeemCodeRedemptionRequest) {
+    return unwrapData(() => redeemCurrentUserRedeemCode({ body, throwOnError: true }));
+  },
+
+  // ---- Affiliate ----
+  getAffiliate() {
+    return unwrapData(() => getCurrentUserAffiliate({ throwOnError: true }));
+  },
+  listAffiliateLedger(query?: ListCurrentUserAffiliateLedgerData["query"]) {
+    return unwrapList(() => listCurrentUserAffiliateLedger({ query, throwOnError: true }));
+  },
+  transferToBalance(body: AffiliateTransferToBalanceRequest) {
+    return unwrapData(() =>
+      transferCurrentUserAffiliateToBalance({
+        body,
+        headers: { "Idempotency-Key": crypto.randomUUID() },
+        throwOnError: true,
+      }),
+    );
+  },
+};

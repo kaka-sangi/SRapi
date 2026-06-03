@@ -50,7 +50,7 @@ func (s *Service) Record(ctx context.Context, req contract.RecordRequest) (contr
 	if sourceProtocol == "" {
 		sourceProtocol = "openai-compatible"
 	}
-	totalTokens := req.InputTokens + req.OutputTokens + req.CachedTokens
+	totalTokens := req.InputTokens + req.OutputTokens + req.CachedTokens + req.CacheCreationTokens
 	attemptNo := req.AttemptNo
 	if attemptNo <= 0 {
 		attemptNo = 1
@@ -69,6 +69,7 @@ func (s *Service) Record(ctx context.Context, req contract.RecordRequest) (contr
 		InputTokens:           req.InputTokens,
 		OutputTokens:          req.OutputTokens,
 		CachedTokens:          req.CachedTokens,
+		CacheCreationTokens:   req.CacheCreationTokens,
 		TotalTokens:           totalTokens,
 		UsageEstimated:        req.UsageEstimated,
 		LatencyMS:             req.LatencyMS,

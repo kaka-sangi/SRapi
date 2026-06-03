@@ -454,6 +454,24 @@ export type RegisterRequest = {
     password: string;
 };
 
+export type SetupStatus = {
+    /**
+     * True until an owner/admin account exists; the console shows the first-run setup wizard while true.
+     */
+    needs_setup: boolean;
+};
+
+export type SetupStatusResponse = {
+    data: SetupStatus;
+    request_id: RequestId;
+};
+
+export type CompleteSetupRequest = {
+    email: string;
+    name: string;
+    password: string;
+};
+
 export type RequestPasswordResetRequest = {
     email: string;
 };
@@ -681,6 +699,26 @@ export type ApiKey = {
     rpm_limit?: number | null;
     tpm_limit?: number | null;
     concurrency_limit?: number | null;
+    /**
+     * Max requests allowed per 5-hour window for this key.
+     */
+    request_limit_5h?: number | null;
+    /**
+     * Max requests allowed per 1-day window for this key.
+     */
+    request_limit_1d?: number | null;
+    /**
+     * Max requests allowed per 7-day window for this key.
+     */
+    request_limit_7d?: number | null;
+    /**
+     * Client IPs or CIDRs permitted to use this key. Empty means all IPs are allowed. Enforced against the request client IP; requires a trusted reverse proxy that overwrites X-Forwarded-For.
+     */
+    allowed_ips: Array<string>;
+    /**
+     * Client IPs or CIDRs blocked from using this key. Takes precedence over allowed_ips.
+     */
+    denied_ips: Array<string>;
     expires_at?: string | null;
     last_used_at?: string | null;
     created_at: Timestamp;
@@ -694,6 +732,11 @@ export type CreateApiKeyRequest = {
     rpm_limit?: number | null;
     tpm_limit?: number | null;
     concurrency_limit?: number | null;
+    request_limit_5h?: number | null;
+    request_limit_1d?: number | null;
+    request_limit_7d?: number | null;
+    allowed_ips?: Array<string>;
+    denied_ips?: Array<string>;
     expires_at?: string | null;
 };
 
@@ -703,6 +746,14 @@ export type UpdateApiKeyRequest = {
     scopes?: Array<string>;
     allowed_models?: Array<string>;
     group_ids?: Array<Id>;
+    rpm_limit?: number | null;
+    tpm_limit?: number | null;
+    concurrency_limit?: number | null;
+    request_limit_5h?: number | null;
+    request_limit_1d?: number | null;
+    request_limit_7d?: number | null;
+    allowed_ips?: Array<string>;
+    denied_ips?: Array<string>;
 };
 
 export type ApiKeySecretData = {
@@ -899,6 +950,21 @@ export type CreateSubscriptionPlanRequest = {
     status?: SubscriptionPlanStatus;
 };
 
+export type UpdateSubscriptionPlanRequest = {
+    name?: string;
+    description?: string;
+    /**
+     * Decimal string amount. Float values are not accepted by the service.
+     */
+    price?: string;
+    currency?: string;
+    validity_days?: number;
+    entitlements?: JsonObject;
+    for_sale?: boolean;
+    sort_order?: number;
+    status?: SubscriptionPlanStatus;
+};
+
 export type SubscriptionPlanResponse = {
     data: SubscriptionPlan;
     request_id: RequestId;
@@ -1020,6 +1086,11 @@ export type Provider = {
     status: ResourceStatus;
     capabilities?: JsonObject;
     config_schema?: JsonObject;
+    platform_family?: PlatformFamily;
+    /**
+     * Runtime classes (authentication methods) this provider accepts. Empty or absent means no restriction (all methods allowed).
+     */
+    auth_methods?: Array<RuntimeClass>;
     created_at: Timestamp;
 };
 
@@ -1170,6 +1241,11 @@ export type ModelProviderMappingResponse = {
 
 export type RuntimeClass = 'api_key' | 'oauth_refresh' | 'oauth_device_code' | 'web_session_cookie' | 'desktop_client_token' | 'cli_client_token' | 'ide_plugin_token' | 'service_account_json' | 'custom_reverse_proxy';
 
+/**
+ * Upstream protocol/platform family a provider preset belongs to.
+ */
+export type PlatformFamily = 'openai_compatible' | 'anthropic_compatible' | 'bedrock_anthropic' | 'reverse_proxy_antigravity' | 'rerank_compatible';
+
 export type ProviderAccountStatus = 'active' | 'disabled' | 'needs_reauth' | 'suspended' | 'dead';
 
 export type AccountGroupStatus = 'active' | 'disabled';
@@ -1223,6 +1299,11 @@ export type AccountGroupMember = {
 
 export type AccountGroupMemberResponse = {
     data: AccountGroupMember;
+    request_id: RequestId;
+};
+
+export type AccountGroupMemberListResponse = {
+    data: Array<AccountGroupMember>;
     request_id: RequestId;
 };
 
@@ -2323,6 +2404,10 @@ export type UsageLog = {
     input_tokens: number;
     output_tokens: number;
     cached_tokens: number;
+    /**
+     * Prompt-cache write (creation) tokens, billed at the cache-write rate.
+     */
+    cache_creation_tokens?: number;
     total_tokens: number;
     usage_estimated: boolean;
     latency_ms: number;
@@ -3024,6 +3109,10 @@ export type GatewayUsageRequest = {
     input_tokens: number;
     output_tokens: number;
     cached_tokens: number;
+    /**
+     * Prompt-cache write (creation) tokens, billed at the cache-write rate.
+     */
+    cache_creation_tokens?: number;
     total_tokens: number;
     usage_estimated: boolean;
     latency_ms: number;
@@ -3613,6 +3702,38 @@ export type GeminiModelList = {
     nextPageToken?: string;
 };
 
+export type UserPlatformQuota = {
+    user_id: number;
+    platform: string;
+    daily_limit?: string | null;
+    weekly_limit?: string | null;
+    monthly_limit?: string | null;
+    currency: string;
+    enabled: boolean;
+    created_at: string;
+    updated_at: string;
+};
+
+export type UpsertUserPlatformQuotaRequest = {
+    platform: string;
+    daily_limit?: string | null;
+    weekly_limit?: string | null;
+    monthly_limit?: string | null;
+    currency?: string;
+    enabled?: boolean;
+};
+
+export type UserPlatformQuotaResponse = {
+    data: UserPlatformQuota;
+    request_id: RequestId;
+};
+
+export type UserPlatformQuotaListResponse = {
+    data: Array<UserPlatformQuota>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
 export type ModelRateLimit = {
     model_id: number;
     rpm_limit: number;
@@ -3841,6 +3962,22 @@ export type AccountAvailabilityRollup = {
     availability_ratio: number;
     avg_success_rate: number;
     computed_at: string;
+};
+
+export type AccountAvailabilitySummary = {
+    account_id: number;
+    account_name: string;
+    provider_id: number;
+    status: string;
+    overall_uptime: number;
+    window_days: number;
+    last_checked_at?: string | null;
+};
+
+export type AccountsAvailabilitySummaryResponse = {
+    data: Array<AccountAvailabilitySummary>;
+    pagination: Pagination;
+    request_id: RequestId;
 };
 
 export type AccountAvailabilityResponse = {
@@ -4228,6 +4365,64 @@ export type RegisterResponses = {
 };
 
 export type RegisterResponse = RegisterResponses[keyof RegisterResponses];
+
+export type GetSetupStatusData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/setup/status';
+};
+
+export type GetSetupStatusErrors = {
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetSetupStatusError = GetSetupStatusErrors[keyof GetSetupStatusErrors];
+
+export type GetSetupStatusResponses = {
+    /**
+     * First-run setup status.
+     */
+    200: SetupStatusResponse;
+};
+
+export type GetSetupStatusResponse = GetSetupStatusResponses[keyof GetSetupStatusResponses];
+
+export type CompleteSetupData = {
+    body: CompleteSetupRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/setup';
+};
+
+export type CompleteSetupErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    409: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type CompleteSetupError = CompleteSetupErrors[keyof CompleteSetupErrors];
+
+export type CompleteSetupResponses = {
+    /**
+     * Setup completed and the owner account was created.
+     */
+    201: SetupStatusResponse;
+};
+
+export type CompleteSetupResponse = CompleteSetupResponses[keyof CompleteSetupResponses];
 
 export type StartOAuthAuthorizationData = {
     body?: never;
@@ -8178,6 +8373,45 @@ export type UpdateAdminAccountGroupResponses = {
 
 export type UpdateAdminAccountGroupResponse = UpdateAdminAccountGroupResponses[keyof UpdateAdminAccountGroupResponses];
 
+export type ListAdminAccountGroupMembersData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/account-groups/{id}/accounts';
+};
+
+export type ListAdminAccountGroupMembersErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminAccountGroupMembersError = ListAdminAccountGroupMembersErrors[keyof ListAdminAccountGroupMembersErrors];
+
+export type ListAdminAccountGroupMembersResponses = {
+    /**
+     * Account group member list.
+     */
+    200: AccountGroupMemberListResponse;
+};
+
+export type ListAdminAccountGroupMembersResponse = ListAdminAccountGroupMembersResponses[keyof ListAdminAccountGroupMembersResponses];
+
 export type RemoveAdminAccountGroupMemberData = {
     body?: never;
     path: {
@@ -8911,6 +9145,49 @@ export type CreateAdminSubscriptionPlanResponses = {
 };
 
 export type CreateAdminSubscriptionPlanResponse = CreateAdminSubscriptionPlanResponses[keyof CreateAdminSubscriptionPlanResponses];
+
+export type UpdateAdminSubscriptionPlanData = {
+    body: UpdateSubscriptionPlanRequest;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/subscription-plans/{id}';
+};
+
+export type UpdateAdminSubscriptionPlanErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UpdateAdminSubscriptionPlanError = UpdateAdminSubscriptionPlanErrors[keyof UpdateAdminSubscriptionPlanErrors];
+
+export type UpdateAdminSubscriptionPlanResponses = {
+    /**
+     * Subscription plan updated.
+     */
+    200: SubscriptionPlanResponse;
+};
+
+export type UpdateAdminSubscriptionPlanResponse = UpdateAdminSubscriptionPlanResponses[keyof UpdateAdminSubscriptionPlanResponses];
 
 export type ListAdminUserSubscriptionsData = {
     body?: never;
@@ -14232,6 +14509,120 @@ export type CountAnthropicCompatibleMessageTokensAliasResponses = {
 
 export type CountAnthropicCompatibleMessageTokensAliasResponse = CountAnthropicCompatibleMessageTokensAliasResponses[keyof CountAnthropicCompatibleMessageTokensAliasResponses];
 
+export type ListAdminUserPlatformQuotasData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/users/{id}/platform-quotas';
+};
+
+export type ListAdminUserPlatformQuotasErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminUserPlatformQuotasError = ListAdminUserPlatformQuotasErrors[keyof ListAdminUserPlatformQuotasErrors];
+
+export type ListAdminUserPlatformQuotasResponses = {
+    /**
+     * User platform quota list.
+     */
+    200: UserPlatformQuotaListResponse;
+};
+
+export type ListAdminUserPlatformQuotasResponse = ListAdminUserPlatformQuotasResponses[keyof ListAdminUserPlatformQuotasResponses];
+
+export type UpsertAdminUserPlatformQuotaData = {
+    body: UpsertUserPlatformQuotaRequest;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/users/{id}/platform-quotas';
+};
+
+export type UpsertAdminUserPlatformQuotaErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UpsertAdminUserPlatformQuotaError = UpsertAdminUserPlatformQuotaErrors[keyof UpsertAdminUserPlatformQuotaErrors];
+
+export type UpsertAdminUserPlatformQuotaResponses = {
+    /**
+     * User platform quota upserted.
+     */
+    200: UserPlatformQuotaResponse;
+};
+
+export type UpsertAdminUserPlatformQuotaResponse = UpsertAdminUserPlatformQuotaResponses[keyof UpsertAdminUserPlatformQuotaResponses];
+
+export type DeleteAdminUserPlatformQuotaData = {
+    body?: never;
+    path: {
+        id: Id;
+        platform: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/users/{id}/platform-quotas/{platform}';
+};
+
+export type DeleteAdminUserPlatformQuotaErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DeleteAdminUserPlatformQuotaError = DeleteAdminUserPlatformQuotaErrors[keyof DeleteAdminUserPlatformQuotaErrors];
+
+export type DeleteAdminUserPlatformQuotaResponses = {
+    /**
+     * User platform quota deleted.
+     */
+    200: DeleteResponse;
+};
+
+export type DeleteAdminUserPlatformQuotaResponse = DeleteAdminUserPlatformQuotaResponses[keyof DeleteAdminUserPlatformQuotaResponses];
+
 export type ListAdminModelRateLimitsData = {
     body?: never;
     path?: never;
@@ -14996,6 +15387,41 @@ export type SetAdminUserAttributeValueResponses = {
 };
 
 export type SetAdminUserAttributeValueResponse = SetAdminUserAttributeValueResponses[keyof SetAdminUserAttributeValueResponses];
+
+export type ListAdminAccountsAvailabilityData = {
+    body?: never;
+    path?: never;
+    query?: {
+        days?: number;
+    };
+    url: '/api/v1/admin/accounts/availability';
+};
+
+export type ListAdminAccountsAvailabilityErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminAccountsAvailabilityError = ListAdminAccountsAvailabilityErrors[keyof ListAdminAccountsAvailabilityErrors];
+
+export type ListAdminAccountsAvailabilityResponses = {
+    /**
+     * Per-account availability summary.
+     */
+    200: AccountsAvailabilitySummaryResponse;
+};
+
+export type ListAdminAccountsAvailabilityResponse = ListAdminAccountsAvailabilityResponses[keyof ListAdminAccountsAvailabilityResponses];
 
 export type GetAdminAccountAvailabilityData = {
     body?: never;

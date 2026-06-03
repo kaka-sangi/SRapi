@@ -25,9 +25,9 @@ export interface PaymentProviderFormState {
   name: string;
   status: PaymentProviderStatus;
   supportedMethodsText: string;
-  configJson: string;
-  limitsJson: string;
-  metadataJson: string;
+  config: Record<string, unknown>;
+  limits: Record<string, unknown>;
+  metadata: Record<string, unknown>;
   sortOrder: string;
 }
 
@@ -41,7 +41,7 @@ export function refundFormFromOrder(order: PaymentOrder): RefundOrderFormState {
     orderNo: order.order_no,
     amount: "",
     currency: order.currency,
-    reason: "admin_requested",
+    reason: "",
   };
 }
 
@@ -67,9 +67,9 @@ export function emptyPaymentProviderForm(): PaymentProviderFormState {
     name: "",
     status: "disabled",
     supportedMethodsText: "card\nwallet",
-    configJson: "{}",
-    limitsJson: "{}",
-    metadataJson: "{}",
+    config: {},
+    limits: {},
+    metadata: {},
     sortOrder: "0",
   };
 }
@@ -81,10 +81,10 @@ export function buildCreatePaymentProviderBody(
     provider: requiredText(form.provider, "Provider"),
     name: requiredText(form.name, "Name"),
     status: form.status,
-    config: parseJsonObject(form.configJson, "Config"),
+    config: form.config,
     supported_methods: parseLines(form.supportedMethodsText),
-    limits: parseJsonObject(form.limitsJson, "Limits"),
-    metadata: parseJsonObject(form.metadataJson, "Metadata"),
+    limits: form.limits,
+    metadata: form.metadata,
     sort_order: parseInteger(form.sortOrder, "Sort order"),
   };
 }
@@ -138,19 +138,6 @@ function parseLines(value: string): string[] {
     .split(/\r?\n|,/)
     .map((line) => line.trim())
     .filter(Boolean);
-}
-
-function parseJsonObject(value: string, fieldName: string): Record<string, unknown> {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(value || "{}") as unknown;
-  } catch {
-    throw new Error(`${fieldName} must be valid JSON.`);
-  }
-  if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
-    throw new Error(`${fieldName} must be a JSON object.`);
-  }
-  return parsed as Record<string, unknown>;
 }
 
 function parseInteger(value: string, fieldName: string): number {

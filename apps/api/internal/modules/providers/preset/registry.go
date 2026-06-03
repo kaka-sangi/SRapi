@@ -4,6 +4,7 @@ import (
 	"sort"
 	"strings"
 
+	accountscontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	capabilitiescontract "github.com/srapi/srapi/apps/api/internal/modules/capabilities/contract"
 )
 
@@ -26,27 +27,23 @@ const (
 	AuthModeCustomHeader AuthMode = "custom_header"
 )
 
-type AccountType string
-
-const (
-	AccountTypeAPIKey             AccountType = "api_key"
-	AccountTypeUpstream           AccountType = "upstream"
-	AccountTypeCustomReverseProxy AccountType = "custom_reverse_proxy"
-	AccountTypeDesktopClientToken AccountType = "desktop_client_token"
-	AccountTypeIdePluginToken     AccountType = "ide_plugin_token"
-)
-
 type Preset struct {
-	ProviderKey          string
-	PlatformFamily       PlatformFamily
-	DisplayName          string
-	RouteAliases         []string
-	GeminiRouteAliases   []string
-	DefaultBaseURL       string
-	AuthModes            []AuthMode
-	ModelCatalogOwner    string
-	AccountTypeAllowlist []AccountType
-	Capabilities         map[string]bool
+	ProviderKey        string
+	PlatformFamily     PlatformFamily
+	DisplayName        string
+	RouteAliases       []string
+	GeminiRouteAliases []string
+	DefaultBaseURL     string
+	AuthModes          []AuthMode
+	ModelCatalogOwner  string
+	// RuntimeClassAllowlist is the set of authentication methods (runtime
+	// classes) an admin may attach to accounts on this provider. It is the
+	// single source of truth shared with the OpenAPI Provider.auth_methods
+	// field and the create/update validation. An empty list means "no
+	// restriction" (every runtime class is allowed) — required for legacy and
+	// manually-created providers that carry no preset metadata.
+	RuntimeClassAllowlist []accountscontract.RuntimeClass
+	Capabilities          map[string]bool
 }
 
 func (p Preset) MatchesPath(path string) bool {
@@ -102,11 +99,35 @@ func openAIPreset(providerKey string, displayName string, defaultBaseURL string,
 	if openAIPresetSupportsResponsesCompact(providerKey) {
 		capabilities[capabilitiescontract.KeyResponsesCompact] = true
 	}
-	return compatiblePreset(providerKey, PlatformFamilyOpenAICompatible, displayName, defaultBaseURL, routeAliases, capabilities)
+	preset := compatiblePreset(providerKey, PlatformFamilyOpenAICompatible, displayName, defaultBaseURL, routeAliases, capabilities)
+	if providerKey == "openai" {
+		// First-party OpenAI: the ChatGPT/Codex account flows authenticate via
+		// OAuth in addition to plain API keys.
+		preset.RuntimeClassAllowlist = []accountscontract.RuntimeClass{
+			accountscontract.RuntimeClassAPIKey,
+			accountscontract.RuntimeClassOauthRefresh,
+			accountscontract.RuntimeClassOauthDeviceCode,
+			accountscontract.RuntimeClassCustomReverseProxy,
+		}
+	}
+	return preset
 }
 
 func anthropicPreset(providerKey string, displayName string, defaultBaseURL string, routeAliases []string) Preset {
-	return compatiblePreset(providerKey, PlatformFamilyAnthropicCompatible, displayName, defaultBaseURL, routeAliases, anthropicCapabilities())
+	preset := compatiblePreset(providerKey, PlatformFamilyAnthropicCompatible, displayName, defaultBaseURL, routeAliases, anthropicCapabilities())
+	if providerKey == "anthropic" {
+		// First-party Anthropic: Claude Code (OAuth), Claude setup-token (CLI),
+		// Vertex service accounts, plus plain API keys.
+		preset.RuntimeClassAllowlist = []accountscontract.RuntimeClass{
+			accountscontract.RuntimeClassAPIKey,
+			accountscontract.RuntimeClassOauthRefresh,
+			accountscontract.RuntimeClassOauthDeviceCode,
+			accountscontract.RuntimeClassCliClientToken,
+			accountscontract.RuntimeClassServiceAccountJSON,
+			accountscontract.RuntimeClassCustomReverseProxy,
+		}
+	}
+	return preset
 }
 
 func rerankPreset(providerKey string, displayName string, defaultBaseURL string, routeAliases []string) Preset {
@@ -124,39 +145,43 @@ func antigravityPreset() Preset {
 	)
 	preset.GeminiRouteAliases = []string{"/antigravity/v1beta", "/api/provider/antigravity/v1beta"}
 	preset.AuthModes = []AuthMode{AuthModeBearer, AuthModeCustomHeader}
-	preset.AccountTypeAllowlist = []AccountType{
-		AccountTypeDesktopClientToken,
-		AccountTypeIdePluginToken,
-		AccountTypeCustomReverseProxy,
+	preset.RuntimeClassAllowlist = []accountscontract.RuntimeClass{
+		accountscontract.RuntimeClassDesktopClientToken,
+		accountscontract.RuntimeClassIdePluginToken,
+		accountscontract.RuntimeClassOauthRefresh,
+		accountscontract.RuntimeClassCustomReverseProxy,
 	}
 	return preset
 }
 
 func bedrockPreset() Preset {
 	return Preset{
-		ProviderKey:          "bedrock",
-		PlatformFamily:       PlatformFamilyBedrockAnthropic,
-		DisplayName:          "Amazon Bedrock",
-		RouteAliases:         []string{"/bedrock/v1", "/api/provider/bedrock", "/api/provider/bedrock/v1"},
-		DefaultBaseURL:       "https://bedrock-runtime.us-east-1.amazonaws.com",
-		AuthModes:            []AuthMode{AuthModeCustomHeader},
-		ModelCatalogOwner:    "bedrock",
-		AccountTypeAllowlist: []AccountType{AccountTypeAPIKey, AccountTypeUpstream},
-		Capabilities:         anthropicCapabilities(),
+		ProviderKey:       "bedrock",
+		PlatformFamily:    PlatformFamilyBedrockAnthropic,
+		DisplayName:       "Amazon Bedrock",
+		RouteAliases:      []string{"/bedrock/v1", "/api/provider/bedrock", "/api/provider/bedrock/v1"},
+		DefaultBaseURL:    "https://bedrock-runtime.us-east-1.amazonaws.com",
+		AuthModes:         []AuthMode{AuthModeCustomHeader},
+		ModelCatalogOwner: "bedrock",
+		RuntimeClassAllowlist: []accountscontract.RuntimeClass{
+			accountscontract.RuntimeClassAPIKey,
+			accountscontract.RuntimeClassServiceAccountJSON,
+		},
+		Capabilities: anthropicCapabilities(),
 	}
 }
 
 func compatiblePreset(providerKey string, platformFamily PlatformFamily, displayName string, defaultBaseURL string, routeAliases []string, capabilities map[string]bool) Preset {
 	return Preset{
-		ProviderKey:          providerKey,
-		PlatformFamily:       platformFamily,
-		DisplayName:          displayName,
-		RouteAliases:         routeAliases,
-		DefaultBaseURL:       defaultBaseURL,
-		AuthModes:            []AuthMode{AuthModeBearer, AuthModeXAPIKey, AuthModeAPIKeyQuery, AuthModeCustomHeader},
-		ModelCatalogOwner:    providerKey,
-		AccountTypeAllowlist: standardAccountTypes(),
-		Capabilities:         capabilities,
+		ProviderKey:           providerKey,
+		PlatformFamily:        platformFamily,
+		DisplayName:           displayName,
+		RouteAliases:          routeAliases,
+		DefaultBaseURL:        defaultBaseURL,
+		AuthModes:             []AuthMode{AuthModeBearer, AuthModeXAPIKey, AuthModeAPIKeyQuery, AuthModeCustomHeader},
+		ModelCatalogOwner:     providerKey,
+		RuntimeClassAllowlist: standardRuntimeClasses(),
+		Capabilities:          capabilities,
 	}
 }
 
@@ -164,11 +189,14 @@ func providerAliases(providerKey string) []string {
 	return []string{"/api/provider/" + providerKey, "/api/provider/" + providerKey + "/v1"}
 }
 
-func standardAccountTypes() []AccountType {
-	return []AccountType{
-		AccountTypeAPIKey,
-		AccountTypeUpstream,
-		AccountTypeCustomReverseProxy,
+// standardRuntimeClasses is the default authentication-method allowlist for
+// third-party OpenAI/Anthropic-compatible providers: a plain API key, or a
+// custom reverse-proxy token. First-party providers (openai, anthropic,
+// antigravity, bedrock) override this with their richer sets.
+func standardRuntimeClasses() []accountscontract.RuntimeClass {
+	return []accountscontract.RuntimeClass{
+		accountscontract.RuntimeClassAPIKey,
+		accountscontract.RuntimeClassCustomReverseProxy,
 	}
 }
 
@@ -272,7 +300,7 @@ func clonePreset(preset Preset) Preset {
 	cloned.RouteAliases = append([]string(nil), preset.RouteAliases...)
 	cloned.GeminiRouteAliases = append([]string(nil), preset.GeminiRouteAliases...)
 	cloned.AuthModes = append([]AuthMode(nil), preset.AuthModes...)
-	cloned.AccountTypeAllowlist = append([]AccountType(nil), preset.AccountTypeAllowlist...)
+	cloned.RuntimeClassAllowlist = append([]accountscontract.RuntimeClass(nil), preset.RuntimeClassAllowlist...)
 	if preset.Capabilities != nil {
 		cloned.Capabilities = make(map[string]bool, len(preset.Capabilities))
 		for key, value := range preset.Capabilities {

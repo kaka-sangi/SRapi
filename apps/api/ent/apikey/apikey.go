@@ -41,6 +41,16 @@ const (
 	FieldTpmLimit = "tpm_limit"
 	// FieldConcurrencyLimit holds the string denoting the concurrency_limit field in the database.
 	FieldConcurrencyLimit = "concurrency_limit"
+	// FieldRequestLimit5h holds the string denoting the request_limit_5h field in the database.
+	FieldRequestLimit5h = "request_limit_5h"
+	// FieldRequestLimit1d holds the string denoting the request_limit_1d field in the database.
+	FieldRequestLimit1d = "request_limit_1d"
+	// FieldRequestLimit7d holds the string denoting the request_limit_7d field in the database.
+	FieldRequestLimit7d = "request_limit_7d"
+	// FieldAllowedIpsJSON holds the string denoting the allowed_ips_json field in the database.
+	FieldAllowedIpsJSON = "allowed_ips_json"
+	// FieldDeniedIpsJSON holds the string denoting the denied_ips_json field in the database.
+	FieldDeniedIpsJSON = "denied_ips_json"
 	// FieldExpiresAt holds the string denoting the expires_at field in the database.
 	FieldExpiresAt = "expires_at"
 	// FieldLastUsedAt holds the string denoting the last_used_at field in the database.
@@ -66,6 +76,11 @@ var Columns = []string{
 	FieldRpmLimit,
 	FieldTpmLimit,
 	FieldConcurrencyLimit,
+	FieldRequestLimit5h,
+	FieldRequestLimit1d,
+	FieldRequestLimit7d,
+	FieldAllowedIpsJSON,
+	FieldDeniedIpsJSON,
 	FieldExpiresAt,
 	FieldLastUsedAt,
 }
@@ -161,6 +176,21 @@ func ByTpmLimit(opts ...sql.OrderTermOption) OrderOption {
 // ByConcurrencyLimit orders the results by the concurrency_limit field.
 func ByConcurrencyLimit(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldConcurrencyLimit, opts...).ToFunc()
+}
+
+// ByRequestLimit5h orders the results by the request_limit_5h field.
+func ByRequestLimit5h(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRequestLimit5h, opts...).ToFunc()
+}
+
+// ByRequestLimit1d orders the results by the request_limit_1d field.
+func ByRequestLimit1d(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRequestLimit1d, opts...).ToFunc()
+}
+
+// ByRequestLimit7d orders the results by the request_limit_7d field.
+func ByRequestLimit7d(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRequestLimit7d, opts...).ToFunc()
 }
 
 // ByExpiresAt orders the results by the expires_at field.

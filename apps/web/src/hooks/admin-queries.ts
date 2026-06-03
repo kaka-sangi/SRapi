@@ -1,594 +1,435 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { adminApi, type AdminTimeRange } from "@/lib/admin-api";
-import { diffAccountGroupIds } from "@/lib/admin-account-form";
+import { adminApi } from "@/lib/admin-api";
 import { queryKeys } from "@/lib/query-keys";
-import type {
-  AdminSettings,
-  AnnouncementStatus,
-  Id,
-  PaymentOrderStatus,
-  ProviderAccount,
-  ProviderAccountStatus,
-  Provider,
-  ProxyDefinition,
-  ProxyDefinitionStatus,
-  PromoCodeStatus,
-  RedeemCodeStatus,
-  RiskControlConfig,
-  SchedulerReplayRequest,
-  SchedulerReplayResult,
-  User,
-  UserStatus,
-  UsageAggregateDimension,
-} from "../../../../packages/sdk/typescript/src/types.gen";
+import type { User } from "../../../../packages/sdk/typescript/src/types.gen";
 
-const DEFAULT_PAGE_SIZE = 25;
+/**
+ * Admin data hooks. Pages consume ONLY these (never useEffect+fetch).
+ * Everything routes through `adminApi` (lib/admin-api.ts) → generated SDK.
+ * All endpoints are admin-only and 403 for regular users — the AppShell role
+ * gate keeps non-admins off these pages entirely.
+ *
+ * Param types are derived from each adminApi method so they always match the
+ * generated SDK query shape (status enums etc.).
+ */
 
-export function useAdminDashboardSnapshot(range?: AdminTimeRange) {
+type P<F extends (...a: never[]) => unknown> = Parameters<F>[0];
+
+// ---- Dashboard ----
+export function useAdminDashboard(range?: P<typeof adminApi.getDashboardSnapshot>) {
   return useQuery({
     queryKey: queryKeys.admin.dashboardSnapshot(range),
     queryFn: () => adminApi.getDashboardSnapshot(range),
+    refetchInterval: 30_000,
   });
 }
 
-export function useAdminOps(
-  range?: AdminTimeRange & { bucket?: "hour" | "day"; refetchIntervalMs?: number | false },
-) {
-  const bucket = range?.bucket ?? "hour";
-  const queryRange = { start: range?.start, end: range?.end };
-  const refetchInterval = range?.refetchIntervalMs ?? 30_000;
-
-  return {
-    overview: useQuery({
-      queryKey: queryKeys.admin.opsOverview(queryRange),
-      queryFn: () => adminApi.getOpsOverview(queryRange),
-      refetchInterval,
-    }),
-    throughput: useQuery({
-      queryKey: queryKeys.admin.opsThroughput({ ...queryRange, bucket }),
-      queryFn: () => adminApi.getOpsThroughputTrend({ ...queryRange, bucket }),
-      refetchInterval,
-    }),
-    errorTrend: useQuery({
-      queryKey: queryKeys.admin.opsErrorTrend({ ...queryRange, bucket }),
-      queryFn: () => adminApi.getOpsErrorTrend({ ...queryRange, bucket }),
-      refetchInterval,
-    }),
-    errorDistribution: useQuery({
-      queryKey: queryKeys.admin.opsErrorDistribution(queryRange),
-      queryFn: () => adminApi.getOpsErrorDistribution(queryRange),
-      refetchInterval,
-    }),
-    latencyHistogram: useQuery({
-      queryKey: queryKeys.admin.opsLatencyHistogram(queryRange),
-      queryFn: () => adminApi.getOpsLatencyHistogram(queryRange),
-      refetchInterval,
-    }),
-    concurrency: useQuery({
-      queryKey: queryKeys.admin.opsConcurrency(),
-      queryFn: () => adminApi.getOpsConcurrency(),
-      refetchInterval,
-    }),
-    logs: useQuery({
-      queryKey: queryKeys.admin.opsLogs({ page: 1, page_size: 20 }),
-      queryFn: () => adminApi.listOpsSystemLogs({ page: 1, page_size: 20 }),
-      refetchInterval,
-    }),
-    alerts: useQuery({
-      queryKey: queryKeys.admin.opsAlerts({ page: 1, page_size: 20 }),
-      queryFn: () => adminApi.listOpsAlerts({ page: 1, page_size: 20 }),
-      refetchInterval,
-    }),
-    realtimeSlots: useQuery({
-      queryKey: queryKeys.admin.opsRealtimeSlots(),
-      queryFn: () => adminApi.listOpsRealtimeSlots(),
-      refetchInterval,
-    }),
-    slos: useQuery({
-      queryKey: queryKeys.admin.opsSlos(),
-      queryFn: () => adminApi.listOpsSlos(),
-      refetchInterval: 60_000,
-    }),
-  };
-}
-
-export function useAdminOpsMutations() {
-  const qc = useQueryClient();
-  const invalidateSlos = () => {
-    void qc.invalidateQueries({ queryKey: queryKeys.admin.opsSlos() });
-    void qc.invalidateQueries({ queryKey: ["admin", "ops", "alerts"] });
-  };
-
-  return {
-    acknowledgeAlert: useMutation({
-      mutationFn: adminApi.acknowledgeAlert,
-      onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "ops", "alerts"] }),
-    }),
-    createSlo: useMutation({
-      mutationFn: adminApi.createOpsSlo,
-      onSuccess: invalidateSlos,
-    }),
-    updateSlo: useMutation({
-      mutationFn: ({ id, body }: { id: Id; body: Parameters<typeof adminApi.updateOpsSlo>[1] }) =>
-        adminApi.updateOpsSlo(id, body),
-      onSuccess: invalidateSlos,
-    }),
-  };
-}
-
-export function useAdminSchedulerReplay() {
-  return useMutation<SchedulerReplayResult, Error, SchedulerReplayRequest>({
-    mutationFn: (body) => adminApi.replaySchedulerStrategy(body),
-  });
-}
-
-export function useAdminUsers(filters: { page?: number; q?: string; status?: UserStatus | "all" }) {
-  const query = {
-    page: filters.page ?? 1,
-    page_size: DEFAULT_PAGE_SIZE,
-    q: filters.q || undefined,
-    status: filters.status && filters.status !== "all" ? filters.status : undefined,
-  };
-
+// ---- Users ----
+export function useAdminUsers(params?: P<typeof adminApi.listUsers>) {
   return useQuery({
-    queryKey: queryKeys.admin.users(query),
-    queryFn: () => adminApi.listUsers(query),
+    queryKey: queryKeys.admin.users(params),
+    queryFn: () => adminApi.listUsers(params),
   });
 }
 
-export function useAdminUserMutations() {
+export function useSetUserEnabled() {
   const qc = useQueryClient();
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["admin", "users"] });
-
-  return {
-    create: useMutation({
-      mutationFn: adminApi.createUser,
-      onSuccess: invalidate,
-    }),
-    update: useMutation({
-      mutationFn: ({ id, body }: { id: Id; body: Parameters<typeof adminApi.updateUser>[1] }) =>
-        adminApi.updateUser(id, body),
-      onSuccess: invalidate,
-    }),
-    balance: useMutation({
-      mutationFn: ({ id, body }: { id: Id; body: Parameters<typeof adminApi.updateUserBalance>[1] }) =>
-        adminApi.updateUserBalance(id, body),
-      onSuccess: invalidate,
-    }),
-    toggle: useMutation({
-      mutationFn: (user: User) => adminApi.setUserEnabled(user),
-      onSuccess: invalidate,
-    }),
-  };
-}
-
-export function useAdminProviders(filters: { page?: number; q?: string; status?: string } = {}) {
-  const query = {
-    page: filters.page ?? 1,
-    page_size: 100,
-    q: filters.q || undefined,
-    status: filters.status && filters.status !== "all" ? filters.status : undefined,
-  };
-  return useQuery({
-    queryKey: queryKeys.admin.providers(query),
-    queryFn: () => adminApi.listProviders(query),
+  return useMutation({
+    mutationFn: (user: User) => adminApi.setUserEnabled(user),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "users"] }),
   });
 }
 
-export function useAdminProviderMutations() {
+export function useBulkSetUsersEnabled() {
   const qc = useQueryClient();
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["admin", "providers"] });
-
-  return {
-    create: useMutation({
-      mutationFn: adminApi.createProvider,
-      onSuccess: invalidate,
-    }),
-    update: useMutation({
-      mutationFn: ({ id, body }: { id: Id; body: Parameters<typeof adminApi.updateProvider>[1] }) =>
-        adminApi.updateProvider(id, body),
-      onSuccess: invalidate,
-    }),
-    test: useMutation({
-      mutationFn: (provider: Provider) => adminApi.testProvider(provider.id),
-    }),
-  };
-}
-
-export function useAdminModels() {
-  return useQuery({
-    queryKey: queryKeys.admin.models(),
-    queryFn: () => adminApi.listModels(),
+  return useMutation({
+    mutationFn: ({ ids, enabled }: { ids: string[]; enabled: boolean }) =>
+      Promise.all(ids.map((id) => adminApi.setUserEnabledById(id, enabled))),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "users"] }),
   });
 }
 
-export function useAdminAccounts(filters: { page?: number; status?: ProviderAccountStatus | "all" }) {
-  const query = {
-    page: filters.page ?? 1,
-    page_size: DEFAULT_PAGE_SIZE,
-    status: filters.status && filters.status !== "all" ? filters.status : undefined,
-  };
-
+// ---- Provider accounts ----
+export function useAdminAccounts(params?: P<typeof adminApi.listAccounts>) {
   return useQuery({
-    queryKey: queryKeys.admin.accounts(query),
-    queryFn: () => adminApi.listAccounts(query),
+    queryKey: queryKeys.admin.accounts(params),
+    queryFn: () => adminApi.listAccounts(params),
   });
 }
 
-export function useAdminAccountMutations() {
+export function useSetAccountStatus() {
   const qc = useQueryClient();
-  const invalidate = () => {
-    void qc.invalidateQueries({ queryKey: ["admin", "accounts"] });
-    void qc.invalidateQueries({ queryKey: queryKeys.admin.accountGroups() });
-  };
-
-  return {
-    create: useMutation({
-      mutationFn: adminApi.createAccount,
-      onSuccess: invalidate,
-    }),
-    update: useMutation({
-      mutationFn: ({ id, body }: { id: Id; body: Parameters<typeof adminApi.updateAccount>[1] }) =>
-        adminApi.updateAccount(id, body),
-      onSuccess: invalidate,
-    }),
-    toggle: useMutation({
-      mutationFn: (account: ProviderAccount) => adminApi.setAccountStatus(account.id, account.status),
-      onSuccess: invalidate,
-    }),
-    exportAccounts: useMutation({
-      mutationFn: adminApi.exportAccounts,
-    }),
-    importAccounts: useMutation({
-      mutationFn: adminApi.importAccounts,
-      onSuccess: invalidate,
-    }),
-    batchUpdate: useMutation({
-      mutationFn: adminApi.batchUpdateAccounts,
-      onSuccess: invalidate,
-    }),
-    test: useMutation({
-      mutationFn: (account: ProviderAccount) => adminApi.testAccount(account.id),
-    }),
-    discoverModels: useMutation({
-      mutationFn: ({ account, persist }: { account: ProviderAccount; persist: boolean }) =>
-        adminApi.discoverAccountModels(account.id, { persist }),
-      onSuccess: invalidate,
-    }),
-    clearError: useMutation({
-      mutationFn: (account: ProviderAccount) => adminApi.clearAccountError(account.id),
-      onSuccess: invalidate,
-    }),
-    recover: useMutation({
-      mutationFn: (account: ProviderAccount) => adminApi.recoverAccount(account.id),
-      onSuccess: invalidate,
-    }),
-    syncGroups: useMutation({
-      mutationFn: async ({
-        accountId,
-        currentGroupIds,
-        nextGroupIds,
-      }: {
-        accountId: Id;
-        currentGroupIds: Id[];
-        nextGroupIds: Id[];
-      }) => {
-        const { add, remove } = diffAccountGroupIds(currentGroupIds, nextGroupIds);
-
-        await Promise.all(remove.map((groupId) => adminApi.removeAccountFromGroup(accountId, groupId)));
-        await Promise.all(add.map((groupId) => adminApi.addAccountToGroup(accountId, groupId)));
-      },
-      onSuccess: invalidate,
-    }),
-  };
-}
-
-export function useAdminAccountProxyQuality(accountIds: Id[]) {
-  const ids = [...new Set(accountIds)].filter(Boolean);
-  return useQuery({
-    queryKey: ["admin", "account-proxy-quality", ids],
-    queryFn: async () => {
-      const entries = await Promise.all(
-        ids.map(async (id) => [id, await adminApi.getAccountProxyQuality(id)] as const),
-      );
-      return Object.fromEntries(entries);
-    },
-    enabled: ids.length > 0,
+  return useMutation({
+    mutationFn: ({ id, status }: { id: string; status: "active" | "disabled" }) =>
+      adminApi.setAccountStatus(id, status),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "accounts"] }),
   });
 }
 
-export function useAdminAccountRuntime(accountId: Id | null) {
-  return {
-    health: useQuery({
-      queryKey: ["admin", "account-runtime", accountId, "health"],
-      queryFn: () => adminApi.getAccountHealth(accountId ?? ""),
-      enabled: Boolean(accountId),
-    }),
-    quota: useQuery({
-      queryKey: ["admin", "account-runtime", accountId, "quota"],
-      queryFn: () => adminApi.getAccountQuota(accountId ?? ""),
-      enabled: Boolean(accountId),
-    }),
-    rpm: useQuery({
-      queryKey: ["admin", "account-runtime", accountId, "rpm"],
-      queryFn: () => adminApi.getAccountRpmStatus(accountId ?? ""),
-      enabled: Boolean(accountId),
-    }),
-    proxyQuality: useQuery({
-      queryKey: ["admin", "account-runtime", accountId, "proxy-quality"],
-      queryFn: () => adminApi.getAccountProxyQuality(accountId ?? ""),
-      enabled: Boolean(accountId),
-    }),
-  };
-}
-
-export function useAdminAccountProxyMutations() {
+export function useTestAccount() {
   const qc = useQueryClient();
-  return {
-    bind: useMutation({
-      mutationFn: ({ id, proxyId }: { id: Id; proxyId: string | null }) =>
-        adminApi.bindAccountProxy(id, proxyId),
-      onSuccess: () => {
-        void qc.invalidateQueries({ queryKey: ["admin", "accounts"] });
-        void qc.invalidateQueries({ queryKey: ["admin", "account-proxy-quality"] });
-      },
-    }),
-  };
-}
-
-export function useAdminProxies(filters: { page?: number; status?: ProxyDefinitionStatus | "all" }) {
-  const query = {
-    page: filters.page ?? 1,
-    page_size: DEFAULT_PAGE_SIZE,
-    status: filters.status && filters.status !== "all" ? filters.status : undefined,
-  };
-
-  return useQuery({
-    queryKey: queryKeys.admin.proxies(query),
-    queryFn: () => adminApi.listProxies(query),
+  return useMutation({
+    // A connectivity test can flip the account status (e.g. needs_reauth/dead on
+    // auth failure), so refetch the list to reflect the new state.
+    mutationFn: (id: string) => adminApi.testAccount(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "accounts"] }),
   });
 }
 
-export function useAdminProxyMutations() {
-  const qc = useQueryClient();
-  const invalidate = () => {
-    void qc.invalidateQueries({ queryKey: ["admin", "proxies"] });
-    void qc.invalidateQueries({ queryKey: ["admin", "accounts"] });
-    void qc.invalidateQueries({ queryKey: ["admin", "account-proxy-quality"] });
-  };
-
-  return {
-    create: useMutation({
-      mutationFn: adminApi.createProxy,
-      onSuccess: invalidate,
-    }),
-    update: useMutation({
-      mutationFn: ({ id, body }: { id: ProxyDefinition["id"]; body: Parameters<typeof adminApi.updateProxy>[1] }) =>
-        adminApi.updateProxy(id, body),
-      onSuccess: invalidate,
-    }),
-  };
+// Per-account diagnostics — fetched on demand (when a detail view opens) so the
+// list stays cheap; `enabled` gates each query behind a selected account id.
+export function useAccountHealth(id: string | null) {
+  return useQuery({
+    queryKey: queryKeys.admin.accountHealth(id ?? ""),
+    queryFn: () => adminApi.getAccountHealth(id as string),
+    enabled: Boolean(id),
+  });
+}
+export function useAccountQuota(id: string | null) {
+  return useQuery({
+    queryKey: queryKeys.admin.accountQuota(id ?? ""),
+    queryFn: () => adminApi.getAccountQuota(id as string),
+    enabled: Boolean(id),
+  });
+}
+export function useAccountRpmStatus(id: string | null) {
+  return useQuery({
+    queryKey: queryKeys.admin.accountRpm(id ?? ""),
+    queryFn: () => adminApi.getAccountRpmStatus(id as string),
+    enabled: Boolean(id),
+  });
+}
+export function useAccountProxyQuality(id: string | null) {
+  return useQuery({
+    queryKey: queryKeys.admin.accountProxyQuality(id ?? ""),
+    queryFn: () => adminApi.getAccountProxyQuality(id as string),
+    enabled: Boolean(id),
+  });
 }
 
-export function useAdminAccountGroups() {
+// ---- Account groups ----
+export function useAdminGroups() {
   return useQuery({
     queryKey: queryKeys.admin.accountGroups(),
     queryFn: () => adminApi.listAccountGroups(),
   });
 }
 
-export function useAdminAccountGroupMutations() {
-  const qc = useQueryClient();
-  const invalidate = () => qc.invalidateQueries({ queryKey: queryKeys.admin.accountGroups() });
-
-  return {
-    create: useMutation({
-      mutationFn: adminApi.createAccountGroup,
-      onSuccess: invalidate,
-    }),
-    update: useMutation({
-      mutationFn: ({ id, body }: { id: Id; body: Parameters<typeof adminApi.updateAccountGroup>[1] }) =>
-        adminApi.updateAccountGroup(id, body),
-      onSuccess: invalidate,
-    }),
-  };
-}
-
-export function useAdminUsageLogs(filters: { page?: number; userId?: Id; model?: string }) {
-  const query = {
-    page: filters.page ?? 1,
-    page_size: DEFAULT_PAGE_SIZE,
-    user_id: filters.userId || undefined,
-    model: filters.model || undefined,
-  };
-
+// Members of one group — fetched on demand (when the manage-members dialog opens).
+// Keyed under the account-groups prefix so add/remove member mutations refetch it.
+export function useGroupMembers(groupId: string | null) {
   return useQuery({
-    queryKey: queryKeys.admin.usageLogs(query),
-    queryFn: () => adminApi.listUsageLogs(query),
+    queryKey: queryKeys.admin.accountGroupMembers(groupId ?? ""),
+    queryFn: () => adminApi.listAccountGroupMembers(groupId as string),
+    enabled: Boolean(groupId),
   });
 }
 
-export function useAdminUsageAggregates(dimension: UsageAggregateDimension, range?: AdminTimeRange) {
+// ---- Proxies ----
+export function useAdminProxies(params?: P<typeof adminApi.listProxies>) {
+  return useQuery({
+    queryKey: queryKeys.admin.proxies(params),
+    queryFn: () => adminApi.listProxies(params),
+  });
+}
+
+// ---- Providers & models (reference data) ----
+export function useAdminProviders(params?: P<typeof adminApi.listProviders>) {
+  return useQuery({
+    queryKey: queryKeys.admin.providers(params),
+    queryFn: () => adminApi.listProviders(params),
+  });
+}
+
+export function useAdminModels(params?: P<typeof adminApi.listModels>) {
+  return useQuery({
+    queryKey: queryKeys.admin.models(params),
+    queryFn: () => adminApi.listModels(params),
+  });
+}
+
+// ---- Rate limits (per-model & per-account-group TPM/RPM/concurrency) ----
+// The API has no per-id GET, so these list-all and the UI joins by id.
+export function useModelRateLimits() {
+  return useQuery({
+    queryKey: ["admin", "model-rate-limits"],
+    queryFn: () => adminApi.listModelRateLimits(),
+  });
+}
+export function useUpsertModelRateLimit() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.upsertModelRateLimit>) => adminApi.upsertModelRateLimit(body),
+    ["admin", "model-rate-limits"],
+  );
+}
+export function useDeleteModelRateLimit() {
+  return useAdminMutation(
+    (modelId: string) => adminApi.deleteModelRateLimit(modelId),
+    ["admin", "model-rate-limits"],
+  );
+}
+export function useGroupRateLimits() {
+  return useQuery({
+    queryKey: ["admin", "group-rate-limits"],
+    queryFn: () => adminApi.listGroupRateLimits(),
+  });
+}
+export function useUpsertGroupRateLimit() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.upsertGroupRateLimit>) => adminApi.upsertGroupRateLimit(body),
+    ["admin", "group-rate-limits"],
+  );
+}
+export function useDeleteGroupRateLimit() {
+  return useAdminMutation(
+    (groupId: string) => adminApi.deleteGroupRateLimit(groupId),
+    ["admin", "group-rate-limits"],
+  );
+}
+
+// ---- Subscriptions & commerce ----
+export function useAdminSubscriptionPlans(params?: P<typeof adminApi.listSubscriptionPlans>) {
+  return useQuery({
+    queryKey: queryKeys.admin.subscriptionPlans(params),
+    queryFn: () => adminApi.listSubscriptionPlans(params),
+  });
+}
+
+export function useAdminSubscriptions(params?: P<typeof adminApi.listUserSubscriptions>) {
+  return useQuery({
+    queryKey: queryKeys.admin.userSubscriptions(params),
+    queryFn: () => adminApi.listUserSubscriptions(params),
+  });
+}
+
+export function useAdminPricingRules(params?: P<typeof adminApi.listPricingRules>) {
+  return useQuery({
+    queryKey: queryKeys.admin.pricingRules(params),
+    queryFn: () => adminApi.listPricingRules(params),
+  });
+}
+
+export function useAdminPaymentOrders(params?: P<typeof adminApi.listPaymentOrders>) {
+  return useQuery({
+    queryKey: queryKeys.admin.paymentOrders(params),
+    queryFn: () => adminApi.listPaymentOrders(params),
+  });
+}
+
+export function useAdminPaymentProviders(params?: P<typeof adminApi.listPaymentProviders>) {
+  return useQuery({
+    queryKey: queryKeys.admin.paymentProviders(params),
+    queryFn: () => adminApi.listPaymentProviders(params),
+  });
+}
+
+// ---- Promotions ----
+export function useAdminPromoCodes(params?: P<typeof adminApi.listPromoCodes>) {
+  return useQuery({
+    queryKey: queryKeys.admin.promoCodes(params),
+    queryFn: () => adminApi.listPromoCodes(params),
+  });
+}
+
+export function useAdminRedeemCodes(params?: P<typeof adminApi.listRedeemCodes>) {
+  return useQuery({
+    queryKey: queryKeys.admin.redeemCodes(params),
+    queryFn: () => adminApi.listRedeemCodes(params),
+  });
+}
+
+// ---- Affiliates ----
+export function useAffiliateInvites(params?: P<typeof adminApi.listAffiliateInvites>) {
+  return useQuery({
+    queryKey: queryKeys.admin.affiliateInvites(params),
+    queryFn: () => adminApi.listAffiliateInvites(params),
+  });
+}
+
+export function useAffiliateRebates(params?: P<typeof adminApi.listAffiliateRebates>) {
+  return useQuery({
+    queryKey: queryKeys.admin.affiliateRebates(params),
+    queryFn: () => adminApi.listAffiliateRebates(params),
+  });
+}
+
+export function useAffiliateTransfers(params?: P<typeof adminApi.listAffiliateTransfers>) {
+  return useQuery({
+    queryKey: queryKeys.admin.affiliateTransfers(params),
+    queryFn: () => adminApi.listAffiliateTransfers(params),
+  });
+}
+
+// ---- Announcements ----
+export function useAdminAnnouncements(params?: P<typeof adminApi.listAnnouncements>) {
+  return useQuery({
+    queryKey: queryKeys.admin.announcements(params),
+    queryFn: () => adminApi.listAnnouncements(params),
+  });
+}
+
+// ---- Error passthrough rules ----
+export function useErrorPassthroughRules() {
+  return useQuery({
+    queryKey: queryKeys.admin.errorPassthroughRules(),
+    queryFn: () => adminApi.listErrorPassthroughRules(),
+  });
+}
+
+// ---- TLS fingerprint profiles ----
+export function useTlsProfiles() {
+  return useQuery({
+    queryKey: queryKeys.admin.tlsProfiles(),
+    queryFn: () => adminApi.listTlsProfiles(),
+  });
+}
+
+// ---- Custom user attribute definitions ----
+export function useUserAttributeDefinitions() {
+  return useQuery({
+    queryKey: queryKeys.admin.userAttributes(),
+    queryFn: () => adminApi.listUserAttributeDefinitions(),
+  });
+}
+
+// ---- Notification email templates ----
+export function useNotificationEmailTemplates() {
+  return useQuery({
+    queryKey: queryKeys.admin.notificationEmailTemplates(),
+    queryFn: () => adminApi.listNotificationEmailTemplates(),
+  });
+}
+
+// ---- Account availability (monitoring) ----
+export function useAccountsAvailability(days?: number) {
+  return useQuery({
+    queryKey: queryKeys.admin.accountsAvailability(days),
+    queryFn: () => adminApi.listAccountsAvailability(days),
+  });
+}
+
+// ---- Per-user platform spend quotas ----
+export function useUserPlatformQuotas(userId: string, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.admin.userPlatformQuotas(userId),
+    queryFn: () => adminApi.listUserPlatformQuotas(userId),
+    enabled: enabled && Boolean(userId),
+  });
+}
+export function useUpsertUserPlatformQuota() {
+  return useAdminMutation(
+    (vars: { userId: string; body: B<typeof adminApi.upsertUserPlatformQuota> }) =>
+      adminApi.upsertUserPlatformQuota(vars.userId, vars.body),
+    ["admin", "user-platform-quotas"],
+  );
+}
+export function useDeleteUserPlatformQuota() {
+  return useAdminMutation(
+    (vars: { userId: string; platform: string }) =>
+      adminApi.deleteUserPlatformQuota(vars.userId, vars.platform),
+    ["admin", "user-platform-quotas"],
+  );
+}
+
+// ---- Ops ----
+export function useOpsOverview(range?: P<typeof adminApi.getOpsOverview>) {
+  return useQuery({
+    queryKey: queryKeys.admin.opsOverview(range),
+    queryFn: () => adminApi.getOpsOverview(range),
+    refetchInterval: 30_000,
+  });
+}
+
+export function useOpsSlos() {
+  return useQuery({
+    queryKey: queryKeys.admin.opsSlos(),
+    queryFn: () => adminApi.listOpsSlos(),
+    refetchInterval: 30_000,
+  });
+}
+
+export function useOpsAlerts(params?: P<typeof adminApi.listOpsAlerts>) {
+  return useQuery({
+    queryKey: queryKeys.admin.opsAlerts(params),
+    queryFn: () => adminApi.listOpsAlerts(params),
+  });
+}
+
+export function useOpsThroughput(params?: P<typeof adminApi.getOpsThroughputTrend>) {
+  return useQuery({
+    queryKey: queryKeys.admin.opsThroughput(params),
+    queryFn: () => adminApi.getOpsThroughputTrend(params),
+    refetchInterval: 30_000,
+  });
+}
+
+export function useOpsErrorTrend(params?: P<typeof adminApi.getOpsErrorTrend>) {
+  return useQuery({
+    queryKey: queryKeys.admin.opsErrorTrend(params),
+    queryFn: () => adminApi.getOpsErrorTrend(params),
+    refetchInterval: 30_000,
+  });
+}
+
+export function useAdminUsageDaily(params?: P<typeof adminApi.listUsageDaily>) {
+  return useQuery({
+    queryKey: queryKeys.admin.usageDaily(params),
+    queryFn: () => adminApi.listUsageDaily(params),
+  });
+}
+
+export function useAdminUsageAggregates(
+  dimension: P<typeof adminApi.listUsageAggregates>,
+  range?: B<typeof adminApi.listUsageAggregates>,
+) {
   return useQuery({
     queryKey: queryKeys.admin.usageAggregates(dimension, range),
     queryFn: () => adminApi.listUsageAggregates(dimension, range),
   });
 }
 
-export function useAdminAffiliateInvites(filters: { page?: number }) {
-  const query = { page: filters.page ?? 1, page_size: DEFAULT_PAGE_SIZE };
+// ---- Risk control ----
+export function useRiskStatus() {
   return useQuery({
-    queryKey: queryKeys.admin.affiliateInvites(query),
-    queryFn: () => adminApi.listAffiliateInvites(query),
+    queryKey: queryKeys.admin.riskStatus(),
+    queryFn: () => adminApi.getRiskStatus(),
+    refetchInterval: 30_000,
   });
 }
 
-export function useAdminAffiliateRebates(filters: { page?: number; userId?: Id }) {
-  const query = {
-    page: filters.page ?? 1,
-    page_size: DEFAULT_PAGE_SIZE,
-    user_id: filters.userId || undefined,
-  };
+export function useRiskLogs(params?: P<typeof adminApi.listRiskLogs>) {
   return useQuery({
-    queryKey: queryKeys.admin.affiliateRebates(query),
-    queryFn: () => adminApi.listAffiliateRebates(query),
+    queryKey: queryKeys.admin.riskLogs(params),
+    queryFn: () => adminApi.listRiskLogs(params),
   });
 }
 
-export function useAdminAffiliateTransfers(filters: { page?: number; userId?: Id }) {
-  const query = {
-    page: filters.page ?? 1,
-    page_size: DEFAULT_PAGE_SIZE,
-    user_id: filters.userId || undefined,
-  };
+// ---- Audit & billing ----
+export function useAuditLogs(params?: P<typeof adminApi.listAuditLogs>) {
   return useQuery({
-    queryKey: queryKeys.admin.affiliateTransfers(query),
-    queryFn: () => adminApi.listAffiliateTransfers(query),
+    queryKey: queryKeys.admin.auditLogs(params),
+    queryFn: () => adminApi.listAuditLogs(params),
   });
 }
 
-export function useAdminAnnouncements(filters: { page?: number; status?: AnnouncementStatus | "all" }) {
-  const query = {
-    page: filters.page ?? 1,
-    page_size: DEFAULT_PAGE_SIZE,
-    status: filters.status && filters.status !== "all" ? filters.status : undefined,
-  };
-
+export function useBillingLedger(params?: P<typeof adminApi.listBillingLedger>) {
   return useQuery({
-    queryKey: queryKeys.admin.announcements(query),
-    queryFn: () => adminApi.listAnnouncements(query),
+    queryKey: queryKeys.admin.billingLedger(params),
+    queryFn: () => adminApi.listBillingLedger(params),
   });
 }
 
-export function useAdminAnnouncementMutations() {
-  const qc = useQueryClient();
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["admin", "announcements"] });
-
-  return {
-    create: useMutation({
-      mutationFn: adminApi.createAnnouncement,
-      onSuccess: invalidate,
-    }),
-    update: useMutation({
-      mutationFn: ({ id, body }: { id: Id; body: Parameters<typeof adminApi.updateAnnouncement>[1] }) =>
-        adminApi.updateAnnouncement(id, body),
-      onSuccess: invalidate,
-    }),
-    remove: useMutation({
-      mutationFn: adminApi.deleteAnnouncement,
-      onSuccess: invalidate,
-    }),
-  };
-}
-
-export function useAdminRedeemCodes(filters: { page?: number; status?: RedeemCodeStatus | "all" }) {
-  const query = {
-    page: filters.page ?? 1,
-    page_size: DEFAULT_PAGE_SIZE,
-    status: filters.status && filters.status !== "all" ? filters.status : undefined,
-  };
-
-  return {
-    codes: useQuery({
-      queryKey: queryKeys.admin.redeemCodes(query),
-      queryFn: () => adminApi.listRedeemCodes(query),
-    }),
-    stats: useQuery({
-      queryKey: queryKeys.admin.redeemStats(),
-      queryFn: () => adminApi.getRedeemStats(),
-    }),
-  };
-}
-
-export function useAdminRedeemMutations() {
-  const qc = useQueryClient();
-  const invalidate = () => {
-    void qc.invalidateQueries({ queryKey: ["admin", "redeem-codes"] });
-    void qc.invalidateQueries({ queryKey: queryKeys.admin.redeemStats() });
-  };
-
-  return {
-    create: useMutation({
-      mutationFn: adminApi.createRedeemCode,
-      onSuccess: invalidate,
-    }),
-    batchGenerate: useMutation({
-      mutationFn: adminApi.batchGenerateRedeemCodes,
-      onSuccess: invalidate,
-    }),
-    batchDisable: useMutation({
-      mutationFn: adminApi.batchDisableRedeemCodes,
-      onSuccess: invalidate,
-    }),
-  };
-}
-
-export function useAdminPromoCodes(filters: { page?: number; status?: PromoCodeStatus | "all" }) {
-  const query = {
-    page: filters.page ?? 1,
-    page_size: DEFAULT_PAGE_SIZE,
-    status: filters.status && filters.status !== "all" ? filters.status : undefined,
-  };
+// ---- Admin usage ----
+export function useAdminUsageLogs(params?: P<typeof adminApi.listUsageLogs>) {
   return useQuery({
-    queryKey: queryKeys.admin.promoCodes(query),
-    queryFn: () => adminApi.listPromoCodes(query),
+    queryKey: queryKeys.admin.usageLogs(params),
+    queryFn: () => adminApi.listUsageLogs(params),
   });
 }
 
-export function useAdminPromoCodeMutations() {
-  const qc = useQueryClient();
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["admin", "promo-codes"] });
-
-  return {
-    create: useMutation({
-      mutationFn: adminApi.createPromoCode,
-      onSuccess: invalidate,
-    }),
-    update: useMutation({
-      mutationFn: ({ id, body }: { id: Id; body: Parameters<typeof adminApi.updatePromoCode>[1] }) =>
-        adminApi.updatePromoCode(id, body),
-      onSuccess: invalidate,
-    }),
-    remove: useMutation({
-      mutationFn: adminApi.deletePromoCode,
-      onSuccess: invalidate,
-    }),
-  };
-}
-
-export function useAdminRiskControl(filters: { page?: number }) {
-  const logsQuery = { page: filters.page ?? 1, page_size: DEFAULT_PAGE_SIZE };
-  return {
-    config: useQuery({
-      queryKey: queryKeys.admin.riskConfig(),
-      queryFn: () => adminApi.getRiskConfig(),
-    }),
-    status: useQuery({
-      queryKey: queryKeys.admin.riskStatus(),
-      queryFn: () => adminApi.getRiskStatus(),
-    }),
-    logs: useQuery({
-      queryKey: queryKeys.admin.riskLogs(logsQuery),
-      queryFn: () => adminApi.listRiskLogs(logsQuery),
-    }),
-  };
-}
-
-export function useAdminRiskMutations() {
-  const qc = useQueryClient();
-  return {
-    updateConfig: useMutation({
-      mutationFn: (body: RiskControlConfig) => adminApi.updateRiskConfig(body),
-      onSuccess: () => {
-        void qc.invalidateQueries({ queryKey: queryKeys.admin.riskConfig() });
-        void qc.invalidateQueries({ queryKey: queryKeys.admin.riskStatus() });
-      },
-    }),
-  };
-}
-
+// ---- Settings ----
 export function useAdminSettings() {
   return useQuery({
     queryKey: queryKeys.admin.settings(),
@@ -596,113 +437,447 @@ export function useAdminSettings() {
   });
 }
 
-export function useAdminSettingsMutation() {
+// ---- Risk control config (read) ----
+export function useRiskConfig() {
+  return useQuery({
+    queryKey: queryKeys.admin.riskConfig(),
+    queryFn: () => adminApi.getRiskConfig(),
+  });
+}
+
+// ============================================================
+// Mutations (create / update / delete). Each invalidates the broad
+// ["admin", <resource>] prefix so every param-scoped query variant
+// refetches — the pattern established by useSetAccountStatus above.
+// ============================================================
+
+/** Second positional arg of a method, used for `update(id, body)` shapes. */
+type B<F extends (...a: never[]) => unknown> = Parameters<F>[1];
+
+function useAdminMutation<TVars, TData>(
+  mutationFn: (vars: TVars) => Promise<TData>,
+  invalidate: readonly unknown[],
+) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: AdminSettings) => adminApi.updateSettings(body),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.admin.settings() }),
+    mutationFn,
+    onSuccess: () => qc.invalidateQueries({ queryKey: invalidate }),
   });
 }
 
-export function useAdminSubscriptionPlans(filters: { page?: number }) {
-  const query = { page: filters.page ?? 1, page_size: DEFAULT_PAGE_SIZE };
-  return useQuery({
-    queryKey: queryKeys.admin.subscriptionPlans(query),
-    queryFn: () => adminApi.listSubscriptionPlans(query),
-  });
+// Users
+export function useCreateAdminUser() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.createUser>) => adminApi.createUser(body),
+    ["admin", "users"],
+  );
+}
+export function useUpdateAdminUser() {
+  return useAdminMutation(
+    (vars: { id: string; body: B<typeof adminApi.updateUser> }) =>
+      adminApi.updateUser(vars.id, vars.body),
+    ["admin", "users"],
+  );
+}
+export function useUpdateUserBalance() {
+  return useAdminMutation(
+    (vars: { id: string; body: B<typeof adminApi.updateUserBalance> }) =>
+      adminApi.updateUserBalance(vars.id, vars.body),
+    ["admin", "users"],
+  );
 }
 
-export function useAdminSubscriptionPlanMutations() {
+// Provider accounts
+export function useCreateAccount() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.createAccount>) => adminApi.createAccount(body),
+    ["admin", "accounts"],
+  );
+}
+export function useUpdateAccount() {
+  return useAdminMutation(
+    (vars: { id: string; body: B<typeof adminApi.updateAccount> }) =>
+      adminApi.updateAccount(vars.id, vars.body),
+    ["admin", "accounts"],
+  );
+}
+export function useBindAccountProxy() {
+  return useAdminMutation(
+    (vars: { id: string; proxyId: string | null }) =>
+      adminApi.bindAccountProxy(vars.id, vars.proxyId),
+    ["admin", "accounts"],
+  );
+}
+export function useClearAccountError() {
+  return useAdminMutation((id: string) => adminApi.clearAccountError(id), ["admin", "accounts"]);
+}
+export function useRecoverAccount() {
+  return useAdminMutation((id: string) => adminApi.recoverAccount(id), ["admin", "accounts"]);
+}
+export function useDiscoverAccountModels() {
+  return useAdminMutation(
+    (vars: { id: string; body?: B<typeof adminApi.discoverAccountModels> }) =>
+      adminApi.discoverAccountModels(vars.id, vars.body),
+    ["admin", "accounts"],
+  );
+}
+export function useImportAccounts() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.importAccounts>) => adminApi.importAccounts(body),
+    ["admin", "accounts"],
+  );
+}
+export function useBatchUpdateAccounts() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.batchUpdateAccounts>) => adminApi.batchUpdateAccounts(body),
+    ["admin", "accounts"],
+  );
+}
+/** Export is read-only; expose as a mutation so pages can trigger it on click. */
+export function useExportAccounts() {
+  return useMutation({ mutationFn: () => adminApi.exportAccounts() });
+}
+
+// Proxies
+export function useCreateProxy() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.createProxy>) => adminApi.createProxy(body),
+    ["admin", "proxies"],
+  );
+}
+export function useUpdateProxy() {
+  return useAdminMutation(
+    (vars: { id: string; body: B<typeof adminApi.updateProxy> }) =>
+      adminApi.updateProxy(vars.id, vars.body),
+    ["admin", "proxies"],
+  );
+}
+
+// Providers (upstream platform registry)
+export function useCreateProvider() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.createProvider>) => adminApi.createProvider(body),
+    ["admin", "providers"],
+  );
+}
+export function useUpdateProvider() {
+  return useAdminMutation(
+    (vars: { id: string; body: B<typeof adminApi.updateProvider> }) =>
+      adminApi.updateProvider(vars.id, vars.body),
+    ["admin", "providers"],
+  );
+}
+export function useTestProvider() {
   const qc = useQueryClient();
-  return {
-    create: useMutation({
-      mutationFn: adminApi.createSubscriptionPlan,
-      onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "subscription-plans"] }),
-    }),
-  };
-}
-
-export function useAdminUserSubscriptions(filters: { page?: number; userId?: Id }) {
-  const query = {
-    page: filters.page ?? 1,
-    page_size: DEFAULT_PAGE_SIZE,
-    user_id: filters.userId || undefined,
-  };
-  return useQuery({
-    queryKey: queryKeys.admin.userSubscriptions(query),
-    queryFn: () => adminApi.listUserSubscriptions(query),
+  return useMutation({
+    mutationFn: (id: string) => adminApi.testProvider(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "providers"] }),
   });
 }
 
-export function useAdminUserSubscriptionMutations() {
-  const qc = useQueryClient();
-  return {
-    create: useMutation({
-      mutationFn: adminApi.createUserSubscription,
-      onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "user-subscriptions"] }),
-    }),
-  };
+// Models (model registry)
+export function useCreateModel() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.createModel>) => adminApi.createModel(body),
+    ["admin", "models"],
+  );
+}
+export function useUpdateModel() {
+  return useAdminMutation(
+    (vars: { id: string; body: B<typeof adminApi.updateModel> }) =>
+      adminApi.updateModel(vars.id, vars.body),
+    ["admin", "models"],
+  );
 }
 
-export function useAdminPricingRules(filters: { page?: number }) {
-  const query = { page: filters.page ?? 1, page_size: DEFAULT_PAGE_SIZE };
+// Account groups
+export function useCreateGroup() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.createAccountGroup>) => adminApi.createAccountGroup(body),
+    ["admin", "account-groups"],
+  );
+}
+export function useUpdateGroup() {
+  return useAdminMutation(
+    (vars: { id: string; body: B<typeof adminApi.updateAccountGroup> }) =>
+      adminApi.updateAccountGroup(vars.id, vars.body),
+    ["admin", "account-groups"],
+  );
+}
+export function useAddGroupMember() {
+  return useAdminMutation(
+    (vars: { accountId: string; groupId: string }) =>
+      adminApi.addAccountToGroup(vars.accountId, vars.groupId),
+    ["admin", "account-groups"],
+  );
+}
+export function useRemoveGroupMember() {
+  return useAdminMutation(
+    (vars: { accountId: string; groupId: string }) =>
+      adminApi.removeAccountFromGroup(vars.accountId, vars.groupId),
+    ["admin", "account-groups"],
+  );
+}
+
+// Announcements
+export function useCreateAnnouncement() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.createAnnouncement>) => adminApi.createAnnouncement(body),
+    ["admin", "announcements"],
+  );
+}
+export function useUpdateAnnouncement() {
+  return useAdminMutation(
+    (vars: { id: string; body: B<typeof adminApi.updateAnnouncement> }) =>
+      adminApi.updateAnnouncement(vars.id, vars.body),
+    ["admin", "announcements"],
+  );
+}
+export function useDeleteAnnouncement() {
+  return useAdminMutation(
+    (id: string) => adminApi.deleteAnnouncement(id),
+    ["admin", "announcements"],
+  );
+}
+
+// Error passthrough rules
+export function useCreateErrorPassthroughRule() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.createErrorPassthroughRule>) =>
+      adminApi.createErrorPassthroughRule(body),
+    ["admin", "error-passthrough-rules"],
+  );
+}
+export function useUpdateErrorPassthroughRule() {
+  return useAdminMutation(
+    (vars: { id: string; body: B<typeof adminApi.updateErrorPassthroughRule> }) =>
+      adminApi.updateErrorPassthroughRule(vars.id, vars.body),
+    ["admin", "error-passthrough-rules"],
+  );
+}
+export function useDeleteErrorPassthroughRule() {
+  return useAdminMutation(
+    (id: string) => adminApi.deleteErrorPassthroughRule(id),
+    ["admin", "error-passthrough-rules"],
+  );
+}
+
+// TLS fingerprint profiles
+export function useCreateTlsProfile() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.createTlsProfile>) => adminApi.createTlsProfile(body),
+    ["admin", "tls-profiles"],
+  );
+}
+export function useUpdateTlsProfile() {
+  return useAdminMutation(
+    (vars: { id: string; body: B<typeof adminApi.updateTlsProfile> }) =>
+      adminApi.updateTlsProfile(vars.id, vars.body),
+    ["admin", "tls-profiles"],
+  );
+}
+export function useDeleteTlsProfile() {
+  return useAdminMutation(
+    (id: string) => adminApi.deleteTlsProfile(id),
+    ["admin", "tls-profiles"],
+  );
+}
+
+// Custom user attribute definitions
+export function useCreateUserAttributeDefinition() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.createUserAttributeDefinition>) =>
+      adminApi.createUserAttributeDefinition(body),
+    ["admin", "user-attributes"],
+  );
+}
+export function useUpdateUserAttributeDefinition() {
+  return useAdminMutation(
+    (vars: { id: string; body: B<typeof adminApi.updateUserAttributeDefinition> }) =>
+      adminApi.updateUserAttributeDefinition(vars.id, vars.body),
+    ["admin", "user-attributes"],
+  );
+}
+export function useDeleteUserAttributeDefinition() {
+  return useAdminMutation(
+    (id: string) => adminApi.deleteUserAttributeDefinition(id),
+    ["admin", "user-attributes"],
+  );
+}
+
+// Notification email templates
+export function useUpdateNotificationEmailTemplate() {
+  return useAdminMutation(
+    (vars: {
+      event: P<typeof adminApi.updateNotificationEmailTemplate>;
+      body: B<typeof adminApi.updateNotificationEmailTemplate>;
+    }) => adminApi.updateNotificationEmailTemplate(vars.event, vars.body),
+    ["admin", "notification-email-templates"],
+  );
+}
+export function useRestoreNotificationEmailTemplate() {
+  return useAdminMutation(
+    (event: P<typeof adminApi.restoreNotificationEmailTemplate>) =>
+      adminApi.restoreNotificationEmailTemplate(event),
+    ["admin", "notification-email-templates"],
+  );
+}
+
+// Promo codes
+export function useCreatePromoCode() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.createPromoCode>) => adminApi.createPromoCode(body),
+    ["admin", "promo-codes"],
+  );
+}
+export function useUpdatePromoCode() {
+  return useAdminMutation(
+    (vars: { id: string; body: B<typeof adminApi.updatePromoCode> }) =>
+      adminApi.updatePromoCode(vars.id, vars.body),
+    ["admin", "promo-codes"],
+  );
+}
+export function useDeletePromoCode() {
+  return useAdminMutation(
+    (id: string) => adminApi.deletePromoCode(id),
+    ["admin", "promo-codes"],
+  );
+}
+
+// Redeem codes
+export function useCreateRedeemCode() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.createRedeemCode>) => adminApi.createRedeemCode(body),
+    ["admin", "redeem-codes"],
+  );
+}
+export function useBatchGenerateRedeemCodes() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.batchGenerateRedeemCodes>) => adminApi.batchGenerateRedeemCodes(body),
+    ["admin", "redeem-codes"],
+  );
+}
+export function useBatchDisableRedeemCodes() {
+  return useAdminMutation(
+    (ids: string[]) => adminApi.batchDisableRedeemCodes(ids),
+    ["admin", "redeem-codes"],
+  );
+}
+export function useRedeemStats() {
   return useQuery({
-    queryKey: queryKeys.admin.pricingRules(query),
-    queryFn: () => adminApi.listPricingRules(query),
+    queryKey: queryKeys.admin.redeemStats(),
+    queryFn: () => adminApi.getRedeemStats(),
   });
 }
 
-export function useAdminPricingRuleMutations() {
-  const qc = useQueryClient();
-  return {
-    create: useMutation({
-      mutationFn: adminApi.createPricingRule,
-      onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "pricing-rules"] }),
-    }),
-    bulkImport: useMutation({
-      mutationFn: adminApi.bulkImportPricingRules,
-      onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "pricing-rules"] }),
-    }),
-  };
+// Subscription plans & user subscriptions
+export function useCreateSubscriptionPlan() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.createSubscriptionPlan>) => adminApi.createSubscriptionPlan(body),
+    ["admin", "subscription-plans"],
+  );
+}
+export function useUpdateSubscriptionPlan() {
+  return useAdminMutation(
+    (vars: { id: string; body: B<typeof adminApi.updateSubscriptionPlan> }) =>
+      adminApi.updateSubscriptionPlan(vars.id, vars.body),
+    ["admin", "subscription-plans"],
+  );
+}
+export function useCreateUserSubscription() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.createUserSubscription>) => adminApi.createUserSubscription(body),
+    ["admin", "user-subscriptions"],
+  );
 }
 
-export function useAdminPaymentOrders(filters: { page?: number; status?: PaymentOrderStatus | "all" }) {
-  const query = {
-    page: filters.page ?? 1,
-    page_size: DEFAULT_PAGE_SIZE,
-    status: filters.status && filters.status !== "all" ? filters.status : undefined,
-  };
+// Pricing rules
+export function useCreatePricingRule() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.createPricingRule>) => adminApi.createPricingRule(body),
+    ["admin", "pricing-rules"],
+  );
+}
+export function useBulkImportPricingRules() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.bulkImportPricingRules>) => adminApi.bulkImportPricingRules(body),
+    ["admin", "pricing-rules"],
+  );
+}
+
+// Payment orders & providers
+export function useRefundPaymentOrder() {
+  return useAdminMutation(
+    (vars: { id: string; body: B<typeof adminApi.refundPaymentOrder> }) =>
+      adminApi.refundPaymentOrder(vars.id, vars.body),
+    ["admin", "payment-orders"],
+  );
+}
+export function useCreatePaymentProvider() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.createPaymentProvider>) => adminApi.createPaymentProvider(body),
+    ["admin", "payment-providers"],
+  );
+}
+
+// Risk control
+export function useUpdateRiskConfig() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.updateRiskConfig>) => adminApi.updateRiskConfig(body),
+    ["admin", "risk-config"],
+  );
+}
+
+// Ops alerts
+export function useAcknowledgeAlert() {
+  return useAdminMutation(
+    (id: string) => adminApi.acknowledgeAlert(id),
+    ["admin", "ops", "alerts"],
+  );
+}
+
+// Ops SLO definitions
+export function useCreateOpsSlo() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.createOpsSlo>) => adminApi.createOpsSlo(body),
+    ["admin", "ops", "slos"],
+  );
+}
+export function useUpdateOpsSlo() {
+  return useAdminMutation(
+    (vars: { id: string; body: B<typeof adminApi.updateOpsSlo> }) =>
+      adminApi.updateOpsSlo(vars.id, vars.body),
+    ["admin", "ops", "slos"],
+  );
+}
+
+// Settings
+export function useUpdateSettings() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.updateSettings>) => adminApi.updateSettings(body),
+    ["admin", "settings"],
+  );
+}
+
+// Config snapshot (backup / restore)
+export function useConfigSnapshot() {
   return useQuery({
-    queryKey: queryKeys.admin.paymentOrders(query),
-    queryFn: () => adminApi.listPaymentOrders(query),
+    queryKey: queryKeys.admin.configSnapshot(),
+    queryFn: () => adminApi.getConfigSnapshot(),
+    enabled: false, // fetched on demand from the Backup tab
+  });
+}
+export function useImportConfigSnapshot() {
+  return useMutation({
+    mutationFn: (vars: { body: P<typeof adminApi.importConfigSnapshot>; dryRun?: boolean }) =>
+      adminApi.importConfigSnapshot(vars.body, vars.dryRun),
   });
 }
 
-export function useAdminPaymentOrderMutations() {
-  const qc = useQueryClient();
-  return {
-    refund: useMutation({
-      mutationFn: ({ id, body }: { id: Id; body: Parameters<typeof adminApi.refundPaymentOrder>[1] }) =>
-        adminApi.refundPaymentOrder(id, body),
-      onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "payment-orders"] }),
-    }),
-  };
-}
-
-export function useAdminPaymentProviders(filters: { page?: number }) {
-  const query = { page: filters.page ?? 1, page_size: DEFAULT_PAGE_SIZE };
-  return useQuery({
-    queryKey: queryKeys.admin.paymentProviders(query),
-    queryFn: () => adminApi.listPaymentProviders(query),
+// Scheduler strategy replay
+export function useReplaySchedulerStrategy() {
+  return useMutation({
+    mutationFn: (body: P<typeof adminApi.replaySchedulerStrategy>) =>
+      adminApi.replaySchedulerStrategy(body),
   });
-}
-
-export function useAdminPaymentProviderMutations() {
-  const qc = useQueryClient();
-  return {
-    create: useMutation({
-      mutationFn: adminApi.createPaymentProvider,
-      onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "payment-providers"] }),
-    }),
-  };
 }

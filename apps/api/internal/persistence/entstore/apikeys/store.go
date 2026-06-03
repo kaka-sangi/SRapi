@@ -49,6 +49,11 @@ func (s *Store) Create(ctx context.Context, input contract.CreateStoredKey) (con
 		SetNillableRpmLimit(input.RPMLimit).
 		SetNillableTpmLimit(input.TPMLimit).
 		SetNillableConcurrencyLimit(input.ConcurrencyLimit).
+		SetNillableRequestLimit5h(input.RequestLimit5h).
+		SetNillableRequestLimit1d(input.RequestLimit1d).
+		SetNillableRequestLimit7d(input.RequestLimit7d).
+		SetAllowedIpsJSON(cloneStrings(input.AllowedIPs)).
+		SetDeniedIpsJSON(cloneStrings(input.DeniedIPs)).
 		SetNillableExpiresAt(input.ExpiresAt).
 		Save(ctx)
 	if err != nil {
@@ -92,6 +97,14 @@ func (s *Store) Update(ctx context.Context, key contract.APIKey) (contract.APIKe
 		SetStatus(string(key.Status)).
 		SetScopesJSON(cloneStrings(key.Scopes)).
 		SetAllowedModelsJSON(cloneStrings(key.AllowedModels)).
+		SetNillableRpmLimit(key.RPMLimit).
+		SetNillableTpmLimit(key.TPMLimit).
+		SetNillableConcurrencyLimit(key.ConcurrencyLimit).
+		SetNillableRequestLimit5h(key.RequestLimit5h).
+		SetNillableRequestLimit1d(key.RequestLimit1d).
+		SetNillableRequestLimit7d(key.RequestLimit7d).
+		SetAllowedIpsJSON(cloneStrings(key.AllowedIPs)).
+		SetDeniedIpsJSON(cloneStrings(key.DeniedIPs)).
 		Save(ctx)
 	if err != nil {
 		_ = tx.Rollback()
@@ -196,6 +209,11 @@ func (s *Store) toAPIKey(ctx context.Context, key *ent.APIKey) (contract.APIKey,
 		RPMLimit:         key.RpmLimit,
 		TPMLimit:         key.TpmLimit,
 		ConcurrencyLimit: key.ConcurrencyLimit,
+		RequestLimit5h:   key.RequestLimit5h,
+		RequestLimit1d:   key.RequestLimit1d,
+		RequestLimit7d:   key.RequestLimit7d,
+		AllowedIPs:       cloneStrings(key.AllowedIpsJSON),
+		DeniedIPs:        cloneStrings(key.DeniedIpsJSON),
 		ExpiresAt:        key.ExpiresAt,
 		LastUsedAt:       key.LastUsedAt,
 		CreatedAt:        key.CreatedAt,

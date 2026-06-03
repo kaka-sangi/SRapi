@@ -26,12 +26,12 @@ export const SETTINGS_TABS: Array<{ id: SettingsTab; label: string }> = [
 export interface AdminSettingsDraft {
   value: AdminSettings;
   customMenusJson: string;
-  enabledChannelsText: string;
-  oauthProvidersText: string;
-  schedulerRolloutModelsText: string;
-  schedulerRolloutApiKeyHashesText: string;
-  paymentProvidersText: string;
-  emailTemplatesJson: string;
+  enabledChannels: string[];
+  oauthProviders: string[];
+  schedulerRolloutModels: string[];
+  schedulerRolloutApiKeyHashes: string[];
+  paymentProviders: string[];
+  emailTemplates: Record<string, string>;
 }
 
 export interface SettingsSaveConfirmationState {
@@ -44,18 +44,17 @@ export function createSettingsDraft(value: AdminSettings): AdminSettingsDraft {
   return {
     value,
     customMenusJson: JSON.stringify(value.general.custom_menus ?? [], null, 2),
-    enabledChannelsText: listToText(value.features.enabled_channels),
-    oauthProvidersText: listToText(value.security.oauth_providers),
-    schedulerRolloutModelsText: listToText(value.gateway.scheduler_strategy_rollout_models),
-    schedulerRolloutApiKeyHashesText: listToText(value.gateway.scheduler_strategy_rollout_api_key_hashes),
-    paymentProvidersText: listToText(value.payment.providers),
-    emailTemplatesJson: JSON.stringify(value.email.templates ?? {}, null, 2),
+    enabledChannels: [...(value.features.enabled_channels ?? [])],
+    oauthProviders: [...(value.security.oauth_providers ?? [])],
+    schedulerRolloutModels: [...(value.gateway.scheduler_strategy_rollout_models ?? [])],
+    schedulerRolloutApiKeyHashes: [...(value.gateway.scheduler_strategy_rollout_api_key_hashes ?? [])],
+    paymentProviders: [...(value.payment.providers ?? [])],
+    emailTemplates: { ...(value.email.templates ?? {}) },
   };
 }
 
 export function materializeSettingsDraft(draft: AdminSettingsDraft): AdminSettings {
   const customMenus = parseArrayOfObjects(draft.customMenusJson, "Custom menus");
-  const emailTemplates = parseStringMap(draft.emailTemplatesJson, "Email templates");
   return {
     ...draft.value,
     general: {
@@ -64,24 +63,24 @@ export function materializeSettingsDraft(draft: AdminSettingsDraft): AdminSettin
     },
     features: {
       ...draft.value.features,
-      enabled_channels: textToList(draft.enabledChannelsText),
+      enabled_channels: cleanList(draft.enabledChannels),
     },
     security: {
       ...draft.value.security,
-      oauth_providers: textToList(draft.oauthProvidersText),
+      oauth_providers: cleanList(draft.oauthProviders),
     },
     gateway: {
       ...draft.value.gateway,
-      scheduler_strategy_rollout_models: textToList(draft.schedulerRolloutModelsText),
-      scheduler_strategy_rollout_api_key_hashes: textToList(draft.schedulerRolloutApiKeyHashesText),
+      scheduler_strategy_rollout_models: cleanList(draft.schedulerRolloutModels),
+      scheduler_strategy_rollout_api_key_hashes: cleanList(draft.schedulerRolloutApiKeyHashes),
     },
     payment: {
       ...draft.value.payment,
-      providers: textToList(draft.paymentProvidersText),
+      providers: cleanList(draft.paymentProviders),
     },
     email: {
       ...draft.value.email,
-      templates: emailTemplates,
+      templates: cleanTemplates(draft.emailTemplates),
     },
   };
 }
@@ -125,15 +124,24 @@ export function canConfirmSettingsSave(state: SettingsSaveConfirmationState | nu
   return Boolean(state && state.confirmation.trim() === state.phrase);
 }
 
-export function listToText(items: string[] | undefined): string {
-  return (items ?? []).join("\n");
+/** Trim, drop blanks, and dedupe a chip/picker list before persisting. */
+export function cleanList(items: string[] | undefined): string[] {
+  const out: string[] = [];
+  for (const item of items ?? []) {
+    const trimmed = item.trim();
+    if (trimmed && !out.includes(trimmed)) out.push(trimmed);
+  }
+  return out;
 }
 
-export function textToList(value: string): string[] {
-  return value
-    .split(/\r?\n|,/)
-    .map((item) => item.trim())
-    .filter(Boolean);
+/** Drop blank keys and coerce values to strings for the email-template map. */
+function cleanTemplates(map: Record<string, string> | undefined): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(map ?? {})) {
+    const trimmed = key.trim();
+    if (trimmed) out[trimmed] = typeof value === "string" ? value : JSON.stringify(value);
+  }
+  return out;
 }
 
 function parseArrayOfObjects(value: string, fieldName: string): Array<Record<string, unknown>> {
@@ -147,24 +155,4 @@ function parseArrayOfObjects(value: string, fieldName: string): Array<Record<str
     throw new Error(`${fieldName} must be a JSON array of objects.`);
   }
   return parsed as Array<Record<string, unknown>>;
-}
-
-function parseStringMap(value: string, fieldName: string): Record<string, string> {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(value || "{}") as unknown;
-  } catch {
-    throw new Error(`${fieldName} must be valid JSON.`);
-  }
-  if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
-    throw new Error(`${fieldName} must be a JSON object.`);
-  }
-  const out: Record<string, string> = {};
-  for (const [key, item] of Object.entries(parsed as Record<string, unknown>)) {
-    if (typeof item !== "string") {
-      throw new Error(`${fieldName} values must be strings.`);
-    }
-    out[key] = item;
-  }
-  return out;
 }

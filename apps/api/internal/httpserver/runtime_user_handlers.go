@@ -1186,6 +1186,11 @@ func (s *Server) handleCreateApiKey(w http.ResponseWriter, r *http.Request) {
 		RPMLimit:         body.RpmLimit,
 		TPMLimit:         body.TpmLimit,
 		ConcurrencyLimit: body.ConcurrencyLimit,
+		RequestLimit5h:   body.RequestLimit5h,
+		RequestLimit1d:   body.RequestLimit1d,
+		RequestLimit7d:   body.RequestLimit7d,
+		AllowedIPs:       derefStrings(body.AllowedIps),
+		DeniedIPs:        derefStrings(body.DeniedIps),
 		ExpiresAt:        body.ExpiresAt,
 	})
 	if err != nil {
@@ -1258,13 +1263,21 @@ func (s *Server) handleUpdateApiKey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	updated, err := s.runtime.apiKeys.Update(r.Context(), apikeycontract.UpdateRequest{
-		UserID:        session.User.ID,
-		KeyID:         keyID,
-		Name:          body.Name,
-		Status:        toAPIKeyStatusPtr(body.Status),
-		Scopes:        body.Scopes,
-		AllowedModels: body.AllowedModels,
-		GroupIDs:      groupIDs,
+		UserID:           session.User.ID,
+		KeyID:            keyID,
+		Name:             body.Name,
+		Status:           toAPIKeyStatusPtr(body.Status),
+		Scopes:           body.Scopes,
+		AllowedModels:    body.AllowedModels,
+		GroupIDs:         groupIDs,
+		RPMLimit:         body.RpmLimit,
+		TPMLimit:         body.TpmLimit,
+		ConcurrencyLimit: body.ConcurrencyLimit,
+		RequestLimit5h:   body.RequestLimit5h,
+		RequestLimit1d:   body.RequestLimit1d,
+		RequestLimit7d:   body.RequestLimit7d,
+		AllowedIPs:       body.AllowedIps,
+		DeniedIPs:        body.DeniedIps,
 	})
 	if err != nil {
 		switch {

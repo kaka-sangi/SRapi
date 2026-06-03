@@ -1,23 +1,22 @@
 "use client";
 
-import * as React from "react";
-import { LanguageProvider } from "@/context/LanguageContext";
-import { QueryProvider } from "./query-provider";
 import { ThemeProvider } from "./theme-provider";
+import { QueryProvider } from "./query-provider";
+import { LanguageProvider } from "@/context/LanguageContext";
+import { ToastUIProvider } from "@/context/ToastContext";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
-/**
- * Composed root providers for SRapi v0.1.0.
- *
- * Order matters:
- *   - ThemeProvider goes first so subsequent providers can read CSS variables.
- *   - QueryProvider wraps anything that fetches data.
- *   - LanguageProvider exposes copy via `useLanguage`.
- */
-export function AppProviders({ children }: { children: React.ReactNode }) {
+export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider>
       <QueryProvider>
-        <LanguageProvider>{children}</LanguageProvider>
+        <LanguageProvider>
+          {/* App-wide tooltip context: a brief hover delay, instant re-show when
+              skating across adjacent triggers (icon buttons, truncated values). */}
+          <TooltipProvider delayDuration={250} skipDelayDuration={400}>
+            <ToastUIProvider>{children}</ToastUIProvider>
+          </TooltipProvider>
+        </LanguageProvider>
       </QueryProvider>
     </ThemeProvider>
   );

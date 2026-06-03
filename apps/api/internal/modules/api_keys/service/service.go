@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"net"
 	"strings"
 	"time"
 
@@ -52,6 +53,12 @@ func (s *Service) Create(ctx context.Context, req contract.CreateRequest) (contr
 	if req.UserID <= 0 || strings.TrimSpace(req.Name) == "" {
 		return contract.CreatedKey{}, ErrInvalidInput
 	}
+	if err := validateIPEntries(req.AllowedIPs); err != nil {
+		return contract.CreatedKey{}, err
+	}
+	if err := validateIPEntries(req.DeniedIPs); err != nil {
+		return contract.CreatedKey{}, err
+	}
 	plaintext, prefix, err := GeneratePlaintextKey()
 	if err != nil {
 		return contract.CreatedKey{}, err
@@ -71,6 +78,11 @@ func (s *Service) Create(ctx context.Context, req contract.CreateRequest) (contr
 		RPMLimit:         cloneIntPointer(req.RPMLimit),
 		TPMLimit:         cloneIntPointer(req.TPMLimit),
 		ConcurrencyLimit: cloneIntPointer(req.ConcurrencyLimit),
+		RequestLimit5h:   cloneIntPointer(req.RequestLimit5h),
+		RequestLimit1d:   cloneIntPointer(req.RequestLimit1d),
+		RequestLimit7d:   cloneIntPointer(req.RequestLimit7d),
+		AllowedIPs:       cloneStrings(req.AllowedIPs),
+		DeniedIPs:        cloneStrings(req.DeniedIPs),
 		ExpiresAt:        cloneTimePointer(req.ExpiresAt),
 	})
 	if err != nil {
@@ -148,6 +160,36 @@ func (s *Service) Update(ctx context.Context, req contract.UpdateRequest) (contr
 	}
 	if req.GroupIDs != nil {
 		key.GroupIDs = cloneInts(*req.GroupIDs)
+	}
+	if req.RPMLimit != nil {
+		key.RPMLimit = cloneIntPointer(req.RPMLimit)
+	}
+	if req.TPMLimit != nil {
+		key.TPMLimit = cloneIntPointer(req.TPMLimit)
+	}
+	if req.ConcurrencyLimit != nil {
+		key.ConcurrencyLimit = cloneIntPointer(req.ConcurrencyLimit)
+	}
+	if req.RequestLimit5h != nil {
+		key.RequestLimit5h = cloneIntPointer(req.RequestLimit5h)
+	}
+	if req.RequestLimit1d != nil {
+		key.RequestLimit1d = cloneIntPointer(req.RequestLimit1d)
+	}
+	if req.RequestLimit7d != nil {
+		key.RequestLimit7d = cloneIntPointer(req.RequestLimit7d)
+	}
+	if req.AllowedIPs != nil {
+		if err := validateIPEntries(*req.AllowedIPs); err != nil {
+			return contract.APIKey{}, err
+		}
+		key.AllowedIPs = cloneStrings(*req.AllowedIPs)
+	}
+	if req.DeniedIPs != nil {
+		if err := validateIPEntries(*req.DeniedIPs); err != nil {
+			return contract.APIKey{}, err
+		}
+		key.DeniedIPs = cloneStrings(*req.DeniedIPs)
 	}
 	updated, err := s.store.Update(ctx, key)
 	if err != nil {
@@ -264,6 +306,27 @@ func cloneStrings(values []string) []string {
 	cloned := make([]string, len(values))
 	copy(cloned, values)
 	return cloned
+}
+
+// validateIPEntries rejects an IP allow/deny list containing any entry that is
+// not a valid IP address or CIDR block. Empty/blank entries are rejected too.
+func validateIPEntries(entries []string) error {
+	for _, raw := range entries {
+		entry := strings.TrimSpace(raw)
+		if entry == "" {
+			return ErrInvalidInput
+		}
+		if strings.Contains(entry, "/") {
+			if _, _, err := net.ParseCIDR(entry); err != nil {
+				return ErrInvalidInput
+			}
+			continue
+		}
+		if net.ParseIP(entry) == nil {
+			return ErrInvalidInput
+		}
+	}
+	return nil
 }
 
 func cloneInts(values []int) []int {

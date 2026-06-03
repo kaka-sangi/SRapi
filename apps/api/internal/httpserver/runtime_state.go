@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/config"
@@ -87,6 +88,9 @@ import (
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
 	usageservice "github.com/srapi/srapi/apps/api/internal/modules/usage/service"
 	usagememory "github.com/srapi/srapi/apps/api/internal/modules/usage/store/memory"
+	userplatformquotascontract "github.com/srapi/srapi/apps/api/internal/modules/user_platform_quotas/contract"
+	userplatformquotasservice "github.com/srapi/srapi/apps/api/internal/modules/user_platform_quotas/service"
+	userplatformquotasmemory "github.com/srapi/srapi/apps/api/internal/modules/user_platform_quotas/store/memory"
 	userattributescontract "github.com/srapi/srapi/apps/api/internal/modules/userattributes/contract"
 	userattributesservice "github.com/srapi/srapi/apps/api/internal/modules/userattributes/service"
 	userattributesmemory "github.com/srapi/srapi/apps/api/internal/modules/userattributes/store/memory"
@@ -112,70 +116,73 @@ const (
 var errRequestTooLarge = errors.New("request body too large")
 
 type runtimeState struct {
-	cfg                   config.Config
-	logger                *slog.Logger
-	users                 *usersservice.Service
-	auth                  *authservice.Service
-	apiKeys               *apikeyservice.Service
-	audit                 *auditservice.Service
-	billing               *billingservice.Service
-	events                *eventsservice.Service
-	affiliate             *affiliateservice.Service
-	idempotency           *idempotencyservice.Service
-	notificationContacts  *notificationsservice.ContactService
-	userAvatars           *usersservice.AvatarService
-	contentSafety         *contentsafetyservice.Service
-	gateway               *gatewayservice.Service
-	providers             *providerservice.Service
-	models                *modelservice.Service
-	adapters              *provideradapterservice.Service
-	realtime              *realtimeservice.Service
-	reverseProxy          *reverseproxyservice.Service
-	accounts              *accountservice.Service
-	adminControl          *admincontrolservice.Service
-	qualityEval           *qualityservice.Service
-	scheduler             *schedulerservice.Service
-	subscriptions         *subscriptionservice.Service
-	totp                  *totpservice.Service
-	payments              *paymentservice.Service
-	operations            *operationsservice.Service
-	usage                 *usageservice.Service
-	userAttributes        *userattributesservice.Service
-	errorPassthrough      *errorpassthroughservice.Service
-	tlsProfiles           *tlsprofilesservice.Service
-	captcha               *captchaservice.Service
-	healthRollups         *healthrollupsservice.Service
-	modelRateLimits       *modelratelimitsservice.Service
-	groupRateLimits       *groupratelimitsservice.Service
-	userStore             userscontract.Store
-	sessionStore          authcontract.Store
-	apiKeyStore           apikeycontract.Store
-	auditStore            auditcontract.Store
-	billingStore          billingcontract.Store
-	eventsStore           eventscontract.Store
-	affiliateStore        affiliatecontract.Store
-	operationsStore       operationscontract.Store
-	providerStore         providercontract.Store
-	modelStore            modelcontract.Store
-	accountStore          accountcontract.Store
-	adminControlStore     admincontrolcontract.Store
-	paymentStore          paymentcontract.Store
-	qualityEvalStore      qualitycontract.Store
-	realtimeStore         realtimecontract.Store
-	rateLimiter           *ratelimit.Limiter
-	schedulerStore        schedulercontract.Store
-	subscriptionStore     subscriptioncontract.Store
-	totpStore             totpcontract.Store
-	usageStore            usagecontract.Store
-	userAttributesStore   userattributescontract.Store
-	errorPassthroughStore errorpassthroughcontract.Store
-	tlsProfilesStore      tlsprofilescontract.Store
-	healthRollupsStore    healthrollupscontract.Store
-	modelRateLimitsStore  modelratelimitscontract.Store
-	groupRateLimitsStore  groupratelimitscontract.Store
-	capabilities          []capabilitiescontract.Definition
-	databaseProbe         dependencyPinger
-	redisProbe            dependencyPinger
+	cfg                     config.Config
+	logger                  *slog.Logger
+	setupComplete           atomic.Bool
+	users                   *usersservice.Service
+	auth                    *authservice.Service
+	apiKeys                 *apikeyservice.Service
+	audit                   *auditservice.Service
+	billing                 *billingservice.Service
+	events                  *eventsservice.Service
+	affiliate               *affiliateservice.Service
+	idempotency             *idempotencyservice.Service
+	notificationContacts    *notificationsservice.ContactService
+	userAvatars             *usersservice.AvatarService
+	contentSafety           *contentsafetyservice.Service
+	gateway                 *gatewayservice.Service
+	providers               *providerservice.Service
+	models                  *modelservice.Service
+	adapters                *provideradapterservice.Service
+	realtime                *realtimeservice.Service
+	reverseProxy            *reverseproxyservice.Service
+	accounts                *accountservice.Service
+	adminControl            *admincontrolservice.Service
+	qualityEval             *qualityservice.Service
+	scheduler               *schedulerservice.Service
+	subscriptions           *subscriptionservice.Service
+	totp                    *totpservice.Service
+	payments                *paymentservice.Service
+	operations              *operationsservice.Service
+	usage                   *usageservice.Service
+	userAttributes          *userattributesservice.Service
+	errorPassthrough        *errorpassthroughservice.Service
+	tlsProfiles             *tlsprofilesservice.Service
+	captcha                 *captchaservice.Service
+	healthRollups           *healthrollupsservice.Service
+	modelRateLimits         *modelratelimitsservice.Service
+	groupRateLimits         *groupratelimitsservice.Service
+	userPlatformQuotas      *userplatformquotasservice.Service
+	userStore               userscontract.Store
+	sessionStore            authcontract.Store
+	apiKeyStore             apikeycontract.Store
+	auditStore              auditcontract.Store
+	billingStore            billingcontract.Store
+	eventsStore             eventscontract.Store
+	affiliateStore          affiliatecontract.Store
+	operationsStore         operationscontract.Store
+	providerStore           providercontract.Store
+	modelStore              modelcontract.Store
+	accountStore            accountcontract.Store
+	adminControlStore       admincontrolcontract.Store
+	paymentStore            paymentcontract.Store
+	qualityEvalStore        qualitycontract.Store
+	realtimeStore           realtimecontract.Store
+	rateLimiter             *ratelimit.Limiter
+	schedulerStore          schedulercontract.Store
+	subscriptionStore       subscriptioncontract.Store
+	totpStore               totpcontract.Store
+	usageStore              usagecontract.Store
+	userAttributesStore     userattributescontract.Store
+	errorPassthroughStore   errorpassthroughcontract.Store
+	tlsProfilesStore        tlsprofilescontract.Store
+	healthRollupsStore      healthrollupscontract.Store
+	modelRateLimitsStore    modelratelimitscontract.Store
+	groupRateLimitsStore    groupratelimitscontract.Store
+	userPlatformQuotasStore userplatformquotascontract.Store
+	capabilities            []capabilitiescontract.Definition
+	databaseProbe           dependencyPinger
+	redisProbe              dependencyPinger
 }
 
 type dependencyHealth struct {
@@ -481,6 +488,20 @@ func (rt *runtimeState) buildCapabilityServices(cfg config.Config, opts runtimeO
 		return err
 	}
 	rt.groupRateLimits = groupRateLimitsSvc
+
+	userPlatformQuotasStore := opts.userPlatformQuotas
+	if userPlatformQuotasStore == nil {
+		if !allowMemoryStores {
+			return missingRuntimeStoreError("user platform quotas")
+		}
+		userPlatformQuotasStore = userplatformquotasmemory.New()
+	}
+	rt.userPlatformQuotasStore = userPlatformQuotasStore
+	userPlatformQuotasSvc, err := userplatformquotasservice.New(userPlatformQuotasStore)
+	if err != nil {
+		return err
+	}
+	rt.userPlatformQuotas = userPlatformQuotasSvc
 	return nil
 }
 

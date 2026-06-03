@@ -30,6 +30,11 @@ type APIKey struct {
 	RPMLimit         *int
 	TPMLimit         *int
 	ConcurrencyLimit *int
+	RequestLimit5h   *int
+	RequestLimit1d   *int
+	RequestLimit7d   *int
+	AllowedIPs       []string
+	DeniedIPs        []string
 	ExpiresAt        *time.Time
 	LastUsedAt       *time.Time
 	CreatedAt        time.Time
@@ -45,17 +50,30 @@ type CreateRequest struct {
 	RPMLimit         *int
 	TPMLimit         *int
 	ConcurrencyLimit *int
+	RequestLimit5h   *int
+	RequestLimit1d   *int
+	RequestLimit7d   *int
+	AllowedIPs       []string
+	DeniedIPs        []string
 	ExpiresAt        *time.Time
 }
 
 type UpdateRequest struct {
-	UserID        int
-	KeyID         int
-	Name          *string
-	Status        *Status
-	Scopes        *[]string
-	AllowedModels *[]string
-	GroupIDs      *[]int
+	UserID           int
+	KeyID            int
+	Name             *string
+	Status           *Status
+	Scopes           *[]string
+	AllowedModels    *[]string
+	GroupIDs         *[]int
+	RPMLimit         *int
+	TPMLimit         *int
+	ConcurrencyLimit *int
+	RequestLimit5h   *int
+	RequestLimit1d   *int
+	RequestLimit7d   *int
+	AllowedIPs       *[]string
+	DeniedIPs        *[]string
 }
 
 type CreatedKey struct {
@@ -90,5 +108,10 @@ type CreateStoredKey struct {
 	RPMLimit         *int
 	TPMLimit         *int
 	ConcurrencyLimit *int
+	RequestLimit5h   *int
+	RequestLimit1d   *int
+	RequestLimit7d   *int
+	AllowedIPs       []string
+	DeniedIPs        []string
 	ExpiresAt        *time.Time
 }

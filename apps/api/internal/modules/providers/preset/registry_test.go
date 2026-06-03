@@ -3,6 +3,8 @@ package preset
 import (
 	"reflect"
 	"testing"
+
+	accountscontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 )
 
 func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
@@ -52,8 +54,11 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	if !openaiPreset.MatchesPath("/api/provider/openai-compatible/v1/chat/completions") {
 		t.Fatalf("expected openai-compatible route alias to match path")
 	}
-	if !containsAccountType(openaiPreset.AccountTypeAllowlist, AccountTypeCustomReverseProxy) {
+	if !containsRuntimeClass(openaiPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassCustomReverseProxy) {
 		t.Fatalf("expected openai-compatible allowlist to include custom_reverse_proxy")
+	}
+	if containsRuntimeClass(openaiPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassOauthRefresh) {
+		t.Fatalf("expected third-party openai-compatible allowlist to exclude oauth_refresh")
 	}
 	if !openaiPreset.Capabilities["images"] || !openaiPreset.Capabilities["audio_speech"] {
 		t.Fatalf("expected openai-compatible preset to advertise images and audio_speech")
@@ -111,7 +116,7 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	if !reflect.DeepEqual(antigravityPreset.GeminiRouteAliases, []string{"/antigravity/v1beta", "/api/provider/antigravity/v1beta"}) {
 		t.Fatalf("unexpected antigravity Gemini aliases: %v", antigravityPreset.GeminiRouteAliases)
 	}
-	if !containsAccountType(antigravityPreset.AccountTypeAllowlist, AccountTypeDesktopClientToken) || !containsAccountType(antigravityPreset.AccountTypeAllowlist, AccountTypeIdePluginToken) {
+	if !containsRuntimeClass(antigravityPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassDesktopClientToken) || !containsRuntimeClass(antigravityPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassIdePluginToken) {
 		t.Fatalf("expected antigravity allowlist to include desktop and IDE token accounts")
 	}
 	if !antigravityPreset.Capabilities["chat_completions"] || !antigravityPreset.Capabilities["messages"] || antigravityPreset.Capabilities["embeddings"] {
@@ -131,7 +136,7 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	if !bedrockPreset.MatchesPath("/api/provider/bedrock/v1/messages") || !containsAuthMode(bedrockPreset.AuthModes, AuthModeCustomHeader) {
 		t.Fatalf("unexpected bedrock routing/auth preset: %+v", bedrockPreset)
 	}
-	if !containsAccountType(bedrockPreset.AccountTypeAllowlist, AccountTypeAPIKey) || !bedrockPreset.Capabilities["messages"] || !bedrockPreset.Capabilities["streaming"] {
+	if !containsRuntimeClass(bedrockPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassAPIKey) || !bedrockPreset.Capabilities["messages"] || !bedrockPreset.Capabilities["streaming"] {
 		t.Fatalf("unexpected bedrock capabilities: %+v", bedrockPreset)
 	}
 
@@ -164,7 +169,7 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	if groqPreset.DefaultBaseURL != "https://api.groq.com/openai/v1" {
 		t.Fatalf("unexpected groq base url: %s", groqPreset.DefaultBaseURL)
 	}
-	if !containsAccountType(groqPreset.AccountTypeAllowlist, AccountTypeAPIKey) || !containsAuthMode(groqPreset.AuthModes, AuthModeBearer) {
+	if !containsRuntimeClass(groqPreset.RuntimeClassAllowlist, accountscontract.RuntimeClassAPIKey) || !containsAuthMode(groqPreset.AuthModes, AuthModeBearer) {
 		t.Fatalf("expected groq preset to include bearer api_key support")
 	}
 
@@ -196,7 +201,7 @@ func TestDefaultRegistrySeedsCompatiblePresets(t *testing.T) {
 	}
 }
 
-func containsAccountType(values []AccountType, target AccountType) bool {
+func containsRuntimeClass(values []accountscontract.RuntimeClass, target accountscontract.RuntimeClass) bool {
 	for _, value := range values {
 		if value == target {
 			return true

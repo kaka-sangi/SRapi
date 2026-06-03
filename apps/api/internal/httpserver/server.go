@@ -44,6 +44,7 @@ import (
 	tlsprofilescontract "github.com/srapi/srapi/apps/api/internal/modules/tls_profiles/contract"
 	totpcontract "github.com/srapi/srapi/apps/api/internal/modules/totp/contract"
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
+	userplatformquotascontract "github.com/srapi/srapi/apps/api/internal/modules/user_platform_quotas/contract"
 	userattributescontract "github.com/srapi/srapi/apps/api/internal/modules/userattributes/contract"
 	userscontract "github.com/srapi/srapi/apps/api/internal/modules/users/contract"
 	platformlogger "github.com/srapi/srapi/apps/api/internal/platform/logger"
@@ -70,35 +71,36 @@ type dependencyPinger interface {
 type Option func(*runtimeOptions)
 
 type runtimeOptions struct {
-	adminControl     admincontrolcontract.Store
-	database         dependencyPinger
-	redis            dependencyPinger
-	users            userscontract.Store
-	apiKeys          apikeycontract.Store
-	providers        providercontract.Store
-	models           modelcontract.Store
-	accounts         accountcontract.Store
-	audit            auditcontract.Store
-	authSessions     authcontract.Store
-	billing          billingcontract.Store
-	events           eventscontract.Store
-	affiliate        affiliatecontract.Store
-	idempotency      idempotencycontract.Store
-	operations       operationscontract.Store
-	payments         paymentcontract.Store
-	qualityEval      qualitycontract.Store
-	realtime         realtimecontract.Store
-	rateLimiter      *ratelimit.Limiter
-	scheduler        schedulercontract.Store
-	subscriptions    subscriptioncontract.Store
-	totp             totpcontract.Store
-	usage            usagecontract.Store
-	userAttributes   userattributescontract.Store
-	errorPassthrough errorpassthroughcontract.Store
-	tlsProfiles      tlsprofilescontract.Store
-	healthRollups    healthrollupscontract.Store
-	modelRateLimits  modelratelimitscontract.Store
-	groupRateLimits  groupratelimitscontract.Store
+	adminControl       admincontrolcontract.Store
+	database           dependencyPinger
+	redis              dependencyPinger
+	users              userscontract.Store
+	apiKeys            apikeycontract.Store
+	providers          providercontract.Store
+	models             modelcontract.Store
+	accounts           accountcontract.Store
+	audit              auditcontract.Store
+	authSessions       authcontract.Store
+	billing            billingcontract.Store
+	events             eventscontract.Store
+	affiliate          affiliatecontract.Store
+	idempotency        idempotencycontract.Store
+	operations         operationscontract.Store
+	payments           paymentcontract.Store
+	qualityEval        qualitycontract.Store
+	realtime           realtimecontract.Store
+	rateLimiter        *ratelimit.Limiter
+	scheduler          schedulercontract.Store
+	subscriptions      subscriptioncontract.Store
+	totp               totpcontract.Store
+	usage              usagecontract.Store
+	userAttributes     userattributescontract.Store
+	errorPassthrough   errorpassthroughcontract.Store
+	tlsProfiles        tlsprofilescontract.Store
+	healthRollups      healthrollupscontract.Store
+	modelRateLimits    modelratelimitscontract.Store
+	groupRateLimits    groupratelimitscontract.Store
+	userPlatformQuotas userplatformquotascontract.Store
 }
 
 func WithAdminControlStore(store admincontrolcontract.Store) Option {
@@ -227,6 +229,12 @@ func WithGroupRateLimitsStore(store groupratelimitscontract.Store) Option {
 	}
 }
 
+func WithUserPlatformQuotasStore(store userplatformquotascontract.Store) Option {
+	return func(opts *runtimeOptions) {
+		opts.userPlatformQuotas = store
+	}
+}
+
 func WithPaymentStore(store paymentcontract.Store) Option {
 	return func(opts *runtimeOptions) {
 		opts.payments = store
@@ -318,6 +326,8 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("GET /api/v1/health", server.handleHealth)
 	mux.HandleFunc("POST /api/v1/auth/login", server.handleLogin)
 	mux.HandleFunc("POST /api/v1/auth/register", server.handleRegister)
+	mux.HandleFunc("GET /api/v1/setup/status", server.handleSetupStatus)
+	mux.HandleFunc("POST /api/v1/setup", server.handleCompleteSetup)
 	mux.HandleFunc("POST /api/v1/auth/password-reset/request", server.handleRequestPasswordReset)
 	mux.HandleFunc("POST /api/v1/auth/password-reset/confirm", server.handleConfirmPasswordReset)
 	mux.HandleFunc("POST /api/v1/auth/email-verification/request", server.handleRequestEmailVerification)
@@ -395,6 +405,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("GET /api/v1/admin/account-groups", server.handleListAdminAccountGroups)
 	mux.HandleFunc("POST /api/v1/admin/account-groups", server.handleCreateAdminAccountGroup)
 	mux.HandleFunc("PATCH /api/v1/admin/account-groups/{id}", server.handleUpdateAdminAccountGroup)
+	mux.HandleFunc("GET /api/v1/admin/account-groups/{id}/accounts", server.handleListAdminAccountGroupMembers)
 	mux.HandleFunc("POST /api/v1/admin/account-groups/{id}/accounts/{account_id}", server.handleAddAdminAccountGroupMember)
 	mux.HandleFunc("DELETE /api/v1/admin/account-groups/{id}/accounts/{account_id}", server.handleRemoveAdminAccountGroupMember)
 	mux.HandleFunc("GET /api/v1/admin/usage-logs", server.handleListAdminUsageLogs)
@@ -414,6 +425,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("POST /api/v1/admin/payments/orders/{id}/refund", server.handleRefundAdminPaymentOrder)
 	mux.HandleFunc("GET /api/v1/admin/subscription-plans", server.handleListAdminSubscriptionPlans)
 	mux.HandleFunc("POST /api/v1/admin/subscription-plans", server.handleCreateAdminSubscriptionPlan)
+	mux.HandleFunc("PATCH /api/v1/admin/subscription-plans/{id}", server.handleUpdateAdminSubscriptionPlan)
 	mux.HandleFunc("GET /api/v1/admin/user-subscriptions", server.handleListAdminUserSubscriptions)
 	mux.HandleFunc("POST /api/v1/admin/user-subscriptions", server.handleCreateAdminUserSubscription)
 	mux.HandleFunc("GET /api/v1/admin/pricing-rules", server.handleListAdminPricingRules)
@@ -506,6 +518,7 @@ func (s *Server) registerCapabilityAdminRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/admin/error-passthrough-rules", s.handleCreateAdminErrorPassthroughRule)
 	mux.HandleFunc("PATCH /api/v1/admin/error-passthrough-rules/{id}", s.handleUpdateAdminErrorPassthroughRule)
 	mux.HandleFunc("DELETE /api/v1/admin/error-passthrough-rules/{id}", s.handleDeleteAdminErrorPassthroughRule)
+	mux.HandleFunc("GET /api/v1/admin/accounts/availability", s.handleListAdminAccountsAvailability)
 	mux.HandleFunc("GET /api/v1/admin/accounts/{id}/availability", s.handleAdminAccountAvailability)
 	mux.HandleFunc("POST /api/v1/admin/accounts/{id}/quota-fetch", s.handleAdminAccountQuotaFetch)
 	mux.HandleFunc("GET /api/v1/admin/tls-profiles", s.handleListAdminTLSProfiles)
@@ -515,6 +528,9 @@ func (s *Server) registerCapabilityAdminRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/admin/model-rate-limits", s.handleListAdminModelRateLimits)
 	mux.HandleFunc("PUT /api/v1/admin/model-rate-limits", s.handleUpsertAdminModelRateLimit)
 	mux.HandleFunc("DELETE /api/v1/admin/model-rate-limits/{modelId}", s.handleDeleteAdminModelRateLimit)
+	mux.HandleFunc("GET /api/v1/admin/users/{id}/platform-quotas", s.handleListAdminUserPlatformQuotas)
+	mux.HandleFunc("PUT /api/v1/admin/users/{id}/platform-quotas", s.handleUpsertAdminUserPlatformQuota)
+	mux.HandleFunc("DELETE /api/v1/admin/users/{id}/platform-quotas/{platform}", s.handleDeleteAdminUserPlatformQuota)
 	mux.HandleFunc("GET /api/v1/admin/group-rate-limits", s.handleListAdminGroupRateLimits)
 	mux.HandleFunc("PUT /api/v1/admin/group-rate-limits", s.handleUpsertAdminGroupRateLimit)
 	mux.HandleFunc("DELETE /api/v1/admin/group-rate-limits/{groupId}", s.handleDeleteAdminGroupRateLimit)

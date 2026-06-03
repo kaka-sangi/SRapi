@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="zh" class="">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SRapi · 概念 B · 冷调极简</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = { darkMode: 'class' };
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{ --bg:#FFFFFF; --bg2:#FAFAFA; --card:#FFFFFF; --line:#E8E8EB; --line2:#EFEFF1; --ink:#18181B; --ink2:#71717A; --acc:#5B5BD6; --acc-soft:#EEEEFB; --ok:#16A34A; --warn:#D97706; --err:#DC2626; }
+  .dark{ --bg:#09090B; --bg2:#0C0C0F; --card:#121215; --line:#222226; --line2:#1A1A1E; --ink:#FAFAFA; --ink2:#8B8B93; --acc:#7C7CF0; --acc-soft:#1B1B2E; --ok:#22C55E; --warn:#EAB308; --err:#F87171; }
+  html,body{background:var(--bg);color:var(--ink);}
+  body{font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased;letter-spacing:-.011em;}
+  .mono{font-family:'JetBrains Mono',monospace;font-feature-settings:"tnum";}
+  .num{font-variant-numeric:tabular-nums;}
+  .card{background:var(--card);border:1px solid var(--line);}
+  .hair{border-color:var(--line);}
+  .acc{color:var(--acc);} .bg-acc{background:var(--acc);}
+  .btn{background:var(--acc);color:#fff;} .btn:hover{filter:brightness(1.08);}
+  .btn-ghost{border:1px solid var(--line);background:transparent;color:var(--ink);} .btn-ghost:hover{background:var(--bg2);border-color:var(--ink2);}
+  .ring:focus-visible{outline:none;box-shadow:0 0 0 3px var(--acc-soft),0 0 0 1px var(--acc);}
+  .pill{border:1px solid var(--line);border-radius:6px;}
+  .glow{box-shadow:0 1px 2px rgba(0,0,0,.04);}
+  .dark .glow{box-shadow:0 1px 2px rgba(0,0,0,.4);}
+  .fade{opacity:0;animation:fade .45s cubic-bezier(.2,.6,.2,1) forwards;}
+  @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  ::-webkit-scrollbar{height:7px;width:7px}::-webkit-scrollbar-thumb{background:var(--line);border-radius:9px}
+  .row:hover{background:var(--bg2);}
+  a{color:inherit}
+</style>
+</head>
+<body>
+
+<!-- 概念切换条 -->
+<div class="border-b hair px-4 py-2 flex flex-wrap items-center gap-2 text-[12px]" style="background:var(--bg2)">
+  <span class="mono" style="color:var(--ink2)">概念预览</span>
+  <a href="concept-a-editorial.html" class="px-2 py-1 rounded-md btn-ghost mono">A · 编辑暖纸</a>
+  <a href="concept-b-minimal.html"   class="px-2 py-1 rounded-md btn mono">B · 冷调极简</a>
+  <a href="concept-c-darkroom.html"  class="px-2 py-1 rounded-md btn-ghost mono">C · 暗房控制台</a>
+  <span class="ml-auto hidden sm:inline" style="color:var(--ink2)">拖动窗口可预览移动端 →</span>
+  <button onclick="toggleTheme()" class="ring px-2 py-1 rounded-md btn-ghost mono">◐ 主题</button>
+</div>
+
+<!-- 登录 / 落地 -->
+<section class="max-w-6xl mx-auto px-6 pt-20 pb-24 grid lg:grid-cols-2 gap-16 items-center">
+  <div class="fade">
+    <div class="pill inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] mono mb-6" style="color:var(--ink2)">
+      <span class="w-1.5 h-1.5 rounded-full bg-acc"></span> Self-hosted AI Gateway
+    </div>
+    <h1 class="text-[2.7rem] sm:text-[3.5rem] font-700 leading-[1.04] tracking-[-.03em] mb-5" style="font-weight:700">
+      一个入口，<br>接入所有服务商。
+    </h1>
+    <p class="text-[15px] leading-relaxed max-w-md mb-8" style="color:var(--ink2)">
+      通过一个 OpenAI 兼容接口接入 OpenAI、Anthropic、Gemini 与 CLI / 反代账号，自带调度、配额与用量审计。
+    </p>
+    <div class="flex gap-3">
+      <button class="btn ring px-5 py-2.5 rounded-lg text-[13px] font-500">开始使用</button>
+      <button class="btn-ghost ring px-5 py-2.5 rounded-lg text-[13px] font-500">查看文档</button>
+    </div>
+    <div class="mt-10 flex flex-wrap gap-6 text-[12px] mono" style="color:var(--ink2)">
+      <span>21 上游账号在线</span><span>99.97% 可用</span><span>p50 412ms</span>
+    </div>
+  </div>
+
+  <div class="fade card glow rounded-xl p-7" style="animation-delay:.1s">
+    <h2 class="text-[1.4rem] font-600 mb-1" style="font-weight:600">登录 SRapi</h2>
+    <p class="text-[13px] mb-6" style="color:var(--ink2)">使用你的邮箱登录控制台。</p>
+    <label class="block text-[12px] mb-1.5" style="color:var(--ink2)">邮箱</label>
+    <input class="ring w-full mb-4 px-3 py-2.5 rounded-lg text-[14px] hair" style="background:var(--bg2);border-width:1px" placeholder="you@example.com" value="admin@srapi.dev">
+    <label class="block text-[12px] mb-1.5" style="color:var(--ink2)">密码</label>
+    <input type="password" class="ring w-full mb-6 px-3 py-2.5 rounded-lg text-[14px] hair" style="background:var(--bg2);border-width:1px" value="••••••••••">
+    <button class="btn ring w-full py-2.5 rounded-lg text-[13px] font-500">登录</button>
+    <div class="mt-5 pt-5 border-t hair flex items-center justify-between text-[12px]" style="color:var(--ink2)">
+      <span>本地演示账号</span><span class="mono">admin / developer</span>
+    </div>
+  </div>
+</section>
+
+<!-- 控制台 -->
+<section class="border-t hair">
+  <div class="max-w-[1500px] mx-auto flex">
+
+    <!-- 侧栏 -->
+    <aside id="side" class="fixed lg:static inset-y-0 left-0 z-30 w-60 shrink-0 -translate-x-full lg:translate-x-0 transition-transform border-r hair p-3 flex flex-col" style="background:var(--bg2)">
+      <div class="flex items-center gap-2 px-2 py-2.5 mb-1">
+        <div class="w-7 h-7 rounded-md bg-acc grid place-items-center text-white font-700 text-[15px]">S</div>
+        <div class="font-600 text-[15px]" style="font-weight:600">SRapi</div>
+        <span class="mono text-[10px] ml-auto" style="color:var(--ink2)">v0.1.0</span>
+      </div>
+      <nav class="text-[13px] space-y-0.5">
+        <div class="px-2 pt-3 pb-1 text-[10.5px] tracking-wide uppercase mono" style="color:var(--ink2)">工作区</div>
+        <a class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-md" style="background:var(--acc-soft);color:var(--acc)">▦ 工作台</a>
+        <a class="row flex items-center gap-2.5 px-2.5 py-1.5 rounded-md" style="color:var(--ink2)">⚿ API 密钥</a>
+        <a class="row flex items-center gap-2.5 px-2.5 py-1.5 rounded-md" style="color:var(--ink2)">▤ 用量</a>
+        <div class="px-2 pt-3 pb-1 text-[10.5px] tracking-wide uppercase mono" style="color:var(--ink2)">网关</div>
+        <a class="row flex items-center gap-2.5 px-2.5 py-1.5 rounded-md" style="color:var(--ink2)">◈ 上游账号</a>
+        <a class="row flex items-center gap-2.5 px-2.5 py-1.5 rounded-md" style="color:var(--ink2)">⇄ 调度决策</a>
+        <div class="px-2 pt-3 pb-1 text-[10.5px] tracking-wide uppercase mono" style="color:var(--ink2)">管理后台</div>
+        <a class="row flex items-center gap-2.5 px-2.5 py-1.5 rounded-md" style="color:var(--ink2)">◑ 用户</a>
+        <a class="row flex items-center gap-2.5 px-2.5 py-1.5 rounded-md" style="color:var(--ink2)">⊞ 订阅与计费</a>
+        <a class="row flex items-center gap-2.5 px-2.5 py-1.5 rounded-md" style="color:var(--ink2)">◎ Ops / SLO</a>
+      </nav>
+      <div class="mt-auto pt-3 border-t hair flex items-center gap-2.5 px-2">
+        <div class="w-7 h-7 rounded-full grid place-items-center text-[13px] font-600" style="background:var(--acc-soft);color:var(--acc)">A</div>
+        <div class="text-[12px] leading-tight"><div>Admin</div><div class="mono text-[10.5px]" style="color:var(--ink2)">admin@srapi.dev</div></div>
+      </div>
+    </aside>
+    <div id="scrim" onclick="toggleNav()" class="fixed inset-0 z-20 bg-black/40 hidden lg:hidden"></div>
+
+    <!-- 主区 -->
+    <main class="flex-1 min-w-0">
+      <header class="sticky top-0 z-10 flex items-center gap-3 px-5 py-2.5 border-b hair" style="background:color-mix(in srgb,var(--bg) 85%,transparent);backdrop-filter:blur(8px)">
+        <button onclick="toggleNav()" class="lg:hidden ring p-1.5 rounded-md btn-ghost">☰</button>
+        <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg pill text-[13px] w-full max-w-sm" style="color:var(--ink2)">
+          <span>⌕</span><span class="hidden sm:inline">搜索…</span><span class="ml-auto mono text-[11px] pill px-1.5 hidden sm:inline">⌘K</span>
+        </div>
+        <div class="ml-auto flex items-center gap-2 text-[12px]">
+          <span class="mono hidden sm:flex items-center gap-1.5" style="color:var(--ink2)"><span class="w-1.5 h-1.5 rounded-full" style="background:var(--ok)"></span>实时</span>
+          <button class="btn-ghost ring px-2.5 py-1.5 rounded-md mono">中/EN</button>
+          <button onclick="toggleTheme()" class="btn-ghost ring px-2.5 py-1.5 rounded-md">◐</button>
+        </div>
+      </header>
+
+      <div class="p-5 sm:p-6 space-y-6">
+        <div class="fade flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div class="text-[12px] mono mb-1" style="color:var(--ink2)">工作台</div>
+            <h1 class="text-[1.7rem] font-700 tracking-[-.02em]" style="font-weight:700">网关总览</h1>
+          </div>
+          <div class="flex gap-2">
+            <button class="btn-ghost ring px-3.5 py-2 rounded-lg text-[13px]">最近 7 天 ▾</button>
+            <button class="btn ring px-4 py-2 rounded-lg text-[13px] font-500">＋ 新建 API 密钥</button>
+          </div>
+        </div>
+
+        <!-- KPI -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div class="fade card glow rounded-xl p-4">
+            <div class="flex items-center justify-between mb-3"><span class="text-[12px]" style="color:var(--ink2)">请求总数</span><span class="text-[11px] mono" style="color:var(--ok)">+12.4%</span></div>
+            <div class="num text-[26px] font-700" style="font-weight:700">128,402</div>
+          </div>
+          <div class="fade card glow rounded-xl p-4" style="animation-delay:.04s">
+            <div class="flex items-center justify-between mb-3"><span class="text-[12px]" style="color:var(--ink2)">成功率</span><span class="text-[11px] mono" style="color:var(--ok)">+0.3%</span></div>
+            <div class="num text-[26px] font-700" style="font-weight:700">99.6%</div>
+          </div>
+          <div class="fade card glow rounded-xl p-4" style="animation-delay:.08s">
+            <div class="flex items-center justify-between mb-3"><span class="text-[12px]" style="color:var(--ink2)">累计 Token</span></div>
+            <div class="num text-[26px] font-700" style="font-weight:700">42.7M</div>
+          </div>
+          <div class="fade card glow rounded-xl p-4" style="animation-delay:.12s">
+            <div class="flex items-center justify-between mb-3"><span class="text-[12px]" style="color:var(--ink2)">总花费</span><span class="text-[11px] mono" style="color:var(--err)">−3.1%</span></div>
+            <div class="num text-[26px] font-700" style="font-weight:700">$1,284.50</div>
+          </div>
+        </div>
+
+        <!-- 吞吐迷你图 -->
+        <div class="fade card glow rounded-xl p-5">
+          <div class="flex items-center justify-between mb-4"><span class="text-[13px] font-500" style="font-weight:500">吞吐趋势</span><span class="text-[11px] mono" style="color:var(--ink2)">请求 / 分钟</span></div>
+          <svg viewBox="0 0 600 90" class="w-full h-[90px]" preserveAspectRatio="none">
+            <polyline fill="none" stroke="var(--acc)" stroke-width="1.5" points="0,70 40,60 80,64 120,40 160,48 200,30 240,38 280,22 320,34 360,18 400,28 440,14 480,24 520,10 560,20 600,8"/>
+            <polygon fill="var(--acc)" opacity=".07" points="0,70 40,60 80,64 120,40 160,48 200,30 240,38 280,22 320,34 360,18 400,28 440,14 480,24 520,10 560,20 600,8 600,90 0,90"/>
+          </svg>
+        </div>
+
+        <div class="grid lg:grid-cols-12 gap-5">
+          <!-- 左 -->
+          <div class="lg:col-span-7 space-y-5">
+            <div class="fade card glow rounded-xl overflow-hidden">
+              <div class="flex items-center justify-between px-5 py-3.5 border-b hair">
+                <h2 class="text-[13px] font-600" style="font-weight:600">上游账号健康</h2><span class="mono text-[11px]" style="color:var(--ink2)">21 在线</span>
+              </div>
+              <div>
+                <div class="row flex items-center gap-4 px-5 py-3 border-b hair" style="border-color:var(--line2)">
+                  <div class="flex-1 min-w-0"><div class="text-[13.5px] truncate">claude-sonnet-01</div><div class="mono text-[11px]" style="color:var(--ink2)">Anthropic · OAuth</div></div>
+                  <div class="hidden sm:block w-28"><div class="h-1.5 rounded-full" style="background:var(--line)"><div class="h-1.5 rounded-full bg-acc" style="width:85%"></div></div></div>
+                  <span class="pill px-2 py-0.5 text-[11px] mono inline-flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full" style="background:var(--ok)"></span>Active</span>
+                </div>
+                <div class="row flex items-center gap-4 px-5 py-3 border-b hair" style="border-color:var(--line2)">
+                  <div class="flex-1 min-w-0"><div class="text-[13.5px] truncate">openai-pro-02</div><div class="mono text-[11px]" style="color:var(--ink2)">OpenAI · API key</div></div>
+                  <div class="hidden sm:block w-28"><div class="h-1.5 rounded-full" style="background:var(--line)"><div class="h-1.5 rounded-full" style="width:24%;background:var(--warn)"></div></div></div>
+                  <span class="pill px-2 py-0.5 text-[11px] mono inline-flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full" style="background:var(--warn)"></span>Limited</span>
+                </div>
+                <div class="row flex items-center gap-4 px-5 py-3 opacity-50">
+                  <div class="flex-1 min-w-0"><div class="text-[13.5px] truncate">gemini-web-03</div><div class="mono text-[11px]" style="color:var(--ink2)">Gemini · Web</div></div>
+                  <div class="hidden sm:block w-28"><div class="h-1.5 rounded-full" style="background:var(--line)"></div></div>
+                  <span class="pill px-2 py-0.5 text-[11px] mono" style="color:var(--ink2)">Disabled</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="fade card glow rounded-xl overflow-hidden">
+              <div class="flex items-center justify-between px-5 py-3.5 border-b hair">
+                <h2 class="text-[13px] font-600" style="font-weight:600">你的 API 密钥</h2><button class="mono text-[11px] acc">＋ 新建</button>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-[13px] min-w-[540px]">
+                  <thead><tr class="border-b hair text-left mono text-[11px] uppercase tracking-wide" style="color:var(--ink2)">
+                    <th class="font-500 px-5 py-2">名称</th><th class="font-500 px-3 py-2">前缀</th><th class="font-500 px-3 py-2">状态</th><th class="font-500 px-3 py-2">可用模型</th><th class="font-500 px-3 py-2">创建</th><th class="px-5 py-2"></th>
+                  </tr></thead>
+                  <tbody>
+                    <tr class="row border-b hair" style="border-color:var(--line2)"><td class="px-5 py-2.5">生产网关</td><td class="px-3 py-2.5 mono" style="color:var(--ink2)">sk_live_a1</td><td class="px-3 py-2.5"><span class="text-[11px] mono inline-flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full" style="background:var(--ok)"></span>启用</span></td><td class="px-3 py-2.5" style="color:var(--ink2)">全部</td><td class="px-3 py-2.5 mono" style="color:var(--ink2)">05-12</td><td class="px-5 py-2.5 text-right">⋯</td></tr>
+                    <tr class="row border-b hair" style="border-color:var(--line2)"><td class="px-5 py-2.5">移动端 App</td><td class="px-3 py-2.5 mono" style="color:var(--ink2)">sk_live_7f</td><td class="px-3 py-2.5"><span class="text-[11px] mono inline-flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full" style="background:var(--ok)"></span>启用</span></td><td class="px-3 py-2.5" style="color:var(--ink2)">claude · gpt-4o</td><td class="px-3 py-2.5 mono" style="color:var(--ink2)">04-28</td><td class="px-5 py-2.5 text-right">⋯</td></tr>
+                    <tr class="row opacity-50"><td class="px-5 py-2.5">临时调试</td><td class="px-3 py-2.5 mono" style="color:var(--ink2)">sk_live_3c</td><td class="px-3 py-2.5"><span class="text-[11px] mono" style="color:var(--ink2)">已停用</span></td><td class="px-3 py-2.5" style="color:var(--ink2)">gemini-pro</td><td class="px-3 py-2.5 mono" style="color:var(--ink2)">03-02</td><td class="px-5 py-2.5 text-right">⋯</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- 右：调度流 -->
+          <div class="lg:col-span-5">
+            <div class="fade card glow rounded-xl lg:sticky lg:top-20 overflow-hidden" style="animation-delay:.16s">
+              <div class="flex items-center justify-between px-5 py-3.5 border-b hair">
+                <h2 class="text-[13px] font-600" style="font-weight:600">实时调度决策</h2>
+                <span class="text-[11px] mono inline-flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full" style="background:var(--ok)"></span>实时</span>
+              </div>
+              <div class="p-5 mono text-[12px] leading-relaxed" id="stream"></div>
+              <div class="px-5 py-2.5 border-t hair flex items-center justify-between text-[11px] mono" style="color:var(--ink2)"><span>req_8fK2…a9</span><span>claude-3-7-sonnet</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</section>
+
+<footer class="border-t hair py-8 text-center text-[12px]" style="color:var(--ink2)">SRapi · 概念 B · 冷调极简 — Linear / Vercel 调性</footer>
+
+<script>
+  function toggleTheme(){ document.documentElement.classList.toggle('dark'); }
+  function toggleNav(){ const s=document.getElementById('side'),sc=document.getElementById('scrim'); s.classList.toggle('-translate-x-full'); sc.classList.toggle('hidden'); }
+  const lines=['[1/5] request received  id=req_8fK2a9 model=claude-3-7-sonnet','[2/5] scheduler         capability ok, candidates=3','[3/5] candidates        scoring 3 accounts','[4/5] excluded          openai-pro-02 cooldown not expired','[5/5] selected          claude-sonnet-01  score=0.94','                        - health 1.00 (w 0.3) -> 0.300','                        - quota  0.85 (w 0.2) -> 0.170','                        - cost   0.92 (w 0.1) -> 0.092'];
+  const el=document.getElementById('stream'); let li=0,ci=0;
+  function color(t){return t.replace(/selected|received/, m=>'<b style="color:var(--acc)">'+m+'</b>');}
+  function type(){ if(li>=lines.length)return;
+    if(ci===0){const d=document.createElement('div');d.className='whitespace-pre';d.id='l'+li;d.style.margin='2px 0';d.style.color='var(--ink2)';el.appendChild(d);}
+    const d=document.getElementById('l'+li); d.innerHTML=color(lines[li].slice(0,ci))+'<span style="display:inline-block;width:6px;height:13px;background:var(--acc);vertical-align:-2px;opacity:.8"></span>'; ci++;
+    if(ci>lines[li].length){d.innerHTML=color(lines[li]);li++;ci=0;setTimeout(type,200);} else setTimeout(type,8+Math.random()*10);
+  } type();
+</script>
+</body>
+</html>

@@ -191,6 +191,58 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/setup/status:
+    get:
+      tags:
+        - Setup
+      operationId: getSetupStatus
+      summary: Report whether first-run setup is required.
+      description: Public endpoint. needs_setup is true until an owner/admin account exists.
+      security: []
+      responses:
+        "200":
+          description: First-run setup status.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SetupStatusResponse"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/setup:
+    post:
+      tags:
+        - Setup
+      operationId: completeSetup
+      summary: Create the initial owner account (first-run setup).
+      description: Public endpoint, accepted only while needs_setup is true. Creates the first owner account; once an owner/admin exists the endpoint returns 409.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompleteSetupRequest"
+      responses:
+        "201":
+          description: Setup completed and the owner account was created.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SetupStatusResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "409":
+          $ref: "#/components/responses/StandardError"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/auth/oauth/{provider}/start:
     get:
       tags:
@@ -3847,6 +3899,43 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/account-groups/{id}/accounts:
+    get:
+      tags:
+        - AdminAccountGroups
+      operationId: listAdminAccountGroupMembers
+      summary: List the provider accounts in an account group.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Account group member list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountGroupMemberListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/account-groups/{id}/accounts/{account_id}:
     post:
       tags:
@@ -4567,6 +4656,51 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/subscription-plans/{id}:
+    patch:
+      tags:
+        - AdminSubscriptions
+      operationId: updateAdminSubscriptionPlan
+      summary: Update a subscription plan.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSubscriptionPlanRequest"
+      responses:
+        "200":
+          description: Subscription plan updated.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscriptionPlanResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         default:
           $ref: "#/components/responses/StandardError"
 
@@ -9690,6 +9824,123 @@ paths:
         default:
           $ref: "#/components/responses/GatewayError"
 
+  /api/v1/admin/users/{id}/platform-quotas:
+    get:
+      tags:
+        - AdminUsers
+      operationId: listAdminUserPlatformQuotas
+      summary: List a user's per-platform spend quotas.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: User platform quota list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserPlatformQuotaListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+    put:
+      tags:
+        - AdminUsers
+      operationId: upsertAdminUserPlatformQuota
+      summary: Create or update a user's per-platform spend quota.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertUserPlatformQuotaRequest"
+      responses:
+        "200":
+          description: User platform quota upserted.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserPlatformQuotaResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+  /api/v1/admin/users/{id}/platform-quotas/{platform}:
+    delete:
+      tags:
+        - AdminUsers
+      operationId: deleteAdminUserPlatformQuota
+      summary: Delete a user's per-platform spend quota.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+        - name: platform
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User platform quota deleted.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/model-rate-limits:
     get:
       tags:
@@ -10398,6 +10649,41 @@ paths:
                 $ref: "#/components/schemas/SetUserAttributeValueResponse"
         "400":
           $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+  /api/v1/admin/accounts/availability:
+    get:
+      tags:
+        - AdminAccounts
+      operationId: listAdminAccountsAvailability
+      summary: Aggregate current availability and uptime across all accounts.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 90
+      responses:
+        "200":
+          description: Per-account availability summary.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountsAvailabilitySummaryResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -11809,6 +12095,46 @@ components:
           format: password
           minLength: 8
 
+    SetupStatus:
+      type: object
+      required:
+        - needs_setup
+      properties:
+        needs_setup:
+          type: boolean
+          description: True until an owner/admin account exists; the console shows the first-run setup wizard while true.
+
+    SetupStatusResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/SetupStatus"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    CompleteSetupRequest:
+      type: object
+      required:
+        - email
+        - name
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 200
+
     RequestPasswordResetRequest:
       type: object
       required:
@@ -12303,6 +12629,8 @@ components:
         - scopes
         - allowed_models
         - group_ids
+        - allowed_ips
+        - denied_ips
         - created_at
       properties:
         id:
@@ -12339,6 +12667,34 @@ components:
           type: integer
           nullable: true
           minimum: 0
+        request_limit_5h:
+          type: integer
+          nullable: true
+          minimum: 0
+          description: Max requests allowed per 5-hour window for this key.
+        request_limit_1d:
+          type: integer
+          nullable: true
+          minimum: 0
+          description: Max requests allowed per 1-day window for this key.
+        request_limit_7d:
+          type: integer
+          nullable: true
+          minimum: 0
+          description: Max requests allowed per 7-day window for this key.
+        allowed_ips:
+          type: array
+          items:
+            type: string
+          description: >-
+            Client IPs or CIDRs permitted to use this key. Empty means all IPs
+            are allowed. Enforced against the request client IP; requires a
+            trusted reverse proxy that overwrites X-Forwarded-For.
+        denied_ips:
+          type: array
+          items:
+            type: string
+          description: Client IPs or CIDRs blocked from using this key. Takes precedence over allowed_ips.
         expires_at:
           type: string
           format: date-time
@@ -12387,6 +12743,28 @@ components:
           type: integer
           nullable: true
           minimum: 0
+        request_limit_5h:
+          type: integer
+          nullable: true
+          minimum: 0
+        request_limit_1d:
+          type: integer
+          nullable: true
+          minimum: 0
+        request_limit_7d:
+          type: integer
+          nullable: true
+          minimum: 0
+        allowed_ips:
+          type: array
+          items:
+            type: string
+          default: []
+        denied_ips:
+          type: array
+          items:
+            type: string
+          default: []
         expires_at:
           type: string
           format: date-time
@@ -12414,6 +12792,38 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Id"
+        rpm_limit:
+          type: integer
+          nullable: true
+          minimum: 0
+        tpm_limit:
+          type: integer
+          nullable: true
+          minimum: 0
+        concurrency_limit:
+          type: integer
+          nullable: true
+          minimum: 0
+        request_limit_5h:
+          type: integer
+          nullable: true
+          minimum: 0
+        request_limit_1d:
+          type: integer
+          nullable: true
+          minimum: 0
+        request_limit_7d:
+          type: integer
+          nullable: true
+          minimum: 0
+        allowed_ips:
+          type: array
+          items:
+            type: string
+        denied_ips:
+          type: array
+          items:
+            type: string
 
     ApiKeySecretData:
       type: object
@@ -12904,6 +13314,36 @@ components:
         status:
           $ref: "#/components/schemas/SubscriptionPlanStatus"
 
+    UpdateSubscriptionPlanRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 160
+        description:
+          type: string
+        price:
+          type: string
+          description: Decimal string amount. Float values are not accepted by the service.
+          example: "19.99000000"
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 12
+          example: USD
+        validity_days:
+          type: integer
+          minimum: 1
+        entitlements:
+          $ref: "#/components/schemas/JsonObject"
+        for_sale:
+          type: boolean
+        sort_order:
+          type: integer
+        status:
+          $ref: "#/components/schemas/SubscriptionPlanStatus"
+
     SubscriptionPlanResponse:
       type: object
       required:
@@ -13261,6 +13701,15 @@ components:
           $ref: "#/components/schemas/JsonObject"
         config_schema:
           $ref: "#/components/schemas/JsonObject"
+        platform_family:
+          $ref: "#/components/schemas/PlatformFamily"
+        auth_methods:
+          type: array
+          description: >-
+            Runtime classes (authentication methods) this provider accepts.
+            Empty or absent means no restriction (all methods allowed).
+          items:
+            $ref: "#/components/schemas/RuntimeClass"
         created_at:
           $ref: "#/components/schemas/Timestamp"
 
@@ -13670,6 +14119,16 @@ components:
         - service_account_json
         - custom_reverse_proxy
 
+    PlatformFamily:
+      type: string
+      description: Upstream protocol/platform family a provider preset belongs to.
+      enum:
+        - openai_compatible
+        - anthropic_compatible
+        - bedrock_anthropic
+        - reverse_proxy_antigravity
+        - rerank_compatible
+
     ProviderAccountStatus:
       type: string
       enum:
@@ -13807,6 +14266,19 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/AccountGroupMember"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    AccountGroupMemberListResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountGroupMember"
         request_id:
           $ref: "#/components/schemas/RequestId"
 
@@ -16750,6 +17222,10 @@ components:
         cached_tokens:
           type: integer
           minimum: 0
+        cache_creation_tokens:
+          type: integer
+          minimum: 0
+          description: Prompt-cache write (creation) tokens, billed at the cache-write rate.
         total_tokens:
           type: integer
           minimum: 0
@@ -18681,6 +19157,10 @@ components:
         cached_tokens:
           type: integer
           minimum: 0
+        cache_creation_tokens:
+          type: integer
+          minimum: 0
+          description: Prompt-cache write (creation) tokens, billed at the cache-write rate.
         total_tokens:
           type: integer
           minimum: 0
@@ -20137,6 +20617,85 @@ components:
         nextPageToken:
           type: string
 
+    UserPlatformQuota:
+      type: object
+      required:
+        - user_id
+        - platform
+        - currency
+        - enabled
+        - created_at
+        - updated_at
+      properties:
+        user_id:
+          type: integer
+          format: int64
+        platform:
+          type: string
+        daily_limit:
+          type: string
+          nullable: true
+        weekly_limit:
+          type: string
+          nullable: true
+        monthly_limit:
+          type: string
+          nullable: true
+        currency:
+          type: string
+        enabled:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    UpsertUserPlatformQuotaRequest:
+      type: object
+      required:
+        - platform
+      properties:
+        platform:
+          type: string
+        daily_limit:
+          type: string
+          nullable: true
+        weekly_limit:
+          type: string
+          nullable: true
+        monthly_limit:
+          type: string
+          nullable: true
+        currency:
+          type: string
+        enabled:
+          type: boolean
+    UserPlatformQuotaResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/UserPlatformQuota"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+    UserPlatformQuotaListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserPlatformQuota"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
     ModelRateLimit:
       type: object
       required:
@@ -20748,6 +21307,51 @@ components:
         computed_at:
           type: string
           format: date-time
+    AccountAvailabilitySummary:
+      type: object
+      required:
+        - account_id
+        - account_name
+        - provider_id
+        - status
+        - overall_uptime
+        - window_days
+      properties:
+        account_id:
+          type: integer
+          format: int64
+        account_name:
+          type: string
+        provider_id:
+          type: integer
+          format: int64
+        status:
+          type: string
+        overall_uptime:
+          type: number
+          format: float
+        window_days:
+          type: integer
+          format: int64
+        last_checked_at:
+          type: string
+          format: date-time
+          nullable: true
+    AccountsAvailabilitySummaryResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountAvailabilitySummary"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
     AccountAvailabilityResponse:
       type: object
       required:

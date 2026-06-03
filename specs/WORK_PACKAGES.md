@@ -4952,3 +4952,52 @@ Required gates:
 - `make architecture-check`
 - `make code-quality-check`
 - `git diff --check`
+
+---
+
+## WP-1310: Frontend Business-Completeness And Correctness Pass v1
+
+Objective: make the `apps/web` console expose and correctly operate the backend
+capabilities it sits on. The console was rewritten ahead of this work and an audit
+found it surfaced only a fraction of the admin/business API, plus a P0 correctness
+bug. Close the reachability + correctness gaps; no backend changes.
+
+Read first:
+
+- `docs/FRONTEND_ARCHITECTURE.md`
+- `docs/FRONTEND_DESIGN_SYSTEM.md`
+- `docs/PRODUCT_TONE.md`
+
+Owned modules:
+
+- `apps/web/src/components/layout/nav-items.ts` (grouped admin navigation)
+- `apps/web/src/lib/admin-api.ts`, `apps/web/src/hooks/admin-queries.ts`, `apps/web/src/lib/query-keys.ts` (admin data layer)
+- `apps/web/src/app/admin/**`, `apps/web/src/app/{api-keys,billing,error,not-found}/...`
+- `apps/web/src/components/admin/**`, `apps/web/src/components/layout/page-query-state.tsx`
+- `apps/web/src/i18n/messages/{en,zh}.ts`
+
+Definition of done (slice 1 — completed):
+
+- No admin page is reachable only by URL: every `ADMIN_ROUTES` entry (except deliberate redirect stubs) has a sidebar entry.
+- `setAccountStatus` calls the endpoint matching the caller's target state (no inverted toggle).
+- Each mutation shows loading + success/error feedback; destructive/bulk actions confirm; list queries invalidate after success.
+- Backend capabilities are exposed in the UI wherever a hook + endpoint already exist (account lifecycle/diagnostics actions, redeem stats, admin dashboard snapshot, payment providers, usage aggregates).
+- `apps/web` typecheck + lint + i18n-parity unit test pass; en/zh catalogs stay aligned.
+- `docs/FRONTEND_ARCHITECTURE.md` reflects the current code.
+
+Slice 2 (completed):
+
+- Ops SLO create/edit dialog; models list pagination/filter/search; partial-refund remaining-amount cap; scheduler strategy-replay extra inputs + richer result rendering; pricing-rule bulk-import dialog; account detail drawer (health/quota/rpm/proxy-quality); status-badge enum→label i18n across all badges.
+- Group member management (completed — the one WP-1310 item that needed a backend change): added `GET /api/v1/admin/account-groups/{id}/accounts` (`listAdminAccountGroupMembers`) OpenAPI-first — op + `AccountGroupMemberListResponse` schema + handler + route, reusing the existing `accounts.ListGroupMembers` service/store (no schema/migration change) — regenerated Go + TS SDKs, added the `TestAdminListAccountGroupMembers` HTTP regression, and wired a frontend Manage-members dialog (list/add/remove) on the groups page.
+
+Remaining (tracked in `specs/STATUS.md`):
+
+- Browser verification (desktop + mobile) per the Frontend quality gate — the only remaining item.
+
+Required gates:
+
+- `cd apps/web && npm run typecheck`
+- `cd apps/web && npm run lint`
+- `cd apps/web && npx vitest run tests/unit/messages.test.ts`
+- For the group-members backend endpoint: `make openapi-lint`, `make openapi-codegen-check`, `make openapi-ts-codegen-check`, `make sdk-ts-typecheck`, and `cd apps/api && go test ./internal/httpserver -run TestAdminListAccountGroupMembers`.
+- Browser verification for substantial UI work (desktop + mobile screenshots), per `specs/QUALITY_GATES.md` §9.

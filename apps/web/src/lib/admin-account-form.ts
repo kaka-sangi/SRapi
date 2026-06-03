@@ -39,7 +39,7 @@ export interface AdminAccountFormState {
   status: ProviderAccountStatus;
   priority: string;
   weight: string;
-  metadata: string;
+  metadata: Record<string, unknown>;
   groupIds: Id[];
 }
 
@@ -54,7 +54,7 @@ export function emptyAccountForm(defaultProviderId = ""): AdminAccountFormState 
     status: "active",
     priority: "0",
     weight: "1",
-    metadata: "{}",
+    metadata: {},
     groupIds: [],
   };
 }
@@ -70,7 +70,7 @@ export function accountFormFromAccount(account: ProviderAccount): AdminAccountFo
     status: account.status,
     priority: String(account.priority),
     weight: String(account.weight),
-    metadata: JSON.stringify(account.metadata ?? {}, null, 2),
+    metadata: (account.metadata ?? {}) as Record<string, unknown>,
     groupIds: account.group_ids,
   };
 }
@@ -99,7 +99,7 @@ export function buildCreateAccountBody(form: AdminAccountFormState): CreateAdmin
     status: form.status,
     priority: Number(form.priority || 0),
     weight: Number(form.weight || 1),
-    metadata: parseJsonObject(form.metadata, "Metadata"),
+    metadata: form.metadata,
   };
 }
 
@@ -111,7 +111,7 @@ export function buildUpdateAccountBody(form: AdminAccountFormState): UpdateAdmin
     status: form.status,
     priority: Number(form.priority || 0),
     weight: Number(form.weight || 1),
-    metadata: parseJsonObject(form.metadata, "Metadata"),
+    metadata: form.metadata,
   };
 
   if (form.proxyId.trim()) {

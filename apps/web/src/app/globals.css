@@ -1,579 +1,377 @@
 @import "tailwindcss";
 
-/*
- * SRapi v0.1.0 design tokens — "AI-Lab warm" identity.
- *
- * A warm, premium, editorial system in the spirit of Claude / OpenAI / Gemini:
- * bone paper light mode, warm near-black dark mode, a clay brand accent, and a
- * very restrained blue→violet spectrum reserved for gradient accents only.
- *
- * Theme tokens are exposed as CSS variables and surfaced through Tailwind via
- * the @theme block. Page code should never hardcode hex values, font stacks,
- * or one-off pixel sizes — pull from the tokens here.
- *
- * Typography: body floor is `--text-xs` (12px). `--text-2xs` (11px) is reserved
- * for mono "caps"/overline labels only. Display sizes (`--text-display-*`) are
- * for hero headlines. Add new copy at >= 12px.
- */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ============================================================
+   SRapi 设计系统 · 概念 A · 编辑社论暖纸
+   视觉规范见 docs/FRONTEND_DESIGN_SYSTEM.md
+   排版工程：字阶 / 行高 / 字距三者成套，组件不得散落一次性字号。
+   ============================================================ */
 @theme {
-  /* Color tokens (resolved per .light/.dark via CSS variables below) */
-  --color-srapi-bg: var(--srapi-bg);
-  --color-srapi-card: var(--srapi-card);
-  --color-srapi-card-muted: var(--srapi-card-muted);
-  --color-srapi-text-primary: var(--srapi-text-primary);
-  --color-srapi-text-secondary: var(--srapi-text-secondary);
-  --color-srapi-border: var(--srapi-border);
-  --color-srapi-primary: var(--srapi-primary);
-  --color-srapi-primary-hover: var(--srapi-primary-hover);
-  --color-srapi-success: var(--srapi-success);
-  --color-srapi-warning: var(--srapi-warning);
-  --color-srapi-error: var(--srapi-error);
-  --color-srapi-info: var(--srapi-info);
+  /* —— 温润纸张 (Warm Light) —— */
+  --color-srapi-bg: #f9f6f0;
+  --color-srapi-card: #ffffff;
+  --color-srapi-card-muted: #f1ebe4;
+  --color-srapi-text-primary: #1c1a17;
+  --color-srapi-text-secondary: #6e6a5f;
+  --color-srapi-text-tertiary: #9a9384;
+  --color-srapi-border: #e7ddcb;
+  --color-srapi-border-strong: #d8ccb4;
+  --color-srapi-primary: #bf5638;
+  --color-srapi-primary-hover: #a2452b;
+  --color-srapi-success: #3f6f3a;
+  --color-srapi-warning: #b07a28;
+  --color-srapi-error: #b3432f;
+  /* 反相按钮（亮=炭黑底） */
+  --color-srapi-invert: #1c1a17;
+  --color-srapi-invert-fg: #f9f6f0;
 
-  /* Spectrum accent stops — used ONLY for gradient text / rings / glows */
-  --color-srapi-grad-from: var(--srapi-grad-from);
-  --color-srapi-grad-via: var(--srapi-grad-via);
-  --color-srapi-grad-to: var(--srapi-grad-to);
+  /* 字族（next/font 变量在 layout.tsx 注入 body）
+     标题用 Cormorant Garamond（高对比展示衬线，frontend-design / canvas-design 首选）。 */
+  --font-serif: var(--font-serif-display), "Cormorant Garamond", Georgia, serif;
+  --font-sans: var(--font-inter), "Inter", system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), "JetBrains Mono", monospace;
 
-  /* Font families */
-  --font-serif: var(--font-lora), Georgia, serif;
-  --font-sans: var(--font-inter), sans-serif;
-  --font-mono: var(--font-jetbrains-mono), monospace;
+  /* —— 字阶（size / line-height / letter-spacing 三件套）——
+     正文下限 12px；11px 仅限 mono 大写小标签。 */
+  --text-2xs: 0.6875rem;            /* 11px */
+  --text-2xs--line-height: 1.45;
+  --text-2xs--letter-spacing: 0.04em;
+  --text-xs: 0.75rem;               /* 12px */
+  --text-xs--line-height: 1.5;
+  --text-sm: 0.8125rem;             /* 13px */
+  --text-sm--line-height: 1.55;
+  --text-base: 0.875rem;            /* 14px */
+  --text-base--line-height: 1.62;
+  --text-md: 1rem;                  /* 16px */
+  --text-md--line-height: 1.6;
+  --text-lg: 1.125rem;              /* 18px */
+  --text-lg--line-height: 1.5;
+  --text-lg--letter-spacing: -0.005em;
+  --text-xl: 1.375rem;              /* 22px */
+  --text-xl--line-height: 1.35;
+  --text-xl--letter-spacing: -0.01em;
+  --text-2xl: 1.75rem;              /* 28px */
+  --text-2xl--line-height: 1.2;
+  --text-2xl--letter-spacing: -0.018em;
+  --text-3xl: 2.125rem;             /* 34px */
+  --text-3xl--line-height: 1.14;
+  --text-3xl--letter-spacing: -0.022em;
+  --text-4xl: 3rem;                 /* 48px */
+  --text-4xl--line-height: 1.05;
+  --text-4xl--letter-spacing: -0.025em;
+  --text-5xl: 4rem;                 /* 64px — dramatic hero contrast */
+  --text-5xl--line-height: 1.0;
+  --text-5xl--letter-spacing: -0.03em;
+  --text-6xl: 5rem;                 /* 80px */
+  --text-6xl--line-height: 0.98;
+  --text-6xl--letter-spacing: -0.032em;
 
-  /* Typography scale (12 / 13 / 14 / 16 / 18 / 24 / 30 / 36px) */
-  --text-2xs: 0.6875rem; /* 11px — reserved for 'caps' labels only */
-  --text-xs: 0.75rem;    /* 12px — body floor for non-decorative text */
-  --text-sm: 0.8125rem;  /* 13px */
-  --text-base: 0.875rem; /* 14px */
-  --text-md: 1rem;       /* 16px */
-  --text-lg: 1.125rem;   /* 18px */
-  --text-xl: 1.5rem;     /* 24px */
-  --text-2xl: 1.875rem;  /* 30px */
-  --text-3xl: 2.25rem;   /* 36px */
-
-  /* Display scale — hero headlines only (paired line-heights are tight) */
-  --text-display-sm: 2.5rem;   --text-display-sm--line-height: 1.08;
-  --text-display-md: 3.25rem;  --text-display-md--line-height: 1.04;
-  --text-display-lg: 4rem;     --text-display-lg--line-height: 1.0;
-  --text-display-xl: 5rem;     --text-display-xl--line-height: 0.98;
-
-  /* Radius scale */
-  --radius-xs: 0.25rem;
-  --radius-sm: 0.5rem;
-  --radius-md: 0.75rem;
-  --radius-lg: 1rem;
-  --radius-xl: 1.5rem;
+  /* 圆角语言 */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.875rem;
+  --radius-xl: 1.125rem;
   --radius-pill: 9999px;
 
-  /* Motion */
+  /* 缓动 */
   --ease-bloom: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-:root {
-  /* Light Mode — Warm Bone Paper */
-  --srapi-bg: #f7f4ee;
-  --srapi-card: #ffffff;
-  --srapi-card-muted: #f0ebe3;
-  --srapi-text-primary: #1a1714;
-  --srapi-text-secondary: #6b6459;
-  --srapi-border: #e6decf;
-  --srapi-primary: #c9684a;
-  --srapi-primary-hover: #a8512f;
-  --srapi-success: #15803d;
-  --srapi-warning: #b45309;
-  --srapi-error: #b91c1c;
-  --srapi-info: #2563eb;
-
-  /* Restrained spectrum accent (clay → indigo → violet) */
-  --srapi-grad-from: #c9684a;
-  --srapi-grad-via: #6366f1;
-  --srapi-grad-to: #8b5cf6;
-
-  /* Elevation — warm-tinted, soft */
-  --shadow-sm: 0 1px 2px rgba(26, 23, 20, 0.04), 0 1px 3px rgba(26, 23, 20, 0.03);
-  --shadow-md: 0 4px 12px -2px rgba(26, 23, 20, 0.06), 0 2px 6px -2px rgba(26, 23, 20, 0.04);
-  --shadow-lg: 0 18px 48px -12px rgba(26, 23, 20, 0.14), 0 6px 16px -8px rgba(26, 23, 20, 0.08);
-  --shadow-glow: 0 0 0 1px color-mix(in srgb, var(--srapi-primary) 18%, transparent),
-    0 12px 40px -12px color-mix(in srgb, var(--srapi-primary) 30%, transparent);
-  --surface-inset: inset 0 1px 0 0 rgba(255, 255, 255, 0.8);
-}
-
+/* —— 深邃墨水 (Ink Dark) —— */
 .dark {
-  /* Dark Mode — Warm Ink */
-  --srapi-bg: #14110d;
-  --srapi-card: #1e1a15;
-  --srapi-card-muted: #26221b;
-  --srapi-text-primary: #f3efe8;
-  --srapi-text-secondary: #a39c8e;
-  --srapi-border: #322b22;
-  --srapi-primary: #e08763;
-  --srapi-primary-hover: #c9684a;
-  --srapi-success: #22c55e;
-  --srapi-warning: #f59e0b;
-  --srapi-error: #ef4444;
-  --srapi-info: #60a5fa;
+  --color-srapi-bg: #100f0d;
+  --color-srapi-card: #1a1916;
+  --color-srapi-card-muted: #232019;
+  --color-srapi-text-primary: #f1efe9;
+  --color-srapi-text-secondary: #a09a8d;
+  --color-srapi-text-tertiary: #6f6a5f;
+  --color-srapi-border: #2c2a23;
+  --color-srapi-border-strong: #3a372e;
+  --color-srapi-primary: #e07a5f;
+  --color-srapi-primary-hover: #c96243;
+  --color-srapi-success: #5fa564;
+  --color-srapi-warning: #d6a45a;
+  --color-srapi-error: #e2705a;
+  --color-srapi-invert: #f1efe9;
+  --color-srapi-invert-fg: #100f0d;
+}
 
-  --srapi-grad-from: #e08763;
-  --srapi-grad-via: #818cf8;
-  --srapi-grad-to: #a78bfa;
-
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 14px -2px rgba(0, 0, 0, 0.5), 0 2px 6px -2px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 22px 56px -14px rgba(0, 0, 0, 0.7), 0 8px 20px -10px rgba(0, 0, 0, 0.5);
-  --shadow-glow: 0 0 0 1px color-mix(in srgb, var(--srapi-primary) 26%, transparent),
-    0 14px 44px -12px color-mix(in srgb, var(--srapi-primary) 36%, transparent);
-  --surface-inset: inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+html {
+  color-scheme: light;
+}
+html.dark {
+  color-scheme: dark;
 }
 
 body {
-  background-color: var(--srapi-bg);
-  color: var(--srapi-text-primary);
-  font-family: var(--font-inter), sans-serif;
+  background-color: var(--color-srapi-bg);
+  color: var(--color-srapi-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "cv05", "ss01", "calt", "kern";
 }
 
-/* Cotton Paper Texture Filter */
-.paper-grain {
-  position: relative;
+/* 衬线标题：Cormorant 高对比但纤细，统一给中重字重 + 光学字距，
+   避免小尺寸发虚；超大展示标题可在使用处单独减重。 */
+.font-serif {
+  font-weight: 600;
+  font-feature-settings: "kern", "liga", "calt", "swsh";
+  letter-spacing: -0.01em;
 }
 
+/* 数字一律等宽，避免表格 / 指标跳动 */
+.font-mono,
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum", "zero", "ss03";
+}
+
+/* 暖色对焦环（禁止系统亮蓝）— 仅键盘聚焦时显示的克制细环，非点击高亮 */
+*:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 1.5px var(--color-srapi-bg),
+    0 0 0 3px color-mix(in srgb, var(--color-srapi-primary) 32%, transparent);
+  border-radius: 6px;
+}
+/* 鼠标点击不应留下聚焦环（部分元素如复选框默认会在点击后命中 :focus-visible） */
+input:focus:not(:focus-visible),
+button:focus:not(:focus-visible),
+[role="button"]:focus:not(:focus-visible),
+[role="checkbox"]:focus:not(:focus-visible) {
+  box-shadow: none;
+}
+/* 文本输入框 / 文本域 / 下拉触发器用「边框变深」表达聚焦，不再叠加暖色环——
+   否则深色边框外再套一圈赤陶色看起来像红框/报错。环留给按钮、链接、复选框。 */
+input:not([type="checkbox"]):not([type="radio"]):focus-visible,
+textarea:focus-visible,
+[role="combobox"]:focus-visible {
+  box-shadow: none;
+  border-radius: revert;
+}
+
+/* 选区 */
+::selection {
+  background: color-mix(in srgb, var(--color-srapi-primary) 22%, transparent);
+}
+
+/* —— 浮层动效（自带,不依赖 tailwindcss-animate）—— */
+@keyframes srapi-fade-in { from { opacity: 0 } to { opacity: 1 } }
+@keyframes srapi-fade-out { from { opacity: 1 } to { opacity: 0 } }
+@keyframes srapi-pop-in {
+  from { opacity: 0; transform: scale(0.96) }
+  to { opacity: 1; transform: scale(1) }
+}
+@keyframes srapi-pop-out {
+  from { opacity: 1; transform: scale(1) }
+  to { opacity: 0; transform: scale(0.96) }
+}
+@keyframes srapi-dialog-in {
+  from { opacity: 0; transform: translate(-50%, -48%) scale(0.97) }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1) }
+}
+@keyframes srapi-dialog-out {
+  from { opacity: 1; transform: translate(-50%, -50%) scale(1) }
+  to { opacity: 0; transform: translate(-50%, -48%) scale(0.97) }
+}
+
+.srapi-anim-fade[data-state="open"] { animation: srapi-fade-in 160ms ease-out }
+.srapi-anim-fade[data-state="closed"] { animation: srapi-fade-out 130ms ease-in }
+
+.srapi-anim-pop { transform-origin: var(--radix-popper-transform-origin, center) }
+.srapi-anim-pop[data-state="open"] { animation: srapi-pop-in 150ms cubic-bezier(0.16, 1, 0.3, 1) }
+.srapi-anim-pop[data-state="closed"] { animation: srapi-pop-out 110ms ease-in }
+
+.srapi-anim-dialog[data-state="open"] { animation: srapi-dialog-in 190ms cubic-bezier(0.16, 1, 0.3, 1) }
+.srapi-anim-dialog[data-state="closed"] { animation: srapi-dialog-out 140ms ease-in }
+
+/* 边缘抽屉（Sheet）滑入 */
+@keyframes srapi-sheet-left-in { from { transform: translateX(-100%) } to { transform: translateX(0) } }
+@keyframes srapi-sheet-left-out { from { transform: translateX(0) } to { transform: translateX(-100%) } }
+@keyframes srapi-sheet-right-in { from { transform: translateX(100%) } to { transform: translateX(0) } }
+@keyframes srapi-sheet-right-out { from { transform: translateX(0) } to { transform: translateX(100%) } }
+@keyframes srapi-sheet-bottom-in { from { transform: translateY(100%) } to { transform: translateY(0) } }
+@keyframes srapi-sheet-bottom-out { from { transform: translateY(0) } to { transform: translateY(100%) } }
+
+.srapi-anim-sheet-left[data-state="open"] { animation: srapi-sheet-left-in 240ms cubic-bezier(0.16, 1, 0.3, 1) }
+.srapi-anim-sheet-left[data-state="closed"] { animation: srapi-sheet-left-out 200ms ease-in }
+.srapi-anim-sheet-right[data-state="open"] { animation: srapi-sheet-right-in 240ms cubic-bezier(0.16, 1, 0.3, 1) }
+.srapi-anim-sheet-right[data-state="closed"] { animation: srapi-sheet-right-out 200ms ease-in }
+.srapi-anim-sheet-bottom[data-state="open"] { animation: srapi-sheet-bottom-in 260ms cubic-bezier(0.16, 1, 0.3, 1) }
+.srapi-anim-sheet-bottom[data-state="closed"] { animation: srapi-sheet-bottom-out 210ms ease-in }
+
+@media (prefers-reduced-motion: reduce) {
+  .srapi-anim-fade,
+  .srapi-anim-pop,
+  .srapi-anim-dialog,
+  .srapi-anim-sheet-left,
+  .srapi-anim-sheet-right,
+  .srapi-anim-sheet-bottom { animation: none !important }
+}
+
+/* 滚动条 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-srapi-border-strong);
+  border-radius: 9999px;
+  border: 2px solid var(--color-srapi-bg);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ============================================================
+   §4.1 棉纸物理微杂色纹理（锁定 3.5–4%）
+   ============================================================ */
 .paper-grain::before {
   content: "";
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  width: 100%; height: 100%;
-  opacity: 0.025;
+  position: fixed;
+  inset: 0;
+  opacity: 0.035;
   pointer-events: none;
-  z-index: 10;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  z-index: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.dark .paper-grain::before {
+  opacity: 0.05;
 }
 
-/* ─── Premium Surface / Card ───
- * The canonical card treatment: hairline border, soft elevation, gentle lift
- * on hover. `tactile-card` is kept as an alias so legacy pages uplift for free.
- */
-.surface,
+/* ============================================================
+   §4.2 物理压凹内高光（凸版印刷质感）
+   ============================================================ */
 .tactile-card {
-  background-color: var(--srapi-card);
-  border: 1px solid var(--srapi-border);
-  box-shadow: var(--shadow-sm), var(--surface-inset);
-  transition:
-    box-shadow 0.3s var(--ease-bloom),
-    transform 0.3s var(--ease-bloom),
-    border-color 0.3s ease;
+  box-shadow:
+    0 1px 2px rgba(28, 26, 23, 0.03),
+    0 6px 24px -8px rgba(28, 26, 23, 0.05),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.65);
+}
+.dark .tactile-card {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.35),
+    0 8px 28px -10px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.035);
 }
 
-.surface:hover,
-.tactile-card:hover {
-  box-shadow: var(--shadow-md), var(--surface-inset);
-  border-color: color-mix(in srgb, var(--srapi-primary) 22%, var(--srapi-border));
-}
-
-/* Opt-in lift for cards that should read as clickable (e.g. bento tiles). */
-.surface-interactive {
-  cursor: pointer;
-}
-.surface-interactive:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lg), var(--surface-inset);
-}
-
-/* Spectrum hover ring — for flagship bento cards */
-.surface-glow {
+/* ============================================================
+   §4.3 物理仪表型 Quota 轨道（1px 刻度针）
+   ============================================================ */
+.quota-rail {
   position: relative;
-}
-.surface-glow::after {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(135deg, var(--srapi-grad-from), var(--srapi-grad-via), var(--srapi-grad-to));
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  opacity: 0;
-  transition: opacity 0.35s var(--ease-bloom);
-  pointer-events: none;
-}
-.surface-glow:hover::after {
-  opacity: 0.55;
-}
-
-/* ─── Glassmorphism Card ─── */
-.glass-card {
-  background: color-mix(in srgb, var(--srapi-card) 72%, transparent);
-  backdrop-filter: blur(20px) saturate(160%);
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
-  border: 1px solid color-mix(in srgb, var(--srapi-border) 80%, transparent);
-  box-shadow: var(--shadow-lg), var(--surface-inset);
-}
-
-/* ─── Gradient Text ─── */
-.gradient-text {
-  background-image: linear-gradient(
-    100deg,
-    var(--srapi-grad-from),
-    var(--srapi-grad-via),
-    var(--srapi-grad-to)
-  );
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
-}
-
-/* ─── Quiet Badges ─── */
-.quiet-badge {
-  font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 4px;
-  border: 1px solid var(--srapi-border);
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-/* ─── Quota Notch Meter ─── */
-.notch-rail {
   height: 1px;
-  background-color: var(--srapi-border);
-  position: relative;
   width: 100%;
+  background: var(--color-srapi-border-strong);
 }
-
-.notch-pin {
-  width: 1px;
-  height: 12px;
+.quota-rail .quota-notch {
   position: absolute;
-  top: -5px;
-  transition: left 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  top: -6px;
+  width: 1px;
+  height: 13px;
+  background: var(--color-srapi-primary);
+  transition: left 0.5s var(--ease-bloom);
+}
+.quota-rail .quota-notch[data-level="warn"] {
+  background: var(--color-srapi-warning);
+}
+.quota-rail .quota-notch[data-level="crit"] {
+  background: var(--color-srapi-error);
 }
 
-/* ─── Typing Stream Cursor ─── */
+/* ============================================================
+   §5 流式打字游标
+   ============================================================ */
 .stream-cursor {
   display: inline-block;
-  width: 4px;
-  height: 14px;
+  width: 3px;
+  height: 1em;
+  background: var(--color-srapi-primary);
   margin-left: 2px;
-  vertical-align: middle;
-  background-color: var(--srapi-primary);
-  animation: cursorBlink 800ms infinite alternate;
+  vertical-align: -0.15em;
+  animation: stream-blink 0.85s ease-in-out infinite;
+}
+@keyframes stream-blink {
+  0%,
+  100% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.stream-line {
+  white-space: pre-wrap;
+  border-left: 1.5px solid color-mix(in srgb, var(--color-srapi-primary) 45%, transparent);
+  padding-left: 12px;
+  margin: 3px 0;
 }
 
-@keyframes cursorBlink {
-  0% { opacity: 0.1; }
-  100% { opacity: 1; }
+/* ============================================================
+   §6 黄金阻尼进场（Editorial Bloom）+ 交错阶梯
+   ============================================================ */
+.animate-bloom {
+  opacity: 0;
+  animation: editorial-bloom 700ms var(--ease-bloom) forwards;
 }
-
-/* ─── High Fidelity Editorial Bloom Intro Animation ─── */
-@keyframes editorialBloom {
+@keyframes editorial-bloom {
   from {
     opacity: 0;
     transform: translateY(16px);
-    filter: blur(4px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
-    filter: blur(0);
+    transform: none;
+  }
+}
+.bloom-delay-1 {
+  animation-delay: 90ms;
+}
+.bloom-delay-2 {
+  animation-delay: 180ms;
+}
+.bloom-delay-3 {
+  animation-delay: 270ms;
+}
+
+/* 骨架脉冲 */
+.skeleton-pulse {
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
   }
 }
 
-.animate-bloom {
-  opacity: 0;
-  animation: editorialBloom 600ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-/* Stagger delay helpers */
-.animate-bloom.delay-100 { animation-delay: 80ms; }
-.animate-bloom.delay-200 { animation-delay: 160ms; }
-.animate-bloom.delay-300 { animation-delay: 240ms; }
-.animate-bloom.delay-400 { animation-delay: 320ms; }
-
-@keyframes editorialBloomSoft {
-  from { opacity: 0; transform: scale(0.97) translateY(8px); filter: blur(2px); }
-  to { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
-}
-.animate-bloom-soft {
-  opacity: 0;
-  animation: editorialBloomSoft 500ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-/* ─── Scroll Reveal (driven by IntersectionObserver via useReveal) ─── */
-.reveal {
-  opacity: 0;
-  transform: translateY(20px);
-  filter: blur(3px);
-  transition:
-    opacity 0.7s var(--ease-bloom),
-    transform 0.7s var(--ease-bloom),
-    filter 0.7s var(--ease-bloom);
-  will-change: opacity, transform;
-}
-.reveal.is-visible {
-  opacity: 1;
-  transform: none;
-  filter: none;
-}
-
-/* ─── 3D Tilt (transform set inline via JS; this is the base) ─── */
-.tilt {
-  transform-style: preserve-3d;
-  transition: transform 0.2s var(--ease-bloom);
-  will-change: transform;
-}
-
-/* ─── Shimmer Loading Skeleton ─── */
-@keyframes shimmerSlide {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
-}
-
-.shimmer {
-  position: relative;
-  overflow: hidden;
-  background: var(--srapi-card-muted);
-  border-radius: 0.75rem;
-}
-
-.shimmer::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.3) 50%,
-    transparent 100%
-  );
-  animation: shimmerSlide 1.8s ease-in-out infinite;
-}
-
-.dark .shimmer::after {
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.04) 50%,
-    transparent 100%
-  );
-}
-
-/* ─── Animated Gradient Background for Login ─── */
-@keyframes gradientShift {
-  0%   { background-position: 0% 50%; }
-  50%  { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-
-.gradient-bg {
-  background: linear-gradient(
-    135deg,
-    var(--srapi-bg) 0%,
-    color-mix(in srgb, var(--srapi-primary) 6%, var(--srapi-bg)) 25%,
-    var(--srapi-bg) 50%,
-    color-mix(in srgb, var(--srapi-primary) 4%, var(--srapi-bg)) 75%,
-    var(--srapi-bg) 100%
-  );
-  background-size: 400% 400%;
-  animation: gradientShift 20s ease infinite;
-}
-
-/* ─── Aurora Ambient Field (CSS-only hero wash) ─── */
-.aurora {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-.aurora::before,
-.aurora::after {
-  content: "";
-  position: absolute;
-  width: 60vw;
-  height: 60vw;
-  max-width: 760px;
-  max-height: 760px;
-  border-radius: 50%;
-  filter: blur(90px);
-  opacity: 0.5;
-  will-change: transform;
-}
-.aurora::before {
-  top: -18%;
-  left: -8%;
-  background: radial-gradient(circle at 30% 30%, color-mix(in srgb, var(--srapi-grad-from) 60%, transparent), transparent 65%);
-  animation: orbFloat1 22s ease-in-out infinite;
-}
-.aurora::after {
-  bottom: -22%;
-  right: -10%;
-  background: radial-gradient(circle at 70% 70%, color-mix(in srgb, var(--srapi-grad-via) 42%, transparent), transparent 65%);
-  animation: orbFloat2 26s ease-in-out infinite;
-}
-.dark .aurora::before { opacity: 0.32; }
-.dark .aurora::after { opacity: 0.26; }
-
-/* ─── Cursor Spotlight (CSS vars --mx/--my updated via JS) ─── */
-.spotlight {
-  position: relative;
-}
-.spotlight::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: radial-gradient(
-    600px circle at var(--mx, 50%) var(--my, 0%),
-    color-mix(in srgb, var(--srapi-primary) 9%, transparent),
-    transparent 42%
-  );
-  transition: background 0.2s ease;
-  z-index: 0;
-}
-
-/* ─── Floating Orb Ambient Light ─── */
-@keyframes orbFloat1 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(30px, -20px) scale(1.05); }
-  66% { transform: translate(-10px, 15px) scale(0.95); }
-}
-
-@keyframes orbFloat2 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(-25px, 25px) scale(1.1); }
-  66% { transform: translate(15px, -10px) scale(0.9); }
-}
-
-.orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  pointer-events: none;
-  will-change: transform;
-}
-
-.orb-1 {
-  width: 300px;
-  height: 300px;
-  background: color-mix(in srgb, var(--srapi-primary) 12%, transparent);
-  animation: orbFloat1 18s ease-in-out infinite;
-}
-
-.orb-2 {
-  width: 250px;
-  height: 250px;
-  background: color-mix(in srgb, var(--srapi-primary) 8%, transparent);
-  animation: orbFloat2 22s ease-in-out infinite;
-}
-
-/* ─── Pulse Status Dot ─── */
-@keyframes statusPulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.5; transform: scale(1.5); }
-}
-
-.pulse-dot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  animation: statusPulse 2s ease-in-out infinite;
-}
-
-/* ─── Focus Ring ─── */
-.focus-ring {
-  transition: box-shadow 0.2s ease, border-color 0.2s ease;
-}
-
-.focus-ring:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--srapi-primary) 25%, transparent);
-  border-color: var(--srapi-primary);
-}
-
-/* ─── Stat Card Accent Stripe ─── */
-.stat-accent {
-  position: relative;
-  overflow: hidden;
-}
-
-.stat-accent::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, var(--srapi-primary), color-mix(in srgb, var(--srapi-primary) 40%, var(--srapi-bg)));
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.stat-accent:hover::before {
-  opacity: 1;
-}
-
-/* ─── Smooth Scrollbar ─── */
-.scrollbar-none::-webkit-scrollbar {
-  display: none;
-}
-.scrollbar-none {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-.scrollbar-thin::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
-}
-.scrollbar-thin::-webkit-scrollbar-track {
-  background: transparent;
-}
-.scrollbar-thin::-webkit-scrollbar-thumb {
-  background: var(--srapi-border);
-  border-radius: 9999px;
-}
-.scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background: var(--srapi-text-secondary);
-}
-
-/* Respect user preference: skip motion entirely so motion-sensitive users see
- * content instantly. */
+/* ============================================================
+   §9.2 Reduced Motion
+   ============================================================ */
 @media (prefers-reduced-motion: reduce) {
-  .animate-bloom,
-  .animate-bloom-soft,
-  .animate-bloom.delay-100,
-  .animate-bloom.delay-200,
-  .animate-bloom.delay-300,
-  .animate-bloom.delay-400 {
+  .animate-bloom {
     animation: none;
     opacity: 1;
     transform: none;
-    filter: none;
   }
-  .reveal {
-    opacity: 1;
-    transform: none;
-    filter: none;
-    transition: none;
+  .stream-cursor {
+    animation: none;
+    opacity: 0.6;
   }
-  .tilt {
-    transform: none !important;
-  }
-  .gradient-bg,
-  .aurora::before,
-  .aurora::after {
+  .skeleton-pulse {
     animation: none;
   }
-  .orb-1, .orb-2 {
-    animation: none;
-  }
-  .pulse-dot {
-    animation: none;
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
   }
 }

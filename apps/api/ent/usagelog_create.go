@@ -206,6 +206,20 @@ func (_c *UsageLogCreate) SetNillableCachedTokens(v *int) *UsageLogCreate {
 	return _c
 }
 
+// SetCacheCreationTokens sets the "cache_creation_tokens" field.
+func (_c *UsageLogCreate) SetCacheCreationTokens(v int) *UsageLogCreate {
+	_c.mutation.SetCacheCreationTokens(v)
+	return _c
+}
+
+// SetNillableCacheCreationTokens sets the "cache_creation_tokens" field if the given value is not nil.
+func (_c *UsageLogCreate) SetNillableCacheCreationTokens(v *int) *UsageLogCreate {
+	if v != nil {
+		_c.SetCacheCreationTokens(*v)
+	}
+	return _c
+}
+
 // SetTotalTokens sets the "total_tokens" field.
 func (_c *UsageLogCreate) SetTotalTokens(v int) *UsageLogCreate {
 	_c.mutation.SetTotalTokens(v)
@@ -413,6 +427,10 @@ func (_c *UsageLogCreate) defaults() {
 		v := usagelog.DefaultCachedTokens
 		_c.mutation.SetCachedTokens(v)
 	}
+	if _, ok := _c.mutation.CacheCreationTokens(); !ok {
+		v := usagelog.DefaultCacheCreationTokens
+		_c.mutation.SetCacheCreationTokens(v)
+	}
 	if _, ok := _c.mutation.TotalTokens(); !ok {
 		v := usagelog.DefaultTotalTokens
 		_c.mutation.SetTotalTokens(v)
@@ -488,6 +506,9 @@ func (_c *UsageLogCreate) check() error {
 	}
 	if _, ok := _c.mutation.CachedTokens(); !ok {
 		return &ValidationError{Name: "cached_tokens", err: errors.New(`ent: missing required field "UsageLog.cached_tokens"`)}
+	}
+	if _, ok := _c.mutation.CacheCreationTokens(); !ok {
+		return &ValidationError{Name: "cache_creation_tokens", err: errors.New(`ent: missing required field "UsageLog.cache_creation_tokens"`)}
 	}
 	if _, ok := _c.mutation.TotalTokens(); !ok {
 		return &ValidationError{Name: "total_tokens", err: errors.New(`ent: missing required field "UsageLog.total_tokens"`)}
@@ -595,6 +616,10 @@ func (_c *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.CachedTokens(); ok {
 		_spec.SetField(usagelog.FieldCachedTokens, field.TypeInt, value)
 		_node.CachedTokens = value
+	}
+	if value, ok := _c.mutation.CacheCreationTokens(); ok {
+		_spec.SetField(usagelog.FieldCacheCreationTokens, field.TypeInt, value)
+		_node.CacheCreationTokens = value
 	}
 	if value, ok := _c.mutation.TotalTokens(); ok {
 		_spec.SetField(usagelog.FieldTotalTokens, field.TypeInt, value)

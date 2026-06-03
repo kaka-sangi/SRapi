@@ -2,6 +2,7 @@ package contract
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"time"
 )
@@ -38,6 +39,26 @@ type Runtime interface {
 	// managed egress; otherwise (nil, false, nil) so the caller keeps its default
 	// client.
 	ManagedEgressClient(account AccountRuntime) (*http.Client, bool, error)
+}
+
+// StreamResponse carries a live, unbuffered upstream response for incremental
+// streaming. The caller owns Body and MUST close it.
+type StreamResponse struct {
+	StatusCode int
+	Headers    http.Header
+	Body       io.ReadCloser
+}
+
+// StreamRuntime is implemented by reverse-proxy runtimes that can forward an
+// upstream response incrementally (returning the live body) rather than
+// buffering it. It is an optional capability: callers type-assert to it and
+// fall back to buffered Do when unavailable.
+type StreamRuntime interface {
+	// DoStream performs the upstream request and returns the live response body
+	// on a 2xx status. On a non-2xx status it consumes (bounded) and closes the
+	// body and returns a classified RuntimeError, so callers can fail over
+	// before writing anything downstream.
+	DoStream(ctx context.Context, req Request) (StreamResponse, error)
 }
 
 type WebSocketMessageType string

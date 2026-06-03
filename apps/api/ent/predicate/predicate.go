@@ -168,6 +168,9 @@ type UserAttributeValue func(*sql.Selector)
 // UserAuthIdentity is the predicate function for userauthidentity builders.
 type UserAuthIdentity func(*sql.Selector)
 
+// UserPlatformQuota is the predicate function for userplatformquota builders.
+type UserPlatformQuota func(*sql.Selector)
+
 // UserPromoCodeApplication is the predicate function for userpromocodeapplication builders.
 type UserPromoCodeApplication func(*sql.Selector)
 

@@ -374,6 +374,57 @@ func (s *Server) handleCreateAdminSubscriptionPlan(w http.ResponseWriter, r *htt
 	})
 }
 
+func (s *Server) handleUpdateAdminSubscriptionPlan(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	planID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || planID <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid plan id", requestID)
+		return
+	}
+	var beforeSnapshot map[string]any
+	if existing, findErr := s.runtime.subscriptions.FindPlanByID(r.Context(), planID); findErr == nil {
+		beforeSnapshot = subscriptionPlanAuditSnapshot(existing)
+	}
+	var body apiopenapi.UpdateSubscriptionPlanRequest
+	if err := s.decodeJSONBody(w, r, &body); err != nil {
+		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid subscription plan request", requestID)
+		return
+	}
+	plan, err := s.runtime.subscriptions.UpdatePlan(r.Context(), planID, subscriptioncontract.UpdatePlanRequest{
+		Name:         body.Name,
+		Description:  body.Description,
+		Price:        body.Price,
+		Currency:     body.Currency,
+		ValidityDays: body.ValidityDays,
+		Entitlements: jsonObjectToMapPtr(body.Entitlements),
+		ForSale:      body.ForSale,
+		SortOrder:    body.SortOrder,
+		Status:       toSubscriptionPlanStatusPtr(body.Status),
+	})
+	if err != nil {
+		if errors.Is(err, subscriptioncontract.ErrNotFound) {
+			writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "subscription plan not found", requestID)
+			return
+		}
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid subscription plan request", requestID)
+		return
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "subscription_plan.update", "subscription_plan", strconv.Itoa(plan.ID), beforeSnapshot, subscriptionPlanAuditSnapshot(plan)))
+	writeJSONAny(w, http.StatusOK, apiopenapi.SubscriptionPlanResponse{
+		Data:      toAPISubscriptionPlan(plan),
+		RequestId: requestID,
+	})
+}
+
 func (s *Server) handleListAdminUserSubscriptions(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	if _, err := s.requireAdminSession(r); err != nil {

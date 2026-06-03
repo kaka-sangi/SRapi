@@ -41,6 +41,11 @@ func (s *Store) Create(_ context.Context, input contract.CreateStoredKey) (contr
 		RPMLimit:         cloneIntPointer(input.RPMLimit),
 		TPMLimit:         cloneIntPointer(input.TPMLimit),
 		ConcurrencyLimit: cloneIntPointer(input.ConcurrencyLimit),
+		RequestLimit5h:   cloneIntPointer(input.RequestLimit5h),
+		RequestLimit1d:   cloneIntPointer(input.RequestLimit1d),
+		RequestLimit7d:   cloneIntPointer(input.RequestLimit7d),
+		AllowedIPs:       append([]string(nil), input.AllowedIPs...),
+		DeniedIPs:        append([]string(nil), input.DeniedIPs...),
 		ExpiresAt:        cloneTimePointer(input.ExpiresAt),
 		CreatedAt:        now,
 	}
@@ -62,14 +67,19 @@ func (s *Store) Update(_ context.Context, key contract.APIKey) (contract.APIKey,
 	key.Prefix = stored.Prefix
 	key.Hash = stored.Hash
 	key.CreatedAt = stored.CreatedAt
-	key.RPMLimit = cloneIntPointer(stored.RPMLimit)
-	key.TPMLimit = cloneIntPointer(stored.TPMLimit)
-	key.ConcurrencyLimit = cloneIntPointer(stored.ConcurrencyLimit)
 	key.ExpiresAt = cloneTimePointer(stored.ExpiresAt)
 	key.LastUsedAt = cloneTimePointer(stored.LastUsedAt)
+	key.RPMLimit = cloneIntPointer(key.RPMLimit)
+	key.TPMLimit = cloneIntPointer(key.TPMLimit)
+	key.ConcurrencyLimit = cloneIntPointer(key.ConcurrencyLimit)
+	key.RequestLimit5h = cloneIntPointer(key.RequestLimit5h)
+	key.RequestLimit1d = cloneIntPointer(key.RequestLimit1d)
+	key.RequestLimit7d = cloneIntPointer(key.RequestLimit7d)
 	key.Scopes = append([]string(nil), key.Scopes...)
 	key.AllowedModels = append([]string(nil), key.AllowedModels...)
 	key.GroupIDs = append([]int(nil), key.GroupIDs...)
+	key.AllowedIPs = append([]string(nil), key.AllowedIPs...)
+	key.DeniedIPs = append([]string(nil), key.DeniedIPs...)
 	s.byID[key.ID] = key
 	return key, nil
 }
@@ -126,6 +136,11 @@ func cloneKey(key contract.APIKey) contract.APIKey {
 	key.RPMLimit = cloneIntPointer(key.RPMLimit)
 	key.TPMLimit = cloneIntPointer(key.TPMLimit)
 	key.ConcurrencyLimit = cloneIntPointer(key.ConcurrencyLimit)
+	key.RequestLimit5h = cloneIntPointer(key.RequestLimit5h)
+	key.RequestLimit1d = cloneIntPointer(key.RequestLimit1d)
+	key.RequestLimit7d = cloneIntPointer(key.RequestLimit7d)
+	key.AllowedIPs = append([]string(nil), key.AllowedIPs...)
+	key.DeniedIPs = append([]string(nil), key.DeniedIPs...)
 	key.ExpiresAt = cloneTimePointer(key.ExpiresAt)
 	key.LastUsedAt = cloneTimePointer(key.LastUsedAt)
 	return key

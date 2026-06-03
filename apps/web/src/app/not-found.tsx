@@ -1,22 +1,22 @@
+"use client";
+
 import Link from "next/link";
-import { Button, Card, CardDescription, CardTitle } from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { useLanguage } from "@/context/LanguageContext";
 
 export default function NotFound() {
+  const { t } = useLanguage();
+
   return (
-    <div className="flex min-h-[60vh] items-center justify-center p-8">
-      <Card className="max-w-lg space-y-6 text-center">
-        <div className="space-y-2">
-          <CardTitle>Page not found</CardTitle>
-          <CardDescription>
-            The page you opened does not exist in this SRapi build. Use the link below to head back.
-          </CardDescription>
-        </div>
-        <div className="flex justify-center">
-          <Button asChild>
-            <Link href="/">Back to home</Link>
-          </Button>
-        </div>
-      </Card>
+    <div className="flex min-h-dvh flex-col items-center justify-center gap-5 px-6 text-center">
+      <div className="font-mono text-2xs uppercase tracking-widest text-srapi-text-secondary">
+        404
+      </div>
+      <h1 className="font-serif text-4xl tracking-[-0.02em]">{t("common.notFound")}</h1>
+      <p className="max-w-sm text-sm text-srapi-text-secondary">{t("common.notFoundBody")}</p>
+      <Button asChild variant="primary">
+        <Link href="/">{t("common.backHome")}</Link>
+      </Button>
     </div>
   );
 }

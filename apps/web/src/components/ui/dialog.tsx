@@ -17,15 +17,13 @@ export const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-50 bg-black/45 backdrop-blur-sm",
-      "data-[state=open]:animate-in data-[state=open]:fade-in-0",
-      "data-[state=closed]:animate-out data-[state=closed]:fade-out-0",
+      "srapi-anim-fade fixed inset-0 z-50 bg-black/40 backdrop-blur-sm",
       className,
     )}
     {...props}
   />
 ));
-DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
+DialogOverlay.displayName = "DialogOverlay";
 
 export const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
@@ -36,46 +34,33 @@ export const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "paper-grain fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2",
-        "rounded-3xl border border-srapi-border bg-srapi-card p-8 shadow-2xl",
-        "space-y-6",
+        "srapi-anim-dialog tactile-card fixed left-1/2 top-1/2 z-50 grid w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-2xl border border-srapi-border bg-srapi-card p-6",
         className,
       )}
       {...props}
     >
       {children}
-      <DialogPrimitive.Close
-        className={cn(
-          "absolute right-4 top-4 rounded-full border border-srapi-border p-1.5",
-          "text-srapi-text-secondary transition-colors hover:bg-srapi-card-muted hover:text-srapi-text-primary",
-          "focus:outline-none focus:ring-2 focus:ring-srapi-primary",
-        )}
-      >
-        <X size={14} aria-hidden="true" />
+      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-lg p-1 text-srapi-text-secondary transition-colors hover:bg-srapi-card-muted hover:text-srapi-text-primary">
+        <X className="size-4" />
         <span className="sr-only">Close</span>
       </DialogPrimitive.Close>
     </DialogPrimitive.Content>
   </DialogPortal>
 ));
-DialogContent.displayName = DialogPrimitive.Content.displayName;
+DialogContent.displayName = "DialogContent";
 
-export const DialogHeader: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({
-  className,
-  ...props
-}) => <div className={cn("space-y-1", className)} {...props} />;
+export function DialogHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+  return <div className={cn("flex flex-col gap-1.5", className)} {...props} />;
+}
 
-export const DialogFooter: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({
-  className,
-  ...props
-}) => (
-  <div
-    className={cn(
-      "flex flex-col-reverse gap-3 pt-3 sm:flex-row sm:justify-end sm:space-x-3",
-      className,
-    )}
-    {...props}
-  />
-);
+export function DialogFooter({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      className={cn("flex flex-col-reverse gap-2 sm:flex-row sm:justify-end", className)}
+      {...props}
+    />
+  );
+}
 
 export const DialogTitle = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Title>,
@@ -83,14 +68,11 @@ export const DialogTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Title
     ref={ref}
-    className={cn(
-      "font-serif text-lg font-medium tracking-tight text-srapi-text-primary",
-      className,
-    )}
+    className={cn("font-serif text-xl text-srapi-text-primary", className)}
     {...props}
   />
 ));
-DialogTitle.displayName = DialogPrimitive.Title.displayName;
+DialogTitle.displayName = "DialogTitle";
 
 export const DialogDescription = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Description>,
@@ -98,8 +80,8 @@ export const DialogDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Description
     ref={ref}
-    className={cn("text-xs leading-relaxed text-srapi-text-secondary", className)}
+    className={cn("text-sm text-srapi-text-secondary", className)}
     {...props}
   />
 ));
-DialogDescription.displayName = DialogPrimitive.Description.displayName;
+DialogDescription.displayName = "DialogDescription";

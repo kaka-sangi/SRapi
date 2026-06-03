@@ -95,8 +95,69 @@ func (s *Service) CreatePlan(ctx context.Context, req contract.CreatePlanRequest
 	})
 }
 
+// UpdatePlan applies a partial edit to a plan. Only the fields present in req are
+// validated and forwarded; nil fields leave the stored value untouched. Mirrors
+// CreatePlan's validation (money/currency/status/validity) per field.
+func (s *Service) UpdatePlan(ctx context.Context, id int, req contract.UpdatePlanRequest) (contract.SubscriptionPlan, error) {
+	if id <= 0 {
+		return contract.SubscriptionPlan{}, ErrInvalidInput
+	}
+	var stored contract.UpdateStoredPlan
+	if req.Name != nil {
+		name := strings.TrimSpace(*req.Name)
+		if name == "" {
+			return contract.SubscriptionPlan{}, ErrInvalidInput
+		}
+		stored.Name = &name
+	}
+	if req.Description != nil {
+		desc := strings.TrimSpace(*req.Description)
+		stored.Description = &desc
+	}
+	if req.Price != nil {
+		price, ok := normalizeMoney(*req.Price)
+		if !ok {
+			return contract.SubscriptionPlan{}, ErrInvalidInput
+		}
+		stored.Price = &price
+	}
+	if req.Currency != nil {
+		currency := normalizeCurrency(*req.Currency)
+		stored.Currency = &currency
+	}
+	if req.ValidityDays != nil {
+		if *req.ValidityDays <= 0 {
+			return contract.SubscriptionPlan{}, ErrInvalidInput
+		}
+		stored.ValidityDays = req.ValidityDays
+	}
+	if req.Entitlements != nil {
+		cloned := cloneMap(*req.Entitlements)
+		stored.Entitlements = &cloned
+	}
+	if req.ForSale != nil {
+		stored.ForSale = req.ForSale
+	}
+	if req.SortOrder != nil {
+		stored.SortOrder = req.SortOrder
+	}
+	if req.Status != nil {
+		if !validPlanStatus(*req.Status) {
+			return contract.SubscriptionPlan{}, ErrInvalidInput
+		}
+		stored.Status = req.Status
+	}
+	return s.store.UpdatePlan(ctx, id, stored)
+}
+
 func (s *Service) ListPlans(ctx context.Context) ([]contract.SubscriptionPlan, error) {
 	return s.store.ListPlans(ctx)
+}
+
+// FindPlanByID returns a single plan, used by the update handler to capture the
+// pre-change audit snapshot.
+func (s *Service) FindPlanByID(ctx context.Context, id int) (contract.SubscriptionPlan, error) {
+	return s.store.FindPlanByID(ctx, id)
 }
 
 func (s *Service) CreateUserSubscription(ctx context.Context, req contract.CreateSubscriptionRequest) (contract.UserSubscription, error) {
@@ -568,8 +629,19 @@ func priceFromRule(rule contract.PricingRule, req contract.PricingRequest, ruleI
 	amount := usagePrice(req.InputTokens, rule.InputPricePerMillionTokens)
 	amount = addMoney(amount, usagePrice(req.OutputTokens, rule.OutputPricePerMillionTokens))
 	amount = addMoney(amount, usagePrice(req.CacheReadTokens, rule.CacheReadPricePerMillionTokens))
-	amount = addMoney(amount, usagePrice(req.CacheWriteTokens, rule.CacheWritePricePerMillionTokens))
+	amount = addMoney(amount, usagePrice(req.CacheWriteTokens, cacheWriteRateOrInput(rule)))
 	return contract.PricingResult{Amount: amount, Currency: normalizeCurrency(rule.Currency), PricingRuleID: ruleID}
+}
+
+// cacheWriteRateOrInput returns the configured cache-write rate, falling back to
+// the input rate when no positive cache-write rate is set. Prompt-cache writes
+// cost at least as much as normal input tokens, so an unset write rate must not
+// bill them at zero (a revenue leak); it bills them at the input rate instead.
+func cacheWriteRateOrInput(rule contract.PricingRule) string {
+	if rate, ok := decimalRat(rule.CacheWritePricePerMillionTokens); ok && rate.Sign() > 0 {
+		return rule.CacheWritePricePerMillionTokens
+	}
+	return rule.InputPricePerMillionTokens
 }
 
 func priceFromPayload(payload map[string]any, req contract.PricingRequest, ruleID *int) (contract.PricingResult, bool) {

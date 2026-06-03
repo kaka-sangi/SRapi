@@ -269,6 +269,8 @@ func toAPIKey(key apikeycontract.APIKey) apiopenapi.ApiKey {
 	}
 	return apiopenapi.ApiKey{
 		AllowedModels:    append([]string(nil), key.AllowedModels...),
+		AllowedIps:       append([]string{}, key.AllowedIPs...),
+		DeniedIps:        append([]string{}, key.DeniedIPs...),
 		CreatedAt:        key.CreatedAt,
 		ExpiresAt:        key.ExpiresAt,
 		GroupIds:         groupIDs,
@@ -278,6 +280,9 @@ func toAPIKey(key apikeycontract.APIKey) apiopenapi.ApiKey {
 		Prefix:           key.Prefix,
 		ConcurrencyLimit: key.ConcurrencyLimit,
 		RpmLimit:         key.RPMLimit,
+		RequestLimit5h:   key.RequestLimit5h,
+		RequestLimit1d:   key.RequestLimit1d,
+		RequestLimit7d:   key.RequestLimit7d,
 		Scopes:           append([]string(nil), key.Scopes...),
 		Status:           apiopenapi.ApiKeyStatus(key.Status),
 		TpmLimit:         key.TPMLimit,
@@ -286,16 +291,43 @@ func toAPIKey(key apikeycontract.APIKey) apiopenapi.ApiKey {
 
 func toAPIProvider(provider providercontract.Provider) apiopenapi.Provider {
 	return apiopenapi.Provider{
-		AdapterType:  apiopenapi.ProviderAdapterType(provider.AdapterType),
-		Capabilities: mapToJsonObjectPtr(provider.Capabilities),
-		ConfigSchema: mapToJsonObjectPtr(provider.ConfigSchema),
-		CreatedAt:    provider.CreatedAt,
-		DisplayName:  provider.DisplayName,
-		Id:           apiopenapi.Id(strconv.Itoa(provider.ID)),
-		Name:         provider.Name,
-		Protocol:     apiopenapi.ProviderProtocol(provider.Protocol),
-		Status:       apiopenapi.ResourceStatus(provider.Status),
+		AdapterType:    apiopenapi.ProviderAdapterType(provider.AdapterType),
+		AuthMethods:    providerAuthMethodsAPI(provider.ConfigSchema),
+		Capabilities:   mapToJsonObjectPtr(provider.Capabilities),
+		ConfigSchema:   mapToJsonObjectPtr(provider.ConfigSchema),
+		CreatedAt:      provider.CreatedAt,
+		DisplayName:    provider.DisplayName,
+		Id:             apiopenapi.Id(strconv.Itoa(provider.ID)),
+		Name:           provider.Name,
+		PlatformFamily: providerPlatformFamilyAPI(provider.ConfigSchema),
+		Protocol:       apiopenapi.ProviderProtocol(provider.Protocol),
+		Status:         apiopenapi.ResourceStatus(provider.Status),
 	}
+}
+
+// providerAuthMethodsAPI surfaces the provider's auth_methods allowlist (stored
+// in config_schema by the preset installer) as the typed OpenAPI field so the
+// admin UI can scope the authentication-method selector per provider. Returns
+// nil when the provider carries no allowlist (no restriction).
+func providerAuthMethodsAPI(configSchema map[string]any) *[]apiopenapi.RuntimeClass {
+	methods := providerAuthMethodStrings(configSchema)
+	if len(methods) == 0 {
+		return nil
+	}
+	out := make([]apiopenapi.RuntimeClass, 0, len(methods))
+	for _, method := range methods {
+		out = append(out, apiopenapi.RuntimeClass(method))
+	}
+	return &out
+}
+
+func providerPlatformFamilyAPI(configSchema map[string]any) *apiopenapi.PlatformFamily {
+	family, ok := configSchema["platform_family"].(string)
+	if !ok || family == "" {
+		return nil
+	}
+	value := apiopenapi.PlatformFamily(family)
+	return &value
 }
 
 func toAPIModel(model modelcontract.Model) apiopenapi.Model {
@@ -472,6 +504,7 @@ func toAPIUsageLog(log usagecontract.UsageLog) apiopenapi.UsageLog {
 		ApiKeyId:              apiopenapi.Id(strconv.Itoa(log.APIKeyID)),
 		AttemptNo:             log.AttemptNo,
 		CachedTokens:          log.CachedTokens,
+		CacheCreationTokens:   ptrInt(log.CacheCreationTokens),
 		CompatibilityWarnings: nonNilStrings(log.CompatibilityWarnings),
 		Cost:                  log.Cost,
 		CreatedAt:             log.CreatedAt,

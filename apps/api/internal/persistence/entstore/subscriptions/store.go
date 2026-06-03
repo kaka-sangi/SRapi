@@ -46,6 +46,32 @@ func (s *Store) CreatePlan(ctx context.Context, input contract.CreateStoredPlan)
 	return toPlan(created), nil
 }
 
+func (s *Store) UpdatePlan(ctx context.Context, id int, input contract.UpdateStoredPlan) (contract.SubscriptionPlan, error) {
+	update := s.client.SubscriptionPlan.UpdateOneID(id).
+		Where(entsubscriptionplan.DeletedAtIsNil()).
+		SetNillableName(input.Name).
+		SetNillableDescription(input.Description).
+		SetNillablePrice(input.Price).
+		SetNillableCurrency(input.Currency).
+		SetNillableValidityDays(input.ValidityDays).
+		SetNillableForSale(input.ForSale).
+		SetNillableSortOrder(input.SortOrder)
+	if input.Status != nil {
+		update = update.SetStatus(string(*input.Status))
+	}
+	if input.Entitlements != nil {
+		update = update.SetEntitlementsJSON(cloneMap(*input.Entitlements))
+	}
+	updated, err := update.Save(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return contract.SubscriptionPlan{}, contract.ErrNotFound
+		}
+		return contract.SubscriptionPlan{}, err
+	}
+	return toPlan(updated), nil
+}
+
 func (s *Store) FindPlanByID(ctx context.Context, id int) (contract.SubscriptionPlan, error) {
 	found, err := s.client.SubscriptionPlan.Query().
 		Where(entsubscriptionplan.IDEQ(id), entsubscriptionplan.DeletedAtIsNil()).

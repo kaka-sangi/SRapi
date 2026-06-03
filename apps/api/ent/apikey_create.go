@@ -168,6 +168,60 @@ func (_c *APIKeyCreate) SetNillableConcurrencyLimit(v *int) *APIKeyCreate {
 	return _c
 }
 
+// SetRequestLimit5h sets the "request_limit_5h" field.
+func (_c *APIKeyCreate) SetRequestLimit5h(v int) *APIKeyCreate {
+	_c.mutation.SetRequestLimit5h(v)
+	return _c
+}
+
+// SetNillableRequestLimit5h sets the "request_limit_5h" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableRequestLimit5h(v *int) *APIKeyCreate {
+	if v != nil {
+		_c.SetRequestLimit5h(*v)
+	}
+	return _c
+}
+
+// SetRequestLimit1d sets the "request_limit_1d" field.
+func (_c *APIKeyCreate) SetRequestLimit1d(v int) *APIKeyCreate {
+	_c.mutation.SetRequestLimit1d(v)
+	return _c
+}
+
+// SetNillableRequestLimit1d sets the "request_limit_1d" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableRequestLimit1d(v *int) *APIKeyCreate {
+	if v != nil {
+		_c.SetRequestLimit1d(*v)
+	}
+	return _c
+}
+
+// SetRequestLimit7d sets the "request_limit_7d" field.
+func (_c *APIKeyCreate) SetRequestLimit7d(v int) *APIKeyCreate {
+	_c.mutation.SetRequestLimit7d(v)
+	return _c
+}
+
+// SetNillableRequestLimit7d sets the "request_limit_7d" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableRequestLimit7d(v *int) *APIKeyCreate {
+	if v != nil {
+		_c.SetRequestLimit7d(*v)
+	}
+	return _c
+}
+
+// SetAllowedIpsJSON sets the "allowed_ips_json" field.
+func (_c *APIKeyCreate) SetAllowedIpsJSON(v []string) *APIKeyCreate {
+	_c.mutation.SetAllowedIpsJSON(v)
+	return _c
+}
+
+// SetDeniedIpsJSON sets the "denied_ips_json" field.
+func (_c *APIKeyCreate) SetDeniedIpsJSON(v []string) *APIKeyCreate {
+	_c.mutation.SetDeniedIpsJSON(v)
+	return _c
+}
+
 // SetExpiresAt sets the "expires_at" field.
 func (_c *APIKeyCreate) SetExpiresAt(v time.Time) *APIKeyCreate {
 	_c.mutation.SetExpiresAt(v)
@@ -359,6 +413,26 @@ func (_c *APIKeyCreate) createSpec() (*APIKey, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.ConcurrencyLimit(); ok {
 		_spec.SetField(apikey.FieldConcurrencyLimit, field.TypeInt, value)
 		_node.ConcurrencyLimit = &value
+	}
+	if value, ok := _c.mutation.RequestLimit5h(); ok {
+		_spec.SetField(apikey.FieldRequestLimit5h, field.TypeInt, value)
+		_node.RequestLimit5h = &value
+	}
+	if value, ok := _c.mutation.RequestLimit1d(); ok {
+		_spec.SetField(apikey.FieldRequestLimit1d, field.TypeInt, value)
+		_node.RequestLimit1d = &value
+	}
+	if value, ok := _c.mutation.RequestLimit7d(); ok {
+		_spec.SetField(apikey.FieldRequestLimit7d, field.TypeInt, value)
+		_node.RequestLimit7d = &value
+	}
+	if value, ok := _c.mutation.AllowedIpsJSON(); ok {
+		_spec.SetField(apikey.FieldAllowedIpsJSON, field.TypeJSON, value)
+		_node.AllowedIpsJSON = value
+	}
+	if value, ok := _c.mutation.DeniedIpsJSON(); ok {
+		_spec.SetField(apikey.FieldDeniedIpsJSON, field.TypeJSON, value)
+		_node.DeniedIpsJSON = value
 	}
 	if value, ok := _c.mutation.ExpiresAt(); ok {
 		_spec.SetField(apikey.FieldExpiresAt, field.TypeTime, value)

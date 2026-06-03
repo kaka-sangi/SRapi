@@ -1,5 +1,6 @@
-import { AdminOrdersDashboardProductionPage } from "@/components/admin/admin-resource-pages";
+import { redirect } from "next/navigation";
 
-export default function AdminOrdersDashboardPage() {
-  return <AdminOrdersDashboardProductionPage />;
+// Payment dashboard rolls up into the orders list for now.
+export default function OrdersDashboardPage() {
+  redirect("/admin/orders");
 }

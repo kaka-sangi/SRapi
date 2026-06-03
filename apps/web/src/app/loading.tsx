@@ -1,9 +1,9 @@
-import { Spinner } from "@/components/ui";
+import { Spinner } from "@/components/ui/spinner";
 
-export default function RootLoading() {
+export default function Loading() {
   return (
-    <div className="flex min-h-[40vh] items-center justify-center p-8">
-      <Spinner size={28} label="Loading..." />
+    <div className="flex min-h-dvh items-center justify-center">
+      <Spinner className="size-5" />
     </div>
   );
 }

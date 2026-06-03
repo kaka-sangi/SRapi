@@ -38,6 +38,7 @@ func (rt *runtimeState) recordGatewayUsage(ctx context.Context, rec gatewayUsage
 		InputTokens:           rec.InputTokens,
 		OutputTokens:          rec.OutputTokens,
 		CachedTokens:          rec.CachedTokens,
+		CacheCreationTokens:   rec.CacheCreationTokens,
 		UsageEstimated:        rec.UsageEstimated,
 		LatencyMS:             rec.LatencyMS,
 		Success:               rec.Success,

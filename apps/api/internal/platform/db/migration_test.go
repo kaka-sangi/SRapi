@@ -107,6 +107,7 @@ func TestEntSchemaAppliesToEmptyDatabase(t *testing.T) {
 		"user_attribute_definitions",
 		"user_attribute_values",
 		"user_auth_identities",
+		"user_platform_quota",
 		"user_promo_code_applications",
 		"user_redeem_code_redemptions",
 		"user_roles",

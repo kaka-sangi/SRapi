@@ -376,6 +376,9 @@ func TestProductionGoAvoidsPanicAndRecoverOutsideBootstrap(t *testing.T) {
 	allowed := map[string][]string{
 		"apps/api/internal/app/app.go":           {"recover()"},
 		"apps/api/internal/httpserver/server.go": {"panic(err)"},
+		// embed.go's fs.Sub only fails on an invalid path, and the //go:embed
+		// pattern is a compile-time constant, so this panic is unreachable.
+		"apps/api/migrations/embed.go": {"panic(err)"},
 	}
 	var violations []string
 	for _, path := range files {

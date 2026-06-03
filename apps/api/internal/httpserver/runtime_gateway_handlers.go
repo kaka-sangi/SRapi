@@ -174,6 +174,10 @@ func (s *Server) handleCreateChatCompletion(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	providerResp := failover.Response
+	if providerResp.StreamBody != nil {
+		s.writeConversationStreamPassthrough(w, r, authed, canonical, result, providerResp, admission, model.ID, startedAt)
+		return
+	}
 	usage := gatewayUsageFromProvider(providerResp)
 	canonicalResp := s.runtime.gateway.BuildCanonicalConversationResponse(canonical, gatewayContentBlocksFromProvider(providerResp.Parts), gatewayStopReasonFromProvider(providerResp.StopReason), usage, providerResp.Warnings, providerResp.Raw, gatewayStreamEventsFromProvider(providerResp.StreamEvents))
 	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequest(model.ID, result.Candidate, canonicalResp.Usage), canonicalResp.Usage.Estimated)
@@ -194,6 +198,7 @@ func (s *Server) handleCreateChatCompletion(w http.ResponseWriter, r *http.Reque
 		InputTokens:           canonicalResp.Usage.InputTokens,
 		OutputTokens:          canonicalResp.Usage.OutputTokens,
 		CachedTokens:          canonicalResp.Usage.CachedTokens,
+		CacheCreationTokens:   canonicalResp.Usage.CacheCreationTokens,
 		UsageEstimated:        canonicalResp.Usage.Estimated,
 		Pricing:               pricing,
 		CompatibilityWarnings: canonicalResp.CompatibilityWarnings,
@@ -346,6 +351,10 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	providerResp := failover.Response
+	if providerResp.StreamBody != nil {
+		s.writeConversationStreamPassthrough(w, r, authed, canonical, result, providerResp, admission, model.ID, startedAt)
+		return
+	}
 	usage := gatewayUsageFromProvider(providerResp)
 	canonicalResp := s.runtime.gateway.BuildCanonicalConversationResponse(canonical, gatewayContentBlocksFromProvider(providerResp.Parts), gatewayStopReasonFromProvider(providerResp.StopReason), usage, providerResp.Warnings, providerResp.Raw, gatewayStreamEventsFromProvider(providerResp.StreamEvents))
 	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequest(model.ID, result.Candidate, canonicalResp.Usage), canonicalResp.Usage.Estimated)
@@ -366,6 +375,7 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 		InputTokens:           canonicalResp.Usage.InputTokens,
 		OutputTokens:          canonicalResp.Usage.OutputTokens,
 		CachedTokens:          canonicalResp.Usage.CachedTokens,
+		CacheCreationTokens:   canonicalResp.Usage.CacheCreationTokens,
 		UsageEstimated:        canonicalResp.Usage.Estimated,
 		Pricing:               pricing,
 		CompatibilityWarnings: canonicalResp.CompatibilityWarnings,
@@ -639,6 +649,10 @@ func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	providerResp := failover.Response
+	if providerResp.StreamBody != nil {
+		s.writeConversationStreamPassthrough(w, r, authed, canonical, result, providerResp, admission, model.ID, startedAt)
+		return
+	}
 	usage := gatewayUsageFromProvider(providerResp)
 	canonicalResp := s.runtime.gateway.BuildCanonicalConversationResponse(canonical, gatewayContentBlocksFromProvider(providerResp.Parts), gatewayStopReasonFromProvider(providerResp.StopReason), usage, providerResp.Warnings, providerResp.Raw, gatewayStreamEventsFromProvider(providerResp.StreamEvents))
 	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequest(model.ID, result.Candidate, canonicalResp.Usage), canonicalResp.Usage.Estimated)
@@ -659,6 +673,7 @@ func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
 		InputTokens:           canonicalResp.Usage.InputTokens,
 		OutputTokens:          canonicalResp.Usage.OutputTokens,
 		CachedTokens:          canonicalResp.Usage.CachedTokens,
+		CacheCreationTokens:   canonicalResp.Usage.CacheCreationTokens,
 		UsageEstimated:        canonicalResp.Usage.Estimated,
 		Pricing:               pricing,
 		CompatibilityWarnings: canonicalResp.CompatibilityWarnings,
@@ -830,6 +845,7 @@ func (s *Server) handleCreateEmbedding(w http.ResponseWriter, r *http.Request) {
 		InputTokens:           canonicalResp.Usage.InputTokens,
 		OutputTokens:          canonicalResp.Usage.OutputTokens,
 		CachedTokens:          canonicalResp.Usage.CachedTokens,
+		CacheCreationTokens:   canonicalResp.Usage.CacheCreationTokens,
 		UsageEstimated:        canonicalResp.Usage.Estimated,
 		Pricing:               pricing,
 		CompatibilityWarnings: canonicalResp.CompatibilityWarnings,
@@ -961,6 +977,10 @@ func (s *Server) handleGeminiModelAction(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	providerResp := failover.Response
+	if providerResp.StreamBody != nil {
+		s.writeConversationStreamPassthrough(w, r, authed, canonical, result, providerResp, admission, model.ID, startedAt)
+		return
+	}
 	usage := gatewayUsageFromProvider(providerResp)
 	canonicalResp := s.runtime.gateway.BuildCanonicalConversationResponse(canonical, gatewayContentBlocksFromProvider(providerResp.Parts), gatewayStopReasonFromProvider(providerResp.StopReason), usage, providerResp.Warnings, providerResp.Raw, gatewayStreamEventsFromProvider(providerResp.StreamEvents))
 	pricing := s.runtime.gatewayPricing(r.Context(), gatewayPricingRequest(model.ID, result.Candidate, canonicalResp.Usage), canonicalResp.Usage.Estimated)
@@ -981,6 +1001,7 @@ func (s *Server) handleGeminiModelAction(w http.ResponseWriter, r *http.Request)
 		InputTokens:           canonicalResp.Usage.InputTokens,
 		OutputTokens:          canonicalResp.Usage.OutputTokens,
 		CachedTokens:          canonicalResp.Usage.CachedTokens,
+		CacheCreationTokens:   canonicalResp.Usage.CacheCreationTokens,
 		UsageEstimated:        canonicalResp.Usage.Estimated,
 		Pricing:               pricing,
 		CompatibilityWarnings: canonicalResp.CompatibilityWarnings,

@@ -3,9 +3,12 @@ import type {
   CreateAdminSubscriptionPlanData,
   CreateAdminUserSubscriptionData,
   Id,
+  SubscriptionPlan,
   SubscriptionPlanStatus,
   UserSubscriptionStatus,
 } from "../../../../packages/sdk/typescript/src/types.gen";
+
+export type CostQuotaMode = "hard_cap" | "allowance";
 
 export interface SubscriptionPlanFormState {
   name: string;
@@ -13,7 +16,17 @@ export interface SubscriptionPlanFormState {
   price: string;
   currency: string;
   validityDays: string;
-  entitlementsJson: string;
+  // Structured entitlements — composed into the `entitlements` JSON on submit so
+  // an admin never has to know the exact backend keys.
+  allowedModels: string[];
+  monthlyTokenQuota: string;
+  monthlyCostQuota: string;
+  costQuotaMode: CostQuotaMode;
+  schedulerStrategy: string;
+  accountGroupScope: string[];
+  // Escape hatch for custom / future entitlement keys the structured fields
+  // don't cover (kept under "Advanced" so capability is never lost).
+  extraEntitlements: Record<string, unknown>;
   forSale: boolean;
   sortOrder: string;
   status: SubscriptionPlanStatus;
@@ -54,6 +67,29 @@ export const SUBSCRIPTION_PLAN_STATUSES: SubscriptionPlanStatus[] = [
   "archived",
 ];
 
+export const COST_QUOTA_MODES: CostQuotaMode[] = ["hard_cap", "allowance"];
+
+// "default" leaves scheduler_strategy unset (gateway default). The rest mirror the
+// Go scheduler registry (apps/api/.../scheduling).
+export const SCHEDULER_STRATEGIES = [
+  "default",
+  "balanced",
+  "cost_saver",
+  "priority",
+  "priority_weight",
+] as const;
+
+// Entitlement keys the structured fields own; everything else round-trips through
+// `extraEntitlements` so custom/future keys survive an edit.
+const KNOWN_ENTITLEMENT_KEYS = [
+  "allowed_models",
+  "monthly_token_quota",
+  "monthly_cost_quota",
+  "cost_quota_mode",
+  "account_group_scope",
+  "scheduler_strategy",
+];
+
 export const USER_SUBSCRIPTION_STATUSES: UserSubscriptionStatus[] = [
   "active",
   "expired",
@@ -68,10 +104,48 @@ export function emptySubscriptionPlanForm(): SubscriptionPlanFormState {
     price: "0",
     currency: "USD",
     validityDays: "30",
-    entitlementsJson: "{}",
+    allowedModels: [],
+    monthlyTokenQuota: "",
+    monthlyCostQuota: "",
+    costQuotaMode: "hard_cap",
+    schedulerStrategy: "default",
+    accountGroupScope: [],
+    extraEntitlements: {},
     forSale: true,
     sortOrder: "0",
     status: "active",
+  };
+}
+
+// Split a stored plan's entitlements JSON back into the structured form fields,
+// dropping known keys into their fields and the remainder into extraEntitlements.
+export function subscriptionPlanFormFromPlan(plan: SubscriptionPlan): SubscriptionPlanFormState {
+  const ent = (plan.entitlements ?? {}) as Record<string, unknown>;
+  const extra: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(ent)) {
+    if (!KNOWN_ENTITLEMENT_KEYS.includes(key)) {
+      extra[key] = value;
+    }
+  }
+  return {
+    name: plan.name,
+    description: plan.description ?? "",
+    price: plan.price,
+    currency: plan.currency,
+    validityDays: String(plan.validity_days),
+    allowedModels: toStringArray(ent.allowed_models),
+    monthlyTokenQuota: ent.monthly_token_quota == null ? "" : String(ent.monthly_token_quota),
+    monthlyCostQuota: ent.monthly_cost_quota == null ? "" : String(ent.monthly_cost_quota),
+    costQuotaMode: ent.cost_quota_mode === "allowance" ? "allowance" : "hard_cap",
+    schedulerStrategy:
+      typeof ent.scheduler_strategy === "string" && ent.scheduler_strategy
+        ? ent.scheduler_strategy
+        : "default",
+    accountGroupScope: toStringArray(ent.account_group_scope),
+    extraEntitlements: extra,
+    forSale: plan.for_sale,
+    sortOrder: String(plan.sort_order),
+    status: plan.status,
   };
 }
 
@@ -101,7 +175,9 @@ export function emptyPricingRuleForm(modelId = "", providerId = ""): PricingRule
   };
 }
 
-export function buildCreateSubscriptionPlanBody(
+// Builds the full plan body (used for both create and update — the PATCH endpoint
+// accepts the same shape with every field optional).
+export function buildSubscriptionPlanBody(
   form: SubscriptionPlanFormState,
 ): CreateAdminSubscriptionPlanData["body"] {
   return {
@@ -110,11 +186,44 @@ export function buildCreateSubscriptionPlanBody(
     price: parseDecimalString(form.price, "Price"),
     currency: requiredText(form.currency, "Currency").toUpperCase(),
     validity_days: parsePositiveInteger(form.validityDays, "Validity days"),
-    entitlements: parseJsonObject(form.entitlementsJson, "Entitlements"),
+    entitlements: composeEntitlements(form),
     for_sale: form.forSale,
     sort_order: parseInteger(form.sortOrder, "Sort order"),
     status: form.status,
   };
+}
+
+// Compose the structured fields back into the backend entitlements JSON. Unset
+// fields are omitted (0 / blank quota = unlimited), and extraEntitlements is the
+// base so structured keys take precedence over any custom key of the same name.
+function composeEntitlements(form: SubscriptionPlanFormState): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...form.extraEntitlements };
+  if (form.allowedModels.length > 0) {
+    out.allowed_models = form.allowedModels;
+  }
+  const tokenQuota = optionalPositiveInt(form.monthlyTokenQuota, "Monthly token quota");
+  if (tokenQuota != null) {
+    out.monthly_token_quota = tokenQuota;
+  }
+  const costQuota = optionalDecimal(form.monthlyCostQuota, "Monthly cost quota");
+  if (costQuota != null) {
+    out.monthly_cost_quota = costQuota;
+    // cost_quota_mode only matters when a cost quota is set.
+    out.cost_quota_mode = form.costQuotaMode;
+  }
+  if (form.accountGroupScope.length > 0) {
+    out.account_group_scope = form.accountGroupScope.map((id) => {
+      const parsed = Number(id);
+      if (!Number.isInteger(parsed)) {
+        throw new Error("Account group scope must be integer ids.");
+      }
+      return parsed;
+    });
+  }
+  if (form.schedulerStrategy && form.schedulerStrategy !== "default") {
+    out.scheduler_strategy = form.schedulerStrategy;
+  }
+  return out;
 }
 
 export function buildCreateUserSubscriptionBody(
@@ -187,19 +296,6 @@ export function canConfirmPricingRuleCreate(
   return Boolean(state && state.confirmation.trim() === state.phrase);
 }
 
-function parseJsonObject(value: string, fieldName: string): Record<string, unknown> {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(value || "{}") as unknown;
-  } catch {
-    throw new Error(`${fieldName} must be valid JSON.`);
-  }
-  if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
-    throw new Error(`${fieldName} must be a JSON object.`);
-  }
-  return parsed as Record<string, unknown>;
-}
-
 function parseDecimalString(value: string, fieldName: string): string {
   const normalized = requiredText(value, fieldName);
   if (!/^[0-9]+(\.[0-9]+)?$/.test(normalized)) {
@@ -222,6 +318,34 @@ function parseInteger(value: string, fieldName: string): number {
     throw new Error(`${fieldName} must be an integer.`);
   }
   return parsed;
+}
+
+function toStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.map((entry) => String(entry)) : [];
+}
+
+// Blank or "0" means "unlimited" → omit the entitlement entirely.
+function optionalPositiveInt(value: string, fieldName: string): number | null {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed === "0") {
+    return null;
+  }
+  const parsed = Number(trimmed);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new Error(`${fieldName} must be a non-negative integer.`);
+  }
+  return parsed;
+}
+
+function optionalDecimal(value: string, fieldName: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed === "0") {
+    return null;
+  }
+  if (!/^[0-9]+(\.[0-9]+)?$/.test(trimmed)) {
+    throw new Error(`${fieldName} must be a non-negative decimal string.`);
+  }
+  return trimmed;
 }
 
 function localDateTimeToIso(value: string, fieldName: string): string | null {

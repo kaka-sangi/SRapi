@@ -38,13 +38,17 @@ apps/web/
 │  │  ├─ loading.tsx            # 路由级 Suspense fallback
 │  │  ├─ global-error.tsx       # 应用级硬错误兜底
 │  │  ├─ globals.css            # @theme 设计令牌 + paper-grain + tactile-card
-│  │  ├─ admin/page.tsx         # 管理后台
-│  │  ├─ admin/ops/strategy/page.tsx # Scheduler 策略 replay 对比页
-│  │  ├─ dashboard/page.tsx     # 工作台
-│  │  ├─ api-keys/page.tsx
-│  │  ├─ usage/page.tsx
-│  │  ├─ provider-accounts/page.tsx
-│  │  ├─ scheduler-decisions/page.tsx
+│  │  ├─ dashboard/ api-keys/ usage/                # 用户工作区
+│  │  ├─ account/ billing/ redeem/ affiliate/        # 用户自助
+│  │  ├─ provider-accounts/ scheduler-decisions/     # 网关只读视图
+│  │  ├─ admin/                                      # 管理后台（按域分组导航）
+│  │  │  ├─ dashboard/ users/ usage/                       # 概览
+│  │  │  ├─ providers/ models/ accounts/ groups/ proxies/  # 网关资源
+│  │  │  ├─ subscriptions/ orders(/plans) channels/pricing/
+│  │  │  │  payment-providers/ promo-codes/ redeem/        # 商业化
+│  │  │  ├─ affiliates/{invites,rebates,transfers}/        # 推广联盟
+│  │  │  ├─ ops(/strategy) risk-control/ announcements/    # 运营
+│  │  │  └─ settings/                                      # 系统
 │  │  └─ srapi-health/route.ts  # 健康代理
 │  │
 │  ├─ proxy.ts                  # Next 16 边缘 proxy（替代旧 middleware.ts）
@@ -55,16 +59,24 @@ apps/web/
 │  │  └─ theme-provider.tsx     # next-themes 包装
 │  │
 │  ├─ components/
-│  │  ├─ ui/                    # 设计系统原语（Button / Card / Badge / Dialog ...）
-│  │  ├─ admin/                 # AdminShell / admin primitives / resource pages / strategy replay page
-│  │  ├─ layout/                # AppShell / TopNav / SmokeDrawer / AuthGate ...
-│  │  └─ DashboardLayout.tsx    # 兼容 shim，转发到 AppShell
+│  │  ├─ ui/                    # 设计系统原语（Button / Card / Dialog / Table / Sheet / Tabs ...）
+│  │  ├─ admin/                 # AdminListView / ResourceFormDialog / ConfirmDialog /
+│  │  │                         #   AccountFormDialog / BindProxyDialog / RowActionsMenu / ListToolbar
+│  │  ├─ layout/                # AppShell / AdminShell / SidebarNav(+nav-items) /
+│  │  │                         #   TopNav / PageHeader / PageQueryState / AuthGate
+│  │  ├─ features/              # GatewayOverview / ApiKeyCreateDialog
+│  │  ├─ charts/                # Sparkline / BarSeries
+│  │  └─ auth/ visual/
 │  │
 │  ├─ hooks/
-│  │  └─ queries.ts             # useApiKeys / useUsageLogs / useCreateApiKey ...
+│  │  ├─ queries.ts             # 用户侧（apiService / meApi）数据 + mutation hooks
+│  │  ├─ admin-queries.ts       # 管理侧（adminApi）数据 + mutation hooks
+│  │  ├─ use-admin-list.ts      # 列表 search/filter/sort/分页/多选 状态
+│  │  └─ use-debounced-value.ts
 │  │
 │  ├─ context/
-│  │  └─ LanguageContext.tsx    # i18n hook，基于 useSyncExternalStore
+│  │  ├─ LanguageContext.tsx    # i18n hook，基于 useSyncExternalStore
+│  │  └─ ToastContext.tsx       # 全局 toast
 │  │
 │  ├─ i18n/messages/
 │  │  ├─ index.ts               # flatLookup + applyVariables
@@ -72,9 +84,12 @@ apps/web/
 │  │  └─ zh.ts
 │  │
 │  └─ lib/
-│     ├─ api.ts                 # apiService 门面：只走真实 SDK/API
+│     ├─ api.ts / me-api.ts / admin-api.ts  # apiService / meApi / adminApi 门面：只走生成 SDK
+│     ├─ admin-*-form.ts        # 各 admin 资源的表单构造/校验（zod 风格纯函数）
 │     ├─ cn.ts                  # tailwind-merge + clsx
 │     ├─ query-keys.ts          # 集中式 query 键
+│     ├─ routes.ts              # ADMIN_ROUTES / USER_ROUTES 路径常量
+│     ├─ status-badge.ts / admin-format.ts  # 状态色映射 / 金额·日期格式化
 │     ├─ schemas/               # zod schemas（client + 未来 Server Action 共用）
 │     │   └─ api-key.ts         # createApiKeySchema + parseGroupIdsCsv
 │     ├─ session-cookie.ts      # 给 proxy.ts 使用的非凭据存在标记
@@ -108,7 +123,9 @@ proxy.ts (edge)        ──> 守卫 /admin、/dashboard 等受保护路由
 AuthGate (client)      ──> 兜底守卫 + 注入 user / runtimeStatus 到子组件
 ```
 
-- 所有页面通过 `@/hooks/queries` 拿数据，hooks 内部调 `apiService.*`，apiService 内部走 `packages/sdk`。**禁止**在页面里手写 `useEffect+fetch` 或 `useState+setLoading`。
+- 所有页面通过 hooks 拿数据：用户侧用 `@/hooks/queries`（内部调 `apiService` / `meApi`），管理侧用 `@/hooks/admin-queries`（内部调 `adminApi`）；三个门面（`lib/api.ts` / `lib/me-api.ts` / `lib/admin-api.ts`）内部都走生成的 `packages/sdk`。**禁止**在页面里手写 `useEffect+fetch` 或 `useState+setLoading`。
+- 管理列表统一走 `useAdminList`（search/filter/sort/分页/多选状态）+ `AdminListView`（渲染表格/工具栏/分页/批量条 + loading/empty/error）+ `PageQueryState`（loading/error/空态包装）；写操作走 `ResourceFormDialog` / `ConfirmDialog`，成功后由 `admin-queries` 的 mutation 统一失效 `["admin", <resource>]` 前缀。
+- 管理后台侧边导航在 `components/layout/nav-items.ts` 按域分组（概览/网关资源/商业化/推广联盟/运营/系统），**每个 admin 路由都必须在此登记**，避免出现只能靠 URL 访问的孤儿页。
 - 前端主体不提供演示业务数据回退；后端不可用或接口失败时显示明确错误态/空态。
 - 凭据从未进入前端：`packages/sdk` 用浏览器 cookie + CSRF，`session-cookie.ts` 只写一个非敏感的 "presence" 标记给 proxy 用。
 - AuthGate 的当前用户由 `useSyncExternalStore(localStorage)` 派生；缓存由 raw JSON 字符串校验，避免 React error #185。同 tab 内 `apiService.login/logout` 触发 `srapi:user-change` 事件即时刷新。
@@ -171,13 +188,14 @@ AuthGate (client)      ──> 兜底守卫 + 注入 user / runtimeStatus 到子
 
 ## 9. 国际化
 
-- 字典分文件：`src/i18n/messages/{en,zh}.ts`，每个文件按命名空间组织（`common/login/admin/apiKeys/usage/providers/scheduler/smoke/workspace`）。
+- 字典分文件：`src/i18n/messages/{en,zh}.ts`，按命名空间组织：`common` / `adminCommon` / `feedback` / `nav` / `login` / `dashboard` / `apiKeys` / `usage` / `providers` / `scheduler` / `account` / `billing` / `redeem` / `affiliate`，以及管理域 `adminUsers` / `adminAccounts` / `adminGroups` / `adminProviders` / `adminModels` / `adminProxies` / `adminSubscriptions` / `adminOrders` / `adminPromos` / `adminAffiliates` / `adminAnnouncements` / `adminOps` / `adminRisk` / `adminUsage` / `adminSettings` / `adminPayments` / `adminPricing`。
 - `LanguageContext` 通过 `useSyncExternalStore(localStorage + custom event)` 跨组件实时同步语言切换。
 - 添加新文案：先改 `en.ts`，再改 `zh.ts`，再在页面里 `t('newKey')`。`tests/unit/messages.test.ts` 会断言两边 key 完全对齐。
 
 ## 10. 演进路线
 
 - **WP-160a**（已完成）：P0–P3 + 前端 harness，组件库、TanStack Query 全量接入、AuthGate 修复 React #185、6 页全部走 hooks、API key 表单走 react-hook-form + zod、bundle 预算守门。98 单测 + 5 e2e 通过。
+- **WP-1310**（业务面补全，进行中）：在 `apps/web` 重写之上，把后端已具备但 UI 未暴露/未正确操作的能力补齐。slice 1 已落地：修复账号启停反向（P0）；admin 侧边栏改为分组导航使全部页面可达；账号域死能力接线（清错/恢复/发现模型/绑代理/导出 + allSettled 批量）；admin 仪表盘改用 `useAdminDashboard` 快照；新增支付渠道页；兑换码统计 + 安全批量停用；用量维度聚合；ops 告警/SLO 健康修正；API Key/订单取消反馈；错误/404 页 i18n；`PageQueryState` disabled query 修正。详见 `specs/STATUS.md` 的 WP-1310 条目与待办（SLO 增改 UI、模型分页、退款上限、策略回放字段、定价批量导入、账号详情抽屉、分组成员管理[受后端缺 list-members 端点阻塞]、状态徽章 i18n、浏览器验证）。
 - **WP-160b**：把 `LanguageContext` 替换成 `next-intl`，启用 ICU plural、按路由代码分割。
 - **WP-160c**：把 admin 总览、用量页改成 RSC + Server Action（form action 用现成的 `@/lib/schemas/api-key.ts` 直接复用）。
 - **WP-160d**：Storybook + Chromatic 视觉回归（如果团队真的需要设计评审产物）。

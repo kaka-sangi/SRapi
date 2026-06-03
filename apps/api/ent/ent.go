@@ -66,6 +66,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/userattributedefinition"
 	"github.com/srapi/srapi/apps/api/ent/userattributevalue"
 	"github.com/srapi/srapi/apps/api/ent/userauthidentity"
+	"github.com/srapi/srapi/apps/api/ent/userplatformquota"
 	"github.com/srapi/srapi/apps/api/ent/userpromocodeapplication"
 	"github.com/srapi/srapi/apps/api/ent/userredeemcoderedemption"
 	"github.com/srapi/srapi/apps/api/ent/userrole"
@@ -186,6 +187,7 @@ func checkColumn(t, c string) error {
 			userattributedefinition.Table:   userattributedefinition.ValidColumn,
 			userattributevalue.Table:        userattributevalue.ValidColumn,
 			userauthidentity.Table:          userauthidentity.ValidColumn,
+			userplatformquota.Table:         userplatformquota.ValidColumn,
 			userpromocodeapplication.Table:  userpromocodeapplication.ValidColumn,
 			userredeemcoderedemption.Table:  userredeemcoderedemption.ValidColumn,
 			userrole.Table:                  userrole.ValidColumn,

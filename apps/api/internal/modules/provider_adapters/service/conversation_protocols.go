@@ -1864,15 +1864,20 @@ type anthropicUsage struct {
 func (u anthropicUsage) ToUsage(text string) contract.Usage {
 	input := valueOrZero(u.InputTokens)
 	output := valueOrZero(u.OutputTokens)
-	cached := valueOrZero(u.CacheCreationInputTokens) + valueOrZero(u.CacheReadInputTokens)
-	if input == 0 && output == 0 && cached == 0 {
+	// Anthropic reports input_tokens EXCLUDING cache tokens, and cache
+	// creation (write) vs read separately. Keep them distinct so they bill at
+	// their (different) rates: writes cost more than input, reads less.
+	cacheRead := valueOrZero(u.CacheReadInputTokens)
+	cacheCreation := valueOrZero(u.CacheCreationInputTokens)
+	if input == 0 && output == 0 && cacheRead == 0 && cacheCreation == 0 {
 		return estimatedUsage(text)
 	}
 	return contract.Usage{
-		InputTokens:  input,
-		OutputTokens: output,
-		CachedTokens: cached,
-		Estimated:    false,
+		InputTokens:         input,
+		OutputTokens:        output,
+		CachedTokens:        cacheRead,
+		CacheCreationTokens: cacheCreation,
+		Estimated:           false,
 	}
 }
 

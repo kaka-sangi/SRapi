@@ -276,6 +276,123 @@ func (_u *APIKeyUpdate) ClearConcurrencyLimit() *APIKeyUpdate {
 	return _u
 }
 
+// SetRequestLimit5h sets the "request_limit_5h" field.
+func (_u *APIKeyUpdate) SetRequestLimit5h(v int) *APIKeyUpdate {
+	_u.mutation.ResetRequestLimit5h()
+	_u.mutation.SetRequestLimit5h(v)
+	return _u
+}
+
+// SetNillableRequestLimit5h sets the "request_limit_5h" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableRequestLimit5h(v *int) *APIKeyUpdate {
+	if v != nil {
+		_u.SetRequestLimit5h(*v)
+	}
+	return _u
+}
+
+// AddRequestLimit5h adds value to the "request_limit_5h" field.
+func (_u *APIKeyUpdate) AddRequestLimit5h(v int) *APIKeyUpdate {
+	_u.mutation.AddRequestLimit5h(v)
+	return _u
+}
+
+// ClearRequestLimit5h clears the value of the "request_limit_5h" field.
+func (_u *APIKeyUpdate) ClearRequestLimit5h() *APIKeyUpdate {
+	_u.mutation.ClearRequestLimit5h()
+	return _u
+}
+
+// SetRequestLimit1d sets the "request_limit_1d" field.
+func (_u *APIKeyUpdate) SetRequestLimit1d(v int) *APIKeyUpdate {
+	_u.mutation.ResetRequestLimit1d()
+	_u.mutation.SetRequestLimit1d(v)
+	return _u
+}
+
+// SetNillableRequestLimit1d sets the "request_limit_1d" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableRequestLimit1d(v *int) *APIKeyUpdate {
+	if v != nil {
+		_u.SetRequestLimit1d(*v)
+	}
+	return _u
+}
+
+// AddRequestLimit1d adds value to the "request_limit_1d" field.
+func (_u *APIKeyUpdate) AddRequestLimit1d(v int) *APIKeyUpdate {
+	_u.mutation.AddRequestLimit1d(v)
+	return _u
+}
+
+// ClearRequestLimit1d clears the value of the "request_limit_1d" field.
+func (_u *APIKeyUpdate) ClearRequestLimit1d() *APIKeyUpdate {
+	_u.mutation.ClearRequestLimit1d()
+	return _u
+}
+
+// SetRequestLimit7d sets the "request_limit_7d" field.
+func (_u *APIKeyUpdate) SetRequestLimit7d(v int) *APIKeyUpdate {
+	_u.mutation.ResetRequestLimit7d()
+	_u.mutation.SetRequestLimit7d(v)
+	return _u
+}
+
+// SetNillableRequestLimit7d sets the "request_limit_7d" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableRequestLimit7d(v *int) *APIKeyUpdate {
+	if v != nil {
+		_u.SetRequestLimit7d(*v)
+	}
+	return _u
+}
+
+// AddRequestLimit7d adds value to the "request_limit_7d" field.
+func (_u *APIKeyUpdate) AddRequestLimit7d(v int) *APIKeyUpdate {
+	_u.mutation.AddRequestLimit7d(v)
+	return _u
+}
+
+// ClearRequestLimit7d clears the value of the "request_limit_7d" field.
+func (_u *APIKeyUpdate) ClearRequestLimit7d() *APIKeyUpdate {
+	_u.mutation.ClearRequestLimit7d()
+	return _u
+}
+
+// SetAllowedIpsJSON sets the "allowed_ips_json" field.
+func (_u *APIKeyUpdate) SetAllowedIpsJSON(v []string) *APIKeyUpdate {
+	_u.mutation.SetAllowedIpsJSON(v)
+	return _u
+}
+
+// AppendAllowedIpsJSON appends value to the "allowed_ips_json" field.
+func (_u *APIKeyUpdate) AppendAllowedIpsJSON(v []string) *APIKeyUpdate {
+	_u.mutation.AppendAllowedIpsJSON(v)
+	return _u
+}
+
+// ClearAllowedIpsJSON clears the value of the "allowed_ips_json" field.
+func (_u *APIKeyUpdate) ClearAllowedIpsJSON() *APIKeyUpdate {
+	_u.mutation.ClearAllowedIpsJSON()
+	return _u
+}
+
+// SetDeniedIpsJSON sets the "denied_ips_json" field.
+func (_u *APIKeyUpdate) SetDeniedIpsJSON(v []string) *APIKeyUpdate {
+	_u.mutation.SetDeniedIpsJSON(v)
+	return _u
+}
+
+// AppendDeniedIpsJSON appends value to the "denied_ips_json" field.
+func (_u *APIKeyUpdate) AppendDeniedIpsJSON(v []string) *APIKeyUpdate {
+	_u.mutation.AppendDeniedIpsJSON(v)
+	return _u
+}
+
+// ClearDeniedIpsJSON clears the value of the "denied_ips_json" field.
+func (_u *APIKeyUpdate) ClearDeniedIpsJSON() *APIKeyUpdate {
+	_u.mutation.ClearDeniedIpsJSON()
+	return _u
+}
+
 // SetExpiresAt sets the "expires_at" field.
 func (_u *APIKeyUpdate) SetExpiresAt(v time.Time) *APIKeyUpdate {
 	_u.mutation.SetExpiresAt(v)
@@ -468,6 +585,55 @@ func (_u *APIKeyUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.ConcurrencyLimitCleared() {
 		_spec.ClearField(apikey.FieldConcurrencyLimit, field.TypeInt)
+	}
+	if value, ok := _u.mutation.RequestLimit5h(); ok {
+		_spec.SetField(apikey.FieldRequestLimit5h, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedRequestLimit5h(); ok {
+		_spec.AddField(apikey.FieldRequestLimit5h, field.TypeInt, value)
+	}
+	if _u.mutation.RequestLimit5hCleared() {
+		_spec.ClearField(apikey.FieldRequestLimit5h, field.TypeInt)
+	}
+	if value, ok := _u.mutation.RequestLimit1d(); ok {
+		_spec.SetField(apikey.FieldRequestLimit1d, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedRequestLimit1d(); ok {
+		_spec.AddField(apikey.FieldRequestLimit1d, field.TypeInt, value)
+	}
+	if _u.mutation.RequestLimit1dCleared() {
+		_spec.ClearField(apikey.FieldRequestLimit1d, field.TypeInt)
+	}
+	if value, ok := _u.mutation.RequestLimit7d(); ok {
+		_spec.SetField(apikey.FieldRequestLimit7d, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedRequestLimit7d(); ok {
+		_spec.AddField(apikey.FieldRequestLimit7d, field.TypeInt, value)
+	}
+	if _u.mutation.RequestLimit7dCleared() {
+		_spec.ClearField(apikey.FieldRequestLimit7d, field.TypeInt)
+	}
+	if value, ok := _u.mutation.AllowedIpsJSON(); ok {
+		_spec.SetField(apikey.FieldAllowedIpsJSON, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedAllowedIpsJSON(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, apikey.FieldAllowedIpsJSON, value)
+		})
+	}
+	if _u.mutation.AllowedIpsJSONCleared() {
+		_spec.ClearField(apikey.FieldAllowedIpsJSON, field.TypeJSON)
+	}
+	if value, ok := _u.mutation.DeniedIpsJSON(); ok {
+		_spec.SetField(apikey.FieldDeniedIpsJSON, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedDeniedIpsJSON(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, apikey.FieldDeniedIpsJSON, value)
+		})
+	}
+	if _u.mutation.DeniedIpsJSONCleared() {
+		_spec.ClearField(apikey.FieldDeniedIpsJSON, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.ExpiresAt(); ok {
 		_spec.SetField(apikey.FieldExpiresAt, field.TypeTime, value)
@@ -748,6 +914,123 @@ func (_u *APIKeyUpdateOne) ClearConcurrencyLimit() *APIKeyUpdateOne {
 	return _u
 }
 
+// SetRequestLimit5h sets the "request_limit_5h" field.
+func (_u *APIKeyUpdateOne) SetRequestLimit5h(v int) *APIKeyUpdateOne {
+	_u.mutation.ResetRequestLimit5h()
+	_u.mutation.SetRequestLimit5h(v)
+	return _u
+}
+
+// SetNillableRequestLimit5h sets the "request_limit_5h" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableRequestLimit5h(v *int) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetRequestLimit5h(*v)
+	}
+	return _u
+}
+
+// AddRequestLimit5h adds value to the "request_limit_5h" field.
+func (_u *APIKeyUpdateOne) AddRequestLimit5h(v int) *APIKeyUpdateOne {
+	_u.mutation.AddRequestLimit5h(v)
+	return _u
+}
+
+// ClearRequestLimit5h clears the value of the "request_limit_5h" field.
+func (_u *APIKeyUpdateOne) ClearRequestLimit5h() *APIKeyUpdateOne {
+	_u.mutation.ClearRequestLimit5h()
+	return _u
+}
+
+// SetRequestLimit1d sets the "request_limit_1d" field.
+func (_u *APIKeyUpdateOne) SetRequestLimit1d(v int) *APIKeyUpdateOne {
+	_u.mutation.ResetRequestLimit1d()
+	_u.mutation.SetRequestLimit1d(v)
+	return _u
+}
+
+// SetNillableRequestLimit1d sets the "request_limit_1d" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableRequestLimit1d(v *int) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetRequestLimit1d(*v)
+	}
+	return _u
+}
+
+// AddRequestLimit1d adds value to the "request_limit_1d" field.
+func (_u *APIKeyUpdateOne) AddRequestLimit1d(v int) *APIKeyUpdateOne {
+	_u.mutation.AddRequestLimit1d(v)
+	return _u
+}
+
+// ClearRequestLimit1d clears the value of the "request_limit_1d" field.
+func (_u *APIKeyUpdateOne) ClearRequestLimit1d() *APIKeyUpdateOne {
+	_u.mutation.ClearRequestLimit1d()
+	return _u
+}
+
+// SetRequestLimit7d sets the "request_limit_7d" field.
+func (_u *APIKeyUpdateOne) SetRequestLimit7d(v int) *APIKeyUpdateOne {
+	_u.mutation.ResetRequestLimit7d()
+	_u.mutation.SetRequestLimit7d(v)
+	return _u
+}
+
+// SetNillableRequestLimit7d sets the "request_limit_7d" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableRequestLimit7d(v *int) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetRequestLimit7d(*v)
+	}
+	return _u
+}
+
+// AddRequestLimit7d adds value to the "request_limit_7d" field.
+func (_u *APIKeyUpdateOne) AddRequestLimit7d(v int) *APIKeyUpdateOne {
+	_u.mutation.AddRequestLimit7d(v)
+	return _u
+}
+
+// ClearRequestLimit7d clears the value of the "request_limit_7d" field.
+func (_u *APIKeyUpdateOne) ClearRequestLimit7d() *APIKeyUpdateOne {
+	_u.mutation.ClearRequestLimit7d()
+	return _u
+}
+
+// SetAllowedIpsJSON sets the "allowed_ips_json" field.
+func (_u *APIKeyUpdateOne) SetAllowedIpsJSON(v []string) *APIKeyUpdateOne {
+	_u.mutation.SetAllowedIpsJSON(v)
+	return _u
+}
+
+// AppendAllowedIpsJSON appends value to the "allowed_ips_json" field.
+func (_u *APIKeyUpdateOne) AppendAllowedIpsJSON(v []string) *APIKeyUpdateOne {
+	_u.mutation.AppendAllowedIpsJSON(v)
+	return _u
+}
+
+// ClearAllowedIpsJSON clears the value of the "allowed_ips_json" field.
+func (_u *APIKeyUpdateOne) ClearAllowedIpsJSON() *APIKeyUpdateOne {
+	_u.mutation.ClearAllowedIpsJSON()
+	return _u
+}
+
+// SetDeniedIpsJSON sets the "denied_ips_json" field.
+func (_u *APIKeyUpdateOne) SetDeniedIpsJSON(v []string) *APIKeyUpdateOne {
+	_u.mutation.SetDeniedIpsJSON(v)
+	return _u
+}
+
+// AppendDeniedIpsJSON appends value to the "denied_ips_json" field.
+func (_u *APIKeyUpdateOne) AppendDeniedIpsJSON(v []string) *APIKeyUpdateOne {
+	_u.mutation.AppendDeniedIpsJSON(v)
+	return _u
+}
+
+// ClearDeniedIpsJSON clears the value of the "denied_ips_json" field.
+func (_u *APIKeyUpdateOne) ClearDeniedIpsJSON() *APIKeyUpdateOne {
+	_u.mutation.ClearDeniedIpsJSON()
+	return _u
+}
+
 // SetExpiresAt sets the "expires_at" field.
 func (_u *APIKeyUpdateOne) SetExpiresAt(v time.Time) *APIKeyUpdateOne {
 	_u.mutation.SetExpiresAt(v)
@@ -970,6 +1253,55 @@ func (_u *APIKeyUpdateOne) sqlSave(ctx context.Context) (_node *APIKey, err erro
 	}
 	if _u.mutation.ConcurrencyLimitCleared() {
 		_spec.ClearField(apikey.FieldConcurrencyLimit, field.TypeInt)
+	}
+	if value, ok := _u.mutation.RequestLimit5h(); ok {
+		_spec.SetField(apikey.FieldRequestLimit5h, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedRequestLimit5h(); ok {
+		_spec.AddField(apikey.FieldRequestLimit5h, field.TypeInt, value)
+	}
+	if _u.mutation.RequestLimit5hCleared() {
+		_spec.ClearField(apikey.FieldRequestLimit5h, field.TypeInt)
+	}
+	if value, ok := _u.mutation.RequestLimit1d(); ok {
+		_spec.SetField(apikey.FieldRequestLimit1d, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedRequestLimit1d(); ok {
+		_spec.AddField(apikey.FieldRequestLimit1d, field.TypeInt, value)
+	}
+	if _u.mutation.RequestLimit1dCleared() {
+		_spec.ClearField(apikey.FieldRequestLimit1d, field.TypeInt)
+	}
+	if value, ok := _u.mutation.RequestLimit7d(); ok {
+		_spec.SetField(apikey.FieldRequestLimit7d, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedRequestLimit7d(); ok {
+		_spec.AddField(apikey.FieldRequestLimit7d, field.TypeInt, value)
+	}
+	if _u.mutation.RequestLimit7dCleared() {
+		_spec.ClearField(apikey.FieldRequestLimit7d, field.TypeInt)
+	}
+	if value, ok := _u.mutation.AllowedIpsJSON(); ok {
+		_spec.SetField(apikey.FieldAllowedIpsJSON, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedAllowedIpsJSON(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, apikey.FieldAllowedIpsJSON, value)
+		})
+	}
+	if _u.mutation.AllowedIpsJSONCleared() {
+		_spec.ClearField(apikey.FieldAllowedIpsJSON, field.TypeJSON)
+	}
+	if value, ok := _u.mutation.DeniedIpsJSON(); ok {
+		_spec.SetField(apikey.FieldDeniedIpsJSON, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedDeniedIpsJSON(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, apikey.FieldDeniedIpsJSON, value)
+		})
+	}
+	if _u.mutation.DeniedIpsJSONCleared() {
+		_spec.ClearField(apikey.FieldDeniedIpsJSON, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.ExpiresAt(); ok {
 		_spec.SetField(apikey.FieldExpiresAt, field.TypeTime, value)

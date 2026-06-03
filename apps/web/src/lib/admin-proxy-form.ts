@@ -15,7 +15,7 @@ export interface ProxyFormState {
   type: ProxyDefinitionType;
   url: string;
   status: ProxyDefinitionStatus;
-  metadata: string;
+  metadata: Record<string, unknown>;
 }
 
 export function emptyProxyForm(): ProxyFormState {
@@ -24,7 +24,7 @@ export function emptyProxyForm(): ProxyFormState {
     type: "http",
     url: "",
     status: "active",
-    metadata: "{}",
+    metadata: {},
   };
 }
 
@@ -34,7 +34,7 @@ export function proxyFormFromProxy(proxy: ProxyDefinition): ProxyFormState {
     type: proxy.type,
     url: "",
     status: proxy.status,
-    metadata: JSON.stringify(proxy.metadata ?? {}, null, 2),
+    metadata: (proxy.metadata ?? {}) as Record<string, unknown>,
   };
 }
 
@@ -44,7 +44,7 @@ export function buildCreateProxyBody(form: ProxyFormState): CreateAdminProxyData
     type: form.type,
     url: requiredText(form.url, "Proxy URL"),
     status: form.status,
-    metadata: parseJsonObject(form.metadata, "Metadata"),
+    metadata: form.metadata,
   };
 }
 
@@ -53,26 +53,13 @@ export function buildUpdateProxyBody(form: ProxyFormState): UpdateAdminProxyData
     name: requiredText(form.name, "Name"),
     type: form.type,
     status: form.status,
-    metadata: parseJsonObject(form.metadata, "Metadata"),
+    metadata: form.metadata,
   };
   const url = form.url.trim();
   if (url) {
     body.url = url;
   }
   return body;
-}
-
-function parseJsonObject(value: string, fieldName: string): Record<string, unknown> {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(value || "{}") as unknown;
-  } catch {
-    throw new Error(`${fieldName} must be valid JSON.`);
-  }
-  if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
-    throw new Error(`${fieldName} must be a JSON object.`);
-  }
-  return parsed as Record<string, unknown>;
 }
 
 function requiredText(value: string, fieldName: string): string {

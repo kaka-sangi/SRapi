@@ -46,8 +46,8 @@ export interface ProviderFormState {
   adapterType: ProviderAdapterType;
   protocol: ProviderProtocol;
   status: ResourceStatus;
-  capabilitiesJson: string;
-  configSchemaJson: string;
+  capabilities: Record<string, unknown>;
+  configSchema: Record<string, unknown>;
 }
 
 export function emptyProviderForm(): ProviderFormState {
@@ -57,8 +57,8 @@ export function emptyProviderForm(): ProviderFormState {
     adapterType: "openai-compatible",
     protocol: "openai-compatible",
     status: "disabled",
-    capabilitiesJson: "{}",
-    configSchemaJson: "{}",
+    capabilities: {},
+    configSchema: {},
   };
 }
 
@@ -69,8 +69,8 @@ export function providerFormFromProvider(provider: Provider): ProviderFormState 
     adapterType: provider.adapter_type,
     protocol: provider.protocol,
     status: provider.status,
-    capabilitiesJson: prettyJson(provider.capabilities ?? {}),
-    configSchemaJson: prettyJson(provider.config_schema ?? {}),
+    capabilities: (provider.capabilities ?? {}) as Record<string, unknown>,
+    configSchema: (provider.config_schema ?? {}) as Record<string, unknown>,
   };
 }
 
@@ -83,8 +83,8 @@ export function buildCreateProviderBody(
     adapter_type: form.adapterType,
     protocol: form.protocol,
     status: form.status,
-    capabilities: parseJsonObject(form.capabilitiesJson, "Capabilities"),
-    config_schema: parseJsonObject(form.configSchemaJson, "Config schema"),
+    capabilities: form.capabilities,
+    config_schema: form.configSchema,
   };
 }
 
@@ -96,8 +96,8 @@ export function buildUpdateProviderBody(
     adapter_type: form.adapterType,
     protocol: form.protocol,
     status: form.status,
-    capabilities: parseJsonObject(form.capabilitiesJson, "Capabilities"),
-    config_schema: parseJsonObject(form.configSchemaJson, "Config schema"),
+    capabilities: form.capabilities,
+    config_schema: form.configSchema,
   };
 }
 
@@ -107,23 +107,6 @@ function parseProviderName(value: string): string {
     throw new Error("Provider name must be 2-63 chars: lowercase letters, numbers, '_' or '-'.");
   }
   return normalized;
-}
-
-function parseJsonObject(value: string, fieldName: string): Record<string, unknown> {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(value || "{}") as unknown;
-  } catch {
-    throw new Error(`${fieldName} must be valid JSON.`);
-  }
-  if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
-    throw new Error(`${fieldName} must be a JSON object.`);
-  }
-  return parsed as Record<string, unknown>;
-}
-
-function prettyJson(value: unknown): string {
-  return JSON.stringify(value ?? {}, null, 2);
 }
 
 function requiredText(value: string, fieldName: string): string {

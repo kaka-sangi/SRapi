@@ -1,74 +1,70 @@
 "use client";
 
-import * as React from "react";
-import { usePathname } from "next/navigation";
-import { useLanguage } from "@/context/LanguageContext";
-import { useSpotlight } from "@/hooks/use-spotlight";
-import { AuthGate } from "./auth-gate";
+import { useState } from "react";
+import { AuthGate, useAuthUser } from "./auth-gate";
+import { SidebarNav, SidebarBrand } from "./sidebar-nav";
 import { TopNav } from "./top-nav";
-import { PageHeader } from "./page-header";
-
-interface AppShellProps {
-  children: React.ReactNode;
-  allowedRole?: "admin" | "user";
-}
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { useRuntimeStatus } from "@/hooks/queries";
 
 /**
- * SRapi v0.1.0 authenticated shell. Composes auth gate + chrome + page header
- * so each route only owns its content.
+ * Unified console shell: role-aware sidebar (static on desktop, drawer on
+ * mobile) + sticky top nav + content. Wrap every authenticated page.
  */
-export function AppShell({ children, allowedRole }: AppShellProps) {
-  const pathname = usePathname();
-  const { t } = useLanguage();
-  const meta = getRouteMeta(pathname, t);
-  const spotlightRef = useSpotlight<HTMLDivElement>();
-
+export function AppShell({
+  allowedRole,
+  children,
+}: {
+  allowedRole?: "admin" | "user";
+  children: React.ReactNode;
+}) {
   return (
-    <AuthGate allowedRole={allowedRole} loadingLabel={t("authenticating")}>
-      {({ user, runtimeStatus }) => (
-        <div
-          ref={spotlightRef}
-          className="spotlight paper-grain relative min-h-screen bg-srapi-bg pb-24 font-sans text-srapi-text-primary antialiased transition-colors duration-300"
-        >
-          <TopNav user={user} runtimeStatus={runtimeStatus} />
-          <main className="relative z-10 mx-auto mt-12 max-w-6xl px-6 md:mt-16 md:px-8">
-            <PageHeader
-              category={meta.category}
-              title={meta.title}
-              description={meta.desc}
-              user={{ name: user.name, balance: user.balance }}
-              showSmoke={user.role === "admin"}
-            />
-            <div className="animate-bloom delay-200">{children}</div>
-          </main>
-        </div>
-      )}
+    <AuthGate allowedRole={allowedRole}>
+      <ShellInner>{children}</ShellInner>
     </AuthGate>
   );
 }
 
-function getRouteMeta(
-  pathname: string,
-  t: (key: string, vars?: Record<string, string | number>) => string,
-): { category: string; title: string; desc: string } {
-  switch (pathname) {
-    case "/dashboard":
-      return { category: t("devCat"), title: t("devTitle"), desc: t("devDesc") };
-    case "/admin":
-      return { category: t("adminCat"), title: t("adminTitle"), desc: t("adminDesc") };
-    case "/api-keys":
-      return { category: t("apiCat"), title: t("apiTitle"), desc: t("apiDesc") };
-    case "/usage":
-      return { category: t("usageCat"), title: t("usageTitle"), desc: t("usageDesc") };
-    case "/provider-accounts":
-      return { category: t("provCat"), title: t("provTitle"), desc: t("provDesc") };
-    case "/scheduler-decisions":
-      return { category: t("schedCat"), title: t("schedTitle"), desc: t("schedDesc") };
-    default:
-      return {
-        category: "SRapi",
-        title: "SRapi console",
-        desc: "Self-hosted AI gateway with built-in scheduler, account management and audit logs.",
-      };
-  }
+function ShellInner({ children }: { children: React.ReactNode }) {
+  const user = useAuthUser();
+  const [navOpen, setNavOpen] = useState(false);
+  const runtime = useRuntimeStatus();
+  const live = runtime.data?.connected ?? false;
+
+  return (
+    <div className="mx-auto flex min-h-dvh w-full max-w-[1500px]">
+      {/* Desktop sidebar */}
+      <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-srapi-border bg-srapi-card-muted p-4 lg:flex">
+        <SidebarBrand />
+        <div className="mt-2 flex-1 overflow-y-auto">
+          <SidebarNav role={user.role} />
+        </div>
+        <div className="mt-auto flex items-center gap-2.5 border-t border-srapi-border px-2 pt-4">
+          <div className="grid size-8 place-items-center rounded-full bg-srapi-primary/15 font-serif text-srapi-primary">
+            {(user.name?.[0] ?? "U").toUpperCase()}
+          </div>
+          <div className="min-w-0 text-xs leading-tight">
+            <div className="truncate text-srapi-text-primary">{user.name}</div>
+            <div className="truncate font-mono text-2xs text-srapi-text-secondary">{user.email}</div>
+          </div>
+        </div>
+      </aside>
+
+      {/* Mobile drawer */}
+      <Sheet open={navOpen} onOpenChange={setNavOpen}>
+        <SheetContent side="left" className="p-4">
+          <SheetTitle className="sr-only">Navigation</SheetTitle>
+          <SidebarBrand />
+          <div className="mt-2 overflow-y-auto">
+            <SidebarNav role={user.role} onNavigate={() => setNavOpen(false)} />
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <TopNav user={user} onOpenNav={() => setNavOpen(true)} live={live} />
+        <main className="flex-1 space-y-7 p-5 sm:p-7">{children}</main>
+      </div>
+    </div>
+  );
 }

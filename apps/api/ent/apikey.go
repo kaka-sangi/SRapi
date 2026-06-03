@@ -46,6 +46,16 @@ type APIKey struct {
 	TpmLimit *int `json:"tpm_limit,omitempty"`
 	// ConcurrencyLimit holds the value of the "concurrency_limit" field.
 	ConcurrencyLimit *int `json:"concurrency_limit,omitempty"`
+	// RequestLimit5h holds the value of the "request_limit_5h" field.
+	RequestLimit5h *int `json:"request_limit_5h,omitempty"`
+	// RequestLimit1d holds the value of the "request_limit_1d" field.
+	RequestLimit1d *int `json:"request_limit_1d,omitempty"`
+	// RequestLimit7d holds the value of the "request_limit_7d" field.
+	RequestLimit7d *int `json:"request_limit_7d,omitempty"`
+	// AllowedIpsJSON holds the value of the "allowed_ips_json" field.
+	AllowedIpsJSON []string `json:"allowed_ips_json,omitempty"`
+	// DeniedIpsJSON holds the value of the "denied_ips_json" field.
+	DeniedIpsJSON []string `json:"denied_ips_json,omitempty"`
 	// ExpiresAt holds the value of the "expires_at" field.
 	ExpiresAt *time.Time `json:"expires_at,omitempty"`
 	// LastUsedAt holds the value of the "last_used_at" field.
@@ -58,9 +68,9 @@ func (*APIKey) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case apikey.FieldScopesJSON, apikey.FieldAllowedModelsJSON:
+		case apikey.FieldScopesJSON, apikey.FieldAllowedModelsJSON, apikey.FieldAllowedIpsJSON, apikey.FieldDeniedIpsJSON:
 			values[i] = new([]byte)
-		case apikey.FieldID, apikey.FieldUserID, apikey.FieldWorkspaceID, apikey.FieldRpmLimit, apikey.FieldTpmLimit, apikey.FieldConcurrencyLimit:
+		case apikey.FieldID, apikey.FieldUserID, apikey.FieldWorkspaceID, apikey.FieldRpmLimit, apikey.FieldTpmLimit, apikey.FieldConcurrencyLimit, apikey.FieldRequestLimit5h, apikey.FieldRequestLimit1d, apikey.FieldRequestLimit7d:
 			values[i] = new(sql.NullInt64)
 		case apikey.FieldName, apikey.FieldPrefix, apikey.FieldHash, apikey.FieldStatus:
 			values[i] = new(sql.NullString)
@@ -180,6 +190,43 @@ func (_m *APIKey) assignValues(columns []string, values []any) error {
 				_m.ConcurrencyLimit = new(int)
 				*_m.ConcurrencyLimit = int(value.Int64)
 			}
+		case apikey.FieldRequestLimit5h:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field request_limit_5h", values[i])
+			} else if value.Valid {
+				_m.RequestLimit5h = new(int)
+				*_m.RequestLimit5h = int(value.Int64)
+			}
+		case apikey.FieldRequestLimit1d:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field request_limit_1d", values[i])
+			} else if value.Valid {
+				_m.RequestLimit1d = new(int)
+				*_m.RequestLimit1d = int(value.Int64)
+			}
+		case apikey.FieldRequestLimit7d:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field request_limit_7d", values[i])
+			} else if value.Valid {
+				_m.RequestLimit7d = new(int)
+				*_m.RequestLimit7d = int(value.Int64)
+			}
+		case apikey.FieldAllowedIpsJSON:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field allowed_ips_json", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.AllowedIpsJSON); err != nil {
+					return fmt.Errorf("unmarshal field allowed_ips_json: %w", err)
+				}
+			}
+		case apikey.FieldDeniedIpsJSON:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field denied_ips_json", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.DeniedIpsJSON); err != nil {
+					return fmt.Errorf("unmarshal field denied_ips_json: %w", err)
+				}
+			}
 		case apikey.FieldExpiresAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field expires_at", values[i])
@@ -280,6 +327,27 @@ func (_m *APIKey) String() string {
 		builder.WriteString("concurrency_limit=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
+	builder.WriteString(", ")
+	if v := _m.RequestLimit5h; v != nil {
+		builder.WriteString("request_limit_5h=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.RequestLimit1d; v != nil {
+		builder.WriteString("request_limit_1d=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.RequestLimit7d; v != nil {
+		builder.WriteString("request_limit_7d=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	builder.WriteString("allowed_ips_json=")
+	builder.WriteString(fmt.Sprintf("%v", _m.AllowedIpsJSON))
+	builder.WriteString(", ")
+	builder.WriteString("denied_ips_json=")
+	builder.WriteString(fmt.Sprintf("%v", _m.DeniedIpsJSON))
 	builder.WriteString(", ")
 	if v := _m.ExpiresAt; v != nil {
 		builder.WriteString("expires_at=")

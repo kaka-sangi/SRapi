@@ -2,6 +2,7 @@ package subscriptions
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"testing"
 	"time"
@@ -146,6 +147,62 @@ func TestStorePersistsPlansSubscriptionsAndPricingRules(t *testing.T) {
 	}
 	if len(rules) != 1 || rules[0].ID != rule.ID || rules[0].EffectiveFrom == nil || rules[0].EffectiveTo == nil {
 		t.Fatalf("expected persisted pricing rule with effectivity, got %+v", rules)
+	}
+}
+
+func TestStoreUpdatePlanPartialAndNotFound(t *testing.T) {
+	client := enttest.Open(t, dialect.SQLite, sqliteDSN(t))
+	defer client.Close()
+
+	store, err := New(client)
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	ctx := context.Background()
+
+	plan, err := store.CreatePlan(ctx, contract.CreateStoredPlan{
+		Name:         "starter",
+		Description:  "Starter plan",
+		Price:        "9.99000000",
+		Currency:     "USD",
+		ValidityDays: 30,
+		Entitlements: map[string]any{"allowed_models": []any{"a"}},
+		ForSale:      true,
+		SortOrder:    0,
+		Status:       contract.PlanStatusActive,
+	})
+	if err != nil {
+		t.Fatalf("create plan: %v", err)
+	}
+
+	newPrice := "14.99000000"
+	newStatus := contract.PlanStatusDisabled
+	newEnt := map[string]any{"monthly_token_quota": float64(1000)}
+	updated, err := store.UpdatePlan(ctx, plan.ID, contract.UpdateStoredPlan{
+		Price:        &newPrice,
+		Status:       &newStatus,
+		Entitlements: &newEnt,
+	})
+	if err != nil {
+		t.Fatalf("update plan: %v", err)
+	}
+	if updated.Price != newPrice || updated.Status != contract.PlanStatusDisabled {
+		t.Fatalf("expected price/status updated, got %+v", updated)
+	}
+	// Untouched fields (nil pointers) must be preserved.
+	if updated.Name != "starter" || updated.ValidityDays != 30 || !updated.ForSale {
+		t.Fatalf("expected untouched fields preserved, got %+v", updated)
+	}
+	// Entitlements are fully replaced, not merged.
+	if _, ok := updated.Entitlements["monthly_token_quota"]; !ok {
+		t.Fatalf("expected entitlements replaced, got %+v", updated.Entitlements)
+	}
+	if _, ok := updated.Entitlements["allowed_models"]; ok {
+		t.Fatalf("expected old entitlement key dropped, got %+v", updated.Entitlements)
+	}
+
+	if _, err := store.UpdatePlan(ctx, 99999, contract.UpdateStoredPlan{Price: &newPrice}); !errors.Is(err, contract.ErrNotFound) {
+		t.Fatalf("expected ErrNotFound for missing plan, got %v", err)
 	}
 }
 

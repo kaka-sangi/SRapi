@@ -60,6 +60,7 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/userattributedefinition"
 	"github.com/srapi/srapi/apps/api/ent/userattributevalue"
 	"github.com/srapi/srapi/apps/api/ent/userauthidentity"
+	"github.com/srapi/srapi/apps/api/ent/userplatformquota"
 	"github.com/srapi/srapi/apps/api/ent/userpromocodeapplication"
 	"github.com/srapi/srapi/apps/api/ent/userredeemcoderedemption"
 	"github.com/srapi/srapi/apps/api/ent/userrole"
@@ -1793,32 +1794,36 @@ func init() {
 	usagelogDescCachedTokens := usagelogFields[12].Descriptor()
 	// usagelog.DefaultCachedTokens holds the default value on creation for the cached_tokens field.
 	usagelog.DefaultCachedTokens = usagelogDescCachedTokens.Default.(int)
+	// usagelogDescCacheCreationTokens is the schema descriptor for cache_creation_tokens field.
+	usagelogDescCacheCreationTokens := usagelogFields[13].Descriptor()
+	// usagelog.DefaultCacheCreationTokens holds the default value on creation for the cache_creation_tokens field.
+	usagelog.DefaultCacheCreationTokens = usagelogDescCacheCreationTokens.Default.(int)
 	// usagelogDescTotalTokens is the schema descriptor for total_tokens field.
-	usagelogDescTotalTokens := usagelogFields[13].Descriptor()
+	usagelogDescTotalTokens := usagelogFields[14].Descriptor()
 	// usagelog.DefaultTotalTokens holds the default value on creation for the total_tokens field.
 	usagelog.DefaultTotalTokens = usagelogDescTotalTokens.Default.(int)
 	// usagelogDescUsageEstimated is the schema descriptor for usage_estimated field.
-	usagelogDescUsageEstimated := usagelogFields[14].Descriptor()
+	usagelogDescUsageEstimated := usagelogFields[15].Descriptor()
 	// usagelog.DefaultUsageEstimated holds the default value on creation for the usage_estimated field.
 	usagelog.DefaultUsageEstimated = usagelogDescUsageEstimated.Default.(bool)
 	// usagelogDescLatencyMs is the schema descriptor for latency_ms field.
-	usagelogDescLatencyMs := usagelogFields[15].Descriptor()
+	usagelogDescLatencyMs := usagelogFields[16].Descriptor()
 	// usagelog.DefaultLatencyMs holds the default value on creation for the latency_ms field.
 	usagelog.DefaultLatencyMs = usagelogDescLatencyMs.Default.(int)
 	// usagelogDescSuccess is the schema descriptor for success field.
-	usagelogDescSuccess := usagelogFields[16].Descriptor()
+	usagelogDescSuccess := usagelogFields[17].Descriptor()
 	// usagelog.DefaultSuccess holds the default value on creation for the success field.
 	usagelog.DefaultSuccess = usagelogDescSuccess.Default.(bool)
 	// usagelogDescCost is the schema descriptor for cost field.
-	usagelogDescCost := usagelogFields[18].Descriptor()
+	usagelogDescCost := usagelogFields[19].Descriptor()
 	// usagelog.DefaultCost holds the default value on creation for the cost field.
 	usagelog.DefaultCost = usagelogDescCost.Default.(string)
 	// usagelogDescBillableCost is the schema descriptor for billable_cost field.
-	usagelogDescBillableCost := usagelogFields[19].Descriptor()
+	usagelogDescBillableCost := usagelogFields[20].Descriptor()
 	// usagelog.DefaultBillableCost holds the default value on creation for the billable_cost field.
 	usagelog.DefaultBillableCost = usagelogDescBillableCost.Default.(string)
 	// usagelogDescCurrency is the schema descriptor for currency field.
-	usagelogDescCurrency := usagelogFields[20].Descriptor()
+	usagelogDescCurrency := usagelogFields[21].Descriptor()
 	// usagelog.DefaultCurrency holds the default value on creation for the currency field.
 	usagelog.DefaultCurrency = usagelogDescCurrency.Default.(string)
 	userMixin := schema.User{}.Mixin()
@@ -1976,6 +1981,33 @@ func init() {
 	userauthidentityDescAvatarURL := userauthidentityFields[8].Descriptor()
 	// userauthidentity.DefaultAvatarURL holds the default value on creation for the avatar_url field.
 	userauthidentity.DefaultAvatarURL = userauthidentityDescAvatarURL.Default.(string)
+	userplatformquotaMixin := schema.UserPlatformQuota{}.Mixin()
+	userplatformquotaMixinFields0 := userplatformquotaMixin[0].Fields()
+	_ = userplatformquotaMixinFields0
+	userplatformquotaFields := schema.UserPlatformQuota{}.Fields()
+	_ = userplatformquotaFields
+	// userplatformquotaDescCreatedAt is the schema descriptor for created_at field.
+	userplatformquotaDescCreatedAt := userplatformquotaMixinFields0[0].Descriptor()
+	// userplatformquota.DefaultCreatedAt holds the default value on creation for the created_at field.
+	userplatformquota.DefaultCreatedAt = userplatformquotaDescCreatedAt.Default.(func() time.Time)
+	// userplatformquotaDescUpdatedAt is the schema descriptor for updated_at field.
+	userplatformquotaDescUpdatedAt := userplatformquotaMixinFields0[1].Descriptor()
+	// userplatformquota.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	userplatformquota.DefaultUpdatedAt = userplatformquotaDescUpdatedAt.Default.(func() time.Time)
+	// userplatformquota.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	userplatformquota.UpdateDefaultUpdatedAt = userplatformquotaDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// userplatformquotaDescPlatform is the schema descriptor for platform field.
+	userplatformquotaDescPlatform := userplatformquotaFields[1].Descriptor()
+	// userplatformquota.PlatformValidator is a validator for the "platform" field. It is called by the builders before save.
+	userplatformquota.PlatformValidator = userplatformquotaDescPlatform.Validators[0].(func(string) error)
+	// userplatformquotaDescCurrency is the schema descriptor for currency field.
+	userplatformquotaDescCurrency := userplatformquotaFields[5].Descriptor()
+	// userplatformquota.DefaultCurrency holds the default value on creation for the currency field.
+	userplatformquota.DefaultCurrency = userplatformquotaDescCurrency.Default.(string)
+	// userplatformquotaDescEnabled is the schema descriptor for enabled field.
+	userplatformquotaDescEnabled := userplatformquotaFields[6].Descriptor()
+	// userplatformquota.DefaultEnabled holds the default value on creation for the enabled field.
+	userplatformquota.DefaultEnabled = userplatformquotaDescEnabled.Default.(bool)
 	userpromocodeapplicationMixin := schema.UserPromoCodeApplication{}.Mixin()
 	userpromocodeapplicationMixinFields0 := userpromocodeapplicationMixin[0].Fields()
 	_ = userpromocodeapplicationMixinFields0

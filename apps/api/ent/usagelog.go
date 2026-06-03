@@ -48,6 +48,8 @@ type UsageLog struct {
 	OutputTokens int `json:"output_tokens,omitempty"`
 	// CachedTokens holds the value of the "cached_tokens" field.
 	CachedTokens int `json:"cached_tokens,omitempty"`
+	// CacheCreationTokens holds the value of the "cache_creation_tokens" field.
+	CacheCreationTokens int `json:"cache_creation_tokens,omitempty"`
 	// TotalTokens holds the value of the "total_tokens" field.
 	TotalTokens int `json:"total_tokens,omitempty"`
 	// UsageEstimated holds the value of the "usage_estimated" field.
@@ -80,7 +82,7 @@ func (*UsageLog) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case usagelog.FieldUsageEstimated, usagelog.FieldSuccess:
 			values[i] = new(sql.NullBool)
-		case usagelog.FieldID, usagelog.FieldAttemptNo, usagelog.FieldUserID, usagelog.FieldAPIKeyID, usagelog.FieldProviderID, usagelog.FieldAccountID, usagelog.FieldInputTokens, usagelog.FieldOutputTokens, usagelog.FieldCachedTokens, usagelog.FieldTotalTokens, usagelog.FieldLatencyMs:
+		case usagelog.FieldID, usagelog.FieldAttemptNo, usagelog.FieldUserID, usagelog.FieldAPIKeyID, usagelog.FieldProviderID, usagelog.FieldAccountID, usagelog.FieldInputTokens, usagelog.FieldOutputTokens, usagelog.FieldCachedTokens, usagelog.FieldCacheCreationTokens, usagelog.FieldTotalTokens, usagelog.FieldLatencyMs:
 			values[i] = new(sql.NullInt64)
 		case usagelog.FieldRequestID, usagelog.FieldSourceProtocol, usagelog.FieldSourceEndpoint, usagelog.FieldTargetProtocol, usagelog.FieldModel, usagelog.FieldErrorClass, usagelog.FieldCost, usagelog.FieldBillableCost, usagelog.FieldCurrency:
 			values[i] = new(sql.NullString)
@@ -198,6 +200,12 @@ func (_m *UsageLog) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field cached_tokens", values[i])
 			} else if value.Valid {
 				_m.CachedTokens = int(value.Int64)
+			}
+		case usagelog.FieldCacheCreationTokens:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field cache_creation_tokens", values[i])
+			} else if value.Valid {
+				_m.CacheCreationTokens = int(value.Int64)
 			}
 		case usagelog.FieldTotalTokens:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -347,6 +355,9 @@ func (_m *UsageLog) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("cached_tokens=")
 	builder.WriteString(fmt.Sprintf("%v", _m.CachedTokens))
+	builder.WriteString(", ")
+	builder.WriteString("cache_creation_tokens=")
+	builder.WriteString(fmt.Sprintf("%v", _m.CacheCreationTokens))
 	builder.WriteString(", ")
 	builder.WriteString("total_tokens=")
 	builder.WriteString(fmt.Sprintf("%v", _m.TotalTokens))

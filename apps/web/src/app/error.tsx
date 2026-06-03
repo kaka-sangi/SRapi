@@ -1,47 +1,30 @@
 "use client";
 
-import * as React from "react";
-import { Button, Card, CardDescription, CardTitle } from "@/components/ui";
+import { useEffect } from "react";
 import { captureException } from "@/lib/telemetry";
+import { Button } from "@/components/ui/button";
+import { useLanguage } from "@/context/LanguageContext";
 
-export default function RootError({
+export default function Error({
   error,
   reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  React.useEffect(() => {
-    captureException(error, {
-      boundary: "route",
-      digest: error.digest ?? null,
-    });
-    if (process.env.NODE_ENV !== "production") {
-      console.error("[srapi] route error", error);
-    }
+  const { t } = useLanguage();
+
+  useEffect(() => {
+    captureException(error, { digest: error.digest ?? null });
   }, [error]);
 
   return (
-    <div className="flex min-h-[60vh] items-center justify-center p-8">
-      <Card className="max-w-lg space-y-6 text-center">
-        <div className="space-y-2">
-          <CardTitle>Something went wrong</CardTitle>
-          <CardDescription>
-            SRapi could not render this page. The control plane and your data are unaffected.
-          </CardDescription>
-        </div>
-        {error.digest ? (
-          <p className="font-mono text-2xs text-srapi-text-secondary">
-            Error reference: {error.digest}
-          </p>
-        ) : null}
-        <div className="flex justify-center gap-3">
-          <Button variant="outline" onClick={() => (window.location.href = "/")}>
-            Back to home
-          </Button>
-          <Button onClick={() => reset()}>Try again</Button>
-        </div>
-      </Card>
+    <div className="flex min-h-dvh flex-col items-center justify-center gap-5 px-6 text-center">
+      <h1 className="font-serif text-3xl tracking-[-0.02em]">{t("common.error")}</h1>
+      <p className="max-w-sm text-sm text-srapi-text-secondary">{t("common.errorRetryHint")}</p>
+      <Button variant="primary" onClick={reset}>
+        {t("common.retry")}
+      </Button>
     </div>
   );
 }

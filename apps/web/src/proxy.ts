@@ -3,17 +3,13 @@ import { SESSION_PRESENT_COOKIE, SESSION_ROLE_COOKIE } from "@/lib/session-cooki
 import { ADMIN_HOME_ROUTE, USER_HOME_ROUTE } from "@/lib/routes";
 
 /**
- * SRapi v0.1.0 edge proxy (formerly Next.js middleware).
+ * SRapi edge proxy (Next.js 16 successor to middleware.ts).
  *
- * Server-side gate for the protected console routes so users never see a
- * flash of unauthenticated content. Renamed from `middleware.ts` per
- * Next.js 16 conventions; same edge runtime.
- *
- * Inspects two non-credential cookies set by the client after
- * `apiService.login` succeeds (see `src/lib/session-cookie.ts`). Real auth
- * and CSRF tokens still live in the backend's HttpOnly cookies and are not
- * read here. Treat this as a UX optimization on top of the existing
- * client-side guards.
+ * Server-side gate for protected console routes so users never see a flash of
+ * unauthenticated content. Inspects two non-credential cookies set by the
+ * client after `apiService.login` succeeds (see `src/lib/session-cookie.ts`).
+ * Real auth + CSRF still live in the backend's HttpOnly cookies and are never
+ * read here — treat this as a UX optimization on top of the client guards.
  */
 const PROTECTED_PATHS = [
   "/dashboard",
@@ -60,10 +56,6 @@ export function proxy(request: NextRequest) {
   return NextResponse.next();
 }
 
-// `api/` (the backend reverse-proxy rewrite root) and Next.js framework
-// paths are excluded so the auth gate never sits in front of static assets
-// or the JSON API. Anchored with a trailing `/` so route names that start
-// with the literal characters "api" — e.g. `/api-keys` — still pass through.
 export const config = {
   matcher: ["/((?!api/|_next/static/|_next/image|favicon.ico|srapi-health).*)"],
 };

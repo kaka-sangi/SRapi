@@ -1,0 +1,263 @@
+"use client";
+
+import { useState } from "react";
+import { Plug } from "lucide-react";
+import { AdminShell } from "@/components/layout/admin-shell";
+import { PageHeader } from "@/components/layout/page-header";
+import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
+import { RowActionsMenu } from "@/components/admin/row-actions";
+import { ListToolbar, FilterSelect } from "@/components/admin/list-toolbar";
+import { useAdminList } from "@/hooks/use-admin-list";
+import {
+  ResourceFormDialog,
+  enumOptions,
+  type FieldConfig,
+} from "@/components/admin/resource-form-dialog";
+import {
+  useAdminProviders,
+  useCreateProvider,
+  useUpdateProvider,
+  useTestProvider,
+} from "@/hooks/admin-queries";
+import { useLanguage } from "@/context/LanguageContext";
+import { useToast } from "@/context/ToastContext";
+import { adminErrorMessage } from "@/lib/admin-api";
+import { QuietBadge } from "@/components/ui/quiet-badge";
+import { Button } from "@/components/ui/button";
+import { quietStatusFor, statusLabel } from "@/lib/status-badge";
+import {
+  PROVIDER_ADAPTER_TYPES,
+  PROVIDER_PROTOCOLS,
+  RESOURCE_STATUSES,
+  emptyProviderForm,
+  providerFormFromProvider,
+  buildCreateProviderBody,
+  buildUpdateProviderBody,
+  type ProviderFormState,
+} from "@/lib/admin-provider-form";
+import type { Provider } from "@/lib/sdk-types";
+
+export default function AdminProvidersPage() {
+  return (
+    <AdminShell>
+      <ProvidersContent />
+    </AdminShell>
+  );
+}
+
+function ProvidersContent() {
+  const { t } = useLanguage();
+  const { toast } = useToast();
+  const list = useAdminList();
+  const statusFilter = (list.filters.status as Provider["status"]) || undefined;
+  const providers = useAdminProviders({
+    page: list.page,
+    page_size: list.pageSize,
+    status: statusFilter,
+  });
+  const createMut = useCreateProvider();
+  const updateMut = useUpdateProvider();
+  const testMut = useTestProvider();
+
+  const [formTarget, setFormTarget] = useState<Provider | "new" | null>(null);
+
+  async function runTest(id: string) {
+    try {
+      const result = await testMut.mutateAsync(id);
+      toast({
+        title: result.ok ? t("feedback.acknowledged") : t("feedback.failed"),
+        description:
+          result.message ??
+          (result.latency_ms != null ? `${result.latency_ms} ms` : undefined),
+        tone: result.ok ? "success" : "error",
+      });
+    } catch {
+      toast({ title: t("feedback.failed"), tone: "error" });
+    }
+  }
+
+  async function toggleStatus(p: Provider) {
+    const next = p.status === "disabled" ? "active" : "disabled";
+    try {
+      await updateMut.mutateAsync({
+        id: p.id,
+        body: buildUpdateProviderBody({ ...providerFormFromProvider(p), status: next }),
+      });
+      toast({ title: t("feedback.saved"), tone: "success" });
+    } catch (err) {
+      toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
+    }
+  }
+
+  // The provider slug (`name`) is immutable after creation, so it only appears
+  // on the create form; edits keep the identity stable.
+  const sharedFields: FieldConfig<ProviderFormState>[] = [
+    { name: "displayName", label: t("adminProviders.displayName") },
+    {
+      name: "adapterType",
+      label: t("adminProviders.adapterType"),
+      type: "select",
+      options: enumOptions(PROVIDER_ADAPTER_TYPES),
+      hint: t("adminProviders.adapterHint"),
+    },
+    {
+      name: "protocol",
+      label: t("adminProviders.protocol"),
+      type: "select",
+      options: enumOptions(PROVIDER_PROTOCOLS),
+    },
+    {
+      name: "status",
+      label: t("adminCommon.status"),
+      type: "select",
+      options: enumOptions(RESOURCE_STATUSES),
+    },
+    { name: "capabilities", label: t("adminProviders.capabilities"), type: "keyvalue", advanced: true },
+    { name: "configSchema", label: t("adminProviders.configSchema"), type: "keyvalue", advanced: true },
+  ];
+
+  const createFields: FieldConfig<ProviderFormState>[] = [
+    {
+      name: "name",
+      label: t("adminProviders.name"),
+      placeholder: "deepseek",
+      hint: t("adminProviders.nameHint"),
+    },
+    ...sharedFields,
+  ];
+
+  const columns: Column<Provider>[] = [
+    {
+      key: "name",
+      header: t("adminProviders.name"),
+      sortValue: (p) => p.display_name || p.name,
+      render: (p) => (
+        <div className="min-w-0">
+          <div className="truncate text-srapi-text-primary">{p.display_name || p.name}</div>
+          <div className="truncate font-mono text-2xs text-srapi-text-tertiary">{p.name}</div>
+        </div>
+      ),
+    },
+    {
+      key: "adapterType",
+      header: t("adminProviders.adapterType"),
+      hideOnMobile: true,
+      render: (p) => (
+        <span className="font-mono text-2xs text-srapi-text-secondary">{p.adapter_type}</span>
+      ),
+    },
+    {
+      key: "protocol",
+      header: t("adminProviders.protocol"),
+      hideOnMobile: true,
+      render: (p) => (
+        <span className="font-mono text-2xs text-srapi-text-tertiary">{p.protocol}</span>
+      ),
+    },
+    {
+      key: "status",
+      header: t("common.active"),
+      sortValue: (p) => p.status,
+      render: (p) => <QuietBadge status={quietStatusFor(p.status)} label={statusLabel(t, p.status)} />,
+    },
+  ];
+
+  return (
+    <>
+      <PageHeader
+        eyebrow={t("nav.sectionAdmin")}
+        title={t("adminProviders.title")}
+        description={t("adminProviders.subtitle")}
+        actions={
+          <div className="flex items-center gap-3">
+            {providers.data ? (
+              <ListCount total={providers.data.pagination?.total ?? providers.data.data.length} />
+            ) : null}
+            <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
+              ＋ {t("adminProviders.create")}
+            </Button>
+          </div>
+        }
+      />
+      <AdminListView
+        query={providers}
+        columns={columns}
+        getRowId={(p) => p.id}
+        emptyIcon={Plug}
+        emptyTitle={t("adminProviders.emptyTitle")}
+        emptyBody={t("adminProviders.emptyBody")}
+        emptyAction={
+          <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
+            ＋ {t("adminProviders.create")}
+          </Button>
+        }
+        minWidth={560}
+        isFiltered={Boolean(statusFilter)}
+        onClearFilters={list.clearFilters}
+        sort={list.sort}
+        onSort={list.toggleSort}
+        dimRow={(p) => p.status === "disabled"}
+        toolbar={
+          <ListToolbar>
+            <FilterSelect
+              value={statusFilter}
+              onChange={(v) => list.setFilter("status", v)}
+              options={enumOptions(RESOURCE_STATUSES)}
+              allLabel={t("adminCommon.allStatuses")}
+            />
+          </ListToolbar>
+        }
+        pagination={{
+          page: list.page,
+          pageSize: list.pageSize,
+          total: providers.data?.pagination?.total ?? providers.data?.data.length ?? 0,
+          onPageChange: list.setPage,
+        }}
+        rowActions={(p) => (
+          <RowActionsMenu
+            actions={[
+              { label: t("common.edit"), onSelect: () => setFormTarget(p) },
+              { label: t("adminProviders.test"), onSelect: () => void runTest(p.id) },
+              {
+                label: p.status === "disabled" ? t("common.enable") : t("common.disable"),
+                destructive: p.status !== "disabled",
+                onSelect: () => void toggleStatus(p),
+              },
+            ]}
+          />
+        )}
+      />
+
+      {formTarget === "new" ? (
+        <ResourceFormDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setFormTarget(null);
+          }}
+          title={t("adminProviders.create")}
+          fields={createFields}
+          initial={emptyProviderForm()}
+          buildBody={buildCreateProviderBody}
+          submit={(body) => createMut.mutateAsync(body)}
+          successMessage={t("feedback.created")}
+          isPending={createMut.isPending}
+        />
+      ) : formTarget ? (
+        <ResourceFormDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setFormTarget(null);
+          }}
+          title={t("adminProviders.edit")}
+          description={formTarget.name}
+          fields={sharedFields}
+          initial={providerFormFromProvider(formTarget)}
+          buildBody={buildUpdateProviderBody}
+          submit={(body) => updateMut.mutateAsync({ id: formTarget.id, body })}
+          successMessage={t("feedback.updated")}
+          isPending={updateMut.isPending}
+        />
+      ) : null}
+    </>
+  );
+}

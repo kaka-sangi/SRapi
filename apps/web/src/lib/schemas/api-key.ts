@@ -16,6 +16,13 @@ const NAME_MAX = 80;
 const NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9 _.\-/]*$/;
 const ALLOWED_MODELS_MAX = 16;
 const GROUPS_MAX = 16;
+const IP_LIST_MAX = 64;
+
+const ipWindowLimit = z
+  .number()
+  .int({ message: "Limit must be a whole number." })
+  .min(0, { message: "Limit cannot be negative." })
+  .optional();
 
 export const createApiKeySchema = z.object({
   name: z
@@ -33,18 +40,22 @@ export const createApiKeySchema = z.object({
   groupIds: z
     .array(z.string().min(1))
     .max(GROUPS_MAX, { message: "Up to 16 account groups." }),
+  // IP allow/deny entries (IP or CIDR). Format is validated authoritatively by
+  // the API; the client only bounds the count and rejects blanks.
+  allowedIps: z
+    .array(z.string().trim().min(1))
+    .max(IP_LIST_MAX, { message: "Up to 64 allowed IPs/CIDRs." }),
+  deniedIps: z
+    .array(z.string().trim().min(1))
+    .max(IP_LIST_MAX, { message: "Up to 64 denied IPs/CIDRs." }),
+  requestLimit5h: ipWindowLimit,
+  requestLimit1d: ipWindowLimit,
+  requestLimit7d: ipWindowLimit,
+  // Per-key throughput ceilings (0/empty = unlimited) and an optional expiry.
+  rpmLimit: ipWindowLimit,
+  tpmLimit: ipWindowLimit,
+  concurrencyLimit: ipWindowLimit,
+  expiresAt: z.string().trim().optional(),
 });
 
 export type CreateApiKeyValues = z.infer<typeof createApiKeySchema>;
-
-/**
- * Helper to parse the comma-separated group IDs the create dialog renders
- * back into a clean array. Used by both the form and any future Server
- * Action that consumes a `FormData`-derived string.
- */
-export function parseGroupIdsCsv(input: string): string[] {
-  return input
-    .split(",")
-    .map((part) => part.trim())
-    .filter((part) => part.length > 0);
-}

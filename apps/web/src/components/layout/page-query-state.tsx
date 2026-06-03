@@ -1,45 +1,77 @@
 "use client";
 
-import { AlertTriangle, RefreshCw } from "lucide-react";
-import { Button, Card, Spinner } from "@/components/ui";
-import { adminErrorMessage } from "@/lib/admin-api";
+import type { UseQueryResult } from "@tanstack/react-query";
+import { AlertTriangle } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { useLanguage } from "@/context/LanguageContext";
 
-export function PageQueryError({
-  error,
-  onRetry,
-  title = "API request failed",
+/**
+ * Standard loading / error / empty wrapper so pages never hand-roll
+ * `isLoading ? ... : error ? ...`. Renders children with the resolved data.
+ */
+export function PageQueryState<T>({
+  query,
+  isEmpty,
+  emptyTitle,
+  emptyDescription,
+  skeleton,
+  children,
 }: {
-  error: unknown;
-  onRetry?: () => void;
-  title?: string;
+  query: UseQueryResult<T>;
+  isEmpty?: (data: T) => boolean;
+  emptyTitle?: string;
+  emptyDescription?: string;
+  skeleton?: React.ReactNode;
+  children: (data: T) => React.ReactNode;
 }) {
-  return (
-    <Card className="space-y-4 border-srapi-error/30 bg-srapi-error/5 p-6" role="alert">
-      <div className="flex items-start gap-3">
-        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-srapi-error" />
-        <div className="space-y-1">
-          <div className="font-mono text-xs font-bold uppercase tracking-wider text-srapi-error">
-            {title}
-          </div>
-          <p className="text-xs leading-relaxed text-srapi-text-secondary">
-            {adminErrorMessage(error)}
-          </p>
-        </div>
-      </div>
-      {onRetry ? (
-        <Button type="button" variant="outline" size="sm" onClick={onRetry}>
-          <RefreshCw size={12} />
-          Retry
-        </Button>
-      ) : null}
-    </Card>
-  );
-}
+  const { t } = useLanguage();
 
-export function PageQueryLoading({ label }: { label: string }) {
-  return (
-    <div className="py-12 text-center font-mono">
-      <Spinner size={24} label={label} />
-    </div>
-  );
+  if (query.isLoading) {
+    return (
+      <>
+        {skeleton ?? (
+          <div className="space-y-3">
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-2/3" />
+          </div>
+        )}
+      </>
+    );
+  }
+
+  if (query.isError) {
+    return (
+      <EmptyState
+        icon={AlertTriangle}
+        title={t("common.error")}
+        description={t("common.errorBody")}
+        action={
+          <Button variant="outline" size="sm" onClick={() => query.refetch()}>
+            {t("common.retry")}
+          </Button>
+        }
+      />
+    );
+  }
+
+  // No data and not an error: either still pending or the query is disabled
+  // (`enabled: false`, e.g. an on-demand detail fetch). Show the skeleton rather
+  // than a misleading error state — `isLoading` is false for a paused query, so
+  // a bare `data === undefined` check used to render the error EmptyState here.
+  if (query.data === undefined) {
+    return <>{skeleton ?? null}</>;
+  }
+
+  // Only short-circuit to the wrapper's own empty state when the caller supplied
+  // copy for it. With `isEmpty` but no `emptyTitle`, fall through so children can
+  // render their own (usually richer: icon, filtered-vs-empty, CTA) empty state —
+  // passing `isEmpty` alone must not override that with a bare default.
+  if (isEmpty?.(query.data) && emptyTitle) {
+    return <EmptyState title={emptyTitle} description={emptyDescription} />;
+  }
+
+  return <>{children(query.data)}</>;
 }

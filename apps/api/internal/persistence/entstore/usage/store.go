@@ -39,6 +39,7 @@ func (s *Store) Create(ctx context.Context, input contract.UsageLog) (contract.U
 		SetInputTokens(input.InputTokens).
 		SetOutputTokens(input.OutputTokens).
 		SetCachedTokens(input.CachedTokens).
+		SetCacheCreationTokens(input.CacheCreationTokens).
 		SetTotalTokens(input.TotalTokens).
 		SetUsageEstimated(input.UsageEstimated).
 		SetLatencyMs(input.LatencyMS).
@@ -104,6 +105,7 @@ func toUsageLog(row *ent.UsageLog) contract.UsageLog {
 		InputTokens:           row.InputTokens,
 		OutputTokens:          row.OutputTokens,
 		CachedTokens:          row.CachedTokens,
+		CacheCreationTokens:   row.CacheCreationTokens,
 		TotalTokens:           row.TotalTokens,
 		UsageEstimated:        row.UsageEstimated,
 		LatencyMS:             row.LatencyMs,

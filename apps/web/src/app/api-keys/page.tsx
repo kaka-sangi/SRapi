@@ -1,414 +1,147 @@
 "use client";
 
-import * as React from "react";
-import { useForm, useWatch } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Key, Plus, Copy, Check, AlertCircle, Power, Sparkles } from "lucide-react";
-import { AppShell } from "@/components/layout";
-import { useApiKeys, useCreateApiKey, useToggleApiKey } from "@/hooks/queries";
+import { KeyRound, MoreHorizontal } from "lucide-react";
+import { AppShell } from "@/components/layout/app-shell";
+import { PageHeader } from "@/components/layout/page-header";
+import { PageQueryState } from "@/components/layout/page-query-state";
+import { useApiKeys, useToggleApiKey } from "@/hooks/queries";
 import { useLanguage } from "@/context/LanguageContext";
+import { useToast } from "@/context/ToastContext";
+import { Card } from "@/components/ui/card";
 import {
-  Badge,
-  Button,
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  EmptyState,
-  Input,
-  Label,
-  Skeleton,
   Table,
-  TableBody,
-  TableCell,
-  TableHead,
+  TableScroll,
   TableHeader,
+  TableBody,
   TableRow,
-} from "@/components/ui";
-import { PageQueryError } from "@/components/layout/page-query-state";
-import { cn } from "@/lib/cn";
+  TableHead,
+  TableCell,
+} from "@/components/ui/table";
+import { QuietBadge } from "@/components/ui/quiet-badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
-  createApiKeySchema,
-  parseGroupIdsCsv,
-  type CreateApiKeyValues,
-} from "@/lib/schemas/api-key";
-import type { ApiKeySummary } from "@/lib/srapi-types";
-
-const DEFAULT_MODELS: readonly string[] = [
-  "gpt-4o-mini",
-  "claude-3-5-sonnet",
-  "gemini-1.5-pro",
-  "gemini-1.5-flash",
-];
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import { ApiKeyCreateDialog } from "@/components/features/api-key-create-dialog";
 
 export default function ApiKeysPage() {
-  const { language, t } = useLanguage();
-  const apiKeysQuery = useApiKeys();
-  const createMutation = useCreateApiKey();
-  const toggleMutation = useToggleApiKey();
-  const keys = apiKeysQuery.data ?? [];
-  const loading = apiKeysQuery.isLoading;
-
-  const [copiedId, setCopiedId] = React.useState<string | null>(null);
-  const [showCreateModal, setShowCreateModal] = React.useState(false);
-  const [generatedKey, setGeneratedKey] = React.useState<ApiKeySummary | null>(null);
-  const [copiedPlaintext, setCopiedPlaintext] = React.useState(false);
-  const [groupsCsv, setGroupsCsv] = React.useState("group-01");
-
-  const form = useForm<CreateApiKeyValues>({
-    resolver: zodResolver(createApiKeySchema),
-    defaultValues: {
-      name: "",
-      allowedModels: ["gpt-4o-mini"],
-      groupIds: ["group-01"],
-    },
-  });
-  const selectedModels =
-    useWatch({
-      control: form.control,
-      name: "allowedModels",
-    }) ?? [];
-
-  const handleCopy = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    window.setTimeout(() => setCopiedId(null), 1500);
-  };
-
-  const handleCopyPlaintext = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedPlaintext(true);
-    window.setTimeout(() => setCopiedPlaintext(false), 1500);
-  };
-
-  const onSubmit = form.handleSubmit(async (values) => {
-    const newKey = await createMutation.mutateAsync({
-      name: values.name,
-      allowedModels: values.allowedModels,
-      groupIds: values.groupIds,
-    });
-    setGeneratedKey(newKey);
-    form.reset({ name: "", allowedModels: ["gpt-4o-mini"], groupIds: ["group-01"] });
-    setGroupsCsv("group-01");
-    setShowCreateModal(false);
-  });
-
-  const handleToggleStatus = async (id: string, currentStatus: "active" | "disabled") => {
-    await toggleMutation.mutateAsync({ id, currentStatus });
-  };
-
-  const handleModelToggle = (model: string) => {
-    const current = form.getValues("allowedModels");
-    const next = current.includes(model)
-      ? current.filter((m) => m !== model)
-      : [...current, model];
-    form.setValue("allowedModels", next, { shouldValidate: true, shouldDirty: true });
-  };
-
-  // SRapi v0.1.0 product tone, see docs/PRODUCT_TONE.md.
-  const textHeading = language === "en" ? "API keys" : "API 密钥";
-  const textHeadingDesc =
-    language === "en"
-      ? "Issue scoped API keys for your apps. SRapi only stores an HMAC hash, so the secret is shown once at creation."
-      : "为应用颁发带作用域的 API 密钥。SRapi 只保存 HMAC 哈希，明文仅在创建时显示一次。";
-  const textActiveBadge = language === "en" ? "Active" : "启用";
-  const textDisabledBadge = language === "en" ? "Disabled" : "已停用";
-  const placeholderName = language === "en" ? "e.g. production-web" : "例如：production-web";
-
   return (
-    <AppShell>
-      <div className="space-y-8 animate-bloom">
-        {/* Top operational header */}
-        <div className="surface flex flex-col justify-between gap-6 rounded-2xl p-6 sm:flex-row sm:items-center">
-          <div className="space-y-1">
-            <h3 className="font-serif text-lg font-medium tracking-tight">{textHeading}</h3>
-            <p className="text-xs leading-relaxed text-srapi-text-secondary">{textHeadingDesc}</p>
-          </div>
-          <Button
-            onClick={() => {
-              setGeneratedKey(null);
-              setShowCreateModal(true);
-            }}
-            size="md"
-          >
-            <Plus size={14} aria-hidden="true" />
-            {t("generateKey")}
-          </Button>
-        </div>
-
-        {/* One-time plaintext display */}
-        {generatedKey && generatedKey.plaintextKey ? (
-          <div className="space-y-4 rounded-2xl border border-srapi-primary/30 bg-srapi-primary/5 p-6 animate-bloom">
-            <div className="flex items-start gap-3.5">
-              <AlertCircle
-                size={18}
-                aria-hidden="true"
-                className="mt-0.5 shrink-0 text-srapi-primary"
-              />
-              <div className="space-y-1">
-                <h4 className="font-mono text-xs font-extrabold uppercase tracking-wider text-srapi-primary">
-                  {t("secretKeyGenerated")}
-                </h4>
-                <p className="text-xs leading-relaxed text-srapi-text-secondary">
-                  {t("keyWarning")}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
-              <code className="block flex-grow select-all overflow-x-auto rounded-xl border border-srapi-border bg-srapi-card p-3.5 font-mono text-xs font-bold text-srapi-text-primary">
-                {generatedKey.plaintextKey}
-              </code>
-              <Button
-                variant="accent"
-                onClick={() => handleCopyPlaintext(generatedKey.plaintextKey!)}
-              >
-                {copiedPlaintext ? (
-                  <Check size={14} aria-hidden="true" />
-                ) : (
-                  <Copy size={14} aria-hidden="true" />
-                )}
-                {copiedPlaintext ? t("copiedClipboard") : t("copyPlaintext")}
-              </Button>
-            </div>
-          </div>
-        ) : null}
-
-        {/* Keys table */}
-        {toggleMutation.isError ? (
-          <PageQueryError error={toggleMutation.error} title="API key status update failed" />
-        ) : null}
-
-        <div className="surface space-y-5 rounded-3xl p-6">
-          <h4 className="font-serif text-lg italic text-srapi-text-primary">
-            {t("activeChannels")}
-          </h4>
-
-          {loading ? (
-            <ApiKeysSkeleton />
-          ) : apiKeysQuery.isError ? (
-            <PageQueryError error={apiKeysQuery.error} onRetry={() => void apiKeysQuery.refetch()} />
-          ) : keys.length === 0 ? (
-            <EmptyState
-              icon={<Key size={18} aria-hidden="true" />}
-              title={t("noKeys")}
-              description={t("noKeysDesc")}
-              action={
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    setGeneratedKey(null);
-                    setShowCreateModal(true);
-                  }}
-                >
-                  <Plus size={14} aria-hidden="true" />
-                  {t("generateKey")}
-                </Button>
-              }
-            />
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("keyName")}</TableHead>
-                  <TableHead>{t("prefix")}</TableHead>
-                  <TableHead>{t("allowedModels")}</TableHead>
-                  <TableHead>{t("status")}</TableHead>
-                  <TableHead>{t("created")}</TableHead>
-                  <TableHead className="text-right">{t("actions")}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {keys.map((k) => (
-                  <TableRow key={k.id}>
-                    <TableCell className="font-sans font-bold text-srapi-text-primary">
-                      {k.name}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <code className="rounded border border-srapi-border bg-srapi-card-muted px-2 py-0.5 text-xs text-srapi-text-secondary">
-                          {k.prefix}
-                        </code>
-                        <button
-                          type="button"
-                          onClick={() => handleCopy(k.prefix, k.id)}
-                          aria-label={`Copy prefix for ${k.name}`}
-                          className="rounded border border-transparent p-1 text-srapi-text-secondary transition-all hover:border-srapi-border hover:bg-srapi-card-muted hover:text-srapi-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-srapi-primary"
-                        >
-                          {copiedId === k.id ? (
-                            <Check size={12} aria-hidden="true" className="text-srapi-success" />
-                          ) : (
-                            <Copy size={12} aria-hidden="true" />
-                          )}
-                        </button>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex max-w-[260px] flex-wrap gap-1">
-                        {k.allowed_models.map((m) => (
-                          <Badge key={m} size="sm">
-                            {m}
-                          </Badge>
-                        ))}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={k.status === "active" ? "success" : "neutral"}>
-                        {k.status === "active" ? textActiveBadge : textDisabledBadge}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-srapi-text-secondary">
-                      {new Date(k.created_at).toLocaleDateString()}{" "}
-                      {new Date(k.created_at).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        size="sm"
-                        variant={k.status === "active" ? "danger" : "outline"}
-                        onClick={() => handleToggleStatus(k.id, k.status)}
-                        disabled={toggleMutation.isPending}
-                      >
-                        <Power size={11} aria-hidden="true" />
-                        {k.status === "active" ? t("revoke") : t("activate")}
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </div>
-
-        {/* Create dialog */}
-        <Dialog
-          open={showCreateModal}
-          onOpenChange={(open) => {
-            setShowCreateModal(open);
-            if (!open) form.clearErrors();
-          }}
-        >
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{t("deployTitle")}</DialogTitle>
-              <DialogDescription>{t("deployDesc")}</DialogDescription>
-            </DialogHeader>
-
-            <form onSubmit={onSubmit} className="space-y-5">
-              {createMutation.isError ? (
-                <PageQueryError error={createMutation.error} title="API key creation failed" />
-              ) : null}
-              <div className="space-y-1.5">
-                <Label htmlFor="api-key-name">{t("keyNickname")}</Label>
-                <Input
-                  id="api-key-name"
-                  placeholder={placeholderName}
-                  aria-invalid={!!form.formState.errors.name}
-                  aria-describedby={
-                    form.formState.errors.name ? "api-key-name-error" : undefined
-                  }
-                  {...form.register("name")}
-                />
-                {form.formState.errors.name ? (
-                  <p
-                    id="api-key-name-error"
-                    role="alert"
-                    className="text-xs text-srapi-error"
-                  >
-                    {form.formState.errors.name.message}
-                  </p>
-                ) : null}
-              </div>
-
-              <div className="space-y-2">
-                <Label>{t("allowedTargetModels")}</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  {DEFAULT_MODELS.map((m) => {
-                    const isSelected = selectedModels.includes(m);
-                    return (
-                      <button
-                        key={m}
-                        type="button"
-                        onClick={() => handleModelToggle(m)}
-                        aria-pressed={isSelected}
-                        className={cn(
-                          "flex items-center justify-between rounded-lg border p-2.5 font-mono text-xs transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-srapi-primary",
-                          isSelected
-                            ? "border-srapi-primary bg-srapi-primary/5 font-bold text-srapi-primary"
-                            : "border-srapi-border bg-srapi-bg text-srapi-text-secondary hover:bg-srapi-card-muted",
-                        )}
-                      >
-                        {m}
-                        {isSelected ? <Sparkles size={10} aria-hidden="true" /> : null}
-                      </button>
-                    );
-                  })}
-                </div>
-                {form.formState.errors.allowedModels ? (
-                  <p role="alert" className="text-xs text-srapi-error">
-                    {form.formState.errors.allowedModels.message}
-                  </p>
-                ) : null}
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="api-key-groups">{t("scopeGroupsCsv")}</Label>
-                <Input
-                  id="api-key-groups"
-                  placeholder="group-01, group-02"
-                  value={groupsCsv}
-                  onChange={(e) => {
-                    const next = e.target.value;
-                    setGroupsCsv(next);
-                    form.setValue("groupIds", parseGroupIdsCsv(next), {
-                      shouldValidate: true,
-                    });
-                  }}
-                />
-                {form.formState.errors.groupIds ? (
-                  <p role="alert" className="text-xs text-srapi-error">
-                    {form.formState.errors.groupIds.message}
-                  </p>
-                ) : null}
-              </div>
-
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => setShowCreateModal(false)}
-                >
-                  {t("cancel")}
-                </Button>
-                <Button type="submit" disabled={createMutation.isPending}>
-                  {createMutation.isPending ? t("deploying") : t("deployChannel")}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
+    <AppShell allowedRole="user">
+      <ApiKeysContent />
     </AppShell>
   );
 }
 
-/** Shimmer rows mirroring the API key registry table while it loads. */
-function ApiKeysSkeleton() {
+function ApiKeysContent() {
+  const { t } = useLanguage();
+  const { toast } = useToast();
+  const apiKeys = useApiKeys();
+  const toggle = useToggleApiKey();
+
+  async function runToggle(id: string, status: "active" | "disabled") {
+    try {
+      await toggle.mutateAsync({ id, status });
+      toast({ title: t("feedback.saved"), tone: "success" });
+    } catch {
+      toast({ title: t("feedback.failed"), tone: "error" });
+    }
+  }
+
   return (
-    <div className="space-y-3">
-      {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="flex items-center gap-4 px-1">
-          <Skeleton className="h-3 w-32" />
-          <Skeleton className="h-3 w-24" />
-          <Skeleton className="h-3 flex-1" />
-          <Skeleton className="h-5 w-16 rounded-full" />
-          <Skeleton className="h-3 w-20" />
-        </div>
-      ))}
+    <>
+      <PageHeader
+        eyebrow={t("nav.sectionWorkspace")}
+        title={t("apiKeys.title")}
+        description={t("apiKeys.subtitle")}
+        actions={<ApiKeyCreateDialog />}
+      />
+
+      <Card>
+        <PageQueryState
+          query={apiKeys}
+          isEmpty={(d) => d.length === 0}
+          skeleton={<TableSkeleton />}
+        >
+          {(data) =>
+            data.length === 0 ? (
+              <EmptyState
+                icon={KeyRound}
+                title={t("apiKeys.emptyTitle")}
+                description={t("apiKeys.emptyBody")}
+              />
+            ) : (
+              <TableScroll minWidth={560}>
+                <Table>
+                  <TableHeader>
+                    <tr>
+                      <TableHead>{t("apiKeys.name")}</TableHead>
+                      <TableHead>{t("apiKeys.prefix")}</TableHead>
+                      <TableHead>{t("apiKeys.status")}</TableHead>
+                      <TableHead>{t("apiKeys.allowedModels")}</TableHead>
+                      <TableHead>{t("apiKeys.created")}</TableHead>
+                      <TableHead aria-label="actions" />
+                    </tr>
+                  </TableHeader>
+                  <TableBody>
+                    {data.map((key) => (
+                      <TableRow key={key.id} className={key.status === "disabled" ? "opacity-50" : ""}>
+                        <TableCell className="text-srapi-text-primary">{key.name}</TableCell>
+                        <TableCell className="font-mono text-srapi-text-tertiary">
+                          {key.prefix}
+                        </TableCell>
+                        <TableCell>
+                          <QuietBadge
+                            status={key.status === "active" ? "active" : "disabled"}
+                            label={key.status === "active" ? t("common.active") : t("common.disabled")}
+                          />
+                        </TableCell>
+                        <TableCell className="text-srapi-text-secondary">
+                          {key.allowed_models.length === 0 ? t("common.all") : key.allowed_models.join(" · ")}
+                        </TableCell>
+                        <TableCell className="font-mono text-srapi-text-tertiary tabular">
+                          {key.created_at.slice(0, 10)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" aria-label="actions">
+                                <MoreHorizontal className="size-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                disabled={toggle.isPending}
+                                onClick={() => void runToggle(key.id, key.status)}
+                              >
+                                {key.status === "active" ? t("common.disable") : t("common.enable")}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableScroll>
+            )
+          }
+        </PageQueryState>
+      </Card>
+    </>
+  );
+}
+
+function TableSkeleton() {
+  return (
+    <div className="space-y-2 p-5">
+      <Skeleton className="h-9" />
+      <Skeleton className="h-9" />
+      <Skeleton className="h-9 w-2/3" />
     </div>
   );
 }

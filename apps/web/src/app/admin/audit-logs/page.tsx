@@ -1,0 +1,208 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { ScrollText } from "lucide-react";
+import { AdminShell } from "@/components/layout/admin-shell";
+import { PageHeader } from "@/components/layout/page-header";
+import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
+import { RowActionsMenu } from "@/components/admin/row-actions";
+import { ListToolbar, FilterSelect, SearchInput } from "@/components/admin/list-toolbar";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { useAdminList } from "@/hooks/use-admin-list";
+import { useClientPagedList } from "@/hooks/use-client-list";
+import { useAuditLogs } from "@/hooks/admin-queries";
+import { useLanguage } from "@/context/LanguageContext";
+import { formatDateTime, safeJson } from "@/lib/admin-format";
+import type { AuditLog } from "@/lib/sdk-types";
+
+// Filters are exact-match on the backend; the toolbar selects are populated from
+// the values actually present in the data, so an admin only ever picks a real
+// action / resource type instead of guessing an enum.
+function auditMatch(row: AuditLog, term: string, filters: Record<string, string>): boolean {
+  if (filters.action && row.action !== filters.action) return false;
+  if (filters.resource_type && row.resource_type !== filters.resource_type) return false;
+  if (!term) return true;
+  return [row.actor_user_id, row.resource_id, row.resource_type, row.action, row.ip, row.trace_id]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase()
+    .includes(term);
+}
+
+// Newest first — an audit trail reads top-down from the most recent action.
+const auditCompare = (a: AuditLog, b: AuditLog) => (b.created_at ?? "").localeCompare(a.created_at ?? "");
+
+function distinct(values: Array<string | null | undefined>): string[] {
+  return [...new Set(values.filter((v): v is string => Boolean(v)))].sort();
+}
+
+export default function AdminAuditLogsPage() {
+  return (
+    <AdminShell>
+      <AuditLogsContent />
+    </AdminShell>
+  );
+}
+
+function AuditLogsContent() {
+  const { t } = useLanguage();
+  const list = useAdminList();
+  const all = useAuditLogs();
+  const { query, total } = useClientPagedList(all, list, {
+    match: auditMatch,
+    compare: auditCompare,
+  });
+  const [detail, setDetail] = useState<AuditLog | null>(null);
+
+  const rows = useMemo(() => all.data?.data ?? [], [all.data]);
+  const actionOptions = useMemo(() => distinct(rows.map((r) => r.action)), [rows]);
+  const resourceOptions = useMemo(() => distinct(rows.map((r) => r.resource_type)), [rows]);
+  const isFiltered = Boolean(list.search || list.filters.action || list.filters.resource_type);
+
+  const columns: Column<AuditLog>[] = [
+    {
+      key: "time",
+      header: t("adminAudit.time"),
+      render: (a) => (
+        <span className="whitespace-nowrap font-mono text-2xs text-srapi-text-tertiary tabular">
+          {formatDateTime(a.created_at)}
+        </span>
+      ),
+    },
+    {
+      key: "actor",
+      header: t("adminAudit.actor"),
+      hideOnMobile: true,
+      render: (a) => (
+        <span className="font-mono text-2xs text-srapi-text-tertiary">{a.actor_user_id || "—"}</span>
+      ),
+    },
+    {
+      key: "action",
+      header: t("adminAudit.action"),
+      render: (a) => <span className="font-mono text-xs text-srapi-text-primary">{a.action}</span>,
+    },
+    {
+      key: "resource",
+      header: t("adminAudit.resource"),
+      render: (a) => (
+        <span className="text-srapi-text-secondary">
+          {a.resource_type}
+          {a.resource_id ? (
+            <span className="ml-1 font-mono text-2xs text-srapi-text-tertiary">#{a.resource_id}</span>
+          ) : null}
+        </span>
+      ),
+    },
+    {
+      key: "ip",
+      header: t("adminAudit.ip"),
+      hideOnMobile: true,
+      render: (a) => <span className="font-mono text-2xs text-srapi-text-tertiary">{a.ip || "—"}</span>,
+    },
+  ];
+
+  return (
+    <>
+      <PageHeader
+        eyebrow={t("nav.sectionAdmin")}
+        title={t("adminAudit.title")}
+        description={t("adminAudit.subtitle")}
+        actions={all.data ? <ListCount total={total} /> : undefined}
+      />
+      <AdminListView
+        query={query}
+        columns={columns}
+        getRowId={(a) => a.id}
+        emptyIcon={ScrollText}
+        emptyTitle={t("adminAudit.emptyTitle")}
+        emptyBody={t("adminAudit.emptyBody")}
+        minWidth={760}
+        isFiltered={isFiltered}
+        onClearFilters={list.clearFilters}
+        toolbar={
+          <ListToolbar>
+            <SearchInput
+              value={list.searchInput}
+              onChange={list.setSearchInput}
+              placeholder={t("adminAudit.searchPlaceholder")}
+            />
+            <FilterSelect
+              value={list.filters.action}
+              onChange={(v) => list.setFilter("action", v)}
+              options={actionOptions.map((v) => ({ value: v, label: v }))}
+              allLabel={t("adminAudit.allActions")}
+            />
+            <FilterSelect
+              value={list.filters.resource_type}
+              onChange={(v) => list.setFilter("resource_type", v)}
+              options={resourceOptions.map((v) => ({ value: v, label: v }))}
+              allLabel={t("adminAudit.allResources")}
+            />
+          </ListToolbar>
+        }
+        pagination={{
+          page: list.page,
+          pageSize: list.pageSize,
+          total,
+          onPageChange: list.setPage,
+        }}
+        rowActions={(a) => (
+          <RowActionsMenu
+            actions={[{ label: t("adminAudit.viewDetails"), onSelect: () => setDetail(a) }]}
+          />
+        )}
+      />
+
+      {detail ? (
+        <Dialog open onOpenChange={(open) => !open && setDetail(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{t("adminAudit.detailTitle")}</DialogTitle>
+              <DialogDescription>
+                {detail.action} · {detail.resource_type}
+                {detail.resource_id ? ` #${detail.resource_id}` : ""}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="mt-4 max-h-[60vh] space-y-4 overflow-y-auto pr-1">
+              <AuditMeta label={t("adminAudit.actor")} value={detail.actor_user_id || "—"} />
+              <AuditMeta label={t("adminAudit.ip")} value={detail.ip || "—"} />
+              <AuditMeta label={t("adminAudit.trace")} value={detail.trace_id || "—"} />
+              <AuditMeta label={t("adminAudit.userAgent")} value={detail.user_agent || "—"} />
+              <JsonBlock label={t("adminAudit.before")} value={detail.before} />
+              <JsonBlock label={t("adminAudit.after")} value={detail.after} />
+            </div>
+          </DialogContent>
+        </Dialog>
+      ) : null}
+    </>
+  );
+}
+
+function AuditMeta({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline gap-3">
+      <span className="w-24 shrink-0 font-mono text-2xs uppercase text-srapi-text-tertiary">
+        {label}
+      </span>
+      <span className="break-all font-mono text-xs text-srapi-text-secondary">{value}</span>
+    </div>
+  );
+}
+
+function JsonBlock({ label, value }: { label: string; value: unknown }) {
+  return (
+    <div>
+      <span className="font-mono text-2xs uppercase text-srapi-text-tertiary">{label}</span>
+      <pre className="mt-1.5 max-h-48 overflow-auto rounded-lg bg-srapi-card-muted p-3 font-mono text-2xs text-srapi-text-secondary">
+        {safeJson(value)}
+      </pre>
+    </div>
+  );
+}

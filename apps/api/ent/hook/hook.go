@@ -657,6 +657,18 @@ func (f UserAuthIdentityFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.V
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.UserAuthIdentityMutation", m)
 }
 
+// The UserPlatformQuotaFunc type is an adapter to allow the use of ordinary
+// function as UserPlatformQuota mutator.
+type UserPlatformQuotaFunc func(context.Context, *ent.UserPlatformQuotaMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f UserPlatformQuotaFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.UserPlatformQuotaMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.UserPlatformQuotaMutation", m)
+}
+
 // The UserPromoCodeApplicationFunc type is an adapter to allow the use of ordinary
 // function as UserPromoCodeApplication mutator.
 type UserPromoCodeApplicationFunc func(context.Context, *ent.UserPromoCodeApplicationMutation) (ent.Value, error)

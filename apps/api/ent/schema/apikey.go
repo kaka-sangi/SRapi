@@ -27,6 +27,11 @@ func (APIKey) Fields() []ent.Field {
 		field.Int("rpm_limit").Optional().Nillable(),
 		field.Int("tpm_limit").Optional().Nillable(),
 		field.Int("concurrency_limit").Optional().Nillable(),
+		field.Int("request_limit_5h").Optional().Nillable(),
+		field.Int("request_limit_1d").Optional().Nillable(),
+		field.Int("request_limit_7d").Optional().Nillable(),
+		field.JSON("allowed_ips_json", []string{}).Optional(),
+		field.JSON("denied_ips_json", []string{}).Optional(),
 		field.Time("expires_at").Optional().Nillable(),
 		field.Time("last_used_at").Optional().Nillable(),
 	}

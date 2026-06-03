@@ -30,6 +30,7 @@ import (
 	retentionworker "github.com/srapi/srapi/apps/api/internal/workers/retention"
 	sloevaluatorworker "github.com/srapi/srapi/apps/api/internal/workers/slo_evaluator"
 	subscriptionexpirerworker "github.com/srapi/srapi/apps/api/internal/workers/subscription_expirer"
+	"github.com/srapi/srapi/apps/api/migrations"
 )
 
 const defaultReadHeaderTimeout = 10 * time.Second
@@ -269,6 +270,7 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 			httpserver.WithHealthRollupsStore(stores.HealthRollups),
 			httpserver.WithModelRateLimitsStore(stores.ModelRateLimits),
 			httpserver.WithGroupRateLimitsStore(stores.GroupRateLimits),
+			httpserver.WithUserPlatformQuotasStore(stores.UserPlatformQuotas),
 		)
 	}
 
@@ -300,7 +302,14 @@ func persistentStores(ctx context.Context, cfg config.Config, logger *slog.Logge
 		return nil, fmt.Errorf("database unavailable for persistent stores: %w", err)
 	}
 
-	if cfg.Server.Mode != "release" {
+	if cfg.Server.Mode == "release" {
+		migrateCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+		err = dbClient.ApplyMigrations(migrateCtx, migrations.UpFS(), logger)
+		cancel()
+		if err != nil {
+			return nil, fmt.Errorf("apply versioned database migrations: %w", err)
+		}
+	} else {
 		schemaCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		err = dbClient.CreateSchema(schemaCtx)
 		cancel()

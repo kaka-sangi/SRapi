@@ -20,6 +20,7 @@ type UsageLog struct {
 	InputTokens           int
 	OutputTokens          int
 	CachedTokens          int
+	CacheCreationTokens   int
 	TotalTokens           int
 	UsageEstimated        bool
 	LatencyMS             int
@@ -47,6 +48,7 @@ type RecordRequest struct {
 	InputTokens           int
 	OutputTokens          int
 	CachedTokens          int
+	CacheCreationTokens   int
 	UsageEstimated        bool
 	LatencyMS             int
 	Success               bool

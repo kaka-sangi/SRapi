@@ -1,121 +1,229 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient, type UseQueryOptions } from "@tanstack/react-query";
-import { apiService, type ApiRuntimeStatus } from "@/lib/api";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { apiService } from "@/lib/api";
+import { meApi } from "@/lib/me-api";
 import { queryKeys } from "@/lib/query-keys";
-import type {
-  ApiKeySummary,
-  ProviderAccountSummary,
-  SchedulerDecisionSummary,
-  SloSummary,
-  UsageLogSummary,
-  SmokeChecklist,
-} from "@/lib/srapi-types";
 
 /**
- * SRapi v0.1.0 query hooks.
- *
- * Each hook wraps `apiService.*` so pages stay declarative. Production pages
- * render explicit loading, empty, and error states; the service layer does not
- * synthesize fallback business data.
+ * User-facing data hooks. Pages consume ONLY these — never useEffect+fetch.
+ * Everything routes through `apiService` (lib/api.ts) → generated SDK.
  */
 
 export function useRuntimeStatus() {
-  return useQuery<ApiRuntimeStatus>({
+  return useQuery({
     queryKey: queryKeys.runtimeStatus(),
     queryFn: () => apiService.getRuntimeStatus(),
-    staleTime: 10_000,
-  });
-}
-
-export function useSmokeStatus(
-  model?: string,
-  options?: Pick<UseQueryOptions<SmokeChecklist, Error>, "enabled">,
-) {
-  return useQuery<SmokeChecklist>({
-    queryKey: queryKeys.smokeStatus(model),
-    queryFn: () => apiService.getSmokeStatus(model),
-    ...options,
-  });
-}
-
-export function useLiveCurrentUser() {
-  return useQuery({
-    queryKey: queryKeys.currentUser(),
-    queryFn: () => apiService.getLiveCurrentUser(),
+    staleTime: 15_000,
+    refetchInterval: 30_000,
   });
 }
 
 export function useApiKeys() {
-  return useQuery<ApiKeySummary[]>({
+  return useQuery({
     queryKey: queryKeys.apiKeys(),
     queryFn: () => apiService.listApiKeys(),
   });
 }
 
+export function useCreateApiKey() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      name,
+      allowedModels,
+      groupIds,
+      allowedIps,
+      deniedIps,
+      requestLimit5h,
+      requestLimit1d,
+      requestLimit7d,
+      rpmLimit,
+      tpmLimit,
+      concurrencyLimit,
+      expiresAt,
+    }: {
+      name: string;
+      allowedModels: string[];
+      groupIds: string[];
+      allowedIps?: string[];
+      deniedIps?: string[];
+      requestLimit5h?: number;
+      requestLimit1d?: number;
+      requestLimit7d?: number;
+      rpmLimit?: number;
+      tpmLimit?: number;
+      concurrencyLimit?: number;
+      expiresAt?: string;
+    }) =>
+      apiService.createApiKey(name, allowedModels, groupIds, {
+        allowedIps,
+        deniedIps,
+        requestLimit5h,
+        requestLimit1d,
+        requestLimit7d,
+        rpmLimit,
+        tpmLimit,
+        concurrencyLimit,
+        expiresAt,
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.apiKeys() }),
+  });
+}
+
+export function useToggleApiKey() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status }: { id: string; status: "active" | "disabled" }) =>
+      apiService.toggleApiKeyStatus(id, status),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.apiKeys() }),
+  });
+}
+
 export function useUsageLogs() {
-  return useQuery<UsageLogSummary[]>({
+  return useQuery({
     queryKey: queryKeys.usageLogs(),
     queryFn: () => apiService.listUsageLogs(),
   });
 }
 
 export function useProviderAccounts() {
-  return useQuery<ProviderAccountSummary[]>({
+  return useQuery({
     queryKey: queryKeys.providerAccounts(),
     queryFn: () => apiService.listProviderAccounts(),
   });
 }
 
+export function useTestProviderAccount() {
+  return useMutation({
+    mutationFn: (id: string) => apiService.testProviderAccount(id),
+  });
+}
+
 export function useSchedulerDecisions() {
-  return useQuery<SchedulerDecisionSummary[]>({
+  return useQuery({
     queryKey: queryKeys.schedulerDecisions(),
     queryFn: () => apiService.listSchedulerDecisions(),
   });
 }
 
-export function useOverviewStats() {
-  return useQuery({
-    queryKey: queryKeys.overviewStats(),
-    queryFn: () => apiService.getOverviewStats(),
-  });
-}
-
 export function useSlos() {
-  return useQuery<SloSummary[]>({
+  return useQuery({
     queryKey: queryKeys.slos(),
     queryFn: () => apiService.listSlos(),
   });
 }
 
-export interface CreateApiKeyInput {
-  name: string;
-  allowedModels: string[];
-  groupIds: string[];
-}
-
-export function useCreateApiKey() {
-  const qc = useQueryClient();
-  return useMutation<ApiKeySummary, Error, CreateApiKeyInput>({
-    mutationFn: ({ name, allowedModels, groupIds }) =>
-      apiService.createApiKey(name, allowedModels, groupIds),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: queryKeys.apiKeys() });
-    },
+export function useSmokeStatus(model = "gpt-4o-mini") {
+  return useQuery({
+    queryKey: queryKeys.smokeStatus(model),
+    queryFn: () => apiService.getSmokeStatus(model),
   });
 }
 
-export interface ToggleApiKeyInput {
-  id: string;
-  currentStatus: "active" | "disabled";
+// ============================================================
+// Self-service (/me) hooks. Route through `meApi` (lib/me-api.ts).
+// ============================================================
+
+type MeP<F extends (...a: never[]) => unknown> = Parameters<F>[0];
+
+// ---- Profile & security ----
+export function useProfile() {
+  return useQuery({ queryKey: queryKeys.me.profile(), queryFn: () => meApi.getProfile() });
+}
+export function useUpdateProfile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: MeP<typeof meApi.updateProfile>) => meApi.updateProfile(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.me.profile() }),
+  });
+}
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: (body: MeP<typeof meApi.changePassword>) => meApi.changePassword(body),
+  });
+}
+export function useTotpStatus() {
+  return useQuery({ queryKey: queryKeys.me.totpStatus(), queryFn: () => meApi.getTotpStatus() });
+}
+export function useSetupTotp() {
+  return useMutation({ mutationFn: () => meApi.setupTotp() });
+}
+export function useEnableTotp() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: MeP<typeof meApi.enableTotp>) => meApi.enableTotp(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.me.totpStatus() }),
+  });
+}
+export function useDisableTotp() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: MeP<typeof meApi.disableTotp>) => meApi.disableTotp(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.me.totpStatus() }),
+  });
 }
 
-export function useToggleApiKey() {
+// ---- Billing ----
+export function useBalance() {
+  return useQuery({ queryKey: queryKeys.me.balance(), queryFn: () => meApi.getBalance() });
+}
+export function usePaymentMethods() {
+  return useQuery({
+    queryKey: queryKeys.me.paymentMethods(),
+    queryFn: () => meApi.listPaymentMethods(),
+  });
+}
+export function useMyOrders() {
+  return useQuery({ queryKey: queryKeys.me.orders(), queryFn: () => meApi.listOrders() });
+}
+export function useCreateOrder() {
   const qc = useQueryClient();
-  return useMutation<ApiKeySummary | null, Error, ToggleApiKeyInput>({
-    mutationFn: ({ id, currentStatus }) => apiService.toggleApiKeyStatus(id, currentStatus),
+  return useMutation({
+    mutationFn: (body: MeP<typeof meApi.createOrder>) => meApi.createOrder(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["me", "orders"] }),
+  });
+}
+export function useCancelOrder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => meApi.cancelOrder(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["me", "orders"] }),
+  });
+}
+export function useMySubscriptions() {
+  return useQuery({
+    queryKey: queryKeys.me.subscriptions(),
+    queryFn: () => meApi.getSubscriptions(),
+  });
+}
+
+// ---- Redeem ----
+export function useRedeemCode() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: MeP<typeof meApi.redeemCode>) => meApi.redeemCode(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.me.balance() }),
+  });
+}
+
+// ---- Affiliate ----
+export function useAffiliate() {
+  return useQuery({ queryKey: queryKeys.me.affiliate(), queryFn: () => meApi.getAffiliate() });
+}
+export function useAffiliateLedger() {
+  return useQuery({
+    queryKey: queryKeys.me.affiliateLedger(),
+    queryFn: () => meApi.listAffiliateLedger(),
+  });
+}
+export function useTransferToBalance() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: MeP<typeof meApi.transferToBalance>) => meApi.transferToBalance(body),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: queryKeys.apiKeys() });
+      qc.invalidateQueries({ queryKey: queryKeys.me.affiliate() });
+      qc.invalidateQueries({ queryKey: queryKeys.me.balance() });
     },
   });
 }

@@ -62,3 +62,6 @@ venv/
 # Deployment local files
 deploy/.env
 *.local
+
+# Local agent / MCP config (machine-specific, not committed)
+.mcp.json

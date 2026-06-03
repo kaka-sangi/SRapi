@@ -17,8 +17,8 @@ export interface RiskControlFormState {
   maxFailedRequestsPerMinute: string;
   maxCostPerDay: string;
   cooldownSeconds: string;
-  blockedCountriesText: string;
-  blockedIpsText: string;
+  blockedCountries: string[];
+  blockedIps: string[];
 }
 
 export interface RiskControlSaveConfirmationState {
@@ -35,8 +35,8 @@ export function createRiskControlForm(config: RiskControlConfig): RiskControlFor
     maxFailedRequestsPerMinute: String(config.max_failed_requests_per_minute),
     maxCostPerDay: config.max_cost_per_day,
     cooldownSeconds: String(config.cooldown_seconds),
-    blockedCountriesText: listToText(config.blocked_countries),
-    blockedIpsText: listToText(config.blocked_ips),
+    blockedCountries: normalizeCountries(config.blocked_countries ?? []),
+    blockedIps: [...(config.blocked_ips ?? [])],
   };
 }
 
@@ -50,8 +50,8 @@ export function buildRiskControlConfig(form: RiskControlFormState): RiskControlC
     ),
     max_cost_per_day: parseDecimalString(form.maxCostPerDay, "Max cost per day"),
     cooldown_seconds: parseNonNegativeInteger(form.cooldownSeconds, "Cooldown seconds"),
-    blocked_countries: normalizeCountries(textToList(form.blockedCountriesText)),
-    blocked_ips: textToList(form.blockedIpsText),
+    blocked_countries: normalizeCountries(form.blockedCountries),
+    blocked_ips: cleanList(form.blockedIps),
   };
 }
 
@@ -75,19 +75,17 @@ export function canConfirmRiskControlSave(
   return Boolean(state && state.confirmation.trim() === state.phrase);
 }
 
-function listToText(items: string[]): string {
-  return (items ?? []).join("\n");
-}
-
-function textToList(value: string): string[] {
-  return value
-    .split(/\r?\n|,/)
-    .map((item) => item.trim())
-    .filter(Boolean);
+function cleanList(items: string[]): string[] {
+  const out: string[] = [];
+  for (const item of items) {
+    const trimmed = item.trim();
+    if (trimmed && !out.includes(trimmed)) out.push(trimmed);
+  }
+  return out;
 }
 
 function normalizeCountries(items: string[]): string[] {
-  return items.map((item) => item.toUpperCase());
+  return cleanList(items.map((item) => item.toUpperCase()));
 }
 
 function parseNonNegativeInteger(value: string, fieldName: string): number {

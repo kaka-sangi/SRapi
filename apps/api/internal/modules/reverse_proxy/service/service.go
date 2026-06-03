@@ -172,6 +172,77 @@ func (s *Service) Do(ctx context.Context, req contract.Request) (contract.Respon
 	}, nil
 }
 
+// DoStream performs the upstream request like Do but returns the live response
+// body for incremental streaming instead of buffering it with io.ReadAll. The
+// caller owns StreamResponse.Body and MUST close it. On a non-2xx upstream
+// status the body is consumed (bounded) and closed here and a classified
+// RuntimeError is returned, so callers can fail over before writing anything
+// downstream. This shares Do's egress profile, SSRF guard, auth injection, and
+// client selection so streamed traffic is byte-for-byte identical on the wire.
+func (s *Service) DoStream(ctx context.Context, req contract.Request) (contract.StreamResponse, error) {
+	if req.Account.AccountID <= 0 || strings.TrimSpace(req.Method) == "" || strings.TrimSpace(req.URL) == "" {
+		return contract.StreamResponse{}, ErrInvalidInput
+	}
+	if err := guardBody(req.Body); err != nil {
+		s.recordError(errorClass(err))
+		return contract.StreamResponse{}, err
+	}
+	profile, err := resolveEgressProfile(req.Account)
+	if err != nil {
+		s.recordError(errorClass(err))
+		return contract.StreamResponse{}, err
+	}
+	if err := validateEgressTargetURL(req.URL, profile); err != nil {
+		s.recordError(errorClass(err))
+		return contract.StreamResponse{}, err
+	}
+	httpReq, err := http.NewRequestWithContext(ctx, req.Method, req.URL, bytes.NewReader(req.Body))
+	if err != nil {
+		s.recordError("invalid_request")
+		return contract.StreamResponse{}, err
+	}
+	httpReq.Header = sanitizeHeadersForProfile(req.Headers, profile)
+	applyEgressStaticHeaders(httpReq.Header, profile)
+	if len(req.Body) > 0 && httpReq.Header.Get("Content-Type") == "" {
+		httpReq.Header.Set("Content-Type", "application/json")
+	}
+	injectAuth(httpReq.Header, req.Account)
+	if httpReq.Header.Get("User-Agent") == "" {
+		httpReq.Header.Set("User-Agent", userAgentForProfile(req.Account, profile))
+	}
+
+	client, err := s.clientFor(req.Account)
+	if err != nil {
+		s.recordError(errorClass(err))
+		return contract.StreamResponse{}, err
+	}
+	s.recordRequest()
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			runtimeErr := contract.RuntimeError{Class: "timeout", StatusCode: http.StatusGatewayTimeout, Message: "reverse proxy request timed out"}
+			s.recordError(runtimeErr.Class)
+			return contract.StreamResponse{}, runtimeErr
+		}
+		runtimeErr := contract.RuntimeError{Class: "network_error", StatusCode: http.StatusBadGateway, Message: "reverse proxy request failed"}
+		s.recordError(runtimeErr.Class)
+		return contract.StreamResponse{}, runtimeErr
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, maxReverseProxyResponseBytes))
+		_ = resp.Body.Close()
+		runtimeErr := classifyRuntimeError(resp.StatusCode, body)
+		s.recordError(runtimeErr.Class)
+		return contract.StreamResponse{}, runtimeErr
+	}
+	s.recordSuccess()
+	return contract.StreamResponse{
+		StatusCode: resp.StatusCode,
+		Headers:    cloneHeaders(resp.Header),
+		Body:       resp.Body,
+	}, nil
+}
+
 func (s *Service) RelayWebSocket(ctx context.Context, req contract.WebSocketRelayRequest) (contract.WebSocketRelayResult, error) {
 	if req.Account.AccountID <= 0 || strings.TrimSpace(req.URL) == "" || req.ClientToUpstream == nil || req.UpstreamToClient == nil {
 		return contract.WebSocketRelayResult{}, ErrInvalidInput

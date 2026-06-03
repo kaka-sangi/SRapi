@@ -120,6 +120,8 @@ type Tx struct {
 	UserAttributeValue *UserAttributeValueClient
 	// UserAuthIdentity is the client for interacting with the UserAuthIdentity builders.
 	UserAuthIdentity *UserAuthIdentityClient
+	// UserPlatformQuota is the client for interacting with the UserPlatformQuota builders.
+	UserPlatformQuota *UserPlatformQuotaClient
 	// UserPromoCodeApplication is the client for interacting with the UserPromoCodeApplication builders.
 	UserPromoCodeApplication *UserPromoCodeApplicationClient
 	// UserRedeemCodeRedemption is the client for interacting with the UserRedeemCodeRedemption builders.
@@ -317,6 +319,7 @@ func (tx *Tx) init() {
 	tx.UserAttributeDefinition = NewUserAttributeDefinitionClient(tx.config)
 	tx.UserAttributeValue = NewUserAttributeValueClient(tx.config)
 	tx.UserAuthIdentity = NewUserAuthIdentityClient(tx.config)
+	tx.UserPlatformQuota = NewUserPlatformQuotaClient(tx.config)
 	tx.UserPromoCodeApplication = NewUserPromoCodeApplicationClient(tx.config)
 	tx.UserRedeemCodeRedemption = NewUserRedeemCodeRedemptionClient(tx.config)
 	tx.UserRole = NewUserRoleClient(tx.config)

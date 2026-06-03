@@ -1,10 +1,10 @@
 "use client";
 
-import * as React from "react";
+import { useEffect } from "react";
 import { reportWebVitals } from "@/lib/telemetry";
 
 export function WebVitalsReporter() {
-  React.useEffect(() => {
+  useEffect(() => {
     reportWebVitals();
   }, []);
   return null;

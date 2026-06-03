@@ -39,6 +39,15 @@ func (s *Server) reserveGatewayAccountQuotaForScheduledRequest(
 	admission gatewayAdmission,
 	startedAt time.Time,
 ) error {
+	// Per-user, per-platform spend cap (WP sub2api M142 parity): block before
+	// reserving account quota when the user's spend on the scheduled platform
+	// would exceed a configured window cap. 402 is a non-failover class, so this
+	// hard-denies rather than rerouting to another platform.
+	if err := s.runtime.enforceUserPlatformQuota(ctx, canonical.UserID, result.Candidate.Provider.ID, result.Candidate.Provider.Name, admission); err != nil {
+		errorClass, upstreamStatus, _ := providerGatewayError(err)
+		s.recordGatewayProviderAttemptFailure(r, authed, canonical, result, err, errorClass, upstreamStatus, elapsedMillis(startedAt), admission)
+		return err
+	}
 	if err := s.runtime.reserveGatewayAccountQuota(ctx, admission.EstimatedUsage, result.Candidate); err != nil {
 		errorClass, upstreamStatus, _ := providerGatewayError(err)
 		s.recordGatewayProviderAttemptFailure(r, authed, canonical, result, err, errorClass, upstreamStatus, elapsedMillis(startedAt), admission)

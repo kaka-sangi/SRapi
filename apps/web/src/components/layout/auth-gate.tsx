@@ -1,130 +1,106 @@
 "use client";
 
-import * as React from "react";
+import { createContext, useContext, useEffect, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import { apiService, type ApiRuntimeStatus } from "@/lib/api";
-import { useRuntimeStatus } from "@/hooks/queries";
-import { Spinner } from "@/components/ui";
-import { homeRouteForRole } from "@/lib/routes";
-
-type Role = "admin" | "user";
-type CurrentUser = ReturnType<typeof apiService.getCurrentUser>;
-
-interface AuthGateProps {
-  allowedRole?: Role;
-  children: (ctx: AuthedContext) => React.ReactNode;
-  loadingLabel?: string;
-}
-
-export interface AuthedContext {
-  user: NonNullable<CurrentUser>;
-  runtimeStatus: ApiRuntimeStatus | null;
-  refreshRuntimeStatus: () => Promise<void>;
-}
+import { apiService } from "@/lib/api";
+import type { CurrentUser } from "@/lib/srapi-types";
+import { ADMIN_HOME_ROUTE, SIGN_IN_ROUTE, USER_HOME_ROUTE } from "@/lib/routes";
+import { Spinner } from "@/components/ui/spinner";
 
 const USER_STORAGE_KEY = "srapi_user";
 const USER_EVENT = "srapi:user-change";
 
-// `useSyncExternalStore` compares snapshots with Object.is, so we must
-// return a stable reference when storage has not changed. `apiService.getCurrentUser`
-// always returns a fresh object literal — caching by raw JSON keeps the
-// reference identity steady and avoids React error #185 (max update depth).
-let cachedRaw: string | null = null;
-let cachedUser: CurrentUser = null;
+function subscribe(callback: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener(USER_EVENT, callback);
+  window.addEventListener("storage", callback);
+  return () => {
+    window.removeEventListener(USER_EVENT, callback);
+    window.removeEventListener("storage", callback);
+  };
+}
 
-function readCurrentUserStable(): CurrentUser {
+// Return the raw JSON string so useSyncExternalStore gets a stable primitive
+// snapshot (avoids React error #185 from a fresh object each render).
+function getSnapshot(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(USER_STORAGE_KEY);
+}
+
+function getServerSnapshot(): string | null {
+  return null;
+}
+
+export function useCurrentUserShell(): CurrentUser | null {
+  const raw = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as CurrentUser;
+  } catch {
+    return null;
+  }
+}
+
+/** Authoritative localStorage read — used in the redirect effect so a transient
+ *  null snapshot during hydration never bounces an authenticated user. */
+function readStoredUser(): CurrentUser | null {
   if (typeof window === "undefined") return null;
   const raw = window.localStorage.getItem(USER_STORAGE_KEY);
-  if (raw === cachedRaw) return cachedUser;
-  cachedRaw = raw;
-  cachedUser = apiService.getCurrentUser();
-  return cachedUser;
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as CurrentUser;
+  } catch {
+    return null;
+  }
 }
 
-function invalidateUserCache(): void {
-  cachedRaw = null;
-  cachedUser = null;
+const CurrentUserContext = createContext<CurrentUser | null>(null);
+
+export function useAuthUser(): CurrentUser {
+  const user = useContext(CurrentUserContext);
+  if (!user) throw new Error("useAuthUser must be used within an authenticated AuthGate");
+  return user;
 }
-
-const subscribeToUser = (notify: () => void) => {
-  if (typeof window === "undefined") return () => {};
-  const listener = (event: StorageEvent | Event) => {
-    if (event instanceof StorageEvent && event.key && event.key !== USER_STORAGE_KEY) return;
-    invalidateUserCache();
-    notify();
-  };
-  window.addEventListener("storage", listener);
-  window.addEventListener(USER_EVENT, listener);
-  return () => {
-    window.removeEventListener("storage", listener);
-    window.removeEventListener(USER_EVENT, listener);
-  };
-};
-
-const getUserSnapshot = (): CurrentUser => readCurrentUserStable();
-const getServerUserSnapshot = (): CurrentUser => null;
-
-// Stable "is hydrated" signal. `useSyncExternalStore` is the canonical way
-// to get a server-vs-client diverging value without setState-in-effect.
-const subscribeToNothing = () => () => {};
-const getServerMounted = () => false;
-const getClientMounted = () => true;
 
 /**
- * SRapi v0.1.0 client-side auth gate.
- *
- * Auth state derives from `localStorage` via `useSyncExternalStore` so the
- * first client paint matches the actual session. Redirects are issued from
- * a `useEffect` to avoid the "Maximum update depth" loop that happens when
- * navigation is triggered during render.
- *
- * Runtime status flows through TanStack Query for caching, retry, and
- * deduplication. `proxy.ts` (edge) handles the same redirect server-side
- * using the presence cookie, so this client fallback usually only renders
- * during the brief window between cookie write and SPA navigation.
+ * Client-side auth guard. Mirrors `proxy.ts` (edge) but also catches the case
+ * where the presence cookie and localStorage drift apart in the same tab.
  */
-export function AuthGate({ allowedRole, children, loadingLabel = "Loading..." }: AuthGateProps) {
+export function AuthGate({
+  allowedRole,
+  children,
+}: {
+  allowedRole?: "admin" | "user";
+  children: React.ReactNode;
+}) {
   const router = useRouter();
-  const user = React.useSyncExternalStore(
-    subscribeToUser,
-    getUserSnapshot,
-    getServerUserSnapshot,
-  );
-  const mounted = React.useSyncExternalStore(
-    subscribeToNothing,
-    getClientMounted,
-    getServerMounted,
-  );
+  const user = useCurrentUserShell();
 
-  const runtimeQuery = useRuntimeStatus();
-  const refreshRuntimeStatus = React.useCallback(async () => {
-    await runtimeQuery.refetch();
-  }, [runtimeQuery]);
-
-  const wrongRole = !!(user && allowedRole && user.role !== allowedRole);
-  const missingUser = mounted && !user;
-
-  React.useEffect(() => {
-    // Wait until after hydration so we never redirect on the server snapshot.
-    if (!mounted) return;
-    if (missingUser) {
-      router.replace("/");
+  useEffect(() => {
+    // Read localStorage authoritatively rather than the synced snapshot: on a
+    // hard navigation/refresh the server snapshot is null on the first client
+    // commit even when a session exists, so trusting `user` here would bounce an
+    // authenticated user to sign-in. `user` stays in the deps so a real logout
+    // (localStorage cleared + event) re-runs this and redirects.
+    const current = readStoredUser();
+    if (!current) {
+      router.replace(SIGN_IN_ROUTE);
       return;
     }
-    if (wrongRole && user) {
-      router.replace(homeRouteForRole(user.role));
+    if (allowedRole && current.role !== allowedRole) {
+      router.replace(current.role === "admin" ? ADMIN_HOME_ROUTE : USER_HOME_ROUTE);
     }
-  }, [mounted, missingUser, wrongRole, user, router]);
+  }, [user, allowedRole, router]);
 
-  if (!mounted || missingUser || wrongRole) {
+  if (!user || (allowedRole && user.role !== allowedRole)) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center p-8">
-        <Spinner size={28} label={loadingLabel} />
+      <div className="flex min-h-dvh items-center justify-center">
+        <Spinner className="size-5" />
       </div>
     );
   }
 
-  return (
-    <>{children({ user: user!, runtimeStatus: runtimeQuery.data ?? null, refreshRuntimeStatus })}</>
-  );
+  return <CurrentUserContext.Provider value={user}>{children}</CurrentUserContext.Provider>;
 }
+
+export { apiService };

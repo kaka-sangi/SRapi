@@ -4096,7 +4096,7 @@ func TestAnthropicCompatibleAdapterStreamsUpstream(t *testing.T) {
 	if err != nil {
 		t.Fatalf("invoke anthropic stream upstream: %v", err)
 	}
-	if conversationResponseText(resp) != "hello stream" || resp.Usage.Estimated || resp.Usage.InputTokens != 5 || resp.Usage.OutputTokens != 6 || resp.Usage.CachedTokens != 1 {
+	if conversationResponseText(resp) != "hello stream" || resp.Usage.Estimated || resp.Usage.InputTokens != 5 || resp.Usage.OutputTokens != 6 || resp.Usage.CachedTokens != 0 || resp.Usage.CacheCreationTokens != 1 {
 		t.Fatalf("unexpected anthropic stream response: %+v", resp)
 	}
 	if string(resp.Raw) != rawSSE {

@@ -1,25 +1,19 @@
 "use client";
 
-import * as React from "react";
+import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/context/LanguageContext";
-import { cn } from "@/lib/cn";
 
-export function LanguageToggle({ className }: { className?: string }) {
-  const { language, toggleLanguage } = useLanguage();
+export function LanguageToggle() {
+  const { toggleLanguage, t } = useLanguage();
   return (
-    <button
-      type="button"
+    <Button
+      variant="outline"
+      size="sm"
+      className="font-mono normal-case tracking-normal"
       onClick={toggleLanguage}
-      title="Switch language"
-      aria-label="Switch language"
-      className={cn(
-        "rounded-xl border border-srapi-border px-2.5 py-1.5 font-mono text-2xs font-bold uppercase tracking-wider text-srapi-text-secondary",
-        "transition-all hover:bg-srapi-card-muted hover:text-srapi-text-primary",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-srapi-primary focus-visible:ring-offset-2 focus-visible:ring-offset-srapi-bg",
-        className,
-      )}
+      aria-label={t("common.language")}
     >
-      {language === "en" ? "中文" : "EN"}
-    </button>
+      {t("common.language")}
+    </Button>
   );
 }

@@ -48,6 +48,7 @@ type gatewayUsageRecord struct {
 	InputTokens           int
 	OutputTokens          int
 	CachedTokens          int
+	CacheCreationTokens   int
 	UsageEstimated        bool
 	Pricing               gatewayPricingEvidence
 	CompatibilityWarnings []string
@@ -155,6 +156,15 @@ func (rt *runtimeState) prepareGatewayAdmissionWithOptions(ctx context.Context, 
 	if !entitlement.Allowed {
 		return admission, nil
 	}
+	denied, err := rt.gatewayBalanceGate(ctx, canonical.UserID, entitlement, pricing)
+	if err != nil {
+		return gatewayAdmission{}, err
+	}
+	if denied {
+		admission.Entitlement.Allowed = false
+		admission.Entitlement.Reason = "insufficient_balance"
+		return admission, nil
+	}
 	rateLimit, err := rt.checkGatewayRateLimit(ctx, *canonical, estimatedUsage, modelID)
 	if err != nil {
 		return gatewayAdmission{}, err
@@ -232,6 +242,8 @@ func (rt *runtimeState) checkGatewayRateLimit(ctx context.Context, canonical gat
 			Window: time.Minute,
 		})
 	}
+	// Per-key multi-window request ceilings (5h / 1d / 7d).
+	checks = append(checks, gatewayAPIKeyWindowChecks(apiKey)...)
 	if limit := positiveLimit(user.RPMLimit); limit > 0 {
 		checks = append(checks, ratelimit.Check{
 			Name:   "rpm",
@@ -513,13 +525,14 @@ func (rt *runtimeState) gatewayPricing(ctx context.Context, req subscriptioncont
 
 func gatewayPricingRequest(modelID int, candidate schedulercontract.Candidate, usage gatewaycontract.Usage) subscriptioncontract.PricingRequest {
 	return subscriptioncontract.PricingRequest{
-		ModelID:         modelID,
-		ProviderID:      candidate.Provider.ID,
-		InputTokens:     usage.InputTokens,
-		OutputTokens:    usage.OutputTokens,
-		CacheReadTokens: usage.CachedTokens,
-		At:              time.Now().UTC(),
-		PricingOverride: cloneAnyMap(candidate.Mapping.PricingOverride),
+		ModelID:          modelID,
+		ProviderID:       candidate.Provider.ID,
+		InputTokens:      usage.InputTokens,
+		OutputTokens:     usage.OutputTokens,
+		CacheReadTokens:  usage.CachedTokens,
+		CacheWriteTokens: usage.CacheCreationTokens,
+		At:               time.Now().UTC(),
+		PricingOverride:  cloneAnyMap(candidate.Mapping.PricingOverride),
 	}
 }
 
@@ -541,6 +554,130 @@ func (rt *runtimeState) gatewayUserPeriodUsage(ctx context.Context, userID int, 
 	return tokens, cost, nil
 }
 
+// gatewayUserPlatformSpend sums the user's successful spend on a single platform
+// (one provider) across the daily / weekly / monthly windows, reusing the same
+// ListByUser scan the entitlement period-usage check uses. Day and month windows
+// are UTC-calendar-aligned (month start matches the monthly cost entitlement);
+// the week window is a rolling trailing 7 days.
+func (rt *runtimeState) gatewayUserPlatformSpend(ctx context.Context, userID, providerID int, now time.Time) (string, string, string) {
+	daily, weekly, monthly := "0.00000000", "0.00000000", "0.00000000"
+	if rt.usage == nil || userID <= 0 || providerID <= 0 {
+		return daily, weekly, monthly
+	}
+	logs, err := rt.usage.ListByUser(ctx, userID)
+	if err != nil {
+		return daily, weekly, monthly
+	}
+	dayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	weekStart := now.Add(-7 * 24 * time.Hour)
+	monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+	for _, log := range logs {
+		if !log.Success || log.ProviderID == nil || *log.ProviderID != providerID {
+			continue
+		}
+		created := log.CreatedAt.UTC()
+		if !created.Before(monthStart) {
+			monthly = addDecimalMoney(monthly, log.Cost)
+		}
+		if !created.Before(weekStart) {
+			weekly = addDecimalMoney(weekly, log.Cost)
+		}
+		if !created.Before(dayStart) {
+			daily = addDecimalMoney(daily, log.Cost)
+		}
+	}
+	return daily, weekly, monthly
+}
+
+// effectivePlatformLimits resolves the daily/weekly/monthly USD caps for a user
+// on a platform: an enabled per-user UserPlatformQuota override wins; otherwise
+// the subscription plan default carried in entitlements applies. ok is false
+// when no cap is configured.
+func (rt *runtimeState) effectivePlatformLimits(ctx context.Context, userID int, platform string, admission gatewayAdmission) (daily, weekly, monthly *string, ok bool) {
+	if rt.userPlatformQuotas != nil {
+		if quota, found := rt.userPlatformQuotas.EffectiveQuota(ctx, userID, platform); found {
+			return quota.DailyLimit, quota.WeeklyLimit, quota.MonthlyLimit, true
+		}
+	}
+	return platformDefaultsFromEntitlements(admission.Entitlement.Entitlements, platform)
+}
+
+// platformDefaultsFromEntitlements reads plan-level platform caps from the
+// entitlements map, shaped as: platform_spend_quotas: { "<platform>": { daily,
+// weekly, monthly } } (each value a decimal USD string).
+func platformDefaultsFromEntitlements(entitlements map[string]any, platform string) (*string, *string, *string, bool) {
+	raw, ok := entitlements["platform_spend_quotas"]
+	if !ok {
+		return nil, nil, nil, false
+	}
+	byPlatform, ok := raw.(map[string]any)
+	if !ok {
+		return nil, nil, nil, false
+	}
+	entry, ok := byPlatform[platform].(map[string]any)
+	if !ok {
+		return nil, nil, nil, false
+	}
+	daily := optionalMoneyField(entry, "daily")
+	weekly := optionalMoneyField(entry, "weekly")
+	monthly := optionalMoneyField(entry, "monthly")
+	if daily == nil && weekly == nil && monthly == nil {
+		return nil, nil, nil, false
+	}
+	return daily, weekly, monthly, true
+}
+
+func optionalMoneyField(fields map[string]any, key string) *string {
+	value, ok := fields[key].(string)
+	if !ok {
+		return nil
+	}
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return nil
+	}
+	return &trimmed
+}
+
+// enforceUserPlatformQuota hard-denies a request when the user's accumulated
+// spend on the scheduled platform (plus this request's estimate) would exceed
+// any configured window cap. Returns a 402 platform_quota_exceeded ProviderError
+// — a non-failover class — so the request is blocked rather than rerouted.
+func (rt *runtimeState) enforceUserPlatformQuota(ctx context.Context, userID, providerID int, platform string, admission gatewayAdmission) error {
+	platform = strings.TrimSpace(platform)
+	if rt.userPlatformQuotas == nil || userID <= 0 || providerID <= 0 || platform == "" {
+		return nil
+	}
+	daily, weekly, monthly, ok := rt.effectivePlatformLimits(ctx, userID, platform, admission)
+	if !ok {
+		return nil
+	}
+	spendDaily, spendWeekly, spendMonthly := rt.gatewayUserPlatformSpend(ctx, userID, providerID, time.Now().UTC())
+	estimated := admission.Pricing.Amount
+	windows := []struct {
+		limit *string
+		spent string
+		name  string
+	}{
+		{daily, spendDaily, "daily"},
+		{weekly, spendWeekly, "weekly"},
+		{monthly, spendMonthly, "monthly"},
+	}
+	for _, window := range windows {
+		if window.limit == nil {
+			continue
+		}
+		if compareDecimalMoney(addDecimalMoney(window.spent, estimated), *window.limit) > 0 {
+			return provideradaptercontract.ProviderError{
+				Class:      "platform_quota_exceeded",
+				StatusCode: http.StatusPaymentRequired,
+				Message:    fmt.Sprintf("%s platform %s spend quota exceeded", platform, window.name),
+			}
+		}
+	}
+	return nil
+}
+
 func gatewayModelReferences(canonical gatewaycontract.CanonicalRequest, resolution modelcontract.ModelResolution) []string {
 	refs := []string{canonical.CanonicalModel, canonical.Model, resolution.Model.CanonicalName}
 	if resolution.Alias != nil {
@@ -550,61 +687,9 @@ func gatewayModelReferences(canonical gatewaycontract.CanonicalRequest, resoluti
 	return uniqueNonEmptyStrings(refs)
 }
 
-func gatewayEntitlementErrorClass(decision subscriptioncontract.EntitlementDecision) string {
-	switch strings.TrimSpace(decision.Reason) {
-	case "model_not_allowed":
-		return "entitlement_model_not_allowed"
-	case "monthly_token_quota_exceeded":
-		return "monthly_token_quota_exceeded"
-	case "monthly_cost_quota_exceeded":
-		return "monthly_cost_quota_exceeded"
-	case "rpm_limit_exceeded":
-		return "rpm_limit_exceeded"
-	case "tpm_limit_exceeded":
-		return "tpm_limit_exceeded"
-	case "rate_limit_exceeded":
-		return "rate_limit_exceeded"
-	default:
-		return "entitlement_denied"
-	}
-}
-
-func gatewayEntitlementHTTPStatus(errorClass string) int {
-	switch errorClass {
-	case "monthly_token_quota_exceeded", "monthly_cost_quota_exceeded", "rpm_limit_exceeded", "tpm_limit_exceeded", "rate_limit_exceeded":
-		return http.StatusTooManyRequests
-	default:
-		return http.StatusForbidden
-	}
-}
-
-func gatewayEntitlementErrorType(errorClass string) apiopenapi.GatewayErrorObjectType {
-	switch errorClass {
-	case "monthly_token_quota_exceeded", "monthly_cost_quota_exceeded", "rpm_limit_exceeded", "tpm_limit_exceeded", "rate_limit_exceeded":
-		return apiopenapi.RateLimitError
-	default:
-		return apiopenapi.PermissionError
-	}
-}
-
-func gatewayEntitlementMessage(errorClass string) string {
-	switch errorClass {
-	case "entitlement_model_not_allowed":
-		return "model not allowed by subscription entitlement"
-	case "monthly_token_quota_exceeded":
-		return "monthly token quota exceeded"
-	case "monthly_cost_quota_exceeded":
-		return "monthly cost quota exceeded"
-	case "rpm_limit_exceeded":
-		return "API key RPM limit exceeded"
-	case "tpm_limit_exceeded":
-		return "API key TPM limit exceeded"
-	case "rate_limit_exceeded":
-		return "API key rate limit exceeded"
-	default:
-		return "request not allowed by subscription entitlement"
-	}
-}
+// Gateway balance-gate and entitlement-error mapping helpers live in
+// runtime_gateway_entitlement.go to keep this route-family file within the
+// architecture size budget.
 
 func gatewayRateLimitReason(name string) string {
 	switch strings.TrimSpace(name) {
@@ -681,6 +766,20 @@ func addDecimalMoney(left string, right string) string {
 		rightRat = new(big.Rat)
 	}
 	return formatDecimalFixed(leftRat.Add(leftRat, rightRat), 8)
+}
+
+// compareDecimalMoney returns -1, 0 or 1 for left < / == / > right, parsing the
+// same fixed-decimal money strings addDecimalMoney produces.
+func compareDecimalMoney(left string, right string) int {
+	leftRat, ok := new(big.Rat).SetString(defaultDecimalMoney(left))
+	if !ok {
+		leftRat = new(big.Rat)
+	}
+	rightRat, ok := new(big.Rat).SetString(defaultDecimalMoney(right))
+	if !ok {
+		rightRat = new(big.Rat)
+	}
+	return leftRat.Cmp(rightRat)
 }
 
 func defaultDecimalMoney(value string) string {
@@ -1408,8 +1507,33 @@ func (rt *runtimeState) invokeProviderConversation(ctx context.Context, req prov
 	if err != nil {
 		return provideradaptercontract.ConversationResponse{}, err
 	}
-	defer rt.releaseGatewayConcurrency(dispatch.concurrencyLeases)
+	// The concurrency lease normally lasts for this call. For a streamed
+	// passthrough the response body outlives the call, so ownership of the lease
+	// transfers to the stream and is released by StreamBody.Close() instead.
+	releaseLeases := true
+	defer func() {
+		if releaseLeases {
+			rt.releaseGatewayConcurrency(dispatch.concurrencyLeases)
+		}
+	}()
 	req.Credential = dispatch.credential
+	if req.Stream {
+		streamed, streamErr := rt.adapters.StreamConversation(ctx, req)
+		if streamErr == nil {
+			leases := dispatch.concurrencyLeases
+			streamed.StreamBody = newStreamLeaseCloser(streamed.StreamBody, func() {
+				rt.releaseGatewayConcurrency(leases)
+			})
+			releaseLeases = false
+			return streamed, nil
+		}
+		if !errors.Is(streamErr, provideradaptercontract.ErrStreamingUnsupported) {
+			rt.applyProviderAccountProtection(ctx, req.Account, streamErr)
+			return provideradaptercontract.ConversationResponse{}, streamErr
+		}
+		// Streaming passthrough not eligible for this request/candidate; fall
+		// back to the buffered path below.
+	}
 	resp, err := rt.adapters.InvokeConversation(ctx, req)
 	if err != nil {
 		rt.applyProviderAccountProtection(ctx, req.Account, err)
@@ -1870,10 +1994,11 @@ func gatewayUsageFromProvider(resp provideradaptercontract.ConversationResponse)
 
 func gatewayUsageFromProviderUsage(usage provideradaptercontract.Usage) gatewaycontract.Usage {
 	return gatewaycontract.Usage{
-		InputTokens:  usage.InputTokens,
-		OutputTokens: usage.OutputTokens,
-		CachedTokens: usage.CachedTokens,
-		Estimated:    usage.Estimated,
+		InputTokens:         usage.InputTokens,
+		OutputTokens:        usage.OutputTokens,
+		CachedTokens:        usage.CachedTokens,
+		CacheCreationTokens: usage.CacheCreationTokens,
+		Estimated:           usage.Estimated,
 	}
 }
 
@@ -2075,7 +2200,7 @@ func gatewayErrorTypeForProviderClass(errorClass string) apiopenapi.GatewayError
 	switch errorClass {
 	case "invalid_request":
 		return apiopenapi.InvalidRequestError
-	case "rate_limit", "rpm_limit_exceeded", "tpm_limit_exceeded", "concurrency_limit_exceeded":
+	case "rate_limit", "rpm_limit_exceeded", "tpm_limit_exceeded", "concurrency_limit_exceeded", "platform_quota_exceeded":
 		return apiopenapi.RateLimitError
 	case "auth_failed", "auth_error", "permission_denied", "session_invalid", "account_locked", "account_banned", "abuse_detected", "device_unrecognized":
 		return apiopenapi.PermissionError
@@ -2090,6 +2215,9 @@ func providerGatewayHTTPStatus(upstreamStatus int) int {
 	switch upstreamStatus {
 	case http.StatusTooManyRequests:
 		return http.StatusTooManyRequests
+	case http.StatusPaymentRequired:
+		// Per-user platform spend-quota denials surface as 402 to the caller.
+		return http.StatusPaymentRequired
 	case 529:
 		return http.StatusServiceUnavailable
 	case http.StatusUnauthorized, http.StatusForbidden:
@@ -2116,6 +2244,8 @@ func providerGatewayMessage(errorClass string) string {
 		return "provider account TPM limit exceeded"
 	case "concurrency_limit_exceeded":
 		return "provider account concurrency limit exceeded"
+	case "platform_quota_exceeded":
+		return "platform spend quota exceeded"
 	case "auth_failed", "auth_error", "credential_error":
 		return "provider authentication failed"
 	case "configuration_error":

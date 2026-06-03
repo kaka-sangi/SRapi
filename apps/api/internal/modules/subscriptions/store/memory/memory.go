@@ -60,6 +60,45 @@ func (s *Store) CreatePlan(_ context.Context, input contract.CreateStoredPlan) (
 	return clonePlan(plan), nil
 }
 
+func (s *Store) UpdatePlan(_ context.Context, id int, input contract.UpdateStoredPlan) (contract.SubscriptionPlan, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	plan, ok := s.plans[id]
+	if !ok {
+		return contract.SubscriptionPlan{}, contract.ErrNotFound
+	}
+	if input.Name != nil {
+		plan.Name = *input.Name
+	}
+	if input.Description != nil {
+		plan.Description = *input.Description
+	}
+	if input.Price != nil {
+		plan.Price = *input.Price
+	}
+	if input.Currency != nil {
+		plan.Currency = *input.Currency
+	}
+	if input.ValidityDays != nil {
+		plan.ValidityDays = *input.ValidityDays
+	}
+	if input.Entitlements != nil {
+		plan.Entitlements = cloneMap(*input.Entitlements)
+	}
+	if input.ForSale != nil {
+		plan.ForSale = *input.ForSale
+	}
+	if input.SortOrder != nil {
+		plan.SortOrder = *input.SortOrder
+	}
+	if input.Status != nil {
+		plan.Status = *input.Status
+	}
+	plan.UpdatedAt = time.Now().UTC()
+	s.plans[id] = plan
+	return clonePlan(plan), nil
+}
+
 func (s *Store) FindPlanByID(_ context.Context, id int) (contract.SubscriptionPlan, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

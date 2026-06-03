@@ -29,6 +29,7 @@ func (UsageLog) Fields() []ent.Field {
 		field.Int("input_tokens").Default(0),
 		field.Int("output_tokens").Default(0),
 		field.Int("cached_tokens").Default(0),
+		field.Int("cache_creation_tokens").Default(0),
 		field.Int("total_tokens").Default(0),
 		field.Bool("usage_estimated").Default(false),
 		field.Int("latency_ms").Default(0),

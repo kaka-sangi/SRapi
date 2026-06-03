@@ -2103,6 +2103,61 @@ func TestBulkImportAdminPricingRulesAcceptsCSV(t *testing.T) {
 	}
 }
 
+func TestAdminListAccountGroupMembers(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"members-provider","display_name":"Members Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	accountResp := mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"members-account","runtime_class":"api_key","credential":{"api_key":"members-secret"},"status":"active"}`)
+	groupResp := mustCreateAccountGroup(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"members-group","status":"active"}`)
+	groupID := string(groupResp.Data.Id)
+
+	listMembers := func() (*httptest.ResponseRecorder, apiopenapi.AccountGroupMemberListResponse) {
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/account-groups/"+groupID+"/accounts", nil)
+		req.AddCookie(sessionCookie)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		var resp apiopenapi.AccountGroupMemberListResponse
+		if rec.Code == http.StatusOK {
+			if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+				t.Fatalf("decode member list: %v", err)
+			}
+		}
+		return rec, resp
+	}
+
+	if rec, resp := listMembers(); rec.Code != http.StatusOK || len(resp.Data) != 0 {
+		t.Fatalf("expected empty member list, got %d len=%d body=%s", rec.Code, len(resp.Data), rec.Body.String())
+	}
+
+	addReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/account-groups/"+groupID+"/accounts/"+string(accountResp.Data.Id), nil)
+	addReq.AddCookie(sessionCookie)
+	addReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	addRec := httptest.NewRecorder()
+	handler.ServeHTTP(addRec, addReq)
+	if addRec.Code != http.StatusOK {
+		t.Fatalf("expected add member 200, got %d body=%s", addRec.Code, addRec.Body.String())
+	}
+
+	rec, resp := listMembers()
+	if rec.Code != http.StatusOK || len(resp.Data) != 1 {
+		t.Fatalf("expected one member, got %d len=%d body=%s", rec.Code, len(resp.Data), rec.Body.String())
+	}
+	if resp.Data[0].AccountId != accountResp.Data.Id || resp.Data[0].AccountGroupId != groupResp.Data.Id {
+		t.Fatalf("unexpected member %+v", resp.Data[0])
+	}
+	if strings.Contains(rec.Body.String(), "members-secret") {
+		t.Fatalf("member list leaked credential material: %s", rec.Body.String())
+	}
+
+	missingReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/account-groups/999999/accounts", nil)
+	missingReq.AddCookie(sessionCookie)
+	missingRec := httptest.NewRecorder()
+	handler.ServeHTTP(missingRec, missingReq)
+	if missingRec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 for unknown group, got %d body=%s", missingRec.Code, missingRec.Body.String())
+	}
+}
+
 func TestAdminAccountInspectAndExportStaySecretSafe(t *testing.T) {
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)

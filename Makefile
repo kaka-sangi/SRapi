@@ -15,6 +15,9 @@ OBSERVABILITY_RULES_CHECK ?= node tools/observability-rules-check.mjs
 BOOTSTRAP_ENV ?= node tools/bootstrap-env.mjs
 ENV_CHECK ?= node tools/env-check.mjs
 DEPLOY_PREFLIGHT ?= node tools/deploy-preflight.mjs
+WEB_CHECK ?= node tools/web-check.mjs
+WEB_CHECK_E2E ?= node tools/web-check-e2e.mjs
+WEB_DIR ?= apps/web
 API_DIR ?= apps/api
 MIGRATION_NAME ?=
 RATE_LIMIT_BENCH_REDIS_ADDR ?=
@@ -42,7 +45,7 @@ TEMPO_QUERY_PORT ?= 13201
 TEMPO_QUERY_TIMEOUT_SECONDS ?= 20
 TEMPO_SMOKE_TIMEOUT ?= 90s
 
-.PHONY: help bootstrap-env env-check deploy-preflight openapi-lint openapi-bundle openapi-codegen openapi-codegen-check openapi-ts-codegen openapi-ts-codegen-check sdk-ts-typecheck ent-generate ent-generate-check migration-diff migration-hash migration-check api-test api-run dev-up dev-down dev-logs smoke-health smoke-gateway smoke-rate-limit smoke-failover smoke-quality-eval smoke-payment-stripe smoke-payment-alipay smoke-payment-wechat smoke-release smoke-jaeger-trace smoke-tempo-trace rate-limit-bench balance-charger-pressure otel-overhead-bench backup-postgres restore-postgres examples-check observability-rules-check secret-scan architecture-check code-quality-check diff-check web-install web-check web-check-e2e web-dev check
+.PHONY: help bootstrap-env env-check deploy-preflight openapi-lint openapi-bundle openapi-codegen openapi-codegen-check openapi-ts-codegen openapi-ts-codegen-check sdk-ts-typecheck ent-generate ent-generate-check migration-diff migration-hash migration-check api-test api-run dev-up dev-down dev-logs smoke-health smoke-gateway smoke-rate-limit smoke-failover smoke-quality-eval smoke-payment-stripe smoke-payment-alipay smoke-payment-wechat smoke-release smoke-jaeger-trace smoke-tempo-trace rate-limit-bench balance-charger-pressure otel-overhead-bench backup-postgres restore-postgres examples-check observability-rules-check secret-scan architecture-check code-quality-check diff-check web-install web-install-ci web-dev web-check web-check-e2e check
 
 help:
 	@printf '%s\n' \
@@ -88,10 +91,6 @@ help:
 		'  make code-quality-check  Run repository code-quality harness tests' \
 		'  make diff-check     Check staged and unstaged diff whitespace' \
 		'  make secret-scan     Scan source files for committed secrets' \
-		'  make web-install    Install apps/web npm dependencies' \
-		'  make web-check      Run frontend typecheck, lint, unit tests, build, bundle budget' \
-		'  make web-check-e2e  Run frontend Playwright e2e harness' \
-		'  make web-dev        Start the frontend dev server (next dev)' \
 		'  make check           Run current contract and API checks'
 
 bootstrap-env:
@@ -340,15 +339,18 @@ observability-rules-check:
 	$(OBSERVABILITY_RULES_CHECK)
 
 web-install:
-	cd apps/web && npm install --no-fund --no-audit
+	npm --prefix $(WEB_DIR) install
 
-web-check:
-	node tools/web-check.mjs
-
-web-check-e2e:
-	node tools/web-check-e2e.mjs
+web-install-ci:
+	npm --prefix $(WEB_DIR) ci
 
 web-dev:
-	cd apps/web && npm run dev
+	npm --prefix $(WEB_DIR) run dev
+
+web-check:
+	$(WEB_CHECK)
+
+web-check-e2e:
+	$(WEB_CHECK_E2E)
 
 check: diff-check openapi-lint openapi-bundle openapi-codegen-check openapi-ts-codegen-check sdk-ts-typecheck ent-generate-check migration-check architecture-check code-quality-check examples-check observability-rules-check api-test secret-scan web-check

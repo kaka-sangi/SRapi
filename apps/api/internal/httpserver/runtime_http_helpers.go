@@ -346,6 +346,9 @@ func (s *Server) requireGatewayKeyPlaintext(r *http.Request, apiKey string) (api
 	if err != nil {
 		return apikeycontract.AuthResult{}, err
 	}
+	if err := gatewayKeyIPAllowed(authed.Key, clientIP(r)); err != nil {
+		return apikeycontract.AuthResult{}, err
+	}
 	if err := s.acquireGatewayConcurrency(r.Context(), authed.Key); err != nil {
 		return apikeycontract.AuthResult{}, err
 	}
@@ -485,6 +488,8 @@ func writeGatewayAuthError(w http.ResponseWriter, err error, requestID string) {
 	case errors.As(err, &concurrencyErr):
 		setRetryAfterFromDecision(w, concurrencyErr.decision)
 		writeGatewayError(w, http.StatusTooManyRequests, apiopenapi.RateLimitError, "API key concurrency limit exceeded", "concurrency_limit_exceeded")
+	case errors.Is(err, errGatewayKeyIPNotAllowed):
+		writeGatewayError(w, http.StatusForbidden, apiopenapi.PermissionError, "API key not permitted from this IP address", "ip_not_allowed")
 	case errors.Is(err, apikeyservice.ErrInvalidKey), errors.Is(err, apikeyservice.ErrInvalidInput):
 		writeGatewayError(w, http.StatusUnauthorized, apiopenapi.AuthenticationError, "invalid API key", "invalid_api_key")
 	case errors.Is(err, apikeyservice.ErrKeyDisabled), errors.Is(err, apikeyservice.ErrKeyExpired):
@@ -531,6 +536,8 @@ func writeGeminiGatewayAuthError(w http.ResponseWriter, err error) {
 		writeGeminiGatewayError(w, http.StatusTooManyRequests, "RESOURCE_EXHAUSTED", "API key concurrency limit exceeded")
 	case errors.Is(err, errGeminiDeprecatedAPIKeyQuery):
 		writeGeminiGatewayError(w, http.StatusBadRequest, "INVALID_ARGUMENT", "Query parameter api_key is deprecated. Use x-goog-api-key, Authorization Bearer, or key instead.")
+	case errors.Is(err, errGatewayKeyIPNotAllowed):
+		writeGeminiGatewayError(w, http.StatusForbidden, "PERMISSION_DENIED", "API key not permitted from this IP address")
 	case errors.Is(err, apikeyservice.ErrInvalidKey), errors.Is(err, apikeyservice.ErrInvalidInput):
 		writeGeminiGatewayError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "invalid API key")
 	case errors.Is(err, apikeyservice.ErrKeyDisabled), errors.Is(err, apikeyservice.ErrKeyExpired):

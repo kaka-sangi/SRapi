@@ -1,8 +1,6 @@
 .next
-out
-build
 node_modules
-public
 coverage
 playwright-report
 test-results
+design-concepts

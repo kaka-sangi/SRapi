@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>SRapi · 前端视觉概念稿</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lora:ital@1&family=JetBrains+Mono&display=swap" rel="stylesheet">
+<style>
+  body{font-family:Inter,system-ui,sans-serif;margin:0;background:#0d0e11;color:#ECEDEE;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:1000px;margin:0 auto;padding:64px 24px 80px;}
+  h1{font-size:34px;letter-spacing:-.03em;margin:0 0 8px;font-weight:700;}
+  .sub{color:#8A8F98;font-size:15px;margin:0 0 40px;}
+  .grid{display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));}
+  a.card{display:block;text-decoration:none;color:inherit;border:1px solid #23262E;border-radius:16px;padding:22px;background:#121419;transition:.2s;}
+  a.card:hover{border-color:#2DD4BF;transform:translateY(-2px);box-shadow:0 20px 40px -20px rgba(0,0,0,.6);}
+  .tag{font-family:'JetBrains Mono',monospace;font-size:11px;color:#8A8F98;}
+  .swatch{display:flex;gap:6px;margin:16px 0 14px;}
+  .swatch span{width:26px;height:26px;border-radius:7px;border:1px solid rgba(255,255,255,.08);}
+  h2{font-size:19px;margin:4px 0 6px;font-weight:600;}
+  p{color:#8A8F98;font-size:13px;line-height:1.55;margin:0;}
+  .go{margin-top:16px;font-size:12px;color:#2DD4BF;font-family:'JetBrains Mono',monospace;}
+  footer{margin-top:48px;color:#5C636E;font-size:12px;}
+  em{font-family:'Lora',serif;color:#ECEDEE;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>SRapi 前端视觉概念稿</h1>
+  <p class="sub">三套<em>方向各异</em>的完整方案 — 含登录页、控制台外壳、仪表盘、数据表、实时调度流。每套都支持明/暗主题与桌面/移动响应式（拖动窗口即可看移动端）。挑一套，或告诉我想混搭哪些元素。</p>
+  <div class="grid">
+    <a class="card" href="concept-a-editorial.html">
+      <div class="tag">概念 A</div>
+      <div class="swatch"><span style="background:#F9F6F0"></span><span style="background:#C05638"></span><span style="background:#191919"></span><span style="background:#E3DAC9"></span></div>
+      <h2>编辑社论 · 暖纸</h2>
+      <p>沿用并打磨现有设计系统：暖象牙纸、陶土红、Lora 衬线标题、纸纹与凸版阴影、1px 仪表刻度。Anthropic / Stripe / Linear 调性。</p>
+      <div class="go">打开 →</div>
+    </a>
+    <a class="card" href="concept-b-minimal.html">
+      <div class="tag">概念 B</div>
+      <div class="swatch"><span style="background:#FFFFFF"></span><span style="background:#5B5BD6"></span><span style="background:#18181B"></span><span style="background:#E8E8EB"></span></div>
+      <h2>冷调极简 · SaaS</h2>
+      <p>中性灰、高密度、锐利 1px、克制单一强调色、表格优先。工具感强、克制专业。Linear / Vercel 调性。</p>
+      <div class="go">打开 →</div>
+    </a>
+    <a class="card" href="concept-c-darkroom.html">
+      <div class="tag">概念 C</div>
+      <div class="swatch"><span style="background:#0A0B0D"></span><span style="background:#2DD4BF"></span><span style="background:#818CF8"></span><span style="background:#23262E"></span></div>
+      <h2>暗房控制台 · 高级</h2>
+      <p>暗色优先、精致辉光、网格背景、渐变强调、迷你数据可视化。前卫且高级。Vercel / Railway / Raycast 调性。</p>
+      <div class="go">打开 →</div>
+    </a>
+  </div>
+  <footer>放置目录：apps/web/design-concepts/ · 选定后会把对应的色板/字体/质感固化为正式的设计 token，再进入工程实现。</footer>
+</div>
+</body>
+</html>

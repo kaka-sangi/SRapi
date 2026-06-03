@@ -3,6 +3,8 @@ package contract
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 	"net/url"
 	"time"
@@ -11,6 +13,12 @@ import (
 	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 )
+
+// ErrStreamingUnsupported indicates the request is not eligible for
+// same-protocol passthrough streaming (e.g. cross-protocol translation, a
+// non-streaming request, or an adapter/runtime without a streaming transport).
+// Callers fall back to the buffered InvokeConversation path.
+var ErrStreamingUnsupported = errors.New("provider adapter: streaming passthrough unsupported")
 
 type ConversationRequest struct {
 	RequestID         string
@@ -113,8 +121,15 @@ const (
 type Usage struct {
 	InputTokens  int
 	OutputTokens int
+	// CachedTokens is cache-READ tokens (a prompt-cache hit), billed at the
+	// cache-read rate. For OpenAI/Gemini this is the only cache class; for
+	// Anthropic it is reported separately from input_tokens.
 	CachedTokens int
-	Estimated    bool
+	// CacheCreationTokens is cache-WRITE tokens (prompt cache being populated),
+	// billed at the cache-write rate (which exceeds the input rate). Currently
+	// populated for Anthropic; zero for providers without cache writes.
+	CacheCreationTokens int
+	Estimated           bool
 }
 
 type EmbeddingRequest struct {
@@ -455,6 +470,18 @@ type ConversationResponse struct {
 	Warnings     []string
 	StreamEvents []ConversationStreamEvent
 	QuotaSignals []QuotaSignal
+
+	// StreamBody, when non-nil, carries the live upstream response body for
+	// same-protocol passthrough streaming. The caller MUST Close it after
+	// streaming to the client (Close also releases the request's concurrency
+	// lease). When set, Parts/Raw/Usage are not yet populated; the caller copies
+	// the body to the client incrementally and then calls StreamParse on the
+	// fully-streamed bytes to recover usage for metering.
+	StreamBody io.ReadCloser
+	// StreamParse extracts the canonical response (usage, raw, quota) from the
+	// fully-streamed body using the same parser as the buffered path. Only set
+	// when StreamBody is non-nil.
+	StreamParse func(body []byte, statusCode int) (ConversationResponse, error)
 }
 
 // ProbeRequest contains the provider, account, and credential used for a health probe.

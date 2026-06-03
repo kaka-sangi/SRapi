@@ -1,96 +1,66 @@
-'use client';
+"use client";
 
-import {
-  ReactNode,
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useSyncExternalStore,
-} from 'react';
-import { applyVariables, flatLookup, type Locale } from '@/i18n/messages';
+import { createContext, useCallback, useContext, useMemo, useSyncExternalStore } from "react";
+import { DEFAULT_LOCALE, type Locale, translate } from "@/i18n/messages";
 
-type Language = Locale;
+const STORAGE_KEY = "srapi_lang";
+const CHANGE_EVENT = "srapi:language-change";
+const ONE_YEAR = 60 * 60 * 24 * 365;
 
-interface LanguageContextType {
-  language: Language;
-  toggleLanguage: () => void;
-  t: (key: string, variables?: Record<string, string | number>) => string;
+function readLocale(): Locale {
+  if (typeof window === "undefined") return DEFAULT_LOCALE;
+  const stored = window.localStorage.getItem(STORAGE_KEY);
+  return stored === "en" || stored === "zh" ? stored : DEFAULT_LOCALE;
 }
 
-// SRapi v0.1.0 i18n shim. The full per-namespace dictionary lives in
-// `src/i18n/messages/{en,zh}.ts`. Pages keep using the same `t(key)` API.
-
-const STORAGE_KEY = 'srapi_lang';
-const STORAGE_EVENT = 'srapi:language-change';
-
-function readLanguageFromStorage(): Language {
-  if (typeof window === 'undefined') return 'en';
-  const saved = window.localStorage.getItem(STORAGE_KEY);
-  return saved === 'zh' ? 'zh' : 'en';
-}
-
-function subscribeToLanguage(notify: () => void): () => void {
-  if (typeof window === 'undefined') return () => {};
-  const listener = (event: StorageEvent | Event) => {
-    if (event instanceof StorageEvent && event.key && event.key !== STORAGE_KEY) return;
-    notify();
-  };
-  window.addEventListener('storage', listener);
-  window.addEventListener(STORAGE_EVENT, listener);
+function subscribe(callback: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener(CHANGE_EVENT, callback);
+  window.addEventListener("storage", callback);
   return () => {
-    window.removeEventListener('storage', listener);
-    window.removeEventListener(STORAGE_EVENT, listener);
+    window.removeEventListener(CHANGE_EVENT, callback);
+    window.removeEventListener("storage", callback);
   };
 }
 
-function setLanguageInStorage(next: Language): void {
-  if (typeof window === 'undefined') return;
-  window.localStorage.setItem(STORAGE_KEY, next);
-  // Mirror into a cookie so the edge/server can read the locale (e.g. to set
-  // <html lang> without a flash) in a later pass. Carries no credentials.
-  document.cookie = `${STORAGE_KEY}=${next}; Path=/; Max-Age=${60 * 60 * 24 * 365}; SameSite=Lax`;
-  window.dispatchEvent(new Event(STORAGE_EVENT));
+function writeLocale(locale: Locale) {
+  window.localStorage.setItem(STORAGE_KEY, locale);
+  document.cookie = `${STORAGE_KEY}=${locale}; path=/; max-age=${ONE_YEAR}; samesite=lax`;
+  window.dispatchEvent(new Event(CHANGE_EVENT));
 }
 
-const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
+interface LanguageContextValue {
+  language: Locale;
+  setLanguage: (locale: Locale) => void;
+  toggleLanguage: () => void;
+  t: (key: string, vars?: Record<string, string | number>) => string;
+}
 
-export function LanguageProvider({ children }: { children: ReactNode }) {
-  const language = useSyncExternalStore<Language>(
-    subscribeToLanguage,
-    readLanguageFromStorage,
-    () => 'en',
+const LanguageContext = createContext<LanguageContextValue | null>(null);
+
+export function LanguageProvider({ children }: { children: React.ReactNode }) {
+  const language = useSyncExternalStore(subscribe, readLocale, () => DEFAULT_LOCALE);
+
+  const setLanguage = useCallback((locale: Locale) => writeLocale(locale), []);
+  const toggleLanguage = useCallback(
+    () => writeLocale(language === "zh" ? "en" : "zh"),
+    [language],
+  );
+  const t = useCallback(
+    (key: string, vars?: Record<string, string | number>) => translate(language, key, vars),
+    [language],
   );
 
-  // Keep the document language attribute in sync for accessibility / SEO.
-  useEffect(() => {
-    if (typeof document !== 'undefined') {
-      document.documentElement.lang = language;
-    }
-  }, [language]);
-
-  const toggleLanguage = useCallback(() => {
-    setLanguageInStorage(language === 'en' ? 'zh' : 'en');
-  }, [language]);
-
-  const value = useMemo<LanguageContextType>(() => {
-    const dict = flatLookup(language);
-    const fallback = flatLookup('en');
-    return {
-      language,
-      toggleLanguage,
-      t: (key, variables) => applyVariables(dict[key] ?? fallback[key] ?? key, variables),
-    };
-  }, [language, toggleLanguage]);
+  const value = useMemo(
+    () => ({ language, setLanguage, toggleLanguage, t }),
+    [language, setLanguage, toggleLanguage, t],
+  );
 
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
 }
 
-export function useLanguage() {
-  const context = useContext(LanguageContext);
-  if (!context) {
-    throw new Error('useLanguage must be used within a LanguageProvider');
-  }
-  return context;
+export function useLanguage(): LanguageContextValue {
+  const ctx = useContext(LanguageContext);
+  if (!ctx) throw new Error("useLanguage must be used within LanguageProvider");
+  return ctx;
 }

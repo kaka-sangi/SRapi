@@ -89,6 +89,13 @@ type GatewayConfig struct {
 	StreamIdleTimeout          time.Duration
 	RealtimeMaxOpenSlots       int
 	RealtimeMaxOpenSlotsPerKey int
+	// RequirePositiveBalance, when true, synchronously rejects balance-billed
+	// gateway requests (pay-go users, or allowance-mode subscription overage)
+	// from users whose balance no longer covers the request, closing the
+	// deferred-charging overspend window. It never blocks hard_cap subscription
+	// users (who never bill to balance). Default false preserves the historical
+	// fail-open behavior.
+	RequirePositiveBalance bool
 }
 
 type SecurityConfig struct {
@@ -229,6 +236,7 @@ func Load() Config {
 			StreamIdleTimeout:          time.Duration(getIntEnv("GATEWAY_STREAM_IDLE_TIMEOUT_SECONDS", 120)) * time.Second,
 			RealtimeMaxOpenSlots:       getIntEnv("GATEWAY_REALTIME_MAX_OPEN_SLOTS", 0),
 			RealtimeMaxOpenSlotsPerKey: getIntEnv("GATEWAY_REALTIME_MAX_OPEN_SLOTS_PER_API_KEY", 0),
+			RequirePositiveBalance:     getBoolEnv("GATEWAY_REQUIRE_POSITIVE_BALANCE", false),
 		},
 		Security: securityConfigFromEnv(),
 		Bootstrap: BootstrapConfig{

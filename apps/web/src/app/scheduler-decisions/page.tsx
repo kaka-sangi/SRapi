@@ -1,259 +1,141 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import {
-  GitBranch,
-  Terminal as TermIcon,
-  RefreshCw,
-  ChevronDown,
-  ChevronUp,
-  AlertCircle,
-  Clock,
-  Coins,
-  Cpu,
-} from 'lucide-react';
-import { AppShell } from "@/components/layout";
-import { EmptyState, Skeleton } from '@/components/ui';
-import { useSchedulerDecisions } from '@/hooks/queries';
-import { useLanguage } from '../../context/LanguageContext';
-import { PageQueryError } from '@/components/layout/page-query-state';
+import { useState } from "react";
+import { GitBranch } from "lucide-react";
+import { AppShell } from "@/components/layout/app-shell";
+import { PageHeader } from "@/components/layout/page-header";
+import { PageQueryState } from "@/components/layout/page-query-state";
+import { useSchedulerDecisions } from "@/hooks/queries";
+import { useLanguage } from "@/context/LanguageContext";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { QuietBadge } from "@/components/ui/quiet-badge";
+import { SchedulerDecisionStream } from "@/components/ui/scheduler-decision-stream";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { decisionToLines } from "@/lib/format-decision";
+import type { SchedulerDecisionSummary } from "@/lib/srapi-types";
 
 export default function SchedulerDecisionsPage() {
-  const { language, t } = useLanguage();
-  const decisionsQuery = useSchedulerDecisions();
-  const loading = decisionsQuery.isLoading;
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const decisions = decisionsQuery.data ?? [];
-
-  const toggleExpand = (id: string) => {
-    setExpandedId(prev => prev === id ? null : id);
-  };
-
-  // SRapi v0.1.0 product tone, see docs/PRODUCT_TONE.md.
-  const textTitle = language === 'en' ? 'Live scheduling decisions' : '实时调度决策';
-  const textDesc = language === 'en'
-    ? 'Each decision shows the picked provider account, candidate scores, and why other candidates were rejected.'
-    : '每个决策呈现选中的上游账号、候选评分，以及其他候选被排除的原因。';
-  const textDecisionsCount = language === 'en' ? 'REJECTED CANDIDATES' : '被排除的候选';
-
   return (
     <AppShell allowedRole="admin">
-      <div className="space-y-8 animate-bloom">
-        
-        {/* Header Block (rounded-2xl) */}
-        <div className="surface flex flex-col justify-between gap-6 rounded-2xl p-6 sm:flex-row sm:items-center">
-          <div className="space-y-1">
-            <h3 className="font-serif font-medium text-lg tracking-tight">{textTitle}</h3>
-            <p className="text-xs text-srapi-text-secondary font-sans leading-relaxed">{textDesc}</p>
-          </div>
-
-          <button
-            onClick={() => void decisionsQuery.refetch()}
-            className="px-5 py-3.5 border border-srapi-border rounded-full text-xs font-mono font-bold tracking-wider uppercase transition-all active:scale-[0.96] flex items-center gap-2 cursor-pointer text-srapi-text-secondary hover:bg-srapi-card-muted"
-          >
-            <RefreshCw size={12} />
-            {language === 'en' ? 'Refresh' : '刷新'}
-          </button>
-        </div>
-
-        {/* Decisions Feed Logs */}
-        {loading ? (
-          <SchedulerSkeleton />
-        ) : decisionsQuery.isError ? (
-          <PageQueryError error={decisionsQuery.error} onRetry={() => void decisionsQuery.refetch()} />
-        ) : decisions.length === 0 ? (
-          <EmptyState
-            icon={<GitBranch size={18} />}
-            title={language === 'en' ? 'No scheduler decisions yet' : '暂无调度决策'}
-            description={
-              language === 'en'
-                ? 'Send a gateway request to record real scheduler evidence.'
-                : '发出网关请求后，这里会显示真实调度证据。'
-            }
-          />
-        ) : (
-          <div className="space-y-6">
-            {decisions.map((dec) => {
-              const isExpanded = expandedId === dec.request_id;
-              
-              return (
-                <div 
-                  key={dec.request_id} 
-                  className={`surface overflow-hidden rounded-3xl transition-all ${
-                    isExpanded ? 'border-srapi-primary/50 shadow-lg ring-1 ring-srapi-primary' : 'hover:bg-srapi-card-muted/10'
-                  }`}
-                >
-                  
-                  {/* Top Summary Banner */}
-                  <div 
-                    onClick={() => toggleExpand(dec.request_id)}
-                    className="p-5 md:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer select-none"
-                  >
-                    <div className="flex flex-wrap items-center gap-3.5">
-                      <div className="p-2 bg-srapi-card-muted border border-srapi-border rounded-xl text-srapi-primary">
-                        <GitBranch size={16} />
-                      </div>
-                      
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2.5">
-                          <code className="text-xs font-bold text-srapi-text-primary select-all">
-                            {dec.request_id}
-                          </code>
-                          <span className="px-2 py-0.5 bg-srapi-card-muted border border-srapi-border rounded text-2xs font-bold text-srapi-text-secondary font-mono">
-                            {dec.model}
-                          </span>
-                        </div>
-                        <div className="text-2xs font-mono text-srapi-text-secondary flex items-center gap-1.5 font-bold">
-                          <span>{dec.source_endpoint}</span>
-                          <span>•</span>
-                          <span>{new Date(dec.created_at).toLocaleTimeString()}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-4 text-xs font-mono">
-                      <div className="text-right hidden md:block space-y-0.5">
-                        <span className="text-2xs text-srapi-text-secondary block font-bold tracking-wider">{t('leasedUpstream')}</span>
-                        <span className="font-bold text-srapi-text-primary font-serif italic">{dec.selected_account_name}</span>
-                      </div>
-
-                      <div className="flex items-center gap-2.5">
-                        <span className="rounded-full border border-srapi-success/20 bg-srapi-success/10 px-2.5 py-0.5 text-2xs font-bold uppercase text-srapi-success">
-                          {t('routed')}
-                        </span>
-                        {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Expanded Scoring Breakdown and Logs */}
-                  {isExpanded && (
-                    <div className="border-t border-srapi-border p-6 space-y-6 bg-srapi-card-muted/10 animate-bloom">
-                      
-                      {/* Grid sections */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
-                        
-                        {/* Candidates Score Breakdown */}
-                        <div className="space-y-4">
-                          <span className="text-2xs uppercase font-mono tracking-widest text-srapi-text-secondary font-bold block border-b border-srapi-border pb-1">
-                            {t('candidatesScores')}
-                          </span>
-
-                          <div className="space-y-4.5">
-                            {dec.scores.map((cand, idx) => (
-                              <div key={idx} className="space-y-2">
-                                <div className="flex justify-between text-2xs font-mono">
-                                  <span className="font-bold text-srapi-text-primary font-serif">{cand.account}</span>
-                                  <span className="font-bold text-srapi-primary">{language === 'en' ? 'Score' : '评分'}: {cand.score}</span>
-                                </div>
-
-                                {/* Score matrix bars */}
-                                <div className="space-y-1.5 text-2xs font-mono text-srapi-text-secondary bg-srapi-card p-3 border border-srapi-border rounded-xl">
-                                  {/* Latency */}
-                                  <div className="flex items-center gap-3">
-                                    <span className="w-20 flex items-center gap-0.5"><Clock size={10} /> {t('latencyMetric')}</span>
-                                    <div className="flex-grow h-[1px] bg-srapi-border relative">
-                                      <div className="absolute -top-[3px] h-2 w-[1px] bg-srapi-success" style={{ left: `${cand.latency * 100}%` }}></div>
-                                    </div>
-                                    <span className="w-6 text-right">{(cand.latency * 10).toFixed(1)}</span>
-                                  </div>
-
-                                  {/* Cost */}
-                                  <div className="flex items-center gap-3">
-                                    <span className="w-20 flex items-center gap-0.5"><Coins size={10} /> {t('costMetric')}</span>
-                                    <div className="flex-grow h-[1px] bg-srapi-border relative">
-                                      <div className="absolute h-2 w-[1px] bg-srapi-primary -top-[3px]" style={{ left: `${cand.cost * 100}%` }}></div>
-                                    </div>
-                                    <span className="w-6 text-right">{(cand.cost * 10).toFixed(1)}</span>
-                                  </div>
-
-                                  {/* Quota */}
-                                  <div className="flex items-center gap-3">
-                                    <span className="w-20 flex items-center gap-0.5"><Cpu size={10} /> {t('quotaMetric')}</span>
-                                    <div className="flex-grow h-[1px] bg-srapi-border relative">
-                                      <div className="absolute -top-[3px] h-2 w-[1px] bg-srapi-info" style={{ left: `${cand.quota * 100}%` }}></div>
-                                    </div>
-                                    <span className="w-6 text-right">{(cand.quota * 10).toFixed(1)}</span>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Failover and Exclusions */}
-                        <div className="space-y-4">
-                          <span className="text-2xs uppercase font-mono tracking-widest text-srapi-text-secondary font-bold block border-b border-srapi-border pb-1">
-                            {textDecisionsCount} ({dec.rejected_count})
-                          </span>
-
-                          {dec.rejected_reasons.length === 0 ? (
-                            <div className="p-5 border border-dashed border-srapi-border rounded-2xl text-center text-xs text-srapi-text-secondary font-mono">
-                              {t('noFailoverDesc')}
-                            </div>
-                          ) : (
-                            <div className="space-y-3 text-2xs font-mono">
-                              {dec.rejected_reasons.map((re, idx) => (
-                                <div key={idx} className="p-4 border border-srapi-primary/20 bg-srapi-primary/5 rounded-2xl text-srapi-primary flex items-start gap-2.5">
-                                  <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />
-                                  <div className="space-y-0.5">
-                                    <p className="font-bold">{re.account}</p>
-                                    <p className="text-2xs text-srapi-text-secondary font-sans leading-relaxed">{re.reason}</p>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-
-                      </div>
-
-                      {/* Raw reasoning logs console */}
-                      <div className="space-y-2.5">
-                        <span className="text-2xs uppercase font-mono tracking-widest text-srapi-text-secondary font-bold flex items-center gap-1.5">
-                          <TermIcon size={12} />
-                          {t('reasoningLogs')}
-                        </span>
-
-                        <pre className="p-4 bg-srapi-card border border-srapi-border rounded-2xl text-2xs font-mono text-srapi-text-primary leading-relaxed space-y-1.5 overflow-x-auto select-all shadow-inner">
-                          {dec.logs.map((logLine, idx) => (
-                            <div key={idx} className="truncate">
-                              {logLine}
-                            </div>
-                          ))}
-                        </pre>
-                      </div>
-
-                    </div>
-                  )}
-
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-      </div>
+      <SchedulerContent />
     </AppShell>
   );
 }
 
-/** Shimmer cards mirroring the collapsed decision feed while it loads. */
-function SchedulerSkeleton() {
+function SchedulerContent() {
+  const { t } = useLanguage();
+  const decisions = useSchedulerDecisions();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
   return (
-    <div className="space-y-6">
-      {Array.from({ length: 3 }).map((_, i) => (
-        <div key={i} className="surface flex items-center justify-between gap-4 rounded-3xl p-6">
-          <div className="flex items-center gap-3.5">
-            <Skeleton className="h-9 w-9 rounded-xl" />
-            <div className="space-y-2">
-              <Skeleton className="h-3 w-48" />
-              <Skeleton className="h-3 w-32" />
-            </div>
+    <>
+      <PageHeader
+        eyebrow={t("nav.sectionGateway")}
+        title={t("scheduler.title")}
+        actions={
+          <Button variant="outline" size="sm" onClick={() => decisions.refetch()}>
+            {t("common.refresh")}
+          </Button>
+        }
+      />
+
+      <PageQueryState
+        query={decisions}
+        isEmpty={(d) => d.length === 0}
+        skeleton={<Skeleton className="h-96 rounded-xl" />}
+      >
+        {(data) =>
+          data.length === 0 ? (
+            <EmptyState
+              icon={GitBranch}
+              title={t("scheduler.emptyTitle")}
+              description={t("scheduler.emptyBody")}
+            />
+          ) : (
+            <SchedulerBody
+              decisions={data}
+              selected={data.find((d) => d.request_id === selectedId) ?? data[0]}
+              onSelect={setSelectedId}
+            />
+          )
+        }
+      </PageQueryState>
+    </>
+  );
+}
+
+function SchedulerBody({
+  decisions,
+  selected,
+  onSelect,
+}: {
+  decisions: SchedulerDecisionSummary[];
+  selected: SchedulerDecisionSummary;
+  onSelect: (id: string) => void;
+}) {
+  const { t } = useLanguage();
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-12">
+      {/* Left: decision list */}
+      <div className="lg:col-span-5">
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("scheduler.title")}</CardTitle>
+            <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+              {decisions.length}
+            </span>
+          </CardHeader>
+          <div className="max-h-[640px] divide-y divide-srapi-border overflow-y-auto">
+            {decisions.map((d) => {
+              const active = d.request_id === selected.request_id;
+              return (
+                <button
+                  key={d.request_id}
+                  onClick={() => onSelect(d.request_id)}
+                  className={`flex w-full items-center gap-3 px-5 py-3 text-left transition-colors ${
+                    active ? "bg-srapi-card-muted" : "hover:bg-srapi-card-muted/50"
+                  }`}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm text-srapi-text-primary">{d.model}</div>
+                    <div className="truncate font-mono text-2xs text-srapi-text-secondary">
+                      {d.request_id} · {d.created_at.replace("T", " ").slice(0, 16)}
+                    </div>
+                  </div>
+                  <QuietBadge status="active" label={d.selected_account_name} />
+                </button>
+              );
+            })}
           </div>
-          <Skeleton className="h-5 w-20 rounded-full" />
-        </div>
-      ))}
+        </Card>
+      </div>
+
+      {/* Right: trace stream (sticky on desktop) */}
+      <div className="lg:col-span-7">
+        <Card className="lg:sticky lg:top-24">
+          <CardHeader>
+            <CardTitle>{t("scheduler.traceLog")}</CardTitle>
+            <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+              {selected.request_id}
+            </span>
+          </CardHeader>
+          <CardContent>
+            <SchedulerDecisionStream key={selected.request_id} lines={decisionToLines(selected)} />
+            {selected.warnings.length > 0 && (
+              <div className="mt-4 space-y-1 border-t border-srapi-border pt-4">
+                {selected.warnings.map((w, i) => (
+                  <div key={i} className="font-mono text-2xs text-srapi-warning">
+                    ⚠ {w}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

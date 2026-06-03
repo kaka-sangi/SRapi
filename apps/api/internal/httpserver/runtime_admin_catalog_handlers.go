@@ -323,15 +323,15 @@ func presetCapabilityMap(preset providerpreset.Preset) map[string]any {
 
 func presetConfigSchema(preset providerpreset.Preset) map[string]any {
 	return map[string]any{
-		"provider_key":           preset.ProviderKey,
-		"platform_family":        string(preset.PlatformFamily),
-		"default_base_url":       preset.DefaultBaseURL,
-		"route_aliases":          stringSliceAny(preset.RouteAliases),
-		"gemini_route_aliases":   stringSliceAny(preset.GeminiRouteAliases),
-		"auth_modes":             authModesAny(preset.AuthModes),
-		"model_catalog_owner":    preset.ModelCatalogOwner,
-		"account_type_allowlist": accountTypesAny(preset.AccountTypeAllowlist),
-		"installed_from":         "provider_preset",
+		"provider_key":         preset.ProviderKey,
+		"platform_family":      string(preset.PlatformFamily),
+		"default_base_url":     preset.DefaultBaseURL,
+		"route_aliases":        stringSliceAny(preset.RouteAliases),
+		"gemini_route_aliases": stringSliceAny(preset.GeminiRouteAliases),
+		"auth_modes":           authModesAny(preset.AuthModes),
+		"model_catalog_owner":  preset.ModelCatalogOwner,
+		"auth_methods":         runtimeClassesAny(preset.RuntimeClassAllowlist),
+		"installed_from":       "provider_preset",
 	}
 }
 
@@ -351,10 +351,43 @@ func authModesAny(values []providerpreset.AuthMode) []any {
 	return out
 }
 
-func accountTypesAny(values []providerpreset.AccountType) []any {
+func runtimeClassesAny(values []accountcontract.RuntimeClass) []any {
 	out := make([]any, 0, len(values))
 	for _, value := range values {
 		out = append(out, string(value))
+	}
+	return out
+}
+
+// accountRuntimeClassAllowed reports whether runtimeClass may be attached to a
+// provider whose preset declared the given auth_methods allowlist (read from
+// config_schema). An empty allowlist means "no restriction" — this keeps legacy
+// and manually-created providers, which carry no preset metadata, working.
+func accountRuntimeClassAllowed(configSchema map[string]any, runtimeClass accountcontract.RuntimeClass) bool {
+	allowed := providerAuthMethodStrings(configSchema)
+	if len(allowed) == 0 {
+		return true
+	}
+	for _, method := range allowed {
+		if method == string(runtimeClass) {
+			return true
+		}
+	}
+	return false
+}
+
+// providerAuthMethodStrings reads the auth_methods allowlist a provider preset
+// stored in its config_schema. An empty result means "no restriction".
+func providerAuthMethodStrings(configSchema map[string]any) []string {
+	raw, ok := configSchema["auth_methods"].([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(raw))
+	for _, value := range raw {
+		if s, ok := value.(string); ok && s != "" {
+			out = append(out, s)
+		}
 	}
 	return out
 }
@@ -754,8 +787,13 @@ func (s *Server) handleCreateAdminAccount(w http.ResponseWriter, r *http.Request
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid provider id", requestID)
 		return
 	}
-	if _, err := s.runtime.providers.FindByID(r.Context(), providerID); err != nil {
+	provider, err := s.runtime.providers.FindByID(r.Context(), providerID)
+	if err != nil {
 		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "provider not found", requestID)
+		return
+	}
+	if !accountRuntimeClassAllowed(provider.ConfigSchema, accountcontract.RuntimeClass(body.RuntimeClass)) {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "authentication method not allowed for this provider", requestID)
 		return
 	}
 	credential := derefMap(body.Credential)
@@ -998,6 +1036,14 @@ func (s *Server) handleUpdateAdminAccount(w http.ResponseWriter, r *http.Request
 	runtimeClass := before.RuntimeClass
 	if body.RuntimeClass != nil {
 		runtimeClass = accountcontract.RuntimeClass(*body.RuntimeClass)
+	}
+	if body.RuntimeClass != nil && runtimeClass != before.RuntimeClass {
+		if provider, err := s.runtime.providers.FindByID(r.Context(), before.ProviderID); err == nil {
+			if !accountRuntimeClassAllowed(provider.ConfigSchema, runtimeClass) {
+				writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "authentication method not allowed for this provider", requestID)
+				return
+			}
+		}
 	}
 	upstreamClient := before.UpstreamClient
 	if body.UpstreamClient != nil {
@@ -1556,6 +1602,36 @@ func (s *Server) handleUpdateAdminAccountGroup(w http.ResponseWriter, r *http.Re
 	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "account_group.update", "account_group", strconv.Itoa(group.ID), accountGroupAuditSnapshot(before), accountGroupAuditSnapshot(group)))
 	writeJSONAny(w, http.StatusOK, apiopenapi.AccountGroupResponse{
 		Data:      toAPIAccountGroup(group),
+		RequestId: requestID,
+	})
+}
+
+func (s *Server) handleListAdminAccountGroupMembers(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	if _, err := s.requireAdminSession(r); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	groupID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || groupID <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid account group id", requestID)
+		return
+	}
+	if _, err := s.runtime.accounts.FindGroupByID(r.Context(), groupID); err != nil {
+		writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "account group not found", requestID)
+		return
+	}
+	members, err := s.runtime.accounts.ListGroupMembers(r.Context(), groupID)
+	if err != nil {
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to list account group members", requestID)
+		return
+	}
+	data := make([]apiopenapi.AccountGroupMember, 0, len(members))
+	for _, member := range members {
+		data = append(data, toAPIAccountGroupMember(member))
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.AccountGroupMemberListResponse{
+		Data:      data,
 		RequestId: requestID,
 	})
 }

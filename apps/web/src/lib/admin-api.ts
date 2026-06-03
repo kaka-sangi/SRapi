@@ -10,10 +10,36 @@ import {
   batchUpdateAdminAccounts,
   bindAdminAccountProxy,
   bulkImportAdminPricingRules,
+  listAdminModelRateLimits,
+  upsertAdminModelRateLimit,
+  deleteAdminModelRateLimit,
+  listAdminGroupRateLimits,
+  upsertAdminGroupRateLimit,
+  deleteAdminGroupRateLimit,
   clearAdminAccountError,
   createAdminAccount,
   createAdminAccountGroup,
   createAdminAnnouncement,
+  createAdminErrorPassthroughRule,
+  deleteAdminErrorPassthroughRule,
+  listAdminErrorPassthroughRules,
+  updateAdminErrorPassthroughRule,
+  createAdminTlsProfile,
+  deleteAdminTlsProfile,
+  listAdminTlsProfiles,
+  updateAdminTlsProfile,
+  createAdminUserAttributeDefinition,
+  deleteAdminUserAttributeDefinition,
+  listAdminUserAttributeDefinitions,
+  updateAdminUserAttributeDefinition,
+  listAdminNotificationEmailTemplates,
+  updateAdminNotificationEmailTemplate,
+  previewAdminNotificationEmailTemplate,
+  restoreAdminNotificationEmailTemplate,
+  listAdminAccountsAvailability,
+  listAdminUserPlatformQuotas,
+  upsertAdminUserPlatformQuota,
+  deleteAdminUserPlatformQuota,
   createAdminOpsSlo,
   createAdminPaymentProvider,
   createAdminPricingRule,
@@ -22,6 +48,7 @@ import {
   createAdminProxy,
   createAdminRedeemCode,
   createAdminSubscriptionPlan,
+  updateAdminSubscriptionPlan,
   createAdminUser,
   createAdminUserSubscription,
   deleteAdminAnnouncement,
@@ -36,6 +63,8 @@ import {
   getAdminAccountProxyQuality,
   getAdminAccountQuota,
   getAdminAccountRpmStatus,
+  getAdminConfigSnapshot,
+  importAdminConfigSnapshot,
   getAdminDashboardSnapshot,
   getAdminOpsConcurrency,
   getAdminOpsErrorDistribution,
@@ -51,6 +80,7 @@ import {
   getAdminUsageDaily,
   importAdminAccounts,
   listAdminAccountGroups,
+  listAdminAccountGroupMembers,
   listAdminAccounts,
   listAdminAffiliateInvites,
   listAdminAffiliateRebates,
@@ -59,6 +89,8 @@ import {
   listAdminAuditLogs,
   listAdminBillingLedger,
   listAdminModels,
+  createAdminModel,
+  updateAdminModel,
   listAdminOpsAlertEvents,
   listAdminOpsAlerts,
   listAdminOpsRealtimeSlots,
@@ -109,10 +141,31 @@ import type {
   AffiliateLedgerEntry,
   Announcement,
   AnnouncementStatus,
+  CreateErrorPassthroughRuleRequest,
+  ErrorPassthroughRule,
+  UpdateErrorPassthroughRuleRequest,
+  CreateTlsProfileRequest,
+  TlsProfile,
+  UpdateTlsProfileRequest,
+  CreateUserAttributeDefinitionRequest,
+  UserAttributeDefinition,
+  UpdateUserAttributeDefinitionRequest,
+  NotificationEmailTemplate,
+  NotificationEmailTemplateList,
+  NotificationEmailTemplateEventName,
+  NotificationEmailTemplatePreview,
+  PreviewNotificationEmailTemplateRequest,
+  UpdateNotificationEmailTemplateRequest,
+  AccountAvailabilitySummary,
+  UserPlatformQuota,
+  UpsertUserPlatformQuotaRequest,
   AuditLog,
   BillingLedgerEntry,
   BulkImportAdminPricingRulesData,
   BulkPricingRuleImportResult,
+  ConfigImportRequest,
+  ConfigImportResponse,
+  ConfigSnapshotResponse,
   CreateAccountGroupRequest,
   CreateAdminAccountData,
   CreateAdminPaymentProviderData,
@@ -134,6 +187,7 @@ import type {
   ListAdminAnnouncementsData,
   ListAdminAuditLogsData,
   ListAdminBillingLedgerData,
+  ListAdminModelsData,
   ListAdminOpsAlertEventsData,
   ListAdminOpsAlertsData,
   ListAdminOpsSystemLogsData,
@@ -161,6 +215,10 @@ import type {
   OpsSystemLog,
   OpsThroughputTrend,
   Pagination,
+  ModelRateLimit,
+  AccountGroupRateLimit,
+  UpsertModelRateLimitRequest,
+  UpsertGroupRateLimitRequest,
   PaymentOrder,
   PaymentProviderInstance,
   PricingRule,
@@ -376,6 +434,12 @@ export const adminApi = {
     return unwrapData(() => disableAdminUser({ path: { id: user.id }, throwOnError: true }));
   },
 
+  setUserEnabledById(id: Id, enabled: boolean): Promise<User> {
+    return enabled
+      ? unwrapData(() => enableAdminUser({ path: { id }, throwOnError: true }))
+      : unwrapData(() => disableAdminUser({ path: { id }, throwOnError: true }));
+  },
+
   listProviders(query?: ListAdminProvidersData["query"]): Promise<AdminListResult<Provider>> {
     return unwrapList(() => listAdminProviders({ query, throwOnError: true }));
   },
@@ -394,8 +458,16 @@ export const adminApi = {
     return unwrapData(() => testAdminProvider({ path: { id }, throwOnError: true }));
   },
 
-  listModels(): Promise<AdminListResult<Model>> {
-    return unwrapList(() => listAdminModels({ throwOnError: true }));
+  listModels(query?: ListAdminModelsData["query"]): Promise<AdminListResult<Model>> {
+    return unwrapList(() => listAdminModels({ query, throwOnError: true }));
+  },
+
+  createModel(body: Parameters<typeof createAdminModel>[0]["body"]): Promise<Model> {
+    return unwrapData(() => createAdminModel({ body, throwOnError: true }));
+  },
+
+  updateModel(id: Id, body: Parameters<typeof updateAdminModel>[0]["body"]): Promise<Model> {
+    return unwrapData(() => updateAdminModel({ path: { id }, body, throwOnError: true }));
   },
 
   listAccounts(query?: ListAdminAccountsData["query"]): Promise<AdminListResult<ProviderAccount>> {
@@ -423,10 +495,14 @@ export const adminApi = {
   },
 
   setAccountStatus(id: Id, status: ProviderAccountStatus): Promise<ProviderAccount> {
+    // `status` is the desired TARGET state set by the caller (e.g. row toggle /
+    // bulk action). Disable the account when the target is "disabled", enable it
+    // otherwise. (Previously inverted: enable/disable were swapped, so the row
+    // toggle was a no-op and the bulk buttons did the opposite of their label.)
     if (status === "disabled") {
-      return unwrapData(() => enableAdminAccount({ path: { id }, throwOnError: true }));
+      return unwrapData(() => disableAdminAccount({ path: { id }, throwOnError: true }));
     }
-    return unwrapData(() => disableAdminAccount({ path: { id }, throwOnError: true }));
+    return unwrapData(() => enableAdminAccount({ path: { id }, throwOnError: true }));
   },
 
   testAccount(id: Id): Promise<AdminTestResult> {
@@ -517,6 +593,12 @@ export const adminApi = {
     });
   },
 
+  listAccountGroupMembers(groupId: Id): Promise<AdminListResult<AccountGroupMember>> {
+    return unwrapList(() =>
+      listAdminAccountGroupMembers({ path: { id: groupId }, throwOnError: true }),
+    );
+  },
+
   listUsageLogs(query?: ListAdminUsageLogsData["query"]): Promise<AdminListResult<UsageLog>> {
     return unwrapList(() => listAdminUsageLogs({ query, throwOnError: true }));
   },
@@ -599,6 +681,13 @@ export const adminApi = {
     return unwrapData(() => createAdminSubscriptionPlan({ body, throwOnError: true }));
   },
 
+  updateSubscriptionPlan(
+    id: Id,
+    body: Parameters<typeof updateAdminSubscriptionPlan>[0]["body"],
+  ): Promise<SubscriptionPlan> {
+    return unwrapData(() => updateAdminSubscriptionPlan({ path: { id }, body, throwOnError: true }));
+  },
+
   listUserSubscriptions(
     query?: ListAdminUserSubscriptionsData["query"],
   ): Promise<AdminListResult<UserSubscription>> {
@@ -647,6 +736,120 @@ export const adminApi = {
 
   deleteAnnouncement(id: Id): Promise<{ deleted: boolean }> {
     return unwrapData(() => deleteAdminAnnouncement({ path: { id }, throwOnError: true }));
+  },
+
+  listErrorPassthroughRules(): Promise<AdminListResult<ErrorPassthroughRule>> {
+    return unwrapList(() => listAdminErrorPassthroughRules({ throwOnError: true }));
+  },
+
+  createErrorPassthroughRule(
+    body: CreateErrorPassthroughRuleRequest,
+  ): Promise<ErrorPassthroughRule> {
+    return unwrapData(() => createAdminErrorPassthroughRule({ body, throwOnError: true }));
+  },
+
+  updateErrorPassthroughRule(
+    id: Id,
+    body: UpdateErrorPassthroughRuleRequest,
+  ): Promise<ErrorPassthroughRule> {
+    return unwrapData(() =>
+      updateAdminErrorPassthroughRule({ path: { id }, body, throwOnError: true }),
+    );
+  },
+
+  deleteErrorPassthroughRule(id: Id): Promise<{ deleted: boolean }> {
+    return unwrapData(() => deleteAdminErrorPassthroughRule({ path: { id }, throwOnError: true }));
+  },
+
+  listTlsProfiles(): Promise<AdminListResult<TlsProfile>> {
+    return unwrapList(() => listAdminTlsProfiles({ throwOnError: true }));
+  },
+
+  createTlsProfile(body: CreateTlsProfileRequest): Promise<TlsProfile> {
+    return unwrapData(() => createAdminTlsProfile({ body, throwOnError: true }));
+  },
+
+  updateTlsProfile(id: Id, body: UpdateTlsProfileRequest): Promise<TlsProfile> {
+    return unwrapData(() => updateAdminTlsProfile({ path: { id }, body, throwOnError: true }));
+  },
+
+  deleteTlsProfile(id: Id): Promise<{ deleted: boolean }> {
+    return unwrapData(() => deleteAdminTlsProfile({ path: { id }, throwOnError: true }));
+  },
+
+  listUserAttributeDefinitions(): Promise<AdminListResult<UserAttributeDefinition>> {
+    return unwrapList(() => listAdminUserAttributeDefinitions({ throwOnError: true }));
+  },
+
+  createUserAttributeDefinition(
+    body: CreateUserAttributeDefinitionRequest,
+  ): Promise<UserAttributeDefinition> {
+    return unwrapData(() => createAdminUserAttributeDefinition({ body, throwOnError: true }));
+  },
+
+  updateUserAttributeDefinition(
+    id: Id,
+    body: UpdateUserAttributeDefinitionRequest,
+  ): Promise<UserAttributeDefinition> {
+    return unwrapData(() =>
+      updateAdminUserAttributeDefinition({ path: { id }, body, throwOnError: true }),
+    );
+  },
+
+  deleteUserAttributeDefinition(id: Id): Promise<{ deleted: boolean }> {
+    return unwrapData(() =>
+      deleteAdminUserAttributeDefinition({ path: { id }, throwOnError: true }),
+    );
+  },
+
+  listNotificationEmailTemplates(): Promise<NotificationEmailTemplateList> {
+    return unwrapData(() => listAdminNotificationEmailTemplates({ throwOnError: true }));
+  },
+
+  updateNotificationEmailTemplate(
+    event: NotificationEmailTemplateEventName,
+    body: UpdateNotificationEmailTemplateRequest,
+  ): Promise<NotificationEmailTemplate> {
+    return unwrapData(() =>
+      updateAdminNotificationEmailTemplate({ path: { event }, body, throwOnError: true }),
+    );
+  },
+
+  restoreNotificationEmailTemplate(
+    event: NotificationEmailTemplateEventName,
+  ): Promise<NotificationEmailTemplate> {
+    return unwrapData(() =>
+      restoreAdminNotificationEmailTemplate({ path: { event }, throwOnError: true }),
+    );
+  },
+
+  previewNotificationEmailTemplate(
+    body: PreviewNotificationEmailTemplateRequest,
+  ): Promise<NotificationEmailTemplatePreview> {
+    return unwrapData(() => previewAdminNotificationEmailTemplate({ body, throwOnError: true }));
+  },
+
+  listAccountsAvailability(days?: number): Promise<AdminListResult<AccountAvailabilitySummary>> {
+    return unwrapList(() => listAdminAccountsAvailability({ query: { days }, throwOnError: true }));
+  },
+
+  listUserPlatformQuotas(userId: Id): Promise<AdminListResult<UserPlatformQuota>> {
+    return unwrapList(() => listAdminUserPlatformQuotas({ path: { id: userId }, throwOnError: true }));
+  },
+
+  upsertUserPlatformQuota(
+    userId: Id,
+    body: UpsertUserPlatformQuotaRequest,
+  ): Promise<UserPlatformQuota> {
+    return unwrapData(() =>
+      upsertAdminUserPlatformQuota({ path: { id: userId }, body, throwOnError: true }),
+    );
+  },
+
+  deleteUserPlatformQuota(userId: Id, platform: string): Promise<{ deleted: boolean }> {
+    return unwrapData(() =>
+      deleteAdminUserPlatformQuota({ path: { id: userId, platform }, throwOnError: true }),
+    );
   },
 
   listRedeemCodes(query?: ListAdminRedeemCodesData["query"]): Promise<AdminListResult<RedeemCode>> {
@@ -711,6 +914,42 @@ export const adminApi = {
 
   updateSettings(body: AdminSettings): Promise<AdminSettings> {
     return unwrapData(() => updateAdminSettings({ body, throwOnError: true }));
+  },
+
+  getConfigSnapshot(): Promise<ConfigSnapshotResponse["data"]> {
+    return unwrapData(() => getAdminConfigSnapshot({ throwOnError: true }));
+  },
+
+  importConfigSnapshot(
+    body: ConfigImportRequest,
+    dryRun = false,
+  ): Promise<ConfigImportResponse["data"]> {
+    return unwrapData(() =>
+      importAdminConfigSnapshot({ body, query: { dry_run: dryRun }, throwOnError: true }),
+    );
+  },
+
+  // Rate limits (per-model & per-account-group TPM/RPM/concurrency). The API keys
+  // them by id with no per-id GET, so reads list all and the UI joins by id.
+  listModelRateLimits(): Promise<AdminListResult<ModelRateLimit>> {
+    return unwrapList(() => listAdminModelRateLimits({ throwOnError: true }));
+  },
+  upsertModelRateLimit(body: UpsertModelRateLimitRequest): Promise<ModelRateLimit> {
+    return unwrapData(() => upsertAdminModelRateLimit({ body, throwOnError: true }));
+  },
+  async deleteModelRateLimit(modelId: Id): Promise<void> {
+    configureAdminClient();
+    await deleteAdminModelRateLimit({ path: { modelId }, throwOnError: true });
+  },
+  listGroupRateLimits(): Promise<AdminListResult<AccountGroupRateLimit>> {
+    return unwrapList(() => listAdminGroupRateLimits({ throwOnError: true }));
+  },
+  upsertGroupRateLimit(body: UpsertGroupRateLimitRequest): Promise<AccountGroupRateLimit> {
+    return unwrapData(() => upsertAdminGroupRateLimit({ body, throwOnError: true }));
+  },
+  async deleteGroupRateLimit(groupId: Id): Promise<void> {
+    configureAdminClient();
+    await deleteAdminGroupRateLimit({ path: { groupId }, throwOnError: true });
   },
 };
 

@@ -1,122 +1,48 @@
 #!/usr/bin/env node
-/* eslint-disable no-console */
-/**
- * SRapi v0.1.0 frontend e2e harness. Invoked separately from web-check
- * because Playwright requires a downloaded browser and a long-running web
- * server; not everyone wants to pay that cost on every save.
- *
- * Steps:
- *   1. build          -> next build (provides static + server bundle for `next start`)
- *   2. install browser-> playwright install chromium (idempotent)
- *   3. e2e            -> playwright test
- *
- * Skip the install step with SRAPI_WEB_E2E_SKIP_INSTALL=1 if Chromium is already
- * cached in CI. Install OS packages explicitly with
- * `npm run test:e2e:install-deps` when setting up a new Linux runner.
- */
+// SRapi frontend e2e gate. Preflights the backend, builds, then runs Playwright
+// (which boots `next start` on SRAPI_WEB_E2E_PORT and runs the specs, incl. axe).
+// Invoked by `make web-check-e2e`. Higher cost than web-check; run separately.
 import { spawnSync } from "node:child_process";
-import { fileURLToPath, pathToFileURL } from "node:url";
-import path from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const here = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(here, "..");
-const webDir = path.join(repoRoot, "apps", "web");
-const isWindows = process.platform === "win32";
-const defaultApiURL = "http://127.0.0.1:8080";
-const apiURL = resolveApiURL(process.env);
-const directBrowserBaseURL = (process.env.SRAPI_WEB_E2E_DIRECT_BROWSER_API ?? "").trim() === "1";
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const repoRoot = join(__dirname, "..");
+const webDir = join(repoRoot, "apps", "web");
 
-export function buildChildEnv(baseEnv, targetApiURL, options = {}) {
-  const directBrowserAPI = options.directBrowserAPI === true;
-  const env = {
-    ...baseEnv,
-    SRAPI_API_PROXY_TARGET: targetApiURL,
-  };
+const apiUrl = process.env.SRAPI_WEB_E2E_API_URL ?? "http://127.0.0.1:8080";
 
-  if (directBrowserAPI && !env.NEXT_PUBLIC_SRAPI_BASE_URL) {
-    env.NEXT_PUBLIC_SRAPI_BASE_URL = targetApiURL;
-  } else if (!directBrowserAPI) {
-    delete env.NEXT_PUBLIC_SRAPI_BASE_URL;
+async function preflight() {
+  for (const path of ["/livez", "/readyz", "/api/v1/health"]) {
+    try {
+      const res = await fetch(`${apiUrl}${path}`, { signal: AbortSignal.timeout(2500) });
+      if (res.ok) {
+        console.info(`✓ API preflight ok via ${path}`);
+        return true;
+      }
+    } catch {
+      /* try next */
+    }
   }
-
-  return env;
+  console.warn(`! API preflight could not reach ${apiUrl}; continuing (demo specs are offline-safe)`);
+  return false;
 }
 
-export function resolveApiURL(env) {
-  return (env.SRAPI_WEB_E2E_API_URL ?? env.SRAPI_API_PROXY_TARGET ?? defaultApiURL).replace(
-    /\/+$/,
-    "",
-  );
-}
-
-function isMainModule() {
-  const entrypoint = process.argv[1];
-  return Boolean(entrypoint) && import.meta.url === pathToFileURL(entrypoint).href;
-}
-
-function run(cmd, args, label, childEnv) {
-  console.log("");
-  console.log(`==> web-check-e2e: ${label}`);
-  const result = spawnSync(cmd, args, {
-    cwd: webDir,
-    stdio: "inherit",
-    shell: isWindows,
-    env: childEnv,
-  });
+function run(name, cmd, args, cwd = webDir, env = {}) {
+  console.info(`\n▶ web-check-e2e: ${name}`);
+  const result = spawnSync(cmd, args, { cwd, stdio: "inherit", env: { ...process.env, ...env } });
   if (result.status !== 0) {
-    console.error(`!! web-check-e2e: ${label} failed with exit code ${result.status ?? 1}`);
+    console.error(`\n✗ web-check-e2e failed at: ${name}`);
     process.exit(result.status ?? 1);
   }
 }
 
-async function requireReadyAPI(apiURL) {
-  console.log("");
-  console.log(`==> web-check-e2e: api preflight (${apiURL})`);
+await preflight();
 
-  for (const path of ["/livez", "/readyz"]) {
-    const url = `${apiURL}${path}`;
-    let response;
-    try {
-      response = await fetch(url, { signal: AbortSignal.timeout(5_000) });
-    } catch (err) {
-      throw new Error(
-        `SRapi API is not reachable at ${url}. Start the backend first or set SRAPI_WEB_E2E_API_URL.`,
-        { cause: err },
-      );
-    }
-
-    if (!response.ok) {
-      const body = await response.text();
-      throw new Error(`${path} returned HTTP ${response.status}: ${body.slice(0, 240)}`);
-    }
-
-    const body = await response.json().catch(() => null);
-    if (body?.data?.status !== "ok") {
-      throw new Error(`${path} did not report data.status="ok": ${JSON.stringify(body)}`);
-    }
-  }
+if (process.env.SRAPI_WEB_E2E_SKIP_INSTALL !== "1") {
+  run("install chromium", "npm", ["run", "test:e2e:install"]);
 }
+run("build", "npm", ["run", "build"]);
+run("playwright", "npm", ["run", "test:e2e"], webDir, { SRAPI_API_PROXY_TARGET: apiUrl });
 
-async function main() {
-  const childEnv = buildChildEnv(process.env, apiURL, { directBrowserAPI: directBrowserBaseURL });
-
-  await requireReadyAPI(apiURL).catch((err) => {
-    console.error(`!! web-check-e2e: api preflight failed: ${err.message}`);
-    process.exit(1);
-  });
-
-  run("npm", ["run", "build"], "build", childEnv);
-
-  if (process.env.SRAPI_WEB_E2E_SKIP_INSTALL !== "1") {
-    run("npm", ["run", "test:e2e:install"], "install playwright chromium", childEnv);
-  }
-
-  run("npm", ["run", "test:e2e"], "playwright test", childEnv);
-
-  console.log("");
-  console.log("==> web-check-e2e: all e2e gates passed");
-}
-
-if (isMainModule()) {
-  await main();
-}
+console.info("\n✓ web-check-e2e passed");

@@ -1,20 +1,30 @@
-"use client";
-
 import * as React from "react";
 import { cn } from "@/lib/cn";
 
+/**
+ * Table primitives. Wrap in <TableScroll> for the §7.2 mobile "侧滑防护罩":
+ * horizontal scroll guard with a min-width so dense tables never blow out the
+ * viewport on narrow screens.
+ */
+export function TableScroll({
+  minWidth = 560,
+  className,
+  children,
+}: {
+  minWidth?: number;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={cn("w-full overflow-x-auto", className)}>
+      <div style={{ minWidth }}>{children}</div>
+    </div>
+  );
+}
+
 export const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
   ({ className, ...props }, ref) => (
-    <div className="overflow-x-auto rounded-2xl border border-srapi-border bg-srapi-card">
-      <table
-        ref={ref}
-        className={cn(
-          "w-full min-w-[640px] border-collapse text-left text-xs",
-          className,
-        )}
-        {...props}
-      />
-    </div>
+    <table ref={ref} className={cn("w-full text-sm", className)} {...props} />
   ),
 );
 Table.displayName = "Table";
@@ -26,7 +36,7 @@ export const TableHeader = React.forwardRef<
   <thead
     ref={ref}
     className={cn(
-      "border-b border-srapi-border bg-srapi-card-muted/60 font-mono text-2xs uppercase tracking-wider text-srapi-text-secondary",
+      "border-b border-srapi-border text-left font-mono text-2xs uppercase text-srapi-text-tertiary [&_th]:font-medium",
       className,
     )}
     {...props}
@@ -38,11 +48,7 @@ export const TableBody = React.forwardRef<
   HTMLTableSectionElement,
   React.HTMLAttributes<HTMLTableSectionElement>
 >(({ className, ...props }, ref) => (
-  <tbody
-    ref={ref}
-    className={cn("divide-y divide-srapi-border/60 font-mono text-2xs", className)}
-    {...props}
-  />
+  <tbody ref={ref} className={cn("divide-y divide-srapi-border", className)} {...props} />
 ));
 TableBody.displayName = "TableBody";
 
@@ -52,7 +58,7 @@ export const TableRow = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <tr
     ref={ref}
-    className={cn("transition-colors hover:bg-srapi-card-muted/20", className)}
+    className={cn("transition-colors hover:bg-srapi-card-muted/60", className)}
     {...props}
   />
 ));
@@ -62,12 +68,7 @@ export const TableHead = React.forwardRef<
   HTMLTableCellElement,
   React.ThHTMLAttributes<HTMLTableCellElement>
 >(({ className, ...props }, ref) => (
-  <th
-    ref={ref}
-    scope="col"
-    className={cn("px-6 py-4 font-medium", className)}
-    {...props}
-  />
+  <th ref={ref} className={cn("h-10 px-3 align-middle first:pl-5 last:pr-5", className)} {...props} />
 ));
 TableHead.displayName = "TableHead";
 
@@ -75,6 +76,6 @@ export const TableCell = React.forwardRef<
   HTMLTableCellElement,
   React.TdHTMLAttributes<HTMLTableCellElement>
 >(({ className, ...props }, ref) => (
-  <td ref={ref} className={cn("whitespace-nowrap px-6 py-4 align-middle", className)} {...props} />
+  <td ref={ref} className={cn("px-3 py-3 align-middle first:pl-5 last:pr-5", className)} {...props} />
 ));
 TableCell.displayName = "TableCell";

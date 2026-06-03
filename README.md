@@ -174,23 +174,7 @@ make ent-generate
 make api-run
 ```
 
-启动前端开发服务器：
-
-```bash
-make web-dev
-```
-
-前端质量门（typecheck / lint / 单测 + a11y / build）：
-
-```bash
-make web-check
-```
-
-前端 e2e（Playwright + Chromium + axe-core 全页 a11y）：
-
-```bash
-make web-check-e2e
-```
+> 前端（`apps/web`）正在重写中：当前仅保留 `apps/web/src/lib` 接口 / API 客户端层，UI、前端构建配置与前端 `make` 目标（`web-dev` / `web-check` / `web-check-e2e` / `web-install`）已移除，待新前端落地后再补充对应命令与质量门。
 
 启动 PostgreSQL、Redis 和 API：
 

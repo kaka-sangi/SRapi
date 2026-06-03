@@ -3,6 +3,8 @@ import { client } from '../../../../packages/sdk/typescript/src/client.gen';
 import {
   login as sdkLogin,
   logout as sdkLogout,
+  getSetupStatus as sdkGetSetupStatus,
+  completeSetup as sdkCompleteSetup,
   getCurrentUser as sdkGetCurrentUser,
   getCurrentUserUsage as sdkGetCurrentUserUsage,
   listApiKeys as sdkListApiKeys,
@@ -10,7 +12,6 @@ import {
   updateApiKey as sdkUpdateApiKey,
   listAdminAccounts as sdkListAdminAccounts,
   testAdminAccount as sdkTestAdminAccount,
-  getAdminOverview as sdkGetAdminOverview,
   listAdminUsageLogs as sdkListAdminUsageLogs,
   listAdminSchedulerDecisions as sdkListAdminSchedulerDecisions,
   listAdminOpsSlos as sdkListAdminOpsSlos
@@ -320,6 +321,17 @@ export const apiService = {
     return this.isBackendConnected();
   },
 
+  async getSetupStatus(): Promise<boolean> {
+    configureSDKClient();
+    const response = await sdkGetSetupStatus({ throwOnError: true });
+    return response.data?.data?.needs_setup ?? false;
+  },
+
+  async completeSetup(input: { email: string; name: string; password: string }): Promise<void> {
+    configureSDKClient();
+    await sdkCompleteSetup({ body: input, throwOnError: true });
+  },
+
   async login(email: string, password: string): Promise<CurrentUser> {
     configureSDKClient();
 
@@ -410,13 +422,37 @@ export const apiService = {
     return [];
   },
 
-  async createApiKey(name: string, allowedModels: string[], groupIds: string[]): Promise<ApiKeySummary> {
+  async createApiKey(
+    name: string,
+    allowedModels: string[],
+    groupIds: string[],
+    options?: {
+      allowedIps?: string[];
+      deniedIps?: string[];
+      requestLimit5h?: number;
+      requestLimit1d?: number;
+      requestLimit7d?: number;
+      rpmLimit?: number;
+      tpmLimit?: number;
+      concurrencyLimit?: number;
+      expiresAt?: string;
+    }
+  ): Promise<ApiKeySummary> {
     const response = await sdkCreateApiKey({
       body: {
         name,
         allowed_models: allowedModels,
         group_ids: groupIds,
-        scopes: ['gateway:invoke']
+        scopes: ['gateway:invoke'],
+        ...(options?.allowedIps?.length ? { allowed_ips: options.allowedIps } : {}),
+        ...(options?.deniedIps?.length ? { denied_ips: options.deniedIps } : {}),
+        ...(options?.requestLimit5h != null ? { request_limit_5h: options.requestLimit5h } : {}),
+        ...(options?.requestLimit1d != null ? { request_limit_1d: options.requestLimit1d } : {}),
+        ...(options?.requestLimit7d != null ? { request_limit_7d: options.requestLimit7d } : {}),
+        ...(options?.rpmLimit != null ? { rpm_limit: options.rpmLimit } : {}),
+        ...(options?.tpmLimit != null ? { tpm_limit: options.tpmLimit } : {}),
+        ...(options?.concurrencyLimit != null ? { concurrency_limit: options.concurrencyLimit } : {}),
+        ...(options?.expiresAt ? { expires_at: options.expiresAt } : {})
       },
       throwOnError: true
     });
@@ -548,21 +584,6 @@ export const apiService = {
       });
     }
     return [];
-  },
-
-  async getOverviewStats(): Promise<{ providers: number; models: number; accounts: number; usage_logs: number; decisions: number }> {
-    const response = await sdkGetAdminOverview({ throwOnError: true });
-    if (response.data) {
-      const data = response.data.data;
-      return {
-        providers: data.provider_count || 0,
-        models: data.model_count || 0,
-        accounts: data.account_count || 0,
-        usage_logs: data.usage_log_count || 0,
-        decisions: data.scheduler_decision_count || 0
-      };
-    }
-    throw new Error('Admin overview returned an empty response.');
   },
 
   async getSmokeStatus(model: string = 'gpt-4o-mini'): Promise<SmokeChecklist> {

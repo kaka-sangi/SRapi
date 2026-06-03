@@ -27,6 +27,7 @@ import (
 	tlsprofilescontract "github.com/srapi/srapi/apps/api/internal/modules/tls_profiles/contract"
 	totpcontract "github.com/srapi/srapi/apps/api/internal/modules/totp/contract"
 	usagecontract "github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
+	userplatformquotascontract "github.com/srapi/srapi/apps/api/internal/modules/user_platform_quotas/contract"
 	userattributescontract "github.com/srapi/srapi/apps/api/internal/modules/userattributes/contract"
 	userscontract "github.com/srapi/srapi/apps/api/internal/modules/users/contract"
 	accountstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/accounts"
@@ -53,38 +54,40 @@ import (
 	totpstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/totp"
 	usagestore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/usage"
 	userattributesstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/userattributes"
+	userplatformquotasstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/userplatformquotas"
 	userstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/users"
 )
 
 var ErrInvalidClient = errors.New("invalid ent store client")
 
 type Stores struct {
-	AdminControl     admincontrolcontract.Store
-	Users            userscontract.Store
-	APIKeys          apikeycontract.Store
-	Affiliate        affiliatecontract.Store
-	Providers        providercontract.Store
-	Models           modelcontract.Store
-	Accounts         accountcontract.Store
-	Audit            auditcontract.Store
-	AuthSessions     authcontract.Store
-	Billing          billingcontract.Store
-	UsageCharges     billingcontract.UsageChargeStore
-	Events           eventscontract.Store
-	Idempotency      idempotencycontract.Store
-	Operations       operationscontract.Store
-	Payments         paymentcontract.Store
-	QualityEval      qualitycontract.Store
-	Scheduler        schedulercontract.Store
-	Subscriptions    subscriptioncontract.Store
-	TOTP             totpcontract.Store
-	Usage            usagecontract.Store
-	UserAttributes   userattributescontract.Store
-	ErrorPassthrough errorpassthroughcontract.Store
-	TLSProfiles      tlsprofilescontract.Store
-	HealthRollups    healthrollupscontract.Store
-	ModelRateLimits  modelratelimitscontract.Store
-	GroupRateLimits  groupratelimitscontract.Store
+	AdminControl       admincontrolcontract.Store
+	Users              userscontract.Store
+	APIKeys            apikeycontract.Store
+	Affiliate          affiliatecontract.Store
+	Providers          providercontract.Store
+	Models             modelcontract.Store
+	Accounts           accountcontract.Store
+	Audit              auditcontract.Store
+	AuthSessions       authcontract.Store
+	Billing            billingcontract.Store
+	UsageCharges       billingcontract.UsageChargeStore
+	Events             eventscontract.Store
+	Idempotency        idempotencycontract.Store
+	Operations         operationscontract.Store
+	Payments           paymentcontract.Store
+	QualityEval        qualitycontract.Store
+	Scheduler          schedulercontract.Store
+	Subscriptions      subscriptioncontract.Store
+	TOTP               totpcontract.Store
+	Usage              usagecontract.Store
+	UserAttributes     userattributescontract.Store
+	ErrorPassthrough   errorpassthroughcontract.Store
+	TLSProfiles        tlsprofilescontract.Store
+	HealthRollups      healthrollupscontract.Store
+	ModelRateLimits    modelratelimitscontract.Store
+	GroupRateLimits    groupratelimitscontract.Store
+	UserPlatformQuotas userplatformquotascontract.Store
 }
 
 func New(client *ent.Client) (Stores, error) {
@@ -191,32 +194,37 @@ func New(client *ent.Client) (Stores, error) {
 	if err != nil {
 		return Stores{}, err
 	}
+	userPlatformQuotas, err := userplatformquotasstore.New(client)
+	if err != nil {
+		return Stores{}, err
+	}
 	return Stores{
-		AdminControl:     adminControl,
-		Users:            users,
-		APIKeys:          apiKeys,
-		Affiliate:        affiliate,
-		Providers:        providers,
-		Models:           models,
-		Accounts:         accounts,
-		Audit:            audit,
-		AuthSessions:     authSessions,
-		Billing:          billing,
-		UsageCharges:     billing,
-		Events:           events,
-		Idempotency:      idempotency,
-		Operations:       operations,
-		Payments:         payments,
-		QualityEval:      qualityEval,
-		Scheduler:        scheduler,
-		Subscriptions:    subscriptions,
-		TOTP:             totp,
-		Usage:            usage,
-		UserAttributes:   userAttributes,
-		ErrorPassthrough: errorPassthrough,
-		TLSProfiles:      tlsProfiles,
-		HealthRollups:    healthRollups,
-		ModelRateLimits:  modelRateLimits,
-		GroupRateLimits:  groupRateLimits,
+		AdminControl:       adminControl,
+		Users:              users,
+		APIKeys:            apiKeys,
+		Affiliate:          affiliate,
+		Providers:          providers,
+		Models:             models,
+		Accounts:           accounts,
+		Audit:              audit,
+		AuthSessions:       authSessions,
+		Billing:            billing,
+		UsageCharges:       billing,
+		Events:             events,
+		Idempotency:        idempotency,
+		Operations:         operations,
+		Payments:           payments,
+		QualityEval:        qualityEval,
+		Scheduler:          scheduler,
+		Subscriptions:      subscriptions,
+		TOTP:               totp,
+		Usage:              usage,
+		UserAttributes:     userAttributes,
+		ErrorPassthrough:   errorPassthrough,
+		TLSProfiles:        tlsProfiles,
+		HealthRollups:      healthRollups,
+		ModelRateLimits:    modelRateLimits,
+		GroupRateLimits:    groupRateLimits,
+		UserPlatformQuotas: userPlatformQuotas,
 	}, nil
 }

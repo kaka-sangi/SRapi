@@ -109,6 +109,35 @@ type CreateStoredPlan struct {
 	Status       PlanStatus
 }
 
+// UpdatePlanRequest carries a partial plan edit: every field is optional, and a
+// nil pointer means "leave unchanged". Mirrors the PATCH semantics of the
+// /admin/subscription-plans/{id} endpoint.
+type UpdatePlanRequest struct {
+	Name         *string
+	Description  *string
+	Price        *string
+	Currency     *string
+	ValidityDays *int
+	Entitlements *map[string]any
+	ForSale      *bool
+	SortOrder    *int
+	Status       *PlanStatus
+}
+
+// UpdateStoredPlan is the normalized, validated form of an UpdatePlanRequest
+// handed to the store; nil fields are skipped during the update.
+type UpdateStoredPlan struct {
+	Name         *string
+	Description  *string
+	Price        *string
+	Currency     *string
+	ValidityDays *int
+	Entitlements *map[string]any
+	ForSale      *bool
+	SortOrder    *int
+	Status       *PlanStatus
+}
+
 type CreateSubscriptionRequest struct {
 	UserID     int
 	PlanID     int
@@ -204,6 +233,7 @@ type ReminderSubscriptionsResult struct {
 
 type Store interface {
 	CreatePlan(ctx context.Context, input CreateStoredPlan) (SubscriptionPlan, error)
+	UpdatePlan(ctx context.Context, id int, input UpdateStoredPlan) (SubscriptionPlan, error)
 	FindPlanByID(ctx context.Context, id int) (SubscriptionPlan, error)
 	ListPlans(ctx context.Context) ([]SubscriptionPlan, error)
 	CreateUserSubscription(ctx context.Context, input CreateStoredSubscription) (UserSubscription, error)
