@@ -14,7 +14,7 @@ import {
 import { useLanguage } from "@/context/LanguageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { QuietBadge } from "@/components/ui/quiet-badge";
-import { Sparkline } from "@/components/charts/sparkline";
+import { TrendChart } from "@/components/charts/trend-chart";
 import { BarSeries, type BarDatum } from "@/components/charts/bar-series";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -49,7 +49,7 @@ function UsageContent() {
   const { t } = useLanguage();
   const usage = useAdminUsageLogs();
   const daily = useAdminUsageDaily();
-  const dailyRequests = (daily.data?.data ?? []).map((d) => d.request_count);
+  const dailyData = daily.data?.data ?? [];
 
   const columns: Column<UsageLog>[] = [
     {
@@ -73,12 +73,26 @@ function UsageContent() {
       render: (u) => <span className="text-srapi-text-primary">{u.model}</span>,
     },
     {
-      key: "tokens",
-      header: t("adminUsage.tokens"),
+      key: "input",
+      header: t("dashboard.inputTokens"),
+      align: "right",
+      hideOnMobile: true,
+      render: (u) => (
+        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+          {formatInteger(u.input_tokens)}
+        </span>
+      ),
+    },
+    {
+      key: "output",
+      header: t("dashboard.outputTokens"),
       align: "right",
       render: (u) => (
         <span className="font-mono text-srapi-text-secondary tabular">
-          {formatInteger(u.total_tokens)}
+          {formatInteger(u.output_tokens)}
+          {u.cached_tokens > 0 ? (
+            <span className="ml-1 text-2xs text-srapi-success">+{formatInteger(u.cached_tokens)}</span>
+          ) : null}
         </span>
       ),
     },
@@ -116,14 +130,21 @@ function UsageContent() {
           ) : undefined
         }
       />
-      {dailyRequests.length > 0 ? (
+      {dailyData.length > 0 ? (
         <Card>
           <CardContent>
             <span className="font-mono text-2xs uppercase text-srapi-text-tertiary">
-              {t("adminUsage.title")}
+              {t("dashboard.tokenTrend")}
             </span>
             <div className="mt-3">
-              <Sparkline values={dailyRequests} ariaLabel={t("adminUsage.title")} height={64} />
+              <TrendChart
+                series={[
+                  { key: "input", label: t("dashboard.inputTokens"), values: dailyData.map((d) => d.input_tokens), tone: "secondary" },
+                  { key: "output", label: t("dashboard.outputTokens"), values: dailyData.map((d) => d.output_tokens), tone: "primary" },
+                ]}
+                ariaLabel={t("dashboard.tokenTrend")}
+                height={140}
+              />
             </div>
           </CardContent>
         </Card>

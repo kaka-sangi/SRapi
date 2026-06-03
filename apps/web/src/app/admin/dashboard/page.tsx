@@ -7,7 +7,8 @@ import { StatCard } from "@/components/ui/stat-card";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BarSeries } from "@/components/charts/bar-series";
-import { Sparkline } from "@/components/charts/sparkline";
+import { TrendChart } from "@/components/charts/trend-chart";
+import { TokenBreakdown } from "@/components/charts/token-breakdown";
 import { useAdminDashboard } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
 import {
@@ -130,7 +131,28 @@ function DashboardBody({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
         </CardContent>
       </Card>
 
-      {/* Trend sparklines */}
+      {/* Token composition */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="not-italic font-sans text-base text-srapi-text-primary">
+            {t("dashboard.tokenBreakdown")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <TokenBreakdown
+            input={tokens.input_tokens}
+            output={tokens.output_tokens}
+            cached={tokens.cached_tokens}
+            labels={{
+              input: t("dashboard.inputTokens"),
+              output: t("dashboard.outputTokens"),
+              cached: t("dashboard.cachedTokens"),
+            }}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Trend charts */}
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardContent>
@@ -139,7 +161,12 @@ function DashboardBody({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
             </span>
             <div className="mt-3">
               {tokenTrend.length > 0 ? (
-                <Sparkline values={tokenTrend} ariaLabel={t("dashboard.tokenTrend")} />
+                <TrendChart
+                  series={[{ key: "tokens", label: t("dashboard.tokenTrend"), values: tokenTrend, tone: "primary" }]}
+                  ariaLabel={t("dashboard.tokenTrend")}
+                  showLegend={false}
+                  height={120}
+                />
               ) : (
                 <p className="flex h-14 items-center justify-center font-mono text-2xs text-srapi-text-tertiary">
                   {t("dashboard.noData")}
@@ -155,7 +182,12 @@ function DashboardBody({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
             </span>
             <div className="mt-3">
               {userTrend.length > 0 ? (
-                <Sparkline values={userTrend} ariaLabel={t("dashboard.userTrend")} />
+                <TrendChart
+                  series={[{ key: "users", label: t("dashboard.userTrend"), values: userTrend, tone: "secondary" }]}
+                  ariaLabel={t("dashboard.userTrend")}
+                  showLegend={false}
+                  height={120}
+                />
               ) : (
                 <p className="flex h-14 items-center justify-center font-mono text-2xs text-srapi-text-tertiary">
                   {t("dashboard.noData")}
