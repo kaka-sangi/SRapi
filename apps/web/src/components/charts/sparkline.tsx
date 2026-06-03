@@ -35,11 +35,16 @@ export function Sparkline({
   const max = Math.max(...values, 1);
   const min = Math.min(...values, 0);
   const span = max - min || 1;
-  const step = values.length > 1 ? (width - pad * 2) / (values.length - 1) : 0;
+  const flat = values.length === 1 || max === min;
 
-  const points = values.map((v, i) => {
+  // A single bucket (or a perfectly flat series) has no slope to plot — draw a
+  // flat midline across the full width so the card shows a reading, not a blank.
+  const series = values.length === 1 ? [values[0], values[0]] : values;
+  const step = (width - pad * 2) / (series.length - 1);
+
+  const points = series.map((v, i) => {
     const x = pad + i * step;
-    const y = height - pad - ((v - min) / span) * (height - pad * 2);
+    const y = flat ? height / 2 : height - pad - ((v - min) / span) * (height - pad * 2);
     return [x, y] as const;
   });
 

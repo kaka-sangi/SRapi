@@ -138,7 +138,13 @@ function DashboardBody({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
               {t("dashboard.tokenTrend")}
             </span>
             <div className="mt-3">
-              <Sparkline values={tokenTrend} ariaLabel={t("dashboard.tokenTrend")} />
+              {tokenTrend.length > 0 ? (
+                <Sparkline values={tokenTrend} ariaLabel={t("dashboard.tokenTrend")} />
+              ) : (
+                <p className="flex h-14 items-center justify-center font-mono text-2xs text-srapi-text-tertiary">
+                  {t("dashboard.noData")}
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -148,7 +154,13 @@ function DashboardBody({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
               {t("dashboard.userTrend")}
             </span>
             <div className="mt-3">
-              <Sparkline values={userTrend} ariaLabel={t("dashboard.userTrend")} />
+              {userTrend.length > 0 ? (
+                <Sparkline values={userTrend} ariaLabel={t("dashboard.userTrend")} />
+              ) : (
+                <p className="flex h-14 items-center justify-center font-mono text-2xs text-srapi-text-tertiary">
+                  {t("dashboard.noData")}
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>

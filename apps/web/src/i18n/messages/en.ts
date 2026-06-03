@@ -224,6 +224,7 @@ export const en = {
     modelDistribution: "Model distribution",
     tokenTrend: "Token trend",
     userTrend: "Active users",
+    noData: "No data yet",
     performance: "Performance",
     inventory: "Inventory",
     traffic: "Traffic",

@@ -225,6 +225,7 @@ export const zh: Messages = {
     modelDistribution: "模型分布",
     tokenTrend: "Token 趋势",
     userTrend: "活跃用户",
+    noData: "暂无数据",
     performance: "性能",
     inventory: "资源清单",
     traffic: "流量",
