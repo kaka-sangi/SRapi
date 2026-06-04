@@ -3,6 +3,7 @@ OPENAPI ?= packages/openapi/openapi.yaml
 OPENAPI_BUNDLE ?= build/openapi/openapi.bundle.yaml
 OPENAPI_GO_CONFIG ?= packages/openapi/oapi-codegen.server.yaml
 OPENAPI_GO_OUTPUT ?= apps/api/internal/openapi/openapi.gen.go
+OPENAPI_COPILOT_SPEC ?= apps/api/internal/modules/copilot/openapi.spec.yaml
 OPENAPI_TS_OUTPUT ?= packages/sdk/typescript/src
 OAPI_CODEGEN ?= go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.7.0
 OPENAPI_TS ?= npx --yes @hey-api/openapi-ts@0.97.2
@@ -112,6 +113,7 @@ openapi-bundle:
 openapi-codegen:
 	@mkdir -p $(dir $(OPENAPI_GO_OUTPUT))
 	cd $(API_DIR) && $(OAPI_CODEGEN) -generate types,std-http -package openapi -o internal/openapi/openapi.gen.go ../../$(OPENAPI)
+	cp $(OPENAPI) $(OPENAPI_COPILOT_SPEC)
 
 openapi-codegen-check:
 	@set -e; \
@@ -119,6 +121,7 @@ openapi-codegen-check:
 	(cd $(API_DIR) && $(OAPI_CODEGEN) -generate types,std-http -package openapi -o "$$tmp" ../../$(OPENAPI)); \
 	cmp -s "$$tmp" "$(OPENAPI_GO_OUTPUT)" || (echo "$(OPENAPI_GO_OUTPUT) is out of date; run make openapi-codegen" >&2; rm -f "$$tmp"; exit 1); \
 	rm -f "$$tmp"
+	@cmp -s "$(OPENAPI)" "$(OPENAPI_COPILOT_SPEC)" || (echo "$(OPENAPI_COPILOT_SPEC) is out of date; run make openapi-codegen" >&2; exit 1)
 
 openapi-ts-codegen:
 	$(OPENAPI_TS) -i $(OPENAPI) -o $(OPENAPI_TS_OUTPUT) -c @hey-api/client-fetch -p @hey-api/typescript @hey-api/sdk --no-log-file

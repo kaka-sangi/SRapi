@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	apikeycontract "github.com/srapi/srapi/apps/api/internal/modules/api_keys/contract"
 	gatewaycontract "github.com/srapi/srapi/apps/api/internal/modules/gateway/contract"
 	gatewayservice "github.com/srapi/srapi/apps/api/internal/modules/gateway/service"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
@@ -86,6 +87,16 @@ func (s *Server) handleCreateChatCompletion(w http.ResponseWriter, r *http.Reque
 		writeGatewayError(w, jsonDecodeStatus(err), apiopenapi.InvalidRequestError, "invalid chat completion request", "invalid_request")
 		return
 	}
+	s.serveChatCompletion(w, r, authed, body, rawBody, sourceEndpoint, forcedProviderKey, startedAt)
+}
+
+// serveChatCompletion runs the gateway chat pipeline AFTER authentication: model
+// resolution, per-key entitlement, admission (balance / quota / subscription),
+// provider scheduling + failover, and streaming/metering+billing. It is shared
+// by the API-key path (handleCreateChatCompletion) and the session-billed user
+// playground (交界地) so both bill identically.
+func (s *Server) serveChatCompletion(w http.ResponseWriter, r *http.Request, authed apikeycontract.AuthResult, body apiopenapi.ChatCompletionRequest, rawBody []byte, sourceEndpoint, forcedProviderKey string, startedAt time.Time) {
+	requestID := requestIDFromContext(r.Context())
 	modelResolution, err := s.runtime.models.ResolveModelReference(r.Context(), body.Model)
 	if err != nil {
 		s.runtime.recordGatewayUsage(r.Context(), gatewayUsageRecord{

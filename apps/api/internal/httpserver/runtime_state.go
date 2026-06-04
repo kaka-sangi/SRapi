@@ -35,6 +35,7 @@ import (
 	capabilitiescontract "github.com/srapi/srapi/apps/api/internal/modules/capabilities/contract"
 	captchaservice "github.com/srapi/srapi/apps/api/internal/modules/captcha/service"
 	contentsafetyservice "github.com/srapi/srapi/apps/api/internal/modules/content_safety/service"
+	"github.com/srapi/srapi/apps/api/internal/modules/copilot"
 	errorpassthroughcontract "github.com/srapi/srapi/apps/api/internal/modules/error_passthrough/contract"
 	errorpassthroughservice "github.com/srapi/srapi/apps/api/internal/modules/error_passthrough/service"
 	errorpassthroughmemory "github.com/srapi/srapi/apps/api/internal/modules/error_passthrough/store/memory"
@@ -157,6 +158,8 @@ type runtimeState struct {
 	groupRateLimits         *groupratelimitsservice.Service
 	userPlatformQuotas      *userplatformquotasservice.Service
 	payloadRules            *payloadrulesservice.Service
+	copilotEngine           *copilot.Engine
+	internalRouter          http.Handler
 	userStore               userscontract.Store
 	sessionStore            authcontract.Store
 	apiKeyStore             apikeycontract.Store
@@ -521,6 +524,15 @@ func (rt *runtimeState) buildCapabilityServices(cfg config.Config, opts runtimeO
 		return err
 	}
 	rt.payloadRules = payloadRulesSvc
+
+	// The admin copilot loads its tool catalog from the embedded OpenAPI spec. A
+	// parse failure disables the copilot (handlers return 503) but must not block
+	// the rest of the server from starting.
+	if catalog, err := copilot.LoadCatalog(); err != nil {
+		rt.logger.Error("failed to load admin copilot catalog", "error", err)
+	} else {
+		rt.copilotEngine = copilot.NewEngine(catalog)
+	}
 	return nil
 }
 

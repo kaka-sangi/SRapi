@@ -65,6 +65,87 @@ func (e AccountModelDiscoverySource) Valid() bool {
 	}
 }
 
+// Defines values for AdminCopilotChatRequestReasoningEffort.
+const (
+	AdminCopilotChatRequestReasoningEffortHigh   AdminCopilotChatRequestReasoningEffort = "high"
+	AdminCopilotChatRequestReasoningEffortLow    AdminCopilotChatRequestReasoningEffort = "low"
+	AdminCopilotChatRequestReasoningEffortMedium AdminCopilotChatRequestReasoningEffort = "medium"
+	AdminCopilotChatRequestReasoningEffortOff    AdminCopilotChatRequestReasoningEffort = "off"
+)
+
+// Valid indicates whether the value is a known member of the AdminCopilotChatRequestReasoningEffort enum.
+func (e AdminCopilotChatRequestReasoningEffort) Valid() bool {
+	switch e {
+	case AdminCopilotChatRequestReasoningEffortHigh:
+		return true
+	case AdminCopilotChatRequestReasoningEffortLow:
+		return true
+	case AdminCopilotChatRequestReasoningEffortMedium:
+		return true
+	case AdminCopilotChatRequestReasoningEffortOff:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AdminCopilotConfigSource.
+const (
+	AdminCopilotConfigSourceAccount   AdminCopilotConfigSource = "account"
+	AdminCopilotConfigSourceDedicated AdminCopilotConfigSource = "dedicated"
+)
+
+// Valid indicates whether the value is a known member of the AdminCopilotConfigSource enum.
+func (e AdminCopilotConfigSource) Valid() bool {
+	switch e {
+	case AdminCopilotConfigSourceAccount:
+		return true
+	case AdminCopilotConfigSourceDedicated:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AdminCopilotMessageRole.
+const (
+	AdminCopilotMessageRoleAssistant AdminCopilotMessageRole = "assistant"
+	AdminCopilotMessageRoleTool      AdminCopilotMessageRole = "tool"
+	AdminCopilotMessageRoleUser      AdminCopilotMessageRole = "user"
+)
+
+// Valid indicates whether the value is a known member of the AdminCopilotMessageRole enum.
+func (e AdminCopilotMessageRole) Valid() bool {
+	switch e {
+	case AdminCopilotMessageRoleAssistant:
+		return true
+	case AdminCopilotMessageRoleTool:
+		return true
+	case AdminCopilotMessageRoleUser:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AdminSettingsCopilotSource.
+const (
+	AdminSettingsCopilotSourceAccount   AdminSettingsCopilotSource = "account"
+	AdminSettingsCopilotSourceDedicated AdminSettingsCopilotSource = "dedicated"
+)
+
+// Valid indicates whether the value is a known member of the AdminSettingsCopilotSource enum.
+func (e AdminSettingsCopilotSource) Valid() bool {
+	switch e {
+	case AdminSettingsCopilotSourceAccount:
+		return true
+	case AdminSettingsCopilotSourceDedicated:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for AdminTestResultStatus.
 const (
 	AdminTestResultStatusFailed AdminTestResultStatus = "failed"
@@ -1610,6 +1691,48 @@ func (e PlatformFamily) Valid() bool {
 	}
 }
 
+// Defines values for PlaygroundChatRequestReasoningEffort.
+const (
+	PlaygroundChatRequestReasoningEffortHigh   PlaygroundChatRequestReasoningEffort = "high"
+	PlaygroundChatRequestReasoningEffortLow    PlaygroundChatRequestReasoningEffort = "low"
+	PlaygroundChatRequestReasoningEffortMedium PlaygroundChatRequestReasoningEffort = "medium"
+	PlaygroundChatRequestReasoningEffortOff    PlaygroundChatRequestReasoningEffort = "off"
+)
+
+// Valid indicates whether the value is a known member of the PlaygroundChatRequestReasoningEffort enum.
+func (e PlaygroundChatRequestReasoningEffort) Valid() bool {
+	switch e {
+	case PlaygroundChatRequestReasoningEffortHigh:
+		return true
+	case PlaygroundChatRequestReasoningEffortLow:
+		return true
+	case PlaygroundChatRequestReasoningEffortMedium:
+		return true
+	case PlaygroundChatRequestReasoningEffortOff:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PlaygroundMessageRole.
+const (
+	PlaygroundMessageRoleAssistant PlaygroundMessageRole = "assistant"
+	PlaygroundMessageRoleUser      PlaygroundMessageRole = "user"
+)
+
+// Valid indicates whether the value is a known member of the PlaygroundMessageRole enum.
+func (e PlaygroundMessageRole) Valid() bool {
+	switch e {
+	case PlaygroundMessageRoleAssistant:
+		return true
+	case PlaygroundMessageRoleUser:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PromoCodeStatus.
 const (
 	PromoCodeStatusActive   PromoCodeStatus = "active"
@@ -2794,6 +2917,95 @@ type AccountsAvailabilitySummaryResponse struct {
 	RequestId  RequestId                    `json:"request_id"`
 }
 
+// AdminCopilotApproval defines model for AdminCopilotApproval.
+type AdminCopilotApproval struct {
+	Approved   bool   `json:"approved"`
+	ToolCallId string `json:"tool_call_id"`
+}
+
+// AdminCopilotChatRequest defines model for AdminCopilotChatRequest.
+type AdminCopilotChatRequest struct {
+	Approval *AdminCopilotApproval `json:"approval,omitempty"`
+	Messages []AdminCopilotMessage `json:"messages"`
+
+	// Model Per-turn model override; falls back to the configured default.
+	Model *string `json:"model,omitempty"`
+
+	// ReasoningEffort Thinking effort for reasoning-capable models.
+	ReasoningEffort *AdminCopilotChatRequestReasoningEffort `json:"reasoning_effort,omitempty"`
+}
+
+// AdminCopilotChatRequestReasoningEffort Thinking effort for reasoning-capable models.
+type AdminCopilotChatRequestReasoningEffort string
+
+// AdminCopilotConfig defines model for AdminCopilotConfig.
+type AdminCopilotConfig struct {
+	// Configured True when the selected source has usable credentials.
+	Configured bool `json:"configured"`
+	Enabled    bool `json:"enabled"`
+
+	// Model Default model the composer selects.
+	Model string `json:"model"`
+
+	// Models Models offered in the composer picker (custom entries also allowed).
+	Models    []string `json:"models"`
+	OwnerOnly bool     `json:"owner_only"`
+
+	// Protocol Wire protocol of the configured source (hints model capabilities).
+	Protocol string                   `json:"protocol"`
+	Source   AdminCopilotConfigSource `json:"source"`
+}
+
+// AdminCopilotConfigSource defines model for AdminCopilotConfig.Source.
+type AdminCopilotConfigSource string
+
+// AdminCopilotConfigResponse defines model for AdminCopilotConfigResponse.
+type AdminCopilotConfigResponse struct {
+	Data      AdminCopilotConfig `json:"data"`
+	RequestId RequestId          `json:"request_id"`
+}
+
+// AdminCopilotImage defines model for AdminCopilotImage.
+type AdminCopilotImage struct {
+	// Data Base64-encoded image bytes (no data URL prefix).
+	Data string `json:"data"`
+
+	// MimeType Image MIME type, e.g. image/png.
+	MimeType string `json:"mime_type"`
+}
+
+// AdminCopilotMessage defines model for AdminCopilotMessage.
+type AdminCopilotMessage struct {
+	Content *string `json:"content,omitempty"`
+
+	// Images Image attachments on a user message (multimodal input).
+	Images *[]AdminCopilotImage `json:"images,omitempty"`
+
+	// Reasoning Model chain-of-thought for an assistant message (display only; never sent back upstream).
+	Reasoning   *string                   `json:"reasoning,omitempty"`
+	Role        AdminCopilotMessageRole   `json:"role"`
+	ToolCalls   *[]AdminCopilotToolCall   `json:"tool_calls,omitempty"`
+	ToolResults *[]AdminCopilotToolResult `json:"tool_results,omitempty"`
+}
+
+// AdminCopilotMessageRole defines model for AdminCopilotMessage.Role.
+type AdminCopilotMessageRole string
+
+// AdminCopilotToolCall defines model for AdminCopilotToolCall.
+type AdminCopilotToolCall struct {
+	// Arguments Raw JSON arguments emitted by the model.
+	Arguments string `json:"arguments"`
+	Id        string `json:"id"`
+	Name      string `json:"name"`
+}
+
+// AdminCopilotToolResult defines model for AdminCopilotToolResult.
+type AdminCopilotToolResult struct {
+	Content    string `json:"content"`
+	IsError    *bool  `json:"is_error,omitempty"`
+	ToolCallId string `json:"tool_call_id"`
+}
+
 // AdminDashboard defines model for AdminDashboard.
 type AdminDashboard = AdminOverview
 
@@ -2901,13 +3113,16 @@ type AdminOverviewResponse struct {
 type AdminSettings struct {
 	Agreement AdminSettingsAgreement `json:"agreement"`
 	Backup    AdminSettingsBackup    `json:"backup"`
-	Email     AdminSettingsEmail     `json:"email"`
-	Features  AdminSettingsFeatures  `json:"features"`
-	Gateway   AdminSettingsGateway   `json:"gateway"`
-	General   AdminSettingsGeneral   `json:"general"`
-	Payment   AdminSettingsPayment   `json:"payment"`
-	Security  AdminSettingsSecurity  `json:"security"`
-	Users     AdminSettingsUsers     `json:"users"`
+
+	// Copilot Admin AI Copilot configuration. The copilot drives an agentic tool-calling loop over the admin API; configure which LLM powers it and how autonomously it may act.
+	Copilot  AdminSettingsCopilot  `json:"copilot"`
+	Email    AdminSettingsEmail    `json:"email"`
+	Features AdminSettingsFeatures `json:"features"`
+	Gateway  AdminSettingsGateway  `json:"gateway"`
+	General  AdminSettingsGeneral  `json:"general"`
+	Payment  AdminSettingsPayment  `json:"payment"`
+	Security AdminSettingsSecurity `json:"security"`
+	Users    AdminSettingsUsers    `json:"users"`
 }
 
 // AdminSettingsAgreement defines model for AdminSettingsAgreement.
@@ -2922,6 +3137,48 @@ type AdminSettingsBackup struct {
 	LastBackupAt  *Timestamp `json:"last_backup_at,omitempty"`
 	RetentionDays int        `json:"retention_days"`
 }
+
+// AdminSettingsCopilot Admin AI Copilot configuration. The copilot drives an agentic tool-calling loop over the admin API; configure which LLM powers it and how autonomously it may act.
+type AdminSettingsCopilot struct {
+	// AutoRunReads Auto-execute read-only (GET) tool calls without confirmation.
+	AutoRunReads bool `json:"auto_run_reads"`
+
+	// DedicatedApiKey API key for dedicated mode. Write-only; supplied to set or rotate the key and never returned. Omit to keep the stored key.
+	DedicatedApiKey *string `json:"dedicated_api_key,omitempty"`
+
+	// DedicatedApiKeyConfigured True when a dedicated API key is stored.
+	DedicatedApiKeyConfigured bool `json:"dedicated_api_key_configured"`
+
+	// DedicatedBaseUrl Upstream base URL for dedicated mode.
+	DedicatedBaseUrl string `json:"dedicated_base_url"`
+
+	// DedicatedProtocol Wire protocol for dedicated mode (openai-compatible, anthropic-compatible, gemini-compatible).
+	DedicatedProtocol string `json:"dedicated_protocol"`
+
+	// Enabled Master switch for the copilot chat endpoint.
+	Enabled bool `json:"enabled"`
+
+	// MaxSteps Maximum agent tool-calling iterations per turn.
+	MaxSteps int `json:"max_steps"`
+
+	// Model Default upstream model the copilot calls (e.g. claude-3-5-sonnet, gpt-4o).
+	Model string `json:"model"`
+
+	// Models Selectable models offered in the chat composer's picker. Optional; when empty the picker is auto-derived from the account's discovered models plus the default.
+	Models *[]string `json:"models,omitempty"`
+
+	// OwnerOnly Restrict the copilot to owner-role admins.
+	OwnerOnly bool `json:"owner_only"`
+
+	// ProviderAccountId Provider account id used when source is "account" (0 = unset).
+	ProviderAccountId int `json:"provider_account_id"`
+
+	// Source Where the copilot's LLM credentials come from. "account" reuses an existing provider account; "dedicated" uses a standalone key.
+	Source AdminSettingsCopilotSource `json:"source"`
+}
+
+// AdminSettingsCopilotSource Where the copilot's LLM credentials come from. "account" reuses an existing provider account; "dedicated" uses a standalone key.
+type AdminSettingsCopilotSource string
 
 // AdminSettingsEmail defines model for AdminSettingsEmail.
 type AdminSettingsEmail struct {
@@ -5752,6 +6009,45 @@ type PendingOAuthIntent string
 // PlatformFamily Upstream protocol/platform family a provider preset belongs to.
 type PlatformFamily string
 
+// PlaygroundChatRequest defines model for PlaygroundChatRequest.
+type PlaygroundChatRequest struct {
+	Messages        []PlaygroundMessage                   `json:"messages"`
+	Model           string                                `json:"model"`
+	ReasoningEffort *PlaygroundChatRequestReasoningEffort `json:"reasoning_effort,omitempty"`
+}
+
+// PlaygroundChatRequestReasoningEffort defines model for PlaygroundChatRequest.ReasoningEffort.
+type PlaygroundChatRequestReasoningEffort string
+
+// PlaygroundImage defines model for PlaygroundImage.
+type PlaygroundImage struct {
+	// Data Base64-encoded image bytes (no data URL prefix).
+	Data     string `json:"data"`
+	MimeType string `json:"mime_type"`
+}
+
+// PlaygroundMessage defines model for PlaygroundMessage.
+type PlaygroundMessage struct {
+	Content *string               `json:"content,omitempty"`
+	Images  *[]PlaygroundImage    `json:"images,omitempty"`
+	Role    PlaygroundMessageRole `json:"role"`
+}
+
+// PlaygroundMessageRole defines model for PlaygroundMessage.Role.
+type PlaygroundMessageRole string
+
+// PlaygroundModel defines model for PlaygroundModel.
+type PlaygroundModel struct {
+	Id   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// PlaygroundModelsResponse defines model for PlaygroundModelsResponse.
+type PlaygroundModelsResponse struct {
+	Data      []PlaygroundModel `json:"data"`
+	RequestId RequestId         `json:"request_id"`
+}
+
 // PreviewNotificationEmailTemplateRequest defines model for PreviewNotificationEmailTemplateRequest.
 type PreviewNotificationEmailTemplateRequest struct {
 	Event NotificationEmailTemplateEventName `json:"event"`
@@ -8142,6 +8438,9 @@ type UpdateAdminAnnouncementJSONRequestBody = UpdateAnnouncementRequest
 // ImportAdminConfigSnapshotJSONRequestBody defines body for ImportAdminConfigSnapshot for application/json ContentType.
 type ImportAdminConfigSnapshotJSONRequestBody = ConfigImportRequest
 
+// CreateAdminCopilotChatJSONRequestBody defines body for CreateAdminCopilotChat for application/json ContentType.
+type CreateAdminCopilotChatJSONRequestBody = AdminCopilotChatRequest
+
 // CreateAdminErrorPassthroughRuleJSONRequestBody defines body for CreateAdminErrorPassthroughRule for application/json ContentType.
 type CreateAdminErrorPassthroughRuleJSONRequestBody = CreateErrorPassthroughRuleRequest
 
@@ -8357,6 +8656,9 @@ type UpdateCurrentUserNotificationPreferencesJSONRequestBody = UpdateNotificatio
 
 // ChangeCurrentUserPasswordJSONRequestBody defines body for ChangeCurrentUserPassword for application/json ContentType.
 type ChangeCurrentUserPasswordJSONRequestBody = ChangeCurrentUserPasswordRequest
+
+// CreateMePlaygroundChatJSONRequestBody defines body for CreateMePlaygroundChat for application/json ContentType.
+type CreateMePlaygroundChatJSONRequestBody = PlaygroundChatRequest
 
 // RedeemCurrentUserRedeemCodeJSONRequestBody defines body for RedeemCurrentUserRedeemCode for application/json ContentType.
 type RedeemCurrentUserRedeemCodeJSONRequestBody = RedeemCodeRedemptionRequest
@@ -14887,6 +15189,12 @@ type ServerInterface interface {
 	// Import the portable sections of a config snapshot.
 	// (POST /api/v1/admin/config-snapshot/import)
 	ImportAdminConfigSnapshot(w http.ResponseWriter, r *http.Request, params ImportAdminConfigSnapshotParams)
+	// Drive one admin AI copilot turn (SSE stream of events).
+	// (POST /api/v1/admin/copilot/chat)
+	CreateAdminCopilotChat(w http.ResponseWriter, r *http.Request)
+	// Get the admin AI copilot runtime configuration.
+	// (GET /api/v1/admin/copilot/config)
+	GetAdminCopilotConfig(w http.ResponseWriter, r *http.Request)
 	// Get admin dashboard statistics.
 	// (GET /api/v1/admin/dashboard)
 	GetAdminDashboard(w http.ResponseWriter, r *http.Request)
@@ -15358,6 +15666,12 @@ type ServerInterface interface {
 	// Change current console user password.
 	// (POST /api/v1/me/password)
 	ChangeCurrentUserPassword(w http.ResponseWriter, r *http.Request)
+	// Stream a billed playground chat completion (SSE) for the current user.
+	// (POST /api/v1/me/playground/chat)
+	CreateMePlaygroundChat(w http.ResponseWriter, r *http.Request)
+	// List models available to the current user for the playground.
+	// (GET /api/v1/me/playground/models)
+	ListMePlaygroundModels(w http.ResponseWriter, r *http.Request)
 	// Redeem a code for the current user.
 	// (POST /api/v1/me/redeem-codes/redeem)
 	RedeemCurrentUserRedeemCode(w http.ResponseWriter, r *http.Request)
@@ -17723,6 +18037,48 @@ func (siw *ServerInterfaceWrapper) ImportAdminConfigSnapshot(w http.ResponseWrit
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ImportAdminConfigSnapshot(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAdminCopilotChat operation middleware
+func (siw *ServerInterfaceWrapper) CreateAdminCopilotChat(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAdminCopilotChat(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminCopilotConfig operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminCopilotConfig(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminCopilotConfig(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -23174,6 +23530,48 @@ func (siw *ServerInterfaceWrapper) ChangeCurrentUserPassword(w http.ResponseWrit
 	handler.ServeHTTP(w, r)
 }
 
+// CreateMePlaygroundChat operation middleware
+func (siw *ServerInterfaceWrapper) CreateMePlaygroundChat(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateMePlaygroundChat(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListMePlaygroundModels operation middleware
+func (siw *ServerInterfaceWrapper) ListMePlaygroundModels(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMePlaygroundModels(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // RedeemCurrentUserRedeemCode operation middleware
 func (siw *ServerInterfaceWrapper) RedeemCurrentUserRedeemCode(w http.ResponseWriter, r *http.Request) {
 
@@ -25386,6 +25784,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/capabilities", wrapper.ListAdminCapabilities)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/config-snapshot", wrapper.GetAdminConfigSnapshot)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/config-snapshot/import", wrapper.ImportAdminConfigSnapshot)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/copilot/chat", wrapper.CreateAdminCopilotChat)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/copilot/config", wrapper.GetAdminCopilotConfig)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/dashboard", wrapper.GetAdminDashboard)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/dashboard/snapshot", wrapper.GetAdminDashboardSnapshot)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/error-passthrough-rules", wrapper.ListAdminErrorPassthroughRules)
@@ -25543,6 +25943,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/notification-preferences", wrapper.GetCurrentUserNotificationPreferences)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/me/notification-preferences", wrapper.UpdateCurrentUserNotificationPreferences)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/me/password", wrapper.ChangeCurrentUserPassword)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/me/playground/chat", wrapper.CreateMePlaygroundChat)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/playground/models", wrapper.ListMePlaygroundModels)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/me/redeem-codes/redeem", wrapper.RedeemCurrentUserRedeemCode)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/subscriptions", wrapper.GetCurrentUserSubscriptions)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/me/totp/disable", wrapper.DisableCurrentUserTOTP)

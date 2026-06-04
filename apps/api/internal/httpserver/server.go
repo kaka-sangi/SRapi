@@ -459,6 +459,8 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("POST /api/v1/admin/ops/alerts/{id}/ack", server.handleAcknowledgeAdminOpsAlert)
 	mux.HandleFunc("GET /api/v1/admin/settings", server.handleGetAdminSettings)
 	mux.HandleFunc("PUT /api/v1/admin/settings", server.handleUpdateAdminSettings)
+	mux.HandleFunc("GET /api/v1/admin/copilot/config", server.handleAdminCopilotConfig)
+	mux.HandleFunc("POST /api/v1/admin/copilot/chat", server.handleAdminCopilotChat)
 	mux.HandleFunc("GET /api/v1/admin/notifications/email-templates", server.handleListAdminNotificationEmailTemplates)
 	mux.HandleFunc("POST /api/v1/admin/notifications/email-template-preview", server.handlePreviewAdminNotificationEmailTemplate)
 	mux.HandleFunc("GET /api/v1/admin/notifications/email-templates/{event}", server.handleGetAdminNotificationEmailTemplate)
@@ -509,6 +511,10 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("POST /v1/rerank", server.handleCreateRerank)
 	mux.HandleFunc("POST /v1beta/models/", server.handleGeminiModelAction)
 	server.registerGatewayProviderAliases(mux)
+
+	// The admin copilot dispatches approved admin calls in-process against this
+	// bare mux (so path values + handler auth/validation/audit all apply).
+	runtime.internalRouter = mux
 
 	return requestIDMiddleware(server.tracingMiddleware(server.gatewayConcurrencyMiddleware(mux)))
 }
@@ -580,6 +586,8 @@ func (s *Server) registerCurrentUserRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/me/affiliate/transfer-to-balance", s.handleCurrentUserAffiliateTransferToBalance)
 	mux.HandleFunc("GET /api/v1/me/usage", s.handleCurrentUserUsage)
 	mux.HandleFunc("GET /api/v1/me/subscriptions", s.handleCurrentUserSubscriptions)
+	mux.HandleFunc("GET /api/v1/me/playground/models", s.handleMePlaygroundModels)
+	mux.HandleFunc("POST /api/v1/me/playground/chat", s.handleMePlaygroundChat)
 }
 
 func (s *Server) handleLive(w http.ResponseWriter, r *http.Request) {

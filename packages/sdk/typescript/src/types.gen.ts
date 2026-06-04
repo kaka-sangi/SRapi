@@ -1981,10 +1981,177 @@ export type AdminSettings = {
     payment: AdminSettingsPayment;
     email: AdminSettingsEmail;
     backup: AdminSettingsBackup;
+    copilot: AdminSettingsCopilot;
+};
+
+/**
+ * Admin AI Copilot configuration. The copilot drives an agentic tool-calling loop over the admin API; configure which LLM powers it and how autonomously it may act.
+ */
+export type AdminSettingsCopilot = {
+    /**
+     * Master switch for the copilot chat endpoint.
+     */
+    enabled: boolean;
+    /**
+     * Where the copilot's LLM credentials come from. "account" reuses an existing provider account; "dedicated" uses a standalone key.
+     */
+    source: 'account' | 'dedicated';
+    /**
+     * Provider account id used when source is "account" (0 = unset).
+     */
+    provider_account_id: number;
+    /**
+     * Default upstream model the copilot calls (e.g. claude-3-5-sonnet, gpt-4o).
+     */
+    model: string;
+    /**
+     * Selectable models offered in the chat composer's picker. Optional; when empty the picker is auto-derived from the account's discovered models plus the default.
+     */
+    models?: Array<string>;
+    /**
+     * Wire protocol for dedicated mode (openai-compatible, anthropic-compatible, gemini-compatible).
+     */
+    dedicated_protocol: string;
+    /**
+     * Upstream base URL for dedicated mode.
+     */
+    dedicated_base_url: string;
+    /**
+     * True when a dedicated API key is stored.
+     */
+    dedicated_api_key_configured: boolean;
+    /**
+     * Maximum agent tool-calling iterations per turn.
+     */
+    max_steps: number;
+    /**
+     * Restrict the copilot to owner-role admins.
+     */
+    owner_only: boolean;
+    /**
+     * Auto-execute read-only (GET) tool calls without confirmation.
+     */
+    auto_run_reads: boolean;
 };
 
 export type AdminSettingsResponse = {
     data: AdminSettings;
+    request_id: RequestId;
+};
+
+export type AdminCopilotConfig = {
+    enabled: boolean;
+    source: 'account' | 'dedicated';
+    /**
+     * Default model the composer selects.
+     */
+    model: string;
+    /**
+     * Models offered in the composer picker (custom entries also allowed).
+     */
+    models: Array<string>;
+    /**
+     * Wire protocol of the configured source (hints model capabilities).
+     */
+    protocol: string;
+    owner_only: boolean;
+    /**
+     * True when the selected source has usable credentials.
+     */
+    configured: boolean;
+};
+
+export type AdminCopilotConfigResponse = {
+    data: AdminCopilotConfig;
+    request_id: RequestId;
+};
+
+export type AdminCopilotToolCall = {
+    id: string;
+    name: string;
+    /**
+     * Raw JSON arguments emitted by the model.
+     */
+    arguments: string;
+};
+
+export type AdminCopilotToolResult = {
+    tool_call_id: string;
+    content: string;
+    is_error?: boolean;
+};
+
+export type AdminCopilotImage = {
+    /**
+     * Image MIME type, e.g. image/png.
+     */
+    mime_type: string;
+    /**
+     * Base64-encoded image bytes (no data URL prefix).
+     */
+    data: string;
+};
+
+export type AdminCopilotMessage = {
+    role: 'user' | 'assistant' | 'tool';
+    content?: string;
+    /**
+     * Model chain-of-thought for an assistant message (display only; never sent back upstream).
+     */
+    reasoning?: string;
+    /**
+     * Image attachments on a user message (multimodal input).
+     */
+    images?: Array<AdminCopilotImage>;
+    tool_calls?: Array<AdminCopilotToolCall>;
+    tool_results?: Array<AdminCopilotToolResult>;
+};
+
+export type AdminCopilotApproval = {
+    tool_call_id: string;
+    approved: boolean;
+};
+
+export type AdminCopilotChatRequest = {
+    messages: Array<AdminCopilotMessage>;
+    approval?: AdminCopilotApproval;
+    /**
+     * Per-turn model override; falls back to the configured default.
+     */
+    model?: string;
+    /**
+     * Thinking effort for reasoning-capable models.
+     */
+    reasoning_effort?: 'off' | 'low' | 'medium' | 'high';
+};
+
+export type PlaygroundImage = {
+    mime_type: string;
+    /**
+     * Base64-encoded image bytes (no data URL prefix).
+     */
+    data: string;
+};
+
+export type PlaygroundMessage = {
+    role: 'user' | 'assistant';
+    content?: string;
+    images?: Array<PlaygroundImage>;
+};
+
+export type PlaygroundChatRequest = {
+    messages: Array<PlaygroundMessage>;
+    model: string;
+    reasoning_effort?: 'off' | 'low' | 'medium' | 'high';
+};
+
+export type PlaygroundModel = {
+    id: string;
+    name: string;
+};
+
+export type PlaygroundModelsResponse = {
+    data: Array<PlaygroundModel>;
     request_id: RequestId;
 };
 
@@ -4249,6 +4416,78 @@ export type ProviderAccountImportRequestWritable = {
     accounts: Array<ProviderAccountImportItemWritable>;
 };
 
+export type AdminSettingsWritable = {
+    general: AdminSettingsGeneral;
+    agreement: AdminSettingsAgreement;
+    features: AdminSettingsFeatures;
+    security: AdminSettingsSecurity;
+    users: AdminSettingsUsers;
+    gateway: AdminSettingsGateway;
+    payment: AdminSettingsPayment;
+    email: AdminSettingsEmail;
+    backup: AdminSettingsBackup;
+    copilot: AdminSettingsCopilotWritable;
+};
+
+/**
+ * Admin AI Copilot configuration. The copilot drives an agentic tool-calling loop over the admin API; configure which LLM powers it and how autonomously it may act.
+ */
+export type AdminSettingsCopilotWritable = {
+    /**
+     * Master switch for the copilot chat endpoint.
+     */
+    enabled: boolean;
+    /**
+     * Where the copilot's LLM credentials come from. "account" reuses an existing provider account; "dedicated" uses a standalone key.
+     */
+    source: 'account' | 'dedicated';
+    /**
+     * Provider account id used when source is "account" (0 = unset).
+     */
+    provider_account_id: number;
+    /**
+     * Default upstream model the copilot calls (e.g. claude-3-5-sonnet, gpt-4o).
+     */
+    model: string;
+    /**
+     * Selectable models offered in the chat composer's picker. Optional; when empty the picker is auto-derived from the account's discovered models plus the default.
+     */
+    models?: Array<string>;
+    /**
+     * Wire protocol for dedicated mode (openai-compatible, anthropic-compatible, gemini-compatible).
+     */
+    dedicated_protocol: string;
+    /**
+     * Upstream base URL for dedicated mode.
+     */
+    dedicated_base_url: string;
+    /**
+     * API key for dedicated mode. Write-only; supplied to set or rotate the key and never returned. Omit to keep the stored key.
+     */
+    dedicated_api_key?: string;
+    /**
+     * True when a dedicated API key is stored.
+     */
+    dedicated_api_key_configured: boolean;
+    /**
+     * Maximum agent tool-calling iterations per turn.
+     */
+    max_steps: number;
+    /**
+     * Restrict the copilot to owner-role admins.
+     */
+    owner_only: boolean;
+    /**
+     * Auto-execute read-only (GET) tool calls without confirmation.
+     */
+    auto_run_reads: boolean;
+};
+
+export type AdminSettingsResponseWritable = {
+    data: AdminSettingsWritable;
+    request_id: RequestId;
+};
+
 export type SchedulerSimulationProfileWritable = {
     request_id: RequestId;
     attempt_no?: number;
@@ -4295,6 +4534,25 @@ export type SchedulerSimulationRequestWritable = {
 };
 
 export type RerankDocumentWritable = string | JsonObject;
+
+export type ConfigSnapshotResponseWritable = {
+    data: {
+        snapshot_version: string;
+        generated_at: string;
+        providers?: Array<Provider>;
+        models?: Array<Model>;
+        account_groups?: Array<AccountGroup>;
+        subscription_plans?: Array<SubscriptionPlan>;
+        pricing_rules?: Array<PricingRule>;
+        model_rate_limits?: Array<SnapshotModelRateLimit>;
+        group_rate_limits?: Array<SnapshotGroupRateLimit>;
+        error_passthrough_rules?: Array<ErrorPassthroughRule>;
+        tls_profiles?: Array<TlsProfile>;
+        user_attribute_definitions?: Array<UserAttributeDefinition>;
+        settings?: AdminSettingsWritable;
+    };
+    request_id: RequestId;
+};
 
 export type Page = number;
 
@@ -5938,6 +6196,72 @@ export type GetCurrentUserBalanceResponses = {
 };
 
 export type GetCurrentUserBalanceResponse = GetCurrentUserBalanceResponses[keyof GetCurrentUserBalanceResponses];
+
+export type ListMePlaygroundModelsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/me/playground/models';
+};
+
+export type ListMePlaygroundModelsErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListMePlaygroundModelsError = ListMePlaygroundModelsErrors[keyof ListMePlaygroundModelsErrors];
+
+export type ListMePlaygroundModelsResponses = {
+    /**
+     * Playground models.
+     */
+    200: PlaygroundModelsResponse;
+};
+
+export type ListMePlaygroundModelsResponse = ListMePlaygroundModelsResponses[keyof ListMePlaygroundModelsResponses];
+
+export type CreateMePlaygroundChatData = {
+    body: PlaygroundChatRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/me/playground/chat';
+};
+
+export type CreateMePlaygroundChatErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    402: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type CreateMePlaygroundChatError = CreateMePlaygroundChatErrors[keyof CreateMePlaygroundChatErrors];
+
+export type CreateMePlaygroundChatResponses = {
+    /**
+     * OpenAI-compatible SSE chunks.
+     */
+    200: string;
+};
+
+export type CreateMePlaygroundChatResponse = CreateMePlaygroundChatResponses[keyof CreateMePlaygroundChatResponses];
 
 export type RedeemCurrentUserRedeemCodeData = {
     body: RedeemCodeRedemptionRequest;
@@ -10175,7 +10499,7 @@ export type GetAdminSettingsResponses = {
 export type GetAdminSettingsResponse = GetAdminSettingsResponses[keyof GetAdminSettingsResponses];
 
 export type UpdateAdminSettingsData = {
-    body: AdminSettings;
+    body: AdminSettingsWritable;
     path?: never;
     query?: never;
     url: '/api/v1/admin/settings';
@@ -10210,6 +10534,80 @@ export type UpdateAdminSettingsResponses = {
 };
 
 export type UpdateAdminSettingsResponse = UpdateAdminSettingsResponses[keyof UpdateAdminSettingsResponses];
+
+export type GetAdminCopilotConfigData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/copilot/config';
+};
+
+export type GetAdminCopilotConfigErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminCopilotConfigError = GetAdminCopilotConfigErrors[keyof GetAdminCopilotConfigErrors];
+
+export type GetAdminCopilotConfigResponses = {
+    /**
+     * Copilot runtime configuration.
+     */
+    200: AdminCopilotConfigResponse;
+};
+
+export type GetAdminCopilotConfigResponse = GetAdminCopilotConfigResponses[keyof GetAdminCopilotConfigResponses];
+
+export type CreateAdminCopilotChatData = {
+    body: AdminCopilotChatRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/copilot/chat';
+};
+
+export type CreateAdminCopilotChatErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource conflict.
+     */
+    409: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type CreateAdminCopilotChatError = CreateAdminCopilotChatErrors[keyof CreateAdminCopilotChatErrors];
+
+export type CreateAdminCopilotChatResponses = {
+    /**
+     * Newline-delimited SSE frames; event is one of assistant_delta, tool_call, tool_result, pending_action, done, error.
+     */
+    200: string;
+};
+
+export type CreateAdminCopilotChatResponse = CreateAdminCopilotChatResponses[keyof CreateAdminCopilotChatResponses];
 
 export type ListAdminNotificationEmailTemplatesData = {
     body?: never;

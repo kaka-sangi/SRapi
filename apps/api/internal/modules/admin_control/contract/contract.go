@@ -42,6 +42,25 @@ type AdminSettings struct {
 	Payment   AdminSettingsPayment   `json:"payment"`
 	Email     AdminSettingsEmail     `json:"email"`
 	Backup    AdminSettingsBackup    `json:"backup"`
+	Copilot   AdminSettingsCopilot   `json:"copilot"`
+}
+
+// AdminSettingsCopilot configures the admin AI copilot: which LLM powers it and
+// how autonomously it may act. DedicatedAPIKeyCiphertext is persisted (encrypted
+// at rest) but never crosses the API boundary; the API exposes only a
+// "configured" indicator and a write-only key field.
+type AdminSettingsCopilot struct {
+	Enabled                   bool     `json:"enabled"`
+	Source                    string   `json:"source"`
+	ProviderAccountID         int      `json:"provider_account_id"`
+	Model                     string   `json:"model"`
+	Models                    []string `json:"models"`
+	DedicatedProtocol         string   `json:"dedicated_protocol"`
+	DedicatedBaseURL          string   `json:"dedicated_base_url"`
+	DedicatedAPIKeyCiphertext string   `json:"dedicated_api_key_ciphertext,omitempty"`
+	MaxSteps                  int      `json:"max_steps"`
+	OwnerOnly                 bool     `json:"owner_only"`
+	AutoRunReads              bool     `json:"auto_run_reads"`
 }
 type AdminSettingsGeneral struct {
 	SiteName     string           `json:"site_name"`

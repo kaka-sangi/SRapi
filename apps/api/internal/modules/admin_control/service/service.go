@@ -948,6 +948,15 @@ func defaultAdminSettings(now time.Time) admincontrol.AdminSettings {
 			LastBackupAt:  &now,
 			RetentionDays: 30,
 		},
+		Copilot: admincontrol.AdminSettingsCopilot{
+			Enabled:           false,
+			Source:            "account",
+			Models:            []string{},
+			DedicatedProtocol: "openai-compatible",
+			MaxSteps:          8,
+			OwnerOnly:         false,
+			AutoRunReads:      true,
+		},
 	}
 }
 
@@ -1040,6 +1049,29 @@ func normalizeAdminSettings(settings admincontrol.AdminSettings) (admincontrol.A
 	}
 	if settings.Gateway.SchedulerStrategyRolloutAPIKeyHashes == nil {
 		settings.Gateway.SchedulerStrategyRolloutAPIKeyHashes = []string{}
+	}
+	settings.Copilot.Source = strings.TrimSpace(strings.ToLower(settings.Copilot.Source))
+	if settings.Copilot.Source != "dedicated" {
+		settings.Copilot.Source = "account"
+	}
+	settings.Copilot.Model = strings.TrimSpace(settings.Copilot.Model)
+	settings.Copilot.Models = uniqueTrimmedStrings(settings.Copilot.Models)
+	if settings.Copilot.Models == nil {
+		settings.Copilot.Models = []string{}
+	}
+	settings.Copilot.DedicatedProtocol = strings.TrimSpace(strings.ToLower(settings.Copilot.DedicatedProtocol))
+	if settings.Copilot.DedicatedProtocol == "" {
+		settings.Copilot.DedicatedProtocol = "openai-compatible"
+	}
+	settings.Copilot.DedicatedBaseURL = strings.TrimRight(strings.TrimSpace(settings.Copilot.DedicatedBaseURL), "/")
+	if settings.Copilot.ProviderAccountID < 0 {
+		settings.Copilot.ProviderAccountID = 0
+	}
+	if settings.Copilot.MaxSteps <= 0 {
+		settings.Copilot.MaxSteps = 8
+	}
+	if settings.Copilot.MaxSteps > 20 {
+		settings.Copilot.MaxSteps = 20
 	}
 	return settings, nil
 }

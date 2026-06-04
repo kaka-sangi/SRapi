@@ -45,7 +45,20 @@ func (s *Server) handleUpdateAdminSettings(w http.ResponseWriter, r *http.Reques
 		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid settings request", requestID)
 		return
 	}
-	updated, err := s.runtime.adminControl.UpdateAdminSettings(r.Context(), adminSettingsFromAPI(body), session.User.ID)
+	mapped := adminSettingsFromAPI(body)
+	// The copilot dedicated API key is write-only: encrypt a freshly supplied
+	// key, otherwise carry over the existing ciphertext so a save never wipes it.
+	if body.Copilot.DedicatedApiKey != nil && strings.TrimSpace(*body.Copilot.DedicatedApiKey) != "" {
+		ciphertext, encErr := s.encryptCopilotSecret(strings.TrimSpace(*body.Copilot.DedicatedApiKey))
+		if encErr != nil {
+			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to secure copilot key", requestID)
+			return
+		}
+		mapped.Copilot.DedicatedAPIKeyCiphertext = ciphertext
+	} else {
+		mapped.Copilot.DedicatedAPIKeyCiphertext = before.Copilot.DedicatedAPIKeyCiphertext
+	}
+	updated, err := s.runtime.adminControl.UpdateAdminSettings(r.Context(), mapped, session.User.ID)
 	if err != nil {
 		writeAdminControlError(w, err, requestID)
 		return
@@ -569,6 +582,19 @@ func toAPIAdminSettings(in admincontrol.AdminSettings) apiopenapi.AdminSettings 
 			RpmLimitDefault:       in.Users.RPMLimitDefault,
 			UserSelfDeleteEnabled: in.Users.UserSelfDeleteEnabled,
 		},
+		Copilot: apiopenapi.AdminSettingsCopilot{
+			Enabled:                   in.Copilot.Enabled,
+			Source:                    apiopenapi.AdminSettingsCopilotSource(in.Copilot.Source),
+			ProviderAccountId:         in.Copilot.ProviderAccountID,
+			Model:                     in.Copilot.Model,
+			Models:                    stringSlicePtr(in.Copilot.Models),
+			DedicatedProtocol:         in.Copilot.DedicatedProtocol,
+			DedicatedBaseUrl:          in.Copilot.DedicatedBaseURL,
+			DedicatedApiKeyConfigured: strings.TrimSpace(in.Copilot.DedicatedAPIKeyCiphertext) != "",
+			MaxSteps:                  in.Copilot.MaxSteps,
+			OwnerOnly:                 in.Copilot.OwnerOnly,
+			AutoRunReads:              in.Copilot.AutoRunReads,
+		},
 	}
 }
 
@@ -648,6 +674,20 @@ func adminSettingsFromAPI(in apiopenapi.AdminSettings) admincontrol.AdminSetting
 			DefaultGroup:          in.Users.DefaultGroup,
 			RPMLimitDefault:       in.Users.RpmLimitDefault,
 			UserSelfDeleteEnabled: in.Users.UserSelfDeleteEnabled,
+		},
+		Copilot: admincontrol.AdminSettingsCopilot{
+			Enabled:           in.Copilot.Enabled,
+			Source:            string(in.Copilot.Source),
+			ProviderAccountID: in.Copilot.ProviderAccountId,
+			Model:             in.Copilot.Model,
+			Models:            stringSliceFromPtr(in.Copilot.Models),
+			DedicatedProtocol: in.Copilot.DedicatedProtocol,
+			DedicatedBaseURL:  in.Copilot.DedicatedBaseUrl,
+			MaxSteps:          in.Copilot.MaxSteps,
+			OwnerOnly:         in.Copilot.OwnerOnly,
+			AutoRunReads:      in.Copilot.AutoRunReads,
+			// DedicatedAPIKeyCiphertext is set by the handler (encrypt-new or
+			// preserve-existing); never derived from the request body here.
 		},
 	}
 }

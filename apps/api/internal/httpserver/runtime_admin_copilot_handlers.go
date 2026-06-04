@@ -1,0 +1,606 @@
+package httpserver
+
+import (
+	"bufio"
+	"bytes"
+	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+
+	"github.com/srapi/srapi/apps/api/internal/modules/copilot"
+	modelcontract "github.com/srapi/srapi/apps/api/internal/modules/models/contract"
+	provideradaptercontract "github.com/srapi/srapi/apps/api/internal/modules/provider_adapters/contract"
+	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
+	userscontract "github.com/srapi/srapi/apps/api/internal/modules/users/contract"
+	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
+	platformcrypto "github.com/srapi/srapi/apps/api/internal/platform/crypto"
+)
+
+const copilotSecretVersion = "copilotv1"
+
+// handleAdminCopilotConfig reports the copilot's runtime state so the page can
+// render an enabled/disabled view without exposing settings internals.
+func (s *Server) handleAdminCopilotConfig(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	if _, err := s.requireAdminSession(r); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	settings, ciphertext, err := s.copilotSettings(r.Context())
+	if err != nil {
+		writeAdminControlError(w, err, requestID)
+		return
+	}
+	models, protocol := s.copilotModelList(r.Context(), settings)
+	writeJSONAny(w, http.StatusOK, apiopenapi.AdminCopilotConfigResponse{
+		Data: apiopenapi.AdminCopilotConfig{
+			Enabled:    settings.Enabled,
+			Source:     apiopenapi.AdminCopilotConfigSource(settings.Source),
+			Model:      settings.Model,
+			Models:     models,
+			Protocol:   protocol,
+			OwnerOnly:  settings.OwnerOnly,
+			Configured: copilotConfigError(settings, ciphertext) == "",
+		},
+		RequestId: requestID,
+	})
+}
+
+// handleAdminCopilotChat runs one agentic copilot turn and streams events as SSE.
+func (s *Server) handleAdminCopilotChat(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	settings, ciphertext, err := s.copilotSettings(r.Context())
+	if err != nil {
+		writeAdminControlError(w, err, requestID)
+		return
+	}
+	if !settings.Enabled {
+		writeStandardError(w, http.StatusConflict, apiopenapi.RESOURCECONFLICT, "the admin copilot is disabled", requestID)
+		return
+	}
+	if settings.OwnerOnly && !sessionHasRole(session.User.Roles, userscontract.RoleOwner) {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "owner access required", requestID)
+		return
+	}
+	if msg := copilotConfigError(settings, ciphertext); msg != "" {
+		writeStandardError(w, http.StatusConflict, apiopenapi.RESOURCECONFLICT, msg, requestID)
+		return
+	}
+	if s.runtime.copilotEngine == nil {
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "copilot unavailable", requestID)
+		return
+	}
+
+	var body apiopenapi.AdminCopilotChatRequest
+	if err := s.decodeJSONBody(w, r, &body); err != nil {
+		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid copilot request", requestID)
+		return
+	}
+	history := copilotHistoryFromAPI(body.Messages)
+	var approval *copilot.Approval
+	if body.Approval != nil {
+		approval = &copilot.Approval{ToolCallID: body.Approval.ToolCallId, Approved: body.Approval.Approved}
+	}
+	overrideModel := ""
+	if body.Model != nil {
+		overrideModel = *body.Model
+	}
+	effort := ""
+	if body.ReasoningEffort != nil {
+		effort = string(*body.ReasoningEffort)
+	}
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Request-ID", requestID)
+	w.WriteHeader(http.StatusOK)
+	flusher, _ := w.(http.Flusher)
+	emit := func(ev copilot.Event) {
+		data, mErr := json.Marshal(ev.Data)
+		if mErr != nil {
+			data = []byte("{}")
+		}
+		fmt.Fprintf(w, "event: %s\ndata: %s\n\n", ev.Type, data)
+		if flusher != nil {
+			flusher.Flush()
+		}
+	}
+
+	llm := s.buildCopilotLLM(settings, ciphertext, overrideModel, effort)
+	dispatch := s.buildCopilotDispatcher(r, session.User.ID, r.Header.Get("Cookie"), r.Header.Get(csrfHeaderName))
+	_, _ = s.runtime.copilotEngine.Run(r.Context(), settings, history, approval, llm, dispatch, emit)
+}
+
+// buildCopilotLLM returns an invoker bound to the configured source (an existing
+// provider account, or a standalone dedicated key), the chosen model, and the
+// requested thinking effort.
+func (s *Server) buildCopilotLLM(settings copilot.Settings, ciphertext, overrideModel, effort string) copilot.LLMFunc {
+	model := strings.TrimSpace(overrideModel)
+	if model == "" {
+		model = settings.Model
+	}
+	maxTokens := 8192
+	if budget := copilotEffortBudget(effort); budget > 0 {
+		maxTokens = budget + 4096 // leave room for output beyond the thinking budget
+	}
+	return func(ctx context.Context, system string, messages []provideradaptercontract.ConversationMessage, tools []map[string]any, onDelta func(kind, text string)) (provideradaptercontract.ConversationResponse, error) {
+		req := provideradaptercontract.ConversationRequest{
+			RequestID:       newRequestID(),
+			SourceEndpoint:  "/internal/admin/copilot",
+			Model:           model,
+			Mapping:         modelcontract.ModelProviderMapping{UpstreamModelName: model},
+			Instructions:    system,
+			Messages:        messages,
+			Tools:           tools,
+			ToolChoice:      "auto",
+			MaxOutputTokens: &maxTokens,
+		}
+		if settings.Source == "dedicated" {
+			key, err := s.decryptCopilotSecret(ciphertext)
+			if err != nil {
+				return provideradaptercontract.ConversationResponse{}, fmt.Errorf("decrypt dedicated key: %w", err)
+			}
+			protocol := strings.TrimSpace(settings.DedicatedProtocol)
+			req.SourceProtocol = protocol
+			req.TargetProtocol = protocol
+			req.Provider = providercontract.Provider{
+				Name:         "copilot-dedicated",
+				DisplayName:  "Copilot dedicated",
+				Protocol:     protocol,
+				AdapterType:  protocol,
+				ConfigSchema: map[string]any{"base_url": settings.DedicatedBaseURL},
+			}
+			req.Credential = map[string]any{"api_key": key}
+		} else {
+			account, err := s.runtime.accounts.FindByID(ctx, settings.ProviderAccountID)
+			if err != nil {
+				return provideradaptercontract.ConversationResponse{}, fmt.Errorf("load provider account: %w", err)
+			}
+			provider, err := s.runtime.providers.FindByID(ctx, account.ProviderID)
+			if err != nil {
+				return provideradaptercontract.ConversationResponse{}, fmt.Errorf("load provider: %w", err)
+			}
+			credential, err := s.runtime.accounts.DecryptCredential(ctx, account.ID)
+			if err != nil {
+				return provideradaptercontract.ConversationResponse{}, fmt.Errorf("decrypt credential: %w", err)
+			}
+			req.SourceProtocol = provider.Protocol
+			req.TargetProtocol = provider.Protocol
+			req.Provider = provider
+			req.Account = account
+			req.Credential = credential
+		}
+		applyCopilotReasoning(&req, effort)
+
+		// Prefer same-protocol passthrough streaming so the client sees tokens as
+		// they arrive; fall back to a single buffered call when streaming isn't
+		// available (cross-protocol, reverse-proxy runtimes that can't stream).
+		streamReq := req
+		streamReq.Stream = true
+		if streamResp, err := s.runtime.adapters.StreamConversation(ctx, streamReq); err == nil && streamResp.StreamBody != nil {
+			defer func() { _ = streamResp.StreamBody.Close() }()
+			raw, content, reasoning := consumeCopilotStream(streamResp.StreamBody, onDelta)
+			status := streamResp.StatusCode
+			if status == 0 {
+				status = http.StatusOK
+			}
+			if streamResp.StreamParse != nil {
+				if final, perr := streamResp.StreamParse(raw, status); perr == nil {
+					return final, nil
+				}
+			}
+			// Stream parsed loosely (non-OpenAI shape): return what we accumulated.
+			parts := make([]provideradaptercontract.ContentPart, 0, 2)
+			if reasoning != "" {
+				parts = append(parts, provideradaptercontract.ContentPart{Kind: provideradaptercontract.ContentPartThinking, Text: reasoning})
+			}
+			if content != "" {
+				parts = append(parts, provideradaptercontract.ContentPart{Kind: provideradaptercontract.ContentPartText, Text: content})
+			}
+			return provideradaptercontract.ConversationResponse{Parts: parts, StopReason: provideradaptercontract.StopReasonEndTurn, StatusCode: status}, nil
+		} else if err != nil && !errors.Is(err, provideradaptercontract.ErrStreamingUnsupported) {
+			return provideradaptercontract.ConversationResponse{}, err
+		}
+
+		// Buffered fallback: one call, then surface its content/reasoning once.
+		req.Stream = false
+		resp, err := s.runtime.adapters.InvokeConversation(ctx, req)
+		if err != nil {
+			return resp, err
+		}
+		for _, part := range resp.Parts {
+			switch part.Kind {
+			case provideradaptercontract.ContentPartThinking:
+				onDelta("reasoning", part.Text)
+			case provideradaptercontract.ContentPartText:
+				onDelta("content", part.Text)
+			}
+		}
+		return resp, nil
+	}
+}
+
+// consumeCopilotStream reads an OpenAI-style SSE stream, forwarding content and
+// reasoning_content deltas via onDelta as they arrive, and returns the raw bytes
+// (for StreamParse) plus the accumulated content/reasoning.
+func consumeCopilotStream(body io.Reader, onDelta func(kind, text string)) (raw []byte, content, reasoning string) {
+	var rawBuf bytes.Buffer
+	var contentBuf, reasoningBuf strings.Builder
+	scanner := bufio.NewScanner(io.TeeReader(body, &rawBuf))
+	scanner.Buffer(make([]byte, 0, 64*1024), 8*1024*1024)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if !strings.HasPrefix(line, "data:") {
+			continue
+		}
+		payload := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+		if payload == "" || payload == "[DONE]" {
+			continue
+		}
+		var chunk struct {
+			Choices []struct {
+				Delta struct {
+					Content          string `json:"content"`
+					ReasoningContent string `json:"reasoning_content"`
+				} `json:"delta"`
+			} `json:"choices"`
+		}
+		if err := json.Unmarshal([]byte(payload), &chunk); err != nil || len(chunk.Choices) == 0 {
+			continue
+		}
+		if rc := chunk.Choices[0].Delta.ReasoningContent; rc != "" {
+			reasoningBuf.WriteString(rc)
+			onDelta("reasoning", rc)
+		}
+		if cc := chunk.Choices[0].Delta.Content; cc != "" {
+			contentBuf.WriteString(cc)
+			onDelta("content", cc)
+		}
+	}
+	return rawBuf.Bytes(), contentBuf.String(), reasoningBuf.String()
+}
+
+// copilotEffortBudget maps a thinking-effort level to an Anthropic/Gemini
+// thinking-token budget. Returns 0 for "off"/unset.
+func copilotEffortBudget(effort string) int {
+	switch strings.ToLower(strings.TrimSpace(effort)) {
+	case "low":
+		return 2048
+	case "medium":
+		return 8192
+	case "high":
+		return 16384
+	default:
+		return 0
+	}
+}
+
+// applyCopilotReasoning wires the thinking effort into the request using the
+// mechanism each protocol understands: Anthropic reads req.Reasoning natively;
+// OpenAI/Gemini take a payload-transform override (reasoning_effort /
+// thinkingConfig). A no-op for "off"/unset.
+func applyCopilotReasoning(req *provideradaptercontract.ConversationRequest, effort string) {
+	effort = strings.ToLower(strings.TrimSpace(effort))
+	budget := copilotEffortBudget(effort)
+	if budget == 0 {
+		return
+	}
+	protocol := strings.ToLower(strings.TrimSpace(req.TargetProtocol))
+	switch {
+	case strings.Contains(protocol, "anthropic") || strings.Contains(protocol, "bedrock") || strings.Contains(protocol, "claude"):
+		req.Reasoning = map[string]any{"type": "enabled", "budget_tokens": budget}
+	case strings.Contains(protocol, "gemini"):
+		req.PayloadTransforms = append(req.PayloadTransforms, provideradaptercontract.PayloadTransform{
+			Action: "override", Path: "generationConfig.thinkingConfig.thinkingBudget", Value: budget,
+		})
+	default: // openai-compatible and friends
+		req.PayloadTransforms = append(req.PayloadTransforms, provideradaptercontract.PayloadTransform{
+			Action: "override", Path: "reasoning_effort", Value: effort,
+		})
+	}
+}
+
+// buildCopilotDispatcher returns a dispatcher that replays an admin call through
+// the real router, carrying the admin's own session + CSRF so auth, validation,
+// and audit all apply. Each executed mutation gets an extra "via copilot" audit
+// entry on top of the handler's own record.
+func (s *Server) buildCopilotDispatcher(r *http.Request, actorUserID int, cookie, csrf string) copilot.DispatchFunc {
+	return func(ctx context.Context, method, path string, body []byte) (int, []byte, error) {
+		if s.runtime.internalRouter == nil {
+			return 0, nil, errors.New("internal router unavailable")
+		}
+		target := "http://copilot.internal" + path
+		req, err := http.NewRequestWithContext(ctx, method, target, bytes.NewReader(body))
+		if err != nil {
+			return 0, nil, err
+		}
+		if cookie != "" {
+			req.Header.Set("Cookie", cookie)
+		}
+		if csrf != "" {
+			req.Header.Set(csrfHeaderName, csrf)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		s.runtime.internalRouter.ServeHTTP(rec, req)
+		if copilotIsMutation(method) {
+			s.runtime.recordAudit(ctx, auditRecordFromRequest(r, actorUserID, "copilot.action", "copilot", path, nil, map[string]any{
+				"method": method,
+				"path":   path,
+				"status": rec.Code,
+				"via":    "copilot",
+			}))
+		}
+		// Redact secret/PII-bearing fields before the result reaches the LLM (and
+		// the UI). The copilot's model may be a third party; admin secrets must
+		// never be sent to it.
+		return rec.Code, redactSensitiveJSON(rec.Body.Bytes()), nil
+	}
+}
+
+// redactSensitiveJSON parses a JSON body and replaces values under secret-like
+// keys (api_key, token, password, credential, …) with a redaction marker,
+// recursively. Non-JSON bodies are returned unchanged.
+func redactSensitiveJSON(body []byte) []byte {
+	if len(bytes.TrimSpace(body)) == 0 {
+		return body
+	}
+	var decoded any
+	if err := json.Unmarshal(body, &decoded); err != nil {
+		return body
+	}
+	redacted := redactSensitiveValue("", decoded)
+	out, err := json.Marshal(redacted)
+	if err != nil {
+		return body
+	}
+	return out
+}
+
+func redactSensitiveValue(key string, value any) any {
+	switch typed := value.(type) {
+	case map[string]any:
+		out := make(map[string]any, len(typed))
+		for k, v := range typed {
+			if sensitiveMetadataKey(k) && isScalarOrString(v) {
+				out[k] = "***redacted***"
+				continue
+			}
+			out[k] = redactSensitiveValue(k, v)
+		}
+		return out
+	case []any:
+		out := make([]any, len(typed))
+		for i, v := range typed {
+			out[i] = redactSensitiveValue(key, v)
+		}
+		return out
+	default:
+		return typed
+	}
+}
+
+func isScalarOrString(v any) bool {
+	switch v.(type) {
+	case string, float64, bool, nil:
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *Server) copilotSettings(ctx context.Context) (copilot.Settings, string, error) {
+	settings, err := s.runtime.adminControl.GetAdminSettings(ctx)
+	if err != nil {
+		return copilot.Settings{}, "", err
+	}
+	c := settings.Copilot
+	return copilot.Settings{
+		Enabled:           c.Enabled,
+		Source:            c.Source,
+		ProviderAccountID: c.ProviderAccountID,
+		Model:             c.Model,
+		Models:            append([]string(nil), c.Models...),
+		DedicatedProtocol: c.DedicatedProtocol,
+		DedicatedBaseURL:  c.DedicatedBaseURL,
+		MaxSteps:          c.MaxSteps,
+		OwnerOnly:         c.OwnerOnly,
+		AutoRunReads:      c.AutoRunReads,
+	}, c.DedicatedAPIKeyCiphertext, nil
+}
+
+// copilotModelList resolves the models offered in the composer picker and the
+// configured source's wire protocol. Models = configured list ∪ the account's
+// discovered models ∪ the default — deduped, default first.
+func (s *Server) copilotModelList(ctx context.Context, settings copilot.Settings) (models []string, protocol string) {
+	protocol = strings.TrimSpace(settings.DedicatedProtocol)
+	seen := map[string]bool{}
+	add := func(name string) {
+		name = strings.TrimSpace(name)
+		if name == "" || seen[name] {
+			return
+		}
+		seen[name] = true
+		models = append(models, name)
+	}
+	add(settings.Model)
+	for _, m := range settings.Models {
+		add(m)
+	}
+	if settings.Source == "account" && settings.ProviderAccountID > 0 {
+		if account, err := s.runtime.accounts.FindByID(ctx, settings.ProviderAccountID); err == nil {
+			for _, m := range accountSupportedModels(account.Metadata) {
+				add(m)
+			}
+			if provider, err := s.runtime.providers.FindByID(ctx, account.ProviderID); err == nil {
+				protocol = provider.Protocol
+			}
+		}
+	}
+	if models == nil {
+		models = []string{}
+	}
+	return models, protocol
+}
+
+// accountSupportedModels reads the model ids discovered for an account.
+func accountSupportedModels(metadata map[string]any) []string {
+	raw, ok := metadata["supported_models"].([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(raw))
+	for _, v := range raw {
+		if s, ok := v.(string); ok && strings.TrimSpace(s) != "" {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+func copilotConfigError(settings copilot.Settings, ciphertext string) string {
+	if strings.TrimSpace(settings.Model) == "" {
+		return "no copilot model configured"
+	}
+	if settings.Source == "dedicated" {
+		if strings.TrimSpace(settings.DedicatedBaseURL) == "" {
+			return "dedicated base URL is not configured"
+		}
+		if strings.TrimSpace(ciphertext) == "" {
+			return "dedicated API key is not configured"
+		}
+		return ""
+	}
+	if settings.ProviderAccountID <= 0 {
+		return "no provider account selected for the copilot"
+	}
+	return ""
+}
+
+func copilotHistoryFromAPI(messages []apiopenapi.AdminCopilotMessage) []copilot.Message {
+	out := make([]copilot.Message, 0, len(messages))
+	for _, m := range messages {
+		msg := copilot.Message{Role: string(m.Role)}
+		if m.Content != nil {
+			msg.Content = *m.Content
+		}
+		if m.Reasoning != nil {
+			msg.Reasoning = *m.Reasoning
+		}
+		if m.Images != nil {
+			for _, img := range *m.Images {
+				msg.Images = append(msg.Images, copilot.MessageImage{MIMEType: img.MimeType, Data: img.Data})
+			}
+		}
+		if m.ToolCalls != nil {
+			for _, tc := range *m.ToolCalls {
+				msg.ToolCalls = append(msg.ToolCalls, copilot.ToolCall{ID: tc.Id, Name: tc.Name, ArgumentsJSON: tc.Arguments})
+			}
+		}
+		if m.ToolResults != nil {
+			for _, tr := range *m.ToolResults {
+				isErr := false
+				if tr.IsError != nil {
+					isErr = *tr.IsError
+				}
+				msg.ToolResults = append(msg.ToolResults, copilot.ToolResult{ToolCallID: tr.ToolCallId, Content: tr.Content, IsError: isErr})
+			}
+		}
+		out = append(out, msg)
+	}
+	return out
+}
+
+func sessionHasRole(roles []userscontract.Role, target userscontract.Role) bool {
+	for _, role := range roles {
+		if role == target {
+			return true
+		}
+	}
+	return false
+}
+
+func copilotIsMutation(method string) bool {
+	switch strings.ToUpper(method) {
+	case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *Server) copilotCryptoKey() ([]byte, error) {
+	return platformcrypto.DeriveAESKey(s.cfg.Security.MasterKey)
+}
+
+func (s *Server) encryptCopilotSecret(plaintext string) (string, error) {
+	key, err := s.copilotCryptoKey()
+	if err != nil {
+		return "", err
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return "", err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", err
+	}
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := rand.Read(nonce); err != nil {
+		return "", err
+	}
+	ciphertext := gcm.Seal(nil, nonce, []byte(plaintext), []byte(copilotSecretVersion))
+	return fmt.Sprintf("%s:%s:%s", copilotSecretVersion, base64.RawURLEncoding.EncodeToString(nonce), base64.RawURLEncoding.EncodeToString(ciphertext)), nil
+}
+
+func (s *Server) decryptCopilotSecret(ciphertext string) (string, error) {
+	parts := strings.Split(ciphertext, ":")
+	if len(parts) != 3 || parts[0] != copilotSecretVersion {
+		return "", errors.New("invalid copilot secret")
+	}
+	nonce, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return "", err
+	}
+	encrypted, err := base64.RawURLEncoding.DecodeString(parts[2])
+	if err != nil {
+		return "", err
+	}
+	key, err := s.copilotCryptoKey()
+	if err != nil {
+		return "", err
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return "", err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", err
+	}
+	raw, err := gcm.Open(nil, nonce, encrypted, []byte(copilotSecretVersion))
+	if err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
