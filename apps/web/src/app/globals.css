@@ -488,6 +488,29 @@ textarea:focus-visible,
   animation: pop-in 240ms var(--ease-spring-bounce);
 }
 
+/* 骨架微光扫过 —— 比单纯的透明度脉冲更有「正在加载」的高级质感。
+   挂在 .skeleton-shimmer 上（含 overflow 裁剪，光带贴合圆角）。 */
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+.skeleton-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+  animation: skeleton-shimmer 1.6s ease-in-out infinite;
+}
+.dark .skeleton-shimmer::after {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent);
+}
+@keyframes skeleton-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
 /* ============================================================
    §6.2 可交互卡片（Interactive Card）—— hover 物理抬升 + 阴影加深
    rest 态沿用 tactile-card；交互态用 spring 上浮，性格「弹」。
@@ -583,6 +606,10 @@ textarea:focus-visible,
   }
   .skeleton-pulse {
     animation: none;
+  }
+  .skeleton-shimmer::after {
+    animation: none;
+    opacity: 0;
   }
   *,
   *::before,

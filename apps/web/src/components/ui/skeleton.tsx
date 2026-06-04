@@ -3,7 +3,7 @@ import { cn } from "@/lib/cn";
 export function Skeleton({ className }: { className?: string }) {
   return (
     <div
-      className={cn("skeleton-pulse rounded-md bg-srapi-card-muted", className)}
+      className={cn("skeleton-shimmer rounded-md bg-srapi-card-muted", className)}
       aria-hidden
     />
   );

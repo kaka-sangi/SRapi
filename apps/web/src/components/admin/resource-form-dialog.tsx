@@ -253,20 +253,28 @@ export function ResourceFormDialog<TDraft extends object, TBody>({
                     )}
                   />
                 </button>
-                {advancedOpen ? (
-                  <div className="space-y-4 border-t border-srapi-border px-3.5 py-4">
-                    {advancedFields.map((field) => (
-                      <FieldRow
-                        key={field.name}
-                        field={field}
-                        value={draft[field.name]}
-                        error={fieldErrors[field.name]}
-                        disabled={busy}
-                        onChange={(value) => setField(field.name, value)}
-                      />
-                    ))}
+                <div
+                  className={cn(
+                    "grid overflow-hidden transition-[grid-template-rows] duration-300 ease-[var(--ease-out-quint)]",
+                    advancedOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
+                  )}
+                  inert={!advancedOpen || undefined}
+                >
+                  <div className="min-h-0 overflow-hidden">
+                    <div className="space-y-4 border-t border-srapi-border px-3.5 py-4">
+                      {advancedFields.map((field) => (
+                        <FieldRow
+                          key={field.name}
+                          field={field}
+                          value={draft[field.name]}
+                          error={fieldErrors[field.name]}
+                          disabled={busy}
+                          onChange={(value) => setField(field.name, value)}
+                        />
+                      ))}
+                    </div>
                   </div>
-                ) : null}
+                </div>
               </div>
             ) : null}
             {error ? (
