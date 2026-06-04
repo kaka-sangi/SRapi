@@ -2,6 +2,14 @@ import type { Auth } from '../../../../packages/sdk/typescript/src/core/auth.gen
 import { client } from '../../../../packages/sdk/typescript/src/client.gen';
 import {
   login as sdkLogin,
+  loginTwoFactor as sdkLoginTwoFactor,
+  listEnabledOAuthProviders as sdkListOAuthProviders,
+  getPendingOAuthSession as sdkGetOAuthPending,
+  bindPendingOAuthLogin as sdkBindOAuthPendingLogin,
+  completePendingOAuthBindLoginTwoFactor as sdkBindOAuthLoginTwoFactor,
+  createPendingOAuthAccount as sdkCreateOAuthAccount,
+  sendPendingOAuthEmailCompletion as sdkSendOAuthEmailCode,
+  confirmPendingOAuthEmailCompletion as sdkConfirmOAuthEmail,
   logout as sdkLogout,
   getSetupStatus as sdkGetSetupStatus,
   completeSetup as sdkCompleteSetup,
@@ -27,7 +35,7 @@ import {
   type SmokeChecklist,
   type UsageLogSummary,
 } from './srapi-types';
-import type { AdminTestResult } from '../../../../packages/sdk/typescript/src/types.gen';
+import type { AdminTestResult, EnabledOAuthProvider, OAuthPendingSession } from '../../../../packages/sdk/typescript/src/types.gen';
 import { setSessionPresenceCookie, clearSessionPresenceCookie } from './session-cookie';
 
 export interface ApiRuntimeStatus {
@@ -36,6 +44,15 @@ export interface ApiRuntimeStatus {
   apiBaseUrl: string;
   checkedAt: string;
 }
+
+/**
+ * Result of a password sign-in: either the user is authenticated, or the
+ * account has TOTP enabled and a second factor is required to finish. The form
+ * branches on `kind`.
+ */
+export type LoginResult =
+  | { kind: 'user'; user: CurrentUser }
+  | { kind: 'twoFactor'; challengeId: string; expiresAt: string };
 
 const DEFAULT_PROXY_TARGET = 'http://127.0.0.1:8080';
 const HEALTH_TIMEOUT_MS = 2500;
@@ -332,7 +349,7 @@ export const apiService = {
     await sdkCompleteSetup({ body: input, throwOnError: true });
   },
 
-  async login(email: string, password: string): Promise<CurrentUser> {
+  async login(email: string, password: string): Promise<LoginResult> {
     configureSDKClient();
 
     const connected = await this.isBackendConnected();
@@ -346,10 +363,9 @@ export const apiService = {
     });
     const session = response.data?.data;
     if (session && 'required' in session) {
-      // 202: password accepted but two-factor verification is required. The
-      // console sign-in form does not yet collect a TOTP code, so surface a
-      // clear error instead of silently failing.
-      throw new Error('Two-factor verification is required for this account.');
+      // 202: password accepted, TOTP required. Hand the challenge back so the
+      // form can collect a code and call verifyLoginTwoFactor.
+      return { kind: 'twoFactor', challengeId: session.challenge_id, expiresAt: session.expires_at };
     }
     if (!session?.user) {
       throw new Error('Authentication rejected. Verify email and password.');
@@ -357,7 +373,116 @@ export const apiService = {
 
     const mappedUser = mapLiveUser(session.user, email);
     storeSession(mappedUser, session.csrf_token);
+    return { kind: 'user', user: mappedUser };
+  },
+
+  // Completes a sign-in that returned a two-factor challenge.
+  async verifyLoginTwoFactor(challengeId: string, code: string): Promise<CurrentUser> {
+    configureSDKClient();
+    const response = await sdkLoginTwoFactor({
+      body: { challenge_id: challengeId, code },
+      throwOnError: true
+    });
+    const session = response.data?.data;
+    if (!session?.user) {
+      throw new Error('Two-factor verification failed.');
+    }
+    const mappedUser = mapLiveUser(session.user, session.user.email);
+    storeSession(mappedUser, session.csrf_token);
     return mappedUser;
+  },
+
+  // Public: which OAuth/OIDC providers the sign-in page should offer. Degrades
+  // to an empty list (no buttons) if the endpoint is unreachable.
+  async listOAuthProviders(): Promise<EnabledOAuthProvider[]> {
+    configureSDKClient();
+    try {
+      const response = await sdkListOAuthProviders({ throwOnError: true });
+      return response.data?.data ?? [];
+    } catch {
+      return [];
+    }
+  },
+
+  // ---- OAuth pending-session flow (post-callback) ----
+  // Inspects the short-lived pending session the callback created. Throws if it
+  // is missing/expired so the page can send the user back to sign in.
+  async getOAuthPending(): Promise<OAuthPendingSession> {
+    configureSDKClient();
+    const response = await sdkGetOAuthPending({ throwOnError: true });
+    const data = response.data?.data;
+    if (!data) throw new Error('No pending OAuth session.');
+    return data;
+  },
+
+  // Authenticates an existing local account by email+password and binds the
+  // pending provider identity to it, then logs in (or asks for a TOTP code).
+  async bindOAuthPendingLogin(
+    email: string,
+    password: string,
+    adoptDisplayName?: boolean,
+  ): Promise<LoginResult> {
+    configureSDKClient();
+    const response = await sdkBindOAuthPendingLogin({
+      body: { email, password, adopt_display_name: adoptDisplayName },
+      throwOnError: true
+    });
+    const session = response.data?.data;
+    if (session && 'required' in session) {
+      return { kind: 'twoFactor', challengeId: session.challenge_id, expiresAt: session.expires_at };
+    }
+    if (!session?.user) throw new Error('OAuth sign-in failed.');
+    const mappedUser = mapLiveUser(session.user, session.user.email);
+    storeSession(mappedUser, session.csrf_token);
+    return { kind: 'user', user: mappedUser };
+  },
+
+  async verifyOAuthBindLoginTwoFactor(challengeId: string, code: string): Promise<CurrentUser> {
+    configureSDKClient();
+    const response = await sdkBindOAuthLoginTwoFactor({
+      body: { challenge_id: challengeId, code },
+      throwOnError: true
+    });
+    const session = response.data?.data;
+    if (!session?.user) throw new Error('Two-factor verification failed.');
+    const mappedUser = mapLiveUser(session.user, session.user.email);
+    storeSession(mappedUser, session.csrf_token);
+    return mappedUser;
+  },
+
+  // Creates a new local account from the provider identity and logs in. The
+  // action token comes from the pending session's create_account_action.
+  async createOAuthPendingAccount(
+    email: string,
+    password: string,
+    actionToken: string,
+    name?: string,
+  ): Promise<CurrentUser> {
+    configureSDKClient();
+    const response = await sdkCreateOAuthAccount({
+      body: { email, password, action_token: actionToken, name },
+      throwOnError: true
+    });
+    const session = response.data?.data;
+    if (!session?.user) throw new Error('Account creation failed.');
+    const mappedUser = mapLiveUser(session.user, email);
+    storeSession(mappedUser, session.csrf_token);
+    return mappedUser;
+  },
+
+  // Sends an email-verification token when the provider did not supply an email.
+  async sendOAuthEmailCode(email: string): Promise<void> {
+    configureSDKClient();
+    await sdkSendOAuthEmailCode({ body: { email }, throwOnError: true });
+  },
+
+  // Confirms the email-verification token; returns the refreshed pending session.
+  async confirmOAuthEmailCompletion(token: string): Promise<OAuthPendingSession> {
+    configureSDKClient();
+    const response = await sdkConfirmOAuthEmail({ body: { token }, throwOnError: true });
+    const data = response.data?.data;
+    if (!data) throw new Error('Email verification failed.');
+    return data;
   },
 
   async logout(): Promise<void> {

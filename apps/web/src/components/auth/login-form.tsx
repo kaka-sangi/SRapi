@@ -1,14 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiService } from "@/lib/api";
+import type { EnabledOAuthProvider } from "@/lib/sdk-types";
 import { ADMIN_HOME_ROUTE, USER_HOME_ROUTE } from "@/lib/routes";
 import { useLanguage } from "@/context/LanguageContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
+
+// Where the provider redirects the browser after the callback creates the
+// short-lived pending session; that page finishes the sign-in.
+const OAUTH_CALLBACK_PATH = "/auth/oauth/callback";
+
+function startOAuthHref(provider: string, providerKey: string): string {
+  const params = new URLSearchParams();
+  if (providerKey) params.set("provider_key", providerKey);
+  params.set("redirect", OAUTH_CALLBACK_PATH);
+  return `/api/v1/auth/oauth/${encodeURIComponent(provider)}/start?${params.toString()}`;
+}
 
 export function LoginForm() {
   const router = useRouter();
@@ -18,6 +30,26 @@ export function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [providers, setProviders] = useState<EnabledOAuthProvider[]>([]);
+  // When set, the password step succeeded but TOTP is required to finish.
+  const [challengeId, setChallengeId] = useState<string | null>(null);
+  const [code, setCode] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    apiService.listOAuthProviders().then((list) => {
+      if (active) setProviders(list);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  function goHome(role: string) {
+    const from = params.get("from");
+    const home = role === "admin" ? ADMIN_HOME_ROUTE : USER_HOME_ROUTE;
+    router.replace(from && from.startsWith("/") ? from : home);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -28,10 +60,13 @@ export function LoginForm() {
     }
     setSubmitting(true);
     try {
-      const user = await apiService.login(email, password);
-      const from = params.get("from");
-      const home = user.role === "admin" ? ADMIN_HOME_ROUTE : USER_HOME_ROUTE;
-      router.replace(from && from.startsWith("/") ? from : home);
+      const result = await apiService.login(email, password);
+      if (result.kind === "twoFactor") {
+        setChallengeId(result.challengeId);
+        setCode("");
+      } else {
+        goHome(result.user.role);
+      }
     } catch {
       setError(t("login.errWrong"));
     } finally {
@@ -39,6 +74,72 @@ export function LoginForm() {
     }
   }
 
+  async function handleVerify(e: React.FormEvent) {
+    e.preventDefault();
+    if (!challengeId) return;
+    setError(null);
+    setSubmitting(true);
+    try {
+      const user = await apiService.verifyLoginTwoFactor(challengeId, code.trim());
+      goHome(user.role);
+    } catch {
+      setError(t("login.err2fa"));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  // ---- Two-factor step ----
+  if (challengeId) {
+    return (
+      <Card className="p-7 sm:p-8">
+        <h2 className="font-serif text-2xl text-srapi-text-primary">{t("login.twoFactorTitle")}</h2>
+        <p className="mt-1.5 text-sm text-srapi-text-secondary">{t("login.twoFactorHint")}</p>
+        <form onSubmit={handleVerify} noValidate className="mt-7 space-y-5">
+          <div>
+            <Label htmlFor="totp">{t("login.code")}</Label>
+            <Input
+              id="totp"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              autoFocus
+              maxLength={6}
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+              placeholder="000000"
+              className="text-center font-mono text-lg tracking-[0.4em]"
+            />
+          </div>
+          {error && (
+            <p role="alert" className="text-sm text-srapi-error">
+              {error}
+            </p>
+          )}
+          <Button
+            type="submit"
+            variant="primary"
+            size="lg"
+            className="w-full"
+            disabled={submitting || code.length < 6}
+          >
+            {submitting ? t("login.verifying") : t("login.verify")}
+          </Button>
+          <button
+            type="button"
+            onClick={() => {
+              setChallengeId(null);
+              setError(null);
+            }}
+            className="w-full text-center font-mono text-2xs text-srapi-text-tertiary transition-colors hover:text-srapi-text-secondary"
+          >
+            {t("login.back")}
+          </button>
+        </form>
+      </Card>
+    );
+  }
+
+  // ---- Password + OAuth step ----
   return (
     <Card className="p-7 sm:p-8">
       <h2 className="font-serif text-2xl text-srapi-text-primary">{t("login.title")}</h2>
@@ -75,6 +176,29 @@ export function LoginForm() {
           {submitting ? t("login.signingIn") : t("login.signIn")}
         </Button>
       </form>
+
+      {providers.length > 0 && (
+        <>
+          <div className="my-6 flex items-center gap-3">
+            <span className="h-px flex-1 bg-srapi-border" />
+            <span className="font-mono text-2xs uppercase tracking-wide text-srapi-text-tertiary">
+              {t("login.orContinueWith")}
+            </span>
+            <span className="h-px flex-1 bg-srapi-border" />
+          </div>
+          <div className="space-y-2.5">
+            {providers.map((p) => (
+              <a
+                key={`${p.provider}:${p.provider_key}`}
+                href={startOAuthHref(p.provider, p.provider_key)}
+                className="flex h-11 w-full items-center justify-center rounded-lg border border-srapi-border-strong bg-srapi-card text-sm font-medium text-srapi-text-primary transition-colors hover:border-srapi-text-tertiary hover:bg-srapi-card-muted"
+              >
+                {t("login.continueWith", { name: p.display_name })}
+              </a>
+            ))}
+          </div>
+        </>
+      )}
     </Card>
   );
 }

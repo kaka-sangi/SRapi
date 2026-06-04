@@ -98,6 +98,64 @@ func (s *Server) handleStartOAuthAuthorization(w http.ResponseWriter, r *http.Re
 	http.Redirect(w, r, result.AuthorizationURL, http.StatusFound)
 }
 
+// handleListOAuthProviders is the public, unauthenticated endpoint backing the
+// sign-in page's provider buttons. It returns only providers that are enabled
+// AND startable (would not be rejected by handleStartOAuthAuthorization), and
+// only their non-secret identity — never a client secret or back-channel URL.
+func (s *Server) handleListOAuthProviders(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	settings, err := s.runtime.adminControl.GetAdminSettings(r.Context())
+	if err != nil {
+		writeAdminControlError(w, err, requestID)
+		return
+	}
+	data := make([]apiopenapi.EnabledOAuthProvider, 0)
+	if settings.Security.OAuthEnabled {
+		for _, config := range settings.Security.OAuthProviderConfigs {
+			provider := userscontract.AuthIdentityProvider(strings.ToLower(strings.TrimSpace(config.Provider)))
+			if !validOAuthStartProvider(provider) {
+				continue
+			}
+			if !oauthProviderEnabled(settings.Security.OAuthProviders, provider) {
+				continue
+			}
+			if !oauthProviderStartable(config) {
+				continue
+			}
+			data = append(data, apiopenapi.EnabledOAuthProvider{
+				Provider:    apiopenapi.AuthIdentityProvider(provider),
+				ProviderKey: config.ProviderKey,
+				DisplayName: oauthProviderDisplayName(config),
+			})
+		}
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.EnabledOAuthProviderListResponse{
+		Data:      data,
+		RequestId: requestID,
+	})
+}
+
+// oauthProviderStartable reports whether a config carries the minimum fields
+// handleStartOAuthAuthorization needs to build an authorization redirect. Kept
+// intentionally no stricter than /start so the button set matches what works.
+func oauthProviderStartable(config admincontrolcontract.OAuthProviderConfig) bool {
+	return strings.TrimSpace(config.ClientID) != "" &&
+		strings.TrimSpace(config.AuthorizeURL) != "" &&
+		strings.TrimSpace(config.RedirectURI) != ""
+}
+
+// oauthProviderDisplayName falls back to the provider key (then the provider
+// name) so a button always has a label even if the admin left it blank.
+func oauthProviderDisplayName(config admincontrolcontract.OAuthProviderConfig) string {
+	if name := strings.TrimSpace(config.DisplayName); name != "" {
+		return name
+	}
+	if key := strings.TrimSpace(config.ProviderKey); key != "" {
+		return key
+	}
+	return strings.TrimSpace(config.Provider)
+}
+
 func (s *Server) handleCompleteOAuthAuthorization(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Pragma", "no-cache")

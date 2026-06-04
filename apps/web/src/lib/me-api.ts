@@ -20,6 +20,8 @@ import {
   getCurrentUserAffiliate,
   listCurrentUserAffiliateLedger,
   transferCurrentUserAffiliateToBalance,
+  listCurrentUserAnnouncements,
+  markCurrentUserAnnouncementRead,
 } from "../../../../packages/sdk/typescript/src/index";
 import type {
   AffiliateTransferToBalanceRequest,
@@ -31,12 +33,19 @@ import type {
   RedeemCodeRedemptionRequest,
   TotpVerifyRequest,
   UpdateCurrentUserProfileRequest,
+  UserAnnouncement,
 } from "../../../../packages/sdk/typescript/src/types.gen";
 
 const CSRF_STORAGE_KEY = "srapi_csrf_token";
 
 export interface MeListResult<T> {
   data: T[];
+  pagination?: Pagination;
+}
+
+export interface MeAnnouncementsResult {
+  data: UserAnnouncement[];
+  unread: number;
   pagination?: Pagination;
 }
 
@@ -166,5 +175,22 @@ export const meApi = {
         throwOnError: true,
       }),
     );
+  },
+
+  // ---- Announcements ----
+  // The list endpoint returns the unread count alongside data, so we surface
+  // the full envelope rather than going through the generic `unwrapList`.
+  async listAnnouncements(): Promise<MeAnnouncementsResult> {
+    configureClient();
+    const response = await listCurrentUserAnnouncements({ throwOnError: true });
+    const body = response.data;
+    if (!body || !Array.isArray(body.data)) {
+      throw new Error("Request returned an empty list response.");
+    }
+    return { data: body.data, unread: body.unread ?? 0, pagination: body.pagination };
+  },
+  async markAnnouncementRead(id: string): Promise<void> {
+    configureClient();
+    await markCurrentUserAnnouncementRead({ path: { id }, throwOnError: true });
   },
 };

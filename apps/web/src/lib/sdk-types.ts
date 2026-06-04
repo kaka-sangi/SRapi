@@ -36,6 +36,7 @@ export type {
   AccountAvailabilitySummary,
   UserPlatformQuota,
   Announcement,
+  UserAnnouncement,
   PricingRule,
   RiskControlLog,
   RiskControlStatus,
@@ -44,6 +45,9 @@ export type {
   OpsSloDefinition,
   ModelRateLimit,
   AccountGroupRateLimit,
+  AdminTestResult,
+  EnabledOAuthProvider,
+  OAuthPendingSession,
   UpsertModelRateLimitRequest,
   UpsertGroupRateLimitRequest,
 } from "../../../../packages/sdk/typescript/src/types.gen";

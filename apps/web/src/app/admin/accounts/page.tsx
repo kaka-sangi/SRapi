@@ -13,6 +13,7 @@ import { enumOptions } from "@/components/admin/resource-form-dialog";
 import { AccountFormDialog } from "@/components/admin/account-form-dialog";
 import { BindProxyDialog } from "@/components/admin/bind-proxy-dialog";
 import { AccountDetailSheet } from "@/components/admin/account-detail-sheet";
+import { AccountTestDialog } from "@/components/features/account-test-dialog";
 import {
   useAdminAccounts,
   useAdminProviders,
@@ -84,6 +85,7 @@ function AccountsContent() {
   const [formTarget, setFormTarget] = useState<ProviderAccount | "new" | null>(null);
   const [proxyTarget, setProxyTarget] = useState<ProviderAccount | null>(null);
   const [detailTarget, setDetailTarget] = useState<ProviderAccount | null>(null);
+  const [testTarget, setTestTarget] = useState<ProviderAccount | null>(null);
   const [bulkDisableOpen, setBulkDisableOpen] = useState(false);
 
   const providerOptions = (providers.data?.data ?? []).map((p) => ({
@@ -92,6 +94,9 @@ function AccountsContent() {
     platformFamily: p.platform_family ?? null,
     authMethods: p.auth_methods ?? null,
   }));
+  const providerNameById = new Map(
+    (providers.data?.data ?? []).map((p) => [String(p.id), p.display_name || p.name] as const),
+  );
   const proxyOptions = (proxies.data?.data ?? []).map((p) => ({ value: p.id, label: p.name }));
   const isFiltered = Boolean(statusFilter || providerFilter);
 
@@ -117,19 +122,6 @@ function AccountsContent() {
       toast({ title: okTitle, tone: "success" });
     } catch (err) {
       toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
-    }
-  }
-
-  async function runTest(id: string) {
-    try {
-      const result = await test.mutateAsync(id);
-      toast({
-        title: result.ok ? t("adminAccounts.testOk") : t("adminAccounts.testFailed"),
-        description: result.message ?? undefined,
-        tone: result.ok ? "success" : "error",
-      });
-    } catch (err) {
-      toast({ title: t("adminAccounts.testFailed"), description: adminErrorMessage(err), tone: "error" });
     }
   }
 
@@ -165,9 +157,11 @@ function AccountsContent() {
     {
       key: "provider",
       header: t("adminAccounts.provider"),
-      sortValue: (a) => a.provider_id,
+      sortValue: (a) => providerNameById.get(String(a.provider_id)) || a.provider_id,
       render: (a) => (
-        <span className="font-mono text-2xs text-srapi-text-secondary">{a.provider_id}</span>
+        <span className="text-srapi-text-secondary">
+          {providerNameById.get(String(a.provider_id)) || a.provider_id}
+        </span>
       ),
     },
     {
@@ -280,7 +274,13 @@ function AccountsContent() {
           const actions: RowAction[] = [
             { label: t("adminAccounts.details"), onSelect: () => setDetailTarget(a) },
             { label: t("adminAccounts.edit"), onSelect: () => setFormTarget(a) },
-            { label: t("adminAccounts.test"), onSelect: () => void runTest(a.id) },
+            {
+              label: t("adminAccounts.test"),
+              onSelect: () => {
+                setTestTarget(a);
+                test.mutate(a.id);
+              },
+            },
             { label: t("adminAccounts.discoverModels"), onSelect: () => void runDiscover(a.id) },
             { label: t("adminAccounts.bindProxy"), onSelect: () => setProxyTarget(a) },
           ];
@@ -346,6 +346,20 @@ function AccountsContent() {
             })
           }
           isPending={updateMut.isPending}
+        />
+      ) : null}
+
+      {testTarget ? (
+        <AccountTestDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setTestTarget(null);
+          }}
+          accountName={testTarget.name}
+          onRun={() => test.mutate(testTarget.id)}
+          result={test.data}
+          errorMessage={test.error instanceof Error ? test.error.message : null}
+          isPending={test.isPending}
         />
       ) : null}
 

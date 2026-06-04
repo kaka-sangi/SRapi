@@ -20,6 +20,7 @@ export const queryKeys = {
     subscriptions: () => ["me", "subscriptions"] as const,
     affiliate: () => ["me", "affiliate"] as const,
     affiliateLedger: (params?: unknown) => ["me", "affiliate-ledger", params ?? {}] as const,
+    announcements: () => ["me", "announcements"] as const,
   },
   admin: {
     dashboardSnapshot: (params?: unknown) => ["admin", "dashboard-snapshot", params ?? {}] as const,

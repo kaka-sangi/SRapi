@@ -227,3 +227,21 @@ export function useTransferToBalance() {
     },
   });
 }
+
+// ---- Announcements ----
+// Polls in the background so the unread badge stays fresh without a reload.
+export function useMyAnnouncements() {
+  return useQuery({
+    queryKey: queryKeys.me.announcements(),
+    queryFn: () => meApi.listAnnouncements(),
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+  });
+}
+export function useMarkAnnouncementRead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => meApi.markAnnouncementRead(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.me.announcements() }),
+  });
+}

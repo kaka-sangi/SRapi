@@ -4244,6 +4244,22 @@ type EmbeddingVector0 = []float32
 // EmbeddingVector1 defines model for .
 type EmbeddingVector1 = string
 
+// EnabledOAuthProvider defines model for EnabledOAuthProvider.
+type EnabledOAuthProvider struct {
+	// DisplayName Non-secret label to render on the sign-in button.
+	DisplayName string               `json:"display_name"`
+	Provider    AuthIdentityProvider `json:"provider"`
+
+	// ProviderKey Stable provider instance key; pass back as the provider_key query param when starting authorization.
+	ProviderKey string `json:"provider_key"`
+}
+
+// EnabledOAuthProviderListResponse defines model for EnabledOAuthProviderListResponse.
+type EnabledOAuthProviderListResponse struct {
+	Data      []EnabledOAuthProvider `json:"data"`
+	RequestId RequestId              `json:"request_id"`
+}
+
 // ErrorCode defines model for ErrorCode.
 type ErrorCode string
 
@@ -15261,6 +15277,9 @@ type ServerInterface interface {
 	// Send a pending OAuth/OIDC email-completion verification link.
 	// (POST /api/v1/auth/oauth/pending/send-verify-code)
 	SendPendingOAuthEmailCompletion(w http.ResponseWriter, r *http.Request)
+	// List enabled OAuth/OIDC sign-in providers.
+	// (GET /api/v1/auth/oauth/providers)
+	ListEnabledOAuthProviders(w http.ResponseWriter, r *http.Request)
 	// Complete an OAuth/OIDC authorization-code callback.
 	// (GET /api/v1/auth/oauth/{provider}/callback)
 	CompleteOAuthAuthorization(w http.ResponseWriter, r *http.Request, provider AuthIdentityProvider, params CompleteOAuthAuthorizationParams)
@@ -22369,6 +22388,20 @@ func (siw *ServerInterfaceWrapper) SendPendingOAuthEmailCompletion(w http.Respon
 	handler.ServeHTTP(w, r)
 }
 
+// ListEnabledOAuthProviders operation middleware
+func (siw *ServerInterfaceWrapper) ListEnabledOAuthProviders(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListEnabledOAuthProviders(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // CompleteOAuthAuthorization operation middleware
 func (siw *ServerInterfaceWrapper) CompleteOAuthAuthorization(w http.ResponseWriter, r *http.Request) {
 
@@ -25483,6 +25516,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/auth/oauth/pending/create-account", wrapper.CreatePendingOAuthAccount)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/auth/oauth/pending/email-completion/confirm", wrapper.ConfirmPendingOAuthEmailCompletion)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/auth/oauth/pending/send-verify-code", wrapper.SendPendingOAuthEmailCompletion)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/auth/oauth/providers", wrapper.ListEnabledOAuthProviders)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/auth/oauth/{provider}/callback", wrapper.CompleteOAuthAuthorization)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/auth/oauth/{provider}/start", wrapper.StartOAuthAuthorization)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/auth/password-reset/confirm", wrapper.ConfirmPasswordReset)

@@ -2116,6 +2116,23 @@ export type UserAnnouncementListResponse = {
     request_id: RequestId;
 };
 
+export type EnabledOAuthProvider = {
+    provider: AuthIdentityProvider;
+    /**
+     * Stable provider instance key; pass back as the provider_key query param when starting authorization.
+     */
+    provider_key: string;
+    /**
+     * Non-secret label to render on the sign-in button.
+     */
+    display_name: string;
+};
+
+export type EnabledOAuthProviderListResponse = {
+    data: Array<EnabledOAuthProvider>;
+    request_id: RequestId;
+};
+
 export type RedeemCodeStatus = 'active' | 'redeemed' | 'disabled' | 'expired';
 
 export type RedeemCodeType = 'balance' | 'subscription';
@@ -4473,6 +4490,31 @@ export type CompleteSetupResponses = {
 };
 
 export type CompleteSetupResponse = CompleteSetupResponses[keyof CompleteSetupResponses];
+
+export type ListEnabledOAuthProvidersData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/oauth/providers';
+};
+
+export type ListEnabledOAuthProvidersErrors = {
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListEnabledOAuthProvidersError = ListEnabledOAuthProvidersErrors[keyof ListEnabledOAuthProvidersErrors];
+
+export type ListEnabledOAuthProvidersResponses = {
+    /**
+     * Enabled, startable OAuth providers.
+     */
+    200: EnabledOAuthProviderListResponse;
+};
+
+export type ListEnabledOAuthProvidersResponse = ListEnabledOAuthProvidersResponses[keyof ListEnabledOAuthProvidersResponses];
 
 export type StartOAuthAuthorizationData = {
     body?: never;

@@ -243,6 +243,27 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/auth/oauth/providers:
+    get:
+      tags:
+        - Auth
+      operationId: listEnabledOAuthProviders
+      summary: List enabled OAuth/OIDC sign-in providers.
+      description: Public and unauthenticated. Returns the non-secret identity of each console OAuth provider that is both enabled and fully configured to start an authorization flow, so the sign-in page can render the matching buttons. Returns an empty list when OAuth is disabled globally or no provider is startable. No secrets (client secret, token URL) are ever exposed.
+      security: []
+      responses:
+        "200":
+          description: Enabled, startable OAuth providers.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnabledOAuthProviderListResponse"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/auth/oauth/{provider}/start:
     get:
       tags:
@@ -16531,6 +16552,35 @@ components:
         unread:
           type: integer
           minimum: 0
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    EnabledOAuthProvider:
+      type: object
+      required:
+        - provider
+        - provider_key
+        - display_name
+      properties:
+        provider:
+          $ref: "#/components/schemas/AuthIdentityProvider"
+        provider_key:
+          type: string
+          description: Stable provider instance key; pass back as the provider_key query param when starting authorization.
+        display_name:
+          type: string
+          description: Non-secret label to render on the sign-in button.
+
+    EnabledOAuthProviderListResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/EnabledOAuthProvider"
         request_id:
           $ref: "#/components/schemas/RequestId"
 

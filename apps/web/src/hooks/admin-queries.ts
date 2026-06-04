@@ -22,7 +22,7 @@ export function useAdminDashboard(range?: P<typeof adminApi.getDashboardSnapshot
   return useQuery({
     queryKey: queryKeys.admin.dashboardSnapshot(range),
     queryFn: () => adminApi.getDashboardSnapshot(range),
-    refetchInterval: 30_000,
+    // Polling is driven by the page's AutoRefreshControl (single source of truth).
   });
 }
 

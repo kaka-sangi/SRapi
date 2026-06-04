@@ -14,6 +14,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { CopyableValue } from "@/components/ui/copy-button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AccountTestDialog } from "@/components/features/account-test-dialog";
 import type { ProviderAccountSummary } from "@/lib/srapi-types";
 
 export default function ProviderAccountsPage() {
@@ -78,21 +79,13 @@ const STATUS_MAP: Record<
 function ProviderAccountCard({ account }: { account: ProviderAccountSummary }) {
   const { t } = useLanguage();
   const test = useTestProviderAccount();
-  const [result, setResult] = useState<"ok" | "fail" | null>(null);
+  const [testOpen, setTestOpen] = useState(false);
   const badge = STATUS_MAP[account.status];
   // The SDK maps an unset endpoint to a sentinel string; only offer copy when a
   // real URL is present, otherwise show a muted, localized placeholder.
   const hasBaseUrl = account.base_url.includes("://");
-
-  async function runTest() {
-    setResult(null);
-    try {
-      const res = await test.mutateAsync(account.id);
-      setResult(res?.ok ? "ok" : "fail");
-    } catch {
-      setResult("fail");
-    }
-  }
+  // Last test outcome, surfaced as an at-a-glance badge beside the button.
+  const lastResult = test.data;
 
   return (
     <Card className={account.status === "disabled" ? "opacity-60" : ""}>
@@ -136,15 +129,34 @@ function ProviderAccountCard({ account }: { account: ProviderAccountSummary }) {
           <QuotaNotchRail value={account.quota_percentage} />
         </div>
         <div className="flex items-center gap-2 pt-1">
-          <Button variant="outline" size="sm" onClick={runTest} loading={test.isPending}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setTestOpen(true);
+              test.mutate(account.id);
+            }}
+            loading={test.isPending}
+          >
             {test.isPending ? t("providers.testing") : t("providers.test")}
           </Button>
-          {result === "ok" && (
-            <QuietBadge status="active" label={t("providers.testOk")} />
-          )}
-          {result === "fail" && <QuietBadge status="error" label={t("common.error")} />}
+          {!test.isPending && lastResult ? (
+            <QuietBadge
+              status={lastResult.ok ? "active" : "error"}
+              label={lastResult.ok ? t("providers.testOk") : t("providers.testFailed")}
+            />
+          ) : null}
         </div>
       </div>
+      <AccountTestDialog
+        open={testOpen}
+        onOpenChange={setTestOpen}
+        accountName={account.name}
+        onRun={() => test.mutate(account.id)}
+        result={test.data}
+        errorMessage={test.error instanceof Error ? test.error.message : null}
+        isPending={test.isPending}
+      />
     </Card>
   );
 }

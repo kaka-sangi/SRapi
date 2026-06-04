@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ThemeToggle } from "./theme-toggle";
 import { LanguageToggle } from "./language-toggle";
+import { AnnouncementBell } from "./announcement-bell";
 
 export function TopNav({
   user,
@@ -67,6 +68,7 @@ export function TopNav({
           />
           {live ? t("common.live") : t("common.apiOffline")}
         </span>
+        <AnnouncementBell />
         <LanguageToggle />
         <ThemeToggle />
         <DropdownMenu>

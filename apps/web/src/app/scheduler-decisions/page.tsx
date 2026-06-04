@@ -11,7 +11,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { SchedulerDecisionStream } from "@/components/ui/scheduler-decision-stream";
-import { Button } from "@/components/ui/button";
+import { AutoRefreshControl } from "@/components/ui/auto-refresh";
 import { Skeleton } from "@/components/ui/skeleton";
 import { decisionToLines } from "@/lib/format-decision";
 import type { SchedulerDecisionSummary } from "@/lib/srapi-types";
@@ -35,9 +35,11 @@ function SchedulerContent() {
         eyebrow={t("nav.sectionGateway")}
         title={t("scheduler.title")}
         actions={
-          <Button variant="outline" size="sm" onClick={() => decisions.refetch()}>
-            {t("common.refresh")}
-          </Button>
+          <AutoRefreshControl
+            onRefresh={() => void decisions.refetch()}
+            isRefreshing={decisions.isFetching}
+            storageKey="srapi.autorefresh.scheduler-decisions"
+          />
         }
       />
 

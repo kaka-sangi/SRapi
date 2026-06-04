@@ -6,11 +6,16 @@ import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageQueryState } from "@/components/layout/page-query-state";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
+import { ListToolbar, FilterSelect } from "@/components/admin/list-toolbar";
 import {
   useAdminUsageLogs,
   useAdminUsageDaily,
   useAdminUsageAggregates,
+  useAdminModels,
+  useAdminUsers,
 } from "@/hooks/admin-queries";
+import { useAdminList } from "@/hooks/use-admin-list";
+import { AutoRefreshControl } from "@/components/ui/auto-refresh";
 import { useLanguage } from "@/context/LanguageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { QuietBadge } from "@/components/ui/quiet-badge";
@@ -23,8 +28,7 @@ import { formatMoney, formatDateTime, formatInteger } from "@/lib/admin-format";
 import type { UsageLog } from "@/lib/sdk-types";
 
 // Structurally matches `UsageAggregateDimension` ('day' | 'model' | 'user' |
-// 'account') without importing the generated type (page-only edit). The order
-// here drives the segmented-control order.
+// 'account'). The order here drives the segmented-control order.
 const AGGREGATE_DIMENSIONS = ["model", "user", "account", "day"] as const;
 type AggregateDimension = (typeof AGGREGATE_DIMENSIONS)[number];
 
@@ -45,11 +49,42 @@ export default function AdminUsagePage() {
   );
 }
 
+function formatLatency(ms: number): string {
+  if (!ms) return "—";
+  return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.round(ms)}ms`;
+}
+
 function UsageContent() {
   const { t } = useLanguage();
-  const usage = useAdminUsageLogs();
+  const list = useAdminList();
+  const modelFilter = list.filters.model || undefined;
+  const userFilter = list.filters.user || undefined;
+  // Server-side: page/filters drive the query (the log can grow unbounded).
+  const usage = useAdminUsageLogs({
+    page: list.page,
+    page_size: list.pageSize,
+    model: modelFilter,
+    user_id: userFilter,
+  });
   const daily = useAdminUsageDaily();
   const dailyData = daily.data?.data ?? [];
+
+  // Filter option sources: catalog models + users (by email).
+  const models = useAdminModels({ page: 1, page_size: 100 });
+  const usersList = useAdminUsers({ page: 1, page_size: 100 });
+  const modelOptions = (models.data?.data ?? []).map((m) => ({
+    value: m.canonical_name,
+    label: m.canonical_name,
+  }));
+  const userOptions = (usersList.data?.data ?? []).map((u) => ({
+    value: String(u.id),
+    label: u.email,
+  }));
+  const userEmailById = new Map(
+    (usersList.data?.data ?? []).map((u) => [String(u.id), u.email] as const),
+  );
+  const isFiltered = Boolean(modelFilter || userFilter);
+  const total = usage.data?.pagination?.total ?? usage.data?.data.length ?? 0;
 
   const columns: Column<UsageLog>[] = [
     {
@@ -65,7 +100,11 @@ function UsageContent() {
       key: "user",
       header: t("adminUsage.user"),
       hideOnMobile: true,
-      render: (u) => <span className="font-mono text-2xs text-srapi-text-tertiary">{u.user_id}</span>,
+      render: (u) => (
+        <span className="text-srapi-text-secondary">
+          {userEmailById.get(String(u.user_id)) || u.user_id}
+        </span>
+      ),
     },
     {
       key: "model",
@@ -97,6 +136,17 @@ function UsageContent() {
       ),
     },
     {
+      key: "latency",
+      header: t("adminUsage.latency"),
+      align: "right",
+      hideOnMobile: true,
+      render: (u) => (
+        <span className="font-mono text-2xs text-srapi-text-tertiary tabular">
+          {formatLatency(u.latency_ms)}
+        </span>
+      ),
+    },
+    {
       key: "cost",
       header: t("adminUsage.cost"),
       align: "right",
@@ -112,7 +162,7 @@ function UsageContent() {
       render: (u) => (
         <QuietBadge
           status={u.success ? "active" : "error"}
-          label={u.success ? t("usage.successful") : t("usage.failed")}
+          label={u.success ? t("usage.successful") : u.error_class || t("usage.failed")}
         />
       ),
     },
@@ -125,9 +175,14 @@ function UsageContent() {
         title={t("adminUsage.title")}
         description={t("adminUsage.subtitle")}
         actions={
-          usage.data ? (
-            <ListCount total={usage.data.pagination?.total ?? usage.data.data.length} />
-          ) : undefined
+          <div className="flex items-center gap-3">
+            {usage.data ? <ListCount total={total} /> : null}
+            <AutoRefreshControl
+              onRefresh={() => void usage.refetch()}
+              isRefreshing={usage.isFetching}
+              storageKey="srapi.autorefresh.admin-usage"
+            />
+          </div>
         }
       />
       {dailyData.length > 0 ? (
@@ -157,7 +212,31 @@ function UsageContent() {
         emptyIcon={BarChart3}
         emptyTitle={t("adminUsage.emptyTitle")}
         emptyBody={t("adminUsage.emptyBody")}
-        minWidth={720}
+        minWidth={820}
+        isFiltered={isFiltered}
+        onClearFilters={list.clearFilters}
+        toolbar={
+          <ListToolbar>
+            <FilterSelect
+              value={list.filters.model}
+              onChange={(v) => list.setFilter("model", v)}
+              options={modelOptions}
+              allLabel={t("adminUsage.allModels")}
+            />
+            <FilterSelect
+              value={list.filters.user}
+              onChange={(v) => list.setFilter("user", v)}
+              options={userOptions}
+              allLabel={t("adminUsage.allUsers")}
+            />
+          </ListToolbar>
+        }
+        pagination={{
+          page: list.page,
+          pageSize: list.pageSize,
+          total,
+          onPageChange: list.setPage,
+        }}
       />
     </>
   );

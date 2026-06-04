@@ -36,7 +36,7 @@ function ShellInner({ children }: { children: React.ReactNode }) {
       {/* Desktop sidebar */}
       <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-srapi-border bg-srapi-card-muted p-4 lg:flex">
         <SidebarBrand />
-        <div className="mt-2 flex-1 overflow-y-auto">
+        <div className="mt-2 flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <SidebarNav role={user.role} />
         </div>
         <div className="mt-auto flex items-center gap-2.5 border-t border-srapi-border px-2 pt-4">
@@ -55,7 +55,7 @@ function ShellInner({ children }: { children: React.ReactNode }) {
         <SheetContent side="left" className="p-4">
           <SheetTitle className="sr-only">Navigation</SheetTitle>
           <SidebarBrand />
-          <div className="mt-2 overflow-y-auto">
+          <div className="mt-2 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <SidebarNav role={user.role} onNavigate={() => setNavOpen(false)} />
           </div>
         </SheetContent>

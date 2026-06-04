@@ -34,13 +34,24 @@ func (s *Server) handleListAdminUsageLogs(w http.ResponseWriter, r *http.Request
 		return
 	}
 	items = filterUsageLogs(items, r.URL.Query().Get("user_id"), r.URL.Query().Get("model"))
-	data := make([]apiopenapi.UsageLog, 0, len(items))
-	for _, item := range items {
+	total := len(items)
+	opts := listOptionsFromRequest(r)
+	start := (opts.Page - 1) * opts.PageSize
+	if start > total {
+		start = total
+	}
+	end := start + opts.PageSize
+	if end > total {
+		end = total
+	}
+	paged := items[start:end]
+	data := make([]apiopenapi.UsageLog, 0, len(paged))
+	for _, item := range paged {
 		data = append(data, toAPIUsageLog(item))
 	}
 	writeJSONAny(w, http.StatusOK, apiopenapi.UsageLogListResponse{
 		Data:       data,
-		Pagination: pagination(len(data)),
+		Pagination: paginationWithRequest(r, total),
 		RequestId:  requestID,
 	})
 }
