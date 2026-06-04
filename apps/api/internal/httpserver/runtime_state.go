@@ -451,6 +451,7 @@ func (rt *runtimeState) buildCapabilityServices(cfg config.Config, opts runtimeO
 		Enabled:   cfg.Captcha.Enabled,
 		Provider:  cfg.Captcha.Provider,
 		SecretKey: cfg.Captcha.SecretKey,
+		SiteKey:   cfg.Captcha.SiteKey,
 		VerifyURL: cfg.Captcha.VerifyURL,
 	}, nil)
 	reverseproxyservice.SetNamedProfileExpander(rt.expandEgressProfileMetadata)

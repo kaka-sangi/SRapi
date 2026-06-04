@@ -135,6 +135,24 @@ func (s *Server) handleListOAuthProviders(w http.ResponseWriter, r *http.Request
 	})
 }
 
+// handleAuthCaptchaConfig is the public, unauthenticated endpoint backing the
+// auth pages' human-verification widget. It reports whether verification is
+// enforced and the non-secret provider + site key the widget needs — never the
+// secret key. The frontend renders nothing when enabled is false.
+func (s *Server) handleAuthCaptchaConfig(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	cfg := apiopenapi.CaptchaConfig{Provider: "turnstile"}
+	if s.runtime.captcha != nil {
+		cfg.Enabled = s.runtime.captcha.Enabled()
+		cfg.Provider = s.runtime.captcha.Provider()
+		cfg.SiteKey = s.runtime.captcha.SiteKey()
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.CaptchaConfigResponse{
+		Data:      cfg,
+		RequestId: requestID,
+	})
+}
+
 // oauthProviderStartable reports whether a config carries the minimum fields
 // handleStartOAuthAuthorization needs to build an authorization redirect. Kept
 // intentionally no stricter than /start so the button set matches what works.

@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
+import { useCaptcha } from "@/components/auth/captcha";
 
 // Where the provider redirects the browser after the callback creates the
 // short-lived pending session; that page finishes the sign-in.
@@ -36,6 +37,7 @@ export function LoginForm() {
   const [challengeId, setChallengeId] = useState<string | null>(null);
   const [code, setCode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const captcha = useCaptcha();
 
   useEffect(() => {
     let active = true;
@@ -62,7 +64,7 @@ export function LoginForm() {
     }
     setSubmitting(true);
     try {
-      const result = await apiService.login(email, password);
+      const result = await apiService.login(email, password, captcha.token);
       if (result.kind === "twoFactor") {
         setChallengeId(result.challengeId);
         setCode("");
@@ -193,7 +195,14 @@ export function LoginForm() {
             {error}
           </p>
         )}
-        <Button type="submit" variant="primary" size="lg" className="w-full" disabled={submitting}>
+        {captcha.node}
+        <Button
+          type="submit"
+          variant="primary"
+          size="lg"
+          className="w-full"
+          disabled={submitting || (captcha.required && !captcha.token)}
+        >
           {submitting ? t("login.signingIn") : t("login.signIn")}
         </Button>
       </form>

@@ -266,6 +266,27 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/auth/captcha:
+    get:
+      tags:
+        - Auth
+      operationId: getAuthCaptchaConfig
+      summary: Public captcha configuration for the sign-in / sign-up widget.
+      description: Public and unauthenticated. Reports whether human-verification is enforced on auth endpoints and, if so, the provider and non-secret site key the frontend widget needs to render. The secret key is never exposed. When disabled, enabled is false and the frontend renders no widget.
+      security: []
+      responses:
+        "200":
+          description: Public captcha configuration.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaptchaConfigResponse"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/auth/oauth/{provider}/start:
     get:
       tags:
@@ -17033,6 +17054,34 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/EnabledOAuthProvider"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    CaptchaConfig:
+      type: object
+      required:
+        - enabled
+        - provider
+        - site_key
+      properties:
+        enabled:
+          type: boolean
+          description: Whether human-verification is enforced on auth endpoints.
+        provider:
+          type: string
+          description: Captcha provider widget to render (turnstile | hcaptcha | recaptcha).
+        site_key:
+          type: string
+          description: Public site key for the provider widget. Empty when captcha is unconfigured. Never secret.
+
+    CaptchaConfigResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/CaptchaConfig"
         request_id:
           $ref: "#/components/schemas/RequestId"
 

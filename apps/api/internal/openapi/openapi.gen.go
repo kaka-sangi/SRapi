@@ -3871,6 +3871,24 @@ type CapabilityListResponse struct {
 	RequestId  RequestId              `json:"request_id"`
 }
 
+// CaptchaConfig defines model for CaptchaConfig.
+type CaptchaConfig struct {
+	// Enabled Whether human-verification is enforced on auth endpoints.
+	Enabled bool `json:"enabled"`
+
+	// Provider Captcha provider widget to render (turnstile | hcaptcha | recaptcha).
+	Provider string `json:"provider"`
+
+	// SiteKey Public site key for the provider widget. Empty when captcha is unconfigured. Never secret.
+	SiteKey string `json:"site_key"`
+}
+
+// CaptchaConfigResponse defines model for CaptchaConfigResponse.
+type CaptchaConfigResponse struct {
+	Data      CaptchaConfig `json:"data"`
+	RequestId RequestId     `json:"request_id"`
+}
+
 // ChangeCurrentUserPasswordRequest defines model for ChangeCurrentUserPasswordRequest.
 type ChangeCurrentUserPasswordRequest struct {
 	CurrentPassword string `json:"current_password"`
@@ -15549,6 +15567,9 @@ type ServerInterface interface {
 	// Update API key metadata and policy.
 	// (PATCH /api/v1/api-keys/{id})
 	UpdateApiKey(w http.ResponseWriter, r *http.Request, id Id)
+	// Public captcha configuration for the sign-in / sign-up widget.
+	// (GET /api/v1/auth/captcha)
+	GetAuthCaptchaConfig(w http.ResponseWriter, r *http.Request)
 	// Confirm a console email verification token.
 	// (POST /api/v1/auth/email-verification/confirm)
 	ConfirmEmailVerification(w http.ResponseWriter, r *http.Request)
@@ -22560,6 +22581,20 @@ func (siw *ServerInterfaceWrapper) UpdateApiKey(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
+// GetAuthCaptchaConfig operation middleware
+func (siw *ServerInterfaceWrapper) GetAuthCaptchaConfig(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAuthCaptchaConfig(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ConfirmEmailVerification operation middleware
 func (siw *ServerInterfaceWrapper) ConfirmEmailVerification(w http.ResponseWriter, r *http.Request) {
 
@@ -25904,6 +25939,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/api-keys", wrapper.ListApiKeys)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/api-keys", wrapper.CreateApiKey)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/api-keys/{id}", wrapper.UpdateApiKey)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/auth/captcha", wrapper.GetAuthCaptchaConfig)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/auth/email-verification/confirm", wrapper.ConfirmEmailVerification)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/auth/email-verification/request", wrapper.RequestEmailVerification)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/auth/login", wrapper.Login)

@@ -117,6 +117,7 @@ type CaptchaConfig struct {
 	Enabled   bool
 	Provider  string // turnstile | hcaptcha | recaptcha
 	SecretKey string
+	SiteKey   string // public site key the frontend widget renders (safe to expose)
 	VerifyURL string // optional override of the provider's siteverify endpoint
 }
 
@@ -307,6 +308,7 @@ func Load() Config {
 			Enabled:   getBoolEnv("CAPTCHA_ENABLED", false),
 			Provider:  getEnv("CAPTCHA_PROVIDER", "turnstile"),
 			SecretKey: getEnv("CAPTCHA_SECRET_KEY", ""),
+			SiteKey:   getEnv("CAPTCHA_SITE_KEY", ""),
 			VerifyURL: getEnv("CAPTCHA_VERIFY_URL", ""),
 		},
 		QuotaRefresh: QuotaRefreshConfig{

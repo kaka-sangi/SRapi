@@ -16,6 +16,7 @@ type Config struct {
 	Enabled   bool
 	Provider  string
 	SecretKey string
+	SiteKey   string
 	VerifyURL string
 }
 
@@ -23,6 +24,8 @@ type Config struct {
 // no-op so callers can wire it unconditionally.
 type Service struct {
 	enabled   bool
+	provider  string
+	siteKey   string
 	secret    string
 	verifyURL string
 	verifier  contract.Verifier
@@ -47,8 +50,14 @@ func New(cfg Config, verifier contract.Verifier) *Service {
 			client:   &http.Client{Timeout: 10 * time.Second},
 		}
 	}
+	provider := strings.ToLower(strings.TrimSpace(cfg.Provider))
+	if provider == "" {
+		provider = "turnstile"
+	}
 	return &Service{
 		enabled:   cfg.Enabled,
+		provider:  provider,
+		siteKey:   strings.TrimSpace(cfg.SiteKey),
 		secret:    strings.TrimSpace(cfg.SecretKey),
 		verifyURL: verifyURL,
 		verifier:  verifier,
@@ -57,6 +66,12 @@ func New(cfg Config, verifier contract.Verifier) *Service {
 
 // Enabled reports whether verification is active.
 func (s *Service) Enabled() bool { return s.enabled }
+
+// Provider reports the configured captcha provider (turnstile | hcaptcha | recaptcha).
+func (s *Service) Provider() string { return s.provider }
+
+// SiteKey reports the public site key the frontend widget renders. Never secret.
+func (s *Service) SiteKey() string { return s.siteKey }
 
 // Verify checks the supplied token. It returns nil when verification is disabled,
 // contract.ErrCaptchaRequired when the token is missing, and

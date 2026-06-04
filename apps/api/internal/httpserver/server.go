@@ -341,6 +341,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("POST /api/v1/auth/email-verification/request", server.handleRequestEmailVerification)
 	mux.HandleFunc("POST /api/v1/auth/email-verification/confirm", server.handleConfirmEmailVerification)
 	mux.HandleFunc("GET /api/v1/auth/oauth/providers", server.handleListOAuthProviders)
+	mux.HandleFunc("GET /api/v1/auth/captcha", server.handleAuthCaptchaConfig)
 	mux.HandleFunc("GET /api/v1/auth/oauth/{provider}/start", server.handleStartOAuthAuthorization)
 	mux.HandleFunc("GET /api/v1/auth/oauth/{provider}/callback", server.handleCompleteOAuthAuthorization)
 	mux.HandleFunc("GET /api/v1/auth/oauth/pending", server.handleGetPendingOAuthSession)

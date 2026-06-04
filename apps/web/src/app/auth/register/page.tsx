@@ -12,6 +12,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { useCaptcha } from "@/components/auth/captcha";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { LanguageToggle } from "@/components/layout/language-toggle";
 
@@ -29,6 +30,7 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const captcha = useCaptcha();
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -39,7 +41,7 @@ export default function RegisterPage() {
     }
     setSubmitting(true);
     try {
-      await apiService.register(email, name.trim(), password);
+      await apiService.register(email, name.trim(), password, captcha.token);
       router.replace(USER_HOME_ROUTE);
     } catch (err) {
       setError(meErrorMessage(err));
@@ -113,7 +115,14 @@ export default function RegisterPage() {
                   {error}
                 </p>
               )}
-              <Button type="submit" variant="primary" size="lg" className="w-full" disabled={submitting}>
+              {captcha.node}
+              <Button
+                type="submit"
+                variant="primary"
+                size="lg"
+                className="w-full"
+                disabled={submitting || (captcha.required && !captcha.token)}
+              >
                 {submitting ? t("authRegister.submitting") : t("authRegister.cta")}
               </Button>
             </form>

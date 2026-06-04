@@ -2300,6 +2300,26 @@ export type EnabledOAuthProviderListResponse = {
     request_id: RequestId;
 };
 
+export type CaptchaConfig = {
+    /**
+     * Whether human-verification is enforced on auth endpoints.
+     */
+    enabled: boolean;
+    /**
+     * Captcha provider widget to render (turnstile | hcaptcha | recaptcha).
+     */
+    provider: string;
+    /**
+     * Public site key for the provider widget. Empty when captcha is unconfigured. Never secret.
+     */
+    site_key: string;
+};
+
+export type CaptchaConfigResponse = {
+    data: CaptchaConfig;
+    request_id: RequestId;
+};
+
 export type RedeemCodeStatus = 'active' | 'redeemed' | 'disabled' | 'expired';
 
 export type RedeemCodeType = 'balance' | 'subscription';
@@ -4773,6 +4793,31 @@ export type ListEnabledOAuthProvidersResponses = {
 };
 
 export type ListEnabledOAuthProvidersResponse = ListEnabledOAuthProvidersResponses[keyof ListEnabledOAuthProvidersResponses];
+
+export type GetAuthCaptchaConfigData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/captcha';
+};
+
+export type GetAuthCaptchaConfigErrors = {
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAuthCaptchaConfigError = GetAuthCaptchaConfigErrors[keyof GetAuthCaptchaConfigErrors];
+
+export type GetAuthCaptchaConfigResponses = {
+    /**
+     * Public captcha configuration.
+     */
+    200: CaptchaConfigResponse;
+};
+
+export type GetAuthCaptchaConfigResponse = GetAuthCaptchaConfigResponses[keyof GetAuthCaptchaConfigResponses];
 
 export type StartOAuthAuthorizationData = {
     body?: never;

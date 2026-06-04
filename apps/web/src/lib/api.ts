@@ -16,6 +16,7 @@ import {
   requestPasswordReset as sdkRequestPasswordReset,
   confirmPasswordReset as sdkConfirmPasswordReset,
   register as sdkRegister,
+  getAuthCaptchaConfig as sdkGetAuthCaptchaConfig,
   getCurrentUser as sdkGetCurrentUser,
   getCurrentUserUsage as sdkGetCurrentUserUsage,
   listApiKeys as sdkListApiKeys,
@@ -365,12 +366,24 @@ export const apiService = {
     await sdkConfirmPasswordReset({ body: { token, new_password: newPassword }, throwOnError: true });
   },
 
+  // Public captcha config (provider + non-secret site key) for the auth-page
+  // widget. Returns undefined on failure → the form treats captcha as off.
+  async getCaptchaConfig() {
+    configureSDKClient();
+    const response = await sdkGetAuthCaptchaConfig({ throwOnError: true });
+    return response.data?.data;
+  },
+
   // Public self-service sign-up. Gated server-side by Security.RegistrationEnabled
   // (403 "registration disabled" when off). On success the backend returns a
   // session, mirroring login, so the new account is signed in immediately.
-  async register(email: string, name: string, password: string) {
+  async register(email: string, name: string, password: string, captchaToken?: string) {
     configureSDKClient();
-    const response = await sdkRegister({ body: { email, name, password }, throwOnError: true });
+    const response = await sdkRegister({
+      body: { email, name, password },
+      headers: captchaToken ? { 'X-Captcha-Token': captchaToken } : undefined,
+      throwOnError: true,
+    });
     const session = response.data?.data;
     if (!session?.user) {
       throw new Error('Registration did not return a session.');
@@ -380,7 +393,7 @@ export const apiService = {
     return mappedUser;
   },
 
-  async login(email: string, password: string): Promise<LoginResult> {
+  async login(email: string, password: string, captchaToken?: string): Promise<LoginResult> {
     configureSDKClient();
 
     const connected = await this.isBackendConnected();
@@ -390,6 +403,7 @@ export const apiService = {
 
     const response = await sdkLogin({
       body: { email, password },
+      headers: captchaToken ? { 'X-Captcha-Token': captchaToken } : undefined,
       throwOnError: true
     });
     const session = response.data?.data;

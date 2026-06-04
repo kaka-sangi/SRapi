@@ -10,20 +10,33 @@ const SECURITY_HEADERS = [
 
 const isProd = process.env.NODE_ENV === "production";
 
+// Human-verification widget CDNs (Cloudflare Turnstile / hCaptcha / reCAPTCHA).
+// Allowed so the operator-toggled captcha can load its script + challenge iframe.
+// Dormant — nothing is fetched from them — until the server reports captcha
+// enabled and the widget actually mounts.
+const CAPTCHA_SCRIPT_SRC =
+  "https://challenges.cloudflare.com https://js.hcaptcha.com https://www.google.com https://www.gstatic.com";
+const CAPTCHA_FRAME_SRC =
+  "https://challenges.cloudflare.com https://newassets.hcaptcha.com https://www.google.com";
+const CAPTCHA_CONNECT_SRC =
+  "https://challenges.cloudflare.com https://*.hcaptcha.com https://www.google.com";
+
 const cspDirectives = [
   "default-src 'self'",
   "base-uri 'self'",
   "form-action 'self'",
   "frame-ancestors 'none'",
   "object-src 'none'",
-  isProd ? "script-src 'self'" : "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
+  isProd
+    ? `script-src 'self' ${CAPTCHA_SCRIPT_SRC}`
+    : `script-src 'self' 'unsafe-eval' 'unsafe-inline' ${CAPTCHA_SCRIPT_SRC}`,
   isProd ? "style-src 'self'" : "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
   process.env.NEXT_PUBLIC_SRAPI_TELEMETRY_URL
-    ? `connect-src 'self' ${new URL(process.env.NEXT_PUBLIC_SRAPI_TELEMETRY_URL).origin}`
-    : "connect-src 'self'",
-  "frame-src 'none'",
+    ? `connect-src 'self' ${CAPTCHA_CONNECT_SRC} ${new URL(process.env.NEXT_PUBLIC_SRAPI_TELEMETRY_URL).origin}`
+    : `connect-src 'self' ${CAPTCHA_CONNECT_SRC}`,
+  `frame-src ${CAPTCHA_FRAME_SRC}`,
 ].join("; ");
 
 // rewrites proxy /api and /v1 to the backend (Next same-origin proxy)
