@@ -92,7 +92,7 @@ export function LoginForm() {
   // ---- Two-factor step ----
   if (challengeId) {
     return (
-      <Card className="p-7 sm:p-8">
+      <Card className="card-raised p-7 sm:p-8">
         <h2 className="font-serif text-2xl text-srapi-text-primary">{t("login.twoFactorTitle")}</h2>
         <p className="mt-1.5 text-sm text-srapi-text-secondary">{t("login.twoFactorHint")}</p>
         <form onSubmit={handleVerify} noValidate className="mt-7 space-y-5">
@@ -141,7 +141,7 @@ export function LoginForm() {
 
   // ---- Password + OAuth step ----
   return (
-    <Card className="p-7 sm:p-8">
+    <Card className="card-raised p-7 sm:p-8">
       <h2 className="font-serif text-2xl text-srapi-text-primary">{t("login.title")}</h2>
       <p className="mt-1.5 text-sm text-srapi-text-secondary">{t("login.subtitle")}</p>
 

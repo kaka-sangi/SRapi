@@ -74,8 +74,22 @@
   --radius-xl: 1.125rem;
   --radius-pill: 9999px;
 
-  /* 缓动 */
+  /* 缓动 —— bloom 用于克制进场；spring 系列提供「有存在感」的弹性 */
   --ease-bloom: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);       /* 强减速，进场默认 */
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.5, 1);          /* 轻微 overshoot（hover / 交互） */
+  --ease-spring-bounce: cubic-bezier(0.34, 1.56, 0.64, 1); /* 明显回弹（强调动作） */
+
+  /* 流体展示字阶（masthead）—— 随视口连续缩放，消除 sm: 断点处的字号跳变。
+     桌面封顶 4.5rem：在叙事列宽内让「一个入口，接入」保持单行，不再把动词「接入」挤成孤行。 */
+  --text-hero: clamp(2.75rem, 1.6rem + 4.6vw, 4.5rem);
+  --text-hero--line-height: 1.04;
+  --text-hero--letter-spacing: -0.028em;
+
+  /* 高度阶梯（elevation）—— 从浅到深的统一阴影语言，配合 .card-interactive */
+  --shadow-e1: 0 1px 2px rgba(28, 26, 23, 0.04);
+  --shadow-e2: 0 2px 6px -2px rgba(28, 26, 23, 0.06), 0 8px 24px -10px rgba(28, 26, 23, 0.1);
+  --shadow-e3: 0 10px 26px -8px rgba(28, 26, 23, 0.14), 0 22px 48px -16px rgba(28, 26, 23, 0.12);
 }
 
 /* —— 深邃墨水 (Ink Dark) —— */
@@ -117,14 +131,20 @@ body {
 }
 
 /* 衬线标题：Cormorant 高对比但纤细，统一给中重字重 + 光学字距，
-   避免小尺寸发虚；超大展示标题可在使用处单独减重。 */
+   避免小尺寸发虚；超大展示标题可在使用处单独减重。
+   字族显式绑定 next/font 变量 —— 不依赖 Tailwind 的 font-serif 工具类
+   （其 --font-serif 在本项目中解析为空，会回退到无衬线，编辑社论身份因此失效）。 */
 .font-serif {
+  font-family: var(--font-serif-display), "Cormorant Garamond", Georgia, serif;
   font-weight: 600;
   font-feature-settings: "kern", "liga", "calt", "swsh";
   letter-spacing: -0.01em;
 }
 
 /* 数字一律等宽，避免表格 / 指标跳动 */
+.font-mono {
+  font-family: var(--font-jetbrains), "JetBrains Mono", ui-monospace, monospace;
+}
 .font-mono,
 .tabular {
   font-variant-numeric: tabular-nums;
@@ -339,6 +359,120 @@ textarea:focus-visible,
   animation-delay: 270ms;
 }
 
+/* ============================================================
+   §6.1 弹性进场（Spring Rise）+ 可编排交错（stagger）
+   比 bloom 位移更大、带轻微 overshoot 回落 —— 「有存在感」的动效性格。
+   编排次序用 --stagger-index：style={{ ["--stagger-index"]: n }}
+   ============================================================ */
+@keyframes spring-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(26px) scale(0.985);
+  }
+  55% {
+    opacity: 1;
+  }
+  72% {
+    transform: translateY(-4px) scale(1.004); /* overshoot —— 这一帧让它「弹」 */
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.anim-rise {
+  opacity: 0;
+  animation: spring-rise 660ms var(--ease-out-quint) both;
+  animation-delay: calc(var(--stagger-index, 0) * 85ms);
+}
+
+/* eyebrow 小标尺：进场时从左「抽出」生长，与文字错峰 */
+@keyframes rule-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+.anim-rule {
+  transform-origin: left center;
+  animation: rule-grow 720ms var(--ease-spring) both;
+  animation-delay: calc(var(--stagger-index, 0) * 85ms + 140ms);
+}
+
+/* 行 / 消息 / 卡片网格等密集场景用的轻量进场（位移更小、更快、交错更紧） */
+@keyframes rise-sm {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.anim-rise-sm {
+  opacity: 0;
+  animation: rise-sm 460ms var(--ease-out-quint) both;
+  animation-delay: calc(var(--stagger-index, 0) * 45ms);
+}
+
+/* ============================================================
+   §6.2 可交互卡片（Interactive Card）—— hover 物理抬升 + 阴影加深
+   rest 态沿用 tactile-card；交互态用 spring 上浮，性格「弹」。
+   ============================================================ */
+.card-interactive {
+  transition:
+    transform 260ms var(--ease-spring),
+    box-shadow 260ms var(--ease-out-quint),
+    border-color 200ms ease;
+}
+.card-interactive:hover {
+  transform: translateY(-3px);
+  border-color: var(--color-srapi-border-strong);
+  box-shadow:
+    0 1px 2px rgba(28, 26, 23, 0.04),
+    0 16px 34px -14px rgba(28, 26, 23, 0.18),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.7);
+}
+.dark .card-interactive:hover {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.4),
+    0 20px 42px -16px rgba(0, 0, 0, 0.62),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+}
+.card-interactive:active {
+  transform: translateY(-1px);
+  transition-duration: 120ms;
+}
+
+/* 焦点卡片（focal / raised）—— 比 tactile-card 更强的悬浮深度，
+   用于页面主角：登录卡、特性卡、对话框等。定义在 tactile-card 之后，
+   故同时挂两个类时由 card-raised 接管阴影。 */
+.card-raised {
+  box-shadow:
+    0 1px 2px rgba(28, 26, 23, 0.04),
+    0 18px 40px -16px rgba(28, 26, 23, 0.2),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.72);
+}
+.dark .card-raised {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.4),
+    0 24px 50px -18px rgba(0, 0, 0, 0.65),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+}
+
+/* ============================================================
+   §6.3 排版细节：标题平衡断行 / 正文优化孤字
+   ============================================================ */
+:where(h1, h2, h3) {
+  text-wrap: balance;
+}
+:where(p) {
+  text-wrap: pretty;
+}
+
 /* 骨架脉冲 */
 .skeleton-pulse {
   animation: skeleton-pulse 1.4s ease-in-out infinite;
@@ -357,9 +491,15 @@ textarea:focus-visible,
    §9.2 Reduced Motion
    ============================================================ */
 @media (prefers-reduced-motion: reduce) {
-  .animate-bloom {
+  .animate-bloom,
+  .anim-rise,
+  .anim-rise-sm,
+  .anim-rule {
     animation: none;
     opacity: 1;
+    transform: none;
+  }
+  .card-interactive:hover {
     transform: none;
   }
   .stream-cursor {

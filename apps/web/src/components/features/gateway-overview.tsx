@@ -1,5 +1,6 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import { KeyRound, Activity, ArrowUpRight } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
@@ -13,6 +14,8 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { UsageLogSummary } from "@/lib/srapi-types";
+
+const rise = (i: number) => ({ "--stagger-index": i }) as CSSProperties;
 
 function compact(n: number): string {
   return new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(n);
@@ -77,15 +80,17 @@ export function GatewayOverview() {
 
   return (
     <>
-      <PageHeader
-        eyebrow={t("dashboard.eyebrow")}
-        title={t("dashboard.title")}
-        actions={
-          <Button asChild variant="primary">
-            <Link href="/api-keys">＋ {t("apiKeys.create")}</Link>
-          </Button>
-        }
-      />
+      <div className="anim-rise-sm" style={rise(0)}>
+        <PageHeader
+          eyebrow={t("dashboard.eyebrow")}
+          title={t("dashboard.title")}
+          actions={
+            <Button asChild variant="primary">
+              <Link href="/api-keys">＋ {t("apiKeys.create")}</Link>
+            </Button>
+          }
+        />
+      </div>
 
       {/* KPI row — the user's own request/token/cost footprint. */}
       {usage.isLoading ? (
@@ -96,17 +101,44 @@ export function GatewayOverview() {
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <StatCard label={t("dashboard.requests")} value={compact(requests)} spark={reqSpark} />
-          <StatCard
-            label={t("dashboard.successRate")}
-            value={successRate != null ? `${successRate}%` : "—"}
-          />
-          <StatCard label={t("dashboard.totalTokens")} value={compact(totalTokens)} />
-          <StatCard label={t("dashboard.cost")} value={fmtCost(totalCost, currency)} />
+          <div className="anim-rise-sm" style={rise(1)}>
+            <StatCard
+              className="card-interactive h-full"
+              label={t("dashboard.requests")}
+              value={requests}
+              format={compact}
+              spark={reqSpark}
+            />
+          </div>
+          <div className="anim-rise-sm" style={rise(2)}>
+            <StatCard
+              className="card-interactive h-full"
+              label={t("dashboard.successRate")}
+              value={successRate != null ? successRate : "—"}
+              format={(n) => `${Math.round(n)}%`}
+            />
+          </div>
+          <div className="anim-rise-sm" style={rise(3)}>
+            <StatCard
+              className="card-interactive h-full"
+              label={t("dashboard.totalTokens")}
+              value={totalTokens}
+              format={compact}
+            />
+          </div>
+          <div className="anim-rise-sm" style={rise(4)}>
+            <StatCard
+              className="card-interactive h-full"
+              label={t("dashboard.cost")}
+              value={totalCost}
+              format={(n) => fmtCost(n, currency)}
+            />
+          </div>
         </div>
       )}
 
       {/* Recent request activity — full width; onboarding CTA when empty */}
+      <div className="anim-rise-sm" style={rise(5)}>
       <Card>
         <CardHeader>
           <CardTitle>{t("dashboard.recentActivity")}</CardTitle>
@@ -144,7 +176,10 @@ export function GatewayOverview() {
             ) : (
               <div className="divide-y divide-srapi-border">
                 {rows.slice(0, 8).map((log) => (
-                  <div key={log.request_id} className="flex items-center gap-3 px-5 py-3">
+                  <div
+                    key={log.request_id}
+                    className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-srapi-card-muted/40"
+                  >
                     <div className="w-24 shrink-0 font-mono text-2xs tabular text-srapi-text-tertiary">
                       {fmtTime(log.created_at)}
                     </div>
@@ -168,6 +203,7 @@ export function GatewayOverview() {
           }
         </PageQueryState>
       </Card>
+      </div>
 
       <div className="lg:hidden">
         <Button asChild variant="outline" className="w-full">

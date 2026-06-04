@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type { CSSProperties } from "react";
 import { LineChart } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { PageHeader } from "@/components/layout/page-header";
@@ -40,6 +41,8 @@ function rangeWindow(key: RangeKey): { start: string; end: string } {
   start.setHours(0, 0, 0, 0);
   return { start: start.toISOString(), end: end.toISOString() };
 }
+
+const rise = (i: number) => ({ "--stagger-index": i }) as CSSProperties;
 
 export default function AdminDashboardPage() {
   return (
@@ -133,56 +136,80 @@ function DashboardBody({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
     <div className="space-y-5">
       {/* KPI grid — surfaces traffic, tokens, cost tiers, throughput, latency, users */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
-        <StatCard
-          label={t("dashboard.traffic")}
-          value={formatCompactNumber(traffic.total_requests)}
-          unit={t("dashboard.requests")}
-          hint={`${t("dashboard.today")} ${formatCompactNumber(traffic.today_requests)} · ${t(
-            "dashboard.successRate",
-          )} ${successRate != null ? formatPercent(successRate) : "—"}`}
-        />
-        <StatCard
-          label={t("dashboard.totalTokens")}
-          value={formatCompactNumber(tokens.total_tokens)}
-          hint={`${t("dashboard.today")} ${formatCompactNumber(tokens.today_tokens)} · ${t(
-            "dashboard.inputTokens",
-          )} ${formatCompactNumber(tokens.input_tokens)} / ${t(
-            "dashboard.outputTokens",
-          )} ${formatCompactNumber(tokens.output_tokens)}`}
-        />
-        <StatCard
-          label={t("dashboard.cost")}
-          value={formatMoney(c.actual_cost, c.currency)}
-          hint={`${t("dashboard.standardCost")} ${formatMoney(c.standard_cost, c.currency)} · ${t(
-            "dashboard.accountCost",
-          )} ${formatMoney(c.account_cost, c.currency)}`}
-        />
-        <StatCard
-          label={t("dashboard.throughput")}
-          value={formatInteger(performance.current_rpm)}
-          unit="RPM"
-          hint={`${formatInteger(performance.current_tpm)} TPM · ${t("dashboard.peak")} ${formatInteger(
-            performance.peak_rpm,
-          )}/${formatInteger(performance.peak_tpm)}`}
-        />
-        <StatCard
-          label={t("dashboard.latency")}
-          value={formatInteger(performance.average_latency_ms)}
-          unit="ms"
-          hint={`p95 ${formatInteger(performance.p95_latency_ms)} ms`}
-        />
-        <StatCard
-          label={t("dashboard.users")}
-          value={formatInteger(users.active_users)}
-          unit={t("dashboard.activeUnit")}
-          hint={`${t("dashboard.today")} +${formatInteger(users.today_new_users)} · ${t(
-            "dashboard.total",
-          )} ${formatInteger(users.total_users)}`}
-        />
+        <div className="anim-rise-sm" style={rise(0)}>
+          <StatCard
+            className="card-interactive h-full"
+            label={t("dashboard.traffic")}
+            value={traffic.total_requests}
+            format={formatCompactNumber}
+            unit={t("dashboard.requests")}
+            hint={`${t("dashboard.today")} ${formatCompactNumber(traffic.today_requests)} · ${t(
+              "dashboard.successRate",
+            )} ${successRate != null ? formatPercent(successRate) : "—"}`}
+          />
+        </div>
+        <div className="anim-rise-sm" style={rise(1)}>
+          <StatCard
+            className="card-interactive h-full"
+            label={t("dashboard.totalTokens")}
+            value={tokens.total_tokens}
+            format={formatCompactNumber}
+            hint={`${t("dashboard.today")} ${formatCompactNumber(tokens.today_tokens)} · ${t(
+              "dashboard.inputTokens",
+            )} ${formatCompactNumber(tokens.input_tokens)} / ${t(
+              "dashboard.outputTokens",
+            )} ${formatCompactNumber(tokens.output_tokens)}`}
+          />
+        </div>
+        <div className="anim-rise-sm" style={rise(2)}>
+          <StatCard
+            className="card-interactive h-full"
+            label={t("dashboard.cost")}
+            value={Number(c.actual_cost)}
+            format={(n) => formatMoney(n, c.currency)}
+            hint={`${t("dashboard.standardCost")} ${formatMoney(c.standard_cost, c.currency)} · ${t(
+              "dashboard.accountCost",
+            )} ${formatMoney(c.account_cost, c.currency)}`}
+          />
+        </div>
+        <div className="anim-rise-sm" style={rise(3)}>
+          <StatCard
+            className="card-interactive h-full"
+            label={t("dashboard.throughput")}
+            value={performance.current_rpm}
+            format={formatInteger}
+            unit="RPM"
+            hint={`${formatInteger(performance.current_tpm)} TPM · ${t("dashboard.peak")} ${formatInteger(
+              performance.peak_rpm,
+            )}/${formatInteger(performance.peak_tpm)}`}
+          />
+        </div>
+        <div className="anim-rise-sm" style={rise(4)}>
+          <StatCard
+            className="card-interactive h-full"
+            label={t("dashboard.latency")}
+            value={performance.average_latency_ms}
+            format={formatInteger}
+            unit="ms"
+            hint={`p95 ${formatInteger(performance.p95_latency_ms)} ms`}
+          />
+        </div>
+        <div className="anim-rise-sm" style={rise(5)}>
+          <StatCard
+            className="card-interactive h-full"
+            label={t("dashboard.users")}
+            value={users.active_users}
+            format={formatInteger}
+            unit={t("dashboard.activeUnit")}
+            hint={`${t("dashboard.today")} +${formatInteger(users.today_new_users)} · ${t(
+              "dashboard.total",
+            )} ${formatInteger(users.total_users)}`}
+          />
+        </div>
       </div>
 
       {/* Token composition */}
-      <Card>
+      <Card className="anim-rise-sm" style={rise(6)}>
         <CardHeader>
           <CardTitle>
             {t("dashboard.tokenBreakdown")}
@@ -203,7 +230,7 @@ function DashboardBody({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
       </Card>
 
       {/* Token trend over the window */}
-      <Card>
+      <Card className="anim-rise-sm" style={rise(7)}>
         <CardContent>
           <span className="font-mono text-2xs uppercase text-srapi-text-tertiary">
             {t("dashboard.tokenTrend")}
@@ -226,7 +253,7 @@ function DashboardBody({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
       </Card>
 
       {/* Distributions: by model + by user */}
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="anim-rise-sm grid gap-4 md:grid-cols-2" style={rise(8)}>
         <Card>
           <CardHeader>
             <CardTitle>

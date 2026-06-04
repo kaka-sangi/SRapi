@@ -10,6 +10,9 @@ import type { ReasoningEffort } from "@/components/chat/types";
 import { useLanguage } from "@/context/LanguageContext";
 import { streamPlaygroundChat, type PlaygroundMessage } from "@/lib/playground-client";
 import { fileToImagePart, imagePartToDataUrl, type CopilotImagePart } from "@/lib/image-utils";
+import type { CSSProperties } from "react";
+
+const rise = (i: number) => ({ "--stagger-index": i }) as CSSProperties;
 
 /** The 交界地 chat: a billed, session-authenticated user chat. Same surface as
  * the admin copilot minus all agentic/admin capability — it can only talk. */
@@ -175,14 +178,17 @@ function EmptyState({ onPick }: { onPick: (s: string) => void }) {
   const examples = [t("playground.example1"), t("playground.example2"), t("playground.example3")];
   return (
     <div className="flex h-full flex-col items-center justify-center gap-4 px-4 text-center">
-      <div className="flex size-14 items-center justify-center rounded-2xl bg-srapi-primary/10">
+      <div
+        className="anim-rise flex size-14 items-center justify-center rounded-2xl bg-srapi-primary/10"
+        style={rise(0)}
+      >
         <Bot className="size-7 text-srapi-primary" />
       </div>
-      <div className="space-y-1.5">
+      <div className="anim-rise space-y-1.5" style={rise(1)}>
         <h2 className="font-serif text-2xl text-srapi-text-primary">{t("playground.greeting")}</h2>
         <p className="mx-auto max-w-md text-sm text-srapi-text-secondary">{t("playground.emptyHint")}</p>
       </div>
-      <div className="flex flex-wrap justify-center gap-2">
+      <div className="anim-rise flex flex-wrap justify-center gap-2" style={rise(2)}>
         {examples.map((ex) => (
           <button
             key={ex}
@@ -201,7 +207,7 @@ function EmptyState({ onPick }: { onPick: (s: string) => void }) {
 function MessageRow({ message }: { message: PlaygroundMessage }) {
   if (message.role === "user") {
     return (
-      <div className="flex justify-end gap-2">
+      <div className="anim-rise-sm flex justify-end gap-2">
         <div className="max-w-[80%] space-y-2">
           {message.images?.length ? (
             <div className="flex flex-wrap justify-end gap-1.5">
@@ -229,7 +235,7 @@ function MessageRow({ message }: { message: PlaygroundMessage }) {
     );
   }
   return (
-    <div className="flex gap-2">
+    <div className="anim-rise-sm flex gap-2">
       <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-srapi-primary/10">
         <Bot className="size-4 text-srapi-primary" />
       </div>
