@@ -157,8 +157,11 @@ body {
   box-shadow:
     0 0 0 1.5px var(--color-srapi-bg),
     0 0 0 3px color-mix(in srgb, var(--color-srapi-primary) 32%, transparent);
-  border-radius: 6px;
 }
+/* 聚焦态【不】统一设置 border-radius。Tailwind 的 rounded-* 工具类位于 @layer 内，
+   任何非分层规则（哪怕 :where() 零特异度）都会盖过它，强设圆角会把输入框/下拉的圆角
+   压成方框（这正是「点击输入框变方框」bug 的根因）。焦点环用 box-shadow，本就会自动
+   贴合元素自身圆角，无需也不应再设 radius。 */
 /* 鼠标点击不应留下聚焦环（部分元素如复选框默认会在点击后命中 :focus-visible） */
 input:focus:not(:focus-visible),
 button:focus:not(:focus-visible),
@@ -172,7 +175,6 @@ input:not([type="checkbox"]):not([type="radio"]):focus-visible,
 textarea:focus-visible,
 [role="combobox"]:focus-visible {
   box-shadow: none;
-  border-radius: revert;
 }
 
 /* 选区 */
@@ -444,6 +446,20 @@ textarea:focus-visible,
   animation: form-shake 380ms ease-in-out;
 }
 
+/* 页面级进场 —— 挂在 AppShell 的 <main> 上，每次进入整页柔和淡入。
+   纯 opacity（不带位移），与各区块自己的 rise/stagger 零冲突地叠加。 */
+@keyframes page-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.anim-page {
+  animation: page-enter 300ms var(--ease-out-quint) both;
+}
+
 /* ============================================================
    §6.2 可交互卡片（Interactive Card）—— hover 物理抬升 + 阴影加深
    rest 态沿用 tactile-card；交互态用 spring 上浮，性格「弹」。
@@ -521,7 +537,8 @@ textarea:focus-visible,
   .anim-rise,
   .anim-rise-sm,
   .anim-rule,
-  .anim-shake {
+  .anim-shake,
+  .anim-page {
     animation: none;
     opacity: 1;
     transform: none;

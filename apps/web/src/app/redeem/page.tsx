@@ -46,7 +46,7 @@ function RedeemContent() {
         title={t("redeem.title")}
         description={t("redeem.subtitle")}
       />
-      <Card>
+      <Card className="anim-rise-sm">
         <CardContent>
           <form onSubmit={submit} className="max-w-md space-y-4">
             <div>

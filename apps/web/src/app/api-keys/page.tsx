@@ -61,7 +61,7 @@ function ApiKeysContent() {
         actions={<ApiKeyCreateDialog />}
       />
 
-      <Card>
+      <Card className="anim-rise-sm">
         <PageQueryState
           query={apiKeys}
           isEmpty={(d) => d.length === 0}

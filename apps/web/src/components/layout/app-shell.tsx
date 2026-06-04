@@ -65,7 +65,7 @@ function ShellInner({ children }: { children: React.ReactNode }) {
       <CommandPaletteProvider role={user.role}>
         <div className="flex min-w-0 flex-1 flex-col">
           <TopNav user={user} onOpenNav={() => setNavOpen(true)} live={live} />
-          <main className="flex-1 space-y-6 p-5 sm:p-7">{children}</main>
+          <main className="anim-page flex-1 space-y-6 p-5 sm:p-7">{children}</main>
         </div>
       </CommandPaletteProvider>
     </div>
