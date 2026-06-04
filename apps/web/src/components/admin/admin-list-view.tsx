@@ -114,7 +114,7 @@ export function AdminListView<T>({
   const { t } = useLanguage();
 
   return (
-    <Card className="overflow-hidden">
+    <Card className="anim-rise-sm overflow-hidden">
       {toolbar}
       {selection && selection.selected.size > 0 ? (
         <BulkBar
@@ -331,7 +331,7 @@ function BulkBar({
 }) {
   const { t } = useLanguage();
   return (
-    <div className="flex flex-wrap items-center gap-3 border-b border-srapi-border bg-srapi-card-muted px-4 py-2.5">
+    <div className="anim-rise-sm flex flex-wrap items-center gap-3 border-b border-srapi-border bg-srapi-card-muted px-4 py-2.5">
       <span className="font-mono text-2xs text-srapi-text-secondary">
         {t("adminCommon.selectedCount", { count })}
       </span>

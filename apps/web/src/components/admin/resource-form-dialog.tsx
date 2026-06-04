@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import {
   Dialog,
@@ -123,6 +123,7 @@ export function ResourceFormDialog<TDraft extends object, TBody>({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
 
   const primaryFields = fields.filter((f) => !f.advanced);
   const advancedFields = fields.filter((f) => f.advanced);
@@ -140,7 +141,7 @@ export function ResourceFormDialog<TDraft extends object, TBody>({
   }
 
   /** Run `required` + per-field `validate` rules; populate inline errors. */
-  function validateFields(): boolean {
+  function validateFields(): Record<string, string> {
     const errs: Record<string, string> = {};
     for (const field of fields) {
       const value = draft[field.name];
@@ -161,13 +162,33 @@ export function ResourceFormDialog<TDraft extends object, TBody>({
     // If a problem hides under the collapsed Advanced section, open it so the
     // admin can actually see the field that failed.
     if (advancedFields.some((f) => errs[f.name])) setAdvancedOpen(true);
-    return Object.keys(errs).length === 0;
+    return errs;
   }
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
-    if (!validateFields()) return;
+    const errs = validateFields();
+    if (Object.keys(errs).length > 0) {
+      // Validation choreography: shake the form, then bring the first offending
+      // field into view + focus it (deferred a tick so a just-opened Advanced
+      // section is mounted before we look the field up).
+      const formEl = formRef.current;
+      if (formEl) {
+        formEl.classList.remove("anim-shake");
+        void formEl.offsetWidth; // reflow so the animation re-triggers each time
+        formEl.classList.add("anim-shake");
+      }
+      const firstErr = fields.find((f) => errs[f.name])?.name;
+      if (firstErr) {
+        setTimeout(() => {
+          const ctrl = document.getElementById(`field-${firstErr}`);
+          ctrl?.scrollIntoView({ block: "nearest" });
+          (ctrl as HTMLElement | null)?.focus?.({ preventScroll: true });
+        }, 0);
+      }
+      return;
+    }
     let body: TBody;
     try {
       body = buildBody(draft);
@@ -192,7 +213,7 @@ export function ResourceFormDialog<TDraft extends object, TBody>({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        <form onSubmit={onSubmit} noValidate>
+        <form ref={formRef} onSubmit={onSubmit} noValidate>
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
             {/* Always describe the dialog: a visible hint when given, else an

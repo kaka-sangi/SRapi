@@ -418,6 +418,32 @@ textarea:focus-visible,
   animation-delay: calc(var(--stagger-index, 0) * 45ms);
 }
 
+/* 校验失败的轻微横向抖动 —— 把注意力拉回表单（配合滚动到首个错误字段） */
+@keyframes form-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  15% {
+    transform: translateX(-7px);
+  }
+  30% {
+    transform: translateX(6px);
+  }
+  45% {
+    transform: translateX(-4px);
+  }
+  60% {
+    transform: translateX(3px);
+  }
+  75% {
+    transform: translateX(-2px);
+  }
+}
+.anim-shake {
+  animation: form-shake 380ms ease-in-out;
+}
+
 /* ============================================================
    §6.2 可交互卡片（Interactive Card）—— hover 物理抬升 + 阴影加深
    rest 态沿用 tactile-card；交互态用 spring 上浮，性格「弹」。
@@ -494,7 +520,8 @@ textarea:focus-visible,
   .animate-bloom,
   .anim-rise,
   .anim-rise-sm,
-  .anim-rule {
+  .anim-rule,
+  .anim-shake {
     animation: none;
     opacity: 1;
     transform: none;
