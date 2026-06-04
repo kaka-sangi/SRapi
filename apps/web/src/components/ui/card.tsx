@@ -32,7 +32,7 @@ export const CardTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <h2
     ref={ref}
-    className={cn("font-serif text-lg italic text-srapi-text-secondary", className)}
+    className={cn("font-sans text-base font-medium text-srapi-text-primary", className)}
     {...props}
   />
 ));

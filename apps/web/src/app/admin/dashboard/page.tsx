@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { LineChart } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageQueryState } from "@/components/layout/page-query-state";
@@ -10,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { BarSeries } from "@/components/charts/bar-series";
 import { TrendChart } from "@/components/charts/trend-chart";
 import { TokenBreakdown } from "@/components/charts/token-breakdown";
+import { ChartEmpty } from "@/components/charts/chart-empty";
 import { AutoRefreshControl } from "@/components/ui/auto-refresh";
 import { useAdminDashboard } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
@@ -182,7 +184,7 @@ function DashboardBody({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
       {/* Token composition */}
       <Card>
         <CardHeader>
-          <CardTitle className="not-italic font-sans text-base text-srapi-text-primary">
+          <CardTitle>
             {t("dashboard.tokenBreakdown")}
           </CardTitle>
         </CardHeader>
@@ -217,9 +219,7 @@ function DashboardBody({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
                 height={132}
               />
             ) : (
-              <p className="flex h-32 items-center justify-center font-mono text-2xs text-srapi-text-tertiary">
-                {t("dashboard.noData")}
-              </p>
+              <ChartEmpty icon={LineChart} label={t("dashboard.noData")} />
             )}
           </div>
         </CardContent>
@@ -229,7 +229,7 @@ function DashboardBody({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="not-italic font-sans text-base text-srapi-text-primary">
+            <CardTitle>
               {t("dashboard.modelDistribution")}
             </CardTitle>
           </CardHeader>
@@ -241,15 +241,13 @@ function DashboardBody({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
                 formatValue={(v) => formatCompactNumber(v)}
               />
             ) : (
-              <p className="py-6 text-center font-mono text-2xs text-srapi-text-tertiary">
-                {t("dashboard.noActivityTitle")}
-              </p>
+              <ChartEmpty label={t("dashboard.noActivityTitle")} />
             )}
           </CardContent>
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle className="not-italic font-sans text-base text-srapi-text-primary">
+            <CardTitle>
               {t("dashboard.topUsers")}
             </CardTitle>
           </CardHeader>
@@ -261,9 +259,7 @@ function DashboardBody({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
                 formatValue={(v) => formatCompactNumber(v)}
               />
             ) : (
-              <p className="py-6 text-center font-mono text-2xs text-srapi-text-tertiary">
-                {t("dashboard.noActivityTitle")}
-              </p>
+              <ChartEmpty label={t("dashboard.noActivityTitle")} />
             )}
           </CardContent>
         </Card>

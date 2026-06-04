@@ -36,7 +36,7 @@ export function StatCard({
       </div>
       <div className="mt-3 font-serif text-3xl leading-none text-srapi-text-primary tabular">
         {value}
-        {unit && <span className="ml-0.5 text-lg text-srapi-text-tertiary">{unit}</span>}
+        {unit && <span className="ml-1.5 text-sm font-sans font-normal text-srapi-text-tertiary">{unit}</span>}
       </div>
       {spark && spark.length >= 2 && (
         <div className="mt-3.5">

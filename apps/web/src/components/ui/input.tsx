@@ -10,6 +10,7 @@ export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttribute
         "h-10 w-full rounded-lg border border-srapi-border-strong bg-srapi-card px-3.5 text-sm text-srapi-text-primary transition-colors",
         "placeholder:text-srapi-text-tertiary",
         "outline-none hover:border-srapi-text-tertiary focus:border-srapi-text-secondary",
+        "aria-[invalid=true]:border-srapi-error aria-[invalid=true]:hover:border-srapi-error aria-[invalid=true]:focus:border-srapi-error",
         "disabled:cursor-not-allowed disabled:opacity-50",
         className,
       )}
