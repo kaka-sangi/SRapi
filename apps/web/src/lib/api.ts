@@ -13,6 +13,9 @@ import {
   logout as sdkLogout,
   getSetupStatus as sdkGetSetupStatus,
   completeSetup as sdkCompleteSetup,
+  requestPasswordReset as sdkRequestPasswordReset,
+  confirmPasswordReset as sdkConfirmPasswordReset,
+  register as sdkRegister,
   getCurrentUser as sdkGetCurrentUser,
   getCurrentUserUsage as sdkGetCurrentUserUsage,
   listApiKeys as sdkListApiKeys,
@@ -347,6 +350,34 @@ export const apiService = {
   async completeSetup(input: { email: string; name: string; password: string }): Promise<void> {
     configureSDKClient();
     await sdkCompleteSetup({ body: input, throwOnError: true });
+  },
+
+  // Public password-reset flow. The request endpoint reports success regardless
+  // of whether the email is registered (no account enumeration); the reset
+  // token is delivered by email and confirmed on /auth/reset?token=…
+  async requestPasswordReset(email: string): Promise<void> {
+    configureSDKClient();
+    await sdkRequestPasswordReset({ body: { email }, throwOnError: true });
+  },
+
+  async confirmPasswordReset(token: string, newPassword: string): Promise<void> {
+    configureSDKClient();
+    await sdkConfirmPasswordReset({ body: { token, new_password: newPassword }, throwOnError: true });
+  },
+
+  // Public self-service sign-up. Gated server-side by Security.RegistrationEnabled
+  // (403 "registration disabled" when off). On success the backend returns a
+  // session, mirroring login, so the new account is signed in immediately.
+  async register(email: string, name: string, password: string) {
+    configureSDKClient();
+    const response = await sdkRegister({ body: { email, name, password }, throwOnError: true });
+    const session = response.data?.data;
+    if (!session?.user) {
+      throw new Error('Registration did not return a session.');
+    }
+    const mappedUser = mapLiveUser(session.user, email);
+    storeSession(mappedUser, session.csrf_token);
+    return mappedUser;
   },
 
   async login(email: string, password: string): Promise<LoginResult> {
