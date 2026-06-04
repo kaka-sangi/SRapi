@@ -71,12 +71,28 @@ export function useCreateApiKey() {
   });
 }
 
+type ApiKeyList = Awaited<ReturnType<typeof apiService.listApiKeys>>;
+
 export function useToggleApiKey() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, status }: { id: string; status: "active" | "disabled" }) =>
       apiService.toggleApiKeyStatus(id, status),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.apiKeys() }),
+    // 联动: flip the row instantly. onError rolls back; onSettled refetches so
+    // the optimistic guess reconciles with server truth.
+    onMutate: async ({ id, status }) => {
+      await qc.cancelQueries({ queryKey: queryKeys.apiKeys() });
+      const prev = qc.getQueryData<ApiKeyList>(queryKeys.apiKeys());
+      const next = status === "active" ? "disabled" : "active";
+      qc.setQueryData<ApiKeyList>(queryKeys.apiKeys(), (old) =>
+        old?.map((k) => (k.id === id ? { ...k, status: next } : k)),
+      );
+      return { prev };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) qc.setQueryData(queryKeys.apiKeys(), ctx.prev);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: queryKeys.apiKeys() }),
   });
 }
 

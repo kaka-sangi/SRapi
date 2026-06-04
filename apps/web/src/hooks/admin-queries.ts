@@ -34,11 +34,33 @@ export function useAdminUsers(params?: P<typeof adminApi.listUsers>) {
   });
 }
 
+type UserList = Awaited<ReturnType<typeof adminApi.listUsers>>;
+const USERS_KEY = ["admin", "users"] as const;
+
+/** Optimistically patch every cached users page (any filter/sort/page), and
+ *  return the prior snapshots so onError can roll them all back. */
+function optimisticUsers(qc: ReturnType<typeof useQueryClient>, apply: (u: User) => User) {
+  const prev = qc.getQueriesData<UserList>({ queryKey: USERS_KEY });
+  qc.setQueriesData<UserList>({ queryKey: USERS_KEY }, (old) =>
+    old ? { ...old, data: old.data.map(apply) } : old,
+  );
+  return prev;
+}
+
 export function useSetUserEnabled() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (user: User) => adminApi.setUserEnabled(user),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "users"] }),
+    // 联动: the row's status badge + dim flips the instant you click, well
+    // before the server responds. onError restores; onSettled reconciles.
+    onMutate: async (user) => {
+      await qc.cancelQueries({ queryKey: USERS_KEY });
+      const next = user.status === "disabled" ? "active" : "disabled";
+      const prev = optimisticUsers(qc, (u) => (u.id === user.id ? { ...u, status: next } : u));
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => ctx?.prev?.forEach(([key, data]) => qc.setQueryData(key, data)),
+    onSettled: () => qc.invalidateQueries({ queryKey: USERS_KEY }),
   });
 }
 
@@ -47,7 +69,15 @@ export function useBulkSetUsersEnabled() {
   return useMutation({
     mutationFn: ({ ids, enabled }: { ids: string[]; enabled: boolean }) =>
       Promise.all(ids.map((id) => adminApi.setUserEnabledById(id, enabled))),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "users"] }),
+    onMutate: async ({ ids, enabled }) => {
+      await qc.cancelQueries({ queryKey: USERS_KEY });
+      const next = enabled ? "active" : "disabled";
+      const set = new Set(ids);
+      const prev = optimisticUsers(qc, (u) => (set.has(u.id) ? { ...u, status: next } : u));
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => ctx?.prev?.forEach(([key, data]) => qc.setQueryData(key, data)),
+    onSettled: () => qc.invalidateQueries({ queryKey: USERS_KEY }),
   });
 }
 
