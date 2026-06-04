@@ -23,15 +23,18 @@ export function BarSeries({
   const max = Math.max(...data.map((d) => d.value), 1);
 
   return (
-    <div role="img" aria-label={ariaLabel} className={cn("space-y-2", className)}>
+    <div role="img" aria-label={ariaLabel} className={cn("group/bars space-y-2", className)}>
       {data.map((d) => (
-        <div key={d.label} className="flex items-center gap-3">
+        <div
+          key={d.label}
+          className="group/row flex items-center gap-3 transition-opacity duration-200 group-hover/bars:opacity-40 hover:!opacity-100"
+        >
           <span className="w-28 shrink-0 truncate font-mono text-2xs text-srapi-text-secondary">
             {d.label}
           </span>
           <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-srapi-card-muted">
             <div
-              className="h-full rounded-full bg-srapi-primary/70"
+              className="h-full rounded-full bg-srapi-primary/70 transition-colors group-hover/row:bg-srapi-primary"
               style={{ width: `${Math.max(2, (d.value / max) * 100)}%` }}
             />
           </div>
