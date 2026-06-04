@@ -28,6 +28,8 @@ export type {
   ErrorPassthroughRule,
   PayloadRule,
   TlsProfile,
+  Role,
+  CreateRoleRequest,
   UserAttributeDefinition,
   NotificationEmailTemplate,
   NotificationEmailTemplateList,

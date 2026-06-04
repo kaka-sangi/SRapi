@@ -26,6 +26,7 @@ import {
   ArrowLeftRight,
   Shield,
   ShieldAlert,
+  ShieldCheck,
   Fingerprint,
   SlidersHorizontal,
   Megaphone,
@@ -152,6 +153,7 @@ const ADMIN_SYSTEM_SECTION: NavSection = {
   titleKey: "nav.sectionAdminSystem",
   items: [
     { href: ADMIN_ROUTES.copilot, labelKey: "nav.adminCopilot", icon: Bot },
+    { href: ADMIN_ROUTES.roles, labelKey: "nav.adminRoles", icon: ShieldCheck },
     { href: ADMIN_ROUTES.userAttributes, labelKey: "nav.adminUserAttributes", icon: Tags },
     {
       href: ADMIN_ROUTES.notificationTemplates,

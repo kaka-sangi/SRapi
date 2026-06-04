@@ -74,6 +74,7 @@ export const queryKeys = {
     errorPassthroughRules: () => ["admin", "error-passthrough-rules"] as const,
     payloadRules: () => ["admin", "payload-rules"] as const,
     tlsProfiles: () => ["admin", "tls-profiles"] as const,
+    roles: () => ["admin", "roles"] as const,
     userAttributes: () => ["admin", "user-attributes"] as const,
     notificationEmailTemplates: () => ["admin", "notification-email-templates"] as const,
     accountsAvailability: (days?: number) => ["admin", "accounts-availability", days ?? 7] as const,

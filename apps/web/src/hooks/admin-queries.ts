@@ -294,6 +294,20 @@ export function useTlsProfiles() {
   });
 }
 
+// Custom RBAC roles (read + create; no PATCH/DELETE endpoint yet)
+export function useAdminRoles() {
+  return useQuery({
+    queryKey: queryKeys.admin.roles(),
+    queryFn: () => adminApi.listRoles(),
+  });
+}
+export function useCreateAdminRole() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.createRole>) => adminApi.createRole(body),
+    ["admin", "roles"],
+  );
+}
+
 // ---- Custom user attribute definitions ----
 export function useUserAttributeDefinitions() {
   return useQuery({
