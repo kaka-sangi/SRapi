@@ -1,10 +1,12 @@
 "use client";
 
 import { AppShell } from "@/components/layout/app-shell";
+import { PageHeader } from "@/components/layout/page-header";
 import { PageQueryState } from "@/components/layout/page-query-state";
 import { PlaygroundChat } from "@/components/playground/playground-chat";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePlaygroundModels } from "@/hooks/queries";
+import { useLanguage } from "@/context/LanguageContext";
 
 export default function PlaygroundPage() {
   return (
@@ -15,13 +17,17 @@ export default function PlaygroundPage() {
 }
 
 function PlaygroundContent() {
+  const { t } = useLanguage();
   const models = usePlaygroundModels();
   return (
-    <PageQueryState query={models} skeleton={<Skeleton className="h-[70vh] rounded-2xl" />}>
-      {(data) => {
-        const names = data.map((m) => m.id);
-        return <PlaygroundChat models={names} defaultModel={names[0] ?? ""} />;
-      }}
-    </PageQueryState>
+    <>
+      <PageHeader title={t("nav.playground")} />
+      <PageQueryState query={models} skeleton={<Skeleton className="h-[70vh] rounded-2xl" />}>
+        {(data) => {
+          const names = data.map((m) => m.id);
+          return <PlaygroundChat models={names} defaultModel={names[0] ?? ""} />;
+        }}
+      </PageQueryState>
+    </>
   );
 }
