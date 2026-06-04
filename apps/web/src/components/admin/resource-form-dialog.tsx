@@ -71,13 +71,20 @@ export interface FieldConfig<TDraft> {
   format?: (value: TDraft[keyof TDraft]) => string;
   /** convert the raw input string back to the stored value (default: identity string) */
   parse?: (raw: string) => unknown;
+  /** require a non-empty value; an empty field blocks submit with an inline error */
+  required?: boolean;
+  /** custom per-field validation; return an error string to block submit, or undefined */
+  validate?: (value: TDraft[keyof TDraft], draft: TDraft) => string | undefined;
 }
 
 /**
  * Generic create/edit dialog. Each admin resource supplies a flat `initial`
  * draft (from its `emptyXForm()` / `xFormFromEntity()` helper), a `fields`
- * config, and the matching `buildBody` transform. Validation errors thrown by
- * `buildBody` and server errors from `submit` both surface inline via role=alert.
+ * config, and the matching `buildBody` transform.
+ *
+ * Validation happens in two layers: per-field `required`/`validate` rules
+ * surface inline under each field BEFORE submit; `buildBody` and server errors
+ * still surface in the shared role=alert footer.
  *
  * Structure mirrors the working api-key-create-dialog: local draft state,
  * mutateAsync on submit, reset on (re)open.
@@ -113,6 +120,7 @@ export function ResourceFormDialog<TDraft extends object, TBody>({
   // so the component mounts fresh per open and `initial` is read once — no reset effect needed.
   const [draft, setDraft] = useState<TDraft>(initial);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
@@ -121,11 +129,45 @@ export function ResourceFormDialog<TDraft extends object, TBody>({
 
   function setField(name: string, value: unknown) {
     setDraft((prev) => ({ ...prev, [name]: value }) as TDraft);
+    // Clear a field's error the moment the admin edits it — errors should feel
+    // responsive, not stick around after the problem is fixed.
+    setFieldErrors((prev) => {
+      if (!prev[name]) return prev;
+      const next = { ...prev };
+      delete next[name];
+      return next;
+    });
+  }
+
+  /** Run `required` + per-field `validate` rules; populate inline errors. */
+  function validateFields(): boolean {
+    const errs: Record<string, string> = {};
+    for (const field of fields) {
+      const value = draft[field.name];
+      if (field.required) {
+        const empty =
+          value == null ||
+          (typeof value === "string" && value.trim() === "") ||
+          (Array.isArray(value) && value.length === 0);
+        if (empty) {
+          errs[field.name] = t("adminCommon.required");
+          continue;
+        }
+      }
+      const message = field.validate?.(value, draft);
+      if (message) errs[field.name] = message;
+    }
+    setFieldErrors(errs);
+    // If a problem hides under the collapsed Advanced section, open it so the
+    // admin can actually see the field that failed.
+    if (advancedFields.some((f) => errs[f.name])) setAdvancedOpen(true);
+    return Object.keys(errs).length === 0;
   }
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
+    if (!validateFields()) return;
     let body: TBody;
     try {
       body = buildBody(draft);
@@ -150,7 +192,7 @@ export function ResourceFormDialog<TDraft extends object, TBody>({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        <form onSubmit={onSubmit}>
+        <form onSubmit={onSubmit} noValidate>
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
             {/* Always describe the dialog: a visible hint when given, else an
@@ -167,6 +209,7 @@ export function ResourceFormDialog<TDraft extends object, TBody>({
                 key={field.name}
                 field={field}
                 value={draft[field.name]}
+                error={fieldErrors[field.name]}
                 disabled={busy}
                 onChange={(value) => setField(field.name, value)}
               />
@@ -196,6 +239,7 @@ export function ResourceFormDialog<TDraft extends object, TBody>({
                         key={field.name}
                         field={field}
                         value={draft[field.name]}
+                        error={fieldErrors[field.name]}
                         disabled={busy}
                         onChange={(value) => setField(field.name, value)}
                       />
@@ -229,22 +273,46 @@ export function ResourceFormDialog<TDraft extends object, TBody>({
   );
 }
 
+/** Inline field footer: a red error takes priority over the muted hint. */
+function FieldMessage({ id, error, hint }: { id: string; error?: string; hint?: string }) {
+  if (error) {
+    return (
+      <p id={id} role="alert" className="mt-1 text-2xs text-srapi-error">
+        {error}
+      </p>
+    );
+  }
+  if (hint) {
+    return (
+      <p id={id} className="mt-1 text-2xs text-srapi-text-tertiary">
+        {hint}
+      </p>
+    );
+  }
+  return null;
+}
+
 function FieldRow<TDraft extends object>({
   field,
   value,
   onChange,
+  error,
   disabled,
 }: {
   field: FieldConfig<TDraft>;
   value: TDraft[keyof TDraft];
   onChange: (value: unknown) => void;
+  error?: string;
   disabled?: boolean;
 }) {
   const { t } = useLanguage();
   const id = `field-${field.name}`;
+  const msgId = `${id}-msg`;
   const type = field.type ?? "text";
   const asString = field.format ? field.format(value) : value == null ? "" : String(value);
   const parse = field.parse ?? ((raw: string) => raw);
+  const invalid = error ? true : undefined;
+  const describedBy = error || field.hint ? msgId : undefined;
 
   if (type === "switch") {
     return (
@@ -253,9 +321,7 @@ function FieldRow<TDraft extends object>({
           <Label htmlFor={id} className="mb-0">
             {field.label}
           </Label>
-          {field.hint ? (
-            <p className="mt-1 text-2xs text-srapi-text-tertiary">{field.hint}</p>
-          ) : null}
+          <FieldMessage id={msgId} error={error} hint={field.hint} />
         </div>
         <Switch
           id={id}
@@ -283,7 +349,7 @@ function FieldRow<TDraft extends object>({
             addLabel={t("adminCommon.addField")}
           />
         </div>
-        {field.hint ? <p className="mt-1 text-2xs text-srapi-text-tertiary">{field.hint}</p> : null}
+        <FieldMessage id={msgId} error={error} hint={field.hint} />
       </div>
     );
   }
@@ -317,7 +383,7 @@ function FieldRow<TDraft extends object>({
             );
           })}
         </div>
-        {field.hint ? <p className="mt-1 text-2xs text-srapi-text-tertiary">{field.hint}</p> : null}
+        <FieldMessage id={msgId} error={error} hint={field.hint} />
       </div>
     );
   }
@@ -336,7 +402,7 @@ function FieldRow<TDraft extends object>({
             disabled={disabled}
           />
         </div>
-        {field.hint ? <p className="mt-1 text-2xs text-srapi-text-tertiary">{field.hint}</p> : null}
+        <FieldMessage id={msgId} error={error} hint={field.hint} />
       </div>
     );
   }
@@ -360,7 +426,7 @@ function FieldRow<TDraft extends object>({
             disabled={disabled}
           />
         </div>
-        {field.hint ? <p className="mt-1 text-2xs text-srapi-text-tertiary">{field.hint}</p> : null}
+        <FieldMessage id={msgId} error={error} hint={field.hint} />
       </div>
     );
   }
@@ -370,7 +436,7 @@ function FieldRow<TDraft extends object>({
       <div>
         <Label htmlFor={id}>{field.label}</Label>
         <Select value={asString} onValueChange={(next) => onChange(next)} disabled={disabled}>
-          <SelectTrigger id={id}>
+          <SelectTrigger id={id} aria-invalid={invalid} aria-describedby={describedBy}>
             <SelectValue placeholder={field.placeholder} />
           </SelectTrigger>
           <SelectContent>
@@ -381,7 +447,7 @@ function FieldRow<TDraft extends object>({
             ))}
           </SelectContent>
         </Select>
-        {field.hint ? <p className="mt-1 text-2xs text-srapi-text-tertiary">{field.hint}</p> : null}
+        <FieldMessage id={msgId} error={error} hint={field.hint} />
       </div>
     );
   }
@@ -397,9 +463,11 @@ function FieldRow<TDraft extends object>({
           className={type === "json" ? "min-h-28 font-mono text-xs" : undefined}
           value={asString}
           disabled={disabled}
+          aria-invalid={invalid}
+          aria-describedby={describedBy}
           onChange={(event) => onChange(parse(event.target.value))}
         />
-        {field.hint ? <p className="mt-1 text-2xs text-srapi-text-tertiary">{field.hint}</p> : null}
+        <FieldMessage id={msgId} error={error} hint={field.hint} />
       </div>
     );
   }
@@ -422,9 +490,11 @@ function FieldRow<TDraft extends object>({
         placeholder={field.placeholder}
         value={asString}
         disabled={disabled}
+        aria-invalid={invalid}
+        aria-describedby={describedBy}
         onChange={(event) => onChange(parse(event.target.value))}
       />
-      {field.hint ? <p className="mt-1 text-2xs text-srapi-text-tertiary">{field.hint}</p> : null}
+      <FieldMessage id={msgId} error={error} hint={field.hint} />
     </div>
   );
 }

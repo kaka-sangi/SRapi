@@ -74,6 +74,7 @@ export const zh: Messages = {
     clearSelection: "清除选择",
     addField: "添加字段",
     addValue: "添加“{value}”",
+    required: "必填",
   },
   feedback: {
     created: "已创建",

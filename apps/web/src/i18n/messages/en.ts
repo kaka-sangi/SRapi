@@ -72,6 +72,7 @@ export const en = {
     clearSelection: "Clear selection",
     addField: "Add field",
     addValue: "Add “{value}”",
+    required: "Required",
   },
   feedback: {
     created: "Created",

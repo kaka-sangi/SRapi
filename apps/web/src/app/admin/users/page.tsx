@@ -101,9 +101,9 @@ function UsersContent() {
   }
 
   const createFields: FieldConfig<UserCreateFormState>[] = [
-    { name: "email", label: t("adminUsers.email") },
-    { name: "name", label: t("adminUsers.name") },
-    { name: "password", label: t("adminUsers.password"), type: "password" },
+    { name: "email", label: t("adminUsers.email"), required: true },
+    { name: "name", label: t("adminUsers.name"), required: true },
+    { name: "password", label: t("adminUsers.password"), type: "password", required: true },
     { name: "rolesCsv", label: t("adminUsers.roles"), placeholder: "user, admin" },
     { name: "status", label: t("adminCommon.status"), type: "select", options: enumOptions(USER_STATUSES) },
     { name: "rpmLimit", label: t("adminUsers.rpmLimit"), type: "number", placeholder: t("adminUsers.unlimited") },

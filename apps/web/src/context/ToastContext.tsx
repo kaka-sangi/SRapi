@@ -16,6 +16,8 @@ interface ToastInput {
   title: string;
   description?: string;
   tone?: ToastTone;
+  /** Auto-dismiss delay (ms). Defaults longer for errors so they don't vanish before they're read. */
+  duration?: number;
 }
 
 interface ToastItem extends ToastInput {
@@ -58,6 +60,7 @@ export function ToastUIProvider({ children }: { children: React.ReactNode }) {
           <Toast
             key={item.id}
             tone={item.tone}
+            duration={item.duration ?? (item.tone === "error" ? 7000 : 4000)}
             onOpenChange={(open) => {
               if (!open) remove(item.id);
             }}
