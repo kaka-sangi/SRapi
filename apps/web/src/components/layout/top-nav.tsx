@@ -19,6 +19,7 @@ import {
 import { ThemeToggle } from "./theme-toggle";
 import { LanguageToggle } from "./language-toggle";
 import { AnnouncementBell } from "./announcement-bell";
+import { useCommandPalette } from "./command-palette";
 
 export function TopNav({
   user,
@@ -31,6 +32,7 @@ export function TopNav({
 }) {
   const router = useRouter();
   const { t } = useLanguage();
+  const { open: openCommand } = useCommandPalette();
 
   async function handleSignOut() {
     await apiService.logout();
@@ -51,6 +53,7 @@ export function TopNav({
 
       <button
         type="button"
+        onClick={openCommand}
         className="flex w-full max-w-xs items-center gap-2 rounded-full border border-srapi-border bg-srapi-card-muted px-3 py-1.5 text-sm text-srapi-text-secondary transition-colors hover:border-srapi-text-tertiary hover:text-srapi-text-primary"
       >
         <Search className="size-4" />

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { AuthGate, useAuthUser } from "./auth-gate";
 import { SidebarNav, SidebarBrand } from "./sidebar-nav";
 import { TopNav } from "./top-nav";
+import { CommandPaletteProvider } from "./command-palette";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useRuntimeStatus } from "@/hooks/queries";
 
@@ -61,10 +62,12 @@ function ShellInner({ children }: { children: React.ReactNode }) {
         </SheetContent>
       </Sheet>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <TopNav user={user} onOpenNav={() => setNavOpen(true)} live={live} />
-        <main className="flex-1 space-y-6 p-5 sm:p-7">{children}</main>
-      </div>
+      <CommandPaletteProvider role={user.role}>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <TopNav user={user} onOpenNav={() => setNavOpen(true)} live={live} />
+          <main className="flex-1 space-y-6 p-5 sm:p-7">{children}</main>
+        </div>
+      </CommandPaletteProvider>
     </div>
   );
 }
