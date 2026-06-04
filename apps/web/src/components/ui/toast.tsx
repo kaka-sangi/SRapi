@@ -25,7 +25,7 @@ ToastViewport.displayName = "ToastViewport";
 
 // Quiet, paper-toned card. Tone shows only as a 2px left rule — no fills, no glow.
 const toastVariants = cva(
-  "animate-bloom tactile-card pointer-events-auto relative flex w-full items-start gap-3 rounded-xl border border-l-2 border-srapi-border bg-srapi-card p-4 pr-9",
+  "srapi-anim-toast tactile-card pointer-events-auto relative flex w-full items-start gap-3 rounded-xl border border-l-2 border-srapi-border bg-srapi-card p-4 pr-9",
   {
     variants: {
       tone: {

@@ -227,13 +227,29 @@ textarea:focus-visible,
 .srapi-anim-sheet-bottom[data-state="open"] { animation: srapi-sheet-bottom-in 260ms cubic-bezier(0.16, 1, 0.3, 1) }
 .srapi-anim-sheet-bottom[data-state="closed"] { animation: srapi-sheet-bottom-out 210ms ease-in }
 
+/* Toast：从右侧滑入 / 滑出，滑动手势跟随手指（Radix data-swipe 变量） */
+@keyframes srapi-toast-in {
+  from { opacity: 0; transform: translateX(16px) }
+  to { opacity: 1; transform: translateX(0) }
+}
+@keyframes srapi-toast-out {
+  from { opacity: 1; transform: translateX(0) }
+  to { opacity: 0; transform: translateX(16px) }
+}
+.srapi-anim-toast[data-state="open"] { animation: srapi-toast-in 260ms cubic-bezier(0.16, 1, 0.3, 1) }
+.srapi-anim-toast[data-state="closed"] { animation: srapi-toast-out 200ms ease-in }
+.srapi-anim-toast[data-swipe="move"] { transform: translateX(var(--radix-toast-swipe-move-x)) }
+.srapi-anim-toast[data-swipe="cancel"] { transform: translateX(0); transition: transform 200ms ease-out }
+.srapi-anim-toast[data-swipe="end"] { animation: srapi-toast-out 200ms ease-out }
+
 @media (prefers-reduced-motion: reduce) {
   .srapi-anim-fade,
   .srapi-anim-pop,
   .srapi-anim-dialog,
   .srapi-anim-sheet-left,
   .srapi-anim-sheet-right,
-  .srapi-anim-sheet-bottom { animation: none !important }
+  .srapi-anim-sheet-bottom,
+  .srapi-anim-toast { animation: none !important }
 }
 
 /* 滚动条 */

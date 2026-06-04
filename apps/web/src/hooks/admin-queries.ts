@@ -89,12 +89,24 @@ export function useAdminAccounts(params?: P<typeof adminApi.listAccounts>) {
   });
 }
 
+type AccountList = Awaited<ReturnType<typeof adminApi.listAccounts>>;
+
 export function useSetAccountStatus() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, status }: { id: string; status: "active" | "disabled" }) =>
       adminApi.setAccountStatus(id, status),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "accounts"] }),
+    // 联动: flip the account row instantly; rollback on error, reconcile on settle.
+    onMutate: async ({ id, status }) => {
+      await qc.cancelQueries({ queryKey: ["admin", "accounts"] });
+      const prev = qc.getQueriesData<AccountList>({ queryKey: ["admin", "accounts"] });
+      qc.setQueriesData<AccountList>({ queryKey: ["admin", "accounts"] }, (old) =>
+        old ? { ...old, data: old.data.map((a) => (a.id === id ? { ...a, status } : a)) } : old,
+      );
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => ctx?.prev?.forEach(([key, data]) => qc.setQueryData(key, data)),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["admin", "accounts"] }),
   });
 }
 
