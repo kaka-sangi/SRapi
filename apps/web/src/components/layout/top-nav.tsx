@@ -83,11 +83,14 @@ export function TopNav({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuLabel>{user.email}</DropdownMenuLabel>
-            <DropdownMenuItem disabled>
-              <UserIcon className="size-4" />
-              {user.role === "admin" ? "Admin" : "Workspace"}
-            </DropdownMenuItem>
+            <DropdownMenuLabel>
+              <div className="text-srapi-text-primary">{user.name}</div>
+              <div className="mt-0.5 flex items-center gap-1.5 font-mono text-2xs font-normal text-srapi-text-tertiary">
+                <UserIcon className="size-3" aria-hidden />
+                {user.email} ·{" "}
+                {user.role === "admin" ? t("nav.sectionAdmin") : t("nav.sectionWorkspace")}
+              </div>
+            </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem destructive onClick={handleSignOut}>
               <LogOut className="size-4" />
