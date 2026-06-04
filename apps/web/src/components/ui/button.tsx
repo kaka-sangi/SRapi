@@ -8,18 +8,18 @@ import { cn } from "@/lib/cn";
 
 const buttonVariants = cva(
   // shared rhythm: medium weight, tight optical tracking, calm transitions
-  "inline-flex select-none items-center justify-center gap-2 whitespace-nowrap font-medium transition-[background-color,color,box-shadow,transform,opacity] duration-150 disabled:pointer-events-none disabled:opacity-40 [&_svg]:size-4 [&_svg]:shrink-0 active:scale-[0.985]",
+  "inline-flex select-none items-center justify-center gap-2 whitespace-nowrap font-medium transition-[background-color,color,box-shadow,transform,opacity] duration-150 ease-[var(--ease-out-quint)] disabled:pointer-events-none disabled:opacity-40 [&_svg]:size-4 [&_svg]:shrink-0 active:scale-[0.985]",
   {
     variants: {
       variant: {
         // §8 主操作：亮=炭黑底 / 暗=羊皮白底
-        primary: "bg-srapi-invert text-srapi-invert-fg hover:opacity-90",
-        accent: "bg-srapi-primary text-white hover:bg-srapi-primary-hover",
+        primary: "btn-raise bg-srapi-invert text-srapi-invert-fg hover:opacity-90",
+        accent: "btn-raise bg-srapi-primary text-white hover:bg-srapi-primary-hover",
         outline:
           "border border-srapi-border-strong bg-srapi-card text-srapi-text-primary hover:border-srapi-text-tertiary hover:bg-srapi-card-muted",
         ghost:
           "text-srapi-text-secondary hover:bg-srapi-card-muted hover:text-srapi-text-primary",
-        danger: "bg-srapi-error text-white hover:opacity-90",
+        danger: "btn-raise bg-srapi-error text-white hover:opacity-90",
         link: "text-srapi-primary underline-offset-4 hover:underline",
       },
       size: {

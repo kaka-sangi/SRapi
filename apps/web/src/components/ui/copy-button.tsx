@@ -92,7 +92,7 @@ export function CopyButton({
           )}
         >
           {copied ? (
-            <Check className={cn(iconSize, "text-srapi-success")} aria-hidden />
+            <Check className={cn(iconSize, "anim-pop-in text-srapi-success")} aria-hidden />
           ) : (
             <Copy className={iconSize} aria-hidden />
           )}

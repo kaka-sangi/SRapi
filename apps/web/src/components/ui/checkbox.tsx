@@ -25,7 +25,7 @@ export const Checkbox = React.forwardRef<
         type="checkbox"
         checked={checked}
         className={cn(
-          "peer size-4 cursor-pointer appearance-none rounded border border-srapi-border-strong bg-srapi-card transition-colors",
+          "peer size-4 cursor-pointer appearance-none rounded border border-srapi-border-strong bg-srapi-card transition-[background-color,border-color,transform] duration-150 active:scale-90",
           "checked:border-srapi-primary checked:bg-srapi-primary",
           "indeterminate:border-srapi-primary indeterminate:bg-srapi-primary",
           "hover:border-srapi-text-tertiary",
@@ -34,7 +34,7 @@ export const Checkbox = React.forwardRef<
         )}
         {...props}
       />
-      <span className="pointer-events-none absolute text-srapi-primary-foreground opacity-0 peer-checked:opacity-100 peer-indeterminate:opacity-0">
+      <span className="pointer-events-none absolute scale-50 text-srapi-primary-foreground opacity-0 transition-[opacity,transform] duration-200 ease-[var(--ease-spring-bounce)] peer-checked:scale-100 peer-checked:opacity-100 peer-indeterminate:opacity-0">
         <Check className="size-3" strokeWidth={3} />
       </span>
       {indeterminate ? (
