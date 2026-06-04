@@ -21,6 +21,7 @@ export const queryKeys = {
     affiliate: () => ["me", "affiliate"] as const,
     affiliateLedger: (params?: unknown) => ["me", "affiliate-ledger", params ?? {}] as const,
     announcements: () => ["me", "announcements"] as const,
+    playgroundModels: () => ["me", "playground-models"] as const,
   },
   admin: {
     dashboardSnapshot: (params?: unknown) => ["admin", "dashboard-snapshot", params ?? {}] as const,
@@ -82,5 +83,6 @@ export const queryKeys = {
     riskLogs: (params?: unknown) => ["admin", "risk-logs", params ?? {}] as const,
     settings: () => ["admin", "settings"] as const,
     configSnapshot: () => ["admin", "config-snapshot"] as const,
+    copilotConfig: () => ["admin", "copilot-config"] as const,
   },
 };

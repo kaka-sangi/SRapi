@@ -80,6 +80,7 @@ import {
   getAdminRiskControlConfig,
   getAdminRiskControlStatus,
   getAdminSettings,
+  getAdminCopilotConfig,
   getAdminUsageAggregates,
   getAdminUsageDaily,
   importAdminAccounts,
@@ -138,6 +139,7 @@ import type {
   AccountProxyQuality,
   AccountQuotaSnapshot,
   AccountRpmStatus,
+  AdminCopilotConfig,
   AdminDashboardSnapshot,
   AdminSettings,
   AdminTestResult,
@@ -937,6 +939,10 @@ export const adminApi = {
 
   updateSettings(body: AdminSettings): Promise<AdminSettings> {
     return unwrapData(() => updateAdminSettings({ body, throwOnError: true }));
+  },
+
+  getCopilotConfig(): Promise<AdminCopilotConfig> {
+    return unwrapData(() => getAdminCopilotConfig({ throwOnError: true }));
   },
 
   getConfigSnapshot(): Promise<ConfigSnapshotResponse["data"]> {

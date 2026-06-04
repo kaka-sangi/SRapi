@@ -8,6 +8,7 @@ export const USER_ROUTES = {
   billing: "/billing",
   redeem: "/redeem",
   affiliate: "/affiliate",
+  playground: "/playground",
 } as const;
 
 /** Canonical admin route paths, referenced by the sidebar nav + pages. */
@@ -43,6 +44,7 @@ export const ADMIN_ROUTES = {
   userAttributes: "/admin/user-attributes",
   notificationTemplates: "/admin/notification-templates",
   usage: "/admin/usage",
+  copilot: "/admin/copilot",
   settings: "/admin/settings",
 } as const;
 

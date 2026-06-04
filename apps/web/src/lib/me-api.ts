@@ -22,9 +22,11 @@ import {
   transferCurrentUserAffiliateToBalance,
   listCurrentUserAnnouncements,
   markCurrentUserAnnouncementRead,
+  listMePlaygroundModels,
 } from "../../../../packages/sdk/typescript/src/index";
 import type {
   AffiliateTransferToBalanceRequest,
+  PlaygroundModel,
   ChangeCurrentUserPasswordRequest,
   CreatePaymentOrderRequest,
   ListCurrentUserAffiliateLedgerData,
@@ -138,6 +140,9 @@ export const meApi = {
   // ---- Billing ----
   getBalance() {
     return unwrapData(() => getCurrentUserBalance({ throwOnError: true }));
+  },
+  getPlaygroundModels(): Promise<PlaygroundModel[]> {
+    return unwrapData(() => listMePlaygroundModels({ throwOnError: true }));
   },
   listPaymentMethods() {
     return unwrapList(() => listPaymentMethods({ throwOnError: true }));

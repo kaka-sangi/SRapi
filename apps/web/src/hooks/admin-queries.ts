@@ -445,6 +445,14 @@ export function useAdminSettings() {
   });
 }
 
+// ---- Admin AI copilot ----
+export function useAdminCopilotConfig() {
+  return useQuery({
+    queryKey: queryKeys.admin.copilotConfig(),
+    queryFn: () => adminApi.getCopilotConfig(),
+  });
+}
+
 // ---- Risk control config (read) ----
 export function useRiskConfig() {
   return useQuery({

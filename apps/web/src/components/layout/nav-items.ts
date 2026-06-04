@@ -34,6 +34,7 @@ import {
   Tags,
   Mail,
   Gauge,
+  Bot,
   type LucideIcon,
 } from "lucide-react";
 import { ADMIN_ROUTES, USER_ROUTES, USER_HOME_ROUTE } from "@/lib/routes";
@@ -54,6 +55,7 @@ export const WORKSPACE_SECTION: NavSection = {
   titleKey: "nav.sectionWorkspace",
   items: [
     { href: USER_HOME_ROUTE, labelKey: "nav.dashboard", icon: LayoutGrid },
+    { href: USER_ROUTES.playground, labelKey: "nav.playground", icon: Bot },
     { href: "/api-keys", labelKey: "nav.apiKeys", icon: KeyRound },
     { href: "/usage", labelKey: "nav.usage", icon: BarChart3 },
   ],
@@ -149,6 +151,7 @@ const ADMIN_OPS_SECTION: NavSection = {
 const ADMIN_SYSTEM_SECTION: NavSection = {
   titleKey: "nav.sectionAdminSystem",
   items: [
+    { href: ADMIN_ROUTES.copilot, labelKey: "nav.adminCopilot", icon: Bot },
     { href: ADMIN_ROUTES.userAttributes, labelKey: "nav.adminUserAttributes", icon: Tags },
     {
       href: ADMIN_ROUTES.notificationTemplates,

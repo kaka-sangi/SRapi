@@ -1,4 +1,11 @@
-import type { AdminSettings } from "../../../../packages/sdk/typescript/src/types.gen";
+import type {
+  AdminSettings,
+  AdminSettingsCopilotWritable,
+} from "../../../../packages/sdk/typescript/src/types.gen";
+
+// The write model carries the write-only `dedicated_api_key`; the copilot
+// settings form edits that field, so it works against the writable shape.
+export type AdminSettingsCopilot = AdminSettingsCopilotWritable;
 
 export type SettingsTab =
   | "general"
@@ -9,6 +16,7 @@ export type SettingsTab =
   | "gateway"
   | "payment"
   | "email"
+  | "copilot"
   | "backup";
 
 export const SETTINGS_TABS: Array<{ id: SettingsTab; label: string }> = [
@@ -20,6 +28,7 @@ export const SETTINGS_TABS: Array<{ id: SettingsTab; label: string }> = [
   { id: "gateway", label: "Gateway" },
   { id: "payment", label: "Payment" },
   { id: "email", label: "Email" },
+  { id: "copilot", label: "Copilot" },
   { id: "backup", label: "Backup" },
 ];
 

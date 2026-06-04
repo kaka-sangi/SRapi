@@ -168,6 +168,14 @@ export function useDisableTotp() {
 export function useBalance() {
   return useQuery({ queryKey: queryKeys.me.balance(), queryFn: () => meApi.getBalance() });
 }
+
+// ---- Playground (交界地) ----
+export function usePlaygroundModels() {
+  return useQuery({
+    queryKey: queryKeys.me.playgroundModels(),
+    queryFn: () => meApi.getPlaygroundModels(),
+  });
+}
 export function usePaymentMethods() {
   return useQuery({
     queryKey: queryKeys.me.paymentMethods(),
