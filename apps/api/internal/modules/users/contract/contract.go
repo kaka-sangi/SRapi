@@ -132,6 +132,13 @@ type CreateStoredRole struct {
 	Permissions []string
 }
 
+// UpdateStoredRole is the store-level payload for updating a role definition.
+// The role name (identity) is immutable; only description and permissions change.
+type UpdateStoredRole struct {
+	Description *string
+	Permissions *[]string
+}
+
 type StoredUser struct {
 	User
 	PasswordHash    string
@@ -180,6 +187,8 @@ type Store interface {
 	UpdateLastLogin(ctx context.Context, id int, at time.Time) error
 	CreateRole(ctx context.Context, input CreateStoredRole) (RoleDefinition, error)
 	ListRoles(ctx context.Context) ([]RoleDefinition, error)
+	UpdateRole(ctx context.Context, id int, input UpdateStoredRole) (RoleDefinition, error)
+	DeleteRole(ctx context.Context, id int) error
 	ListAuthIdentities(ctx context.Context, userID int) ([]UserAuthIdentity, error)
 	FindAuthIdentityByProviderSubject(ctx context.Context, provider AuthIdentityProvider, providerKey string, providerSubjectHash string) (UserAuthIdentity, error)
 	UpsertAuthIdentity(ctx context.Context, input CreateUserAuthIdentity) (UserAuthIdentity, error)

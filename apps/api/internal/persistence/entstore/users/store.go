@@ -318,6 +318,34 @@ func (s *Store) ListRoles(ctx context.Context) ([]contract.RoleDefinition, error
 	return out, nil
 }
 
+func (s *Store) UpdateRole(ctx context.Context, id int, input contract.UpdateStoredRole) (contract.RoleDefinition, error) {
+	update := s.client.Role.UpdateOneID(id)
+	if input.Description != nil {
+		update = update.SetDescription(strings.TrimSpace(*input.Description))
+	}
+	if input.Permissions != nil {
+		update = update.SetPermissionsJSON(append([]string(nil), (*input.Permissions)...))
+	}
+	saved, err := update.Save(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return contract.RoleDefinition{}, contract.ErrNotFound
+		}
+		return contract.RoleDefinition{}, err
+	}
+	return toRoleDefinition(saved), nil
+}
+
+func (s *Store) DeleteRole(ctx context.Context, id int) error {
+	if err := s.client.Role.DeleteOneID(id).Exec(ctx); err != nil {
+		if ent.IsNotFound(err) {
+			return contract.ErrNotFound
+		}
+		return err
+	}
+	return nil
+}
+
 func (s *Store) ListAuthIdentities(ctx context.Context, userID int) ([]contract.UserAuthIdentity, error) {
 	exists, err := s.client.User.Query().
 		Where(entuser.IDEQ(userID), entuser.DeletedAtIsNil()).

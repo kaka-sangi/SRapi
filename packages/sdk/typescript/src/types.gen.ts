@@ -95,6 +95,11 @@ export type CreateRoleRequest = {
     permissions: Array<string>;
 };
 
+export type UpdateRoleRequest = {
+    description?: string;
+    permissions: Array<string>;
+};
+
 export type RoleResponse = {
     data: Role;
     request_id: RequestId;
@@ -7222,6 +7227,96 @@ export type CreateAdminRoleResponses = {
 };
 
 export type CreateAdminRoleResponse = CreateAdminRoleResponses[keyof CreateAdminRoleResponses];
+
+export type DeleteAdminRoleData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/roles/{id}';
+};
+
+export type DeleteAdminRoleErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict.
+     */
+    409: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DeleteAdminRoleError = DeleteAdminRoleErrors[keyof DeleteAdminRoleErrors];
+
+export type DeleteAdminRoleResponses = {
+    /**
+     * Role deleted.
+     */
+    200: DeleteResponse;
+};
+
+export type DeleteAdminRoleResponse = DeleteAdminRoleResponses[keyof DeleteAdminRoleResponses];
+
+export type UpdateAdminRoleData = {
+    body: UpdateRoleRequest;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/roles/{id}';
+};
+
+export type UpdateAdminRoleErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Resource conflict.
+     */
+    409: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UpdateAdminRoleError = UpdateAdminRoleErrors[keyof UpdateAdminRoleErrors];
+
+export type UpdateAdminRoleResponses = {
+    /**
+     * Role updated.
+     */
+    200: RoleResponse;
+};
+
+export type UpdateAdminRoleResponse = UpdateAdminRoleResponses[keyof UpdateAdminRoleResponses];
 
 export type ListAdminUsersData = {
     body?: never;

@@ -252,6 +252,38 @@ func (s *memoryStore) ListRoles(_ context.Context) ([]contract.RoleDefinition, e
 	return out, nil
 }
 
+func (s *memoryStore) UpdateRole(_ context.Context, id int, input contract.UpdateStoredRole) (contract.RoleDefinition, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for name, role := range s.roles {
+		if role.ID != id {
+			continue
+		}
+		if input.Description != nil {
+			role.Description = strings.TrimSpace(*input.Description)
+		}
+		if input.Permissions != nil {
+			role.Permissions = append([]string(nil), (*input.Permissions)...)
+		}
+		role.UpdatedAt = time.Now().UTC()
+		s.roles[name] = role
+		return cloneRole(role), nil
+	}
+	return contract.RoleDefinition{}, contract.ErrNotFound
+}
+
+func (s *memoryStore) DeleteRole(_ context.Context, id int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for name, role := range s.roles {
+		if role.ID == id {
+			delete(s.roles, name)
+			return nil
+		}
+	}
+	return contract.ErrNotFound
+}
+
 func (s *memoryStore) ListAuthIdentities(_ context.Context, userID int) ([]contract.UserAuthIdentity, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

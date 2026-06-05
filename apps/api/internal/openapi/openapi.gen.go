@@ -7330,6 +7330,12 @@ type UpdateProxyDefinitionRequest struct {
 	Url *string `json:"url,omitempty"`
 }
 
+// UpdateRoleRequest defines model for UpdateRoleRequest.
+type UpdateRoleRequest struct {
+	Description *string  `json:"description,omitempty"`
+	Permissions []string `json:"permissions"`
+}
+
 // UpdateSubscriptionPlanRequest defines model for UpdateSubscriptionPlanRequest.
 type UpdateSubscriptionPlanRequest struct {
 	Currency     *string     `json:"currency,omitempty"`
@@ -8554,6 +8560,9 @@ type UpdateAdminRiskControlConfigJSONRequestBody = RiskControlConfig
 
 // CreateAdminRoleJSONRequestBody defines body for CreateAdminRole for application/json ContentType.
 type CreateAdminRoleJSONRequestBody = CreateRoleRequest
+
+// UpdateAdminRoleJSONRequestBody defines body for UpdateAdminRole for application/json ContentType.
+type UpdateAdminRoleJSONRequestBody = UpdateRoleRequest
 
 // ReplaySchedulerStrategyJSONRequestBody defines body for ReplaySchedulerStrategy for application/json ContentType.
 type ReplaySchedulerStrategyJSONRequestBody = SchedulerReplayRequest
@@ -15441,6 +15450,12 @@ type ServerInterface interface {
 	// Create a role definition.
 	// (POST /api/v1/admin/roles)
 	CreateAdminRole(w http.ResponseWriter, r *http.Request)
+	// Delete a role definition.
+	// (DELETE /api/v1/admin/roles/{id})
+	DeleteAdminRole(w http.ResponseWriter, r *http.Request, id Id)
+	// Update a role definition.
+	// (PATCH /api/v1/admin/roles/{id})
+	UpdateAdminRole(w http.ResponseWriter, r *http.Request, id Id)
 	// List scheduler decisions.
 	// (GET /api/v1/admin/scheduler/decisions)
 	ListAdminSchedulerDecisions(w http.ResponseWriter, r *http.Request, params ListAdminSchedulerDecisionsParams)
@@ -20967,6 +20982,74 @@ func (siw *ServerInterfaceWrapper) CreateAdminRole(w http.ResponseWriter, r *htt
 	handler.ServeHTTP(w, r)
 }
 
+// DeleteAdminRole operation middleware
+func (siw *ServerInterfaceWrapper) DeleteAdminRole(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteAdminRole(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateAdminRole operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAdminRole(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAdminRole(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListAdminSchedulerDecisions operation middleware
 func (siw *ServerInterfaceWrapper) ListAdminSchedulerDecisions(w http.ResponseWriter, r *http.Request) {
 
@@ -25897,6 +25980,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/risk-control/status", wrapper.GetAdminRiskControlStatus)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/roles", wrapper.ListAdminRoles)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/roles", wrapper.CreateAdminRole)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/roles/{id}", wrapper.DeleteAdminRole)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/roles/{id}", wrapper.UpdateAdminRole)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/scheduler/decisions", wrapper.ListAdminSchedulerDecisions)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/scheduler/overview", wrapper.GetAdminSchedulerOverview)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/scheduler/replay", wrapper.ReplaySchedulerStrategy)

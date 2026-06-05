@@ -295,6 +295,78 @@ func (s *Service) ListRoles(ctx context.Context) ([]contract.RoleDefinition, err
 	return s.store.ListRoles(ctx)
 }
 
+// UpdateRoleRequest carries the editable fields of a role (the name is immutable).
+type UpdateRoleRequest struct {
+	Description *string
+	Permissions *[]string
+}
+
+// UpdateRole edits a custom role's description and/or permissions. Built-in roles
+// (owner/admin/operator/user) are immutable.
+func (s *Service) UpdateRole(ctx context.Context, id int, req UpdateRoleRequest) (contract.RoleDefinition, error) {
+	if id <= 0 {
+		return contract.RoleDefinition{}, ErrInvalidInput
+	}
+	existing, err := s.findRoleByID(ctx, id)
+	if err != nil {
+		return contract.RoleDefinition{}, err
+	}
+	if contract.IsBuiltInRole(existing.Name) {
+		return contract.RoleDefinition{}, ErrRoleImmutable
+	}
+	input := contract.UpdateStoredRole{}
+	if req.Description != nil {
+		desc := strings.TrimSpace(*req.Description)
+		input.Description = &desc
+	}
+	if req.Permissions != nil {
+		permissions, err := normalizePermissions(*req.Permissions)
+		if err != nil {
+			return contract.RoleDefinition{}, err
+		}
+		input.Permissions = &permissions
+	}
+	role, err := s.store.UpdateRole(ctx, id, input)
+	if errors.Is(err, contract.ErrNotFound) {
+		return contract.RoleDefinition{}, ErrRoleNotFound
+	}
+	return role, err
+}
+
+// DeleteRole removes a custom role. Built-in roles cannot be deleted.
+func (s *Service) DeleteRole(ctx context.Context, id int) error {
+	if id <= 0 {
+		return ErrInvalidInput
+	}
+	existing, err := s.findRoleByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	if contract.IsBuiltInRole(existing.Name) {
+		return ErrRoleImmutable
+	}
+	if err := s.store.DeleteRole(ctx, id); err != nil {
+		if errors.Is(err, contract.ErrNotFound) {
+			return ErrRoleNotFound
+		}
+		return err
+	}
+	return nil
+}
+
+func (s *Service) findRoleByID(ctx context.Context, id int) (contract.RoleDefinition, error) {
+	roles, err := s.store.ListRoles(ctx)
+	if err != nil {
+		return contract.RoleDefinition{}, err
+	}
+	for _, role := range roles {
+		if role.ID == id {
+			return role, nil
+		}
+	}
+	return contract.RoleDefinition{}, ErrRoleNotFound
+}
+
 func (s *Service) Update(ctx context.Context, id int, req UpdateRequest) (contract.StoredUser, error) {
 	if id <= 0 {
 		return contract.StoredUser{}, ErrInvalidInput

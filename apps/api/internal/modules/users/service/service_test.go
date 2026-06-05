@@ -409,6 +409,69 @@ func TestCustomRoleCarriesPermissions(t *testing.T) {
 	}
 }
 
+func TestUpdateAndDeleteRole(t *testing.T) {
+	store := newMemoryStore()
+	svc, err := New(store, nil)
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	ctx := context.Background()
+	created, err := svc.CreateRole(ctx, CreateRoleRequest{
+		Name:        "payment_reader",
+		Description: "Payment reader",
+		Permissions: []string{"payment_order:read"},
+	})
+	if err != nil {
+		t.Fatalf("create role: %v", err)
+	}
+
+	newDesc := "Payments + refunds reader"
+	updated, err := svc.UpdateRole(ctx, created.ID, UpdateRoleRequest{
+		Description: &newDesc,
+		Permissions: &[]string{"payment_order:read", "refund:read"},
+	})
+	if err != nil {
+		t.Fatalf("update role: %v", err)
+	}
+	if updated.Description != newDesc || len(updated.Permissions) != 2 {
+		t.Fatalf("unexpected updated role: %+v", updated)
+	}
+
+	// Built-in roles cannot be modified or deleted.
+	var adminID int
+	roles, err := svc.ListRoles(ctx)
+	if err != nil {
+		t.Fatalf("list roles: %v", err)
+	}
+	for _, role := range roles {
+		if role.Name == contract.RoleAdmin {
+			adminID = role.ID
+		}
+	}
+	if adminID == 0 {
+		t.Fatalf("expected seeded admin role")
+	}
+	if _, err := svc.UpdateRole(ctx, adminID, UpdateRoleRequest{Permissions: &[]string{"thing:read"}}); !errors.Is(err, ErrRoleImmutable) {
+		t.Fatalf("expected ErrRoleImmutable updating built-in, got %v", err)
+	}
+	if err := svc.DeleteRole(ctx, adminID); !errors.Is(err, ErrRoleImmutable) {
+		t.Fatalf("expected ErrRoleImmutable deleting built-in, got %v", err)
+	}
+
+	// Unknown id → not found.
+	if _, err := svc.UpdateRole(ctx, 999999, UpdateRoleRequest{Permissions: &[]string{"thing:read"}}); !errors.Is(err, ErrRoleNotFound) {
+		t.Fatalf("expected ErrRoleNotFound, got %v", err)
+	}
+
+	// Delete the custom role, then deleting again is not-found.
+	if err := svc.DeleteRole(ctx, created.ID); err != nil {
+		t.Fatalf("delete role: %v", err)
+	}
+	if err := svc.DeleteRole(ctx, created.ID); !errors.Is(err, ErrRoleNotFound) {
+		t.Fatalf("expected ErrRoleNotFound after delete, got %v", err)
+	}
+}
+
 func TestAuthenticatePasswordRejectsWrongPassword(t *testing.T) {
 	store := newMemoryStore()
 	svc, err := New(store, nil)
