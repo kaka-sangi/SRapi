@@ -16,7 +16,11 @@ function useCountUp(target: number, enabled: boolean, duration = 750): number {
   const rafRef = React.useRef<number | null>(null);
 
   React.useEffect(() => {
+    // This effect drives a requestAnimationFrame count-up. The two synchronous
+    // setN(target) calls are the skip-animation paths (disabled / reduced
+    // motion); they jump straight to the final value with no rAF loop.
     if (!enabled) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setN(target);
       return;
     }

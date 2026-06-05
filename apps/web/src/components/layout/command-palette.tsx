@@ -151,6 +151,7 @@ function CommandPalette({
 
   // Reset highlight whenever the result set changes or the palette (re)opens.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setActive(0);
   }, [query, open]);
 
