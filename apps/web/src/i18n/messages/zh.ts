@@ -519,6 +519,13 @@ export const zh: Messages = {
     testFailed: "连接失败",
     export: "导出",
     exportDone: "已导出 {count} 个账号",
+    importTitle: "导入账号",
+    importAction: "导入",
+    importHint: "粘贴导出的快照。凭据不会被导出，导入前请为每个账号补全凭据。",
+    importJson: "账号 JSON",
+    importSubmit: "导入账号",
+    importDone: "已导入 {created} 个账号，跳过 {skipped} 个",
+    importErrorsTitle: "部分账号未能导入",
     runtime: {
       api_key: "API Key",
       oauth_refresh: "OAuth · 刷新令牌",

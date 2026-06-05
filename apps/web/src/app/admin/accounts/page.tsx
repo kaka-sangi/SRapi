@@ -34,6 +34,7 @@ import { Button } from "@/components/ui/button";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
 import { adminErrorMessage } from "@/lib/admin-api";
 import { ACCOUNT_STATUSES } from "@/lib/admin-account-form";
+import { AccountImportDialog } from "@/components/admin/account-import-dialog";
 import type { ProviderAccount } from "@/lib/sdk-types";
 
 export default function AdminAccountsPage() {
@@ -87,6 +88,7 @@ function AccountsContent() {
   const [detailTarget, setDetailTarget] = useState<ProviderAccount | null>(null);
   const [testTarget, setTestTarget] = useState<ProviderAccount | null>(null);
   const [bulkDisableOpen, setBulkDisableOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   const providerOptions = (providers.data?.data ?? []).map((p) => ({
     value: p.id,
@@ -197,6 +199,9 @@ function AccountsContent() {
               onClick={() => void runExport()}
             >
               {t("adminAccounts.export")}
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
+              {t("adminAccounts.importAction")}
             </Button>
             <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
               ＋ {t("adminAccounts.create")}
@@ -389,6 +394,8 @@ function AccountsContent() {
         confirmLabel={t("common.disable")}
         onConfirm={() => applyBulkStatus("disabled")}
       />
+
+      <AccountImportDialog open={importOpen} onOpenChange={setImportOpen} />
     </>
   );
 }

@@ -520,6 +520,13 @@ export const en = {
     testFailed: "Connection failed",
     export: "Export",
     exportDone: "Exported {count} accounts",
+    importTitle: "Import accounts",
+    importAction: "Import",
+    importHint: "Paste an exported snapshot. Credentials are never exported, so add a credential to each account before importing.",
+    importJson: "Accounts JSON",
+    importSubmit: "Import accounts",
+    importDone: "Imported {created} accounts, skipped {skipped}",
+    importErrorsTitle: "Some accounts were not imported",
     runtime: {
       api_key: "API Key",
       oauth_refresh: "OAuth · refresh token",

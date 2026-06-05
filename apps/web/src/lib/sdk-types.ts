@@ -62,4 +62,5 @@ export type {
   NotificationPreference,
   NotificationContact,
   CurrentUserAuthIdentity,
+  ProviderAccountImportResult,
 } from "../../../../packages/sdk/typescript/src/types.gen";
