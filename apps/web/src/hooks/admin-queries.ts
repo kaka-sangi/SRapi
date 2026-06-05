@@ -646,6 +646,12 @@ export function useTestProvider() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "providers"] }),
   });
 }
+export function useInstallProviderPresets() {
+  return useAdminMutation<void, Awaited<ReturnType<typeof adminApi.installProviderPresets>>>(
+    () => adminApi.installProviderPresets(),
+    ["admin", "providers"],
+  );
+}
 
 // Models (model registry)
 export function useCreateModel() {

@@ -86,6 +86,7 @@ import {
   getAdminUsageAggregates,
   getAdminUsageDaily,
   importAdminAccounts,
+  installAdminProviderPresets,
   listAdminAccountGroups,
   listAdminAccountGroupMembers,
   listAdminAccounts,
@@ -190,6 +191,7 @@ import type {
   CreateAnnouncementRequest,
   CreateRedeemCodeRequest,
   DiscoverAdminAccountModelsData,
+  BatchOperationResult,
   BatchUpdateAccountsResult,
   Id,
   ImportAdminAccountsData,
@@ -469,6 +471,11 @@ export const adminApi = {
 
   testProvider(id: Id): Promise<AdminTestResult> {
     return unwrapData(() => testAdminProvider({ path: { id }, throwOnError: true }));
+  },
+  // Bulk-create any missing built-in provider presets (existing ones are skipped,
+  // new ones land disabled). Returns how many were requested/created/failed.
+  installProviderPresets(): Promise<BatchOperationResult> {
+    return unwrapData(() => installAdminProviderPresets({ throwOnError: true }));
   },
 
   listModels(query?: ListAdminModelsData["query"]): Promise<AdminListResult<Model>> {

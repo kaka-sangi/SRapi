@@ -18,6 +18,7 @@ import {
   useCreateProvider,
   useUpdateProvider,
   useTestProvider,
+  useInstallProviderPresets,
 } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
@@ -58,8 +59,29 @@ function ProvidersContent() {
   const createMut = useCreateProvider();
   const updateMut = useUpdateProvider();
   const testMut = useTestProvider();
+  const installMut = useInstallProviderPresets();
 
   const [formTarget, setFormTarget] = useState<Provider | "new" | null>(null);
+
+  async function runInstallPresets() {
+    try {
+      const r = await installMut.mutateAsync();
+      const skipped = Math.max(0, r.requested - r.succeeded - r.failed);
+      toast({
+        title: r.succeeded > 0 ? t("feedback.created") : t("adminProviders.presetsNone"),
+        description:
+          r.succeeded > 0
+            ? t("adminProviders.presetsInstalled", {
+                created: String(r.succeeded),
+                skipped: String(skipped),
+              })
+            : undefined,
+        tone: "success",
+      });
+    } catch (err) {
+      toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
+    }
+  }
 
   async function runTest(id: string) {
     try {
@@ -173,6 +195,16 @@ function ProvidersContent() {
             {providers.data ? (
               <ListCount total={providers.data.pagination?.total ?? providers.data.data.length} />
             ) : null}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void runInstallPresets()}
+              disabled={installMut.isPending}
+            >
+              {installMut.isPending
+                ? t("adminProviders.installingPresets")
+                : t("adminProviders.installPresets")}
+            </Button>
             <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
               ＋ {t("adminProviders.create")}
             </Button>
