@@ -116,11 +116,11 @@ func (s *Service) ListSLOs(ctx context.Context) ([]contract.SLOWithEvaluation, e
 	if err != nil {
 		return nil, err
 	}
-	usageLogs, err := s.observabilityStore.ListUsageLogs(ctx)
+	now := s.clock.Now()
+	usageLogs, err := s.observabilityStore.ListUsageLogsSince(ctx, sloUsageLookback(definitions, now))
 	if err != nil {
 		return nil, err
 	}
-	now := s.clock.Now()
 	out := make([]contract.SLOWithEvaluation, 0, len(definitions))
 	for _, definition := range definitions {
 		out = append(out, contract.SLOWithEvaluation{
@@ -154,7 +154,8 @@ func (s *Service) EvaluateSLOAlerts(ctx context.Context) (contract.AlertEvaluati
 	if err != nil {
 		return contract.AlertEvaluationResult{}, err
 	}
-	usageLogs, err := s.observabilityStore.ListUsageLogs(ctx)
+	now := s.clock.Now()
+	usageLogs, err := s.observabilityStore.ListUsageLogsSince(ctx, sloUsageLookback(definitions, now))
 	if err != nil {
 		return contract.AlertEvaluationResult{}, err
 	}
@@ -162,7 +163,11 @@ func (s *Service) EvaluateSLOAlerts(ctx context.Context) (contract.AlertEvaluati
 	if err != nil {
 		return contract.AlertEvaluationResult{}, err
 	}
-	return s.evaluateAlerts(ctx, definitions, usageLogs, alerts, s.clock.Now())
+	silences, err := s.observabilityStore.ListAlertSilences(ctx)
+	if err != nil {
+		return contract.AlertEvaluationResult{}, err
+	}
+	return s.evaluateAlerts(ctx, definitions, usageLogs, alerts, silences, now)
 }
 
 func (s *Service) AcknowledgeAlert(ctx context.Context, id int, req contract.AckAlertRequest) (contract.AlertEvent, error) {
@@ -184,7 +189,7 @@ func (s *Service) AcknowledgeAlert(ctx context.Context, id int, req contract.Ack
 	return s.observabilityStore.UpdateAlert(ctx, alert)
 }
 
-func (s *Service) evaluateAlerts(ctx context.Context, definitions []contract.SLODefinition, usageLogs []usagecontract.UsageLog, alerts []contract.AlertEvent, now time.Time) (contract.AlertEvaluationResult, error) {
+func (s *Service) evaluateAlerts(ctx context.Context, definitions []contract.SLODefinition, usageLogs []usagecontract.UsageLog, alerts []contract.AlertEvent, silences []contract.AlertSilence, now time.Time) (contract.AlertEvaluationResult, error) {
 	result := contract.AlertEvaluationResult{}
 	activeAlerts := activeBurnRateAlertsByFingerprint(alerts)
 	seenBreaches := map[string]struct{}{}
@@ -207,16 +212,19 @@ func (s *Service) evaluateAlerts(ctx context.Context, definitions []contract.SLO
 			}
 			seenBreaches[fingerprint] = struct{}{}
 			result.Breached++
+			suppressedBy := matchingSilenceIDForSLO(silences, definition, threshold.Severity, now)
 			alert, ok := activeAlerts[fingerprint]
 			if !ok {
-				_, err := s.observabilityStore.CreateAlert(ctx, burnRateAlert(definition, threshold, longEval, shortEval, now))
-				if err != nil {
+				created := burnRateAlert(definition, threshold, longEval, shortEval, now)
+				applySilence(&created, suppressedBy)
+				if _, err := s.observabilityStore.CreateAlert(ctx, created); err != nil {
 					return result, err
 				}
 				result.Created++
 				continue
 			}
 			updated := updateBurnRateAlert(alert, definition, threshold, longEval, shortEval, now)
+			applySilence(&updated, suppressedBy)
 			if _, err := s.observabilityStore.UpdateAlert(ctx, updated); err != nil {
 				return result, err
 			}

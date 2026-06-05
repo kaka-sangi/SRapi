@@ -630,7 +630,9 @@ func dockerfileViolations(t *testing.T, root, rel string) []string {
 	if strings.Contains(content, ":latest") {
 		violations = append(violations, rel+": image tags must be pinned; do not use latest")
 	}
-	if !strings.Contains(content, "USER nonroot") {
+	// Require dropping root. Accept the distroless "nonroot" user and the
+	// official node image's built-in unprivileged "node" user.
+	if !strings.Contains(content, "USER nonroot") && !strings.Contains(content, "USER node") {
 		violations = append(violations, rel+": runtime image must declare a non-root user")
 	}
 	return violations

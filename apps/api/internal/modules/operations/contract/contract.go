@@ -291,6 +291,7 @@ type ObservabilityStore interface {
 	FindAlertByID(ctx context.Context, id int) (AlertEvent, error)
 	ListAlerts(ctx context.Context) ([]AlertEvent, error)
 	ListUsageLogs(ctx context.Context) ([]usagecontract.UsageLog, error)
+	ListUsageLogsSince(ctx context.Context, since time.Time) ([]usagecontract.UsageLog, error)
 	CreateAlertRule(ctx context.Context, input AlertRule) (AlertRule, error)
 	UpdateAlertRule(ctx context.Context, input AlertRule) (AlertRule, error)
 	FindAlertRuleByID(ctx context.Context, id int) (AlertRule, error)

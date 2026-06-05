@@ -382,6 +382,11 @@ func realtimeSlotStore(ctx context.Context, cfg config.Config, logger *slog.Logg
 
 func gatewayRateLimiterOption(ctx context.Context, cfg config.Config, logger *slog.Logger, redisClient *platformredis.Client) (httpserver.Option, error) {
 	if redisClient == nil || redisClient.Raw() == nil {
+		if cfg.Server.Mode == "release" {
+			// Don't disable rate limiting silently in production: make it loud so an
+			// operator configures REDIS_URL rather than discovering it under abuse.
+			logger.Warn("redis not configured; gateway rate limiting and concurrency controls are DISABLED in release mode — set REDIS_URL to enable them")
+		}
 		return nil, nil
 	}
 	pingCtx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)

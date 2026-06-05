@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"net/url"
 	"strings"
+	"time"
 
 	"entgo.io/ent/dialect"
 	entsql "entgo.io/ent/dialect/sql"
@@ -24,6 +25,17 @@ func Open(cfg config.DependencyConfig) (*Client, error) {
 	db, err := sql.Open("pgx", dsn)
 	if err != nil {
 		return nil, err
+	}
+	// Bound the pool so a busy/replicated deployment can't exhaust Postgres
+	// max_connections (database/sql defaults to unlimited open connections).
+	if cfg.MaxOpenConns > 0 {
+		db.SetMaxOpenConns(cfg.MaxOpenConns)
+	}
+	if cfg.MaxIdleConns > 0 {
+		db.SetMaxIdleConns(cfg.MaxIdleConns)
+	}
+	if cfg.ConnMaxLifetimeSeconds > 0 {
+		db.SetConnMaxLifetime(time.Duration(cfg.ConnMaxLifetimeSeconds) * time.Second)
 	}
 	return &Client{
 		db:  db,

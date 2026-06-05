@@ -493,7 +493,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	// bare mux (so path values + handler auth/validation/audit all apply).
 	runtime.internalRouter = mux
 
-	return requestIDMiddleware(server.tracingMiddleware(server.gatewayConcurrencyMiddleware(mux)))
+	return securityHeadersMiddleware(requestIDMiddleware(server.tracingMiddleware(server.gatewayConcurrencyMiddleware(mux))))
 }
 
 // registerAdminOpsRoutes registers the operational monitoring + maintenance
@@ -722,6 +722,22 @@ func tcpStatus(ctx context.Context, address string) string {
 	}
 	_ = conn.Close()
 	return "ok"
+}
+
+// securityHeadersMiddleware sets defensive response headers on every response.
+// The API only ever emits JSON/SSE (never trusted HTML with active content), so
+// a deny-all CSP plus anti-sniffing/anti-framing headers are safe and block
+// XSS/clickjacking on anything a proxy or browser might render from a body.
+// TLS/HSTS is intentionally left to the terminating reverse proxy.
+func securityHeadersMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("X-Frame-Options", "DENY")
+		h.Set("Referrer-Policy", "no-referrer")
+		h.Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
+		next.ServeHTTP(w, r)
+	})
 }
 
 func requestIDMiddleware(next http.Handler) http.Handler {

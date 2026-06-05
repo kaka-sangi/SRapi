@@ -240,9 +240,19 @@ func (s *Store) ListAlerts(ctx context.Context) ([]contract.AlertEvent, error) {
 }
 
 func (s *Store) ListUsageLogs(ctx context.Context) ([]usagecontract.UsageLog, error) {
-	rows, err := s.client.UsageLog.Query().
-		Order(entusagelog.ByID()).
-		All(ctx)
+	return s.ListUsageLogsSince(ctx, time.Time{})
+}
+
+// ListUsageLogsSince returns usage logs created at or after `since`. A zero
+// `since` returns all logs. Observability aggregations pass their own lookback
+// window so they never scan the whole (retention-bounded but potentially huge)
+// usage_logs table into memory.
+func (s *Store) ListUsageLogsSince(ctx context.Context, since time.Time) ([]usagecontract.UsageLog, error) {
+	query := s.client.UsageLog.Query().Order(entusagelog.ByID())
+	if !since.IsZero() {
+		query = query.Where(entusagelog.CreatedAtGTE(since))
+	}
+	rows, err := query.All(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -161,6 +161,16 @@ func (s *captureStore) ListUsageLogs(context.Context) ([]usagecontract.UsageLog,
 	return append([]usagecontract.UsageLog(nil), s.usageLogs...), nil
 }
 
+func (s *captureStore) ListUsageLogsSince(_ context.Context, since time.Time) ([]usagecontract.UsageLog, error) {
+	out := make([]usagecontract.UsageLog, 0, len(s.usageLogs))
+	for _, log := range s.usageLogs {
+		if since.IsZero() || !log.CreatedAt.Before(since) {
+			out = append(out, log)
+		}
+	}
+	return out, nil
+}
+
 func (s *captureStore) CreateAlertRule(_ context.Context, input contract.AlertRule) (contract.AlertRule, error) {
 	input.ID = s.nextRuleID
 	s.nextRuleID++

@@ -158,6 +158,20 @@ func (s *Store) ListUsageLogs(ctx context.Context) ([]usagecontract.UsageLog, er
 	return s.usage.List(ctx)
 }
 
+func (s *Store) ListUsageLogsSince(ctx context.Context, since time.Time) ([]usagecontract.UsageLog, error) {
+	logs, err := s.ListUsageLogs(ctx)
+	if err != nil || since.IsZero() {
+		return logs, err
+	}
+	out := make([]usagecontract.UsageLog, 0, len(logs))
+	for _, log := range logs {
+		if !log.CreatedAt.Before(since) {
+			out = append(out, log)
+		}
+	}
+	return out, nil
+}
+
 func (s *Store) CreateAlertRule(_ context.Context, input contract.AlertRule) (contract.AlertRule, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -170,7 +170,8 @@ func (s *Service) EvaluateAlertRules(ctx context.Context) (contract.AlertRuleEva
 	if err != nil {
 		return contract.AlertRuleEvaluationResult{}, err
 	}
-	usageLogs, err := s.observabilityStore.ListUsageLogs(ctx)
+	now := s.clock.Now()
+	usageLogs, err := s.observabilityStore.ListUsageLogsSince(ctx, alertRuleUsageLookback(rules, now))
 	if err != nil {
 		return contract.AlertRuleEvaluationResult{}, err
 	}
@@ -182,7 +183,7 @@ func (s *Service) EvaluateAlertRules(ctx context.Context) (contract.AlertRuleEva
 	if err != nil {
 		return contract.AlertRuleEvaluationResult{}, err
 	}
-	return s.evaluateAlertRules(ctx, rules, usageLogs, alerts, silences, s.clock.Now())
+	return s.evaluateAlertRules(ctx, rules, usageLogs, alerts, silences, now)
 }
 
 func (s *Service) evaluateAlertRules(ctx context.Context, rules []contract.AlertRule, usageLogs []usagecontract.UsageLog, alerts []contract.AlertEvent, silences []contract.AlertSilence, now time.Time) (contract.AlertRuleEvaluationResult, error) {
@@ -564,4 +565,67 @@ func cloneAlertSilence(value contract.AlertSilence) contract.AlertSilence {
 		value.CreatedBy = &createdBy
 	}
 	return value
+}
+
+// sloUsageLookback returns the earliest usage-log timestamp the SLO evaluations
+// need: the longest SLO budget window across definitions plus a safety buffer.
+// Zero definitions -> `now`, so no logs are scanned when nothing uses them.
+func sloUsageLookback(definitions []contract.SLODefinition, now time.Time) time.Time {
+	maxDays := 0
+	for _, d := range definitions {
+		if d.WindowDays > maxDays {
+			maxDays = d.WindowDays
+		}
+	}
+	if maxDays <= 0 {
+		return now
+	}
+	return now.Add(-(time.Duration(maxDays)*24*time.Hour + time.Hour))
+}
+
+// alertRuleUsageLookback returns the earliest usage-log timestamp the generic
+// metric alert-rule evaluations need: the longest rule window plus a buffer.
+func alertRuleUsageLookback(rules []contract.AlertRule, now time.Time) time.Time {
+	maxSeconds := 0
+	for _, r := range rules {
+		if r.WindowSeconds > maxSeconds {
+			maxSeconds = r.WindowSeconds
+		}
+	}
+	if maxSeconds <= 0 {
+		return now
+	}
+	return now.Add(-(time.Duration(maxSeconds)*time.Second + time.Hour))
+}
+
+// matchingSilenceIDForSLO returns the id of an active silence that should
+// suppress an SLO burn-rate alert, or "". Silences that target a specific
+// generic rule (RuleID matcher) never match SLO alerts; severity/scope-only
+// silences do, so operators can quiet SLO burn-rate noise the same way.
+func matchingSilenceIDForSLO(silences []contract.AlertSilence, definition contract.SLODefinition, severity contract.AlertSeverity, now time.Time) string {
+	for _, silence := range silences {
+		if now.Before(silence.StartsAt) || now.After(silence.EndsAt) {
+			continue
+		}
+		m := silence.Matcher
+		if m.RuleID != "" {
+			continue
+		}
+		if m.Severity != "" && m.Severity != severity {
+			continue
+		}
+		if m.SourceEndpoint != "" && m.SourceEndpoint != definition.Filter.SourceEndpoint {
+			continue
+		}
+		if m.Model != "" && m.Model != definition.Filter.Model {
+			continue
+		}
+		if m.ProviderID != nil {
+			if definition.Filter.ProviderID == nil || *definition.Filter.ProviderID != *m.ProviderID {
+				continue
+			}
+		}
+		return fmt.Sprintf("silence.%d", silence.ID)
+	}
+	return ""
 }
