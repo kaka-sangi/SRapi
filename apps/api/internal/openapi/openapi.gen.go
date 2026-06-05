@@ -15740,6 +15740,9 @@ type ServerInterface interface {
 	// Redeem a code for the current user.
 	// (POST /api/v1/me/redeem-codes/redeem)
 	RedeemCurrentUserRedeemCode(w http.ResponseWriter, r *http.Request)
+	// Sign out of all sessions.
+	// (POST /api/v1/me/sessions/revoke-all)
+	RevokeAllCurrentUserSessions(w http.ResponseWriter, r *http.Request)
 	// List subscriptions for the current console user.
 	// (GET /api/v1/me/subscriptions)
 	GetCurrentUserSubscriptions(w http.ResponseWriter, r *http.Request, params GetCurrentUserSubscriptionsParams)
@@ -23853,6 +23856,28 @@ func (siw *ServerInterfaceWrapper) RedeemCurrentUserRedeemCode(w http.ResponseWr
 	handler.ServeHTTP(w, r)
 }
 
+// RevokeAllCurrentUserSessions operation middleware
+func (siw *ServerInterfaceWrapper) RevokeAllCurrentUserSessions(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RevokeAllCurrentUserSessions(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetCurrentUserSubscriptions operation middleware
 func (siw *ServerInterfaceWrapper) GetCurrentUserSubscriptions(w http.ResponseWriter, r *http.Request) {
 
@@ -26210,6 +26235,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/me/playground/chat", wrapper.CreateMePlaygroundChat)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/playground/models", wrapper.ListMePlaygroundModels)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/me/redeem-codes/redeem", wrapper.RedeemCurrentUserRedeemCode)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/me/sessions/revoke-all", wrapper.RevokeAllCurrentUserSessions)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me/subscriptions", wrapper.GetCurrentUserSubscriptions)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/me/totp/disable", wrapper.DisableCurrentUserTOTP)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/me/totp/enable", wrapper.EnableCurrentUserTOTP)

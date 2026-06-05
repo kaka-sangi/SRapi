@@ -5769,6 +5769,39 @@ export type ChangeCurrentUserPasswordResponses = {
 
 export type ChangeCurrentUserPasswordResponse = ChangeCurrentUserPasswordResponses[keyof ChangeCurrentUserPasswordResponses];
 
+export type RevokeAllCurrentUserSessionsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/me/sessions/revoke-all';
+};
+
+export type RevokeAllCurrentUserSessionsErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type RevokeAllCurrentUserSessionsError = RevokeAllCurrentUserSessionsErrors[keyof RevokeAllCurrentUserSessionsErrors];
+
+export type RevokeAllCurrentUserSessionsResponses = {
+    /**
+     * All sessions revoked.
+     */
+    204: void;
+};
+
+export type RevokeAllCurrentUserSessionsResponse = RevokeAllCurrentUserSessionsResponses[keyof RevokeAllCurrentUserSessionsResponses];
+
 export type GetCurrentUserNotificationPreferencesData = {
     body?: never;
     path?: never;

@@ -14,6 +14,7 @@ import {
   useDisableTotp,
   useUploadAvatar,
   useDeleteAvatar,
+  useRevokeAllSessions,
 } from "@/hooks/queries";
 import { NotificationsTab } from "@/components/features/account-notifications";
 import { LinkedSignInsCard } from "@/components/features/account-linked-signins";
@@ -65,6 +66,7 @@ function AccountContent() {
             <ChangePasswordCard />
             <TwoFactorCard />
             <LinkedSignInsCard />
+            <SignOutEverywhereCard />
           </div>
         </TabsContent>
         <TabsContent value="notifications">
@@ -364,6 +366,39 @@ function TwoFactorCard() {
             </Button>
           </div>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function SignOutEverywhereCard() {
+  const { t } = useLanguage();
+  const { toast } = useToast();
+  const revokeMut = useRevokeAllSessions();
+
+  async function revokeAll() {
+    if (!window.confirm(t("account.signOutAllConfirm"))) return;
+    try {
+      await revokeMut.mutateAsync();
+      // The current session is revoked too, so leave for the sign-in screen.
+      window.location.assign("/login");
+    } catch (err) {
+      toast({ title: t("feedback.failed"), description: meErrorMessage(err), tone: "error" });
+    }
+  }
+
+  return (
+    <Card>
+      <CardContent className="space-y-4">
+        <div>
+          <h3 className="font-serif text-lg text-srapi-text-primary">{t("account.signOutAll")}</h3>
+          <p className="mt-1 text-2xs text-srapi-text-tertiary">{t("account.signOutAllHint")}</p>
+        </div>
+        <div className="flex justify-end">
+          <Button variant="danger" loading={revokeMut.isPending} onClick={revokeAll}>
+            {t("account.signOutAllButton")}
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

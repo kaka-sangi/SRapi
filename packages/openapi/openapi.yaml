@@ -1170,6 +1170,33 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/me/sessions/revoke-all:
+    post:
+      tags:
+        - CurrentUser
+      operationId: revokeAllCurrentUserSessions
+      summary: Sign out of all sessions.
+      description: Revokes every active console session for the current user, including the caller's own, and clears the current session cookie.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      responses:
+        "204":
+          description: All sessions revoked.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+            Set-Cookie:
+              description: Expired HttpOnly console session cookie.
+              schema:
+                type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/me/notification-preferences:
     get:
       tags:

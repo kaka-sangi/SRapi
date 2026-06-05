@@ -1408,6 +1408,10 @@ export const zh: Messages = {
     linkedUnbindBlocked: "该登录方式无法解绑。",
     linkedLastUsed: "最近使用",
     linkedNeverUsed: "从未使用",
+    signOutAll: "退出所有会话",
+    signOutAllHint: "撤销所有活跃会话（包括当前设备），之后需要重新登录。",
+    signOutAllButton: "退出全部会话",
+    signOutAllConfirm: "确定退出所有会话（包括当前设备）？",
   },
   billing: {
     title: "账单",

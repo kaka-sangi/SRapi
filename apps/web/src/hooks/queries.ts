@@ -172,6 +172,9 @@ export function useChangePassword() {
     mutationFn: (body: MeP<typeof meApi.changePassword>) => meApi.changePassword(body),
   });
 }
+export function useRevokeAllSessions() {
+  return useMutation({ mutationFn: () => meApi.revokeAllSessions() });
+}
 export function useTotpStatus() {
   return useQuery({ queryKey: queryKeys.me.totpStatus(), queryFn: () => meApi.getTotpStatus() });
 }

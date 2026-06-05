@@ -1400,6 +1400,10 @@ export const en = {
     linkedUnbindBlocked: "This sign-in can't be unbound.",
     linkedLastUsed: "Last used",
     linkedNeverUsed: "Never used",
+    signOutAll: "Sign out everywhere",
+    signOutAllHint: "Revoke every active session, including this one. You'll need to sign in again.",
+    signOutAllButton: "Sign out all sessions",
+    signOutAllConfirm: "Sign out of every session, including this device?",
   },
   billing: {
     title: "Billing",

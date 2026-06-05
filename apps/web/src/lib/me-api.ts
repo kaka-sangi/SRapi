@@ -23,6 +23,7 @@ import {
   listCurrentUserAnnouncements,
   markCurrentUserAnnouncementRead,
   listMePlaygroundModels,
+  revokeAllCurrentUserSessions,
   getCurrentUserNotificationPreferences,
   updateCurrentUserNotificationPreferences,
   listCurrentUserNotificationContacts,
@@ -141,6 +142,10 @@ export const meApi = {
   },
   getTotpStatus() {
     return unwrapData(() => getCurrentUserTotpStatus({ throwOnError: true }));
+  },
+  async revokeAllSessions(): Promise<void> {
+    configureClient();
+    await revokeAllCurrentUserSessions({ throwOnError: true });
   },
   setupTotp() {
     return unwrapData(() => setupCurrentUserTotp({ throwOnError: true }));

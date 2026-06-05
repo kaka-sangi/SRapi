@@ -571,6 +571,7 @@ func (s *Server) registerCurrentUserRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /api/v1/me/avatar", s.handleDeleteCurrentUserAvatar)
 	mux.HandleFunc("GET /api/v1/users/{id}/avatar", s.handleGetUserAvatar)
 	mux.HandleFunc("POST /api/v1/me/password", s.handleChangeCurrentUserPassword)
+	mux.HandleFunc("POST /api/v1/me/sessions/revoke-all", s.handleRevokeAllCurrentUserSessions)
 	mux.HandleFunc("GET /api/v1/me/notification-contacts", s.handleCurrentUserNotificationContacts)
 	mux.HandleFunc("POST /api/v1/me/notification-contacts", s.handleRequestCurrentUserNotificationContactVerification)
 	mux.HandleFunc("POST /api/v1/me/notification-contacts/verify", s.handleConfirmCurrentUserNotificationContactVerification)

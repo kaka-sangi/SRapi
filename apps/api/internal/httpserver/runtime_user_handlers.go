@@ -485,6 +485,29 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// handleRevokeAllCurrentUserSessions signs the user out of every session,
+// including the current one, by bulk-revoking their console sessions. The
+// caller's cookie is cleared so the browser returns to the sign-in screen.
+func (s *Server) handleRevokeAllCurrentUserSessions(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireConsoleSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusUnauthorized, apiopenapi.UNAUTHORIZED, "unauthorized", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	if err := s.runtime.auth.LogoutUser(r.Context(), session.User.ID); err != nil {
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to revoke sessions", requestID)
+		return
+	}
+	s.clearSessionCookie(w)
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "user.sessions_revoke_all", "user", strconv.Itoa(session.User.ID), nil, nil))
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (s *Server) handleCurrentUser(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	session, err := s.requireConsoleSession(r)
