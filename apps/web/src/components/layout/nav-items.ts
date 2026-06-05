@@ -36,6 +36,7 @@ import {
   Mail,
   Gauge,
   Bot,
+  Webhook,
   type LucideIcon,
 } from "lucide-react";
 import { ADMIN_ROUTES, USER_ROUTES, USER_HOME_ROUTE } from "@/lib/routes";
@@ -146,6 +147,7 @@ const ADMIN_OPS_SECTION: NavSection = {
     { href: ADMIN_ROUTES.riskControl, labelKey: "nav.adminRiskControl", icon: Shield },
     { href: ADMIN_ROUTES.announcements, labelKey: "nav.adminAnnouncements", icon: Megaphone },
     { href: ADMIN_ROUTES.auditLogs, labelKey: "nav.adminAuditLogs", icon: ScrollText },
+    { href: ADMIN_ROUTES.eventsOutbox, labelKey: "nav.adminOutbox", icon: Webhook },
   ],
 };
 

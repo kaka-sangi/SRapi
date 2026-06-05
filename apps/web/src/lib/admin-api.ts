@@ -107,6 +107,7 @@ import {
   listAdminOpsRealtimeSlots,
   listAdminOpsSlos,
   listAdminOpsSystemLogs,
+  listAdminOutboxEvents,
   listAdminPaymentOrders,
   listAdminPaymentProviders,
   listAdminPricingRules,
@@ -198,6 +199,7 @@ import type {
   CreateAnnouncementRequest,
   CreateRedeemCodeRequest,
   DiscoverAdminAccountModelsData,
+  DomainEventOutbox,
   BatchOperationResult,
   BatchUpdateAccountsResult,
   Id,
@@ -223,6 +225,7 @@ import type {
   ListAdminRiskControlLogsData,
   ListAdminSubscriptionPlansData,
   ListAdminUsageLogsData,
+  ListAdminOutboxEventsData,
   ListAdminUsersData,
   ListAdminUserSubscriptionsData,
   Model,
@@ -667,6 +670,11 @@ export const adminApi = {
 
   listAuditLogs(query?: ListAdminAuditLogsData["query"]): Promise<AdminListResult<AuditLog>> {
     return unwrapList(() => listAdminAuditLogs({ query, throwOnError: true }));
+  },
+  listOutboxEvents(
+    query?: ListAdminOutboxEventsData["query"],
+  ): Promise<AdminListResult<DomainEventOutbox>> {
+    return unwrapList(() => listAdminOutboxEvents({ query, throwOnError: true }));
   },
 
   listBillingLedger(

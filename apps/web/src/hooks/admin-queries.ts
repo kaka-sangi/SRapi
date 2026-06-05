@@ -486,6 +486,12 @@ export function useAuditLogs(params?: P<typeof adminApi.listAuditLogs>) {
     queryFn: () => adminApi.listAuditLogs(params),
   });
 }
+export function useOutboxEvents(params?: P<typeof adminApi.listOutboxEvents>) {
+  return useQuery({
+    queryKey: queryKeys.admin.outboxEvents(params),
+    queryFn: () => adminApi.listOutboxEvents(params),
+  });
+}
 
 export function useBillingLedger(params?: P<typeof adminApi.listBillingLedger>) {
   return useQuery({

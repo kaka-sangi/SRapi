@@ -25,6 +25,7 @@ export type {
   AffiliateLedgerEntry,
   AuditLog,
   BillingLedgerEntry,
+  DomainEventOutbox,
   ErrorPassthroughRule,
   PayloadRule,
   TlsProfile,
