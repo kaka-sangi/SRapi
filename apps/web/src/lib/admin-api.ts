@@ -67,6 +67,7 @@ import {
   exportAdminAccounts,
   getAdminAccountHealth,
   getAdminAccountProxyQuality,
+  fetchAdminAccountQuota,
   getAdminAccountQuota,
   getAdminAccountRpmStatus,
   getAdminConfigSnapshot,
@@ -144,6 +145,7 @@ import type {
   AccountHealthSnapshot,
   AccountModelDiscovery,
   AccountProxyQuality,
+  AccountQuotaReport,
   AccountQuotaSnapshot,
   AccountRpmStatus,
   AdminCopilotConfig,
@@ -585,6 +587,11 @@ export const adminApi = {
 
   getAccountQuota(id: Id): Promise<AdminListResult<AccountQuotaSnapshot>> {
     return unwrapList(() => getAdminAccountQuota({ path: { id }, throwOnError: true }));
+  },
+  // Trigger a live quota pull from the upstream provider (vs the stored
+  // snapshots getAccountQuota returns). Returns the fresh provider report.
+  fetchAccountQuota(id: Id): Promise<AccountQuotaReport> {
+    return unwrapData(() => fetchAdminAccountQuota({ path: { id }, throwOnError: true }));
   },
 
   getAccountRpmStatus(id: Id): Promise<AccountRpmStatus> {

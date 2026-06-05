@@ -136,6 +136,15 @@ export function useAccountQuota(id: string | null) {
     enabled: Boolean(id),
   });
 }
+export function useFetchAccountQuota() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => adminApi.fetchAccountQuota(id),
+    // A live pull refreshes the stored snapshots, so re-read them for this account.
+    onSuccess: (_data, id) =>
+      qc.invalidateQueries({ queryKey: queryKeys.admin.accountQuota(id) }),
+  });
+}
 export function useAccountRpmStatus(id: string | null) {
   return useQuery({
     queryKey: queryKeys.admin.accountRpm(id ?? ""),

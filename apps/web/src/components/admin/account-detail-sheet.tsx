@@ -1,15 +1,20 @@
 "use client";
 
 import type { UseQueryResult } from "@tanstack/react-query";
+import { RefreshCw } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   useAccountHealth,
   useAccountQuota,
+  useFetchAccountQuota,
   useAccountRpmStatus,
   useAccountProxyQuality,
 } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
+import { useToast } from "@/context/ToastContext";
+import { adminErrorMessage } from "@/lib/admin-api";
+import { cn } from "@/lib/cn";
 import type { ProviderAccount } from "@/lib/sdk-types";
 
 function pct(ratio: number): string {
@@ -30,18 +35,23 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 function Section<T>({
   title,
   query,
+  action,
   children,
 }: {
   title: string;
   query: UseQueryResult<T>;
+  action?: React.ReactNode;
   children: (data: T) => React.ReactNode;
 }) {
   const { t } = useLanguage();
   return (
     <div className="border-t border-srapi-border pt-4 first:border-t-0 first:pt-0">
-      <h3 className="mb-2 font-mono text-2xs uppercase tracking-widest text-srapi-text-secondary">
-        {title}
-      </h3>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h3 className="font-mono text-2xs uppercase tracking-widest text-srapi-text-secondary">
+          {title}
+        </h3>
+        {action}
+      </div>
       {query.isLoading ? (
         <Skeleton className="h-16 w-full" />
       ) : query.data === undefined ? (
@@ -65,11 +75,34 @@ export function AccountDetailSheet({
   onOpenChange: (open: boolean) => void;
 }) {
   const { t } = useLanguage();
+  const { toast } = useToast();
   const id = account?.id ?? null;
   const health = useAccountHealth(id);
   const quota = useAccountQuota(id);
   const rpm = useAccountRpmStatus(id);
   const proxy = useAccountProxyQuality(id);
+  const fetchQuota = useFetchAccountQuota();
+
+  async function refreshQuota() {
+    if (!id) return;
+    try {
+      const report = await fetchQuota.mutateAsync(id);
+      toast({
+        title: report.supported
+          ? t("adminAccounts.quotaRefreshed")
+          : t("adminAccounts.quotaUnsupported"),
+        description: report.supported
+          ? t("adminAccounts.quotaCredits", {
+              remaining: report.credits_remaining,
+              limit: report.credits_limit,
+            })
+          : undefined,
+        tone: report.supported ? "success" : "default",
+      });
+    } catch (err) {
+      toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
+    }
+  }
 
   return (
     <Sheet open={account !== null} onOpenChange={onOpenChange}>
@@ -103,7 +136,23 @@ export function AccountDetailSheet({
             )}
           </Section>
 
-          <Section title={t("adminAccounts.quotaTitle")} query={quota}>
+          <Section
+            title={t("adminAccounts.quotaTitle")}
+            query={quota}
+            action={
+              id ? (
+                <button
+                  type="button"
+                  onClick={() => void refreshQuota()}
+                  disabled={fetchQuota.isPending}
+                  className="flex items-center gap-1 font-mono text-2xs uppercase tracking-wide text-srapi-text-tertiary transition-colors hover:text-srapi-text-secondary disabled:opacity-50"
+                >
+                  <RefreshCw className={cn("size-3", fetchQuota.isPending && "animate-spin")} />
+                  {t("adminAccounts.quotaRefresh")}
+                </button>
+              ) : null
+            }
+          >
             {(q) =>
               q.data.length === 0 ? (
                 <p className="text-2xs text-srapi-text-tertiary">{t("adminAccounts.detailNoData")}</p>
