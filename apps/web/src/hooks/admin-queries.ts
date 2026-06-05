@@ -358,6 +358,16 @@ export function useCreateAdminRole() {
     ["admin", "roles"],
   );
 }
+export function useUpdateAdminRole() {
+  return useAdminMutation(
+    (vars: { id: string; body: B<typeof adminApi.updateRole> }) =>
+      adminApi.updateRole(vars.id, vars.body),
+    ["admin", "roles"],
+  );
+}
+export function useDeleteAdminRole() {
+  return useAdminMutation((id: string) => adminApi.deleteRole(id), ["admin", "roles"]);
+}
 
 // ---- Custom user attribute definitions ----
 export function useUserAttributeDefinitions() {

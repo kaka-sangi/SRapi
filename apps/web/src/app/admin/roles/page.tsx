@@ -7,12 +7,26 @@ import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { ListToolbar, SearchInput } from "@/components/admin/list-toolbar";
 import { ResourceFormDialog, type FieldConfig } from "@/components/admin/resource-form-dialog";
+import { RowActionsMenu } from "@/components/admin/row-actions";
+import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useClientPagedList } from "@/hooks/use-client-list";
-import { useAdminRoles, useCreateAdminRole } from "@/hooks/admin-queries";
+import {
+  useAdminRoles,
+  useCreateAdminRole,
+  useUpdateAdminRole,
+  useDeleteAdminRole,
+} from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
-import { emptyRoleForm, buildRoleBody, type RoleFormState } from "@/lib/admin-role-form";
+import {
+  emptyRoleForm,
+  roleFormFromRole,
+  buildRoleBody,
+  buildRoleUpdateBody,
+  isBuiltInRole,
+  type RoleFormState,
+} from "@/lib/admin-role-form";
 import type { Role } from "@/lib/sdk-types";
 
 function roleMatch(role: Role, term: string): boolean {
@@ -40,8 +54,20 @@ function RolesContent() {
   const all = useAdminRoles();
   const { query, total } = useClientPagedList(all, list, { match: roleMatch, compare: roleCompare });
   const createMut = useCreateAdminRole();
+  const updateMut = useUpdateAdminRole();
+  const deleteMut = useDeleteAdminRole();
   const [creating, setCreating] = useState(false);
+  const [editTarget, setEditTarget] = useState<Role | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Role | null>(null);
   const isFiltered = Boolean(list.search);
+
+  const permissionsField: FieldConfig<RoleFormState> = {
+    name: "permissions",
+    label: t("adminRoles.permissions"),
+    type: "tags",
+    placeholder: t("adminRoles.permissionsPlaceholder"),
+    hint: t("adminRoles.permissionsHint"),
+  };
 
   const fields: FieldConfig<RoleFormState>[] = [
     {
@@ -51,20 +77,29 @@ function RolesContent() {
       placeholder: t("adminRoles.namePlaceholder"),
     },
     { name: "description", label: t("adminCommon.description") },
-    {
-      name: "permissions",
-      label: t("adminRoles.permissions"),
-      type: "tags",
-      placeholder: t("adminRoles.permissionsPlaceholder"),
-      hint: t("adminRoles.permissionsHint"),
-    },
+    permissionsField,
+  ];
+
+  // The role name is the immutable identity, so it's omitted from the edit form.
+  const editFields: FieldConfig<RoleFormState>[] = [
+    { name: "description", label: t("adminCommon.description") },
+    permissionsField,
   ];
 
   const columns: Column<Role>[] = [
     {
       key: "name",
       header: t("adminRoles.name"),
-      render: (r) => <span className="font-mono text-xs text-srapi-text-primary">{r.name}</span>,
+      render: (r) => (
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-xs text-srapi-text-primary">{r.name}</span>
+          {isBuiltInRole(r.name) ? (
+            <span className="rounded border border-srapi-border px-1 py-px text-[10px] uppercase tracking-wide text-srapi-text-tertiary">
+              {t("adminRoles.builtIn")}
+            </span>
+          ) : null}
+        </div>
+      ),
       sortValue: (r) => r.name,
     },
     {
@@ -166,6 +201,20 @@ function RolesContent() {
           total,
           onPageChange: list.setPage,
         }}
+        rowActions={(r) =>
+          isBuiltInRole(r.name) ? null : (
+            <RowActionsMenu
+              actions={[
+                { label: t("common.edit"), onSelect: () => setEditTarget(r) },
+                {
+                  label: t("common.delete"),
+                  destructive: true,
+                  onSelect: () => setDeleteTarget(r),
+                },
+              ]}
+            />
+          )
+        }
       />
 
       {creating ? (
@@ -182,6 +231,38 @@ function RolesContent() {
           submit={(body) => createMut.mutateAsync(body)}
           successMessage={t("feedback.created")}
           isPending={createMut.isPending}
+        />
+      ) : null}
+
+      {editTarget ? (
+        <ResourceFormDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setEditTarget(null);
+          }}
+          title={t("adminRoles.edit")}
+          description={editTarget.name}
+          fields={editFields}
+          initial={roleFormFromRole(editTarget)}
+          buildBody={buildRoleUpdateBody}
+          submit={(body) => updateMut.mutateAsync({ id: String(editTarget.id), body })}
+          successMessage={t("feedback.updated")}
+          isPending={updateMut.isPending}
+        />
+      ) : null}
+
+      {deleteTarget ? (
+        <ConfirmDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setDeleteTarget(null);
+          }}
+          title={t("adminRoles.deleteTitle")}
+          body={t("adminRoles.deleteBody", { name: deleteTarget.name })}
+          confirmLabel={t("common.delete")}
+          onConfirm={() => deleteMut.mutateAsync(String(deleteTarget.id))}
+          successMessage={t("feedback.deleted")}
+          isPending={deleteMut.isPending}
         />
       ) : null}
     </>

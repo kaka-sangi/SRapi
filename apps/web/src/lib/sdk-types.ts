@@ -31,6 +31,7 @@ export type {
   TlsProfile,
   Role,
   CreateRoleRequest,
+  UpdateRoleRequest,
   UserAttributeDefinition,
   NotificationEmailTemplate,
   NotificationEmailTemplateList,

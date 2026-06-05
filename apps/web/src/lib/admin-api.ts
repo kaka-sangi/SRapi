@@ -34,7 +34,9 @@ import {
   listAdminTlsProfiles,
   updateAdminTlsProfile,
   createAdminRole,
+  deleteAdminRole,
   listAdminRoles,
+  updateAdminRole,
   createAdminUserAttributeDefinition,
   deleteAdminUserAttributeDefinition,
   listAdminUserAttributeDefinitions,
@@ -170,6 +172,7 @@ import type {
   UpdateTlsProfileRequest,
   Role,
   CreateRoleRequest,
+  UpdateRoleRequest,
   CreateUserAttributeDefinitionRequest,
   UserAttributeDefinition,
   UpdateUserAttributeDefinitionRequest,
@@ -871,6 +874,14 @@ export const adminApi = {
 
   createRole(body: CreateRoleRequest): Promise<Role> {
     return unwrapData(() => createAdminRole({ body, throwOnError: true }));
+  },
+
+  updateRole(id: Id, body: UpdateRoleRequest): Promise<Role> {
+    return unwrapData(() => updateAdminRole({ path: { id }, body, throwOnError: true }));
+  },
+
+  deleteRole(id: Id): Promise<{ deleted: boolean }> {
+    return unwrapData(() => deleteAdminRole({ path: { id }, throwOnError: true }));
   },
 
   updateTlsProfile(id: Id, body: UpdateTlsProfileRequest): Promise<TlsProfile> {
