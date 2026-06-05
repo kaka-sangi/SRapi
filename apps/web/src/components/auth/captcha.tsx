@@ -83,9 +83,12 @@ export function Captcha({
   className?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  // Keep the latest onToken without re-rendering the widget on every parent render.
+  // Keep the latest onToken without re-rendering the widget on every parent
+  // render. Sync in an effect (not during render) so the ref read stays legal.
   const onTokenRef = useRef(onToken);
-  onTokenRef.current = onToken;
+  useEffect(() => {
+    onTokenRef.current = onToken;
+  });
 
   const meta = PROVIDERS[provider];
 
