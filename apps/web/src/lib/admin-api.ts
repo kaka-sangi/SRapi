@@ -21,6 +21,10 @@ import {
   deleteAdminGroupRateLimit,
   clearAdminAccountError,
   createAdminAccount,
+  startAdminAccountOAuthAuthorizeUrl,
+  exchangeAdminAccountOAuthCode,
+  startAdminAccountOAuthDeviceCode,
+  pollAdminAccountOAuthDeviceCode,
   createAdminAccountGroup,
   createAdminAnnouncement,
   createAdminErrorPassthroughRule,
@@ -37,6 +41,17 @@ import {
   listAdminScheduledTestPlanRuns,
   runAdminScheduledTestPlan,
   updateAdminScheduledTestPlan,
+  listAdminChannelMonitors,
+  createAdminChannelMonitor,
+  updateAdminChannelMonitor,
+  deleteAdminChannelMonitor,
+  runAdminChannelMonitor,
+  listAdminChannelMonitorRuns,
+  listAdminChannelMonitorTemplates,
+  createAdminChannelMonitorTemplate,
+  updateAdminChannelMonitorTemplate,
+  deleteAdminChannelMonitorTemplate,
+  applyAdminChannelMonitorTemplate,
   createAdminTlsProfile,
   deleteAdminTlsProfile,
   listAdminTlsProfiles,
@@ -197,6 +212,13 @@ import type {
   ScheduledTestPlan,
   ScheduledTestPlanRun,
   UpdateScheduledTestPlanRequest,
+  ChannelMonitor,
+  CreateChannelMonitorRequest,
+  UpdateChannelMonitorRequest,
+  ChannelMonitorRun,
+  ChannelMonitorTemplate,
+  CreateChannelMonitorTemplateRequest,
+  UpdateChannelMonitorTemplateRequest,
   CreateTlsProfileRequest,
   TlsProfile,
   UpdateTlsProfileRequest,
@@ -224,6 +246,11 @@ import type {
   ConfigSnapshotResponse,
   CreateAccountGroupRequest,
   CreateAdminAccountData,
+  AccountOAuthProviderConfig,
+  AccountOAuthAuthorizeUrl,
+  AccountOAuthCredential,
+  AccountOAuthDeviceCode,
+  AccountOAuthPending,
   CreateAdminPaymentProviderData,
   UpdateAdminPaymentProviderData,
   CreateAdminPricingRuleData,
@@ -598,6 +625,53 @@ export const adminApi = {
 
   createAccount(body: CreateAdminAccountData["body"]): Promise<ProviderAccount> {
     return unwrapData(() => createAdminAccount({ body, throwOnError: true }));
+  },
+
+  // Interactive upstream-account OAuth provisioning (replaces hand-pasting
+  // access_token/refresh_token). The minted credential is returned write-only
+  // and immediately fed into createAccount — it is never persisted server-side.
+  startAccountOAuthAuthorizeUrl(config: AccountOAuthProviderConfig): Promise<AccountOAuthAuthorizeUrl> {
+    return unwrapData(() =>
+      startAdminAccountOAuthAuthorizeUrl({ body: { config }, throwOnError: true }),
+    );
+  },
+
+  exchangeAccountOAuthCode(input: {
+    sessionId: string;
+    code: string;
+    state: string;
+  }): Promise<AccountOAuthCredential> {
+    return unwrapData(() =>
+      exchangeAdminAccountOAuthCode({
+        body: { session_id: input.sessionId, code: input.code, state: input.state },
+        throwOnError: true,
+      }),
+    );
+  },
+
+  startAccountOAuthDeviceCode(config: AccountOAuthProviderConfig): Promise<AccountOAuthDeviceCode> {
+    return unwrapData(() =>
+      startAdminAccountOAuthDeviceCode({ body: { config }, throwOnError: true }),
+    );
+  },
+
+  // Polls once. Returns the minted credential on success, or a pending status
+  // (status === "pending") that the caller keeps polling on a fixed interval.
+  // The endpoint returns a union (200 credential / 202 pending), so we unwrap
+  // the envelope directly rather than through the single-type unwrapData.
+  async pollAccountOAuthDeviceCode(
+    sessionId: string,
+  ): Promise<AccountOAuthCredential | AccountOAuthPending> {
+    configureAdminClient();
+    const response = await pollAdminAccountOAuthDeviceCode({
+      body: { session_id: sessionId },
+      throwOnError: true,
+    });
+    const data = response.data?.data;
+    if (!data) {
+      throw new Error("Device-code poll returned an empty response.");
+    }
+    return data;
   },
 
   updateAccount(id: Id, body: UpdateAdminAccountData["body"]): Promise<ProviderAccount> {
@@ -976,6 +1050,68 @@ export const adminApi = {
       listAdminScheduledTestPlanRuns({
         path: { id },
         query: limit ? { limit } : {},
+        throwOnError: true,
+      }),
+    );
+  },
+
+  listChannelMonitors(): Promise<AdminListResult<ChannelMonitor>> {
+    return unwrapList(() => listAdminChannelMonitors({ throwOnError: true }));
+  },
+
+  createChannelMonitor(body: CreateChannelMonitorRequest): Promise<ChannelMonitor> {
+    return unwrapData(() => createAdminChannelMonitor({ body, throwOnError: true }));
+  },
+
+  updateChannelMonitor(id: Id, body: UpdateChannelMonitorRequest): Promise<ChannelMonitor> {
+    return unwrapData(() => updateAdminChannelMonitor({ path: { id }, body, throwOnError: true }));
+  },
+
+  deleteChannelMonitor(id: Id): Promise<{ deleted: boolean }> {
+    return unwrapData(() => deleteAdminChannelMonitor({ path: { id }, throwOnError: true }));
+  },
+
+  runChannelMonitor(id: Id): Promise<ChannelMonitorRun> {
+    return unwrapData(() => runAdminChannelMonitor({ path: { id }, throwOnError: true }));
+  },
+
+  listChannelMonitorRuns(id: Id, limit?: number): Promise<AdminListResult<ChannelMonitorRun>> {
+    return unwrapList(() =>
+      listAdminChannelMonitorRuns({ path: { id }, query: { limit }, throwOnError: true }),
+    );
+  },
+
+  listChannelMonitorTemplates(): Promise<AdminListResult<ChannelMonitorTemplate>> {
+    return unwrapList(() => listAdminChannelMonitorTemplates({ throwOnError: true }));
+  },
+
+  createChannelMonitorTemplate(
+    body: CreateChannelMonitorTemplateRequest,
+  ): Promise<ChannelMonitorTemplate> {
+    return unwrapData(() => createAdminChannelMonitorTemplate({ body, throwOnError: true }));
+  },
+
+  updateChannelMonitorTemplate(
+    id: Id,
+    body: UpdateChannelMonitorTemplateRequest,
+  ): Promise<ChannelMonitorTemplate> {
+    return unwrapData(() =>
+      updateAdminChannelMonitorTemplate({ path: { id }, body, throwOnError: true }),
+    );
+  },
+
+  deleteChannelMonitorTemplate(id: Id): Promise<{ deleted: boolean }> {
+    return unwrapData(() => deleteAdminChannelMonitorTemplate({ path: { id }, throwOnError: true }));
+  },
+
+  applyChannelMonitorTemplate(
+    id: Id,
+    monitorIds: number[],
+  ): Promise<AdminListResult<ChannelMonitor>> {
+    return unwrapList(() =>
+      applyAdminChannelMonitorTemplate({
+        path: { id },
+        body: { monitor_ids: monitorIds },
         throwOnError: true,
       }),
     );

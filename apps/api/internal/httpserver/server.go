@@ -25,6 +25,7 @@ import (
 	authcontract "github.com/srapi/srapi/apps/api/internal/modules/auth/contract"
 	billingcontract "github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
 	capabilitiescontract "github.com/srapi/srapi/apps/api/internal/modules/capabilities/contract"
+	channelmonitorscontract "github.com/srapi/srapi/apps/api/internal/modules/channel_monitors/contract"
 	errorpassthroughcontract "github.com/srapi/srapi/apps/api/internal/modules/error_passthrough/contract"
 	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	gatewaycontract "github.com/srapi/srapi/apps/api/internal/modules/gateway/contract"
@@ -105,6 +106,7 @@ type runtimeOptions struct {
 	userPlatformQuotas userplatformquotascontract.Store
 	payloadRules       payloadrulescontract.Store
 	scheduledTests     scheduledtestscontract.Store
+	channelMonitors    channelmonitorscontract.Store
 }
 
 func WithAdminControlStore(store admincontrolcontract.Store) Option {
@@ -248,6 +250,12 @@ func WithPayloadRulesStore(store payloadrulescontract.Store) Option {
 func WithScheduledTestsStore(store scheduledtestscontract.Store) Option {
 	return func(opts *runtimeOptions) {
 		opts.scheduledTests = store
+	}
+}
+
+func WithChannelMonitorsStore(store channelmonitorscontract.Store) Option {
+	return func(opts *runtimeOptions) {
+		opts.channelMonitors = store
 	}
 }
 
@@ -583,9 +591,21 @@ func (s *Server) registerCapabilityAdminRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /api/v1/admin/scheduled-test-plans/{id}", s.handleDeleteAdminScheduledTestPlan)
 	mux.HandleFunc("GET /api/v1/admin/scheduled-test-plans/{id}/runs", s.handleListAdminScheduledTestPlanRuns)
 	mux.HandleFunc("POST /api/v1/admin/scheduled-test-plans/{id}/run", s.handleRunAdminScheduledTestPlan)
+	mux.HandleFunc("GET /api/v1/admin/channel-monitors", s.handleListAdminChannelMonitors)
+	mux.HandleFunc("POST /api/v1/admin/channel-monitors", s.handleCreateAdminChannelMonitor)
+	mux.HandleFunc("PATCH /api/v1/admin/channel-monitors/{id}", s.handleUpdateAdminChannelMonitor)
+	mux.HandleFunc("DELETE /api/v1/admin/channel-monitors/{id}", s.handleDeleteAdminChannelMonitor)
+	mux.HandleFunc("POST /api/v1/admin/channel-monitors/{id}/run", s.handleRunAdminChannelMonitor)
+	mux.HandleFunc("GET /api/v1/admin/channel-monitors/{id}/runs", s.handleListAdminChannelMonitorRuns)
+	mux.HandleFunc("GET /api/v1/admin/channel-monitor-templates", s.handleListAdminChannelMonitorTemplates)
+	mux.HandleFunc("POST /api/v1/admin/channel-monitor-templates", s.handleCreateAdminChannelMonitorTemplate)
+	mux.HandleFunc("PATCH /api/v1/admin/channel-monitor-templates/{id}", s.handleUpdateAdminChannelMonitorTemplate)
+	mux.HandleFunc("DELETE /api/v1/admin/channel-monitor-templates/{id}", s.handleDeleteAdminChannelMonitorTemplate)
+	mux.HandleFunc("POST /api/v1/admin/channel-monitor-templates/{id}/apply", s.handleApplyAdminChannelMonitorTemplate)
 	mux.HandleFunc("GET /api/v1/admin/accounts/availability", s.handleListAdminAccountsAvailability)
 	mux.HandleFunc("GET /api/v1/admin/accounts/{id}/availability", s.handleAdminAccountAvailability)
 	mux.HandleFunc("POST /api/v1/admin/accounts/{id}/quota-fetch", s.handleAdminAccountQuotaFetch)
+	s.registerAdminAccountOAuthRoutes(mux)
 	mux.HandleFunc("GET /api/v1/admin/tls-profiles", s.handleListAdminTLSProfiles)
 	mux.HandleFunc("POST /api/v1/admin/tls-profiles", s.handleCreateAdminTLSProfile)
 	mux.HandleFunc("PATCH /api/v1/admin/tls-profiles/{id}", s.handleUpdateAdminTLSProfile)

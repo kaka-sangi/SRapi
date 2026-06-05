@@ -1,0 +1,429 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ExternalLink, Loader2 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useLanguage } from "@/context/LanguageContext";
+import { useToast } from "@/context/ToastContext";
+import { adminApi, adminErrorMessage } from "@/lib/admin-api";
+import type {
+  AccountOAuthCredential,
+  AccountOAuthProviderConfig,
+  AccountOAuthDeviceCode,
+} from "@/lib/sdk-types";
+
+/** Which provisioning flow the wizard drives, keyed off the runtime class. */
+export type AccountOAuthFlowMode = "authorization_code" | "device_code";
+
+/** Tokens lifted out of a completed credential for the parent form to apply. */
+export interface ProvisionedTokens {
+  accessToken: string;
+  refreshToken: string;
+}
+
+const DEVICE_POLL_INTERVAL_MS = 2500;
+const DEVICE_MAX_POLLS = 120; // ~5 min ceiling regardless of provider expiry
+
+function extractTokens(credential: AccountOAuthCredential): ProvisionedTokens {
+  const cred = (credential.credential ?? {}) as Record<string, unknown>;
+  return {
+    accessToken: typeof cred.access_token === "string" ? cred.access_token : "",
+    refreshToken: typeof cred.refresh_token === "string" ? cred.refresh_token : "",
+  };
+}
+
+/**
+ * Interactive OAuth provisioning wizard that mints an upstream-account
+ * credential without the operator hand-pasting tokens. For oauth_refresh it
+ * runs the authorization-code (PKCE) flow: build a URL, the admin consents in a
+ * new tab, then pastes the returned code+state. For oauth_device_code it runs
+ * the RFC 8628 device flow: show a user code + verification URI and poll until
+ * the provider approves. On success it hands the minted access/refresh tokens
+ * back to the account form.
+ */
+export function AccountOAuthAuthorizeDialog({
+  open,
+  onOpenChange,
+  mode,
+  onProvisioned,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  mode: AccountOAuthFlowMode;
+  onProvisioned: (tokens: ProvisionedTokens) => void;
+}) {
+  const { t } = useLanguage();
+  const { toast } = useToast();
+
+  const [clientId, setClientId] = useState("");
+  const [clientSecret, setClientSecret] = useState("");
+  const [authorizeUrl, setAuthorizeUrl] = useState("");
+  const [tokenUrl, setTokenUrl] = useState("");
+  const [deviceAuthorizeUrl, setDeviceAuthorizeUrl] = useState("");
+  const [redirectUri, setRedirectUri] = useState("");
+  const [scopes, setScopes] = useState("");
+
+  // Authorization-code flow state.
+  const [authSessionId, setAuthSessionId] = useState("");
+  const [authState, setAuthState] = useState("");
+  const [authUrl, setAuthUrl] = useState("");
+  const [callbackCode, setCallbackCode] = useState("");
+
+  // Device-code flow state.
+  const [device, setDevice] = useState<AccountOAuthDeviceCode | null>(null);
+  const [polling, setPolling] = useState(false);
+
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollCount = useRef(0);
+  // Holds the latest pollDevice so the self-scheduling setTimeout recursion
+  // doesn't reference the callback before its own declaration.
+  const pollDeviceRef = useRef<((sessionId: string) => Promise<void>) | null>(null);
+
+  const stopPolling = useCallback(() => {
+    if (pollTimer.current) {
+      clearTimeout(pollTimer.current);
+      pollTimer.current = null;
+    }
+    pollCount.current = 0;
+    setPolling(false);
+  }, []);
+
+  const resetAll = useCallback(() => {
+    stopPolling();
+    setAuthSessionId("");
+    setAuthState("");
+    setAuthUrl("");
+    setCallbackCode("");
+    setDevice(null);
+    setError(null);
+    setBusy(false);
+  }, [stopPolling]);
+
+  // Clear transient flow state whenever the dialog closes so a re-open starts
+  // fresh (config inputs are intentionally preserved between opens).
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (!open) resetAll();
+  }, [open, resetAll]);
+
+  useEffect(() => () => stopPolling(), [stopPolling]);
+
+  function buildConfig(): AccountOAuthProviderConfig {
+    const scopeList = scopes
+      .split(/[\s,]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    return {
+      client_id: clientId.trim(),
+      client_secret: clientSecret.trim() || undefined,
+      authorize_url: authorizeUrl.trim() || undefined,
+      token_url: tokenUrl.trim() || undefined,
+      device_authorize_url: deviceAuthorizeUrl.trim() || undefined,
+      redirect_uri: redirectUri.trim() || undefined,
+      scopes: scopeList.length ? scopeList : undefined,
+      use_pkce: true,
+    };
+  }
+
+  function complete(credential: AccountOAuthCredential) {
+    const tokens = extractTokens(credential);
+    if (!tokens.accessToken && !tokens.refreshToken) {
+      setError(t("accountOAuth.errors.noTokens"));
+      return;
+    }
+    onProvisioned(tokens);
+    toast({ title: t("accountOAuth.provisioned"), tone: "success" });
+    onOpenChange(false);
+  }
+
+  async function startAuthorizeUrl() {
+    setError(null);
+    setBusy(true);
+    try {
+      const result = await adminApi.startAccountOAuthAuthorizeUrl(buildConfig());
+      setAuthSessionId(result.session_id);
+      setAuthState(result.state);
+      setAuthUrl(result.authorization_url);
+    } catch (err) {
+      setError(adminErrorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function exchangeCode() {
+    setError(null);
+    setBusy(true);
+    try {
+      const credential = await adminApi.exchangeAccountOAuthCode({
+        sessionId: authSessionId,
+        code: callbackCode.trim(),
+        state: authState,
+      });
+      complete(credential);
+    } catch (err) {
+      setError(adminErrorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const pollDevice = useCallback(
+    async (sessionId: string) => {
+      try {
+        const result = await adminApi.pollAccountOAuthDeviceCode(sessionId);
+        if ("status" in result && result.status === "pending") {
+          pollCount.current += 1;
+          if (pollCount.current >= DEVICE_MAX_POLLS) {
+            stopPolling();
+            setError(t("accountOAuth.errors.deviceTimeout"));
+            return;
+          }
+          pollTimer.current = setTimeout(
+            () => void pollDeviceRef.current?.(sessionId),
+            DEVICE_POLL_INTERVAL_MS,
+          );
+          return;
+        }
+        stopPolling();
+        complete(result as AccountOAuthCredential);
+      } catch (err) {
+        stopPolling();
+        setError(adminErrorMessage(err));
+      }
+    },
+    // complete/t/stopPolling are stable enough for this imperative poller.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [stopPolling, t],
+  );
+  useEffect(() => {
+    pollDeviceRef.current = pollDevice;
+  }, [pollDevice]);
+
+  async function startDeviceCode() {
+    setError(null);
+    setBusy(true);
+    try {
+      const result = await adminApi.startAccountOAuthDeviceCode(buildConfig());
+      setDevice(result);
+      setPolling(true);
+      pollCount.current = 0;
+      pollTimer.current = setTimeout(
+        () => void pollDevice(result.session_id),
+        DEVICE_POLL_INTERVAL_MS,
+      );
+    } catch (err) {
+      setError(adminErrorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const isAuthCode = mode === "authorization_code";
+  const configReady =
+    clientId.trim() !== "" &&
+    (isAuthCode
+      ? authorizeUrl.trim() !== "" && tokenUrl.trim() !== "" && redirectUri.trim() !== ""
+      : deviceAuthorizeUrl.trim() !== "" && tokenUrl.trim() !== "");
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t("accountOAuth.title")}</DialogTitle>
+          <DialogDescription>
+            {isAuthCode ? t("accountOAuth.authCodeIntro") : t("accountOAuth.deviceIntro")}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="mt-4 max-h-[60vh] space-y-4 overflow-y-auto pr-1">
+          <div>
+            <Label htmlFor="oauth-client-id">{t("accountOAuth.clientId")}</Label>
+            <Input
+              id="oauth-client-id"
+              autoComplete="off"
+              className="mt-1.5 font-mono"
+              value={clientId}
+              disabled={busy || polling}
+              onChange={(e) => setClientId(e.target.value)}
+            />
+          </div>
+          <div>
+            <Label htmlFor="oauth-client-secret">{t("accountOAuth.clientSecret")}</Label>
+            <Input
+              id="oauth-client-secret"
+              type="password"
+              autoComplete="off"
+              className="mt-1.5 font-mono"
+              value={clientSecret}
+              disabled={busy || polling}
+              onChange={(e) => setClientSecret(e.target.value)}
+            />
+            <p className="mt-1 text-2xs text-srapi-text-tertiary">
+              {t("accountOAuth.clientSecretHint")}
+            </p>
+          </div>
+          {isAuthCode ? (
+            <>
+              <div>
+                <Label htmlFor="oauth-authorize-url">{t("accountOAuth.authorizeUrl")}</Label>
+                <Input
+                  id="oauth-authorize-url"
+                  autoComplete="off"
+                  className="mt-1.5 font-mono"
+                  value={authorizeUrl}
+                  disabled={busy}
+                  onChange={(e) => setAuthorizeUrl(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="oauth-redirect-uri">{t("accountOAuth.redirectUri")}</Label>
+                <Input
+                  id="oauth-redirect-uri"
+                  autoComplete="off"
+                  className="mt-1.5 font-mono"
+                  value={redirectUri}
+                  disabled={busy}
+                  onChange={(e) => setRedirectUri(e.target.value)}
+                />
+              </div>
+            </>
+          ) : (
+            <div>
+              <Label htmlFor="oauth-device-url">{t("accountOAuth.deviceAuthorizeUrl")}</Label>
+              <Input
+                id="oauth-device-url"
+                autoComplete="off"
+                className="mt-1.5 font-mono"
+                value={deviceAuthorizeUrl}
+                disabled={busy || polling}
+                onChange={(e) => setDeviceAuthorizeUrl(e.target.value)}
+              />
+            </div>
+          )}
+          <div>
+            <Label htmlFor="oauth-token-url">{t("accountOAuth.tokenUrl")}</Label>
+            <Input
+              id="oauth-token-url"
+              autoComplete="off"
+              className="mt-1.5 font-mono"
+              value={tokenUrl}
+              disabled={busy || polling}
+              onChange={(e) => setTokenUrl(e.target.value)}
+            />
+          </div>
+          <div>
+            <Label htmlFor="oauth-scopes">{t("accountOAuth.scopes")}</Label>
+            <Input
+              id="oauth-scopes"
+              autoComplete="off"
+              className="mt-1.5 font-mono"
+              placeholder={t("accountOAuth.scopesPlaceholder")}
+              value={scopes}
+              disabled={busy || polling}
+              onChange={(e) => setScopes(e.target.value)}
+            />
+          </div>
+
+          {/* Authorization-code: show the generated URL + a code paste box. */}
+          {isAuthCode && authUrl ? (
+            <div className="space-y-2 rounded-lg border border-srapi-border bg-srapi-card-muted px-3.5 py-3">
+              <a
+                href={authUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 text-sm text-srapi-primary hover:underline"
+              >
+                <ExternalLink className="size-3.5" />
+                {t("accountOAuth.openAuthorizeUrl")}
+              </a>
+              <p className="text-2xs text-srapi-text-tertiary">{t("accountOAuth.pasteCodeHint")}</p>
+              <div>
+                <Label htmlFor="oauth-callback-code" className="text-2xs">
+                  {t("accountOAuth.callbackCode")}
+                </Label>
+                <Input
+                  id="oauth-callback-code"
+                  autoComplete="off"
+                  className="mt-1 font-mono"
+                  value={callbackCode}
+                  disabled={busy}
+                  onChange={(e) => setCallbackCode(e.target.value)}
+                />
+              </div>
+            </div>
+          ) : null}
+
+          {/* Device-code: show the user code + verification URI while polling. */}
+          {!isAuthCode && device ? (
+            <div className="space-y-2 rounded-lg border border-srapi-border bg-srapi-card-muted px-3.5 py-3">
+              <p className="text-2xs text-srapi-text-tertiary">{t("accountOAuth.deviceCodeHint")}</p>
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-lg tracking-widest text-srapi-text-primary">
+                  {device.user_code}
+                </span>
+                <a
+                  href={device.verification_uri_complete ?? device.verification_uri}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 text-sm text-srapi-primary hover:underline"
+                >
+                  <ExternalLink className="size-3.5" />
+                  {t("accountOAuth.openVerificationUri")}
+                </a>
+              </div>
+              {polling ? (
+                <p className="inline-flex items-center gap-1.5 text-2xs text-srapi-text-secondary">
+                  <Loader2 className="size-3.5 animate-spin" />
+                  {t("accountOAuth.waitingForApproval")}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
+          {error ? <p className="text-sm text-srapi-error">{error}</p> : null}
+        </div>
+
+        <DialogFooter>
+          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>
+            {t("common.cancel")}
+          </Button>
+          {isAuthCode ? (
+            authUrl ? (
+              <Button type="button" onClick={() => void exchangeCode()} disabled={busy || !callbackCode.trim()}>
+                {busy ? <Loader2 className="size-4 animate-spin" /> : null}
+                {t("accountOAuth.completeAuthorization")}
+              </Button>
+            ) : (
+              <Button type="button" onClick={() => void startAuthorizeUrl()} disabled={busy || !configReady}>
+                {busy ? <Loader2 className="size-4 animate-spin" /> : null}
+                {t("accountOAuth.buildAuthorizeUrl")}
+              </Button>
+            )
+          ) : (
+            <Button
+              type="button"
+              onClick={() => void startDeviceCode()}
+              disabled={busy || polling || !configReady}
+            >
+              {busy || polling ? <Loader2 className="size-4 animate-spin" /> : null}
+              {t("accountOAuth.startDeviceCode")}
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

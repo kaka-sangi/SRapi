@@ -40,6 +40,9 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/modelprovidermapping"
 	"github.com/srapi/srapi/apps/api/ent/modelratelimit"
 	"github.com/srapi/srapi/apps/api/ent/modelregistry"
+	"github.com/srapi/srapi/apps/api/ent/monitordefinition"
+	"github.com/srapi/srapi/apps/api/ent/monitorrequesttemplate"
+	"github.com/srapi/srapi/apps/api/ent/monitorrunresult"
 	"github.com/srapi/srapi/apps/api/ent/obsalertevent"
 	"github.com/srapi/srapi/apps/api/ent/obsalertrule"
 	"github.com/srapi/srapi/apps/api/ent/obsalertsilence"
@@ -139,6 +142,12 @@ type Client struct {
 	ModelRateLimit *ModelRateLimitClient
 	// ModelRegistry is the client for interacting with the ModelRegistry builders.
 	ModelRegistry *ModelRegistryClient
+	// MonitorDefinition is the client for interacting with the MonitorDefinition builders.
+	MonitorDefinition *MonitorDefinitionClient
+	// MonitorRequestTemplate is the client for interacting with the MonitorRequestTemplate builders.
+	MonitorRequestTemplate *MonitorRequestTemplateClient
+	// MonitorRunResult is the client for interacting with the MonitorRunResult builders.
+	MonitorRunResult *MonitorRunResultClient
 	// ObsAlertEvent is the client for interacting with the ObsAlertEvent builders.
 	ObsAlertEvent *ObsAlertEventClient
 	// ObsAlertRule is the client for interacting with the ObsAlertRule builders.
@@ -256,6 +265,9 @@ func (c *Client) init() {
 	c.ModelProviderMapping = NewModelProviderMappingClient(c.config)
 	c.ModelRateLimit = NewModelRateLimitClient(c.config)
 	c.ModelRegistry = NewModelRegistryClient(c.config)
+	c.MonitorDefinition = NewMonitorDefinitionClient(c.config)
+	c.MonitorRequestTemplate = NewMonitorRequestTemplateClient(c.config)
+	c.MonitorRunResult = NewMonitorRunResultClient(c.config)
 	c.ObsAlertEvent = NewObsAlertEventClient(c.config)
 	c.ObsAlertRule = NewObsAlertRuleClient(c.config)
 	c.ObsAlertSilence = NewObsAlertSilenceClient(c.config)
@@ -414,6 +426,9 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		ModelProviderMapping:      NewModelProviderMappingClient(cfg),
 		ModelRateLimit:            NewModelRateLimitClient(cfg),
 		ModelRegistry:             NewModelRegistryClient(cfg),
+		MonitorDefinition:         NewMonitorDefinitionClient(cfg),
+		MonitorRequestTemplate:    NewMonitorRequestTemplateClient(cfg),
+		MonitorRunResult:          NewMonitorRunResultClient(cfg),
 		ObsAlertEvent:             NewObsAlertEventClient(cfg),
 		ObsAlertRule:              NewObsAlertRuleClient(cfg),
 		ObsAlertSilence:           NewObsAlertSilenceClient(cfg),
@@ -499,6 +514,9 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		ModelProviderMapping:      NewModelProviderMappingClient(cfg),
 		ModelRateLimit:            NewModelRateLimitClient(cfg),
 		ModelRegistry:             NewModelRegistryClient(cfg),
+		MonitorDefinition:         NewMonitorDefinitionClient(cfg),
+		MonitorRequestTemplate:    NewMonitorRequestTemplateClient(cfg),
+		MonitorRunResult:          NewMonitorRunResultClient(cfg),
 		ObsAlertEvent:             NewObsAlertEventClient(cfg),
 		ObsAlertRule:              NewObsAlertRuleClient(cfg),
 		ObsAlertSilence:           NewObsAlertSilenceClient(cfg),
@@ -575,7 +593,8 @@ func (c *Client) Use(hooks ...Hook) {
 		c.DomainEventsOutbox, c.EmailVerificationToken, c.Entitlement,
 		c.ErrorPassthroughRule, c.IdempotencyRecord, c.InviteCode,
 		c.InviteRelationship, c.ModelAlias, c.ModelProviderMapping, c.ModelRateLimit,
-		c.ModelRegistry, c.ObsAlertEvent, c.ObsAlertRule, c.ObsAlertSilence,
+		c.ModelRegistry, c.MonitorDefinition, c.MonitorRequestTemplate,
+		c.MonitorRunResult, c.ObsAlertEvent, c.ObsAlertRule, c.ObsAlertSilence,
 		c.ObsSLODefinition, c.OpsSystemLog, c.PasswordResetToken, c.PayloadRule,
 		c.PaymentAuditLog, c.PaymentOrder, c.PaymentProviderInstance,
 		c.PendingOAuthSession, c.PricingRule, c.Provider, c.ProviderAccount, c.Proxy,
@@ -602,7 +621,8 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.DomainEventsOutbox, c.EmailVerificationToken, c.Entitlement,
 		c.ErrorPassthroughRule, c.IdempotencyRecord, c.InviteCode,
 		c.InviteRelationship, c.ModelAlias, c.ModelProviderMapping, c.ModelRateLimit,
-		c.ModelRegistry, c.ObsAlertEvent, c.ObsAlertRule, c.ObsAlertSilence,
+		c.ModelRegistry, c.MonitorDefinition, c.MonitorRequestTemplate,
+		c.MonitorRunResult, c.ObsAlertEvent, c.ObsAlertRule, c.ObsAlertSilence,
 		c.ObsSLODefinition, c.OpsSystemLog, c.PasswordResetToken, c.PayloadRule,
 		c.PaymentAuditLog, c.PaymentOrder, c.PaymentProviderInstance,
 		c.PendingOAuthSession, c.PricingRule, c.Provider, c.ProviderAccount, c.Proxy,
@@ -673,6 +693,12 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.ModelRateLimit.mutate(ctx, m)
 	case *ModelRegistryMutation:
 		return c.ModelRegistry.mutate(ctx, m)
+	case *MonitorDefinitionMutation:
+		return c.MonitorDefinition.mutate(ctx, m)
+	case *MonitorRequestTemplateMutation:
+		return c.MonitorRequestTemplate.mutate(ctx, m)
+	case *MonitorRunResultMutation:
+		return c.MonitorRunResult.mutate(ctx, m)
 	case *ObsAlertEventMutation:
 		return c.ObsAlertEvent.mutate(ctx, m)
 	case *ObsAlertRuleMutation:
@@ -4213,6 +4239,405 @@ func (c *ModelRegistryClient) mutate(ctx context.Context, m *ModelRegistryMutati
 		return (&ModelRegistryDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown ModelRegistry mutation op: %q", m.Op())
+	}
+}
+
+// MonitorDefinitionClient is a client for the MonitorDefinition schema.
+type MonitorDefinitionClient struct {
+	config
+}
+
+// NewMonitorDefinitionClient returns a client for the MonitorDefinition from the given config.
+func NewMonitorDefinitionClient(c config) *MonitorDefinitionClient {
+	return &MonitorDefinitionClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `monitordefinition.Hooks(f(g(h())))`.
+func (c *MonitorDefinitionClient) Use(hooks ...Hook) {
+	c.hooks.MonitorDefinition = append(c.hooks.MonitorDefinition, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `monitordefinition.Intercept(f(g(h())))`.
+func (c *MonitorDefinitionClient) Intercept(interceptors ...Interceptor) {
+	c.inters.MonitorDefinition = append(c.inters.MonitorDefinition, interceptors...)
+}
+
+// Create returns a builder for creating a MonitorDefinition entity.
+func (c *MonitorDefinitionClient) Create() *MonitorDefinitionCreate {
+	mutation := newMonitorDefinitionMutation(c.config, OpCreate)
+	return &MonitorDefinitionCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of MonitorDefinition entities.
+func (c *MonitorDefinitionClient) CreateBulk(builders ...*MonitorDefinitionCreate) *MonitorDefinitionCreateBulk {
+	return &MonitorDefinitionCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *MonitorDefinitionClient) MapCreateBulk(slice any, setFunc func(*MonitorDefinitionCreate, int)) *MonitorDefinitionCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &MonitorDefinitionCreateBulk{err: fmt.Errorf("calling to MonitorDefinitionClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*MonitorDefinitionCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &MonitorDefinitionCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for MonitorDefinition.
+func (c *MonitorDefinitionClient) Update() *MonitorDefinitionUpdate {
+	mutation := newMonitorDefinitionMutation(c.config, OpUpdate)
+	return &MonitorDefinitionUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *MonitorDefinitionClient) UpdateOne(_m *MonitorDefinition) *MonitorDefinitionUpdateOne {
+	mutation := newMonitorDefinitionMutation(c.config, OpUpdateOne, withMonitorDefinition(_m))
+	return &MonitorDefinitionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *MonitorDefinitionClient) UpdateOneID(id int) *MonitorDefinitionUpdateOne {
+	mutation := newMonitorDefinitionMutation(c.config, OpUpdateOne, withMonitorDefinitionID(id))
+	return &MonitorDefinitionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for MonitorDefinition.
+func (c *MonitorDefinitionClient) Delete() *MonitorDefinitionDelete {
+	mutation := newMonitorDefinitionMutation(c.config, OpDelete)
+	return &MonitorDefinitionDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *MonitorDefinitionClient) DeleteOne(_m *MonitorDefinition) *MonitorDefinitionDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *MonitorDefinitionClient) DeleteOneID(id int) *MonitorDefinitionDeleteOne {
+	builder := c.Delete().Where(monitordefinition.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &MonitorDefinitionDeleteOne{builder}
+}
+
+// Query returns a query builder for MonitorDefinition.
+func (c *MonitorDefinitionClient) Query() *MonitorDefinitionQuery {
+	return &MonitorDefinitionQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeMonitorDefinition},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a MonitorDefinition entity by its id.
+func (c *MonitorDefinitionClient) Get(ctx context.Context, id int) (*MonitorDefinition, error) {
+	return c.Query().Where(monitordefinition.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *MonitorDefinitionClient) GetX(ctx context.Context, id int) *MonitorDefinition {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *MonitorDefinitionClient) Hooks() []Hook {
+	return c.hooks.MonitorDefinition
+}
+
+// Interceptors returns the client interceptors.
+func (c *MonitorDefinitionClient) Interceptors() []Interceptor {
+	return c.inters.MonitorDefinition
+}
+
+func (c *MonitorDefinitionClient) mutate(ctx context.Context, m *MonitorDefinitionMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&MonitorDefinitionCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&MonitorDefinitionUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&MonitorDefinitionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&MonitorDefinitionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown MonitorDefinition mutation op: %q", m.Op())
+	}
+}
+
+// MonitorRequestTemplateClient is a client for the MonitorRequestTemplate schema.
+type MonitorRequestTemplateClient struct {
+	config
+}
+
+// NewMonitorRequestTemplateClient returns a client for the MonitorRequestTemplate from the given config.
+func NewMonitorRequestTemplateClient(c config) *MonitorRequestTemplateClient {
+	return &MonitorRequestTemplateClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `monitorrequesttemplate.Hooks(f(g(h())))`.
+func (c *MonitorRequestTemplateClient) Use(hooks ...Hook) {
+	c.hooks.MonitorRequestTemplate = append(c.hooks.MonitorRequestTemplate, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `monitorrequesttemplate.Intercept(f(g(h())))`.
+func (c *MonitorRequestTemplateClient) Intercept(interceptors ...Interceptor) {
+	c.inters.MonitorRequestTemplate = append(c.inters.MonitorRequestTemplate, interceptors...)
+}
+
+// Create returns a builder for creating a MonitorRequestTemplate entity.
+func (c *MonitorRequestTemplateClient) Create() *MonitorRequestTemplateCreate {
+	mutation := newMonitorRequestTemplateMutation(c.config, OpCreate)
+	return &MonitorRequestTemplateCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of MonitorRequestTemplate entities.
+func (c *MonitorRequestTemplateClient) CreateBulk(builders ...*MonitorRequestTemplateCreate) *MonitorRequestTemplateCreateBulk {
+	return &MonitorRequestTemplateCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *MonitorRequestTemplateClient) MapCreateBulk(slice any, setFunc func(*MonitorRequestTemplateCreate, int)) *MonitorRequestTemplateCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &MonitorRequestTemplateCreateBulk{err: fmt.Errorf("calling to MonitorRequestTemplateClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*MonitorRequestTemplateCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &MonitorRequestTemplateCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for MonitorRequestTemplate.
+func (c *MonitorRequestTemplateClient) Update() *MonitorRequestTemplateUpdate {
+	mutation := newMonitorRequestTemplateMutation(c.config, OpUpdate)
+	return &MonitorRequestTemplateUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *MonitorRequestTemplateClient) UpdateOne(_m *MonitorRequestTemplate) *MonitorRequestTemplateUpdateOne {
+	mutation := newMonitorRequestTemplateMutation(c.config, OpUpdateOne, withMonitorRequestTemplate(_m))
+	return &MonitorRequestTemplateUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *MonitorRequestTemplateClient) UpdateOneID(id int) *MonitorRequestTemplateUpdateOne {
+	mutation := newMonitorRequestTemplateMutation(c.config, OpUpdateOne, withMonitorRequestTemplateID(id))
+	return &MonitorRequestTemplateUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for MonitorRequestTemplate.
+func (c *MonitorRequestTemplateClient) Delete() *MonitorRequestTemplateDelete {
+	mutation := newMonitorRequestTemplateMutation(c.config, OpDelete)
+	return &MonitorRequestTemplateDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *MonitorRequestTemplateClient) DeleteOne(_m *MonitorRequestTemplate) *MonitorRequestTemplateDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *MonitorRequestTemplateClient) DeleteOneID(id int) *MonitorRequestTemplateDeleteOne {
+	builder := c.Delete().Where(monitorrequesttemplate.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &MonitorRequestTemplateDeleteOne{builder}
+}
+
+// Query returns a query builder for MonitorRequestTemplate.
+func (c *MonitorRequestTemplateClient) Query() *MonitorRequestTemplateQuery {
+	return &MonitorRequestTemplateQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeMonitorRequestTemplate},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a MonitorRequestTemplate entity by its id.
+func (c *MonitorRequestTemplateClient) Get(ctx context.Context, id int) (*MonitorRequestTemplate, error) {
+	return c.Query().Where(monitorrequesttemplate.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *MonitorRequestTemplateClient) GetX(ctx context.Context, id int) *MonitorRequestTemplate {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *MonitorRequestTemplateClient) Hooks() []Hook {
+	return c.hooks.MonitorRequestTemplate
+}
+
+// Interceptors returns the client interceptors.
+func (c *MonitorRequestTemplateClient) Interceptors() []Interceptor {
+	return c.inters.MonitorRequestTemplate
+}
+
+func (c *MonitorRequestTemplateClient) mutate(ctx context.Context, m *MonitorRequestTemplateMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&MonitorRequestTemplateCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&MonitorRequestTemplateUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&MonitorRequestTemplateUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&MonitorRequestTemplateDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown MonitorRequestTemplate mutation op: %q", m.Op())
+	}
+}
+
+// MonitorRunResultClient is a client for the MonitorRunResult schema.
+type MonitorRunResultClient struct {
+	config
+}
+
+// NewMonitorRunResultClient returns a client for the MonitorRunResult from the given config.
+func NewMonitorRunResultClient(c config) *MonitorRunResultClient {
+	return &MonitorRunResultClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `monitorrunresult.Hooks(f(g(h())))`.
+func (c *MonitorRunResultClient) Use(hooks ...Hook) {
+	c.hooks.MonitorRunResult = append(c.hooks.MonitorRunResult, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `monitorrunresult.Intercept(f(g(h())))`.
+func (c *MonitorRunResultClient) Intercept(interceptors ...Interceptor) {
+	c.inters.MonitorRunResult = append(c.inters.MonitorRunResult, interceptors...)
+}
+
+// Create returns a builder for creating a MonitorRunResult entity.
+func (c *MonitorRunResultClient) Create() *MonitorRunResultCreate {
+	mutation := newMonitorRunResultMutation(c.config, OpCreate)
+	return &MonitorRunResultCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of MonitorRunResult entities.
+func (c *MonitorRunResultClient) CreateBulk(builders ...*MonitorRunResultCreate) *MonitorRunResultCreateBulk {
+	return &MonitorRunResultCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *MonitorRunResultClient) MapCreateBulk(slice any, setFunc func(*MonitorRunResultCreate, int)) *MonitorRunResultCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &MonitorRunResultCreateBulk{err: fmt.Errorf("calling to MonitorRunResultClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*MonitorRunResultCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &MonitorRunResultCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for MonitorRunResult.
+func (c *MonitorRunResultClient) Update() *MonitorRunResultUpdate {
+	mutation := newMonitorRunResultMutation(c.config, OpUpdate)
+	return &MonitorRunResultUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *MonitorRunResultClient) UpdateOne(_m *MonitorRunResult) *MonitorRunResultUpdateOne {
+	mutation := newMonitorRunResultMutation(c.config, OpUpdateOne, withMonitorRunResult(_m))
+	return &MonitorRunResultUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *MonitorRunResultClient) UpdateOneID(id int) *MonitorRunResultUpdateOne {
+	mutation := newMonitorRunResultMutation(c.config, OpUpdateOne, withMonitorRunResultID(id))
+	return &MonitorRunResultUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for MonitorRunResult.
+func (c *MonitorRunResultClient) Delete() *MonitorRunResultDelete {
+	mutation := newMonitorRunResultMutation(c.config, OpDelete)
+	return &MonitorRunResultDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *MonitorRunResultClient) DeleteOne(_m *MonitorRunResult) *MonitorRunResultDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *MonitorRunResultClient) DeleteOneID(id int) *MonitorRunResultDeleteOne {
+	builder := c.Delete().Where(monitorrunresult.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &MonitorRunResultDeleteOne{builder}
+}
+
+// Query returns a query builder for MonitorRunResult.
+func (c *MonitorRunResultClient) Query() *MonitorRunResultQuery {
+	return &MonitorRunResultQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeMonitorRunResult},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a MonitorRunResult entity by its id.
+func (c *MonitorRunResultClient) Get(ctx context.Context, id int) (*MonitorRunResult, error) {
+	return c.Query().Where(monitorrunresult.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *MonitorRunResultClient) GetX(ctx context.Context, id int) *MonitorRunResult {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *MonitorRunResultClient) Hooks() []Hook {
+	return c.hooks.MonitorRunResult
+}
+
+// Interceptors returns the client interceptors.
+func (c *MonitorRunResultClient) Interceptors() []Interceptor {
+	return c.inters.MonitorRunResult
+}
+
+func (c *MonitorRunResultClient) mutate(ctx context.Context, m *MonitorRunResultMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&MonitorRunResultCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&MonitorRunResultUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&MonitorRunResultUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&MonitorRunResultDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown MonitorRunResult mutation op: %q", m.Op())
 	}
 }
 
@@ -9545,7 +9970,8 @@ type (
 		BillingLedger, CapabilityDefinition, DomainEventsInbox, DomainEventsOutbox,
 		EmailVerificationToken, Entitlement, ErrorPassthroughRule, IdempotencyRecord,
 		InviteCode, InviteRelationship, ModelAlias, ModelProviderMapping,
-		ModelRateLimit, ModelRegistry, ObsAlertEvent, ObsAlertRule, ObsAlertSilence,
+		ModelRateLimit, ModelRegistry, MonitorDefinition, MonitorRequestTemplate,
+		MonitorRunResult, ObsAlertEvent, ObsAlertRule, ObsAlertSilence,
 		ObsSLODefinition, OpsSystemLog, PasswordResetToken, PayloadRule,
 		PaymentAuditLog, PaymentOrder, PaymentProviderInstance, PendingOAuthSession,
 		PricingRule, Provider, ProviderAccount, Proxy, QualityEvalSample,
@@ -9564,7 +9990,8 @@ type (
 		BillingLedger, CapabilityDefinition, DomainEventsInbox, DomainEventsOutbox,
 		EmailVerificationToken, Entitlement, ErrorPassthroughRule, IdempotencyRecord,
 		InviteCode, InviteRelationship, ModelAlias, ModelProviderMapping,
-		ModelRateLimit, ModelRegistry, ObsAlertEvent, ObsAlertRule, ObsAlertSilence,
+		ModelRateLimit, ModelRegistry, MonitorDefinition, MonitorRequestTemplate,
+		MonitorRunResult, ObsAlertEvent, ObsAlertRule, ObsAlertSilence,
 		ObsSLODefinition, OpsSystemLog, PasswordResetToken, PayloadRule,
 		PaymentAuditLog, PaymentOrder, PaymentProviderInstance, PendingOAuthSession,
 		PricingRule, Provider, ProviderAccount, Proxy, QualityEvalSample,

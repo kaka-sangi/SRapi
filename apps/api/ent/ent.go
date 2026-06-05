@@ -38,6 +38,9 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/modelprovidermapping"
 	"github.com/srapi/srapi/apps/api/ent/modelratelimit"
 	"github.com/srapi/srapi/apps/api/ent/modelregistry"
+	"github.com/srapi/srapi/apps/api/ent/monitordefinition"
+	"github.com/srapi/srapi/apps/api/ent/monitorrequesttemplate"
+	"github.com/srapi/srapi/apps/api/ent/monitorrunresult"
 	"github.com/srapi/srapi/apps/api/ent/obsalertevent"
 	"github.com/srapi/srapi/apps/api/ent/obsalertrule"
 	"github.com/srapi/srapi/apps/api/ent/obsalertsilence"
@@ -164,6 +167,9 @@ func checkColumn(t, c string) error {
 			modelprovidermapping.Table:      modelprovidermapping.ValidColumn,
 			modelratelimit.Table:            modelratelimit.ValidColumn,
 			modelregistry.Table:             modelregistry.ValidColumn,
+			monitordefinition.Table:         monitordefinition.ValidColumn,
+			monitorrequesttemplate.Table:    monitorrequesttemplate.ValidColumn,
+			monitorrunresult.Table:          monitorrunresult.ValidColumn,
 			obsalertevent.Table:             obsalertevent.ValidColumn,
 			obsalertrule.Table:              obsalertrule.ValidColumn,
 			obsalertsilence.Table:           obsalertsilence.ValidColumn,

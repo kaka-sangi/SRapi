@@ -65,6 +65,48 @@ func (e AccountModelDiscoverySource) Valid() bool {
 	}
 }
 
+// Defines values for AccountOAuthPendingMode.
+const (
+	AuthorizationCode AccountOAuthPendingMode = "authorization_code"
+	DeviceCode        AccountOAuthPendingMode = "device_code"
+)
+
+// Valid indicates whether the value is a known member of the AccountOAuthPendingMode enum.
+func (e AccountOAuthPendingMode) Valid() bool {
+	switch e {
+	case AuthorizationCode:
+		return true
+	case DeviceCode:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AccountOAuthPendingStatus.
+const (
+	AccountOAuthPendingStatusCompleted AccountOAuthPendingStatus = "completed"
+	AccountOAuthPendingStatusExpired   AccountOAuthPendingStatus = "expired"
+	AccountOAuthPendingStatusFailed    AccountOAuthPendingStatus = "failed"
+	AccountOAuthPendingStatusPending   AccountOAuthPendingStatus = "pending"
+)
+
+// Valid indicates whether the value is a known member of the AccountOAuthPendingStatus enum.
+func (e AccountOAuthPendingStatus) Valid() bool {
+	switch e {
+	case AccountOAuthPendingStatusCompleted:
+		return true
+	case AccountOAuthPendingStatusExpired:
+		return true
+	case AccountOAuthPendingStatusFailed:
+		return true
+	case AccountOAuthPendingStatusPending:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for AdminCopilotChatRequestReasoningEffort.
 const (
 	AdminCopilotChatRequestReasoningEffortHigh   AdminCopilotChatRequestReasoningEffort = "high"
@@ -599,6 +641,30 @@ func (e CapabilityDescriptorStatus) Valid() bool {
 	case CapabilityDescriptorStatusExperimental:
 		return true
 	case CapabilityDescriptorStatusStable:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ChannelMonitorScope.
+const (
+	ChannelMonitorScopeAccount  ChannelMonitorScope = "account"
+	ChannelMonitorScopeGroup    ChannelMonitorScope = "group"
+	ChannelMonitorScopeModel    ChannelMonitorScope = "model"
+	ChannelMonitorScopeProvider ChannelMonitorScope = "provider"
+)
+
+// Valid indicates whether the value is a known member of the ChannelMonitorScope enum.
+func (e ChannelMonitorScope) Valid() bool {
+	switch e {
+	case ChannelMonitorScopeAccount:
+		return true
+	case ChannelMonitorScopeGroup:
+		return true
+	case ChannelMonitorScopeModel:
+		return true
+	case ChannelMonitorScopeProvider:
 		return true
 	default:
 		return false
@@ -2677,22 +2743,22 @@ func (e UserStatus) Valid() bool {
 
 // Defines values for UserSubscriptionStatus.
 const (
-	UserSubscriptionStatusActive    UserSubscriptionStatus = "active"
-	UserSubscriptionStatusCancelled UserSubscriptionStatus = "cancelled"
-	UserSubscriptionStatusExpired   UserSubscriptionStatus = "expired"
-	UserSubscriptionStatusSuspended UserSubscriptionStatus = "suspended"
+	Active    UserSubscriptionStatus = "active"
+	Cancelled UserSubscriptionStatus = "cancelled"
+	Expired   UserSubscriptionStatus = "expired"
+	Suspended UserSubscriptionStatus = "suspended"
 )
 
 // Valid indicates whether the value is a known member of the UserSubscriptionStatus enum.
 func (e UserSubscriptionStatus) Valid() bool {
 	switch e {
-	case UserSubscriptionStatusActive:
+	case Active:
 		return true
-	case UserSubscriptionStatusCancelled:
+	case Cancelled:
 		return true
-	case UserSubscriptionStatusExpired:
+	case Expired:
 		return true
-	case UserSubscriptionStatusSuspended:
+	case Suspended:
 		return true
 	default:
 		return false
@@ -3016,6 +3082,123 @@ type AccountModelDiscoverySource string
 type AccountModelDiscoveryResponse struct {
 	Data      AccountModelDiscovery `json:"data"`
 	RequestId RequestId             `json:"request_id"`
+}
+
+// AccountOAuthAuthorizeUrl defines model for AccountOAuthAuthorizeUrl.
+type AccountOAuthAuthorizeUrl struct {
+	AuthorizationUrl string    `json:"authorization_url"`
+	ExpiresAt        time.Time `json:"expires_at"`
+	SessionId        string    `json:"session_id"`
+	State            string    `json:"state"`
+}
+
+// AccountOAuthAuthorizeUrlRequest defines model for AccountOAuthAuthorizeUrlRequest.
+type AccountOAuthAuthorizeUrlRequest struct {
+	// Config Config-driven description of an upstream provider's OAuth endpoints used to provision an account credential interactively. Secrets are write-only.
+	Config AccountOAuthProviderConfig `json:"config"`
+}
+
+// AccountOAuthAuthorizeUrlResponse defines model for AccountOAuthAuthorizeUrlResponse.
+type AccountOAuthAuthorizeUrlResponse struct {
+	Data      AccountOAuthAuthorizeUrl `json:"data"`
+	RequestId RequestId                `json:"request_id"`
+}
+
+// AccountOAuthCredential Provisioned upstream credential. Returned write-only so the client can immediately submit it to POST /admin/accounts; never persisted by this endpoint.
+type AccountOAuthCredential struct {
+	// Credential The minted upstream credential map (access_token/refresh_token/...) to submit to POST /admin/accounts. Returned only here; never persisted.
+	Credential      map[string]interface{} `json:"credential"`
+	ExpiresIn       *int                   `json:"expires_in,omitempty"`
+	HasAccessToken  *bool                  `json:"has_access_token,omitempty"`
+	HasRefreshToken *bool                  `json:"has_refresh_token,omitempty"`
+	Scope           *string                `json:"scope,omitempty"`
+	SessionId       string                 `json:"session_id"`
+	TokenType       *string                `json:"token_type,omitempty"`
+}
+
+// AccountOAuthCredentialResponse defines model for AccountOAuthCredentialResponse.
+type AccountOAuthCredentialResponse struct {
+	// Data Provisioned upstream credential. Returned write-only so the client can immediately submit it to POST /admin/accounts; never persisted by this endpoint.
+	Data      AccountOAuthCredential `json:"data"`
+	RequestId RequestId              `json:"request_id"`
+}
+
+// AccountOAuthDeviceCode defines model for AccountOAuthDeviceCode.
+type AccountOAuthDeviceCode struct {
+	ExpiresAt               time.Time `json:"expires_at"`
+	Interval                int       `json:"interval"`
+	SessionId               string    `json:"session_id"`
+	UserCode                string    `json:"user_code"`
+	VerificationUri         string    `json:"verification_uri"`
+	VerificationUriComplete *string   `json:"verification_uri_complete,omitempty"`
+}
+
+// AccountOAuthDeviceCodeRequest defines model for AccountOAuthDeviceCodeRequest.
+type AccountOAuthDeviceCodeRequest struct {
+	// Config Config-driven description of an upstream provider's OAuth endpoints used to provision an account credential interactively. Secrets are write-only.
+	Config AccountOAuthProviderConfig `json:"config"`
+}
+
+// AccountOAuthDeviceCodeResponse defines model for AccountOAuthDeviceCodeResponse.
+type AccountOAuthDeviceCodeResponse struct {
+	Data      AccountOAuthDeviceCode `json:"data"`
+	RequestId RequestId              `json:"request_id"`
+}
+
+// AccountOAuthDevicePollRequest defines model for AccountOAuthDevicePollRequest.
+type AccountOAuthDevicePollRequest struct {
+	SessionId string `json:"session_id"`
+}
+
+// AccountOAuthExchangeRequest defines model for AccountOAuthExchangeRequest.
+type AccountOAuthExchangeRequest struct {
+	Code      string `json:"code"`
+	SessionId string `json:"session_id"`
+	State     string `json:"state"`
+}
+
+// AccountOAuthPending defines model for AccountOAuthPending.
+type AccountOAuthPending struct {
+	ExpiresAt     time.Time                 `json:"expires_at"`
+	FailureReason *string                   `json:"failure_reason,omitempty"`
+	Mode          AccountOAuthPendingMode   `json:"mode"`
+	SessionId     string                    `json:"session_id"`
+	Status        AccountOAuthPendingStatus `json:"status"`
+}
+
+// AccountOAuthPendingMode defines model for AccountOAuthPending.Mode.
+type AccountOAuthPendingMode string
+
+// AccountOAuthPendingResponse defines model for AccountOAuthPendingResponse.
+type AccountOAuthPendingResponse struct {
+	Data      AccountOAuthPending `json:"data"`
+	RequestId RequestId           `json:"request_id"`
+}
+
+// AccountOAuthPendingStatus defines model for AccountOAuthPendingStatus.
+type AccountOAuthPendingStatus string
+
+// AccountOAuthProviderConfig Config-driven description of an upstream provider's OAuth endpoints used to provision an account credential interactively. Secrets are write-only.
+type AccountOAuthProviderConfig struct {
+	// AuthorizeUrl Authorization endpoint (https). Required for the authorization-code flow.
+	AuthorizeUrl *string `json:"authorize_url,omitempty"`
+	ClientId     string  `json:"client_id"`
+
+	// ClientSecret Confidential-client secret. Omit for public/PKCE clients.
+	ClientSecret *string `json:"client_secret,omitempty"`
+
+	// DeviceAuthorizeUrl RFC 8628 device-authorization endpoint. Required for the device-code flow.
+	DeviceAuthorizeUrl *string `json:"device_authorize_url,omitempty"`
+
+	// RedirectUri Redirect URI registered with the provider (authorization-code flow).
+	RedirectUri *string   `json:"redirect_uri,omitempty"`
+	Scopes      *[]string `json:"scopes,omitempty"`
+
+	// TokenUrl Token endpoint used to exchange the code or device_code for tokens.
+	TokenUrl *string `json:"token_url,omitempty"`
+
+	// UsePkce Whether to attach a PKCE S256 challenge to the authorization request.
+	UsePkce *bool `json:"use_pkce,omitempty"`
 }
 
 // AccountProxyQuality defines model for AccountProxyQuality.
@@ -3837,6 +4020,11 @@ type ApiKeySecretData struct {
 // ApiKeyStatus defines model for ApiKeyStatus.
 type ApiKeyStatus string
 
+// ApplyChannelMonitorTemplateRequest defines model for ApplyChannelMonitorTemplateRequest.
+type ApplyChannelMonitorTemplateRequest struct {
+	MonitorIds []int64 `json:"monitor_ids"`
+}
+
 // AudioSpeechRequest defines model for AudioSpeechRequest.
 type AudioSpeechRequest struct {
 	// Input Text to synthesize. SRapi does not persist full input text in logs.
@@ -4128,6 +4316,116 @@ type ChangeCurrentUserPasswordRequest struct {
 	NewPassword     string `json:"new_password"`
 }
 
+// ChannelMonitor defines model for ChannelMonitor.
+type ChannelMonitor struct {
+	CreatedAt       time.Time `json:"created_at"`
+	Enabled         bool      `json:"enabled"`
+	Id              int64     `json:"id"`
+	IntervalSeconds int64     `json:"interval_seconds"`
+	Model           string    `json:"model"`
+	Name            string    `json:"name"`
+
+	// Request Custom synthetic-probe request override; empty fields inherit the config-map probe defaults.
+	Request ChannelMonitorRequest `json:"request"`
+
+	// Scope What the monitor probes — a single account, an account group, all of a provider's accounts, or accounts serving a model.
+	Scope     ChannelMonitorScope `json:"scope"`
+	ScopeRef  string              `json:"scope_ref"`
+	UpdatedAt time.Time           `json:"updated_at"`
+}
+
+// ChannelMonitorCheckResult defines model for ChannelMonitorCheckResult.
+type ChannelMonitorCheckResult struct {
+	AccountId   int64       `json:"account_id"`
+	AccountName string      `json:"account_name"`
+	ErrorClass  *string     `json:"error_class,omitempty"`
+	LatencyMs   int64       `json:"latency_ms"`
+	Metadata    *JsonObject `json:"metadata,omitempty"`
+	Model       string      `json:"model"`
+	Ok          bool        `json:"ok"`
+	ProviderId  int64       `json:"provider_id"`
+	StatusCode  int64       `json:"status_code"`
+}
+
+// ChannelMonitorListResponse defines model for ChannelMonitorListResponse.
+type ChannelMonitorListResponse struct {
+	Data       []ChannelMonitor `json:"data"`
+	Pagination Pagination       `json:"pagination"`
+	RequestId  RequestId        `json:"request_id"`
+}
+
+// ChannelMonitorRequest Custom synthetic-probe request override; empty fields inherit the config-map probe defaults.
+type ChannelMonitorRequest struct {
+	Body                *string            `json:"body,omitempty"`
+	ExpectedStatusCodes *[]int64           `json:"expected_status_codes,omitempty"`
+	Headers             *map[string]string `json:"headers,omitempty"`
+	Method              *string            `json:"method,omitempty"`
+	ResponseContains    *string            `json:"response_contains,omitempty"`
+	ResponseJsonPath    *string            `json:"response_json_path,omitempty"`
+	Url                 *string            `json:"url,omitempty"`
+}
+
+// ChannelMonitorResponse defines model for ChannelMonitorResponse.
+type ChannelMonitorResponse struct {
+	Data      ChannelMonitor `json:"data"`
+	RequestId RequestId      `json:"request_id"`
+}
+
+// ChannelMonitorRun defines model for ChannelMonitorRun.
+type ChannelMonitorRun struct {
+	CheckedCount int64                       `json:"checked_count"`
+	CreatedAt    time.Time                   `json:"created_at"`
+	Id           int64                       `json:"id"`
+	LatencyMs    int64                       `json:"latency_ms"`
+	MonitorId    int64                       `json:"monitor_id"`
+	Ok           bool                        `json:"ok"`
+	OkCount      int64                       `json:"ok_count"`
+	Results      []ChannelMonitorCheckResult `json:"results"`
+	RunId        string                      `json:"run_id"`
+	Trigger      string                      `json:"trigger"`
+}
+
+// ChannelMonitorRunListResponse defines model for ChannelMonitorRunListResponse.
+type ChannelMonitorRunListResponse struct {
+	Data       []ChannelMonitorRun `json:"data"`
+	Pagination Pagination          `json:"pagination"`
+	RequestId  RequestId           `json:"request_id"`
+}
+
+// ChannelMonitorRunResponse defines model for ChannelMonitorRunResponse.
+type ChannelMonitorRunResponse struct {
+	Data      ChannelMonitorRun `json:"data"`
+	RequestId RequestId         `json:"request_id"`
+}
+
+// ChannelMonitorScope What the monitor probes — a single account, an account group, all of a provider's accounts, or accounts serving a model.
+type ChannelMonitorScope string
+
+// ChannelMonitorTemplate defines model for ChannelMonitorTemplate.
+type ChannelMonitorTemplate struct {
+	CreatedAt   time.Time `json:"created_at"`
+	Description string    `json:"description"`
+	Id          int64     `json:"id"`
+	Name        string    `json:"name"`
+
+	// Request Custom synthetic-probe request override; empty fields inherit the config-map probe defaults.
+	Request   ChannelMonitorRequest `json:"request"`
+	UpdatedAt time.Time             `json:"updated_at"`
+}
+
+// ChannelMonitorTemplateListResponse defines model for ChannelMonitorTemplateListResponse.
+type ChannelMonitorTemplateListResponse struct {
+	Data       []ChannelMonitorTemplate `json:"data"`
+	Pagination Pagination               `json:"pagination"`
+	RequestId  RequestId                `json:"request_id"`
+}
+
+// ChannelMonitorTemplateResponse defines model for ChannelMonitorTemplateResponse.
+type ChannelMonitorTemplateResponse struct {
+	Data      ChannelMonitorTemplate `json:"data"`
+	RequestId RequestId              `json:"request_id"`
+}
+
 // ChatCompletionChoice defines model for ChatCompletionChoice.
 type ChatCompletionChoice struct {
 	FinishReason *string     `json:"finish_reason"`
@@ -4401,6 +4699,30 @@ type CreateApiKeyRequest struct {
 type CreateApiKeyResponse struct {
 	Data      ApiKeySecretData `json:"data"`
 	RequestId RequestId        `json:"request_id"`
+}
+
+// CreateChannelMonitorRequest defines model for CreateChannelMonitorRequest.
+type CreateChannelMonitorRequest struct {
+	Enabled         *bool   `json:"enabled,omitempty"`
+	IntervalSeconds *int64  `json:"interval_seconds,omitempty"`
+	Model           *string `json:"model,omitempty"`
+	Name            string  `json:"name"`
+
+	// Request Custom synthetic-probe request override; empty fields inherit the config-map probe defaults.
+	Request *ChannelMonitorRequest `json:"request,omitempty"`
+
+	// Scope What the monitor probes — a single account, an account group, all of a provider's accounts, or accounts serving a model.
+	Scope    ChannelMonitorScope `json:"scope"`
+	ScopeRef *string             `json:"scope_ref,omitempty"`
+}
+
+// CreateChannelMonitorTemplateRequest defines model for CreateChannelMonitorTemplateRequest.
+type CreateChannelMonitorTemplateRequest struct {
+	Description *string `json:"description,omitempty"`
+	Name        string  `json:"name"`
+
+	// Request Custom synthetic-probe request override; empty fields inherit the config-map probe defaults.
+	Request *ChannelMonitorRequest `json:"request,omitempty"`
 }
 
 // CreateErrorPassthroughRuleRequest defines model for CreateErrorPassthroughRuleRequest.
@@ -7706,6 +8028,30 @@ type UpdateApiKeyRequest struct {
 	TpmLimit       *int          `json:"tpm_limit,omitempty"`
 }
 
+// UpdateChannelMonitorRequest defines model for UpdateChannelMonitorRequest.
+type UpdateChannelMonitorRequest struct {
+	Enabled         *bool   `json:"enabled,omitempty"`
+	IntervalSeconds *int64  `json:"interval_seconds,omitempty"`
+	Model           *string `json:"model,omitempty"`
+	Name            *string `json:"name,omitempty"`
+
+	// Request Custom synthetic-probe request override; empty fields inherit the config-map probe defaults.
+	Request *ChannelMonitorRequest `json:"request,omitempty"`
+
+	// Scope What the monitor probes — a single account, an account group, all of a provider's accounts, or accounts serving a model.
+	Scope    *ChannelMonitorScope `json:"scope,omitempty"`
+	ScopeRef *string              `json:"scope_ref,omitempty"`
+}
+
+// UpdateChannelMonitorTemplateRequest defines model for UpdateChannelMonitorTemplateRequest.
+type UpdateChannelMonitorTemplateRequest struct {
+	Description *string `json:"description,omitempty"`
+	Name        *string `json:"name,omitempty"`
+
+	// Request Custom synthetic-probe request override; empty fields inherit the config-map probe defaults.
+	Request *ChannelMonitorRequest `json:"request,omitempty"`
+}
+
 // UpdateCurrentUserProfileRequest defines model for UpdateCurrentUserProfileRequest.
 type UpdateCurrentUserProfileRequest struct {
 	// Name Current user's display name.
@@ -8452,6 +8798,11 @@ type ListAdminCapabilitiesParams struct {
 	Status   *Status   `form:"status,omitempty" json:"status,omitempty"`
 }
 
+// ListAdminChannelMonitorRunsParams defines parameters for ListAdminChannelMonitorRuns.
+type ListAdminChannelMonitorRunsParams struct {
+	Limit *int64 `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // ImportAdminConfigSnapshotParams defines parameters for ImportAdminConfigSnapshot.
 type ImportAdminConfigSnapshotParams struct {
 	DryRun *bool `form:"dry_run,omitempty" json:"dry_run,omitempty"`
@@ -9040,6 +9391,18 @@ type ImportAdminAccountsJSONRequestBody = ProviderAccountImportRequest
 // ImportAdminCodexSessionJSONRequestBody defines body for ImportAdminCodexSession for application/json ContentType.
 type ImportAdminCodexSessionJSONRequestBody = CodexSessionImportRequest
 
+// StartAdminAccountOAuthAuthorizeUrlJSONRequestBody defines body for StartAdminAccountOAuthAuthorizeUrl for application/json ContentType.
+type StartAdminAccountOAuthAuthorizeUrlJSONRequestBody = AccountOAuthAuthorizeUrlRequest
+
+// PollAdminAccountOAuthDeviceCodeJSONRequestBody defines body for PollAdminAccountOAuthDeviceCode for application/json ContentType.
+type PollAdminAccountOAuthDeviceCodeJSONRequestBody = AccountOAuthDevicePollRequest
+
+// StartAdminAccountOAuthDeviceCodeJSONRequestBody defines body for StartAdminAccountOAuthDeviceCode for application/json ContentType.
+type StartAdminAccountOAuthDeviceCodeJSONRequestBody = AccountOAuthDeviceCodeRequest
+
+// ExchangeAdminAccountOAuthCodeJSONRequestBody defines body for ExchangeAdminAccountOAuthCode for application/json ContentType.
+type ExchangeAdminAccountOAuthCodeJSONRequestBody = AccountOAuthExchangeRequest
+
 // UpdateAdminAccountJSONRequestBody defines body for UpdateAdminAccount for application/json ContentType.
 type UpdateAdminAccountJSONRequestBody = UpdateProviderAccountRequest
 
@@ -9057,6 +9420,21 @@ type UpdateAdminAnnouncementJSONRequestBody = UpdateAnnouncementRequest
 
 // UpdateAdminApiKeyJSONRequestBody defines body for UpdateAdminApiKey for application/json ContentType.
 type UpdateAdminApiKeyJSONRequestBody = AdminUpdateApiKeyRequest
+
+// CreateAdminChannelMonitorTemplateJSONRequestBody defines body for CreateAdminChannelMonitorTemplate for application/json ContentType.
+type CreateAdminChannelMonitorTemplateJSONRequestBody = CreateChannelMonitorTemplateRequest
+
+// UpdateAdminChannelMonitorTemplateJSONRequestBody defines body for UpdateAdminChannelMonitorTemplate for application/json ContentType.
+type UpdateAdminChannelMonitorTemplateJSONRequestBody = UpdateChannelMonitorTemplateRequest
+
+// ApplyAdminChannelMonitorTemplateJSONRequestBody defines body for ApplyAdminChannelMonitorTemplate for application/json ContentType.
+type ApplyAdminChannelMonitorTemplateJSONRequestBody = ApplyChannelMonitorTemplateRequest
+
+// CreateAdminChannelMonitorJSONRequestBody defines body for CreateAdminChannelMonitor for application/json ContentType.
+type CreateAdminChannelMonitorJSONRequestBody = CreateChannelMonitorRequest
+
+// UpdateAdminChannelMonitorJSONRequestBody defines body for UpdateAdminChannelMonitor for application/json ContentType.
+type UpdateAdminChannelMonitorJSONRequestBody = UpdateChannelMonitorRequest
 
 // ImportAdminConfigSnapshotJSONRequestBody defines body for ImportAdminConfigSnapshot for application/json ContentType.
 type ImportAdminConfigSnapshotJSONRequestBody = ConfigImportRequest
@@ -15761,6 +16139,21 @@ type ServerInterface interface {
 	// Import Codex/ChatGPT desktop session blobs as upstream accounts.
 	// (POST /api/v1/admin/accounts/import/codex-session)
 	ImportAdminCodexSession(w http.ResponseWriter, r *http.Request)
+	// Begin an interactive OAuth authorization-code provisioning flow.
+	// (POST /api/v1/admin/accounts/oauth/authorize-url)
+	StartAdminAccountOAuthAuthorizeUrl(w http.ResponseWriter, r *http.Request)
+	// Poll a device-code provisioning session for tokens.
+	// (POST /api/v1/admin/accounts/oauth/device-code/poll)
+	PollAdminAccountOAuthDeviceCode(w http.ResponseWriter, r *http.Request)
+	// Begin an RFC 8628 device-code provisioning flow.
+	// (POST /api/v1/admin/accounts/oauth/device-code/start)
+	StartAdminAccountOAuthDeviceCode(w http.ResponseWriter, r *http.Request)
+	// Exchange an authorization code into a provisioned account credential.
+	// (POST /api/v1/admin/accounts/oauth/exchange)
+	ExchangeAdminAccountOAuthCode(w http.ResponseWriter, r *http.Request)
+	// Get the status of a pending OAuth provisioning session.
+	// (GET /api/v1/admin/accounts/oauth/pending/{id})
+	GetAdminAccountOAuthPending(w http.ResponseWriter, r *http.Request, id string)
 	// Get a provider account.
 	// (GET /api/v1/admin/accounts/{id})
 	GetAdminAccount(w http.ResponseWriter, r *http.Request, id Id)
@@ -15845,6 +16238,39 @@ type ServerInterface interface {
 	// List capability descriptors.
 	// (GET /api/v1/admin/capabilities)
 	ListAdminCapabilities(w http.ResponseWriter, r *http.Request, params ListAdminCapabilitiesParams)
+	// List channel-monitor request templates.
+	// (GET /api/v1/admin/channel-monitor-templates)
+	ListAdminChannelMonitorTemplates(w http.ResponseWriter, r *http.Request)
+	// Create a channel-monitor request template.
+	// (POST /api/v1/admin/channel-monitor-templates)
+	CreateAdminChannelMonitorTemplate(w http.ResponseWriter, r *http.Request)
+	// Delete a channel-monitor request template.
+	// (DELETE /api/v1/admin/channel-monitor-templates/{id})
+	DeleteAdminChannelMonitorTemplate(w http.ResponseWriter, r *http.Request, id Id)
+	// Update a channel-monitor request template.
+	// (PATCH /api/v1/admin/channel-monitor-templates/{id})
+	UpdateAdminChannelMonitorTemplate(w http.ResponseWriter, r *http.Request, id Id)
+	// Apply a request template to one or more monitor definitions.
+	// (POST /api/v1/admin/channel-monitor-templates/{id}/apply)
+	ApplyAdminChannelMonitorTemplate(w http.ResponseWriter, r *http.Request, id Id)
+	// List channel-monitor definitions.
+	// (GET /api/v1/admin/channel-monitors)
+	ListAdminChannelMonitors(w http.ResponseWriter, r *http.Request)
+	// Create a channel-monitor definition.
+	// (POST /api/v1/admin/channel-monitors)
+	CreateAdminChannelMonitor(w http.ResponseWriter, r *http.Request)
+	// Delete a channel-monitor definition.
+	// (DELETE /api/v1/admin/channel-monitors/{id})
+	DeleteAdminChannelMonitor(w http.ResponseWriter, r *http.Request, id Id)
+	// Update a channel-monitor definition.
+	// (PATCH /api/v1/admin/channel-monitors/{id})
+	UpdateAdminChannelMonitor(w http.ResponseWriter, r *http.Request, id Id)
+	// Run a channel-monitor definition now and return per-model results.
+	// (POST /api/v1/admin/channel-monitors/{id}/run)
+	RunAdminChannelMonitor(w http.ResponseWriter, r *http.Request, id Id)
+	// List run history for a channel-monitor definition.
+	// (GET /api/v1/admin/channel-monitors/{id}/runs)
+	ListAdminChannelMonitorRuns(w http.ResponseWriter, r *http.Request, id Id, params ListAdminChannelMonitorRunsParams)
 	// Export a versioned snapshot of operator configuration.
 	// (GET /api/v1/admin/config-snapshot)
 	GetAdminConfigSnapshot(w http.ResponseWriter, r *http.Request)
@@ -17669,6 +18095,126 @@ func (siw *ServerInterfaceWrapper) ImportAdminCodexSession(w http.ResponseWriter
 	handler.ServeHTTP(w, r)
 }
 
+// StartAdminAccountOAuthAuthorizeUrl operation middleware
+func (siw *ServerInterfaceWrapper) StartAdminAccountOAuthAuthorizeUrl(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StartAdminAccountOAuthAuthorizeUrl(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PollAdminAccountOAuthDeviceCode operation middleware
+func (siw *ServerInterfaceWrapper) PollAdminAccountOAuthDeviceCode(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PollAdminAccountOAuthDeviceCode(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// StartAdminAccountOAuthDeviceCode operation middleware
+func (siw *ServerInterfaceWrapper) StartAdminAccountOAuthDeviceCode(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StartAdminAccountOAuthDeviceCode(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ExchangeAdminAccountOAuthCode operation middleware
+func (siw *ServerInterfaceWrapper) ExchangeAdminAccountOAuthCode(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ExchangeAdminAccountOAuthCode(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminAccountOAuthPending operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminAccountOAuthPending(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminAccountOAuthPending(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetAdminAccount operation middleware
 func (siw *ServerInterfaceWrapper) GetAdminAccount(w http.ResponseWriter, r *http.Request) {
 
@@ -18905,6 +19451,342 @@ func (siw *ServerInterfaceWrapper) ListAdminCapabilities(w http.ResponseWriter, 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListAdminCapabilities(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAdminChannelMonitorTemplates operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminChannelMonitorTemplates(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminChannelMonitorTemplates(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAdminChannelMonitorTemplate operation middleware
+func (siw *ServerInterfaceWrapper) CreateAdminChannelMonitorTemplate(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAdminChannelMonitorTemplate(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteAdminChannelMonitorTemplate operation middleware
+func (siw *ServerInterfaceWrapper) DeleteAdminChannelMonitorTemplate(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteAdminChannelMonitorTemplate(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateAdminChannelMonitorTemplate operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAdminChannelMonitorTemplate(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAdminChannelMonitorTemplate(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ApplyAdminChannelMonitorTemplate operation middleware
+func (siw *ServerInterfaceWrapper) ApplyAdminChannelMonitorTemplate(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ApplyAdminChannelMonitorTemplate(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAdminChannelMonitors operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminChannelMonitors(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminChannelMonitors(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAdminChannelMonitor operation middleware
+func (siw *ServerInterfaceWrapper) CreateAdminChannelMonitor(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAdminChannelMonitor(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteAdminChannelMonitor operation middleware
+func (siw *ServerInterfaceWrapper) DeleteAdminChannelMonitor(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteAdminChannelMonitor(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateAdminChannelMonitor operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAdminChannelMonitor(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAdminChannelMonitor(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RunAdminChannelMonitor operation middleware
+func (siw *ServerInterfaceWrapper) RunAdminChannelMonitor(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RunAdminChannelMonitor(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAdminChannelMonitorRuns operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminChannelMonitorRuns(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminChannelMonitorRunsParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: "int64"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminChannelMonitorRuns(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -27358,6 +28240,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/export", wrapper.ExportAdminAccounts)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/import", wrapper.ImportAdminAccounts)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/import/codex-session", wrapper.ImportAdminCodexSession)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/oauth/authorize-url", wrapper.StartAdminAccountOAuthAuthorizeUrl)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/oauth/device-code/poll", wrapper.PollAdminAccountOAuthDeviceCode)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/oauth/device-code/start", wrapper.StartAdminAccountOAuthDeviceCode)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/oauth/exchange", wrapper.ExchangeAdminAccountOAuthCode)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/oauth/pending/{id}", wrapper.GetAdminAccountOAuthPending)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/{id}", wrapper.GetAdminAccount)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/accounts/{id}", wrapper.UpdateAdminAccount)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/availability", wrapper.GetAdminAccountAvailability)
@@ -27386,6 +28273,17 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/audit-logs", wrapper.ListAdminAuditLogs)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/billing-ledger", wrapper.ListAdminBillingLedger)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/capabilities", wrapper.ListAdminCapabilities)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/channel-monitor-templates", wrapper.ListAdminChannelMonitorTemplates)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/channel-monitor-templates", wrapper.CreateAdminChannelMonitorTemplate)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/channel-monitor-templates/{id}", wrapper.DeleteAdminChannelMonitorTemplate)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/channel-monitor-templates/{id}", wrapper.UpdateAdminChannelMonitorTemplate)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/channel-monitor-templates/{id}/apply", wrapper.ApplyAdminChannelMonitorTemplate)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/channel-monitors", wrapper.ListAdminChannelMonitors)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/channel-monitors", wrapper.CreateAdminChannelMonitor)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/channel-monitors/{id}", wrapper.DeleteAdminChannelMonitor)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/channel-monitors/{id}", wrapper.UpdateAdminChannelMonitor)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/channel-monitors/{id}/run", wrapper.RunAdminChannelMonitor)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/channel-monitors/{id}/runs", wrapper.ListAdminChannelMonitorRuns)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/config-snapshot", wrapper.GetAdminConfigSnapshot)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/config-snapshot/import", wrapper.ImportAdminConfigSnapshot)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/copilot/chat", wrapper.CreateAdminCopilotChat)

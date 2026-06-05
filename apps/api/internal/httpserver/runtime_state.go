@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/srapi/srapi/apps/api/internal/config"
+	accountprovisioningservice "github.com/srapi/srapi/apps/api/internal/modules/account_provisioning/service"
 	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	accountservice "github.com/srapi/srapi/apps/api/internal/modules/accounts/service"
 	accountmemory "github.com/srapi/srapi/apps/api/internal/modules/accounts/store/memory"
@@ -34,6 +35,9 @@ import (
 	billingmemory "github.com/srapi/srapi/apps/api/internal/modules/billing/store/memory"
 	capabilitiescontract "github.com/srapi/srapi/apps/api/internal/modules/capabilities/contract"
 	captchaservice "github.com/srapi/srapi/apps/api/internal/modules/captcha/service"
+	channelmonitorscontract "github.com/srapi/srapi/apps/api/internal/modules/channel_monitors/contract"
+	channelmonitorsservice "github.com/srapi/srapi/apps/api/internal/modules/channel_monitors/service"
+	channelmonitorsmemory "github.com/srapi/srapi/apps/api/internal/modules/channel_monitors/store/memory"
 	contentsafetyservice "github.com/srapi/srapi/apps/api/internal/modules/content_safety/service"
 	"github.com/srapi/srapi/apps/api/internal/modules/copilot"
 	errorpassthroughcontract "github.com/srapi/srapi/apps/api/internal/modules/error_passthrough/contract"
@@ -164,6 +168,8 @@ type runtimeState struct {
 	payloadRules            *payloadrulesservice.Service
 	scheduledTests          *scheduledtestsservice.Service
 	scheduledTestRunner     *scheduledtestworker.Runner
+	accountProvisioning     *accountprovisioningservice.Service
+	channelMonitors         *channelmonitorsservice.Service
 	copilotEngine           *copilot.Engine
 	internalRouter          http.Handler
 	userStore               userscontract.Store
@@ -195,6 +201,7 @@ type runtimeState struct {
 	userPlatformQuotasStore userplatformquotascontract.Store
 	payloadRulesStore       payloadrulescontract.Store
 	scheduledTestsStore     scheduledtestscontract.Store
+	channelMonitorsStore    channelmonitorscontract.Store
 	capabilities            []capabilitiescontract.Definition
 	databaseProbe           dependencyPinger
 	redisProbe              dependencyPinger
@@ -551,6 +558,23 @@ func (rt *runtimeState) buildCapabilityServices(cfg config.Config, opts runtimeO
 		return err
 	}
 	rt.scheduledTestRunner = scheduledTestRunner
+
+	// Upstream-account OAuth provisioning keeps pending sessions in-memory only
+	// (short-lived, single-process); a restart simply drops in-flight wizards.
+	rt.accountProvisioning = accountprovisioningservice.New()
+	channelMonitorsStore := opts.channelMonitors
+	if channelMonitorsStore == nil {
+		if !allowMemoryStores {
+			return missingRuntimeStoreError("channel monitors")
+		}
+		channelMonitorsStore = channelmonitorsmemory.New()
+	}
+	rt.channelMonitorsStore = channelMonitorsStore
+	channelMonitorsSvc, err := channelmonitorsservice.New(channelMonitorsStore)
+	if err != nil {
+		return err
+	}
+	rt.channelMonitors = channelMonitorsSvc
 
 	// The admin copilot loads its tool catalog from the embedded OpenAPI spec. A
 	// parse failure disables the copilot (handlers return 503) but must not block

@@ -84,6 +84,15 @@ type ModelRateLimit func(*sql.Selector)
 // ModelRegistry is the predicate function for modelregistry builders.
 type ModelRegistry func(*sql.Selector)
 
+// MonitorDefinition is the predicate function for monitordefinition builders.
+type MonitorDefinition func(*sql.Selector)
+
+// MonitorRequestTemplate is the predicate function for monitorrequesttemplate builders.
+type MonitorRequestTemplate func(*sql.Selector)
+
+// MonitorRunResult is the predicate function for monitorrunresult builders.
+type MonitorRunResult func(*sql.Selector)
+
 // ObsAlertEvent is the predicate function for obsalertevent builders.
 type ObsAlertEvent func(*sql.Selector)
 

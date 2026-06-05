@@ -1588,6 +1588,120 @@ export type ProviderAccountListResponse = {
     request_id: RequestId;
 };
 
+/**
+ * Config-driven description of an upstream provider's OAuth endpoints used to provision an account credential interactively. Secrets are write-only.
+ */
+export type AccountOAuthProviderConfig = {
+    client_id: string;
+    /**
+     * Confidential-client secret. Omit for public/PKCE clients.
+     */
+    client_secret?: string | null;
+    /**
+     * Authorization endpoint (https). Required for the authorization-code flow.
+     */
+    authorize_url?: string;
+    /**
+     * Token endpoint used to exchange the code or device_code for tokens.
+     */
+    token_url?: string;
+    /**
+     * RFC 8628 device-authorization endpoint. Required for the device-code flow.
+     */
+    device_authorize_url?: string;
+    /**
+     * Redirect URI registered with the provider (authorization-code flow).
+     */
+    redirect_uri?: string;
+    scopes?: Array<string>;
+    /**
+     * Whether to attach a PKCE S256 challenge to the authorization request.
+     */
+    use_pkce?: boolean;
+};
+
+export type AccountOAuthAuthorizeUrlRequest = {
+    config: AccountOAuthProviderConfig;
+};
+
+export type AccountOAuthAuthorizeUrl = {
+    session_id: string;
+    authorization_url: string;
+    state: string;
+    expires_at: string;
+};
+
+export type AccountOAuthAuthorizeUrlResponse = {
+    data: AccountOAuthAuthorizeUrl;
+    request_id: RequestId;
+};
+
+export type AccountOAuthExchangeRequest = {
+    session_id: string;
+    code: string;
+    state: string;
+};
+
+/**
+ * Provisioned upstream credential. Returned write-only so the client can immediately submit it to POST /admin/accounts; never persisted by this endpoint.
+ */
+export type AccountOAuthCredential = {
+    session_id: string;
+    /**
+     * The minted upstream credential map (access_token/refresh_token/...) to submit to POST /admin/accounts. Returned only here; never persisted.
+     */
+    credential: {
+        [key: string]: unknown;
+    };
+    has_refresh_token?: boolean;
+    has_access_token?: boolean;
+    token_type?: string;
+    scope?: string;
+    expires_in?: number;
+};
+
+export type AccountOAuthCredentialResponse = {
+    data: AccountOAuthCredential;
+    request_id: RequestId;
+};
+
+export type AccountOAuthPendingStatus = 'pending' | 'completed' | 'failed' | 'expired';
+
+export type AccountOAuthPending = {
+    session_id: string;
+    mode: 'authorization_code' | 'device_code';
+    status: AccountOAuthPendingStatus;
+    failure_reason?: string;
+    expires_at: string;
+};
+
+export type AccountOAuthPendingResponse = {
+    data: AccountOAuthPending;
+    request_id: RequestId;
+};
+
+export type AccountOAuthDeviceCodeRequest = {
+    config: AccountOAuthProviderConfig;
+};
+
+export type AccountOAuthDeviceCode = {
+    session_id: string;
+    user_code: string;
+    verification_uri: string;
+    verification_uri_complete?: string;
+    interval: number;
+    expires_at: string;
+};
+
+export type AccountOAuthDeviceCodeResponse = {
+    data: AccountOAuthDeviceCode;
+    request_id: RequestId;
+};
+
+export type AccountOAuthDevicePollRequest = {
+    session_id: string;
+};
+
 export type DiscoverAccountModelsRequest = {
     /**
      * Persist discovered model IDs to account metadata.
@@ -4465,6 +4579,142 @@ export type ScheduledTestPlanRunResponse = {
 
 export type ScheduledTestPlanRunListResponse = {
     data: Array<ScheduledTestPlanRun>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+/**
+ * What the monitor probes — a single account, an account group, all of a provider's accounts, or accounts serving a model.
+ */
+export type ChannelMonitorScope = 'account' | 'group' | 'provider' | 'model';
+
+/**
+ * Custom synthetic-probe request override; empty fields inherit the config-map probe defaults.
+ */
+export type ChannelMonitorRequest = {
+    method?: string;
+    url?: string;
+    headers?: {
+        [key: string]: string;
+    };
+    body?: string;
+    expected_status_codes?: Array<number>;
+    response_json_path?: string;
+    response_contains?: string;
+};
+
+export type ChannelMonitor = {
+    id: number;
+    name: string;
+    enabled: boolean;
+    scope: ChannelMonitorScope;
+    scope_ref: string;
+    interval_seconds: number;
+    model: string;
+    request: ChannelMonitorRequest;
+    created_at: string;
+    updated_at: string;
+};
+
+export type CreateChannelMonitorRequest = {
+    name: string;
+    enabled?: boolean;
+    scope: ChannelMonitorScope;
+    scope_ref?: string;
+    interval_seconds?: number;
+    model?: string;
+    request?: ChannelMonitorRequest;
+};
+
+export type UpdateChannelMonitorRequest = {
+    name?: string;
+    enabled?: boolean;
+    scope?: ChannelMonitorScope;
+    scope_ref?: string;
+    interval_seconds?: number;
+    model?: string;
+    request?: ChannelMonitorRequest;
+};
+
+export type ChannelMonitorResponse = {
+    data: ChannelMonitor;
+    request_id: RequestId;
+};
+
+export type ChannelMonitorListResponse = {
+    data: Array<ChannelMonitor>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type ChannelMonitorCheckResult = {
+    account_id: number;
+    account_name: string;
+    provider_id: number;
+    model: string;
+    ok: boolean;
+    status_code: number;
+    latency_ms: number;
+    error_class?: string;
+    metadata?: JsonObject;
+};
+
+export type ChannelMonitorRun = {
+    id: number;
+    monitor_id: number;
+    run_id: string;
+    ok: boolean;
+    checked_count: number;
+    ok_count: number;
+    latency_ms: number;
+    trigger: string;
+    results: Array<ChannelMonitorCheckResult>;
+    created_at: string;
+};
+
+export type ChannelMonitorRunResponse = {
+    data: ChannelMonitorRun;
+    request_id: RequestId;
+};
+
+export type ChannelMonitorRunListResponse = {
+    data: Array<ChannelMonitorRun>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type ChannelMonitorTemplate = {
+    id: number;
+    name: string;
+    description: string;
+    request: ChannelMonitorRequest;
+    created_at: string;
+    updated_at: string;
+};
+
+export type CreateChannelMonitorTemplateRequest = {
+    name: string;
+    description?: string;
+    request?: ChannelMonitorRequest;
+};
+
+export type UpdateChannelMonitorTemplateRequest = {
+    name?: string;
+    description?: string;
+    request?: ChannelMonitorRequest;
+};
+
+export type ApplyChannelMonitorTemplateRequest = {
+    monitor_ids: Array<number>;
+};
+
+export type ChannelMonitorTemplateResponse = {
+    data: ChannelMonitorTemplate;
+    request_id: RequestId;
+};
+
+export type ChannelMonitorTemplateListResponse = {
+    data: Array<ChannelMonitorTemplate>;
     pagination: Pagination;
     request_id: RequestId;
 };
@@ -8635,6 +8885,209 @@ export type ImportAdminAccountsResponses = {
 };
 
 export type ImportAdminAccountsResponse = ImportAdminAccountsResponses[keyof ImportAdminAccountsResponses];
+
+export type StartAdminAccountOAuthAuthorizeUrlData = {
+    body: AccountOAuthAuthorizeUrlRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/accounts/oauth/authorize-url';
+};
+
+export type StartAdminAccountOAuthAuthorizeUrlErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type StartAdminAccountOAuthAuthorizeUrlError = StartAdminAccountOAuthAuthorizeUrlErrors[keyof StartAdminAccountOAuthAuthorizeUrlErrors];
+
+export type StartAdminAccountOAuthAuthorizeUrlResponses = {
+    /**
+     * Authorization URL and pending session.
+     */
+    201: AccountOAuthAuthorizeUrlResponse;
+};
+
+export type StartAdminAccountOAuthAuthorizeUrlResponse = StartAdminAccountOAuthAuthorizeUrlResponses[keyof StartAdminAccountOAuthAuthorizeUrlResponses];
+
+export type ExchangeAdminAccountOAuthCodeData = {
+    body: AccountOAuthExchangeRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/accounts/oauth/exchange';
+};
+
+export type ExchangeAdminAccountOAuthCodeErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    502: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ExchangeAdminAccountOAuthCodeError = ExchangeAdminAccountOAuthCodeErrors[keyof ExchangeAdminAccountOAuthCodeErrors];
+
+export type ExchangeAdminAccountOAuthCodeResponses = {
+    /**
+     * Provisioned credential.
+     */
+    200: AccountOAuthCredentialResponse;
+};
+
+export type ExchangeAdminAccountOAuthCodeResponse = ExchangeAdminAccountOAuthCodeResponses[keyof ExchangeAdminAccountOAuthCodeResponses];
+
+export type StartAdminAccountOAuthDeviceCodeData = {
+    body: AccountOAuthDeviceCodeRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/accounts/oauth/device-code/start';
+};
+
+export type StartAdminAccountOAuthDeviceCodeErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    502: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type StartAdminAccountOAuthDeviceCodeError = StartAdminAccountOAuthDeviceCodeErrors[keyof StartAdminAccountOAuthDeviceCodeErrors];
+
+export type StartAdminAccountOAuthDeviceCodeResponses = {
+    /**
+     * Device authorization started.
+     */
+    201: AccountOAuthDeviceCodeResponse;
+};
+
+export type StartAdminAccountOAuthDeviceCodeResponse = StartAdminAccountOAuthDeviceCodeResponses[keyof StartAdminAccountOAuthDeviceCodeResponses];
+
+export type PollAdminAccountOAuthDeviceCodeData = {
+    body: AccountOAuthDevicePollRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/accounts/oauth/device-code/poll';
+};
+
+export type PollAdminAccountOAuthDeviceCodeErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    502: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type PollAdminAccountOAuthDeviceCodeError = PollAdminAccountOAuthDeviceCodeErrors[keyof PollAdminAccountOAuthDeviceCodeErrors];
+
+export type PollAdminAccountOAuthDeviceCodeResponses = {
+    /**
+     * Provisioned credential.
+     */
+    200: AccountOAuthCredentialResponse;
+    /**
+     * Authorization still pending; keep polling.
+     */
+    202: AccountOAuthPendingResponse;
+};
+
+export type PollAdminAccountOAuthDeviceCodeResponse = PollAdminAccountOAuthDeviceCodeResponses[keyof PollAdminAccountOAuthDeviceCodeResponses];
+
+export type GetAdminAccountOAuthPendingData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/accounts/oauth/pending/{id}';
+};
+
+export type GetAdminAccountOAuthPendingErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminAccountOAuthPendingError = GetAdminAccountOAuthPendingErrors[keyof GetAdminAccountOAuthPendingErrors];
+
+export type GetAdminAccountOAuthPendingResponses = {
+    /**
+     * Pending session status.
+     */
+    200: AccountOAuthPendingResponse;
+};
+
+export type GetAdminAccountOAuthPendingResponse = GetAdminAccountOAuthPendingResponses[keyof GetAdminAccountOAuthPendingResponses];
 
 export type ImportAdminCodexSessionData = {
     body: CodexSessionImportRequest;
@@ -17153,6 +17606,433 @@ export type RunAdminScheduledTestPlanResponses = {
 };
 
 export type RunAdminScheduledTestPlanResponse = RunAdminScheduledTestPlanResponses[keyof RunAdminScheduledTestPlanResponses];
+
+export type ListAdminChannelMonitorsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/channel-monitors';
+};
+
+export type ListAdminChannelMonitorsErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminChannelMonitorsError = ListAdminChannelMonitorsErrors[keyof ListAdminChannelMonitorsErrors];
+
+export type ListAdminChannelMonitorsResponses = {
+    /**
+     * Channel-monitor definition list.
+     */
+    200: ChannelMonitorListResponse;
+};
+
+export type ListAdminChannelMonitorsResponse = ListAdminChannelMonitorsResponses[keyof ListAdminChannelMonitorsResponses];
+
+export type CreateAdminChannelMonitorData = {
+    body: CreateChannelMonitorRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/channel-monitors';
+};
+
+export type CreateAdminChannelMonitorErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type CreateAdminChannelMonitorError = CreateAdminChannelMonitorErrors[keyof CreateAdminChannelMonitorErrors];
+
+export type CreateAdminChannelMonitorResponses = {
+    /**
+     * Channel-monitor definition created.
+     */
+    201: ChannelMonitorResponse;
+};
+
+export type CreateAdminChannelMonitorResponse = CreateAdminChannelMonitorResponses[keyof CreateAdminChannelMonitorResponses];
+
+export type DeleteAdminChannelMonitorData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/channel-monitors/{id}';
+};
+
+export type DeleteAdminChannelMonitorErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DeleteAdminChannelMonitorError = DeleteAdminChannelMonitorErrors[keyof DeleteAdminChannelMonitorErrors];
+
+export type DeleteAdminChannelMonitorResponses = {
+    /**
+     * Channel-monitor definition deleted.
+     */
+    200: DeleteResponse;
+};
+
+export type DeleteAdminChannelMonitorResponse = DeleteAdminChannelMonitorResponses[keyof DeleteAdminChannelMonitorResponses];
+
+export type UpdateAdminChannelMonitorData = {
+    body: UpdateChannelMonitorRequest;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/channel-monitors/{id}';
+};
+
+export type UpdateAdminChannelMonitorErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UpdateAdminChannelMonitorError = UpdateAdminChannelMonitorErrors[keyof UpdateAdminChannelMonitorErrors];
+
+export type UpdateAdminChannelMonitorResponses = {
+    /**
+     * Channel-monitor definition updated.
+     */
+    200: ChannelMonitorResponse;
+};
+
+export type UpdateAdminChannelMonitorResponse = UpdateAdminChannelMonitorResponses[keyof UpdateAdminChannelMonitorResponses];
+
+export type RunAdminChannelMonitorData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/channel-monitors/{id}/run';
+};
+
+export type RunAdminChannelMonitorErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type RunAdminChannelMonitorError = RunAdminChannelMonitorErrors[keyof RunAdminChannelMonitorErrors];
+
+export type RunAdminChannelMonitorResponses = {
+    /**
+     * Channel-monitor run result.
+     */
+    200: ChannelMonitorRunResponse;
+};
+
+export type RunAdminChannelMonitorResponse = RunAdminChannelMonitorResponses[keyof RunAdminChannelMonitorResponses];
+
+export type ListAdminChannelMonitorRunsData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: {
+        limit?: number;
+    };
+    url: '/api/v1/admin/channel-monitors/{id}/runs';
+};
+
+export type ListAdminChannelMonitorRunsErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminChannelMonitorRunsError = ListAdminChannelMonitorRunsErrors[keyof ListAdminChannelMonitorRunsErrors];
+
+export type ListAdminChannelMonitorRunsResponses = {
+    /**
+     * Channel-monitor run history.
+     */
+    200: ChannelMonitorRunListResponse;
+};
+
+export type ListAdminChannelMonitorRunsResponse = ListAdminChannelMonitorRunsResponses[keyof ListAdminChannelMonitorRunsResponses];
+
+export type ListAdminChannelMonitorTemplatesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/channel-monitor-templates';
+};
+
+export type ListAdminChannelMonitorTemplatesErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminChannelMonitorTemplatesError = ListAdminChannelMonitorTemplatesErrors[keyof ListAdminChannelMonitorTemplatesErrors];
+
+export type ListAdminChannelMonitorTemplatesResponses = {
+    /**
+     * Channel-monitor request template list.
+     */
+    200: ChannelMonitorTemplateListResponse;
+};
+
+export type ListAdminChannelMonitorTemplatesResponse = ListAdminChannelMonitorTemplatesResponses[keyof ListAdminChannelMonitorTemplatesResponses];
+
+export type CreateAdminChannelMonitorTemplateData = {
+    body: CreateChannelMonitorTemplateRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/channel-monitor-templates';
+};
+
+export type CreateAdminChannelMonitorTemplateErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type CreateAdminChannelMonitorTemplateError = CreateAdminChannelMonitorTemplateErrors[keyof CreateAdminChannelMonitorTemplateErrors];
+
+export type CreateAdminChannelMonitorTemplateResponses = {
+    /**
+     * Channel-monitor request template created.
+     */
+    201: ChannelMonitorTemplateResponse;
+};
+
+export type CreateAdminChannelMonitorTemplateResponse = CreateAdminChannelMonitorTemplateResponses[keyof CreateAdminChannelMonitorTemplateResponses];
+
+export type DeleteAdminChannelMonitorTemplateData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/channel-monitor-templates/{id}';
+};
+
+export type DeleteAdminChannelMonitorTemplateErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DeleteAdminChannelMonitorTemplateError = DeleteAdminChannelMonitorTemplateErrors[keyof DeleteAdminChannelMonitorTemplateErrors];
+
+export type DeleteAdminChannelMonitorTemplateResponses = {
+    /**
+     * Channel-monitor request template deleted.
+     */
+    200: DeleteResponse;
+};
+
+export type DeleteAdminChannelMonitorTemplateResponse = DeleteAdminChannelMonitorTemplateResponses[keyof DeleteAdminChannelMonitorTemplateResponses];
+
+export type UpdateAdminChannelMonitorTemplateData = {
+    body: UpdateChannelMonitorTemplateRequest;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/channel-monitor-templates/{id}';
+};
+
+export type UpdateAdminChannelMonitorTemplateErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UpdateAdminChannelMonitorTemplateError = UpdateAdminChannelMonitorTemplateErrors[keyof UpdateAdminChannelMonitorTemplateErrors];
+
+export type UpdateAdminChannelMonitorTemplateResponses = {
+    /**
+     * Channel-monitor request template updated.
+     */
+    200: ChannelMonitorTemplateResponse;
+};
+
+export type UpdateAdminChannelMonitorTemplateResponse = UpdateAdminChannelMonitorTemplateResponses[keyof UpdateAdminChannelMonitorTemplateResponses];
+
+export type ApplyAdminChannelMonitorTemplateData = {
+    body: ApplyChannelMonitorTemplateRequest;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/channel-monitor-templates/{id}/apply';
+};
+
+export type ApplyAdminChannelMonitorTemplateErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ApplyAdminChannelMonitorTemplateError = ApplyAdminChannelMonitorTemplateErrors[keyof ApplyAdminChannelMonitorTemplateErrors];
+
+export type ApplyAdminChannelMonitorTemplateResponses = {
+    /**
+     * Template applied to monitor definitions.
+     */
+    200: ChannelMonitorListResponse;
+};
+
+export type ApplyAdminChannelMonitorTemplateResponse = ApplyAdminChannelMonitorTemplateResponses[keyof ApplyAdminChannelMonitorTemplateResponses];
 
 export type ListAdminUserAttributeDefinitionsData = {
     body?: never;

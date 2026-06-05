@@ -1,7 +1,12 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { ChevronDown, Upload } from "lucide-react";
+import { ChevronDown, KeyRound, Upload } from "lucide-react";
+import {
+  AccountOAuthAuthorizeDialog,
+  type AccountOAuthFlowMode,
+  type ProvisionedTokens,
+} from "@/components/admin/account-oauth-authorize-dialog";
 import {
   Dialog,
   DialogContent,
@@ -241,6 +246,25 @@ export function AccountFormDialog({
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [oauthWizardOpen, setOauthWizardOpen] = useState(false);
+
+  // Map the OAuth runtime class to its provisioning flow: refresh-token runtimes
+  // run the redirect/PKCE authorization-code flow; device-code runtimes run the
+  // RFC 8628 device flow.
+  const oauthFlowMode: AccountOAuthFlowMode | null =
+    runtimeClass === "oauth_refresh"
+      ? "authorization_code"
+      : runtimeClass === "oauth_device_code"
+        ? "device_code"
+        : null;
+
+  function applyProvisionedTokens(tokens: ProvisionedTokens) {
+    setCredFields((prev) => ({
+      ...prev,
+      access_token: tokens.accessToken || prev.access_token || "",
+      refresh_token: tokens.refreshToken || prev.refresh_token || "",
+    }));
+  }
 
   const spec = specFor(runtimeClass);
   const busy = submitting || Boolean(isPending);
@@ -370,9 +394,18 @@ export function AccountFormDialog({
   const credId = "account-credential";
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <form onSubmit={onSubmit}>
+    <>
+      {oauthFlowMode ? (
+        <AccountOAuthAuthorizeDialog
+          open={oauthWizardOpen}
+          onOpenChange={setOauthWizardOpen}
+          mode={oauthFlowMode}
+          onProvisioned={applyProvisionedTokens}
+        />
+      ) : null}
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent>
+          <form onSubmit={onSubmit}>
           <DialogHeader>
             <DialogTitle>
               {mode === "create" ? t("adminAccounts.create") : t("adminAccounts.edit")}
@@ -442,7 +475,26 @@ export function AccountFormDialog({
             <div>
               {spec.kind === "fields" ? (
                 <>
-                  <Label>{credLabel}</Label>
+                  <div className="flex items-center justify-between gap-2">
+                    <Label className="mb-0">{credLabel}</Label>
+                    {oauthFlowMode ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={busy}
+                        onClick={() => setOauthWizardOpen(true)}
+                      >
+                        <KeyRound className="size-3.5" />
+                        {t("accountOAuth.authorizeAccount")}
+                      </Button>
+                    ) : null}
+                  </div>
+                  {oauthFlowMode ? (
+                    <p className="mt-1 text-2xs text-srapi-text-tertiary">
+                      {t("accountOAuth.authorizeAccountHint")}
+                    </p>
+                  ) : null}
                   <div className="mt-1.5 space-y-3">
                     {(spec.fields ?? []).map((f) => (
                       <div key={f.key}>
@@ -666,8 +718,9 @@ export function AccountFormDialog({
               {t("common.save")}
             </Button>
           </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

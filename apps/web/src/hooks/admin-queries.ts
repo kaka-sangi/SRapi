@@ -360,6 +360,29 @@ export function useScheduledTestPlanRuns(planId: string | null) {
   });
 }
 
+// ---- Channel monitors (synthetic probes) ----
+export function useChannelMonitors() {
+  return useQuery({
+    queryKey: queryKeys.admin.channelMonitors(),
+    queryFn: () => adminApi.listChannelMonitors(),
+  });
+}
+
+export function useChannelMonitorRuns(monitorId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.admin.channelMonitorRuns(monitorId ?? ""),
+    queryFn: () => adminApi.listChannelMonitorRuns(monitorId as string),
+    enabled: Boolean(monitorId),
+  });
+}
+
+export function useChannelMonitorTemplates() {
+  return useQuery({
+    queryKey: queryKeys.admin.channelMonitorTemplates(),
+    queryFn: () => adminApi.listChannelMonitorTemplates(),
+  });
+}
+
 // ---- TLS fingerprint profiles ----
 export function useTlsProfiles() {
   return useQuery({
@@ -901,6 +924,63 @@ export function useRunScheduledTestPlan() {
   return useAdminMutation(
     (id: string) => adminApi.runScheduledTestPlan(id),
     ["admin", "scheduled-test-plans"],
+  );
+}
+
+// Channel monitors (synthetic probes)
+export function useCreateChannelMonitor() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.createChannelMonitor>) => adminApi.createChannelMonitor(body),
+    ["admin", "channel-monitors"],
+  );
+}
+export function useUpdateChannelMonitor() {
+  return useAdminMutation(
+    (vars: { id: string; body: B<typeof adminApi.updateChannelMonitor> }) =>
+      adminApi.updateChannelMonitor(vars.id, vars.body),
+    ["admin", "channel-monitors"],
+  );
+}
+export function useDeleteChannelMonitor() {
+  return useAdminMutation(
+    (id: string) => adminApi.deleteChannelMonitor(id),
+    ["admin", "channel-monitors"],
+  );
+}
+export function useRunChannelMonitor() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => adminApi.runChannelMonitor(id),
+    onSuccess: (_data, id) => {
+      qc.invalidateQueries({ queryKey: queryKeys.admin.channelMonitorRuns(id) });
+    },
+  });
+}
+export function useCreateChannelMonitorTemplate() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.createChannelMonitorTemplate>) =>
+      adminApi.createChannelMonitorTemplate(body),
+    ["admin", "channel-monitor-templates"],
+  );
+}
+export function useUpdateChannelMonitorTemplate() {
+  return useAdminMutation(
+    (vars: { id: string; body: B<typeof adminApi.updateChannelMonitorTemplate> }) =>
+      adminApi.updateChannelMonitorTemplate(vars.id, vars.body),
+    ["admin", "channel-monitor-templates"],
+  );
+}
+export function useDeleteChannelMonitorTemplate() {
+  return useAdminMutation(
+    (id: string) => adminApi.deleteChannelMonitorTemplate(id),
+    ["admin", "channel-monitor-templates"],
+  );
+}
+export function useApplyChannelMonitorTemplate() {
+  return useAdminMutation(
+    (vars: { id: string; monitorIds: number[] }) =>
+      adminApi.applyChannelMonitorTemplate(vars.id, vars.monitorIds),
+    ["admin", "channel-monitors"],
   );
 }
 

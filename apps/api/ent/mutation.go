@@ -37,6 +37,9 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/modelprovidermapping"
 	"github.com/srapi/srapi/apps/api/ent/modelratelimit"
 	"github.com/srapi/srapi/apps/api/ent/modelregistry"
+	"github.com/srapi/srapi/apps/api/ent/monitordefinition"
+	"github.com/srapi/srapi/apps/api/ent/monitorrequesttemplate"
+	"github.com/srapi/srapi/apps/api/ent/monitorrunresult"
 	"github.com/srapi/srapi/apps/api/ent/obsalertevent"
 	"github.com/srapi/srapi/apps/api/ent/obsalertrule"
 	"github.com/srapi/srapi/apps/api/ent/obsalertsilence"
@@ -115,6 +118,9 @@ const (
 	TypeModelProviderMapping      = "ModelProviderMapping"
 	TypeModelRateLimit            = "ModelRateLimit"
 	TypeModelRegistry             = "ModelRegistry"
+	TypeMonitorDefinition         = "MonitorDefinition"
+	TypeMonitorRequestTemplate    = "MonitorRequestTemplate"
+	TypeMonitorRunResult          = "MonitorRunResult"
 	TypeObsAlertEvent             = "ObsAlertEvent"
 	TypeObsAlertRule              = "ObsAlertRule"
 	TypeObsAlertSilence           = "ObsAlertSilence"
@@ -24155,6 +24161,3092 @@ func (m *ModelRegistryMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *ModelRegistryMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown ModelRegistry edge %s", name)
+}
+
+// MonitorDefinitionMutation represents an operation that mutates the MonitorDefinition nodes in the graph.
+type MonitorDefinitionMutation struct {
+	config
+	op                          Op
+	typ                         string
+	id                          *int
+	created_at                  *time.Time
+	updated_at                  *time.Time
+	name                        *string
+	enabled                     *bool
+	scope                       *string
+	scope_ref                   *string
+	interval_seconds            *int
+	addinterval_seconds         *int
+	model                       *string
+	request_method              *string
+	request_url                 *string
+	request_headers             *map[string]string
+	request_body                *string
+	expected_status_codes       *[]int
+	appendexpected_status_codes []int
+	response_json_path          *string
+	response_contains           *string
+	clearedFields               map[string]struct{}
+	done                        bool
+	oldValue                    func(context.Context) (*MonitorDefinition, error)
+	predicates                  []predicate.MonitorDefinition
+}
+
+var _ ent.Mutation = (*MonitorDefinitionMutation)(nil)
+
+// monitordefinitionOption allows management of the mutation configuration using functional options.
+type monitordefinitionOption func(*MonitorDefinitionMutation)
+
+// newMonitorDefinitionMutation creates new mutation for the MonitorDefinition entity.
+func newMonitorDefinitionMutation(c config, op Op, opts ...monitordefinitionOption) *MonitorDefinitionMutation {
+	m := &MonitorDefinitionMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeMonitorDefinition,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withMonitorDefinitionID sets the ID field of the mutation.
+func withMonitorDefinitionID(id int) monitordefinitionOption {
+	return func(m *MonitorDefinitionMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *MonitorDefinition
+		)
+		m.oldValue = func(ctx context.Context) (*MonitorDefinition, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().MonitorDefinition.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withMonitorDefinition sets the old MonitorDefinition of the mutation.
+func withMonitorDefinition(node *MonitorDefinition) monitordefinitionOption {
+	return func(m *MonitorDefinitionMutation) {
+		m.oldValue = func(context.Context) (*MonitorDefinition, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m MonitorDefinitionMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m MonitorDefinitionMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *MonitorDefinitionMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *MonitorDefinitionMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().MonitorDefinition.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *MonitorDefinitionMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *MonitorDefinitionMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the MonitorDefinition entity.
+// If the MonitorDefinition object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorDefinitionMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *MonitorDefinitionMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *MonitorDefinitionMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *MonitorDefinitionMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the MonitorDefinition entity.
+// If the MonitorDefinition object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorDefinitionMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *MonitorDefinitionMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetName sets the "name" field.
+func (m *MonitorDefinitionMutation) SetName(s string) {
+	m.name = &s
+}
+
+// Name returns the value of the "name" field in the mutation.
+func (m *MonitorDefinitionMutation) Name() (r string, exists bool) {
+	v := m.name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldName returns the old "name" field's value of the MonitorDefinition entity.
+// If the MonitorDefinition object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorDefinitionMutation) OldName(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldName: %w", err)
+	}
+	return oldValue.Name, nil
+}
+
+// ResetName resets all changes to the "name" field.
+func (m *MonitorDefinitionMutation) ResetName() {
+	m.name = nil
+}
+
+// SetEnabled sets the "enabled" field.
+func (m *MonitorDefinitionMutation) SetEnabled(b bool) {
+	m.enabled = &b
+}
+
+// Enabled returns the value of the "enabled" field in the mutation.
+func (m *MonitorDefinitionMutation) Enabled() (r bool, exists bool) {
+	v := m.enabled
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEnabled returns the old "enabled" field's value of the MonitorDefinition entity.
+// If the MonitorDefinition object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorDefinitionMutation) OldEnabled(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEnabled is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEnabled requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEnabled: %w", err)
+	}
+	return oldValue.Enabled, nil
+}
+
+// ResetEnabled resets all changes to the "enabled" field.
+func (m *MonitorDefinitionMutation) ResetEnabled() {
+	m.enabled = nil
+}
+
+// SetScope sets the "scope" field.
+func (m *MonitorDefinitionMutation) SetScope(s string) {
+	m.scope = &s
+}
+
+// Scope returns the value of the "scope" field in the mutation.
+func (m *MonitorDefinitionMutation) Scope() (r string, exists bool) {
+	v := m.scope
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldScope returns the old "scope" field's value of the MonitorDefinition entity.
+// If the MonitorDefinition object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorDefinitionMutation) OldScope(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldScope is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldScope requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldScope: %w", err)
+	}
+	return oldValue.Scope, nil
+}
+
+// ResetScope resets all changes to the "scope" field.
+func (m *MonitorDefinitionMutation) ResetScope() {
+	m.scope = nil
+}
+
+// SetScopeRef sets the "scope_ref" field.
+func (m *MonitorDefinitionMutation) SetScopeRef(s string) {
+	m.scope_ref = &s
+}
+
+// ScopeRef returns the value of the "scope_ref" field in the mutation.
+func (m *MonitorDefinitionMutation) ScopeRef() (r string, exists bool) {
+	v := m.scope_ref
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldScopeRef returns the old "scope_ref" field's value of the MonitorDefinition entity.
+// If the MonitorDefinition object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorDefinitionMutation) OldScopeRef(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldScopeRef is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldScopeRef requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldScopeRef: %w", err)
+	}
+	return oldValue.ScopeRef, nil
+}
+
+// ResetScopeRef resets all changes to the "scope_ref" field.
+func (m *MonitorDefinitionMutation) ResetScopeRef() {
+	m.scope_ref = nil
+}
+
+// SetIntervalSeconds sets the "interval_seconds" field.
+func (m *MonitorDefinitionMutation) SetIntervalSeconds(i int) {
+	m.interval_seconds = &i
+	m.addinterval_seconds = nil
+}
+
+// IntervalSeconds returns the value of the "interval_seconds" field in the mutation.
+func (m *MonitorDefinitionMutation) IntervalSeconds() (r int, exists bool) {
+	v := m.interval_seconds
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldIntervalSeconds returns the old "interval_seconds" field's value of the MonitorDefinition entity.
+// If the MonitorDefinition object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorDefinitionMutation) OldIntervalSeconds(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldIntervalSeconds is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldIntervalSeconds requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldIntervalSeconds: %w", err)
+	}
+	return oldValue.IntervalSeconds, nil
+}
+
+// AddIntervalSeconds adds i to the "interval_seconds" field.
+func (m *MonitorDefinitionMutation) AddIntervalSeconds(i int) {
+	if m.addinterval_seconds != nil {
+		*m.addinterval_seconds += i
+	} else {
+		m.addinterval_seconds = &i
+	}
+}
+
+// AddedIntervalSeconds returns the value that was added to the "interval_seconds" field in this mutation.
+func (m *MonitorDefinitionMutation) AddedIntervalSeconds() (r int, exists bool) {
+	v := m.addinterval_seconds
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetIntervalSeconds resets all changes to the "interval_seconds" field.
+func (m *MonitorDefinitionMutation) ResetIntervalSeconds() {
+	m.interval_seconds = nil
+	m.addinterval_seconds = nil
+}
+
+// SetModel sets the "model" field.
+func (m *MonitorDefinitionMutation) SetModel(s string) {
+	m.model = &s
+}
+
+// Model returns the value of the "model" field in the mutation.
+func (m *MonitorDefinitionMutation) Model() (r string, exists bool) {
+	v := m.model
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldModel returns the old "model" field's value of the MonitorDefinition entity.
+// If the MonitorDefinition object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorDefinitionMutation) OldModel(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldModel is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldModel requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldModel: %w", err)
+	}
+	return oldValue.Model, nil
+}
+
+// ResetModel resets all changes to the "model" field.
+func (m *MonitorDefinitionMutation) ResetModel() {
+	m.model = nil
+}
+
+// SetRequestMethod sets the "request_method" field.
+func (m *MonitorDefinitionMutation) SetRequestMethod(s string) {
+	m.request_method = &s
+}
+
+// RequestMethod returns the value of the "request_method" field in the mutation.
+func (m *MonitorDefinitionMutation) RequestMethod() (r string, exists bool) {
+	v := m.request_method
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRequestMethod returns the old "request_method" field's value of the MonitorDefinition entity.
+// If the MonitorDefinition object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorDefinitionMutation) OldRequestMethod(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRequestMethod is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRequestMethod requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRequestMethod: %w", err)
+	}
+	return oldValue.RequestMethod, nil
+}
+
+// ResetRequestMethod resets all changes to the "request_method" field.
+func (m *MonitorDefinitionMutation) ResetRequestMethod() {
+	m.request_method = nil
+}
+
+// SetRequestURL sets the "request_url" field.
+func (m *MonitorDefinitionMutation) SetRequestURL(s string) {
+	m.request_url = &s
+}
+
+// RequestURL returns the value of the "request_url" field in the mutation.
+func (m *MonitorDefinitionMutation) RequestURL() (r string, exists bool) {
+	v := m.request_url
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRequestURL returns the old "request_url" field's value of the MonitorDefinition entity.
+// If the MonitorDefinition object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorDefinitionMutation) OldRequestURL(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRequestURL is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRequestURL requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRequestURL: %w", err)
+	}
+	return oldValue.RequestURL, nil
+}
+
+// ResetRequestURL resets all changes to the "request_url" field.
+func (m *MonitorDefinitionMutation) ResetRequestURL() {
+	m.request_url = nil
+}
+
+// SetRequestHeaders sets the "request_headers" field.
+func (m *MonitorDefinitionMutation) SetRequestHeaders(value map[string]string) {
+	m.request_headers = &value
+}
+
+// RequestHeaders returns the value of the "request_headers" field in the mutation.
+func (m *MonitorDefinitionMutation) RequestHeaders() (r map[string]string, exists bool) {
+	v := m.request_headers
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRequestHeaders returns the old "request_headers" field's value of the MonitorDefinition entity.
+// If the MonitorDefinition object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorDefinitionMutation) OldRequestHeaders(ctx context.Context) (v map[string]string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRequestHeaders is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRequestHeaders requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRequestHeaders: %w", err)
+	}
+	return oldValue.RequestHeaders, nil
+}
+
+// ClearRequestHeaders clears the value of the "request_headers" field.
+func (m *MonitorDefinitionMutation) ClearRequestHeaders() {
+	m.request_headers = nil
+	m.clearedFields[monitordefinition.FieldRequestHeaders] = struct{}{}
+}
+
+// RequestHeadersCleared returns if the "request_headers" field was cleared in this mutation.
+func (m *MonitorDefinitionMutation) RequestHeadersCleared() bool {
+	_, ok := m.clearedFields[monitordefinition.FieldRequestHeaders]
+	return ok
+}
+
+// ResetRequestHeaders resets all changes to the "request_headers" field.
+func (m *MonitorDefinitionMutation) ResetRequestHeaders() {
+	m.request_headers = nil
+	delete(m.clearedFields, monitordefinition.FieldRequestHeaders)
+}
+
+// SetRequestBody sets the "request_body" field.
+func (m *MonitorDefinitionMutation) SetRequestBody(s string) {
+	m.request_body = &s
+}
+
+// RequestBody returns the value of the "request_body" field in the mutation.
+func (m *MonitorDefinitionMutation) RequestBody() (r string, exists bool) {
+	v := m.request_body
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRequestBody returns the old "request_body" field's value of the MonitorDefinition entity.
+// If the MonitorDefinition object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorDefinitionMutation) OldRequestBody(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRequestBody is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRequestBody requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRequestBody: %w", err)
+	}
+	return oldValue.RequestBody, nil
+}
+
+// ResetRequestBody resets all changes to the "request_body" field.
+func (m *MonitorDefinitionMutation) ResetRequestBody() {
+	m.request_body = nil
+}
+
+// SetExpectedStatusCodes sets the "expected_status_codes" field.
+func (m *MonitorDefinitionMutation) SetExpectedStatusCodes(i []int) {
+	m.expected_status_codes = &i
+	m.appendexpected_status_codes = nil
+}
+
+// ExpectedStatusCodes returns the value of the "expected_status_codes" field in the mutation.
+func (m *MonitorDefinitionMutation) ExpectedStatusCodes() (r []int, exists bool) {
+	v := m.expected_status_codes
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExpectedStatusCodes returns the old "expected_status_codes" field's value of the MonitorDefinition entity.
+// If the MonitorDefinition object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorDefinitionMutation) OldExpectedStatusCodes(ctx context.Context) (v []int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExpectedStatusCodes is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExpectedStatusCodes requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExpectedStatusCodes: %w", err)
+	}
+	return oldValue.ExpectedStatusCodes, nil
+}
+
+// AppendExpectedStatusCodes adds i to the "expected_status_codes" field.
+func (m *MonitorDefinitionMutation) AppendExpectedStatusCodes(i []int) {
+	m.appendexpected_status_codes = append(m.appendexpected_status_codes, i...)
+}
+
+// AppendedExpectedStatusCodes returns the list of values that were appended to the "expected_status_codes" field in this mutation.
+func (m *MonitorDefinitionMutation) AppendedExpectedStatusCodes() ([]int, bool) {
+	if len(m.appendexpected_status_codes) == 0 {
+		return nil, false
+	}
+	return m.appendexpected_status_codes, true
+}
+
+// ClearExpectedStatusCodes clears the value of the "expected_status_codes" field.
+func (m *MonitorDefinitionMutation) ClearExpectedStatusCodes() {
+	m.expected_status_codes = nil
+	m.appendexpected_status_codes = nil
+	m.clearedFields[monitordefinition.FieldExpectedStatusCodes] = struct{}{}
+}
+
+// ExpectedStatusCodesCleared returns if the "expected_status_codes" field was cleared in this mutation.
+func (m *MonitorDefinitionMutation) ExpectedStatusCodesCleared() bool {
+	_, ok := m.clearedFields[monitordefinition.FieldExpectedStatusCodes]
+	return ok
+}
+
+// ResetExpectedStatusCodes resets all changes to the "expected_status_codes" field.
+func (m *MonitorDefinitionMutation) ResetExpectedStatusCodes() {
+	m.expected_status_codes = nil
+	m.appendexpected_status_codes = nil
+	delete(m.clearedFields, monitordefinition.FieldExpectedStatusCodes)
+}
+
+// SetResponseJSONPath sets the "response_json_path" field.
+func (m *MonitorDefinitionMutation) SetResponseJSONPath(s string) {
+	m.response_json_path = &s
+}
+
+// ResponseJSONPath returns the value of the "response_json_path" field in the mutation.
+func (m *MonitorDefinitionMutation) ResponseJSONPath() (r string, exists bool) {
+	v := m.response_json_path
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldResponseJSONPath returns the old "response_json_path" field's value of the MonitorDefinition entity.
+// If the MonitorDefinition object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorDefinitionMutation) OldResponseJSONPath(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldResponseJSONPath is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldResponseJSONPath requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldResponseJSONPath: %w", err)
+	}
+	return oldValue.ResponseJSONPath, nil
+}
+
+// ResetResponseJSONPath resets all changes to the "response_json_path" field.
+func (m *MonitorDefinitionMutation) ResetResponseJSONPath() {
+	m.response_json_path = nil
+}
+
+// SetResponseContains sets the "response_contains" field.
+func (m *MonitorDefinitionMutation) SetResponseContains(s string) {
+	m.response_contains = &s
+}
+
+// ResponseContains returns the value of the "response_contains" field in the mutation.
+func (m *MonitorDefinitionMutation) ResponseContains() (r string, exists bool) {
+	v := m.response_contains
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldResponseContains returns the old "response_contains" field's value of the MonitorDefinition entity.
+// If the MonitorDefinition object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorDefinitionMutation) OldResponseContains(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldResponseContains is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldResponseContains requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldResponseContains: %w", err)
+	}
+	return oldValue.ResponseContains, nil
+}
+
+// ResetResponseContains resets all changes to the "response_contains" field.
+func (m *MonitorDefinitionMutation) ResetResponseContains() {
+	m.response_contains = nil
+}
+
+// Where appends a list predicates to the MonitorDefinitionMutation builder.
+func (m *MonitorDefinitionMutation) Where(ps ...predicate.MonitorDefinition) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the MonitorDefinitionMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *MonitorDefinitionMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.MonitorDefinition, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *MonitorDefinitionMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *MonitorDefinitionMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (MonitorDefinition).
+func (m *MonitorDefinitionMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *MonitorDefinitionMutation) Fields() []string {
+	fields := make([]string, 0, 15)
+	if m.created_at != nil {
+		fields = append(fields, monitordefinition.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, monitordefinition.FieldUpdatedAt)
+	}
+	if m.name != nil {
+		fields = append(fields, monitordefinition.FieldName)
+	}
+	if m.enabled != nil {
+		fields = append(fields, monitordefinition.FieldEnabled)
+	}
+	if m.scope != nil {
+		fields = append(fields, monitordefinition.FieldScope)
+	}
+	if m.scope_ref != nil {
+		fields = append(fields, monitordefinition.FieldScopeRef)
+	}
+	if m.interval_seconds != nil {
+		fields = append(fields, monitordefinition.FieldIntervalSeconds)
+	}
+	if m.model != nil {
+		fields = append(fields, monitordefinition.FieldModel)
+	}
+	if m.request_method != nil {
+		fields = append(fields, monitordefinition.FieldRequestMethod)
+	}
+	if m.request_url != nil {
+		fields = append(fields, monitordefinition.FieldRequestURL)
+	}
+	if m.request_headers != nil {
+		fields = append(fields, monitordefinition.FieldRequestHeaders)
+	}
+	if m.request_body != nil {
+		fields = append(fields, monitordefinition.FieldRequestBody)
+	}
+	if m.expected_status_codes != nil {
+		fields = append(fields, monitordefinition.FieldExpectedStatusCodes)
+	}
+	if m.response_json_path != nil {
+		fields = append(fields, monitordefinition.FieldResponseJSONPath)
+	}
+	if m.response_contains != nil {
+		fields = append(fields, monitordefinition.FieldResponseContains)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *MonitorDefinitionMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case monitordefinition.FieldCreatedAt:
+		return m.CreatedAt()
+	case monitordefinition.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case monitordefinition.FieldName:
+		return m.Name()
+	case monitordefinition.FieldEnabled:
+		return m.Enabled()
+	case monitordefinition.FieldScope:
+		return m.Scope()
+	case monitordefinition.FieldScopeRef:
+		return m.ScopeRef()
+	case monitordefinition.FieldIntervalSeconds:
+		return m.IntervalSeconds()
+	case monitordefinition.FieldModel:
+		return m.Model()
+	case monitordefinition.FieldRequestMethod:
+		return m.RequestMethod()
+	case monitordefinition.FieldRequestURL:
+		return m.RequestURL()
+	case monitordefinition.FieldRequestHeaders:
+		return m.RequestHeaders()
+	case monitordefinition.FieldRequestBody:
+		return m.RequestBody()
+	case monitordefinition.FieldExpectedStatusCodes:
+		return m.ExpectedStatusCodes()
+	case monitordefinition.FieldResponseJSONPath:
+		return m.ResponseJSONPath()
+	case monitordefinition.FieldResponseContains:
+		return m.ResponseContains()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *MonitorDefinitionMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case monitordefinition.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case monitordefinition.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case monitordefinition.FieldName:
+		return m.OldName(ctx)
+	case monitordefinition.FieldEnabled:
+		return m.OldEnabled(ctx)
+	case monitordefinition.FieldScope:
+		return m.OldScope(ctx)
+	case monitordefinition.FieldScopeRef:
+		return m.OldScopeRef(ctx)
+	case monitordefinition.FieldIntervalSeconds:
+		return m.OldIntervalSeconds(ctx)
+	case monitordefinition.FieldModel:
+		return m.OldModel(ctx)
+	case monitordefinition.FieldRequestMethod:
+		return m.OldRequestMethod(ctx)
+	case monitordefinition.FieldRequestURL:
+		return m.OldRequestURL(ctx)
+	case monitordefinition.FieldRequestHeaders:
+		return m.OldRequestHeaders(ctx)
+	case monitordefinition.FieldRequestBody:
+		return m.OldRequestBody(ctx)
+	case monitordefinition.FieldExpectedStatusCodes:
+		return m.OldExpectedStatusCodes(ctx)
+	case monitordefinition.FieldResponseJSONPath:
+		return m.OldResponseJSONPath(ctx)
+	case monitordefinition.FieldResponseContains:
+		return m.OldResponseContains(ctx)
+	}
+	return nil, fmt.Errorf("unknown MonitorDefinition field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *MonitorDefinitionMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case monitordefinition.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case monitordefinition.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case monitordefinition.FieldName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetName(v)
+		return nil
+	case monitordefinition.FieldEnabled:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEnabled(v)
+		return nil
+	case monitordefinition.FieldScope:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetScope(v)
+		return nil
+	case monitordefinition.FieldScopeRef:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetScopeRef(v)
+		return nil
+	case monitordefinition.FieldIntervalSeconds:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetIntervalSeconds(v)
+		return nil
+	case monitordefinition.FieldModel:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetModel(v)
+		return nil
+	case monitordefinition.FieldRequestMethod:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRequestMethod(v)
+		return nil
+	case monitordefinition.FieldRequestURL:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRequestURL(v)
+		return nil
+	case monitordefinition.FieldRequestHeaders:
+		v, ok := value.(map[string]string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRequestHeaders(v)
+		return nil
+	case monitordefinition.FieldRequestBody:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRequestBody(v)
+		return nil
+	case monitordefinition.FieldExpectedStatusCodes:
+		v, ok := value.([]int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExpectedStatusCodes(v)
+		return nil
+	case monitordefinition.FieldResponseJSONPath:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetResponseJSONPath(v)
+		return nil
+	case monitordefinition.FieldResponseContains:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetResponseContains(v)
+		return nil
+	}
+	return fmt.Errorf("unknown MonitorDefinition field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *MonitorDefinitionMutation) AddedFields() []string {
+	var fields []string
+	if m.addinterval_seconds != nil {
+		fields = append(fields, monitordefinition.FieldIntervalSeconds)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *MonitorDefinitionMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case monitordefinition.FieldIntervalSeconds:
+		return m.AddedIntervalSeconds()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *MonitorDefinitionMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case monitordefinition.FieldIntervalSeconds:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddIntervalSeconds(v)
+		return nil
+	}
+	return fmt.Errorf("unknown MonitorDefinition numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *MonitorDefinitionMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(monitordefinition.FieldRequestHeaders) {
+		fields = append(fields, monitordefinition.FieldRequestHeaders)
+	}
+	if m.FieldCleared(monitordefinition.FieldExpectedStatusCodes) {
+		fields = append(fields, monitordefinition.FieldExpectedStatusCodes)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *MonitorDefinitionMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *MonitorDefinitionMutation) ClearField(name string) error {
+	switch name {
+	case monitordefinition.FieldRequestHeaders:
+		m.ClearRequestHeaders()
+		return nil
+	case monitordefinition.FieldExpectedStatusCodes:
+		m.ClearExpectedStatusCodes()
+		return nil
+	}
+	return fmt.Errorf("unknown MonitorDefinition nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *MonitorDefinitionMutation) ResetField(name string) error {
+	switch name {
+	case monitordefinition.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case monitordefinition.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case monitordefinition.FieldName:
+		m.ResetName()
+		return nil
+	case monitordefinition.FieldEnabled:
+		m.ResetEnabled()
+		return nil
+	case monitordefinition.FieldScope:
+		m.ResetScope()
+		return nil
+	case monitordefinition.FieldScopeRef:
+		m.ResetScopeRef()
+		return nil
+	case monitordefinition.FieldIntervalSeconds:
+		m.ResetIntervalSeconds()
+		return nil
+	case monitordefinition.FieldModel:
+		m.ResetModel()
+		return nil
+	case monitordefinition.FieldRequestMethod:
+		m.ResetRequestMethod()
+		return nil
+	case monitordefinition.FieldRequestURL:
+		m.ResetRequestURL()
+		return nil
+	case monitordefinition.FieldRequestHeaders:
+		m.ResetRequestHeaders()
+		return nil
+	case monitordefinition.FieldRequestBody:
+		m.ResetRequestBody()
+		return nil
+	case monitordefinition.FieldExpectedStatusCodes:
+		m.ResetExpectedStatusCodes()
+		return nil
+	case monitordefinition.FieldResponseJSONPath:
+		m.ResetResponseJSONPath()
+		return nil
+	case monitordefinition.FieldResponseContains:
+		m.ResetResponseContains()
+		return nil
+	}
+	return fmt.Errorf("unknown MonitorDefinition field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *MonitorDefinitionMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *MonitorDefinitionMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *MonitorDefinitionMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *MonitorDefinitionMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *MonitorDefinitionMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *MonitorDefinitionMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *MonitorDefinitionMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown MonitorDefinition unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *MonitorDefinitionMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown MonitorDefinition edge %s", name)
+}
+
+// MonitorRequestTemplateMutation represents an operation that mutates the MonitorRequestTemplate nodes in the graph.
+type MonitorRequestTemplateMutation struct {
+	config
+	op                          Op
+	typ                         string
+	id                          *int
+	created_at                  *time.Time
+	updated_at                  *time.Time
+	name                        *string
+	description                 *string
+	request_method              *string
+	request_url                 *string
+	request_headers             *map[string]string
+	request_body                *string
+	expected_status_codes       *[]int
+	appendexpected_status_codes []int
+	response_json_path          *string
+	response_contains           *string
+	clearedFields               map[string]struct{}
+	done                        bool
+	oldValue                    func(context.Context) (*MonitorRequestTemplate, error)
+	predicates                  []predicate.MonitorRequestTemplate
+}
+
+var _ ent.Mutation = (*MonitorRequestTemplateMutation)(nil)
+
+// monitorrequesttemplateOption allows management of the mutation configuration using functional options.
+type monitorrequesttemplateOption func(*MonitorRequestTemplateMutation)
+
+// newMonitorRequestTemplateMutation creates new mutation for the MonitorRequestTemplate entity.
+func newMonitorRequestTemplateMutation(c config, op Op, opts ...monitorrequesttemplateOption) *MonitorRequestTemplateMutation {
+	m := &MonitorRequestTemplateMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeMonitorRequestTemplate,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withMonitorRequestTemplateID sets the ID field of the mutation.
+func withMonitorRequestTemplateID(id int) monitorrequesttemplateOption {
+	return func(m *MonitorRequestTemplateMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *MonitorRequestTemplate
+		)
+		m.oldValue = func(ctx context.Context) (*MonitorRequestTemplate, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().MonitorRequestTemplate.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withMonitorRequestTemplate sets the old MonitorRequestTemplate of the mutation.
+func withMonitorRequestTemplate(node *MonitorRequestTemplate) monitorrequesttemplateOption {
+	return func(m *MonitorRequestTemplateMutation) {
+		m.oldValue = func(context.Context) (*MonitorRequestTemplate, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m MonitorRequestTemplateMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m MonitorRequestTemplateMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *MonitorRequestTemplateMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *MonitorRequestTemplateMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().MonitorRequestTemplate.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *MonitorRequestTemplateMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *MonitorRequestTemplateMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the MonitorRequestTemplate entity.
+// If the MonitorRequestTemplate object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorRequestTemplateMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *MonitorRequestTemplateMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *MonitorRequestTemplateMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *MonitorRequestTemplateMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the MonitorRequestTemplate entity.
+// If the MonitorRequestTemplate object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorRequestTemplateMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *MonitorRequestTemplateMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetName sets the "name" field.
+func (m *MonitorRequestTemplateMutation) SetName(s string) {
+	m.name = &s
+}
+
+// Name returns the value of the "name" field in the mutation.
+func (m *MonitorRequestTemplateMutation) Name() (r string, exists bool) {
+	v := m.name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldName returns the old "name" field's value of the MonitorRequestTemplate entity.
+// If the MonitorRequestTemplate object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorRequestTemplateMutation) OldName(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldName: %w", err)
+	}
+	return oldValue.Name, nil
+}
+
+// ResetName resets all changes to the "name" field.
+func (m *MonitorRequestTemplateMutation) ResetName() {
+	m.name = nil
+}
+
+// SetDescription sets the "description" field.
+func (m *MonitorRequestTemplateMutation) SetDescription(s string) {
+	m.description = &s
+}
+
+// Description returns the value of the "description" field in the mutation.
+func (m *MonitorRequestTemplateMutation) Description() (r string, exists bool) {
+	v := m.description
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDescription returns the old "description" field's value of the MonitorRequestTemplate entity.
+// If the MonitorRequestTemplate object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorRequestTemplateMutation) OldDescription(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDescription is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDescription requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDescription: %w", err)
+	}
+	return oldValue.Description, nil
+}
+
+// ResetDescription resets all changes to the "description" field.
+func (m *MonitorRequestTemplateMutation) ResetDescription() {
+	m.description = nil
+}
+
+// SetRequestMethod sets the "request_method" field.
+func (m *MonitorRequestTemplateMutation) SetRequestMethod(s string) {
+	m.request_method = &s
+}
+
+// RequestMethod returns the value of the "request_method" field in the mutation.
+func (m *MonitorRequestTemplateMutation) RequestMethod() (r string, exists bool) {
+	v := m.request_method
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRequestMethod returns the old "request_method" field's value of the MonitorRequestTemplate entity.
+// If the MonitorRequestTemplate object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorRequestTemplateMutation) OldRequestMethod(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRequestMethod is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRequestMethod requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRequestMethod: %w", err)
+	}
+	return oldValue.RequestMethod, nil
+}
+
+// ResetRequestMethod resets all changes to the "request_method" field.
+func (m *MonitorRequestTemplateMutation) ResetRequestMethod() {
+	m.request_method = nil
+}
+
+// SetRequestURL sets the "request_url" field.
+func (m *MonitorRequestTemplateMutation) SetRequestURL(s string) {
+	m.request_url = &s
+}
+
+// RequestURL returns the value of the "request_url" field in the mutation.
+func (m *MonitorRequestTemplateMutation) RequestURL() (r string, exists bool) {
+	v := m.request_url
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRequestURL returns the old "request_url" field's value of the MonitorRequestTemplate entity.
+// If the MonitorRequestTemplate object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorRequestTemplateMutation) OldRequestURL(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRequestURL is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRequestURL requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRequestURL: %w", err)
+	}
+	return oldValue.RequestURL, nil
+}
+
+// ResetRequestURL resets all changes to the "request_url" field.
+func (m *MonitorRequestTemplateMutation) ResetRequestURL() {
+	m.request_url = nil
+}
+
+// SetRequestHeaders sets the "request_headers" field.
+func (m *MonitorRequestTemplateMutation) SetRequestHeaders(value map[string]string) {
+	m.request_headers = &value
+}
+
+// RequestHeaders returns the value of the "request_headers" field in the mutation.
+func (m *MonitorRequestTemplateMutation) RequestHeaders() (r map[string]string, exists bool) {
+	v := m.request_headers
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRequestHeaders returns the old "request_headers" field's value of the MonitorRequestTemplate entity.
+// If the MonitorRequestTemplate object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorRequestTemplateMutation) OldRequestHeaders(ctx context.Context) (v map[string]string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRequestHeaders is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRequestHeaders requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRequestHeaders: %w", err)
+	}
+	return oldValue.RequestHeaders, nil
+}
+
+// ClearRequestHeaders clears the value of the "request_headers" field.
+func (m *MonitorRequestTemplateMutation) ClearRequestHeaders() {
+	m.request_headers = nil
+	m.clearedFields[monitorrequesttemplate.FieldRequestHeaders] = struct{}{}
+}
+
+// RequestHeadersCleared returns if the "request_headers" field was cleared in this mutation.
+func (m *MonitorRequestTemplateMutation) RequestHeadersCleared() bool {
+	_, ok := m.clearedFields[monitorrequesttemplate.FieldRequestHeaders]
+	return ok
+}
+
+// ResetRequestHeaders resets all changes to the "request_headers" field.
+func (m *MonitorRequestTemplateMutation) ResetRequestHeaders() {
+	m.request_headers = nil
+	delete(m.clearedFields, monitorrequesttemplate.FieldRequestHeaders)
+}
+
+// SetRequestBody sets the "request_body" field.
+func (m *MonitorRequestTemplateMutation) SetRequestBody(s string) {
+	m.request_body = &s
+}
+
+// RequestBody returns the value of the "request_body" field in the mutation.
+func (m *MonitorRequestTemplateMutation) RequestBody() (r string, exists bool) {
+	v := m.request_body
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRequestBody returns the old "request_body" field's value of the MonitorRequestTemplate entity.
+// If the MonitorRequestTemplate object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorRequestTemplateMutation) OldRequestBody(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRequestBody is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRequestBody requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRequestBody: %w", err)
+	}
+	return oldValue.RequestBody, nil
+}
+
+// ResetRequestBody resets all changes to the "request_body" field.
+func (m *MonitorRequestTemplateMutation) ResetRequestBody() {
+	m.request_body = nil
+}
+
+// SetExpectedStatusCodes sets the "expected_status_codes" field.
+func (m *MonitorRequestTemplateMutation) SetExpectedStatusCodes(i []int) {
+	m.expected_status_codes = &i
+	m.appendexpected_status_codes = nil
+}
+
+// ExpectedStatusCodes returns the value of the "expected_status_codes" field in the mutation.
+func (m *MonitorRequestTemplateMutation) ExpectedStatusCodes() (r []int, exists bool) {
+	v := m.expected_status_codes
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExpectedStatusCodes returns the old "expected_status_codes" field's value of the MonitorRequestTemplate entity.
+// If the MonitorRequestTemplate object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorRequestTemplateMutation) OldExpectedStatusCodes(ctx context.Context) (v []int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExpectedStatusCodes is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExpectedStatusCodes requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExpectedStatusCodes: %w", err)
+	}
+	return oldValue.ExpectedStatusCodes, nil
+}
+
+// AppendExpectedStatusCodes adds i to the "expected_status_codes" field.
+func (m *MonitorRequestTemplateMutation) AppendExpectedStatusCodes(i []int) {
+	m.appendexpected_status_codes = append(m.appendexpected_status_codes, i...)
+}
+
+// AppendedExpectedStatusCodes returns the list of values that were appended to the "expected_status_codes" field in this mutation.
+func (m *MonitorRequestTemplateMutation) AppendedExpectedStatusCodes() ([]int, bool) {
+	if len(m.appendexpected_status_codes) == 0 {
+		return nil, false
+	}
+	return m.appendexpected_status_codes, true
+}
+
+// ClearExpectedStatusCodes clears the value of the "expected_status_codes" field.
+func (m *MonitorRequestTemplateMutation) ClearExpectedStatusCodes() {
+	m.expected_status_codes = nil
+	m.appendexpected_status_codes = nil
+	m.clearedFields[monitorrequesttemplate.FieldExpectedStatusCodes] = struct{}{}
+}
+
+// ExpectedStatusCodesCleared returns if the "expected_status_codes" field was cleared in this mutation.
+func (m *MonitorRequestTemplateMutation) ExpectedStatusCodesCleared() bool {
+	_, ok := m.clearedFields[monitorrequesttemplate.FieldExpectedStatusCodes]
+	return ok
+}
+
+// ResetExpectedStatusCodes resets all changes to the "expected_status_codes" field.
+func (m *MonitorRequestTemplateMutation) ResetExpectedStatusCodes() {
+	m.expected_status_codes = nil
+	m.appendexpected_status_codes = nil
+	delete(m.clearedFields, monitorrequesttemplate.FieldExpectedStatusCodes)
+}
+
+// SetResponseJSONPath sets the "response_json_path" field.
+func (m *MonitorRequestTemplateMutation) SetResponseJSONPath(s string) {
+	m.response_json_path = &s
+}
+
+// ResponseJSONPath returns the value of the "response_json_path" field in the mutation.
+func (m *MonitorRequestTemplateMutation) ResponseJSONPath() (r string, exists bool) {
+	v := m.response_json_path
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldResponseJSONPath returns the old "response_json_path" field's value of the MonitorRequestTemplate entity.
+// If the MonitorRequestTemplate object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorRequestTemplateMutation) OldResponseJSONPath(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldResponseJSONPath is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldResponseJSONPath requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldResponseJSONPath: %w", err)
+	}
+	return oldValue.ResponseJSONPath, nil
+}
+
+// ResetResponseJSONPath resets all changes to the "response_json_path" field.
+func (m *MonitorRequestTemplateMutation) ResetResponseJSONPath() {
+	m.response_json_path = nil
+}
+
+// SetResponseContains sets the "response_contains" field.
+func (m *MonitorRequestTemplateMutation) SetResponseContains(s string) {
+	m.response_contains = &s
+}
+
+// ResponseContains returns the value of the "response_contains" field in the mutation.
+func (m *MonitorRequestTemplateMutation) ResponseContains() (r string, exists bool) {
+	v := m.response_contains
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldResponseContains returns the old "response_contains" field's value of the MonitorRequestTemplate entity.
+// If the MonitorRequestTemplate object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorRequestTemplateMutation) OldResponseContains(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldResponseContains is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldResponseContains requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldResponseContains: %w", err)
+	}
+	return oldValue.ResponseContains, nil
+}
+
+// ResetResponseContains resets all changes to the "response_contains" field.
+func (m *MonitorRequestTemplateMutation) ResetResponseContains() {
+	m.response_contains = nil
+}
+
+// Where appends a list predicates to the MonitorRequestTemplateMutation builder.
+func (m *MonitorRequestTemplateMutation) Where(ps ...predicate.MonitorRequestTemplate) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the MonitorRequestTemplateMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *MonitorRequestTemplateMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.MonitorRequestTemplate, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *MonitorRequestTemplateMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *MonitorRequestTemplateMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (MonitorRequestTemplate).
+func (m *MonitorRequestTemplateMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *MonitorRequestTemplateMutation) Fields() []string {
+	fields := make([]string, 0, 11)
+	if m.created_at != nil {
+		fields = append(fields, monitorrequesttemplate.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, monitorrequesttemplate.FieldUpdatedAt)
+	}
+	if m.name != nil {
+		fields = append(fields, monitorrequesttemplate.FieldName)
+	}
+	if m.description != nil {
+		fields = append(fields, monitorrequesttemplate.FieldDescription)
+	}
+	if m.request_method != nil {
+		fields = append(fields, monitorrequesttemplate.FieldRequestMethod)
+	}
+	if m.request_url != nil {
+		fields = append(fields, monitorrequesttemplate.FieldRequestURL)
+	}
+	if m.request_headers != nil {
+		fields = append(fields, monitorrequesttemplate.FieldRequestHeaders)
+	}
+	if m.request_body != nil {
+		fields = append(fields, monitorrequesttemplate.FieldRequestBody)
+	}
+	if m.expected_status_codes != nil {
+		fields = append(fields, monitorrequesttemplate.FieldExpectedStatusCodes)
+	}
+	if m.response_json_path != nil {
+		fields = append(fields, monitorrequesttemplate.FieldResponseJSONPath)
+	}
+	if m.response_contains != nil {
+		fields = append(fields, monitorrequesttemplate.FieldResponseContains)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *MonitorRequestTemplateMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case monitorrequesttemplate.FieldCreatedAt:
+		return m.CreatedAt()
+	case monitorrequesttemplate.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case monitorrequesttemplate.FieldName:
+		return m.Name()
+	case monitorrequesttemplate.FieldDescription:
+		return m.Description()
+	case monitorrequesttemplate.FieldRequestMethod:
+		return m.RequestMethod()
+	case monitorrequesttemplate.FieldRequestURL:
+		return m.RequestURL()
+	case monitorrequesttemplate.FieldRequestHeaders:
+		return m.RequestHeaders()
+	case monitorrequesttemplate.FieldRequestBody:
+		return m.RequestBody()
+	case monitorrequesttemplate.FieldExpectedStatusCodes:
+		return m.ExpectedStatusCodes()
+	case monitorrequesttemplate.FieldResponseJSONPath:
+		return m.ResponseJSONPath()
+	case monitorrequesttemplate.FieldResponseContains:
+		return m.ResponseContains()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *MonitorRequestTemplateMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case monitorrequesttemplate.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case monitorrequesttemplate.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case monitorrequesttemplate.FieldName:
+		return m.OldName(ctx)
+	case monitorrequesttemplate.FieldDescription:
+		return m.OldDescription(ctx)
+	case monitorrequesttemplate.FieldRequestMethod:
+		return m.OldRequestMethod(ctx)
+	case monitorrequesttemplate.FieldRequestURL:
+		return m.OldRequestURL(ctx)
+	case monitorrequesttemplate.FieldRequestHeaders:
+		return m.OldRequestHeaders(ctx)
+	case monitorrequesttemplate.FieldRequestBody:
+		return m.OldRequestBody(ctx)
+	case monitorrequesttemplate.FieldExpectedStatusCodes:
+		return m.OldExpectedStatusCodes(ctx)
+	case monitorrequesttemplate.FieldResponseJSONPath:
+		return m.OldResponseJSONPath(ctx)
+	case monitorrequesttemplate.FieldResponseContains:
+		return m.OldResponseContains(ctx)
+	}
+	return nil, fmt.Errorf("unknown MonitorRequestTemplate field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *MonitorRequestTemplateMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case monitorrequesttemplate.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case monitorrequesttemplate.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case monitorrequesttemplate.FieldName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetName(v)
+		return nil
+	case monitorrequesttemplate.FieldDescription:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDescription(v)
+		return nil
+	case monitorrequesttemplate.FieldRequestMethod:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRequestMethod(v)
+		return nil
+	case monitorrequesttemplate.FieldRequestURL:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRequestURL(v)
+		return nil
+	case monitorrequesttemplate.FieldRequestHeaders:
+		v, ok := value.(map[string]string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRequestHeaders(v)
+		return nil
+	case monitorrequesttemplate.FieldRequestBody:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRequestBody(v)
+		return nil
+	case monitorrequesttemplate.FieldExpectedStatusCodes:
+		v, ok := value.([]int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExpectedStatusCodes(v)
+		return nil
+	case monitorrequesttemplate.FieldResponseJSONPath:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetResponseJSONPath(v)
+		return nil
+	case monitorrequesttemplate.FieldResponseContains:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetResponseContains(v)
+		return nil
+	}
+	return fmt.Errorf("unknown MonitorRequestTemplate field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *MonitorRequestTemplateMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *MonitorRequestTemplateMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *MonitorRequestTemplateMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown MonitorRequestTemplate numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *MonitorRequestTemplateMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(monitorrequesttemplate.FieldRequestHeaders) {
+		fields = append(fields, monitorrequesttemplate.FieldRequestHeaders)
+	}
+	if m.FieldCleared(monitorrequesttemplate.FieldExpectedStatusCodes) {
+		fields = append(fields, monitorrequesttemplate.FieldExpectedStatusCodes)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *MonitorRequestTemplateMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *MonitorRequestTemplateMutation) ClearField(name string) error {
+	switch name {
+	case monitorrequesttemplate.FieldRequestHeaders:
+		m.ClearRequestHeaders()
+		return nil
+	case monitorrequesttemplate.FieldExpectedStatusCodes:
+		m.ClearExpectedStatusCodes()
+		return nil
+	}
+	return fmt.Errorf("unknown MonitorRequestTemplate nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *MonitorRequestTemplateMutation) ResetField(name string) error {
+	switch name {
+	case monitorrequesttemplate.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case monitorrequesttemplate.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case monitorrequesttemplate.FieldName:
+		m.ResetName()
+		return nil
+	case monitorrequesttemplate.FieldDescription:
+		m.ResetDescription()
+		return nil
+	case monitorrequesttemplate.FieldRequestMethod:
+		m.ResetRequestMethod()
+		return nil
+	case monitorrequesttemplate.FieldRequestURL:
+		m.ResetRequestURL()
+		return nil
+	case monitorrequesttemplate.FieldRequestHeaders:
+		m.ResetRequestHeaders()
+		return nil
+	case monitorrequesttemplate.FieldRequestBody:
+		m.ResetRequestBody()
+		return nil
+	case monitorrequesttemplate.FieldExpectedStatusCodes:
+		m.ResetExpectedStatusCodes()
+		return nil
+	case monitorrequesttemplate.FieldResponseJSONPath:
+		m.ResetResponseJSONPath()
+		return nil
+	case monitorrequesttemplate.FieldResponseContains:
+		m.ResetResponseContains()
+		return nil
+	}
+	return fmt.Errorf("unknown MonitorRequestTemplate field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *MonitorRequestTemplateMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *MonitorRequestTemplateMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *MonitorRequestTemplateMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *MonitorRequestTemplateMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *MonitorRequestTemplateMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *MonitorRequestTemplateMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *MonitorRequestTemplateMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown MonitorRequestTemplate unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *MonitorRequestTemplateMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown MonitorRequestTemplate edge %s", name)
+}
+
+// MonitorRunResultMutation represents an operation that mutates the MonitorRunResult nodes in the graph.
+type MonitorRunResultMutation struct {
+	config
+	op               Op
+	typ              string
+	id               *int
+	created_at       *time.Time
+	updated_at       *time.Time
+	monitor_id       *int
+	addmonitor_id    *int
+	run_id           *string
+	ok               *bool
+	checked_count    *int
+	addchecked_count *int
+	ok_count         *int
+	addok_count      *int
+	latency_ms       *int
+	addlatency_ms    *int
+	trigger          *string
+	results          *[]map[string]interface{}
+	appendresults    []map[string]interface{}
+	clearedFields    map[string]struct{}
+	done             bool
+	oldValue         func(context.Context) (*MonitorRunResult, error)
+	predicates       []predicate.MonitorRunResult
+}
+
+var _ ent.Mutation = (*MonitorRunResultMutation)(nil)
+
+// monitorrunresultOption allows management of the mutation configuration using functional options.
+type monitorrunresultOption func(*MonitorRunResultMutation)
+
+// newMonitorRunResultMutation creates new mutation for the MonitorRunResult entity.
+func newMonitorRunResultMutation(c config, op Op, opts ...monitorrunresultOption) *MonitorRunResultMutation {
+	m := &MonitorRunResultMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeMonitorRunResult,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withMonitorRunResultID sets the ID field of the mutation.
+func withMonitorRunResultID(id int) monitorrunresultOption {
+	return func(m *MonitorRunResultMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *MonitorRunResult
+		)
+		m.oldValue = func(ctx context.Context) (*MonitorRunResult, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().MonitorRunResult.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withMonitorRunResult sets the old MonitorRunResult of the mutation.
+func withMonitorRunResult(node *MonitorRunResult) monitorrunresultOption {
+	return func(m *MonitorRunResultMutation) {
+		m.oldValue = func(context.Context) (*MonitorRunResult, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m MonitorRunResultMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m MonitorRunResultMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *MonitorRunResultMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *MonitorRunResultMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().MonitorRunResult.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *MonitorRunResultMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *MonitorRunResultMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the MonitorRunResult entity.
+// If the MonitorRunResult object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorRunResultMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *MonitorRunResultMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *MonitorRunResultMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *MonitorRunResultMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the MonitorRunResult entity.
+// If the MonitorRunResult object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorRunResultMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *MonitorRunResultMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetMonitorID sets the "monitor_id" field.
+func (m *MonitorRunResultMutation) SetMonitorID(i int) {
+	m.monitor_id = &i
+	m.addmonitor_id = nil
+}
+
+// MonitorID returns the value of the "monitor_id" field in the mutation.
+func (m *MonitorRunResultMutation) MonitorID() (r int, exists bool) {
+	v := m.monitor_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMonitorID returns the old "monitor_id" field's value of the MonitorRunResult entity.
+// If the MonitorRunResult object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorRunResultMutation) OldMonitorID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMonitorID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMonitorID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMonitorID: %w", err)
+	}
+	return oldValue.MonitorID, nil
+}
+
+// AddMonitorID adds i to the "monitor_id" field.
+func (m *MonitorRunResultMutation) AddMonitorID(i int) {
+	if m.addmonitor_id != nil {
+		*m.addmonitor_id += i
+	} else {
+		m.addmonitor_id = &i
+	}
+}
+
+// AddedMonitorID returns the value that was added to the "monitor_id" field in this mutation.
+func (m *MonitorRunResultMutation) AddedMonitorID() (r int, exists bool) {
+	v := m.addmonitor_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetMonitorID resets all changes to the "monitor_id" field.
+func (m *MonitorRunResultMutation) ResetMonitorID() {
+	m.monitor_id = nil
+	m.addmonitor_id = nil
+}
+
+// SetRunID sets the "run_id" field.
+func (m *MonitorRunResultMutation) SetRunID(s string) {
+	m.run_id = &s
+}
+
+// RunID returns the value of the "run_id" field in the mutation.
+func (m *MonitorRunResultMutation) RunID() (r string, exists bool) {
+	v := m.run_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRunID returns the old "run_id" field's value of the MonitorRunResult entity.
+// If the MonitorRunResult object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorRunResultMutation) OldRunID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRunID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRunID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRunID: %w", err)
+	}
+	return oldValue.RunID, nil
+}
+
+// ResetRunID resets all changes to the "run_id" field.
+func (m *MonitorRunResultMutation) ResetRunID() {
+	m.run_id = nil
+}
+
+// SetOk sets the "ok" field.
+func (m *MonitorRunResultMutation) SetOk(b bool) {
+	m.ok = &b
+}
+
+// Ok returns the value of the "ok" field in the mutation.
+func (m *MonitorRunResultMutation) Ok() (r bool, exists bool) {
+	v := m.ok
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOk returns the old "ok" field's value of the MonitorRunResult entity.
+// If the MonitorRunResult object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorRunResultMutation) OldOk(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOk is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOk requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOk: %w", err)
+	}
+	return oldValue.Ok, nil
+}
+
+// ResetOk resets all changes to the "ok" field.
+func (m *MonitorRunResultMutation) ResetOk() {
+	m.ok = nil
+}
+
+// SetCheckedCount sets the "checked_count" field.
+func (m *MonitorRunResultMutation) SetCheckedCount(i int) {
+	m.checked_count = &i
+	m.addchecked_count = nil
+}
+
+// CheckedCount returns the value of the "checked_count" field in the mutation.
+func (m *MonitorRunResultMutation) CheckedCount() (r int, exists bool) {
+	v := m.checked_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCheckedCount returns the old "checked_count" field's value of the MonitorRunResult entity.
+// If the MonitorRunResult object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorRunResultMutation) OldCheckedCount(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCheckedCount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCheckedCount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCheckedCount: %w", err)
+	}
+	return oldValue.CheckedCount, nil
+}
+
+// AddCheckedCount adds i to the "checked_count" field.
+func (m *MonitorRunResultMutation) AddCheckedCount(i int) {
+	if m.addchecked_count != nil {
+		*m.addchecked_count += i
+	} else {
+		m.addchecked_count = &i
+	}
+}
+
+// AddedCheckedCount returns the value that was added to the "checked_count" field in this mutation.
+func (m *MonitorRunResultMutation) AddedCheckedCount() (r int, exists bool) {
+	v := m.addchecked_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetCheckedCount resets all changes to the "checked_count" field.
+func (m *MonitorRunResultMutation) ResetCheckedCount() {
+	m.checked_count = nil
+	m.addchecked_count = nil
+}
+
+// SetOkCount sets the "ok_count" field.
+func (m *MonitorRunResultMutation) SetOkCount(i int) {
+	m.ok_count = &i
+	m.addok_count = nil
+}
+
+// OkCount returns the value of the "ok_count" field in the mutation.
+func (m *MonitorRunResultMutation) OkCount() (r int, exists bool) {
+	v := m.ok_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOkCount returns the old "ok_count" field's value of the MonitorRunResult entity.
+// If the MonitorRunResult object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorRunResultMutation) OldOkCount(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOkCount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOkCount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOkCount: %w", err)
+	}
+	return oldValue.OkCount, nil
+}
+
+// AddOkCount adds i to the "ok_count" field.
+func (m *MonitorRunResultMutation) AddOkCount(i int) {
+	if m.addok_count != nil {
+		*m.addok_count += i
+	} else {
+		m.addok_count = &i
+	}
+}
+
+// AddedOkCount returns the value that was added to the "ok_count" field in this mutation.
+func (m *MonitorRunResultMutation) AddedOkCount() (r int, exists bool) {
+	v := m.addok_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetOkCount resets all changes to the "ok_count" field.
+func (m *MonitorRunResultMutation) ResetOkCount() {
+	m.ok_count = nil
+	m.addok_count = nil
+}
+
+// SetLatencyMs sets the "latency_ms" field.
+func (m *MonitorRunResultMutation) SetLatencyMs(i int) {
+	m.latency_ms = &i
+	m.addlatency_ms = nil
+}
+
+// LatencyMs returns the value of the "latency_ms" field in the mutation.
+func (m *MonitorRunResultMutation) LatencyMs() (r int, exists bool) {
+	v := m.latency_ms
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLatencyMs returns the old "latency_ms" field's value of the MonitorRunResult entity.
+// If the MonitorRunResult object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorRunResultMutation) OldLatencyMs(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLatencyMs is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLatencyMs requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLatencyMs: %w", err)
+	}
+	return oldValue.LatencyMs, nil
+}
+
+// AddLatencyMs adds i to the "latency_ms" field.
+func (m *MonitorRunResultMutation) AddLatencyMs(i int) {
+	if m.addlatency_ms != nil {
+		*m.addlatency_ms += i
+	} else {
+		m.addlatency_ms = &i
+	}
+}
+
+// AddedLatencyMs returns the value that was added to the "latency_ms" field in this mutation.
+func (m *MonitorRunResultMutation) AddedLatencyMs() (r int, exists bool) {
+	v := m.addlatency_ms
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetLatencyMs resets all changes to the "latency_ms" field.
+func (m *MonitorRunResultMutation) ResetLatencyMs() {
+	m.latency_ms = nil
+	m.addlatency_ms = nil
+}
+
+// SetTrigger sets the "trigger" field.
+func (m *MonitorRunResultMutation) SetTrigger(s string) {
+	m.trigger = &s
+}
+
+// Trigger returns the value of the "trigger" field in the mutation.
+func (m *MonitorRunResultMutation) Trigger() (r string, exists bool) {
+	v := m.trigger
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTrigger returns the old "trigger" field's value of the MonitorRunResult entity.
+// If the MonitorRunResult object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorRunResultMutation) OldTrigger(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTrigger is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTrigger requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTrigger: %w", err)
+	}
+	return oldValue.Trigger, nil
+}
+
+// ResetTrigger resets all changes to the "trigger" field.
+func (m *MonitorRunResultMutation) ResetTrigger() {
+	m.trigger = nil
+}
+
+// SetResults sets the "results" field.
+func (m *MonitorRunResultMutation) SetResults(value []map[string]interface{}) {
+	m.results = &value
+	m.appendresults = nil
+}
+
+// Results returns the value of the "results" field in the mutation.
+func (m *MonitorRunResultMutation) Results() (r []map[string]interface{}, exists bool) {
+	v := m.results
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldResults returns the old "results" field's value of the MonitorRunResult entity.
+// If the MonitorRunResult object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MonitorRunResultMutation) OldResults(ctx context.Context) (v []map[string]interface{}, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldResults is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldResults requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldResults: %w", err)
+	}
+	return oldValue.Results, nil
+}
+
+// AppendResults adds value to the "results" field.
+func (m *MonitorRunResultMutation) AppendResults(value []map[string]interface{}) {
+	m.appendresults = append(m.appendresults, value...)
+}
+
+// AppendedResults returns the list of values that were appended to the "results" field in this mutation.
+func (m *MonitorRunResultMutation) AppendedResults() ([]map[string]interface{}, bool) {
+	if len(m.appendresults) == 0 {
+		return nil, false
+	}
+	return m.appendresults, true
+}
+
+// ClearResults clears the value of the "results" field.
+func (m *MonitorRunResultMutation) ClearResults() {
+	m.results = nil
+	m.appendresults = nil
+	m.clearedFields[monitorrunresult.FieldResults] = struct{}{}
+}
+
+// ResultsCleared returns if the "results" field was cleared in this mutation.
+func (m *MonitorRunResultMutation) ResultsCleared() bool {
+	_, ok := m.clearedFields[monitorrunresult.FieldResults]
+	return ok
+}
+
+// ResetResults resets all changes to the "results" field.
+func (m *MonitorRunResultMutation) ResetResults() {
+	m.results = nil
+	m.appendresults = nil
+	delete(m.clearedFields, monitorrunresult.FieldResults)
+}
+
+// Where appends a list predicates to the MonitorRunResultMutation builder.
+func (m *MonitorRunResultMutation) Where(ps ...predicate.MonitorRunResult) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the MonitorRunResultMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *MonitorRunResultMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.MonitorRunResult, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *MonitorRunResultMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *MonitorRunResultMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (MonitorRunResult).
+func (m *MonitorRunResultMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *MonitorRunResultMutation) Fields() []string {
+	fields := make([]string, 0, 10)
+	if m.created_at != nil {
+		fields = append(fields, monitorrunresult.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, monitorrunresult.FieldUpdatedAt)
+	}
+	if m.monitor_id != nil {
+		fields = append(fields, monitorrunresult.FieldMonitorID)
+	}
+	if m.run_id != nil {
+		fields = append(fields, monitorrunresult.FieldRunID)
+	}
+	if m.ok != nil {
+		fields = append(fields, monitorrunresult.FieldOk)
+	}
+	if m.checked_count != nil {
+		fields = append(fields, monitorrunresult.FieldCheckedCount)
+	}
+	if m.ok_count != nil {
+		fields = append(fields, monitorrunresult.FieldOkCount)
+	}
+	if m.latency_ms != nil {
+		fields = append(fields, monitorrunresult.FieldLatencyMs)
+	}
+	if m.trigger != nil {
+		fields = append(fields, monitorrunresult.FieldTrigger)
+	}
+	if m.results != nil {
+		fields = append(fields, monitorrunresult.FieldResults)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *MonitorRunResultMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case monitorrunresult.FieldCreatedAt:
+		return m.CreatedAt()
+	case monitorrunresult.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case monitorrunresult.FieldMonitorID:
+		return m.MonitorID()
+	case monitorrunresult.FieldRunID:
+		return m.RunID()
+	case monitorrunresult.FieldOk:
+		return m.Ok()
+	case monitorrunresult.FieldCheckedCount:
+		return m.CheckedCount()
+	case monitorrunresult.FieldOkCount:
+		return m.OkCount()
+	case monitorrunresult.FieldLatencyMs:
+		return m.LatencyMs()
+	case monitorrunresult.FieldTrigger:
+		return m.Trigger()
+	case monitorrunresult.FieldResults:
+		return m.Results()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *MonitorRunResultMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case monitorrunresult.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case monitorrunresult.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case monitorrunresult.FieldMonitorID:
+		return m.OldMonitorID(ctx)
+	case monitorrunresult.FieldRunID:
+		return m.OldRunID(ctx)
+	case monitorrunresult.FieldOk:
+		return m.OldOk(ctx)
+	case monitorrunresult.FieldCheckedCount:
+		return m.OldCheckedCount(ctx)
+	case monitorrunresult.FieldOkCount:
+		return m.OldOkCount(ctx)
+	case monitorrunresult.FieldLatencyMs:
+		return m.OldLatencyMs(ctx)
+	case monitorrunresult.FieldTrigger:
+		return m.OldTrigger(ctx)
+	case monitorrunresult.FieldResults:
+		return m.OldResults(ctx)
+	}
+	return nil, fmt.Errorf("unknown MonitorRunResult field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *MonitorRunResultMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case monitorrunresult.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case monitorrunresult.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case monitorrunresult.FieldMonitorID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMonitorID(v)
+		return nil
+	case monitorrunresult.FieldRunID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRunID(v)
+		return nil
+	case monitorrunresult.FieldOk:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOk(v)
+		return nil
+	case monitorrunresult.FieldCheckedCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCheckedCount(v)
+		return nil
+	case monitorrunresult.FieldOkCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOkCount(v)
+		return nil
+	case monitorrunresult.FieldLatencyMs:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLatencyMs(v)
+		return nil
+	case monitorrunresult.FieldTrigger:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTrigger(v)
+		return nil
+	case monitorrunresult.FieldResults:
+		v, ok := value.([]map[string]interface{})
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetResults(v)
+		return nil
+	}
+	return fmt.Errorf("unknown MonitorRunResult field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *MonitorRunResultMutation) AddedFields() []string {
+	var fields []string
+	if m.addmonitor_id != nil {
+		fields = append(fields, monitorrunresult.FieldMonitorID)
+	}
+	if m.addchecked_count != nil {
+		fields = append(fields, monitorrunresult.FieldCheckedCount)
+	}
+	if m.addok_count != nil {
+		fields = append(fields, monitorrunresult.FieldOkCount)
+	}
+	if m.addlatency_ms != nil {
+		fields = append(fields, monitorrunresult.FieldLatencyMs)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *MonitorRunResultMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case monitorrunresult.FieldMonitorID:
+		return m.AddedMonitorID()
+	case monitorrunresult.FieldCheckedCount:
+		return m.AddedCheckedCount()
+	case monitorrunresult.FieldOkCount:
+		return m.AddedOkCount()
+	case monitorrunresult.FieldLatencyMs:
+		return m.AddedLatencyMs()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *MonitorRunResultMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case monitorrunresult.FieldMonitorID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddMonitorID(v)
+		return nil
+	case monitorrunresult.FieldCheckedCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddCheckedCount(v)
+		return nil
+	case monitorrunresult.FieldOkCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddOkCount(v)
+		return nil
+	case monitorrunresult.FieldLatencyMs:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddLatencyMs(v)
+		return nil
+	}
+	return fmt.Errorf("unknown MonitorRunResult numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *MonitorRunResultMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(monitorrunresult.FieldResults) {
+		fields = append(fields, monitorrunresult.FieldResults)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *MonitorRunResultMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *MonitorRunResultMutation) ClearField(name string) error {
+	switch name {
+	case monitorrunresult.FieldResults:
+		m.ClearResults()
+		return nil
+	}
+	return fmt.Errorf("unknown MonitorRunResult nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *MonitorRunResultMutation) ResetField(name string) error {
+	switch name {
+	case monitorrunresult.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case monitorrunresult.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case monitorrunresult.FieldMonitorID:
+		m.ResetMonitorID()
+		return nil
+	case monitorrunresult.FieldRunID:
+		m.ResetRunID()
+		return nil
+	case monitorrunresult.FieldOk:
+		m.ResetOk()
+		return nil
+	case monitorrunresult.FieldCheckedCount:
+		m.ResetCheckedCount()
+		return nil
+	case monitorrunresult.FieldOkCount:
+		m.ResetOkCount()
+		return nil
+	case monitorrunresult.FieldLatencyMs:
+		m.ResetLatencyMs()
+		return nil
+	case monitorrunresult.FieldTrigger:
+		m.ResetTrigger()
+		return nil
+	case monitorrunresult.FieldResults:
+		m.ResetResults()
+		return nil
+	}
+	return fmt.Errorf("unknown MonitorRunResult field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *MonitorRunResultMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *MonitorRunResultMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *MonitorRunResultMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *MonitorRunResultMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *MonitorRunResultMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *MonitorRunResultMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *MonitorRunResultMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown MonitorRunResult unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *MonitorRunResultMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown MonitorRunResult edge %s", name)
 }
 
 // ObsAlertEventMutation represents an operation that mutates the ObsAlertEvent nodes in the graph.

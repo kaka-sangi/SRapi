@@ -921,6 +921,103 @@ var (
 			},
 		},
 	}
+	// MonitorDefinitionsColumns holds the columns for the "monitor_definitions" table.
+	MonitorDefinitionsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "name", Type: field.TypeString},
+		{Name: "enabled", Type: field.TypeBool, Default: true},
+		{Name: "scope", Type: field.TypeString, Default: "account"},
+		{Name: "scope_ref", Type: field.TypeString, Default: ""},
+		{Name: "interval_seconds", Type: field.TypeInt, Default: 300},
+		{Name: "model", Type: field.TypeString, Default: ""},
+		{Name: "request_method", Type: field.TypeString, Default: ""},
+		{Name: "request_url", Type: field.TypeString, Default: ""},
+		{Name: "request_headers", Type: field.TypeJSON, Nullable: true},
+		{Name: "request_body", Type: field.TypeString, Default: ""},
+		{Name: "expected_status_codes", Type: field.TypeJSON, Nullable: true},
+		{Name: "response_json_path", Type: field.TypeString, Default: ""},
+		{Name: "response_contains", Type: field.TypeString, Default: ""},
+	}
+	// MonitorDefinitionsTable holds the schema information for the "monitor_definitions" table.
+	MonitorDefinitionsTable = &schema.Table{
+		Name:       "monitor_definitions",
+		Columns:    MonitorDefinitionsColumns,
+		PrimaryKey: []*schema.Column{MonitorDefinitionsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "monitordefinition_enabled",
+				Unique:  false,
+				Columns: []*schema.Column{MonitorDefinitionsColumns[4]},
+			},
+			{
+				Name:    "monitordefinition_scope",
+				Unique:  false,
+				Columns: []*schema.Column{MonitorDefinitionsColumns[5]},
+			},
+		},
+	}
+	// MonitorRequestTemplatesColumns holds the columns for the "monitor_request_templates" table.
+	MonitorRequestTemplatesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "name", Type: field.TypeString},
+		{Name: "description", Type: field.TypeString, Default: ""},
+		{Name: "request_method", Type: field.TypeString, Default: ""},
+		{Name: "request_url", Type: field.TypeString, Default: ""},
+		{Name: "request_headers", Type: field.TypeJSON, Nullable: true},
+		{Name: "request_body", Type: field.TypeString, Default: ""},
+		{Name: "expected_status_codes", Type: field.TypeJSON, Nullable: true},
+		{Name: "response_json_path", Type: field.TypeString, Default: ""},
+		{Name: "response_contains", Type: field.TypeString, Default: ""},
+	}
+	// MonitorRequestTemplatesTable holds the schema information for the "monitor_request_templates" table.
+	MonitorRequestTemplatesTable = &schema.Table{
+		Name:       "monitor_request_templates",
+		Columns:    MonitorRequestTemplatesColumns,
+		PrimaryKey: []*schema.Column{MonitorRequestTemplatesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "monitorrequesttemplate_name",
+				Unique:  false,
+				Columns: []*schema.Column{MonitorRequestTemplatesColumns[3]},
+			},
+		},
+	}
+	// MonitorRunResultsColumns holds the columns for the "monitor_run_results" table.
+	MonitorRunResultsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "monitor_id", Type: field.TypeInt},
+		{Name: "run_id", Type: field.TypeString},
+		{Name: "ok", Type: field.TypeBool, Default: false},
+		{Name: "checked_count", Type: field.TypeInt, Default: 0},
+		{Name: "ok_count", Type: field.TypeInt, Default: 0},
+		{Name: "latency_ms", Type: field.TypeInt, Default: 0},
+		{Name: "trigger", Type: field.TypeString, Default: "manual"},
+		{Name: "results", Type: field.TypeJSON, Nullable: true},
+	}
+	// MonitorRunResultsTable holds the schema information for the "monitor_run_results" table.
+	MonitorRunResultsTable = &schema.Table{
+		Name:       "monitor_run_results",
+		Columns:    MonitorRunResultsColumns,
+		PrimaryKey: []*schema.Column{MonitorRunResultsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "monitorrunresult_monitor_id",
+				Unique:  false,
+				Columns: []*schema.Column{MonitorRunResultsColumns[3]},
+			},
+			{
+				Name:    "monitorrunresult_run_id",
+				Unique:  false,
+				Columns: []*schema.Column{MonitorRunResultsColumns[4]},
+			},
+		},
+	}
 	// ObsAlertEventsColumns holds the columns for the "obs_alert_events" table.
 	ObsAlertEventsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -2536,6 +2633,9 @@ var (
 		ModelProviderMappingsTable,
 		ModelRateLimitsTable,
 		ModelRegistriesTable,
+		MonitorDefinitionsTable,
+		MonitorRequestTemplatesTable,
+		MonitorRunResultsTable,
 		ObsAlertEventsTable,
 		ObsAlertRulesTable,
 		ObsAlertSilencesTable,

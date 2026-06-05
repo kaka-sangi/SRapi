@@ -64,6 +64,12 @@ type Tx struct {
 	ModelRateLimit *ModelRateLimitClient
 	// ModelRegistry is the client for interacting with the ModelRegistry builders.
 	ModelRegistry *ModelRegistryClient
+	// MonitorDefinition is the client for interacting with the MonitorDefinition builders.
+	MonitorDefinition *MonitorDefinitionClient
+	// MonitorRequestTemplate is the client for interacting with the MonitorRequestTemplate builders.
+	MonitorRequestTemplate *MonitorRequestTemplateClient
+	// MonitorRunResult is the client for interacting with the MonitorRunResult builders.
+	MonitorRunResult *MonitorRunResultClient
 	// ObsAlertEvent is the client for interacting with the ObsAlertEvent builders.
 	ObsAlertEvent *ObsAlertEventClient
 	// ObsAlertRule is the client for interacting with the ObsAlertRule builders.
@@ -301,6 +307,9 @@ func (tx *Tx) init() {
 	tx.ModelProviderMapping = NewModelProviderMappingClient(tx.config)
 	tx.ModelRateLimit = NewModelRateLimitClient(tx.config)
 	tx.ModelRegistry = NewModelRegistryClient(tx.config)
+	tx.MonitorDefinition = NewMonitorDefinitionClient(tx.config)
+	tx.MonitorRequestTemplate = NewMonitorRequestTemplateClient(tx.config)
+	tx.MonitorRunResult = NewMonitorRunResultClient(tx.config)
 	tx.ObsAlertEvent = NewObsAlertEventClient(tx.config)
 	tx.ObsAlertRule = NewObsAlertRuleClient(tx.config)
 	tx.ObsAlertSilence = NewObsAlertSilenceClient(tx.config)

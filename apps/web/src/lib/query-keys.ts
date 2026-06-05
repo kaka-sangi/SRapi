@@ -86,6 +86,9 @@ export const queryKeys = {
     scheduledTestPlans: () => ["admin", "scheduled-test-plans"] as const,
     scheduledTestPlanRuns: (planId: string) =>
       ["admin", "scheduled-test-plans", planId, "runs"] as const,
+    channelMonitors: () => ["admin", "channel-monitors"] as const,
+    channelMonitorRuns: (id: string) => ["admin", "channel-monitor-runs", id] as const,
+    channelMonitorTemplates: () => ["admin", "channel-monitor-templates"] as const,
     tlsProfiles: () => ["admin", "tls-profiles"] as const,
     roles: () => ["admin", "roles"] as const,
     userAttributes: () => ["admin", "user-attributes"] as const,

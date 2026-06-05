@@ -11,6 +11,7 @@ import (
 	auditcontract "github.com/srapi/srapi/apps/api/internal/modules/audit/contract"
 	authcontract "github.com/srapi/srapi/apps/api/internal/modules/auth/contract"
 	billingcontract "github.com/srapi/srapi/apps/api/internal/modules/billing/contract"
+	channelmonitorscontract "github.com/srapi/srapi/apps/api/internal/modules/channel_monitors/contract"
 	errorpassthroughcontract "github.com/srapi/srapi/apps/api/internal/modules/error_passthrough/contract"
 	eventscontract "github.com/srapi/srapi/apps/api/internal/modules/events/contract"
 	groupratelimitscontract "github.com/srapi/srapi/apps/api/internal/modules/group_rate_limits/contract"
@@ -39,6 +40,7 @@ import (
 	auditstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/audit"
 	authstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/auth"
 	billingstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/billing"
+	channelmonitorsstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/channelmonitors"
 	errorpassthroughstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/errorpassthrough"
 	eventsstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/events"
 	groupratelimitsstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/groupratelimits"
@@ -94,6 +96,7 @@ type Stores struct {
 	UserPlatformQuotas userplatformquotascontract.Store
 	PayloadRules       payloadrulescontract.Store
 	ScheduledTests     scheduledtestscontract.Store
+	ChannelMonitors    channelmonitorscontract.Store
 }
 
 func New(client *ent.Client) (Stores, error) {
@@ -209,6 +212,7 @@ func New(client *ent.Client) (Stores, error) {
 		return Stores{}, err
 	}
 	scheduledTests, err := scheduledtestsstore.New(client)
+	channelMonitors, err := channelmonitorsstore.New(client)
 	if err != nil {
 		return Stores{}, err
 	}
@@ -242,5 +246,6 @@ func New(client *ent.Client) (Stores, error) {
 		UserPlatformQuotas: userPlatformQuotas,
 		PayloadRules:       payloadRules,
 		ScheduledTests:     scheduledTests,
+		ChannelMonitors:    channelMonitors,
 	}, nil
 }

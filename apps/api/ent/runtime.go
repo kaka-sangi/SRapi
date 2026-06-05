@@ -31,6 +31,9 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/modelprovidermapping"
 	"github.com/srapi/srapi/apps/api/ent/modelratelimit"
 	"github.com/srapi/srapi/apps/api/ent/modelregistry"
+	"github.com/srapi/srapi/apps/api/ent/monitordefinition"
+	"github.com/srapi/srapi/apps/api/ent/monitorrequesttemplate"
+	"github.com/srapi/srapi/apps/api/ent/monitorrunresult"
 	"github.com/srapi/srapi/apps/api/ent/obsalertevent"
 	"github.com/srapi/srapi/apps/api/ent/obsalertrule"
 	"github.com/srapi/srapi/apps/api/ent/obsalertsilence"
@@ -882,6 +885,147 @@ func init() {
 	modelregistryDescStatus := modelregistryFields[6].Descriptor()
 	// modelregistry.DefaultStatus holds the default value on creation for the status field.
 	modelregistry.DefaultStatus = modelregistryDescStatus.Default.(string)
+	monitordefinitionMixin := schema.MonitorDefinition{}.Mixin()
+	monitordefinitionMixinFields0 := monitordefinitionMixin[0].Fields()
+	_ = monitordefinitionMixinFields0
+	monitordefinitionFields := schema.MonitorDefinition{}.Fields()
+	_ = monitordefinitionFields
+	// monitordefinitionDescCreatedAt is the schema descriptor for created_at field.
+	monitordefinitionDescCreatedAt := monitordefinitionMixinFields0[0].Descriptor()
+	// monitordefinition.DefaultCreatedAt holds the default value on creation for the created_at field.
+	monitordefinition.DefaultCreatedAt = monitordefinitionDescCreatedAt.Default.(func() time.Time)
+	// monitordefinitionDescUpdatedAt is the schema descriptor for updated_at field.
+	monitordefinitionDescUpdatedAt := monitordefinitionMixinFields0[1].Descriptor()
+	// monitordefinition.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	monitordefinition.DefaultUpdatedAt = monitordefinitionDescUpdatedAt.Default.(func() time.Time)
+	// monitordefinition.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	monitordefinition.UpdateDefaultUpdatedAt = monitordefinitionDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// monitordefinitionDescName is the schema descriptor for name field.
+	monitordefinitionDescName := monitordefinitionFields[0].Descriptor()
+	// monitordefinition.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	monitordefinition.NameValidator = monitordefinitionDescName.Validators[0].(func(string) error)
+	// monitordefinitionDescEnabled is the schema descriptor for enabled field.
+	monitordefinitionDescEnabled := monitordefinitionFields[1].Descriptor()
+	// monitordefinition.DefaultEnabled holds the default value on creation for the enabled field.
+	monitordefinition.DefaultEnabled = monitordefinitionDescEnabled.Default.(bool)
+	// monitordefinitionDescScope is the schema descriptor for scope field.
+	monitordefinitionDescScope := monitordefinitionFields[2].Descriptor()
+	// monitordefinition.DefaultScope holds the default value on creation for the scope field.
+	monitordefinition.DefaultScope = monitordefinitionDescScope.Default.(string)
+	// monitordefinitionDescScopeRef is the schema descriptor for scope_ref field.
+	monitordefinitionDescScopeRef := monitordefinitionFields[3].Descriptor()
+	// monitordefinition.DefaultScopeRef holds the default value on creation for the scope_ref field.
+	monitordefinition.DefaultScopeRef = monitordefinitionDescScopeRef.Default.(string)
+	// monitordefinitionDescIntervalSeconds is the schema descriptor for interval_seconds field.
+	monitordefinitionDescIntervalSeconds := monitordefinitionFields[4].Descriptor()
+	// monitordefinition.DefaultIntervalSeconds holds the default value on creation for the interval_seconds field.
+	monitordefinition.DefaultIntervalSeconds = monitordefinitionDescIntervalSeconds.Default.(int)
+	// monitordefinitionDescModel is the schema descriptor for model field.
+	monitordefinitionDescModel := monitordefinitionFields[5].Descriptor()
+	// monitordefinition.DefaultModel holds the default value on creation for the model field.
+	monitordefinition.DefaultModel = monitordefinitionDescModel.Default.(string)
+	// monitordefinitionDescRequestMethod is the schema descriptor for request_method field.
+	monitordefinitionDescRequestMethod := monitordefinitionFields[6].Descriptor()
+	// monitordefinition.DefaultRequestMethod holds the default value on creation for the request_method field.
+	monitordefinition.DefaultRequestMethod = monitordefinitionDescRequestMethod.Default.(string)
+	// monitordefinitionDescRequestURL is the schema descriptor for request_url field.
+	monitordefinitionDescRequestURL := monitordefinitionFields[7].Descriptor()
+	// monitordefinition.DefaultRequestURL holds the default value on creation for the request_url field.
+	monitordefinition.DefaultRequestURL = monitordefinitionDescRequestURL.Default.(string)
+	// monitordefinitionDescRequestBody is the schema descriptor for request_body field.
+	monitordefinitionDescRequestBody := monitordefinitionFields[9].Descriptor()
+	// monitordefinition.DefaultRequestBody holds the default value on creation for the request_body field.
+	monitordefinition.DefaultRequestBody = monitordefinitionDescRequestBody.Default.(string)
+	// monitordefinitionDescResponseJSONPath is the schema descriptor for response_json_path field.
+	monitordefinitionDescResponseJSONPath := monitordefinitionFields[11].Descriptor()
+	// monitordefinition.DefaultResponseJSONPath holds the default value on creation for the response_json_path field.
+	monitordefinition.DefaultResponseJSONPath = monitordefinitionDescResponseJSONPath.Default.(string)
+	// monitordefinitionDescResponseContains is the schema descriptor for response_contains field.
+	monitordefinitionDescResponseContains := monitordefinitionFields[12].Descriptor()
+	// monitordefinition.DefaultResponseContains holds the default value on creation for the response_contains field.
+	monitordefinition.DefaultResponseContains = monitordefinitionDescResponseContains.Default.(string)
+	monitorrequesttemplateMixin := schema.MonitorRequestTemplate{}.Mixin()
+	monitorrequesttemplateMixinFields0 := monitorrequesttemplateMixin[0].Fields()
+	_ = monitorrequesttemplateMixinFields0
+	monitorrequesttemplateFields := schema.MonitorRequestTemplate{}.Fields()
+	_ = monitorrequesttemplateFields
+	// monitorrequesttemplateDescCreatedAt is the schema descriptor for created_at field.
+	monitorrequesttemplateDescCreatedAt := monitorrequesttemplateMixinFields0[0].Descriptor()
+	// monitorrequesttemplate.DefaultCreatedAt holds the default value on creation for the created_at field.
+	monitorrequesttemplate.DefaultCreatedAt = monitorrequesttemplateDescCreatedAt.Default.(func() time.Time)
+	// monitorrequesttemplateDescUpdatedAt is the schema descriptor for updated_at field.
+	monitorrequesttemplateDescUpdatedAt := monitorrequesttemplateMixinFields0[1].Descriptor()
+	// monitorrequesttemplate.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	monitorrequesttemplate.DefaultUpdatedAt = monitorrequesttemplateDescUpdatedAt.Default.(func() time.Time)
+	// monitorrequesttemplate.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	monitorrequesttemplate.UpdateDefaultUpdatedAt = monitorrequesttemplateDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// monitorrequesttemplateDescName is the schema descriptor for name field.
+	monitorrequesttemplateDescName := monitorrequesttemplateFields[0].Descriptor()
+	// monitorrequesttemplate.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	monitorrequesttemplate.NameValidator = monitorrequesttemplateDescName.Validators[0].(func(string) error)
+	// monitorrequesttemplateDescDescription is the schema descriptor for description field.
+	monitorrequesttemplateDescDescription := monitorrequesttemplateFields[1].Descriptor()
+	// monitorrequesttemplate.DefaultDescription holds the default value on creation for the description field.
+	monitorrequesttemplate.DefaultDescription = monitorrequesttemplateDescDescription.Default.(string)
+	// monitorrequesttemplateDescRequestMethod is the schema descriptor for request_method field.
+	monitorrequesttemplateDescRequestMethod := monitorrequesttemplateFields[2].Descriptor()
+	// monitorrequesttemplate.DefaultRequestMethod holds the default value on creation for the request_method field.
+	monitorrequesttemplate.DefaultRequestMethod = monitorrequesttemplateDescRequestMethod.Default.(string)
+	// monitorrequesttemplateDescRequestURL is the schema descriptor for request_url field.
+	monitorrequesttemplateDescRequestURL := monitorrequesttemplateFields[3].Descriptor()
+	// monitorrequesttemplate.DefaultRequestURL holds the default value on creation for the request_url field.
+	monitorrequesttemplate.DefaultRequestURL = monitorrequesttemplateDescRequestURL.Default.(string)
+	// monitorrequesttemplateDescRequestBody is the schema descriptor for request_body field.
+	monitorrequesttemplateDescRequestBody := monitorrequesttemplateFields[5].Descriptor()
+	// monitorrequesttemplate.DefaultRequestBody holds the default value on creation for the request_body field.
+	monitorrequesttemplate.DefaultRequestBody = monitorrequesttemplateDescRequestBody.Default.(string)
+	// monitorrequesttemplateDescResponseJSONPath is the schema descriptor for response_json_path field.
+	monitorrequesttemplateDescResponseJSONPath := monitorrequesttemplateFields[7].Descriptor()
+	// monitorrequesttemplate.DefaultResponseJSONPath holds the default value on creation for the response_json_path field.
+	monitorrequesttemplate.DefaultResponseJSONPath = monitorrequesttemplateDescResponseJSONPath.Default.(string)
+	// monitorrequesttemplateDescResponseContains is the schema descriptor for response_contains field.
+	monitorrequesttemplateDescResponseContains := monitorrequesttemplateFields[8].Descriptor()
+	// monitorrequesttemplate.DefaultResponseContains holds the default value on creation for the response_contains field.
+	monitorrequesttemplate.DefaultResponseContains = monitorrequesttemplateDescResponseContains.Default.(string)
+	monitorrunresultMixin := schema.MonitorRunResult{}.Mixin()
+	monitorrunresultMixinFields0 := monitorrunresultMixin[0].Fields()
+	_ = monitorrunresultMixinFields0
+	monitorrunresultFields := schema.MonitorRunResult{}.Fields()
+	_ = monitorrunresultFields
+	// monitorrunresultDescCreatedAt is the schema descriptor for created_at field.
+	monitorrunresultDescCreatedAt := monitorrunresultMixinFields0[0].Descriptor()
+	// monitorrunresult.DefaultCreatedAt holds the default value on creation for the created_at field.
+	monitorrunresult.DefaultCreatedAt = monitorrunresultDescCreatedAt.Default.(func() time.Time)
+	// monitorrunresultDescUpdatedAt is the schema descriptor for updated_at field.
+	monitorrunresultDescUpdatedAt := monitorrunresultMixinFields0[1].Descriptor()
+	// monitorrunresult.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	monitorrunresult.DefaultUpdatedAt = monitorrunresultDescUpdatedAt.Default.(func() time.Time)
+	// monitorrunresult.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	monitorrunresult.UpdateDefaultUpdatedAt = monitorrunresultDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// monitorrunresultDescRunID is the schema descriptor for run_id field.
+	monitorrunresultDescRunID := monitorrunresultFields[1].Descriptor()
+	// monitorrunresult.RunIDValidator is a validator for the "run_id" field. It is called by the builders before save.
+	monitorrunresult.RunIDValidator = monitorrunresultDescRunID.Validators[0].(func(string) error)
+	// monitorrunresultDescOk is the schema descriptor for ok field.
+	monitorrunresultDescOk := monitorrunresultFields[2].Descriptor()
+	// monitorrunresult.DefaultOk holds the default value on creation for the ok field.
+	monitorrunresult.DefaultOk = monitorrunresultDescOk.Default.(bool)
+	// monitorrunresultDescCheckedCount is the schema descriptor for checked_count field.
+	monitorrunresultDescCheckedCount := monitorrunresultFields[3].Descriptor()
+	// monitorrunresult.DefaultCheckedCount holds the default value on creation for the checked_count field.
+	monitorrunresult.DefaultCheckedCount = monitorrunresultDescCheckedCount.Default.(int)
+	// monitorrunresultDescOkCount is the schema descriptor for ok_count field.
+	monitorrunresultDescOkCount := monitorrunresultFields[4].Descriptor()
+	// monitorrunresult.DefaultOkCount holds the default value on creation for the ok_count field.
+	monitorrunresult.DefaultOkCount = monitorrunresultDescOkCount.Default.(int)
+	// monitorrunresultDescLatencyMs is the schema descriptor for latency_ms field.
+	monitorrunresultDescLatencyMs := monitorrunresultFields[5].Descriptor()
+	// monitorrunresult.DefaultLatencyMs holds the default value on creation for the latency_ms field.
+	monitorrunresult.DefaultLatencyMs = monitorrunresultDescLatencyMs.Default.(int)
+	// monitorrunresultDescTrigger is the schema descriptor for trigger field.
+	monitorrunresultDescTrigger := monitorrunresultFields[6].Descriptor()
+	// monitorrunresult.DefaultTrigger holds the default value on creation for the trigger field.
+	monitorrunresult.DefaultTrigger = monitorrunresultDescTrigger.Default.(string)
 	obsalerteventMixin := schema.ObsAlertEvent{}.Mixin()
 	obsalerteventMixinFields0 := obsalerteventMixin[0].Fields()
 	_ = obsalerteventMixinFields0

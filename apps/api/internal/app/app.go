@@ -280,6 +280,7 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 			httpserver.WithUserPlatformQuotasStore(stores.UserPlatformQuotas),
 			httpserver.WithPayloadRulesStore(stores.PayloadRules),
 			httpserver.WithScheduledTestsStore(stores.ScheduledTests),
+			httpserver.WithChannelMonitorsStore(stores.ChannelMonitors),
 		)
 	}
 

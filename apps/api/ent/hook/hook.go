@@ -321,6 +321,42 @@ func (f ModelRegistryFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Valu
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ModelRegistryMutation", m)
 }
 
+// The MonitorDefinitionFunc type is an adapter to allow the use of ordinary
+// function as MonitorDefinition mutator.
+type MonitorDefinitionFunc func(context.Context, *ent.MonitorDefinitionMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f MonitorDefinitionFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.MonitorDefinitionMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.MonitorDefinitionMutation", m)
+}
+
+// The MonitorRequestTemplateFunc type is an adapter to allow the use of ordinary
+// function as MonitorRequestTemplate mutator.
+type MonitorRequestTemplateFunc func(context.Context, *ent.MonitorRequestTemplateMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f MonitorRequestTemplateFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.MonitorRequestTemplateMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.MonitorRequestTemplateMutation", m)
+}
+
+// The MonitorRunResultFunc type is an adapter to allow the use of ordinary
+// function as MonitorRunResult mutator.
+type MonitorRunResultFunc func(context.Context, *ent.MonitorRunResultMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f MonitorRunResultFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.MonitorRunResultMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.MonitorRunResultMutation", m)
+}
+
 // The ObsAlertEventFunc type is an adapter to allow the use of ordinary
 // function as ObsAlertEvent mutator.
 type ObsAlertEventFunc func(context.Context, *ent.ObsAlertEventMutation) (ent.Value, error)
