@@ -164,7 +164,10 @@ func TestEngineWriteFlowDenied(t *testing.T) {
 	}
 	// First turn: suspend.
 	pendHistory, _ := eng.Run(context.Background(), Settings{Enabled: true, AutoRunReads: true, MaxSteps: 8}, []Message{{Role: RoleUser, Content: "delete it"}}, nil, llm,
-		func(_ context.Context, _, _ string, _ []byte) (int, []byte, error) { t.Fatal("must not dispatch"); return 0, nil, nil }, func(Event) {})
+		func(_ context.Context, _, _ string, _ []byte) (int, []byte, error) {
+			t.Fatal("must not dispatch")
+			return 0, nil, nil
+		}, func(Event) {})
 
 	denyDispatched := false
 	llm2 := func(_ context.Context, _ string, _ []provideradaptercontract.ConversationMessage, _ []map[string]any, _ func(string, string)) (provideradaptercontract.ConversationResponse, error) {
@@ -172,7 +175,10 @@ func TestEngineWriteFlowDenied(t *testing.T) {
 	}
 	var events []Event
 	_, err := eng.Run(context.Background(), Settings{Enabled: true, AutoRunReads: true, MaxSteps: 8}, pendHistory, &Approval{ToolCallID: "d1", Approved: false}, llm2,
-		func(_ context.Context, _, _ string, _ []byte) (int, []byte, error) { denyDispatched = true; return 0, nil, nil },
+		func(_ context.Context, _, _ string, _ []byte) (int, []byte, error) {
+			denyDispatched = true
+			return 0, nil, nil
+		},
 		func(e Event) { events = append(events, e) })
 	if err != nil {
 		t.Fatalf("resume Run: %v", err)

@@ -10,11 +10,11 @@ import (
 func TestApplyPayloadTransforms(t *testing.T) {
 	base := []byte(`{"reasoning":{"effort":"low"},"max_tokens":100,"temperature":0.7}`)
 	transforms := []contract.PayloadTransform{
-		{Action: "override", Path: "reasoning.effort", Value: "high"},          // overwrite nested
-		{Action: "default", Path: "top_p", Value: 0.9},                         // absent -> set
-		{Action: "default", Path: "max_tokens", Value: 999},                    // present -> keep
+		{Action: "override", Path: "reasoning.effort", Value: "high"},                      // overwrite nested
+		{Action: "default", Path: "top_p", Value: 0.9},                                     // absent -> set
+		{Action: "default", Path: "max_tokens", Value: 999},                                // present -> keep
 		{Action: "override", Path: "generationConfig.thinkingConfig.budget", Value: 32768}, // create deep
-		{Action: "filter", Path: "temperature"},                                // remove
+		{Action: "filter", Path: "temperature"},                                            // remove
 	}
 	out, err := applyPayloadTransforms(base, transforms)
 	if err != nil {
