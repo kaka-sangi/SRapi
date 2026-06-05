@@ -59,4 +59,7 @@ export type {
   OAuthPendingSession,
   UpsertModelRateLimitRequest,
   UpsertGroupRateLimitRequest,
+  NotificationPreference,
+  NotificationContact,
+  CurrentUserAuthIdentity,
 } from "../../../../packages/sdk/typescript/src/types.gen";

@@ -22,6 +22,9 @@ export const queryKeys = {
     affiliateLedger: (params?: unknown) => ["me", "affiliate-ledger", params ?? {}] as const,
     announcements: () => ["me", "announcements"] as const,
     playgroundModels: () => ["me", "playground-models"] as const,
+    notificationPreferences: () => ["me", "notification-preferences"] as const,
+    notificationContacts: () => ["me", "notification-contacts"] as const,
+    authIdentities: () => ["me", "auth-identities"] as const,
   },
   admin: {
     dashboardSnapshot: (params?: unknown) => ["admin", "dashboard-snapshot", params ?? {}] as const,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageQueryState } from "@/components/layout/page-query-state";
@@ -12,7 +12,11 @@ import {
   useSetupTotp,
   useEnableTotp,
   useDisableTotp,
+  useUploadAvatar,
+  useDeleteAvatar,
 } from "@/hooks/queries";
+import { NotificationsTab } from "@/components/features/account-notifications";
+import { LinkedSignInsCard } from "@/components/features/account-linked-signins";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { Card, CardContent } from "@/components/ui/card";
@@ -49,6 +53,7 @@ function AccountContent() {
         <TabsList>
           <TabsTrigger value="profile">{t("account.tabProfile")}</TabsTrigger>
           <TabsTrigger value="security">{t("account.tabSecurity")}</TabsTrigger>
+          <TabsTrigger value="notifications">{t("account.tabNotifications")}</TabsTrigger>
         </TabsList>
         <TabsContent value="profile">
           <PageQueryState query={profile} skeleton={<Skeleton className="h-48 rounded-xl" />}>
@@ -59,18 +64,33 @@ function AccountContent() {
           <div className="grid gap-4 lg:grid-cols-2">
             <ChangePasswordCard />
             <TwoFactorCard />
+            <LinkedSignInsCard />
           </div>
+        </TabsContent>
+        <TabsContent value="notifications">
+          <NotificationsTab />
         </TabsContent>
       </Tabs>
     </>
   );
 }
 
+const MAX_AVATAR_BYTES = 1024 * 1024;
+
 function ProfileForm({ user }: { user: User }) {
   const { t } = useLanguage();
   const { toast } = useToast();
   const updateMut = useUpdateProfile();
+  const uploadMut = useUploadAvatar();
+  const deleteMut = useDeleteAvatar();
+  const fileInput = useRef<HTMLInputElement>(null);
   const [name, setName] = useState(user.name);
+
+  const initials = (user.name || user.email).trim().charAt(0).toUpperCase();
+  // Cache-bust against avatar_updated_at so a fresh upload renders immediately.
+  const avatarSrc = user.avatar_url
+    ? `${user.avatar_url}${user.avatar_updated_at ? `?v=${encodeURIComponent(user.avatar_updated_at)}` : ""}`
+    : null;
 
   async function save() {
     try {
@@ -81,9 +101,77 @@ function ProfileForm({ user }: { user: User }) {
     }
   }
 
+  async function onPickFile(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (file.size > MAX_AVATAR_BYTES) {
+      toast({ title: t("feedback.failed"), description: t("account.avatarTooLarge"), tone: "error" });
+      return;
+    }
+    try {
+      await uploadMut.mutateAsync(file);
+      toast({ title: t("feedback.saved"), tone: "success" });
+    } catch (err) {
+      toast({ title: t("feedback.failed"), description: meErrorMessage(err), tone: "error" });
+    }
+  }
+
+  async function removeAvatar() {
+    try {
+      await deleteMut.mutateAsync();
+      toast({ title: t("feedback.saved"), tone: "success" });
+    } catch (err) {
+      toast({ title: t("feedback.failed"), description: meErrorMessage(err), tone: "error" });
+    }
+  }
+
   return (
     <Card>
       <CardContent className="max-w-md space-y-4">
+        <div>
+          <Label>{t("account.avatar")}</Label>
+          <div className="mt-1 flex items-center gap-4">
+            <span className="flex size-16 items-center justify-center overflow-hidden rounded-full border border-srapi-border bg-srapi-card-muted text-xl font-serif text-srapi-text-secondary">
+              {avatarSrc ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={avatarSrc} alt="" className="size-full object-cover" />
+              ) : (
+                initials
+              )}
+            </span>
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  loading={uploadMut.isPending}
+                  onClick={() => fileInput.current?.click()}
+                >
+                  {t("account.avatarUpload")}
+                </Button>
+                {avatarSrc ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    loading={deleteMut.isPending}
+                    onClick={removeAvatar}
+                  >
+                    {t("account.avatarRemove")}
+                  </Button>
+                ) : null}
+              </div>
+              <p className="text-2xs text-srapi-text-tertiary">{t("account.avatarHint")}</p>
+            </div>
+            <input
+              ref={fileInput}
+              type="file"
+              accept="image/png,image/jpeg"
+              className="hidden"
+              onChange={onPickFile}
+            />
+          </div>
+        </div>
         <div>
           <Label htmlFor="email">{t("account.email")}</Label>
           <Input id="email" value={user.email} disabled />

@@ -180,6 +180,93 @@ export function useDisableTotp() {
   });
 }
 
+// ---- Avatar ----
+export function useUploadAvatar() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (file: File) => meApi.uploadAvatar(file),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.me.profile() }),
+  });
+}
+export function useDeleteAvatar() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => meApi.deleteAvatar(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.me.profile() }),
+  });
+}
+
+// ---- Notification preferences ----
+export function useNotificationPreferences() {
+  return useQuery({
+    queryKey: queryKeys.me.notificationPreferences(),
+    queryFn: () => meApi.listNotificationPreferences(),
+  });
+}
+export function useUpdateNotificationPreferences() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: MeP<typeof meApi.updateNotificationPreferences>) =>
+      meApi.updateNotificationPreferences(body),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: queryKeys.me.notificationPreferences() }),
+  });
+}
+
+// ---- Notification contacts ----
+export function useNotificationContacts() {
+  return useQuery({
+    queryKey: queryKeys.me.notificationContacts(),
+    queryFn: () => meApi.listNotificationContacts(),
+  });
+}
+export function useRequestNotificationContact() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: MeP<typeof meApi.requestNotificationContactVerification>) =>
+      meApi.requestNotificationContactVerification(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.me.notificationContacts() }),
+  });
+}
+export function useConfirmNotificationContact() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: MeP<typeof meApi.confirmNotificationContact>) =>
+      meApi.confirmNotificationContact(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.me.notificationContacts() }),
+  });
+}
+export function useUpdateNotificationContact() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, disabled }: { id: string; disabled: boolean }) =>
+      meApi.updateNotificationContact(id, { disabled }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.me.notificationContacts() }),
+  });
+}
+export function useDeleteNotificationContact() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => meApi.deleteNotificationContact(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.me.notificationContacts() }),
+  });
+}
+
+// ---- Linked sign-in identities ----
+export function useAuthIdentities() {
+  return useQuery({
+    queryKey: queryKeys.me.authIdentities(),
+    queryFn: () => meApi.listAuthIdentities(),
+  });
+}
+export function useUnbindAuthIdentity() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => meApi.unbindAuthIdentity(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.me.authIdentities() }),
+  });
+}
+
 // ---- Billing ----
 export function useBalance() {
   return useQuery({ queryKey: queryKeys.me.balance(), queryFn: () => meApi.getBalance() });

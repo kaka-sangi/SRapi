@@ -23,6 +23,17 @@ import {
   listCurrentUserAnnouncements,
   markCurrentUserAnnouncementRead,
   listMePlaygroundModels,
+  getCurrentUserNotificationPreferences,
+  updateCurrentUserNotificationPreferences,
+  listCurrentUserNotificationContacts,
+  requestCurrentUserNotificationContactVerification,
+  confirmCurrentUserNotificationContactVerification,
+  updateCurrentUserNotificationContact,
+  deleteCurrentUserNotificationContact,
+  listCurrentUserAuthIdentities,
+  unbindCurrentUserAuthIdentity,
+  uploadCurrentUserAvatar,
+  deleteCurrentUserAvatar,
 } from "../../../../packages/sdk/typescript/src/index";
 import type {
   AffiliateTransferToBalanceRequest,
@@ -35,6 +46,10 @@ import type {
   RedeemCodeRedemptionRequest,
   TotpVerifyRequest,
   UpdateCurrentUserProfileRequest,
+  UpdateNotificationPreferencesRequest,
+  NotificationContactVerificationRequest,
+  NotificationContactConfirmRequest,
+  UpdateNotificationContactRequest,
   UserAnnouncement,
 } from "../../../../packages/sdk/typescript/src/types.gen";
 
@@ -180,6 +195,60 @@ export const meApi = {
         throwOnError: true,
       }),
     );
+  },
+
+  // ---- Notification preferences (per-event opt in/out) ----
+  listNotificationPreferences() {
+    return unwrapList(() => getCurrentUserNotificationPreferences({ throwOnError: true }));
+  },
+  updateNotificationPreferences(body: UpdateNotificationPreferencesRequest) {
+    return unwrapList(() =>
+      updateCurrentUserNotificationPreferences({ body, throwOnError: true }),
+    );
+  },
+
+  // ---- Notification contacts (secondary verified emails) ----
+  listNotificationContacts() {
+    return unwrapList(() => listCurrentUserNotificationContacts({ throwOnError: true }));
+  },
+  requestNotificationContactVerification(body: NotificationContactVerificationRequest) {
+    return unwrapData(() =>
+      requestCurrentUserNotificationContactVerification({ body, throwOnError: true }),
+    );
+  },
+  confirmNotificationContact(body: NotificationContactConfirmRequest) {
+    return unwrapData(() =>
+      confirmCurrentUserNotificationContactVerification({ body, throwOnError: true }),
+    );
+  },
+  updateNotificationContact(id: string, body: UpdateNotificationContactRequest) {
+    return unwrapData(() =>
+      updateCurrentUserNotificationContact({ path: { id }, body, throwOnError: true }),
+    );
+  },
+  async deleteNotificationContact(id: string): Promise<void> {
+    configureClient();
+    await deleteCurrentUserNotificationContact({ path: { id }, throwOnError: true });
+  },
+
+  // ---- Linked sign-in identities (OAuth/OIDC) ----
+  listAuthIdentities() {
+    return unwrapList(() => listCurrentUserAuthIdentities({ throwOnError: true }));
+  },
+  async unbindAuthIdentity(id: string): Promise<void> {
+    configureClient();
+    await unbindCurrentUserAuthIdentity({ path: { id }, throwOnError: true });
+  },
+
+  // ---- Avatar ----
+  uploadAvatar(file: File) {
+    return unwrapData(() =>
+      uploadCurrentUserAvatar({ body: { avatar: file }, throwOnError: true }),
+    );
+  },
+  async deleteAvatar(): Promise<void> {
+    configureClient();
+    await deleteCurrentUserAvatar({ throwOnError: true });
   },
 
   // ---- Announcements ----
