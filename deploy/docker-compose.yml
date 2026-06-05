@@ -83,6 +83,21 @@ services:
       timeout: 3s
       retries: 12
 
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      # Same-origin proxy: the console forwards /api and /v1 to the API service.
+      SRAPI_API_PROXY_TARGET: http://api:8080
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+
   prometheus:
     image: prom/prometheus:v3.7.3
     profiles: ["observability"]
