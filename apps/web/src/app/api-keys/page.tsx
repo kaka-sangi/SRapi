@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { ApiKeyCreateDialog, ApiKeyFormDialog } from "@/components/features/api-key-create-dialog";
+import { ApiKeyUsageDialog } from "@/components/features/api-key-usage-dialog";
 
 export default function ApiKeysPage() {
   return (
@@ -45,6 +46,7 @@ function ApiKeysContent() {
   const apiKeys = useApiKeys();
   const toggle = useToggleApiKey();
   const [editKey, setEditKey] = useState<ApiKeySummary | null>(null);
+  const [usageKey, setUsageKey] = useState<ApiKeySummary | null>(null);
 
   async function runToggle(id: string, status: "active" | "disabled") {
     try {
@@ -117,6 +119,9 @@ function ApiKeysContent() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => setUsageKey(key)}>
+                                {t("apiKeys.usageAction")}
+                              </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => setEditKey(key)}>
                                 {t("common.edit")}
                               </DropdownMenuItem>
@@ -145,6 +150,16 @@ function ApiKeysContent() {
         open={editKey !== null}
         onOpenChange={(next) => {
           if (!next) setEditKey(null);
+        }}
+      />
+
+      <ApiKeyUsageDialog
+        keyId={usageKey?.id ?? null}
+        keyName={usageKey?.name ?? ""}
+        variant="me"
+        open={usageKey !== null}
+        onOpenChange={(next) => {
+          if (!next) setUsageKey(null);
         }}
       />
     </>

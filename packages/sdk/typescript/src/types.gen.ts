@@ -6900,6 +6900,50 @@ export type UpdateApiKeyResponses = {
 
 export type UpdateApiKeyResponse = UpdateApiKeyResponses[keyof UpdateApiKeyResponses];
 
+export type GetApiKeyUsageData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: {
+        /**
+         * Number of UTC days to include in usage summaries.
+         */
+        days?: number;
+    };
+    url: '/api/v1/api-keys/{id}/usage';
+};
+
+export type GetApiKeyUsageErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetApiKeyUsageError = GetApiKeyUsageErrors[keyof GetApiKeyUsageErrors];
+
+export type GetApiKeyUsageResponses = {
+    /**
+     * API key usage summary.
+     */
+    200: GatewayUsageResponse;
+};
+
+export type GetApiKeyUsageResponse = GetApiKeyUsageResponses[keyof GetApiKeyUsageResponses];
+
 export type ListAdminProvidersData = {
     body?: never;
     path?: never;
@@ -7444,6 +7488,54 @@ export type UpdateAdminApiKeyResponses = {
 };
 
 export type UpdateAdminApiKeyResponse = UpdateAdminApiKeyResponses[keyof UpdateAdminApiKeyResponses];
+
+export type GetAdminApiKeyUsageData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: {
+        /**
+         * Number of UTC days to include in usage summaries.
+         */
+        days?: number;
+    };
+    url: '/api/v1/admin/api-keys/{id}/usage';
+};
+
+export type GetAdminApiKeyUsageErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminApiKeyUsageError = GetAdminApiKeyUsageErrors[keyof GetAdminApiKeyUsageErrors];
+
+export type GetAdminApiKeyUsageResponses = {
+    /**
+     * API key usage summary.
+     */
+    200: GatewayUsageResponse;
+};
+
+export type GetAdminApiKeyUsageResponse = GetAdminApiKeyUsageResponses[keyof GetAdminApiKeyUsageResponses];
 
 export type ListAdminUsersData = {
     body?: never;

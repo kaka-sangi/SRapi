@@ -2148,6 +2148,49 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/api-keys/{id}/usage:
+    get:
+      tags:
+        - ApiKeys
+      operationId: getApiKeyUsage
+      summary: Get the usage drilldown for one of the current user's API keys.
+      description: Returns the same key-scoped usage snapshot as the gateway /v1/usage endpoint, authenticated by the console session and scoped to a key the caller owns.
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+        - name: days
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 90
+            default: 30
+          description: Number of UTC days to include in usage summaries.
+      responses:
+        "200":
+          description: API key usage summary.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GatewayUsageResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/providers:
     get:
       tags:
@@ -2654,6 +2697,53 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiKeyResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/api-keys/{id}/usage:
+    get:
+      tags:
+        - AdminUsers
+      operationId: getAdminApiKeyUsage
+      summary: Get the usage drilldown for any API key as an admin.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+        - name: days
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 90
+            default: 30
+          description: Number of UTC days to include in usage summaries.
+      responses:
+        "200":
+          description: API key usage summary.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GatewayUsageResponse"
         "400":
           $ref: "#/components/responses/ValidationError"
         "401":

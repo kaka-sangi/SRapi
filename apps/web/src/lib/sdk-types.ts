@@ -63,4 +63,7 @@ export type {
   NotificationContact,
   CurrentUserAuthIdentity,
   ProviderAccountImportResult,
+  GatewayUsageResponse,
+  GatewayUsageModel,
+  GatewayUsageRequest,
 } from "../../../../packages/sdk/typescript/src/types.gen";

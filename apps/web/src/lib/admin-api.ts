@@ -112,6 +112,7 @@ import {
   listAdminOpsSlos,
   listAdminOpsSystemLogs,
   listAdminApiKeys,
+  getAdminApiKeyUsage,
   listAdminOutboxEvents,
   listAdminPaymentOrders,
   listAdminPaymentProviders,
@@ -161,6 +162,7 @@ import type {
   AdminTestResult,
   AdminUpdateApiKeyRequest,
   ApiKey,
+  GatewayUsageResponse,
   AffiliateInviteRecord,
   AffiliateLedgerEntry,
   Announcement,
@@ -895,6 +897,16 @@ export const adminApi = {
 
   updateAdminApiKey(id: Id, body: AdminUpdateApiKeyRequest): Promise<ApiKey> {
     return unwrapData(() => updateAdminApiKey({ path: { id }, body, throwOnError: true }));
+  },
+
+  // The usage envelope is returned bare (no { data } wrapper), so call directly.
+  async getAdminApiKeyUsage(id: Id, days: number): Promise<GatewayUsageResponse> {
+    configureAdminClient();
+    const response = await getAdminApiKeyUsage({ path: { id }, query: { days }, throwOnError: true });
+    if (!response.data) {
+      throw new Error("API key usage returned an empty response.");
+    }
+    return response.data;
   },
 
   updateTlsProfile(id: Id, body: UpdateTlsProfileRequest): Promise<TlsProfile> {

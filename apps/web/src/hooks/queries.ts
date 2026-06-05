@@ -109,6 +109,14 @@ export function useUpdateApiKey() {
   });
 }
 
+export function useApiKeyUsage(id: string | null, days: number, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.apiKeyUsage(id ?? "", days),
+    queryFn: () => apiService.getApiKeyUsage(id as string, days),
+    enabled: enabled && Boolean(id),
+  });
+}
+
 export function useUsageLogs() {
   return useQuery({
     queryKey: queryKeys.usageLogs(),

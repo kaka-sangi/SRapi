@@ -12,6 +12,7 @@ import { enumOptions } from "@/components/admin/resource-form-dialog";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { useAdminApiKeys, useUpdateAdminApiKey } from "@/hooks/admin-queries";
+import { ApiKeyUsageDialog } from "@/components/features/api-key-usage-dialog";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { adminErrorMessage } from "@/lib/admin-api";
@@ -47,6 +48,7 @@ function ApiKeysContent() {
   });
   const updateMut = useUpdateAdminApiKey();
   const [revokeTarget, setRevokeTarget] = useState<ApiKey | null>(null);
+  const [usageTarget, setUsageTarget] = useState<ApiKey | null>(null);
 
   async function enableKey(key: ApiKey) {
     try {
@@ -148,11 +150,13 @@ function ApiKeysContent() {
           total: keys.data?.pagination?.total ?? keys.data?.data.length ?? 0,
           onPageChange: list.setPage,
         }}
-        rowActions={(k) =>
-          k.status === "expired" ? null : (
-            <RowActionsMenu
-              actions={
-                k.status === "disabled"
+        rowActions={(k) => (
+          <RowActionsMenu
+            actions={[
+              { label: t("apiKeys.usageAction"), onSelect: () => setUsageTarget(k) },
+              ...(k.status === "expired"
+                ? []
+                : k.status === "disabled"
                   ? [{ label: t("adminApiKeys.enable"), onSelect: () => void enableKey(k) }]
                   : [
                       {
@@ -160,11 +164,20 @@ function ApiKeysContent() {
                         destructive: true,
                         onSelect: () => setRevokeTarget(k),
                       },
-                    ]
-              }
-            />
-          )
-        }
+                    ]),
+            ]}
+          />
+        )}
+      />
+
+      <ApiKeyUsageDialog
+        keyId={usageTarget ? String(usageTarget.id) : null}
+        keyName={usageTarget?.name ?? ""}
+        variant="admin"
+        open={usageTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setUsageTarget(null);
+        }}
       />
 
       {revokeTarget ? (

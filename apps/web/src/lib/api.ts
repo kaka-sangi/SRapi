@@ -22,6 +22,7 @@ import {
   listApiKeys as sdkListApiKeys,
   createApiKey as sdkCreateApiKey,
   updateApiKey as sdkUpdateApiKey,
+  getApiKeyUsage as sdkGetApiKeyUsage,
   listAdminAccounts as sdkListAdminAccounts,
   testAdminAccount as sdkTestAdminAccount,
   listAdminUsageLogs as sdkListAdminUsageLogs,
@@ -39,7 +40,7 @@ import {
   type SmokeChecklist,
   type UsageLogSummary,
 } from './srapi-types';
-import type { AdminTestResult, EnabledOAuthProvider, OAuthPendingSession } from '../../../../packages/sdk/typescript/src/types.gen';
+import type { AdminTestResult, EnabledOAuthProvider, OAuthPendingSession, GatewayUsageResponse } from '../../../../packages/sdk/typescript/src/types.gen';
 import { setSessionPresenceCookie, clearSessionPresenceCookie } from './session-cookie';
 
 export interface ApiRuntimeStatus {
@@ -725,6 +726,14 @@ export const apiService = {
       },
       throwOnError: true
     });
+  },
+
+  async getApiKeyUsage(id: string, days: number): Promise<GatewayUsageResponse> {
+    const response = await sdkGetApiKeyUsage({ path: { id }, query: { days }, throwOnError: true });
+    if (!response.data) {
+      throw new Error('API key usage returned an empty response.');
+    }
+    return response.data;
   },
 
   async listProviderAccounts(): Promise<ProviderAccountSummary[]> {

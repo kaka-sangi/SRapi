@@ -381,6 +381,13 @@ export function useUpdateAdminApiKey() {
     ["admin", "api-keys"],
   );
 }
+export function useAdminApiKeyUsage(id: string | null, days: number, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.admin.apiKeyUsage(id ?? "", days),
+    queryFn: () => adminApi.getAdminApiKeyUsage(id as string, days),
+    enabled: enabled && Boolean(id),
+  });
+}
 
 // ---- Custom user attribute definitions ----
 export function useUserAttributeDefinitions() {

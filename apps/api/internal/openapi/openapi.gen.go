@@ -7881,6 +7881,12 @@ type ListAdminApiKeysParams struct {
 	UserId   *Id           `form:"user_id,omitempty" json:"user_id,omitempty"`
 }
 
+// GetAdminApiKeyUsageParams defines parameters for GetAdminApiKeyUsage.
+type GetAdminApiKeyUsageParams struct {
+	// Days Number of UTC days to include in usage summaries.
+	Days *int `form:"days,omitempty" json:"days,omitempty"`
+}
+
 // ListAdminAuditLogsParams defines parameters for ListAdminAuditLogs.
 type ListAdminAuditLogsParams struct {
 	Page         *Page     `form:"page,omitempty" json:"page,omitempty"`
@@ -8173,6 +8179,12 @@ type ListApiKeysParams struct {
 	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
 	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
 	Status   *Status   `form:"status,omitempty" json:"status,omitempty"`
+}
+
+// GetApiKeyUsageParams defines parameters for GetApiKeyUsage.
+type GetApiKeyUsageParams struct {
+	// Days Number of UTC days to include in usage summaries.
+	Days *int `form:"days,omitempty" json:"days,omitempty"`
 }
 
 // CompleteOAuthAuthorizationParams defines parameters for CompleteOAuthAuthorization.
@@ -15230,6 +15242,9 @@ type ServerInterface interface {
 	// Update an API key as an admin (e.g. revoke by disabling).
 	// (PATCH /api/v1/admin/api-keys/{id})
 	UpdateAdminApiKey(w http.ResponseWriter, r *http.Request, id Id)
+	// Get the usage drilldown for any API key as an admin.
+	// (GET /api/v1/admin/api-keys/{id}/usage)
+	GetAdminApiKeyUsage(w http.ResponseWriter, r *http.Request, id Id, params GetAdminApiKeyUsageParams)
 	// List audit logs.
 	// (GET /api/v1/admin/audit-logs)
 	ListAdminAuditLogs(w http.ResponseWriter, r *http.Request, params ListAdminAuditLogsParams)
@@ -15611,6 +15626,9 @@ type ServerInterface interface {
 	// Update API key metadata and policy.
 	// (PATCH /api/v1/api-keys/{id})
 	UpdateApiKey(w http.ResponseWriter, r *http.Request, id Id)
+	// Get the usage drilldown for one of the current user's API keys.
+	// (GET /api/v1/api-keys/{id}/usage)
+	GetApiKeyUsage(w http.ResponseWriter, r *http.Request, id Id, params GetApiKeyUsageParams)
 	// Public captcha configuration for the sign-in / sign-up widget.
 	// (GET /api/v1/auth/captcha)
 	GetAuthCaptchaConfig(w http.ResponseWriter, r *http.Request)
@@ -17922,6 +17940,54 @@ func (siw *ServerInterfaceWrapper) UpdateAdminApiKey(w http.ResponseWriter, r *h
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateAdminApiKey(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminApiKeyUsage operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminApiKeyUsage(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAdminApiKeyUsageParams
+
+	// ------------- Optional query parameter "days" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "days", r.URL.Query(), &params.Days, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "days"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "days", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminApiKeyUsage(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -22808,6 +22874,54 @@ func (siw *ServerInterfaceWrapper) UpdateApiKey(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
+// GetApiKeyUsage operation middleware
+func (siw *ServerInterfaceWrapper) GetApiKeyUsage(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetApiKeyUsageParams
+
+	// ------------- Optional query parameter "days" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "days", r.URL.Query(), &params.Days, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "days"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "days", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetApiKeyUsage(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetAuthCaptchaConfig operation middleware
 func (siw *ServerInterfaceWrapper) GetAuthCaptchaConfig(w http.ResponseWriter, r *http.Request) {
 
@@ -26065,6 +26179,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/admin/announcements/{id}", wrapper.UpdateAdminAnnouncement)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/api-keys", wrapper.ListAdminApiKeys)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/api-keys/{id}", wrapper.UpdateAdminApiKey)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/api-keys/{id}/usage", wrapper.GetAdminApiKeyUsage)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/audit-logs", wrapper.ListAdminAuditLogs)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/billing-ledger", wrapper.ListAdminBillingLedger)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/capabilities", wrapper.ListAdminCapabilities)
@@ -26192,6 +26307,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/api-keys", wrapper.ListApiKeys)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/api-keys", wrapper.CreateApiKey)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/api-keys/{id}", wrapper.UpdateApiKey)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/api-keys/{id}/usage", wrapper.GetApiKeyUsage)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/auth/captcha", wrapper.GetAuthCaptchaConfig)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/auth/email-verification/confirm", wrapper.ConfirmEmailVerification)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/auth/email-verification/request", wrapper.RequestEmailVerification)
