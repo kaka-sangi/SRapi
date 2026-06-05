@@ -56,6 +56,7 @@ export const queryKeys = {
       ["admin", "usage-aggregates", dimension, params ?? {}] as const,
     auditLogs: (params?: unknown) => ["admin", "audit-logs", params ?? {}] as const,
     outboxEvents: (params?: unknown) => ["admin", "outbox-events", params ?? {}] as const,
+    apiKeys: (params?: unknown) => ["admin", "api-keys", params ?? {}] as const,
     billingLedger: (params?: unknown) => ["admin", "billing-ledger", params ?? {}] as const,
     affiliateInvites: (params?: unknown) => ["admin", "affiliates", "invites", params ?? {}] as const,
     affiliateRebates: (params?: unknown) => ["admin", "affiliates", "rebates", params ?? {}] as const,

@@ -36,6 +36,7 @@ import {
   createAdminRole,
   deleteAdminRole,
   listAdminRoles,
+  updateAdminApiKey,
   updateAdminRole,
   createAdminUserAttributeDefinition,
   deleteAdminUserAttributeDefinition,
@@ -110,6 +111,7 @@ import {
   listAdminOpsRealtimeSlots,
   listAdminOpsSlos,
   listAdminOpsSystemLogs,
+  listAdminApiKeys,
   listAdminOutboxEvents,
   listAdminPaymentOrders,
   listAdminPaymentProviders,
@@ -157,6 +159,8 @@ import type {
   AdminDashboardSnapshot,
   AdminSettings,
   AdminTestResult,
+  AdminUpdateApiKeyRequest,
+  ApiKey,
   AffiliateInviteRecord,
   AffiliateLedgerEntry,
   Announcement,
@@ -230,6 +234,7 @@ import type {
   ListAdminRiskControlLogsData,
   ListAdminSubscriptionPlansData,
   ListAdminUsageLogsData,
+  ListAdminApiKeysData,
   ListAdminOutboxEventsData,
   ListAdminUsersData,
   ListAdminUserSubscriptionsData,
@@ -882,6 +887,14 @@ export const adminApi = {
 
   deleteRole(id: Id): Promise<{ deleted: boolean }> {
     return unwrapData(() => deleteAdminRole({ path: { id }, throwOnError: true }));
+  },
+
+  listAdminApiKeys(query?: ListAdminApiKeysData["query"]): Promise<AdminListResult<ApiKey>> {
+    return unwrapList(() => listAdminApiKeys({ query, throwOnError: true }));
+  },
+
+  updateAdminApiKey(id: Id, body: AdminUpdateApiKeyRequest): Promise<ApiKey> {
+    return unwrapData(() => updateAdminApiKey({ path: { id }, body, throwOnError: true }));
   },
 
   updateTlsProfile(id: Id, body: UpdateTlsProfileRequest): Promise<TlsProfile> {

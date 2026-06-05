@@ -368,6 +368,19 @@ export function useUpdateAdminRole() {
 export function useDeleteAdminRole() {
   return useAdminMutation((id: string) => adminApi.deleteRole(id), ["admin", "roles"]);
 }
+export function useAdminApiKeys(params?: P<typeof adminApi.listAdminApiKeys>) {
+  return useQuery({
+    queryKey: queryKeys.admin.apiKeys(params),
+    queryFn: () => adminApi.listAdminApiKeys(params),
+  });
+}
+export function useUpdateAdminApiKey() {
+  return useAdminMutation(
+    (vars: { id: string; body: B<typeof adminApi.updateAdminApiKey> }) =>
+      adminApi.updateAdminApiKey(vars.id, vars.body),
+    ["admin", "api-keys"],
+  );
+}
 
 // ---- Custom user attribute definitions ----
 export function useUserAttributeDefinitions() {

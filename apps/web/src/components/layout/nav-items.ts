@@ -156,6 +156,7 @@ const ADMIN_SYSTEM_SECTION: NavSection = {
   items: [
     { href: ADMIN_ROUTES.copilot, labelKey: "nav.adminCopilot", icon: Bot },
     { href: ADMIN_ROUTES.roles, labelKey: "nav.adminRoles", icon: ShieldCheck },
+    { href: ADMIN_ROUTES.apiKeys, labelKey: "nav.adminApiKeys", icon: KeyRound },
     { href: ADMIN_ROUTES.userAttributes, labelKey: "nav.adminUserAttributes", icon: Tags },
     {
       href: ADMIN_ROUTES.notificationTemplates,

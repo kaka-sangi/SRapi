@@ -32,6 +32,8 @@ export type {
   Role,
   CreateRoleRequest,
   UpdateRoleRequest,
+  ApiKey,
+  ApiKeyStatus,
   UserAttributeDefinition,
   NotificationEmailTemplate,
   NotificationEmailTemplateList,
