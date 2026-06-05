@@ -911,11 +911,79 @@ func toAPIAnnouncement(in admincontrol.Announcement) apiopenapi.Announcement {
 		CreatedAt: in.CreatedAt,
 		EndsAt:    in.EndsAt,
 		Id:        apiopenapi.Id(strconv.Itoa(in.ID)),
+		Segments:  toAPIAnnouncementSegments(in.Segments),
 		Severity:  apiopenapi.AnnouncementSeverity(in.Severity),
 		StartsAt:  in.StartsAt,
 		Status:    apiopenapi.AnnouncementStatus(in.Status),
 		Title:     in.Title,
 		UpdatedAt: in.UpdatedAt,
+	}
+}
+
+func toAPIAnnouncementSegments(segments []admincontrol.AnnouncementSegment) *[]apiopenapi.AnnouncementSegment {
+	if len(segments) == 0 {
+		return nil
+	}
+	out := make([]apiopenapi.AnnouncementSegment, 0, len(segments))
+	for _, seg := range segments {
+		api := apiopenapi.AnnouncementSegment{}
+		if len(seg.Roles) > 0 {
+			roles := append([]string(nil), seg.Roles...)
+			api.Roles = &roles
+		}
+		if len(seg.EmailDomains) > 0 {
+			domains := append([]string(nil), seg.EmailDomains...)
+			api.EmailDomains = &domains
+		}
+		if len(seg.UserIDs) > 0 {
+			ids := make([]apiopenapi.Id, 0, len(seg.UserIDs))
+			for _, id := range seg.UserIDs {
+				ids = append(ids, apiopenapi.Id(strconv.Itoa(id)))
+			}
+			api.UserIds = &ids
+		}
+		out = append(out, api)
+	}
+	return &out
+}
+
+func announcementSegmentsFromAPI(in *[]apiopenapi.AnnouncementSegment) []admincontrol.AnnouncementSegment {
+	if in == nil || len(*in) == 0 {
+		return nil
+	}
+	out := make([]admincontrol.AnnouncementSegment, 0, len(*in))
+	for _, seg := range *in {
+		c := admincontrol.AnnouncementSegment{}
+		if seg.Roles != nil {
+			c.Roles = append([]string(nil), (*seg.Roles)...)
+		}
+		if seg.EmailDomains != nil {
+			c.EmailDomains = append([]string(nil), (*seg.EmailDomains)...)
+		}
+		if seg.UserIds != nil {
+			for _, id := range *seg.UserIds {
+				if n, err := strconv.Atoi(string(id)); err == nil && n > 0 {
+					c.UserIDs = append(c.UserIDs, n)
+				}
+			}
+		}
+		out = append(out, c)
+	}
+	return out
+}
+
+func toAPIAnnouncementReadStatus(in admincontrol.AnnouncementReadStatus) apiopenapi.AnnouncementReadStatus {
+	readers := make([]apiopenapi.AnnouncementReader, 0, len(in.Readers))
+	for _, r := range in.Readers {
+		readers = append(readers, apiopenapi.AnnouncementReader{
+			UserId: apiopenapi.Id(strconv.Itoa(r.UserID)),
+			ReadAt: r.ReadAt,
+		})
+	}
+	return apiopenapi.AnnouncementReadStatus{
+		AnnouncementId: apiopenapi.Id(strconv.Itoa(in.AnnouncementID)),
+		Total:          in.Total,
+		Readers:        readers,
 	}
 }
 
@@ -954,7 +1022,29 @@ func announcementRequestFromAPI(in apiopenapi.CreateAnnouncementRequest) adminco
 	if in.Audience != nil {
 		req.Audience = admincontrol.AnnouncementAudience(*in.Audience)
 	}
+	req.Segments = announcementSegmentsFromAPI(in.Segments)
 	return req
+}
+
+func (s *Server) handleListAdminAnnouncementReads(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	if _, err := s.requireAdminSession(r); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	id, ok := pathID(w, r, requestID)
+	if !ok {
+		return
+	}
+	status, err := s.runtime.adminControl.AnnouncementReadStatus(r.Context(), id)
+	if err != nil {
+		writeAdminControlError(w, err, requestID)
+		return
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.AnnouncementReadStatusResponse{
+		Data:      toAPIAnnouncementReadStatus(status),
+		RequestId: requestID,
+	})
 }
 
 func toAPIRedeemCodes(items []admincontrol.RedeemCode) []apiopenapi.RedeemCode {

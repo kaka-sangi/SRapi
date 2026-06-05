@@ -572,6 +572,65 @@ func TestUserAnnouncementsFilterVisibleAndTrackReadState(t *testing.T) {
 	}
 }
 
+func TestAnnouncementSegmentTargetingAndReadStatus(t *testing.T) {
+	now := time.Date(2026, time.May, 28, 15, 0, 0, 0, time.UTC)
+	store := admincontrolmemory.New()
+	svc, err := admincontrolservice.New(store, fixedClock{now: now})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	acme := userscontract.User{ID: 10, Email: "ops@acme.io", Roles: []userscontract.Role{userscontract.RoleUser}}
+	other := userscontract.User{ID: 11, Email: "ops@other.io", Roles: []userscontract.Role{userscontract.RoleUser}}
+
+	created, err := svc.CreateAnnouncement(context.Background(), admincontrol.AnnouncementRequest{
+		Title:    "acme-only",
+		Content:  "targeted by email domain",
+		Status:   admincontrol.AnnouncementStatusPublished,
+		Severity: admincontrol.AnnouncementSeverityInfo,
+		Audience: admincontrol.AnnouncementAudienceAll,
+		Segments: []admincontrol.AnnouncementSegment{{EmailDomains: []string{"ACME.io"}}},
+	}, 1)
+	if err != nil {
+		t.Fatalf("create targeted announcement: %v", err)
+	}
+
+	acmeList, err := svc.ListUserAnnouncements(context.Background(), acme, admincontrol.ListOptions{})
+	if err != nil {
+		t.Fatalf("list for acme: %v", err)
+	}
+	if !announcementListContains(acmeList.Items, created.ID) {
+		t.Fatal("a user in the targeted email domain must see the announcement")
+	}
+
+	otherList, err := svc.ListUserAnnouncements(context.Background(), other, admincontrol.ListOptions{})
+	if err != nil {
+		t.Fatalf("list for other: %v", err)
+	}
+	if announcementListContains(otherList.Items, created.ID) {
+		t.Fatal("a user outside the targeted email domain must NOT see the announcement")
+	}
+
+	if _, err := svc.MarkUserAnnouncementRead(context.Background(), acme, created.ID); err != nil {
+		t.Fatalf("mark read: %v", err)
+	}
+	status, err := svc.AnnouncementReadStatus(context.Background(), created.ID)
+	if err != nil {
+		t.Fatalf("read status: %v", err)
+	}
+	if status.Total != 1 || len(status.Readers) != 1 || status.Readers[0].UserID != acme.ID {
+		t.Fatalf("unexpected read status: %+v", status)
+	}
+}
+
+func announcementListContains(items []admincontrol.UserAnnouncement, id int) bool {
+	for _, item := range items {
+		if item.ID == id {
+			return true
+		}
+	}
+	return false
+}
+
 func TestSystemLogsRecordListAndCleanup(t *testing.T) {
 	store := admincontrolmemory.New()
 	svc, err := admincontrolservice.New(store, fixedClock{now: time.Date(2026, time.May, 28, 15, 0, 0, 0, time.UTC)})

@@ -16,6 +16,7 @@ type Store interface {
 	Get(ctx context.Context, key string) (map[string]any, bool, error)
 	Set(ctx context.Context, key string, value map[string]any, updatedBy *int) error
 	ListAnnouncementReads(ctx context.Context, userID int, announcementIDs []int) ([]AnnouncementRead, error)
+	ListAnnouncementReadsByAnnouncement(ctx context.Context, announcementID, limit int) ([]AnnouncementRead, error)
 	MarkAnnouncementRead(ctx context.Context, userID int, announcementID int, at time.Time) (AnnouncementRead, error)
 	RedeemCode(ctx context.Context, input RedeemCodeRedemptionInput) (RedeemCodeRedemptionResult, error)
 	PreviewPromoCode(ctx context.Context, input PromoCodePreviewInput) (PromoCodeApplication, error)
@@ -195,17 +196,29 @@ func (a AnnouncementAudience) Valid() bool {
 	return a == AnnouncementAudienceAll || a == AnnouncementAudienceUsers || a == AnnouncementAudienceAdmins
 }
 
+// AnnouncementSegment is one AND-group of audience conditions. An announcement
+// is delivered to a user when it has no segments (audience-only) OR any segment
+// matches. Within a segment, every non-empty condition must match (AND); all
+// conditions are evaluated against the delivery-time user, so no cross-module
+// attribute resolution is needed.
+type AnnouncementSegment struct {
+	Roles        []string `json:"roles,omitempty"`
+	UserIDs      []int    `json:"user_ids,omitempty"`
+	EmailDomains []string `json:"email_domains,omitempty"`
+}
+
 type Announcement struct {
-	ID        int                  `json:"id"`
-	Title     string               `json:"title"`
-	Content   string               `json:"content"`
-	Status    AnnouncementStatus   `json:"status"`
-	Severity  AnnouncementSeverity `json:"severity"`
-	Audience  AnnouncementAudience `json:"audience"`
-	StartsAt  *time.Time           `json:"starts_at,omitempty"`
-	EndsAt    *time.Time           `json:"ends_at,omitempty"`
-	CreatedAt time.Time            `json:"created_at"`
-	UpdatedAt time.Time            `json:"updated_at"`
+	ID        int                   `json:"id"`
+	Title     string                `json:"title"`
+	Content   string                `json:"content"`
+	Status    AnnouncementStatus    `json:"status"`
+	Severity  AnnouncementSeverity  `json:"severity"`
+	Audience  AnnouncementAudience  `json:"audience"`
+	Segments  []AnnouncementSegment `json:"segments,omitempty"`
+	StartsAt  *time.Time            `json:"starts_at,omitempty"`
+	EndsAt    *time.Time            `json:"ends_at,omitempty"`
+	CreatedAt time.Time             `json:"created_at"`
+	UpdatedAt time.Time             `json:"updated_at"`
 }
 type AnnouncementRequest struct {
 	Title    string
@@ -213,8 +226,16 @@ type AnnouncementRequest struct {
 	Status   AnnouncementStatus
 	Severity AnnouncementSeverity
 	Audience AnnouncementAudience
+	Segments []AnnouncementSegment
 	StartsAt *time.Time
 	EndsAt   *time.Time
+}
+
+// AnnouncementReadStatus is the admin view of who has read one announcement.
+type AnnouncementReadStatus struct {
+	AnnouncementID int
+	Total          int
+	Readers        []AnnouncementRead
 }
 type AnnouncementList struct {
 	Items []Announcement

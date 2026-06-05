@@ -106,6 +106,28 @@ func (s *Store) ListAnnouncementReads(_ context.Context, userID int, announcemen
 	return items, nil
 }
 
+func (s *Store) ListAnnouncementReadsByAnnouncement(_ context.Context, announcementID, limit int) ([]admincontrol.AnnouncementRead, error) {
+	if announcementID <= 0 {
+		return nil, admincontrol.ErrInvalidInput
+	}
+	if limit <= 0 || limit > 500 {
+		limit = 500
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	items := make([]admincontrol.AnnouncementRead, 0)
+	for _, byAnnouncement := range s.reads {
+		if item, ok := byAnnouncement[announcementID]; ok {
+			items = append(items, item)
+		}
+	}
+	sort.SliceStable(items, func(i, j int) bool { return items[i].ReadAt.After(items[j].ReadAt) })
+	if len(items) > limit {
+		items = items[:limit]
+	}
+	return items, nil
+}
+
 func (s *Store) MarkAnnouncementRead(_ context.Context, userID int, announcementID int, at time.Time) (admincontrol.AnnouncementRead, error) {
 	if userID <= 0 || announcementID <= 0 {
 		return admincontrol.AnnouncementRead{}, admincontrol.ErrInvalidInput

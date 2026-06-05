@@ -77,6 +77,7 @@ export const queryKeys = {
       ["admin", "user-subscriptions", params ?? {}] as const,
     pricingRules: (params?: unknown) => ["admin", "pricing-rules", params ?? {}] as const,
     announcements: (params?: unknown) => ["admin", "announcements", params ?? {}] as const,
+    announcementReads: (id: string) => ["admin", "announcement-reads", id] as const,
     redeemCodes: (params?: unknown) => ["admin", "redeem-codes", params ?? {}] as const,
     redeemStats: () => ["admin", "redeem-stats"] as const,
     promoCodes: (params?: unknown) => ["admin", "promo-codes", params ?? {}] as const,

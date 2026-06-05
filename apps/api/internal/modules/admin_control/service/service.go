@@ -193,7 +193,7 @@ func (s *Service) ListUserAnnouncements(ctx context.Context, user userscontract.
 	now := s.clock.Now()
 	visible := make([]admincontrol.Announcement, 0, len(collection.Items))
 	for _, item := range collection.Items {
-		if !announcementVisibleToUser(item, user.Roles, now) {
+		if !announcementVisibleToUser(item, user, now) {
 			continue
 		}
 		visible = append(visible, item)
@@ -239,7 +239,7 @@ func (s *Service) MarkUserAnnouncementRead(ctx context.Context, user userscontra
 		if item.ID != announcementID {
 			continue
 		}
-		if !announcementVisibleToUser(item, user.Roles, now) {
+		if !announcementVisibleToUser(item, user, now) {
 			return admincontrol.UserAnnouncement{}, admincontrol.ErrNotFound
 		}
 		reads, err := s.store.ListAnnouncementReads(ctx, user.ID, []int{announcementID})
@@ -681,7 +681,24 @@ func (s *Service) systemLogStore() (admincontrol.SystemLogStore, bool) {
 	return store, ok
 }
 
-func announcementVisibleToUser(item admincontrol.Announcement, roles []userscontract.Role, now time.Time) bool {
+// AnnouncementReadStatus returns who has read one announcement (recent-first),
+// for the admin read-status view.
+func (s *Service) AnnouncementReadStatus(ctx context.Context, announcementID int) (admincontrol.AnnouncementReadStatus, error) {
+	if announcementID <= 0 {
+		return admincontrol.AnnouncementReadStatus{}, admincontrol.ErrInvalidInput
+	}
+	readers, err := s.store.ListAnnouncementReadsByAnnouncement(ctx, announcementID, 500)
+	if err != nil {
+		return admincontrol.AnnouncementReadStatus{}, err
+	}
+	return admincontrol.AnnouncementReadStatus{
+		AnnouncementID: announcementID,
+		Total:          len(readers),
+		Readers:        readers,
+	}, nil
+}
+
+func announcementVisibleToUser(item admincontrol.Announcement, user userscontract.User, now time.Time) bool {
 	if item.Status != admincontrol.AnnouncementStatusPublished {
 		return false
 	}
@@ -691,7 +708,19 @@ func announcementVisibleToUser(item admincontrol.Announcement, roles []userscont
 	if item.EndsAt != nil && !now.Before(item.EndsAt.UTC()) {
 		return false
 	}
-	switch item.Audience {
+	if !announcementMatchesAudience(item.Audience, user.Roles) {
+		return false
+	}
+	// Segments refine the audience: when present, at least one segment must
+	// match the user. No segments = audience-only delivery (back-compat).
+	if len(item.Segments) > 0 && !announcementMatchesSegments(item.Segments, user) {
+		return false
+	}
+	return true
+}
+
+func announcementMatchesAudience(audience admincontrol.AnnouncementAudience, roles []userscontract.Role) bool {
+	switch audience {
 	case admincontrol.AnnouncementAudienceAll:
 		return true
 	case admincontrol.AnnouncementAudienceUsers:
@@ -701,6 +730,63 @@ func announcementVisibleToUser(item admincontrol.Announcement, roles []userscont
 	default:
 		return false
 	}
+}
+
+func announcementMatchesSegments(segments []admincontrol.AnnouncementSegment, user userscontract.User) bool {
+	for _, seg := range segments {
+		if announcementSegmentMatches(seg, user) {
+			return true
+		}
+	}
+	return false
+}
+
+// announcementSegmentMatches is AND across the segment's non-empty conditions.
+func announcementSegmentMatches(seg admincontrol.AnnouncementSegment, user userscontract.User) bool {
+	if len(seg.Roles) > 0 && !userRolesIntersect(user.Roles, seg.Roles) {
+		return false
+	}
+	if len(seg.UserIDs) > 0 && !containsInt(seg.UserIDs, user.ID) {
+		return false
+	}
+	if len(seg.EmailDomains) > 0 && !emailDomainIn(user.Email, seg.EmailDomains) {
+		return false
+	}
+	return true
+}
+
+func userRolesIntersect(roles []userscontract.Role, want []string) bool {
+	for _, role := range roles {
+		for _, w := range want {
+			if strings.EqualFold(string(role), strings.TrimSpace(w)) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func containsInt(values []int, target int) bool {
+	for _, v := range values {
+		if v == target {
+			return true
+		}
+	}
+	return false
+}
+
+func emailDomainIn(email string, domains []string) bool {
+	at := strings.LastIndex(email, "@")
+	if at < 0 || at == len(email)-1 {
+		return false
+	}
+	domain := strings.ToLower(strings.TrimSpace(email[at+1:]))
+	for _, d := range domains {
+		if strings.ToLower(strings.TrimSpace(d)) == domain {
+			return true
+		}
+	}
+	return false
 }
 
 func hasAdminRole(roles []userscontract.Role) bool {
@@ -786,11 +872,34 @@ func announcementFromCreateRequest(req admincontrol.AnnouncementRequest, id int,
 		Status:    status,
 		Severity:  severity,
 		Audience:  audience,
+		Segments:  normalizeAnnouncementSegments(req.Segments),
 		StartsAt:  req.StartsAt,
 		EndsAt:    req.EndsAt,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}, nil
+}
+
+// normalizeAnnouncementSegments trims/dedupes each segment's conditions and
+// drops segments that carry no condition (which would otherwise match nobody).
+func normalizeAnnouncementSegments(segments []admincontrol.AnnouncementSegment) []admincontrol.AnnouncementSegment {
+	if len(segments) == 0 {
+		return nil
+	}
+	out := make([]admincontrol.AnnouncementSegment, 0, len(segments))
+	for _, seg := range segments {
+		roles := uniqueTrimmedStrings(seg.Roles)
+		domains := lowerUniqueTrimmedStrings(seg.EmailDomains)
+		ids := uniquePositiveInts(seg.UserIDs)
+		if len(roles) == 0 && len(domains) == 0 && len(ids) == 0 {
+			continue
+		}
+		out = append(out, admincontrol.AnnouncementSegment{Roles: roles, UserIDs: ids, EmailDomains: domains})
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func redeemCodeFromCreateRequest(req admincontrol.CreateRedeemCodeRequest, id int, now time.Time) (admincontrol.RedeemCode, error) {
@@ -1339,6 +1448,32 @@ func uniqueTrimmedStrings(values []string) []string {
 		}
 		seen[key] = struct{}{}
 		out = append(out, trimmed)
+	}
+	return out
+}
+
+// lowerUniqueTrimmedStrings is uniqueTrimmedStrings but lowercases the kept
+// values (used for case-insensitive email domains).
+func lowerUniqueTrimmedStrings(values []string) []string {
+	out := uniqueTrimmedStrings(values)
+	for i := range out {
+		out[i] = strings.ToLower(out[i])
+	}
+	return out
+}
+
+func uniquePositiveInts(values []int) []int {
+	out := make([]int, 0, len(values))
+	seen := map[int]struct{}{}
+	for _, value := range values {
+		if value <= 0 {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
 	}
 	return out
 }

@@ -92,6 +92,7 @@ import {
   createAdminUser,
   createAdminUserSubscription,
   deleteAdminAnnouncement,
+  getAdminAnnouncementReadStatus,
   deleteAdminPromoCode,
   disableAdminAccount,
   disableAdminUser,
@@ -202,6 +203,7 @@ import type {
   AffiliateLedgerEntry,
   Announcement,
   AnnouncementStatus,
+  AnnouncementReadStatus,
   CreateErrorPassthroughRuleRequest,
   ErrorPassthroughRule,
   UpdateErrorPassthroughRuleRequest,
@@ -978,6 +980,10 @@ export const adminApi = {
 
   deleteAnnouncement(id: Id): Promise<{ deleted: boolean }> {
     return unwrapData(() => deleteAdminAnnouncement({ path: { id }, throwOnError: true }));
+  },
+
+  getAnnouncementReadStatus(id: Id): Promise<AnnouncementReadStatus> {
+    return unwrapData(() => getAdminAnnouncementReadStatus({ path: { id }, throwOnError: true }));
   },
 
   listErrorPassthroughRules(): Promise<AdminListResult<ErrorPassthroughRule>> {

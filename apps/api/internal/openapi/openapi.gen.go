@@ -3819,11 +3819,14 @@ type Announcement struct {
 	CreatedAt Timestamp            `json:"created_at"`
 	EndsAt    *Timestamp           `json:"ends_at,omitempty"`
 	Id        Id                   `json:"id"`
-	Severity  AnnouncementSeverity `json:"severity"`
-	StartsAt  *Timestamp           `json:"starts_at,omitempty"`
-	Status    AnnouncementStatus   `json:"status"`
-	Title     string               `json:"title"`
-	UpdatedAt Timestamp            `json:"updated_at"`
+
+	// Segments Optional audience-targeting segments that refine the audience.
+	Segments  *[]AnnouncementSegment `json:"segments,omitempty"`
+	Severity  AnnouncementSeverity   `json:"severity"`
+	StartsAt  *Timestamp             `json:"starts_at,omitempty"`
+	Status    AnnouncementStatus     `json:"status"`
+	Title     string                 `json:"title"`
+	UpdatedAt Timestamp              `json:"updated_at"`
 }
 
 // AnnouncementAudience defines model for AnnouncementAudience.
@@ -3836,10 +3839,43 @@ type AnnouncementListResponse struct {
 	RequestId  RequestId      `json:"request_id"`
 }
 
+// AnnouncementReadStatus defines model for AnnouncementReadStatus.
+type AnnouncementReadStatus struct {
+	AnnouncementId Id                   `json:"announcement_id"`
+	Readers        []AnnouncementReader `json:"readers"`
+
+	// Total Number of recent readers returned (capped).
+	Total int `json:"total"`
+}
+
+// AnnouncementReadStatusResponse defines model for AnnouncementReadStatusResponse.
+type AnnouncementReadStatusResponse struct {
+	Data      AnnouncementReadStatus `json:"data"`
+	RequestId RequestId              `json:"request_id"`
+}
+
+// AnnouncementReader defines model for AnnouncementReader.
+type AnnouncementReader struct {
+	ReadAt Timestamp `json:"read_at"`
+	UserId Id        `json:"user_id"`
+}
+
 // AnnouncementResponse defines model for AnnouncementResponse.
 type AnnouncementResponse struct {
 	Data      Announcement `json:"data"`
 	RequestId RequestId    `json:"request_id"`
+}
+
+// AnnouncementSegment One AND-group of audience conditions. An announcement is delivered when it has no segments (audience-only) or any segment matches the recipient. Within a segment every non-empty condition must match.
+type AnnouncementSegment struct {
+	// EmailDomains Match users whose email domain is in this list (case-insensitive).
+	EmailDomains *[]string `json:"email_domains,omitempty"`
+
+	// Roles Match users holding any of these roles (e.g. owner, admin, user).
+	Roles *[]string `json:"roles,omitempty"`
+
+	// UserIds Match these specific user ids.
+	UserIds *[]Id `json:"user_ids,omitempty"`
 }
 
 // AnnouncementSeverity defines model for AnnouncementSeverity.
@@ -4672,10 +4708,13 @@ type CreateAnnouncementRequest struct {
 	Audience *AnnouncementAudience `json:"audience,omitempty"`
 	Content  string                `json:"content"`
 	EndsAt   *Timestamp            `json:"ends_at,omitempty"`
-	Severity *AnnouncementSeverity `json:"severity,omitempty"`
-	StartsAt *Timestamp            `json:"starts_at,omitempty"`
-	Status   *AnnouncementStatus   `json:"status,omitempty"`
-	Title    string                `json:"title"`
+
+	// Segments Optional audience-targeting segments that refine the audience.
+	Segments *[]AnnouncementSegment `json:"segments,omitempty"`
+	Severity *AnnouncementSeverity  `json:"severity,omitempty"`
+	StartsAt *Timestamp             `json:"starts_at,omitempty"`
+	Status   *AnnouncementStatus    `json:"status,omitempty"`
+	Title    string                 `json:"title"`
 }
 
 // CreateApiKeyRequest defines model for CreateApiKeyRequest.
@@ -16220,6 +16259,9 @@ type ServerInterface interface {
 	// Update an announcement.
 	// (PUT /api/v1/admin/announcements/{id})
 	UpdateAdminAnnouncement(w http.ResponseWriter, r *http.Request, id Id)
+	// Get the read-status (who has read it) of an announcement.
+	// (GET /api/v1/admin/announcements/{id}/reads)
+	GetAdminAnnouncementReadStatus(w http.ResponseWriter, r *http.Request, id Id)
 	// List API keys across all users.
 	// (GET /api/v1/admin/api-keys)
 	ListAdminApiKeys(w http.ResponseWriter, r *http.Request, params ListAdminApiKeysParams)
@@ -19057,6 +19099,38 @@ func (siw *ServerInterfaceWrapper) UpdateAdminAnnouncement(w http.ResponseWriter
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateAdminAnnouncement(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminAnnouncementReadStatus operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminAnnouncementReadStatus(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminAnnouncementReadStatus(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -28267,6 +28341,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/announcements", wrapper.CreateAdminAnnouncement)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/announcements/{id}", wrapper.DeleteAdminAnnouncement)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/admin/announcements/{id}", wrapper.UpdateAdminAnnouncement)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/announcements/{id}/reads", wrapper.GetAdminAnnouncementReadStatus)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/api-keys", wrapper.ListAdminApiKeys)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/api-keys/{id}", wrapper.UpdateAdminApiKey)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/api-keys/{id}/usage", wrapper.GetAdminApiKeyUsage)

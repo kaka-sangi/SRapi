@@ -13,6 +13,7 @@ import {
   type FieldConfig,
 } from "@/components/admin/resource-form-dialog";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
+import { AnnouncementReadStatusDialog } from "@/components/admin/announcement-read-status-dialog";
 import {
   useAdminAnnouncements,
   useCreateAnnouncement,
@@ -28,6 +29,7 @@ import {
   ANNOUNCEMENT_STATUSES,
   ANNOUNCEMENT_SEVERITIES,
   ANNOUNCEMENT_AUDIENCES,
+  ANNOUNCEMENT_SEGMENT_ROLES,
   emptyAnnouncementForm,
   announcementFormFromAnnouncement,
   buildAnnouncementBody,
@@ -58,6 +60,7 @@ function AnnouncementsContent() {
 
   const [formTarget, setFormTarget] = useState<Announcement | "new" | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Announcement | null>(null);
+  const [readsTarget, setReadsTarget] = useState<Announcement | null>(null);
   const isNew = formTarget === "new";
 
   const enumOptions = (values: readonly string[]) => values.map((v) => ({ value: v, label: v }));
@@ -81,6 +84,26 @@ function AnnouncementsContent() {
       label: t("adminAnnouncements.audience"),
       type: "select",
       options: enumOptions(ANNOUNCEMENT_AUDIENCES),
+    },
+    {
+      name: "segmentRoles",
+      label: t("adminAnnouncements.segmentRoles"),
+      type: "multiselect",
+      options: enumOptions(ANNOUNCEMENT_SEGMENT_ROLES),
+      hint: t("adminAnnouncements.segmentRolesHint"),
+      advanced: true,
+    },
+    {
+      name: "segmentEmailDomains",
+      label: t("adminAnnouncements.segmentEmailDomains"),
+      type: "tags",
+      advanced: true,
+    },
+    {
+      name: "segmentUserIds",
+      label: t("adminAnnouncements.segmentUserIds"),
+      type: "tags",
+      advanced: true,
     },
   ];
 
@@ -161,6 +184,7 @@ function AnnouncementsContent() {
         rowActions={(a) => (
           <RowActionsMenu
             actions={[
+              { label: t("adminAnnouncements.readStatus"), onSelect: () => setReadsTarget(a) },
               { label: t("common.edit"), onSelect: () => setFormTarget(a) },
               { label: t("common.delete"), destructive: true, onSelect: () => setDeleteTarget(a) },
             ]}
@@ -203,6 +227,15 @@ function AnnouncementsContent() {
           isPending={deleteMut.isPending}
         />
       ) : null}
+
+      <AnnouncementReadStatusDialog
+        announcementId={readsTarget?.id ?? null}
+        title={readsTarget?.title ?? ""}
+        open={readsTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setReadsTarget(null);
+        }}
+      />
     </>
   );
 }

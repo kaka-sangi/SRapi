@@ -111,6 +111,28 @@ func (s *Store) ListAnnouncementReads(ctx context.Context, userID int, announcem
 	return items, nil
 }
 
+func (s *Store) ListAnnouncementReadsByAnnouncement(ctx context.Context, announcementID, limit int) ([]admincontrolcontract.AnnouncementRead, error) {
+	if announcementID <= 0 {
+		return nil, admincontrolcontract.ErrInvalidInput
+	}
+	if limit <= 0 || limit > 500 {
+		limit = 500
+	}
+	rows, err := s.client.UserAnnouncementRead.Query().
+		Where(entuserannouncementread.AnnouncementIDEQ(announcementID)).
+		Order(entuserannouncementread.ByReadAt(entsql.OrderDesc())).
+		Limit(limit).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]admincontrolcontract.AnnouncementRead, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, toAnnouncementRead(row))
+	}
+	return items, nil
+}
+
 func (s *Store) MarkAnnouncementRead(ctx context.Context, userID int, announcementID int, at time.Time) (admincontrolcontract.AnnouncementRead, error) {
 	if userID <= 0 || announcementID <= 0 {
 		return admincontrolcontract.AnnouncementRead{}, admincontrolcontract.ErrInvalidInput

@@ -527,6 +527,7 @@ func (s *Server) registerAdminPromotionRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/admin/announcements", s.handleCreateAdminAnnouncement)
 	mux.HandleFunc("PUT /api/v1/admin/announcements/{id}", s.handleUpdateAdminAnnouncement)
 	mux.HandleFunc("DELETE /api/v1/admin/announcements/{id}", s.handleDeleteAdminAnnouncement)
+	mux.HandleFunc("GET /api/v1/admin/announcements/{id}/reads", s.handleListAdminAnnouncementReads)
 	mux.HandleFunc("GET /api/v1/admin/redeem-codes", s.handleListAdminRedeemCodes)
 	mux.HandleFunc("POST /api/v1/admin/redeem-codes", s.handleCreateAdminRedeemCode)
 	mux.HandleFunc("POST /api/v1/admin/redeem-codes/batch-generate", s.handleBatchGenerateAdminRedeemCodes)

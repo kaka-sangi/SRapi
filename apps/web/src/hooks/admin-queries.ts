@@ -327,6 +327,13 @@ export function useAdminAnnouncements(params?: P<typeof adminApi.listAnnouncemen
     queryFn: () => adminApi.listAnnouncements(params),
   });
 }
+export function useAnnouncementReadStatus(id: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.admin.announcementReads(id ?? ""),
+    queryFn: () => adminApi.getAnnouncementReadStatus(id as string),
+    enabled: enabled && Boolean(id),
+  });
+}
 
 // ---- Error passthrough rules ----
 export function useErrorPassthroughRules() {

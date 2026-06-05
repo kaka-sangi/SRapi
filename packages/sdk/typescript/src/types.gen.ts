@@ -2476,6 +2476,43 @@ export type AnnouncementSeverity = 'info' | 'warning' | 'critical';
 
 export type AnnouncementAudience = 'all' | 'users' | 'admins';
 
+/**
+ * One AND-group of audience conditions. An announcement is delivered when it has no segments (audience-only) or any segment matches the recipient. Within a segment every non-empty condition must match.
+ */
+export type AnnouncementSegment = {
+    /**
+     * Match users holding any of these roles (e.g. owner, admin, user).
+     */
+    roles?: Array<string>;
+    /**
+     * Match these specific user ids.
+     */
+    user_ids?: Array<Id>;
+    /**
+     * Match users whose email domain is in this list (case-insensitive).
+     */
+    email_domains?: Array<string>;
+};
+
+export type AnnouncementReader = {
+    user_id: Id;
+    read_at: Timestamp;
+};
+
+export type AnnouncementReadStatus = {
+    announcement_id: Id;
+    /**
+     * Number of recent readers returned (capped).
+     */
+    total: number;
+    readers: Array<AnnouncementReader>;
+};
+
+export type AnnouncementReadStatusResponse = {
+    data: AnnouncementReadStatus;
+    request_id: RequestId;
+};
+
 export type Announcement = {
     id: Id;
     title: string;
@@ -2483,6 +2520,10 @@ export type Announcement = {
     status: AnnouncementStatus;
     severity: AnnouncementSeverity;
     audience: AnnouncementAudience;
+    /**
+     * Optional audience-targeting segments that refine the audience.
+     */
+    segments?: Array<AnnouncementSegment>;
     starts_at?: Timestamp;
     ends_at?: Timestamp;
     created_at: Timestamp;
@@ -2495,6 +2536,10 @@ export type CreateAnnouncementRequest = {
     status?: AnnouncementStatus;
     severity?: AnnouncementSeverity;
     audience?: AnnouncementAudience;
+    /**
+     * Optional audience-targeting segments that refine the audience.
+     */
+    segments?: Array<AnnouncementSegment>;
     starts_at?: Timestamp;
     ends_at?: Timestamp;
 };
@@ -12500,6 +12545,45 @@ export type UpdateAdminAnnouncementResponses = {
 };
 
 export type UpdateAdminAnnouncementResponse = UpdateAdminAnnouncementResponses[keyof UpdateAdminAnnouncementResponses];
+
+export type GetAdminAnnouncementReadStatusData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/announcements/{id}/reads';
+};
+
+export type GetAdminAnnouncementReadStatusErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type GetAdminAnnouncementReadStatusError = GetAdminAnnouncementReadStatusErrors[keyof GetAdminAnnouncementReadStatusErrors];
+
+export type GetAdminAnnouncementReadStatusResponses = {
+    /**
+     * Announcement read status.
+     */
+    200: AnnouncementReadStatusResponse;
+};
+
+export type GetAdminAnnouncementReadStatusResponse = GetAdminAnnouncementReadStatusResponses[keyof GetAdminAnnouncementReadStatusResponses];
 
 export type ListAdminRedeemCodesData = {
     body?: never;

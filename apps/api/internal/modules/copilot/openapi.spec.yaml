@@ -7014,6 +7014,42 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/announcements/{id}/reads:
+    get:
+      tags:
+        - AdminAnnouncements
+      operationId: getAdminAnnouncementReadStatus
+      summary: Get the read-status (who has read it) of an announcement.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Announcement read status.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnnouncementReadStatusResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/redeem-codes:
     get:
       tags:
@@ -18983,6 +19019,68 @@ components:
         - users
         - admins
 
+    AnnouncementSegment:
+      type: object
+      description: >-
+        One AND-group of audience conditions. An announcement is delivered when
+        it has no segments (audience-only) or any segment matches the recipient.
+        Within a segment every non-empty condition must match.
+      properties:
+        roles:
+          type: array
+          items:
+            type: string
+          description: Match users holding any of these roles (e.g. owner, admin, user).
+        user_ids:
+          type: array
+          items:
+            $ref: "#/components/schemas/Id"
+          description: Match these specific user ids.
+        email_domains:
+          type: array
+          items:
+            type: string
+          description: Match users whose email domain is in this list (case-insensitive).
+
+    AnnouncementReader:
+      type: object
+      required:
+        - user_id
+        - read_at
+      properties:
+        user_id:
+          $ref: "#/components/schemas/Id"
+        read_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    AnnouncementReadStatus:
+      type: object
+      required:
+        - announcement_id
+        - total
+        - readers
+      properties:
+        announcement_id:
+          $ref: "#/components/schemas/Id"
+        total:
+          type: integer
+          description: Number of recent readers returned (capped).
+        readers:
+          type: array
+          items:
+            $ref: "#/components/schemas/AnnouncementReader"
+
+    AnnouncementReadStatusResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/AnnouncementReadStatus"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
     Announcement:
       type: object
       required:
@@ -19010,6 +19108,11 @@ components:
           $ref: "#/components/schemas/AnnouncementSeverity"
         audience:
           $ref: "#/components/schemas/AnnouncementAudience"
+        segments:
+          type: array
+          items:
+            $ref: "#/components/schemas/AnnouncementSegment"
+          description: Optional audience-targeting segments that refine the audience.
         starts_at:
           $ref: "#/components/schemas/Timestamp"
           nullable: true
@@ -19040,6 +19143,11 @@ components:
           $ref: "#/components/schemas/AnnouncementSeverity"
         audience:
           $ref: "#/components/schemas/AnnouncementAudience"
+        segments:
+          type: array
+          items:
+            $ref: "#/components/schemas/AnnouncementSegment"
+          description: Optional audience-targeting segments that refine the audience.
         starts_at:
           $ref: "#/components/schemas/Timestamp"
           nullable: true
