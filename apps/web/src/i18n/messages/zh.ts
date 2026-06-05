@@ -653,9 +653,10 @@ export const zh: Messages = {
   },
   adminSubscriptions: {
     title: "订阅",
-    subtitle: "套餐与用户的有效订阅。",
+    subtitle: "用户的有效订阅。套餐目录请在「套餐」中管理。",
     tabPlans: "套餐",
     tabSubscriptions: "用户订阅",
+    managePlans: "管理套餐",
     plan: "套餐",
     price: "价格",
     user: "用户",

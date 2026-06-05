@@ -654,9 +654,10 @@ export const en = {
   },
   adminSubscriptions: {
     title: "Subscriptions",
-    subtitle: "Plans and active user subscriptions.",
+    subtitle: "Active user subscriptions. Manage the plan catalog under Plans.",
     tabPlans: "Plans",
     tabSubscriptions: "User subscriptions",
+    managePlans: "Manage plans",
     plan: "Plan",
     price: "Price",
     user: "User",
