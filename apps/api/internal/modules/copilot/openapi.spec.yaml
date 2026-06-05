@@ -6042,6 +6042,249 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/ops/alert-rules:
+    get:
+      tags:
+        - AdminOps
+      operationId: listAdminOpsAlertRules
+      summary: List configurable generic metric alert rules.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: Alert rule list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsAlertRuleListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+    post:
+      tags:
+        - AdminOps
+      operationId: createAdminOpsAlertRule
+      summary: Create a generic metric alert rule.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOpsAlertRuleRequest"
+      responses:
+        "201":
+          description: Alert rule created.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsAlertRuleResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/ops/alert-rules/{id}:
+    patch:
+      tags:
+        - AdminOps
+      operationId: updateAdminOpsAlertRule
+      summary: Update a generic metric alert rule.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOpsAlertRuleRequest"
+      responses:
+        "200":
+          description: Alert rule updated.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsAlertRuleResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+    delete:
+      tags:
+        - AdminOps
+      operationId: deleteAdminOpsAlertRule
+      summary: Delete a generic metric alert rule.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "204":
+          description: Alert rule deleted.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/ops/alert-silences:
+    get:
+      tags:
+        - AdminOps
+      operationId: listAdminOpsAlertSilences
+      summary: List alert silences that suppress matching alert events.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: Alert silence list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsAlertSilenceListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+    post:
+      tags:
+        - AdminOps
+      operationId: createAdminOpsAlertSilence
+      summary: Create an alert silence window.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOpsAlertSilenceRequest"
+      responses:
+        "201":
+          description: Alert silence created.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpsAlertSilenceResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/ops/alert-silences/{id}:
+    delete:
+      tags:
+        - AdminOps
+      operationId: deleteAdminOpsAlertSilence
+      summary: Delete an alert silence.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "204":
+          description: Alert silence deleted.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/settings:
     get:
       tags:
@@ -6096,6 +6339,49 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AdminSettingsResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/settings/send-test-email:
+    post:
+      tags:
+        - AdminSettings
+      operationId: sendAdminTestEmail
+      summary: Send a test email to verify SMTP credentials.
+      description: >-
+        Builds the effective SMTP configuration the same way the notification
+        worker does (admin-settings SMTP fields plus the static SMTP password)
+        and delivers a small probe message. Because the SMTP password is
+        write-only, this is the only way to confirm the credentials actually
+        work end to end.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminSendTestEmailRequest"
+      responses:
+        "200":
+          description: Test email delivery result.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminTestResultResponse"
         "400":
           $ref: "#/components/responses/ValidationError"
         "401":
@@ -11202,6 +11488,226 @@ paths:
           $ref: "#/components/responses/NotFound"
         default:
           $ref: "#/components/responses/StandardError"
+  /api/v1/admin/scheduled-test-plans:
+    get:
+      tags:
+        - AdminScheduledTestPlans
+      operationId: listAdminScheduledTestPlans
+      summary: List scheduled account health-test plans.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      responses:
+        "200":
+          description: Scheduled test plan list.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduledTestPlanListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+    post:
+      tags:
+        - AdminScheduledTestPlans
+      operationId: createAdminScheduledTestPlan
+      summary: Create a scheduled test plan.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateScheduledTestPlanRequest"
+      responses:
+        "201":
+          description: Scheduled test plan created.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduledTestPlanResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+  /api/v1/admin/scheduled-test-plans/{id}:
+    patch:
+      tags:
+        - AdminScheduledTestPlans
+      operationId: updateAdminScheduledTestPlan
+      summary: Update a scheduled test plan.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateScheduledTestPlanRequest"
+      responses:
+        "200":
+          description: Scheduled test plan updated.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduledTestPlanResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+    delete:
+      tags:
+        - AdminScheduledTestPlans
+      operationId: deleteAdminScheduledTestPlan
+      summary: Delete a scheduled test plan.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Scheduled test plan deleted.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+  /api/v1/admin/scheduled-test-plans/{id}/runs:
+    get:
+      tags:
+        - AdminScheduledTestPlans
+      operationId: listAdminScheduledTestPlanRuns
+      summary: List run history for a scheduled test plan.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+        operator: read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Scheduled test plan run history.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduledTestPlanRunListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+  /api/v1/admin/scheduled-test-plans/{id}/run:
+    post:
+      tags:
+        - AdminScheduledTestPlans
+      operationId: runAdminScheduledTestPlan
+      summary: Run a scheduled test plan immediately.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Scheduled test plan run completed.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduledTestPlanRunResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
   /api/v1/admin/user-attributes:
     get:
       tags:
@@ -14629,6 +15135,16 @@ components:
           $ref: "#/components/schemas/AdminTestResult"
         request_id:
           $ref: "#/components/schemas/RequestId"
+
+    AdminSendTestEmailRequest:
+      type: object
+      properties:
+        recipient:
+          type: string
+          format: email
+          description: >-
+            Mailbox to deliver the probe to. Defaults to the requesting admin's
+            own account email when omitted.
 
     CapabilityDescriptor:
       type: object
@@ -19631,6 +20147,257 @@ components:
         request_id:
           $ref: "#/components/schemas/RequestId"
 
+    OpsAlertMetricType:
+      type: string
+      enum:
+        - error_rate
+        - success_rate
+        - latency_p95
+        - request_count
+
+    OpsAlertOperator:
+      type: string
+      enum:
+        - gt
+        - gte
+        - lt
+        - lte
+
+    OpsAlertRuleScope:
+      type: object
+      required:
+        - source_endpoint
+        - model
+      properties:
+        source_endpoint:
+          type: string
+        model:
+          type: string
+        provider_id:
+          $ref: "#/components/schemas/Id"
+          nullable: true
+
+    OpsAlertRule:
+      type: object
+      required:
+        - id
+        - name
+        - metric_type
+        - operator
+        - threshold
+        - severity
+        - enabled
+        - window_seconds
+        - cooldown_seconds
+        - min_request_count
+        - scope
+        - created_at
+        - updated_at
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        name:
+          type: string
+        metric_type:
+          $ref: "#/components/schemas/OpsAlertMetricType"
+        operator:
+          $ref: "#/components/schemas/OpsAlertOperator"
+        threshold:
+          type: number
+          description: Threshold compared against the observed metric value (ratio for rates, milliseconds for latency).
+        severity:
+          $ref: "#/components/schemas/OpsAlertSeverity"
+        enabled:
+          type: boolean
+        window_seconds:
+          type: integer
+          minimum: 1
+        cooldown_seconds:
+          type: integer
+          minimum: 0
+        min_request_count:
+          type: integer
+          minimum: 0
+        scope:
+          $ref: "#/components/schemas/OpsAlertRuleScope"
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+        updated_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    CreateOpsAlertRuleRequest:
+      type: object
+      required:
+        - name
+        - metric_type
+        - operator
+        - threshold
+      properties:
+        name:
+          type: string
+          minLength: 1
+        metric_type:
+          $ref: "#/components/schemas/OpsAlertMetricType"
+        operator:
+          $ref: "#/components/schemas/OpsAlertOperator"
+        threshold:
+          type: number
+        severity:
+          $ref: "#/components/schemas/OpsAlertSeverity"
+        enabled:
+          type: boolean
+        window_seconds:
+          type: integer
+          minimum: 1
+        cooldown_seconds:
+          type: integer
+          minimum: 0
+        min_request_count:
+          type: integer
+          minimum: 0
+        scope:
+          $ref: "#/components/schemas/OpsAlertRuleScope"
+
+    UpdateOpsAlertRuleRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        metric_type:
+          $ref: "#/components/schemas/OpsAlertMetricType"
+        operator:
+          $ref: "#/components/schemas/OpsAlertOperator"
+        threshold:
+          type: number
+        severity:
+          $ref: "#/components/schemas/OpsAlertSeverity"
+        enabled:
+          type: boolean
+        window_seconds:
+          type: integer
+          minimum: 1
+        cooldown_seconds:
+          type: integer
+          minimum: 0
+        min_request_count:
+          type: integer
+          minimum: 0
+        scope:
+          $ref: "#/components/schemas/OpsAlertRuleScope"
+
+    OpsAlertRuleResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/OpsAlertRule"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    OpsAlertRuleListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/OpsAlertRule"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    OpsAlertSilenceMatcher:
+      type: object
+      properties:
+        rule_id:
+          type: string
+        severity:
+          $ref: "#/components/schemas/OpsAlertSeverity"
+          nullable: true
+        source_endpoint:
+          type: string
+        model:
+          type: string
+        provider_id:
+          $ref: "#/components/schemas/Id"
+          nullable: true
+
+    OpsAlertSilence:
+      type: object
+      required:
+        - id
+        - matcher
+        - starts_at
+        - ends_at
+        - created_at
+        - updated_at
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        comment:
+          type: string
+        matcher:
+          $ref: "#/components/schemas/OpsAlertSilenceMatcher"
+        starts_at:
+          $ref: "#/components/schemas/Timestamp"
+        ends_at:
+          $ref: "#/components/schemas/Timestamp"
+        created_by:
+          $ref: "#/components/schemas/Id"
+          nullable: true
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+        updated_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    CreateOpsAlertSilenceRequest:
+      type: object
+      required:
+        - ends_at
+      properties:
+        comment:
+          type: string
+        matcher:
+          $ref: "#/components/schemas/OpsAlertSilenceMatcher"
+        starts_at:
+          $ref: "#/components/schemas/Timestamp"
+        ends_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    OpsAlertSilenceResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/OpsAlertSilence"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    OpsAlertSilenceListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/OpsAlertSilence"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
     SchedulerDecision:
       type: object
       required:
@@ -22683,6 +23450,231 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ErrorPassthroughRule"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    ScheduledTestPlan:
+      type: object
+      required:
+        - id
+        - name
+        - enabled
+        - scope_type
+        - interval_seconds
+        - cron_expression
+        - max_results
+        - auto_recover
+        - last_status
+        - last_summary
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        enabled:
+          type: boolean
+        scope_type:
+          type: string
+          enum:
+            - all
+            - account
+            - group
+        scope_id:
+          type: integer
+          format: int64
+          nullable: true
+        interval_seconds:
+          type: integer
+          format: int64
+        cron_expression:
+          type: string
+        max_results:
+          type: integer
+          format: int64
+        auto_recover:
+          type: boolean
+        last_run_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_status:
+          type: string
+        last_summary:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    CreateScheduledTestPlanRequest:
+      type: object
+      required:
+        - name
+        - scope_type
+      properties:
+        name:
+          type: string
+        enabled:
+          type: boolean
+        scope_type:
+          type: string
+          enum:
+            - all
+            - account
+            - group
+        scope_id:
+          type: integer
+          format: int64
+          nullable: true
+        interval_seconds:
+          type: integer
+          format: int64
+        cron_expression:
+          type: string
+        max_results:
+          type: integer
+          format: int64
+        auto_recover:
+          type: boolean
+    UpdateScheduledTestPlanRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        enabled:
+          type: boolean
+        scope_type:
+          type: string
+          enum:
+            - all
+            - account
+            - group
+        scope_id:
+          type: integer
+          format: int64
+          nullable: true
+        interval_seconds:
+          type: integer
+          format: int64
+        cron_expression:
+          type: string
+        max_results:
+          type: integer
+          format: int64
+        auto_recover:
+          type: boolean
+    ScheduledTestPlanRun:
+      type: object
+      required:
+        - id
+        - plan_id
+        - trigger
+        - status
+        - selected
+        - probed
+        - skipped
+        - failed
+        - unhealthy
+        - recovered
+        - summary
+        - started_at
+        - finished_at
+      properties:
+        id:
+          type: integer
+          format: int64
+        plan_id:
+          type: integer
+          format: int64
+        trigger:
+          type: string
+          enum:
+            - schedule
+            - manual
+        status:
+          type: string
+          enum:
+            - ok
+            - partial
+            - failed
+        selected:
+          type: integer
+          format: int64
+        probed:
+          type: integer
+          format: int64
+        skipped:
+          type: integer
+          format: int64
+        failed:
+          type: integer
+          format: int64
+        unhealthy:
+          type: integer
+          format: int64
+        recovered:
+          type: integer
+          format: int64
+        summary:
+          type: string
+        started_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+    ScheduledTestPlanResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/ScheduledTestPlan"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+    ScheduledTestPlanListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScheduledTestPlan"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+    ScheduledTestPlanRunResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/ScheduledTestPlanRun"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+    ScheduledTestPlanRunListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScheduledTestPlanRun"
         pagination:
           $ref: "#/components/schemas/Pagination"
         request_id:

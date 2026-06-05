@@ -1158,6 +1158,13 @@ export type AdminTestResultResponse = {
     request_id: RequestId;
 };
 
+export type AdminSendTestEmailRequest = {
+    /**
+     * Mailbox to deliver the probe to. Defaults to the requesting admin's own account email when omitted.
+     */
+    recipient?: string;
+};
+
 export type CapabilityDescriptor = {
     key: string;
     version: string;
@@ -3107,6 +3114,109 @@ export type OpsAlertListResponse = {
     request_id: RequestId;
 };
 
+export type OpsAlertMetricType = 'error_rate' | 'success_rate' | 'latency_p95' | 'request_count';
+
+export type OpsAlertOperator = 'gt' | 'gte' | 'lt' | 'lte';
+
+export type OpsAlertRuleScope = {
+    source_endpoint: string;
+    model: string;
+    provider_id?: Id;
+};
+
+export type OpsAlertRule = {
+    id: Id;
+    name: string;
+    metric_type: OpsAlertMetricType;
+    operator: OpsAlertOperator;
+    /**
+     * Threshold compared against the observed metric value (ratio for rates, milliseconds for latency).
+     */
+    threshold: number;
+    severity: OpsAlertSeverity;
+    enabled: boolean;
+    window_seconds: number;
+    cooldown_seconds: number;
+    min_request_count: number;
+    scope: OpsAlertRuleScope;
+    created_at: Timestamp;
+    updated_at: Timestamp;
+};
+
+export type CreateOpsAlertRuleRequest = {
+    name: string;
+    metric_type: OpsAlertMetricType;
+    operator: OpsAlertOperator;
+    threshold: number;
+    severity?: OpsAlertSeverity;
+    enabled?: boolean;
+    window_seconds?: number;
+    cooldown_seconds?: number;
+    min_request_count?: number;
+    scope?: OpsAlertRuleScope;
+};
+
+export type UpdateOpsAlertRuleRequest = {
+    name?: string;
+    metric_type?: OpsAlertMetricType;
+    operator?: OpsAlertOperator;
+    threshold?: number;
+    severity?: OpsAlertSeverity;
+    enabled?: boolean;
+    window_seconds?: number;
+    cooldown_seconds?: number;
+    min_request_count?: number;
+    scope?: OpsAlertRuleScope;
+};
+
+export type OpsAlertRuleResponse = {
+    data: OpsAlertRule;
+    request_id: RequestId;
+};
+
+export type OpsAlertRuleListResponse = {
+    data: Array<OpsAlertRule>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type OpsAlertSilenceMatcher = {
+    rule_id?: string;
+    severity?: OpsAlertSeverity;
+    source_endpoint?: string;
+    model?: string;
+    provider_id?: Id;
+};
+
+export type OpsAlertSilence = {
+    id: Id;
+    comment?: string;
+    matcher: OpsAlertSilenceMatcher;
+    starts_at: Timestamp;
+    ends_at: Timestamp;
+    created_by?: Id;
+    created_at: Timestamp;
+    updated_at: Timestamp;
+};
+
+export type CreateOpsAlertSilenceRequest = {
+    comment?: string;
+    matcher?: OpsAlertSilenceMatcher;
+    starts_at?: Timestamp;
+    ends_at: Timestamp;
+};
+
+export type OpsAlertSilenceResponse = {
+    data: OpsAlertSilence;
+    request_id: RequestId;
+};
+
+export type OpsAlertSilenceListResponse = {
+    data: Array<OpsAlertSilence>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
 export type SchedulerDecision = {
     id: Id;
     request_id: RequestId;
@@ -4278,6 +4388,83 @@ export type ErrorPassthroughRuleResponse = {
 
 export type ErrorPassthroughRuleListResponse = {
     data: Array<ErrorPassthroughRule>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type ScheduledTestPlan = {
+    id: number;
+    name: string;
+    enabled: boolean;
+    scope_type: 'all' | 'account' | 'group';
+    scope_id?: number | null;
+    interval_seconds: number;
+    cron_expression: string;
+    max_results: number;
+    auto_recover: boolean;
+    last_run_at?: string | null;
+    last_status: string;
+    last_summary: string;
+    created_at: string;
+    updated_at: string;
+};
+
+export type CreateScheduledTestPlanRequest = {
+    name: string;
+    enabled?: boolean;
+    scope_type: 'all' | 'account' | 'group';
+    scope_id?: number | null;
+    interval_seconds?: number;
+    cron_expression?: string;
+    max_results?: number;
+    auto_recover?: boolean;
+};
+
+export type UpdateScheduledTestPlanRequest = {
+    name?: string;
+    enabled?: boolean;
+    scope_type?: 'all' | 'account' | 'group';
+    scope_id?: number | null;
+    interval_seconds?: number;
+    cron_expression?: string;
+    max_results?: number;
+    auto_recover?: boolean;
+};
+
+export type ScheduledTestPlanRun = {
+    id: number;
+    plan_id: number;
+    trigger: 'schedule' | 'manual';
+    status: 'ok' | 'partial' | 'failed';
+    selected: number;
+    probed: number;
+    skipped: number;
+    failed: number;
+    unhealthy: number;
+    recovered: number;
+    summary: string;
+    started_at: string;
+    finished_at: string;
+};
+
+export type ScheduledTestPlanResponse = {
+    data: ScheduledTestPlan;
+    request_id: RequestId;
+};
+
+export type ScheduledTestPlanListResponse = {
+    data: Array<ScheduledTestPlan>;
+    pagination: Pagination;
+    request_id: RequestId;
+};
+
+export type ScheduledTestPlanRunResponse = {
+    data: ScheduledTestPlanRun;
+    request_id: RequestId;
+};
+
+export type ScheduledTestPlanRunListResponse = {
+    data: Array<ScheduledTestPlanRun>;
     pagination: Pagination;
     request_id: RequestId;
 };
@@ -11062,6 +11249,273 @@ export type AcknowledgeAdminOpsAlertResponses = {
 
 export type AcknowledgeAdminOpsAlertResponse = AcknowledgeAdminOpsAlertResponses[keyof AcknowledgeAdminOpsAlertResponses];
 
+export type ListAdminOpsAlertRulesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        page_size?: number;
+    };
+    url: '/api/v1/admin/ops/alert-rules';
+};
+
+export type ListAdminOpsAlertRulesErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminOpsAlertRulesError = ListAdminOpsAlertRulesErrors[keyof ListAdminOpsAlertRulesErrors];
+
+export type ListAdminOpsAlertRulesResponses = {
+    /**
+     * Alert rule list.
+     */
+    200: OpsAlertRuleListResponse;
+};
+
+export type ListAdminOpsAlertRulesResponse = ListAdminOpsAlertRulesResponses[keyof ListAdminOpsAlertRulesResponses];
+
+export type CreateAdminOpsAlertRuleData = {
+    body: CreateOpsAlertRuleRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/ops/alert-rules';
+};
+
+export type CreateAdminOpsAlertRuleErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type CreateAdminOpsAlertRuleError = CreateAdminOpsAlertRuleErrors[keyof CreateAdminOpsAlertRuleErrors];
+
+export type CreateAdminOpsAlertRuleResponses = {
+    /**
+     * Alert rule created.
+     */
+    201: OpsAlertRuleResponse;
+};
+
+export type CreateAdminOpsAlertRuleResponse = CreateAdminOpsAlertRuleResponses[keyof CreateAdminOpsAlertRuleResponses];
+
+export type DeleteAdminOpsAlertRuleData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/ops/alert-rules/{id}';
+};
+
+export type DeleteAdminOpsAlertRuleErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DeleteAdminOpsAlertRuleError = DeleteAdminOpsAlertRuleErrors[keyof DeleteAdminOpsAlertRuleErrors];
+
+export type DeleteAdminOpsAlertRuleResponses = {
+    /**
+     * Alert rule deleted.
+     */
+    204: void;
+};
+
+export type DeleteAdminOpsAlertRuleResponse = DeleteAdminOpsAlertRuleResponses[keyof DeleteAdminOpsAlertRuleResponses];
+
+export type UpdateAdminOpsAlertRuleData = {
+    body: UpdateOpsAlertRuleRequest;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/ops/alert-rules/{id}';
+};
+
+export type UpdateAdminOpsAlertRuleErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UpdateAdminOpsAlertRuleError = UpdateAdminOpsAlertRuleErrors[keyof UpdateAdminOpsAlertRuleErrors];
+
+export type UpdateAdminOpsAlertRuleResponses = {
+    /**
+     * Alert rule updated.
+     */
+    200: OpsAlertRuleResponse;
+};
+
+export type UpdateAdminOpsAlertRuleResponse = UpdateAdminOpsAlertRuleResponses[keyof UpdateAdminOpsAlertRuleResponses];
+
+export type ListAdminOpsAlertSilencesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        page_size?: number;
+    };
+    url: '/api/v1/admin/ops/alert-silences';
+};
+
+export type ListAdminOpsAlertSilencesErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminOpsAlertSilencesError = ListAdminOpsAlertSilencesErrors[keyof ListAdminOpsAlertSilencesErrors];
+
+export type ListAdminOpsAlertSilencesResponses = {
+    /**
+     * Alert silence list.
+     */
+    200: OpsAlertSilenceListResponse;
+};
+
+export type ListAdminOpsAlertSilencesResponse = ListAdminOpsAlertSilencesResponses[keyof ListAdminOpsAlertSilencesResponses];
+
+export type CreateAdminOpsAlertSilenceData = {
+    body: CreateOpsAlertSilenceRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/ops/alert-silences';
+};
+
+export type CreateAdminOpsAlertSilenceErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type CreateAdminOpsAlertSilenceError = CreateAdminOpsAlertSilenceErrors[keyof CreateAdminOpsAlertSilenceErrors];
+
+export type CreateAdminOpsAlertSilenceResponses = {
+    /**
+     * Alert silence created.
+     */
+    201: OpsAlertSilenceResponse;
+};
+
+export type CreateAdminOpsAlertSilenceResponse = CreateAdminOpsAlertSilenceResponses[keyof CreateAdminOpsAlertSilenceResponses];
+
+export type DeleteAdminOpsAlertSilenceData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/ops/alert-silences/{id}';
+};
+
+export type DeleteAdminOpsAlertSilenceErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DeleteAdminOpsAlertSilenceError = DeleteAdminOpsAlertSilenceErrors[keyof DeleteAdminOpsAlertSilenceErrors];
+
+export type DeleteAdminOpsAlertSilenceResponses = {
+    /**
+     * Alert silence deleted.
+     */
+    204: void;
+};
+
+export type DeleteAdminOpsAlertSilenceResponse = DeleteAdminOpsAlertSilenceResponses[keyof DeleteAdminOpsAlertSilenceResponses];
+
 export type GetAdminSettingsData = {
     body?: never;
     path?: never;
@@ -11131,6 +11585,43 @@ export type UpdateAdminSettingsResponses = {
 };
 
 export type UpdateAdminSettingsResponse = UpdateAdminSettingsResponses[keyof UpdateAdminSettingsResponses];
+
+export type SendAdminTestEmailData = {
+    body?: AdminSendTestEmailRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/settings/send-test-email';
+};
+
+export type SendAdminTestEmailErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type SendAdminTestEmailError = SendAdminTestEmailErrors[keyof SendAdminTestEmailErrors];
+
+export type SendAdminTestEmailResponses = {
+    /**
+     * Test email delivery result.
+     */
+    200: AdminTestResultResponse;
+};
+
+export type SendAdminTestEmailResponse = SendAdminTestEmailResponses[keyof SendAdminTestEmailResponses];
 
 export type GetAdminCopilotConfigData = {
     body?: never;
@@ -16430,6 +16921,238 @@ export type UpdateAdminErrorPassthroughRuleResponses = {
 };
 
 export type UpdateAdminErrorPassthroughRuleResponse = UpdateAdminErrorPassthroughRuleResponses[keyof UpdateAdminErrorPassthroughRuleResponses];
+
+export type ListAdminScheduledTestPlansData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/scheduled-test-plans';
+};
+
+export type ListAdminScheduledTestPlansErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminScheduledTestPlansError = ListAdminScheduledTestPlansErrors[keyof ListAdminScheduledTestPlansErrors];
+
+export type ListAdminScheduledTestPlansResponses = {
+    /**
+     * Scheduled test plan list.
+     */
+    200: ScheduledTestPlanListResponse;
+};
+
+export type ListAdminScheduledTestPlansResponse = ListAdminScheduledTestPlansResponses[keyof ListAdminScheduledTestPlansResponses];
+
+export type CreateAdminScheduledTestPlanData = {
+    body: CreateScheduledTestPlanRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/scheduled-test-plans';
+};
+
+export type CreateAdminScheduledTestPlanErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type CreateAdminScheduledTestPlanError = CreateAdminScheduledTestPlanErrors[keyof CreateAdminScheduledTestPlanErrors];
+
+export type CreateAdminScheduledTestPlanResponses = {
+    /**
+     * Scheduled test plan created.
+     */
+    201: ScheduledTestPlanResponse;
+};
+
+export type CreateAdminScheduledTestPlanResponse = CreateAdminScheduledTestPlanResponses[keyof CreateAdminScheduledTestPlanResponses];
+
+export type DeleteAdminScheduledTestPlanData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/scheduled-test-plans/{id}';
+};
+
+export type DeleteAdminScheduledTestPlanErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DeleteAdminScheduledTestPlanError = DeleteAdminScheduledTestPlanErrors[keyof DeleteAdminScheduledTestPlanErrors];
+
+export type DeleteAdminScheduledTestPlanResponses = {
+    /**
+     * Scheduled test plan deleted.
+     */
+    200: DeleteResponse;
+};
+
+export type DeleteAdminScheduledTestPlanResponse = DeleteAdminScheduledTestPlanResponses[keyof DeleteAdminScheduledTestPlanResponses];
+
+export type UpdateAdminScheduledTestPlanData = {
+    body: UpdateScheduledTestPlanRequest;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/scheduled-test-plans/{id}';
+};
+
+export type UpdateAdminScheduledTestPlanErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UpdateAdminScheduledTestPlanError = UpdateAdminScheduledTestPlanErrors[keyof UpdateAdminScheduledTestPlanErrors];
+
+export type UpdateAdminScheduledTestPlanResponses = {
+    /**
+     * Scheduled test plan updated.
+     */
+    200: ScheduledTestPlanResponse;
+};
+
+export type UpdateAdminScheduledTestPlanResponse = UpdateAdminScheduledTestPlanResponses[keyof UpdateAdminScheduledTestPlanResponses];
+
+export type ListAdminScheduledTestPlanRunsData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: {
+        limit?: number;
+    };
+    url: '/api/v1/admin/scheduled-test-plans/{id}/runs';
+};
+
+export type ListAdminScheduledTestPlanRunsErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminScheduledTestPlanRunsError = ListAdminScheduledTestPlanRunsErrors[keyof ListAdminScheduledTestPlanRunsErrors];
+
+export type ListAdminScheduledTestPlanRunsResponses = {
+    /**
+     * Scheduled test plan run history.
+     */
+    200: ScheduledTestPlanRunListResponse;
+};
+
+export type ListAdminScheduledTestPlanRunsResponse = ListAdminScheduledTestPlanRunsResponses[keyof ListAdminScheduledTestPlanRunsResponses];
+
+export type RunAdminScheduledTestPlanData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/scheduled-test-plans/{id}/run';
+};
+
+export type RunAdminScheduledTestPlanErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type RunAdminScheduledTestPlanError = RunAdminScheduledTestPlanErrors[keyof RunAdminScheduledTestPlanErrors];
+
+export type RunAdminScheduledTestPlanResponses = {
+    /**
+     * Scheduled test plan run completed.
+     */
+    200: ScheduledTestPlanRunResponse;
+};
+
+export type RunAdminScheduledTestPlanResponse = RunAdminScheduledTestPlanResponses[keyof RunAdminScheduledTestPlanResponses];
 
 export type ListAdminUserAttributeDefinitionsData = {
     body?: never;

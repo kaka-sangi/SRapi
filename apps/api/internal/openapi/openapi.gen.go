@@ -238,19 +238,19 @@ func (e AffiliateRelationshipStatus) Valid() bool {
 
 // Defines values for AnnouncementAudience.
 const (
-	Admins AnnouncementAudience = "admins"
-	All    AnnouncementAudience = "all"
-	Users  AnnouncementAudience = "users"
+	AnnouncementAudienceAdmins AnnouncementAudience = "admins"
+	AnnouncementAudienceAll    AnnouncementAudience = "all"
+	AnnouncementAudienceUsers  AnnouncementAudience = "users"
 )
 
 // Valid indicates whether the value is a known member of the AnnouncementAudience enum.
 func (e AnnouncementAudience) Valid() bool {
 	switch e {
-	case Admins:
+	case AnnouncementAudienceAdmins:
 		return true
-	case All:
+	case AnnouncementAudienceAll:
 		return true
-	case Users:
+	case AnnouncementAudienceUsers:
 		return true
 	default:
 		return false
@@ -734,6 +734,27 @@ func (e CreatePayloadRuleRequestAction) Valid() bool {
 	case CreatePayloadRuleRequestActionFilter:
 		return true
 	case CreatePayloadRuleRequestActionOverride:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateScheduledTestPlanRequestScopeType.
+const (
+	CreateScheduledTestPlanRequestScopeTypeAccount CreateScheduledTestPlanRequestScopeType = "account"
+	CreateScheduledTestPlanRequestScopeTypeAll     CreateScheduledTestPlanRequestScopeType = "all"
+	CreateScheduledTestPlanRequestScopeTypeGroup   CreateScheduledTestPlanRequestScopeType = "group"
+)
+
+// Valid indicates whether the value is a known member of the CreateScheduledTestPlanRequestScopeType enum.
+func (e CreateScheduledTestPlanRequestScopeType) Valid() bool {
+	switch e {
+	case CreateScheduledTestPlanRequestScopeTypeAccount:
+		return true
+	case CreateScheduledTestPlanRequestScopeTypeAll:
+		return true
+	case CreateScheduledTestPlanRequestScopeTypeGroup:
 		return true
 	default:
 		return false
@@ -1409,6 +1430,54 @@ const (
 func (e OpenAIModelListObject) Valid() bool {
 	switch e {
 	case OpenAIModelListObjectList:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for OpsAlertMetricType.
+const (
+	ErrorRate    OpsAlertMetricType = "error_rate"
+	LatencyP95   OpsAlertMetricType = "latency_p95"
+	RequestCount OpsAlertMetricType = "request_count"
+	SuccessRate  OpsAlertMetricType = "success_rate"
+)
+
+// Valid indicates whether the value is a known member of the OpsAlertMetricType enum.
+func (e OpsAlertMetricType) Valid() bool {
+	switch e {
+	case ErrorRate:
+		return true
+	case LatencyP95:
+		return true
+	case RequestCount:
+		return true
+	case SuccessRate:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for OpsAlertOperator.
+const (
+	Gt  OpsAlertOperator = "gt"
+	Gte OpsAlertOperator = "gte"
+	Lt  OpsAlertOperator = "lt"
+	Lte OpsAlertOperator = "lte"
+)
+
+// Valid indicates whether the value is a known member of the OpsAlertOperator enum.
+func (e OpsAlertOperator) Valid() bool {
+	switch e {
+	case Gt:
+		return true
+	case Gte:
+		return true
+	case Lt:
+		return true
+	case Lte:
 		return true
 	default:
 		return false
@@ -2189,6 +2258,66 @@ func (e RuntimeClass) Valid() bool {
 	}
 }
 
+// Defines values for ScheduledTestPlanScopeType.
+const (
+	ScheduledTestPlanScopeTypeAccount ScheduledTestPlanScopeType = "account"
+	ScheduledTestPlanScopeTypeAll     ScheduledTestPlanScopeType = "all"
+	ScheduledTestPlanScopeTypeGroup   ScheduledTestPlanScopeType = "group"
+)
+
+// Valid indicates whether the value is a known member of the ScheduledTestPlanScopeType enum.
+func (e ScheduledTestPlanScopeType) Valid() bool {
+	switch e {
+	case ScheduledTestPlanScopeTypeAccount:
+		return true
+	case ScheduledTestPlanScopeTypeAll:
+		return true
+	case ScheduledTestPlanScopeTypeGroup:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ScheduledTestPlanRunStatus.
+const (
+	Failed  ScheduledTestPlanRunStatus = "failed"
+	Ok      ScheduledTestPlanRunStatus = "ok"
+	Partial ScheduledTestPlanRunStatus = "partial"
+)
+
+// Valid indicates whether the value is a known member of the ScheduledTestPlanRunStatus enum.
+func (e ScheduledTestPlanRunStatus) Valid() bool {
+	switch e {
+	case Failed:
+		return true
+	case Ok:
+		return true
+	case Partial:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ScheduledTestPlanRunTrigger.
+const (
+	Manual   ScheduledTestPlanRunTrigger = "manual"
+	Schedule ScheduledTestPlanRunTrigger = "schedule"
+)
+
+// Valid indicates whether the value is a known member of the ScheduledTestPlanRunTrigger enum.
+func (e ScheduledTestPlanRunTrigger) Valid() bool {
+	switch e {
+	case Manual:
+		return true
+	case Schedule:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for SchedulerDecisionStrategy.
 const (
 	SchedulerDecisionStrategyBalanced           SchedulerDecisionStrategy = "balanced"
@@ -2375,6 +2504,27 @@ func (e UpdatePayloadRuleRequestAction) Valid() bool {
 	case Filter:
 		return true
 	case Override:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UpdateScheduledTestPlanRequestScopeType.
+const (
+	UpdateScheduledTestPlanRequestScopeTypeAccount UpdateScheduledTestPlanRequestScopeType = "account"
+	UpdateScheduledTestPlanRequestScopeTypeAll     UpdateScheduledTestPlanRequestScopeType = "all"
+	UpdateScheduledTestPlanRequestScopeTypeGroup   UpdateScheduledTestPlanRequestScopeType = "group"
+)
+
+// Valid indicates whether the value is a known member of the UpdateScheduledTestPlanRequestScopeType enum.
+func (e UpdateScheduledTestPlanRequestScopeType) Valid() bool {
+	switch e {
+	case UpdateScheduledTestPlanRequestScopeTypeAccount:
+		return true
+	case UpdateScheduledTestPlanRequestScopeTypeAll:
+		return true
+	case UpdateScheduledTestPlanRequestScopeTypeGroup:
 		return true
 	default:
 		return false
@@ -3149,6 +3299,12 @@ type AdminOverview struct {
 type AdminOverviewResponse struct {
 	Data      AdminOverview `json:"data"`
 	RequestId RequestId     `json:"request_id"`
+}
+
+// AdminSendTestEmailRequest defines model for AdminSendTestEmailRequest.
+type AdminSendTestEmailRequest struct {
+	// Recipient Mailbox to deliver the probe to. Defaults to the requesting admin's own account email when omitted.
+	Recipient *openapi_types.Email `json:"recipient,omitempty"`
 }
 
 // AdminSettings defines model for AdminSettings.
@@ -4290,6 +4446,28 @@ type CreateModelRequest struct {
 	Status          *ResourceStatus         `json:"status,omitempty"`
 }
 
+// CreateOpsAlertRuleRequest defines model for CreateOpsAlertRuleRequest.
+type CreateOpsAlertRuleRequest struct {
+	CooldownSeconds *int               `json:"cooldown_seconds,omitempty"`
+	Enabled         *bool              `json:"enabled,omitempty"`
+	MetricType      OpsAlertMetricType `json:"metric_type"`
+	MinRequestCount *int               `json:"min_request_count,omitempty"`
+	Name            string             `json:"name"`
+	Operator        OpsAlertOperator   `json:"operator"`
+	Scope           *OpsAlertRuleScope `json:"scope,omitempty"`
+	Severity        *OpsAlertSeverity  `json:"severity,omitempty"`
+	Threshold       float32            `json:"threshold"`
+	WindowSeconds   *int               `json:"window_seconds,omitempty"`
+}
+
+// CreateOpsAlertSilenceRequest defines model for CreateOpsAlertSilenceRequest.
+type CreateOpsAlertSilenceRequest struct {
+	Comment  *string                 `json:"comment,omitempty"`
+	EndsAt   Timestamp               `json:"ends_at"`
+	Matcher  *OpsAlertSilenceMatcher `json:"matcher,omitempty"`
+	StartsAt *Timestamp              `json:"starts_at,omitempty"`
+}
+
 // CreateOpsSLORequest defines model for CreateOpsSLORequest.
 type CreateOpsSLORequest struct {
 	AlertPolicy *OpsAlertPolicy `json:"alert_policy,omitempty"`
@@ -4423,6 +4601,21 @@ type CreateRoleRequest struct {
 	Name        UserRole `json:"name"`
 	Permissions []string `json:"permissions"`
 }
+
+// CreateScheduledTestPlanRequest defines model for CreateScheduledTestPlanRequest.
+type CreateScheduledTestPlanRequest struct {
+	AutoRecover     *bool                                   `json:"auto_recover,omitempty"`
+	CronExpression  *string                                 `json:"cron_expression,omitempty"`
+	Enabled         *bool                                   `json:"enabled,omitempty"`
+	IntervalSeconds *int64                                  `json:"interval_seconds,omitempty"`
+	MaxResults      *int64                                  `json:"max_results,omitempty"`
+	Name            string                                  `json:"name"`
+	ScopeId         *int64                                  `json:"scope_id,omitempty"`
+	ScopeType       CreateScheduledTestPlanRequestScopeType `json:"scope_type"`
+}
+
+// CreateScheduledTestPlanRequestScopeType defines model for CreateScheduledTestPlanRequest.ScopeType.
+type CreateScheduledTestPlanRequestScopeType string
 
 // CreateSubscriptionPlanRequest defines model for CreateSubscriptionPlanRequest.
 type CreateSubscriptionPlanRequest struct {
@@ -5651,6 +5844,12 @@ type OpsAlertListResponse struct {
 	RequestId  RequestId       `json:"request_id"`
 }
 
+// OpsAlertMetricType defines model for OpsAlertMetricType.
+type OpsAlertMetricType string
+
+// OpsAlertOperator defines model for OpsAlertOperator.
+type OpsAlertOperator string
+
 // OpsAlertPolicy defines model for OpsAlertPolicy.
 type OpsAlertPolicy struct {
 	Name       string                 `json:"name"`
@@ -5663,8 +5862,81 @@ type OpsAlertResponse struct {
 	RequestId RequestId     `json:"request_id"`
 }
 
+// OpsAlertRule defines model for OpsAlertRule.
+type OpsAlertRule struct {
+	CooldownSeconds int                `json:"cooldown_seconds"`
+	CreatedAt       Timestamp          `json:"created_at"`
+	Enabled         bool               `json:"enabled"`
+	Id              Id                 `json:"id"`
+	MetricType      OpsAlertMetricType `json:"metric_type"`
+	MinRequestCount int                `json:"min_request_count"`
+	Name            string             `json:"name"`
+	Operator        OpsAlertOperator   `json:"operator"`
+	Scope           OpsAlertRuleScope  `json:"scope"`
+	Severity        OpsAlertSeverity   `json:"severity"`
+
+	// Threshold Threshold compared against the observed metric value (ratio for rates, milliseconds for latency).
+	Threshold     float32   `json:"threshold"`
+	UpdatedAt     Timestamp `json:"updated_at"`
+	WindowSeconds int       `json:"window_seconds"`
+}
+
+// OpsAlertRuleListResponse defines model for OpsAlertRuleListResponse.
+type OpsAlertRuleListResponse struct {
+	Data       []OpsAlertRule `json:"data"`
+	Pagination Pagination     `json:"pagination"`
+	RequestId  RequestId      `json:"request_id"`
+}
+
+// OpsAlertRuleResponse defines model for OpsAlertRuleResponse.
+type OpsAlertRuleResponse struct {
+	Data      OpsAlertRule `json:"data"`
+	RequestId RequestId    `json:"request_id"`
+}
+
+// OpsAlertRuleScope defines model for OpsAlertRuleScope.
+type OpsAlertRuleScope struct {
+	Model          string `json:"model"`
+	ProviderId     *Id    `json:"provider_id,omitempty"`
+	SourceEndpoint string `json:"source_endpoint"`
+}
+
 // OpsAlertSeverity defines model for OpsAlertSeverity.
 type OpsAlertSeverity string
+
+// OpsAlertSilence defines model for OpsAlertSilence.
+type OpsAlertSilence struct {
+	Comment   *string                `json:"comment,omitempty"`
+	CreatedAt Timestamp              `json:"created_at"`
+	CreatedBy *Id                    `json:"created_by,omitempty"`
+	EndsAt    Timestamp              `json:"ends_at"`
+	Id        Id                     `json:"id"`
+	Matcher   OpsAlertSilenceMatcher `json:"matcher"`
+	StartsAt  Timestamp              `json:"starts_at"`
+	UpdatedAt Timestamp              `json:"updated_at"`
+}
+
+// OpsAlertSilenceListResponse defines model for OpsAlertSilenceListResponse.
+type OpsAlertSilenceListResponse struct {
+	Data       []OpsAlertSilence `json:"data"`
+	Pagination Pagination        `json:"pagination"`
+	RequestId  RequestId         `json:"request_id"`
+}
+
+// OpsAlertSilenceMatcher defines model for OpsAlertSilenceMatcher.
+type OpsAlertSilenceMatcher struct {
+	Model          *string           `json:"model,omitempty"`
+	ProviderId     *Id               `json:"provider_id,omitempty"`
+	RuleId         *string           `json:"rule_id,omitempty"`
+	Severity       *OpsAlertSeverity `json:"severity,omitempty"`
+	SourceEndpoint *string           `json:"source_endpoint,omitempty"`
+}
+
+// OpsAlertSilenceResponse defines model for OpsAlertSilenceResponse.
+type OpsAlertSilenceResponse struct {
+	Data      OpsAlertSilence `json:"data"`
+	RequestId RequestId       `json:"request_id"`
+}
 
 // OpsAlertStatus defines model for OpsAlertStatus.
 type OpsAlertStatus string
@@ -6818,6 +7090,76 @@ type RoleResponse struct {
 // RuntimeClass defines model for RuntimeClass.
 type RuntimeClass string
 
+// ScheduledTestPlan defines model for ScheduledTestPlan.
+type ScheduledTestPlan struct {
+	AutoRecover     bool                       `json:"auto_recover"`
+	CreatedAt       time.Time                  `json:"created_at"`
+	CronExpression  string                     `json:"cron_expression"`
+	Enabled         bool                       `json:"enabled"`
+	Id              int64                      `json:"id"`
+	IntervalSeconds int64                      `json:"interval_seconds"`
+	LastRunAt       *time.Time                 `json:"last_run_at,omitempty"`
+	LastStatus      string                     `json:"last_status"`
+	LastSummary     string                     `json:"last_summary"`
+	MaxResults      int64                      `json:"max_results"`
+	Name            string                     `json:"name"`
+	ScopeId         *int64                     `json:"scope_id,omitempty"`
+	ScopeType       ScheduledTestPlanScopeType `json:"scope_type"`
+	UpdatedAt       time.Time                  `json:"updated_at"`
+}
+
+// ScheduledTestPlanScopeType defines model for ScheduledTestPlan.ScopeType.
+type ScheduledTestPlanScopeType string
+
+// ScheduledTestPlanListResponse defines model for ScheduledTestPlanListResponse.
+type ScheduledTestPlanListResponse struct {
+	Data       []ScheduledTestPlan `json:"data"`
+	Pagination Pagination          `json:"pagination"`
+	RequestId  RequestId           `json:"request_id"`
+}
+
+// ScheduledTestPlanResponse defines model for ScheduledTestPlanResponse.
+type ScheduledTestPlanResponse struct {
+	Data      ScheduledTestPlan `json:"data"`
+	RequestId RequestId         `json:"request_id"`
+}
+
+// ScheduledTestPlanRun defines model for ScheduledTestPlanRun.
+type ScheduledTestPlanRun struct {
+	Failed     int64                       `json:"failed"`
+	FinishedAt time.Time                   `json:"finished_at"`
+	Id         int64                       `json:"id"`
+	PlanId     int64                       `json:"plan_id"`
+	Probed     int64                       `json:"probed"`
+	Recovered  int64                       `json:"recovered"`
+	Selected   int64                       `json:"selected"`
+	Skipped    int64                       `json:"skipped"`
+	StartedAt  time.Time                   `json:"started_at"`
+	Status     ScheduledTestPlanRunStatus  `json:"status"`
+	Summary    string                      `json:"summary"`
+	Trigger    ScheduledTestPlanRunTrigger `json:"trigger"`
+	Unhealthy  int64                       `json:"unhealthy"`
+}
+
+// ScheduledTestPlanRunStatus defines model for ScheduledTestPlanRun.Status.
+type ScheduledTestPlanRunStatus string
+
+// ScheduledTestPlanRunTrigger defines model for ScheduledTestPlanRun.Trigger.
+type ScheduledTestPlanRunTrigger string
+
+// ScheduledTestPlanRunListResponse defines model for ScheduledTestPlanRunListResponse.
+type ScheduledTestPlanRunListResponse struct {
+	Data       []ScheduledTestPlanRun `json:"data"`
+	Pagination Pagination             `json:"pagination"`
+	RequestId  RequestId              `json:"request_id"`
+}
+
+// ScheduledTestPlanRunResponse defines model for ScheduledTestPlanRunResponse.
+type ScheduledTestPlanRunResponse struct {
+	Data      ScheduledTestPlanRun `json:"data"`
+	RequestId RequestId            `json:"request_id"`
+}
+
 // SchedulerDecision defines model for SchedulerDecision.
 type SchedulerDecision struct {
 	ApiKeyId               Id         `json:"api_key_id"`
@@ -7411,6 +7753,20 @@ type UpdateNotificationPreferencesRequest struct {
 	Preferences []NotificationPreferenceUpdate `json:"preferences"`
 }
 
+// UpdateOpsAlertRuleRequest defines model for UpdateOpsAlertRuleRequest.
+type UpdateOpsAlertRuleRequest struct {
+	CooldownSeconds *int                `json:"cooldown_seconds,omitempty"`
+	Enabled         *bool               `json:"enabled,omitempty"`
+	MetricType      *OpsAlertMetricType `json:"metric_type,omitempty"`
+	MinRequestCount *int                `json:"min_request_count,omitempty"`
+	Name            *string             `json:"name,omitempty"`
+	Operator        *OpsAlertOperator   `json:"operator,omitempty"`
+	Scope           *OpsAlertRuleScope  `json:"scope,omitempty"`
+	Severity        *OpsAlertSeverity   `json:"severity,omitempty"`
+	Threshold       *float32            `json:"threshold,omitempty"`
+	WindowSeconds   *int                `json:"window_seconds,omitempty"`
+}
+
 // UpdateOpsSLORequest defines model for UpdateOpsSLORequest.
 type UpdateOpsSLORequest struct {
 	AlertPolicy *OpsAlertPolicy `json:"alert_policy,omitempty"`
@@ -7491,6 +7847,21 @@ type UpdateRoleRequest struct {
 	Description *string  `json:"description,omitempty"`
 	Permissions []string `json:"permissions"`
 }
+
+// UpdateScheduledTestPlanRequest defines model for UpdateScheduledTestPlanRequest.
+type UpdateScheduledTestPlanRequest struct {
+	AutoRecover     *bool                                    `json:"auto_recover,omitempty"`
+	CronExpression  *string                                  `json:"cron_expression,omitempty"`
+	Enabled         *bool                                    `json:"enabled,omitempty"`
+	IntervalSeconds *int64                                   `json:"interval_seconds,omitempty"`
+	MaxResults      *int64                                   `json:"max_results,omitempty"`
+	Name            *string                                  `json:"name,omitempty"`
+	ScopeId         *int64                                   `json:"scope_id,omitempty"`
+	ScopeType       *UpdateScheduledTestPlanRequestScopeType `json:"scope_type,omitempty"`
+}
+
+// UpdateScheduledTestPlanRequestScopeType defines model for UpdateScheduledTestPlanRequest.ScopeType.
+type UpdateScheduledTestPlanRequestScopeType string
 
 // UpdateSubscriptionPlanRequest defines model for UpdateSubscriptionPlanRequest.
 type UpdateSubscriptionPlanRequest struct {
@@ -8108,6 +8479,18 @@ type ListAdminOpsAlertEventsParams struct {
 	Severity *OpsAlertSeverity `form:"severity,omitempty" json:"severity,omitempty"`
 }
 
+// ListAdminOpsAlertRulesParams defines parameters for ListAdminOpsAlertRules.
+type ListAdminOpsAlertRulesParams struct {
+	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
+
+// ListAdminOpsAlertSilencesParams defines parameters for ListAdminOpsAlertSilences.
+type ListAdminOpsAlertSilencesParams struct {
+	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
+
 // ListAdminOpsAlertsParams defines parameters for ListAdminOpsAlerts.
 type ListAdminOpsAlertsParams struct {
 	Page     *Page             `form:"page,omitempty" json:"page,omitempty"`
@@ -8272,6 +8655,11 @@ type ListAdminRiskControlLogsParams struct {
 	Page     *Page     `form:"page,omitempty" json:"page,omitempty"`
 	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
 	Level    *string   `form:"level,omitempty" json:"level,omitempty"`
+}
+
+// ListAdminScheduledTestPlanRunsParams defines parameters for ListAdminScheduledTestPlanRuns.
+type ListAdminScheduledTestPlanRunsParams struct {
+	Limit *int64 `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
 // ListAdminSchedulerDecisionsParams defines parameters for ListAdminSchedulerDecisions.
@@ -8706,6 +9094,15 @@ type PreviewAdminNotificationEmailTemplateJSONRequestBody = PreviewNotificationE
 // UpdateAdminNotificationEmailTemplateJSONRequestBody defines body for UpdateAdminNotificationEmailTemplate for application/json ContentType.
 type UpdateAdminNotificationEmailTemplateJSONRequestBody = UpdateNotificationEmailTemplateRequest
 
+// CreateAdminOpsAlertRuleJSONRequestBody defines body for CreateAdminOpsAlertRule for application/json ContentType.
+type CreateAdminOpsAlertRuleJSONRequestBody = CreateOpsAlertRuleRequest
+
+// UpdateAdminOpsAlertRuleJSONRequestBody defines body for UpdateAdminOpsAlertRule for application/json ContentType.
+type UpdateAdminOpsAlertRuleJSONRequestBody = UpdateOpsAlertRuleRequest
+
+// CreateAdminOpsAlertSilenceJSONRequestBody defines body for CreateAdminOpsAlertSilence for application/json ContentType.
+type CreateAdminOpsAlertSilenceJSONRequestBody = CreateOpsAlertSilenceRequest
+
 // UpdateAdminOpsSettingsJSONRequestBody defines body for UpdateAdminOpsSettings for application/json ContentType.
 type UpdateAdminOpsSettingsJSONRequestBody = OpsSettings
 
@@ -8775,6 +9172,12 @@ type CreateAdminRoleJSONRequestBody = CreateRoleRequest
 // UpdateAdminRoleJSONRequestBody defines body for UpdateAdminRole for application/json ContentType.
 type UpdateAdminRoleJSONRequestBody = UpdateRoleRequest
 
+// CreateAdminScheduledTestPlanJSONRequestBody defines body for CreateAdminScheduledTestPlan for application/json ContentType.
+type CreateAdminScheduledTestPlanJSONRequestBody = CreateScheduledTestPlanRequest
+
+// UpdateAdminScheduledTestPlanJSONRequestBody defines body for UpdateAdminScheduledTestPlan for application/json ContentType.
+type UpdateAdminScheduledTestPlanJSONRequestBody = UpdateScheduledTestPlanRequest
+
 // ReplaySchedulerStrategyJSONRequestBody defines body for ReplaySchedulerStrategy for application/json ContentType.
 type ReplaySchedulerStrategyJSONRequestBody = SchedulerReplayRequest
 
@@ -8783,6 +9186,9 @@ type SimulateSchedulerStrategyJSONRequestBody = SchedulerSimulationRequest
 
 // UpdateAdminSettingsJSONRequestBody defines body for UpdateAdminSettings for application/json ContentType.
 type UpdateAdminSettingsJSONRequestBody = AdminSettings
+
+// SendAdminTestEmailJSONRequestBody defines body for SendAdminTestEmail for application/json ContentType.
+type SendAdminTestEmailJSONRequestBody = AdminSendTestEmailRequest
 
 // CreateAdminSubscriptionPlanJSONRequestBody defines body for CreateAdminSubscriptionPlan for application/json ContentType.
 type CreateAdminSubscriptionPlanJSONRequestBody = CreateSubscriptionPlanRequest
@@ -15520,6 +15926,27 @@ type ServerInterface interface {
 	// List operational alert events.
 	// (GET /api/v1/admin/ops/alert-events)
 	ListAdminOpsAlertEvents(w http.ResponseWriter, r *http.Request, params ListAdminOpsAlertEventsParams)
+	// List configurable generic metric alert rules.
+	// (GET /api/v1/admin/ops/alert-rules)
+	ListAdminOpsAlertRules(w http.ResponseWriter, r *http.Request, params ListAdminOpsAlertRulesParams)
+	// Create a generic metric alert rule.
+	// (POST /api/v1/admin/ops/alert-rules)
+	CreateAdminOpsAlertRule(w http.ResponseWriter, r *http.Request)
+	// Delete a generic metric alert rule.
+	// (DELETE /api/v1/admin/ops/alert-rules/{id})
+	DeleteAdminOpsAlertRule(w http.ResponseWriter, r *http.Request, id Id)
+	// Update a generic metric alert rule.
+	// (PATCH /api/v1/admin/ops/alert-rules/{id})
+	UpdateAdminOpsAlertRule(w http.ResponseWriter, r *http.Request, id Id)
+	// List alert silences that suppress matching alert events.
+	// (GET /api/v1/admin/ops/alert-silences)
+	ListAdminOpsAlertSilences(w http.ResponseWriter, r *http.Request, params ListAdminOpsAlertSilencesParams)
+	// Create an alert silence window.
+	// (POST /api/v1/admin/ops/alert-silences)
+	CreateAdminOpsAlertSilence(w http.ResponseWriter, r *http.Request)
+	// Delete an alert silence.
+	// (DELETE /api/v1/admin/ops/alert-silences/{id})
+	DeleteAdminOpsAlertSilence(w http.ResponseWriter, r *http.Request, id Id)
 	// List operational alert events.
 	// (GET /api/v1/admin/ops/alerts)
 	ListAdminOpsAlerts(w http.ResponseWriter, r *http.Request, params ListAdminOpsAlertsParams)
@@ -15688,6 +16115,24 @@ type ServerInterface interface {
 	// Update a role definition.
 	// (PATCH /api/v1/admin/roles/{id})
 	UpdateAdminRole(w http.ResponseWriter, r *http.Request, id Id)
+	// List scheduled account health-test plans.
+	// (GET /api/v1/admin/scheduled-test-plans)
+	ListAdminScheduledTestPlans(w http.ResponseWriter, r *http.Request)
+	// Create a scheduled test plan.
+	// (POST /api/v1/admin/scheduled-test-plans)
+	CreateAdminScheduledTestPlan(w http.ResponseWriter, r *http.Request)
+	// Delete a scheduled test plan.
+	// (DELETE /api/v1/admin/scheduled-test-plans/{id})
+	DeleteAdminScheduledTestPlan(w http.ResponseWriter, r *http.Request, id Id)
+	// Update a scheduled test plan.
+	// (PATCH /api/v1/admin/scheduled-test-plans/{id})
+	UpdateAdminScheduledTestPlan(w http.ResponseWriter, r *http.Request, id Id)
+	// Run a scheduled test plan immediately.
+	// (POST /api/v1/admin/scheduled-test-plans/{id}/run)
+	RunAdminScheduledTestPlan(w http.ResponseWriter, r *http.Request, id Id)
+	// List run history for a scheduled test plan.
+	// (GET /api/v1/admin/scheduled-test-plans/{id}/runs)
+	ListAdminScheduledTestPlanRuns(w http.ResponseWriter, r *http.Request, id Id, params ListAdminScheduledTestPlanRunsParams)
 	// List scheduler decisions.
 	// (GET /api/v1/admin/scheduler/decisions)
 	ListAdminSchedulerDecisions(w http.ResponseWriter, r *http.Request, params ListAdminSchedulerDecisionsParams)
@@ -15709,6 +16154,9 @@ type ServerInterface interface {
 	// Update typed system settings.
 	// (PUT /api/v1/admin/settings)
 	UpdateAdminSettings(w http.ResponseWriter, r *http.Request)
+	// Send a test email to verify SMTP credentials.
+	// (POST /api/v1/admin/settings/send-test-email)
+	SendAdminTestEmail(w http.ResponseWriter, r *http.Request)
 	// List subscription plans.
 	// (GET /api/v1/admin/subscription-plans)
 	ListAdminSubscriptionPlans(w http.ResponseWriter, r *http.Request, params ListAdminSubscriptionPlansParams)
@@ -19325,6 +19773,256 @@ func (siw *ServerInterfaceWrapper) ListAdminOpsAlertEvents(w http.ResponseWriter
 	handler.ServeHTTP(w, r)
 }
 
+// ListAdminOpsAlertRules operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminOpsAlertRules(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminOpsAlertRulesParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminOpsAlertRules(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAdminOpsAlertRule operation middleware
+func (siw *ServerInterfaceWrapper) CreateAdminOpsAlertRule(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAdminOpsAlertRule(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteAdminOpsAlertRule operation middleware
+func (siw *ServerInterfaceWrapper) DeleteAdminOpsAlertRule(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteAdminOpsAlertRule(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateAdminOpsAlertRule operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAdminOpsAlertRule(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAdminOpsAlertRule(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAdminOpsAlertSilences operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminOpsAlertSilences(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminOpsAlertSilencesParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminOpsAlertSilences(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAdminOpsAlertSilence operation middleware
+func (siw *ServerInterfaceWrapper) CreateAdminOpsAlertSilence(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAdminOpsAlertSilence(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteAdminOpsAlertSilence operation middleware
+func (siw *ServerInterfaceWrapper) DeleteAdminOpsAlertSilence(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteAdminOpsAlertSilence(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListAdminOpsAlerts operation middleware
 func (siw *ServerInterfaceWrapper) ListAdminOpsAlerts(w http.ResponseWriter, r *http.Request) {
 
@@ -21527,6 +22225,198 @@ func (siw *ServerInterfaceWrapper) UpdateAdminRole(w http.ResponseWriter, r *htt
 	handler.ServeHTTP(w, r)
 }
 
+// ListAdminScheduledTestPlans operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminScheduledTestPlans(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminScheduledTestPlans(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAdminScheduledTestPlan operation middleware
+func (siw *ServerInterfaceWrapper) CreateAdminScheduledTestPlan(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAdminScheduledTestPlan(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteAdminScheduledTestPlan operation middleware
+func (siw *ServerInterfaceWrapper) DeleteAdminScheduledTestPlan(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteAdminScheduledTestPlan(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateAdminScheduledTestPlan operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAdminScheduledTestPlan(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAdminScheduledTestPlan(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RunAdminScheduledTestPlan operation middleware
+func (siw *ServerInterfaceWrapper) RunAdminScheduledTestPlan(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RunAdminScheduledTestPlan(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAdminScheduledTestPlanRuns operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminScheduledTestPlanRuns(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminScheduledTestPlanRunsParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: "int64"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminScheduledTestPlanRuns(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListAdminSchedulerDecisions operation middleware
 func (siw *ServerInterfaceWrapper) ListAdminSchedulerDecisions(w http.ResponseWriter, r *http.Request) {
 
@@ -21780,6 +22670,28 @@ func (siw *ServerInterfaceWrapper) UpdateAdminSettings(w http.ResponseWriter, r 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateAdminSettings(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SendAdminTestEmail operation middleware
+func (siw *ServerInterfaceWrapper) SendAdminTestEmail(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SendAdminTestEmail(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -26501,6 +27413,13 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/admin/notifications/email-templates/{event}", wrapper.UpdateAdminNotificationEmailTemplate)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/notifications/email-templates/{event}/restore", wrapper.RestoreAdminNotificationEmailTemplate)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/alert-events", wrapper.ListAdminOpsAlertEvents)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/alert-rules", wrapper.ListAdminOpsAlertRules)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/ops/alert-rules", wrapper.CreateAdminOpsAlertRule)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/ops/alert-rules/{id}", wrapper.DeleteAdminOpsAlertRule)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/ops/alert-rules/{id}", wrapper.UpdateAdminOpsAlertRule)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/alert-silences", wrapper.ListAdminOpsAlertSilences)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/ops/alert-silences", wrapper.CreateAdminOpsAlertSilence)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/ops/alert-silences/{id}", wrapper.DeleteAdminOpsAlertSilence)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/alerts", wrapper.ListAdminOpsAlerts)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/ops/alerts/{id}/ack", wrapper.AcknowledgeAdminOpsAlert)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/concurrency", wrapper.GetAdminOpsConcurrency)
@@ -26557,6 +27476,12 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/roles", wrapper.CreateAdminRole)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/roles/{id}", wrapper.DeleteAdminRole)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/roles/{id}", wrapper.UpdateAdminRole)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/scheduled-test-plans", wrapper.ListAdminScheduledTestPlans)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/scheduled-test-plans", wrapper.CreateAdminScheduledTestPlan)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/scheduled-test-plans/{id}", wrapper.DeleteAdminScheduledTestPlan)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/scheduled-test-plans/{id}", wrapper.UpdateAdminScheduledTestPlan)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/scheduled-test-plans/{id}/run", wrapper.RunAdminScheduledTestPlan)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/scheduled-test-plans/{id}/runs", wrapper.ListAdminScheduledTestPlanRuns)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/scheduler/decisions", wrapper.ListAdminSchedulerDecisions)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/scheduler/overview", wrapper.GetAdminSchedulerOverview)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/scheduler/replay", wrapper.ReplaySchedulerStrategy)
@@ -26564,6 +27489,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/scheduler/strategies", wrapper.ListSchedulerStrategies)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/settings", wrapper.GetAdminSettings)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/admin/settings", wrapper.UpdateAdminSettings)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/settings/send-test-email", wrapper.SendAdminTestEmail)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/subscription-plans", wrapper.ListAdminSubscriptionPlans)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/subscription-plans", wrapper.CreateAdminSubscriptionPlan)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/subscription-plans/{id}", wrapper.UpdateAdminSubscriptionPlan)

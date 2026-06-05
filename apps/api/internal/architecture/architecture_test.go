@@ -232,6 +232,7 @@ func TestAppBootstrapOnlyImportsBootstrapPackages(t *testing.T) {
 		"github.com/srapi/srapi/apps/api/internal/workers/subscription_expirer":     true,
 		"github.com/srapi/srapi/apps/api/internal/workers/quota_refresh":            true,
 		"github.com/srapi/srapi/apps/api/internal/workers/connectivity_test":        true,
+		"github.com/srapi/srapi/apps/api/internal/workers/scheduled_test":           true,
 	}
 
 	var violations []string

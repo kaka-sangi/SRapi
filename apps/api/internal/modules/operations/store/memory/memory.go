@@ -12,12 +12,16 @@ import (
 )
 
 type Store struct {
-	mu          sync.Mutex
-	nextSLOID   int
-	nextAlertID int
-	slos        map[int]contract.SLODefinition
-	alerts      map[int]contract.AlertEvent
-	usage       usagecontract.Store
+	mu            sync.Mutex
+	nextSLOID     int
+	nextAlertID   int
+	nextRuleID    int
+	nextSilenceID int
+	slos          map[int]contract.SLODefinition
+	alerts        map[int]contract.AlertEvent
+	rules         map[int]contract.AlertRule
+	silences      map[int]contract.AlertSilence
+	usage         usagecontract.Store
 }
 
 func New() *Store {
@@ -26,11 +30,15 @@ func New() *Store {
 
 func NewWithUsageStore(usage usagecontract.Store) *Store {
 	return &Store{
-		nextSLOID:   1,
-		nextAlertID: 1,
-		slos:        map[int]contract.SLODefinition{},
-		alerts:      map[int]contract.AlertEvent{},
-		usage:       usage,
+		nextSLOID:     1,
+		nextAlertID:   1,
+		nextRuleID:    1,
+		nextSilenceID: 1,
+		slos:          map[int]contract.SLODefinition{},
+		alerts:        map[int]contract.AlertEvent{},
+		rules:         map[int]contract.AlertRule{},
+		silences:      map[int]contract.AlertSilence{},
+		usage:         usage,
 	}
 }
 
@@ -148,6 +156,115 @@ func (s *Store) ListUsageLogs(ctx context.Context) ([]usagecontract.UsageLog, er
 		return nil, nil
 	}
 	return s.usage.List(ctx)
+}
+
+func (s *Store) CreateAlertRule(_ context.Context, input contract.AlertRule) (contract.AlertRule, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	item := cloneRule(input)
+	item.ID = s.nextRuleID
+	if item.CreatedAt.IsZero() {
+		item.CreatedAt = time.Now().UTC()
+	}
+	if item.UpdatedAt.IsZero() {
+		item.UpdatedAt = item.CreatedAt
+	}
+	s.rules[item.ID] = item
+	s.nextRuleID++
+	return cloneRule(item), nil
+}
+
+func (s *Store) UpdateAlertRule(_ context.Context, input contract.AlertRule) (contract.AlertRule, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.rules[input.ID]; !ok {
+		return contract.AlertRule{}, contract.ErrNotFound
+	}
+	item := cloneRule(input)
+	if item.UpdatedAt.IsZero() {
+		item.UpdatedAt = time.Now().UTC()
+	}
+	s.rules[item.ID] = item
+	return cloneRule(item), nil
+}
+
+func (s *Store) FindAlertRuleByID(_ context.Context, id int) (contract.AlertRule, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	item, ok := s.rules[id]
+	if !ok {
+		return contract.AlertRule{}, contract.ErrNotFound
+	}
+	return cloneRule(item), nil
+}
+
+func (s *Store) ListAlertRules(_ context.Context) ([]contract.AlertRule, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]contract.AlertRule, 0, len(s.rules))
+	for _, item := range s.rules {
+		out = append(out, cloneRule(item))
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out, nil
+}
+
+func (s *Store) DeleteAlertRule(_ context.Context, id int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.rules[id]; !ok {
+		return contract.ErrNotFound
+	}
+	delete(s.rules, id)
+	return nil
+}
+
+func (s *Store) CreateAlertSilence(_ context.Context, input contract.AlertSilence) (contract.AlertSilence, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	item := cloneSilence(input)
+	item.ID = s.nextSilenceID
+	if item.CreatedAt.IsZero() {
+		item.CreatedAt = time.Now().UTC()
+	}
+	if item.UpdatedAt.IsZero() {
+		item.UpdatedAt = item.CreatedAt
+	}
+	s.silences[item.ID] = item
+	s.nextSilenceID++
+	return cloneSilence(item), nil
+}
+
+func (s *Store) ListAlertSilences(_ context.Context) ([]contract.AlertSilence, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]contract.AlertSilence, 0, len(s.silences))
+	for _, item := range s.silences {
+		out = append(out, cloneSilence(item))
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out, nil
+}
+
+func (s *Store) DeleteAlertSilence(_ context.Context, id int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.silences[id]; !ok {
+		return contract.ErrNotFound
+	}
+	delete(s.silences, id)
+	return nil
+}
+
+func cloneRule(value contract.AlertRule) contract.AlertRule {
+	value.Scope.ProviderID = cloneInt(value.Scope.ProviderID)
+	return value
+}
+
+func cloneSilence(value contract.AlertSilence) contract.AlertSilence {
+	value.Matcher.ProviderID = cloneInt(value.Matcher.ProviderID)
+	value.CreatedBy = cloneInt(value.CreatedBy)
+	return value
 }
 
 func cloneSLO(value contract.SLODefinition) contract.SLODefinition {

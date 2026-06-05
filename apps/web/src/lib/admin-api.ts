@@ -31,6 +31,12 @@ import {
   deleteAdminPayloadRule,
   listAdminPayloadRules,
   updateAdminPayloadRule,
+  createAdminScheduledTestPlan,
+  deleteAdminScheduledTestPlan,
+  listAdminScheduledTestPlans,
+  listAdminScheduledTestPlanRuns,
+  runAdminScheduledTestPlan,
+  updateAdminScheduledTestPlan,
   createAdminTlsProfile,
   deleteAdminTlsProfile,
   listAdminTlsProfiles,
@@ -53,6 +59,13 @@ import {
   upsertAdminUserPlatformQuota,
   deleteAdminUserPlatformQuota,
   createAdminOpsSlo,
+  listAdminOpsAlertRules,
+  createAdminOpsAlertRule,
+  updateAdminOpsAlertRule,
+  deleteAdminOpsAlertRule,
+  listAdminOpsAlertSilences,
+  createAdminOpsAlertSilence,
+  deleteAdminOpsAlertSilence,
   createAdminPaymentProvider,
   createAdminPricingRule,
   createAdminPromoCode,
@@ -134,6 +147,7 @@ import {
   removeAdminAccountGroupMember,
   replaySchedulerStrategy,
   recoverAdminAccount,
+  sendAdminTestEmail,
   testAdminAccount,
   testAdminPaymentProvider,
   testAdminProvider,
@@ -162,6 +176,7 @@ import type {
   AccountRpmStatus,
   AdminCopilotConfig,
   AdminDashboardSnapshot,
+  AdminSendTestEmailRequest,
   AdminSettings,
   AdminTestResult,
   AdminUpdateApiKeyRequest,
@@ -178,6 +193,10 @@ import type {
   CreatePayloadRuleRequest,
   PayloadRule,
   UpdatePayloadRuleRequest,
+  CreateScheduledTestPlanRequest,
+  ScheduledTestPlan,
+  ScheduledTestPlanRun,
+  UpdateScheduledTestPlanRequest,
   CreateTlsProfileRequest,
   TlsProfile,
   UpdateTlsProfileRequest,
@@ -251,6 +270,11 @@ import type {
   ModelAlias,
   ModelProviderMapping,
   OpsAlertEvent,
+  OpsAlertRule,
+  OpsAlertSilence,
+  CreateAdminOpsAlertRuleData,
+  UpdateAdminOpsAlertRuleData,
+  CreateAdminOpsAlertSilenceData,
   OpsConcurrency,
   OpsErrorDistribution,
   OpsErrorTrend,
@@ -834,6 +858,36 @@ export const adminApi = {
     return unwrapData(() => updateAdminOpsSlo({ path: { id }, body, throwOnError: true }));
   },
 
+  listOpsAlertRules(): Promise<AdminListResult<OpsAlertRule>> {
+    return unwrapList(() => listAdminOpsAlertRules({ throwOnError: true }));
+  },
+
+  createOpsAlertRule(body: CreateAdminOpsAlertRuleData["body"]): Promise<OpsAlertRule> {
+    return unwrapData(() => createAdminOpsAlertRule({ body, throwOnError: true }));
+  },
+
+  updateOpsAlertRule(id: Id, body: UpdateAdminOpsAlertRuleData["body"]): Promise<OpsAlertRule> {
+    return unwrapData(() => updateAdminOpsAlertRule({ path: { id }, body, throwOnError: true }));
+  },
+
+  async deleteOpsAlertRule(id: Id): Promise<void> {
+    configureAdminClient();
+    await deleteAdminOpsAlertRule({ path: { id }, throwOnError: true });
+  },
+
+  listOpsAlertSilences(): Promise<AdminListResult<OpsAlertSilence>> {
+    return unwrapList(() => listAdminOpsAlertSilences({ throwOnError: true }));
+  },
+
+  createOpsAlertSilence(body: CreateAdminOpsAlertSilenceData["body"]): Promise<OpsAlertSilence> {
+    return unwrapData(() => createAdminOpsAlertSilence({ body, throwOnError: true }));
+  },
+
+  async deleteOpsAlertSilence(id: Id): Promise<void> {
+    configureAdminClient();
+    await deleteAdminOpsAlertSilence({ path: { id }, throwOnError: true });
+  },
+
   listAnnouncements(
     query?: ListAdminAnnouncementsData["query"],
   ): Promise<AdminListResult<Announcement>> {
@@ -889,6 +943,46 @@ export const adminApi = {
 
   deletePayloadRule(id: Id): Promise<{ deleted: boolean }> {
     return unwrapData(() => deleteAdminPayloadRule({ path: { id }, throwOnError: true }));
+  },
+
+  listScheduledTestPlans(): Promise<AdminListResult<ScheduledTestPlan>> {
+    return unwrapList(() => listAdminScheduledTestPlans({ throwOnError: true }));
+  },
+
+  createScheduledTestPlan(
+    body: CreateScheduledTestPlanRequest,
+  ): Promise<ScheduledTestPlan> {
+    return unwrapData(() => createAdminScheduledTestPlan({ body, throwOnError: true }));
+  },
+
+  updateScheduledTestPlan(
+    id: Id,
+    body: UpdateScheduledTestPlanRequest,
+  ): Promise<ScheduledTestPlan> {
+    return unwrapData(() =>
+      updateAdminScheduledTestPlan({ path: { id }, body, throwOnError: true }),
+    );
+  },
+
+  deleteScheduledTestPlan(id: Id): Promise<{ deleted: boolean }> {
+    return unwrapData(() => deleteAdminScheduledTestPlan({ path: { id }, throwOnError: true }));
+  },
+
+  listScheduledTestPlanRuns(
+    id: Id,
+    limit?: number,
+  ): Promise<AdminListResult<ScheduledTestPlanRun>> {
+    return unwrapList(() =>
+      listAdminScheduledTestPlanRuns({
+        path: { id },
+        query: limit ? { limit } : {},
+        throwOnError: true,
+      }),
+    );
+  },
+
+  runScheduledTestPlan(id: Id): Promise<ScheduledTestPlanRun> {
+    return unwrapData(() => runAdminScheduledTestPlan({ path: { id }, throwOnError: true }));
   },
 
   listTlsProfiles(): Promise<AdminListResult<TlsProfile>> {
@@ -1082,6 +1176,12 @@ export const adminApi = {
 
   updateSettings(body: AdminSettings): Promise<AdminSettings> {
     return unwrapData(() => updateAdminSettings({ body, throwOnError: true }));
+  },
+
+  // Deliver a probe email through the effective SMTP config. The write-only SMTP
+  // password makes this the only way to confirm the credentials actually work.
+  sendTestEmail(body?: AdminSendTestEmailRequest): Promise<AdminTestResult> {
+    return unwrapData(() => sendAdminTestEmail({ body: body ?? {}, throwOnError: true }));
   },
 
   getCopilotConfig(): Promise<AdminCopilotConfig> {

@@ -344,6 +344,22 @@ export function usePayloadRules() {
   });
 }
 
+// ---- Scheduled account health-test plans ----
+export function useScheduledTestPlans() {
+  return useQuery({
+    queryKey: queryKeys.admin.scheduledTestPlans(),
+    queryFn: () => adminApi.listScheduledTestPlans(),
+  });
+}
+
+export function useScheduledTestPlanRuns(planId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.admin.scheduledTestPlanRuns(planId ?? ""),
+    queryFn: () => adminApi.listScheduledTestPlanRuns(planId ?? ""),
+    enabled: Boolean(planId),
+  });
+}
+
 // ---- TLS fingerprint profiles ----
 export function useTlsProfiles() {
   return useQuery({
@@ -860,6 +876,34 @@ export function useDeletePayloadRule() {
   );
 }
 
+// Scheduled account health-test plans
+export function useCreateScheduledTestPlan() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.createScheduledTestPlan>) =>
+      adminApi.createScheduledTestPlan(body),
+    ["admin", "scheduled-test-plans"],
+  );
+}
+export function useUpdateScheduledTestPlan() {
+  return useAdminMutation(
+    (vars: { id: string; body: B<typeof adminApi.updateScheduledTestPlan> }) =>
+      adminApi.updateScheduledTestPlan(vars.id, vars.body),
+    ["admin", "scheduled-test-plans"],
+  );
+}
+export function useDeleteScheduledTestPlan() {
+  return useAdminMutation(
+    (id: string) => adminApi.deleteScheduledTestPlan(id),
+    ["admin", "scheduled-test-plans"],
+  );
+}
+export function useRunScheduledTestPlan() {
+  return useAdminMutation(
+    (id: string) => adminApi.runScheduledTestPlan(id),
+    ["admin", "scheduled-test-plans"],
+  );
+}
+
 // TLS fingerprint profiles
 export function useCreateTlsProfile() {
   return useAdminMutation(
@@ -1063,12 +1107,65 @@ export function useUpdateOpsSlo() {
   );
 }
 
+// Ops alert rules + silences (configurable generic metric alerting)
+export function useOpsAlertRules() {
+  return useQuery({
+    queryKey: queryKeys.admin.opsAlertRules(),
+    queryFn: () => adminApi.listOpsAlertRules(),
+  });
+}
+export function useCreateOpsAlertRule() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.createOpsAlertRule>) => adminApi.createOpsAlertRule(body),
+    ["admin", "ops"],
+  );
+}
+export function useUpdateOpsAlertRule() {
+  return useAdminMutation(
+    (vars: { id: string; body: B<typeof adminApi.updateOpsAlertRule> }) =>
+      adminApi.updateOpsAlertRule(vars.id, vars.body),
+    ["admin", "ops"],
+  );
+}
+export function useDeleteOpsAlertRule() {
+  return useAdminMutation(
+    (id: string) => adminApi.deleteOpsAlertRule(id),
+    ["admin", "ops"],
+  );
+}
+export function useOpsAlertSilences() {
+  return useQuery({
+    queryKey: queryKeys.admin.opsAlertSilences(),
+    queryFn: () => adminApi.listOpsAlertSilences(),
+  });
+}
+export function useCreateOpsAlertSilence() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.createOpsAlertSilence>) => adminApi.createOpsAlertSilence(body),
+    ["admin", "ops"],
+  );
+}
+export function useDeleteOpsAlertSilence() {
+  return useAdminMutation(
+    (id: string) => adminApi.deleteOpsAlertSilence(id),
+    ["admin", "ops"],
+  );
+}
+
 // Settings
 export function useUpdateSettings() {
   return useAdminMutation(
     (body: P<typeof adminApi.updateSettings>) => adminApi.updateSettings(body),
     ["admin", "settings"],
   );
+}
+
+// Send a probe email to verify SMTP credentials. Returns an AdminTestResult; it
+// changes no server state, so there is nothing to invalidate.
+export function useSendTestEmail() {
+  return useMutation({
+    mutationFn: (body?: P<typeof adminApi.sendTestEmail>) => adminApi.sendTestEmail(body),
+  });
 }
 
 // Config snapshot (backup / restore)

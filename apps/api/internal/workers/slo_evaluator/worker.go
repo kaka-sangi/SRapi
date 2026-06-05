@@ -124,6 +124,20 @@ func (w *Worker) RunOnce(ctx context.Context) (contract.AlertEvaluationResult, e
 	return w.operations.EvaluateSLOAlerts(evalCtx)
 }
 
+// RunRulesOnce evaluates the configurable generic metric alert rules and applies
+// any active silences. It is invoked on the same cadence as the SLO pass.
+func (w *Worker) RunRulesOnce(ctx context.Context) (contract.AlertRuleEvaluationResult, error) {
+	if w == nil {
+		return contract.AlertRuleEvaluationResult{}, nil
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	evalCtx, cancel := context.WithTimeout(ctx, w.timeout)
+	defer cancel()
+	return w.operations.EvaluateAlertRules(evalCtx)
+}
+
 func (w *Worker) run(ctx context.Context) {
 	w.evaluateAndLog(ctx)
 	ticker := time.NewTicker(w.interval)
@@ -142,9 +156,7 @@ func (w *Worker) evaluateAndLog(ctx context.Context) {
 	result, err := w.RunOnce(ctx)
 	if err != nil && !errors.Is(err, context.Canceled) {
 		w.logger.Warn("SLO alert evaluation failed", "error", err)
-		return
-	}
-	if result.Created > 0 || result.Updated > 0 || result.Resolved > 0 {
+	} else if result.Created > 0 || result.Updated > 0 || result.Resolved > 0 {
 		w.logger.Info(
 			"SLO alert evaluation completed",
 			"evaluated", result.Evaluated,
@@ -152,6 +164,23 @@ func (w *Worker) evaluateAndLog(ctx context.Context) {
 			"created", result.Created,
 			"updated", result.Updated,
 			"resolved", result.Resolved,
+		)
+	}
+
+	ruleResult, err := w.RunRulesOnce(ctx)
+	if err != nil && !errors.Is(err, context.Canceled) {
+		w.logger.Warn("alert rule evaluation failed", "error", err)
+		return
+	}
+	if ruleResult.Created > 0 || ruleResult.Updated > 0 || ruleResult.Resolved > 0 {
+		w.logger.Info(
+			"alert rule evaluation completed",
+			"evaluated", ruleResult.Evaluated,
+			"breached", ruleResult.Breached,
+			"created", ruleResult.Created,
+			"updated", ruleResult.Updated,
+			"resolved", ruleResult.Resolved,
+			"suppressed", ruleResult.Suppressed,
 		)
 	}
 }

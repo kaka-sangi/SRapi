@@ -66,6 +66,10 @@ type Tx struct {
 	ModelRegistry *ModelRegistryClient
 	// ObsAlertEvent is the client for interacting with the ObsAlertEvent builders.
 	ObsAlertEvent *ObsAlertEventClient
+	// ObsAlertRule is the client for interacting with the ObsAlertRule builders.
+	ObsAlertRule *ObsAlertRuleClient
+	// ObsAlertSilence is the client for interacting with the ObsAlertSilence builders.
+	ObsAlertSilence *ObsAlertSilenceClient
 	// ObsSLODefinition is the client for interacting with the ObsSLODefinition builders.
 	ObsSLODefinition *ObsSLODefinitionClient
 	// OpsSystemLog is the client for interacting with the OpsSystemLog builders.
@@ -96,6 +100,10 @@ type Tx struct {
 	QualityEvaluation *QualityEvaluationClient
 	// Role is the client for interacting with the Role builders.
 	Role *RoleClient
+	// ScheduledTestPlan is the client for interacting with the ScheduledTestPlan builders.
+	ScheduledTestPlan *ScheduledTestPlanClient
+	// ScheduledTestPlanRun is the client for interacting with the ScheduledTestPlanRun builders.
+	ScheduledTestPlanRun *ScheduledTestPlanRunClient
 	// SchedulerDecision is the client for interacting with the SchedulerDecision builders.
 	SchedulerDecision *SchedulerDecisionClient
 	// SchedulerFeedback is the client for interacting with the SchedulerFeedback builders.
@@ -294,6 +302,8 @@ func (tx *Tx) init() {
 	tx.ModelRateLimit = NewModelRateLimitClient(tx.config)
 	tx.ModelRegistry = NewModelRegistryClient(tx.config)
 	tx.ObsAlertEvent = NewObsAlertEventClient(tx.config)
+	tx.ObsAlertRule = NewObsAlertRuleClient(tx.config)
+	tx.ObsAlertSilence = NewObsAlertSilenceClient(tx.config)
 	tx.ObsSLODefinition = NewObsSLODefinitionClient(tx.config)
 	tx.OpsSystemLog = NewOpsSystemLogClient(tx.config)
 	tx.PasswordResetToken = NewPasswordResetTokenClient(tx.config)
@@ -309,6 +319,8 @@ func (tx *Tx) init() {
 	tx.QualityEvalSample = NewQualityEvalSampleClient(tx.config)
 	tx.QualityEvaluation = NewQualityEvaluationClient(tx.config)
 	tx.Role = NewRoleClient(tx.config)
+	tx.ScheduledTestPlan = NewScheduledTestPlanClient(tx.config)
+	tx.ScheduledTestPlanRun = NewScheduledTestPlanRunClient(tx.config)
 	tx.SchedulerDecision = NewSchedulerDecisionClient(tx.config)
 	tx.SchedulerFeedback = NewSchedulerFeedbackClient(tx.config)
 	tx.SchedulerRequestSnapshot = NewSchedulerRequestSnapshotClient(tx.config)

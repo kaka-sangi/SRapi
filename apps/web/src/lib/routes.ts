@@ -42,6 +42,7 @@ export const ADMIN_ROUTES = {
   errorPassthrough: "/admin/error-passthrough",
   tlsProfiles: "/admin/tls-profiles",
   payloadRules: "/admin/payload-rules",
+  scheduledTests: "/admin/scheduled-tests",
   roles: "/admin/roles",
   apiKeys: "/admin/api-keys",
   userAttributes: "/admin/user-attributes",

@@ -172,6 +172,115 @@ type AckAlertRequest struct {
 	Now         time.Time
 }
 
+// AlertMetricType enumerates the generic metrics an AlertRule can evaluate.
+type AlertMetricType string
+
+const (
+	AlertMetricErrorRate    AlertMetricType = "error_rate"
+	AlertMetricSuccessRate  AlertMetricType = "success_rate"
+	AlertMetricLatencyP95   AlertMetricType = "latency_p95"
+	AlertMetricRequestCount AlertMetricType = "request_count"
+)
+
+// AlertOperator compares an observed metric value against a rule threshold.
+type AlertOperator string
+
+const (
+	AlertOperatorGT  AlertOperator = "gt"
+	AlertOperatorGTE AlertOperator = "gte"
+	AlertOperatorLT  AlertOperator = "lt"
+	AlertOperatorLTE AlertOperator = "lte"
+)
+
+// AlertRuleScope narrows the usage logs an AlertRule evaluates over.
+type AlertRuleScope struct {
+	SourceEndpoint string
+	Model          string
+	ProviderID     *int
+}
+
+// AlertRule is a configurable, generic metric alert rule.
+type AlertRule struct {
+	ID              int
+	Name            string
+	MetricType      AlertMetricType
+	Operator        AlertOperator
+	Threshold       float64
+	Severity        AlertSeverity
+	Enabled         bool
+	WindowSeconds   int
+	CooldownSeconds int
+	MinRequestCount int
+	Scope           AlertRuleScope
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+}
+
+type CreateAlertRuleRequest struct {
+	Name            string
+	MetricType      AlertMetricType
+	Operator        AlertOperator
+	Threshold       float64
+	Severity        AlertSeverity
+	Enabled         *bool
+	WindowSeconds   int
+	CooldownSeconds int
+	MinRequestCount int
+	Scope           AlertRuleScope
+}
+
+type UpdateAlertRuleRequest struct {
+	Name            *string
+	MetricType      *AlertMetricType
+	Operator        *AlertOperator
+	Threshold       *float64
+	Severity        *AlertSeverity
+	Enabled         *bool
+	WindowSeconds   *int
+	CooldownSeconds *int
+	MinRequestCount *int
+	Scope           *AlertRuleScope
+}
+
+// AlertSilenceMatcher selects which alert events a silence suppresses.
+type AlertSilenceMatcher struct {
+	RuleID         string
+	Severity       AlertSeverity
+	SourceEndpoint string
+	Model          string
+	ProviderID     *int
+}
+
+// AlertSilence suppresses matching alert events within a bounded window.
+type AlertSilence struct {
+	ID        int
+	Comment   string
+	Matcher   AlertSilenceMatcher
+	StartsAt  time.Time
+	EndsAt    time.Time
+	CreatedBy *int
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+type CreateAlertSilenceRequest struct {
+	Comment   string
+	Matcher   AlertSilenceMatcher
+	StartsAt  time.Time
+	EndsAt    time.Time
+	CreatedBy *int
+}
+
+// AlertRuleEvaluationResult summarizes one generic alert-rule evaluation pass.
+type AlertRuleEvaluationResult struct {
+	Evaluated  int
+	Breached   int
+	Created    int
+	Updated    int
+	Resolved   int
+	Suppressed int
+}
+
 type ObservabilityStore interface {
 	CreateSLO(ctx context.Context, input SLODefinition) (SLODefinition, error)
 	UpdateSLO(ctx context.Context, input SLODefinition) (SLODefinition, error)
@@ -182,6 +291,14 @@ type ObservabilityStore interface {
 	FindAlertByID(ctx context.Context, id int) (AlertEvent, error)
 	ListAlerts(ctx context.Context) ([]AlertEvent, error)
 	ListUsageLogs(ctx context.Context) ([]usagecontract.UsageLog, error)
+	CreateAlertRule(ctx context.Context, input AlertRule) (AlertRule, error)
+	UpdateAlertRule(ctx context.Context, input AlertRule) (AlertRule, error)
+	FindAlertRuleByID(ctx context.Context, id int) (AlertRule, error)
+	ListAlertRules(ctx context.Context) ([]AlertRule, error)
+	DeleteAlertRule(ctx context.Context, id int) error
+	CreateAlertSilence(ctx context.Context, input AlertSilence) (AlertSilence, error)
+	ListAlertSilences(ctx context.Context) ([]AlertSilence, error)
+	DeleteAlertSilence(ctx context.Context, id int) error
 }
 
 type Store interface {

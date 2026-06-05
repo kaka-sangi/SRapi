@@ -40,6 +40,7 @@ import (
 	providerpreset "github.com/srapi/srapi/apps/api/internal/modules/providers/preset"
 	qualitycontract "github.com/srapi/srapi/apps/api/internal/modules/quality_eval/contract"
 	realtimecontract "github.com/srapi/srapi/apps/api/internal/modules/realtime/contract"
+	scheduledtestscontract "github.com/srapi/srapi/apps/api/internal/modules/scheduled_tests/contract"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	tlsprofilescontract "github.com/srapi/srapi/apps/api/internal/modules/tls_profiles/contract"
@@ -103,6 +104,7 @@ type runtimeOptions struct {
 	groupRateLimits    groupratelimitscontract.Store
 	userPlatformQuotas userplatformquotascontract.Store
 	payloadRules       payloadrulescontract.Store
+	scheduledTests     scheduledtestscontract.Store
 }
 
 func WithAdminControlStore(store admincontrolcontract.Store) Option {
@@ -240,6 +242,12 @@ func WithUserPlatformQuotasStore(store userplatformquotascontract.Store) Option 
 func WithPayloadRulesStore(store payloadrulescontract.Store) Option {
 	return func(opts *runtimeOptions) {
 		opts.payloadRules = store
+	}
+}
+
+func WithScheduledTestsStore(store scheduledtestscontract.Store) Option {
+	return func(opts *runtimeOptions) {
+		opts.scheduledTests = store
 	}
 }
 
@@ -448,8 +456,10 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("POST /api/v1/admin/pricing-rules", server.handleCreateAdminPricingRule)
 	mux.HandleFunc("POST /api/v1/admin/pricing-rules:bulk", server.handleBulkImportAdminPricingRules)
 	server.registerAdminOpsRoutes(mux)
+	server.registerAlertRulesRoutes(mux)
 	mux.HandleFunc("GET /api/v1/admin/settings", server.handleGetAdminSettings)
 	mux.HandleFunc("PUT /api/v1/admin/settings", server.handleUpdateAdminSettings)
+	mux.HandleFunc("POST /api/v1/admin/settings/send-test-email", server.handleSendAdminTestEmail)
 	mux.HandleFunc("GET /api/v1/admin/copilot/config", server.handleAdminCopilotConfig)
 	mux.HandleFunc("POST /api/v1/admin/copilot/chat", server.handleAdminCopilotChat)
 	mux.HandleFunc("GET /api/v1/admin/notifications/email-templates", server.handleListAdminNotificationEmailTemplates)
@@ -567,6 +577,12 @@ func (s *Server) registerCapabilityAdminRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("PATCH /api/v1/admin/payload-rules/{id}", s.handleUpdateAdminPayloadRule)
 	mux.HandleFunc("DELETE /api/v1/admin/payload-rules/{id}", s.handleDeleteAdminPayloadRule)
 	mux.HandleFunc("POST /api/v1/admin/accounts/batch-action", s.handleBatchActionAdminAccounts)
+	mux.HandleFunc("GET /api/v1/admin/scheduled-test-plans", s.handleListAdminScheduledTestPlans)
+	mux.HandleFunc("POST /api/v1/admin/scheduled-test-plans", s.handleCreateAdminScheduledTestPlan)
+	mux.HandleFunc("PATCH /api/v1/admin/scheduled-test-plans/{id}", s.handleUpdateAdminScheduledTestPlan)
+	mux.HandleFunc("DELETE /api/v1/admin/scheduled-test-plans/{id}", s.handleDeleteAdminScheduledTestPlan)
+	mux.HandleFunc("GET /api/v1/admin/scheduled-test-plans/{id}/runs", s.handleListAdminScheduledTestPlanRuns)
+	mux.HandleFunc("POST /api/v1/admin/scheduled-test-plans/{id}/run", s.handleRunAdminScheduledTestPlan)
 	mux.HandleFunc("GET /api/v1/admin/accounts/availability", s.handleListAdminAccountsAvailability)
 	mux.HandleFunc("GET /api/v1/admin/accounts/{id}/availability", s.handleAdminAccountAvailability)
 	mux.HandleFunc("POST /api/v1/admin/accounts/{id}/quota-fetch", s.handleAdminAccountQuotaFetch)

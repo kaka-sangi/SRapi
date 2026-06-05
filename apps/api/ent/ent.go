@@ -39,6 +39,8 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/modelratelimit"
 	"github.com/srapi/srapi/apps/api/ent/modelregistry"
 	"github.com/srapi/srapi/apps/api/ent/obsalertevent"
+	"github.com/srapi/srapi/apps/api/ent/obsalertrule"
+	"github.com/srapi/srapi/apps/api/ent/obsalertsilence"
 	"github.com/srapi/srapi/apps/api/ent/obsslodefinition"
 	"github.com/srapi/srapi/apps/api/ent/opssystemlog"
 	"github.com/srapi/srapi/apps/api/ent/passwordresettoken"
@@ -54,6 +56,8 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/qualityevalsample"
 	"github.com/srapi/srapi/apps/api/ent/qualityevaluation"
 	"github.com/srapi/srapi/apps/api/ent/role"
+	"github.com/srapi/srapi/apps/api/ent/scheduledtestplan"
+	"github.com/srapi/srapi/apps/api/ent/scheduledtestplanrun"
 	"github.com/srapi/srapi/apps/api/ent/schedulerdecision"
 	"github.com/srapi/srapi/apps/api/ent/schedulerfeedback"
 	"github.com/srapi/srapi/apps/api/ent/schedulerrequestsnapshot"
@@ -161,6 +165,8 @@ func checkColumn(t, c string) error {
 			modelratelimit.Table:            modelratelimit.ValidColumn,
 			modelregistry.Table:             modelregistry.ValidColumn,
 			obsalertevent.Table:             obsalertevent.ValidColumn,
+			obsalertrule.Table:              obsalertrule.ValidColumn,
+			obsalertsilence.Table:           obsalertsilence.ValidColumn,
 			obsslodefinition.Table:          obsslodefinition.ValidColumn,
 			opssystemlog.Table:              opssystemlog.ValidColumn,
 			passwordresettoken.Table:        passwordresettoken.ValidColumn,
@@ -176,6 +182,8 @@ func checkColumn(t, c string) error {
 			qualityevalsample.Table:         qualityevalsample.ValidColumn,
 			qualityevaluation.Table:         qualityevaluation.ValidColumn,
 			role.Table:                      role.ValidColumn,
+			scheduledtestplan.Table:         scheduledtestplan.ValidColumn,
+			scheduledtestplanrun.Table:      scheduledtestplanrun.ValidColumn,
 			schedulerdecision.Table:         schedulerdecision.ValidColumn,
 			schedulerfeedback.Table:         schedulerfeedback.ValidColumn,
 			schedulerrequestsnapshot.Table:  schedulerrequestsnapshot.ValidColumn,

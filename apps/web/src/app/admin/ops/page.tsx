@@ -1,11 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Activity, Pencil } from "lucide-react";
+import { Activity, BellRing, BellOff, Pencil, Trash2 } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageQueryState } from "@/components/layout/page-query-state";
 import { SloFormDialog } from "@/components/admin/slo-form-dialog";
+import { AlertRuleFormDialog } from "@/components/admin/alert-rule-form-dialog";
+import { AlertSilenceFormDialog } from "@/components/admin/alert-silence-form-dialog";
+import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { OpsLogCleanupDialog } from "@/components/admin/ops-log-cleanup-dialog";
 import { ResourceFormDialog, type FieldConfig } from "@/components/admin/resource-form-dialog";
 import {
@@ -15,13 +18,17 @@ import {
   useOpsThroughput,
   useOpsErrorTrend,
   useUpdateOpsSettings,
+  useOpsAlertRules,
+  useDeleteOpsAlertRule,
+  useOpsAlertSilences,
+  useDeleteOpsAlertSilence,
 } from "@/hooks/admin-queries";
 import {
   defaultOpsSettingsForm,
   buildOpsSettingsBody,
   type OpsSettingsFormState,
 } from "@/lib/admin-ops-settings-form";
-import type { OpsSloDefinition } from "@/lib/sdk-types";
+import type { OpsSloDefinition, OpsAlertRule, OpsAlertSilence } from "@/lib/sdk-types";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { adminErrorMessage } from "@/lib/admin-api";
@@ -77,7 +84,15 @@ function OpsContent() {
 
   const throughput = useOpsThroughput();
   const errorTrend = useOpsErrorTrend();
+  const alertRules = useOpsAlertRules();
+  const alertSilences = useOpsAlertSilences();
+  const deleteRuleMut = useDeleteOpsAlertRule();
+  const deleteSilenceMut = useDeleteOpsAlertSilence();
   const [sloTarget, setSloTarget] = useState<OpsSloDefinition | "new" | null>(null);
+  const [ruleTarget, setRuleTarget] = useState<OpsAlertRule | "new" | null>(null);
+  const [showSilenceForm, setShowSilenceForm] = useState(false);
+  const [ruleToDelete, setRuleToDelete] = useState<OpsAlertRule | null>(null);
+  const [silenceToDelete, setSilenceToDelete] = useState<OpsAlertSilence | null>(null);
   // Only firing alerts are "active". A resolved/suppressed alert also has no
   // acknowledged_at, so the old `!acknowledged_at` check wrongly kept them here.
   const activeAlerts = (alerts.data?.data ?? []).filter((a) => a.status === "firing");
@@ -254,6 +269,124 @@ function OpsContent() {
         </Card>
       ) : null}
 
+      <Card>
+        <CardHeader className="flex-row items-center justify-between">
+          <div>
+            <CardTitle className="not-italic font-sans text-base text-srapi-text-primary">
+              {t("adminOps.alertRules.title")}
+            </CardTitle>
+            <p className="mt-1 text-2xs text-srapi-text-tertiary">{t("adminOps.alertRules.subtitle")}</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => setRuleTarget("new")}>
+            ＋ {t("adminOps.alertRules.create")}
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {(alertRules.data?.data ?? []).length === 0 ? (
+            <EmptyState
+              icon={BellRing}
+              title={t("adminOps.alertRules.empty")}
+              description={t("adminOps.alertRules.emptyBody")}
+            />
+          ) : (
+            (alertRules.data?.data ?? []).map((rule) => (
+              <div
+                key={rule.id}
+                className="flex items-center justify-between gap-4 border-t border-srapi-border py-2.5 first:border-t-0"
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate text-sm text-srapi-text-primary">{rule.name}</span>
+                    <QuietBadge status={quietStatusFor(rule.severity)} label={rule.severity} />
+                  </div>
+                  <div className="font-mono text-2xs text-srapi-text-tertiary tabular">
+                    {t(`adminOps.alertRules.metricType.${rule.metric_type}`)}{" "}
+                    {t(`adminOps.alertRules.operators.${rule.operator}`)} {rule.threshold}
+                    {rule.scope.source_endpoint ? ` · ${rule.scope.source_endpoint}` : ""}
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-3">
+                  <QuietBadge
+                    status={rule.enabled ? "active" : "disabled"}
+                    label={rule.enabled ? t("adminOps.alertRules.enabled") : t("common.disabled")}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setRuleTarget(rule)}
+                    aria-label={t("adminOps.alertRules.edit")}
+                    className="text-srapi-text-tertiary transition-colors hover:text-srapi-text-primary"
+                  >
+                    <Pencil className="size-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRuleToDelete(rule)}
+                    aria-label={t("common.delete")}
+                    className="text-srapi-text-tertiary transition-colors hover:text-srapi-error"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex-row items-center justify-between">
+          <div>
+            <CardTitle className="not-italic font-sans text-base text-srapi-text-primary">
+              {t("adminOps.silences.title")}
+            </CardTitle>
+            <p className="mt-1 text-2xs text-srapi-text-tertiary">{t("adminOps.silences.subtitle")}</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => setShowSilenceForm(true)}>
+            ＋ {t("adminOps.silences.create")}
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {(alertSilences.data?.data ?? []).length === 0 ? (
+            <EmptyState
+              icon={BellOff}
+              title={t("adminOps.silences.empty")}
+              description={t("adminOps.silences.emptyBody")}
+            />
+          ) : (
+            (alertSilences.data?.data ?? []).map((silence) => {
+              const matcherText =
+                silence.matcher.rule_id ||
+                silence.matcher.source_endpoint ||
+                silence.matcher.severity ||
+                t("adminOps.silences.anyMatcher");
+              return (
+                <div
+                  key={silence.id}
+                  className="flex items-center justify-between gap-4 border-t border-srapi-border py-2.5 first:border-t-0"
+                >
+                  <div className="min-w-0">
+                    <div className="truncate text-sm text-srapi-text-primary">
+                      {silence.comment || matcherText}
+                    </div>
+                    <div className="font-mono text-2xs text-srapi-text-tertiary tabular">
+                      {matcherText} · {formatDateTime(silence.starts_at)} → {formatDateTime(silence.ends_at)}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSilenceToDelete(silence)}
+                    aria-label={t("common.delete")}
+                    className="shrink-0 text-srapi-text-tertiary transition-colors hover:text-srapi-error"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
+                </div>
+              );
+            })
+          )}
+        </CardContent>
+      </Card>
+
       {sloTarget !== null ? (
         <SloFormDialog
           key={sloTarget === "new" ? "new" : sloTarget.id}
@@ -262,6 +395,48 @@ function OpsContent() {
           onOpenChange={(open) => {
             if (!open) setSloTarget(null);
           }}
+        />
+      ) : null}
+
+      {ruleTarget !== null ? (
+        <AlertRuleFormDialog
+          key={ruleTarget === "new" ? "new" : ruleTarget.id}
+          open
+          target={ruleTarget === "new" ? null : ruleTarget}
+          onOpenChange={(open) => {
+            if (!open) setRuleTarget(null);
+          }}
+        />
+      ) : null}
+
+      <AlertSilenceFormDialog open={showSilenceForm} onOpenChange={setShowSilenceForm} />
+
+      {ruleToDelete ? (
+        <ConfirmDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setRuleToDelete(null);
+          }}
+          title={t("adminOps.alertRules.deleteConfirm")}
+          body={ruleToDelete.name}
+          confirmLabel={t("common.delete")}
+          successMessage={t("feedback.deleted")}
+          isPending={deleteRuleMut.isPending}
+          onConfirm={() => deleteRuleMut.mutateAsync(ruleToDelete.id)}
+        />
+      ) : null}
+
+      {silenceToDelete ? (
+        <ConfirmDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setSilenceToDelete(null);
+          }}
+          title={t("adminOps.silences.deleteConfirm")}
+          confirmLabel={t("common.delete")}
+          successMessage={t("feedback.deleted")}
+          isPending={deleteSilenceMut.isPending}
+          onConfirm={() => deleteSilenceMut.mutateAsync(silenceToDelete.id)}
         />
       ) : null}
 

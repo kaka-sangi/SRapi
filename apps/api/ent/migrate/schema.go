@@ -967,6 +967,69 @@ var (
 			},
 		},
 	}
+	// ObsAlertRulesColumns holds the columns for the "obs_alert_rules" table.
+	ObsAlertRulesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "name", Type: field.TypeString},
+		{Name: "metric_type", Type: field.TypeString, Default: "error_rate"},
+		{Name: "operator", Type: field.TypeString, Default: "gt"},
+		{Name: "threshold", Type: field.TypeFloat64},
+		{Name: "severity", Type: field.TypeString, Default: "warning"},
+		{Name: "enabled", Type: field.TypeBool, Default: true},
+		{Name: "window_seconds", Type: field.TypeInt, Default: 3600},
+		{Name: "cooldown_seconds", Type: field.TypeInt, Default: 0},
+		{Name: "min_request_count", Type: field.TypeInt, Default: 0},
+		{Name: "scope_json", Type: field.TypeJSON, Nullable: true},
+	}
+	// ObsAlertRulesTable holds the schema information for the "obs_alert_rules" table.
+	ObsAlertRulesTable = &schema.Table{
+		Name:       "obs_alert_rules",
+		Columns:    ObsAlertRulesColumns,
+		PrimaryKey: []*schema.Column{ObsAlertRulesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "obsalertrule_name",
+				Unique:  true,
+				Columns: []*schema.Column{ObsAlertRulesColumns[3]},
+			},
+			{
+				Name:    "obsalertrule_enabled_metric_type",
+				Unique:  false,
+				Columns: []*schema.Column{ObsAlertRulesColumns[8], ObsAlertRulesColumns[4]},
+			},
+			{
+				Name:    "obsalertrule_severity_enabled",
+				Unique:  false,
+				Columns: []*schema.Column{ObsAlertRulesColumns[7], ObsAlertRulesColumns[8]},
+			},
+		},
+	}
+	// ObsAlertSilencesColumns holds the columns for the "obs_alert_silences" table.
+	ObsAlertSilencesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "comment", Type: field.TypeString, Nullable: true},
+		{Name: "matcher_json", Type: field.TypeJSON, Nullable: true},
+		{Name: "starts_at", Type: field.TypeTime},
+		{Name: "ends_at", Type: field.TypeTime},
+		{Name: "created_by", Type: field.TypeInt, Nullable: true},
+	}
+	// ObsAlertSilencesTable holds the schema information for the "obs_alert_silences" table.
+	ObsAlertSilencesTable = &schema.Table{
+		Name:       "obs_alert_silences",
+		Columns:    ObsAlertSilencesColumns,
+		PrimaryKey: []*schema.Column{ObsAlertSilencesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "obsalertsilence_starts_at_ends_at",
+				Unique:  false,
+				Columns: []*schema.Column{ObsAlertSilencesColumns[5], ObsAlertSilencesColumns[6]},
+			},
+		},
+	}
 	// ObsSloDefinitionsColumns holds the columns for the "obs_slo_definitions" table.
 	ObsSloDefinitionsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -1572,6 +1635,70 @@ var (
 				Name:    "role_name",
 				Unique:  true,
 				Columns: []*schema.Column{RolesColumns[3]},
+			},
+		},
+	}
+	// ScheduledTestPlansColumns holds the columns for the "scheduled_test_plans" table.
+	ScheduledTestPlansColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "name", Type: field.TypeString},
+		{Name: "enabled", Type: field.TypeBool, Default: true},
+		{Name: "scope_type", Type: field.TypeString, Default: "all"},
+		{Name: "scope_id", Type: field.TypeInt, Nullable: true},
+		{Name: "interval_seconds", Type: field.TypeInt, Default: 3600},
+		{Name: "cron_expression", Type: field.TypeString, Nullable: true},
+		{Name: "max_results", Type: field.TypeInt, Default: 0},
+		{Name: "auto_recover", Type: field.TypeBool, Default: false},
+		{Name: "last_run_at", Type: field.TypeTime, Nullable: true},
+		{Name: "last_status", Type: field.TypeString, Default: ""},
+		{Name: "last_summary", Type: field.TypeString, Default: ""},
+	}
+	// ScheduledTestPlansTable holds the schema information for the "scheduled_test_plans" table.
+	ScheduledTestPlansTable = &schema.Table{
+		Name:       "scheduled_test_plans",
+		Columns:    ScheduledTestPlansColumns,
+		PrimaryKey: []*schema.Column{ScheduledTestPlansColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "scheduledtestplan_enabled",
+				Unique:  false,
+				Columns: []*schema.Column{ScheduledTestPlansColumns[4]},
+			},
+			{
+				Name:    "scheduledtestplan_scope_type_scope_id",
+				Unique:  false,
+				Columns: []*schema.Column{ScheduledTestPlansColumns[5], ScheduledTestPlansColumns[6]},
+			},
+		},
+	}
+	// ScheduledTestPlanRunsColumns holds the columns for the "scheduled_test_plan_runs" table.
+	ScheduledTestPlanRunsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "plan_id", Type: field.TypeInt},
+		{Name: "trigger", Type: field.TypeString, Default: "schedule"},
+		{Name: "status", Type: field.TypeString, Default: "ok"},
+		{Name: "selected", Type: field.TypeInt, Default: 0},
+		{Name: "probed", Type: field.TypeInt, Default: 0},
+		{Name: "skipped", Type: field.TypeInt, Default: 0},
+		{Name: "failed", Type: field.TypeInt, Default: 0},
+		{Name: "unhealthy", Type: field.TypeInt, Default: 0},
+		{Name: "recovered", Type: field.TypeInt, Default: 0},
+		{Name: "summary", Type: field.TypeString, Default: ""},
+		{Name: "started_at", Type: field.TypeTime},
+		{Name: "finished_at", Type: field.TypeTime},
+	}
+	// ScheduledTestPlanRunsTable holds the schema information for the "scheduled_test_plan_runs" table.
+	ScheduledTestPlanRunsTable = &schema.Table{
+		Name:       "scheduled_test_plan_runs",
+		Columns:    ScheduledTestPlanRunsColumns,
+		PrimaryKey: []*schema.Column{ScheduledTestPlanRunsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "scheduledtestplanrun_plan_id_started_at",
+				Unique:  false,
+				Columns: []*schema.Column{ScheduledTestPlanRunsColumns[1], ScheduledTestPlanRunsColumns[11]},
 			},
 		},
 	}
@@ -2410,6 +2537,8 @@ var (
 		ModelRateLimitsTable,
 		ModelRegistriesTable,
 		ObsAlertEventsTable,
+		ObsAlertRulesTable,
+		ObsAlertSilencesTable,
 		ObsSloDefinitionsTable,
 		OpsSystemLogsTable,
 		PasswordResetTokensTable,
@@ -2425,6 +2554,8 @@ var (
 		QualityEvalSamplesTable,
 		QualityEvaluationsTable,
 		RolesTable,
+		ScheduledTestPlansTable,
+		ScheduledTestPlanRunsTable,
 		SchedulerDecisionsTable,
 		SchedulerFeedbacksTable,
 		SchedulerRequestSnapshotsTable,

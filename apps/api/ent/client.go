@@ -41,6 +41,8 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/modelratelimit"
 	"github.com/srapi/srapi/apps/api/ent/modelregistry"
 	"github.com/srapi/srapi/apps/api/ent/obsalertevent"
+	"github.com/srapi/srapi/apps/api/ent/obsalertrule"
+	"github.com/srapi/srapi/apps/api/ent/obsalertsilence"
 	"github.com/srapi/srapi/apps/api/ent/obsslodefinition"
 	"github.com/srapi/srapi/apps/api/ent/opssystemlog"
 	"github.com/srapi/srapi/apps/api/ent/passwordresettoken"
@@ -56,6 +58,8 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/qualityevalsample"
 	"github.com/srapi/srapi/apps/api/ent/qualityevaluation"
 	"github.com/srapi/srapi/apps/api/ent/role"
+	"github.com/srapi/srapi/apps/api/ent/scheduledtestplan"
+	"github.com/srapi/srapi/apps/api/ent/scheduledtestplanrun"
 	"github.com/srapi/srapi/apps/api/ent/schedulerdecision"
 	"github.com/srapi/srapi/apps/api/ent/schedulerfeedback"
 	"github.com/srapi/srapi/apps/api/ent/schedulerrequestsnapshot"
@@ -137,6 +141,10 @@ type Client struct {
 	ModelRegistry *ModelRegistryClient
 	// ObsAlertEvent is the client for interacting with the ObsAlertEvent builders.
 	ObsAlertEvent *ObsAlertEventClient
+	// ObsAlertRule is the client for interacting with the ObsAlertRule builders.
+	ObsAlertRule *ObsAlertRuleClient
+	// ObsAlertSilence is the client for interacting with the ObsAlertSilence builders.
+	ObsAlertSilence *ObsAlertSilenceClient
 	// ObsSLODefinition is the client for interacting with the ObsSLODefinition builders.
 	ObsSLODefinition *ObsSLODefinitionClient
 	// OpsSystemLog is the client for interacting with the OpsSystemLog builders.
@@ -167,6 +175,10 @@ type Client struct {
 	QualityEvaluation *QualityEvaluationClient
 	// Role is the client for interacting with the Role builders.
 	Role *RoleClient
+	// ScheduledTestPlan is the client for interacting with the ScheduledTestPlan builders.
+	ScheduledTestPlan *ScheduledTestPlanClient
+	// ScheduledTestPlanRun is the client for interacting with the ScheduledTestPlanRun builders.
+	ScheduledTestPlanRun *ScheduledTestPlanRunClient
 	// SchedulerDecision is the client for interacting with the SchedulerDecision builders.
 	SchedulerDecision *SchedulerDecisionClient
 	// SchedulerFeedback is the client for interacting with the SchedulerFeedback builders.
@@ -245,6 +257,8 @@ func (c *Client) init() {
 	c.ModelRateLimit = NewModelRateLimitClient(c.config)
 	c.ModelRegistry = NewModelRegistryClient(c.config)
 	c.ObsAlertEvent = NewObsAlertEventClient(c.config)
+	c.ObsAlertRule = NewObsAlertRuleClient(c.config)
+	c.ObsAlertSilence = NewObsAlertSilenceClient(c.config)
 	c.ObsSLODefinition = NewObsSLODefinitionClient(c.config)
 	c.OpsSystemLog = NewOpsSystemLogClient(c.config)
 	c.PasswordResetToken = NewPasswordResetTokenClient(c.config)
@@ -260,6 +274,8 @@ func (c *Client) init() {
 	c.QualityEvalSample = NewQualityEvalSampleClient(c.config)
 	c.QualityEvaluation = NewQualityEvaluationClient(c.config)
 	c.Role = NewRoleClient(c.config)
+	c.ScheduledTestPlan = NewScheduledTestPlanClient(c.config)
+	c.ScheduledTestPlanRun = NewScheduledTestPlanRunClient(c.config)
 	c.SchedulerDecision = NewSchedulerDecisionClient(c.config)
 	c.SchedulerFeedback = NewSchedulerFeedbackClient(c.config)
 	c.SchedulerRequestSnapshot = NewSchedulerRequestSnapshotClient(c.config)
@@ -399,6 +415,8 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		ModelRateLimit:            NewModelRateLimitClient(cfg),
 		ModelRegistry:             NewModelRegistryClient(cfg),
 		ObsAlertEvent:             NewObsAlertEventClient(cfg),
+		ObsAlertRule:              NewObsAlertRuleClient(cfg),
+		ObsAlertSilence:           NewObsAlertSilenceClient(cfg),
 		ObsSLODefinition:          NewObsSLODefinitionClient(cfg),
 		OpsSystemLog:              NewOpsSystemLogClient(cfg),
 		PasswordResetToken:        NewPasswordResetTokenClient(cfg),
@@ -414,6 +432,8 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		QualityEvalSample:         NewQualityEvalSampleClient(cfg),
 		QualityEvaluation:         NewQualityEvaluationClient(cfg),
 		Role:                      NewRoleClient(cfg),
+		ScheduledTestPlan:         NewScheduledTestPlanClient(cfg),
+		ScheduledTestPlanRun:      NewScheduledTestPlanRunClient(cfg),
 		SchedulerDecision:         NewSchedulerDecisionClient(cfg),
 		SchedulerFeedback:         NewSchedulerFeedbackClient(cfg),
 		SchedulerRequestSnapshot:  NewSchedulerRequestSnapshotClient(cfg),
@@ -480,6 +500,8 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		ModelRateLimit:            NewModelRateLimitClient(cfg),
 		ModelRegistry:             NewModelRegistryClient(cfg),
 		ObsAlertEvent:             NewObsAlertEventClient(cfg),
+		ObsAlertRule:              NewObsAlertRuleClient(cfg),
+		ObsAlertSilence:           NewObsAlertSilenceClient(cfg),
 		ObsSLODefinition:          NewObsSLODefinitionClient(cfg),
 		OpsSystemLog:              NewOpsSystemLogClient(cfg),
 		PasswordResetToken:        NewPasswordResetTokenClient(cfg),
@@ -495,6 +517,8 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		QualityEvalSample:         NewQualityEvalSampleClient(cfg),
 		QualityEvaluation:         NewQualityEvaluationClient(cfg),
 		Role:                      NewRoleClient(cfg),
+		ScheduledTestPlan:         NewScheduledTestPlanClient(cfg),
+		ScheduledTestPlanRun:      NewScheduledTestPlanRunClient(cfg),
 		SchedulerDecision:         NewSchedulerDecisionClient(cfg),
 		SchedulerFeedback:         NewSchedulerFeedbackClient(cfg),
 		SchedulerRequestSnapshot:  NewSchedulerRequestSnapshotClient(cfg),
@@ -551,16 +575,17 @@ func (c *Client) Use(hooks ...Hook) {
 		c.DomainEventsOutbox, c.EmailVerificationToken, c.Entitlement,
 		c.ErrorPassthroughRule, c.IdempotencyRecord, c.InviteCode,
 		c.InviteRelationship, c.ModelAlias, c.ModelProviderMapping, c.ModelRateLimit,
-		c.ModelRegistry, c.ObsAlertEvent, c.ObsSLODefinition, c.OpsSystemLog,
-		c.PasswordResetToken, c.PayloadRule, c.PaymentAuditLog, c.PaymentOrder,
-		c.PaymentProviderInstance, c.PendingOAuthSession, c.PricingRule, c.Provider,
-		c.ProviderAccount, c.Proxy, c.QualityEvalSample, c.QualityEvaluation, c.Role,
-		c.SchedulerDecision, c.SchedulerFeedback, c.SchedulerRequestSnapshot,
-		c.SchedulerStrategy, c.Setting, c.SubscriptionPlan, c.TLSFingerprintProfile,
-		c.UsageLog, c.User, c.UserAnnouncementRead, c.UserAttributeDefinition,
-		c.UserAttributeValue, c.UserAuthIdentity, c.UserPlatformQuota,
-		c.UserPromoCodeApplication, c.UserRedeemCodeRedemption, c.UserRole,
-		c.UserSubscription, c.UserTOTPSecret, c.Workspace,
+		c.ModelRegistry, c.ObsAlertEvent, c.ObsAlertRule, c.ObsAlertSilence,
+		c.ObsSLODefinition, c.OpsSystemLog, c.PasswordResetToken, c.PayloadRule,
+		c.PaymentAuditLog, c.PaymentOrder, c.PaymentProviderInstance,
+		c.PendingOAuthSession, c.PricingRule, c.Provider, c.ProviderAccount, c.Proxy,
+		c.QualityEvalSample, c.QualityEvaluation, c.Role, c.ScheduledTestPlan,
+		c.ScheduledTestPlanRun, c.SchedulerDecision, c.SchedulerFeedback,
+		c.SchedulerRequestSnapshot, c.SchedulerStrategy, c.Setting, c.SubscriptionPlan,
+		c.TLSFingerprintProfile, c.UsageLog, c.User, c.UserAnnouncementRead,
+		c.UserAttributeDefinition, c.UserAttributeValue, c.UserAuthIdentity,
+		c.UserPlatformQuota, c.UserPromoCodeApplication, c.UserRedeemCodeRedemption,
+		c.UserRole, c.UserSubscription, c.UserTOTPSecret, c.Workspace,
 	} {
 		n.Use(hooks...)
 	}
@@ -577,16 +602,17 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.DomainEventsOutbox, c.EmailVerificationToken, c.Entitlement,
 		c.ErrorPassthroughRule, c.IdempotencyRecord, c.InviteCode,
 		c.InviteRelationship, c.ModelAlias, c.ModelProviderMapping, c.ModelRateLimit,
-		c.ModelRegistry, c.ObsAlertEvent, c.ObsSLODefinition, c.OpsSystemLog,
-		c.PasswordResetToken, c.PayloadRule, c.PaymentAuditLog, c.PaymentOrder,
-		c.PaymentProviderInstance, c.PendingOAuthSession, c.PricingRule, c.Provider,
-		c.ProviderAccount, c.Proxy, c.QualityEvalSample, c.QualityEvaluation, c.Role,
-		c.SchedulerDecision, c.SchedulerFeedback, c.SchedulerRequestSnapshot,
-		c.SchedulerStrategy, c.Setting, c.SubscriptionPlan, c.TLSFingerprintProfile,
-		c.UsageLog, c.User, c.UserAnnouncementRead, c.UserAttributeDefinition,
-		c.UserAttributeValue, c.UserAuthIdentity, c.UserPlatformQuota,
-		c.UserPromoCodeApplication, c.UserRedeemCodeRedemption, c.UserRole,
-		c.UserSubscription, c.UserTOTPSecret, c.Workspace,
+		c.ModelRegistry, c.ObsAlertEvent, c.ObsAlertRule, c.ObsAlertSilence,
+		c.ObsSLODefinition, c.OpsSystemLog, c.PasswordResetToken, c.PayloadRule,
+		c.PaymentAuditLog, c.PaymentOrder, c.PaymentProviderInstance,
+		c.PendingOAuthSession, c.PricingRule, c.Provider, c.ProviderAccount, c.Proxy,
+		c.QualityEvalSample, c.QualityEvaluation, c.Role, c.ScheduledTestPlan,
+		c.ScheduledTestPlanRun, c.SchedulerDecision, c.SchedulerFeedback,
+		c.SchedulerRequestSnapshot, c.SchedulerStrategy, c.Setting, c.SubscriptionPlan,
+		c.TLSFingerprintProfile, c.UsageLog, c.User, c.UserAnnouncementRead,
+		c.UserAttributeDefinition, c.UserAttributeValue, c.UserAuthIdentity,
+		c.UserPlatformQuota, c.UserPromoCodeApplication, c.UserRedeemCodeRedemption,
+		c.UserRole, c.UserSubscription, c.UserTOTPSecret, c.Workspace,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -649,6 +675,10 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.ModelRegistry.mutate(ctx, m)
 	case *ObsAlertEventMutation:
 		return c.ObsAlertEvent.mutate(ctx, m)
+	case *ObsAlertRuleMutation:
+		return c.ObsAlertRule.mutate(ctx, m)
+	case *ObsAlertSilenceMutation:
+		return c.ObsAlertSilence.mutate(ctx, m)
 	case *ObsSLODefinitionMutation:
 		return c.ObsSLODefinition.mutate(ctx, m)
 	case *OpsSystemLogMutation:
@@ -679,6 +709,10 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.QualityEvaluation.mutate(ctx, m)
 	case *RoleMutation:
 		return c.Role.mutate(ctx, m)
+	case *ScheduledTestPlanMutation:
+		return c.ScheduledTestPlan.mutate(ctx, m)
+	case *ScheduledTestPlanRunMutation:
+		return c.ScheduledTestPlanRun.mutate(ctx, m)
 	case *SchedulerDecisionMutation:
 		return c.SchedulerDecision.mutate(ctx, m)
 	case *SchedulerFeedbackMutation:
@@ -4315,6 +4349,272 @@ func (c *ObsAlertEventClient) mutate(ctx context.Context, m *ObsAlertEventMutati
 	}
 }
 
+// ObsAlertRuleClient is a client for the ObsAlertRule schema.
+type ObsAlertRuleClient struct {
+	config
+}
+
+// NewObsAlertRuleClient returns a client for the ObsAlertRule from the given config.
+func NewObsAlertRuleClient(c config) *ObsAlertRuleClient {
+	return &ObsAlertRuleClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `obsalertrule.Hooks(f(g(h())))`.
+func (c *ObsAlertRuleClient) Use(hooks ...Hook) {
+	c.hooks.ObsAlertRule = append(c.hooks.ObsAlertRule, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `obsalertrule.Intercept(f(g(h())))`.
+func (c *ObsAlertRuleClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ObsAlertRule = append(c.inters.ObsAlertRule, interceptors...)
+}
+
+// Create returns a builder for creating a ObsAlertRule entity.
+func (c *ObsAlertRuleClient) Create() *ObsAlertRuleCreate {
+	mutation := newObsAlertRuleMutation(c.config, OpCreate)
+	return &ObsAlertRuleCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ObsAlertRule entities.
+func (c *ObsAlertRuleClient) CreateBulk(builders ...*ObsAlertRuleCreate) *ObsAlertRuleCreateBulk {
+	return &ObsAlertRuleCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ObsAlertRuleClient) MapCreateBulk(slice any, setFunc func(*ObsAlertRuleCreate, int)) *ObsAlertRuleCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ObsAlertRuleCreateBulk{err: fmt.Errorf("calling to ObsAlertRuleClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ObsAlertRuleCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ObsAlertRuleCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ObsAlertRule.
+func (c *ObsAlertRuleClient) Update() *ObsAlertRuleUpdate {
+	mutation := newObsAlertRuleMutation(c.config, OpUpdate)
+	return &ObsAlertRuleUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ObsAlertRuleClient) UpdateOne(_m *ObsAlertRule) *ObsAlertRuleUpdateOne {
+	mutation := newObsAlertRuleMutation(c.config, OpUpdateOne, withObsAlertRule(_m))
+	return &ObsAlertRuleUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ObsAlertRuleClient) UpdateOneID(id int) *ObsAlertRuleUpdateOne {
+	mutation := newObsAlertRuleMutation(c.config, OpUpdateOne, withObsAlertRuleID(id))
+	return &ObsAlertRuleUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ObsAlertRule.
+func (c *ObsAlertRuleClient) Delete() *ObsAlertRuleDelete {
+	mutation := newObsAlertRuleMutation(c.config, OpDelete)
+	return &ObsAlertRuleDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ObsAlertRuleClient) DeleteOne(_m *ObsAlertRule) *ObsAlertRuleDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ObsAlertRuleClient) DeleteOneID(id int) *ObsAlertRuleDeleteOne {
+	builder := c.Delete().Where(obsalertrule.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ObsAlertRuleDeleteOne{builder}
+}
+
+// Query returns a query builder for ObsAlertRule.
+func (c *ObsAlertRuleClient) Query() *ObsAlertRuleQuery {
+	return &ObsAlertRuleQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeObsAlertRule},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ObsAlertRule entity by its id.
+func (c *ObsAlertRuleClient) Get(ctx context.Context, id int) (*ObsAlertRule, error) {
+	return c.Query().Where(obsalertrule.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ObsAlertRuleClient) GetX(ctx context.Context, id int) *ObsAlertRule {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ObsAlertRuleClient) Hooks() []Hook {
+	return c.hooks.ObsAlertRule
+}
+
+// Interceptors returns the client interceptors.
+func (c *ObsAlertRuleClient) Interceptors() []Interceptor {
+	return c.inters.ObsAlertRule
+}
+
+func (c *ObsAlertRuleClient) mutate(ctx context.Context, m *ObsAlertRuleMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ObsAlertRuleCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ObsAlertRuleUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ObsAlertRuleUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ObsAlertRuleDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ObsAlertRule mutation op: %q", m.Op())
+	}
+}
+
+// ObsAlertSilenceClient is a client for the ObsAlertSilence schema.
+type ObsAlertSilenceClient struct {
+	config
+}
+
+// NewObsAlertSilenceClient returns a client for the ObsAlertSilence from the given config.
+func NewObsAlertSilenceClient(c config) *ObsAlertSilenceClient {
+	return &ObsAlertSilenceClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `obsalertsilence.Hooks(f(g(h())))`.
+func (c *ObsAlertSilenceClient) Use(hooks ...Hook) {
+	c.hooks.ObsAlertSilence = append(c.hooks.ObsAlertSilence, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `obsalertsilence.Intercept(f(g(h())))`.
+func (c *ObsAlertSilenceClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ObsAlertSilence = append(c.inters.ObsAlertSilence, interceptors...)
+}
+
+// Create returns a builder for creating a ObsAlertSilence entity.
+func (c *ObsAlertSilenceClient) Create() *ObsAlertSilenceCreate {
+	mutation := newObsAlertSilenceMutation(c.config, OpCreate)
+	return &ObsAlertSilenceCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ObsAlertSilence entities.
+func (c *ObsAlertSilenceClient) CreateBulk(builders ...*ObsAlertSilenceCreate) *ObsAlertSilenceCreateBulk {
+	return &ObsAlertSilenceCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ObsAlertSilenceClient) MapCreateBulk(slice any, setFunc func(*ObsAlertSilenceCreate, int)) *ObsAlertSilenceCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ObsAlertSilenceCreateBulk{err: fmt.Errorf("calling to ObsAlertSilenceClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ObsAlertSilenceCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ObsAlertSilenceCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ObsAlertSilence.
+func (c *ObsAlertSilenceClient) Update() *ObsAlertSilenceUpdate {
+	mutation := newObsAlertSilenceMutation(c.config, OpUpdate)
+	return &ObsAlertSilenceUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ObsAlertSilenceClient) UpdateOne(_m *ObsAlertSilence) *ObsAlertSilenceUpdateOne {
+	mutation := newObsAlertSilenceMutation(c.config, OpUpdateOne, withObsAlertSilence(_m))
+	return &ObsAlertSilenceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ObsAlertSilenceClient) UpdateOneID(id int) *ObsAlertSilenceUpdateOne {
+	mutation := newObsAlertSilenceMutation(c.config, OpUpdateOne, withObsAlertSilenceID(id))
+	return &ObsAlertSilenceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ObsAlertSilence.
+func (c *ObsAlertSilenceClient) Delete() *ObsAlertSilenceDelete {
+	mutation := newObsAlertSilenceMutation(c.config, OpDelete)
+	return &ObsAlertSilenceDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ObsAlertSilenceClient) DeleteOne(_m *ObsAlertSilence) *ObsAlertSilenceDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ObsAlertSilenceClient) DeleteOneID(id int) *ObsAlertSilenceDeleteOne {
+	builder := c.Delete().Where(obsalertsilence.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ObsAlertSilenceDeleteOne{builder}
+}
+
+// Query returns a query builder for ObsAlertSilence.
+func (c *ObsAlertSilenceClient) Query() *ObsAlertSilenceQuery {
+	return &ObsAlertSilenceQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeObsAlertSilence},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ObsAlertSilence entity by its id.
+func (c *ObsAlertSilenceClient) Get(ctx context.Context, id int) (*ObsAlertSilence, error) {
+	return c.Query().Where(obsalertsilence.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ObsAlertSilenceClient) GetX(ctx context.Context, id int) *ObsAlertSilence {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ObsAlertSilenceClient) Hooks() []Hook {
+	return c.hooks.ObsAlertSilence
+}
+
+// Interceptors returns the client interceptors.
+func (c *ObsAlertSilenceClient) Interceptors() []Interceptor {
+	return c.inters.ObsAlertSilence
+}
+
+func (c *ObsAlertSilenceClient) mutate(ctx context.Context, m *ObsAlertSilenceMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ObsAlertSilenceCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ObsAlertSilenceUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ObsAlertSilenceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ObsAlertSilenceDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ObsAlertSilence mutation op: %q", m.Op())
+	}
+}
+
 // ObsSLODefinitionClient is a client for the ObsSLODefinition schema.
 type ObsSLODefinitionClient struct {
 	config
@@ -6307,6 +6607,272 @@ func (c *RoleClient) mutate(ctx context.Context, m *RoleMutation) (Value, error)
 		return (&RoleDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown Role mutation op: %q", m.Op())
+	}
+}
+
+// ScheduledTestPlanClient is a client for the ScheduledTestPlan schema.
+type ScheduledTestPlanClient struct {
+	config
+}
+
+// NewScheduledTestPlanClient returns a client for the ScheduledTestPlan from the given config.
+func NewScheduledTestPlanClient(c config) *ScheduledTestPlanClient {
+	return &ScheduledTestPlanClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `scheduledtestplan.Hooks(f(g(h())))`.
+func (c *ScheduledTestPlanClient) Use(hooks ...Hook) {
+	c.hooks.ScheduledTestPlan = append(c.hooks.ScheduledTestPlan, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `scheduledtestplan.Intercept(f(g(h())))`.
+func (c *ScheduledTestPlanClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ScheduledTestPlan = append(c.inters.ScheduledTestPlan, interceptors...)
+}
+
+// Create returns a builder for creating a ScheduledTestPlan entity.
+func (c *ScheduledTestPlanClient) Create() *ScheduledTestPlanCreate {
+	mutation := newScheduledTestPlanMutation(c.config, OpCreate)
+	return &ScheduledTestPlanCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ScheduledTestPlan entities.
+func (c *ScheduledTestPlanClient) CreateBulk(builders ...*ScheduledTestPlanCreate) *ScheduledTestPlanCreateBulk {
+	return &ScheduledTestPlanCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ScheduledTestPlanClient) MapCreateBulk(slice any, setFunc func(*ScheduledTestPlanCreate, int)) *ScheduledTestPlanCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ScheduledTestPlanCreateBulk{err: fmt.Errorf("calling to ScheduledTestPlanClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ScheduledTestPlanCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ScheduledTestPlanCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ScheduledTestPlan.
+func (c *ScheduledTestPlanClient) Update() *ScheduledTestPlanUpdate {
+	mutation := newScheduledTestPlanMutation(c.config, OpUpdate)
+	return &ScheduledTestPlanUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ScheduledTestPlanClient) UpdateOne(_m *ScheduledTestPlan) *ScheduledTestPlanUpdateOne {
+	mutation := newScheduledTestPlanMutation(c.config, OpUpdateOne, withScheduledTestPlan(_m))
+	return &ScheduledTestPlanUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ScheduledTestPlanClient) UpdateOneID(id int) *ScheduledTestPlanUpdateOne {
+	mutation := newScheduledTestPlanMutation(c.config, OpUpdateOne, withScheduledTestPlanID(id))
+	return &ScheduledTestPlanUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ScheduledTestPlan.
+func (c *ScheduledTestPlanClient) Delete() *ScheduledTestPlanDelete {
+	mutation := newScheduledTestPlanMutation(c.config, OpDelete)
+	return &ScheduledTestPlanDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ScheduledTestPlanClient) DeleteOne(_m *ScheduledTestPlan) *ScheduledTestPlanDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ScheduledTestPlanClient) DeleteOneID(id int) *ScheduledTestPlanDeleteOne {
+	builder := c.Delete().Where(scheduledtestplan.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ScheduledTestPlanDeleteOne{builder}
+}
+
+// Query returns a query builder for ScheduledTestPlan.
+func (c *ScheduledTestPlanClient) Query() *ScheduledTestPlanQuery {
+	return &ScheduledTestPlanQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeScheduledTestPlan},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ScheduledTestPlan entity by its id.
+func (c *ScheduledTestPlanClient) Get(ctx context.Context, id int) (*ScheduledTestPlan, error) {
+	return c.Query().Where(scheduledtestplan.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ScheduledTestPlanClient) GetX(ctx context.Context, id int) *ScheduledTestPlan {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ScheduledTestPlanClient) Hooks() []Hook {
+	return c.hooks.ScheduledTestPlan
+}
+
+// Interceptors returns the client interceptors.
+func (c *ScheduledTestPlanClient) Interceptors() []Interceptor {
+	return c.inters.ScheduledTestPlan
+}
+
+func (c *ScheduledTestPlanClient) mutate(ctx context.Context, m *ScheduledTestPlanMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ScheduledTestPlanCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ScheduledTestPlanUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ScheduledTestPlanUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ScheduledTestPlanDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ScheduledTestPlan mutation op: %q", m.Op())
+	}
+}
+
+// ScheduledTestPlanRunClient is a client for the ScheduledTestPlanRun schema.
+type ScheduledTestPlanRunClient struct {
+	config
+}
+
+// NewScheduledTestPlanRunClient returns a client for the ScheduledTestPlanRun from the given config.
+func NewScheduledTestPlanRunClient(c config) *ScheduledTestPlanRunClient {
+	return &ScheduledTestPlanRunClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `scheduledtestplanrun.Hooks(f(g(h())))`.
+func (c *ScheduledTestPlanRunClient) Use(hooks ...Hook) {
+	c.hooks.ScheduledTestPlanRun = append(c.hooks.ScheduledTestPlanRun, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `scheduledtestplanrun.Intercept(f(g(h())))`.
+func (c *ScheduledTestPlanRunClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ScheduledTestPlanRun = append(c.inters.ScheduledTestPlanRun, interceptors...)
+}
+
+// Create returns a builder for creating a ScheduledTestPlanRun entity.
+func (c *ScheduledTestPlanRunClient) Create() *ScheduledTestPlanRunCreate {
+	mutation := newScheduledTestPlanRunMutation(c.config, OpCreate)
+	return &ScheduledTestPlanRunCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ScheduledTestPlanRun entities.
+func (c *ScheduledTestPlanRunClient) CreateBulk(builders ...*ScheduledTestPlanRunCreate) *ScheduledTestPlanRunCreateBulk {
+	return &ScheduledTestPlanRunCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ScheduledTestPlanRunClient) MapCreateBulk(slice any, setFunc func(*ScheduledTestPlanRunCreate, int)) *ScheduledTestPlanRunCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ScheduledTestPlanRunCreateBulk{err: fmt.Errorf("calling to ScheduledTestPlanRunClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ScheduledTestPlanRunCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ScheduledTestPlanRunCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ScheduledTestPlanRun.
+func (c *ScheduledTestPlanRunClient) Update() *ScheduledTestPlanRunUpdate {
+	mutation := newScheduledTestPlanRunMutation(c.config, OpUpdate)
+	return &ScheduledTestPlanRunUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ScheduledTestPlanRunClient) UpdateOne(_m *ScheduledTestPlanRun) *ScheduledTestPlanRunUpdateOne {
+	mutation := newScheduledTestPlanRunMutation(c.config, OpUpdateOne, withScheduledTestPlanRun(_m))
+	return &ScheduledTestPlanRunUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ScheduledTestPlanRunClient) UpdateOneID(id int) *ScheduledTestPlanRunUpdateOne {
+	mutation := newScheduledTestPlanRunMutation(c.config, OpUpdateOne, withScheduledTestPlanRunID(id))
+	return &ScheduledTestPlanRunUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ScheduledTestPlanRun.
+func (c *ScheduledTestPlanRunClient) Delete() *ScheduledTestPlanRunDelete {
+	mutation := newScheduledTestPlanRunMutation(c.config, OpDelete)
+	return &ScheduledTestPlanRunDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ScheduledTestPlanRunClient) DeleteOne(_m *ScheduledTestPlanRun) *ScheduledTestPlanRunDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ScheduledTestPlanRunClient) DeleteOneID(id int) *ScheduledTestPlanRunDeleteOne {
+	builder := c.Delete().Where(scheduledtestplanrun.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ScheduledTestPlanRunDeleteOne{builder}
+}
+
+// Query returns a query builder for ScheduledTestPlanRun.
+func (c *ScheduledTestPlanRunClient) Query() *ScheduledTestPlanRunQuery {
+	return &ScheduledTestPlanRunQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeScheduledTestPlanRun},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ScheduledTestPlanRun entity by its id.
+func (c *ScheduledTestPlanRunClient) Get(ctx context.Context, id int) (*ScheduledTestPlanRun, error) {
+	return c.Query().Where(scheduledtestplanrun.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ScheduledTestPlanRunClient) GetX(ctx context.Context, id int) *ScheduledTestPlanRun {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ScheduledTestPlanRunClient) Hooks() []Hook {
+	return c.hooks.ScheduledTestPlanRun
+}
+
+// Interceptors returns the client interceptors.
+func (c *ScheduledTestPlanRunClient) Interceptors() []Interceptor {
+	return c.inters.ScheduledTestPlanRun
+}
+
+func (c *ScheduledTestPlanRunClient) mutate(ctx context.Context, m *ScheduledTestPlanRunMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ScheduledTestPlanRunCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ScheduledTestPlanRunUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ScheduledTestPlanRunUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ScheduledTestPlanRunDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ScheduledTestPlanRun mutation op: %q", m.Op())
 	}
 }
 
@@ -8979,10 +9545,11 @@ type (
 		BillingLedger, CapabilityDefinition, DomainEventsInbox, DomainEventsOutbox,
 		EmailVerificationToken, Entitlement, ErrorPassthroughRule, IdempotencyRecord,
 		InviteCode, InviteRelationship, ModelAlias, ModelProviderMapping,
-		ModelRateLimit, ModelRegistry, ObsAlertEvent, ObsSLODefinition, OpsSystemLog,
-		PasswordResetToken, PayloadRule, PaymentAuditLog, PaymentOrder,
-		PaymentProviderInstance, PendingOAuthSession, PricingRule, Provider,
-		ProviderAccount, Proxy, QualityEvalSample, QualityEvaluation, Role,
+		ModelRateLimit, ModelRegistry, ObsAlertEvent, ObsAlertRule, ObsAlertSilence,
+		ObsSLODefinition, OpsSystemLog, PasswordResetToken, PayloadRule,
+		PaymentAuditLog, PaymentOrder, PaymentProviderInstance, PendingOAuthSession,
+		PricingRule, Provider, ProviderAccount, Proxy, QualityEvalSample,
+		QualityEvaluation, Role, ScheduledTestPlan, ScheduledTestPlanRun,
 		SchedulerDecision, SchedulerFeedback, SchedulerRequestSnapshot,
 		SchedulerStrategy, Setting, SubscriptionPlan, TLSFingerprintProfile, UsageLog,
 		User, UserAnnouncementRead, UserAttributeDefinition, UserAttributeValue,
@@ -8997,10 +9564,11 @@ type (
 		BillingLedger, CapabilityDefinition, DomainEventsInbox, DomainEventsOutbox,
 		EmailVerificationToken, Entitlement, ErrorPassthroughRule, IdempotencyRecord,
 		InviteCode, InviteRelationship, ModelAlias, ModelProviderMapping,
-		ModelRateLimit, ModelRegistry, ObsAlertEvent, ObsSLODefinition, OpsSystemLog,
-		PasswordResetToken, PayloadRule, PaymentAuditLog, PaymentOrder,
-		PaymentProviderInstance, PendingOAuthSession, PricingRule, Provider,
-		ProviderAccount, Proxy, QualityEvalSample, QualityEvaluation, Role,
+		ModelRateLimit, ModelRegistry, ObsAlertEvent, ObsAlertRule, ObsAlertSilence,
+		ObsSLODefinition, OpsSystemLog, PasswordResetToken, PayloadRule,
+		PaymentAuditLog, PaymentOrder, PaymentProviderInstance, PendingOAuthSession,
+		PricingRule, Provider, ProviderAccount, Proxy, QualityEvalSample,
+		QualityEvaluation, Role, ScheduledTestPlan, ScheduledTestPlanRun,
 		SchedulerDecision, SchedulerFeedback, SchedulerRequestSnapshot,
 		SchedulerStrategy, Setting, SubscriptionPlan, TLSFingerprintProfile, UsageLog,
 		User, UserAnnouncementRead, UserAttributeDefinition, UserAttributeValue,

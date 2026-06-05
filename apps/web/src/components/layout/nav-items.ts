@@ -1,6 +1,7 @@
 import {
   LayoutGrid,
   KeyRound,
+  CalendarClock,
   BarChart3,
   Server,
   GitBranch,
@@ -143,6 +144,7 @@ const ADMIN_OPS_SECTION: NavSection = {
   items: [
     { href: ADMIN_ROUTES.ops, labelKey: "nav.adminOps", icon: Activity },
     { href: ADMIN_ROUTES.channelsMonitor, labelKey: "nav.adminMonitor", icon: Gauge },
+    { href: ADMIN_ROUTES.scheduledTests, labelKey: "nav.adminScheduledTests", icon: CalendarClock },
     { href: ADMIN_ROUTES.opsStrategy, labelKey: "nav.adminOpsStrategy", icon: GitBranch },
     { href: ADMIN_ROUTES.riskControl, labelKey: "nav.adminRiskControl", icon: Shield },
     { href: ADMIN_ROUTES.announcements, labelKey: "nav.adminAnnouncements", icon: Megaphone },

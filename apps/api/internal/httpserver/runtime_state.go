@@ -77,6 +77,9 @@ import (
 	realtimecontract "github.com/srapi/srapi/apps/api/internal/modules/realtime/contract"
 	realtimeservice "github.com/srapi/srapi/apps/api/internal/modules/realtime/service"
 	reverseproxyservice "github.com/srapi/srapi/apps/api/internal/modules/reverse_proxy/service"
+	scheduledtestscontract "github.com/srapi/srapi/apps/api/internal/modules/scheduled_tests/contract"
+	scheduledtestsservice "github.com/srapi/srapi/apps/api/internal/modules/scheduled_tests/service"
+	scheduledtestsmemory "github.com/srapi/srapi/apps/api/internal/modules/scheduled_tests/store/memory"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 	schedulerservice "github.com/srapi/srapi/apps/api/internal/modules/scheduler/service"
 	schedulermemory "github.com/srapi/srapi/apps/api/internal/modules/scheduler/store/memory"
@@ -103,6 +106,7 @@ import (
 	usermemory "github.com/srapi/srapi/apps/api/internal/modules/users/store/memory"
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 	"github.com/srapi/srapi/apps/api/internal/platform/ratelimit"
+	scheduledtestworker "github.com/srapi/srapi/apps/api/internal/workers/scheduled_test"
 )
 
 const (
@@ -158,6 +162,8 @@ type runtimeState struct {
 	groupRateLimits         *groupratelimitsservice.Service
 	userPlatformQuotas      *userplatformquotasservice.Service
 	payloadRules            *payloadrulesservice.Service
+	scheduledTests          *scheduledtestsservice.Service
+	scheduledTestRunner     *scheduledtestworker.Runner
 	copilotEngine           *copilot.Engine
 	internalRouter          http.Handler
 	userStore               userscontract.Store
@@ -188,6 +194,7 @@ type runtimeState struct {
 	groupRateLimitsStore    groupratelimitscontract.Store
 	userPlatformQuotasStore userplatformquotascontract.Store
 	payloadRulesStore       payloadrulescontract.Store
+	scheduledTestsStore     scheduledtestscontract.Store
 	capabilities            []capabilitiescontract.Definition
 	databaseProbe           dependencyPinger
 	redisProbe              dependencyPinger
@@ -525,6 +532,25 @@ func (rt *runtimeState) buildCapabilityServices(cfg config.Config, opts runtimeO
 		return err
 	}
 	rt.payloadRules = payloadRulesSvc
+
+	scheduledTestsStore := opts.scheduledTests
+	if scheduledTestsStore == nil {
+		if !allowMemoryStores {
+			return missingRuntimeStoreError("scheduled tests")
+		}
+		scheduledTestsStore = scheduledtestsmemory.New()
+	}
+	rt.scheduledTestsStore = scheduledTestsStore
+	scheduledTestsSvc, err := scheduledtestsservice.New(scheduledTestsStore, nil)
+	if err != nil {
+		return err
+	}
+	rt.scheduledTests = scheduledTestsSvc
+	scheduledTestRunner, err := scheduledtestworker.NewRunner(rt.accounts, rt.providers, scheduledTestsSvc, scheduledtestworker.RealProber(rt.adapters))
+	if err != nil {
+		return err
+	}
+	rt.scheduledTestRunner = scheduledTestRunner
 
 	// The admin copilot loads its tool catalog from the embedded OpenAPI spec. A
 	// parse failure disables the copilot (handlers return 503) but must not block

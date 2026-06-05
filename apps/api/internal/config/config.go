@@ -38,6 +38,7 @@ type Config struct {
 	Captcha          CaptchaConfig
 	QuotaRefresh     QuotaRefreshConfig
 	ConnectivityTest ConnectivityTestConfig
+	ScheduledTest    ScheduledTestConfig
 	OAuth            OAuthConfig
 }
 
@@ -60,6 +61,15 @@ type ConnectivityTestConfig struct {
 	Interval      time.Duration
 	Timeout       time.Duration
 	MaxConcurrent int
+}
+
+// ScheduledTestConfig controls the scheduled-test-plan worker, which evaluates
+// admin-managed plans on a fixed tick and runs each plan's real generative
+// probe. Disabled by default; plans still run only when this worker is enabled.
+type ScheduledTestConfig struct {
+	Enabled bool
+	Tick    time.Duration
+	Timeout time.Duration
 }
 
 type ServerConfig struct {
@@ -322,6 +332,11 @@ func Load() Config {
 			Interval:      time.Duration(getIntEnv("ACCOUNT_CONNECTIVITY_TEST_INTERVAL_SECONDS", 3600)) * time.Second,
 			Timeout:       time.Duration(getIntEnv("ACCOUNT_CONNECTIVITY_TEST_TIMEOUT_SECONDS", 30)) * time.Second,
 			MaxConcurrent: getIntEnv("ACCOUNT_CONNECTIVITY_TEST_MAX_CONCURRENT", 2),
+		},
+		ScheduledTest: ScheduledTestConfig{
+			Enabled: getBoolEnv("ACCOUNT_SCHEDULED_TEST_ENABLED", false),
+			Tick:    time.Duration(getIntEnv("ACCOUNT_SCHEDULED_TEST_TICK_SECONDS", 60)) * time.Second,
+			Timeout: time.Duration(getIntEnv("ACCOUNT_SCHEDULED_TEST_TIMEOUT_SECONDS", 30)) * time.Second,
 		},
 		OAuth: OAuthConfig{
 			ClientSecrets: parseStringMapEnv("OAUTH_CLIENT_SECRETS_JSON"),

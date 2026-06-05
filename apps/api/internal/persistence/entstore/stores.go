@@ -23,6 +23,7 @@ import (
 	paymentcontract "github.com/srapi/srapi/apps/api/internal/modules/payments/contract"
 	providercontract "github.com/srapi/srapi/apps/api/internal/modules/providers/contract"
 	qualitycontract "github.com/srapi/srapi/apps/api/internal/modules/quality_eval/contract"
+	scheduledtestscontract "github.com/srapi/srapi/apps/api/internal/modules/scheduled_tests/contract"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 	subscriptioncontract "github.com/srapi/srapi/apps/api/internal/modules/subscriptions/contract"
 	tlsprofilescontract "github.com/srapi/srapi/apps/api/internal/modules/tls_profiles/contract"
@@ -50,6 +51,7 @@ import (
 	paymentstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/payments"
 	providerstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/providers"
 	qualitystore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/qualityeval"
+	scheduledtestsstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/scheduledtests"
 	schedulerstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/scheduler"
 	subscriptionstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/subscriptions"
 	tlsprofilesstore "github.com/srapi/srapi/apps/api/internal/persistence/entstore/tlsprofiles"
@@ -91,6 +93,7 @@ type Stores struct {
 	GroupRateLimits    groupratelimitscontract.Store
 	UserPlatformQuotas userplatformquotascontract.Store
 	PayloadRules       payloadrulescontract.Store
+	ScheduledTests     scheduledtestscontract.Store
 }
 
 func New(client *ent.Client) (Stores, error) {
@@ -205,6 +208,10 @@ func New(client *ent.Client) (Stores, error) {
 	if err != nil {
 		return Stores{}, err
 	}
+	scheduledTests, err := scheduledtestsstore.New(client)
+	if err != nil {
+		return Stores{}, err
+	}
 	return Stores{
 		AdminControl:       adminControl,
 		Users:              users,
@@ -234,5 +241,6 @@ func New(client *ent.Client) (Stores, error) {
 		GroupRateLimits:    groupRateLimits,
 		UserPlatformQuotas: userPlatformQuotas,
 		PayloadRules:       payloadRules,
+		ScheduledTests:     scheduledTests,
 	}, nil
 }

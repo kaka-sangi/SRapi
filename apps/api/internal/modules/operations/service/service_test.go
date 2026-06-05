@@ -278,19 +278,27 @@ func TestEvaluateSLOAlertsCreatesUpdatesAndResolvesBurnRateAlerts(t *testing.T) 
 }
 
 type captureObservabilityStore struct {
-	nextSLOID   int
-	nextAlertID int
-	slos        map[int]contract.SLODefinition
-	alerts      map[int]contract.AlertEvent
-	usageLogs   []usagecontract.UsageLog
+	nextSLOID     int
+	nextAlertID   int
+	nextRuleID    int
+	nextSilenceID int
+	slos          map[int]contract.SLODefinition
+	alerts        map[int]contract.AlertEvent
+	rules         map[int]contract.AlertRule
+	silences      map[int]contract.AlertSilence
+	usageLogs     []usagecontract.UsageLog
 }
 
 func newCaptureObservabilityStore() *captureObservabilityStore {
 	return &captureObservabilityStore{
-		nextSLOID:   1,
-		nextAlertID: 1,
-		slos:        map[int]contract.SLODefinition{},
-		alerts:      map[int]contract.AlertEvent{},
+		nextSLOID:     1,
+		nextAlertID:   1,
+		nextRuleID:    1,
+		nextSilenceID: 1,
+		slos:          map[int]contract.SLODefinition{},
+		alerts:        map[int]contract.AlertEvent{},
+		rules:         map[int]contract.AlertRule{},
+		silences:      map[int]contract.AlertSilence{},
 	}
 }
 
@@ -358,6 +366,68 @@ func (s *captureObservabilityStore) ListAlerts(_ context.Context) ([]contract.Al
 
 func (s *captureObservabilityStore) ListUsageLogs(_ context.Context) ([]usagecontract.UsageLog, error) {
 	return append([]usagecontract.UsageLog(nil), s.usageLogs...), nil
+}
+
+func (s *captureObservabilityStore) CreateAlertRule(_ context.Context, input contract.AlertRule) (contract.AlertRule, error) {
+	input.ID = s.nextRuleID
+	s.nextRuleID++
+	s.rules[input.ID] = input
+	return input, nil
+}
+
+func (s *captureObservabilityStore) UpdateAlertRule(_ context.Context, input contract.AlertRule) (contract.AlertRule, error) {
+	if _, ok := s.rules[input.ID]; !ok {
+		return contract.AlertRule{}, ErrNotFound
+	}
+	s.rules[input.ID] = input
+	return input, nil
+}
+
+func (s *captureObservabilityStore) FindAlertRuleByID(_ context.Context, id int) (contract.AlertRule, error) {
+	value, ok := s.rules[id]
+	if !ok {
+		return contract.AlertRule{}, ErrNotFound
+	}
+	return value, nil
+}
+
+func (s *captureObservabilityStore) ListAlertRules(_ context.Context) ([]contract.AlertRule, error) {
+	out := make([]contract.AlertRule, 0, len(s.rules))
+	for _, value := range s.rules {
+		out = append(out, value)
+	}
+	return out, nil
+}
+
+func (s *captureObservabilityStore) DeleteAlertRule(_ context.Context, id int) error {
+	if _, ok := s.rules[id]; !ok {
+		return ErrNotFound
+	}
+	delete(s.rules, id)
+	return nil
+}
+
+func (s *captureObservabilityStore) CreateAlertSilence(_ context.Context, input contract.AlertSilence) (contract.AlertSilence, error) {
+	input.ID = s.nextSilenceID
+	s.nextSilenceID++
+	s.silences[input.ID] = input
+	return input, nil
+}
+
+func (s *captureObservabilityStore) ListAlertSilences(_ context.Context) ([]contract.AlertSilence, error) {
+	out := make([]contract.AlertSilence, 0, len(s.silences))
+	for _, value := range s.silences {
+		out = append(out, value)
+	}
+	return out, nil
+}
+
+func (s *captureObservabilityStore) DeleteAlertSilence(_ context.Context, id int) error {
+	if _, ok := s.silences[id]; !ok {
+		return ErrNotFound
+	}
+	delete(s.silences, id)
+	return nil
 }
 
 func findAlertByRule(t *testing.T, alerts []contract.AlertEvent, ruleID string) contract.AlertEvent {

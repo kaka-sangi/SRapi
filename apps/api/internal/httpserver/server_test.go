@@ -10279,3 +10279,110 @@ func rejectionReasonsContain(value apiopenapi.JsonObject, target string) bool {
 	}
 	return false
 }
+
+func TestAdminOpsAlertRulesControlPlane(t *testing.T) {
+	usageStore := usagememory.New()
+	operationsStore := operationsmemory.NewWithUsageStore(usageStore)
+	auditStore := auditmemory.New()
+	handler := New(config.Load(), nil,
+		WithUsageStore(usageStore),
+		WithOperationsStore(operationsStore),
+		WithAuditStore(auditStore),
+	)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	ctx := t.Context()
+
+	createReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/ops/alert-rules", strings.NewReader(`{"name":"Chat error rate","metric_type":"error_rate","operator":"gt","threshold":0.25,"severity":"critical","window_seconds":3600,"min_request_count":2,"scope":{"source_endpoint":"/v1/chat/completions","model":""}}`))
+	createReq.Header.Set("Content-Type", "application/json")
+	createReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	createReq.AddCookie(sessionCookie)
+	createRec := httptest.NewRecorder()
+	handler.ServeHTTP(createRec, createReq)
+	if createRec.Code != http.StatusCreated {
+		t.Fatalf("expected alert rule create 201, got %d body=%s", createRec.Code, createRec.Body.String())
+	}
+	var createResp apiopenapi.OpsAlertRuleResponse
+	if err := json.NewDecoder(createRec.Body).Decode(&createResp); err != nil {
+		t.Fatalf("decode alert rule create: %v", err)
+	}
+	if createResp.Data.MetricType != "error_rate" || createResp.Data.Severity != "critical" || !createResp.Data.Enabled {
+		t.Fatalf("unexpected created rule: %+v", createResp.Data)
+	}
+
+	listReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/ops/alert-rules", nil)
+	listReq.AddCookie(sessionCookie)
+	listRec := httptest.NewRecorder()
+	handler.ServeHTTP(listRec, listReq)
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("expected alert rule list 200, got %d body=%s", listRec.Code, listRec.Body.String())
+	}
+	var listResp apiopenapi.OpsAlertRuleListResponse
+	if err := json.NewDecoder(listRec.Body).Decode(&listResp); err != nil {
+		t.Fatalf("decode alert rule list: %v", err)
+	}
+	if len(listResp.Data) != 1 {
+		t.Fatalf("expected one rule, got %+v", listResp.Data)
+	}
+
+	patchReq := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/ops/alert-rules/"+string(createResp.Data.Id), strings.NewReader(`{"enabled":false,"threshold":0.5}`))
+	patchReq.Header.Set("Content-Type", "application/json")
+	patchReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	patchReq.AddCookie(sessionCookie)
+	patchRec := httptest.NewRecorder()
+	handler.ServeHTTP(patchRec, patchReq)
+	if patchRec.Code != http.StatusOK {
+		t.Fatalf("expected alert rule patch 200, got %d body=%s", patchRec.Code, patchRec.Body.String())
+	}
+	var patchResp apiopenapi.OpsAlertRuleResponse
+	if err := json.NewDecoder(patchRec.Body).Decode(&patchResp); err != nil {
+		t.Fatalf("decode alert rule patch: %v", err)
+	}
+	if patchResp.Data.Enabled || patchResp.Data.Threshold < 0.49 || patchResp.Data.Threshold > 0.51 {
+		t.Fatalf("unexpected patched rule: %+v", patchResp.Data)
+	}
+
+	silenceReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/ops/alert-silences", strings.NewReader(`{"comment":"deploy","matcher":{"rule_id":"rule.1","severity":"critical"},"starts_at":"2026-06-01T00:00:00Z","ends_at":"2030-06-01T00:00:00Z"}`))
+	silenceReq.Header.Set("Content-Type", "application/json")
+	silenceReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	silenceReq.AddCookie(sessionCookie)
+	silenceRec := httptest.NewRecorder()
+	handler.ServeHTTP(silenceRec, silenceReq)
+	if silenceRec.Code != http.StatusCreated {
+		t.Fatalf("expected alert silence create 201, got %d body=%s", silenceRec.Code, silenceRec.Body.String())
+	}
+	var silenceResp apiopenapi.OpsAlertSilenceResponse
+	if err := json.NewDecoder(silenceRec.Body).Decode(&silenceResp); err != nil {
+		t.Fatalf("decode alert silence create: %v", err)
+	}
+	if silenceResp.Data.CreatedBy == nil || silenceResp.Data.Matcher.RuleId == nil || *silenceResp.Data.Matcher.RuleId != "rule.1" {
+		t.Fatalf("unexpected created silence: %+v", silenceResp.Data)
+	}
+
+	delSilenceReq := httptest.NewRequest(http.MethodDelete, "/api/v1/admin/ops/alert-silences/"+string(silenceResp.Data.Id), nil)
+	delSilenceReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	delSilenceReq.AddCookie(sessionCookie)
+	delSilenceRec := httptest.NewRecorder()
+	handler.ServeHTTP(delSilenceRec, delSilenceReq)
+	if delSilenceRec.Code != http.StatusNoContent {
+		t.Fatalf("expected alert silence delete 204, got %d body=%s", delSilenceRec.Code, delSilenceRec.Body.String())
+	}
+
+	delRuleReq := httptest.NewRequest(http.MethodDelete, "/api/v1/admin/ops/alert-rules/"+string(createResp.Data.Id), nil)
+	delRuleReq.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+	delRuleReq.AddCookie(sessionCookie)
+	delRuleRec := httptest.NewRecorder()
+	handler.ServeHTTP(delRuleRec, delRuleReq)
+	if delRuleRec.Code != http.StatusNoContent {
+		t.Fatalf("expected alert rule delete 204, got %d body=%s", delRuleRec.Code, delRuleRec.Body.String())
+	}
+
+	auditLogs, err := auditStore.List(ctx)
+	if err != nil {
+		t.Fatalf("list audit: %v", err)
+	}
+	for _, action := range []string{"ops_alert_rule.create", "ops_alert_rule.update", "ops_alert_rule.delete", "ops_alert_silence.create", "ops_alert_silence.delete"} {
+		if !auditContractLogHasAction(auditLogs, action) {
+			t.Fatalf("expected audit action %s in %+v", action, auditLogs)
+		}
+	}
+}

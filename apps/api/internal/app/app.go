@@ -28,6 +28,7 @@ import (
 	qualityevalworker "github.com/srapi/srapi/apps/api/internal/workers/quality_eval"
 	quotarefreshworker "github.com/srapi/srapi/apps/api/internal/workers/quota_refresh"
 	retentionworker "github.com/srapi/srapi/apps/api/internal/workers/retention"
+	scheduledtestworker "github.com/srapi/srapi/apps/api/internal/workers/scheduled_test"
 	sloevaluatorworker "github.com/srapi/srapi/apps/api/internal/workers/slo_evaluator"
 	subscriptionexpirerworker "github.com/srapi/srapi/apps/api/internal/workers/subscription_expirer"
 	"github.com/srapi/srapi/apps/api/migrations"
@@ -48,6 +49,7 @@ type App struct {
 	idemClean        *idempotencycleanupworker.Worker
 	quotaRefresh     *quotarefreshworker.Worker
 	connectivityTest *connectivitytestworker.Worker
+	scheduledTest    *scheduledtestworker.Worker
 	expirer          *orderexpirerworker.Worker
 	subExpiry        *subscriptionexpirerworker.Worker
 	quota            *accountquotaalertworker.Worker
@@ -79,7 +81,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		return nil, err
 	}
 
-	handler, outbox, retention, authClean, expirer, subExpiry, quota, balance, health, quality, sloEval, idemClean, quotaRefresh, connectivityTest, err := newHandler(cfg, logger, dbClient, redisClient)
+	handler, outbox, retention, authClean, expirer, subExpiry, quota, balance, health, quality, sloEval, idemClean, quotaRefresh, connectivityTest, scheduledTest, err := newHandler(cfg, logger, dbClient, redisClient)
 	if err != nil {
 		_ = dbClient.Close()
 		_ = redisClient.Close()
@@ -105,6 +107,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		idemClean:        idemClean,
 		quotaRefresh:     quotaRefresh,
 		connectivityTest: connectivityTest,
+		scheduledTest:    scheduledTest,
 		expirer:          expirer,
 		subExpiry:        subExpiry,
 		quota:            quota,
@@ -161,7 +164,7 @@ func Healthcheck(ctx context.Context, cfg config.Config) error {
 	return httpserver.Healthcheck(ctx, cfg.HealthcheckAddress())
 }
 
-func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Client, redisClient *platformredis.Client) (http.Handler, *outboxworker.Worker, *retentionworker.Worker, *authcleanupworker.Worker, *orderexpirerworker.Worker, *subscriptionexpirerworker.Worker, *accountquotaalertworker.Worker, *balancechargerworker.Worker, *healthprobeworker.Worker, *qualityevalworker.Worker, *sloevaluatorworker.Worker, *idempotencycleanupworker.Worker, *quotarefreshworker.Worker, *connectivitytestworker.Worker, error) {
+func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Client, redisClient *platformredis.Client) (http.Handler, *outboxworker.Worker, *retentionworker.Worker, *authcleanupworker.Worker, *orderexpirerworker.Worker, *subscriptionexpirerworker.Worker, *accountquotaalertworker.Worker, *balancechargerworker.Worker, *healthprobeworker.Worker, *qualityevalworker.Worker, *sloevaluatorworker.Worker, *idempotencycleanupworker.Worker, *quotarefreshworker.Worker, *connectivitytestworker.Worker, *scheduledtestworker.Worker, error) {
 	var (
 		handler http.Handler
 		err     error
@@ -175,73 +178,77 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 	}
 	realtimeStore, err := realtimeSlotStore(context.Background(), cfg, logger, redisClient)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	if realtimeStore != nil {
 		options = append(options, httpserver.WithRealtimeStore(realtimeStore))
 	}
 	rateLimiterOption, err := gatewayRateLimiterOption(context.Background(), cfg, logger, redisClient)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	if rateLimiterOption != nil {
 		options = append(options, rateLimiterOption)
 	}
 	stores, err := persistentStores(context.Background(), cfg, logger, dbClient, redisClient)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	outbox, err := domainEventsWorker(cfg, stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	retention, err := retentionCleanupWorker(cfg, stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	authClean, err := authSessionCleanupWorker(cfg, stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	idemClean, err := idempotencyCleanupWorker(stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	expirer, err := paymentOrderExpirerWorker(cfg, stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	subExpiry, err := subscriptionExpirerWorker(stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	quota, err := accountQuotaAlertWorker(cfg, stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	balance, err := balanceChargerWorker(cfg, stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	health, err := accountHealthProbeWorker(cfg, stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	quality, err := qualityEvalWorker(cfg, stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	sloEval, err := sloEvaluatorWorker(cfg, stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	quotaRefresh, err := quotaRefreshWorker(cfg, stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	connectivityTest, err := connectivityTestWorker(cfg, stores, logger)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+	}
+	scheduledTest, err := scheduledTestWorker(cfg, stores, logger)
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	if stores != nil {
 		options = append(options,
@@ -272,6 +279,7 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 			httpserver.WithGroupRateLimitsStore(stores.GroupRateLimits),
 			httpserver.WithUserPlatformQuotasStore(stores.UserPlatformQuotas),
 			httpserver.WithPayloadRulesStore(stores.PayloadRules),
+			httpserver.WithScheduledTestsStore(stores.ScheduledTests),
 		)
 	}
 
@@ -284,7 +292,7 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 		handler = httpserver.New(cfg, logger, options...)
 	}()
 
-	return handler, outbox, retention, authClean, expirer, subExpiry, quota, balance, health, quality, sloEval, idemClean, quotaRefresh, connectivityTest, err
+	return handler, outbox, retention, authClean, expirer, subExpiry, quota, balance, health, quality, sloEval, idemClean, quotaRefresh, connectivityTest, scheduledTest, err
 }
 
 func persistentStores(ctx context.Context, cfg config.Config, logger *slog.Logger, dbClient *platformdb.Client, redisClient *platformredis.Client) (*entstore.Stores, error) {
@@ -524,6 +532,17 @@ func connectivityTestWorker(cfg config.Config, stores *entstore.Stores, logger *
 	})
 }
 
+func scheduledTestWorker(cfg config.Config, stores *entstore.Stores, logger *slog.Logger) (*scheduledtestworker.Worker, error) {
+	if stores == nil || stores.Accounts == nil || stores.Providers == nil || stores.ScheduledTests == nil || !cfg.ScheduledTest.Enabled {
+		return nil, nil
+	}
+	return scheduledtestworker.New(stores.Accounts, stores.Providers, stores.ScheduledTests, logger, scheduledtestworker.Config{
+		Tick:      cfg.ScheduledTest.Tick,
+		Timeout:   cfg.ScheduledTest.Timeout,
+		MasterKey: cfg.Security.MasterKey,
+	})
+}
+
 func qualityEvalWorker(cfg config.Config, stores *entstore.Stores, logger *slog.Logger) (*qualityevalworker.Worker, error) {
 	if stores == nil || stores.QualityEval == nil || !cfg.QualityEval.Enabled {
 		return nil, nil
@@ -594,6 +613,9 @@ func (a *App) startWorkers() {
 	if a.connectivityTest != nil {
 		a.connectivityTest.Start(context.Background())
 	}
+	if a.scheduledTest != nil {
+		a.scheduledTest.Start(context.Background())
+	}
 }
 
 func (a *App) stopWorkers(ctx context.Context) error {
@@ -639,6 +661,9 @@ func (a *App) stopWorkers(ctx context.Context) error {
 	}
 	if a.connectivityTest != nil {
 		errs = append(errs, a.connectivityTest.Shutdown(ctx))
+	}
+	if a.scheduledTest != nil {
+		errs = append(errs, a.scheduledTest.Shutdown(ctx))
 	}
 	return errors.Join(errs...)
 }

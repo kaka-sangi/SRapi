@@ -87,6 +87,12 @@ type ModelRegistry func(*sql.Selector)
 // ObsAlertEvent is the predicate function for obsalertevent builders.
 type ObsAlertEvent func(*sql.Selector)
 
+// ObsAlertRule is the predicate function for obsalertrule builders.
+type ObsAlertRule func(*sql.Selector)
+
+// ObsAlertSilence is the predicate function for obsalertsilence builders.
+type ObsAlertSilence func(*sql.Selector)
+
 // ObsSLODefinition is the predicate function for obsslodefinition builders.
 type ObsSLODefinition func(*sql.Selector)
 
@@ -131,6 +137,12 @@ type QualityEvaluation func(*sql.Selector)
 
 // Role is the predicate function for role builders.
 type Role func(*sql.Selector)
+
+// ScheduledTestPlan is the predicate function for scheduledtestplan builders.
+type ScheduledTestPlan func(*sql.Selector)
+
+// ScheduledTestPlanRun is the predicate function for scheduledtestplanrun builders.
+type ScheduledTestPlanRun func(*sql.Selector)
 
 // SchedulerDecision is the predicate function for schedulerdecision builders.
 type SchedulerDecision func(*sql.Selector)

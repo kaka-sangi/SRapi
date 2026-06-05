@@ -32,6 +32,8 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/modelratelimit"
 	"github.com/srapi/srapi/apps/api/ent/modelregistry"
 	"github.com/srapi/srapi/apps/api/ent/obsalertevent"
+	"github.com/srapi/srapi/apps/api/ent/obsalertrule"
+	"github.com/srapi/srapi/apps/api/ent/obsalertsilence"
 	"github.com/srapi/srapi/apps/api/ent/obsslodefinition"
 	"github.com/srapi/srapi/apps/api/ent/opssystemlog"
 	"github.com/srapi/srapi/apps/api/ent/passwordresettoken"
@@ -47,6 +49,8 @@ import (
 	"github.com/srapi/srapi/apps/api/ent/qualityevalsample"
 	"github.com/srapi/srapi/apps/api/ent/qualityevaluation"
 	"github.com/srapi/srapi/apps/api/ent/role"
+	"github.com/srapi/srapi/apps/api/ent/scheduledtestplan"
+	"github.com/srapi/srapi/apps/api/ent/scheduledtestplanrun"
 	"github.com/srapi/srapi/apps/api/ent/schedulerdecision"
 	"github.com/srapi/srapi/apps/api/ent/schedulerfeedback"
 	"github.com/srapi/srapi/apps/api/ent/schedulerrequestsnapshot"
@@ -913,6 +917,68 @@ func init() {
 	obsalerteventDescSummary := obsalerteventFields[5].Descriptor()
 	// obsalertevent.SummaryValidator is a validator for the "summary" field. It is called by the builders before save.
 	obsalertevent.SummaryValidator = obsalerteventDescSummary.Validators[0].(func(string) error)
+	obsalertruleMixin := schema.ObsAlertRule{}.Mixin()
+	obsalertruleMixinFields0 := obsalertruleMixin[0].Fields()
+	_ = obsalertruleMixinFields0
+	obsalertruleFields := schema.ObsAlertRule{}.Fields()
+	_ = obsalertruleFields
+	// obsalertruleDescCreatedAt is the schema descriptor for created_at field.
+	obsalertruleDescCreatedAt := obsalertruleMixinFields0[0].Descriptor()
+	// obsalertrule.DefaultCreatedAt holds the default value on creation for the created_at field.
+	obsalertrule.DefaultCreatedAt = obsalertruleDescCreatedAt.Default.(func() time.Time)
+	// obsalertruleDescUpdatedAt is the schema descriptor for updated_at field.
+	obsalertruleDescUpdatedAt := obsalertruleMixinFields0[1].Descriptor()
+	// obsalertrule.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	obsalertrule.DefaultUpdatedAt = obsalertruleDescUpdatedAt.Default.(func() time.Time)
+	// obsalertrule.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	obsalertrule.UpdateDefaultUpdatedAt = obsalertruleDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// obsalertruleDescName is the schema descriptor for name field.
+	obsalertruleDescName := obsalertruleFields[0].Descriptor()
+	// obsalertrule.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	obsalertrule.NameValidator = obsalertruleDescName.Validators[0].(func(string) error)
+	// obsalertruleDescMetricType is the schema descriptor for metric_type field.
+	obsalertruleDescMetricType := obsalertruleFields[1].Descriptor()
+	// obsalertrule.DefaultMetricType holds the default value on creation for the metric_type field.
+	obsalertrule.DefaultMetricType = obsalertruleDescMetricType.Default.(string)
+	// obsalertruleDescOperator is the schema descriptor for operator field.
+	obsalertruleDescOperator := obsalertruleFields[2].Descriptor()
+	// obsalertrule.DefaultOperator holds the default value on creation for the operator field.
+	obsalertrule.DefaultOperator = obsalertruleDescOperator.Default.(string)
+	// obsalertruleDescSeverity is the schema descriptor for severity field.
+	obsalertruleDescSeverity := obsalertruleFields[4].Descriptor()
+	// obsalertrule.DefaultSeverity holds the default value on creation for the severity field.
+	obsalertrule.DefaultSeverity = obsalertruleDescSeverity.Default.(string)
+	// obsalertruleDescEnabled is the schema descriptor for enabled field.
+	obsalertruleDescEnabled := obsalertruleFields[5].Descriptor()
+	// obsalertrule.DefaultEnabled holds the default value on creation for the enabled field.
+	obsalertrule.DefaultEnabled = obsalertruleDescEnabled.Default.(bool)
+	// obsalertruleDescWindowSeconds is the schema descriptor for window_seconds field.
+	obsalertruleDescWindowSeconds := obsalertruleFields[6].Descriptor()
+	// obsalertrule.DefaultWindowSeconds holds the default value on creation for the window_seconds field.
+	obsalertrule.DefaultWindowSeconds = obsalertruleDescWindowSeconds.Default.(int)
+	// obsalertruleDescCooldownSeconds is the schema descriptor for cooldown_seconds field.
+	obsalertruleDescCooldownSeconds := obsalertruleFields[7].Descriptor()
+	// obsalertrule.DefaultCooldownSeconds holds the default value on creation for the cooldown_seconds field.
+	obsalertrule.DefaultCooldownSeconds = obsalertruleDescCooldownSeconds.Default.(int)
+	// obsalertruleDescMinRequestCount is the schema descriptor for min_request_count field.
+	obsalertruleDescMinRequestCount := obsalertruleFields[8].Descriptor()
+	// obsalertrule.DefaultMinRequestCount holds the default value on creation for the min_request_count field.
+	obsalertrule.DefaultMinRequestCount = obsalertruleDescMinRequestCount.Default.(int)
+	obsalertsilenceMixin := schema.ObsAlertSilence{}.Mixin()
+	obsalertsilenceMixinFields0 := obsalertsilenceMixin[0].Fields()
+	_ = obsalertsilenceMixinFields0
+	obsalertsilenceFields := schema.ObsAlertSilence{}.Fields()
+	_ = obsalertsilenceFields
+	// obsalertsilenceDescCreatedAt is the schema descriptor for created_at field.
+	obsalertsilenceDescCreatedAt := obsalertsilenceMixinFields0[0].Descriptor()
+	// obsalertsilence.DefaultCreatedAt holds the default value on creation for the created_at field.
+	obsalertsilence.DefaultCreatedAt = obsalertsilenceDescCreatedAt.Default.(func() time.Time)
+	// obsalertsilenceDescUpdatedAt is the schema descriptor for updated_at field.
+	obsalertsilenceDescUpdatedAt := obsalertsilenceMixinFields0[1].Descriptor()
+	// obsalertsilence.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	obsalertsilence.DefaultUpdatedAt = obsalertsilenceDescUpdatedAt.Default.(func() time.Time)
+	// obsalertsilence.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	obsalertsilence.UpdateDefaultUpdatedAt = obsalertsilenceDescUpdatedAt.UpdateDefault.(func() time.Time)
 	obsslodefinitionMixin := schema.ObsSLODefinition{}.Mixin()
 	obsslodefinitionMixinFields0 := obsslodefinitionMixin[0].Fields()
 	_ = obsslodefinitionMixinFields0
@@ -1466,6 +1532,91 @@ func init() {
 	roleDescDescription := roleFields[1].Descriptor()
 	// role.DefaultDescription holds the default value on creation for the description field.
 	role.DefaultDescription = roleDescDescription.Default.(string)
+	scheduledtestplanMixin := schema.ScheduledTestPlan{}.Mixin()
+	scheduledtestplanMixinFields0 := scheduledtestplanMixin[0].Fields()
+	_ = scheduledtestplanMixinFields0
+	scheduledtestplanFields := schema.ScheduledTestPlan{}.Fields()
+	_ = scheduledtestplanFields
+	// scheduledtestplanDescCreatedAt is the schema descriptor for created_at field.
+	scheduledtestplanDescCreatedAt := scheduledtestplanMixinFields0[0].Descriptor()
+	// scheduledtestplan.DefaultCreatedAt holds the default value on creation for the created_at field.
+	scheduledtestplan.DefaultCreatedAt = scheduledtestplanDescCreatedAt.Default.(func() time.Time)
+	// scheduledtestplanDescUpdatedAt is the schema descriptor for updated_at field.
+	scheduledtestplanDescUpdatedAt := scheduledtestplanMixinFields0[1].Descriptor()
+	// scheduledtestplan.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	scheduledtestplan.DefaultUpdatedAt = scheduledtestplanDescUpdatedAt.Default.(func() time.Time)
+	// scheduledtestplan.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	scheduledtestplan.UpdateDefaultUpdatedAt = scheduledtestplanDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// scheduledtestplanDescName is the schema descriptor for name field.
+	scheduledtestplanDescName := scheduledtestplanFields[0].Descriptor()
+	// scheduledtestplan.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	scheduledtestplan.NameValidator = scheduledtestplanDescName.Validators[0].(func(string) error)
+	// scheduledtestplanDescEnabled is the schema descriptor for enabled field.
+	scheduledtestplanDescEnabled := scheduledtestplanFields[1].Descriptor()
+	// scheduledtestplan.DefaultEnabled holds the default value on creation for the enabled field.
+	scheduledtestplan.DefaultEnabled = scheduledtestplanDescEnabled.Default.(bool)
+	// scheduledtestplanDescScopeType is the schema descriptor for scope_type field.
+	scheduledtestplanDescScopeType := scheduledtestplanFields[2].Descriptor()
+	// scheduledtestplan.DefaultScopeType holds the default value on creation for the scope_type field.
+	scheduledtestplan.DefaultScopeType = scheduledtestplanDescScopeType.Default.(string)
+	// scheduledtestplanDescIntervalSeconds is the schema descriptor for interval_seconds field.
+	scheduledtestplanDescIntervalSeconds := scheduledtestplanFields[4].Descriptor()
+	// scheduledtestplan.DefaultIntervalSeconds holds the default value on creation for the interval_seconds field.
+	scheduledtestplan.DefaultIntervalSeconds = scheduledtestplanDescIntervalSeconds.Default.(int)
+	// scheduledtestplanDescMaxResults is the schema descriptor for max_results field.
+	scheduledtestplanDescMaxResults := scheduledtestplanFields[6].Descriptor()
+	// scheduledtestplan.DefaultMaxResults holds the default value on creation for the max_results field.
+	scheduledtestplan.DefaultMaxResults = scheduledtestplanDescMaxResults.Default.(int)
+	// scheduledtestplanDescAutoRecover is the schema descriptor for auto_recover field.
+	scheduledtestplanDescAutoRecover := scheduledtestplanFields[7].Descriptor()
+	// scheduledtestplan.DefaultAutoRecover holds the default value on creation for the auto_recover field.
+	scheduledtestplan.DefaultAutoRecover = scheduledtestplanDescAutoRecover.Default.(bool)
+	// scheduledtestplanDescLastStatus is the schema descriptor for last_status field.
+	scheduledtestplanDescLastStatus := scheduledtestplanFields[9].Descriptor()
+	// scheduledtestplan.DefaultLastStatus holds the default value on creation for the last_status field.
+	scheduledtestplan.DefaultLastStatus = scheduledtestplanDescLastStatus.Default.(string)
+	// scheduledtestplanDescLastSummary is the schema descriptor for last_summary field.
+	scheduledtestplanDescLastSummary := scheduledtestplanFields[10].Descriptor()
+	// scheduledtestplan.DefaultLastSummary holds the default value on creation for the last_summary field.
+	scheduledtestplan.DefaultLastSummary = scheduledtestplanDescLastSummary.Default.(string)
+	scheduledtestplanrunFields := schema.ScheduledTestPlanRun{}.Fields()
+	_ = scheduledtestplanrunFields
+	// scheduledtestplanrunDescTrigger is the schema descriptor for trigger field.
+	scheduledtestplanrunDescTrigger := scheduledtestplanrunFields[1].Descriptor()
+	// scheduledtestplanrun.DefaultTrigger holds the default value on creation for the trigger field.
+	scheduledtestplanrun.DefaultTrigger = scheduledtestplanrunDescTrigger.Default.(string)
+	// scheduledtestplanrunDescStatus is the schema descriptor for status field.
+	scheduledtestplanrunDescStatus := scheduledtestplanrunFields[2].Descriptor()
+	// scheduledtestplanrun.DefaultStatus holds the default value on creation for the status field.
+	scheduledtestplanrun.DefaultStatus = scheduledtestplanrunDescStatus.Default.(string)
+	// scheduledtestplanrunDescSelected is the schema descriptor for selected field.
+	scheduledtestplanrunDescSelected := scheduledtestplanrunFields[3].Descriptor()
+	// scheduledtestplanrun.DefaultSelected holds the default value on creation for the selected field.
+	scheduledtestplanrun.DefaultSelected = scheduledtestplanrunDescSelected.Default.(int)
+	// scheduledtestplanrunDescProbed is the schema descriptor for probed field.
+	scheduledtestplanrunDescProbed := scheduledtestplanrunFields[4].Descriptor()
+	// scheduledtestplanrun.DefaultProbed holds the default value on creation for the probed field.
+	scheduledtestplanrun.DefaultProbed = scheduledtestplanrunDescProbed.Default.(int)
+	// scheduledtestplanrunDescSkipped is the schema descriptor for skipped field.
+	scheduledtestplanrunDescSkipped := scheduledtestplanrunFields[5].Descriptor()
+	// scheduledtestplanrun.DefaultSkipped holds the default value on creation for the skipped field.
+	scheduledtestplanrun.DefaultSkipped = scheduledtestplanrunDescSkipped.Default.(int)
+	// scheduledtestplanrunDescFailed is the schema descriptor for failed field.
+	scheduledtestplanrunDescFailed := scheduledtestplanrunFields[6].Descriptor()
+	// scheduledtestplanrun.DefaultFailed holds the default value on creation for the failed field.
+	scheduledtestplanrun.DefaultFailed = scheduledtestplanrunDescFailed.Default.(int)
+	// scheduledtestplanrunDescUnhealthy is the schema descriptor for unhealthy field.
+	scheduledtestplanrunDescUnhealthy := scheduledtestplanrunFields[7].Descriptor()
+	// scheduledtestplanrun.DefaultUnhealthy holds the default value on creation for the unhealthy field.
+	scheduledtestplanrun.DefaultUnhealthy = scheduledtestplanrunDescUnhealthy.Default.(int)
+	// scheduledtestplanrunDescRecovered is the schema descriptor for recovered field.
+	scheduledtestplanrunDescRecovered := scheduledtestplanrunFields[8].Descriptor()
+	// scheduledtestplanrun.DefaultRecovered holds the default value on creation for the recovered field.
+	scheduledtestplanrun.DefaultRecovered = scheduledtestplanrunDescRecovered.Default.(int)
+	// scheduledtestplanrunDescSummary is the schema descriptor for summary field.
+	scheduledtestplanrunDescSummary := scheduledtestplanrunFields[9].Descriptor()
+	// scheduledtestplanrun.DefaultSummary holds the default value on creation for the summary field.
+	scheduledtestplanrun.DefaultSummary = scheduledtestplanrunDescSummary.Default.(string)
 	schedulerdecisionMixin := schema.SchedulerDecision{}.Mixin()
 	schedulerdecisionMixinFields0 := schedulerdecisionMixin[0].Fields()
 	_ = schedulerdecisionMixinFields0

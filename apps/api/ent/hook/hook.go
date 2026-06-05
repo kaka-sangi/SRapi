@@ -333,6 +333,30 @@ func (f ObsAlertEventFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Valu
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ObsAlertEventMutation", m)
 }
 
+// The ObsAlertRuleFunc type is an adapter to allow the use of ordinary
+// function as ObsAlertRule mutator.
+type ObsAlertRuleFunc func(context.Context, *ent.ObsAlertRuleMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ObsAlertRuleFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ObsAlertRuleMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ObsAlertRuleMutation", m)
+}
+
+// The ObsAlertSilenceFunc type is an adapter to allow the use of ordinary
+// function as ObsAlertSilence mutator.
+type ObsAlertSilenceFunc func(context.Context, *ent.ObsAlertSilenceMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ObsAlertSilenceFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ObsAlertSilenceMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ObsAlertSilenceMutation", m)
+}
+
 // The ObsSLODefinitionFunc type is an adapter to allow the use of ordinary
 // function as ObsSLODefinition mutator.
 type ObsSLODefinitionFunc func(context.Context, *ent.ObsSLODefinitionMutation) (ent.Value, error)
@@ -511,6 +535,30 @@ func (f RoleFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error)
 		return f(ctx, mv)
 	}
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.RoleMutation", m)
+}
+
+// The ScheduledTestPlanFunc type is an adapter to allow the use of ordinary
+// function as ScheduledTestPlan mutator.
+type ScheduledTestPlanFunc func(context.Context, *ent.ScheduledTestPlanMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ScheduledTestPlanFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ScheduledTestPlanMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ScheduledTestPlanMutation", m)
+}
+
+// The ScheduledTestPlanRunFunc type is an adapter to allow the use of ordinary
+// function as ScheduledTestPlanRun mutator.
+type ScheduledTestPlanRunFunc func(context.Context, *ent.ScheduledTestPlanRunMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ScheduledTestPlanRunFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ScheduledTestPlanRunMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ScheduledTestPlanRunMutation", m)
 }
 
 // The SchedulerDecisionFunc type is an adapter to allow the use of ordinary
