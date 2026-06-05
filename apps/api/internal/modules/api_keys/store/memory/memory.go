@@ -94,6 +94,16 @@ func (s *Store) FindByPrefix(_ context.Context, prefix string) (contract.APIKey,
 	return cloneKey(s.byID[id]), nil
 }
 
+func (s *Store) FindByID(_ context.Context, id int) (contract.APIKey, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key, ok := s.byID[id]
+	if !ok {
+		return contract.APIKey{}, contract.ErrKeyNotFound
+	}
+	return cloneKey(key), nil
+}
+
 func (s *Store) ListByUser(_ context.Context, userID int) ([]contract.APIKey, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

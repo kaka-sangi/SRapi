@@ -2554,6 +2554,90 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/api-keys:
+    get:
+      tags:
+        - AdminUsers
+      operationId: listAdminApiKeys
+      summary: List API keys across all users.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/ApiKeyStatus"
+        - name: user_id
+          in: query
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: API key list across users.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKeyListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/api-keys/{id}:
+    patch:
+      tags:
+        - AdminUsers
+      operationId: updateAdminApiKey
+      summary: Update an API key as an admin (e.g. revoke by disabling).
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminUpdateApiKeyRequest"
+      responses:
+        "200":
+          description: API key updated.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKeyResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/users:
     get:
       tags:
@@ -13127,6 +13211,11 @@ components:
           nullable: true
         created_at:
           $ref: "#/components/schemas/Timestamp"
+        user_id:
+          $ref: "#/components/schemas/Id"
+        user_email:
+          type: string
+          description: Owner email; populated only on admin (cross-user) responses.
 
     CreateApiKeyRequest:
       type: object
@@ -13191,6 +13280,14 @@ components:
           type: string
           format: date-time
           nullable: true
+
+    AdminUpdateApiKeyRequest:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          $ref: "#/components/schemas/ApiKeyStatus"
 
     UpdateApiKeyRequest:
       type: object

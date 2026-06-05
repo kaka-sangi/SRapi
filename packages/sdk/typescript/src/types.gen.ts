@@ -727,6 +727,11 @@ export type ApiKey = {
     expires_at?: string | null;
     last_used_at?: string | null;
     created_at: Timestamp;
+    user_id?: Id;
+    /**
+     * Owner email; populated only on admin (cross-user) responses.
+     */
+    user_email?: string;
 };
 
 export type CreateApiKeyRequest = {
@@ -743,6 +748,10 @@ export type CreateApiKeyRequest = {
     allowed_ips?: Array<string>;
     denied_ips?: Array<string>;
     expires_at?: string | null;
+};
+
+export type AdminUpdateApiKeyRequest = {
+    status: ApiKeyStatus;
 };
 
 export type UpdateApiKeyRequest = {
@@ -7317,6 +7326,87 @@ export type UpdateAdminRoleResponses = {
 };
 
 export type UpdateAdminRoleResponse = UpdateAdminRoleResponses[keyof UpdateAdminRoleResponses];
+
+export type ListAdminApiKeysData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        page_size?: number;
+        status?: ApiKeyStatus;
+        user_id?: Id;
+    };
+    url: '/api/v1/admin/api-keys';
+};
+
+export type ListAdminApiKeysErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminApiKeysError = ListAdminApiKeysErrors[keyof ListAdminApiKeysErrors];
+
+export type ListAdminApiKeysResponses = {
+    /**
+     * API key list across users.
+     */
+    200: ApiKeyListResponse;
+};
+
+export type ListAdminApiKeysResponse = ListAdminApiKeysResponses[keyof ListAdminApiKeysResponses];
+
+export type UpdateAdminApiKeyData = {
+    body: AdminUpdateApiKeyRequest;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/api-keys/{id}';
+};
+
+export type UpdateAdminApiKeyErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type UpdateAdminApiKeyError = UpdateAdminApiKeyErrors[keyof UpdateAdminApiKeyErrors];
+
+export type UpdateAdminApiKeyResponses = {
+    /**
+     * API key updated.
+     */
+    200: ApiKeyResponse;
+};
+
+export type UpdateAdminApiKeyResponse = UpdateAdminApiKeyResponses[keyof UpdateAdminApiKeyResponses];
 
 export type ListAdminUsersData = {
     body?: never;

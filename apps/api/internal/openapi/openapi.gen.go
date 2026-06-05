@@ -3309,6 +3309,11 @@ type AdminTestResultResponse struct {
 	RequestId RequestId       `json:"request_id"`
 }
 
+// AdminUpdateApiKeyRequest defines model for AdminUpdateApiKeyRequest.
+type AdminUpdateApiKeyRequest struct {
+	Status ApiKeyStatus `json:"status"`
+}
+
 // AffiliateCurrencySummary defines model for AffiliateCurrencySummary.
 type AffiliateCurrencySummary struct {
 	AccruedAmount string `json:"accrued_amount"`
@@ -3589,6 +3594,10 @@ type ApiKey struct {
 	Scopes         []string     `json:"scopes"`
 	Status         ApiKeyStatus `json:"status"`
 	TpmLimit       *int         `json:"tpm_limit,omitempty"`
+
+	// UserEmail Owner email; populated only on admin (cross-user) responses.
+	UserEmail *string `json:"user_email,omitempty"`
+	UserId    *Id     `json:"user_id,omitempty"`
 }
 
 // ApiKeyListResponse defines model for ApiKeyListResponse.
@@ -7861,6 +7870,14 @@ type ListAdminAnnouncementsParams struct {
 	Status   *AnnouncementStatus `form:"status,omitempty" json:"status,omitempty"`
 }
 
+// ListAdminApiKeysParams defines parameters for ListAdminApiKeys.
+type ListAdminApiKeysParams struct {
+	Page     *Page         `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *PageSize     `form:"page_size,omitempty" json:"page_size,omitempty"`
+	Status   *ApiKeyStatus `form:"status,omitempty" json:"status,omitempty"`
+	UserId   *Id           `form:"user_id,omitempty" json:"user_id,omitempty"`
+}
+
 // ListAdminAuditLogsParams defines parameters for ListAdminAuditLogs.
 type ListAdminAuditLogsParams struct {
 	Page         *Page     `form:"page,omitempty" json:"page,omitempty"`
@@ -8458,6 +8475,9 @@ type CreateAdminAnnouncementJSONRequestBody = CreateAnnouncementRequest
 
 // UpdateAdminAnnouncementJSONRequestBody defines body for UpdateAdminAnnouncement for application/json ContentType.
 type UpdateAdminAnnouncementJSONRequestBody = UpdateAnnouncementRequest
+
+// UpdateAdminApiKeyJSONRequestBody defines body for UpdateAdminApiKey for application/json ContentType.
+type UpdateAdminApiKeyJSONRequestBody = AdminUpdateApiKeyRequest
 
 // ImportAdminConfigSnapshotJSONRequestBody defines body for ImportAdminConfigSnapshot for application/json ContentType.
 type ImportAdminConfigSnapshotJSONRequestBody = ConfigImportRequest
@@ -15201,6 +15221,12 @@ type ServerInterface interface {
 	// Update an announcement.
 	// (PUT /api/v1/admin/announcements/{id})
 	UpdateAdminAnnouncement(w http.ResponseWriter, r *http.Request, id Id)
+	// List API keys across all users.
+	// (GET /api/v1/admin/api-keys)
+	ListAdminApiKeys(w http.ResponseWriter, r *http.Request, params ListAdminApiKeysParams)
+	// Update an API key as an admin (e.g. revoke by disabling).
+	// (PATCH /api/v1/admin/api-keys/{id})
+	UpdateAdminApiKey(w http.ResponseWriter, r *http.Request, id Id)
 	// List audit logs.
 	// (GET /api/v1/admin/audit-logs)
 	ListAdminAuditLogs(w http.ResponseWriter, r *http.Request, params ListAdminAuditLogsParams)
@@ -17778,6 +17804,118 @@ func (siw *ServerInterfaceWrapper) UpdateAdminAnnouncement(w http.ResponseWriter
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateAdminAnnouncement(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAdminApiKeys operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminApiKeys(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminApiKeysParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "user_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "user_id", r.URL.Query(), &params.UserId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "user_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminApiKeys(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateAdminApiKey operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAdminApiKey(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAdminApiKey(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -25897,6 +26035,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/announcements", wrapper.CreateAdminAnnouncement)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/announcements/{id}", wrapper.DeleteAdminAnnouncement)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/admin/announcements/{id}", wrapper.UpdateAdminAnnouncement)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/api-keys", wrapper.ListAdminApiKeys)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/api-keys/{id}", wrapper.UpdateAdminApiKey)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/audit-logs", wrapper.ListAdminAuditLogs)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/billing-ledger", wrapper.ListAdminBillingLedger)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/capabilities", wrapper.ListAdminCapabilities)

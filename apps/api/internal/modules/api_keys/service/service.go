@@ -119,6 +119,19 @@ func (s *Service) List(ctx context.Context) ([]contract.APIKey, error) {
 	return out, nil
 }
 
+// GetByID returns a single key by its ID (without the secret hash), regardless
+// of owner — used by admin tooling that operates across users.
+func (s *Service) GetByID(ctx context.Context, id int) (contract.APIKey, error) {
+	if id <= 0 {
+		return contract.APIKey{}, ErrInvalidInput
+	}
+	key, err := s.store.FindByID(ctx, id)
+	if err != nil {
+		return contract.APIKey{}, err
+	}
+	return withoutHash(key), nil
+}
+
 func (s *Service) Update(ctx context.Context, req contract.UpdateRequest) (contract.APIKey, error) {
 	if req.UserID <= 0 || req.KeyID <= 0 {
 		return contract.APIKey{}, ErrInvalidInput

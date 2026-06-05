@@ -82,6 +82,16 @@ func (s *memoryStore) FindByPrefix(_ context.Context, prefix string) (contract.A
 	return s.byID[id], nil
 }
 
+func (s *memoryStore) FindByID(_ context.Context, id int) (contract.APIKey, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key, ok := s.byID[id]
+	if !ok {
+		return contract.APIKey{}, ErrKeyNotFound
+	}
+	return key, nil
+}
+
 func (s *memoryStore) ListByUser(_ context.Context, userID int) ([]contract.APIKey, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
