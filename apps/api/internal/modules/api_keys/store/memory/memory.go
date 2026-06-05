@@ -67,7 +67,9 @@ func (s *Store) Update(_ context.Context, key contract.APIKey) (contract.APIKey,
 	key.Prefix = stored.Prefix
 	key.Hash = stored.Hash
 	key.CreatedAt = stored.CreatedAt
-	key.ExpiresAt = cloneTimePointer(stored.ExpiresAt)
+	// ExpiresAt is editable via Update; the service carries the current value
+	// through when unchanged, so persist whatever it hands us.
+	key.ExpiresAt = cloneTimePointer(key.ExpiresAt)
 	key.LastUsedAt = cloneTimePointer(stored.LastUsedAt)
 	key.RPMLimit = cloneIntPointer(key.RPMLimit)
 	key.TPMLimit = cloneIntPointer(key.TPMLimit)

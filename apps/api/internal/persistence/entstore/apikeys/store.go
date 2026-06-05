@@ -105,6 +105,7 @@ func (s *Store) Update(ctx context.Context, key contract.APIKey) (contract.APIKe
 		SetNillableRequestLimit7d(key.RequestLimit7d).
 		SetAllowedIpsJSON(cloneStrings(key.AllowedIPs)).
 		SetDeniedIpsJSON(cloneStrings(key.DeniedIPs)).
+		SetNillableExpiresAt(key.ExpiresAt).
 		Save(ctx)
 	if err != nil {
 		_ = tx.Rollback()

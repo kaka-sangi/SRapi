@@ -83,6 +83,15 @@ type LiveApiKey = {
   created_at: string;
   allowed_models?: string[];
   group_ids?: string[];
+  allowed_ips?: string[];
+  denied_ips?: string[];
+  request_limit_5h?: number | null;
+  request_limit_1d?: number | null;
+  request_limit_7d?: number | null;
+  rpm_limit?: number | null;
+  tpm_limit?: number | null;
+  concurrency_limit?: number | null;
+  expires_at?: string | null;
 };
 
 type LiveProviderAccount = {
@@ -586,7 +595,16 @@ export const apiService = {
         status: (key.status === 'active' ? 'active' : 'disabled') as 'active' | 'disabled',
         created_at: key.created_at,
         allowed_models: key.allowed_models || [],
-        group_ids: key.group_ids || []
+        group_ids: key.group_ids || [],
+        allowed_ips: key.allowed_ips || [],
+        denied_ips: key.denied_ips || [],
+        request_limit_5h: key.request_limit_5h ?? null,
+        request_limit_1d: key.request_limit_1d ?? null,
+        request_limit_7d: key.request_limit_7d ?? null,
+        rpm_limit: key.rpm_limit ?? null,
+        tpm_limit: key.tpm_limit ?? null,
+        concurrency_limit: key.concurrency_limit ?? null,
+        expires_at: key.expires_at ?? null
       }));
     }
     return [];
@@ -664,6 +682,49 @@ export const apiService = {
       };
     }
     throw new Error('API key update returned an empty response.');
+  },
+
+  // Edit the full policy of an existing key. Status stays under the row
+  // enable/disable control; everything else the create dialog collects is
+  // editable here. `expiresAt` is omitted when blank to leave expiry unchanged.
+  async updateApiKey(
+    id: string,
+    policy: {
+      name: string;
+      allowedModels: string[];
+      groupIds: string[];
+      allowedIps?: string[];
+      deniedIps?: string[];
+      requestLimit5h?: number;
+      requestLimit1d?: number;
+      requestLimit7d?: number;
+      rpmLimit?: number;
+      tpmLimit?: number;
+      concurrencyLimit?: number;
+      expiresAt?: string;
+    }
+  ): Promise<void> {
+    await sdkUpdateApiKey({
+      path: { id },
+      body: {
+        name: policy.name,
+        allowed_models: policy.allowedModels,
+        group_ids: policy.groupIds,
+        // Arrays are always sent so emptying a list clears it server-side.
+        allowed_ips: policy.allowedIps ?? [],
+        denied_ips: policy.deniedIps ?? [],
+        // 0 is the backend's canonical "unlimited" (enforcement keeps only
+        // limit > 0), so a blank field clears the limit rather than no-op.
+        rpm_limit: policy.rpmLimit ?? 0,
+        tpm_limit: policy.tpmLimit ?? 0,
+        concurrency_limit: policy.concurrencyLimit ?? 0,
+        request_limit_5h: policy.requestLimit5h ?? 0,
+        request_limit_1d: policy.requestLimit1d ?? 0,
+        request_limit_7d: policy.requestLimit7d ?? 0,
+        ...(policy.expiresAt ? { expires_at: policy.expiresAt } : {})
+      },
+      throwOnError: true
+    });
   },
 
   async listProviderAccounts(): Promise<ProviderAccountSummary[]> {

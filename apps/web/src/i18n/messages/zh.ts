@@ -368,6 +368,8 @@ export const zh: Messages = {
     throughputLimitsHint: "每分钟请求 / Token 上限与最大并发数，留空表示不限。",
     expiresAt: "过期时间",
     expiresAtHint: "可选。超过该时间后密钥停止工作。",
+    expiresAtEditHint: "留空则保持当前过期时间。",
+    edit: "编辑密钥",
     created: "创建",
     createdToast: "已创建 API 密钥",
     copyKey: "复制密钥",

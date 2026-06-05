@@ -2,9 +2,14 @@
 
 import { useState } from "react";
 import { Copy, Check } from "lucide-react";
-import { createApiKeySchema, type CreateApiKeyValues } from "@/lib/schemas/api-key";
-import { useCreateApiKey } from "@/hooks/queries";
+import {
+  createApiKeySchema,
+  updateApiKeySchema,
+  type CreateApiKeyValues,
+} from "@/lib/schemas/api-key";
+import { useCreateApiKey, useUpdateApiKey } from "@/hooks/queries";
 import { useLanguage } from "@/context/LanguageContext";
+import { useToast } from "@/context/ToastContext";
 import {
   Dialog,
   DialogTrigger,
@@ -18,26 +23,69 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TagInput } from "@/components/ui/tag-input";
+import type { ApiKeySummary } from "@/lib/srapi-types";
 
+/** Create entry point used by the page header. */
 export function ApiKeyCreateDialog() {
+  return <ApiKeyFormDialog />;
+}
+
+function limitToInput(value?: number | null): string {
+  return value && value > 0 ? String(value) : "";
+}
+
+// ISO timestamp → value accepted by <input type="datetime-local"> (local time,
+// minute precision), so the current expiry prefills correctly.
+function isoToLocalInput(iso?: string | null): string {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
+    date.getHours(),
+  )}:${pad(date.getMinutes())}`;
+}
+
+export function ApiKeyFormDialog({
+  editKey,
+  open: controlledOpen,
+  onOpenChange,
+}: {
+  editKey?: ApiKeySummary;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
   const { t } = useLanguage();
-  const [open, setOpen] = useState(false);
+  const { toast } = useToast();
+  const isEdit = Boolean(editKey);
+  const controlled = onOpenChange !== undefined;
+
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlled ? Boolean(controlledOpen) : internalOpen;
+
+  // Initial state derives from the edited key (lazy initializers). The page
+  // remounts this dialog via `key` when a different key is selected, so a fresh
+  // mount always reflects the right key without a state-syncing effect.
   const [plaintext, setPlaintext] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [name, setName] = useState("");
-  const [allowedModels, setAllowedModels] = useState<string[]>([]);
-  const [groupIds, setGroupIds] = useState<string[]>([]);
-  const [allowedIps, setAllowedIps] = useState<string[]>([]);
-  const [deniedIps, setDeniedIps] = useState<string[]>([]);
-  const [limit5h, setLimit5h] = useState("");
-  const [limit1d, setLimit1d] = useState("");
-  const [limit7d, setLimit7d] = useState("");
-  const [rpmLimit, setRpmLimit] = useState("");
-  const [tpmLimit, setTpmLimit] = useState("");
-  const [concurrencyLimit, setConcurrencyLimit] = useState("");
-  const [expiresAt, setExpiresAt] = useState("");
+  const [name, setName] = useState(() => editKey?.name ?? "");
+  const [allowedModels, setAllowedModels] = useState<string[]>(() => editKey?.allowed_models ?? []);
+  const [groupIds, setGroupIds] = useState<string[]>(() => editKey?.group_ids ?? []);
+  const [allowedIps, setAllowedIps] = useState<string[]>(() => editKey?.allowed_ips ?? []);
+  const [deniedIps, setDeniedIps] = useState<string[]>(() => editKey?.denied_ips ?? []);
+  const [limit5h, setLimit5h] = useState(() => limitToInput(editKey?.request_limit_5h));
+  const [limit1d, setLimit1d] = useState(() => limitToInput(editKey?.request_limit_1d));
+  const [limit7d, setLimit7d] = useState(() => limitToInput(editKey?.request_limit_7d));
+  const [rpmLimit, setRpmLimit] = useState(() => limitToInput(editKey?.rpm_limit));
+  const [tpmLimit, setTpmLimit] = useState(() => limitToInput(editKey?.tpm_limit));
+  const [concurrencyLimit, setConcurrencyLimit] = useState(() =>
+    limitToInput(editKey?.concurrency_limit),
+  );
+  const [expiresAt, setExpiresAt] = useState(() => isoToLocalInput(editKey?.expires_at));
   const [error, setError] = useState<string | null>(null);
   const createKey = useCreateApiKey();
+  const updateKey = useUpdateApiKey();
+  const pending = isEdit ? updateKey.isPending : createKey.isPending;
 
   function parseLimit(value: string): number | undefined {
     const trimmed = value.trim();
@@ -54,7 +102,7 @@ export function ApiKeyCreateDialog() {
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
-    const parsed = createApiKeySchema.safeParse({
+    const values = {
       name,
       allowedModels,
       groupIds,
@@ -67,29 +115,37 @@ export function ApiKeyCreateDialog() {
       tpmLimit: parseLimit(tpmLimit),
       concurrencyLimit: parseLimit(concurrencyLimit),
       expiresAt: expiresAt.trim() || undefined,
-    } satisfies CreateApiKeyValues);
+    } satisfies CreateApiKeyValues;
+    const parsed = (isEdit ? updateApiKeySchema : createApiKeySchema).safeParse(values);
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? "Invalid input");
       return;
     }
+    const payload = {
+      name: parsed.data.name,
+      allowedModels: parsed.data.allowedModels,
+      groupIds: parsed.data.groupIds,
+      allowedIps: parsed.data.allowedIps,
+      deniedIps: parsed.data.deniedIps,
+      requestLimit5h: parsed.data.requestLimit5h,
+      requestLimit1d: parsed.data.requestLimit1d,
+      requestLimit7d: parsed.data.requestLimit7d,
+      rpmLimit: parsed.data.rpmLimit,
+      tpmLimit: parsed.data.tpmLimit,
+      concurrencyLimit: parsed.data.concurrencyLimit,
+      expiresAt: isoOrUndefined(parsed.data.expiresAt),
+    };
     try {
-      const created = await createKey.mutateAsync({
-        name: parsed.data.name,
-        allowedModels: parsed.data.allowedModels,
-        groupIds: parsed.data.groupIds,
-        allowedIps: parsed.data.allowedIps,
-        deniedIps: parsed.data.deniedIps,
-        requestLimit5h: parsed.data.requestLimit5h,
-        requestLimit1d: parsed.data.requestLimit1d,
-        requestLimit7d: parsed.data.requestLimit7d,
-        rpmLimit: parsed.data.rpmLimit,
-        tpmLimit: parsed.data.tpmLimit,
-        concurrencyLimit: parsed.data.concurrencyLimit,
-        expiresAt: isoOrUndefined(parsed.data.expiresAt),
-      });
-      setPlaintext(created.plaintextKey ?? null);
+      if (isEdit && editKey) {
+        await updateKey.mutateAsync({ id: editKey.id, ...payload });
+        toast({ title: t("feedback.saved"), tone: "success" });
+        setOpen(false);
+      } else {
+        const created = await createKey.mutateAsync(payload);
+        setPlaintext(created.plaintextKey ?? null);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create API key.");
+      setError(err instanceof Error ? err.message : t("feedback.failed"));
     }
   }
 
@@ -100,8 +156,9 @@ export function ApiKeyCreateDialog() {
     setTimeout(() => setCopied(false), 1500);
   }
 
-  function close(next: boolean) {
-    setOpen(next);
+  function setOpen(next: boolean) {
+    if (controlled) onOpenChange?.(next);
+    else setInternalOpen(next);
     if (!next) {
       setName("");
       setAllowedModels([]);
@@ -122,10 +179,12 @@ export function ApiKeyCreateDialog() {
   }
 
   return (
-    <Dialog open={open} onOpenChange={close}>
-      <DialogTrigger asChild>
-        <Button variant="primary">＋ {t("apiKeys.create")}</Button>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={setOpen}>
+      {controlled ? null : (
+        <DialogTrigger asChild>
+          <Button variant="primary">＋ {t("apiKeys.create")}</Button>
+        </DialogTrigger>
+      )}
       <DialogContent>
         {plaintext ? (
           <>
@@ -140,7 +199,7 @@ export function ApiKeyCreateDialog() {
               </Button>
             </div>
             <DialogFooter>
-              <Button variant="primary" onClick={() => close(false)}>
+              <Button variant="primary" onClick={() => setOpen(false)}>
                 {t("common.close")}
               </Button>
             </DialogFooter>
@@ -148,7 +207,7 @@ export function ApiKeyCreateDialog() {
         ) : (
           <form onSubmit={onSubmit}>
             <DialogHeader>
-              <DialogTitle>{t("apiKeys.create")}</DialogTitle>
+              <DialogTitle>{isEdit ? t("apiKeys.edit") : t("apiKeys.create")}</DialogTitle>
               <DialogDescription>{t("apiKeys.subtitle")}</DialogDescription>
             </DialogHeader>
             <div className="mt-4 space-y-4">
@@ -162,7 +221,7 @@ export function ApiKeyCreateDialog() {
                   id="key-models"
                   value={allowedModels}
                   onChange={setAllowedModels}
-                  disabled={createKey.isPending}
+                  disabled={pending}
                   placeholder="claude-3-7-sonnet, gpt-4o"
                 />
                 <p className="mt-1 text-2xs text-srapi-text-tertiary">{t("apiKeys.modelsHint")}</p>
@@ -173,7 +232,7 @@ export function ApiKeyCreateDialog() {
                   id="key-groups"
                   value={groupIds}
                   onChange={setGroupIds}
-                  disabled={createKey.isPending}
+                  disabled={pending}
                   placeholder="default"
                 />
                 <p className="mt-1 text-2xs text-srapi-text-tertiary">{t("apiKeys.groupsHint")}</p>
@@ -189,7 +248,7 @@ export function ApiKeyCreateDialog() {
                   id="key-allowed-ips"
                   value={allowedIps}
                   onChange={setAllowedIps}
-                  disabled={createKey.isPending}
+                  disabled={pending}
                   placeholder="10.0.0.0/8, 203.0.113.7"
                 />
                 <p className="mt-1 text-2xs text-srapi-text-tertiary">{t("apiKeys.allowedIpsHint")}</p>
@@ -200,7 +259,7 @@ export function ApiKeyCreateDialog() {
                   id="key-denied-ips"
                   value={deniedIps}
                   onChange={setDeniedIps}
-                  disabled={createKey.isPending}
+                  disabled={pending}
                   placeholder="198.51.100.0/24"
                 />
                 <p className="mt-1 text-2xs text-srapi-text-tertiary">{t("apiKeys.deniedIpsHint")}</p>
@@ -216,7 +275,7 @@ export function ApiKeyCreateDialog() {
                     placeholder={t("apiKeys.windowLimit5h")}
                     value={limit5h}
                     onChange={(e) => setLimit5h(e.target.value)}
-                    disabled={createKey.isPending}
+                    disabled={pending}
                   />
                   <Input
                     type="number"
@@ -226,7 +285,7 @@ export function ApiKeyCreateDialog() {
                     placeholder={t("apiKeys.windowLimit1d")}
                     value={limit1d}
                     onChange={(e) => setLimit1d(e.target.value)}
-                    disabled={createKey.isPending}
+                    disabled={pending}
                   />
                   <Input
                     type="number"
@@ -236,7 +295,7 @@ export function ApiKeyCreateDialog() {
                     placeholder={t("apiKeys.windowLimit7d")}
                     value={limit7d}
                     onChange={(e) => setLimit7d(e.target.value)}
-                    disabled={createKey.isPending}
+                    disabled={pending}
                   />
                 </div>
                 <p className="mt-1 text-2xs text-srapi-text-tertiary">{t("apiKeys.windowLimitsHint")}</p>
@@ -252,7 +311,7 @@ export function ApiKeyCreateDialog() {
                     placeholder={t("apiKeys.rpm")}
                     value={rpmLimit}
                     onChange={(e) => setRpmLimit(e.target.value)}
-                    disabled={createKey.isPending}
+                    disabled={pending}
                   />
                   <Input
                     type="number"
@@ -262,7 +321,7 @@ export function ApiKeyCreateDialog() {
                     placeholder={t("apiKeys.tpm")}
                     value={tpmLimit}
                     onChange={(e) => setTpmLimit(e.target.value)}
-                    disabled={createKey.isPending}
+                    disabled={pending}
                   />
                   <Input
                     type="number"
@@ -272,7 +331,7 @@ export function ApiKeyCreateDialog() {
                     placeholder={t("apiKeys.concurrency")}
                     value={concurrencyLimit}
                     onChange={(e) => setConcurrencyLimit(e.target.value)}
-                    disabled={createKey.isPending}
+                    disabled={pending}
                   />
                 </div>
                 <p className="mt-1 text-2xs text-srapi-text-tertiary">{t("apiKeys.throughputLimitsHint")}</p>
@@ -284,9 +343,11 @@ export function ApiKeyCreateDialog() {
                   type="datetime-local"
                   value={expiresAt}
                   onChange={(e) => setExpiresAt(e.target.value)}
-                  disabled={createKey.isPending}
+                  disabled={pending}
                 />
-                <p className="mt-1 text-2xs text-srapi-text-tertiary">{t("apiKeys.expiresAtHint")}</p>
+                <p className="mt-1 text-2xs text-srapi-text-tertiary">
+                  {isEdit ? t("apiKeys.expiresAtEditHint") : t("apiKeys.expiresAtHint")}
+                </p>
               </div>
               {error && (
                 <p role="alert" className="text-sm text-srapi-error">
@@ -295,11 +356,11 @@ export function ApiKeyCreateDialog() {
               )}
             </div>
             <DialogFooter className="mt-6">
-              <Button type="button" variant="ghost" onClick={() => close(false)}>
+              <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
                 {t("common.cancel")}
               </Button>
-              <Button type="submit" variant="primary" loading={createKey.isPending}>
-                {t("common.create")}
+              <Button type="submit" variant="primary" loading={pending}>
+                {isEdit ? t("common.save") : t("common.create")}
               </Button>
             </DialogFooter>
           </form>

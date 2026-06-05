@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { KeyRound, MoreHorizontal } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageQueryState } from "@/components/layout/page-query-state";
 import { useApiKeys, useToggleApiKey } from "@/hooks/queries";
+import type { ApiKeySummary } from "@/lib/srapi-types";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { Card } from "@/components/ui/card";
@@ -27,7 +29,7 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { ApiKeyCreateDialog } from "@/components/features/api-key-create-dialog";
+import { ApiKeyCreateDialog, ApiKeyFormDialog } from "@/components/features/api-key-create-dialog";
 
 export default function ApiKeysPage() {
   return (
@@ -42,6 +44,7 @@ function ApiKeysContent() {
   const { toast } = useToast();
   const apiKeys = useApiKeys();
   const toggle = useToggleApiKey();
+  const [editKey, setEditKey] = useState<ApiKeySummary | null>(null);
 
   async function runToggle(id: string, status: "active" | "disabled") {
     try {
@@ -114,6 +117,9 @@ function ApiKeysContent() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => setEditKey(key)}>
+                                {t("common.edit")}
+                              </DropdownMenuItem>
                               <DropdownMenuItem
                                 disabled={toggle.isPending}
                                 onClick={() => void runToggle(key.id, key.status)}
@@ -132,6 +138,15 @@ function ApiKeysContent() {
           }
         </PageQueryState>
       </Card>
+
+      <ApiKeyFormDialog
+        key={editKey?.id ?? "none"}
+        editKey={editKey ?? undefined}
+        open={editKey !== null}
+        onOpenChange={(next) => {
+          if (!next) setEditKey(null);
+        }}
+      />
     </>
   );
 }

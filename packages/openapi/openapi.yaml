@@ -13343,6 +13343,13 @@ components:
           type: array
           items:
             type: string
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: >-
+            New expiry timestamp. When present the key expiry is updated; omit
+            to leave the current expiry unchanged.
 
     ApiKeySecretData:
       type: object

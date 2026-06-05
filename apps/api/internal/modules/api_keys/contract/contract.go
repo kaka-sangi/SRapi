@@ -74,6 +74,7 @@ type UpdateRequest struct {
 	RequestLimit7d   *int
 	AllowedIPs       *[]string
 	DeniedIPs        *[]string
+	ExpiresAt        *time.Time
 }
 
 type CreatedKey struct {

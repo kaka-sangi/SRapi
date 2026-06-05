@@ -63,7 +63,7 @@ func (s *memoryStore) Update(_ context.Context, key contract.APIKey) (contract.A
 	key.CreatedAt = stored.CreatedAt
 	key.RPMLimit = stored.RPMLimit
 	key.TPMLimit = stored.TPMLimit
-	key.ExpiresAt = stored.ExpiresAt
+	// ExpiresAt is editable via Update; keep whatever the service passes through.
 	key.LastUsedAt = stored.LastUsedAt
 	key.Scopes = append([]string(nil), key.Scopes...)
 	key.AllowedModels = append([]string(nil), key.AllowedModels...)

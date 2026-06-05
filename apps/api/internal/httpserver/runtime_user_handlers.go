@@ -1278,6 +1278,7 @@ func (s *Server) handleUpdateApiKey(w http.ResponseWriter, r *http.Request) {
 		RequestLimit7d:   body.RequestLimit7d,
 		AllowedIPs:       body.AllowedIps,
 		DeniedIPs:        body.DeniedIps,
+		ExpiresAt:        body.ExpiresAt,
 	})
 	if err != nil {
 		switch {

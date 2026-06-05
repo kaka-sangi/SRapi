@@ -368,6 +368,8 @@ export const en = {
     throughputLimitsHint: "Per-minute request / token ceilings and max concurrent requests. Blank = unlimited.",
     expiresAt: "Expires at",
     expiresAtHint: "Optional. The key stops working after this time.",
+    expiresAtEditHint: "Leave blank to keep the current expiry.",
+    edit: "Edit key",
     created: "Created",
     createdToast: "API key created",
     copyKey: "Copy key",

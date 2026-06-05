@@ -96,6 +96,19 @@ export function useToggleApiKey() {
   });
 }
 
+export function useUpdateApiKey() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      ...policy
+    }: {
+      id: string;
+    } & Parameters<typeof apiService.updateApiKey>[1]) => apiService.updateApiKey(id, policy),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.apiKeys() }),
+  });
+}
+
 export function useUsageLogs() {
   return useQuery({
     queryKey: queryKeys.usageLogs(),

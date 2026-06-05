@@ -7202,19 +7202,22 @@ type UpdateAnnouncementRequest = CreateAnnouncementRequest
 
 // UpdateApiKeyRequest defines model for UpdateApiKeyRequest.
 type UpdateApiKeyRequest struct {
-	AllowedIps       *[]string     `json:"allowed_ips,omitempty"`
-	AllowedModels    *[]string     `json:"allowed_models,omitempty"`
-	ConcurrencyLimit *int          `json:"concurrency_limit,omitempty"`
-	DeniedIps        *[]string     `json:"denied_ips,omitempty"`
-	GroupIds         *[]Id         `json:"group_ids,omitempty"`
-	Name             *string       `json:"name,omitempty"`
-	RequestLimit1d   *int          `json:"request_limit_1d,omitempty"`
-	RequestLimit5h   *int          `json:"request_limit_5h,omitempty"`
-	RequestLimit7d   *int          `json:"request_limit_7d,omitempty"`
-	RpmLimit         *int          `json:"rpm_limit,omitempty"`
-	Scopes           *[]string     `json:"scopes,omitempty"`
-	Status           *ApiKeyStatus `json:"status,omitempty"`
-	TpmLimit         *int          `json:"tpm_limit,omitempty"`
+	AllowedIps       *[]string `json:"allowed_ips,omitempty"`
+	AllowedModels    *[]string `json:"allowed_models,omitempty"`
+	ConcurrencyLimit *int      `json:"concurrency_limit,omitempty"`
+	DeniedIps        *[]string `json:"denied_ips,omitempty"`
+
+	// ExpiresAt New expiry timestamp. When present the key expiry is updated; omit to leave the current expiry unchanged.
+	ExpiresAt      *time.Time    `json:"expires_at,omitempty"`
+	GroupIds       *[]Id         `json:"group_ids,omitempty"`
+	Name           *string       `json:"name,omitempty"`
+	RequestLimit1d *int          `json:"request_limit_1d,omitempty"`
+	RequestLimit5h *int          `json:"request_limit_5h,omitempty"`
+	RequestLimit7d *int          `json:"request_limit_7d,omitempty"`
+	RpmLimit       *int          `json:"rpm_limit,omitempty"`
+	Scopes         *[]string     `json:"scopes,omitempty"`
+	Status         *ApiKeyStatus `json:"status,omitempty"`
+	TpmLimit       *int          `json:"tpm_limit,omitempty"`
 }
 
 // UpdateCurrentUserProfileRequest defines model for UpdateCurrentUserProfileRequest.

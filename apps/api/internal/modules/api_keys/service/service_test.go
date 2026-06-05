@@ -186,6 +186,37 @@ func TestUpdateChangesMutableFieldsAndPreservesSecretMaterial(t *testing.T) {
 	}
 }
 
+func TestUpdateChangesExpiryWhenProvided(t *testing.T) {
+	expiresAt := time.Now().UTC().Add(time.Hour)
+	store := newMemoryStore()
+	svc := newTestService(t, store)
+	created, err := svc.Create(context.Background(), contract.CreateRequest{
+		UserID:    7,
+		Name:      "gateway",
+		ExpiresAt: &expiresAt,
+	})
+	if err != nil {
+		t.Fatalf("create api key: %v", err)
+	}
+
+	newExpiry := time.Now().UTC().Add(72 * time.Hour)
+	if _, err := svc.Update(context.Background(), contract.UpdateRequest{
+		UserID:    7,
+		KeyID:     created.Key.ID,
+		ExpiresAt: &newExpiry,
+	}); err != nil {
+		t.Fatalf("update api key: %v", err)
+	}
+
+	stored, err := store.FindByPrefix(context.Background(), created.Key.Prefix)
+	if err != nil {
+		t.Fatalf("find updated key: %v", err)
+	}
+	if stored.ExpiresAt == nil || !stored.ExpiresAt.Equal(newExpiry) {
+		t.Fatalf("expiry must update to the provided timestamp, got %v", stored.ExpiresAt)
+	}
+}
+
 func TestUpdateRejectsOtherUserKey(t *testing.T) {
 	store := newMemoryStore()
 	svc := newTestService(t, store)

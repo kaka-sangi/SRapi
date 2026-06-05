@@ -204,6 +204,11 @@ func (s *Service) Update(ctx context.Context, req contract.UpdateRequest) (contr
 		}
 		key.DeniedIPs = cloneStrings(*req.DeniedIPs)
 	}
+	if req.ExpiresAt != nil {
+		// Set-if-present: a supplied timestamp updates expiry. Clearing an
+		// existing expiry is not exposed through edit (mirror create-only set).
+		key.ExpiresAt = cloneTimePointer(req.ExpiresAt)
+	}
 	updated, err := s.store.Update(ctx, key)
 	if err != nil {
 		if errors.Is(err, contract.ErrKeyNotFound) {

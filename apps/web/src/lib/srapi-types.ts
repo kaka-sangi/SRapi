@@ -19,6 +19,16 @@ export interface ApiKeySummary {
   created_at: string;
   allowed_models: string[];
   group_ids: string[];
+  // Full policy, carried so the edit dialog can prefill without a second fetch.
+  allowed_ips?: string[];
+  denied_ips?: string[];
+  request_limit_5h?: number | null;
+  request_limit_1d?: number | null;
+  request_limit_7d?: number | null;
+  rpm_limit?: number | null;
+  tpm_limit?: number | null;
+  concurrency_limit?: number | null;
+  expires_at?: string | null;
 }
 
 export interface ProviderAccountSummary {

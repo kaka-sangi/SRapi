@@ -768,6 +768,10 @@ export type UpdateApiKeyRequest = {
     request_limit_7d?: number | null;
     allowed_ips?: Array<string>;
     denied_ips?: Array<string>;
+    /**
+     * New expiry timestamp. When present the key expiry is updated; omit to leave the current expiry unchanged.
+     */
+    expires_at?: string | null;
 };
 
 export type ApiKeySecretData = {
