@@ -33,6 +33,9 @@ func (s *Service) InvokeImageEdit(ctx context.Context, req contract.ImageEditReq
 	if isReverseProxyImageEditRuntime(req) {
 		return contract.ImageGenerationResponse{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "reverse proxy upstream base url missing"}
 	}
+	if !s.allowLocalStub {
+		return contract.ImageGenerationResponse{}, errUpstreamBaseURLMissing("image edit")
+	}
 	return synthesizeLocalImageEdit(req), nil
 }
 

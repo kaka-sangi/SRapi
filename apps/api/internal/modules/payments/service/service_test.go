@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"errors"
+	"math/big"
 	"net/url"
 	"strconv"
 	"strings"
@@ -145,6 +146,60 @@ func TestPaymentWebhookFulfillsSubscriptionOrderIdempotently(t *testing.T) {
 		t.Fatalf("duplicate webhook should be idempotent, got %+v", duplicate)
 	}
 	assertCounts(t, h, 1, 1, 1, 1)
+}
+
+// Regression for B2: a paid balance_credit top-up must credit the user's
+// spendable balance, and refunding it must claw that balance back.
+func TestPaidBalanceCreditCreditsThenRefundDebits(t *testing.T) {
+	h := newHarness(t)
+	if _, err := h.payments.CreateProviderInstance(t.Context(), contract.CreateProviderInstanceRequest{
+		Provider:         "easypay",
+		Name:             "primary",
+		Config:           easypayTestConfig("provider-signing-secret"),
+		SupportedMethods: []string{"alipay"},
+		Limits:           map[string]any{"currency": "USD"},
+	}); err != nil {
+		t.Fatalf("create provider: %v", err)
+	}
+	order, err := h.payments.CreateOrder(t.Context(), contract.CreateOrderRequest{
+		UserID:      7,
+		Method:      "alipay",
+		Amount:      "25.00",
+		Currency:    "USD",
+		ProductType: contract.ProductTypeBalanceCredit,
+	})
+	if err != nil {
+		t.Fatalf("create order: %v", err)
+	}
+	payload := map[string]any{
+		"order_no":        order.OrderNo,
+		"amount":          "25.00000000",
+		"currency":        "USD",
+		"status":          "paid",
+		"transaction_id":  "txn_balance",
+		"idempotency_key": "evt_balance_paid",
+	}
+	result, err := h.payments.HandleWebhook(t.Context(), contract.WebhookRequest{
+		Provider: "easypay",
+		Headers:  map[string]string{"X-SRapi-Payment-Signature": signWebhookPayload("provider-signing-secret", payload)},
+		Payload:  payload,
+	})
+	if err != nil {
+		t.Fatalf("handle webhook: %v", err)
+	}
+	if !result.Handled || result.Order.Status != contract.OrderStatusFulfilled {
+		t.Fatalf("expected fulfilled balance_credit order, got %+v", result)
+	}
+	if got := h.balance.net(7); got != "25.00000000" {
+		t.Fatalf("balance after top-up = %s, want 25.00000000", got)
+	}
+
+	if _, err := h.payments.RequestRefund(t.Context(), contract.RefundRequest{OrderID: order.ID, ActorUserID: 1, Reason: "test refund"}); err != nil {
+		t.Fatalf("refund: %v", err)
+	}
+	if got := h.balance.net(7); got != "0.00000000" {
+		t.Fatalf("balance after refund = %s, want 0.00000000 (credit must be clawed back)", got)
+	}
 }
 
 func TestPaymentWebhookRejectsInvalidSignatureFailClosed(t *testing.T) {
@@ -1055,6 +1110,7 @@ type harness struct {
 	audit         *auditservice.Service
 	events        *eventsservice.Service
 	stripe        *fakeStripeCheckout
+	balance       *stubBalance
 }
 
 type promoPreviewStore struct {
@@ -1080,6 +1136,48 @@ func newHarness(t *testing.T) harness {
 	return newHarnessWithDeps(t, Dependencies{})
 }
 
+// stubBalance is an in-memory BalanceAdjuster that tracks each user's net
+// spendable balance so tests can assert top-up credits and refund debits.
+type stubBalance struct {
+	balances map[int]*big.Rat
+}
+
+func newStubBalance() *stubBalance { return &stubBalance{balances: map[int]*big.Rat{}} }
+
+func (s *stubBalance) adjust(userID int, amount string, sign int) error {
+	delta, ok := new(big.Rat).SetString(amount)
+	if !ok {
+		return errors.New("stub balance: invalid amount " + amount)
+	}
+	cur := s.balances[userID]
+	if cur == nil {
+		cur = new(big.Rat)
+	}
+	if sign < 0 {
+		cur = new(big.Rat).Sub(cur, delta)
+	} else {
+		cur = new(big.Rat).Add(cur, delta)
+	}
+	s.balances[userID] = cur
+	return nil
+}
+
+func (s *stubBalance) CreditBalance(_ context.Context, userID int, amount, _ string) error {
+	return s.adjust(userID, amount, 1)
+}
+
+func (s *stubBalance) DebitBalance(_ context.Context, userID int, amount, _ string) error {
+	return s.adjust(userID, amount, -1)
+}
+
+func (s *stubBalance) net(userID int) string {
+	cur := s.balances[userID]
+	if cur == nil {
+		return "0.00000000"
+	}
+	return cur.FloatString(8)
+}
+
 func newHarnessWithDeps(t *testing.T, deps Dependencies) harness {
 	t.Helper()
 	store := paymentmemory.New()
@@ -1100,16 +1198,20 @@ func newHarnessWithDeps(t *testing.T, deps Dependencies) harness {
 		t.Fatalf("new events service: %v", err)
 	}
 	stripeFake := &fakeStripeCheckout{}
+	balanceStub := newStubBalance()
 	deps.Billing = billingSvc
 	deps.Subscriptions = subSvc
 	deps.Audit = auditSvc
 	deps.Events = eventsSvc
 	deps.Stripe = stripeFake
+	if deps.Balance == nil {
+		deps.Balance = balanceStub
+	}
 	paymentsSvc, err := New(store, testMasterKey, deps, fixedClock{now: time.Date(2026, 5, 22, 12, 0, 0, 0, time.UTC)})
 	if err != nil {
 		t.Fatalf("new payment service: %v", err)
 	}
-	return harness{store: store, payments: paymentsSvc, billing: billingSvc, subscriptions: subSvc, audit: auditSvc, events: eventsSvc, stripe: stripeFake}
+	return harness{store: store, payments: paymentsSvc, billing: billingSvc, subscriptions: subSvc, audit: auditSvc, events: eventsSvc, stripe: stripeFake, balance: balanceStub}
 }
 
 func assertCounts(t *testing.T, h harness, wantLedger int, wantSubs int, wantOutbox int, wantAudit int) {

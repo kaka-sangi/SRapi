@@ -61,11 +61,21 @@ type EventEnqueuer interface {
 	Enqueue(ctx context.Context, req eventscontract.EnqueueRequest) (eventscontract.OutboxEvent, error)
 }
 
+// BalanceAdjuster moves a user's spendable balance. A paid balance_credit order
+// credits it; a refund of one debits it. Without this dependency a top-up would
+// record a ledger entry but never make the funds spendable (and a refund would
+// never claw them back).
+type BalanceAdjuster interface {
+	CreditBalance(ctx context.Context, userID int, amount, currency string) error
+	DebitBalance(ctx context.Context, userID int, amount, currency string) error
+}
+
 type Dependencies struct {
 	Billing       BillingRecorder
 	Subscriptions SubscriptionActivator
 	Audit         AuditRecorder
 	Events        EventEnqueuer
+	Balance       BalanceAdjuster
 	Checkout      checkoutprovider.Registry
 	Stripe        stripeprovider.CheckoutCreator
 }
@@ -737,6 +747,14 @@ func (s *Service) RequestRefund(ctx context.Context, req contract.RefundRequest)
 	if err != nil {
 		return contract.PaymentOrder{}, err
 	}
+	// Claw back the spendable balance that the matching top-up credited. Only
+	// balance_credit orders ever credited balance, so only those are debited.
+	// The status transition above (Paid/Fulfilled -> Refunded) gates re-runs.
+	if order.ProductType == contract.ProductTypeBalanceCredit && s.deps.Balance != nil {
+		if err := s.deps.Balance.DebitBalance(ctx, order.UserID, refundAmount, order.Currency); err != nil {
+			return contract.PaymentOrder{}, err
+		}
+	}
 	negativeAmount := "-" + refundAmount
 	_, _ = s.recordBilling(ctx, billingcontract.RecordRequest{
 		UserID:        order.UserID,
@@ -804,6 +822,14 @@ func (s *Service) fulfill(ctx context.Context, order contract.PaymentOrder, inst
 	})
 	if err != nil {
 		return err
+	}
+	if order.ProductType == contract.ProductTypeBalanceCredit {
+		// Make the paid amount spendable. Idempotent per order: fulfill only runs
+		// on the Paid->Fulfilled transition, which validateTransition gates.
+		if s.deps.Balance == nil {
+			return ErrInvalidInput
+		}
+		return s.deps.Balance.CreditBalance(ctx, order.UserID, order.Amount, order.Currency)
 	}
 	if order.ProductType != contract.ProductTypeSubscriptionPlan {
 		return nil

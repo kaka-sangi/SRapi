@@ -262,7 +262,13 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 		return nil, err
 	}
 
-	adaptersSvc, err := provideradapterservice.NewWithReverseProxy(&http.Client{Timeout: cfg.Gateway.RequestTimeout}, reverseProxySvc)
+	adaptersSvc, err := provideradapterservice.NewWithReverseProxy(
+		&http.Client{Timeout: cfg.Gateway.RequestTimeout},
+		reverseProxySvc,
+		// Synthesize fake upstream responses only in local/dev. In any other mode a
+		// missing base_url must hard-error so customers are never billed for fakes.
+		provideradapterservice.WithLocalStub(cfg.Server.Mode == "local"),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -316,7 +322,7 @@ func newRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOptions
 		return nil, err
 	}
 
-	subscriptionStore, subscriptionSvc, paymentStore, paymentsSvc, err := newCommerceRuntime(cfg, opts, access.billingSvc, access.auditSvc, access.eventsSvc, allowMemoryStores)
+	subscriptionStore, subscriptionSvc, paymentStore, paymentsSvc, err := newCommerceRuntime(cfg, opts, access.billingSvc, access.auditSvc, access.eventsSvc, access.usersSvc, allowMemoryStores)
 	if err != nil {
 		return nil, err
 	}
@@ -734,6 +740,7 @@ func newCommerceRuntime(
 	billingSvc *billingservice.Service,
 	auditSvc *auditservice.Service,
 	eventsSvc *eventsservice.Service,
+	usersSvc *usersservice.Service,
 	allowMemoryStores bool,
 ) (subscriptioncontract.Store, *subscriptionservice.Service, paymentcontract.Store, *paymentservice.Service, error) {
 	subscriptionStore := opts.subscriptions
@@ -760,6 +767,7 @@ func newCommerceRuntime(
 		Subscriptions: subscriptionSvc,
 		Audit:         auditSvc,
 		Events:        eventsSvc,
+		Balance:       paymentsBalanceAdapter{users: usersSvc},
 	}, nil)
 	if err != nil {
 		return nil, nil, nil, nil, err
@@ -1063,4 +1071,29 @@ func dependencyStatus(status string) apiopenapi.HealthDependencyStatus {
 	default:
 		return apiopenapi.HealthDependencyStatusUnavailable
 	}
+}
+
+// paymentsBalanceAdapter lets the payments service credit/debit a user's
+// spendable balance through the users service, keeping the two modules
+// decoupled (payments depends on the narrow BalanceAdjuster interface).
+type paymentsBalanceAdapter struct {
+	users *usersservice.Service
+}
+
+func (a paymentsBalanceAdapter) CreditBalance(ctx context.Context, userID int, amount, currency string) error {
+	_, err := a.users.UpdateBalance(ctx, userID, usersservice.BalanceUpdateRequest{
+		Operation: userscontract.BalanceOperationIncrement,
+		Amount:    amount,
+		Currency:  currency,
+	})
+	return err
+}
+
+func (a paymentsBalanceAdapter) DebitBalance(ctx context.Context, userID int, amount, currency string) error {
+	_, err := a.users.UpdateBalance(ctx, userID, usersservice.BalanceUpdateRequest{
+		Operation: userscontract.BalanceOperationDecrement,
+		Amount:    amount,
+		Currency:  currency,
+	})
+	return err
 }

@@ -27,6 +27,9 @@ func (s *Service) InvokeImageVariation(ctx context.Context, req contract.ImageVa
 	if isReverseProxyImageVariationRuntime(req) {
 		return contract.ImageGenerationResponse{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "reverse proxy upstream base url missing"}
 	}
+	if !s.allowLocalStub {
+		return contract.ImageGenerationResponse{}, errUpstreamBaseURLMissing("image variation")
+	}
 	return synthesizeLocalImageVariation(req), nil
 }
 

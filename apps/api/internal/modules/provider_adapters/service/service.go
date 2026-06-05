@@ -20,17 +20,46 @@ import (
 type Service struct {
 	client       *http.Client
 	reverseProxy reverseproxycontract.Runtime
+	// allowLocalStub permits synthesizing a fake local response when an account
+	// has no upstream base_url. It MUST stay false outside local/dev mode so a
+	// misconfigured account can never bill a customer for counterfeit output.
+	allowLocalStub bool
 }
 
-func New(client *http.Client) (*Service, error) {
-	return NewWithReverseProxy(client, nil)
+// Option configures the provider-adapter Service.
+type Option func(*Service)
+
+// WithLocalStub enables (local/dev only) synthesizing of fake responses when an
+// account has no upstream base_url, instead of returning a configuration error.
+func WithLocalStub(enabled bool) Option {
+	return func(s *Service) { s.allowLocalStub = enabled }
 }
 
-func NewWithReverseProxy(client *http.Client, runtime reverseproxycontract.Runtime) (*Service, error) {
+func New(client *http.Client, opts ...Option) (*Service, error) {
+	return NewWithReverseProxy(client, nil, opts...)
+}
+
+func NewWithReverseProxy(client *http.Client, runtime reverseproxycontract.Runtime, opts ...Option) (*Service, error) {
 	if client == nil {
 		client = &http.Client{Timeout: 30 * time.Second}
 	}
-	return &Service{client: client, reverseProxy: runtime}, nil
+	svc := &Service{client: client, reverseProxy: runtime}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(svc)
+		}
+	}
+	return svc, nil
+}
+
+// errUpstreamBaseURLMissing is returned (in non-local mode) when an account has
+// no upstream base_url, so the gateway never bills for a synthesized response.
+func errUpstreamBaseURLMissing(kind string) contract.ProviderError {
+	return contract.ProviderError{
+		Class:      "configuration_error",
+		StatusCode: http.StatusBadGateway,
+		Message:    kind + " upstream base url missing",
+	}
 }
 
 func (s *Service) InvokeConversation(ctx context.Context, req contract.ConversationRequest) (contract.ConversationResponse, error) {
@@ -72,6 +101,9 @@ func (s *Service) InvokeConversation(ctx context.Context, req contract.Conversat
 	}
 	if openAIResponsesCompactRequest(req) {
 		return contract.ConversationResponse{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "responses compact upstream base url missing"}
+	}
+	if !s.allowLocalStub {
+		return contract.ConversationResponse{}, errUpstreamBaseURLMissing("conversation")
 	}
 	text := synthesizeLocalText(req.Model, conversationPrompt(req))
 	return conversationTextResponse(text, http.StatusOK, estimatedUsage(text)), nil
@@ -127,6 +159,9 @@ func (s *Service) InvokeEmbeddings(ctx context.Context, req contract.EmbeddingRe
 	if isReverseProxyEmbeddingRuntime(req) {
 		return contract.EmbeddingResponse{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "reverse proxy upstream base url missing"}
 	}
+	if !s.allowLocalStub {
+		return contract.EmbeddingResponse{}, errUpstreamBaseURLMissing("embeddings")
+	}
 	return synthesizeLocalEmbeddings(req), nil
 }
 
@@ -142,6 +177,9 @@ func (s *Service) InvokeImageGeneration(ctx context.Context, req contract.ImageG
 	}
 	if isReverseProxyImageRuntime(req) {
 		return contract.ImageGenerationResponse{}, contract.ProviderError{Class: "invalid_request", StatusCode: http.StatusBadRequest, Message: "reverse proxy upstream base url missing"}
+	}
+	if !s.allowLocalStub {
+		return contract.ImageGenerationResponse{}, errUpstreamBaseURLMissing("image generation")
 	}
 	return synthesizeLocalImages(req), nil
 }

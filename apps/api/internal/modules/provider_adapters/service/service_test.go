@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -2158,7 +2159,8 @@ func TestOpenAICompatibleAdapterClassifiesStreamErrorFrame(t *testing.T) {
 }
 
 func TestAdapterFallsBackToLocalResponseWithoutBaseURL(t *testing.T) {
-	svc, err := service.New(nil)
+	// Local/dev opt-in: synthesizing a fake response is allowed.
+	svc, err := service.New(nil, service.WithLocalStub(true))
 	if err != nil {
 		t.Fatalf("create service: %v", err)
 	}
@@ -2176,6 +2178,49 @@ func TestAdapterFallsBackToLocalResponseWithoutBaseURL(t *testing.T) {
 	if !strings.Contains(conversationResponseText(resp), "hello local") || !resp.Usage.Estimated {
 		t.Fatalf("unexpected local fallback response: %+v", resp)
 	}
+}
+
+// Regression for B1: outside local mode (the default), a missing upstream
+// base_url must hard-error so the gateway never bills for a synthesized fake.
+func TestAdapterRejectsMissingBaseURLWithoutLocalStub(t *testing.T) {
+	svc, err := service.New(nil)
+	if err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	check := func(name string, err error) {
+		t.Helper()
+		if err == nil {
+			t.Fatalf("%s: expected configuration error when base_url missing, got nil", name)
+		}
+		var provErr contract.ProviderError
+		if !errors.As(err, &provErr) || provErr.Class != "configuration_error" {
+			t.Fatalf("%s: expected configuration_error, got %v", name, err)
+		}
+	}
+
+	_, err = svc.InvokeConversation(context.Background(), contract.ConversationRequest{
+		RequestID:  "req_local",
+		Model:      "gpt-local",
+		InputParts: textParts("hello local"),
+		Mapping:    modelcontract.ModelProviderMapping{UpstreamModelName: "gpt-local"},
+	})
+	check("conversation", err)
+
+	_, err = svc.InvokeEmbeddings(context.Background(), contract.EmbeddingRequest{
+		RequestID: "req_local",
+		Model:     "embed-local",
+		Input:     []string{"hello"},
+		Mapping:   modelcontract.ModelProviderMapping{UpstreamModelName: "embed-local"},
+	})
+	check("embeddings", err)
+
+	_, err = svc.InvokeImageGeneration(context.Background(), contract.ImageGenerationRequest{
+		RequestID: "req_local",
+		Model:     "image-local",
+		Prompt:    "a cat",
+		Mapping:   modelcontract.ModelProviderMapping{UpstreamModelName: "image-local"},
+	})
+	check("images", err)
 }
 
 func TestOpenAICompatibleAdapterClassifiesAuthFailure(t *testing.T) {

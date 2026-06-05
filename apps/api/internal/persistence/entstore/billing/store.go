@@ -2,6 +2,7 @@ package billing
 
 import (
 	"context"
+	stdsql "database/sql"
 	"encoding/json"
 	"errors"
 	"math/big"
@@ -123,7 +124,11 @@ func (s *Store) ChargeUsage(ctx context.Context, req contract.ChargeUsageRequest
 		return contract.ChargeUsageResult{}, ErrInvalidStore
 	}
 
-	tx, err := s.client.Tx(ctx)
+	// Serializable isolation prevents a lost-update race when concurrent charges
+	// hit the same user's balance (read-modify-write). Matches the affiliate and
+	// payments stores; a serialization failure simply leaves the usage logs
+	// pending and the charge worker retries on its next pass.
+	tx, err := s.client.BeginTx(ctx, &stdsql.TxOptions{Isolation: stdsql.LevelSerializable})
 	if err != nil {
 		return contract.ChargeUsageResult{}, err
 	}
