@@ -4,6 +4,7 @@ import type { Auth } from "../../../../packages/sdk/typescript/src/core/auth.gen
 import { client } from "../../../../packages/sdk/typescript/src/client.gen";
 import {
   acknowledgeAdminOpsAlert,
+  cleanupAdminOpsSystemLogs,
   addAdminAccountGroupMember,
   batchDisableAdminRedeemCodes,
   batchGenerateAdminRedeemCodes,
@@ -130,6 +131,7 @@ import {
   updateAdminAccount,
   updateAdminAccountGroup,
   updateAdminAnnouncement,
+  updateAdminOpsSettings,
   updateAdminOpsSlo,
   updateAdminPaymentProvider,
   updateAdminPromoCode,
@@ -238,8 +240,11 @@ import type {
   OpsLatencyHistogram,
   OpsOverview,
   OpsSlo,
+  OpsSettings,
   OpsSloDefinition,
   OpsSystemLog,
+  OpsSystemLogCleanupRequest,
+  OpsSystemLogCleanupResult,
   OpsThroughputTrend,
   Pagination,
   ModelRateLimit,
@@ -408,6 +413,16 @@ export const adminApi = {
     query?: ListAdminOpsSystemLogsData["query"],
   ): Promise<AdminListResult<OpsSystemLog>> {
     return unwrapList(() => listAdminOpsSystemLogs({ query, throwOnError: true }));
+  },
+  // Bounded deletion of sanitized system logs (requires ≥1 filter; dry_run
+  // previews without deleting). Returns matched/deleted counts.
+  cleanupOpsSystemLogs(body: OpsSystemLogCleanupRequest): Promise<OpsSystemLogCleanupResult> {
+    return unwrapData(() => cleanupAdminOpsSystemLogs({ body, throwOnError: true }));
+  },
+  // Replace the operational monitoring settings (auto-refresh, alert thresholds,
+  // retention). The backend exposes no read endpoint, so this is write-only.
+  updateOpsSettings(body: OpsSettings): Promise<OpsSettings> {
+    return unwrapData(() => updateAdminOpsSettings({ body, throwOnError: true }));
   },
 
   listOpsAlerts(query?: ListAdminOpsAlertsData["query"]): Promise<AdminListResult<OpsAlertEvent>> {

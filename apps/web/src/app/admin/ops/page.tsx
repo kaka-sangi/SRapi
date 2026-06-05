@@ -6,13 +6,21 @@ import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageQueryState } from "@/components/layout/page-query-state";
 import { SloFormDialog } from "@/components/admin/slo-form-dialog";
+import { OpsLogCleanupDialog } from "@/components/admin/ops-log-cleanup-dialog";
+import { ResourceFormDialog, type FieldConfig } from "@/components/admin/resource-form-dialog";
 import {
   useOpsSlos,
   useOpsAlerts,
   useAcknowledgeAlert,
   useOpsThroughput,
   useOpsErrorTrend,
+  useUpdateOpsSettings,
 } from "@/hooks/admin-queries";
+import {
+  defaultOpsSettingsForm,
+  buildOpsSettingsBody,
+  type OpsSettingsFormState,
+} from "@/lib/admin-ops-settings-form";
 import type { OpsSloDefinition } from "@/lib/sdk-types";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
@@ -41,6 +49,22 @@ function OpsContent() {
   const slos = useOpsSlos();
   const alerts = useOpsAlerts();
   const ackMut = useAcknowledgeAlert();
+  const settingsMut = useUpdateOpsSettings();
+  const [showCleanup, setShowCleanup] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+
+  const settingsFields: FieldConfig<OpsSettingsFormState>[] = [
+    { name: "autoRefreshEnabled", label: t("adminOpsSettings.autoRefresh"), type: "switch" },
+    { name: "refreshIntervalSeconds", label: t("adminOpsSettings.refreshInterval"), type: "number" },
+    {
+      name: "errorRateThreshold",
+      label: t("adminOpsSettings.errorRateThreshold"),
+      type: "number",
+      hint: t("adminOpsSettings.errorRateHint"),
+    },
+    { name: "latencyP95ThresholdMs", label: t("adminOpsSettings.latencyThreshold"), type: "number" },
+    { name: "alertRetentionDays", label: t("adminOpsSettings.alertRetention"), type: "number" },
+  ];
 
   async function ackAlert(id: string) {
     try {
@@ -68,9 +92,17 @@ function OpsContent() {
         title={t("adminOps.title")}
         description={t("adminOps.subtitle")}
         actions={
-          <Button variant="primary" size="sm" onClick={() => setSloTarget("new")}>
-            ＋ {t("adminOps.createSlo")}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setShowCleanup(true)}>
+              {t("adminOpsCleanup.action")}
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setShowSettings(true)}>
+              {t("adminOpsSettings.action")}
+            </Button>
+            <Button variant="primary" size="sm" onClick={() => setSloTarget("new")}>
+              ＋ {t("adminOps.createSlo")}
+            </Button>
+          </div>
         }
       />
 
@@ -230,6 +262,23 @@ function OpsContent() {
           onOpenChange={(open) => {
             if (!open) setSloTarget(null);
           }}
+        />
+      ) : null}
+
+      <OpsLogCleanupDialog open={showCleanup} onOpenChange={setShowCleanup} />
+
+      {showSettings ? (
+        <ResourceFormDialog
+          open
+          onOpenChange={setShowSettings}
+          title={t("adminOpsSettings.title")}
+          description={t("adminOpsSettings.note")}
+          fields={settingsFields}
+          initial={defaultOpsSettingsForm()}
+          buildBody={buildOpsSettingsBody}
+          submit={(body) => settingsMut.mutateAsync(body)}
+          successMessage={t("feedback.saved")}
+          isPending={settingsMut.isPending}
         />
       ) : null}
     </>

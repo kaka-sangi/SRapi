@@ -422,6 +422,18 @@ export function useOpsSlos() {
     refetchInterval: 30_000,
   });
 }
+export function useCleanupOpsSystemLogs() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.cleanupOpsSystemLogs>) => adminApi.cleanupOpsSystemLogs(body),
+    ["admin", "ops"],
+  );
+}
+export function useUpdateOpsSettings() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.updateOpsSettings>) => adminApi.updateOpsSettings(body),
+    ["admin", "ops"],
+  );
+}
 
 export function useOpsAlerts(params?: P<typeof adminApi.listOpsAlerts>) {
   return useQuery({
