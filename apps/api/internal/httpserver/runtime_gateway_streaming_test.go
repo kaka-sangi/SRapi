@@ -109,3 +109,60 @@ func TestGatewayChatCompletionsStreamsSameProtocolSSEIncrementally(t *testing.T)
 		t.Fatalf("response was buffered: first flush already contained later chunks: %q", rec.firstFlushBody)
 	}
 }
+
+// TestGatewayChatCompletionStreamIdleTimeoutCutsHungUpstream proves the
+// configured StreamIdleTimeout is actually enforced: when an upstream delivers
+// one chunk then stalls forever, the gateway cuts the stream (rather than
+// holding the client open indefinitely) and records a stream_idle_timeout.
+func TestGatewayChatCompletionStreamIdleTimeoutCutsHungUpstream(t *testing.T) {
+	t.Setenv("GATEWAY_STREAM_IDLE_TIMEOUT_SECONDS", "1")
+	chunk1 := "data: {\"id\":\"chunk_1\",\"choices\":[{\"delta\":{\"content\":\"hello\"}}]}\n\n"
+
+	hang := make(chan struct{})
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		flusher, _ := w.(http.Flusher)
+		_, _ = io.WriteString(w, chunk1)
+		if flusher != nil {
+			flusher.Flush()
+		}
+		// Stall: send no more so the gateway must idle-timeout and cut us off.
+		// Bounded so the handler can't outlive the test if cleanup races.
+		select {
+		case <-hang:
+		case <-time.After(8 * time.Second):
+		}
+	}))
+	// Order matters: release the stalled handler (close hang) BEFORE upstream.Close,
+	// which waits for in-flight handlers. Deferred LIFO runs close(hang) first.
+	defer upstream.Close()
+	defer close(hang)
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	providerResp := mustCreateProvider(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"name":"idle-provider","display_name":"Idle Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	modelResp := mustCreateModel(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"canonical_name":"idle-model","display_name":"Idle Model","status":"active","capabilities":[{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateMapping(t, handler, sessionCookie, loginResp.Data.CsrfToken, string(modelResp.Data.Id), `{"provider_id":"`+string(providerResp.Data.Id)+`","upstream_model_name":"idle-upstream","status":"active","capability_override":[{"key":"streaming","level":"required","status":"stable","version":"v1"}]}`)
+	mustCreateAccount(t, handler, sessionCookie, loginResp.Data.CsrfToken, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"idle-account","runtime_class":"api_key","credential":{"api_key":"upstream-secret"},"metadata":{"base_url":"`+upstream.URL+`/v1"},"status":"active"}`)
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, loginResp.Data.CsrfToken)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"idle-model","stream":true,"messages":[{"role":"user","content":"hi"}]}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	rec := &flushCapturingWriter{header: http.Header{}, release: make(chan struct{})}
+	start := time.Now()
+	handler.ServeHTTP(rec, req)
+	elapsed := time.Since(start)
+
+	if !strings.Contains(rec.body.String(), "chunk_1") {
+		t.Fatalf("expected the first chunk delivered before the idle cut, got: %q", rec.body.String())
+	}
+	if strings.Contains(rec.body.String(), "[DONE]") {
+		t.Fatalf("stream should have been cut by the idle timeout, not completed: %q", rec.body.String())
+	}
+	// 1s idle timeout + scheduling slack; must be far below an unbounded hang.
+	if elapsed > 5*time.Second {
+		t.Fatalf("idle timeout did not cut the hung stream promptly; elapsed=%s", elapsed)
+	}
+}

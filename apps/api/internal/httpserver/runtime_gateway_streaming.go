@@ -72,20 +72,69 @@ func (s *Server) writeConversationStreamPassthrough(
 	forwardUpstreamResponseHeaders(w, providerResp.Headers, s.gatewayPassthroughHeaderConfig(r.Context()))
 	flusher, _ := w.(http.Flusher)
 
-	var meter bytes.Buffer
-	buf := make([]byte, 32*1024)
-	interrupted := false
-	for {
-		n, readErr := providerResp.StreamBody.Read(buf)
-		if n > 0 {
-			if remaining := maxStreamMeterBytes - meter.Len(); remaining > 0 {
-				if n <= remaining {
-					meter.Write(buf[:n])
-				} else {
-					meter.Write(buf[:remaining])
+	// Idle-timeout enforcement: read the upstream in a goroutine so the main loop
+	// can react to a stall independently of a blocked Read. If no chunk arrives
+	// within the configured window, stop streaming and close the body — a hung
+	// upstream must not hold the client connection open indefinitely.
+	idle := s.cfg.Gateway.StreamIdleTimeout
+	idleTimedOut := false
+
+	type streamChunk struct {
+		data []byte
+		err  error
+	}
+	chunkCh := make(chan streamChunk)
+	readerDone := make(chan struct{})
+	defer close(readerDone)
+	go func() {
+		for {
+			b := make([]byte, 32*1024)
+			n, err := providerResp.StreamBody.Read(b)
+			if n > 0 {
+				select {
+				case chunkCh <- streamChunk{data: b[:n]}:
+				case <-readerDone:
+					return
 				}
 			}
-			if _, writeErr := w.Write(buf[:n]); writeErr != nil {
+			if err != nil {
+				select {
+				case chunkCh <- streamChunk{err: err}:
+				case <-readerDone:
+				}
+				return
+			}
+		}
+	}()
+
+	var meter bytes.Buffer
+	interrupted := false
+readLoop:
+	for {
+		var sc streamChunk
+		if idle > 0 {
+			timer := time.NewTimer(idle)
+			select {
+			case sc = <-chunkCh:
+				timer.Stop()
+			case <-timer.C:
+				idleTimedOut = true
+				interrupted = true
+				_ = providerResp.StreamBody.Close()
+				break readLoop
+			}
+		} else {
+			sc = <-chunkCh
+		}
+		if len(sc.data) > 0 {
+			if remaining := maxStreamMeterBytes - meter.Len(); remaining > 0 {
+				if len(sc.data) <= remaining {
+					meter.Write(sc.data)
+				} else {
+					meter.Write(sc.data[:remaining])
+				}
+			}
+			if _, writeErr := w.Write(sc.data); writeErr != nil {
 				interrupted = true
 				break
 			}
@@ -93,8 +142,8 @@ func (s *Server) writeConversationStreamPassthrough(
 				flusher.Flush()
 			}
 		}
-		if readErr != nil {
-			if readErr != io.EOF {
+		if sc.err != nil {
+			if sc.err != io.EOF {
 				interrupted = true
 			}
 			break
@@ -142,7 +191,11 @@ func (s *Server) writeConversationStreamPassthrough(
 		ProviderQuotaSignals:  quotaSignals,
 	}
 	if interrupted {
-		record.ErrorClass = ptrStringValue("stream_interrupted")
+		if idleTimedOut {
+			record.ErrorClass = ptrStringValue("stream_idle_timeout")
+		} else {
+			record.ErrorClass = ptrStringValue("stream_interrupted")
+		}
 	}
 	s.runtime.recordGatewayUsage(r.Context(), record)
 }
