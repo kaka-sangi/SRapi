@@ -667,6 +667,20 @@ export function useUpdateModel() {
     ["admin", "models"],
   );
 }
+export function useCreateModelAlias() {
+  return useAdminMutation(
+    (vars: { id: string; body: B<typeof adminApi.createModelAlias> }) =>
+      adminApi.createModelAlias(vars.id, vars.body),
+    ["admin", "models"],
+  );
+}
+export function useCreateModelMapping() {
+  return useAdminMutation(
+    (vars: { id: string; body: B<typeof adminApi.createModelMapping> }) =>
+      adminApi.createModelMapping(vars.id, vars.body),
+    ["admin", "models"],
+  );
+}
 
 // Account groups
 export function useCreateGroup() {

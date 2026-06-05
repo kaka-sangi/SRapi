@@ -15,8 +15,11 @@ import {
 } from "@/components/admin/resource-form-dialog";
 import {
   useAdminModels,
+  useAdminProviders,
   useCreateModel,
   useUpdateModel,
+  useCreateModelAlias,
+  useCreateModelMapping,
   useModelRateLimits,
   useUpsertModelRateLimit,
   useDeleteModelRateLimit,
@@ -33,7 +36,13 @@ import {
   modelFormFromModel,
   buildCreateModelBody,
   buildUpdateModelBody,
+  emptyModelAliasForm,
+  buildCreateModelAliasBody,
+  emptyModelMappingForm,
+  buildCreateModelMappingBody,
   type ModelFormState,
+  type ModelAliasFormState,
+  type ModelMappingFormState,
 } from "@/lib/admin-model-form";
 import { MODEL_CAPABILITY_OPTIONS } from "@/lib/capabilities";
 import type { Model, ModelRateLimit } from "@/lib/sdk-types";
@@ -61,10 +70,20 @@ function ModelsContent() {
   const rateLimits = useModelRateLimits();
   const upsertRl = useUpsertModelRateLimit();
   const deleteRl = useDeleteModelRateLimit();
+  const aliasMut = useCreateModelAlias();
+  const mappingMut = useCreateModelMapping();
+  // Provider picker for the mapping dialog (the registry is small; 200 covers it).
+  const providers = useAdminProviders({ page: 1, page_size: 200 });
+  const providerOptions = (providers.data?.data ?? []).map((p) => ({
+    value: p.id,
+    label: p.display_name || p.name,
+  }));
   const isFiltered = Boolean(statusFilter || list.search);
 
   const [formTarget, setFormTarget] = useState<Model | "new" | null>(null);
   const [rateLimitTarget, setRateLimitTarget] = useState<Model | null>(null);
+  const [aliasTarget, setAliasTarget] = useState<Model | null>(null);
+  const [mappingTarget, setMappingTarget] = useState<Model | null>(null);
   const rateLimitByModel = new Map<number, ModelRateLimit>(
     (rateLimits.data?.data ?? []).map((rl) => [rl.model_id, rl]),
   );
@@ -93,6 +112,63 @@ function ModelsContent() {
       hint: t("adminModels.canonicalHint"),
     },
     ...sharedFields,
+  ];
+
+  const aliasFields: FieldConfig<ModelAliasFormState>[] = [
+    {
+      name: "alias",
+      label: t("adminModels.alias"),
+      hint: t("adminModels.aliasHint"),
+      required: true,
+      placeholder: "gpt-4o",
+    },
+    { name: "status", label: t("adminCommon.status"), type: "select", options: enumOptions(MODEL_STATUSES) },
+    {
+      name: "strategyHint",
+      label: t("adminModels.strategyHintLabel"),
+      hint: t("adminModels.strategyHintHint"),
+      advanced: true,
+    },
+    {
+      name: "fallbackModelsText",
+      label: t("adminModels.fallbackModels"),
+      type: "textarea",
+      hint: t("adminModels.fallbackModelsHint"),
+      advanced: true,
+    },
+  ];
+
+  const mappingFields: FieldConfig<ModelMappingFormState>[] = [
+    {
+      name: "providerId",
+      label: t("adminModels.mappingProvider"),
+      type: "select",
+      options: providerOptions,
+      required: true,
+    },
+    {
+      name: "upstreamModelName",
+      label: t("adminModels.upstreamModelName"),
+      hint: t("adminModels.upstreamModelNameHint"),
+      required: true,
+      placeholder: "gpt-4o-2024-08-06",
+    },
+    { name: "status", label: t("adminCommon.status"), type: "select", options: enumOptions(MODEL_STATUSES) },
+    {
+      name: "capabilities",
+      label: t("adminModels.capabilityOverride"),
+      type: "multiselect",
+      options: MODEL_CAPABILITY_OPTIONS,
+      hint: t("adminModels.capabilityOverrideHint"),
+      advanced: true,
+    },
+    {
+      name: "pricingOverride",
+      label: t("adminModels.pricingOverride"),
+      type: "keyvalue",
+      hint: t("adminModels.pricingOverrideHint"),
+      advanced: true,
+    },
   ];
 
   const columns: Column<Model>[] = [
@@ -211,6 +287,8 @@ function ModelsContent() {
             actions={[
               { label: t("common.edit"), onSelect: () => setFormTarget(m) },
               { label: t("adminRateLimit.action"), onSelect: () => setRateLimitTarget(m) },
+              { label: t("adminModels.addAlias"), onSelect: () => setAliasTarget(m) },
+              { label: t("adminModels.addMapping"), onSelect: () => setMappingTarget(m) },
             ]}
           />
         )}
@@ -264,6 +342,40 @@ function ModelsContent() {
               : undefined
           }
           isPending={upsertRl.isPending || deleteRl.isPending}
+        />
+      ) : null}
+
+      {aliasTarget ? (
+        <ResourceFormDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setAliasTarget(null);
+          }}
+          title={t("adminModels.aliasTitle")}
+          description={aliasTarget.canonical_name}
+          fields={aliasFields}
+          initial={emptyModelAliasForm()}
+          buildBody={buildCreateModelAliasBody}
+          submit={(body) => aliasMut.mutateAsync({ id: aliasTarget.id, body })}
+          successMessage={t("feedback.created")}
+          isPending={aliasMut.isPending}
+        />
+      ) : null}
+
+      {mappingTarget ? (
+        <ResourceFormDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setMappingTarget(null);
+          }}
+          title={t("adminModels.mappingTitle")}
+          description={mappingTarget.canonical_name}
+          fields={mappingFields}
+          initial={emptyModelMappingForm()}
+          buildBody={buildCreateModelMappingBody}
+          submit={(body) => mappingMut.mutateAsync({ id: mappingTarget.id, body })}
+          successMessage={t("feedback.created")}
+          isPending={mappingMut.isPending}
         />
       ) : null}
     </>

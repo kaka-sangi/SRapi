@@ -98,6 +98,8 @@ import {
   listAdminBillingLedger,
   listAdminModels,
   createAdminModel,
+  createAdminModelAlias,
+  createAdminModelMapping,
   updateAdminModel,
   listAdminOpsAlertEvents,
   listAdminOpsAlerts,
@@ -222,6 +224,8 @@ import type {
   ListAdminUsersData,
   ListAdminUserSubscriptionsData,
   Model,
+  ModelAlias,
+  ModelProviderMapping,
   OpsAlertEvent,
   OpsConcurrency,
   OpsErrorDistribution,
@@ -491,6 +495,18 @@ export const adminApi = {
 
   updateModel(id: Id, body: Parameters<typeof updateAdminModel>[0]["body"]): Promise<Model> {
     return unwrapData(() => updateAdminModel({ path: { id }, body, throwOnError: true }));
+  },
+  createModelAlias(
+    id: Id,
+    body: Parameters<typeof createAdminModelAlias>[0]["body"],
+  ): Promise<ModelAlias> {
+    return unwrapData(() => createAdminModelAlias({ path: { id }, body, throwOnError: true }));
+  },
+  createModelMapping(
+    id: Id,
+    body: Parameters<typeof createAdminModelMapping>[0]["body"],
+  ): Promise<ModelProviderMapping> {
+    return unwrapData(() => createAdminModelMapping({ path: { id }, body, throwOnError: true }));
   },
 
   listAccounts(query?: ListAdminAccountsData["query"]): Promise<AdminListResult<ProviderAccount>> {

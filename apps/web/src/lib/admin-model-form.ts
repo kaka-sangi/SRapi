@@ -1,4 +1,6 @@
 import type {
+  CreateModelAliasRequest,
+  CreateModelProviderMappingRequest,
   CreateModelRequest,
   Model,
   ResourceStatus,
@@ -72,6 +74,71 @@ export function buildUpdateModelBody(form: ModelFormState): UpdateModelRequest {
     status: form.status,
     capabilities: capabilityKeysToDescriptors(form.capabilities),
   };
+}
+
+// --- Model alias (alias → this model, with optional fallback chain) ---
+
+export interface ModelAliasFormState {
+  alias: string;
+  strategyHint: string;
+  fallbackModelsText: string;
+  status: ResourceStatus;
+}
+
+export function emptyModelAliasForm(): ModelAliasFormState {
+  return { alias: "", strategyHint: "", fallbackModelsText: "", status: "active" };
+}
+
+export function buildCreateModelAliasBody(form: ModelAliasFormState): CreateModelAliasRequest {
+  const fallbacks = splitLines(form.fallbackModelsText);
+  return {
+    alias: requiredText(form.alias, "Alias"),
+    strategy_hint: optionalText(form.strategyHint),
+    fallback_models: fallbacks.length ? fallbacks : undefined,
+    status: form.status,
+  };
+}
+
+// --- Model → provider mapping (this model served by a provider's upstream name) ---
+
+export interface ModelMappingFormState {
+  providerId: string;
+  upstreamModelName: string;
+  status: ResourceStatus;
+  /** Capability keys (chips) overriding the model defaults for this provider. */
+  capabilities: string[];
+  pricingOverride: Record<string, unknown>;
+}
+
+export function emptyModelMappingForm(): ModelMappingFormState {
+  return {
+    providerId: "",
+    upstreamModelName: "",
+    status: "active",
+    capabilities: [],
+    pricingOverride: {},
+  };
+}
+
+export function buildCreateModelMappingBody(
+  form: ModelMappingFormState,
+): CreateModelProviderMappingRequest {
+  return {
+    provider_id: requiredText(form.providerId, "Provider"),
+    upstream_model_name: requiredText(form.upstreamModelName, "Upstream model name"),
+    status: form.status,
+    capability_override: form.capabilities.length
+      ? capabilityKeysToDescriptors(form.capabilities)
+      : undefined,
+    pricing_override: Object.keys(form.pricingOverride).length ? form.pricingOverride : undefined,
+  };
+}
+
+function splitLines(value: string): string[] {
+  return value
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
 }
 
 function optionalInt(value: string, fieldName: string): number | undefined {
