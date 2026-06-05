@@ -110,6 +110,31 @@ func FinalizePromoCodeWithClient(ctx context.Context, client *ent.Client, input 
 	return ToPromoCodeApplication(row), nil
 }
 
+// ListPromoCodeUsagesWithClient returns the redemption rows for one promo code,
+// newest first, bounded by limit. It reads the durably-indexed application table
+// (promo_code_id index) written at finalize time.
+func ListPromoCodeUsagesWithClient(ctx context.Context, client *ent.Client, promoCodeID, limit int) ([]admincontrolcontract.PromoCodeApplication, error) {
+	if client == nil || promoCodeID <= 0 {
+		return nil, admincontrolcontract.ErrInvalidInput
+	}
+	if limit <= 0 || limit > 500 {
+		limit = 200
+	}
+	rows, err := client.UserPromoCodeApplication.Query().
+		Where(entuserpromocodeapplication.PromoCodeIDEQ(promoCodeID)).
+		Order(ent.Desc(entuserpromocodeapplication.FieldAppliedAt)).
+		Limit(limit).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	usages := make([]admincontrolcontract.PromoCodeApplication, 0, len(rows))
+	for _, row := range rows {
+		usages = append(usages, ToPromoCodeApplication(row))
+	}
+	return usages, nil
+}
+
 func LoadPromoCodes(ctx context.Context, client *ent.Client) (promoCodeCollection, *ent.Setting, error) {
 	setting, err := client.Setting.Query().Where(entsetting.KeyEQ(settingsKeyPromoCodes)).Only(ctx)
 	if err != nil {

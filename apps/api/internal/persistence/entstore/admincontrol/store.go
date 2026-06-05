@@ -269,6 +269,13 @@ func (s *Store) FinalizePromoCode(ctx context.Context, input admincontrolcontrac
 	return application, nil
 }
 
+func (s *Store) ListPromoCodeUsages(ctx context.Context, promoCodeID, limit int) ([]admincontrolcontract.PromoCodeApplication, error) {
+	if s == nil || s.client == nil {
+		return nil, admincontrolcontract.ErrInvalidInput
+	}
+	return ListPromoCodeUsagesWithClient(ctx, s.client, promoCodeID, limit)
+}
+
 func (s *Store) CreateSystemLog(ctx context.Context, input admincontrolcontract.OpsSystemLog) (admincontrolcontract.OpsSystemLog, error) {
 	if strings.TrimSpace(input.Source) == "" || strings.TrimSpace(input.Message) == "" || !input.Level.Valid() {
 		return admincontrolcontract.OpsSystemLog{}, admincontrolcontract.ErrInvalidInput

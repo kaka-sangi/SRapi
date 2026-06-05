@@ -6708,6 +6708,43 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/promo-codes/{id}/usages:
+    get:
+      tags:
+        - AdminPromotions
+      operationId: listAdminPromoCodeUsages
+      summary: List redemptions of a promo code.
+      description: Returns the per-redemption history (who redeemed it, on which order, and the discount applied) recorded when the code was finalized, newest first.
+      security:
+        - cookieAuth: []
+      x-srapi-rbac:
+        owner: read
+        admin: read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Promo code redemptions.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PromoCodeUsageListResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/risk-control/config:
     get:
       tags:
@@ -17805,6 +17842,57 @@ components:
             $ref: "#/components/schemas/PromoCode"
         pagination:
           $ref: "#/components/schemas/Pagination"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    PromoCodeUsage:
+      type: object
+      required:
+        - id
+        - user_id
+        - promo_code_id
+        - payment_order_id
+        - order_no
+        - original_amount
+        - discount_amount
+        - final_amount
+        - currency
+        - discount_type
+        - applied_at
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        user_id:
+          $ref: "#/components/schemas/Id"
+        promo_code_id:
+          $ref: "#/components/schemas/Id"
+        payment_order_id:
+          $ref: "#/components/schemas/Id"
+        order_no:
+          type: string
+        original_amount:
+          type: string
+        discount_amount:
+          type: string
+        final_amount:
+          type: string
+        currency:
+          type: string
+        discount_type:
+          $ref: "#/components/schemas/PromoDiscountType"
+        applied_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    PromoCodeUsageListResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/PromoCodeUsage"
         request_id:
           $ref: "#/components/schemas/RequestId"
 

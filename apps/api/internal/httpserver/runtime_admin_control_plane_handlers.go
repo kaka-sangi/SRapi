@@ -391,6 +391,27 @@ func (s *Server) handleDeleteAdminPromoCode(w http.ResponseWriter, r *http.Reque
 	writeJSONAny(w, http.StatusOK, deleteResponse(true, requestID))
 }
 
+func (s *Server) handleListAdminPromoCodeUsages(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	if _, err := s.requireAdminSession(r); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	id, ok := pathID(w, r, requestID)
+	if !ok {
+		return
+	}
+	usages, err := s.runtime.adminControl.ListPromoCodeUsages(r.Context(), id, 200)
+	if err != nil {
+		writeAdminControlError(w, err, requestID)
+		return
+	}
+	writeJSONAny(w, http.StatusOK, apiopenapi.PromoCodeUsageListResponse{
+		Data:      toAPIPromoCodeUsages(usages),
+		RequestId: requestID,
+	})
+}
+
 func (s *Server) handleGetAdminRiskControlConfig(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	if _, err := s.requireAdminSession(r); err != nil {
@@ -1019,6 +1040,26 @@ func toAPIRedeemCodeStats(in admincontrol.RedeemCodeStats) apiopenapi.RedeemCode
 		Redeemed: in.Redeemed,
 		Total:    in.Total,
 	}
+}
+
+func toAPIPromoCodeUsages(items []admincontrol.PromoCodeApplication) []apiopenapi.PromoCodeUsage {
+	out := make([]apiopenapi.PromoCodeUsage, 0, len(items))
+	for _, item := range items {
+		out = append(out, apiopenapi.PromoCodeUsage{
+			Id:             apiopenapi.Id(strconv.Itoa(item.ID)),
+			UserId:         apiopenapi.Id(strconv.Itoa(item.UserID)),
+			PromoCodeId:    apiopenapi.Id(strconv.Itoa(item.PromoCodeID)),
+			PaymentOrderId: apiopenapi.Id(strconv.Itoa(item.PaymentOrderID)),
+			OrderNo:        item.OrderNo,
+			OriginalAmount: item.OriginalAmount,
+			DiscountAmount: item.DiscountAmount,
+			FinalAmount:    item.FinalAmount,
+			Currency:       item.Currency,
+			DiscountType:   apiopenapi.PromoDiscountType(item.DiscountType),
+			AppliedAt:      item.AppliedAt,
+		})
+	}
+	return out
 }
 
 func toAPIPromoCodes(items []admincontrol.PromoCode) []apiopenapi.PromoCode {

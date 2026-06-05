@@ -2486,6 +2486,25 @@ export type PromoCodeListResponse = {
     request_id: RequestId;
 };
 
+export type PromoCodeUsage = {
+    id: Id;
+    user_id: Id;
+    promo_code_id: Id;
+    payment_order_id: Id;
+    order_no: string;
+    original_amount: string;
+    discount_amount: string;
+    final_amount: string;
+    currency: string;
+    discount_type: PromoDiscountType;
+    applied_at: Timestamp;
+};
+
+export type PromoCodeUsageListResponse = {
+    data: Array<PromoCodeUsage>;
+    request_id: RequestId;
+};
+
 export type RiskControlMode = 'monitor' | 'enforce';
 
 export type RiskControlConfig = {
@@ -11655,6 +11674,45 @@ export type UpdateAdminPromoCodeResponses = {
 };
 
 export type UpdateAdminPromoCodeResponse = UpdateAdminPromoCodeResponses[keyof UpdateAdminPromoCodeResponses];
+
+export type ListAdminPromoCodeUsagesData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/promo-codes/{id}/usages';
+};
+
+export type ListAdminPromoCodeUsagesErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ListAdminPromoCodeUsagesError = ListAdminPromoCodeUsagesErrors[keyof ListAdminPromoCodeUsagesErrors];
+
+export type ListAdminPromoCodeUsagesResponses = {
+    /**
+     * Promo code redemptions.
+     */
+    200: PromoCodeUsageListResponse;
+};
+
+export type ListAdminPromoCodeUsagesResponse = ListAdminPromoCodeUsagesResponses[keyof ListAdminPromoCodeUsagesResponses];
 
 export type GetAdminRiskControlConfigData = {
     body?: never;

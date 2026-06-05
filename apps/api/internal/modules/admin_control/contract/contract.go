@@ -20,6 +20,7 @@ type Store interface {
 	RedeemCode(ctx context.Context, input RedeemCodeRedemptionInput) (RedeemCodeRedemptionResult, error)
 	PreviewPromoCode(ctx context.Context, input PromoCodePreviewInput) (PromoCodeApplication, error)
 	FinalizePromoCode(ctx context.Context, input PromoCodeFinalizeInput) (PromoCodeApplication, error)
+	ListPromoCodeUsages(ctx context.Context, promoCodeID, limit int) ([]PromoCodeApplication, error)
 }
 
 type ListOptions struct {

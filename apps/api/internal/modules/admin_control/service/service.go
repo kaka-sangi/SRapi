@@ -440,6 +440,14 @@ func (s *Service) ListPromoCodes(ctx context.Context, opts admincontrol.ListOpti
 	return admincontrol.PromoCodeList{Items: pageItems(items, opts), Total: len(items)}, nil
 }
 
+// ListPromoCodeUsages returns the redemption history for one promo code.
+func (s *Service) ListPromoCodeUsages(ctx context.Context, promoCodeID, limit int) ([]admincontrol.PromoCodeApplication, error) {
+	if promoCodeID <= 0 {
+		return nil, admincontrol.ErrInvalidInput
+	}
+	return s.store.ListPromoCodeUsages(ctx, promoCodeID, limit)
+}
+
 func (s *Service) CreatePromoCode(ctx context.Context, req admincontrol.PromoCodeRequest, actorUserID int) (admincontrol.PromoCode, error) {
 	var collection promoCodeCollection
 	if err := s.loadTyped(ctx, settingsKeyPromoCodes, &collection); err != nil {

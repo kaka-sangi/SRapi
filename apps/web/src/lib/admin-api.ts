@@ -118,6 +118,7 @@ import {
   listAdminPaymentProviders,
   listAdminPricingRules,
   listAdminPromoCodes,
+  listAdminPromoCodeUsages,
   listAdminProviders,
   listAdminProxies,
   listAdminRedeemCodes,
@@ -163,6 +164,7 @@ import type {
   AdminUpdateApiKeyRequest,
   ApiKey,
   GatewayUsageResponse,
+  PromoCodeUsage,
   AffiliateInviteRecord,
   AffiliateLedgerEntry,
   Announcement,
@@ -1030,6 +1032,10 @@ export const adminApi = {
 
   deletePromoCode(id: Id): Promise<{ deleted: boolean }> {
     return unwrapData(() => deleteAdminPromoCode({ path: { id }, throwOnError: true }));
+  },
+
+  listPromoCodeUsages(id: Id): Promise<AdminListResult<PromoCodeUsage>> {
+    return unwrapList(() => listAdminPromoCodeUsages({ path: { id }, throwOnError: true }));
   },
 
   getRiskConfig(): Promise<RiskControlConfig> {

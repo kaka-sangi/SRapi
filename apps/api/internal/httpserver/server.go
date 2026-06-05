@@ -486,6 +486,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("POST /api/v1/admin/promo-codes", server.handleCreateAdminPromoCode)
 	mux.HandleFunc("PUT /api/v1/admin/promo-codes/{id}", server.handleUpdateAdminPromoCode)
 	mux.HandleFunc("DELETE /api/v1/admin/promo-codes/{id}", server.handleDeleteAdminPromoCode)
+	mux.HandleFunc("GET /api/v1/admin/promo-codes/{id}/usages", server.handleListAdminPromoCodeUsages)
 	mux.HandleFunc("GET /api/v1/admin/risk-control/config", server.handleGetAdminRiskControlConfig)
 	mux.HandleFunc("PUT /api/v1/admin/risk-control/config", server.handleUpdateAdminRiskControlConfig)
 	mux.HandleFunc("GET /api/v1/admin/risk-control/status", server.handleGetAdminRiskControlStatus)

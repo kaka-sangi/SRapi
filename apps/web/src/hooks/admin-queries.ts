@@ -283,6 +283,13 @@ export function useAdminPromoCodes(params?: P<typeof adminApi.listPromoCodes>) {
     queryFn: () => adminApi.listPromoCodes(params),
   });
 }
+export function useAdminPromoCodeUsages(id: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.admin.promoCodeUsages(id ?? ""),
+    queryFn: () => adminApi.listPromoCodeUsages(id as string),
+    enabled: enabled && Boolean(id),
+  });
+}
 
 export function useAdminRedeemCodes(params?: P<typeof adminApi.listRedeemCodes>) {
   return useQuery({

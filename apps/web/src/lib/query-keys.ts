@@ -78,6 +78,7 @@ export const queryKeys = {
     redeemCodes: (params?: unknown) => ["admin", "redeem-codes", params ?? {}] as const,
     redeemStats: () => ["admin", "redeem-stats"] as const,
     promoCodes: (params?: unknown) => ["admin", "promo-codes", params ?? {}] as const,
+    promoCodeUsages: (id: string) => ["admin", "promo-code-usages", id] as const,
     errorPassthroughRules: () => ["admin", "error-passthrough-rules"] as const,
     payloadRules: () => ["admin", "payload-rules"] as const,
     tlsProfiles: () => ["admin", "tls-profiles"] as const,

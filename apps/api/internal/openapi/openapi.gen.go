@@ -6148,6 +6148,27 @@ type PromoCodeResponse struct {
 // PromoCodeStatus defines model for PromoCodeStatus.
 type PromoCodeStatus string
 
+// PromoCodeUsage defines model for PromoCodeUsage.
+type PromoCodeUsage struct {
+	AppliedAt      Timestamp         `json:"applied_at"`
+	Currency       string            `json:"currency"`
+	DiscountAmount string            `json:"discount_amount"`
+	DiscountType   PromoDiscountType `json:"discount_type"`
+	FinalAmount    string            `json:"final_amount"`
+	Id             Id                `json:"id"`
+	OrderNo        string            `json:"order_no"`
+	OriginalAmount string            `json:"original_amount"`
+	PaymentOrderId Id                `json:"payment_order_id"`
+	PromoCodeId    Id                `json:"promo_code_id"`
+	UserId         Id                `json:"user_id"`
+}
+
+// PromoCodeUsageListResponse defines model for PromoCodeUsageListResponse.
+type PromoCodeUsageListResponse struct {
+	Data      []PromoCodeUsage `json:"data"`
+	RequestId RequestId        `json:"request_id"`
+}
+
 // PromoDiscountType defines model for PromoDiscountType.
 type PromoDiscountType string
 
@@ -15437,6 +15458,9 @@ type ServerInterface interface {
 	// Update a promo code.
 	// (PUT /api/v1/admin/promo-codes/{id})
 	UpdateAdminPromoCode(w http.ResponseWriter, r *http.Request, id Id)
+	// List redemptions of a promo code.
+	// (GET /api/v1/admin/promo-codes/{id}/usages)
+	ListAdminPromoCodeUsages(w http.ResponseWriter, r *http.Request, id Id)
 	// List providers.
 	// (GET /api/v1/admin/providers)
 	ListAdminProviders(w http.ResponseWriter, r *http.Request, params ListAdminProvidersParams)
@@ -20552,6 +20576,38 @@ func (siw *ServerInterfaceWrapper) UpdateAdminPromoCode(w http.ResponseWriter, r
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateAdminPromoCode(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAdminPromoCodeUsages operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminPromoCodeUsages(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminPromoCodeUsages(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -26244,6 +26300,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/promo-codes", wrapper.CreateAdminPromoCode)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/promo-codes/{id}", wrapper.DeleteAdminPromoCode)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/admin/promo-codes/{id}", wrapper.UpdateAdminPromoCode)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/promo-codes/{id}/usages", wrapper.ListAdminPromoCodeUsages)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/providers", wrapper.ListAdminProviders)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/providers", wrapper.CreateAdminProvider)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/providers/preset/install", wrapper.InstallAdminProviderPresets)

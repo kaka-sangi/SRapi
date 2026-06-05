@@ -14,6 +14,7 @@ import {
   type FieldConfig,
 } from "@/components/admin/resource-form-dialog";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
+import { PromoCodeUsagesDialog } from "@/components/admin/promo-code-usages-dialog";
 import {
   useAdminPromoCodes,
   useCreatePromoCode,
@@ -57,6 +58,7 @@ function PromoContent() {
 
   const [formTarget, setFormTarget] = useState<PromoCode | "new" | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<PromoCode | null>(null);
+  const [usagesTarget, setUsagesTarget] = useState<PromoCode | null>(null);
   const isNew = formTarget === "new";
 
   const fields: FieldConfig<PromoCodeFormState>[] = [
@@ -168,6 +170,7 @@ function PromoContent() {
         rowActions={(p) => (
           <RowActionsMenu
             actions={[
+              { label: t("adminPromos.usagesAction"), onSelect: () => setUsagesTarget(p) },
               { label: t("common.edit"), onSelect: () => setFormTarget(p) },
               { label: t("common.delete"), destructive: true, onSelect: () => setDeleteTarget(p) },
             ]}
@@ -210,6 +213,15 @@ function PromoContent() {
           isPending={deleteMut.isPending}
         />
       ) : null}
+
+      <PromoCodeUsagesDialog
+        promoId={usagesTarget?.id ?? null}
+        code={usagesTarget?.code ?? ""}
+        open={usagesTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setUsagesTarget(null);
+        }}
+      />
     </>
   );
 }

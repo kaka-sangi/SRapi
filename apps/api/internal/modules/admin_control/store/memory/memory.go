@@ -268,6 +268,28 @@ func (s *Store) FinalizePromoCode(_ context.Context, input admincontrol.PromoCod
 	return application, nil
 }
 
+func (s *Store) ListPromoCodeUsages(_ context.Context, promoCodeID, limit int) ([]admincontrol.PromoCodeApplication, error) {
+	if promoCodeID <= 0 {
+		return nil, admincontrol.ErrInvalidInput
+	}
+	if limit <= 0 || limit > 500 {
+		limit = 200
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	usages := make([]admincontrol.PromoCodeApplication, 0)
+	for _, application := range s.promoApplications {
+		if application.PromoCodeID == promoCodeID {
+			usages = append(usages, application)
+		}
+	}
+	sort.SliceStable(usages, func(i, j int) bool { return usages[i].AppliedAt.After(usages[j].AppliedAt) })
+	if len(usages) > limit {
+		usages = usages[:limit]
+	}
+	return usages, nil
+}
+
 func (s *Store) CreateSystemLog(_ context.Context, input admincontrol.OpsSystemLog) (admincontrol.OpsSystemLog, error) {
 	if strings.TrimSpace(input.Source) == "" || strings.TrimSpace(input.Message) == "" || !input.Level.Valid() {
 		return admincontrol.OpsSystemLog{}, admincontrol.ErrInvalidInput
