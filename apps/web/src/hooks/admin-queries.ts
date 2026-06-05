@@ -918,6 +918,20 @@ export function useCreatePaymentProvider() {
     ["admin", "payment-providers"],
   );
 }
+export function useUpdatePaymentProvider() {
+  return useAdminMutation(
+    (vars: { id: string; body: B<typeof adminApi.updatePaymentProvider> }) =>
+      adminApi.updatePaymentProvider(vars.id, vars.body),
+    ["admin", "payment-providers"],
+  );
+}
+export function useTestPaymentProvider() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => adminApi.testPaymentProvider(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "payment-providers"] }),
+  });
+}
 
 // Risk control
 export function useUpdateRiskConfig() {

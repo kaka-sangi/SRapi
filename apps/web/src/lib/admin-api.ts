@@ -121,11 +121,13 @@ import {
   replaySchedulerStrategy,
   recoverAdminAccount,
   testAdminAccount,
+  testAdminPaymentProvider,
   testAdminProvider,
   updateAdminAccount,
   updateAdminAccountGroup,
   updateAdminAnnouncement,
   updateAdminOpsSlo,
+  updateAdminPaymentProvider,
   updateAdminPromoCode,
   updateAdminProvider,
   updateAdminProxy,
@@ -183,6 +185,7 @@ import type {
   CreateAccountGroupRequest,
   CreateAdminAccountData,
   CreateAdminPaymentProviderData,
+  UpdateAdminPaymentProviderData,
   CreateAdminPricingRuleData,
   CreateAdminProxyData,
   CreateAdminSubscriptionPlanData,
@@ -677,6 +680,17 @@ export const adminApi = {
     body: CreateAdminPaymentProviderData["body"],
   ): Promise<PaymentProviderInstance> {
     return unwrapData(() => createAdminPaymentProvider({ body, throwOnError: true }));
+  },
+  updatePaymentProvider(
+    id: Id,
+    body: UpdateAdminPaymentProviderData["body"],
+  ): Promise<PaymentProviderInstance> {
+    return unwrapData(() =>
+      updateAdminPaymentProvider({ path: { id }, body, throwOnError: true }),
+    );
+  },
+  testPaymentProvider(id: Id): Promise<AdminTestResult> {
+    return unwrapData(() => testAdminPaymentProvider({ path: { id }, throwOnError: true }));
   },
 
   listPaymentOrders(

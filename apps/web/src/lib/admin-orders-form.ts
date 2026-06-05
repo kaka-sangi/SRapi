@@ -3,7 +3,9 @@ import type {
   Id,
   PaymentOrder,
   PaymentOrderStatus,
+  PaymentProviderInstance,
   PaymentProviderStatus,
+  UpdateAdminPaymentProviderData,
 } from "../../../../packages/sdk/typescript/src/types.gen";
 
 export const REFUNDABLE_ORDER_STATUSES: PaymentOrderStatus[] = [
@@ -82,6 +84,38 @@ export function buildCreatePaymentProviderBody(
     name: requiredText(form.name, "Name"),
     status: form.status,
     config: form.config,
+    supported_methods: parseLines(form.supportedMethodsText),
+    limits: form.limits,
+    metadata: form.metadata,
+    sort_order: parseInteger(form.sortOrder, "Sort order"),
+  };
+}
+
+export function paymentProviderFormFromInstance(
+  p: PaymentProviderInstance,
+): PaymentProviderFormState {
+  return {
+    provider: p.provider,
+    name: p.name,
+    status: p.status,
+    supportedMethodsText: p.supported_methods.join("\n"),
+    // Stored credentials are never returned by the API, so config starts blank
+    // on edit and is only sent back when the admin re-enters keys.
+    config: {},
+    limits: (p.limits as Record<string, unknown>) ?? {},
+    metadata: (p.metadata as Record<string, unknown>) ?? {},
+    sortOrder: String(p.sort_order),
+  };
+}
+
+export function buildUpdatePaymentProviderBody(
+  form: PaymentProviderFormState,
+): UpdateAdminPaymentProviderData["body"] {
+  return {
+    name: requiredText(form.name, "Name"),
+    status: form.status,
+    // Only send config when keys were entered — empty means keep stored secrets.
+    config: Object.keys(form.config).length ? form.config : undefined,
     supported_methods: parseLines(form.supportedMethodsText),
     limits: form.limits,
     metadata: form.metadata,

@@ -11,8 +11,16 @@ import {
   enumOptions,
   type FieldConfig,
 } from "@/components/admin/resource-form-dialog";
-import { useAdminPaymentProviders, useCreatePaymentProvider } from "@/hooks/admin-queries";
+import { RowActionsMenu } from "@/components/admin/row-actions";
+import {
+  useAdminPaymentProviders,
+  useCreatePaymentProvider,
+  useUpdatePaymentProvider,
+  useTestPaymentProvider,
+} from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
+import { useToast } from "@/context/ToastContext";
+import { adminErrorMessage } from "@/lib/admin-api";
 import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
@@ -20,6 +28,8 @@ import {
   PAYMENT_PROVIDER_STATUSES,
   emptyPaymentProviderForm,
   buildCreatePaymentProviderBody,
+  buildUpdatePaymentProviderBody,
+  paymentProviderFormFromInstance,
   type PaymentProviderFormState,
 } from "@/lib/admin-orders-form";
 import type { PaymentProviderInstance } from "../../../../../../packages/sdk/typescript/src/types.gen";
@@ -39,9 +49,26 @@ function PaymentProvidersContent() {
     page: list.page,
     page_size: list.pageSize,
   });
+  const { toast } = useToast();
   const createMut = useCreatePaymentProvider();
+  const updateMut = useUpdatePaymentProvider();
+  const testMut = useTestPaymentProvider();
 
-  const [showCreate, setShowCreate] = useState(false);
+  const [formTarget, setFormTarget] = useState<PaymentProviderInstance | "new" | null>(null);
+
+  async function runTest(id: string) {
+    try {
+      const result = await testMut.mutateAsync(id);
+      toast({
+        title: result.ok ? t("feedback.acknowledged") : t("feedback.failed"),
+        description:
+          result.message ?? (result.latency_ms != null ? `${result.latency_ms} ms` : undefined),
+        tone: result.ok ? "success" : "error",
+      });
+    } catch {
+      toast({ title: t("feedback.failed"), tone: "error" });
+    }
+  }
 
   const fields: FieldConfig<PaymentProviderFormState>[] = [
     { name: "name", label: t("adminPayments.name") },
@@ -69,6 +96,12 @@ function PaymentProvidersContent() {
     { name: "sortOrder", label: t("adminPayments.sortOrder"), type: "number", advanced: true },
     { name: "metadata", label: t("adminCommon.metadata"), type: "keyvalue", advanced: true },
   ];
+
+  // The channel (provider) is immutable once created, and stored secrets aren't
+  // returned, so edits drop the channel field and nudge config toward "leave blank".
+  const editFields = fields
+    .filter((f) => f.name !== "provider")
+    .map((f) => (f.name === "config" ? { ...f, hint: t("adminPayments.configEditHint") } : f));
 
   const columns: Column<PaymentProviderInstance>[] = [
     {
@@ -113,7 +146,7 @@ function PaymentProvidersContent() {
             {providers.data ? (
               <ListCount total={providers.data.pagination?.total ?? providers.data.data.length} />
             ) : null}
-            <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
+            <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
               ＋ {t("adminPayments.create")}
             </Button>
           </div>
@@ -127,7 +160,7 @@ function PaymentProvidersContent() {
         emptyTitle={t("adminPayments.emptyTitle")}
         emptyBody={t("adminPayments.emptyBody")}
         emptyAction={
-          <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
+          <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
             ＋ {t("adminPayments.create")}
           </Button>
         }
@@ -140,13 +173,21 @@ function PaymentProvidersContent() {
           total: providers.data?.pagination?.total ?? providers.data?.data.length ?? 0,
           onPageChange: list.setPage,
         }}
+        rowActions={(p) => (
+          <RowActionsMenu
+            actions={[
+              { label: t("adminPayments.edit"), onSelect: () => setFormTarget(p) },
+              { label: t("adminPayments.test"), onSelect: () => void runTest(p.id) },
+            ]}
+          />
+        )}
       />
 
-      {showCreate ? (
+      {formTarget === "new" ? (
         <ResourceFormDialog
           open
           onOpenChange={(open) => {
-            if (!open) setShowCreate(false);
+            if (!open) setFormTarget(null);
           }}
           title={t("adminPayments.create")}
           fields={fields}
@@ -155,6 +196,21 @@ function PaymentProvidersContent() {
           submit={(body) => createMut.mutateAsync(body)}
           successMessage={t("feedback.created")}
           isPending={createMut.isPending}
+        />
+      ) : formTarget ? (
+        <ResourceFormDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setFormTarget(null);
+          }}
+          title={t("adminPayments.edit")}
+          description={formTarget.name}
+          fields={editFields}
+          initial={paymentProviderFormFromInstance(formTarget)}
+          buildBody={buildUpdatePaymentProviderBody}
+          submit={(body) => updateMut.mutateAsync({ id: formTarget.id, body })}
+          successMessage={t("feedback.updated")}
+          isPending={updateMut.isPending}
         />
       ) : null}
     </>
