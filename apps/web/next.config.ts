@@ -1,3 +1,4 @@
+import path from "node:path";
 import type { NextConfig } from "next";
 import bundleAnalyzer from "@next/bundle-analyzer";
 
@@ -47,6 +48,12 @@ const withBundleAnalyzer = bundleAnalyzer({ enabled: process.env.ANALYZE === "1"
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // Pin Turbopack's workspace root explicitly to silence the multi-lockfile
+  // inference warning (lockfiles at repo root + apps/web). It must be the repo
+  // root, NOT apps/web: this app imports the generated SDK from
+  // ../../packages/sdk, which lives outside apps/web, and Turbopack refuses to
+  // resolve modules above the configured root (next build fails otherwise).
+  turbopack: { root: path.join(__dirname, "..", "..") },
   async headers() {
     return [
       {
