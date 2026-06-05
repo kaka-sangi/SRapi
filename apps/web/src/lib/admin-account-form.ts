@@ -1,4 +1,6 @@
 import type {
+  BatchAccountActionRequest,
+  BatchActionAdminAccountsData,
   BatchUpdateAdminAccountsData,
   CreateAdminAccountData,
   Id,
@@ -232,6 +234,22 @@ export function buildBatchUpdateAccountsBody({
     throw new Error("Select at least one account.");
   }
   return { account_ids: ids, status };
+}
+
+export type AccountBatchAction = BatchAccountActionRequest["action"];
+
+export function buildBatchAccountActionBody({
+  accountIds,
+  action,
+}: {
+  accountIds: Id[];
+  action: AccountBatchAction;
+}): BatchActionAdminAccountsData["body"] {
+  const ids = [...new Set(accountIds.map((id) => id.trim()).filter(Boolean))];
+  if (ids.length === 0) {
+    throw new Error("Select at least one account.");
+  }
+  return { account_ids: ids, action };
 }
 
 export function createAccountBatchStatusConfirmation({

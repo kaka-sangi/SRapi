@@ -28,6 +28,9 @@ func (s *Server) handleListModels(w http.ResponseWriter, r *http.Request) {
 	}
 	gatewayModels := toGatewayModels(models)
 	gatewayModels = filterGatewayModels(gatewayModels, authed.Key.AllowedModels)
+	if hidden := s.runtime.modelsHiddenByExclusion(r.Context(), models, authed.Key); len(hidden) > 0 {
+		gatewayModels = hideGatewayModels(gatewayModels, hidden)
+	}
 	writeJSONAny(w, http.StatusOK, apiopenapi.OpenAIModelList{
 		Object: apiopenapi.OpenAIModelListObjectList,
 		Data:   gatewayModels,
@@ -219,6 +222,7 @@ func (s *Server) serveChatCompletion(w http.ResponseWriter, r *http.Request, aut
 	})
 	if canonical.Stream {
 		if sameProtocolRawConversationStream(canonical, result.Candidate.Provider.Protocol, result.Candidate.Provider.AdapterType, result.Candidate.Provider.Name, result.Candidate.Provider.ConfigSchema, result.Candidate.Provider.Capabilities, result.Candidate.Account.Metadata, canonicalResp.RawProviderMetadata) {
+			s.forwardBufferedPassthroughHeaders(w, r, providerResp.Headers)
 			writeRawSSEResponse(w, canonicalResp.RawProviderMetadata)
 			return
 		}
@@ -226,6 +230,7 @@ func (s *Server) serveChatCompletion(w http.ResponseWriter, r *http.Request, aut
 		return
 	}
 	if sameProtocolRawConversationResponse(canonical, result.Candidate.Provider.Protocol, result.Candidate.Provider.AdapterType, result.Candidate.Provider.Name, result.Candidate.Provider.ConfigSchema, result.Candidate.Provider.Capabilities, result.Candidate.Account.Metadata, canonicalResp.RawProviderMetadata) {
+		s.forwardBufferedPassthroughHeaders(w, r, providerResp.Headers)
 		writeRawJSONResponse(w, http.StatusOK, canonicalResp.RawProviderMetadata)
 		return
 	}
@@ -397,6 +402,7 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 	response := s.runtime.gateway.RenderResponses(canonicalResp)
 	if canonical.Stream {
 		if sameProtocolRawConversationStream(canonical, result.Candidate.Provider.Protocol, result.Candidate.Provider.AdapterType, result.Candidate.Provider.Name, result.Candidate.Provider.ConfigSchema, result.Candidate.Provider.Capabilities, result.Candidate.Account.Metadata, canonicalResp.RawProviderMetadata) {
+			s.forwardBufferedPassthroughHeaders(w, r, providerResp.Headers)
 			writeRawSSEResponse(w, canonicalResp.RawProviderMetadata)
 			return
 		}
@@ -404,6 +410,7 @@ func (s *Server) handleCreateResponse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if sameProtocolRawConversationResponse(canonical, result.Candidate.Provider.Protocol, result.Candidate.Provider.AdapterType, result.Candidate.Provider.Name, result.Candidate.Provider.ConfigSchema, result.Candidate.Provider.Capabilities, result.Candidate.Account.Metadata, canonicalResp.RawProviderMetadata) {
+		s.forwardBufferedPassthroughHeaders(w, r, providerResp.Headers)
 		writeRawJSONResponse(w, http.StatusOK, canonicalResp.RawProviderMetadata)
 		return
 	}
@@ -695,6 +702,7 @@ func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
 	response := s.runtime.gateway.RenderAnthropicMessages(canonicalResp)
 	if canonical.Stream {
 		if sameProtocolRawConversationStream(canonical, result.Candidate.Provider.Protocol, result.Candidate.Provider.AdapterType, result.Candidate.Provider.Name, result.Candidate.Provider.ConfigSchema, result.Candidate.Provider.Capabilities, result.Candidate.Account.Metadata, canonicalResp.RawProviderMetadata) {
+			s.forwardBufferedPassthroughHeaders(w, r, providerResp.Headers)
 			writeRawSSEResponse(w, canonicalResp.RawProviderMetadata)
 			return
 		}
@@ -702,6 +710,7 @@ func (s *Server) handleCreateMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if sameProtocolRawConversationResponse(canonical, result.Candidate.Provider.Protocol, result.Candidate.Provider.AdapterType, result.Candidate.Provider.Name, result.Candidate.Provider.ConfigSchema, result.Candidate.Provider.Capabilities, result.Candidate.Account.Metadata, canonicalResp.RawProviderMetadata) {
+		s.forwardBufferedPassthroughHeaders(w, r, providerResp.Headers)
 		writeRawJSONResponse(w, http.StatusOK, canonicalResp.RawProviderMetadata)
 		return
 	}
@@ -1022,6 +1031,7 @@ func (s *Server) handleGeminiModelAction(w http.ResponseWriter, r *http.Request)
 	})
 	if canonical.Stream {
 		if sameProtocolRawConversationStream(canonical, result.Candidate.Provider.Protocol, result.Candidate.Provider.AdapterType, result.Candidate.Provider.Name, result.Candidate.Provider.ConfigSchema, result.Candidate.Provider.Capabilities, result.Candidate.Account.Metadata, canonicalResp.RawProviderMetadata) {
+			s.forwardBufferedPassthroughHeaders(w, r, providerResp.Headers)
 			writeRawSSEResponse(w, canonicalResp.RawProviderMetadata)
 			return
 		}
@@ -1029,6 +1039,7 @@ func (s *Server) handleGeminiModelAction(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if sameProtocolRawConversationResponse(canonical, result.Candidate.Provider.Protocol, result.Candidate.Provider.AdapterType, result.Candidate.Provider.Name, result.Candidate.Provider.ConfigSchema, result.Candidate.Provider.Capabilities, result.Candidate.Account.Metadata, canonicalResp.RawProviderMetadata) {
+		s.forwardBufferedPassthroughHeaders(w, r, providerResp.Headers)
 		writeRawJSONResponse(w, http.StatusOK, canonicalResp.RawProviderMetadata)
 		return
 	}

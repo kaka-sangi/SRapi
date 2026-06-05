@@ -491,6 +491,24 @@ func (e AuthIdentityProvider) Valid() bool {
 	}
 }
 
+// Defines values for BatchAccountActionRequestAction.
+const (
+	ClearError BatchAccountActionRequestAction = "clear_error"
+	Recover    BatchAccountActionRequestAction = "recover"
+)
+
+// Valid indicates whether the value is a known member of the BatchAccountActionRequestAction enum.
+func (e BatchAccountActionRequestAction) Valid() bool {
+	switch e {
+	case ClearError:
+		return true
+	case Recover:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for BillingLedgerEntryType.
 const (
 	Adjustment        BillingLedgerEntryType = "adjustment"
@@ -623,6 +641,30 @@ func (e ChatMessageRole) Valid() bool {
 	case ChatMessageRoleTool:
 		return true
 	case ChatMessageRoleUser:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CodexSessionImportItemAction.
+const (
+	CodexSessionImportItemActionCreated CodexSessionImportItemAction = "created"
+	CodexSessionImportItemActionFailed  CodexSessionImportItemAction = "failed"
+	CodexSessionImportItemActionSkipped CodexSessionImportItemAction = "skipped"
+	CodexSessionImportItemActionUpdated CodexSessionImportItemAction = "updated"
+)
+
+// Valid indicates whether the value is a known member of the CodexSessionImportItemAction enum.
+func (e CodexSessionImportItemAction) Valid() bool {
+	switch e {
+	case CodexSessionImportItemActionCreated:
+		return true
+	case CodexSessionImportItemActionFailed:
+		return true
+	case CodexSessionImportItemActionSkipped:
+		return true
+	case CodexSessionImportItemActionUpdated:
 		return true
 	default:
 		return false
@@ -2485,22 +2527,22 @@ func (e UserStatus) Valid() bool {
 
 // Defines values for UserSubscriptionStatus.
 const (
-	Active    UserSubscriptionStatus = "active"
-	Cancelled UserSubscriptionStatus = "cancelled"
-	Expired   UserSubscriptionStatus = "expired"
-	Suspended UserSubscriptionStatus = "suspended"
+	UserSubscriptionStatusActive    UserSubscriptionStatus = "active"
+	UserSubscriptionStatusCancelled UserSubscriptionStatus = "cancelled"
+	UserSubscriptionStatusExpired   UserSubscriptionStatus = "expired"
+	UserSubscriptionStatusSuspended UserSubscriptionStatus = "suspended"
 )
 
 // Valid indicates whether the value is a known member of the UserSubscriptionStatus enum.
 func (e UserSubscriptionStatus) Valid() bool {
 	switch e {
-	case Active:
+	case UserSubscriptionStatusActive:
 		return true
-	case Cancelled:
+	case UserSubscriptionStatusCancelled:
 		return true
-	case Expired:
+	case UserSubscriptionStatusExpired:
 		return true
-	case Suspended:
+	case UserSubscriptionStatusSuspended:
 		return true
 	default:
 		return false
@@ -3227,10 +3269,25 @@ type AdminSettingsFeatures struct {
 
 // AdminSettingsGateway defines model for AdminSettingsGateway.
 type AdminSettingsGateway struct {
-	BetaStrategy             string `json:"beta_strategy"`
-	OverloadCooldownSeconds  int    `json:"overload_cooldown_seconds"`
-	RateLimitCooldownSeconds int    `json:"rate_limit_cooldown_seconds"`
-	RequestShaperEnabled     bool   `json:"request_shaper_enabled"`
+	BetaStrategy string `json:"beta_strategy"`
+
+	// MaxRetryCredentials Maximum distinct credentials the failover loop may exclude and retry across. 0 means unlimited (bounded only by retry_count and available candidates).
+	MaxRetryCredentials *int `json:"max_retry_credentials,omitempty"`
+
+	// MaxRetryIntervalMs Default ceiling for same-candidate retry backoff delay in milliseconds. Per-account metadata overrides still apply.
+	MaxRetryIntervalMs      *int `json:"max_retry_interval_ms,omitempty"`
+	OverloadCooldownSeconds int  `json:"overload_cooldown_seconds"`
+
+	// PassthroughHeaderAllowlist Case-insensitive allowlist of upstream response header names to forward when passthrough_upstream_headers is enabled (e.g. retry-after, x-request-id, x-ratelimit-remaining). A trailing "*" wildcard matches by prefix (e.g. x-ratelimit-*).
+	PassthroughHeaderAllowlist *[]string `json:"passthrough_header_allowlist,omitempty"`
+
+	// PassthroughUpstreamHeaders When enabled, allowlisted upstream response headers are forwarded to the client on both the streaming and buffered gateway response paths. Hop-by-hop headers and headers SRapi already sets are never forwarded. Default off so behavior is unchanged unless explicitly enabled.
+	PassthroughUpstreamHeaders *bool `json:"passthrough_upstream_headers,omitempty"`
+	RateLimitCooldownSeconds   int   `json:"rate_limit_cooldown_seconds"`
+	RequestShaperEnabled       bool  `json:"request_shaper_enabled"`
+
+	// RetryCount Maximum cross-candidate gateway attempts before failing a request. Bounds how many distinct credentials the failover loop may try.
+	RetryCount *int `json:"retry_count,omitempty"`
 
 	// SchedulerStrategyRolloutApiKeyHashes Optional SHA-256 API key prefix hash scope. Empty means all API keys.
 	SchedulerStrategyRolloutApiKeyHashes *[]string `json:"scheduler_strategy_rollout_api_key_hashes,omitempty"`
@@ -3713,6 +3770,17 @@ type AuditLogListResponse struct {
 // AuthIdentityProvider defines model for AuthIdentityProvider.
 type AuthIdentityProvider string
 
+// BatchAccountActionRequest defines model for BatchAccountActionRequest.
+type BatchAccountActionRequest struct {
+	AccountIds []Id `json:"account_ids"`
+
+	// Action Maintenance action to apply per account. `clear_error` clears transient error/cooldown metadata and reactivates non-healthy accounts; `recover` resets the account back to active.
+	Action BatchAccountActionRequestAction `json:"action"`
+}
+
+// BatchAccountActionRequestAction Maintenance action to apply per account. `clear_error` clears transient error/cooldown metadata and reactivates non-healthy accounts; `recover` resets the account back to active.
+type BatchAccountActionRequestAction string
+
 // BatchDisableRedeemCodesRequest defines model for BatchDisableRedeemCodesRequest.
 type BatchDisableRedeemCodesRequest struct {
 	Ids []Id `json:"ids"`
@@ -3991,6 +4059,59 @@ type ChatToolCall struct {
 	Id                   string                 `json:"id"`
 	Type                 string                 `json:"type"`
 	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// CodexSessionImportItem defines model for CodexSessionImportItem.
+type CodexSessionImportItem struct {
+	AccountId *Id                          `json:"account_id,omitempty"`
+	Action    CodexSessionImportItemAction `json:"action"`
+	Index     int                          `json:"index"`
+	Message   *string                      `json:"message,omitempty"`
+	Name      *string                      `json:"name,omitempty"`
+}
+
+// CodexSessionImportItemAction defines model for CodexSessionImportItem.Action.
+type CodexSessionImportItemAction string
+
+// CodexSessionImportMessage defines model for CodexSessionImportMessage.
+type CodexSessionImportMessage struct {
+	Index   int     `json:"index"`
+	Message string  `json:"message"`
+	Name    *string `json:"name,omitempty"`
+}
+
+// CodexSessionImportRequest defines model for CodexSessionImportRequest.
+type CodexSessionImportRequest struct {
+	// Content Raw session payload. Accepts a Codex/ChatGPT session JSON object, a single raw access token, a JSON array of either, or newline-delimited (NDJSON) entries mixing the above.
+	Content  string `json:"content"`
+	GroupIds *[]Id  `json:"group_ids,omitempty"`
+
+	// Name Optional base account name. When multiple sessions are imported a "#N" suffix is appended; when omitted the email/account id from the session is used.
+	Name       *string                `json:"name,omitempty"`
+	ProviderId Id                     `json:"provider_id"`
+	ProxyId    *string                `json:"proxy_id,omitempty"`
+	Status     *ProviderAccountStatus `json:"status,omitempty"`
+
+	// UpdateExisting When an account with a matching identity already exists, update its credential instead of skipping. Defaults to true.
+	UpdateExisting *bool `json:"update_existing,omitempty"`
+}
+
+// CodexSessionImportResponse defines model for CodexSessionImportResponse.
+type CodexSessionImportResponse struct {
+	Data      CodexSessionImportResult `json:"data"`
+	RequestId RequestId                `json:"request_id"`
+}
+
+// CodexSessionImportResult defines model for CodexSessionImportResult.
+type CodexSessionImportResult struct {
+	Created  int                         `json:"created"`
+	Errors   []CodexSessionImportMessage `json:"errors"`
+	Failed   int                         `json:"failed"`
+	Items    []CodexSessionImportItem    `json:"items"`
+	Skipped  int                         `json:"skipped"`
+	Total    int                         `json:"total"`
+	Updated  int                         `json:"updated"`
+	Warnings []CodexSessionImportMessage `json:"warnings"`
 }
 
 // CompleteSetupRequest defines model for CompleteSetupRequest.
@@ -6193,9 +6314,11 @@ type Provider struct {
 
 // ProviderAccount defines model for ProviderAccount.
 type ProviderAccount struct {
-	CreatedAt      Timestamp             `json:"created_at"`
-	GroupIds       []Id                  `json:"group_ids"`
-	Id             Id                    `json:"id"`
+	CreatedAt Timestamp `json:"created_at"`
+	GroupIds  []Id      `json:"group_ids"`
+	Id        Id        `json:"id"`
+
+	// Metadata Free-form per-account configuration. Recognized convention keys (no schema migration; read at scheduling time): `base_url` (override the upstream base URL); `supported_models` (string array — exact-match inclusion whitelist of upstream model names this account may serve; absent = serve all); `excluded_models` (string array of `*` wildcard patterns — exclude any catalog or upstream model name matching a pattern; takes precedence over `supported_models` and hides the model from `/v1/models` when every serving account excludes it); `model_mapping` (object mapping a canonical catalog model name to a per-account upstream model name override).
 	Metadata       *JsonObject           `json:"metadata,omitempty"`
 	Name           string                `json:"name"`
 	Priority       int                   `json:"priority"`
@@ -7477,6 +7600,32 @@ type UsageAggregateListResponse struct {
 	RequestId  RequestId        `json:"request_id"`
 }
 
+// UsageCleanupRequest Bounded filter for operator on-demand usage-record cleanup. At least one of model, start or end must be supplied so a cleanup can never match the entire table by accident.
+type UsageCleanupRequest struct {
+	DryRun    *bool      `json:"dry_run,omitempty"`
+	End       *Timestamp `json:"end,omitempty"`
+	MaxDelete *int       `json:"max_delete,omitempty"`
+
+	// Model Canonical model name; matched case-insensitively.
+	Model *string    `json:"model,omitempty"`
+	Start *Timestamp `json:"start,omitempty"`
+}
+
+// UsageCleanupResponse defines model for UsageCleanupResponse.
+type UsageCleanupResponse struct {
+	Data      UsageCleanupResult `json:"data"`
+	RequestId RequestId          `json:"request_id"`
+}
+
+// UsageCleanupResult defines model for UsageCleanupResult.
+type UsageCleanupResult struct {
+	Deleted   int  `json:"deleted"`
+	DryRun    bool `json:"dry_run"`
+	Limited   bool `json:"limited"`
+	Matched   int  `json:"matched"`
+	MaxDelete int  `json:"max_delete"`
+}
+
 // UsageExport defines model for UsageExport.
 type UsageExport struct {
 	ByAccount   []UsageAggregate `json:"by_account"`
@@ -8494,8 +8643,14 @@ type CreateAdminAccountJSONRequestBody = CreateProviderAccountRequest
 // BatchUpdateAdminAccountsJSONRequestBody defines body for BatchUpdateAdminAccounts for application/json ContentType.
 type BatchUpdateAdminAccountsJSONRequestBody = BatchUpdateAccountsRequest
 
+// BatchActionAdminAccountsJSONRequestBody defines body for BatchActionAdminAccounts for application/json ContentType.
+type BatchActionAdminAccountsJSONRequestBody = BatchAccountActionRequest
+
 // ImportAdminAccountsJSONRequestBody defines body for ImportAdminAccounts for application/json ContentType.
 type ImportAdminAccountsJSONRequestBody = ProviderAccountImportRequest
+
+// ImportAdminCodexSessionJSONRequestBody defines body for ImportAdminCodexSession for application/json ContentType.
+type ImportAdminCodexSessionJSONRequestBody = CodexSessionImportRequest
 
 // UpdateAdminAccountJSONRequestBody defines body for UpdateAdminAccount for application/json ContentType.
 type UpdateAdminAccountJSONRequestBody = UpdateProviderAccountRequest
@@ -8640,6 +8795,9 @@ type CreateAdminTLSProfileJSONRequestBody = CreateTLSProfileRequest
 
 // UpdateAdminTLSProfileJSONRequestBody defines body for UpdateAdminTLSProfile for application/json ContentType.
 type UpdateAdminTLSProfileJSONRequestBody = UpdateTLSProfileRequest
+
+// CleanupAdminUsageJSONRequestBody defines body for CleanupAdminUsage for application/json ContentType.
+type CleanupAdminUsageJSONRequestBody = UsageCleanupRequest
 
 // CreateAdminUserAttributeDefinitionJSONRequestBody defines body for CreateAdminUserAttributeDefinition for application/json ContentType.
 type CreateAdminUserAttributeDefinitionJSONRequestBody = CreateUserAttributeDefinitionRequest
@@ -15185,12 +15343,18 @@ type ServerInterface interface {
 	// Batch update provider account status.
 	// (PATCH /api/v1/admin/accounts/batch)
 	BatchUpdateAdminAccounts(w http.ResponseWriter, r *http.Request)
+	// Run a bulk recovery action across provider accounts.
+	// (POST /api/v1/admin/accounts/batch-action)
+	BatchActionAdminAccounts(w http.ResponseWriter, r *http.Request)
 	// Export provider account metadata without credentials.
 	// (GET /api/v1/admin/accounts/export)
 	ExportAdminAccounts(w http.ResponseWriter, r *http.Request)
 	// Import provider account metadata and write-only credentials.
 	// (POST /api/v1/admin/accounts/import)
 	ImportAdminAccounts(w http.ResponseWriter, r *http.Request)
+	// Import Codex/ChatGPT desktop session blobs as upstream accounts.
+	// (POST /api/v1/admin/accounts/import/codex-session)
+	ImportAdminCodexSession(w http.ResponseWriter, r *http.Request)
 	// Get a provider account.
 	// (GET /api/v1/admin/accounts/{id})
 	GetAdminAccount(w http.ResponseWriter, r *http.Request, id Id)
@@ -15572,6 +15736,9 @@ type ServerInterface interface {
 	// Get usage aggregates by dimension.
 	// (GET /api/v1/admin/usage/aggregates)
 	GetAdminUsageAggregates(w http.ResponseWriter, r *http.Request, params GetAdminUsageAggregatesParams)
+	// Cleanup usage records by bounded filter.
+	// (POST /api/v1/admin/usage/cleanup)
+	CleanupAdminUsage(w http.ResponseWriter, r *http.Request)
 	// Get daily usage aggregates.
 	// (GET /api/v1/admin/usage/daily)
 	GetAdminUsageDaily(w http.ResponseWriter, r *http.Request, params GetAdminUsageDailyParams)
@@ -16968,6 +17135,28 @@ func (siw *ServerInterfaceWrapper) BatchUpdateAdminAccounts(w http.ResponseWrite
 	handler.ServeHTTP(w, r)
 }
 
+// BatchActionAdminAccounts operation middleware
+func (siw *ServerInterfaceWrapper) BatchActionAdminAccounts(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BatchActionAdminAccounts(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ExportAdminAccounts operation middleware
 func (siw *ServerInterfaceWrapper) ExportAdminAccounts(w http.ResponseWriter, r *http.Request) {
 
@@ -17001,6 +17190,28 @@ func (siw *ServerInterfaceWrapper) ImportAdminAccounts(w http.ResponseWriter, r 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ImportAdminAccounts(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ImportAdminCodexSession operation middleware
+func (siw *ServerInterfaceWrapper) ImportAdminCodexSession(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ImportAdminCodexSession(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -21939,6 +22150,28 @@ func (siw *ServerInterfaceWrapper) GetAdminUsageAggregates(w http.ResponseWriter
 	handler.ServeHTTP(w, r)
 }
 
+// CleanupAdminUsage operation middleware
+func (siw *ServerInterfaceWrapper) CleanupAdminUsage(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CleanupAdminUsage(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetAdminUsageDaily operation middleware
 func (siw *ServerInterfaceWrapper) GetAdminUsageDaily(w http.ResponseWriter, r *http.Request) {
 
@@ -26209,8 +26442,10 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts", wrapper.CreateAdminAccount)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/availability", wrapper.ListAdminAccountsAvailability)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/accounts/batch", wrapper.BatchUpdateAdminAccounts)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/batch-action", wrapper.BatchActionAdminAccounts)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/export", wrapper.ExportAdminAccounts)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/import", wrapper.ImportAdminAccounts)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/accounts/import/codex-session", wrapper.ImportAdminCodexSession)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/{id}", wrapper.GetAdminAccount)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/accounts/{id}", wrapper.UpdateAdminAccount)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/accounts/{id}/availability", wrapper.GetAdminAccountAvailability)
@@ -26338,6 +26573,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/tls-profiles/{id}", wrapper.UpdateAdminTLSProfile)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/usage-logs", wrapper.ListAdminUsageLogs)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/usage/aggregates", wrapper.GetAdminUsageAggregates)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/usage/cleanup", wrapper.CleanupAdminUsage)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/usage/daily", wrapper.GetAdminUsageDaily)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/usage/export", wrapper.ExportAdminUsage)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/user-attributes", wrapper.ListAdminUserAttributeDefinitions)

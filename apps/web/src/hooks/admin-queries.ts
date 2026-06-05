@@ -465,6 +465,14 @@ export function useCleanupOpsSystemLogs() {
     ["admin", "ops"],
   );
 }
+// Operator on-demand usage-record cleanup. Invalidates the usage-* queries so
+// the admin usage view refreshes once records are actually deleted.
+export function useCleanupAdminUsage() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.cleanupUsage>) => adminApi.cleanupUsage(body),
+    ["admin", "usage-logs"],
+  );
+}
 export function useUpdateOpsSettings() {
   return useAdminMutation(
     (body: P<typeof adminApi.updateOpsSettings>) => adminApi.updateOpsSettings(body),
@@ -663,9 +671,22 @@ export function useImportAccounts() {
     ["admin", "accounts"],
   );
 }
+/** Import Codex/ChatGPT desktop session blobs as upstream codex_cli accounts. */
+export function useImportCodexSession() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.importCodexSession>) => adminApi.importCodexSession(body),
+    ["admin", "accounts"],
+  );
+}
 export function useBatchUpdateAccounts() {
   return useAdminMutation(
     (body: P<typeof adminApi.batchUpdateAccounts>) => adminApi.batchUpdateAccounts(body),
+    ["admin", "accounts"],
+  );
+}
+export function useBatchActionAccounts() {
+  return useAdminMutation(
+    (body: P<typeof adminApi.batchActionAccounts>) => adminApi.batchActionAccounts(body),
     ["admin", "accounts"],
   );
 }

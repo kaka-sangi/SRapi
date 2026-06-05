@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/srapi/srapi/apps/api/internal/modules/payload_rules/contract"
+	"github.com/srapi/srapi/apps/api/internal/platform/glob"
 )
 
 // ErrInvalidInput is returned for malformed rules.
@@ -110,7 +111,7 @@ func (s *Service) Resolve(ctx context.Context, model, protocol string) []contrac
 	})
 	var out []contract.ResolvedTransform
 	for _, rule := range enabled {
-		if !globMatch(rule.MatchModel, model) {
+		if !glob.Match(rule.MatchModel, model) {
 			continue
 		}
 		if !protocolMatch(rule.MatchProtocol, protocol) {
@@ -170,36 +171,4 @@ func protocolMatch(rule, actual string) bool {
 		return true
 	}
 	return strings.EqualFold(rule, strings.TrimSpace(actual))
-}
-
-// globMatch supports "*" wildcards: exact, "prefix*", "*suffix", "*contains*",
-// and "*" (match-any). Case-insensitive.
-func globMatch(pattern, value string) bool {
-	pattern = strings.ToLower(strings.TrimSpace(pattern))
-	value = strings.ToLower(strings.TrimSpace(value))
-	if pattern == "" || pattern == "*" {
-		return true
-	}
-	if !strings.Contains(pattern, "*") {
-		return pattern == value
-	}
-	parts := strings.Split(pattern, "*")
-	pos := 0
-	for i, part := range parts {
-		if part == "" {
-			continue
-		}
-		idx := strings.Index(value[pos:], part)
-		if idx < 0 {
-			return false
-		}
-		if i == 0 && idx != 0 {
-			return false // anchored prefix (pattern does not start with '*')
-		}
-		pos += idx + len(part)
-	}
-	if last := parts[len(parts)-1]; last != "" && !strings.HasSuffix(value, last) {
-		return false // anchored suffix (pattern does not end with '*')
-	}
-	return true
 }

@@ -1377,6 +1377,7 @@ func TestConsoleWriteRoutesRequireCSRF(t *testing.T) {
 		{http.MethodPost, "/api/v1/admin/ops/slo", `{"name":"blocked-slo","objective":99}`},
 		{http.MethodPatch, "/api/v1/admin/ops/slo/1", `{"status":"disabled"}`},
 		{http.MethodPost, "/api/v1/admin/ops/system-logs/cleanup", `{"source":"blocked"}`},
+		{http.MethodPost, "/api/v1/admin/usage/cleanup", `{"model":"blocked"}`},
 		{http.MethodPost, "/api/v1/admin/ops/alerts/1/ack", `{}`},
 	}
 
@@ -1658,6 +1659,112 @@ func TestAdminOpsSLOAndAlertControlPlane(t *testing.T) {
 	}
 }
 
+func TestAdminUsageCleanupControlPlane(t *testing.T) {
+	usageStore := usagememory.New()
+	auditStore := auditmemory.New()
+	handler := New(config.Load(), nil,
+		WithUsageStore(usageStore),
+		WithAuditStore(auditStore),
+	)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	ctx := t.Context()
+	old := time.Now().UTC().Add(-72 * time.Hour)
+	recent := time.Now().UTC().Add(-time.Hour)
+	// Four records: three on the targeted model (two old, one recent) and one on
+	// a different model that must never be touched by the model-scoped cleanup.
+	seedUsageLog(t, usageStore, usagecontract.UsageLog{RequestID: "u_old_1", SourceEndpoint: "/v1/chat/completions", Model: "gpt-cleanup", Success: true, CreatedAt: old})
+	seedUsageLog(t, usageStore, usagecontract.UsageLog{RequestID: "u_old_2", SourceEndpoint: "/v1/chat/completions", Model: "gpt-cleanup", Success: true, CreatedAt: old})
+	seedUsageLog(t, usageStore, usagecontract.UsageLog{RequestID: "u_recent", SourceEndpoint: "/v1/chat/completions", Model: "gpt-cleanup", Success: true, CreatedAt: recent})
+	seedUsageLog(t, usageStore, usagecontract.UsageLog{RequestID: "u_other", SourceEndpoint: "/v1/chat/completions", Model: "keep-me", Success: true, CreatedAt: old})
+
+	cleanup := func(t *testing.T, body string) (*httptest.ResponseRecorder, apiopenapi.UsageCleanupResult) {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/usage/cleanup", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-CSRF-Token", loginResp.Data.CsrfToken)
+		req.AddCookie(sessionCookie)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		var resp apiopenapi.UsageCleanupResponse
+		if rec.Code == http.StatusOK {
+			if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+				t.Fatalf("decode usage cleanup: %v", err)
+			}
+		}
+		return rec, resp.Data
+	}
+
+	// Missing-filter requests are rejected so a cleanup can never target the
+	// whole table by accident.
+	if rec, _ := cleanup(t, `{"max_delete":10}`); rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 without filter, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	// Dry run previews the model match count without deleting anything.
+	rec, result := cleanup(t, `{"model":"gpt-cleanup","dry_run":true,"max_delete":10}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected dry-run 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if result.Matched != 3 || result.Deleted != 0 || !result.DryRun {
+		t.Fatalf("dry-run expected matched=3 deleted=0 dry_run=true, got %+v", result)
+	}
+	if logs, err := usageStore.List(ctx); err != nil || len(logs) != 4 {
+		t.Fatalf("dry-run must not delete: len=%d err=%v", len(logs), err)
+	}
+
+	// A capped real delete removes only max_delete records and reports Limited,
+	// trimming the oldest first.
+	rec, result = cleanup(t, `{"model":"gpt-cleanup","max_delete":1}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected capped delete 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if result.Matched != 3 || result.Deleted != 1 || !result.Limited || result.DryRun {
+		t.Fatalf("capped delete expected matched=3 deleted=1 limited=true, got %+v", result)
+	}
+
+	// A second uncapped delete clears the remaining matches; the other model is
+	// untouched.
+	rec, result = cleanup(t, `{"model":"gpt-cleanup","max_delete":10}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected delete 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if result.Matched != 2 || result.Deleted != 2 || result.Limited {
+		t.Fatalf("delete expected matched=2 deleted=2 limited=false, got %+v", result)
+	}
+	logs, err := usageStore.List(ctx)
+	if err != nil {
+		t.Fatalf("list usage: %v", err)
+	}
+	if len(logs) != 1 || logs[0].Model != "keep-me" {
+		t.Fatalf("expected only the other-model record to survive, got %+v", logs)
+	}
+
+	// Admin gating: an unauthenticated request is rejected.
+	anonReq := httptest.NewRequest(http.MethodPost, "/api/v1/admin/usage/cleanup", strings.NewReader(`{"model":"gpt-cleanup"}`))
+	anonReq.Header.Set("Content-Type", "application/json")
+	anonRec := httptest.NewRecorder()
+	handler.ServeHTTP(anonRec, anonReq)
+	if anonRec.Code != http.StatusForbidden {
+		t.Fatalf("expected anonymous cleanup 403, got %d", anonRec.Code)
+	}
+
+	// The deletions are audited.
+	auditReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/audit-logs", nil)
+	auditReq.AddCookie(sessionCookie)
+	auditRec := httptest.NewRecorder()
+	handler.ServeHTTP(auditRec, auditReq)
+	if auditRec.Code != http.StatusOK {
+		t.Fatalf("expected audit logs 200, got %d", auditRec.Code)
+	}
+	var auditResp apiopenapi.AuditLogListResponse
+	if err := json.NewDecoder(auditRec.Body).Decode(&auditResp); err != nil {
+		t.Fatalf("decode audit logs: %v", err)
+	}
+	if !auditLogHasAction(auditResp.Data, "usage_log.cleanup") {
+		t.Fatalf("expected usage_log.cleanup audit action in %+v", auditResp.Data)
+	}
+}
+
 func TestAdminSubscriptionPricingControlPlane(t *testing.T) {
 	handler := New(config.Load(), nil)
 	loginResp, sessionCookie := mustLoginAdmin(t, handler)
@@ -1697,7 +1804,7 @@ func TestAdminSubscriptionPricingControlPlane(t *testing.T) {
 	if err := json.NewDecoder(userSubRec.Body).Decode(&userSubResp); err != nil {
 		t.Fatalf("decode user subscription: %v", err)
 	}
-	if userSubResp.Data.UserId != loginResp.Data.User.Id || userSubResp.Data.PlanId != planResp.Data.Id || userSubResp.Data.Status != apiopenapi.Active {
+	if userSubResp.Data.UserId != loginResp.Data.User.Id || userSubResp.Data.PlanId != planResp.Data.Id || userSubResp.Data.Status != apiopenapi.UserSubscriptionStatusActive {
 		t.Fatalf("unexpected user subscription response: %+v", userSubResp.Data)
 	}
 	if userSubResp.Data.EntitlementsSnapshot["scheduler_strategy"] != "cost_saver" {
@@ -5370,6 +5477,118 @@ func TestGatewayChatCompletionFailoverRecordsAttemptEvidence(t *testing.T) {
 	metrics := metricsBody(t, handler)
 	if !strings.Contains(metrics, `srapi_gateway_failover_total{endpoint_family="chat_completions",model="failover-attempt-model",provider_protocol="openai-compatible",result="success"} 1`) {
 		t.Fatalf("expected failover metric, got:\n%s", metrics)
+	}
+}
+
+// setGatewayRetryCount reads current admin settings, sets the operator-tunable
+// gateway.retry_count cross-candidate failover cap, and saves.
+func setGatewayRetryCount(t *testing.T, handler http.Handler, sessionCookie *http.Cookie, csrf string, retryCount int) {
+	t.Helper()
+	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/settings", nil)
+	getReq.AddCookie(sessionCookie)
+	getRec := httptest.NewRecorder()
+	handler.ServeHTTP(getRec, getReq)
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("get settings: expected 200, got %d body=%s", getRec.Code, getRec.Body.String())
+	}
+	var wrapper struct {
+		Data json.RawMessage `json:"data"`
+	}
+	if err := json.NewDecoder(getRec.Body).Decode(&wrapper); err != nil {
+		t.Fatalf("decode settings: %v", err)
+	}
+	var data map[string]any
+	if err := json.Unmarshal(wrapper.Data, &data); err != nil {
+		t.Fatalf("unmarshal settings data: %v", err)
+	}
+	gateway, ok := data["gateway"].(map[string]any)
+	if !ok {
+		t.Fatalf("settings missing gateway object: %v", data["gateway"])
+	}
+	gateway["retry_count"] = retryCount
+	data["gateway"] = gateway
+	body, _ := json.Marshal(data)
+	putReq := httptest.NewRequest(http.MethodPut, "/api/v1/admin/settings", bytes.NewReader(body))
+	putReq.AddCookie(sessionCookie)
+	putReq.Header.Set("X-CSRF-Token", csrf)
+	putReq.Header.Set("Content-Type", "application/json")
+	putRec := httptest.NewRecorder()
+	handler.ServeHTTP(putRec, putReq)
+	if putRec.Code != http.StatusOK {
+		t.Fatalf("put settings: expected 200, got %d body=%s", putRec.Code, putRec.Body.String())
+	}
+	var putWrapper struct {
+		Data apiopenapi.AdminSettings `json:"data"`
+	}
+	if err := json.NewDecoder(putRec.Body).Decode(&putWrapper); err != nil {
+		t.Fatalf("decode put settings: %v", err)
+	}
+	if putWrapper.Data.Gateway.RetryCount == nil || *putWrapper.Data.Gateway.RetryCount != retryCount {
+		t.Fatalf("expected gateway retry_count %d to persist, got %+v", retryCount, putWrapper.Data.Gateway.RetryCount)
+	}
+}
+
+// TestGatewayChatCompletionRetryCountCapHonored verifies the operator-tunable
+// gateway.retry_count caps cross-candidate failover: with retry_count=1 a failing
+// primary is not failed over to the available secondary candidate, even though a
+// healthy fallback exists.
+func TestGatewayChatCompletionRetryCountCapHonored(t *testing.T) {
+	var (
+		mu             sync.Mutex
+		primaryCalls   int
+		secondaryCalls int
+	)
+	primaryUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		primaryCalls++
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = w.Write([]byte(`{"error":{"message":"primary unavailable","type":"server_error"}}`))
+	}))
+	defer primaryUpstream.Close()
+
+	secondaryUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		secondaryCalls++
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"failover ok"}}],"usage":{"prompt_tokens":7,"completion_tokens":3,"total_tokens":10}}`))
+	}))
+	defer secondaryUpstream.Close()
+
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	csrf := loginResp.Data.CsrfToken
+	setGatewayRetryCount(t, handler, sessionCookie, csrf, 1)
+
+	modelResp := mustCreateModel(t, handler, sessionCookie, csrf, `{"canonical_name":"retry-cap-model","display_name":"Retry Cap Model","status":"active"}`)
+	primaryProvider := mustCreateProvider(t, handler, sessionCookie, csrf, `{"name":"retry-cap-primary-provider","display_name":"Retry Cap Primary","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	secondaryProvider := mustCreateProvider(t, handler, sessionCookie, csrf, `{"name":"retry-cap-secondary-provider","display_name":"Retry Cap Secondary","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, csrf, string(modelResp.Data.Id), `{"provider_id":"`+string(primaryProvider.Data.Id)+`","upstream_model_name":"retry-cap-primary-upstream","status":"active"}`)
+	mustCreateMapping(t, handler, sessionCookie, csrf, string(modelResp.Data.Id), `{"provider_id":"`+string(secondaryProvider.Data.Id)+`","upstream_model_name":"retry-cap-secondary-upstream","status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, csrf, `{"provider_id":"`+string(primaryProvider.Data.Id)+`","name":"retry-cap-primary-account","runtime_class":"api_key","credential":{"api_key":"retry-cap-primary-secret"},"metadata":{"base_url":"`+primaryUpstream.URL+`/v1","health_score":0.99,"latency_p95_ms":50,"quality_score":0.99},"status":"active"}`)
+	mustCreateAccount(t, handler, sessionCookie, csrf, `{"provider_id":"`+string(secondaryProvider.Data.Id)+`","name":"retry-cap-secondary-account","runtime_class":"api_key","credential":{"api_key":"retry-cap-secondary-secret"},"metadata":{"base_url":"`+secondaryUpstream.URL+`/v1","health_score":0.80,"latency_p95_ms":1000,"quality_score":0.50},"status":"active"}`)
+
+	_, apiKey := mustCreateGatewayAPIKey(t, handler, sessionCookie, csrf)
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"retry-cap-model","messages":[{"role":"user","content":"exercise retry cap"}]}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code == http.StatusOK {
+		t.Fatalf("expected failed request when retry_count caps failover, got 200 body=%s", rec.Body.String())
+	}
+
+	mu.Lock()
+	gotPrimaryCalls := primaryCalls
+	gotSecondaryCalls := secondaryCalls
+	mu.Unlock()
+	if gotPrimaryCalls != 1 {
+		t.Fatalf("expected primary upstream to be called once, got %d", gotPrimaryCalls)
+	}
+	if gotSecondaryCalls != 0 {
+		t.Fatalf("expected retry_count=1 to prevent failover to secondary, got %d secondary calls", gotSecondaryCalls)
 	}
 }
 

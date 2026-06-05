@@ -69,6 +69,7 @@ func (s *Server) writeConversationStreamPassthrough(
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
+	forwardUpstreamResponseHeaders(w, providerResp.Headers, s.gatewayPassthroughHeaderConfig(r.Context()))
 	flusher, _ := w.(http.Flusher)
 
 	var meter bytes.Buffer

@@ -3,6 +3,7 @@ package memory
 import (
 	"context"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -60,6 +61,54 @@ func (s *Store) ListByUser(_ context.Context, userID int) ([]contract.UsageLog, 
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
 	return out, nil
+}
+
+// CleanupLogs deletes the records matching filter, oldest first, capped at
+// filter.MaxDelete. Matched counts every record the filter selects (so the
+// caller can report when the cap left some in place); Deleted is 0 on a dry run.
+func (s *Store) CleanupLogs(_ context.Context, filter contract.CleanupFilter) (contract.CleanupResult, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	matchedIDs := make([]int, 0)
+	for id, log := range s.byID {
+		if cleanupMatches(log, filter) {
+			matchedIDs = append(matchedIDs, id)
+		}
+	}
+	// Delete oldest first (smaller ID == earlier insert) so a capped batch
+	// trims the oldest records, matching the retention worker's intent.
+	sort.Ints(matchedIDs)
+	result := contract.CleanupResult{
+		Matched:   len(matchedIDs),
+		DryRun:    filter.DryRun,
+		MaxDelete: filter.MaxDelete,
+	}
+	if filter.DryRun {
+		result.Limited = result.Matched > filter.MaxDelete
+		return result, nil
+	}
+	for _, id := range matchedIDs {
+		if result.Deleted >= filter.MaxDelete {
+			break
+		}
+		delete(s.byID, id)
+		result.Deleted++
+	}
+	result.Limited = result.Matched > result.Deleted
+	return result, nil
+}
+
+func cleanupMatches(log contract.UsageLog, filter contract.CleanupFilter) bool {
+	if filter.Model != "" && !strings.EqualFold(strings.TrimSpace(log.Model), strings.TrimSpace(filter.Model)) {
+		return false
+	}
+	if filter.Start != nil && log.CreatedAt.Before(filter.Start.UTC()) {
+		return false
+	}
+	if filter.End != nil && !log.CreatedAt.Before(filter.End.UTC()) {
+		return false
+	}
+	return true
 }
 
 func cloneLog(value contract.UsageLog) contract.UsageLog {

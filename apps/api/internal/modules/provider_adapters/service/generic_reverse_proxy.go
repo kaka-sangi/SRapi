@@ -44,9 +44,17 @@ func (s *Service) invokeGenericReverseProxyText(ctx context.Context, req contrac
 		return contract.ConversationResponse{}, classifyProviderHTTPError(runtimeResp.StatusCode, runtimeResp.Body)
 	}
 	if req.Stream {
-		return parseOpenAICompatibleStream(runtimeResp.Body, runtimeResp.StatusCode)
+		resp, err := parseOpenAICompatibleStream(runtimeResp.Body, runtimeResp.StatusCode)
+		if err == nil {
+			resp.Headers = runtimeResp.Headers
+		}
+		return resp, err
 	}
-	return parseGenericReverseProxyText(runtimeResp.Body, runtimeResp.StatusCode, req)
+	resp, err := parseGenericReverseProxyText(runtimeResp.Body, runtimeResp.StatusCode, req)
+	if err == nil {
+		resp.Headers = runtimeResp.Headers
+	}
+	return resp, err
 }
 
 func (s *Service) invokeGenericReverseProxyEmbeddings(ctx context.Context, req contract.EmbeddingRequest, baseURL string) (contract.EmbeddingResponse, error) {

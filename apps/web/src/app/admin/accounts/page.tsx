@@ -11,6 +11,7 @@ import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { useAdminList } from "@/hooks/use-admin-list";
 import { enumOptions } from "@/components/admin/resource-form-dialog";
 import { AccountFormDialog } from "@/components/admin/account-form-dialog";
+import { CodexSessionImportDialog } from "@/components/admin/codex-session-import-dialog";
 import { BindProxyDialog } from "@/components/admin/bind-proxy-dialog";
 import { AccountDetailSheet } from "@/components/admin/account-detail-sheet";
 import { AccountTestDialog } from "@/components/features/account-test-dialog";
@@ -24,6 +25,7 @@ import {
   useUpdateAccount,
   useClearAccountError,
   useRecoverAccount,
+  useBatchActionAccounts,
   useDiscoverAccountModels,
   useExportAccounts,
 } from "@/hooks/admin-queries";
@@ -33,7 +35,11 @@ import { QuietBadge } from "@/components/ui/quiet-badge";
 import { Button } from "@/components/ui/button";
 import { quietStatusFor, statusLabel } from "@/lib/status-badge";
 import { adminErrorMessage } from "@/lib/admin-api";
-import { ACCOUNT_STATUSES } from "@/lib/admin-account-form";
+import {
+  ACCOUNT_STATUSES,
+  buildBatchAccountActionBody,
+  type AccountBatchAction,
+} from "@/lib/admin-account-form";
 import { AccountImportDialog } from "@/components/admin/account-import-dialog";
 import type { ProviderAccount } from "@/lib/sdk-types";
 
@@ -80,6 +86,7 @@ function AccountsContent() {
   const updateMut = useUpdateAccount();
   const clearErr = useClearAccountError();
   const recover = useRecoverAccount();
+  const batchAction = useBatchActionAccounts();
   const discover = useDiscoverAccountModels();
   const exportMut = useExportAccounts();
 
@@ -89,6 +96,7 @@ function AccountsContent() {
   const [testTarget, setTestTarget] = useState<ProviderAccount | null>(null);
   const [bulkDisableOpen, setBulkDisableOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [codexImportOpen, setCodexImportOpen] = useState(false);
 
   const providerOptions = (providers.data?.data ?? []).map((p) => ({
     value: p.id,
@@ -115,6 +123,27 @@ function AccountsContent() {
       toast({ title: t("feedback.failed"), description: `${failed}/${ids.length}`, tone: "error" });
     } else {
       toast({ title: t("adminAccounts.bulkDone", { count: ids.length }), tone: "success" });
+    }
+  }
+
+  /** Run a per-account maintenance action (clear_error / recover) across the selection. */
+  async function applyBulkAction(action: AccountBatchAction) {
+    const ids = [...list.selected];
+    if (ids.length === 0) return;
+    try {
+      const result = await batchAction.mutateAsync(buildBatchAccountActionBody({ accountIds: ids, action }));
+      list.clearSelection();
+      if (result.errors.length > 0) {
+        toast({
+          title: t("feedback.failed"),
+          description: `${result.errors.length}/${ids.length}`,
+          tone: "error",
+        });
+      } else {
+        toast({ title: t("adminAccounts.bulkDone", { count: result.updated_count }), tone: "success" });
+      }
+    } catch (err) {
+      toast({ title: t("feedback.failed"), description: adminErrorMessage(err), tone: "error" });
     }
   }
 
@@ -203,6 +232,9 @@ function AccountsContent() {
             <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
               {t("adminAccounts.importAction")}
             </Button>
+            <Button variant="outline" size="sm" onClick={() => setCodexImportOpen(true)}>
+              {t("codexImport.action")}
+            </Button>
             <Button variant="primary" size="sm" onClick={() => setFormTarget("new")}>
               ＋ {t("adminAccounts.create")}
             </Button>
@@ -271,6 +303,22 @@ function AccountsContent() {
                 onClick={() => setBulkDisableOpen(true)}
               >
                 {t("common.disable")}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                loading={batchAction.isPending}
+                onClick={() => void applyBulkAction("clear_error")}
+              >
+                {t("adminAccounts.clearError")}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                loading={batchAction.isPending}
+                onClick={() => void applyBulkAction("recover")}
+              >
+                {t("adminAccounts.recover")}
               </Button>
             </>
           ),
@@ -396,6 +444,15 @@ function AccountsContent() {
       />
 
       <AccountImportDialog open={importOpen} onOpenChange={setImportOpen} />
+
+      {codexImportOpen ? (
+        <CodexSessionImportDialog
+          open
+          onOpenChange={setCodexImportOpen}
+          providerOptions={providerOptions.map((o) => ({ value: o.value, label: o.label }))}
+          defaultProviderId={providers.data?.data?.[0]?.id ?? ""}
+        />
+      ) : null}
     </>
   );
 }

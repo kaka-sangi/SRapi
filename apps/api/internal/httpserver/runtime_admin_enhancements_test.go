@@ -185,6 +185,116 @@ func TestAdminAccountManagementEnhancements(t *testing.T) {
 	}
 }
 
+func TestAdminAccountBatchActions(t *testing.T) {
+	handler := New(config.Load(), nil)
+	loginResp, sessionCookie := mustLoginAdmin(t, handler)
+	csrf := loginResp.Data.CsrfToken
+	providerResp := mustCreateProvider(t, handler, sessionCookie, csrf, `{"name":"batch-action-provider","display_name":"Batch Action Provider","adapter_type":"openai-compatible","protocol":"openai-compatible","status":"active"}`)
+	accountA := mustCreateAccount(t, handler, sessionCookie, csrf, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"batch-action-a","runtime_class":"api_key","credential":{"api_key":"secret-a"},"metadata":{"last_error_class":"rate_limit","last_error_message":"too many requests","cooldown_active":true},"status":"dead"}`)
+	accountB := mustCreateAccount(t, handler, sessionCookie, csrf, `{"provider_id":"`+string(providerResp.Data.Id)+`","name":"batch-action-b","runtime_class":"api_key","credential":{"api_key":"secret-b"},"metadata":{"cooldown_active":true},"status":"suspended"}`)
+
+	doBatchAction := func(t *testing.T, body string, withCSRF bool, cookie *http.Cookie) *httptest.ResponseRecorder {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/batch-action", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		if withCSRF {
+			req.Header.Set("X-CSRF-Token", csrf)
+		}
+		if cookie != nil {
+			req.AddCookie(cookie)
+		}
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		return rec
+	}
+
+	// clear_error happy path across two accounts.
+	clearRec := doBatchAction(t, `{"account_ids":["`+string(accountA.Data.Id)+`","`+string(accountB.Data.Id)+`"],"action":"clear_error"}`, true, sessionCookie)
+	if clearRec.Code != http.StatusOK {
+		t.Fatalf("expected clear_error batch 200, got %d body=%s", clearRec.Code, clearRec.Body.String())
+	}
+	var clearResp apiopenapi.BatchUpdateAccountsResponse
+	if err := json.NewDecoder(clearRec.Body).Decode(&clearResp); err != nil {
+		t.Fatalf("decode clear_error batch: %v", err)
+	}
+	if clearResp.Data.UpdatedCount != 2 || len(clearResp.Data.UpdatedIds) != 2 || len(clearResp.Data.Errors) != 0 {
+		t.Fatalf("unexpected clear_error batch result: %+v", clearResp.Data)
+	}
+
+	// Verify account A error metadata was cleared and reactivated.
+	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts/"+string(accountA.Data.Id), nil)
+	getReq.AddCookie(sessionCookie)
+	getRec := httptest.NewRecorder()
+	handler.ServeHTTP(getRec, getReq)
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("expected get account 200, got %d", getRec.Code)
+	}
+	var getResp apiopenapi.ProviderAccountResponse
+	if err := json.NewDecoder(getRec.Body).Decode(&getResp); err != nil {
+		t.Fatalf("decode get account: %v", err)
+	}
+	if getResp.Data.Status != apiopenapi.ProviderAccountStatusActive {
+		t.Fatalf("expected account reactivated, got status %s", getResp.Data.Status)
+	}
+	if getResp.Data.Metadata == nil || (*getResp.Data.Metadata)["last_error_class"] != nil || (*getResp.Data.Metadata)["last_error_cleared_at"] == nil {
+		t.Fatalf("expected cleared error metadata, got %+v", getResp.Data.Metadata)
+	}
+
+	// recover happy path.
+	recoverRec := doBatchAction(t, `{"account_ids":["`+string(accountB.Data.Id)+`"],"action":"recover"}`, true, sessionCookie)
+	if recoverRec.Code != http.StatusOK {
+		t.Fatalf("expected recover batch 200, got %d body=%s", recoverRec.Code, recoverRec.Body.String())
+	}
+	var recoverResp apiopenapi.BatchUpdateAccountsResponse
+	if err := json.NewDecoder(recoverRec.Body).Decode(&recoverResp); err != nil {
+		t.Fatalf("decode recover batch: %v", err)
+	}
+	if recoverResp.Data.UpdatedCount != 1 || recoverResp.Data.UpdatedIds[0] != accountB.Data.Id || len(recoverResp.Data.Errors) != 0 {
+		t.Fatalf("unexpected recover batch result: %+v", recoverResp.Data)
+	}
+
+	// partial failure: one valid id + one missing id accumulates an error but still updates the valid one.
+	partialRec := doBatchAction(t, `{"account_ids":["`+string(accountA.Data.Id)+`","999999"],"action":"recover"}`, true, sessionCookie)
+	if partialRec.Code != http.StatusOK {
+		t.Fatalf("expected partial recover 200, got %d body=%s", partialRec.Code, partialRec.Body.String())
+	}
+	var partialResp apiopenapi.BatchUpdateAccountsResponse
+	if err := json.NewDecoder(partialRec.Body).Decode(&partialResp); err != nil {
+		t.Fatalf("decode partial recover: %v", err)
+	}
+	if partialResp.Data.UpdatedCount != 1 || partialResp.Data.UpdatedIds[0] != accountA.Data.Id || len(partialResp.Data.Errors) != 1 {
+		t.Fatalf("expected partial result with 1 update + 1 error, got %+v", partialResp.Data)
+	}
+
+	// invalid action -> 400.
+	invalidRec := doBatchAction(t, `{"account_ids":["`+string(accountA.Data.Id)+`"],"action":"nuke"}`, true, sessionCookie)
+	if invalidRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected invalid action 400, got %d body=%s", invalidRec.Code, invalidRec.Body.String())
+	}
+
+	// admin gating: no session -> 403.
+	unauthRec := doBatchAction(t, `{"account_ids":["`+string(accountA.Data.Id)+`"],"action":"recover"}`, false, nil)
+	if unauthRec.Code != http.StatusForbidden {
+		t.Fatalf("expected unauthenticated 403, got %d body=%s", unauthRec.Code, unauthRec.Body.String())
+	}
+
+	// audit trail recorded for the batch action.
+	auditReq := httptest.NewRequest(http.MethodGet, "/api/v1/admin/audit-logs", nil)
+	auditReq.AddCookie(sessionCookie)
+	auditRec := httptest.NewRecorder()
+	handler.ServeHTTP(auditRec, auditReq)
+	if auditRec.Code != http.StatusOK {
+		t.Fatalf("expected audit list 200, got %d", auditRec.Code)
+	}
+	var auditResp apiopenapi.AuditLogListResponse
+	if err := json.NewDecoder(auditRec.Body).Decode(&auditResp); err != nil {
+		t.Fatalf("decode audit logs: %v", err)
+	}
+	if !auditLogHasAction(auditResp.Data, "provider_account.batch_action") {
+		t.Fatalf("expected provider_account.batch_action audit, got %+v", auditResp.Data)
+	}
+}
+
 func TestAdminUsageDashboardAggregatesAndExport(t *testing.T) {
 	usageStore := usagememory.New()
 	handler := New(config.Load(), nil, WithUsageStore(usageStore))

@@ -926,11 +926,16 @@ func defaultAdminSettings(now time.Time) admincontrol.AdminSettings {
 			StreamTimeoutSeconds:                 600,
 			RequestShaperEnabled:                 true,
 			BetaStrategy:                         "allow_configured",
+			RetryCount:                           3,
+			MaxRetryCredentials:                  0,
+			MaxRetryIntervalMS:                   2000,
 			SchedulerStrategyRolloutEnabled:      false,
 			SchedulerStrategyShadowStrategy:      "",
 			SchedulerStrategyRolloutPercent:      0,
 			SchedulerStrategyRolloutModels:       []string{},
 			SchedulerStrategyRolloutAPIKeyHashes: []string{},
+			PassthroughUpstreamHeaders:           false,
+			PassthroughHeaderAllowlist:           []string{},
 		},
 		Payment: admincontrol.AdminSettingsPayment{
 			Enabled:                  false,
@@ -997,6 +1002,10 @@ func normalizeAdminSettings(settings admincontrol.AdminSettings) (admincontrol.A
 	settings.Security.OAuthProviderConfigs = oauthProviderConfigs
 	settings.Gateway.SchedulerStrategyRolloutModels = uniqueTrimmedStrings(settings.Gateway.SchedulerStrategyRolloutModels)
 	settings.Gateway.SchedulerStrategyRolloutAPIKeyHashes = uniqueTrimmedStrings(settings.Gateway.SchedulerStrategyRolloutAPIKeyHashes)
+	settings.Gateway.RetryCount = normalizeGatewayRetryCount(settings.Gateway.RetryCount)
+	settings.Gateway.MaxRetryCredentials = normalizeGatewayMaxRetryCredentials(settings.Gateway.MaxRetryCredentials)
+	settings.Gateway.MaxRetryIntervalMS = normalizeGatewayMaxRetryIntervalMS(settings.Gateway.MaxRetryIntervalMS)
+	settings.Gateway.PassthroughHeaderAllowlist = normalizePassthroughHeaderAllowlist(settings.Gateway.PassthroughHeaderAllowlist)
 	if settings.General.SiteName == "" || !validDecimal(settings.Users.DefaultBalance) || settings.Users.RPMLimitDefault < 0 || settings.Gateway.StreamTimeoutSeconds <= 0 || settings.Backup.RetentionDays <= 0 {
 		return admincontrol.AdminSettings{}, admincontrol.ErrInvalidInput
 	}
@@ -1082,6 +1091,40 @@ func normalizeAdminSettings(settings admincontrol.AdminSettings) (admincontrol.A
 		settings.Copilot.MaxSteps = 20
 	}
 	return settings, nil
+}
+
+// gatewayRetryCountDefault / gatewayRetryCountMax bound the operator-tunable
+// cross-candidate failover cap. They mirror the OpenAPI schema bounds for
+// AdminSettingsGateway.retry_count and keep the failover hot path within a sane
+// envelope even if persisted settings predate the field.
+const (
+	gatewayRetryCountDefault       = 3
+	gatewayRetryCountMax           = 20
+	gatewayMaxRetryIntervalDefault = 2000
+)
+
+func normalizeGatewayRetryCount(count int) int {
+	if count <= 0 {
+		return gatewayRetryCountDefault
+	}
+	if count > gatewayRetryCountMax {
+		return gatewayRetryCountMax
+	}
+	return count
+}
+
+func normalizeGatewayMaxRetryCredentials(value int) int {
+	if value < 0 {
+		return 0
+	}
+	return value
+}
+
+func normalizeGatewayMaxRetryIntervalMS(value int) int {
+	if value < 0 {
+		return gatewayMaxRetryIntervalDefault
+	}
+	return value
 }
 
 func normalizeOAuthProviderConfigs(values []admincontrol.OAuthProviderConfig) ([]admincontrol.OAuthProviderConfig, error) {
@@ -1295,6 +1338,28 @@ func uniqueTrimmedStrings(values []string) []string {
 			continue
 		}
 		seen[key] = struct{}{}
+		out = append(out, trimmed)
+	}
+	return out
+}
+
+// normalizePassthroughHeaderAllowlist canonicalizes upstream response header
+// allowlist entries to lowercase (HTTP header names are case-insensitive),
+// trims whitespace, drops blanks, and dedupes. It always returns a non-nil
+// slice so the persisted settings round-trip cleanly. A trailing "*" wildcard
+// is preserved for prefix matching (e.g. "x-ratelimit-*").
+func normalizePassthroughHeaderAllowlist(values []string) []string {
+	out := make([]string, 0, len(values))
+	seen := map[string]struct{}{}
+	for _, value := range values {
+		trimmed := strings.ToLower(strings.TrimSpace(value))
+		if trimmed == "" || trimmed == "*" {
+			continue
+		}
+		if _, ok := seen[trimmed]; ok {
+			continue
+		}
+		seen[trimmed] = struct{}{}
 		out = append(out, trimmed)
 	}
 	return out

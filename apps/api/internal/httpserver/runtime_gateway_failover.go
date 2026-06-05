@@ -17,9 +17,62 @@ import (
 	apiopenapi "github.com/srapi/srapi/apps/api/internal/openapi"
 )
 
-const maxGatewayFailoverAttempts = 3
+// defaultGatewayFailoverAttempts is the fallback cross-candidate failover cap
+// used when the operator-tunable AdminSettingsGateway.retry_count is unset or
+// the settings read fails. Operators tune this via admin settings; per-account
+// metadata still governs same-candidate retries on top of it.
+const defaultGatewayFailoverAttempts = 3
+
+const defaultGatewayMaxRetryIntervalMS = 2000
 
 const maxGatewayProviderErrorMessageLength = 300
+
+// gatewayRetrySettings is the resolved, per-request snapshot of the
+// operator-tunable failover/retry policy. It is read once at the top of the
+// failover loop so the hot path never re-reads admin settings mid-flight.
+type gatewayRetrySettings struct {
+	// MaxAttempts caps the number of cross-candidate gateway attempts.
+	MaxAttempts int
+	// MaxRetryCredentials caps how many distinct credentials the loop may
+	// exclude and retry across. 0 means unlimited (bounded only by MaxAttempts
+	// and available candidates).
+	MaxRetryCredentials int
+	// MaxRetryIntervalMS is the default ceiling for same-candidate retry backoff
+	// when per-account metadata does not override it.
+	MaxRetryIntervalMS int
+}
+
+// resolveGatewayRetrySettings loads the operator-tunable failover policy,
+// falling back to the historical hardcoded defaults when admin settings are
+// unavailable so the hot path keeps behaving identically.
+func (rt *runtimeState) resolveGatewayRetrySettings(ctx context.Context) gatewayRetrySettings {
+	settings := gatewayRetrySettings{
+		MaxAttempts:         defaultGatewayFailoverAttempts,
+		MaxRetryCredentials: 0,
+		MaxRetryIntervalMS:  defaultGatewayMaxRetryIntervalMS,
+	}
+	if rt == nil || rt.adminControl == nil {
+		return settings
+	}
+	adminSettings, err := rt.adminControl.GetAdminSettings(ctx)
+	if err != nil {
+		if rt.logger != nil {
+			rt.logger.Warn("failed to load gateway retry settings; using defaults", "error", err)
+		}
+		return settings
+	}
+	gateway := adminSettings.Gateway
+	if gateway.RetryCount > 0 {
+		settings.MaxAttempts = gateway.RetryCount
+	}
+	if gateway.MaxRetryCredentials > 0 {
+		settings.MaxRetryCredentials = gateway.MaxRetryCredentials
+	}
+	if gateway.MaxRetryIntervalMS > 0 {
+		settings.MaxRetryIntervalMS = gateway.MaxRetryIntervalMS
+	}
+	return settings
+}
 
 type gatewayFailoverResult[T any] struct {
 	Response        T
@@ -341,13 +394,14 @@ func invokeGatewayCandidateWithFailover[T any](
 	startedAt time.Time,
 	invoke gatewayCandidateInvoker[T],
 ) gatewayFailoverResult[T] {
+	retrySettings := s.runtime.resolveGatewayRetrySettings(ctx)
 	initialExcluded := append([]int(nil), scheduleReq.ExcludedAccountIDs...)
 	excluded := append([]int(nil), initialExcluded...)
 	var fallbackFromDecisionID *int
 	var lastFailure gatewayFailoverResult[T]
 
 NextCandidate:
-	for attemptNo := 1; attemptNo <= maxGatewayFailoverAttempts; attemptNo++ {
+	for attemptNo := 1; attemptNo <= retrySettings.MaxAttempts; attemptNo++ {
 		attemptReq := scheduleReq
 		attemptReq.AttemptNo = attemptNo
 		attemptReq.FallbackFromDecisionID = cloneIntPtr(fallbackFromDecisionID)
@@ -367,7 +421,8 @@ NextCandidate:
 				Err:             err,
 				FailureRecorded: true,
 			}
-			if !gatewayShouldFailover(errorClass, upstreamStatus, attemptNo, len(result.Candidates)) {
+			if !gatewayShouldFailover(errorClass, upstreamStatus, attemptNo, len(result.Candidates), retrySettings.MaxAttempts) ||
+				gatewayRetryCredentialBudgetExhausted(retrySettings, excluded, initialExcluded) {
 				return lastFailure
 			}
 			excluded = append(excluded, result.Candidate.Account.ID)
@@ -376,7 +431,7 @@ NextCandidate:
 			continue
 		}
 
-		retryPolicy := gatewaySameCandidateRetryPolicyFor(result.Candidate)
+		retryPolicy := gatewaySameCandidateRetryPolicyFor(result.Candidate, retrySettings.MaxRetryIntervalMS)
 		for sameCandidateRetries := 0; ; {
 			response, err := invoke(ctx, result.Candidate)
 			if err == nil {
@@ -405,7 +460,8 @@ NextCandidate:
 				Err:             err,
 				FailureRecorded: true,
 			}
-			if !gatewayShouldFailover(errorClass, upstreamStatus, attemptNo, len(result.Candidates)) {
+			if !gatewayShouldFailover(errorClass, upstreamStatus, attemptNo, len(result.Candidates), retrySettings.MaxAttempts) ||
+				gatewayRetryCredentialBudgetExhausted(retrySettings, excluded, initialExcluded) {
 				return lastFailure
 			}
 
@@ -713,8 +769,22 @@ func gatewayProviderPublicMessage(err error, errorClass string, upstreamStatus i
 	return providerGatewayMessage(errorClass)
 }
 
-func gatewayShouldFailover(errorClass string, upstreamStatus int, attemptNo int, candidateCount int) bool {
-	if attemptNo >= maxGatewayFailoverAttempts || candidateCount <= 1 {
+// gatewayRetryCredentialBudgetExhausted reports whether excluding one more
+// credential would exceed the operator-tunable max_retry_credentials cap. A cap
+// of 0 means unlimited (bounded only by MaxAttempts and available candidates).
+// The number of credentials this request has already failed over across equals
+// the credentials excluded since the loop began (entries beyond the scheduler's
+// initial exclusion list).
+func gatewayRetryCredentialBudgetExhausted(settings gatewayRetrySettings, excluded []int, initialExcluded []int) bool {
+	if settings.MaxRetryCredentials <= 0 {
+		return false
+	}
+	credentialsTried := len(excluded) - len(initialExcluded)
+	return credentialsTried >= settings.MaxRetryCredentials
+}
+
+func gatewayShouldFailover(errorClass string, upstreamStatus int, attemptNo int, candidateCount int, maxAttempts int) bool {
+	if attemptNo >= maxAttempts || candidateCount <= 1 {
 		return false
 	}
 	if upstreamStatus == http.StatusTooManyRequests ||
@@ -746,7 +816,11 @@ const (
 	defaultGatewayRetryMaxDelay        = 2 * time.Second
 )
 
-func gatewaySameCandidateRetryPolicyFor(candidate schedulercontract.Candidate) gatewaySameCandidateRetryPolicy {
+// gatewaySameCandidateRetryPolicyFor resolves the per-account same-candidate
+// retry policy. The MaxDelay ceiling falls back to the operator-tunable
+// defaultMaxRetryIntervalMS (AdminSettingsGateway.max_retry_interval_ms) when
+// per-account metadata does not override it; metadata overrides always win.
+func gatewaySameCandidateRetryPolicyFor(candidate schedulercontract.Candidate, defaultMaxRetryIntervalMS int) gatewaySameCandidateRetryPolicy {
 	metadata := candidate.Account.Metadata
 	poolMode := metadataBool(metadata, "pool_mode")
 	enabled := poolMode ||
@@ -771,9 +845,19 @@ func gatewaySameCandidateRetryPolicyFor(candidate schedulercontract.Candidate) g
 		Enabled:           true,
 		MaxRetries:        clampGatewayRetryCount(count),
 		BaseDelay:         gatewayRetryDelay(metadata, defaultGatewayRetryBaseDelay, "same_candidate_retry_base_delay_ms", "same_account_retry_base_delay_ms", "pool_mode_retry_base_delay_ms"),
-		MaxDelay:          gatewayRetryDelay(metadata, defaultGatewayRetryMaxDelay, "same_candidate_retry_max_delay_ms", "same_account_retry_max_delay_ms", "pool_mode_retry_max_delay_ms"),
+		MaxDelay:          gatewayRetryDelay(metadata, gatewayDefaultMaxRetryInterval(defaultMaxRetryIntervalMS), "same_candidate_retry_max_delay_ms", "same_account_retry_max_delay_ms", "pool_mode_retry_max_delay_ms"),
 		RetryAuthFailures: poolMode || metadataBool(metadata, "same_candidate_retry_auth_errors") || metadataBool(metadata, "same_account_retry_auth_errors"),
 	}
+}
+
+// gatewayDefaultMaxRetryInterval converts the operator-tunable
+// max_retry_interval_ms into a duration, falling back to the historical 2s
+// ceiling when it is unset or non-positive so behavior stays identical.
+func gatewayDefaultMaxRetryInterval(maxRetryIntervalMS int) time.Duration {
+	if maxRetryIntervalMS <= 0 {
+		return defaultGatewayRetryMaxDelay
+	}
+	return time.Duration(maxRetryIntervalMS) * time.Millisecond
 }
 
 func gatewayShouldRetrySameCandidate(policy gatewaySameCandidateRetryPolicy, errorClass string, upstreamStatus int, retriesUsed int) bool {

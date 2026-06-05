@@ -1336,6 +1336,10 @@ export type ProviderAccount = {
     weight: number;
     risk_level?: string | null;
     group_ids: Array<Id>;
+    /**
+     * Free-form per-account configuration. Recognized convention keys (no schema migration; read at scheduling time): `base_url` (override the upstream base URL); `supported_models` (string array — exact-match inclusion whitelist of upstream model names this account may serve; absent = serve all); `excluded_models` (string array of `*` wildcard patterns — exclude any catalog or upstream model name matching a pattern; takes precedence over `supported_models` and hides the model from `/v1/models` when every serving account excludes it); `model_mapping` (object mapping a canonical catalog model name to a per-account upstream model name override).
+     *
+     */
     metadata?: JsonObject;
     created_at: Timestamp;
 };
@@ -1464,9 +1468,66 @@ export type ProviderAccountImportResponse = {
     request_id: RequestId;
 };
 
+export type CodexSessionImportRequest = {
+    provider_id: Id;
+    /**
+     * Raw session payload. Accepts a Codex/ChatGPT session JSON object, a single raw access token, a JSON array of either, or newline-delimited (NDJSON) entries mixing the above.
+     */
+    content: string;
+    /**
+     * Optional base account name. When multiple sessions are imported a "#N" suffix is appended; when omitted the email/account id from the session is used.
+     */
+    name?: string | null;
+    /**
+     * When an account with a matching identity already exists, update its credential instead of skipping. Defaults to true.
+     */
+    update_existing?: boolean;
+    group_ids?: Array<Id>;
+    proxy_id?: string | null;
+    status?: ProviderAccountStatus;
+};
+
+export type CodexSessionImportItem = {
+    index: number;
+    name?: string;
+    action: 'created' | 'updated' | 'skipped' | 'failed';
+    account_id?: Id;
+    message?: string;
+};
+
+export type CodexSessionImportMessage = {
+    index: number;
+    name?: string;
+    message: string;
+};
+
+export type CodexSessionImportResult = {
+    total: number;
+    created: number;
+    updated: number;
+    skipped: number;
+    failed: number;
+    items: Array<CodexSessionImportItem>;
+    warnings: Array<CodexSessionImportMessage>;
+    errors: Array<CodexSessionImportMessage>;
+};
+
+export type CodexSessionImportResponse = {
+    data: CodexSessionImportResult;
+    request_id: RequestId;
+};
+
 export type BatchUpdateAccountsRequest = {
     account_ids: Array<Id>;
     status: ProviderAccountStatus;
+};
+
+export type BatchAccountActionRequest = {
+    account_ids: Array<Id>;
+    /**
+     * Maintenance action to apply per account. `clear_error` clears transient error/cooldown metadata and reactivates non-healthy accounts; `recover` resets the account back to active.
+     */
+    action: 'clear_error' | 'recover';
 };
 
 export type BatchUpdateAccountsResult = {
@@ -1849,6 +1910,33 @@ export type OpsSystemLogCleanupResponse = {
     request_id: RequestId;
 };
 
+/**
+ * Bounded filter for operator on-demand usage-record cleanup. At least one of model, start or end must be supplied so a cleanup can never match the entire table by accident.
+ */
+export type UsageCleanupRequest = {
+    /**
+     * Canonical model name; matched case-insensitively.
+     */
+    model?: string;
+    start?: Timestamp;
+    end?: Timestamp;
+    dry_run?: boolean;
+    max_delete?: number;
+};
+
+export type UsageCleanupResult = {
+    matched: number;
+    deleted: number;
+    dry_run: boolean;
+    max_delete: number;
+    limited: boolean;
+};
+
+export type UsageCleanupResponse = {
+    data: UsageCleanupResult;
+    request_id: RequestId;
+};
+
 export type OpsSettings = {
     auto_refresh_enabled: boolean;
     refresh_interval_seconds: number;
@@ -1927,6 +2015,26 @@ export type AdminSettingsGateway = {
      * Optional SHA-256 API key prefix hash scope. Empty means all API keys.
      */
     scheduler_strategy_rollout_api_key_hashes?: Array<string>;
+    /**
+     * Maximum cross-candidate gateway attempts before failing a request. Bounds how many distinct credentials the failover loop may try.
+     */
+    retry_count?: number;
+    /**
+     * Maximum distinct credentials the failover loop may exclude and retry across. 0 means unlimited (bounded only by retry_count and available candidates).
+     */
+    max_retry_credentials?: number;
+    /**
+     * Default ceiling for same-candidate retry backoff delay in milliseconds. Per-account metadata overrides still apply.
+     */
+    max_retry_interval_ms?: number;
+    /**
+     * When enabled, allowlisted upstream response headers are forwarded to the client on both the streaming and buffered gateway response paths. Hop-by-hop headers and headers SRapi already sets are never forwarded. Default off so behavior is unchanged unless explicitly enabled.
+     */
+    passthrough_upstream_headers?: boolean;
+    /**
+     * Case-insensitive allowlist of upstream response header names to forward when passthrough_upstream_headers is enabled (e.g. retry-after, x-request-id, x-ratelimit-remaining). A trailing "*" wildcard matches by prefix (e.g. x-ratelimit-*).
+     */
+    passthrough_header_allowlist?: Array<string>;
 };
 
 export type AdminSettingsPayment = {
@@ -8341,6 +8449,43 @@ export type ImportAdminAccountsResponses = {
 
 export type ImportAdminAccountsResponse = ImportAdminAccountsResponses[keyof ImportAdminAccountsResponses];
 
+export type ImportAdminCodexSessionData = {
+    body: CodexSessionImportRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/accounts/import/codex-session';
+};
+
+export type ImportAdminCodexSessionErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type ImportAdminCodexSessionError = ImportAdminCodexSessionErrors[keyof ImportAdminCodexSessionErrors];
+
+export type ImportAdminCodexSessionResponses = {
+    /**
+     * Codex session import result.
+     */
+    200: CodexSessionImportResponse;
+};
+
+export type ImportAdminCodexSessionResponse = ImportAdminCodexSessionResponses[keyof ImportAdminCodexSessionResponses];
+
 export type BatchUpdateAdminAccountsData = {
     body: BatchUpdateAccountsRequest;
     path?: never;
@@ -8377,6 +8522,43 @@ export type BatchUpdateAdminAccountsResponses = {
 };
 
 export type BatchUpdateAdminAccountsResponse = BatchUpdateAdminAccountsResponses[keyof BatchUpdateAdminAccountsResponses];
+
+export type BatchActionAdminAccountsData = {
+    body: BatchAccountActionRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/accounts/batch-action';
+};
+
+export type BatchActionAdminAccountsErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type BatchActionAdminAccountsError = BatchActionAdminAccountsErrors[keyof BatchActionAdminAccountsErrors];
+
+export type BatchActionAdminAccountsResponses = {
+    /**
+     * Batch action result.
+     */
+    200: BatchUpdateAccountsResponse;
+};
+
+export type BatchActionAdminAccountsResponse = BatchActionAdminAccountsResponses[keyof BatchActionAdminAccountsResponses];
 
 export type GetAdminAccountData = {
     body?: never;
@@ -9444,6 +9626,43 @@ export type ExportAdminUsageResponses = {
 };
 
 export type ExportAdminUsageResponse = ExportAdminUsageResponses[keyof ExportAdminUsageResponses];
+
+export type CleanupAdminUsageData = {
+    body: UsageCleanupRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/usage/cleanup';
+};
+
+export type CleanupAdminUsageErrors = {
+    /**
+     * Request validation failed.
+     */
+    400: ErrorResponse;
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type CleanupAdminUsageError = CleanupAdminUsageErrors[keyof CleanupAdminUsageErrors];
+
+export type CleanupAdminUsageResponses = {
+    /**
+     * Usage cleanup result.
+     */
+    200: UsageCleanupResponse;
+};
+
+export type CleanupAdminUsageResponse = CleanupAdminUsageResponses[keyof CleanupAdminUsageResponses];
 
 export type ListAdminAuditLogsData = {
     body?: never;

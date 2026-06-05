@@ -416,6 +416,34 @@ func (s *Service) BatchUpdateStatus(ctx context.Context, ids []int, status contr
 	return result
 }
 
+func (s *Service) BatchClearErrorState(ctx context.Context, ids []int) contract.BatchUpdateResult {
+	return s.batchPerAccount(ctx, ids, s.ClearErrorState)
+}
+
+func (s *Service) BatchRecover(ctx context.Context, ids []int) contract.BatchUpdateResult {
+	return s.batchPerAccount(ctx, ids, s.Recover)
+}
+
+func (s *Service) batchPerAccount(ctx context.Context, ids []int, op func(context.Context, int) (contract.ProviderAccount, error)) contract.BatchUpdateResult {
+	result := contract.BatchUpdateResult{
+		Updated: make([]contract.ProviderAccount, 0, len(ids)),
+		Errors:  make([]string, 0),
+	}
+	if len(ids) == 0 {
+		result.Errors = append(result.Errors, ErrInvalidInput.Error())
+		return result
+	}
+	for _, id := range ids {
+		updated, err := op(ctx, id)
+		if err != nil {
+			result.Errors = append(result.Errors, strings.TrimSpace(err.Error()))
+			continue
+		}
+		result.Updated = append(result.Updated, updated)
+	}
+	return result
+}
+
 func (s *Service) ClearErrorState(ctx context.Context, id int) (contract.ProviderAccount, error) {
 	if id <= 0 {
 		return contract.ProviderAccount{}, ErrInvalidInput

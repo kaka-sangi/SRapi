@@ -52,6 +52,45 @@ func TestUpdateAdminSettingsNormalizesRegistrationEmailSuffixAllowlist(t *testin
 	}
 }
 
+func TestUpdateAdminSettingsNormalizesPassthroughHeaderAllowlist(t *testing.T) {
+	store := admincontrolmemory.New()
+	svc, err := admincontrolservice.New(store, fixedClock{now: time.Date(2026, time.June, 5, 10, 0, 0, 0, time.UTC)})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	settings, err := svc.GetAdminSettings(context.Background())
+	if err != nil {
+		t.Fatalf("get admin settings: %v", err)
+	}
+	if settings.Gateway.PassthroughUpstreamHeaders {
+		t.Fatalf("passthrough should default off")
+	}
+	settings.Gateway.PassthroughUpstreamHeaders = true
+	settings.Gateway.PassthroughHeaderAllowlist = []string{
+		"Retry-After",
+		" X-Request-Id ",
+		"retry-after", // case-insensitive duplicate
+		"X-RateLimit-*",
+		"",
+		"*",
+	}
+
+	updated, err := svc.UpdateAdminSettings(context.Background(), settings, 1)
+	if err != nil {
+		t.Fatalf("update admin settings: %v", err)
+	}
+	want := []string{"retry-after", "x-request-id", "x-ratelimit-*"}
+	got := updated.Gateway.PassthroughHeaderAllowlist
+	if len(got) != len(want) {
+		t.Fatalf("allowlist = %v, want %v", got, want)
+	}
+	for idx, value := range want {
+		if got[idx] != value {
+			t.Fatalf("allowlist[%d] = %q, want %q (%v)", idx, got[idx], value, got)
+		}
+	}
+}
+
 func TestUpdateAdminSettingsRejectsInvalidRegistrationEmailSuffixAllowlist(t *testing.T) {
 	store := admincontrolmemory.New()
 	svc, err := admincontrolservice.New(store, fixedClock{now: time.Date(2026, time.May, 29, 10, 0, 0, 0, time.UTC)})
@@ -249,6 +288,81 @@ func TestUpdateAdminSettingsValidatesAccountQuotaNotifyRatio(t *testing.T) {
 	_, err = svc.UpdateAdminSettings(context.Background(), settings, 1)
 	if !errors.Is(err, admincontrol.ErrInvalidInput) {
 		t.Fatalf("expected invalid ratio input, got %v", err)
+	}
+}
+
+func TestUpdateAdminSettingsRoundTripsGatewayRetryKnobs(t *testing.T) {
+	store := admincontrolmemory.New()
+	svc, err := admincontrolservice.New(store, fixedClock{now: time.Date(2026, time.May, 29, 10, 0, 0, 0, time.UTC)})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	settings, err := svc.GetAdminSettings(context.Background())
+	if err != nil {
+		t.Fatalf("get admin settings: %v", err)
+	}
+	if settings.Gateway.RetryCount != 3 || settings.Gateway.MaxRetryCredentials != 0 || settings.Gateway.MaxRetryIntervalMS != 2000 {
+		t.Fatalf("unexpected default gateway retry knobs: %+v", settings.Gateway)
+	}
+
+	settings.Gateway.RetryCount = 5
+	settings.Gateway.MaxRetryCredentials = 2
+	settings.Gateway.MaxRetryIntervalMS = 750
+
+	updated, err := svc.UpdateAdminSettings(context.Background(), settings, 1)
+	if err != nil {
+		t.Fatalf("update admin settings: %v", err)
+	}
+	if updated.Gateway.RetryCount != 5 || updated.Gateway.MaxRetryCredentials != 2 || updated.Gateway.MaxRetryIntervalMS != 750 {
+		t.Fatalf("gateway retry knobs not preserved on update: %+v", updated.Gateway)
+	}
+
+	reloaded, err := svc.GetAdminSettings(context.Background())
+	if err != nil {
+		t.Fatalf("reload admin settings: %v", err)
+	}
+	if reloaded.Gateway.RetryCount != 5 || reloaded.Gateway.MaxRetryCredentials != 2 || reloaded.Gateway.MaxRetryIntervalMS != 750 {
+		t.Fatalf("gateway retry knobs not persisted: %+v", reloaded.Gateway)
+	}
+}
+
+func TestUpdateAdminSettingsNormalizesGatewayRetryKnobs(t *testing.T) {
+	store := admincontrolmemory.New()
+	svc, err := admincontrolservice.New(store, fixedClock{now: time.Date(2026, time.May, 29, 10, 0, 0, 0, time.UTC)})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	settings, err := svc.GetAdminSettings(context.Background())
+	if err != nil {
+		t.Fatalf("get admin settings: %v", err)
+	}
+	// Zero retry_count falls back to the default; out-of-range clamps; negative
+	// credentials and interval reset to sane values.
+	settings.Gateway.RetryCount = 0
+	settings.Gateway.MaxRetryCredentials = -4
+	settings.Gateway.MaxRetryIntervalMS = -10
+
+	updated, err := svc.UpdateAdminSettings(context.Background(), settings, 1)
+	if err != nil {
+		t.Fatalf("update admin settings: %v", err)
+	}
+	if updated.Gateway.RetryCount != 3 {
+		t.Fatalf("expected retry_count to default to 3, got %d", updated.Gateway.RetryCount)
+	}
+	if updated.Gateway.MaxRetryCredentials != 0 {
+		t.Fatalf("expected negative max_retry_credentials to clamp to 0, got %d", updated.Gateway.MaxRetryCredentials)
+	}
+	if updated.Gateway.MaxRetryIntervalMS != 2000 {
+		t.Fatalf("expected negative max_retry_interval_ms to default to 2000, got %d", updated.Gateway.MaxRetryIntervalMS)
+	}
+
+	settings.Gateway.RetryCount = 99
+	clamped, err := svc.UpdateAdminSettings(context.Background(), settings, 1)
+	if err != nil {
+		t.Fatalf("update admin settings (clamp): %v", err)
+	}
+	if clamped.Gateway.RetryCount != 20 {
+		t.Fatalf("expected retry_count to clamp to 20, got %d", clamped.Gateway.RetryCount)
 	}
 }
 

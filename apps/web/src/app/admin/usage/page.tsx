@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { BarChart3 } from "lucide-react";
+import { BarChart3, Trash2 } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
+import { Button } from "@/components/ui/button";
+import { UsageCleanupDialog } from "@/components/admin/usage-cleanup-dialog";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageQueryState } from "@/components/layout/page-query-state";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
@@ -57,6 +59,7 @@ function formatLatency(ms: number): string {
 function UsageContent() {
   const { t } = useLanguage();
   const list = useAdminList();
+  const [cleanupOpen, setCleanupOpen] = useState(false);
   const modelFilter = list.filters.model || undefined;
   const userFilter = list.filters.user || undefined;
   // Server-side: page/filters drive the query (the log can grow unbounded).
@@ -177,6 +180,10 @@ function UsageContent() {
         actions={
           <div className="flex items-center gap-3">
             {usage.data ? <ListCount total={total} /> : null}
+            <Button variant="outline" size="sm" onClick={() => setCleanupOpen(true)}>
+              <Trash2 />
+              {t("adminUsageCleanup.action")}
+            </Button>
             <AutoRefreshControl
               onRefresh={() => void usage.refetch()}
               isRefreshing={usage.isFetching}
@@ -184,6 +191,11 @@ function UsageContent() {
             />
           </div>
         }
+      />
+      <UsageCleanupDialog
+        open={cleanupOpen}
+        onOpenChange={setCleanupOpen}
+        modelOptions={modelOptions}
       />
       {dailyData.length > 0 ? (
         <Card>

@@ -1120,6 +1120,9 @@ func (rt *runtimeState) gatewayCandidates(ctx context.Context, modelID int, forc
 			if account.ProviderID != mapping.ProviderID {
 				continue
 			}
+			if accountExcludesModel(account.Metadata, model.CanonicalName, mapping.UpstreamModelName) {
+				continue
+			}
 			if !accountSupportsUpstreamModel(account.Metadata, mapping.UpstreamModelName) {
 				continue
 			}

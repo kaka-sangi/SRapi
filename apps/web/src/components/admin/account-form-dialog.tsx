@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { KeyValueEditor } from "@/components/ui/key-value-editor";
+import { TagInput } from "@/components/ui/tag-input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -104,6 +105,22 @@ const CREDENTIAL_SPECS: Record<RuntimeClass, CredSpec> = {
 
 function specFor(rc: RuntimeClass): CredSpec {
   return CREDENTIAL_SPECS[rc] ?? CREDENTIAL_SPECS.api_key;
+}
+
+// metadataStringList reads a metadata field as a list of trimmed, non-empty
+// strings. Accepts an array (the canonical shape) or a comma-separated string
+// (a legacy/typo-friendly shape the gateway also tolerates).
+function metadataStringList(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).trim()).filter(Boolean);
+  }
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  return [];
 }
 
 function defaultCredInput(rc: RuntimeClass): string {
@@ -228,26 +245,49 @@ export function AccountFormDialog({
   const spec = specFor(runtimeClass);
   const busy = submitting || Boolean(isPending);
 
-  // model_mapping lives inside metadata but gets a dedicated editor below; keep
-  // it out of the generic metadata editor so the two never overwrite each other.
+  // These keys live inside metadata but each gets a dedicated editor below; keep
+  // them out of the generic metadata editor so the editors never overwrite each
+  // other. model_mapping is a map; supported_models/excluded_models are lists.
   const modelMappingKey = "model_mapping";
+  const supportedModelsKey = "supported_models";
+  const excludedModelsKey = "excluded_models";
   const rawModelMapping = metadata[modelMappingKey];
   const modelMapping =
     rawModelMapping && typeof rawModelMapping === "object" && !Array.isArray(rawModelMapping)
       ? (rawModelMapping as Record<string, unknown>)
       : {};
-  const metadataWithoutMapping: Record<string, unknown> = { ...metadata };
-  delete metadataWithoutMapping[modelMappingKey];
-  const updateMetadataFields = (next: Record<string, unknown>) =>
-    setMetadata(
-      Object.keys(modelMapping).length > 0 ? { ...next, [modelMappingKey]: modelMapping } : next,
-    );
+  const supportedModels = metadataStringList(metadata[supportedModelsKey]);
+  const excludedModels = metadataStringList(metadata[excludedModelsKey]);
+  // The generic metadata editor shows everything except the dedicated keys.
+  const metadataWithoutDedicated: Record<string, unknown> = { ...metadata };
+  delete metadataWithoutDedicated[modelMappingKey];
+  delete metadataWithoutDedicated[supportedModelsKey];
+  delete metadataWithoutDedicated[excludedModelsKey];
+  // Re-attach the dedicated keys (only when non-empty) onto a base object.
+  const withDedicated = (base: Record<string, unknown>): Record<string, unknown> => {
+    const next = { ...base };
+    if (Object.keys(modelMapping).length > 0) next[modelMappingKey] = modelMapping;
+    if (supportedModels.length > 0) next[supportedModelsKey] = supportedModels;
+    if (excludedModels.length > 0) next[excludedModelsKey] = excludedModels;
+    return next;
+  };
+  const updateMetadataFields = (next: Record<string, unknown>) => setMetadata(withDedicated(next));
   const updateModelMapping = (next: Record<string, unknown>) =>
     setMetadata(
       Object.keys(next).length > 0
-        ? { ...metadataWithoutMapping, [modelMappingKey]: next }
-        : metadataWithoutMapping,
+        ? { ...withDedicated(metadataWithoutDedicated), [modelMappingKey]: next }
+        : (() => {
+            const base = withDedicated(metadataWithoutDedicated);
+            delete base[modelMappingKey];
+            return base;
+          })(),
     );
+  const updateStringListKey = (key: string, next: string[]) => {
+    const base = withDedicated(metadataWithoutDedicated);
+    if (next.length > 0) base[key] = next;
+    else delete base[key];
+    setMetadata(base);
+  };
 
   // Auth methods the selected provider accepts. Always keep the current
   // selection visible so editing a legacy account never hides its real value.
@@ -556,7 +596,7 @@ export function AccountFormDialog({
                     <Label>{t("adminCommon.metadata")}</Label>
                     <div className="mt-1.5">
                       <KeyValueEditor
-                        value={metadataWithoutMapping}
+                        value={metadataWithoutDedicated}
                         onChange={updateMetadataFields}
                         disabled={busy}
                         addLabel={t("adminCommon.addField")}
@@ -576,6 +616,34 @@ export function AccountFormDialog({
                         keyPlaceholder={t("adminAccounts.modelMappingKeyPlaceholder")}
                         valuePlaceholder={t("adminAccounts.modelMappingValuePlaceholder")}
                         addLabel={t("adminAccounts.addModelMapping")}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label>{t("adminAccounts.supportedModels")}</Label>
+                    <p className="mt-1 text-2xs text-srapi-text-tertiary">
+                      {t("adminAccounts.supportedModelsHint")}
+                    </p>
+                    <div className="mt-1.5">
+                      <TagInput
+                        value={supportedModels}
+                        onChange={(next) => updateStringListKey(supportedModelsKey, next)}
+                        disabled={busy}
+                        placeholder={t("adminAccounts.supportedModelsPlaceholder")}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label>{t("adminAccounts.excludedModels")}</Label>
+                    <p className="mt-1 text-2xs text-srapi-text-tertiary">
+                      {t("adminAccounts.excludedModelsHint")}
+                    </p>
+                    <div className="mt-1.5">
+                      <TagInput
+                        value={excludedModels}
+                        onChange={(next) => updateStringListKey(excludedModelsKey, next)}
+                        disabled={busy}
+                        placeholder={t("adminAccounts.excludedModelsPlaceholder")}
                       />
                     </div>
                   </div>

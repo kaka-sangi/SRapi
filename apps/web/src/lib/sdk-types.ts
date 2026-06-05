@@ -6,6 +6,7 @@
  * instead — this file holds the single known-good relative path.
  */
 export type {
+  Id,
   User,
   UserStatus,
   Provider,
@@ -19,6 +20,8 @@ export type {
   UserSubscription,
   PaymentOrder,
   UsageLog,
+  UsageCleanupRequest,
+  UsageCleanupResult,
   PromoCode,
   RedeemCode,
   AffiliateInviteRecord,
@@ -66,4 +69,8 @@ export type {
   GatewayUsageResponse,
   GatewayUsageModel,
   GatewayUsageRequest,
+  CodexSessionImportRequest,
+  CodexSessionImportResult,
+  CodexSessionImportItem,
+  CodexSessionImportMessage,
 } from "../../../../packages/sdk/typescript/src/types.gen";

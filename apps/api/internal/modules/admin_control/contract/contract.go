@@ -112,11 +112,16 @@ type AdminSettingsGateway struct {
 	StreamTimeoutSeconds                 int      `json:"stream_timeout_seconds"`
 	RequestShaperEnabled                 bool     `json:"request_shaper_enabled"`
 	BetaStrategy                         string   `json:"beta_strategy"`
+	RetryCount                           int      `json:"retry_count"`
+	MaxRetryCredentials                  int      `json:"max_retry_credentials"`
+	MaxRetryIntervalMS                   int      `json:"max_retry_interval_ms"`
 	SchedulerStrategyRolloutEnabled      bool     `json:"scheduler_strategy_rollout_enabled"`
 	SchedulerStrategyShadowStrategy      string   `json:"scheduler_strategy_shadow_strategy"`
 	SchedulerStrategyRolloutPercent      float64  `json:"scheduler_strategy_rollout_percent"`
 	SchedulerStrategyRolloutModels       []string `json:"scheduler_strategy_rollout_models"`
 	SchedulerStrategyRolloutAPIKeyHashes []string `json:"scheduler_strategy_rollout_api_key_hashes"`
+	PassthroughUpstreamHeaders           bool     `json:"passthrough_upstream_headers"`
+	PassthroughHeaderAllowlist           []string `json:"passthrough_header_allowlist"`
 }
 type AdminSettingsPayment struct {
 	Enabled                  bool     `json:"enabled"`

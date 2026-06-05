@@ -72,10 +72,29 @@ const SPECIAL_FIELDS: Partial<Record<SettingsTab, SpecialField[]>> = {
       kind: "tags",
       skip: "scheduler_strategy_rollout_api_key_hashes",
     },
+    {
+      key: "passthroughHeaderAllowlist",
+      kind: "tags",
+      skip: "passthrough_header_allowlist",
+    },
   ],
   payment: [{ key: "paymentProviders", kind: "tags", skip: "providers" }],
   email: [{ key: "emailTemplates", kind: "templates", skip: "templates" }],
 };
+
+/**
+ * Gateway numeric settings that must stay non-negative integers (the
+ * operator-tunable retry/failover knobs and cooldown/timeout values). The Go
+ * side clamps too, but clamping in the input keeps the control honest.
+ */
+const GATEWAY_NON_NEGATIVE_INT_FIELDS = new Set<string>([
+  "overload_cooldown_seconds",
+  "rate_limit_cooldown_seconds",
+  "stream_timeout_seconds",
+  "retry_count",
+  "max_retry_credentials",
+  "max_retry_interval_ms",
+]);
 
 function humanize(key: string): string {
   return key.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
@@ -246,12 +265,17 @@ function SpecialFieldRow({
 
   if (field.kind === "tags") {
     const tags = Array.isArray(value) ? (value as string[]) : [];
+    const hintId = `adminSettings.fields.${field.skip}_hint`;
+    const hint = t(hintId);
     return (
       <div>
         <Label htmlFor={id}>{label}</Label>
         <div className="mt-1.5">
           <TagInput id={id} value={tags} onChange={(next) => onChange(field.key, next)} />
         </div>
+        {hint !== hintId ? (
+          <p className="mt-1 text-2xs text-srapi-text-tertiary">{hint}</p>
+        ) : null}
       </div>
     );
   }
@@ -356,14 +380,20 @@ function SectionFields({
           );
         }
         if (typeof v === "number") {
+          const clamp = GATEWAY_NON_NEGATIVE_INT_FIELDS.has(key)
+            ? (n: number) => (Number.isFinite(n) ? Math.max(0, Math.trunc(n)) : 0)
+            : (n: number) => n;
           return (
             <div key={key}>
               <Label htmlFor={id}>{fieldLabel(key, t)}</Label>
               <Input
                 id={id}
                 type="number"
+                min={GATEWAY_NON_NEGATIVE_INT_FIELDS.has(key) ? 0 : undefined}
                 value={String(v)}
-                onChange={(e) => onChange(key, e.target.value === "" ? 0 : Number(e.target.value))}
+                onChange={(e) =>
+                  onChange(key, e.target.value === "" ? 0 : clamp(Number(e.target.value)))
+                }
               />
             </div>
           );

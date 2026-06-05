@@ -28,7 +28,7 @@ func TestSameProtocolRawConversationResponseAllowsClaudeCodeMessages(t *testing.
 }
 
 func TestGatewayEmptyCompletionErrorClassIsRetryable(t *testing.T) {
-	if !gatewayShouldFailover("empty_completion", http.StatusBadGateway, 0, 2) {
+	if !gatewayShouldFailover("empty_completion", http.StatusBadGateway, 0, 2, defaultGatewayFailoverAttempts) {
 		t.Fatal("expected empty completion to be eligible for failover")
 	}
 	if got := providerGatewayMessage("empty_completion"); got != "provider returned empty completion" {
@@ -111,7 +111,7 @@ func TestGatewaySameCandidateRetryPolicyForPoolMode(t *testing.T) {
 				"pool_mode_retry_max_delay_ms":  float64(1),
 			},
 		},
-	})
+	}, defaultGatewayMaxRetryIntervalMS)
 
 	if !policy.Enabled || policy.MaxRetries != 4 || !policy.RetryAuthFailures {
 		t.Fatalf("unexpected pool mode retry policy: %+v", policy)
@@ -135,7 +135,7 @@ func TestGatewaySameCandidateRetryPolicyExplicitOptIn(t *testing.T) {
 			},
 		},
 		Provider: providercontract.Provider{Protocol: "openai-compatible"},
-	})
+	}, defaultGatewayMaxRetryIntervalMS)
 
 	if !policy.Enabled || policy.MaxRetries != 2 || policy.BaseDelay != 5*time.Millisecond || policy.MaxDelay != 8*time.Millisecond {
 		t.Fatalf("unexpected explicit retry policy: %+v", policy)

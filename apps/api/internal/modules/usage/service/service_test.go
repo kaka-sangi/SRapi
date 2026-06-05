@@ -238,6 +238,78 @@ func TestSummarizeAPIKeyIsScopedAndAggregated(t *testing.T) {
 	}
 }
 
+func TestCleanupLogsBoundedDeleteAndDryRun(t *testing.T) {
+	store := usagememory.New()
+	svc, err := service.New(store, nil)
+	if err != nil {
+		t.Fatalf("new usage service: %v", err)
+	}
+	ctx := t.Context()
+	old := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
+	recent := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+	seed := func(requestID, model string, when time.Time) {
+		if _, err := store.Create(ctx, contract.UsageLog{
+			RequestID: requestID, UserID: 1, APIKeyID: 1,
+			SourceProtocol: "openai-compatible", SourceEndpoint: "/v1/chat/completions",
+			Model: model, Cost: "0.00000000", Currency: "USD", CreatedAt: when,
+		}); err != nil {
+			t.Fatalf("seed usage: %v", err)
+		}
+	}
+	seed("c1", "target", old)
+	seed("c2", "target", old)
+	seed("c3", "target", recent)
+	seed("c4", "other", old)
+
+	// A filter that matches nothing bounded is rejected.
+	if _, err := svc.CleanupLogs(ctx, contract.CleanupFilter{MaxDelete: 5}); err != service.ErrInvalidInput {
+		t.Fatalf("expected ErrInvalidInput without filter, got %v", err)
+	}
+	// start after end is rejected.
+	start := recent
+	end := old
+	if _, err := svc.CleanupLogs(ctx, contract.CleanupFilter{Start: &start, End: &end}); err != service.ErrInvalidInput {
+		t.Fatalf("expected ErrInvalidInput for inverted range, got %v", err)
+	}
+
+	// Dry run counts the model matches without deleting.
+	dry, err := svc.CleanupLogs(ctx, contract.CleanupFilter{Model: "TARGET", DryRun: true, MaxDelete: 5})
+	if err != nil {
+		t.Fatalf("dry run cleanup: %v", err)
+	}
+	if dry.Matched != 3 || dry.Deleted != 0 || !dry.DryRun || dry.Limited {
+		t.Fatalf("dry run expected matched=3 deleted=0, got %+v", dry)
+	}
+	if logs, _ := store.List(ctx); len(logs) != 4 {
+		t.Fatalf("dry run must not delete, got %d", len(logs))
+	}
+
+	// A capped delete removes only MaxDelete records (oldest first) and reports Limited.
+	capped, err := svc.CleanupLogs(ctx, contract.CleanupFilter{Model: "target", MaxDelete: 1})
+	if err != nil {
+		t.Fatalf("capped cleanup: %v", err)
+	}
+	if capped.Matched != 3 || capped.Deleted != 1 || !capped.Limited {
+		t.Fatalf("capped expected matched=3 deleted=1 limited, got %+v", capped)
+	}
+
+	// The remaining target matches clear; the other model survives.
+	rest, err := svc.CleanupLogs(ctx, contract.CleanupFilter{Model: "target", MaxDelete: 100})
+	if err != nil {
+		t.Fatalf("final cleanup: %v", err)
+	}
+	if rest.Matched != 2 || rest.Deleted != 2 || rest.Limited {
+		t.Fatalf("final expected matched=2 deleted=2, got %+v", rest)
+	}
+	logs, err := store.List(ctx)
+	if err != nil {
+		t.Fatalf("list usage: %v", err)
+	}
+	if len(logs) != 1 || logs[0].Model != "other" {
+		t.Fatalf("expected only other-model survivor, got %+v", logs)
+	}
+}
+
 type fixedClock struct {
 	now time.Time
 }

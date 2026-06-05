@@ -468,27 +468,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("GET /api/v1/admin/scheduler/strategies", server.handleListSchedulerStrategies)
 	mux.HandleFunc("POST /api/v1/admin/scheduler/simulate", server.handleSimulateSchedulerStrategy)
 	mux.HandleFunc("POST /api/v1/admin/scheduler/replay", server.handleReplaySchedulerStrategy)
-	mux.HandleFunc("GET /v1/models", server.handleListModels)
-	mux.HandleFunc("GET /v1/usage", server.handleGatewayUsage)
-	mux.HandleFunc("GET /v1beta/models", server.handleListGeminiModels)
-	mux.HandleFunc("GET /v1beta/models/", server.handleGetGeminiModel)
-	mux.HandleFunc("POST /v1/chat/completions", server.withGatewayIdempotency(server.handleCreateChatCompletion))
-	mux.HandleFunc("POST /v1/responses", server.withGatewayIdempotency(server.handleCreateResponse))
-	mux.HandleFunc("GET /v1/responses/{response_id}/input_items", server.handleListResponseInputItems)
-	mux.HandleFunc("POST /v1/responses/compact", server.withGatewaySourceEndpoint(string(gatewaycontract.EndpointResponsesCompact), server.handleCreateResponse))
-	mux.HandleFunc("GET /v1/responses/ws", server.handleResponsesWebSocket)
-	mux.HandleFunc("GET /v1/realtime", server.handleRealtimeWebSocket)
-	mux.HandleFunc("POST /v1/messages", server.withGatewayIdempotency(server.handleCreateMessage))
-	mux.HandleFunc("POST /v1/messages/count_tokens", server.handleAnthropicCountTokens)
-	mux.HandleFunc("POST /v1/embeddings", server.withGatewayIdempotency(server.handleCreateEmbedding))
-	mux.HandleFunc("POST /v1/images/generations", server.handleCreateImageGeneration)
-	mux.HandleFunc("POST /v1/images/edits", server.handleCreateImageEdit)
-	mux.HandleFunc("POST /v1/images/variations", server.handleCreateImageVariation)
-	mux.HandleFunc("POST /v1/audio/transcriptions", server.handleCreateAudioTranscription)
-	mux.HandleFunc("POST /v1/audio/speech", server.handleCreateAudioSpeech)
-	mux.HandleFunc("POST /v1/moderations", server.handleCreateModeration)
-	mux.HandleFunc("POST /v1/rerank", server.handleCreateRerank)
-	mux.HandleFunc("POST /v1beta/models/", server.handleGeminiModelAction)
+	server.registerGatewayEndpointRoutes(mux)
 	server.registerGatewayProviderAliases(mux)
 
 	// The admin copilot dispatches approved admin calls in-process against this
@@ -498,6 +478,9 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	return requestIDMiddleware(server.tracingMiddleware(server.gatewayConcurrencyMiddleware(mux)))
 }
 
+// registerAdminOpsRoutes registers the operational monitoring + maintenance
+// admin surfaces (overview/trends, system + usage log cleanup, realtime slots,
+// SLOs, and alerts). Kept out of New so that function stays under its size cap.
 func (s *Server) registerAdminOpsRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/admin/ops/events/outbox", s.handleListAdminOutboxEvents)
 	mux.HandleFunc("GET /api/v1/admin/ops/overview", s.handleAdminOpsOverview)
@@ -508,6 +491,9 @@ func (s *Server) registerAdminOpsRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/admin/ops/concurrency", s.handleAdminOpsConcurrency)
 	mux.HandleFunc("GET /api/v1/admin/ops/system-logs", s.handleListAdminOpsSystemLogs)
 	mux.HandleFunc("POST /api/v1/admin/ops/system-logs/cleanup", s.handleCleanupAdminOpsSystemLogs)
+	// Operator on-demand usage-record cleanup — the counterpart to the
+	// background retention worker; lives here alongside the system-log cleanup.
+	mux.HandleFunc("POST /api/v1/admin/usage/cleanup", s.handleCleanupAdminUsage)
 	mux.HandleFunc("GET /api/v1/admin/ops/alert-events", s.handleListAdminOpsAlerts)
 	mux.HandleFunc("PUT /api/v1/admin/ops/settings", s.handleUpdateAdminOpsSettings)
 	mux.HandleFunc("GET /api/v1/admin/ops/realtime/slots", s.handleListAdminOpsRealtimeSlots)
@@ -535,6 +521,33 @@ func (s *Server) registerAdminPromotionRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/admin/promo-codes/{id}/usages", s.handleListAdminPromoCodeUsages)
 }
 
+// registerGatewayEndpointRoutes registers the OpenAI/Anthropic/Gemini-compatible
+// gateway request endpoints (chat, responses, messages, embeddings, images,
+// audio, etc.) that the proxy core serves under /v1 and /v1beta.
+func (s *Server) registerGatewayEndpointRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("GET /v1/models", s.handleListModels)
+	mux.HandleFunc("GET /v1/usage", s.handleGatewayUsage)
+	mux.HandleFunc("GET /v1beta/models", s.handleListGeminiModels)
+	mux.HandleFunc("GET /v1beta/models/", s.handleGetGeminiModel)
+	mux.HandleFunc("POST /v1/chat/completions", s.withGatewayIdempotency(s.handleCreateChatCompletion))
+	mux.HandleFunc("POST /v1/responses", s.withGatewayIdempotency(s.handleCreateResponse))
+	mux.HandleFunc("GET /v1/responses/{response_id}/input_items", s.handleListResponseInputItems)
+	mux.HandleFunc("POST /v1/responses/compact", s.withGatewaySourceEndpoint(string(gatewaycontract.EndpointResponsesCompact), s.handleCreateResponse))
+	mux.HandleFunc("GET /v1/responses/ws", s.handleResponsesWebSocket)
+	mux.HandleFunc("GET /v1/realtime", s.handleRealtimeWebSocket)
+	mux.HandleFunc("POST /v1/messages", s.withGatewayIdempotency(s.handleCreateMessage))
+	mux.HandleFunc("POST /v1/messages/count_tokens", s.handleAnthropicCountTokens)
+	mux.HandleFunc("POST /v1/embeddings", s.withGatewayIdempotency(s.handleCreateEmbedding))
+	mux.HandleFunc("POST /v1/images/generations", s.handleCreateImageGeneration)
+	mux.HandleFunc("POST /v1/images/edits", s.handleCreateImageEdit)
+	mux.HandleFunc("POST /v1/images/variations", s.handleCreateImageVariation)
+	mux.HandleFunc("POST /v1/audio/transcriptions", s.handleCreateAudioTranscription)
+	mux.HandleFunc("POST /v1/audio/speech", s.handleCreateAudioSpeech)
+	mux.HandleFunc("POST /v1/moderations", s.handleCreateModeration)
+	mux.HandleFunc("POST /v1/rerank", s.handleCreateRerank)
+	mux.HandleFunc("POST /v1beta/models/", s.handleGeminiModelAction)
+}
+
 // registerCapabilityAdminRoutes registers the sub2api gap-closure admin surfaces
 // (user attributes, error-passthrough rules, account availability/quota, and TLS
 // fingerprint profiles).
@@ -553,6 +566,7 @@ func (s *Server) registerCapabilityAdminRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/admin/payload-rules", s.handleCreateAdminPayloadRule)
 	mux.HandleFunc("PATCH /api/v1/admin/payload-rules/{id}", s.handleUpdateAdminPayloadRule)
 	mux.HandleFunc("DELETE /api/v1/admin/payload-rules/{id}", s.handleDeleteAdminPayloadRule)
+	mux.HandleFunc("POST /api/v1/admin/accounts/batch-action", s.handleBatchActionAdminAccounts)
 	mux.HandleFunc("GET /api/v1/admin/accounts/availability", s.handleListAdminAccountsAvailability)
 	mux.HandleFunc("GET /api/v1/admin/accounts/{id}/availability", s.handleAdminAccountAvailability)
 	mux.HandleFunc("POST /api/v1/admin/accounts/{id}/quota-fetch", s.handleAdminAccountQuotaFetch)
@@ -571,6 +585,7 @@ func (s *Server) registerCapabilityAdminRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /api/v1/admin/group-rate-limits/{groupId}", s.handleDeleteAdminGroupRateLimit)
 	mux.HandleFunc("GET /api/v1/admin/config-snapshot", s.handleAdminConfigSnapshot)
 	mux.HandleFunc("POST /api/v1/admin/config-snapshot/import", s.handleAdminConfigImport)
+	mux.HandleFunc("POST /api/v1/admin/accounts/import/codex-session", s.handleImportAdminCodexSession)
 }
 
 func (s *Server) registerCurrentUserRoutes(mux *http.ServeMux) {

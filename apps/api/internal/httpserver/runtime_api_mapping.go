@@ -151,6 +151,22 @@ func filterGatewayModels(models []apiopenapi.OpenAIModel, allowed []string) []ap
 	return out
 }
 
+// hideGatewayModels drops models whose Id is in the hidden set (canonical
+// names hidden by per-account excluded_models wildcards).
+func hideGatewayModels(models []apiopenapi.OpenAIModel, hidden map[string]struct{}) []apiopenapi.OpenAIModel {
+	if len(hidden) == 0 {
+		return models
+	}
+	out := make([]apiopenapi.OpenAIModel, 0, len(models))
+	for _, model := range models {
+		if _, ok := hidden[model.Id]; ok {
+			continue
+		}
+		out = append(out, model)
+	}
+	return out
+}
+
 func toGatewayModels(models []modelcontract.Model) []apiopenapi.OpenAIModel {
 	out := make([]apiopenapi.OpenAIModel, 0, len(models))
 	for _, model := range models {

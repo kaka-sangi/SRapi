@@ -1005,6 +1005,59 @@ func (s *Server) handleBatchUpdateAdminAccounts(w http.ResponseWriter, r *http.R
 	})
 }
 
+func (s *Server) handleBatchActionAdminAccounts(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	var body apiopenapi.BatchAccountActionRequest
+	if err := s.decodeJSONBody(w, r, &body); err != nil {
+		writeStandardError(w, jsonDecodeStatus(err), apiopenapi.INVALIDREQUEST, "invalid account batch action request", requestID)
+		return
+	}
+	if !body.Action.Valid() {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid batch action", requestID)
+		return
+	}
+	accountIDs, err := apiIDsValueToInts(body.AccountIds)
+	if err != nil {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid account ids", requestID)
+		return
+	}
+	var result accountcontract.BatchUpdateResult
+	switch body.Action {
+	case apiopenapi.Recover:
+		result = s.runtime.accounts.BatchRecover(r.Context(), accountIDs)
+	default:
+		result = s.runtime.accounts.BatchClearErrorState(r.Context(), accountIDs)
+	}
+	updatedIDs := make([]apiopenapi.Id, 0, len(result.Updated))
+	for _, updated := range result.Updated {
+		updatedIDs = append(updatedIDs, apiopenapi.Id(strconv.Itoa(updated.ID)))
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "provider_account.batch_action", "provider_account", "bulk", nil, map[string]any{
+		"action":        string(body.Action),
+		"account_ids":   accountIDs,
+		"updated_ids":   updatedIDs,
+		"updated_count": len(updatedIDs),
+		"errors":        result.Errors,
+	}))
+	writeJSONAny(w, http.StatusOK, apiopenapi.BatchUpdateAccountsResponse{
+		Data: apiopenapi.BatchUpdateAccountsResult{
+			Errors:       result.Errors,
+			UpdatedCount: len(updatedIDs),
+			UpdatedIds:   updatedIDs,
+		},
+		RequestId: requestID,
+	})
+}
+
 func (s *Server) handleUpdateAdminAccount(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	session, err := s.requireAdminSession(r)

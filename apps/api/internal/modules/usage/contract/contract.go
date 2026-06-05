@@ -74,6 +74,31 @@ type QueryFilter struct {
 	End   *time.Time
 }
 
+// CleanupFilter bounds an operator on-demand deletion of usage records. It
+// complements the background retention worker (which only purges by age):
+// here an operator can target a model and/or a time range, capped by MaxDelete
+// so a single call can never delete more than an intended batch. Model is
+// matched case-insensitively. DryRun reports the match count without deleting.
+type CleanupFilter struct {
+	Model     string
+	Start     *time.Time
+	End       *time.Time
+	DryRun    bool
+	MaxDelete int
+}
+
+// CleanupResult summarizes one usage-record cleanup pass. Matched counts the
+// records the filter selected; Deleted counts those actually removed (always 0
+// for a dry run); Limited reports that the MaxDelete cap left matched records
+// in place.
+type CleanupResult struct {
+	Matched   int
+	Deleted   int
+	DryRun    bool
+	MaxDelete int
+	Limited   bool
+}
+
 // APIKeyUsageSummary contains key-scoped usage aggregates for client-facing Gateway usage snapshots.
 type APIKeyUsageSummary struct {
 	APIKeyID     int
@@ -163,4 +188,8 @@ type Store interface {
 	Create(ctx context.Context, input UsageLog) (UsageLog, error)
 	List(ctx context.Context) ([]UsageLog, error)
 	ListByUser(ctx context.Context, userID int) ([]UsageLog, error)
+	// CleanupLogs performs a bounded delete of usage records matching filter.
+	// Implementations must honor filter.MaxDelete and filter.DryRun and return
+	// the matched/deleted counts so the caller can report whether the cap was hit.
+	CleanupLogs(ctx context.Context, filter CleanupFilter) (CleanupResult, error)
 }

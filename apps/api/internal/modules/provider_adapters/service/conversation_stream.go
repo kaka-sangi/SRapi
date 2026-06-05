@@ -101,6 +101,7 @@ func (s *Service) egressStreamConversation(
 	}
 	return contract.ConversationResponse{
 		StatusCode:  resp.StatusCode,
+		Headers:     resp.Header,
 		StreamBody:  resp.Body,
 		StreamParse: parse,
 	}, nil
@@ -213,6 +214,7 @@ func reverseProxyAccountRuntime(req contract.ConversationRequest) reverseproxyco
 func streamConversationResponse(resp reverseproxycontract.StreamResponse, parse func([]byte, int) (contract.ConversationResponse, error)) contract.ConversationResponse {
 	return contract.ConversationResponse{
 		StatusCode:  resp.StatusCode,
+		Headers:     resp.Headers,
 		StreamBody:  resp.Body,
 		StreamParse: parse,
 	}

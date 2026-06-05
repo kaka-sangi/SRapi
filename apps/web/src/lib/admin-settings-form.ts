@@ -39,6 +39,7 @@ export interface AdminSettingsDraft {
   oauthProviders: string[];
   schedulerRolloutModels: string[];
   schedulerRolloutApiKeyHashes: string[];
+  passthroughHeaderAllowlist: string[];
   paymentProviders: string[];
   emailTemplates: Record<string, string>;
 }
@@ -57,6 +58,7 @@ export function createSettingsDraft(value: AdminSettings): AdminSettingsDraft {
     oauthProviders: [...(value.security.oauth_providers ?? [])],
     schedulerRolloutModels: [...(value.gateway.scheduler_strategy_rollout_models ?? [])],
     schedulerRolloutApiKeyHashes: [...(value.gateway.scheduler_strategy_rollout_api_key_hashes ?? [])],
+    passthroughHeaderAllowlist: [...(value.gateway.passthrough_header_allowlist ?? [])],
     paymentProviders: [...(value.payment.providers ?? [])],
     emailTemplates: { ...(value.email.templates ?? {}) },
   };
@@ -82,6 +84,7 @@ export function materializeSettingsDraft(draft: AdminSettingsDraft): AdminSettin
       ...draft.value.gateway,
       scheduler_strategy_rollout_models: cleanList(draft.schedulerRolloutModels),
       scheduler_strategy_rollout_api_key_hashes: cleanList(draft.schedulerRolloutApiKeyHashes),
+      passthrough_header_allowlist: cleanList(draft.passthroughHeaderAllowlist),
     },
     payment: {
       ...draft.value.payment,

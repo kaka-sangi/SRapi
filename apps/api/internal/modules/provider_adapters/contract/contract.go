@@ -483,6 +483,13 @@ type ConversationResponse struct {
 	StreamEvents []ConversationStreamEvent
 	QuotaSignals []QuotaSignal
 
+	// Headers carries the upstream response headers, when the adapter has them
+	// available (currently the same-protocol passthrough paths: streaming and the
+	// buffered generic reverse proxy). It lets the gateway optionally forward an
+	// allowlist of upstream response headers to the client. Nil when the adapter
+	// re-renders the response and has no upstream headers to expose.
+	Headers http.Header
+
 	// StreamBody, when non-nil, carries the live upstream response body for
 	// same-protocol passthrough streaming. The caller MUST Close it after
 	// streaming to the client (Close also releases the request's concurrency

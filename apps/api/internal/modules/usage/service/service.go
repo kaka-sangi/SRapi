@@ -197,6 +197,48 @@ func (s *Service) Export(ctx context.Context, filter contract.QueryFilter) (cont
 	}, nil
 }
 
+const (
+	defaultCleanupMaxDelete = 1000
+	maxCleanupMaxDelete     = 10000
+)
+
+// CleanupLogs performs a bounded, operator-triggered deletion of usage records.
+// It requires at least one bounding filter (model, start, or end) so a cleanup
+// can never accidentally target the whole table, and caps the batch at
+// MaxDelete. DryRun reports the match count without deleting anything.
+func (s *Service) CleanupLogs(ctx context.Context, filter contract.CleanupFilter) (contract.CleanupResult, error) {
+	normalized, err := normalizeCleanupFilter(filter)
+	if err != nil {
+		return contract.CleanupResult{}, err
+	}
+	return s.store.CleanupLogs(ctx, normalized)
+}
+
+func normalizeCleanupFilter(filter contract.CleanupFilter) (contract.CleanupFilter, error) {
+	filter.Model = strings.TrimSpace(filter.Model)
+	if filter.Start != nil {
+		start := filter.Start.UTC()
+		filter.Start = &start
+	}
+	if filter.End != nil {
+		end := filter.End.UTC()
+		filter.End = &end
+	}
+	if filter.Start != nil && filter.End != nil && filter.Start.After(*filter.End) {
+		return contract.CleanupFilter{}, ErrInvalidInput
+	}
+	if filter.Model == "" && filter.Start == nil && filter.End == nil {
+		return contract.CleanupFilter{}, ErrInvalidInput
+	}
+	if filter.MaxDelete == 0 {
+		filter.MaxDelete = defaultCleanupMaxDelete
+	}
+	if filter.MaxDelete < 0 || filter.MaxDelete > maxCleanupMaxDelete {
+		return contract.CleanupFilter{}, ErrInvalidInput
+	}
+	return filter, nil
+}
+
 func cloneStrings(values []string) []string {
 	if values == nil {
 		return nil

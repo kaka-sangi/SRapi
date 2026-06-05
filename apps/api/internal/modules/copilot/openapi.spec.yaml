@@ -3503,6 +3503,51 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/accounts/import/codex-session:
+    post:
+      tags:
+        - AdminAccounts
+      operationId: importAdminCodexSession
+      summary: Import Codex/ChatGPT desktop session blobs as upstream accounts.
+      description: >-
+        Parses a pasted Codex/ChatGPT session JSON, raw access token, or NDJSON
+        batch, decodes the embedded JWT to extract identity claims
+        (chatgpt_account_id/user_id/plan_type/organization_id/email/expiry),
+        deduplicates by identity, and creates or updates codex_cli accounts under
+        the target provider. Accounts with a refresh token mint a fresh access
+        token; refresh-token-less sessions require a valid (non-expired) access
+        token and are recorded with auto-pause-on-expiry metadata.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CodexSessionImportRequest"
+      responses:
+        "200":
+          description: Codex session import result.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CodexSessionImportResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/accounts/batch:
     patch:
       tags:
@@ -3524,6 +3569,47 @@ paths:
       responses:
         "200":
           description: Batch update result.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchUpdateAccountsResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/accounts/batch-action:
+    post:
+      tags:
+        - AdminAccounts
+      operationId: batchActionAdminAccounts
+      summary: Run a bulk recovery action across provider accounts.
+      description: >-
+        Apply a per-account maintenance action to multiple provider accounts in
+        one request. Supports clearing transient error/cooldown state
+        (`clear_error`) and full recovery to active (`recover`).
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchAccountActionRequest"
+      responses:
+        "200":
+          description: Batch action result.
           headers:
             X-Request-ID:
               $ref: "#/components/headers/RequestIdHeader"
@@ -4565,6 +4651,48 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UsageExportResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/StandardError"
+
+  /api/v1/admin/usage/cleanup:
+    post:
+      tags:
+        - AdminUsage
+      operationId: cleanupAdminUsage
+      summary: Cleanup usage records by bounded filter.
+      description: >-
+        Operator on-demand deletion of historical usage logs, complementing the
+        background retention worker. Requires at least one filter condition.
+        Deletion is capped by max_delete and always records a safe audit summary;
+        dry_run previews the match count without deleting.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UsageCleanupRequest"
+      responses:
+        "200":
+          description: Usage cleanup result.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsageCleanupResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -15005,7 +15133,20 @@ components:
             $ref: "#/components/schemas/Id"
           default: []
         metadata:
-          $ref: "#/components/schemas/JsonObject"
+          allOf:
+            - $ref: "#/components/schemas/JsonObject"
+          description: >
+            Free-form per-account configuration. Recognized convention keys
+            (no schema migration; read at scheduling time):
+            `base_url` (override the upstream base URL);
+            `supported_models` (string array — exact-match inclusion whitelist of
+            upstream model names this account may serve; absent = serve all);
+            `excluded_models` (string array of `*` wildcard patterns — exclude any
+            catalog or upstream model name matching a pattern; takes precedence
+            over `supported_models` and hides the model from `/v1/models` when
+            every serving account excludes it);
+            `model_mapping` (object mapping a canonical catalog model name to a
+            per-account upstream model name override).
         created_at:
           $ref: "#/components/schemas/Timestamp"
 
@@ -15338,6 +15479,133 @@ components:
         request_id:
           $ref: "#/components/schemas/RequestId"
 
+    CodexSessionImportRequest:
+      type: object
+      required:
+        - provider_id
+        - content
+      properties:
+        provider_id:
+          $ref: "#/components/schemas/Id"
+        content:
+          type: string
+          minLength: 1
+          description: >-
+            Raw session payload. Accepts a Codex/ChatGPT session JSON object, a
+            single raw access token, a JSON array of either, or newline-delimited
+            (NDJSON) entries mixing the above.
+        name:
+          type: string
+          nullable: true
+          description: >-
+            Optional base account name. When multiple sessions are imported a
+            "#N" suffix is appended; when omitted the email/account id from the
+            session is used.
+        update_existing:
+          type: boolean
+          default: true
+          description: >-
+            When an account with a matching identity already exists, update its
+            credential instead of skipping. Defaults to true.
+        group_ids:
+          type: array
+          items:
+            $ref: "#/components/schemas/Id"
+          default: []
+        proxy_id:
+          type: string
+          nullable: true
+        status:
+          $ref: "#/components/schemas/ProviderAccountStatus"
+
+    CodexSessionImportItem:
+      type: object
+      required:
+        - index
+        - action
+      properties:
+        index:
+          type: integer
+          minimum: 1
+        name:
+          type: string
+        action:
+          type: string
+          enum:
+            - created
+            - updated
+            - skipped
+            - failed
+        account_id:
+          $ref: "#/components/schemas/Id"
+        message:
+          type: string
+
+    CodexSessionImportMessage:
+      type: object
+      required:
+        - index
+        - message
+      properties:
+        index:
+          type: integer
+          minimum: 1
+        name:
+          type: string
+        message:
+          type: string
+
+    CodexSessionImportResult:
+      type: object
+      required:
+        - total
+        - created
+        - updated
+        - skipped
+        - failed
+        - items
+        - warnings
+        - errors
+      properties:
+        total:
+          type: integer
+          minimum: 0
+        created:
+          type: integer
+          minimum: 0
+        updated:
+          type: integer
+          minimum: 0
+        skipped:
+          type: integer
+          minimum: 0
+        failed:
+          type: integer
+          minimum: 0
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/CodexSessionImportItem"
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/CodexSessionImportMessage"
+        errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/CodexSessionImportMessage"
+
+    CodexSessionImportResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/CodexSessionImportResult"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
     BatchUpdateAccountsRequest:
       type: object
       required:
@@ -15351,6 +15619,27 @@ components:
             $ref: "#/components/schemas/Id"
         status:
           $ref: "#/components/schemas/ProviderAccountStatus"
+
+    BatchAccountActionRequest:
+      type: object
+      required:
+        - account_ids
+        - action
+      properties:
+        account_ids:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/Id"
+        action:
+          type: string
+          description: >-
+            Maintenance action to apply per account. `clear_error` clears
+            transient error/cooldown metadata and reactivates non-healthy
+            accounts; `recover` resets the account back to active.
+          enum:
+            - clear_error
+            - recover
 
     BatchUpdateAccountsResult:
       type: object
@@ -16401,6 +16690,64 @@ components:
         request_id:
           $ref: "#/components/schemas/RequestId"
 
+    UsageCleanupRequest:
+      type: object
+      description: >-
+        Bounded filter for operator on-demand usage-record cleanup. At least one
+        of model, start or end must be supplied so a cleanup can never match the
+        entire table by accident.
+      properties:
+        model:
+          type: string
+          description: Canonical model name; matched case-insensitively.
+        start:
+          $ref: "#/components/schemas/Timestamp"
+        end:
+          $ref: "#/components/schemas/Timestamp"
+        dry_run:
+          type: boolean
+          default: false
+        max_delete:
+          type: integer
+          minimum: 1
+          maximum: 10000
+          default: 1000
+
+    UsageCleanupResult:
+      type: object
+      required:
+        - matched
+        - deleted
+        - dry_run
+        - max_delete
+        - limited
+      properties:
+        matched:
+          type: integer
+          minimum: 0
+        deleted:
+          type: integer
+          minimum: 0
+        dry_run:
+          type: boolean
+        max_delete:
+          type: integer
+          minimum: 1
+          maximum: 10000
+        limited:
+          type: boolean
+
+    UsageCleanupResponse:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: "#/components/schemas/UsageCleanupResult"
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
     OpsSettings:
       type: object
       required:
@@ -16597,6 +16944,40 @@ components:
             type: string
           default: []
           description: Optional SHA-256 API key prefix hash scope. Empty means all API keys.
+        retry_count:
+          type: integer
+          minimum: 1
+          maximum: 20
+          default: 3
+          description: Maximum cross-candidate gateway attempts before failing a request. Bounds how many distinct credentials the failover loop may try.
+        max_retry_credentials:
+          type: integer
+          minimum: 0
+          default: 0
+          description: Maximum distinct credentials the failover loop may exclude and retry across. 0 means unlimited (bounded only by retry_count and available candidates).
+        max_retry_interval_ms:
+          type: integer
+          minimum: 0
+          default: 2000
+          description: Default ceiling for same-candidate retry backoff delay in milliseconds. Per-account metadata overrides still apply.
+        passthrough_upstream_headers:
+          type: boolean
+          default: false
+          description: >-
+            When enabled, allowlisted upstream response headers are forwarded to
+            the client on both the streaming and buffered gateway response paths.
+            Hop-by-hop headers and headers SRapi already sets are never forwarded.
+            Default off so behavior is unchanged unless explicitly enabled.
+        passthrough_header_allowlist:
+          type: array
+          items:
+            type: string
+          default: []
+          description: >-
+            Case-insensitive allowlist of upstream response header names to
+            forward when passthrough_upstream_headers is enabled (e.g.
+            retry-after, x-request-id, x-ratelimit-remaining). A trailing "*"
+            wildcard matches by prefix (e.g. x-ratelimit-*).
 
     AdminSettingsPayment:
       type: object

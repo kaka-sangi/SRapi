@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/srapi/srapi/apps/api/ent"
+	"github.com/srapi/srapi/apps/api/ent/predicate"
 	entusagelog "github.com/srapi/srapi/apps/api/ent/usagelog"
 	"github.com/srapi/srapi/apps/api/internal/modules/usage/contract"
 )
@@ -79,6 +80,60 @@ func (s *Store) ListByUser(ctx context.Context, userID int) ([]contract.UsageLog
 		return nil, err
 	}
 	return toUsageLogs(rows), nil
+}
+
+// CleanupLogs counts the matching records and deletes the oldest up to
+// filter.MaxDelete. The cap is enforced by selecting the oldest matching IDs
+// first (ordered by ID) and deleting only those, so a single call never removes
+// more than the intended batch. DryRun returns the match count without deleting.
+func (s *Store) CleanupLogs(ctx context.Context, filter contract.CleanupFilter) (contract.CleanupResult, error) {
+	predicates := cleanupPredicates(filter)
+	matched, err := s.client.UsageLog.Query().Where(predicates...).Count(ctx)
+	if err != nil {
+		return contract.CleanupResult{}, err
+	}
+	result := contract.CleanupResult{
+		Matched:   matched,
+		DryRun:    filter.DryRun,
+		MaxDelete: filter.MaxDelete,
+	}
+	if filter.DryRun {
+		result.Limited = matched > filter.MaxDelete
+		return result, nil
+	}
+	ids, err := s.client.UsageLog.Query().
+		Where(predicates...).
+		Order(entusagelog.ByID()).
+		Limit(filter.MaxDelete).
+		IDs(ctx)
+	if err != nil {
+		return contract.CleanupResult{}, err
+	}
+	if len(ids) > 0 {
+		deleted, err := s.client.UsageLog.Delete().
+			Where(entusagelog.IDIn(ids...)).
+			Exec(ctx)
+		if err != nil {
+			return contract.CleanupResult{}, err
+		}
+		result.Deleted = deleted
+	}
+	result.Limited = matched > result.Deleted
+	return result, nil
+}
+
+func cleanupPredicates(filter contract.CleanupFilter) []predicate.UsageLog {
+	predicates := make([]predicate.UsageLog, 0, 3)
+	if model := strings.TrimSpace(filter.Model); model != "" {
+		predicates = append(predicates, entusagelog.ModelEqualFold(model))
+	}
+	if filter.Start != nil {
+		predicates = append(predicates, entusagelog.CreatedAtGTE(filter.Start.UTC()))
+	}
+	if filter.End != nil {
+		predicates = append(predicates, entusagelog.CreatedAtLT(filter.End.UTC()))
+	}
+	return predicates
 }
 
 func toUsageLogs(rows []*ent.UsageLog) []contract.UsageLog {

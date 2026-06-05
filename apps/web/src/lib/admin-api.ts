@@ -5,9 +5,11 @@ import { client } from "../../../../packages/sdk/typescript/src/client.gen";
 import {
   acknowledgeAdminOpsAlert,
   cleanupAdminOpsSystemLogs,
+  cleanupAdminUsage,
   addAdminAccountGroupMember,
   batchDisableAdminRedeemCodes,
   batchGenerateAdminRedeemCodes,
+  batchActionAdminAccounts,
   batchUpdateAdminAccounts,
   bindAdminAccountProxy,
   bulkImportAdminPricingRules,
@@ -91,6 +93,7 @@ import {
   getAdminUsageAggregates,
   getAdminUsageDaily,
   importAdminAccounts,
+  importAdminCodexSession,
   installAdminProviderPresets,
   listAdminAccountGroups,
   listAdminAccountGroupMembers,
@@ -216,7 +219,9 @@ import type {
   BatchOperationResult,
   BatchUpdateAccountsResult,
   Id,
+  CodexSessionImportResult,
   ImportAdminAccountsData,
+  ImportAdminCodexSessionData,
   ListAdminAccountsData,
   ListAdminAffiliateInvitesData,
   ListAdminAffiliateRebatesData,
@@ -257,6 +262,8 @@ import type {
   OpsSystemLog,
   OpsSystemLogCleanupRequest,
   OpsSystemLogCleanupResult,
+  UsageCleanupRequest,
+  UsageCleanupResult,
   OpsThroughputTrend,
   Pagination,
   ModelRateLimit,
@@ -553,8 +560,16 @@ export const adminApi = {
     return unwrapData(() => importAdminAccounts({ body, throwOnError: true }));
   },
 
+  importCodexSession(body: ImportAdminCodexSessionData["body"]): Promise<CodexSessionImportResult> {
+    return unwrapData(() => importAdminCodexSession({ body, throwOnError: true }));
+  },
+
   batchUpdateAccounts(body: Parameters<typeof batchUpdateAdminAccounts>[0]["body"]): Promise<BatchUpdateAccountsResult> {
     return unwrapData(() => batchUpdateAdminAccounts({ body, throwOnError: true }));
+  },
+
+  batchActionAccounts(body: Parameters<typeof batchActionAdminAccounts>[0]["body"]): Promise<BatchUpdateAccountsResult> {
+    return unwrapData(() => batchActionAdminAccounts({ body, throwOnError: true }));
   },
 
   createAccount(body: CreateAdminAccountData["body"]): Promise<ProviderAccount> {
@@ -693,6 +708,13 @@ export const adminApi = {
         throwOnError: true,
       }),
     );
+  },
+
+  // Operator on-demand deletion of usage records (the counterpart to the
+  // background retention worker). Requires ≥1 bounded filter (model/start/end);
+  // dry_run previews the match count without deleting. Returns matched/deleted.
+  cleanupUsage(body: UsageCleanupRequest): Promise<UsageCleanupResult> {
+    return unwrapData(() => cleanupAdminUsage({ body, throwOnError: true }));
   },
 
   listAuditLogs(query?: ListAdminAuditLogsData["query"]): Promise<AdminListResult<AuditLog>> {
