@@ -46,6 +46,11 @@ type ConversationRequest struct {
 	Mapping           modelcontract.ModelProviderMapping
 	Credential        map[string]any
 	PayloadTransforms []PayloadTransform
+	// SpoofSessionID, when set, is a stable per-conversation id the adapter writes
+	// into the upstream session field (codex prompt_cache_key, Anthropic
+	// metadata.user_id) so the provider treats a multi-turn conversation as one
+	// session (better prompt-cache, lower abuse signal). Empty = no spoofing.
+	SpoofSessionID string
 }
 
 // PayloadTransform is a single operator-configured mutation applied to the

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	accountcontract "github.com/srapi/srapi/apps/api/internal/modules/accounts/contract"
 	gatewaycontract "github.com/srapi/srapi/apps/api/internal/modules/gateway/contract"
 	schedulercontract "github.com/srapi/srapi/apps/api/internal/modules/scheduler/contract"
 	sessionaffinitycontract "github.com/srapi/srapi/apps/api/internal/modules/sessionaffinity/contract"
@@ -263,11 +264,24 @@ func gatewayConversationSessionID(sessionKey string) string {
 	root := sessionKey
 	if strings.HasPrefix(sessionKey, sessionaffinitycontract.ChainMarker) {
 		segments := strings.Split(strings.TrimPrefix(sessionKey, sessionaffinitycontract.ChainMarker), "-")
-		keep := 2
-		if len(segments) < keep {
-			keep = len(segments)
+		// Root = system segment (if any) + the first user turn. Both are present
+		// from turn 1 and never change, so every turn of a conversation maps to
+		// the same id regardless of how the chain grows (and whether a system
+		// prompt is present, which would otherwise shift segment positions).
+		var rootParts []string
+		if len(segments) > 0 && strings.HasPrefix(segments[0], "s:") {
+			rootParts = append(rootParts, segments[0])
 		}
-		root = sessionaffinitycontract.ChainMarker + strings.Join(segments[:keep], "-")
+		for _, segment := range segments {
+			if strings.HasPrefix(segment, "u:") {
+				rootParts = append(rootParts, segment)
+				break
+			}
+		}
+		if len(rootParts) == 0 && len(segments) > 0 {
+			rootParts = append(rootParts, segments[0])
+		}
+		root = sessionaffinitycontract.ChainMarker + strings.Join(rootParts, "-")
 	}
 	return shortDigest(root)
 }
@@ -301,6 +315,22 @@ func (rt *runtimeState) filterCandidatesBySessionLimit(ctx context.Context, cand
 		}
 	}
 	return filtered
+}
+
+// gatewaySpoofSessionID returns a stable per-conversation session id to write
+// into the upstream request when the account has spoof_session_id enabled, so
+// the provider sees a multi-turn conversation as one session. Derived from the
+// request content (header-independent) so it is stable across turns; "" when
+// disabled or no session is derivable.
+func gatewaySpoofSessionID(account accountcontract.ProviderAccount, canonical gatewaycontract.CanonicalRequest) string {
+	if !metadataBool(account.Metadata, "spoof_session_id") {
+		return ""
+	}
+	key, _ := deriveGatewaySessionAffinity(nil, canonical)
+	if key == "" {
+		return ""
+	}
+	return "sess_" + gatewayConversationSessionID(key)
 }
 
 func candidatesContainAccount(candidates []schedulercontract.Candidate, accountID int) bool {

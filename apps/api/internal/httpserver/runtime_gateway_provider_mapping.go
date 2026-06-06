@@ -32,6 +32,7 @@ func providerConversationRequest(req gatewaycontract.CanonicalRequest, candidate
 		Provider:          candidate.Provider,
 		Account:           candidate.Account,
 		Mapping:           candidate.Mapping,
+		SpoofSessionID:    gatewaySpoofSessionID(candidate.Account, req),
 	}
 }
 

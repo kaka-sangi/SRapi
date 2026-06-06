@@ -214,6 +214,11 @@ func codexCanonicalResponsesPayload(req contract.ConversationRequest) map[string
 	if promptCacheKey := requestSetting(req, "codex_prompt_cache_key", "prompt_cache_key"); promptCacheKey != "" {
 		payload["prompt_cache_key"] = promptCacheKey
 	}
+	// Session-id spoofing: pin the upstream session to a stable per-conversation
+	// id so consecutive turns are treated as one session (overrides any caller key).
+	if spoof := strings.TrimSpace(req.SpoofSessionID); spoof != "" {
+		payload["prompt_cache_key"] = spoof
+	}
 	return payload
 }
 
