@@ -66,6 +66,11 @@ func (s *Service) InvokeConversation(ctx context.Context, req contract.Conversat
 	if strings.TrimSpace(req.RequestID) == "" || strings.TrimSpace(req.Model) == "" || strings.TrimSpace(req.Mapping.UpstreamModelName) == "" {
 		return contract.ConversationResponse{}, ErrInvalidInput
 	}
+	// Short-circuit opted-in accounts' warmup/title requests with a canned,
+	// zero-cost response instead of spending upstream tokens.
+	if accountInterceptWarmupEnabled(req.Account.Metadata) && isWarmupRequest(req) {
+		return warmupMockResponse(req), nil
+	}
 	if baseURL := upstreamBaseURL(req); baseURL != "" {
 		if isBedrockCompatible(req) {
 			return s.invokeBedrockAnthropic(ctx, req)
