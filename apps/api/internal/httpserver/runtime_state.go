@@ -892,7 +892,7 @@ func assembleRuntimeState(cfg config.Config, logger *slog.Logger, opts runtimeOp
 		realtimeStore:        opts.realtime,
 		rateLimiter:          opts.rateLimiter,
 		schedulerStore:       assembly.schedulerStore,
-		sessionAffinity:      sessionAffinityStoreOrMemory(opts.sessionAffinity),
+		sessionAffinity:      opts.sessionAffinity,
 		subscriptionStore:    assembly.subscriptionStore,
 		totpStore:            assembly.totpStore,
 		usageStore:           assembly.usageStore,
@@ -916,13 +916,12 @@ func newOperationsRuntime(store operationscontract.Store, usageStore usagecontra
 	return store, service, nil
 }
 
-// sessionAffinityStoreOrMemory falls back to a per-instance in-memory session
-// affinity store when no shared (Redis) store was injected, so stickiness always
-// works (best-effort) even without Redis configured.
-func sessionAffinityStoreOrMemory(store sessionaffinitycontract.Store) sessionaffinitycontract.Store {
-	if store != nil {
-		return store
-	}
+// NewMemorySessionAffinityStore builds a per-instance in-memory session affinity
+// store. The app bootstrap uses it as a best-effort fallback when Redis is not
+// configured (it cannot import the module package directly under the architecture
+// rules). Tests that build the handler without injecting a store leave session
+// affinity disabled, so this never changes default test behavior.
+func NewMemorySessionAffinityStore() sessionaffinitycontract.Store {
 	return sessionaffinitymemory.New()
 }
 

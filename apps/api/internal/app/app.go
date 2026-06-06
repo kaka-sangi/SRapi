@@ -190,6 +190,9 @@ func newHandler(cfg config.Config, logger *slog.Logger, dbClient *platformdb.Cli
 	}
 	if sessionAffinity != nil {
 		options = append(options, httpserver.WithSessionAffinityStore(sessionAffinity))
+	} else {
+		// No Redis: fall back to per-instance in-memory stickiness (best-effort).
+		options = append(options, httpserver.WithSessionAffinityStore(httpserver.NewMemorySessionAffinityStore()))
 	}
 	rateLimiterOption, err := gatewayRateLimiterOption(context.Background(), cfg, logger, redisClient)
 	if err != nil {
