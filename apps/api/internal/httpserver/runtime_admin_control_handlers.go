@@ -529,6 +529,37 @@ func (s *Server) handleCreateAdminUserSubscription(w http.ResponseWriter, r *htt
 	})
 }
 
+func (s *Server) handleDeleteAdminUserSubscription(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	subscriptionID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || subscriptionID <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid user subscription id", requestID)
+		return
+	}
+	if err := s.runtime.subscriptions.DeleteUserSubscription(r.Context(), subscriptionID); err != nil {
+		if errors.Is(err, subscriptioncontract.ErrNotFound) {
+			writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "user subscription not found", requestID)
+			return
+		}
+		writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to delete user subscription", requestID)
+		return
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "user_subscription.delete", "user_subscription", strconv.Itoa(subscriptionID), nil, nil))
+	writeJSONAny(w, http.StatusOK, map[string]any{
+		"data":       map[string]any{"id": subscriptionID, "deleted": true},
+		"request_id": requestID,
+	})
+}
+
 func (s *Server) handleListAdminPricingRules(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	if _, err := s.requireAdminSession(r); err != nil {
@@ -984,6 +1015,33 @@ func (s *Server) handleUpdateAdminOpsSLO(w http.ResponseWriter, r *http.Request)
 	writeJSONAny(w, http.StatusOK, apiopenapi.OpsSLODefinitionResponse{
 		Data:      toAPIOpsSLODefinition(updated),
 		RequestId: requestID,
+	})
+}
+
+func (s *Server) handleDeleteAdminOpsSLO(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	sloID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || sloID <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid slo id", requestID)
+		return
+	}
+	if err := s.runtime.operations.DeleteSLO(r.Context(), sloID); err != nil {
+		writeOperationsServiceError(w, err, requestID)
+		return
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "ops_slo.delete", "ops_slo", strconv.Itoa(sloID), nil, nil))
+	writeJSONAny(w, http.StatusOK, map[string]any{
+		"data":       map[string]any{"id": sloID, "deleted": true},
+		"request_id": requestID,
 	})
 }
 

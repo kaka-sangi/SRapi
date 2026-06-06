@@ -76,6 +76,16 @@ func (s *Store) UpdateSLO(_ context.Context, input contract.SLODefinition) (cont
 	return cloneSLO(item), nil
 }
 
+func (s *Store) DeleteSLO(_ context.Context, id int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.slos[id]; !ok {
+		return contract.ErrNotFound
+	}
+	delete(s.slos, id)
+	return nil
+}
+
 func (s *Store) FindSLOByID(_ context.Context, id int) (contract.SLODefinition, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

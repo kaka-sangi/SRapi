@@ -132,6 +132,13 @@ func (s *Store) FindSLOByID(ctx context.Context, id int) (contract.SLODefinition
 	return toSLO(row), nil
 }
 
+func (s *Store) DeleteSLO(ctx context.Context, id int) error {
+	if err := s.client.ObsSLODefinition.DeleteOneID(id).Exec(ctx); err != nil {
+		return mapNotFound(err)
+	}
+	return nil
+}
+
 func (s *Store) ListSLOs(ctx context.Context) ([]contract.SLODefinition, error) {
 	rows, err := s.client.ObsSLODefinition.Query().
 		Order(entobsslodefinition.ByID()).

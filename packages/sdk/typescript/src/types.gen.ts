@@ -11000,6 +11000,45 @@ export type CreateAdminUserSubscriptionResponses = {
 
 export type CreateAdminUserSubscriptionResponse = CreateAdminUserSubscriptionResponses[keyof CreateAdminUserSubscriptionResponses];
 
+export type DeleteAdminUserSubscriptionData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/user-subscriptions/{id}';
+};
+
+export type DeleteAdminUserSubscriptionErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DeleteAdminUserSubscriptionError = DeleteAdminUserSubscriptionErrors[keyof DeleteAdminUserSubscriptionErrors];
+
+export type DeleteAdminUserSubscriptionResponses = {
+    /**
+     * User subscription deleted.
+     */
+    200: DeleteResponse;
+};
+
+export type DeleteAdminUserSubscriptionResponse = DeleteAdminUserSubscriptionResponses[keyof DeleteAdminUserSubscriptionResponses];
+
 export type ListAdminPricingRulesData = {
     body?: never;
     path?: never;
@@ -11704,6 +11743,45 @@ export type CreateAdminOpsSloResponses = {
 };
 
 export type CreateAdminOpsSloResponse = CreateAdminOpsSloResponses[keyof CreateAdminOpsSloResponses];
+
+export type DeleteAdminOpsSloData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/ops/slo/{id}';
+};
+
+export type DeleteAdminOpsSloErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DeleteAdminOpsSloError = DeleteAdminOpsSloErrors[keyof DeleteAdminOpsSloErrors];
+
+export type DeleteAdminOpsSloResponses = {
+    /**
+     * SLO deleted.
+     */
+    200: DeleteResponse;
+};
+
+export type DeleteAdminOpsSloResponse = DeleteAdminOpsSloResponses[keyof DeleteAdminOpsSloResponses];
 
 export type UpdateAdminOpsSloData = {
     body: UpdateOpsSloRequest;

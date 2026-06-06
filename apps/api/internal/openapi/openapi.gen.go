@@ -16457,6 +16457,9 @@ type ServerInterface interface {
 	// Create an operational SLO definition.
 	// (POST /api/v1/admin/ops/slo)
 	CreateAdminOpsSLO(w http.ResponseWriter, r *http.Request)
+	// Delete an operational SLO definition.
+	// (DELETE /api/v1/admin/ops/slo/{id})
+	DeleteAdminOpsSLO(w http.ResponseWriter, r *http.Request, id Id)
 	// Update an operational SLO definition.
 	// (PATCH /api/v1/admin/ops/slo/{id})
 	UpdateAdminOpsSLO(w http.ResponseWriter, r *http.Request, id Id)
@@ -16688,6 +16691,9 @@ type ServerInterface interface {
 	// Create a user subscription from an existing plan.
 	// (POST /api/v1/admin/user-subscriptions)
 	CreateAdminUserSubscription(w http.ResponseWriter, r *http.Request)
+	// Delete a user subscription.
+	// (DELETE /api/v1/admin/user-subscriptions/{id})
+	DeleteAdminUserSubscription(w http.ResponseWriter, r *http.Request, id Id)
 	// List and search users.
 	// (GET /api/v1/admin/users)
 	ListAdminUsers(w http.ResponseWriter, r *http.Request, params ListAdminUsersParams)
@@ -21601,6 +21607,40 @@ func (siw *ServerInterfaceWrapper) CreateAdminOpsSLO(w http.ResponseWriter, r *h
 	handler.ServeHTTP(w, r)
 }
 
+// DeleteAdminOpsSLO operation middleware
+func (siw *ServerInterfaceWrapper) DeleteAdminOpsSLO(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteAdminOpsSLO(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // UpdateAdminOpsSLO operation middleware
 func (siw *ServerInterfaceWrapper) UpdateAdminOpsSLO(w http.ResponseWriter, r *http.Request) {
 
@@ -24409,6 +24449,40 @@ func (siw *ServerInterfaceWrapper) CreateAdminUserSubscription(w http.ResponseWr
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateAdminUserSubscription(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteAdminUserSubscription operation middleware
+func (siw *ServerInterfaceWrapper) DeleteAdminUserSubscription(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteAdminUserSubscription(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -28483,6 +28557,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/admin/ops/settings", wrapper.UpdateAdminOpsSettings)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/slo", wrapper.ListAdminOpsSLOs)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/ops/slo", wrapper.CreateAdminOpsSLO)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/ops/slo/{id}", wrapper.DeleteAdminOpsSLO)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/ops/slo/{id}", wrapper.UpdateAdminOpsSLO)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/ops/system-logs", wrapper.ListAdminOpsSystemLogs)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/ops/system-logs/cleanup", wrapper.CleanupAdminOpsSystemLogs)
@@ -28560,6 +28635,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/user-attributes/{id}", wrapper.UpdateAdminUserAttributeDefinition)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/user-subscriptions", wrapper.ListAdminUserSubscriptions)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/user-subscriptions", wrapper.CreateAdminUserSubscription)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/user-subscriptions/{id}", wrapper.DeleteAdminUserSubscription)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/users", wrapper.ListAdminUsers)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/users", wrapper.CreateAdminUser)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/users/batch", wrapper.BatchUpdateAdminUsers)

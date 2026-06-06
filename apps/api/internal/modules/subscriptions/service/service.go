@@ -213,6 +213,13 @@ func (s *Service) ListUserSubscriptions(ctx context.Context) ([]contract.UserSub
 	return s.store.ListUserSubscriptions(ctx)
 }
 
+func (s *Service) DeleteUserSubscription(ctx context.Context, id int) error {
+	if id <= 0 {
+		return ErrInvalidInput
+	}
+	return s.store.DeleteUserSubscription(ctx, id)
+}
+
 func (s *Service) ListUserSubscriptionsByUser(ctx context.Context, userID int) ([]contract.UserSubscription, error) {
 	if userID <= 0 {
 		return nil, ErrInvalidInput

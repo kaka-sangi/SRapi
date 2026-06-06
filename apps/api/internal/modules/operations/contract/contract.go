@@ -286,6 +286,7 @@ type ObservabilityStore interface {
 	UpdateSLO(ctx context.Context, input SLODefinition) (SLODefinition, error)
 	FindSLOByID(ctx context.Context, id int) (SLODefinition, error)
 	ListSLOs(ctx context.Context) ([]SLODefinition, error)
+	DeleteSLO(ctx context.Context, id int) error
 	CreateAlert(ctx context.Context, input AlertEvent) (AlertEvent, error)
 	UpdateAlert(ctx context.Context, input AlertEvent) (AlertEvent, error)
 	FindAlertByID(ctx context.Context, id int) (AlertEvent, error)

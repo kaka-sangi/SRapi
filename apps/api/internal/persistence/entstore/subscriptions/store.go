@@ -328,6 +328,16 @@ func (s *Store) ExpireUserSubscription(ctx context.Context, id int, now time.Tim
 	return toSubscription(subscriptions), false, nil
 }
 
+func (s *Store) DeleteUserSubscription(ctx context.Context, id int) error {
+	if err := s.client.UserSubscription.DeleteOneID(id).Exec(ctx); err != nil {
+		if ent.IsNotFound(err) {
+			return contract.ErrNotFound
+		}
+		return err
+	}
+	return nil
+}
+
 func (s *Store) CreatePricingRule(ctx context.Context, input contract.PricingRule) (contract.PricingRule, error) {
 	create := s.client.PricingRule.Create().
 		SetModelID(input.ModelID).

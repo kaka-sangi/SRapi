@@ -74,6 +74,7 @@ import {
   upsertAdminUserPlatformQuota,
   deleteAdminUserPlatformQuota,
   createAdminOpsSlo,
+  deleteAdminOpsSlo,
   listAdminOpsAlertRules,
   createAdminOpsAlertRule,
   updateAdminOpsAlertRule,
@@ -92,6 +93,7 @@ import {
   updateAdminSubscriptionPlan,
   createAdminUser,
   createAdminUserSubscription,
+  deleteAdminUserSubscription,
   deleteAdminAnnouncement,
   getAdminAnnouncementReadStatus,
   deleteAdminPromoCode,
@@ -918,6 +920,10 @@ export const adminApi = {
     return unwrapData(() => createAdminUserSubscription({ body, throwOnError: true }));
   },
 
+  deleteUserSubscription(id: Id): Promise<{ deleted: boolean }> {
+    return unwrapData(() => deleteAdminUserSubscription({ path: { id }, throwOnError: true }));
+  },
+
   listPricingRules(query?: ListAdminPricingRulesData["query"]): Promise<AdminListResult<PricingRule>> {
     return unwrapList(() => listAdminPricingRules({ query, throwOnError: true }));
   },
@@ -942,6 +948,10 @@ export const adminApi = {
 
   updateOpsSlo(id: Id, body: UpdateAdminOpsSloData["body"]): Promise<OpsSloDefinition> {
     return unwrapData(() => updateAdminOpsSlo({ path: { id }, body, throwOnError: true }));
+  },
+
+  deleteOpsSlo(id: Id): Promise<{ deleted: boolean }> {
+    return unwrapData(() => deleteAdminOpsSlo({ path: { id }, throwOnError: true }));
   },
 
   listOpsAlertRules(): Promise<AdminListResult<OpsAlertRule>> {

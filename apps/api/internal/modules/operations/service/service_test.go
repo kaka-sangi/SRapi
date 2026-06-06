@@ -317,6 +317,14 @@ func (s *captureObservabilityStore) UpdateSLO(_ context.Context, input contract.
 	return input, nil
 }
 
+func (s *captureObservabilityStore) DeleteSLO(_ context.Context, id int) error {
+	if _, ok := s.slos[id]; !ok {
+		return ErrNotFound
+	}
+	delete(s.slos, id)
+	return nil
+}
+
 func (s *captureObservabilityStore) FindSLOByID(_ context.Context, id int) (contract.SLODefinition, error) {
 	value, ok := s.slos[id]
 	if !ok {

@@ -1122,6 +1122,12 @@ export function useCreateUserSubscription() {
     ["admin", "user-subscriptions"],
   );
 }
+export function useDeleteUserSubscription() {
+  return useAdminMutation(
+    (id: string) => adminApi.deleteUserSubscription(id),
+    ["admin", "user-subscriptions"],
+  );
+}
 
 // Pricing rules
 export function useCreatePricingRule() {
@@ -1201,6 +1207,9 @@ export function useUpdateOpsSlo() {
       adminApi.updateOpsSlo(vars.id, vars.body),
     ["admin", "ops", "slos"],
   );
+}
+export function useDeleteOpsSlo() {
+  return useAdminMutation((id: string) => adminApi.deleteOpsSlo(id), ["admin", "ops", "slos"]);
 }
 
 // Ops alert rules + silences (configurable generic metric alerting)

@@ -108,6 +108,13 @@ func (s *Service) UpdateSLO(ctx context.Context, id int, req contract.UpdateSLOR
 	return s.observabilityStore.UpdateSLO(ctx, current)
 }
 
+func (s *Service) DeleteSLO(ctx context.Context, id int) error {
+	if s == nil || s.observabilityStore == nil || id <= 0 {
+		return ErrInvalidInput
+	}
+	return s.observabilityStore.DeleteSLO(ctx, id)
+}
+
 func (s *Service) ListSLOs(ctx context.Context) ([]contract.SLOWithEvaluation, error) {
 	if s == nil || s.observabilityStore == nil {
 		return nil, ErrInvalidInput

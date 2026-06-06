@@ -293,6 +293,16 @@ func (s *Store) ExpireUserSubscription(_ context.Context, id int, now time.Time)
 	return cloneSubscription(subscription), true, nil
 }
 
+func (s *Store) DeleteUserSubscription(_ context.Context, id int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.subscriptions[id]; !ok {
+		return contract.ErrNotFound
+	}
+	delete(s.subscriptions, id)
+	return nil
+}
+
 func (s *Store) CreatePricingRule(_ context.Context, input contract.PricingRule) (contract.PricingRule, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

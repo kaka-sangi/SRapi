@@ -6,6 +6,8 @@ import { CreditCard, Layers } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, type Column } from "@/components/admin/admin-list-view";
+import { RowActionsMenu, type RowAction } from "@/components/admin/row-actions";
+import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import {
   ResourceFormDialog,
   enumOptions,
@@ -16,6 +18,7 @@ import {
   useAdminSubscriptions,
   useAdminUsers,
   useCreateUserSubscription,
+  useDeleteUserSubscription,
 } from "@/hooks/admin-queries";
 import { useLanguage } from "@/context/LanguageContext";
 import { ADMIN_ROUTES } from "@/lib/routes";
@@ -45,7 +48,9 @@ function SubscriptionsContent() {
   const subs = useAdminSubscriptions();
   const users = useAdminUsers();
   const createSub = useCreateUserSubscription();
+  const deleteSub = useDeleteUserSubscription();
   const [creatingSub, setCreatingSub] = useState(false);
+  const [subToDelete, setSubToDelete] = useState<UserSubscription | null>(null);
 
   const subFields: FieldConfig<UserSubscriptionFormState>[] = [
     {
@@ -126,6 +131,27 @@ function SubscriptionsContent() {
         emptyTitle={t("adminSubscriptions.emptySubs")}
         emptyBody={t("adminSubscriptions.emptySubsBody")}
         minWidth={560}
+        rowActions={(s) => {
+          const actions: RowAction[] = [
+            { label: t("common.delete"), destructive: true, onSelect: () => setSubToDelete(s) },
+          ];
+          return <RowActionsMenu actions={actions} />;
+        }}
+      />
+
+      <ConfirmDialog
+        open={subToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setSubToDelete(null);
+        }}
+        title={t("adminSubscriptions.deleteSubTitle")}
+        body={t("adminSubscriptions.deleteSubBody")}
+        confirmLabel={t("common.delete")}
+        successMessage={t("feedback.deleted")}
+        isPending={deleteSub.isPending}
+        onConfirm={async () => {
+          if (subToDelete) await deleteSub.mutateAsync(subToDelete.id);
+        }}
       />
 
       {creatingSub ? (

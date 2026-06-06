@@ -20,6 +20,7 @@ import {
   useUpdateOpsSettings,
   useOpsAlertRules,
   useDeleteOpsAlertRule,
+  useDeleteOpsSlo,
   useOpsAlertSilences,
   useDeleteOpsAlertSilence,
 } from "@/hooks/admin-queries";
@@ -88,6 +89,8 @@ function OpsContent() {
   const alertSilences = useOpsAlertSilences();
   const deleteRuleMut = useDeleteOpsAlertRule();
   const deleteSilenceMut = useDeleteOpsAlertSilence();
+  const deleteSloMut = useDeleteOpsSlo();
+  const [sloToDelete, setSloToDelete] = useState<OpsSloDefinition | null>(null);
   const [sloTarget, setSloTarget] = useState<OpsSloDefinition | "new" | null>(null);
   const [ruleTarget, setRuleTarget] = useState<OpsAlertRule | "new" | null>(null);
   const [showSilenceForm, setShowSilenceForm] = useState(false);
@@ -195,14 +198,24 @@ function OpsContent() {
                           label={healthLabel}
                         />
                         {def ? (
-                          <button
-                            type="button"
-                            onClick={() => setSloTarget(def)}
-                            aria-label={t("adminOps.editSlo")}
-                            className="text-srapi-text-tertiary transition-colors hover:text-srapi-text-primary"
-                          >
-                            <Pencil className="size-3.5" />
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => setSloTarget(def)}
+                              aria-label={t("adminOps.editSlo")}
+                              className="text-srapi-text-tertiary transition-colors hover:text-srapi-text-primary"
+                            >
+                              <Pencil className="size-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setSloToDelete(def)}
+                              aria-label={t("adminOps.deleteSlo")}
+                              className="text-srapi-text-tertiary transition-colors hover:text-srapi-error"
+                            >
+                              <Trash2 className="size-3.5" />
+                            </button>
+                          </>
                         ) : null}
                       </div>
                     </CardHeader>
@@ -423,6 +436,21 @@ function OpsContent() {
           successMessage={t("feedback.deleted")}
           isPending={deleteRuleMut.isPending}
           onConfirm={() => deleteRuleMut.mutateAsync(ruleToDelete.id)}
+        />
+      ) : null}
+
+      {sloToDelete ? (
+        <ConfirmDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setSloToDelete(null);
+          }}
+          title={t("adminOps.deleteSloTitle")}
+          body={sloToDelete.name}
+          confirmLabel={t("common.delete")}
+          successMessage={t("feedback.deleted")}
+          isPending={deleteSloMut.isPending}
+          onConfirm={() => deleteSloMut.mutateAsync(sloToDelete.id)}
         />
       ) : null}
 

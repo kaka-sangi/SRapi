@@ -5542,6 +5542,43 @@ paths:
         default:
           $ref: "#/components/responses/StandardError"
 
+  /api/v1/admin/user-subscriptions/{id}:
+    delete:
+      tags:
+        - AdminSubscriptions
+      operationId: deleteAdminUserSubscription
+      summary: Delete a user subscription.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: User subscription deleted.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+
   /api/v1/admin/pricing-rules:
     get:
       tags:
@@ -6242,6 +6279,41 @@ paths:
                 $ref: "#/components/schemas/OpsSLODefinitionResponse"
         "400":
           $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
+    delete:
+      tags:
+        - AdminOps
+      operationId: deleteAdminOpsSLO
+      summary: Delete an operational SLO definition.
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: SLO deleted.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":

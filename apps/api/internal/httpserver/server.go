@@ -469,6 +469,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) http.Handler
 	mux.HandleFunc("PATCH /api/v1/admin/subscription-plans/{id}", server.handleUpdateAdminSubscriptionPlan)
 	mux.HandleFunc("GET /api/v1/admin/user-subscriptions", server.handleListAdminUserSubscriptions)
 	mux.HandleFunc("POST /api/v1/admin/user-subscriptions", server.handleCreateAdminUserSubscription)
+	mux.HandleFunc("DELETE /api/v1/admin/user-subscriptions/{id}", server.handleDeleteAdminUserSubscription)
 	mux.HandleFunc("GET /api/v1/admin/pricing-rules", server.handleListAdminPricingRules)
 	mux.HandleFunc("POST /api/v1/admin/pricing-rules", server.handleCreateAdminPricingRule)
 	mux.HandleFunc("POST /api/v1/admin/pricing-rules:bulk", server.handleBulkImportAdminPricingRules)
@@ -528,6 +529,7 @@ func (s *Server) registerAdminOpsRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/admin/ops/slo", s.handleListAdminOpsSLOs)
 	mux.HandleFunc("POST /api/v1/admin/ops/slo", s.handleCreateAdminOpsSLO)
 	mux.HandleFunc("PATCH /api/v1/admin/ops/slo/{id}", s.handleUpdateAdminOpsSLO)
+	mux.HandleFunc("DELETE /api/v1/admin/ops/slo/{id}", s.handleDeleteAdminOpsSLO)
 	mux.HandleFunc("GET /api/v1/admin/ops/alerts", s.handleListAdminOpsAlerts)
 	mux.HandleFunc("POST /api/v1/admin/ops/alerts/{id}/ack", s.handleAcknowledgeAdminOpsAlert)
 }
