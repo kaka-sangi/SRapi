@@ -1173,7 +1173,16 @@ func rejectReason(candidate contract.Candidate, req contract.ScheduleRequest) st
 	if limitReached(candidate.Limits.TPMLimit, candidate.RuntimeState.TPMUsed) {
 		return "tpm_limit_exceeded"
 	}
+	if costWindowExceeded(candidate.Limits.CostWindowLimit, candidate.RuntimeState.CostWindowUsed) {
+		return "cost_window_exceeded"
+	}
 	return ""
+}
+
+// costWindowExceeded reports whether an account has reached its rolling
+// cost-window cap. A nil/non-positive limit means no cap.
+func costWindowExceeded(limit *float64, used float64) bool {
+	return limit != nil && *limit > 0 && used >= *limit
 }
 
 func requestCapabilityMismatch(requested []capabilitiescontract.Descriptor, effective []capabilitiescontract.Descriptor) bool {

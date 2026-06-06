@@ -122,14 +122,24 @@ func schedulerRuntimeState(metadata map[string]any) schedulercontract.RuntimeSta
 		CurrentConcurrency:  metadataInt(metadata, "current_concurrency"),
 		RPMUsed:             metadataInt(metadata, "rpm_used"),
 		TPMUsed:             metadataInt(metadata, "tpm_used"),
+		CostWindowUsed:      metadataFloatValue(metadata, "cost_window_used"),
 	}
+}
+
+// metadataFloatValue reads a float metadata value, returning 0 when absent.
+func metadataFloatValue(metadata map[string]any, keys ...string) float64 {
+	if value := metadataOptionalFloat(metadata, keys...); value != nil {
+		return *value
+	}
+	return 0
 }
 
 func schedulerRuntimeLimits(metadata map[string]any) schedulercontract.RuntimeLimits {
 	return schedulercontract.RuntimeLimits{
-		MaxConcurrency: metadataOptionalInt(metadata, "max_concurrency"),
-		RPMLimit:       metadataOptionalInt(metadata, "rpm_limit"),
-		TPMLimit:       metadataOptionalInt(metadata, "tpm_limit"),
+		MaxConcurrency:  metadataOptionalInt(metadata, "max_concurrency"),
+		RPMLimit:        metadataOptionalInt(metadata, "rpm_limit"),
+		TPMLimit:        metadataOptionalInt(metadata, "tpm_limit"),
+		CostWindowLimit: metadataOptionalFloat(metadata, "cost_window_limit"),
 	}
 }
 

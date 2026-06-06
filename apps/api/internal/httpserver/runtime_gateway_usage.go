@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"context"
+	"math/big"
 	"strconv"
 	"strings"
 	"time"
@@ -600,6 +601,24 @@ func (rt *runtimeState) updateAccountRuntimeQuotaMetadata(ctx context.Context, a
 		tpmUsed += log.TotalTokens
 	}
 
+	// Rolling cost window (default 5h) so an operator can cap an account's spend
+	// over a window — the scheduler skips an account once it exceeds cost_window_limit.
+	costWindow := accountCostWindow(account.Metadata)
+	costWindowStart := now.Add(-costWindow)
+	costUsed := new(big.Rat)
+	for _, log := range logs {
+		if log.CreatedAt.Before(costWindowStart) {
+			continue
+		}
+		amount := strings.TrimSpace(log.BillableCost)
+		if amount == "" {
+			amount = strings.TrimSpace(log.Cost)
+		}
+		if parsed, ok := new(big.Rat).SetString(amount); ok {
+			costUsed.Add(costUsed, parsed)
+		}
+	}
+
 	metadata := cloneMetadata(account.Metadata)
 	windowSeconds := int(window / time.Second)
 	resetAt := now.Add(window).Format(time.RFC3339)
@@ -609,6 +628,9 @@ func (rt *runtimeState) updateAccountRuntimeQuotaMetadata(ctx context.Context, a
 	metadata["tpm_window_seconds"] = windowSeconds
 	metadata["rpm_reset_at"] = resetAt
 	metadata["tpm_reset_at"] = resetAt
+	metadata["cost_window_used"] = costUsed.FloatString(8)
+	metadata["cost_window_seconds"] = int(costWindow / time.Second)
+	metadata["cost_window_reset_at"] = now.Add(costWindow).Format(time.RFC3339)
 	metadata["runtime_quota_updated_at"] = now.Format(time.RFC3339)
 	_, err := rt.accounts.Update(ctx, account.ID, accountcontract.UpdateRequest{Metadata: &metadata})
 	return err
@@ -618,6 +640,16 @@ func accountRuntimeQuotaWindow(metadata map[string]any) time.Duration {
 	seconds := metadataInt(metadata, "runtime_quota_window_seconds", "quota_window_seconds", "rpm_window_seconds", "tpm_window_seconds", "window_seconds")
 	if seconds <= 0 {
 		seconds = 60
+	}
+	return time.Duration(seconds) * time.Second
+}
+
+// accountCostWindow is the rolling window over which an account's spend is
+// summed for cost_window_limit enforcement (default 5h, sub2api parity).
+func accountCostWindow(metadata map[string]any) time.Duration {
+	seconds := metadataInt(metadata, "cost_window_seconds")
+	if seconds <= 0 {
+		seconds = 5 * 60 * 60
 	}
 	return time.Duration(seconds) * time.Second
 }

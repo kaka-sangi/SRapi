@@ -126,6 +126,9 @@ type RuntimeState struct {
 	CurrentConcurrency  int
 	RPMUsed             int
 	TPMUsed             int
+	// CostWindowUsed is the account's spend over its rolling cost window
+	// (cost_window_seconds), compared against RuntimeLimits.CostWindowLimit.
+	CostWindowUsed float64
 	// LastUsedUnixMs is when this account was last selected (epoch ms; 0 = never
 	// within the tracking window). It is a least-recently-used tie-breaker so
 	// equally-scored accounts share load instead of always picking the same one.
@@ -137,6 +140,9 @@ type RuntimeLimits struct {
 	MaxConcurrency *int
 	RPMLimit       *int
 	TPMLimit       *int
+	// CostWindowLimit caps an account's spend over its rolling cost window; once
+	// CostWindowUsed reaches it the account is skipped until the window rolls off.
+	CostWindowLimit *float64
 }
 
 type Decision struct {
