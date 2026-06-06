@@ -243,6 +243,64 @@ func (rt *runtimeState) bindGatewaySessionAffinity(ctx context.Context, apiKeyID
 			rt.logger.Warn("session affinity bind failed", "error", err)
 		}
 	}
+	// Track this conversation as active on the account for per-account session
+	// count limits (max_sessions). Re-binding the same conversation refreshes the
+	// same id, so one conversation never counts twice.
+	if sessionID := gatewayConversationSessionID(sessionKey); sessionID != "" {
+		_ = rt.sessionAffinity.AddAccountSession(ctx, accountID, sessionID, gatewaySessionAffinityTTL)
+	}
+}
+
+// gatewayConversationSessionID maps a session key to a stable per-conversation
+// id used for session-count limits. For a digest chain (which grows each turn)
+// it keys off the stable conversation root (system + first turn) so every turn
+// of one conversation yields the same id; explicit session keys map directly.
+func gatewayConversationSessionID(sessionKey string) string {
+	sessionKey = strings.TrimSpace(sessionKey)
+	if sessionKey == "" {
+		return ""
+	}
+	root := sessionKey
+	if strings.HasPrefix(sessionKey, sessionaffinitycontract.ChainMarker) {
+		segments := strings.Split(strings.TrimPrefix(sessionKey, sessionaffinitycontract.ChainMarker), "-")
+		keep := 2
+		if len(segments) < keep {
+			keep = len(segments)
+		}
+		root = sessionaffinitycontract.ChainMarker + strings.Join(segments[:keep], "-")
+	}
+	return shortDigest(root)
+}
+
+// filterCandidatesBySessionLimit drops accounts that already serve their
+// configured max_sessions distinct conversations (excluding this one, so an
+// existing conversation is never evicted from its own account).
+func (rt *runtimeState) filterCandidatesBySessionLimit(ctx context.Context, candidates []schedulercontract.Candidate, sessionKey string) []schedulercontract.Candidate {
+	if rt == nil || rt.sessionAffinity == nil {
+		return candidates
+	}
+	sessionKey = strings.TrimSpace(sessionKey)
+	if sessionKey == "" {
+		return candidates
+	}
+	sessionID := gatewayConversationSessionID(sessionKey)
+	filtered := make([]schedulercontract.Candidate, 0, len(candidates))
+	for _, candidate := range candidates {
+		limit := metadataInt(candidate.Account.Metadata, "max_sessions")
+		if limit <= 0 {
+			filtered = append(filtered, candidate)
+			continue
+		}
+		count, err := rt.sessionAffinity.CountAccountSessionsExcluding(ctx, candidate.Account.ID, sessionID)
+		if err != nil {
+			filtered = append(filtered, candidate) // best-effort: never hard-fail on a count error
+			continue
+		}
+		if count < limit {
+			filtered = append(filtered, candidate)
+		}
+	}
+	return filtered
 }
 
 func candidatesContainAccount(candidates []schedulercontract.Candidate, accountID int) bool {

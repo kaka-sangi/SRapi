@@ -22,16 +22,72 @@ type entry struct {
 
 // Store is an in-memory session→account affinity store.
 type Store struct {
-	mu       sync.Mutex
-	bindings map[string]entry
-	now      func() time.Time
+	mu              sync.Mutex
+	bindings        map[string]entry
+	accountSessions map[int]map[string]time.Time // accountID -> sessionID -> expiry
+	now             func() time.Time
 }
 
 var _ contract.Store = (*Store)(nil)
 
 // New returns an empty in-memory session affinity store.
 func New() *Store {
-	return &Store{bindings: make(map[string]entry), now: func() time.Time { return time.Now().UTC() }}
+	return &Store{
+		bindings:        make(map[string]entry),
+		accountSessions: make(map[int]map[string]time.Time),
+		now:             func() time.Time { return time.Now().UTC() },
+	}
+}
+
+// AddAccountSession records a conversation as active on an account.
+func (s *Store) AddAccountSession(_ context.Context, accountID int, sessionID string, ttl time.Duration) error {
+	sessionID = strings.TrimSpace(sessionID)
+	if accountID <= 0 || sessionID == "" {
+		return contract.ErrInvalidInput
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := s.now()
+	expiresAt := now.Add(ttl)
+	if ttl <= 0 {
+		expiresAt = now.Add(time.Hour)
+	}
+	sessions := s.accountSessions[accountID]
+	if sessions == nil {
+		sessions = map[string]time.Time{}
+		s.accountSessions[accountID] = sessions
+	}
+	for id, exp := range sessions {
+		if now.After(exp) {
+			delete(sessions, id)
+		}
+	}
+	sessions[sessionID] = expiresAt
+	return nil
+}
+
+// CountAccountSessionsExcluding counts distinct active sessions on an account
+// other than sessionID.
+func (s *Store) CountAccountSessionsExcluding(_ context.Context, accountID int, sessionID string) (int, error) {
+	sessionID = strings.TrimSpace(sessionID)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := s.now()
+	sessions := s.accountSessions[accountID]
+	count := 0
+	for id, exp := range sessions {
+		if now.After(exp) {
+			delete(sessions, id)
+			continue
+		}
+		if id != sessionID {
+			count++
+		}
+	}
+	if len(sessions) == 0 {
+		delete(s.accountSessions, accountID)
+	}
+	return count, nil
 }
 
 func storageKey(scope, key string) string {

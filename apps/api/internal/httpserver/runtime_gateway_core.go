@@ -105,6 +105,9 @@ func (rt *runtimeState) scheduleGatewayRequest(ctx context.Context, req schedule
 	// match (e.g. an OAuth account marked codex-only), so a generic client can't
 	// drive an account that would get banned for it.
 	candidates = filterCandidatesByAllowedClients(candidates, gatewayInboundClientFromContext(ctx))
+	// Drop accounts already at their per-account active-session cap (max_sessions),
+	// excluding this conversation so it is never evicted from its own account.
+	candidates = rt.filterCandidatesBySessionLimit(ctx, candidates, req.SessionAffinityKey)
 	if req.StickyAccountID == nil && strings.TrimSpace(req.SessionAffinityKey) != "" {
 		// Prefer a persisted session→account binding (automatic stickiness across
 		// turns); only honor it when the bound account is still a live candidate

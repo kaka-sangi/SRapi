@@ -110,6 +110,34 @@ func TestBindRejectsInvalidInput(t *testing.T) {
 	}
 }
 
+func TestAccountSessionCount(t *testing.T) {
+	store := New()
+	now := time.Unix(2_000_000, 0).UTC()
+	store.now = func() time.Time { return now }
+	ctx := context.Background()
+
+	// One conversation re-recorded never double-counts.
+	_ = store.AddAccountSession(ctx, 7, "sessA", time.Hour)
+	_ = store.AddAccountSession(ctx, 7, "sessA", time.Hour)
+	if n, _ := store.CountAccountSessionsExcluding(ctx, 7, "other"); n != 1 {
+		t.Fatalf("expected 1 distinct session, got %d", n)
+	}
+	// Distinct conversations count separately.
+	_ = store.AddAccountSession(ctx, 7, "sessB", time.Hour)
+	if n, _ := store.CountAccountSessionsExcluding(ctx, 7, "other"); n != 2 {
+		t.Fatalf("expected 2 distinct sessions, got %d", n)
+	}
+	// Excluding a conversation already on the account drops it from the count.
+	if n, _ := store.CountAccountSessionsExcluding(ctx, 7, "sessA"); n != 1 {
+		t.Fatalf("expected 1 when excluding sessA, got %d", n)
+	}
+	// Expiry drops sessions from the count.
+	now = now.Add(2 * time.Hour)
+	if n, _ := store.CountAccountSessionsExcluding(ctx, 7, "other"); n != 0 {
+		t.Fatalf("expected 0 after expiry, got %d", n)
+	}
+}
+
 func TestCandidateKeysOrdering(t *testing.T) {
 	got := contract.CandidateKeys("dc:s-u1-a1-u2")
 	want := []string{"dc:s-u1-a1-u2", "dc:s-u1-a1", "dc:s-u1", "dc:s"}

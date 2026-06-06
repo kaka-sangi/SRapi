@@ -92,3 +92,54 @@ func (s *Store) Release(ctx context.Context, scope, sessionKey string) error {
 	}
 	return s.client.Del(ctx, redisKey(scope, sessionKey)).Err()
 }
+
+const accountSessionsKeyPrefix = "sticky_account_sessions:"
+
+func accountSessionsKey(accountID int) string {
+	return accountSessionsKeyPrefix + strconv.Itoa(accountID)
+}
+
+// AddAccountSession records sessionID as active on accountID (ZSET scored by
+// expiry; re-adding refreshes the score so one conversation never double-counts).
+func (s *Store) AddAccountSession(ctx context.Context, accountID int, sessionID string, ttl time.Duration) error {
+	sessionID = strings.TrimSpace(sessionID)
+	if accountID <= 0 || sessionID == "" {
+		return contract.ErrInvalidInput
+	}
+	if ttl <= 0 {
+		ttl = time.Hour
+	}
+	key := accountSessionsKey(accountID)
+	nowMs := time.Now().UnixMilli()
+	pipe := s.client.Pipeline()
+	pipe.ZRemRangeByScore(ctx, key, "-inf", strconv.FormatInt(nowMs, 10))
+	pipe.ZAdd(ctx, key, redis.Z{Score: float64(nowMs + ttl.Milliseconds()), Member: sessionID})
+	pipe.PExpire(ctx, key, ttl)
+	_, err := pipe.Exec(ctx)
+	return err
+}
+
+// CountAccountSessionsExcluding counts live sessions on accountID other than
+// sessionID.
+func (s *Store) CountAccountSessionsExcluding(ctx context.Context, accountID int, sessionID string) (int, error) {
+	key := accountSessionsKey(accountID)
+	if err := s.client.ZRemRangeByScore(ctx, key, "-inf", strconv.FormatInt(time.Now().UnixMilli(), 10)).Err(); err != nil {
+		return 0, err
+	}
+	total, err := s.client.ZCard(ctx, key).Result()
+	if err != nil {
+		return 0, err
+	}
+	count := int(total)
+	if sessionID = strings.TrimSpace(sessionID); sessionID != "" {
+		if _, err := s.client.ZScore(ctx, key, sessionID).Result(); err == nil {
+			count-- // exclude the current conversation's own slot
+		} else if !errors.Is(err, redis.Nil) {
+			return 0, err
+		}
+	}
+	if count < 0 {
+		count = 0
+	}
+	return count, nil
+}

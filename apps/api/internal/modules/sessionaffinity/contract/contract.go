@@ -58,6 +58,15 @@ type Store interface {
 	// Release removes the binding for sessionKey within scope. Best-effort: a
 	// missing binding is not an error.
 	Release(ctx context.Context, scope, sessionKey string) error
+	// AddAccountSession records that a conversation (sessionID) is active on an
+	// account, with the given TTL, so the number of distinct conversations an
+	// account serves can be capped. Re-recording the same sessionID just refreshes
+	// it (one conversation never counts twice).
+	AddAccountSession(ctx context.Context, accountID int, sessionID string, ttl time.Duration) error
+	// CountAccountSessionsExcluding returns how many distinct active sessions are
+	// on accountID other than sessionID (so an existing conversation does not
+	// count against its own re-use). Expired sessions are excluded.
+	CountAccountSessionsExcluding(ctx context.Context, accountID int, sessionID string) (int, error)
 }
 
 // CandidateKeys returns the lookup keys for sessionKey ordered from most to
