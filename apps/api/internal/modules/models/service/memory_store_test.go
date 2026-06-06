@@ -95,6 +95,32 @@ func (s *memoryStore) FindByCanonicalName(_ context.Context, canonicalName strin
 	return s.byID[id], nil
 }
 
+func (s *memoryStore) Delete(_ context.Context, id int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	model, ok := s.byID[id]
+	if !ok {
+		return errors.New("model not found")
+	}
+	for _, aliasID := range s.aliasIDsByModel[id] {
+		if alias, ok := s.aliasesByID[aliasID]; ok {
+			delete(s.aliasByName, strings.ToLower(strings.TrimSpace(alias.Alias)))
+			delete(s.aliasesByID, aliasID)
+		}
+	}
+	delete(s.aliasIDsByModel, id)
+	for _, mappingID := range s.mappingIDsByModel[id] {
+		if mapping, ok := s.mappingsByID[mappingID]; ok {
+			delete(s.mappingByKey, mappingKey(mapping.ModelID, mapping.ProviderID, mapping.UpstreamModelName))
+			delete(s.mappingsByID, mappingID)
+		}
+	}
+	delete(s.mappingIDsByModel, id)
+	delete(s.byCanonicalName, strings.ToLower(strings.TrimSpace(model.CanonicalName)))
+	delete(s.byID, id)
+	return nil
+}
+
 func (s *memoryStore) FindByAlias(_ context.Context, alias string) (contract.ModelAlias, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

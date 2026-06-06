@@ -8645,6 +8645,45 @@ export type CreateAdminModelResponses = {
 
 export type CreateAdminModelResponse = CreateAdminModelResponses[keyof CreateAdminModelResponses];
 
+export type DeleteAdminModelData = {
+    body?: never;
+    path: {
+        id: Id;
+    };
+    query?: never;
+    url: '/api/v1/admin/models/{id}';
+};
+
+export type DeleteAdminModelErrors = {
+    /**
+     * Authentication is missing or invalid.
+     */
+    401: ErrorResponse;
+    /**
+     * The caller is not allowed to access the resource.
+     */
+    403: ErrorResponse;
+    /**
+     * Resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * Standard SRapi error.
+     */
+    default: ErrorResponse;
+};
+
+export type DeleteAdminModelError = DeleteAdminModelErrors[keyof DeleteAdminModelErrors];
+
+export type DeleteAdminModelResponses = {
+    /**
+     * Model deleted.
+     */
+    200: DeleteResponse;
+};
+
+export type DeleteAdminModelResponse = DeleteAdminModelResponses[keyof DeleteAdminModelResponses];
+
 export type UpdateAdminModelData = {
     body: UpdateModelRequest;
     path: {

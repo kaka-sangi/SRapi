@@ -139,6 +139,7 @@ import {
   createAdminModelAlias,
   createAdminModelMapping,
   updateAdminModel,
+  deleteAdminModel,
   listAdminOpsAlertEvents,
   listAdminOpsAlerts,
   listAdminOpsRealtimeSlots,
@@ -588,6 +589,10 @@ export const adminApi = {
 
   updateModel(id: Id, body: Parameters<typeof updateAdminModel>[0]["body"]): Promise<Model> {
     return unwrapData(() => updateAdminModel({ path: { id }, body, throwOnError: true }));
+  },
+
+  deleteModel(id: Id): Promise<{ deleted: boolean }> {
+    return unwrapData(() => deleteAdminModel({ path: { id }, throwOnError: true }));
   },
   createModelAlias(
     id: Id,

@@ -704,6 +704,8 @@ export const zh: Messages = {
     fallbackModels: "回退模型",
     fallbackModelsHint: "每行一个标准模型名；该模型不可用时按序回退。",
     addMapping: "添加跨厂商映射",
+    deleteTitle: "删除此模型？",
+    deleteBody: "模型及其别名、跨厂商映射都会被移除，之后将无法再被请求。历史用量记录保留。此操作不可撤销。",
     mappingTitle: "新建跨厂商映射",
     mappingProvider: "供应商",
     upstreamModelName: "上游模型名",

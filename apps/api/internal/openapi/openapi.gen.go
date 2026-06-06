@@ -16370,6 +16370,9 @@ type ServerInterface interface {
 	// Create a model registry entry.
 	// (POST /api/v1/admin/models)
 	CreateAdminModel(w http.ResponseWriter, r *http.Request)
+	// Delete a model (cascades its aliases and provider mappings).
+	// (DELETE /api/v1/admin/models/{id})
+	DeleteAdminModel(w http.ResponseWriter, r *http.Request, id Id)
 	// Update a model registry entry.
 	// (PATCH /api/v1/admin/models/{id})
 	UpdateAdminModel(w http.ResponseWriter, r *http.Request, id Id)
@@ -20404,6 +20407,40 @@ func (siw *ServerInterfaceWrapper) CreateAdminModel(w http.ResponseWriter, r *ht
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateAdminModel(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteAdminModel operation middleware
+func (siw *ServerInterfaceWrapper) DeleteAdminModel(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, CsrfHeaderScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteAdminModel(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -28417,6 +28454,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/model-rate-limits/{modelId}", wrapper.DeleteAdminModelRateLimit)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/admin/models", wrapper.ListAdminModels)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/models", wrapper.CreateAdminModel)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/admin/models/{id}", wrapper.DeleteAdminModel)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/admin/models/{id}", wrapper.UpdateAdminModel)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/models/{id}/aliases", wrapper.CreateAdminModelAlias)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/admin/models/{id}/mappings", wrapper.CreateAdminModelMapping)

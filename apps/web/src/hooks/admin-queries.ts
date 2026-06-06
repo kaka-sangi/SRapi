@@ -798,6 +798,9 @@ export function useUpdateModel() {
     ["admin", "models"],
   );
 }
+export function useDeleteModel() {
+  return useAdminMutation((id: string) => adminApi.deleteModel(id), ["admin", "models"]);
+}
 export function useCreateModelAlias() {
   return useAdminMutation(
     (vars: { id: string; body: B<typeof adminApi.createModelAlias> }) =>

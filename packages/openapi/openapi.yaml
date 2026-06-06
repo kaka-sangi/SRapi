@@ -3269,6 +3269,41 @@ paths:
           $ref: "#/components/responses/NotFound"
         default:
           $ref: "#/components/responses/StandardError"
+    delete:
+      tags:
+        - AdminModels
+      operationId: deleteAdminModel
+      summary: Delete a model (cascades its aliases and provider mappings).
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      x-srapi-rbac:
+        owner: write
+        admin: write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Model deleted.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/StandardError"
 
   /api/v1/admin/models/{id}/aliases:
     post:

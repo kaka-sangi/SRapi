@@ -85,6 +85,16 @@ func (s *Service) FindByID(ctx context.Context, id int) (contract.Model, error) 
 	return s.store.FindByID(ctx, id)
 }
 
+func (s *Service) Delete(ctx context.Context, id int) error {
+	if id <= 0 {
+		return ErrInvalidInput
+	}
+	if _, err := s.store.FindByID(ctx, id); err != nil {
+		return ErrModelNotFound
+	}
+	return s.store.Delete(ctx, id)
+}
+
 func (s *Service) Update(ctx context.Context, id int, req contract.UpdateRequest) (contract.Model, error) {
 	if id <= 0 {
 		return contract.Model{}, ErrInvalidInput

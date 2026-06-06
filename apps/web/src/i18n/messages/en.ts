@@ -707,6 +707,8 @@ export const en = {
     fallbackModels: "Fallback models",
     fallbackModelsHint: "One canonical model name per line; tried in order when this model is unavailable.",
     addMapping: "Add provider mapping",
+    deleteTitle: "Delete this model?",
+    deleteBody: "The model and its aliases and provider mappings are removed, so it can no longer be requested. Past usage records are kept. This cannot be undone.",
     mappingTitle: "New provider mapping",
     mappingProvider: "Provider",
     upstreamModelName: "Upstream model name",

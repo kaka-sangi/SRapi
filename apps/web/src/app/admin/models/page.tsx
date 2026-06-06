@@ -6,6 +6,7 @@ import { AdminShell } from "@/components/layout/admin-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { AdminListView, ListCount, type Column } from "@/components/admin/admin-list-view";
 import { RowActionsMenu } from "@/components/admin/row-actions";
+import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { ListToolbar, FilterSelect, SearchInput } from "@/components/admin/list-toolbar";
 import { useAdminList } from "@/hooks/use-admin-list";
 import {
@@ -18,6 +19,7 @@ import {
   useAdminProviders,
   useCreateModel,
   useUpdateModel,
+  useDeleteModel,
   useCreateModelAlias,
   useCreateModelMapping,
   useModelRateLimits,
@@ -72,6 +74,7 @@ function ModelsContent() {
   const deleteRl = useDeleteModelRateLimit();
   const aliasMut = useCreateModelAlias();
   const mappingMut = useCreateModelMapping();
+  const deleteMut = useDeleteModel();
   // Provider picker for the mapping dialog (the registry is small; 200 covers it).
   const providers = useAdminProviders({ page: 1, page_size: 200 });
   const providerOptions = (providers.data?.data ?? []).map((p) => ({
@@ -84,6 +87,7 @@ function ModelsContent() {
   const [rateLimitTarget, setRateLimitTarget] = useState<Model | null>(null);
   const [aliasTarget, setAliasTarget] = useState<Model | null>(null);
   const [mappingTarget, setMappingTarget] = useState<Model | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Model | null>(null);
   const rateLimitByModel = new Map<number, ModelRateLimit>(
     (rateLimits.data?.data ?? []).map((rl) => [rl.model_id, rl]),
   );
@@ -289,9 +293,25 @@ function ModelsContent() {
               { label: t("adminRateLimit.action"), onSelect: () => setRateLimitTarget(m) },
               { label: t("adminModels.addAlias"), onSelect: () => setAliasTarget(m) },
               { label: t("adminModels.addMapping"), onSelect: () => setMappingTarget(m) },
+              { label: t("common.delete"), destructive: true, onSelect: () => setDeleteTarget(m) },
             ]}
           />
         )}
+      />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        title={t("adminModels.deleteTitle")}
+        body={t("adminModels.deleteBody")}
+        confirmLabel={t("common.delete")}
+        successMessage={t("feedback.deleted")}
+        isPending={deleteMut.isPending}
+        onConfirm={async () => {
+          if (deleteTarget) await deleteMut.mutateAsync(deleteTarget.id);
+        }}
       />
 
       {formTarget === "new" ? (

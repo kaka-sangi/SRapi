@@ -135,4 +135,7 @@ type Store interface {
 	CreateMapping(ctx context.Context, input CreateStoredMapping) (ModelProviderMapping, error)
 	ListMappingsByModel(ctx context.Context, modelID int) ([]ModelProviderMapping, error)
 	List(ctx context.Context) ([]Model, error)
+	// Delete removes a model and cascades its aliases and provider mappings so a
+	// removed model can't still be resolved via a lingering alias/mapping.
+	Delete(ctx context.Context, id int) error
 }

@@ -80,6 +80,28 @@ func (s *Store) Update(ctx context.Context, model contract.Model) (contract.Mode
 	return toModel(updated), nil
 }
 
+func (s *Store) Delete(ctx context.Context, id int) error {
+	if id <= 0 {
+		return ErrInvalidStore
+	}
+	// Remove routing sub-resources first so a tombstoned model can never be
+	// resolved through a lingering alias/mapping, then soft-delete the model row
+	// (all queries filter DeletedAtIsNil) to keep historical usage references.
+	if _, err := s.client.ModelAlias.Delete().Where(entmodelalias.ModelIDEQ(id)).Exec(ctx); err != nil {
+		return err
+	}
+	if _, err := s.client.ModelProviderMapping.Delete().Where(entmodelmapping.ModelIDEQ(id)).Exec(ctx); err != nil {
+		return err
+	}
+	if _, err := s.client.ModelRegistry.Update().
+		Where(entmodel.IDEQ(id), entmodel.DeletedAtIsNil()).
+		SetDeletedAt(time.Now().UTC()).
+		Save(ctx); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *Store) FindByID(ctx context.Context, id int) (contract.Model, error) {
 	found, err := s.client.ModelRegistry.Query().
 		Where(entmodel.IDEQ(id), entmodel.DeletedAtIsNil()).

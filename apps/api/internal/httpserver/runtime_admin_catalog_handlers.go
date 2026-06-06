@@ -551,6 +551,45 @@ func (s *Server) handleUpdateAdminModel(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
+func (s *Server) handleDeleteAdminModel(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromContext(r.Context())
+	session, err := s.requireAdminSession(r)
+	if err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "admin access required", requestID)
+		return
+	}
+	if err := validateCSRF(session.Session, r.Header.Get(csrfHeaderName)); err != nil {
+		writeStandardError(w, http.StatusForbidden, apiopenapi.FORBIDDEN, "invalid csrf token", requestID)
+		return
+	}
+	modelID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || modelID <= 0 {
+		writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid model id", requestID)
+		return
+	}
+	before, err := s.runtime.models.FindByID(r.Context(), modelID)
+	if err != nil {
+		writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "model not found", requestID)
+		return
+	}
+	if err := s.runtime.models.Delete(r.Context(), modelID); err != nil {
+		switch {
+		case errors.Is(err, modelservice.ErrModelNotFound):
+			writeStandardError(w, http.StatusNotFound, apiopenapi.RESOURCENOTFOUND, "model not found", requestID)
+		case errors.Is(err, modelservice.ErrInvalidInput):
+			writeStandardError(w, http.StatusBadRequest, apiopenapi.INVALIDREQUEST, "invalid model id", requestID)
+		default:
+			writeStandardError(w, http.StatusInternalServerError, apiopenapi.INTERNALERROR, "failed to delete model", requestID)
+		}
+		return
+	}
+	s.runtime.recordAudit(r.Context(), auditRecordFromRequest(r, session.User.ID, "model.delete", "model", strconv.Itoa(modelID), modelAuditSnapshot(before), nil))
+	writeJSONAny(w, http.StatusOK, map[string]any{
+		"data":       map[string]any{"id": modelID, "deleted": true},
+		"request_id": requestID,
+	})
+}
+
 func (s *Server) handleCreateAdminModelAlias(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromContext(r.Context())
 	session, err := s.requireAdminSession(r)
